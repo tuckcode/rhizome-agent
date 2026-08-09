@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { CaretRight, CaretDown, Brain, ArrowsClockwise, Copy, GitBranch, Terminal } from '@phosphor-icons/react'
+import { CaretRight, CaretDown, Brain, ArrowsClockwise, Copy, FloppyDisk, GitBranch, Terminal } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { AiActionCard, type AiActionStatus } from './AiActionCard'
 import { MarkdownContent } from './MarkdownContent'
@@ -33,6 +33,7 @@ export interface AiMessageProps {
   onOpenNote?: (path: string) => void
   onNavigateWikilink?: (target: string) => void
   onRegenerate?: (messageId: string) => void
+  onPromoteToVault?: (text: string) => void
 }
 
 function LocalMarker({ text }: { text: string }) {
@@ -238,16 +239,21 @@ function ResponseActions({
   messageId,
   onCopy,
   onFork,
+  onPromoteToVault,
   onRegenerate,
+  promoteDisabled = false,
 }: {
   locale: AppLocale
   messageId?: string
   onCopy: () => void
   onFork?: (messageId: string) => void
+  onPromoteToVault?: () => void
   onRegenerate?: (messageId: string) => void
+  promoteDisabled?: boolean
 }) {
   const regenerateDisabled = !messageId || !onRegenerate
   const forkDisabled = !messageId || !onFork
+  const saveDisabled = promoteDisabled || !onPromoteToVault
 
   return (
     <div
@@ -284,6 +290,19 @@ function ResponseActions({
         variant="ghost"
         size="icon-xs"
         className="h-6 w-6 rounded-md p-0 text-muted-foreground hover:text-foreground"
+        disabled={saveDisabled}
+        aria-label={translate(locale, 'ai.message.saveToVault')}
+        title={translate(locale, 'ai.message.saveToVault')}
+        onClick={() => onPromoteToVault?.()}
+        data-testid="ai-message-save-to-vault"
+      >
+        <FloppyDisk size={14} />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        className="h-6 w-6 rounded-md p-0 text-muted-foreground hover:text-foreground"
         disabled={forkDisabled}
         aria-label={translate(locale, 'ai.message.fork')}
         title={translate(locale, 'ai.message.fork')}
@@ -301,6 +320,7 @@ function ResponseBlock({
   messageId,
   onFork,
   onNavigateWikilink,
+  onPromoteToVault,
   onRegenerate,
   text,
 }: {
@@ -308,6 +328,7 @@ function ResponseBlock({
   messageId?: string
   onFork?: (messageId: string) => void
   onNavigateWikilink?: (target: string) => void
+  onPromoteToVault?: (text: string) => void
   onRegenerate?: (messageId: string) => void
   text: string
 }) {
@@ -316,6 +337,9 @@ function ResponseBlock({
       console.warn('[ai] Failed to copy assistant message:', error)
     })
   }, [text])
+  const handlePromote = useCallback(() => {
+    onPromoteToVault?.(text)
+  }, [onPromoteToVault, text])
 
   return (
     <div
@@ -329,7 +353,9 @@ function ResponseBlock({
         messageId={messageId}
         onCopy={handleCopy}
         onFork={onFork}
+        onPromoteToVault={onPromoteToVault ? handlePromote : undefined}
         onRegenerate={onRegenerate}
+        promoteDisabled={!text.trim()}
       />
     </div>
   )
@@ -355,7 +381,7 @@ export function AiMessage(props: AiMessageProps) {
   return <ConversationMessage {...props} />
 }
 
-function ConversationMessage({ userMessage, references, locale = 'en', messageId, reasoning, reasoningDone, actions, response, isStreaming, onFork, onOpenNote, onNavigateWikilink, onRegenerate }: AiMessageProps) {
+function ConversationMessage({ userMessage, references, locale = 'en', messageId, reasoning, reasoningDone, actions, response, isStreaming, onFork, onOpenNote, onNavigateWikilink, onPromoteToVault, onRegenerate }: AiMessageProps) {
   // Manual override: null = follow auto behavior, true/false = user forced
   const [userOverride, setUserOverride] = useState(false)
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())
@@ -404,6 +430,7 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
           text={response}
           onFork={onFork}
           onNavigateWikilink={onNavigateWikilink}
+          onPromoteToVault={onPromoteToVault}
           onRegenerate={onRegenerate}
         />
       )}

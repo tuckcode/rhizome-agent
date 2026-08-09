@@ -95,6 +95,7 @@ interface AiWorkspaceProps {
   onFileModified?: (relativePath: string) => void
   onOpenAiSettings?: () => void
   onOpenNote?: (path: string) => void
+  onPromoteToVault?: (text: string) => void
   onPopOut?: (context?: { activeConversationId?: string }) => void
   onRestoreVaultAiGuidance?: () => void
   onUnsupportedAiPaste?: (message: string) => void
@@ -317,6 +318,7 @@ type ConversationSessionProps = {
   onMessageHistoryScrollStateChange?: (scrolled: boolean) => void
   onOpenAiSettings?: () => void
   onOpenNote?: (path: string) => void
+  onPromoteToVault?: (text: string) => void
   onPopOut?: () => void
   onRestoreVaultAiGuidance?: () => void
   onSelectTarget: (targetId: string) => void
@@ -543,6 +545,7 @@ function ConversationSession({
   onMessageHistoryScrollStateChange,
   onOpenAiSettings,
   onOpenNote,
+  onPromoteToVault,
   onPopOut,
   onRestoreVaultAiGuidance,
   onSelectTarget,
@@ -646,6 +649,7 @@ function ConversationSession({
           onForkMessage={onForkMessage}
           onMessageHistoryScrollStateChange={active ? onMessageHistoryScrollStateChange : undefined}
           onOpenNote={onOpenNote}
+          onPromoteToVault={onPromoteToVault}
           onSendPrompt={() => onPromptSubmitted(conversation.id)}
           onQueuedPromptTarget={onSelectTarget}
           onUnsupportedAiPaste={onUnsupportedAiPaste}
@@ -1028,6 +1032,7 @@ function ConversationSessions({
             onMessageHistoryScrollStateChange={onMessageHistoryScrollStateChange}
             onOpenAiSettings={workspace.onOpenAiSettings}
             onOpenNote={workspace.onOpenNote}
+            onPromoteToVault={workspace.onPromoteToVault}
             onPopOut={workspace.onPopOut}
             onRestoreVaultAiGuidance={workspace.onRestoreVaultAiGuidance}
             onSelectTarget={(targetId) => model.setConversationTarget(conversation.id, targetId)}

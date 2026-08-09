@@ -49,6 +49,7 @@ describe('AiMessage', () => {
     expect(screen.getByTestId('ai-message-actions')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Regenerate response' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Copy response' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Save to vault' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Fork chat from here' })).toBeTruthy()
   })
 
@@ -148,6 +149,7 @@ describe('AiMessage', () => {
   it('runs assistant message actions', () => {
     const onRegenerate = vi.fn()
     const onFork = vi.fn()
+    const onPromoteToVault = vi.fn()
     render(
       <AiMessage
         userMessage="Ask"
@@ -155,17 +157,25 @@ describe('AiMessage', () => {
         messageId="message-1"
         response="Done"
         onFork={onFork}
+        onPromoteToVault={onPromoteToVault}
         onRegenerate={onRegenerate}
       />,
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Regenerate response' }))
     fireEvent.click(screen.getByRole('button', { name: 'Copy response' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save to vault' }))
     fireEvent.click(screen.getByRole('button', { name: 'Fork chat from here' }))
 
     expect(onRegenerate).toHaveBeenCalledWith('message-1')
     expect(writeClipboardText).toHaveBeenCalledWith('Done')
+    expect(onPromoteToVault).toHaveBeenCalledWith('Done')
     expect(onFork).toHaveBeenCalledWith('message-1')
+  })
+
+  it('disables save to vault when no promote handler is provided', () => {
+    render(<AiMessage userMessage="Ask" actions={[]} response="Done" />)
+    expect(screen.getByTestId('ai-message-save-to-vault')).toBeDisabled()
   })
 
   it('does not render reasoning block when no reasoning', () => {

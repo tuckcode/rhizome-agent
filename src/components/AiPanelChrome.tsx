@@ -49,6 +49,7 @@ interface AiPanelMessageHistoryProps {
   onOpenNote?: (path: string) => void
   onNavigateWikilink?: (target: string) => void
   onRegenerateMessage?: (messageId: string) => void
+  onPromoteToVault?: (text: string) => void
   onScrollStateChange?: (scrolled: boolean) => void
   hasContext: boolean
 }
@@ -485,6 +486,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
   onOpenNote,
   onNavigateWikilink,
   onRegenerateMessage,
+  onPromoteToVault,
   onScrollStateChange,
   hasContext,
 }: AiPanelMessageHistoryProps) {
@@ -524,6 +526,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
           onOpenNote={onOpenNote}
           onNavigateWikilink={onNavigateWikilink}
           onRegenerate={onRegenerateMessage}
+          onPromoteToVault={onPromoteToVault}
         />
       ))}
       <div ref={endRef} />
