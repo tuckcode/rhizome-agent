@@ -90,13 +90,22 @@ function primeVaultSkillInstructions(agent?: AiAgentId, vaultPaths?: string[]): 
   if (agent !== 'prime') return ''
   const roots = (vaultPaths ?? []).map((path) => path.trim()).filter(Boolean)
   if (roots.length === 0) {
-    return 'Prime vault tools: no vault is attached. Chat freely; do not claim you can search or open vault notes until a vault is open.'
+    return [
+      'Prime vault tools: no Rhizome vault is attached.',
+      'Chat freely, but do not invent vault search results.',
+      'Do not browse the user personal Obsidian vault (for example Documents/Obsidian Vault) unless they explicitly ask for that path.',
+    ].join(' ')
   }
+  const rootsList = roots.map((path) => `- ${path}`).join('\n')
   return [
-    'Prime vault tools: a project skill named rhizome-vault is seeded under the vault .prime/agent/skills/ directory.',
-    'Use it (VAULT_PATH + node cli-call.mjs as documented in the skill) for search_notes, get_note, and get_vault_context when the user asks about vault content.',
-    'Prefer vault tools over guessing. Save durable knowledge with create_note only when the user wants a lasting note (or Power mode allows writes).',
-  ].join(' ')
+    'Prime vault tools (Rhizome product memory):',
+    `Active Rhizome vault root(s):\n${rootsList}`,
+    'A project skill named rhizome-vault is seeded under the vault .prime/agent/skills/ directory.',
+    'For vault search/read, prefer that skill CLI (VAULT_PATH + node .../cli-call.mjs search_notes|get_note|get_vault_context) over ad-hoc Python filesystem walks.',
+    'Do not treat the personal Obsidian vault (Claude Memory, Session Logs under Documents/Obsidian Vault) as the Rhizome wiki unless the user explicitly asks about that path.',
+    'Do not save error strings, OAuth failures, or tooling glitches as vault notes.',
+    'Save durable knowledge with create_note only when the user wants a lasting note (or Power mode allows writes).',
+  ].join('\n')
 }
 
 export function buildAgentSystemPrompt(options?: string | AgentSystemPromptOptions): string {

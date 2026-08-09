@@ -12,6 +12,24 @@ export function isSessionAutoDistillEnabled(
   return value !== false
 }
 
+/** True when the assistant payload is a transport/auth failure, not knowledge. */
+export function isTransientAgentFailureText(text: string): boolean {
+  const t = text.trim()
+  if (!t) return true
+  if (/^Error:/iu.test(t)) return true
+  if (/finished without returning a reply/iu.test(t)) return true
+  // Provider / OAuth / RPC host failures (must not become wiki "concepts")
+  if (/OAuth session expired/iu.test(t)) return true
+  if (/Failed to authenticate/iu.test(t)) return true
+  if (/could not be refreshed/iu.test(t)) return true
+  if (/invalid args request for command/iu.test(t)) return true
+  if (/missing field vaultPath/iu.test(t)) return true
+  if (/prime.?agent is not available/iu.test(t)) return true
+  if (/not authenticated/iu.test(t) && t.length < 400) return true
+  if (/^Request was aborted/iu.test(t)) return true
+  return false
+}
+
 /** Build distill input from one chat turn. Null = skip (too short / empty). */
 export function buildSessionAutoDistillText(
   userMessage: string,
@@ -20,8 +38,7 @@ export function buildSessionAutoDistillText(
   const user = userMessage.trim()
   const assistant = assistantResponse.trim()
   if (!assistant || assistant.length < MIN_ASSISTANT_CHARS) return null
-  if (/^Error:/iu.test(assistant)) return null
-  if (/finished without returning a reply/iu.test(assistant)) return null
+  if (isTransientAgentFailureText(assistant)) return null
 
   const parts = [
     'Extract durable knowledge worth saving to the wiki from this conversation turn.',

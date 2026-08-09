@@ -25,6 +25,18 @@ describe('sessionAutoDistill', () => {
     ).toBeNull()
   })
 
+  it('skips OAuth and RPC host failure text so they never become wiki concepts', () => {
+    const oauth =
+      'Failed to authenticate: OAuth session expired and could not be refreshed'
+    expect(buildSessionAutoDistillText('hi', oauth)).toBeNull()
+    expect(
+      buildSessionAutoDistillText(
+        'hi',
+        'Error: invalid args request for command stream_prime_session: missing field vaultPath',
+      ),
+    ).toBeNull()
+  })
+
   it('builds a turn payload when the assistant reply is substantial', () => {
     const assistant = 'A'.repeat(100)
     const text = buildSessionAutoDistillText('Remember: deploy Fridays only', assistant)
