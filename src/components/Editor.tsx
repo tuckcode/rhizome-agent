@@ -105,6 +105,7 @@ interface EditorProps {
   onToggleOrganized?: (path: string) => void
   onEnterNeighborhood?: (entry: VaultEntry) => void
   onRevealFile?: (path: string) => void
+  onReloadVault?: () => void
   onCopyFilePath?: (path: string) => void
   onCopyDeepLink?: (entry: VaultEntry) => void
   onCopyGitUrl?: (entry: VaultEntry) => void
@@ -418,6 +419,7 @@ function EditorLayout({
   onToggleOrganized,
   onEnterNeighborhood,
   onRevealFile,
+  onReloadVault,
   onCopyFilePath,
   onCopyDeepLink,
   onCopyGitUrl,
@@ -495,6 +497,7 @@ function EditorLayout({
   onToggleOrganized?: (path: string) => void
   onEnterNeighborhood?: (entry: VaultEntry) => void
   onRevealFile?: (path: string) => void
+  onReloadVault?: () => void
   onCopyFilePath?: (path: string) => void
   onCopyDeepLink?: (entry: VaultEntry) => void
   onCopyGitUrl?: (entry: VaultEntry) => void
@@ -591,6 +594,7 @@ function EditorLayout({
               onToggleOrganized={onToggleOrganized}
               onEnterNeighborhood={onEnterNeighborhood}
               onRevealFile={onRevealFile}
+              onReloadVault={onReloadVault}
               onCopyFilePath={onCopyFilePath}
               onCopyDeepLink={onCopyDeepLink}
               onCopyGitUrl={onCopyGitUrl}

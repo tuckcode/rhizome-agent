@@ -31,6 +31,7 @@ interface ViewCommandsConfig {
   onSetDefaultNoteWidth?: (mode: NoteWidthMode) => void
   onToggleAIChat?: () => void
   onToggleTableOfContents?: () => void
+  onKeyboardShortcuts?: () => void
   zoomLevel: number
   onZoomIn: () => void
   onZoomOut: () => void
@@ -127,7 +128,7 @@ export function buildViewCommands(config: ViewCommandsConfig): CommandAction[] {
     hasActiveNote, activeNoteModified,
     onSetViewMode, onToggleInspector, onToggleDiff, onToggleRawEditor,
     noteWidth = DEFAULT_NOTE_WIDTH_MODE, defaultNoteWidth = DEFAULT_NOTE_WIDTH_MODE,
-    onSetNoteWidth, onSetDefaultNoteWidth, onToggleAIChat, onToggleTableOfContents,
+    onSetNoteWidth, onSetDefaultNoteWidth, onToggleAIChat, onToggleTableOfContents, onKeyboardShortcuts,
     zoomLevel, onZoomIn, onZoomOut, onZoomReset,
     onCustomizeNoteListColumns, canCustomizeNoteListColumns, noteListColumnsLabel,
     selectedViewName, onMoveSelectedViewUp, onMoveSelectedViewDown,
@@ -153,6 +154,7 @@ export function buildViewCommands(config: ViewCommandsConfig): CommandAction[] {
     buildMoveSavedViewCommand('Up', selectedViewName, onMoveSelectedViewUp, canMoveSelectedViewUp),
     buildMoveSavedViewCommand('Down', selectedViewName, onMoveSelectedViewDown, canMoveSelectedViewDown),
     { id: 'customize-note-list-columns', label: noteListColumnsLabel, group: 'View', keywords: ['all notes', 'inbox', 'columns', 'chips', 'properties', 'note list'], enabled: !!(canCustomizeNoteListColumns && onCustomizeNoteListColumns), execute: () => onCustomizeNoteListColumns?.() },
+    { id: 'view-keyboard-shortcuts', label: 'Keyboard Shortcuts', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewKeyboardShortcuts), keywords: ['keyboard', 'shortcuts', 'hotkeys', 'keys', 'cheatsheet', 'help'], enabled: !!onKeyboardShortcuts, execute: () => onKeyboardShortcuts?.() },
     { id: 'zoom-in', label: `Zoom In (${zoomLevel}%)`, group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewZoomIn), keywords: ['zoom', 'bigger', 'larger', 'scale'], enabled: zoomLevel < 150, execute: onZoomIn },
     { id: 'zoom-out', label: `Zoom Out (${zoomLevel}%)`, group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewZoomOut), keywords: ['zoom', 'smaller', 'scale'], enabled: zoomLevel > 80, execute: onZoomOut },
     { id: 'zoom-reset', label: 'Reset Zoom', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewZoomReset), keywords: ['zoom', 'actual', 'default', '100'], enabled: zoomLevel !== 100, execute: onZoomReset },
