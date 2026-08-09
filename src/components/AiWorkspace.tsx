@@ -247,7 +247,7 @@ function PermissionPicker({
   locale,
   permissionMode,
   side = 'bottom',
-  targetKind,
+  target,
   onChange,
 }: {
   compact?: boolean
@@ -255,10 +255,26 @@ function PermissionPicker({
   locale: AppLocale
   permissionMode: AiAgentPermissionMode
   side?: 'bottom' | 'top'
-  targetKind: AiTarget['kind']
+  target: AiTarget
   onChange: (mode: AiAgentPermissionMode) => void
 }) {
-  if (targetKind === 'api_model') {
+  // Prime product: no Safe/Power — default toolkit only (circle v0).
+  if (target.kind === 'agent' && target.agent === 'prime') {
+    return (
+      <Button
+        type="button"
+        variant={compact ? 'ghost' : 'outline'}
+        size={compact ? 'xs' : 'sm'}
+        disabled
+        className="rounded-full px-2 text-[12px] text-muted-foreground"
+        data-testid="ai-workspace-harness-chip"
+      >
+        {translate(locale, 'ai.panel.skills.withVault', { skills: 'rhizome-vault' })}
+      </Button>
+    )
+  }
+
+  if (target.kind === 'api_model') {
     return (
       <Button type="button" variant={compact ? 'ghost' : 'outline'} size={compact ? 'xs' : 'sm'} disabled className="rounded-full px-2 text-[12px] text-muted-foreground">
         {translate(locale, 'ai.panel.mode.chat')}
@@ -472,7 +488,7 @@ function ConversationComposerControls({
         locale={locale}
         permissionMode={permissionMode}
         side={side}
-        targetKind={target.kind}
+        target={target}
         onChange={onPermissionModeChange}
       />
       {onOpenAiSettings && (

@@ -17,6 +17,7 @@ import { PulseView } from './components/PulseView'
 import { StatusBar } from './components/StatusBar'
 // Lazy: keeps three.js/3d-force-graph out of the main bundle chunk.
 const GraphView = lazy(() => import('./components/graph/GraphView'))
+const MyceliumView = lazy(() => import('./components/MyceliumView'))
 import { AppAiWorkspaceSurface } from './components/AppAiWorkspaceSurface'
 import { buildPromoteNoteFromChat } from './utils/promoteChatToVault'
 import { AiWorkspaceFloatingButton } from './components/AiWorkspaceFloatingButton'
@@ -481,6 +482,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const commandRailEnabled = useFeatureFlag('shell_command_rail')
   const railActiveDestination = useMemo((): CommandRailDestination => {
     if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'graph') return 'graph'
+    if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'mycelium') return 'mycelium'
     if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'changes') return 'changes'
     if (showResearch) return 'research'
     return 'notes'
@@ -491,6 +493,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const handleRailSelectGraph = useCallback(() => {
     handleSetSelection(toggleGraphSelection(effectiveSelection, vaultConfig.inbox?.explicitOrganization))
   }, [handleSetSelection, effectiveSelection, vaultConfig.inbox?.explicitOrganization])
+  const handleRailSelectMycelium = useCallback(() => {
+    handleSetSelection({ kind: 'filter', filter: 'mycelium' })
+  }, [handleSetSelection])
   const handleRailSelectChanges = useCallback(() => {
     handleSetSelection({ kind: 'filter', filter: 'changes' })
   }, [handleSetSelection])
@@ -1730,6 +1735,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               activeDestination={railActiveDestination}
               onSelectNotes={handleRailSelectNotes}
               onSelectGraph={handleRailSelectGraph}
+              onSelectMycelium={handleRailSelectMycelium}
               onOpenResearch={() => setShowResearch(true)}
               onSelectChanges={handleRailSelectChanges}
               onOpenSettings={handleOpenSettings}
@@ -1743,7 +1749,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               <ResizeHandle onResize={layout.handleSidebarResize} />
             </>
           )}
-          {noteListVisible && !(effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'graph') && (
+          {noteListVisible && !(effectiveSelection.kind === 'filter' && (effectiveSelection.filter === 'graph' || effectiveSelection.filter === 'mycelium')) && (
             <>
               <div className={`app__note-list${aiActivity.highlightElement === 'notelist' ? ' ai-highlight' : ''}`} style={{ width: layout.noteListWidth }}>
                 {effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse' ? (
@@ -1764,6 +1770,13 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               <div className="relative flex flex-1 min-h-0">
                 <Suspense fallback={<div className="flex h-full flex-1 items-center justify-center text-sm text-muted-foreground" data-testid="graph-suspense">{translate(appLocale, 'graph.loading')}</div>}>
                   <GraphView vaultPath={resolvedPath} onOpenNote={handlePulseOpenNote} locale={appLocale} onExit={handleRailSelectGraph} />
+                </Suspense>
+                {effectiveShowAIChat && aiWorkspaceSurface}
+              </div>
+            ) : effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'mycelium' ? (
+              <div className="relative flex flex-1 min-h-0">
+                <Suspense fallback={<div className="flex h-full flex-1 items-center justify-center text-sm text-muted-foreground" data-testid="mycelium-suspense">{translate(appLocale, 'mycelium.title')}</div>}>
+                  <MyceliumView locale={appLocale} onExit={handleRailSelectNotes} />
                 </Suspense>
                 {effectiveShowAIChat && aiWorkspaceSurface}
               </div>

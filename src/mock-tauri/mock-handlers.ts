@@ -545,6 +545,10 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   prime_session_new_session: () => 'mock-session',
   abort_prime_session_turn: () => false,
   stream_prime_session: () => 'mock-session',
+  list_prime_sessions: () => [],
+  which_binary: ({ name }: { name: string }) => ({ found: name === 'mindwalk', path: name === 'mindwalk' ? '/usr/bin/mindwalk' : null }),
+  run_mindwalk_open: ({ path }: { path: string }) => path,
+  bridge_and_open_prime_session: ({ path }: { path: string }) => path,
   get_agent_docs_path: () => '/mock/Rhizome/resources/agent-docs',
   get_vault_ai_guidance_status: () => ({ ...mockVaultAiGuidanceStatus }),
   restore_vault_ai_guidance: () => {

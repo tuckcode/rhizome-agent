@@ -2,6 +2,24 @@
 
 Living doc. Update in place each session. This file is "what's true right now," not a history log. Detailed per-session records go in `docs/plans/*-session-status.md`.
 
+## Session handoff — 2026-08-09 (harness chrome + Mycelium M1)
+
+**Shipped**
+- Prime harness chrome: hide Safe/Power for Prime; skills chip (`rhizome-vault`); harness empty-state copy
+- Mycelium M1: `primeSessionToMindwalk` + Rust `bridge_and_open_prime_session` (ipython %%bash → bash); rail destination + `MyceliumView`; `mindwalk open` BYO
+- Prior: promote/save (`2381f68`), open-note tools (`e2cd77f`), Open Design brief (`ca708ef`)
+
+**Dogfood**
+- `pnpm tauri dev` → Prime header shows model + Skills, no Vault Safe
+- Rail → Mycelium → pick session → Open in Mindwalk (needs `mindwalk` on PATH)
+
+**Next**
+- UI-2 chat-primary layout spike (use Open Design brief)
+- Native dogfood promote/open
+- Close GH #1 after MCP dogfood note
+
+---
+
 ## Session handoff — 2026-08-09 (Phase 3 #2–#4 promote + open-note)
 
 **Shipped**

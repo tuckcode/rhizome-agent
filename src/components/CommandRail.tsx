@@ -1,17 +1,18 @@
-import { GearSix, GitBranch, ListBullets, MagnifyingGlass, ShareNetwork } from '@phosphor-icons/react'
+import { CirclesThree, GearSix, GitBranch, ListBullets, MagnifyingGlass, ShareNetwork } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { ActionTooltip } from './ui/action-tooltip'
 import { Button } from './ui/button'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { trackRailDestinationClicked } from '../lib/productAnalytics'
 
-export type CommandRailDestination = 'notes' | 'graph' | 'research' | 'changes'
+export type CommandRailDestination = 'notes' | 'graph' | 'mycelium' | 'research' | 'changes'
 
 interface CommandRailProps {
   locale: AppLocale
   activeDestination: CommandRailDestination
   onSelectNotes: () => void
   onSelectGraph: () => void
+  onSelectMycelium: () => void
   onOpenResearch: () => void
   onSelectChanges: () => void
   onOpenSettings: () => void
@@ -69,6 +70,7 @@ export function CommandRail({
   activeDestination,
   onSelectNotes,
   onSelectGraph,
+  onSelectMycelium,
   onOpenResearch,
   onSelectChanges,
   onOpenSettings,
@@ -106,6 +108,13 @@ export function CommandRail({
         label={t('rail.graph')}
         onClick={() => handleSelect('graph', onSelectGraph)}
         testId="command-rail-graph"
+      />
+      <RailButton
+        active={activeDestination === 'mycelium'}
+        icon={CirclesThree}
+        label={t('rail.mycelium')}
+        onClick={() => handleSelect('mycelium', onSelectMycelium)}
+        testId="command-rail-mycelium"
       />
       <RailButton
         active={activeDestination === 'research'}

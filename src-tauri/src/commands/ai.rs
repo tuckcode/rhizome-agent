@@ -567,3 +567,25 @@ mod tests {
         assert!(dir.path().join("GEMINI.md").exists());
     }
 }
+
+// --- Mycelium / Mindwalk ---
+
+#[tauri::command]
+pub fn list_prime_sessions() -> Result<Vec<crate::mycelium::PrimeSessionEntry>, String> {
+    crate::mycelium::list_prime_sessions()
+}
+
+#[tauri::command]
+pub fn which_binary(name: String) -> crate::mycelium::WhichBinaryResult {
+    crate::mycelium::which_binary(&name)
+}
+
+#[tauri::command]
+pub fn run_mindwalk_open(path: String) -> Result<String, String> {
+    crate::mycelium::run_mindwalk_open(&path)
+}
+
+#[tauri::command]
+pub fn bridge_and_open_prime_session(path: String) -> Result<String, String> {
+    crate::mycelium::bridge_and_open_prime_session(&path)
+}
