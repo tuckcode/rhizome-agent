@@ -239,7 +239,8 @@ describe('aiAgentMessageState', () => {
       actions: [{
         tool: 'Write',
         toolId: 'tool-2',
-        label: 'Wrote file',
+        label: 'Wrote file · /tmp/a.md',
+        path: '/tmp/a.md',
         status: 'pending',
       }],
     })
@@ -248,7 +249,8 @@ describe('aiAgentMessageState', () => {
       actions: [{
         tool: 'Edit',
         toolId: 'tool-3',
-        label: 'Edited file',
+        label: 'Edited file · /tmp/a.md',
+        path: '/tmp/a.md',
         status: 'pending',
       }],
     })

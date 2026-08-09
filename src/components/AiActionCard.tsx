@@ -212,6 +212,7 @@ export function AiActionCard({
   const renderIcon = TOOL_ICON_BY_NAME.get(tool) ?? DEFAULT_ICON
   const hasDetails = hasActionDetails(input, output)
   const directOpenPath = resolveDirectOpenPath({ path, onOpenNote, hasDetails })
+  const canOpen = Boolean(path && onOpenNote)
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -232,6 +233,11 @@ export function AiActionCard({
     onToggle()
   }, [directOpenPath, onOpenNote, onToggle])
 
+  const handleOpenNote = useCallback((event: { stopPropagation: () => void }) => {
+    event.stopPropagation()
+    if (path && onOpenNote) onOpenNote(path)
+  }, [onOpenNote, path])
+
   return (
     <div
       data-testid="ai-action-card"
@@ -241,15 +247,32 @@ export function AiActionCard({
         background: TOOL_BACKGROUND_BY_NAME.get(tool) ?? DEFAULT_ACTION_CARD_BACKGROUND,
       }}
     >
-      <ActionCardHeader
-        expanded={expanded}
-        hasDetails={hasDetails}
-        label={label}
-        onClick={handleClick}
-        onKeyDown={handleKeyDown}
-        renderIcon={renderIcon}
-        status={status}
-      />
+      <div className="flex items-stretch">
+        <div className="min-w-0 flex-1">
+          <ActionCardHeader
+            expanded={expanded}
+            hasDetails={hasDetails}
+            label={label}
+            onClick={handleClick}
+            onKeyDown={handleKeyDown}
+            renderIcon={renderIcon}
+            status={status}
+          />
+        </div>
+        {canOpen ? (
+          <button
+            type="button"
+            className="shrink-0 border-0 bg-transparent px-2 text-muted-foreground hover:text-foreground"
+            style={{ fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+            aria-label={`Open ${path}`}
+            title={path}
+            data-testid="action-card-open-note"
+            onClick={handleOpenNote}
+          >
+            Open
+          </button>
+        ) : null}
+      </div>
       <ActionCardDetails
         expanded={expanded}
         hasDetails={hasDetails}

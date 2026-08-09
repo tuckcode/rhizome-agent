@@ -29,8 +29,55 @@ function formatToolLabel(toolName: string): string {
   }
   if (toolName === 'Write') return 'Wrote file'
   if (toolName === 'Edit') return 'Edited file'
+  if (toolName === 'create_note') return 'Created note'
+  if (toolName === 'open_note') return 'Open note'
+  if (toolName === 'get_note') return 'Read note'
+  if (toolName === 'Read') return 'Read file'
   return toolName
 }
+
+/** Vault-relative or absolute note path from common tool input shapes. */
+export function notePathFromToolInput(toolName: string, input?: string): string | undefined {
+  if (!input?.trim()) return undefined
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(input)
+  } catch {
+    return undefined
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined
+  const record = parsed as Record<string, unknown>
+  const candidates = [
+    record.path,
+    record.file_path,
+    record.filePath,
+    record.note_path,
+    record.notePath,
+    record.target,
+  ]
+  for (const value of candidates) {
+    if (typeof value !== 'string') continue
+    const trimmed = value.trim()
+    if (!trimmed) continue
+    // Prefer markdown-looking paths for open-note UX; still allow extensionless wiki stems.
+    if (LOOKS_LIKE_NOTE_PATH.test(trimmed) || OPEN_NOTE_TOOLS.has(toolName)) {
+      return trimmed.replace(/\\/g, '/')
+    }
+  }
+  return undefined
+}
+
+const OPEN_NOTE_TOOLS = new Set([
+  'create_note',
+  'open_note',
+  'get_note',
+  'Read',
+  'Write',
+  'Edit',
+  'ui_open_note',
+])
+
+const LOOKS_LIKE_NOTE_PATH = /\.(md|markdown|txt)$/i
 
 export function updateToolAction(
   message: AiAgentMessage,
@@ -38,12 +85,20 @@ export function updateToolAction(
   toolId: string,
   input?: string,
 ): AiAgentMessage {
+  const path = notePathFromToolInput(toolName, input)
   const existing = message.actions.find((action) => action.toolId === toolId)
   if (existing) {
     return {
       ...message,
       actions: message.actions.map((action) => (
-        action.toolId === toolId ? { ...action, input: input ?? action.input } : action
+        action.toolId === toolId
+          ? {
+              ...action,
+              input: input ?? action.input,
+              path: path ?? action.path,
+              label: action.label || formatToolLabel(toolName),
+            }
+          : action
       )),
     }
   }
@@ -55,7 +110,8 @@ export function updateToolAction(
       {
         tool: toolName,
         toolId,
-        label: formatToolLabel(toolName),
+        label: path ? `${formatToolLabel(toolName)} · ${path}` : formatToolLabel(toolName),
+        path,
         status: 'pending' as const,
         input,
       },
