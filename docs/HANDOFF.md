@@ -6,6 +6,19 @@ Living doc. Update in place each session. This file is "what's true right now," 
 
 **This is `tuckcode/rhizome-agent` (private), not `knispo/rhizome`.** See `docs/IDENTITY.md`. Desktop history below is inherited from the Option C bootstrap snapshot and is useful background; product direction here is Prime harness chat.
 
+## Session handoff — 2026-08-09 (Phase 3 #1 vault tools for Prime)
+
+**Done**
+- `mcp-server/cli-call.mjs` one-shot tool CLI (stdio MCP client)
+- `prime_vault_skill` seeds project skill + settings on Prime host spawn
+- Live-seeded `~/Documents/Rhizome Vault/.prime/agent/skills/rhizome-vault/`
+- search_notes smoke OK against real vault
+
+**Dogfood:** New Prime session after attach vault; ask to search vault via rhizome-vault skill.
+**Next:** #2 Safe/Power policy; #3 promote/save.
+
+---
+
 ## Session handoff — 2026-08-09 (frontend design roadmap)
 
 **Added** `docs/plans/2026-08-09-rhizome-agent-frontend-design-roadmap.md`

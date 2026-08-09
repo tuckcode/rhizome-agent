@@ -10,3 +10,19 @@ Published after Phase 1 Prime chat path implementation. Tracker: GitHub Issues o
 | 4 | https://github.com/tuckcode/rhizome-agent/issues/4 | #3 |
 
 Work the frontier: start with MCP injection once Phase 1 is merged/dogfooded.
+
+
+## Implementation notes (2026-08-09)
+
+### #1 Inject Rhizome MCP — landed as skill + CLI bridge
+
+Prime's host MCP path is HTTP-first; stdio servers are not fully wired through
+the kernel integration layer. Landed approach:
+
+1. `mcp-server/cli-call.mjs` — one-shot MCP client → local stdio server
+2. `prime_vault_skill` seeds `<vault>/.prime/agent/skills/rhizome-vault/SKILL.md`
+   on host spawn/ensure when cwd looks like a vault
+3. Optional `mcpServers.rhizome` stdio entry in vault `.prime/agent/settings.json`
+   for when Prime kernel stdio support matures
+
+Verified: `VAULT_PATH=... node cli-call.mjs search_notes '{"query":"..."}'` returns hits.
