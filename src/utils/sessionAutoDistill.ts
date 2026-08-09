@@ -9,7 +9,9 @@ const MIN_ASSISTANT_CHARS = 80
 export function isSessionAutoDistillEnabled(
   value: boolean | null | undefined,
 ): boolean {
-  return value !== false
+  // Product default OFF: durable saves should be explicit promote/save (grill Q24),
+  // not silent post-turn wiki writes. Explicit true opts in.
+  return value === true
 }
 
 /** True when the assistant payload is a transport/auth failure, not knowledge. */

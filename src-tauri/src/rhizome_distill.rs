@@ -130,6 +130,22 @@ pub fn distill_frontmatter(
 
 /// Write the parsed card to disk as a contract-conformant Concept artifact.
 /// Returns the slug and the path written.
+
+/// Reject error/tooling strings that must never become wiki concepts.
+pub(crate) fn is_junk_distill_title(title: &str) -> bool {
+    let t = title.trim();
+    if t.is_empty() {
+        return true;
+    }
+    let lower = t.to_ascii_lowercase();
+    lower.contains("failed to authenticate")
+        || lower.contains("oauth session expired")
+        || lower.contains("could not be refreshed")
+        || lower.contains("invalid args request")
+        || lower.contains("missing field vaultpath")
+        || lower.starts_with("error:")
+}
+
 pub fn write_distilled_card(
     vault_path: &Path,
     card: &ParsedCard,
@@ -137,6 +153,13 @@ pub fn write_distilled_card(
     project: Option<&str>,
     last_updated: &str,
 ) -> Result<(String, PathBuf), String> {
+    if is_junk_distill_title(&card.title) {
+        return Err(format!(
+            "refusing to distill tooling/auth failure as a note: {}",
+            card.title
+        ));
+    }
+
     let slug = slugify(&card.title);
     let (slug, path) =
         crate::rhizome_write_location::unique_slug_path(vault_path, ArtifactKind::Concept, &slug);
@@ -339,6 +362,14 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn junk_distill_title_detects_oauth_failures() {
+        assert!(is_junk_distill_title(
+            "Failed to authenticate: OAuth session expired and could not be refreshed",
+        ));
+        assert!(!is_junk_distill_title("Event Sourcing"));
+    }
+
     fn falls_back_to_untitled_when_response_is_empty() {
         let card = parse_agent_response("   \n  \n");
         assert_eq!(card.title, "Untitled");
