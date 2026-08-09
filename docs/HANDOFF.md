@@ -6,6 +6,24 @@ Living doc. Update in place each session. This file is "what's true right now," 
 
 **This is `tuckcode/rhizome-agent` (private), not `knispo/rhizome`.** See `docs/IDENTITY.md`. Desktop history below is inherited from the Option C bootstrap snapshot and is useful background; product direction here is Prime harness chat.
 
+## Session handoff — 2026-08-09 (Prime dogfood PASS + UI chrome)
+
+**Dogfood (vault tools / session) — COMPLETE PASS**
+- CLI vault tools: list/context/search/get_note; VAULT_PATH required (negative control OK)
+- Multi-turn continuity, abort+recover, Prime identity OK
+- New-session isolation PASS when active note ≠ dogfood; active-note injection and wiki-read path both healthy
+- Product win: clean chat memory + smarter via vault retrieve — not silent thread bleed
+
+**UI chrome (0213a17 + 7b520a9)**
+- Breadcrumb vault reload (⌘⇧R) + View → Keyboard Shortcuts (⌘/)
+- Dogfood Playwright 4/4; fixed Editor drop of `onReloadVault` and palette registration
+
+**Next eng:** Phase 3 **#2 Safe vs Power tool policy** for Prime vault tools  
+Then #3 promote/save UX, #4 open-note from tools.  
+Optional UI-2 chat-primary spike (parallel).
+
+---
+
 ## Session handoff — 2026-08-09 (Phase 3 #1 vault tools for Prime)
 
 **Done**
