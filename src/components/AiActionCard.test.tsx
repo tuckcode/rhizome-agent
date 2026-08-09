@@ -164,4 +164,25 @@ describe('AiActionCard', () => {
     const outputBlock = screen.getByTestId('detail-output')
     expect(outputBlock.style.color).toContain('destructive')
   })
+
+
+  it('shows Open control when path and onOpenNote are set (even with details)', () => {
+    const onOpenNote = vi.fn()
+    render(
+      <AiActionCard
+        {...defaults}
+        path="inbox/note.md"
+        onOpenNote={onOpenNote}
+        input='{"path":"inbox/note.md"}'
+      />,
+    )
+    fireEvent.click(screen.getByTestId('action-card-open-note'))
+    expect(onOpenNote).toHaveBeenCalledWith('inbox/note.md')
+  })
+
+  it('hides Open control when path is missing', () => {
+    render(<AiActionCard {...defaults} onOpenNote={vi.fn()} />)
+    expect(screen.queryByTestId('action-card-open-note')).toBeNull()
+  })
+
 })

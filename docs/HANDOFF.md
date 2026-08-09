@@ -2,6 +2,21 @@
 
 Living doc. Update in place each session. This file is "what's true right now," not a history log. Detailed per-session records go in `docs/plans/*-session-status.md`.
 
+## Session handoff — 2026-08-09 (Phase 3 #2–#4 promote + open-note)
+
+**Shipped**
+- `2381f68` feat: promote chat to vault + default rhizome-vault toolkit (Save-to-vault UI, skill without Safe/Power, Rust r## fix)
+- Open-note from tool cards: `notePathFromToolInput` on tool start; always-visible **Open** on action cards when path known; create/get/open_note + Write/Edit/Read
+
+**Next**
+- Dogfood promote + Open in `pnpm tauri dev`
+- UI-2 chat-primary spike (optional Open Design later — not a model)
+- Mycelium M1 bridge (parallel)
+
+**Model note:** prefer `xai/grok-4.5` for hard product work; `grok-build-0.1` is cheaper coding build.
+
+---
+
 ## Rhizome Agent — identity
 
 **This is `tuckcode/rhizome-agent` (private), not `knispo/rhizome`.** See `docs/IDENTITY.md`. Desktop history below is inherited from the Option C bootstrap snapshot and is useful background; product direction here is Prime harness chat.
