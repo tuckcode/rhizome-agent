@@ -28,3 +28,4 @@ Do **not** add `knispo/rhizome` as `origin`. Desktop and Agent stay separate rem
 - Vault: Rhizome MCP tools when a vault is attached — Agent is not a second full wiki product on day one.
 
 Session-host spike (slice 1): `docs/plans/2026-08-09-prime-harness-chat-spike.md`.
+v0 brief + roadmap: `docs/plans/2026-08-09-rhizome-agent-v0-brief-and-roadmap.md` (glossary: root `CONTEXT.md`).

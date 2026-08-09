@@ -6,6 +6,17 @@ Living doc. Update in place each session. This file is "what's true right now," 
 
 **This is `tuckcode/rhizome-agent` (private), not `knispo/rhizome`.** See `docs/IDENTITY.md`. Desktop history below is inherited from the Option C bootstrap snapshot and is useful background; product direction here is Prime harness chat.
 
+## Session handoff — 2026-08-09 (v0 brief + roadmap)
+
+**Product direction locked** via `/grill-with-docs`. Read:
+
+- `docs/plans/2026-08-09-rhizome-agent-v0-brief-and-roadmap.md` — brief, phases, exit checklist
+- `CONTEXT.md` — glossary (Prime-only harness, vault SoT, promote loop, Safe/Power)
+
+**Next eng:** Phase 1 — frontend Prime target + Prime-only UI (see roadmap §8–9).
+
+---
+
 ## Session handoff — 2026-08-09 (Prime RPC session-host spike)
 
 **Done**
