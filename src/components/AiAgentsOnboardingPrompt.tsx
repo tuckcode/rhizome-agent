@@ -1,6 +1,6 @@
 import { ArrowUpRight, CaretDown, CheckCircle as CheckCircle2, CircleNotch as Loader2, Robot as Bot } from '@phosphor-icons/react'
 import {
-  AI_AGENT_DEFINITIONS,
+  PRODUCT_AI_AGENT_DEFINITIONS,
   getAiAgentAvailability,
   getAiAgentDefinition,
   hasAnyInstalledAiAgent,
@@ -62,7 +62,8 @@ function getPromptCopy(statuses: AiAgentsStatus, locale: AppLocale) {
 }
 
 function installedAgentDefinitions(statuses: AiAgentsStatus): AiAgentDefinition[] {
-  return AI_AGENT_DEFINITIONS.filter((definition) => {
+  // Rhizome Agent product: only surface Prime (and any future productVisible agents).
+  return PRODUCT_AI_AGENT_DEFINITIONS.filter((definition) => {
     return getAiAgentAvailability(statuses, definition.id).status === 'installed'
   })
 }
@@ -138,7 +139,7 @@ function SupportedAgentsMenu({ locale }: { locale: AppLocale }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="center" className="min-w-[240px]">
-        {AI_AGENT_DEFINITIONS.map((definition) => (
+        {PRODUCT_AI_AGENT_DEFINITIONS.map((definition) => (
           <DropdownMenuItem
             key={definition.id}
             className="gap-2"

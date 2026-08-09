@@ -159,14 +159,15 @@ async function streamNativeAiAgent(request: StreamAiAgentRequest): Promise<void>
   try {
     if (usePrime) {
       await invoke<string>('stream_prime_session', {
+        // PrimePromptRequest uses serde rename_all = "camelCase"
         request: {
           message: request.message,
-          system_prompt: request.systemPrompt || null,
-          vault_path: request.vaultPath || '',
-          event_name: eventName,
+          systemPrompt: request.systemPrompt || null,
+          vaultPath: request.vaultPath || '',
+          eventName,
           provider: null,
-          model_id: null,
-          new_session: false,
+          modelId: null,
+          newSession: false,
         },
       })
     } else {

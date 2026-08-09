@@ -5,23 +5,22 @@ import { AiAgentsOnboardingPrompt } from './AiAgentsOnboardingPrompt'
 
 const openExternalUrl = vi.fn()
 const dragRegionMouseDown = vi.fn()
-const missingStatuses: AiAgentsStatus = {
-  claude_code: { status: 'missing', version: null },
-  codex: { status: 'missing', version: null },
-  opencode: { status: 'missing', version: null },
-  pi: { status: 'missing', version: null },
-  antigravity: { status: 'missing', version: null },
-  kiro: { status: 'missing', version: null },
-  hermes: { status: 'missing', version: null },
+
+function emptyStatuses(): AiAgentsStatus {
+  return {
+    prime: { status: 'missing', version: null },
+    claude_code: { status: 'missing', version: null },
+    codex: { status: 'missing', version: null },
+    opencode: { status: 'missing', version: null },
+    pi: { status: 'missing', version: null },
+    antigravity: { status: 'missing', version: null },
+    kiro: { status: 'missing', version: null },
+    hermes: { status: 'missing', version: null },
+  }
 }
+
 const installLinkTargets = [
-  ['ai-agents-onboarding-install-claude_code', 'https://docs.anthropic.com/en/docs/claude-code'],
-  ['ai-agents-onboarding-install-codex', 'https://developers.openai.com/codex/cli'],
-  ['ai-agents-onboarding-install-opencode', 'https://opencode.ai/docs/'],
-  ['ai-agents-onboarding-install-pi', 'https://pi.dev'],
-  ['ai-agents-onboarding-install-antigravity', 'https://antigravity.google/docs/cli/install'],
-  ['ai-agents-onboarding-install-kiro', 'https://kiro.dev/docs/cli'],
-  ['ai-agents-onboarding-install-hermes', 'https://hermes-agent.nousresearch.com/docs/getting-started/quickstart'],
+  ['ai-agents-onboarding-install-prime', 'https://www.npmjs.com/package/prime-agent'],
 ] as const
 
 vi.mock('../utils/url', () => ({
@@ -34,7 +33,7 @@ vi.mock('../hooks/useDragRegion', () => ({
 function renderPrompt(statuses: Partial<AiAgentsStatus> = {}) {
   return render(
     <AiAgentsOnboardingPrompt
-      statuses={{ ...missingStatuses, ...statuses }}
+      statuses={{ ...emptyStatuses(), ...statuses }}
       onContinue={vi.fn()}
     />,
   )
@@ -49,19 +48,23 @@ describe('AiAgentsOnboardingPrompt', () => {
     vi.clearAllMocks()
   })
 
-  it('shows the ready state when at least one agent is installed', () => {
+  it('shows the ready state when Prime is installed', () => {
     renderPrompt({
+      prime: { status: 'installed', version: '1.2.3' },
+      // Legacy backends installed must not appear in product onboarding.
       claude_code: { status: 'installed', version: '1.0.20' },
+      hermes: { status: 'installed', version: '0.20.0' },
     })
 
     expect(screen.getByText('AI is ready')).toBeInTheDocument()
     expect(screen.getByText('Detected on this machine')).toBeInTheDocument()
-    expect(screen.getByText('Claude Code')).toBeInTheDocument()
-    expect(screen.queryByTestId('ai-agents-onboarding-install-codex')).not.toBeInTheDocument()
+    expect(screen.getByText('Prime Agent')).toBeInTheDocument()
+    expect(screen.queryByText('Claude Code')).not.toBeInTheDocument()
+    expect(screen.queryByText('Hermes Agent')).not.toBeInTheDocument()
     expect(screen.getByTestId('ai-agents-onboarding-continue')).toHaveTextContent('Continue')
   })
 
-  it('shows the missing state when no agents are installed', () => {
+  it('shows the missing state when Prime is not installed', () => {
     renderPrompt()
 
     expect(screen.getByText('AI setup is optional')).toBeInTheDocument()
@@ -73,21 +76,18 @@ describe('AiAgentsOnboardingPrompt', () => {
   })
 
   it('tells the user an installed agent must be launched once to authenticate', () => {
-    // Onboarding previously only mentioned installing — never that a freshly
-    // installed CLI must be run once to log in, which is why Distill failed
-    // for users who installed but never authenticated.
     renderPrompt()
     const authPanel = screen.getByTestId('ai-agents-onboarding-auth')
     expect(authPanel).toBeInTheDocument()
     expect(authPanel.textContent).toMatch(/log in|authenticate/i)
   })
 
-  it('shows the auth reminder even once an agent is installed', () => {
-    renderPrompt({ claude_code: { status: 'installed', version: '1.0.20' } })
+  it('shows the auth reminder even once Prime is installed', () => {
+    renderPrompt({ prime: { status: 'installed', version: '1.2.3' } })
     expect(screen.getByTestId('ai-agents-onboarding-auth')).toBeInTheDocument()
   })
 
-  it('opens the supported agent install links from the menu', () => {
+  it('opens the Prime install link from the supported agents menu', () => {
     renderPrompt()
 
     installLinkTargets.forEach(([testId]) => {
@@ -117,7 +117,7 @@ describe('AiAgentsOnboardingPrompt', () => {
 
   it('uses the surrounding surface as a drag region and excludes the card', () => {
     renderPrompt({
-      claude_code: { status: 'installed', version: '1.0.20' },
+      prime: { status: 'installed', version: '1.2.3' },
     })
 
     const screenContainer = screen.getByTestId('ai-agents-onboarding-screen')
