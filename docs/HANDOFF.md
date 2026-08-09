@@ -6,6 +6,21 @@ Living doc. Update in place each session. This file is "what's true right now," 
 
 **This is `tuckcode/rhizome-agent` (private), not `knispo/rhizome`.** See `docs/IDENTITY.md`. Desktop history below is inherited from the Option C bootstrap snapshot and is useful background; product direction here is Prime harness chat.
 
+## Session handoff — 2026-08-09 (Phase 1 Prime chat path)
+
+**Done**
+- Product AI target is **Prime only** (`DEFAULT_AI_AGENT = prime`, product-visible definitions).
+- Frontend `streamAiAgent` routes `prime` → `stream_prime_session` / `abort_prime_session_turn`.
+- Chat allowed without vault for Prime (cwd falls back to home on host).
+- Legacy backends remain in status/types but hidden from pickers.
+- Phase 3 memory tickets filed: issues #1–#4 (see `docs/plans/2026-08-09-phase-3-memory-tickets.md`).
+
+**Next**
+1. Dogfood Phase 1 in `pnpm tauri dev` (multi-turn, abort, new session).
+2. Frontier ticket: #1 MCP injection into Prime.
+
+---
+
 ## Session handoff — 2026-08-09 (v0 brief + roadmap)
 
 **Product direction locked** via `/grill-with-docs`. Read:

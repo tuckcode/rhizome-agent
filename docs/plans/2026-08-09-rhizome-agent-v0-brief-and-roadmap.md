@@ -69,12 +69,14 @@ On a machine that can install the app + Prime (BYO):
 
 **Outcome:** Daily multi-turn Prime chat is the product center.
 
+**Status (2026-08-09):** Eng wiring landed — Prime default target, stream/abort routed to session host, legacy backends hidden from product picker. Native dogfood still recommended (`pnpm tauri dev`).
+
 Eng (under this phase):
 
-1. Frontend **Prime** target → `stream_prime_session` / status / abort / new session  
-2. Prime-only UI (hide legacy agent backends; flag OK)  
+1. ~~Frontend **Prime** target → `stream_prime_session` / status / abort / new session~~  
+2. ~~Prime-only UI (hide legacy agent backends; flag OK)~~  
 3. Auth posture: document + rely on `~/.prime` (no new key vault in settings)  
-4. Stream UX: text, thinking, tool cards, errors, Done  
+4. Stream UX: text, thinking, tool cards, errors, Done (inherits existing stream UI)  
 
 **Depends on:** session host spike (done).
 

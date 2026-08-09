@@ -747,6 +747,7 @@ describe('App', () => {
     localStorage.removeItem(AI_AGENTS_ONBOARDING_DISMISSED_STORAGE_NAME)
     localStorage.removeItem(CLAUDE_CODE_ONBOARDING_DISMISSED_STORAGE_NAME)
     mockCommandResults.get_ai_agents_status = {
+      prime: { installed: true, version: 'mock' },
       claude_code: { installed: true, version: '2.1.90' },
       codex: { installed: true, version: '0.122.0-alpha.1' },
       opencode: { installed: false, version: null },
@@ -782,6 +783,7 @@ describe('App', () => {
       default_ai_agent: 'codex',
     })
     mockCommandResults.get_ai_agents_status = {
+      prime: { installed: true, version: 'mock' },
       claude_code: { installed: true, version: '2.1.90' },
       codex: { installed: true, version: '0.122.0-alpha.1' },
       opencode: { installed: false, version: null },
@@ -816,6 +818,7 @@ describe('App', () => {
       resolveSettings = resolve
     })
     mockCommandResults.get_ai_agents_status = {
+      prime: { installed: true, version: 'mock' },
       claude_code: { installed: true, version: '2.1.90' },
       codex: { installed: true, version: '0.122.0-alpha.1' },
       opencode: { installed: false, version: null },

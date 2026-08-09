@@ -131,6 +131,51 @@ describe('streamAiAgent', () => {
     expect(unlistenMock).toHaveBeenCalledTimes(1)
   })
 
+  it('routes prime agent through stream_prime_session and abort_prime_session_turn', async () => {
+    isTauriState.value = true
+    const unlistenMock = vi.fn()
+    let listenedEventName = ''
+    let eventHandler: ((event: { payload: unknown }) => void) | undefined
+
+    listenMock.mockImplementation(async (eventName: string, handler: typeof eventHandler) => {
+      listenedEventName = eventName
+      eventHandler = handler
+      return unlistenMock
+    })
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === 'stream_prime_session') {
+        eventHandler?.({ payload: { kind: 'TextDelta', text: 'hi from prime' } })
+        eventHandler?.({ payload: { kind: 'Done' } })
+        return 'prime-session'
+      }
+      return null
+    })
+
+    const callbacks = createCallbacks()
+    const controller = new AbortController()
+
+    const promise = streamAiAgent({
+      agent: 'prime',
+      message: 'Hello',
+      vaultPath: '',
+      callbacks,
+      signal: controller.signal,
+    })
+
+    await promise
+
+    expect(listenedEventName).toMatch(/^prime-session-stream-/)
+    expect(invokeMock).toHaveBeenCalledWith('stream_prime_session', {
+      request: expect.objectContaining({
+        message: 'Hello',
+        vault_path: '',
+        event_name: listenedEventName,
+      }),
+    })
+    expect(callbacks.onText).toHaveBeenCalledWith('hi from prime')
+    expect(callbacks.onDone).toHaveBeenCalled()
+  })
+
   it('surfaces backend invocation failures and still closes the stream', async () => {
     isTauriState.value = true
     const unlistenMock = vi.fn()

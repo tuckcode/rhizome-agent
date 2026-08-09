@@ -7,6 +7,8 @@ const AI_AGENT_STATUS_PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum AiAgentId {
+    /// Rhizome Agent product default — long-lived Prime RPC host.
+    Prime,
     ClaudeCode,
     Codex,
     Opencode,
@@ -23,6 +25,7 @@ pub enum AiAgentId {
 /// default instead of every write path silently falling back to it.
 pub fn parse_agent_id(value: &str) -> Option<AiAgentId> {
     match value {
+        "prime" => Some(AiAgentId::Prime),
         "claude_code" => Some(AiAgentId::ClaudeCode),
         "codex" => Some(AiAgentId::Codex),
         "opencode" => Some(AiAgentId::Opencode),
@@ -50,6 +53,7 @@ pub struct AiAgentAvailability {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct AiAgentsStatus {
+    pub prime: AiAgentAvailability,
     pub claude_code: AiAgentAvailability,
     pub codex: AiAgentAvailability,
     pub opencode: AiAgentAvailability,
@@ -121,6 +125,7 @@ impl AiAgentStreamRequest {
 /// always returns a fully populated `AiAgentsStatus` and the frontend can
 /// keep rendering.
 pub async fn get_ai_agents_status() -> AiAgentsStatus {
+    let prime = tokio::task::spawn_blocking(crate::prime_session_host::check_cli);
     let claude = tokio::task::spawn_blocking(availability_from_claude);
     let codex = tokio::task::spawn_blocking(crate::codex_cli::check_cli);
     let opencode = tokio::task::spawn_blocking(crate::opencode_cli::check_cli);
@@ -129,7 +134,8 @@ pub async fn get_ai_agents_status() -> AiAgentsStatus {
     let kiro = tokio::task::spawn_blocking(crate::kiro_cli::check_cli);
     let hermes = tokio::task::spawn_blocking(crate::hermes_cli::check_cli);
 
-    let (claude, codex, opencode, pi, antigravity, kiro, hermes) = tokio::join!(
+    let (prime, claude, codex, opencode, pi, antigravity, kiro, hermes) = tokio::join!(
+        availability_or_missing(prime, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(claude, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(codex, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(opencode, AI_AGENT_STATUS_PROBE_TIMEOUT),
@@ -140,6 +146,7 @@ pub async fn get_ai_agents_status() -> AiAgentsStatus {
     );
 
     AiAgentsStatus {
+        prime,
         claude_code: claude,
         codex,
         opencode,
@@ -173,6 +180,7 @@ where
 {
     let permission_mode = request.permission_mode();
     match request.agent {
+        AiAgentId::Prime => run_prime_agent_stream(request, emit),
         AiAgentId::ClaudeCode => run_claude_agent_stream(request, permission_mode, emit),
         AiAgentId::Codex => run_shared_agent_stream(
             request,
@@ -211,6 +219,29 @@ where
             emit,
         ),
     }
+}
+
+fn run_prime_agent_stream<F>(request: AiAgentStreamRequest, emit: F) -> Result<String, String>
+where
+    F: FnMut(AiAgentStreamEvent),
+{
+    let vault_path = if request.vault_path.trim().is_empty() {
+        dirs::home_dir()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|| ".".into())
+    } else {
+        request.vault_path
+    };
+    let prime_request = crate::prime_session_host::PrimePromptRequest {
+        message: request.message,
+        system_prompt: request.system_prompt,
+        vault_path,
+        event_name: request.event_name,
+        provider: None,
+        model_id: None,
+        new_session: false,
+    };
+    crate::prime_session_host::run_prompt_stream(prime_request, emit)
 }
 
 fn run_claude_agent_stream<F>(
@@ -303,6 +334,7 @@ mod tests {
 
     #[test]
     fn parse_agent_id_round_trips_every_frontend_target_id() {
+        assert_eq!(parse_agent_id("prime"), Some(AiAgentId::Prime));
         assert_eq!(parse_agent_id("claude_code"), Some(AiAgentId::ClaudeCode));
         assert_eq!(parse_agent_id("codex"), Some(AiAgentId::Codex));
         assert_eq!(parse_agent_id("opencode"), Some(AiAgentId::Opencode));
@@ -349,6 +381,7 @@ mod tests {
     async fn normalize_status_contains_all_agents() {
         let status = get_ai_agents_status().await;
         let install_flags = [
+            status.prime.installed,
             status.claude_code.installed,
             status.codex.installed,
             status.opencode.installed,

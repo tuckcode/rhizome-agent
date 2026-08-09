@@ -132,7 +132,8 @@ export async function sendAgentMessage({
 
   if (shouldIgnorePrompt(currentStatus, normalizedPrompt)) return
 
-  if (!context.vaultPath) {
+  // Prime (Rhizome Agent product) can chat without a vault; vault unlocks memory tools later.
+  if (!context.vaultPath && context.agent !== 'prime') {
     blockMissingVault(runtime, context, normalizedPrompt)
     return
   }
