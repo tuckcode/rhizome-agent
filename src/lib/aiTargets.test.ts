@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   LOCAL_AI_PROVIDER_KINDS,
-  agentTargetId,
   agentTargets,
   aiModelProviderCatalog,
   aiModelProviderCatalogEntry,
@@ -13,7 +12,6 @@ import {
   type AiTarget,
 } from './aiTargets'
 import {
-  AI_AGENT_DEFINITIONS,
   createAiAgentAvailability,
   createCheckingAiAgentsStatus,
   createMissingAiAgentsStatus,
@@ -48,49 +46,47 @@ function provider(kind: AiModelProvider['kind']): AiModelProvider {
 }
 
 describe('ai target provider contract', () => {
-  it('builds selectable targets for every supported coding agent', () => {
-    expect(agentTargets().map((target) => target.id)).toEqual(
-      AI_AGENT_DEFINITIONS.map((definition) => agentTargetId(definition.id)),
-    )
+  it('builds selectable targets for product-visible agents only (Prime)', () => {
+    expect(agentTargets().map((target) => target.id)).toEqual(['agent:prime'])
   })
 
-  it('resolves Hermes as a persisted default agent target', () => {
+  it('resolves Prime as the default agent target', () => {
     const target = resolveAiTarget({
-      default_ai_agent: 'claude_code',
-      default_ai_target: 'agent:hermes',
+      default_ai_agent: 'prime',
+      default_ai_target: 'agent:prime',
     } as Settings)
 
     expect(target).toMatchObject({
       kind: 'agent',
-      agent: 'hermes',
-      id: 'agent:hermes',
-      label: 'Hermes Agent',
+      agent: 'prime',
+      id: 'agent:prime',
+      label: 'Prime Agent',
     })
   })
 
-  it('accepts legacy agent ids saved in the default target field', () => {
+  it('falls back to Prime when a legacy agent id is saved as the default target', () => {
     const target = resolveAiTarget({
-      default_ai_agent: 'claude_code',
+      default_ai_agent: 'prime',
       default_ai_target: 'kiro',
     } as Settings)
 
     expect(target).toMatchObject({
       kind: 'agent',
-      agent: 'kiro',
-      id: 'agent:kiro',
+      agent: 'prime',
+      id: 'agent:prime',
     })
   })
 
-  it('uses the legacy default agent when a saved agent target is stale', () => {
+  it('uses Prime when a non-product legacy default agent is stored', () => {
     const target = resolveAiTarget({
       default_ai_agent: 'kiro',
-      default_ai_target: 'agent:claude_code',
+      default_ai_target: 'agent:prime',
     } as Settings)
 
     expect(target).toMatchObject({
       kind: 'agent',
-      agent: 'kiro',
-      id: 'agent:kiro',
+      agent: 'prime',
+      id: 'agent:prime',
     })
   })
 
@@ -148,8 +144,15 @@ describe('ai target provider contract', () => {
 })
 
 describe('preflightAiTarget', () => {
-  const claudeTarget = agentTargets().find((t) => t.agent === 'claude_code') as AiTarget
-  const codexTarget = agentTargets().find((t) => t.agent === 'codex') as AiTarget
+  const primeTarget = agentTargets().find((t) => t.agent === 'prime') as AiTarget
+  // Legacy backend not in product picker — still valid for preflight of a forced target.
+  const codexTarget: AiTarget = {
+    kind: 'agent',
+    agent: 'codex',
+    id: 'agent:codex',
+    label: getAiAgentDefinition('codex').label,
+    shortLabel: getAiAgentDefinition('codex').shortLabel,
+  }
   const apiModelTarget: AiTarget = {
     kind: 'api_model',
     provider: provider('anthropic'),
@@ -164,27 +167,27 @@ describe('preflightAiTarget', () => {
   }
 
   it('is ready when the resolved agent is installed', () => {
-    const statuses = statusWith({ claude_code: createAiAgentAvailability('installed', '1.0.0') })
-    expect(preflightAiTarget(claudeTarget, statuses)).toEqual({ state: 'ready' })
+    const statuses = statusWith({ prime: createAiAgentAvailability('installed', '1.0.0') })
+    expect(preflightAiTarget(primeTarget, statuses)).toEqual({ state: 'ready' })
   })
 
   it('is checking while the agent probe has not resolved yet', () => {
-    expect(preflightAiTarget(claudeTarget, createCheckingAiAgentsStatus())).toEqual({ state: 'checking' })
+    expect(preflightAiTarget(primeTarget, createCheckingAiAgentsStatus())).toEqual({ state: 'checking' })
   })
 
   it('is blocked with install guidance when the resolved agent is missing', () => {
     const statuses = createMissingAiAgentsStatus()
-    const result = preflightAiTarget(claudeTarget, statuses)
+    const result = preflightAiTarget(primeTarget, statuses)
     expect(result).toEqual({
       state: 'blocked',
-      agent: 'claude_code',
-      label: getAiAgentDefinition('claude_code').label,
-      installUrl: getAiAgentDefinition('claude_code').installUrl,
+      agent: 'prime',
+      label: getAiAgentDefinition('prime').label,
+      installUrl: getAiAgentDefinition('prime').installUrl,
     })
   })
 
   it('names the correct agent when a non-default agent is missing', () => {
-    const statuses = statusWith({ claude_code: createAiAgentAvailability('installed') })
+    const statuses = statusWith({ prime: createAiAgentAvailability('installed') })
     const result = preflightAiTarget(codexTarget, statuses)
     expect(result).toMatchObject({ state: 'blocked', agent: 'codex' })
   })

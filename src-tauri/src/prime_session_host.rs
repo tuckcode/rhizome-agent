@@ -342,12 +342,14 @@ fn poison<T>(_: std::sync::PoisonError<T>) -> String {
 }
 
 fn normalize_cwd(vault_path: &str) -> Result<PathBuf, String> {
-    let expanded = crate::commands::expand_tilde(vault_path);
-    let path = PathBuf::from(expanded.as_ref());
-    if path.as_os_str().is_empty() {
-        return Err("vault_path is required for the Prime session host".into());
+    let trimmed = vault_path.trim();
+    if trimmed.is_empty() {
+        return dirs::home_dir().ok_or_else(|| {
+            "No vault path and could not resolve home directory for Prime host cwd".into()
+        });
     }
-    Ok(path)
+    let expanded = crate::commands::expand_tilde(trimmed);
+    Ok(PathBuf::from(expanded.as_ref()))
 }
 
 fn with_host_mut<T>(f: impl FnOnce(&mut PrimeHost) -> Result<T, String>) -> Result<T, String> {

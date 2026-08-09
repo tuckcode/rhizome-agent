@@ -120,13 +120,24 @@ function nativeAgentStreamRequest(request: StreamAiAgentRequest, eventName: stri
   }
 }
 
+function isPrimeAgent(agent: AiAgentId): boolean {
+  return agent === 'prime'
+}
+
 async function streamNativeAiAgent(request: StreamAiAgentRequest): Promise<void> {
   const { invoke } = await import('@tauri-apps/api/core')
   const { listen } = await import('@tauri-apps/api/event')
-  const eventName = createScopedStreamEventName('ai-agent-stream')
+  const usePrime = isPrimeAgent(request.agent)
+  const eventName = createScopedStreamEventName(
+    usePrime ? 'prime-session-stream' : 'ai-agent-stream',
+  )
   const closeStream = createStreamCloser(request.callbacks)
 
   const abortNativeStream = (): void => {
+    if (usePrime) {
+      void invoke<boolean>('abort_prime_session_turn').catch(() => {})
+      return
+    }
     void invoke<boolean>('abort_ai_agent_stream', { eventName }).catch(() => {})
   }
 
@@ -146,9 +157,23 @@ async function streamNativeAiAgent(request: StreamAiAgentRequest): Promise<void>
   }
 
   try {
-    await invoke<string>('stream_ai_agent', {
-      request: nativeAgentStreamRequest(request, eventName),
-    })
+    if (usePrime) {
+      await invoke<string>('stream_prime_session', {
+        request: {
+          message: request.message,
+          system_prompt: request.systemPrompt || null,
+          vault_path: request.vaultPath || '',
+          event_name: eventName,
+          provider: null,
+          model_id: null,
+          new_session: false,
+        },
+      })
+    } else {
+      await invoke<string>('stream_ai_agent', {
+        request: nativeAgentStreamRequest(request, eventName),
+      })
+    }
     closeStream()
   } catch (err) {
     request.callbacks.onError(err instanceof Error ? err.message : String(err))

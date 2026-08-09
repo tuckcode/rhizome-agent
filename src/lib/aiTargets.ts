@@ -1,5 +1,5 @@
 import {
-  AI_AGENT_DEFINITIONS,
+  PRODUCT_AI_AGENT_DEFINITIONS,
   DEFAULT_AI_AGENT,
   getAiAgentAvailability,
   getAiAgentDefinition,
@@ -112,7 +112,7 @@ export function configuredModelTargets(providers: AiModelProvider[] | null | und
 }
 
 export function agentTargets(): AiTarget[] {
-  return AI_AGENT_DEFINITIONS.map((definition) => {
+  return PRODUCT_AI_AGENT_DEFINITIONS.map((definition) => {
     return {
       kind: 'agent' as const,
       agent: definition.id,
@@ -128,10 +128,19 @@ export function resolveAiTarget(settings: Settings): AiTarget {
   const agents = agentTargets()
   const targets = [...agents, ...configuredModelTargets(providers)]
   const storedLegacyAgent = normalizeStoredAiAgent(settings.default_ai_agent)
-  const legacyAgent = storedLegacyAgent ?? DEFAULT_AI_AGENT
+  // Product UI only offers product-visible agents; coerce everything else to Prime.
+  const legacyAgent =
+    storedLegacyAgent && agentTargetFor(agents, storedLegacyAgent)
+      ? storedLegacyAgent
+      : DEFAULT_AI_AGENT
   const target = resolveStoredAiTarget(settings.default_ai_target, targets)
   if (target) {
-    if (shouldPreferLegacyAgent(target, storedLegacyAgent)) return agentTargetFor(agents, legacyAgent) ?? target
+    if (target.kind === 'agent' && !agentTargetFor(agents, target.agent)) {
+      return agentTargetFor(agents, DEFAULT_AI_AGENT) ?? agents[0]
+    }
+    if (shouldPreferLegacyAgent(target, storedLegacyAgent)) {
+      return agentTargetFor(agents, legacyAgent) ?? target
+    }
     return target
   }
 

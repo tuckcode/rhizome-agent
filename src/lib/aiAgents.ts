@@ -1,6 +1,17 @@
-export type AiAgentId = 'claude_code' | 'codex' | 'opencode' | 'pi' | 'antigravity' | 'kiro' | 'hermes'
+export type AiAgentId =
+  | 'prime'
+  | 'claude_code'
+  | 'codex'
+  | 'opencode'
+  | 'pi'
+  | 'antigravity'
+  | 'kiro'
+  | 'hermes'
+
 type LegacyAiAgentId = 'gemini'
-type AiAgentsStatusPayload = Partial<Record<AiAgentId | LegacyAiAgentId, { installed?: boolean | null; version?: string | null }>>
+type AiAgentsStatusPayload = Partial<
+  Record<AiAgentId | LegacyAiAgentId, { installed?: boolean | null; version?: string | null }>
+>
 
 export type AiAgentStatus = 'checking' | 'installed' | 'missing'
 export type AiAgentReadiness = 'checking' | 'ready' | 'missing'
@@ -17,56 +28,84 @@ export interface AiAgentDefinition {
   label: string
   shortLabel: string
   installUrl: string
+  /** When true, shown in product target pickers (Rhizome Agent = Prime only). */
+  productVisible: boolean
 }
 
-export const DEFAULT_AI_AGENT: AiAgentId = 'claude_code'
+/** Product default for Rhizome Agent. */
+export const DEFAULT_AI_AGENT: AiAgentId = 'prime'
 
+/**
+ * All known agent ids (status probe + legacy settings migration).
+ * Product UI uses {@link PRODUCT_AI_AGENT_DEFINITIONS} only.
+ */
 export const AI_AGENT_DEFINITIONS: readonly AiAgentDefinition[] = [
+  {
+    id: 'prime',
+    label: 'Prime Agent',
+    shortLabel: 'Prime',
+    installUrl: 'https://www.npmjs.com/package/prime-agent',
+    productVisible: true,
+  },
   {
     id: 'claude_code',
     label: 'Claude Code',
     shortLabel: 'Claude',
     installUrl: 'https://docs.anthropic.com/en/docs/claude-code',
+    productVisible: false,
   },
   {
     id: 'codex',
     label: 'Codex',
     shortLabel: 'Codex',
     installUrl: 'https://developers.openai.com/codex/cli',
+    productVisible: false,
   },
   {
     id: 'opencode',
     label: 'OpenCode',
     shortLabel: 'OpenCode',
     installUrl: 'https://opencode.ai/docs/',
+    productVisible: false,
   },
   {
     id: 'pi',
     label: 'Pi',
     shortLabel: 'Pi',
     installUrl: 'https://pi.dev',
+    productVisible: false,
   },
   {
     id: 'antigravity',
     label: 'Antigravity CLI',
     shortLabel: 'Antigravity',
     installUrl: 'https://antigravity.google/docs/cli/install',
+    productVisible: false,
   },
   {
     id: 'kiro',
     label: 'Kiro',
     shortLabel: 'Kiro',
     installUrl: 'https://kiro.dev/docs/cli',
+    productVisible: false,
   },
   {
     id: 'hermes',
     label: 'Hermes Agent',
     shortLabel: 'Hermes',
     installUrl: 'https://hermes-agent.nousresearch.com/docs/getting-started/quickstart',
+    productVisible: false,
   },
 ] as const
 
-export function createAiAgentAvailability(status: AiAgentStatus = 'checking', version: string | null = null): AiAgentAvailability {
+/** Agents offered in Rhizome Agent UI (Prime only for v0). */
+export const PRODUCT_AI_AGENT_DEFINITIONS: readonly AiAgentDefinition[] =
+  AI_AGENT_DEFINITIONS.filter((definition) => definition.productVisible)
+
+export function createAiAgentAvailability(
+  status: AiAgentStatus = 'checking',
+  version: string | null = null,
+): AiAgentAvailability {
   return { status, version }
 }
 
@@ -94,14 +133,21 @@ export function normalizeStoredAiAgent(value: string | null | undefined): AiAgen
 }
 
 export function resolveDefaultAiAgent(value: string | null | undefined): AiAgentId {
-  return normalizeStoredAiAgent(value) ?? DEFAULT_AI_AGENT
+  const normalized = normalizeStoredAiAgent(value)
+  // Rhizome Agent product: always prefer Prime unless an explicit product-visible id is stored.
+  if (normalized && PRODUCT_AI_AGENT_DEFINITIONS.some((d) => d.id === normalized)) {
+    return normalized
+  }
+  return DEFAULT_AI_AGENT
 }
 
 export function getAiAgentDefinition(agent: AiAgentId): AiAgentDefinition {
   return AI_AGENT_DEFINITIONS.find((definition) => definition.id === agent) ?? AI_AGENT_DEFINITIONS[0]
 }
 
-function normalizeAvailability(agent: { installed?: boolean | null; version?: string | null } | null | undefined): AiAgentAvailability {
+function normalizeAvailability(
+  agent: { installed?: boolean | null; version?: string | null } | null | undefined,
+): AiAgentAvailability {
   if (agent?.installed) {
     return createAiAgentAvailability('installed', agent.version ?? null)
   }
@@ -113,7 +159,9 @@ function payloadForAgent(payload: AiAgentsStatusPayload | null | undefined, agen
   return agent === 'antigravity' ? payload?.antigravity ?? payload?.gemini : payload?.[agent]
 }
 
-export function normalizeAiAgentsStatus(payload: AiAgentsStatusPayload | null | undefined): AiAgentsStatus {
+export function normalizeAiAgentsStatus(
+  payload: AiAgentsStatusPayload | null | undefined,
+): AiAgentsStatus {
   return Object.fromEntries(
     AI_AGENT_DEFINITIONS.map((definition) => [
       definition.id,
@@ -122,12 +170,17 @@ export function normalizeAiAgentsStatus(payload: AiAgentsStatusPayload | null | 
   ) as AiAgentsStatus
 }
 
-export function getAiAgentAvailability(statuses: Partial<AiAgentsStatus>, agent: AiAgentId): AiAgentAvailability {
+export function getAiAgentAvailability(
+  statuses: Partial<AiAgentsStatus>,
+  agent: AiAgentId,
+): AiAgentAvailability {
   return statuses[agent] ?? createAiAgentAvailability('missing')
 }
 
 export function isAiAgentsStatusChecking(statuses: Partial<AiAgentsStatus>): boolean {
-  return AI_AGENT_DEFINITIONS.some((definition) => getAiAgentAvailability(statuses, definition.id).status === 'checking')
+  return PRODUCT_AI_AGENT_DEFINITIONS.some(
+    (definition) => getAiAgentAvailability(statuses, definition.id).status === 'checking',
+  )
 }
 
 export function isAiAgentInstalled(statuses: Partial<AiAgentsStatus>, agent: AiAgentId): boolean {
@@ -135,11 +188,15 @@ export function isAiAgentInstalled(statuses: Partial<AiAgentsStatus>, agent: AiA
 }
 
 export function hasAnyInstalledAiAgent(statuses: Partial<AiAgentsStatus>): boolean {
-  return AI_AGENT_DEFINITIONS.some((definition) => isAiAgentInstalled(statuses, definition.id))
+  return PRODUCT_AI_AGENT_DEFINITIONS.some((definition) =>
+    isAiAgentInstalled(statuses, definition.id),
+  )
 }
 
 export function getNextAiAgentId(current: AiAgentId): AiAgentId {
-  const currentIndex = AI_AGENT_DEFINITIONS.findIndex((definition) => definition.id === current)
-  if (currentIndex < 0) return DEFAULT_AI_AGENT
-  return AI_AGENT_DEFINITIONS[(currentIndex + 1) % AI_AGENT_DEFINITIONS.length].id
+  const product = PRODUCT_AI_AGENT_DEFINITIONS
+  if (product.length === 0) return DEFAULT_AI_AGENT
+  const currentIndex = product.findIndex((definition) => definition.id === current)
+  if (currentIndex < 0) return product[0].id
+  return product[(currentIndex + 1) % product.length].id
 }

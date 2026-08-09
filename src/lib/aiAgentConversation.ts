@@ -75,6 +75,9 @@ export function appendLocalMarker(
 
 export function createMissingAgentResponse(agent: AiAgentId): string {
   const definition = getAiAgentDefinition(agent)
+  if (agent === 'prime') {
+    return `${definition.label} is not available on this machine. Install it with \`npm i -g prime-agent\`, run \`prime-agent\` once to log in, then retry.`
+  }
   return `${definition.label} is not available on this machine. Install it or switch the default AI agent in Settings.`
 }
 
