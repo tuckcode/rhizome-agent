@@ -1,0 +1,100 @@
+name: Deploy docs
+
+# Manual-trigger only for now: this repo is private and GitHub Pages
+# requires a paid plan (GitHub Pro+) for private repos, so the push
+# trigger can only ever fail here. Re-add the `push:` trigger once Pages
+# is enabled (repo goes public, or the plan is upgraded).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  NODE_OPTIONS: --max-old-space-size=4096
+
+jobs:
+  build:
+    name: Build VitePress site
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: 11
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: latest
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build docs and download pages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pnpm docs:build
+
+          DIST="site/.vitepress/dist"
+          mkdir -p "$DIST/alpha" "$DIST/stable" "$DIST/download" "$DIST/releases" "$DIST/stable/download"
+
+          gh api -H "Accept: application/vnd.github.html+json" repos/${{ github.repository }}/releases --paginate > "$DIST/releases.json"
+
+          STABLE_TAG="$(gh release list --repo ${{ github.repository }} --limit 100 --json tagName,isDraft,isPrerelease --jq '[.[] | select(.isDraft == false and .isPrerelease == false)][0].tagName // ""')"
+          if [ -n "$STABLE_TAG" ]; then
+            gh release download --repo ${{ github.repository }} "$STABLE_TAG" --pattern "stable-latest.json" --output "$DIST/stable/latest.json" || echo '{}' > "$DIST/stable/latest.json"
+          else
+            echo '{}' > "$DIST/stable/latest.json"
+          fi
+
+          ALPHA_TAG="$(gh release list --repo ${{ github.repository }} --limit 100 --json tagName,isDraft,isPrerelease --jq '[.[] | select(.isDraft == false and .isPrerelease == true)][0].tagName // ""')"
+          if [ -n "$ALPHA_TAG" ]; then
+            gh release download --repo ${{ github.repository }} "$ALPHA_TAG" --pattern "alpha-latest.json" --output "$DIST/alpha/latest.json" || echo '{}' > "$DIST/alpha/latest.json"
+          else
+            echo '{}' > "$DIST/alpha/latest.json"
+          fi
+
+          bun scripts/build-release-download-page.ts --latest-json "$DIST/stable/latest.json" --releases-json "$DIST/releases.json" --output-file "$DIST/download/index.html"
+          bun scripts/build-release-history-page.ts --releases-json "$DIST/releases.json" --output-file "$DIST/releases/index.html"
+          cp "$DIST/download/index.html" "$DIST/stable/download/index.html"
+          cp "$DIST/alpha/latest.json" "$DIST/latest.json"
+          cp "$DIST/alpha/latest.json" "$DIST/latest-canary.json"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site/.vitepress/dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

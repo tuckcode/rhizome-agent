@@ -1,0 +1,101 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index b7357fa..c2c59cb 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -36,6 +36,16 @@ var import_core = require("@tiptap/core");
+ var import_state = require("@tiptap/pm/state");
+ var import_linkifyjs = require("linkifyjs");
+ 
++var PRE_REGISTERED_PROTOCOLS = ["tel", "callto", "sms", "cid", "xmpp"];
++var linkifyProtocolFlag = "__tolariaTiptapLinkifyProtocolsRegistered";
++var linkifyGlobalObject = typeof globalThis === "undefined" ? void 0 : globalThis;
++if (linkifyGlobalObject && !linkifyGlobalObject[linkifyProtocolFlag]) {
++  PRE_REGISTERED_PROTOCOLS.forEach((protocol) => {
++    (0, import_linkifyjs.registerCustomProtocol)(protocol);
++  });
++  linkifyGlobalObject[linkifyProtocolFlag] = true;
++}
++
+ // src/helpers/whitespace.ts
+ var UNICODE_WHITESPACE_PATTERN = "[\0- \xA0\u1680\u180E\u2000-\u2029\u205F\u3000]";
+ var UNICODE_WHITESPACE_REGEX = new RegExp(UNICODE_WHITESPACE_PATTERN);
+@@ -253,7 +263,8 @@ var Link = import_core3.Mark.create({
+     });
+   },
+   onDestroy() {
+-    (0, import_linkifyjs3.reset)();
++    // Tolaria keeps a single editor shell alive across note swaps, so linkify's
++    // protocol registry must survive editor teardown and remount cycles.
+   },
+   inclusive() {
+     return this.options.autolink;
+@@ -472,4 +483,4 @@ var index_default = Link;
+   isAllowedUri,
+   pasteRegex
+ });
+-//# sourceMappingURL=index.cjs.map
+\ No newline at end of file
++//# sourceMappingURL=index.cjs.map
+diff --git a/dist/index.js b/dist/index.js
+index d486894..cb8e256 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -13,6 +13,16 @@ var UNICODE_WHITESPACE_REGEX = new RegExp(UNICODE_WHITESPACE_PATTERN);
+ var UNICODE_WHITESPACE_REGEX_END = new RegExp(`${UNICODE_WHITESPACE_PATTERN}$`);
+ var UNICODE_WHITESPACE_REGEX_GLOBAL = new RegExp(UNICODE_WHITESPACE_PATTERN, "g");
+ 
++var PRE_REGISTERED_PROTOCOLS = ["tel", "callto", "sms", "cid", "xmpp"];
++var linkifyProtocolFlag = "__tolariaTiptapLinkifyProtocolsRegistered";
++var linkifyGlobalObject = typeof globalThis === "undefined" ? void 0 : globalThis;
++if (linkifyGlobalObject && !linkifyGlobalObject[linkifyProtocolFlag]) {
++  PRE_REGISTERED_PROTOCOLS.forEach((protocol) => {
++    registerCustomProtocol(protocol);
++  });
++  linkifyGlobalObject[linkifyProtocolFlag] = true;
++}
++
+ // src/helpers/autolink.ts
+ function isValidLinkStructure(tokens) {
+   if (tokens.length === 1) {
+@@ -224,7 +234,8 @@ var Link = Mark.create({
+     });
+   },
+   onDestroy() {
+-    reset();
++    // Tolaria keeps a single editor shell alive across note swaps, so linkify's
++    // protocol registry must survive editor teardown and remount cycles.
+   },
+   inclusive() {
+     return this.options.autolink;
+@@ -443,4 +454,4 @@ export {
+   isAllowedUri,
+   pasteRegex
+ };
+-//# sourceMappingURL=index.js.map
+\ No newline at end of file
++//# sourceMappingURL=index.js.map
+diff --git a/src/link.ts b/src/link.ts
+index 839a575..bbef783 100644
+--- a/src/link.ts
++++ b/src/link.ts
+@@ -8,6 +8,20 @@ import { clickHandler } from './helpers/clickHandler.js'
+ import { pasteHandler } from './helpers/pasteHandler.js'
+ import { UNICODE_WHITESPACE_REGEX_GLOBAL } from './helpers/whitespace.js'
+ 
++const PRE_REGISTERED_PROTOCOLS = ['tel', 'callto', 'sms', 'cid', 'xmpp'] as const
++const linkifyProtocolFlag = '__tolariaTiptapLinkifyProtocolsRegistered'
++const linkifyGlobalObject = typeof globalThis === 'undefined'
++  ? undefined
++  : (globalThis as Record<string, boolean | undefined>)
++
++if (linkifyGlobalObject && !linkifyGlobalObject[linkifyProtocolFlag]) {
++  PRE_REGISTERED_PROTOCOLS.forEach((protocol) => {
++    registerCustomProtocol(protocol)
++  })
++
++  linkifyGlobalObject[linkifyProtocolFlag] = true
++}
++
+ export interface LinkProtocolOptions {
+   /**
+    * The protocol scheme to be registered.

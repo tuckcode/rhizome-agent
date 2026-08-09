@@ -1,0 +1,268 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  # push:branches:[main] intentionally removed — local pre-push hooks already
+  # run this exact check suite (build+test+coverage+Playwright smoke) before
+  # any push to main succeeds, on macos-15 runners billed at ~10x the Linux
+  # rate. Re-running it in CI on every push was pure duplicate spend; of the
+  # last 50 combined CI+Release runs, 44 failed and only 3 succeeded. Trigger
+  # manually (workflow_dispatch) if you need a clean-room verification.
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  # Bump this when Tauri/Rust target artifacts capture stale absolute paths.
+  RUST_TARGET_CACHE_VERSION: v2026-04-14-tolaria
+  # Keep large production frontend builds below CI runner memory limits.
+  NODE_OPTIONS: --max-old-space-size=4096
+
+jobs:
+  frontend-static-quality:
+    name: Frontend Static Quality Checks
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for docs-changed / git diff checks below
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: 11
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Keep frontend and Rust quality gates in separate macOS jobs so the
+      # expensive Rust target cache restore no longer blocks the frontend lane.
+      # ── 0. Build check (catches type errors and bundler failures) ─────────
+      - name: TypeScript type check
+        run: pnpm exec tsc --noEmit
+
+      - name: Vite build check
+        # TypeScript is checked explicitly above; run Vite directly here to avoid
+        # paying for the package build script's duplicate `tsc -b` pass.
+        run: pnpm exec vite build
+
+      - name: Check whether docs build is needed
+        id: docs-changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ -z "$BASE_SHA" ] || [[ "$BASE_SHA" =~ ^0+$ ]]; then
+            echo "should-build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$BASE_SHA" HEAD | grep -qE '^(docs/|site/|scripts/build-agent-docs\.mjs|package\.json|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'; then
+            echo "should-build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should-build=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Docs build check
+        if: steps.docs-changes.outputs.should-build == 'true'
+        run: pnpm docs:build
+
+      # ── 2. Documentation check (warning only — does not fail build) ───────
+      - name: Check docs are updated
+        continue-on-error: true
+        run: |
+          if git log -1 --pretty=%B | grep -i '\[skip docs\]' > /dev/null; then
+            echo "⏭️  Documentation check skipped"
+            exit 0
+          fi
+          if git diff --name-only origin/main | grep -E '^(src/|src-tauri/)' > /dev/null; then
+            if ! git diff --name-only origin/main | grep -E '^docs/' > /dev/null; then
+              echo "⚠️  Code files changed but docs/ not updated"
+              git diff --name-only origin/main | grep -E '^(src/|src-tauri/)'
+              echo "If this change affects architecture/abstractions/theme documented in docs/, update them."
+              echo "To suppress: include [skip docs] in your commit message."
+            fi
+          fi
+          echo "✅ Documentation check passed"
+
+      # ── 3. Lint & format ──────────────────────────────────────────────────
+      - name: Lint frontend
+        run: pnpm lint
+
+  frontend-tests:
+    name: Frontend Tests & Coverage
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: 11
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The coverage command runs the canonical frontend test suite.
+      - name: Bundle MCP server resources (required by Tauri build)
+        run: node scripts/bundle-mcp-server.mjs
+
+      - name: Frontend tests + coverage (≥70% lines/functions/branches/statements)
+        run: pnpm test:coverage
+        # Thresholds configured in vite.config.ts — exits non-zero if coverage drops
+
+      - name: Upload frontend coverage to Codecov
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: codecov/codecov-action@5975040f7f7d40edaff8d784b576fd65ae95c073
+        with:
+          use_oidc: true
+          fail_ci_if_error: false
+          disable_search: true
+          files: ./coverage/lcov.info
+          flags: frontend
+          verbose: true
+        # OIDC avoids long-lived CODECOV_TOKEN secrets.
+        # fail_ci_if_error: false -- macOS runners hit a gpg-detection quirk
+        # in the action's dependency check (gnupg reports installed but the
+        # check still fails); a reporting hiccup here shouldn't redden CI
+        # over an otherwise-passing build/lint/test/coverage-threshold run.
+
+  rust-quality:
+    name: Rust Tests & Quality Checks
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+        with:
+          components: rustfmt, clippy, llvm-tools-preview
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ env.RUST_TARGET_CACHE_VERSION }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ env.RUST_TARGET_CACHE_VERSION }}-
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@e5de28abeb52d916c5e5875d54b21a9e738b61ec
+
+      - name: Rust tests + coverage (≥85% lines)
+        run: |
+          mkdir -p coverage
+          cargo llvm-cov \
+            --manifest-path src-tauri/Cargo.toml \
+            --ignore-filename-regex 'lib\.rs|main\.rs|menu\.rs' \
+            --lcov \
+            --output-path coverage/rust.lcov \
+            --fail-under-lines 85
+        # cargo-llvm-cov exits non-zero if line coverage drops below 85%
+        # lib.rs/main.rs/menu.rs are Tauri boilerplate -- not meaningfully unit-testable.
+
+      - name: Upload Rust coverage to Codecov
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: codecov/codecov-action@5975040f7f7d40edaff8d784b576fd65ae95c073
+        with:
+          use_oidc: true
+          fail_ci_if_error: false
+          disable_search: true
+          files: ./coverage/rust.lcov
+          flags: rust
+          verbose: true
+        # OIDC avoids long-lived CODECOV_TOKEN secrets.
+        # fail_ci_if_error: false -- see matching note on the frontend job's
+        # Codecov step above.
+
+      - name: Clippy (Rust)
+        run: cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings
+
+      - name: Format check (Rust)
+        run: cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check
+
+  linux-build:
+    name: Linux build verification
+    # Keep the normal push CI lane under the 10-minute target. The release
+    # workflows already perform the full Linux/AppImage build after main
+    # pushes, so this slower compatibility check stays available for PRs and
+    # manual diagnostics without blocking every direct push.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Tauri Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libsoup-3.0-dev \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            libfuse2 \
+            librsvg2-dev \
+            patchelf \
+            build-essential \
+            file
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: 11
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+        with:
+          components: clippy
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ env.RUST_TARGET_CACHE_VERSION }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ env.RUST_TARGET_CACHE_VERSION }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Frontend build
+        run: pnpm build
+
+      - name: Cargo check
+        run: cargo check --manifest-path=src-tauri/Cargo.toml
+
+      - name: Clippy
+        run: cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings

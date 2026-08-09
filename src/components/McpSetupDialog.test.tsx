@@ -1,0 +1,170 @@
+import { describe, it, expect, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { McpSetupDialog } from './McpSetupDialog'
+
+const MANUAL_CONFIG = JSON.stringify({
+  mcpServers: {
+    rhizome: {
+      type: 'stdio',
+      command: 'node',
+      args: ['/Applications/Rhizome.app/Contents/Resources/mcp-server/index.js'],
+      env: {
+        WS_UI_PORT: '9711',
+      },
+    },
+  },
+}, null, 2)
+
+const OPENCODE_CONFIG = JSON.stringify({
+  $schema: 'https://opencode.ai/config.json',
+  mcp: {
+    rhizome: {
+      type: 'local',
+      command: ['node', '/Applications/Rhizome.app/Contents/Resources/mcp-server/index.js'],
+      enabled: true,
+      environment: {
+        WS_UI_PORT: '9711',
+      },
+    },
+  },
+}, null, 2)
+
+describe('McpSetupDialog', () => {
+  it('renders the explicit setup flow without mutating config by default', () => {
+    render(
+      <McpSetupDialog
+        open={true}
+        status="not_installed"
+        busyAction={null}
+        manualConfigSnippet={MANUAL_CONFIG}
+        opencodeManualConfigSnippet={OPENCODE_CONFIG}
+        onClose={vi.fn()}
+        onConnect={vi.fn()}
+        onDisconnect={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Set Up External AI Tools')).toBeInTheDocument()
+    expect(screen.getByText(/will not touch third-party config files until you confirm here/i)).toBeInTheDocument()
+    expect(screen.getByText(/requires Node.js 18\+ or Bun 1\+ on PATH/i)).toBeInTheDocument()
+    expect(screen.getByText('Manual MCP configs')).toBeInTheDocument()
+    expect(screen.getByText('Claude, Codex, Cursor, and Antigravity')).toBeInTheDocument()
+    expect(screen.getByText('OpenCode')).toBeInTheDocument()
+    expect(screen.getByTestId('mcp-config-snippet')).toHaveTextContent('"type": "stdio"')
+    expect(screen.getByTestId('mcp-config-snippet')).toHaveTextContent('"mcpServers"')
+    expect(screen.getByTestId('mcp-config-snippet')).not.toHaveTextContent('"VAULT_PATH"')
+    expect(screen.getByTestId('mcp-config-snippet')).toHaveTextContent('"WS_UI_PORT": "9711"')
+    expect(screen.getByTestId('mcp-opencode-config-snippet')).toHaveTextContent('"mcp"')
+    expect(screen.getByTestId('mcp-opencode-config-snippet')).toHaveTextContent('"type": "local"')
+    expect(screen.getByTestId('mcp-opencode-config-snippet')).toHaveTextContent('"command": [')
+    expect(screen.getByTestId('mcp-opencode-config-snippet')).not.toHaveTextContent('"mcpServers"')
+    expect(screen.getByText('~/.claude.json')).toBeInTheDocument()
+    expect(screen.getByText('~/.claude/mcp.json')).toBeInTheDocument()
+    expect(screen.getByText('~/.gemini/config/mcp_config.json')).toBeInTheDocument()
+    expect(screen.getByText('~/.config/mcp/mcp.json')).toBeInTheDocument()
+    expect(screen.getByText('~/.config/opencode/opencode.json')).toBeInTheDocument()
+    expect(screen.getByText(/Claude Code CLI reads ~\/\.claude\.json/i)).toBeInTheDocument()
+    expect(screen.getByText(/OpenCode reads ~\/\.config\/opencode\/opencode\.json/i)).toBeInTheDocument()
+    expect(screen.getByText(/top-level mcp/i)).toBeInTheDocument()
+    expect(screen.getByText(/Antigravity CLI needs its own install and sign-in/i)).toBeInTheDocument()
+    expect(screen.getByText(/GEMINI\.md/)).toBeInTheDocument()
+    expect(screen.getByTestId('mcp-setup-connect')).toHaveTextContent('Connect External AI Tools')
+    expect(screen.queryByTestId('mcp-setup-disconnect')).not.toBeInTheDocument()
+  })
+
+  it('renders reconnect and disconnect actions for an already connected vault', () => {
+    render(
+      <McpSetupDialog
+        open={true}
+        status="installed"
+        busyAction={null}
+        onClose={vi.fn()}
+        onConnect={vi.fn()}
+        onDisconnect={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Manage External AI Tools')).toBeInTheDocument()
+    expect(screen.getByTestId('mcp-setup-connect')).toHaveTextContent('Reconnect External AI Tools')
+    expect(screen.getByTestId('mcp-setup-disconnect')).toHaveTextContent('Disconnect')
+  })
+
+  it('keeps overflowing setup content inside a scrollable modal body', () => {
+    render(
+      <McpSetupDialog
+        open={true}
+        status="not_installed"
+        busyAction={null}
+        manualConfigSnippet={MANUAL_CONFIG}
+        opencodeManualConfigSnippet={OPENCODE_CONFIG}
+        onClose={vi.fn()}
+        onConnect={vi.fn()}
+        onDisconnect={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('mcp-setup-dialog')).toHaveClass(
+      'flex',
+      'max-h-[calc(100dvh-2rem)]',
+      'overflow-hidden',
+    )
+    expect(screen.getByTestId('mcp-setup-scroll-body')).toHaveClass(
+      'min-h-0',
+      'flex-1',
+      'overflow-y-auto',
+      'overscroll-contain',
+    )
+    expect(screen.getByTestId('mcp-setup-actions')).toHaveClass('shrink-0')
+  })
+
+  it('routes actions through the dialog buttons', () => {
+    const onClose = vi.fn()
+    const onConnect = vi.fn()
+    const onCopyManualConfig = vi.fn()
+    const onCopyOpenCodeManualConfig = vi.fn()
+    const onDisconnect = vi.fn()
+
+    render(
+      <McpSetupDialog
+        open={true}
+        status="installed"
+        busyAction={null}
+        onClose={onClose}
+        onConnect={onConnect}
+        onCopyManualConfig={onCopyManualConfig}
+        onCopyOpenCodeManualConfig={onCopyOpenCodeManualConfig}
+        onDisconnect={onDisconnect}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    fireEvent.click(screen.getByTestId('mcp-copy-config'))
+    fireEvent.click(screen.getByTestId('mcp-copy-opencode-config'))
+    fireEvent.click(screen.getByTestId('mcp-setup-connect'))
+    fireEvent.click(screen.getByTestId('mcp-setup-disconnect'))
+
+    expect(onClose).toHaveBeenCalledOnce()
+    expect(onCopyManualConfig).toHaveBeenCalledOnce()
+    expect(onCopyOpenCodeManualConfig).toHaveBeenCalledOnce()
+    expect(onConnect).toHaveBeenCalledOnce()
+    expect(onDisconnect).toHaveBeenCalledOnce()
+  })
+
+  it('loads exact manual config when opened', () => {
+    const onLoadManualConfig = vi.fn()
+
+    render(
+      <McpSetupDialog
+        open={true}
+        status="not_installed"
+        busyAction={null}
+        onClose={vi.fn()}
+        onConnect={vi.fn()}
+        onDisconnect={vi.fn()}
+        onLoadManualConfig={onLoadManualConfig}
+      />,
+    )
+
+    expect(onLoadManualConfig).toHaveBeenCalledOnce()
+  })
+})

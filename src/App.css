@@ -1,0 +1,89 @@
+/* App layout - minimal CSS, most styling via Tailwind */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--border-primary);
+}
+
+.app {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app__sidebar {
+  flex: 0 0 auto;
+  /* 250px floor: the brand lockup (mark + "rhizome" wordmark) needs ~250px
+     alongside the traffic-light gutter and nav actions — at the old 220px
+     minimum the wordmark clipped at the sidebar edge. */
+  min-width: 250px;
+  display: flex;
+  flex-direction: column;
+}
+
+.app__sidebar > * {
+  flex: 1;
+}
+
+.app:has(.app__note-list) .app__sidebar > * {
+  border-right-color: transparent;
+}
+
+.app__note-list {
+  flex: 0 0 auto;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 20;
+  background: var(--surface-sidebar);
+}
+
+.app__note-list > * {
+  flex: 1;
+  border-left: 1px solid var(--sidebar-border);
+}
+
+.app__editor {
+  flex: 1;
+  min-width: 480px;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  container-type: inline-size;
+  container-name: editor;
+}
+
+.app__editor > * {
+  flex: 1;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes tab-status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.tab-status-pulse {
+  animation: tab-status-pulse 1.2s ease-in-out infinite;
+}
+
+/* AI highlight animation — applied by useAiActivity when MCP calls ui_highlight */
+@keyframes ai-highlight-glow {
+  0% { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent-blue) 80%, transparent); }
+  50% { box-shadow: inset 0 0 8px 2px color-mix(in srgb, var(--accent-blue) 40%, transparent); }
+  100% { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent-blue) 0%, transparent); }
+}
+
+.ai-highlight {
+  animation: ai-highlight-glow 0.8s ease-out;
+}

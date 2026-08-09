@@ -1,0 +1,160 @@
+import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../appCommandCatalog'
+import type { CommandAction } from './types'
+import type { ViewMode } from '../useViewMode'
+import type { NoteWidthMode } from '../../types'
+import { requestNewAiChat } from '../../utils/aiPromptBridge'
+import { DEFAULT_NOTE_WIDTH_MODE } from '../../utils/noteWidth'
+
+const NOTE_WIDTH_COMMAND_LABELS: Record<NoteWidthMode, string> = {
+  normal: 'Use Normal Note Width',
+  wide: 'Use Wide Note Width',
+}
+
+const DEFAULT_NOTE_WIDTH_COMMAND_LABELS: Record<NoteWidthMode, string> = {
+  normal: 'Use Normal Note Width by Default',
+  wide: 'Use Wide Note Width by Default',
+}
+
+const noop = () => {}
+
+interface ViewCommandsConfig {
+  aiFeaturesEnabled?: boolean
+  hasActiveNote: boolean
+  activeNoteModified: boolean
+  onSetViewMode: (mode: ViewMode) => void
+  onToggleInspector: () => void
+  onToggleDiff?: () => void
+  onToggleRawEditor?: () => void
+  noteWidth?: NoteWidthMode
+  defaultNoteWidth?: NoteWidthMode
+  onSetNoteWidth?: (mode: NoteWidthMode) => void
+  onSetDefaultNoteWidth?: (mode: NoteWidthMode) => void
+  onToggleAIChat?: () => void
+  onToggleTableOfContents?: () => void
+  zoomLevel: number
+  onZoomIn: () => void
+  onZoomOut: () => void
+  onZoomReset: () => void
+  onCustomizeNoteListColumns?: () => void
+  canCustomizeNoteListColumns?: boolean
+  noteListColumnsLabel: string
+  selectedViewName?: string
+  onMoveSelectedViewUp?: () => void
+  onMoveSelectedViewDown?: () => void
+  canMoveSelectedViewUp?: boolean
+  canMoveSelectedViewDown?: boolean
+}
+
+function buildSetNoteWidthCommand(
+  mode: NoteWidthMode,
+  activeMode: NoteWidthMode,
+  hasActiveNote: boolean,
+  onSetNoteWidth?: (mode: NoteWidthMode) => void,
+): CommandAction {
+  return {
+    id: `set-note-width-${mode}`,
+    label: Reflect.get(NOTE_WIDTH_COMMAND_LABELS, mode) as string,
+    group: 'View',
+    keywords: ['layout', 'note', 'column', 'width', mode, 'reading'],
+    enabled: hasActiveNote && Boolean(onSetNoteWidth) && activeMode !== mode,
+    execute: onSetNoteWidth ? () => onSetNoteWidth(mode) : noop,
+  }
+}
+
+function buildSetDefaultNoteWidthCommand(
+  mode: NoteWidthMode,
+  defaultMode: NoteWidthMode,
+  onSetDefaultNoteWidth?: (mode: NoteWidthMode) => void,
+): CommandAction {
+  return {
+    id: `set-default-note-width-${mode}`,
+    label: Reflect.get(DEFAULT_NOTE_WIDTH_COMMAND_LABELS, mode) as string,
+    group: 'View',
+    keywords: ['layout', 'note', 'column', 'width', mode, 'default', 'reading'],
+    enabled: Boolean(onSetDefaultNoteWidth) && defaultMode !== mode,
+    execute: onSetDefaultNoteWidth ? () => onSetDefaultNoteWidth(mode) : noop,
+  }
+}
+
+function buildMoveSavedViewCommand(
+  direction: 'Up' | 'Down',
+  selectedViewName: string | undefined,
+  onMoveSelectedView: (() => void) | undefined,
+  canMoveSelectedView: boolean | undefined,
+): CommandAction {
+  const directionKeyword = direction.toLowerCase()
+
+  return {
+    id: `move-view-${directionKeyword}`,
+    label: selectedViewName ? `Move ${selectedViewName} ${direction}` : `Move View ${direction}`,
+    group: 'View',
+    keywords: ['saved view', 'view', 'views', 'order', 'sidebar', 'move', directionKeyword],
+    enabled: Boolean(onMoveSelectedView && canMoveSelectedView),
+    execute: onMoveSelectedView ?? noop,
+  }
+}
+
+function buildToggleTableOfContentsCommand(
+  hasActiveNote: boolean,
+  onToggleTableOfContents?: () => void,
+): CommandAction {
+  return {
+    id: 'toggle-table-of-contents',
+    label: 'Toggle Table of Contents',
+    group: 'View',
+    shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewToggleTableOfContents),
+    keywords: ['toc', 'outline', 'headings', 'contents', 'panel'],
+    enabled: hasActiveNote && !!onToggleTableOfContents,
+    execute: () => onToggleTableOfContents?.(),
+  }
+}
+
+function buildAiViewCommands(
+  aiFeaturesEnabled: boolean,
+  onToggleAIChat?: () => void,
+): CommandAction[] {
+  if (!aiFeaturesEnabled) return []
+
+  return [
+    { id: 'toggle-ai-panel', label: 'Toggle AI Panel', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewToggleAiChat), keywords: ['ai', 'agent', 'chat', 'assistant', 'contextual'], enabled: true, execute: () => onToggleAIChat?.() },
+    { id: 'new-ai-chat', label: 'New AI chat', group: 'View', keywords: ['ai', 'agent', 'chat', 'assistant', 'new', 'fresh', 'conversation', 'reset'], enabled: true, execute: requestNewAiChat },
+  ]
+}
+
+export function buildViewCommands(config: ViewCommandsConfig): CommandAction[] {
+  const {
+    aiFeaturesEnabled = true,
+    hasActiveNote, activeNoteModified,
+    onSetViewMode, onToggleInspector, onToggleDiff, onToggleRawEditor,
+    noteWidth = DEFAULT_NOTE_WIDTH_MODE, defaultNoteWidth = DEFAULT_NOTE_WIDTH_MODE,
+    onSetNoteWidth, onSetDefaultNoteWidth, onToggleAIChat, onToggleTableOfContents,
+    zoomLevel, onZoomIn, onZoomOut, onZoomReset,
+    onCustomizeNoteListColumns, canCustomizeNoteListColumns, noteListColumnsLabel,
+    selectedViewName, onMoveSelectedViewUp, onMoveSelectedViewDown,
+    canMoveSelectedViewUp, canMoveSelectedViewDown,
+  } = config
+
+  const aiCommands = buildAiViewCommands(aiFeaturesEnabled, onToggleAIChat)
+
+  return [
+    { id: 'view-editor', label: 'Editor Only', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewEditorOnly), keywords: ['layout', 'focus'], enabled: true, execute: () => onSetViewMode('editor-only') },
+    { id: 'view-editor-list', label: 'Editor + Note List', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewEditorList), keywords: ['layout'], enabled: true, execute: () => onSetViewMode('editor-list') },
+    { id: 'view-all', label: 'Full Layout', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewAll), keywords: ['layout', 'sidebar'], enabled: true, execute: () => onSetViewMode('all') },
+    { id: 'toggle-inspector', label: 'Toggle Properties Panel', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewToggleProperties), keywords: ['properties', 'inspector', 'panel', 'right', 'sidebar'], enabled: true, execute: onToggleInspector },
+    { id: 'toggle-diff', label: 'Toggle Diff Mode', group: 'View', keywords: ['diff', 'changes', 'git', 'compare', 'version'], enabled: hasActiveNote && activeNoteModified, execute: () => onToggleDiff?.() },
+    { id: 'toggle-raw-editor', label: 'Toggle Raw Editor', group: 'View', keywords: ['raw', 'source', 'markdown', 'frontmatter', 'code', 'textarea'], enabled: hasActiveNote && !!onToggleRawEditor, execute: () => onToggleRawEditor?.() },
+    buildSetNoteWidthCommand('normal', noteWidth, hasActiveNote, onSetNoteWidth),
+    buildSetNoteWidthCommand('wide', noteWidth, hasActiveNote, onSetNoteWidth),
+    buildSetDefaultNoteWidthCommand('normal', defaultNoteWidth, onSetDefaultNoteWidth),
+    buildSetDefaultNoteWidthCommand('wide', defaultNoteWidth, onSetDefaultNoteWidth),
+    ...aiCommands,
+    buildToggleTableOfContentsCommand(hasActiveNote, onToggleTableOfContents),
+    { id: 'toggle-backlinks', label: 'Toggle Backlinks', group: 'View', keywords: ['backlinks', 'references', 'links', 'mentions', 'incoming'], enabled: hasActiveNote, execute: onToggleInspector },
+    buildMoveSavedViewCommand('Up', selectedViewName, onMoveSelectedViewUp, canMoveSelectedViewUp),
+    buildMoveSavedViewCommand('Down', selectedViewName, onMoveSelectedViewDown, canMoveSelectedViewDown),
+    { id: 'customize-note-list-columns', label: noteListColumnsLabel, group: 'View', keywords: ['all notes', 'inbox', 'columns', 'chips', 'properties', 'note list'], enabled: !!(canCustomizeNoteListColumns && onCustomizeNoteListColumns), execute: () => onCustomizeNoteListColumns?.() },
+    { id: 'zoom-in', label: `Zoom In (${zoomLevel}%)`, group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewZoomIn), keywords: ['zoom', 'bigger', 'larger', 'scale'], enabled: zoomLevel < 150, execute: onZoomIn },
+    { id: 'zoom-out', label: `Zoom Out (${zoomLevel}%)`, group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewZoomOut), keywords: ['zoom', 'smaller', 'scale'], enabled: zoomLevel > 80, execute: onZoomOut },
+    { id: 'zoom-reset', label: 'Reset Zoom', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewZoomReset), keywords: ['zoom', 'actual', 'default', '100'], enabled: zoomLevel !== 100, execute: onZoomReset },
+  ]
+}

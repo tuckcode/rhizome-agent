@@ -1,0 +1,493 @@
+import { invoke } from '@tauri-apps/api/core'
+import { isTauri, mockInvoke } from '../mock-tauri'
+import type { VaultEntry } from '../types'
+import { workspacePathForEntry } from '../utils/workspaces'
+import { markNoteOpenTrace } from '../utils/noteOpenPerformance'
+import { errorMessage, isActiveVaultUnavailableError } from '../utils/vaultErrors'
+import { getNoteWindowParams, isNoteWindow } from '../utils/windowMode'
+
+type NotePath = VaultEntry['path']
+
+export interface NoteContentIdentity {
+  modifiedAt: number | null
+  fileSize: number | null
+}
+
+export interface NoteContentCacheEntry {
+  path: NotePath
+  promise: Promise<string>
+  value: string | null
+  byteSize: number
+  identity: NoteContentIdentity | null
+  vaultPath?: string
+  parsedBlockPreload: boolean
+  parsedBlockPreloadNotified: boolean
+  requestState?: NoteContentRequestState
+  startRequest?: () => void
+  cancelRequest?: () => void
+}
+
+export interface NoteContentResolvedEvent {
+  entry: VaultEntry | null
+  path: NotePath
+  content: string
+  parsedBlockPreload: boolean
+}
+
+export interface NoteContentRequestOptions {
+  parsedBlockPreload?: boolean
+}
+
+type NoteContentResolvedListener = (event: NoteContentResolvedEvent) => void
+type NoteContentRequestState = 'queued' | 'running' | 'settled' | 'canceled'
+type NoteContentRequestMode = 'foreground' | 'prefetch'
+
+const prefetchCache = new Map<string, NoteContentCacheEntry>()
+const prefetchQueue: NoteContentCacheEntry[] = []
+const resolvedListeners = new Set<NoteContentResolvedListener>()
+const contentSizeEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null
+
+export const NOTE_CONTENT_CACHE_LIMIT = 24
+export const NOTE_CONTENT_ENTRY_MAX_BYTES = 1024 * 1024
+export const NOTE_CONTENT_CACHE_MAX_BYTES = 8 * 1024 * 1024
+export const NOTE_CONTENT_PREFETCH_CONCURRENCY = 4
+const NOTE_CONTENT_REQUEST_CANCELED = 'Note content request canceled'
+const NOTE_CONTENT_LOAD_RETRY_DELAYS_MS = [120, 320, 800] as const
+
+let activePrefetchRequests = 0
+
+export function subscribeNoteContentResolved(listener: NoteContentResolvedListener): () => void {
+  resolvedListeners.add(listener)
+  return () => resolvedListeners.delete(listener)
+}
+
+function emitNoteContentResolved(event: NoteContentResolvedEvent): void {
+  for (const listener of resolvedListeners) {
+    try {
+      listener(event)
+    } catch (error) {
+      console.warn('Note content cache listener failed:', error)
+    }
+  }
+}
+
+function shouldRequestParsedBlockPreload(options?: NoteContentRequestOptions): boolean {
+  return options?.parsedBlockPreload ?? true
+}
+
+function measureNoteContentBytes(content: string): number {
+  return contentSizeEncoder ? contentSizeEncoder.encode(content).byteLength : content.length
+}
+
+function noteContentIdentity(entry: VaultEntry): NoteContentIdentity {
+  return {
+    modifiedAt: entry.modifiedAt,
+    fileSize: entry.fileSize,
+  }
+}
+
+function isCompleteIdentity(identity: NoteContentIdentity | null): identity is NoteContentIdentity {
+  return identity !== null && identity.modifiedAt !== null && identity.fileSize !== null
+}
+
+function sameIdentity(left: NoteContentIdentity | null, right: NoteContentIdentity | null): boolean {
+  return isCompleteIdentity(left)
+    && isCompleteIdentity(right)
+    && left.modifiedAt === right.modifiedAt
+    && left.fileSize === right.fileSize
+}
+
+function targetPath(target: string | VaultEntry): NotePath {
+  return typeof target === 'string' ? target : target.path
+}
+
+function targetEntry(target: string | VaultEntry): VaultEntry | null {
+  return typeof target === 'string' ? null : target
+}
+
+function targetVaultPath(target: string | VaultEntry): string | undefined {
+  const entry = targetEntry(target)
+  return entry ? workspacePathForEntry(entry) : undefined
+}
+
+function targetIdentity(target: string | VaultEntry): NoteContentIdentity | null {
+  const entry = targetEntry(target)
+  return entry ? noteContentIdentity(entry) : null
+}
+
+function getRetainedPrefetchCacheBytes(): number {
+  let totalBytes = 0
+  for (const entry of prefetchCache.values()) totalBytes += entry.byteSize
+  return totalBytes
+}
+
+function dropOldestPrefetchEntry(): void {
+  const oldestPath = prefetchCache.keys().next().value
+  if (!oldestPath) return
+  const entry = prefetchCache.get(oldestPath)
+  entry?.cancelRequest?.()
+  prefetchCache.delete(oldestPath)
+}
+
+function trimPrefetchCache(): void {
+  while (
+    prefetchCache.size > NOTE_CONTENT_CACHE_LIMIT
+    || getRetainedPrefetchCacheBytes() > NOTE_CONTENT_CACHE_MAX_BYTES
+  ) {
+    if (prefetchCache.size === 0) return
+    dropOldestPrefetchEntry()
+  }
+}
+
+function rememberNoteContent(entry: NoteContentCacheEntry): NoteContentCacheEntry {
+  const { path } = entry
+  const existing = prefetchCache.get(path)
+  if (existing && existing !== entry) {
+    removeQueuedPrefetch(existing)
+    existing.cancelRequest?.()
+    prefetchCache.delete(path)
+  } else if (existing) {
+    prefetchCache.delete(path)
+  }
+  prefetchCache.set(path, entry)
+  trimPrefetchCache()
+  return entry
+}
+
+function retainResolvedNoteContent(entry: NoteContentCacheEntry, content: string, sourceEntry: VaultEntry | null): void {
+  if (prefetchCache.get(entry.path) !== entry) return
+  const byteSize = measureNoteContentBytes(content)
+  if (byteSize > NOTE_CONTENT_ENTRY_MAX_BYTES) {
+    prefetchCache.delete(entry.path)
+    return
+  }
+
+  entry.value = content
+  entry.byteSize = byteSize
+  rememberNoteContent(entry)
+  if (entry.parsedBlockPreload) entry.parsedBlockPreloadNotified = true
+  emitNoteContentResolved({
+    entry: sourceEntry,
+    path: entry.path,
+    content,
+    parsedBlockPreload: entry.parsedBlockPreload,
+  })
+}
+
+function getNoteContentCommandPayload(path: string, vaultPath?: string): { path: string; vaultPath?: string } {
+  if (vaultPath) return { path, vaultPath }
+  if (!isNoteWindow()) return { path }
+
+  const noteWindowParams = getNoteWindowParams()
+  return noteWindowParams ? { path, vaultPath: noteWindowParams.vaultPath } : { path }
+}
+
+function runGetNoteContentCommand(path: string, vaultPath?: string): Promise<string> {
+  const commandPayload = getNoteContentCommandPayload(path, vaultPath)
+  return isTauri()
+    ? invoke<string>('get_note_content', commandPayload)
+    : mockInvoke<string>('get_note_content', commandPayload)
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function isMissingNoteContentError(error: unknown): boolean {
+  return /does not exist|not found|enoent/i.test(errorMessage(error))
+}
+
+function isRetryableNoteContentLoadError(error: unknown): boolean {
+  return !isNoActiveVaultSelectedError(error)
+    && !isMissingNoteContentError(error)
+    && !isUnreadableNoteContentError(error)
+}
+
+async function runGetNoteContentCommandWithRetry(path: string, vaultPath?: string): Promise<string> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= NOTE_CONTENT_LOAD_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      return await runGetNoteContentCommand(path, vaultPath)
+    } catch (error) {
+      lastError = error
+      if (!isRetryableNoteContentLoadError(error) || attempt === NOTE_CONTENT_LOAD_RETRY_DELAYS_MS.length) {
+        throw error
+      }
+      await delay(NOTE_CONTENT_LOAD_RETRY_DELAYS_MS[attempt])
+    }
+  }
+  throw lastError
+}
+
+function getValidateNoteContentCommandPayload(path: string, content: string, vaultPath?: string): { path: string; content: string; vaultPath?: string } {
+  return { ...getNoteContentCommandPayload(path, vaultPath), content }
+}
+
+function shouldReuseExistingRequest(
+  existing: NoteContentCacheEntry,
+  identity: NoteContentIdentity | null,
+  vaultPath?: string,
+): boolean {
+  if (existing.vaultPath !== vaultPath) return false
+  if (!isCompleteIdentity(identity) || !isCompleteIdentity(existing.identity)) return true
+  return sameIdentity(existing.identity, identity)
+}
+
+function markRequestSettled(entry: NoteContentCacheEntry, state: Extract<NoteContentRequestState, 'settled' | 'canceled'>): void {
+  entry.requestState = state
+  entry.startRequest = undefined
+  entry.cancelRequest = undefined
+}
+
+function requestParsedBlockPreload(entry: NoteContentCacheEntry, sourceEntry: VaultEntry | null): void {
+  entry.parsedBlockPreload = true
+  if (entry.value === null || entry.parsedBlockPreloadNotified) return
+
+  entry.parsedBlockPreloadNotified = true
+  emitNoteContentResolved({
+    entry: sourceEntry,
+    path: entry.path,
+    content: entry.value,
+    parsedBlockPreload: true,
+  })
+}
+
+function createNoteContentRequest(target: string | VaultEntry, options?: NoteContentRequestOptions): NoteContentCacheEntry {
+  const path = targetPath(target)
+  const sourceEntry = targetEntry(target)
+  const vaultPath = targetVaultPath(target)
+  const identity = targetIdentity(target)
+  const parsedBlockPreload = shouldRequestParsedBlockPreload(options)
+  const cacheEntry: NoteContentCacheEntry = {
+    path,
+    promise: Promise.resolve(''),
+    value: null,
+    byteSize: 0,
+    identity,
+    vaultPath,
+    parsedBlockPreload,
+    parsedBlockPreloadNotified: false,
+    requestState: 'queued',
+  }
+  let started = false
+  let settled = false
+  let startRequest: () => void = () => {}
+  let cancelRequest: () => void = () => {}
+  const promise = new Promise<string>((resolve, reject) => {
+    startRequest = () => {
+      if (started || settled) return
+      started = true
+      cacheEntry.requestState = 'running'
+      runGetNoteContentCommandWithRetry(path, vaultPath)
+        .then((content) => {
+          settled = true
+          markRequestSettled(cacheEntry, 'settled')
+          retainResolvedNoteContent(cacheEntry, content, sourceEntry)
+          resolve(content)
+        })
+        .catch((err) => {
+          settled = true
+          markRequestSettled(cacheEntry, 'settled')
+          if (prefetchCache.get(path) === cacheEntry) prefetchCache.delete(path)
+          reject(err)
+        })
+    }
+
+    cancelRequest = () => {
+      if (started || settled) return
+      settled = true
+      markRequestSettled(cacheEntry, 'canceled')
+      reject(new Error(NOTE_CONTENT_REQUEST_CANCELED))
+    }
+  })
+
+  cacheEntry.promise = promise
+  cacheEntry.startRequest = startRequest
+  cacheEntry.cancelRequest = cancelRequest
+  return cacheEntry
+}
+
+function removeQueuedPrefetch(entry: NoteContentCacheEntry): void {
+  const index = prefetchQueue.indexOf(entry)
+  if (index >= 0) prefetchQueue.splice(index, 1)
+}
+
+function startNoteContentRequestNow(entry: NoteContentCacheEntry): void {
+  removeQueuedPrefetch(entry)
+  entry.startRequest?.()
+}
+
+function runQueuedPrefetches(): void {
+  while (activePrefetchRequests < NOTE_CONTENT_PREFETCH_CONCURRENCY && prefetchQueue.length > 0) {
+    const entry = prefetchQueue.shift()
+    if (!entry || prefetchCache.get(entry.path) !== entry || entry.requestState !== 'queued') continue
+
+    activePrefetchRequests += 1
+    void entry.promise
+      .finally(() => {
+        activePrefetchRequests = Math.max(0, activePrefetchRequests - 1)
+        runQueuedPrefetches()
+      })
+      .catch(() => {})
+    entry.startRequest?.()
+  }
+}
+
+function enqueuePrefetchRequest(entry: NoteContentCacheEntry): void {
+  prefetchQueue.push(entry)
+  runQueuedPrefetches()
+}
+
+function requestNoteContent(
+  target: string | VaultEntry,
+  mode: NoteContentRequestMode = 'foreground',
+  options?: NoteContentRequestOptions,
+): NoteContentCacheEntry {
+  const cacheEntry = rememberNoteContent(createNoteContentRequest(target, options))
+  if (mode === 'prefetch') {
+    enqueuePrefetchRequest(cacheEntry)
+  } else {
+    startNoteContentRequestNow(cacheEntry)
+  }
+  return cacheEntry
+}
+
+export function prefetchNoteContent(target: string | VaultEntry, options?: NoteContentRequestOptions): void {
+  const path = targetPath(target)
+  const identity = targetIdentity(target)
+  const vaultPath = targetVaultPath(target)
+  const existing = prefetchCache.get(path)
+  if (existing && shouldReuseExistingRequest(existing, identity, vaultPath)) {
+    if (shouldRequestParsedBlockPreload(options)) requestParsedBlockPreload(existing, targetEntry(target))
+    return
+  }
+
+  void requestNoteContent(target, 'prefetch', options).promise.catch((error) => {
+    if (isCanceledNoteContentRequest(error) || isNoActiveVaultSelectedError(error) || isUnreadableNoteContentError(error)) return
+    console.warn('Failed to prefetch note content:', error)
+  })
+}
+
+export function cacheNoteContent(
+  path: string,
+  content: string,
+  entry?: VaultEntry,
+  options?: NoteContentRequestOptions,
+): void {
+  const byteSize = measureNoteContentBytes(content)
+  if (byteSize > NOTE_CONTENT_ENTRY_MAX_BYTES) {
+    prefetchCache.delete(path)
+    return
+  }
+
+  const cacheEntry = rememberNoteContent({
+    path,
+    promise: Promise.resolve(content),
+    value: content,
+    byteSize,
+    identity: entry ? noteContentIdentity(entry) : null,
+    vaultPath: entry ? workspacePathForEntry(entry) : undefined,
+    parsedBlockPreload: shouldRequestParsedBlockPreload(options),
+    parsedBlockPreloadNotified: false,
+  })
+  if (cacheEntry.parsedBlockPreload) cacheEntry.parsedBlockPreloadNotified = true
+  emitNoteContentResolved({
+    entry: entry ?? null,
+    path,
+    content,
+    parsedBlockPreload: cacheEntry.parsedBlockPreload,
+  })
+}
+
+export function clearNoteContentCache(): void {
+  for (const entry of prefetchQueue.splice(0)) entry.cancelRequest?.()
+  prefetchCache.clear()
+}
+
+export function hasResolvedCachedContent(entry: NoteContentCacheEntry | null): entry is NoteContentCacheEntry & { value: string } {
+  return !!entry && entry.value !== null
+}
+
+export function getCachedNoteContentEntry(path: string): NoteContentCacheEntry | null {
+  return prefetchCache.get(path) ?? null
+}
+
+async function validateCachedNoteContent(entry: NoteContentCacheEntry): Promise<boolean> {
+  if (entry.value === null) return false
+  const payload = getValidateNoteContentCommandPayload(entry.path, entry.value, entry.vaultPath)
+  return isTauri()
+    ? invoke<boolean>('validate_note_content', payload)
+    : mockInvoke<boolean>('validate_note_content', payload)
+}
+
+function matchesCachedContentVault(entry: VaultEntry, cachedEntry: NoteContentCacheEntry): boolean {
+  return cachedEntry.vaultPath === targetVaultPath(entry)
+}
+
+function canTrustCachedContentIdentity(entry: VaultEntry, cachedEntry: NoteContentCacheEntry): boolean {
+  return matchesCachedContentVault(entry, cachedEntry)
+    && sameIdentity(noteContentIdentity(entry), cachedEntry.identity)
+}
+
+function canUseExistingContentRequest(target: VaultEntry, existing: NoteContentCacheEntry | undefined, forceFresh: boolean): existing is NoteContentCacheEntry {
+  if (forceFresh || !existing) return false
+  return shouldReuseExistingRequest(existing, noteContentIdentity(target), targetVaultPath(target))
+}
+
+async function loadNoteContent(target: VaultEntry, forceFresh = false): Promise<string> {
+  const existing = prefetchCache.get(target.path)
+  if (canUseExistingContentRequest(target, existing, forceFresh)) {
+    startNoteContentRequestNow(existing)
+    return existing.promise
+  }
+  return requestNoteContent(target).promise
+}
+
+async function loadCachedContentIfFresh(entry: VaultEntry, cachedEntry: NoteContentCacheEntry): Promise<string | null> {
+  if (cachedEntry.value === null) return null
+  if (!matchesCachedContentVault(entry, cachedEntry)) {
+    prefetchCache.delete(entry.path)
+    return null
+  }
+  if (canTrustCachedContentIdentity(entry, cachedEntry)) {
+    rememberNoteContent(cachedEntry)
+    return cachedEntry.value
+  }
+
+  markNoteOpenTrace(entry.path, 'freshnessCheckStart')
+  const isFresh = await validateCachedNoteContent(cachedEntry)
+  markNoteOpenTrace(entry.path, 'freshnessCheckEnd')
+  if (isFresh) {
+    rememberNoteContent(cachedEntry)
+    return cachedEntry.value
+  }
+  prefetchCache.delete(entry.path)
+  return null
+}
+
+export async function loadContentForOpen(options: {
+  entry: VaultEntry
+  forceReload: boolean
+  cachedEntry: NoteContentCacheEntry | null
+}): Promise<string> {
+  const { entry, forceReload, cachedEntry } = options
+
+  if (!forceReload && hasResolvedCachedContent(cachedEntry)) {
+    const cachedContent = await loadCachedContentIfFresh(entry, cachedEntry)
+    if (cachedContent !== null) return cachedContent
+  }
+
+  return loadNoteContent(entry, forceReload || hasResolvedCachedContent(cachedEntry))
+}
+
+export function isNoActiveVaultSelectedError(error: unknown): boolean {
+  return isActiveVaultUnavailableError(error)
+}
+
+export function isCanceledNoteContentRequest(error: unknown): boolean {
+  return errorMessage(error) === NOTE_CONTENT_REQUEST_CANCELED
+}
+
+export function isUnreadableNoteContentError(error: unknown): boolean {
+  return /not valid utf-8 text|invalid utf-8|stream did not contain valid utf-8/i.test(errorMessage(error))
+}

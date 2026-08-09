@@ -1,0 +1,209 @@
+use std::borrow::Cow;
+use std::ffi::OsStr;
+use std::path::{Path, PathBuf};
+
+pub(super) fn runtime_resource_roots() -> Vec<PathBuf> {
+    let local_app_data = if cfg!(windows) {
+        non_empty_env_path("LOCALAPPDATA")
+    } else {
+        None
+    };
+    let current_exe = std::env::current_exe().ok();
+
+    runtime_resource_roots_for_env_and_exe(
+        non_empty_env_path("RESOURCEPATH"),
+        non_empty_env_path("APPDIR"),
+        local_app_data,
+        current_exe.as_deref(),
+    )
+}
+
+fn runtime_resource_roots_for_env_and_exe(
+    resource_path: Option<PathBuf>,
+    appdir: Option<PathBuf>,
+    local_app_data: Option<PathBuf>,
+    current_exe: Option<&Path>,
+) -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+
+    if let Some(resource_path) = resource_path {
+        push_resource_root(&mut roots, resource_path);
+    }
+    if let Some(current_exe) = current_exe {
+        push_current_exe_resource_roots(&mut roots, current_exe);
+    }
+    if let Some(appdir) = appdir {
+        push_resource_root(&mut roots, appdir.join("usr"));
+        // "Rhizome"/"rhizome" first: current productName (see
+        // src-tauri/tauri.conf.json). "Tolaria"/"tolaria" kept for anyone
+        // running a pre-rename AppImage — additive only, never removed.
+        push_resource_root(&mut roots, appdir.join("usr/lib/rhizome"));
+        push_resource_root(&mut roots, appdir.join("usr/lib/Rhizome"));
+        push_resource_root(&mut roots, appdir.join("usr/lib/tolaria"));
+        push_resource_root(&mut roots, appdir.join("usr/lib/Tolaria"));
+    }
+    if let Some(local_app_data) = local_app_data {
+        push_resource_root(&mut roots, local_app_data.join("Rhizome"));
+        push_resource_root(&mut roots, local_app_data.join("rhizome"));
+        push_resource_root(&mut roots, local_app_data.join("Tolaria"));
+        push_resource_root(&mut roots, local_app_data.join("tolaria"));
+    }
+
+    roots
+}
+
+fn push_current_exe_resource_roots(roots: &mut Vec<PathBuf>, current_exe: &Path) {
+    let Some(exe_dir) = current_exe.parent() else {
+        return;
+    };
+
+    push_resource_root(roots, exe_dir.to_path_buf());
+    push_resource_root(roots, exe_dir.join("resources"));
+    if let Some(resource_dir) = macos_app_resources_dir(current_exe) {
+        push_resource_root(roots, resource_dir);
+    }
+}
+
+fn macos_app_resources_dir(executable: &Path) -> Option<PathBuf> {
+    let macos_dir = executable.parent()?;
+    if macos_dir.file_name() != Some(OsStr::new("MacOS")) {
+        return None;
+    }
+
+    let contents_dir = macos_dir.parent()?;
+    if contents_dir.file_name() != Some(OsStr::new("Contents")) {
+        return None;
+    }
+
+    let app_dir = contents_dir.parent()?;
+    if app_dir.extension() != Some(OsStr::new("app")) {
+        return None;
+    }
+
+    Some(contents_dir.join("Resources"))
+}
+
+fn push_resource_root(roots: &mut Vec<PathBuf>, root: PathBuf) {
+    if !root.as_os_str().is_empty() && !roots.iter().any(|candidate| candidate == &root) {
+        roots.push(root);
+    }
+}
+
+fn non_empty_env_path(key: &str) -> Option<PathBuf> {
+    std::env::var_os(key)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+pub(super) fn client_script_path(path: &Path) -> String {
+    strip_windows_verbatim_prefix(&path.to_string_lossy()).into_owned()
+}
+
+fn strip_windows_verbatim_prefix(path: &str) -> Cow<'_, str> {
+    const VERBATIM_PREFIX: &str = r"\\?\";
+    const VERBATIM_UNC_PREFIX: &str = r"\\?\UNC\";
+
+    if let Some(rest) = path.strip_prefix(VERBATIM_UNC_PREFIX) {
+        return Cow::Owned(format!(r"\\{rest}"));
+    }
+
+    path.strip_prefix(VERBATIM_PREFIX)
+        .map(Cow::Borrowed)
+        .unwrap_or_else(|| Cow::Borrowed(path))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn includes_windows_install_locations() {
+        let local_app_data = PathBuf::from(r"C:\Users\alex\AppData\Local");
+        let install_dir = local_app_data.join("Tolaria");
+        let roots =
+            runtime_resource_roots_for_env_and_exe(None, None, Some(local_app_data.clone()), None);
+
+        assert_eq!(roots.iter().filter(|root| *root == &install_dir).count(), 1);
+        assert!(roots.contains(&local_app_data.join("tolaria")));
+
+        let candidates =
+            super::super::mcp_server_dir_candidates(Path::new("/repo/mcp-server"), &roots);
+        assert!(candidates.contains(&install_dir.join("mcp-server")));
+    }
+
+    /// A Windows install built under the current productName ("Rhizome")
+    /// must still be found — until this test, only the pre-rename
+    /// "Tolaria"/"tolaria" install dirs were searched.
+    #[test]
+    fn includes_windows_install_locations_for_current_product_name() {
+        let local_app_data = PathBuf::from(r"C:\Users\alex\AppData\Local");
+        let install_dir = local_app_data.join("Rhizome");
+        let roots =
+            runtime_resource_roots_for_env_and_exe(None, None, Some(local_app_data.clone()), None);
+
+        assert!(roots.contains(&install_dir));
+        assert!(roots.contains(&local_app_data.join("rhizome")));
+
+        let candidates =
+            super::super::mcp_server_dir_candidates(Path::new("/repo/mcp-server"), &roots);
+        assert!(candidates.contains(&install_dir.join("mcp-server")));
+    }
+
+    /// The AppImage `appdir` branch had no test at all before this change —
+    /// added while touching it for the Tolaria→Rhizome rename (ADR-0162), to
+    /// catch a typo in either the new or the kept-for-compat legacy path.
+    #[test]
+    fn includes_appimage_install_locations_for_current_and_legacy_product_name() {
+        let appdir = PathBuf::from("/tmp/.mount_rhizome/AppRun.wZ9k");
+        let roots = runtime_resource_roots_for_env_and_exe(None, Some(appdir.clone()), None, None);
+
+        assert!(roots.contains(&appdir.join("usr")));
+        assert!(roots.contains(&appdir.join("usr/lib/rhizome")));
+        assert!(roots.contains(&appdir.join("usr/lib/Rhizome")));
+        assert!(roots.contains(&appdir.join("usr/lib/tolaria")));
+        assert!(roots.contains(&appdir.join("usr/lib/Tolaria")));
+    }
+
+    #[test]
+    fn includes_macos_app_bundle_resources_from_executable_path() {
+        let executable = PathBuf::from("/Applications/Tolaria.app/Contents/MacOS/Tolaria");
+        let roots = runtime_resource_roots_for_env_and_exe(None, None, None, Some(&executable));
+
+        assert!(roots.contains(&PathBuf::from(
+            "/Applications/Tolaria.app/Contents/Resources"
+        )));
+
+        let candidates =
+            super::super::mcp_server_dir_candidates(Path::new("/repo/mcp-server"), &roots);
+        assert!(candidates.contains(&PathBuf::from(
+            "/Applications/Tolaria.app/Contents/Resources/mcp-server"
+        )));
+    }
+
+    #[test]
+    fn client_script_path_strips_windows_extended_length_disk_prefix() {
+        let path = PathBuf::from(r"\\?\D:\Tolaria\mcp-server\index.js");
+
+        assert_eq!(client_script_path(&path), r"D:\Tolaria\mcp-server\index.js",);
+    }
+
+    #[test]
+    fn client_script_path_strips_windows_extended_length_unc_prefix() {
+        let path = PathBuf::from(r"\\?\UNC\server\share\Tolaria\mcp-server\index.js");
+
+        assert_eq!(
+            client_script_path(&path),
+            r"\\server\share\Tolaria\mcp-server\index.js",
+        );
+    }
+
+    #[test]
+    fn client_script_path_preserves_normal_paths_with_spaces() {
+        let path = PathBuf::from(r"D:\Program Files\Tolaria\mcp-server\index.js");
+
+        assert_eq!(
+            client_script_path(&path),
+            r"D:\Program Files\Tolaria\mcp-server\index.js",
+        );
+    }
+}

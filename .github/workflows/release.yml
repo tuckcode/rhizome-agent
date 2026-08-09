@@ -1,0 +1,457 @@
+name: Release (Alpha)
+
+on:
+  workflow_dispatch:
+  # push:branches:[main] intentionally paused — this workflow ran on every
+  # push, mostly on macos-15 (~10x the Linux billing rate), and of the last
+  # 50 combined CI+Release runs 44 failed. Cut a release manually
+  # (Actions tab -> Release (Alpha) -> Run workflow) until billing/cost is
+  # sorted. Settings' "Alpha follows every push to main" copy was updated
+  # to match — re-enable both together if this comes back.
+
+concurrency:
+  group: release-alpha-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Phase 1: Compute the alpha version string once
+  # Alpha builds use calendar semver and stay newer than the latest stable tag.
+  # ─────────────────────────────────────────────────────────────
+  version:
+    name: Compute alpha version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      display_version: ${{ steps.ver.outputs.display_version }}
+      tag: ${{ steps.ver.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: ver
+        shell: bash
+        run: |
+          python3 <<'PY' > version.env
+          import re
+          import subprocess
+          from datetime import datetime, timedelta, timezone
+
+          def lines(command: list[str]) -> list[str]:
+              output = subprocess.check_output(command, text=True).strip()
+              return [line for line in output.splitlines() if line]
+
+          alpha_pattern = re.compile(r"^alpha-v(\d{4}\.\d{1,2}\.\d{1,2})-alpha\.(\d+)$")
+
+          def parse_alpha_tag(tag: str) -> tuple[str, int] | None:
+              match = alpha_pattern.fullmatch(tag)
+              if not match:
+                  return None
+              calendar_version, sequence = match.groups()
+              return calendar_version, int(sequence)
+
+          def alpha_version(calendar_version: str, sequence: int) -> str:
+              return f"{calendar_version}-alpha.{sequence}"
+
+          def alpha_tag(calendar_version: str, sequence: int) -> str:
+              return f"alpha-v{calendar_version}-alpha.{sequence:04d}"
+
+          existing_tags = [
+              tag for tag in lines(["git", "tag", "--points-at", "HEAD"])
+              if tag.startswith("alpha-v")
+          ]
+
+          if existing_tags:
+              tag = existing_tags[0]
+              parsed = parse_alpha_tag(tag)
+              version = alpha_version(*parsed) if parsed is not None else tag.removeprefix("alpha-v")
+          else:
+              today = datetime.now(timezone.utc).date()
+              stable_date = None
+              stable_patterns = (
+                  re.compile(r"^v(\d{4})-(\d{2})-(\d{2})$"),
+                  re.compile(r"^stable-v(\d{4})\.(\d{1,2})\.(\d{1,2})$"),
+              )
+
+              stable_tags = lines([
+                  "git", "for-each-ref", "--sort=-creatordate", "--format=%(refname:short)",
+                  "refs/tags/v20*", "refs/tags/stable-v*",
+              ])
+
+              for stable_tag in stable_tags:
+                  match = next((pattern.fullmatch(stable_tag) for pattern in stable_patterns if pattern.fullmatch(stable_tag)), None)
+                  if not match:
+                      continue
+
+                  year, month, day = map(int, match.groups())
+                  try:
+                      stable_date = datetime(year, month, day, tzinfo=timezone.utc).date()
+                  except ValueError:
+                      continue
+                  break
+
+              alpha_date = today if stable_date is None or today > stable_date else stable_date + timedelta(days=1)
+              calendar_version = f"{alpha_date.year}.{alpha_date.month}.{alpha_date.day}"
+              sequence = len(lines(["git", "tag", "--list", f"alpha-v{calendar_version}-alpha.*"])) + 1
+
+              version = alpha_version(calendar_version, sequence)
+              tag = alpha_tag(calendar_version, sequence)
+
+          display_match = re.fullmatch(r"(\d{4})\.(\d{1,2})\.(\d{1,2})-alpha\.(\d+)", version)
+          display_version = (
+              f"Alpha {int(display_match.group(1))}.{int(display_match.group(2))}.{int(display_match.group(3))}.{int(display_match.group(4))}"
+              if display_match
+              else version
+          )
+
+          print(f"version={version}")
+          print(f"display_version={display_version}")
+          print(f"tag={tag}")
+          PY
+
+          cat version.env >> "$GITHUB_OUTPUT"
+          VERSION=$(grep '^version=' version.env | cut -d= -f2-)
+          DISPLAY_VERSION=$(grep '^display_version=' version.env | cut -d= -f2-)
+          echo "### Alpha version: \`$DISPLAY_VERSION\` (\`$VERSION\`)" >> "$GITHUB_STEP_SUMMARY"
+
+  # -------------------------------------------------------------
+  # Phase 2: Build shared release artifacts
+  # -------------------------------------------------------------
+  build-artifacts:
+    name: Build release artifacts
+    needs: version
+    uses: ./.github/workflows/release-build-artifacts.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      macos_bundles: app
+      upload_macos_dmg: false
+    secrets: inherit
+
+  # ─────────────────────────────────────────────────────────────
+  # Phase 3: Publish GitHub Release
+  # No lipo/re-signing — use the per-arch artifacts directly
+  # ─────────────────────────────────────────────────────────────
+  release:
+    name: GitHub Release (alpha)
+    needs: [version, build-artifacts]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Normalize macOS updater artifact names
+        run: |
+          # .sig is optional: unsigned builds (no TAURI_SIGNING_*) ship the
+          # download archive only. updater.endpoints is [] so nothing consumes
+          # signatures today. Intel Mac (x86_64) is no longer in the matrix.
+          normalize_updater() {
+            local arch="$1"
+            local normalized_updater="$2"
+            local artifact_dir="updater-${arch}"
+            local updater_file
+            if [ ! -d "$artifact_dir" ]; then
+              echo "::error::Missing macOS artifact directory ${artifact_dir}" >&2
+              return 1
+            fi
+            updater_file=$(find "$artifact_dir" -maxdepth 1 -name "*.app.tar.gz" -print -quit)
+            if [ -z "$updater_file" ]; then
+              echo "::error::Missing macOS .app.tar.gz artifact in ${artifact_dir}" >&2
+              return 1
+            fi
+
+            local sig_file="${updater_file}.sig"
+            local normalized_sig="${normalized_updater}.sig"
+            if [ "$updater_file" != "$normalized_updater" ]; then
+              mv "$updater_file" "$normalized_updater"
+            fi
+            if [ -f "$sig_file" ]; then
+              if [ "$sig_file" != "$normalized_sig" ]; then
+                mv "$sig_file" "$normalized_sig"
+              fi
+            else
+              echo "::warning::No .sig for ${normalized_updater} — publishing download artifact without updater signature."
+            fi
+          }
+
+          normalize_updater aarch64 "updater-aarch64/Rhizome_${{ needs.version.outputs.version }}_macOS_Silicon.app.tar.gz"
+
+      - name: Generate release notes
+        run: |
+          PREV_TAG=$(python3 <<'PY'
+          import re
+          import subprocess
+
+          current_tag = '${{ needs.version.outputs.tag }}'
+          pattern = re.compile(r'^alpha-v(\d{4})\.(\d{1,2})\.(\d{1,2})-alpha\.(\d+)$')
+
+          output = subprocess.check_output(['git', 'tag', '--list', 'alpha-v*'], text=True).strip()
+          tags = [line for line in output.splitlines() if line and line != current_tag]
+
+          parsed_tags = []
+          for tag in tags:
+              match = pattern.fullmatch(tag)
+              if not match:
+                  continue
+              year, month, day, sequence = map(int, match.groups())
+              parsed_tags.append(((year, month, day, sequence), tag))
+
+          print(max(parsed_tags)[1] if parsed_tags else '')
+          PY
+          )
+          if [ -z "$PREV_TAG" ]; then
+            NOTES=$(git log --oneline --no-merges -20)
+          else
+            NOTES=$(git log --oneline --no-merges "${PREV_TAG}..HEAD")
+          fi
+          {
+            echo "## What's Changed (Alpha)"
+            echo ""
+            echo "$NOTES" | while IFS= read -r line; do echo "- $line"; done
+            echo ""
+            echo "---"
+            echo "**Alpha build — updated on every push to \`main\`**"
+            echo ""
+            echo "**Includes macOS (Apple Silicon), Linux x64, and Windows x64 bundles**"
+            echo ""
+            echo "*Built from \`$(git rev-parse --short HEAD)\` on $(date -u +%Y-%m-%d)*"
+          } > release_notes.md
+
+      - name: Build alpha-latest.json
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          TAG="${{ needs.version.outputs.tag }}"
+          REPO="${GITHUB_REPOSITORY}"
+          REPO_NAME="${REPO#*/}"
+          PAGES_URL="https://refactoringhq.github.io/${REPO_NAME}/"
+
+          # find_first: optional glob match (no failure). find_required: hard-fail.
+          # .sig is optional — unsigned builds publish download URLs only.
+          # updater.endpoints is [] so nothing in-app consumes signatures.
+          find_first() {
+            for pattern in "$@"; do
+              # shellcheck disable=SC2086
+              set -- $pattern
+              if [ -e "$1" ]; then
+                printf '%s\n' "$1"
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          find_required() {
+            local patterns=("$@")
+            if path=$(find_first "${patterns[@]}"); then
+              printf '%s\n' "$path"
+              return 0
+            fi
+            echo "::error::Missing required artifact matching one of: ${patterns[*]}" >&2
+            return 1
+          }
+
+          # Emit a platforms JSON object fragment for one target.
+          # If a .sig exists, include signature + url (updater). Always include
+          # download_url when a download artifact is present.
+          platform_json() {
+            local key="$1"
+            local download_file="$2"
+            shift 2
+            local sig_patterns=("$@")
+            local download_base url_field sig_field
+            download_base=$(basename "$download_file")
+            local download_url="https://github.com/${REPO}/releases/download/${TAG}/${download_base}"
+
+            local sig_file=""
+            if [ ${#sig_patterns[@]} -gt 0 ]; then
+              sig_file=$(find_first "${sig_patterns[@]}" || true)
+            fi
+
+            if [ -n "$sig_file" ] && [ -f "$sig_file" ]; then
+              local updater_file="${sig_file%.sig}"
+              local updater_base
+              updater_base=$(basename "$updater_file")
+              local updater_url="https://github.com/${REPO}/releases/download/${TAG}/${updater_base}"
+              local sig
+              sig=$(cat "$sig_file")
+              printf '      "%s": {\n        "signature": "%s",\n        "url": "%s",\n        "download_url": "%s"\n      }' \
+                "$key" "$sig" "$updater_url" "$download_url"
+            else
+              echo "::warning::No .sig for ${key} — publishing download_url only." >&2
+              printf '      "%s": {\n        "url": "%s",\n        "download_url": "%s"\n      }' \
+                "$key" "$download_url" "$download_url"
+            fi
+          }
+
+          ARM_DOWNLOAD=$(find_required "updater-aarch64/*.app.tar.gz")
+          LINUX_DOWNLOAD=$(find_required \
+            "linux-x86_64-bundles/*/*.AppImage" \
+            "linux-x86_64-bundles/*/*.deb" \
+            "linux-x86_64-bundles/*/*.AppImage.tar.gz" \
+            "linux-x86_64-bundles/*.AppImage" \
+            "linux-x86_64-bundles/*.deb" \
+            "linux-x86_64-bundles/*.AppImage.tar.gz")
+          WINDOWS_DOWNLOAD=$(find_required \
+            "windows-x86_64-bundles/*/*-setup.exe" \
+            "windows-x86_64-bundles/*/*.msi" \
+            "windows-x86_64-bundles/*/*.nsis.zip" \
+            "windows-x86_64-bundles/*/*.msi.zip" \
+            "windows-x86_64-bundles/*-setup.exe" \
+            "windows-x86_64-bundles/*.msi" \
+            "windows-x86_64-bundles/*.nsis.zip" \
+            "windows-x86_64-bundles/*.msi.zip")
+
+          ARM_JSON=$(platform_json "darwin-aarch64" "$ARM_DOWNLOAD" \
+            "updater-aarch64/*.app.tar.gz.sig")
+          LINUX_JSON=$(platform_json "linux-x86_64" "$LINUX_DOWNLOAD" \
+            "linux-x86_64-bundles/*/*.AppImage.sig" \
+            "linux-x86_64-bundles/*/*.AppImage.tar.gz.sig" \
+            "linux-x86_64-bundles/*/*.deb.sig" \
+            "linux-x86_64-bundles/*.AppImage.sig" \
+            "linux-x86_64-bundles/*.AppImage.tar.gz.sig" \
+            "linux-x86_64-bundles/*.deb.sig")
+          WINDOWS_JSON=$(platform_json "windows-x86_64" "$WINDOWS_DOWNLOAD" \
+            "windows-x86_64-bundles/*/*-setup.exe.sig" \
+            "windows-x86_64-bundles/*/*.msi.sig" \
+            "windows-x86_64-bundles/*/*.nsis.zip.sig" \
+            "windows-x86_64-bundles/*/*.msi.zip.sig" \
+            "windows-x86_64-bundles/*-setup.exe.sig" \
+            "windows-x86_64-bundles/*.msi.sig" \
+            "windows-x86_64-bundles/*.nsis.zip.sig" \
+            "windows-x86_64-bundles/*.msi.zip.sig")
+
+          cat > alpha-latest.json << EOF
+          {
+            "version": "${VERSION}",
+            "notes": "Alpha build. See ${PAGES_URL} for full release notes.",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+          ${ARM_JSON},
+          ${LINUX_JSON},
+          ${WINDOWS_JSON}
+            }
+          }
+          EOF
+          echo "alpha-latest.json:"; cat alpha-latest.json
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: Rhizome ${{ needs.version.outputs.display_version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: true
+          files: |
+            updater-aarch64/*.app.tar.gz
+            updater-aarch64/*.app.tar.gz.sig
+            linux-x86_64-bundles/*.deb
+            linux-x86_64-bundles/*.deb.sig
+            linux-x86_64-bundles/*.rpm
+            linux-x86_64-bundles/*.AppImage
+            linux-x86_64-bundles/*.AppImage.sig
+            linux-x86_64-bundles/*.AppImage.tar.gz
+            linux-x86_64-bundles/*.AppImage.tar.gz.sig
+            linux-x86_64-bundles/*/*.deb
+            linux-x86_64-bundles/*/*.deb.sig
+            linux-x86_64-bundles/*/*.rpm
+            linux-x86_64-bundles/*/*.AppImage
+            linux-x86_64-bundles/*/*.AppImage.sig
+            linux-x86_64-bundles/*/*.AppImage.tar.gz
+            linux-x86_64-bundles/*/*.AppImage.tar.gz.sig
+            windows-x86_64-bundles/*.exe
+            windows-x86_64-bundles/*.exe.sig
+            windows-x86_64-bundles/*.msi
+            windows-x86_64-bundles/*.msi.sig
+            windows-x86_64-bundles/*.zip
+            windows-x86_64-bundles/*.zip.sig
+            windows-x86_64-bundles/*/*.exe
+            windows-x86_64-bundles/*/*.exe.sig
+            windows-x86_64-bundles/*/*.msi
+            windows-x86_64-bundles/*/*.msi.sig
+            windows-x86_64-bundles/*/*.zip
+            windows-x86_64-bundles/*/*.zip.sig
+            alpha-latest.json
+
+  # ─────────────────────────────────────────────────────────────
+  # Phase 4: Update GitHub Pages with docs, release history, and download assets
+  # ─────────────────────────────────────────────────────────────
+  pages:
+    name: Update docs and release pages
+    needs: [version, release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: 11
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: latest
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build docs and release pages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VITEPRESS_BASE="/" pnpm docs:build
+          mkdir -p _site/alpha _site/stable _site/release-notes
+          cp -R site/.vitepress/dist/. _site/
+          if [ -d release-notes ]; then cp release-notes/*.md _site/release-notes/ 2>/dev/null || true; fi
+          gh api -H "Accept: application/vnd.github.html+json" repos/${{ github.repository }}/releases --paginate > _site/releases.json
+          STABLE_TAG=$(gh release list --repo ${{ github.repository }} --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // ""')
+
+          gh release download --repo ${{ github.repository }} "${{ needs.version.outputs.tag }}" --pattern "alpha-latest.json" --output _site/alpha/latest.json || echo '{}' > _site/alpha/latest.json
+          if [ -n "$STABLE_TAG" ]; then
+            gh release download --repo ${{ github.repository }} "$STABLE_TAG" --pattern "stable-latest.json" --output _site/stable/latest.json || echo '{}' > _site/stable/latest.json
+          else
+            echo '{}' > _site/stable/latest.json
+          fi
+          bun scripts/build-release-download-page.ts --latest-json _site/stable/latest.json --releases-json _site/releases.json --output-file _site/stable/download/index.html
+          bun scripts/build-release-history-page.ts --releases-json _site/releases.json --output-file _site/releases/index.html
+          mkdir -p _site/download
+          cp _site/stable/download/index.html _site/download/index.html
+
+          cp _site/alpha/latest.json _site/latest.json
+          cp _site/alpha/latest.json _site/latest-canary.json
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./_site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

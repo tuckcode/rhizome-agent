@@ -1,0 +1,28 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/main.tsx",
+    "scripts/*.mjs",
+    ".chunk/*.mjs",
+    "site/.vitepress/config.ts",
+    "site/.vitepress/theme/index.ts",
+    "mcp-server/index.js",
+    "tests/**/*.spec.ts",
+    "tests/**/*.setup.ts",
+    "playwright.config.ts",
+    "vite.config.ts"
+  ],
+  "project": ["src/**/*.{ts,tsx}", "scripts/**/*.mjs", "mcp-server/**/*.js"],
+  "ignore": [
+    "src-tauri/gen/**",
+    "src/mock-tauri.ts",
+    "src/types/rhizomeTestBridge.ts"
+  ],
+  "ignoreDependencies": [
+    "@tauri-apps/plugin-updater",
+    "tailwindcss",
+    "tw-animate-css"
+  ],
+  "ignoreExportsUsedInFile": true,
+  "includeEntryExports": false
+}

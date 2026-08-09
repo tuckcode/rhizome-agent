@@ -1,0 +1,744 @@
+/* ==============================================
+   EditorTheme.css — BlockNote theme overrides
+   Driven by CSS custom properties from theme.json
+   ============================================== */
+
+/* --- Editor root --- */
+.editor__blocknote-container {
+  position: relative;
+}
+
+.editor__blocknote-container .bn-editor {
+  font-family: var(--editor-font-family);
+  font-size: var(--editor-font-size);
+  line-height: var(--editor-line-height);
+  max-width: var(--editor-max-width);
+  margin: 0 auto;  /* Center the editor body */
+  padding: var(--editor-padding-vertical) var(--editor-padding-horizontal);
+  color: var(--colors-text);
+  caret-color: var(--colors-cursor);
+}
+
+.editor-content-width--wide .editor__blocknote-container .bn-editor {
+  max-width: none;
+  margin-inline: 0;
+  padding-inline: 0;
+}
+
+/* Let each rich-text block resolve its own base direction for mixed LTR/RTL notes. */
+.editor__blocknote-container .bn-block-content {
+  text-align: start;
+}
+
+.editor__blocknote-container .bn-inline-content {
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+
+.tolaria-rich-editor-text-direction-rtl,
+[data-tolaria-text-direction="rtl"],
+[data-tolaria-text-direction="rtl"] :is(blockquote, .bn-inline-content, .tola-callout) {
+  direction: rtl;
+}
+
+[data-tolaria-text-direction="rtl"]:is(blockquote),
+[data-tolaria-text-direction="rtl"] blockquote {
+  border-left-width: 0;
+  border-inline-start: var(--blockquote-border-left-width, 3px) solid var(--blockquote-border-left-color, var(--border));
+  padding-inline-start: var(--blockquote-padding-left, 0.75em);
+}
+
+/* Override BlockNote's default line-height on block-outer so our theme controls it */
+.editor__blocknote-container .bn-block-outer {
+  line-height: var(--editor-line-height) !important;
+}
+
+/* Stack handle buttons horizontally instead of vertically to reduce height,
+   so they fit within a single text line for headings and paragraphs. */
+.editor__blocknote-container .bn-side-menu {
+  --group-wrap: nowrap !important;
+  align-items: center !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 0 !important;
+}
+
+.editor__blocknote-container .bn-side-menu button,
+.editor__blocknote-container .rhizome-block-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editor__blocknote-container .bn-side-menu [draggable="true"] * {
+  pointer-events: none;
+}
+
+/* More horizontal space between drag handle and content */
+.editor__blocknote-container .bn-side-menu ~ * ,
+.editor__blocknote-container [class*="bn-side-menu"] {
+  /* The side menu is positioned via transform — we shift it further left */
+}
+.editor__blocknote-container .bn-block-content {
+  margin-inline-start: 8px;
+}
+
+.editor__blocknote-container .bn-editor ::selection {
+  background: var(--colors-selection);
+}
+
+.editor__blocknote-container
+  .bn-editor
+  :is(.bn-block-group, .bn-block-outer, .bn-block, .bn-block-content)::selection {
+  background: transparent;
+}
+
+.editor__blocknote-container .ProseMirror-trailingBreak::selection,
+.editor__blocknote-container .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::selection {
+  background: transparent;
+}
+
+.editor__blocknote-container .bn-block-outer.tolaria-rich-editor-block-selected {
+  --tolaria-block-selection-right-outset: 10px;
+  --tolaria-block-selection-top-outset: 2px;
+
+  caret-color: transparent;
+  isolation: isolate;
+  outline: none;
+  position: relative;
+}
+
+.editor__blocknote-container .bn-block-outer.tolaria-rich-editor-block-selected *,
+.editor__blocknote-container .bn-block.tolaria-rich-editor-block-selected,
+.editor__blocknote-container .bn-block.tolaria-rich-editor-block-selected * {
+  caret-color: transparent;
+}
+
+.editor__blocknote-container .bn-block-outer.tolaria-rich-editor-block-selected::after {
+  background: color-mix(in srgb, var(--colors-selection) 82%, transparent);
+  border-radius: 6px;
+  content: "";
+  inset:
+    calc(var(--tolaria-block-selection-top-outset) * -1)
+    calc(var(--tolaria-block-selection-right-outset) * -1)
+    calc(var(--tolaria-block-selection-top-outset) * -1)
+    0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+}
+
+.editor__blocknote-container
+  .bn-block-outer.tolaria-rich-editor-block-selected:has(> .bn-block > .bn-block-content[data-content-type="paragraph"])::after {
+  bottom: calc(var(--editor-paragraph-spacing) - 2px);
+}
+
+.editor__blocknote-container .bn-block-outer.tolaria-rich-editor-block-selected:has(hr)::after {
+  content: none;
+}
+
+.editor__blocknote-container .bn-block-outer.tolaria-rich-editor-block-selected > .bn-block {
+  position: relative;
+  z-index: 1;
+}
+
+.editor__blocknote-container .bn-block.tolaria-rich-editor-block-selected {
+  background: color-mix(in srgb, var(--colors-selection) 82%, transparent);
+  border-radius: 6px;
+  box-decoration-break: clone;
+}
+
+.editor__blocknote-container .bn-block.tolaria-rich-editor-block-selected:has(hr) {
+  background: transparent;
+}
+
+/* Keep BlockNote toolbar/menu icons at a stable size.
+   Some default React Icons-based controls inherit `1em` sizing and can blow up
+   when upstream toolbar styling changes. */
+.editor__blocknote-container :is(.bn-toolbar, .bn-formatting-toolbar, .bn-menu-dropdown, .bn-grid-suggestion-menu) button svg {
+  width: 16px !important;
+  height: 16px !important;
+  flex-shrink: 0;
+}
+
+/* --- Paragraph spacing --- */
+.editor__blocknote-container .bn-block-content[data-content-type="paragraph"] {
+  margin-bottom: var(--editor-paragraph-spacing);
+}
+
+/* --- Headings --- */
+/* Heading spacing: use margin-top on .bn-block-outer (creates space between blocks)
+   and ensure the handle aligns by NOT adding padding/margin on inner elements.
+   BlockNote positions handles via JS based on .bn-block-content bounding rect. */
+
+/* Title (H1) — visually separated from content.
+   BlockNote renders H1 without data-level, so we target :has(h1) */
+.editor__blocknote-container .bn-block-outer:has(h1) {
+  margin-top: var(--headings-h1-margin-top) !important;
+  margin-bottom: var(--headings-h1-margin-bottom) !important;
+  padding-bottom: 16px !important;
+  border-bottom: 1px solid var(--border-primary);
+}
+.editor__blocknote-container [data-content-type="heading"]:not([data-level]) .bn-inline-content,
+.editor__blocknote-container [data-content-type="heading"][data-level="1"] .bn-inline-content {
+  font-size: var(--headings-h1-font-size);
+  font-weight: var(--headings-h1-font-weight);
+  line-height: var(--headings-h1-line-height);
+  color: var(--headings-h1-color);
+  letter-spacing: var(--headings-h1-letter-spacing);
+}
+.editor__blocknote-container [data-content-type="heading"]:not([data-level])[data-is-empty-and-focused] .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before,
+.editor__blocknote-container [data-content-type="heading"]:not([data-level])[data-is-only-empty-block] .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before,
+.editor__blocknote-container [data-content-type="heading"][data-level="1"][data-is-empty-and-focused] .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before,
+.editor__blocknote-container [data-content-type="heading"][data-level="1"][data-is-only-empty-block] .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before {
+  content: "Title" !important;
+}
+
+.editor__blocknote-container .bn-block-outer:has(> .bn-block > [data-content-type="heading"][data-level="2"]) {
+  margin-top: var(--headings-h2-margin-top) !important;
+  margin-bottom: var(--headings-h2-margin-bottom) !important;
+}
+.editor__blocknote-container [data-content-type="heading"][data-level="2"] .bn-inline-content {
+  font-size: var(--headings-h2-font-size);
+  font-weight: var(--headings-h2-font-weight);
+  line-height: var(--headings-h2-line-height);
+  color: var(--headings-h2-color);
+  letter-spacing: var(--headings-h2-letter-spacing);
+}
+
+.editor__blocknote-container .bn-block-outer:has(> .bn-block > [data-content-type="heading"][data-level="3"]) {
+  margin-top: var(--headings-h3-margin-top) !important;
+  margin-bottom: var(--headings-h3-margin-bottom) !important;
+}
+.editor__blocknote-container [data-content-type="heading"][data-level="3"] .bn-inline-content {
+  font-size: var(--headings-h3-font-size);
+  font-weight: var(--headings-h3-font-weight);
+  line-height: var(--headings-h3-line-height);
+  color: var(--headings-h3-color);
+  letter-spacing: var(--headings-h3-letter-spacing);
+}
+
+.editor__blocknote-container .bn-block-outer:has(> .bn-block > [data-content-type="heading"][data-level="4"]) {
+  margin-top: var(--headings-h4-margin-top) !important;
+  margin-bottom: var(--headings-h4-margin-bottom) !important;
+}
+.editor__blocknote-container [data-content-type="heading"][data-level="4"] .bn-inline-content {
+  font-size: var(--headings-h4-font-size);
+  font-weight: var(--headings-h4-font-weight);
+  line-height: var(--headings-h4-line-height);
+  color: var(--headings-h4-color);
+  letter-spacing: var(--headings-h4-letter-spacing);
+}
+
+/* --- Bullet lists --- */
+/* BlockNote renders bullet as ::before on [data-content-type="bulletListItem"] 
+   with content: "•", display: flex, width: 24px */
+.editor__blocknote-container [data-content-type="bulletListItem"] {
+  padding-inline-start: var(--lists-padding-left);
+  margin-bottom: var(--lists-item-spacing);
+  gap: var(--lists-bullet-gap) !important;
+}
+
+.editor__blocknote-container [data-content-type="bulletListItem"]::before {
+  font-size: var(--lists-bullet-size) !important;
+  color: var(--lists-bullet-color) !important;
+  min-width: var(--lists-indent-size) !important;
+  width: var(--lists-indent-size) !important;
+  /* Align bullet with first line of text */
+  height: calc(var(--editor-font-size) * var(--editor-line-height)) !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* Nested list indentation */
+.editor__blocknote-container .bn-block-group .bn-block-group {
+  margin-inline-start: var(--lists-indent-size);
+}
+
+/* Hide the vertical nesting lines — cleaner without them */
+.editor__blocknote-container .bn-block-group .bn-block-group .bn-block-outer::before {
+  border-inline-start: none !important;
+}
+
+/* --- Numbered lists --- */
+.editor__blocknote-container [data-content-type="numberedListItem"] {
+  padding-inline-start: var(--lists-padding-left);
+  margin-bottom: var(--lists-item-spacing);
+  gap: var(--lists-bullet-gap) !important;
+}
+
+.editor__blocknote-container [data-content-type="numberedListItem"]::before {
+  color: var(--lists-bullet-color) !important;
+  font-size: var(--editor-font-size) !important;
+  min-width: var(--lists-indent-size) !important;
+  width: var(--lists-indent-size) !important;
+  height: calc(var(--editor-font-size) * var(--editor-line-height)) !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* --- Checkbox / check list items --- */
+/* BlockNote renders checkbox as: div > input[type=checkbox] inside .bn-block-content */
+.editor__blocknote-container [data-content-type="checkListItem"] {
+  margin-bottom: var(--lists-item-spacing);
+  gap: var(--checkboxes-gap) !important;
+}
+
+.editor__blocknote-container [data-content-type="checkListItem"] input[type="checkbox"] {
+  width: var(--checkboxes-size) !important;
+  height: var(--checkboxes-size) !important;
+  min-width: var(--checkboxes-size) !important;
+  min-height: var(--checkboxes-size) !important;
+  border-radius: var(--checkboxes-border-radius) !important;
+  accent-color: var(--checkboxes-checked-color) !important;
+  border-color: var(--checkboxes-unchecked-border-color) !important;
+  cursor: pointer;
+}
+
+/* Checkbox container div — control spacing, align to first line */
+.editor__blocknote-container [data-content-type="checkListItem"] > div[contenteditable="false"] {
+  width: var(--lists-indent-size) !important;
+  min-width: var(--lists-indent-size) !important;
+  height: calc(var(--editor-font-size) * var(--editor-line-height)) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* --- Inline: bold --- */
+.editor__blocknote-container .bn-editor strong {
+  font-weight: var(--inline-styles-bold-font-weight);
+  color: var(--inline-styles-bold-color);
+}
+
+/* --- Inline: italic --- */
+.editor__blocknote-container .bn-editor em {
+  font-style: var(--inline-styles-italic-font-style);
+  color: var(--inline-styles-italic-color);
+}
+
+/* --- Inline: strikethrough --- */
+.editor__blocknote-container .bn-editor s,
+.editor__blocknote-container .bn-editor del {
+  color: var(--inline-styles-strikethrough-color);
+  text-decoration: var(--inline-styles-strikethrough-text-decoration);
+}
+
+/* --- Inline: code --- */
+.editor__blocknote-container .bn-inline-content code {
+  font-family: var(--inline-styles-code-font-family);
+  font-size: var(--inline-styles-code-font-size);
+  background-color: var(--inline-styles-code-background-color);
+  padding: var(--inline-styles-code-padding-vertical) var(--inline-styles-code-padding-horizontal);
+  border-radius: var(--inline-styles-code-border-radius);
+  color: var(--inline-styles-code-color);
+}
+
+/* --- Inline: Markdown highlight --- */
+.editor__blocknote-container .bn-editor mark.markdown-highlight {
+  background-color: var(--feedback-warning-bg);
+  color: var(--colors-text);
+  border-radius: 2px;
+  padding: 0 0.12em;
+}
+
+/* --- Inline: links --- */
+.editor__blocknote-container .bn-editor a {
+  color: var(--inline-styles-link-color);
+  text-decoration: var(--inline-styles-link-text-decoration);
+  cursor: text;
+}
+
+/* --- Wikilinks (override from Editor.css with theme vars) --- */
+.editor__blocknote-container .wikilink {
+  color: var(--inline-styles-wikilink-color);
+  text-decoration: var(--inline-styles-wikilink-text-decoration);
+  border-bottom: var(--inline-styles-wikilink-border-bottom);
+  cursor: text;
+}
+
+.editor__blocknote-container .math {
+  color: var(--colors-text);
+  cursor: text;
+}
+
+.editor__blocknote-container .math--inline {
+  display: inline-flex;
+  max-width: 100%;
+  vertical-align: baseline;
+}
+
+.editor__blocknote-container .math-block-shell {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 6px 0;
+}
+
+.editor__blocknote-container .math-block-shell:not(.math-block-shell--editing) {
+  width: fit-content;
+  margin-inline: auto;
+}
+
+.editor__blocknote-container .math-block-shell--editing {
+  width: 100%;
+}
+
+.editor__blocknote-container .math-block-source::selection {
+  background: var(--colors-selection);
+  color: var(--colors-text);
+}
+
+.editor__blocknote-container .math--block {
+  display: block;
+  min-width: max-content;
+  text-align: center;
+}
+
+.editor__blocknote-container .math .katex-error {
+  color: var(--destructive) !important;
+  white-space: pre-wrap;
+}
+
+.editor__blocknote-container .mermaid-diagram {
+  position: relative;
+  width: 100%;
+  margin: 10px 0;
+  color: var(--colors-text);
+}
+
+.editor__blocknote-container .mermaid-diagram__viewport {
+  max-width: 100%;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--surface-editor);
+}
+
+.editor__blocknote-container .mermaid-diagram__edit-button,
+.editor__blocknote-container .mermaid-diagram__expand-button {
+  position: absolute;
+  top: 8px;
+  z-index: 1;
+  opacity: 0;
+  background: var(--surface-editor);
+  box-shadow: 0 6px 16px rgb(15 23 42 / 0.14);
+}
+
+.editor__blocknote-container .mermaid-diagram__edit-button {
+  right: 44px;
+}
+
+.editor__blocknote-container .mermaid-diagram__expand-button {
+  right: 8px;
+}
+
+.editor__blocknote-container .mermaid-diagram:is(:hover, :focus-within) .mermaid-diagram__edit-button,
+.editor__blocknote-container .mermaid-diagram:is(:hover, :focus-within) .mermaid-diagram__expand-button {
+  opacity: 1;
+}
+
+.editor__blocknote-container .mermaid-diagram__viewport:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.editor__blocknote-container .mermaid-diagram__viewport svg {
+  display: block;
+  max-width: none;
+  min-width: min-content;
+  height: auto;
+  margin: 0 auto;
+}
+
+@media (hover: none) {
+  .editor__blocknote-container .mermaid-diagram__edit-button,
+  .editor__blocknote-container .mermaid-diagram__expand-button {
+    opacity: 1;
+  }
+}
+
+.mermaid-diagram__dialog {
+  width: calc(100vw - 32px);
+  max-width: calc(100vw - 32px);
+  height: calc(100dvh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+  padding: 0;
+  zoom: var(--tolaria-overlay-zoom-inverse, 1);
+}
+
+.mermaid-diagram__dialog-viewport {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  padding: 24px;
+  color: var(--colors-text);
+  background: var(--surface-editor);
+}
+
+.mermaid-diagram__dialog-viewport:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: -2px;
+}
+
+.mermaid-diagram__dialog-viewport svg {
+  display: block;
+  max-width: none;
+  min-width: min-content;
+  height: auto;
+  margin: auto;
+}
+
+.editor__blocknote-container .mermaid-diagram--error {
+  padding: 12px;
+  border: 1px solid var(--destructive);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+}
+
+.editor__blocknote-container .mermaid-diagram--error figcaption {
+  margin-bottom: 8px;
+  color: var(--destructive);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.editor__blocknote-container .mermaid-diagram--error pre {
+  max-width: 100%;
+  overflow: auto;
+  margin: 0;
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--inline-styles-code-background-color);
+  color: var(--inline-styles-code-color);
+  font-size: 0.85rem;
+}
+
+.editor__blocknote-container .tldraw-whiteboard {
+  position: relative;
+  width: min(var(--tldraw-whiteboard-width, 100%), 100%);
+  max-width: 100%;
+  height: var(--tldraw-whiteboard-height, 520px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  user-select: none;
+}
+
+body.tldraw-whiteboard-fullscreen-open {
+  overflow: hidden;
+}
+
+.editor__blocknote-container .tldraw-whiteboard.tldraw-whiteboard--fullscreen {
+  position: fixed;
+  inset: 8px;
+  z-index: 1200;
+  width: auto;
+  max-width: none;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: 0 18px 60px rgb(0 0 0 / 24%);
+}
+
+.editor__blocknote-container .tldraw-whiteboard .tl-container {
+  --color-background: var(--card);
+  --tl-layer-menu-click-capture: 25;
+  --tl-layer-panels: 30;
+  --tl-layer-menus: 40;
+  --tl-layer-toasts: 50;
+  --tl-layer-cursor: 60;
+  --tl-layer-header-footer: 70;
+  --tl-layer-following-indicator: 80;
+}
+
+.editor__blocknote-container .tldraw-whiteboard__fullscreen-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 90;
+  background: var(--background);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+}
+
+.editor__blocknote-container .tldraw-whiteboard--fullscreen .tldraw-whiteboard__fullscreen-button {
+  top: 12px;
+  right: 12px;
+}
+
+.editor__blocknote-container .tldraw-whiteboard__permission-error {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  z-index: 95;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--destructive) 34%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--background) 94%, var(--destructive));
+  color: var(--foreground);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 16%);
+}
+
+.editor__blocknote-container .tldraw-whiteboard__permission-error strong {
+  color: var(--destructive);
+  font-size: 0.86rem;
+}
+
+.editor__blocknote-container .tldraw-whiteboard [data-radix-popper-content-wrapper] {
+  position: absolute !important;
+}
+
+.editor__blocknote-container .mantine-Popover-dropdown,
+.editor__blocknote-container .bn-menu,
+.editor__blocknote-container .bn-suggestion-menu {
+  z-index: 1000 !important;
+}
+
+.editor__blocknote-container .tldraw-whiteboard__resize-handle {
+  position: absolute;
+  z-index: 2;
+  background: transparent;
+  touch-action: none;
+}
+
+.editor__blocknote-container .tldraw-whiteboard--fullscreen .tldraw-whiteboard__resize-handle {
+  display: none;
+}
+
+.editor__blocknote-container .tldraw-whiteboard__resize-handle--width {
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 100%;
+  cursor: ew-resize;
+}
+
+.editor__blocknote-container .tldraw-whiteboard__resize-handle--height {
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 12px;
+  cursor: ns-resize;
+}
+
+.editor__blocknote-container .tldraw-whiteboard__resize-handle--corner {
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+}
+
+.editor__blocknote-container .tldraw-whiteboard__resize-handle--corner::after {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid color-mix(in srgb, var(--foreground) 42%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--foreground) 42%, transparent);
+  content: '';
+}
+
+.editor__blocknote-container[data-follow-links] .bn-editor a,
+.editor__blocknote-container[data-follow-links] .wikilink {
+  cursor: pointer;
+}
+
+/* Code blocks follow Tolaria's theme instead of BlockNote's fixed dark shell. */
+.editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] {
+  background-color: var(--editor-code-block-background) !important;
+  border: 1px solid var(--editor-code-block-border);
+  color: var(--editor-code-block-text) !important;
+  position: relative;
+}
+
+.editor__code-block-copy {
+  position: absolute;
+  z-index: 4;
+}
+
+.editor__code-block-copy [data-editor-code-copy-button] {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--editor-code-block-language);
+  padding: 0;
+}
+
+.editor__code-block-copy [data-editor-code-copy-button]:hover,
+.editor__code-block-copy [data-editor-code-copy-button]:focus-visible {
+  background: transparent !important;
+  color: var(--editor-code-block-text);
+}
+
+.editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] > pre {
+  color: inherit;
+}
+
+.editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] > div > select {
+  color: var(--editor-code-block-language) !important;
+}
+
+.editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] > div > select > option {
+  background: var(--popover);
+  color: var(--foreground);
+}
+
+.editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] pre code {
+  background-color: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+}
+
+.editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] pre code .shiki {
+  background-color: transparent !important;
+}
+
+/* --- Blockquote --- */
+.editor__blocknote-container [data-content-type="blockquote"],
+.editor__blocknote-container blockquote {
+  border-inline-start: var(--blockquote-border-left-width) solid var(--blockquote-border-left-color);
+  padding-inline-start: var(--blockquote-padding-left);
+  margin-top: var(--blockquote-margin-vertical);
+  margin-bottom: var(--blockquote-margin-vertical);
+  color: var(--blockquote-color);
+  font-style: var(--blockquote-font-style);
+}
+
+/* --- Table --- */
+.editor__blocknote-container [data-content-type="table"] table {
+  border-color: var(--table-border-color);
+  font-size: var(--table-font-size);
+}
+
+.editor__blocknote-container [data-content-type="table"] th {
+  background: var(--table-header-background);
+  padding: var(--table-cell-padding-vertical) var(--table-cell-padding-horizontal);
+}
+
+.editor__blocknote-container [data-content-type="table"] td {
+  padding: var(--table-cell-padding-vertical) var(--table-cell-padding-horizontal);
+  border-color: var(--table-border-color);
+  text-align: start;
+}
+
+/* --- Horizontal rule --- */
+.editor__blocknote-container hr {
+  border: none;
+  border-top: var(--horizontal-rule-thickness) solid var(--horizontal-rule-color);
+  margin: var(--horizontal-rule-margin-vertical) 0;
+}
+
+.editor__blocknote-container .bn-block-outer:has(hr)
+  + .bn-block-outer:has(> .bn-block > [data-content-type="heading"]) {
+  margin-top: var(--editor-divider-followed-by-heading-margin-top) !important;
+}

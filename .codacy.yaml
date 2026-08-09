@@ -1,0 +1,17 @@
+---
+exclude_paths:
+  - "coverage/**"
+  - "dist/**"
+  - "e2e/**"
+  - "node_modules/**"
+  - "scripts/**"
+  - "src/test/**"
+  - "src-tauri/gen/**"
+  - "src-tauri/resources/agent-docs/**"
+  - "src-tauri/target/**"
+  - "target/**"
+  - "test-results/**"
+  - "tests/**"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "vite.config.ts"

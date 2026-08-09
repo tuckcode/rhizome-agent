@@ -1,0 +1,234 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index 6c65eb7d57e207a8cd1f2a2ae3bb99507c405cef..c163932957846385623eb2980bf1141eb6631db1 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -2443,6 +2443,21 @@ function handleMouseLeave(view) {
+ 	const pluginState = columnResizingPluginKey.getState(view.state);
+ 	if (pluginState && pluginState.activeHandle > -1 && !pluginState.dragging) updateHandle(view, -1);
+ }
++function safeDispatch(view, tr) {
++	try {
++		view.dispatch(tr);
++		return true;
++	} catch (_error) {
++		return false;
++	}
++}
++function safeDomAtPos(view, pos) {
++	try {
++		return view.domAtPos(pos);
++	} catch (_error) {
++		return null;
++	}
++}
+ function handleMouseDown(view, event, cellMinWidth, defaultCellMinWidth) {
+ 	var _view$dom$ownerDocume;
+ 	if (!view.editable) return false;
+@@ -2451,17 +2466,18 @@ function handleMouseDown(view, event, cellMinWidth, defaultCellMinWidth) {
+ 	if (!pluginState || pluginState.activeHandle == -1 || pluginState.dragging) return false;
+ 	const cell = view.state.doc.nodeAt(pluginState.activeHandle);
+ 	const width = currentColWidth(view, pluginState.activeHandle, cell.attrs);
+-	view.dispatch(view.state.tr.setMeta(columnResizingPluginKey, { setDragging: {
++	if (width == null) return false;
++	if (!safeDispatch(view, view.state.tr.setMeta(columnResizingPluginKey, { setDragging: {
+ 		startX: event.clientX,
+ 		startWidth: width
+-	} }));
++	} }))) return false;
+ 	function finish(event$1) {
+ 		win.removeEventListener("mouseup", finish);
+ 		win.removeEventListener("mousemove", move);
+ 		const pluginState$1 = columnResizingPluginKey.getState(view.state);
+ 		if (pluginState$1 === null || pluginState$1 === void 0 ? void 0 : pluginState$1.dragging) {
+ 			updateColumnWidth(view, pluginState$1.activeHandle, draggedWidth(pluginState$1.dragging, event$1, cellMinWidth));
+-			view.dispatch(view.state.tr.setMeta(columnResizingPluginKey, { setDragging: null }));
++			safeDispatch(view, view.state.tr.setMeta(columnResizingPluginKey, { setDragging: null }));
+ 		}
+ 	}
+ 	function move(event$1) {
+@@ -2482,15 +2498,18 @@ function handleMouseDown(view, event, cellMinWidth, defaultCellMinWidth) {
+ function currentColWidth(view, cellPos, { colspan, colwidth }) {
+ 	const width = colwidth && colwidth[colwidth.length - 1];
+ 	if (width) return width;
+-	const dom = view.domAtPos(cellPos);
+-	let domWidth = dom.node.childNodes[dom.offset].offsetWidth, parts = colspan;
++	const dom = safeDomAtPos(view, cellPos);
++	if (!dom) return null;
++	const cellDom = dom.node && dom.node.childNodes ? dom.node.childNodes[dom.offset] : null;
++	if (!cellDom || typeof cellDom.offsetWidth != "number") return null;
++	let domWidth = cellDom.offsetWidth, parts = colspan;
+ 	if (colwidth) {
+ 		for (let i = 0; i < colspan; i++) if (colwidth[i]) {
+ 			domWidth -= colwidth[i];
+ 			parts--;
+ 		}
+ 	}
+-	return domWidth / parts;
++	return parts ? domWidth / parts : null;
+ }
+ function domCellAround(target) {
+ 	while (target && target.nodeName != "TD" && target.nodeName != "TH") target = target.classList && target.classList.contains("ProseMirror") ? null : target.parentNode;
+@@ -2516,10 +2535,15 @@ function draggedWidth(dragging, event, resizeMinWidth) {
+ 	return Math.max(resizeMinWidth, dragging.startWidth + offset);
+ }
+ function updateHandle(view, value) {
+-	view.dispatch(view.state.tr.setMeta(columnResizingPluginKey, { setHandle: value }));
++	safeDispatch(view, view.state.tr.setMeta(columnResizingPluginKey, { setHandle: value }));
+ }
+ function updateColumnWidth(view, cell, width) {
+-	const $cell = view.state.doc.resolve(cell);
++	let $cell;
++	try {
++		$cell = view.state.doc.resolve(cell);
++	} catch (_error) {
++		return false;
++	}
+ 	const table = $cell.node(-1), map = TableMap.get(table), start = $cell.start(-1);
+ 	const col = map.colCount($cell.pos - start) + $cell.nodeAfter.attrs.colspan - 1;
+ 	const tr = view.state.tr;
+@@ -2537,16 +2561,24 @@ function updateColumnWidth(view, cell, width) {
+ 			colwidth
+ 		});
+ 	}
+-	if (tr.docChanged) view.dispatch(tr);
++	if (tr.docChanged) return safeDispatch(view, tr);
++	return true;
+ }
+ function displayColumnWidth(view, cell, width, defaultCellMinWidth) {
+-	const $cell = view.state.doc.resolve(cell);
++	let $cell;
++	try {
++		$cell = view.state.doc.resolve(cell);
++	} catch (_error) {
++		return false;
++	}
+ 	const table = $cell.node(-1), start = $cell.start(-1);
+ 	const col = TableMap.get(table).colCount($cell.pos - start) + $cell.nodeAfter.attrs.colspan - 1;
+-	let dom = view.domAtPos($cell.start(-1)).node;
++	const domAtPos = safeDomAtPos(view, $cell.start(-1));
++	let dom = domAtPos && domAtPos.node;
+ 	while (dom && dom.nodeName != "TABLE") dom = dom.parentNode;
+-	if (!dom) return;
++	if (!dom) return false;
+ 	updateColumnsOnResize(table, dom.firstChild, dom, defaultCellMinWidth, col, width);
++	return true;
+ }
+ function zeroes(n) {
+ 	return Array(n).fill(0);
+diff --git a/dist/index.js b/dist/index.js
+index 5b4ac25594ba5722409332b1e5c812f108c9bf11..5b811ee70ff2fcb0c7587f838f00bc6fc19e906a 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -2443,6 +2443,21 @@ function handleMouseLeave(view) {
+ 	const pluginState = columnResizingPluginKey.getState(view.state);
+ 	if (pluginState && pluginState.activeHandle > -1 && !pluginState.dragging) updateHandle(view, -1);
+ }
++function safeDispatch(view, tr) {
++	try {
++		view.dispatch(tr);
++		return true;
++	} catch (_error) {
++		return false;
++	}
++}
++function safeDomAtPos(view, pos) {
++	try {
++		return view.domAtPos(pos);
++	} catch (_error) {
++		return null;
++	}
++}
+ function handleMouseDown(view, event, cellMinWidth, defaultCellMinWidth) {
+ 	var _view$dom$ownerDocume;
+ 	if (!view.editable) return false;
+@@ -2451,17 +2466,18 @@ function handleMouseDown(view, event, cellMinWidth, defaultCellMinWidth) {
+ 	if (!pluginState || pluginState.activeHandle == -1 || pluginState.dragging) return false;
+ 	const cell = view.state.doc.nodeAt(pluginState.activeHandle);
+ 	const width = currentColWidth(view, pluginState.activeHandle, cell.attrs);
+-	view.dispatch(view.state.tr.setMeta(columnResizingPluginKey, { setDragging: {
++	if (width == null) return false;
++	if (!safeDispatch(view, view.state.tr.setMeta(columnResizingPluginKey, { setDragging: {
+ 		startX: event.clientX,
+ 		startWidth: width
+-	} }));
++	} }))) return false;
+ 	function finish(event$1) {
+ 		win.removeEventListener("mouseup", finish);
+ 		win.removeEventListener("mousemove", move);
+ 		const pluginState$1 = columnResizingPluginKey.getState(view.state);
+ 		if (pluginState$1 === null || pluginState$1 === void 0 ? void 0 : pluginState$1.dragging) {
+ 			updateColumnWidth(view, pluginState$1.activeHandle, draggedWidth(pluginState$1.dragging, event$1, cellMinWidth));
+-			view.dispatch(view.state.tr.setMeta(columnResizingPluginKey, { setDragging: null }));
++			safeDispatch(view, view.state.tr.setMeta(columnResizingPluginKey, { setDragging: null }));
+ 		}
+ 	}
+ 	function move(event$1) {
+@@ -2482,15 +2498,18 @@ function handleMouseDown(view, event, cellMinWidth, defaultCellMinWidth) {
+ function currentColWidth(view, cellPos, { colspan, colwidth }) {
+ 	const width = colwidth && colwidth[colwidth.length - 1];
+ 	if (width) return width;
+-	const dom = view.domAtPos(cellPos);
+-	let domWidth = dom.node.childNodes[dom.offset].offsetWidth, parts = colspan;
++	const dom = safeDomAtPos(view, cellPos);
++	if (!dom) return null;
++	const cellDom = dom.node && dom.node.childNodes ? dom.node.childNodes[dom.offset] : null;
++	if (!cellDom || typeof cellDom.offsetWidth != "number") return null;
++	let domWidth = cellDom.offsetWidth, parts = colspan;
+ 	if (colwidth) {
+ 		for (let i = 0; i < colspan; i++) if (colwidth[i]) {
+ 			domWidth -= colwidth[i];
+ 			parts--;
+ 		}
+ 	}
+-	return domWidth / parts;
++	return parts ? domWidth / parts : null;
+ }
+ function domCellAround(target) {
+ 	while (target && target.nodeName != "TD" && target.nodeName != "TH") target = target.classList && target.classList.contains("ProseMirror") ? null : target.parentNode;
+@@ -2516,10 +2535,15 @@ function draggedWidth(dragging, event, resizeMinWidth) {
+ 	return Math.max(resizeMinWidth, dragging.startWidth + offset);
+ }
+ function updateHandle(view, value) {
+-	view.dispatch(view.state.tr.setMeta(columnResizingPluginKey, { setHandle: value }));
++	safeDispatch(view, view.state.tr.setMeta(columnResizingPluginKey, { setHandle: value }));
+ }
+ function updateColumnWidth(view, cell, width) {
+-	const $cell = view.state.doc.resolve(cell);
++	let $cell;
++	try {
++		$cell = view.state.doc.resolve(cell);
++	} catch (_error) {
++		return false;
++	}
+ 	const table = $cell.node(-1), map = TableMap.get(table), start = $cell.start(-1);
+ 	const col = map.colCount($cell.pos - start) + $cell.nodeAfter.attrs.colspan - 1;
+ 	const tr = view.state.tr;
+@@ -2537,16 +2561,24 @@ function updateColumnWidth(view, cell, width) {
+ 			colwidth
+ 		});
+ 	}
+-	if (tr.docChanged) view.dispatch(tr);
++	if (tr.docChanged) return safeDispatch(view, tr);
++	return true;
+ }
+ function displayColumnWidth(view, cell, width, defaultCellMinWidth) {
+-	const $cell = view.state.doc.resolve(cell);
++	let $cell;
++	try {
++		$cell = view.state.doc.resolve(cell);
++	} catch (_error) {
++		return false;
++	}
+ 	const table = $cell.node(-1), start = $cell.start(-1);
+ 	const col = TableMap.get(table).colCount($cell.pos - start) + $cell.nodeAfter.attrs.colspan - 1;
+-	let dom = view.domAtPos($cell.start(-1)).node;
++	const domAtPos = safeDomAtPos(view, $cell.start(-1));
++	let dom = domAtPos && domAtPos.node;
+ 	while (dom && dom.nodeName != "TABLE") dom = dom.parentNode;
+-	if (!dom) return;
++	if (!dom) return false;
+ 	updateColumnsOnResize(table, dom.firstChild, dom, defaultCellMinWidth, col, width);
++	return true;
+ }
+ function zeroes(n) {
+ 	return Array(n).fill(0);
