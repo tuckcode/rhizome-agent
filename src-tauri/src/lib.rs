@@ -37,6 +37,9 @@ pub mod pi_cli;
 mod pi_config;
 mod pi_discovery;
 mod pi_events;
+mod prime_discovery;
+mod prime_events;
+pub mod prime_session_host;
 pub mod rhizome_api;
 pub mod rhizome_commands;
 pub mod rhizome_distill;
@@ -543,6 +546,12 @@ macro_rules! app_invoke_handler {
             commands::stream_claude_chat,
             commands::stream_ai_agent,
             commands::abort_ai_agent_stream,
+            commands::get_prime_session_host_status,
+            commands::ensure_prime_session_host,
+            commands::shutdown_prime_session_host,
+            commands::prime_session_new_session,
+            commands::abort_prime_session_turn,
+            commands::stream_prime_session,
             commands::stream_ai_model,
             commands::save_ai_model_provider_api_key,
             commands::delete_ai_model_provider_api_key,

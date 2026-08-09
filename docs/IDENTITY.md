@@ -27,4 +27,4 @@ Do **not** add `knispo/rhizome` as `origin`. Desktop and Agent stay separate rem
 - Brain: long-lived **Prime Agent** session (`--mode rpc` / harness), not “spawn CLI once per message.”
 - Vault: Rhizome MCP tools when a vault is attached — Agent is not a second full wiki product on day one.
 
-See `docs/plans/` once the Prime session-host spike is written.
+Session-host spike (slice 1): `docs/plans/2026-08-09-prime-harness-chat-spike.md`.

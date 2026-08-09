@@ -363,6 +363,108 @@ pub fn test_ai_model_provider(
     Err("Direct AI model tests are not available in this mobile build yet.".into())
 }
 
+// ── Prime session host (desktop) ────────────────────────────────────────────
+// Long-lived `prime-agent --mode rpc` process. Slice 1 of the harness chat spike.
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn get_prime_session_host_status() -> crate::prime_session_host::PrimeHostStatus {
+    crate::prime_session_host::get_status()
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn ensure_prime_session_host(vault_path: String) -> Result<String, String> {
+    let vault_path = expand_tilde(&vault_path).into_owned();
+    crate::prime_session_host::ensure_host(&vault_path)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn shutdown_prime_session_host() -> Result<bool, String> {
+    crate::prime_session_host::shutdown_host()
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn prime_session_new_session() -> Result<String, String> {
+    crate::prime_session_host::new_session()
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn abort_prime_session_turn() -> Result<bool, String> {
+    crate::prime_session_host::abort_turn()
+}
+
+#[cfg(desktop)]
+fn normalize_prime_request(
+    mut request: crate::prime_session_host::PrimePromptRequest,
+) -> crate::prime_session_host::PrimePromptRequest {
+    request.vault_path = expand_tilde(&request.vault_path).into_owned();
+    request
+}
+
+#[cfg(desktop)]
+fn run_normalized_prime_stream(
+    request: crate::prime_session_host::PrimePromptRequest,
+    emitter: StreamEmitter<crate::ai_agents::AiAgentStreamEvent>,
+) -> Result<String, String> {
+    crate::prime_session_host::run_prompt_stream(normalize_prime_request(request), emitter)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn stream_prime_session(
+    app_handle: tauri::AppHandle,
+    request: crate::prime_session_host::PrimePromptRequest,
+) -> Result<String, String> {
+    let event_name = stream_event_name("prime-session-stream", request.event_name.as_deref());
+    run_desktop_stream(
+        app_handle,
+        DesktopStreamScope::cancellable(event_name),
+        request,
+        run_normalized_prime_stream,
+    )
+    .await
+}
+
+#[cfg(not(desktop))]
+#[tauri::command]
+pub fn get_prime_session_host_status() -> Result<(), String> {
+    Err("Prime session host is only available on desktop".into())
+}
+
+#[cfg(not(desktop))]
+#[tauri::command]
+pub fn ensure_prime_session_host(_vault_path: String) -> Result<String, String> {
+    Err("Prime session host is only available on desktop".into())
+}
+
+#[cfg(not(desktop))]
+#[tauri::command]
+pub fn shutdown_prime_session_host() -> Result<bool, String> {
+    Err("Prime session host is only available on desktop".into())
+}
+
+#[cfg(not(desktop))]
+#[tauri::command]
+pub fn prime_session_new_session() -> Result<String, String> {
+    Err("Prime session host is only available on desktop".into())
+}
+
+#[cfg(not(desktop))]
+#[tauri::command]
+pub fn abort_prime_session_turn() -> Result<bool, String> {
+    Err("Prime session host is only available on desktop".into())
+}
+
+#[cfg(not(desktop))]
+#[tauri::command]
+pub async fn stream_prime_session(_request: serde_json::Value) -> Result<String, String> {
+    Err("Prime session host is only available on desktop".into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
