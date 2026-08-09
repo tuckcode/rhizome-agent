@@ -128,9 +128,6 @@ pub fn distill_frontmatter(
     fm
 }
 
-/// Write the parsed card to disk as a contract-conformant Concept artifact.
-/// Returns the slug and the path written.
-
 /// Reject error/tooling strings that must never become wiki concepts.
 pub(crate) fn is_junk_distill_title(title: &str) -> bool {
     let t = title.trim();
@@ -361,7 +358,6 @@ mod tests {
         assert_eq!(card.title, "Recursion");
     }
 
-    #[test]
     #[test]
     fn junk_distill_title_detects_oauth_failures() {
         assert!(is_junk_distill_title(
