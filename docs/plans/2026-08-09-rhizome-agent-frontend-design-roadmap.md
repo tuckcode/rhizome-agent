@@ -113,13 +113,13 @@ Aligns with product phases in the v0 brief. Each milestone is **demoable UX**, n
 
 | Work | Notes |
 |------|--------|
-| Working indicator | Distinct from “Agents idle” Desktop residue; show turn in flight |
+| Working indicator | **Started:** panel header shows working / tools / error from session status |
 | Tool cards | Already partially there; tighten layout density and collapse |
 | Reasoning disclosure | Keep collapsible; don’t dominate transcript |
 | Skills affordance | “Skills available” / empty hint — even if list is minimal at first |
-| Model display | Show current Prime model name; picker can follow eng |
-| Session actions | New session + abort obvious; optional session name later |
-| Prime identity | Icon + label in header and composer |
+| Model display | **Started:** `PrimeHostStatus` exposes model; panel polls when Prime selected (shows after host has run get_state) |
+| Session actions | New session + abort already present |
+| Prime identity | **Done:** official mark in composer/onboarding; header title “Prime” |
 
 **Exit:** User can answer “is Prime working?” and “which model?” without a terminal.
 

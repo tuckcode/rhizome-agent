@@ -1,6 +1,6 @@
 import { Copy, Cube, Monitor, Moon, Stack, Sun, X } from '@phosphor-icons/react'
 import {
-  AI_AGENT_DEFINITIONS,
+  PRODUCT_AI_AGENT_DEFINITIONS,
   createMissingAiAgentsStatus,
   getAiAgentAvailability,
   getAiAgentDefinition,
@@ -1182,7 +1182,7 @@ function buildDefaultAiTargetOptions(
   providers: AiModelProvider[],
   t: Translate,
 ): Array<{ value: string; label: string }> {
-  const agentOptions = AI_AGENT_DEFINITIONS.map((definition) => {
+  const agentOptions = PRODUCT_AI_AGENT_DEFINITIONS.map((definition) => {
     const status = getAiAgentAvailability(aiAgentsStatus, definition.id)
     const suffix = status.status === 'installed'
       ? ` (${t('settings.aiAgents.installed')}${status.version ? ` ${status.version}` : ''})`
@@ -1363,7 +1363,7 @@ function AiAgentsInstalledSection({
       <div className="text-sm font-medium text-foreground">{t('settings.aiAgents.installedTitle')}</div>
       <div className="mt-1 text-xs leading-5 text-muted-foreground">{t('settings.aiAgents.installedDescription')}</div>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        {AI_AGENT_DEFINITIONS.map((definition) => {
+        {PRODUCT_AI_AGENT_DEFINITIONS.map((definition) => {
           const status = getAiAgentAvailability(aiAgentsStatus, definition.id)
           const installed = status.status === 'installed'
           return (

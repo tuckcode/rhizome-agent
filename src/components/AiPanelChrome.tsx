@@ -20,6 +20,10 @@ import { cn } from '@/lib/utils'
 interface AiPanelHeaderProps {
   agentLabel: string
   agentReadiness: AiAgentReadiness
+  /** Live turn state from the session controller. */
+  agentStatus?: 'idle' | 'thinking' | 'tool-executing' | 'done' | 'error'
+  /** Optional model label from Prime host (e.g. "Grok 4.5"). */
+  modelLabel?: string | null
   targetKind?: 'agent' | 'api_model'
   locale?: AppLocale
   permissionMode: AiAgentPermissionMode
@@ -233,17 +237,26 @@ function permissionModeTooltip(
 function headerStatusText({
   agentLabel,
   agentReadiness,
+  agentStatus,
   modeLabel,
+  modelLabel,
   t,
 }: {
   agentLabel: string
   agentReadiness: AiAgentReadiness
+  agentStatus?: 'idle' | 'thinking' | 'tool-executing' | 'done' | 'error'
   modeLabel: string
+  modelLabel?: string | null
   t: ReturnType<typeof createTranslator>
 }): string {
   if (agentReadiness === 'checking') return t('ai.panel.status.checking')
   if (agentReadiness === 'missing') return t('ai.panel.status.missing', { agent: agentLabel })
-  return t('ai.panel.status.ready', { agent: agentLabel, mode: modeLabel })
+  if (agentStatus === 'thinking') return t('ai.panel.status.working', { agent: agentLabel })
+  if (agentStatus === 'tool-executing') return t('ai.panel.status.tools', { agent: agentLabel })
+  if (agentStatus === 'error') return t('ai.panel.status.error', { agent: agentLabel })
+  const ready = t('ai.panel.status.ready', { agent: agentLabel, mode: modeLabel })
+  const model = modelLabel?.trim()
+  return model ? t('ai.panel.status.readyWithModel', { agent: agentLabel, mode: modeLabel, model }) : ready
 }
 
 function AiPanelEmptyState({
@@ -313,6 +326,8 @@ function AiPanelEmptyState({
 export const AiPanelHeader = memo(function AiPanelHeader({
   agentLabel,
   agentReadiness,
+  agentStatus = 'idle',
+  modelLabel = null,
   targetKind = 'agent',
   locale = 'en',
   permissionMode,
@@ -325,6 +340,7 @@ export const AiPanelHeader = memo(function AiPanelHeader({
   const modeLabel = targetKind === 'api_model'
     ? t('ai.panel.mode.chat')
     : aiAgentPermissionModeLabels(permissionMode, locale).short
+  const working = agentStatus === 'thinking' || agentStatus === 'tool-executing'
 
   return (
     <div
@@ -332,13 +348,16 @@ export const AiPanelHeader = memo(function AiPanelHeader({
       style={{ padding: '8px 12px', gap: 8 }}
     >
       <div className="flex items-center" style={{ gap: 8 }}>
-        <Sparkle size={16} className="shrink-0 text-muted-foreground" />
+        <Sparkle
+          size={16}
+          className={working ? 'shrink-0 animate-pulse text-foreground' : 'shrink-0 text-muted-foreground'}
+        />
         <div className="flex flex-1 flex-col overflow-hidden">
           <span className="text-muted-foreground" style={{ fontSize: 13, fontWeight: 600 }}>
             {t('ai.panel.title')}
           </span>
-          <span className="truncate text-[11px] text-muted-foreground">
-            {headerStatusText({ agentLabel, agentReadiness, modeLabel, t })}
+          <span className="truncate text-[11px] text-muted-foreground" data-agent-status={agentStatus}>
+            {headerStatusText({ agentLabel, agentReadiness, agentStatus, modeLabel, modelLabel, t })}
           </span>
         </div>
         <Button

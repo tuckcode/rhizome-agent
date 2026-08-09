@@ -87,7 +87,7 @@ function render(ui: Parameters<typeof rtlRender>[0]) {
 
 function QueuedPromptTargetHarness({ onTargetChange }: { onTargetChange: (targetId: string) => void }) {
   const [input, setInput] = useState('')
-  const [targetId, setTargetId] = useState('agent:claude_code')
+  const [targetId, setTargetId] = useState('agent:prime')
   const handleTargetChange = (nextTargetId: string) => {
     onTargetChange(nextTargetId)
     setTargetId(nextTargetId)
@@ -163,8 +163,8 @@ describe('AiPanel', () => {
 
   it('renders panel with the default CLI agent header', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
-    expect(screen.getByText('AI Agent')).toBeTruthy()
-    expect(screen.getByText('Claude Code · Safe')).toBeTruthy()
+    expect(screen.getByText('Prime')).toBeTruthy()
+    expect(screen.getByText('Prime Agent · Safe')).toBeTruthy()
   })
 
   it('passes the vault permission mode to the AI agent session', () => {
@@ -175,7 +175,7 @@ describe('AiPanel', () => {
 
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
 
-    expect(screen.getByText('Claude Code · Power User')).toBeTruthy()
+    expect(screen.getByText('Prime Agent · Power User')).toBeTruthy()
     expect(mockUseCliAiAgent).toHaveBeenCalledWith(
       '/tmp/vault',
       undefined,
@@ -209,7 +209,7 @@ describe('AiPanel', () => {
       'AI permission mode changed to Power User. It will apply to the next message.',
     )
     expect(trackEventMock).toHaveBeenCalledWith('ai_agent_permission_mode_changed', {
-      agent: 'claude_code',
+      agent: 'prime',
       permission_mode: 'power_user',
     })
   })
@@ -307,7 +307,7 @@ describe('AiPanel', () => {
 
   it('renders empty state without context', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
-    expect(screen.getByText('Open a note, then ask Claude Code about it')).toBeTruthy()
+    expect(screen.getByText('Open a note, then ask Prime Agent about it')).toBeTruthy()
   })
 
   it('renders contextual empty state when active entry is provided', () => {
@@ -315,7 +315,7 @@ describe('AiPanel', () => {
     render(
       <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" activeEntry={entry} entries={[entry]} />
     )
-    expect(screen.getByText('Ask anything to Claude Code')).toBeTruthy()
+    expect(screen.getByText('Ask anything to Prime Agent')).toBeTruthy()
   })
 
   it('does not render a context bar for the active entry', () => {
@@ -359,13 +359,13 @@ describe('AiPanel', () => {
       <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" activeEntry={entry} entries={[entry]} />
     )
     const input = screen.getByTestId('agent-input')
-    expect(input).toHaveAttribute('aria-placeholder', 'Ask Claude Code')
+    expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime Agent')
   })
 
   it('shows active agent placeholder when no active entry', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
     const input = screen.getByTestId('agent-input')
-    expect(input).toHaveAttribute('aria-placeholder', 'Ask Claude Code')
+    expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime Agent')
   })
 
   it('uses the selected AI agent in the placeholder', () => {
