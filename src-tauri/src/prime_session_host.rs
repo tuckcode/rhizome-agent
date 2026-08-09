@@ -390,6 +390,7 @@ fn ensure_host_for_cwd(cwd: PathBuf) -> Result<String, String> {
         let mut guard = slot.host.lock().map_err(poison)?;
         if let Some(host) = guard.as_mut() {
             if host.is_alive() && host.cwd == cwd {
+                let _ = crate::prime_vault_skill::seed_vault_skill(&cwd);
                 return Ok(host.session_id.clone().unwrap_or_default());
             }
             // Dead or wrong cwd → tear down and respawn.
@@ -525,6 +526,22 @@ impl PrimeHost {
                 cwd.display()
             )
         })?;
+
+        // Seed Rhizome vault skill + optional mcpServers entry when cwd is a vault.
+        // Failures are non-fatal so chat still works without vault tools.
+        match crate::prime_vault_skill::seed_vault_skill(&cwd) {
+            Ok(seed) => {
+                log::info!(
+                    "Prime vault skill ready at {} (vault={}, cli={})",
+                    seed.skill_dir.display(),
+                    seed.vault_path,
+                    seed.cli_call_path.display()
+                );
+            }
+            Err(error) => {
+                log::debug!("Prime vault skill not seeded: {error}");
+            }
+        }
 
         let target = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(&binary)?;
         let mut command = crate::hidden_command(&target.program);
