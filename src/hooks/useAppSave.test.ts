@@ -436,8 +436,8 @@ describe('useAppSave', () => {
   })
 
   it('refreshes a pending untitled auto-rename when the H1 title changes before the timer fires', async () => {
-    const partialTitleContent = '# Obsi\n'
-    const revisedTitleContent = '# Obsidian\n\nBody starts after the title is complete'
+    const partialTitleContent = '# Rhiz\n'
+    const revisedTitleContent = '# Rhizome\n\nBody starts after the title is complete'
     const { result, oldPath } = setupUntitledRenameHarness({
       initialContent: partialTitleContent,
       diskContent: revisedTitleContent,
