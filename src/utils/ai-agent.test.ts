@@ -63,3 +63,19 @@ describe('buildAgentSystemPrompt', () => {
     expect(prompt).toMatch(/wikilink/i)
   })
 })
+
+  it('tells Prime how to use rhizome-vault tools when a vault path is present', () => {
+    const prompt = buildAgentSystemPrompt({
+      agent: 'prime',
+      vaultPaths: ['/tmp/vault'],
+      permissionMode: 'safe',
+    })
+    expect(prompt).toContain('rhizome-vault')
+    expect(prompt).toContain('search_notes')
+  })
+
+  it('tells Prime vault tools are unavailable without a vault', () => {
+    const prompt = buildAgentSystemPrompt({ agent: 'prime', permissionMode: 'safe' })
+    expect(prompt).toContain('no vault is attached')
+  })
+

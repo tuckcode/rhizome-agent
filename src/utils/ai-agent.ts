@@ -85,6 +85,20 @@ When you create or edit a note, call open_note(path) so the user sees it in Rhiz
 When you mention or reference a note by name, always use [[Note Title]] wikilink syntax so the user can click to open it.
 Be concise and helpful. When you've completed a task, briefly summarize what you did.`
 
+
+function primeVaultSkillInstructions(agent?: AiAgentId, vaultPaths?: string[]): string {
+  if (agent !== 'prime') return ''
+  const roots = (vaultPaths ?? []).map((path) => path.trim()).filter(Boolean)
+  if (roots.length === 0) {
+    return 'Prime vault tools: no vault is attached. Chat freely; do not claim you can search or open vault notes until a vault is open.'
+  }
+  return [
+    'Prime vault tools: a project skill named rhizome-vault is seeded under the vault .prime/agent/skills/ directory.',
+    'Use it (VAULT_PATH + node cli-call.mjs as documented in the skill) for search_notes, get_note, and get_vault_context when the user asks about vault content.',
+    'Prefer vault tools over guessing. Save durable knowledge with create_note only when the user wants a lasting note (or Power mode allows writes).',
+  ].join(' ')
+}
+
 export function buildAgentSystemPrompt(options?: string | AgentSystemPromptOptions): string {
   const { vaultContext, agentDocsPath, permissionMode, agent, vaultPaths } = normalizePromptOptions(options)
   const canUseShell = permissionMode === 'power_user' && agent !== 'pi'
@@ -93,7 +107,8 @@ export function buildAgentSystemPrompt(options?: string | AgentSystemPromptOptio
     vaultScopeInstructions(vaultPaths),
     agentDocsInstructions(agentDocsPath, canUseShell),
     permissionModeInstructions(permissionMode, agent),
-  ].join('\n\n')
+    primeVaultSkillInstructions(agent, vaultPaths),
+  ].filter(Boolean).join('\n\n')
 
   if (!vaultContext) return prompt
   return `${prompt}\n\nVault context:\n${vaultContext}`
