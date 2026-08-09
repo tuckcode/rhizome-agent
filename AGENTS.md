@@ -28,7 +28,8 @@
 
 ### Commits & pushes
 
-- origin = git@github.com:knispo/rhizome.git (PUBLIC — AGPL-3.0-or-later). Commit locally, push to origin main when pre-push gates pass.
+- origin = `https://github.com/tuckcode/rhizome-agent.git` (**PRIVATE**). Commit locally, push to origin main when pre-push gates pass.
+  **⛔ Never add `knispo/rhizome` as a remote in this repo.** That is Rhizome Desktop — a different product with a different bundle id and its own history. See the STOP block at the top of this file and `docs/IDENTITY.md`. (This line said `knispo/rhizome` until 2026-08-09; it was inherited verbatim from the Desktop rules during the fork and directly contradicted both.)
 - **Before pushing, ensure these env vars are set** (required for `cargo llvm-cov`, which the pre-push Rust gate invokes at step 4/6):
   ```
   export LLVM_COV="$(brew --prefix llvm)/bin/llvm-cov"
@@ -95,7 +96,7 @@ Use Codacy as a security and static-analysis gate before a task is considered re
 
 - Prefer the Codacy MCP inside Codex to inspect repository/file issues for every touched code file.
 - If MCP is unavailable, use the local CLI wrapper, e.g. `.codacy/cli.sh analyze <path> --format sarif`; choose the relevant tool when useful (`eslint`, `opengrep`, `trivy`, `lizard`).
-- **Not actually set up yet.** `.codacy/` (gitignored, per-machine) has never been created and no Codacy MCP has been available in any session so far. This isn't a config accident — Codacy required payment for a private repo, and this repo was private until it went public (`git remote -v` → `knispo/rhizome`, AGPL). Free-tier eligibility is worth checking now that that's changed; until someone does, **say so explicitly in the completion comment** ("Codacy: not run — no MCP tool, no `.codacy/` directory in this session") rather than silently skipping the gate.
+- **Not actually set up yet.** `.codacy/` (gitignored, per-machine) has never been created and no Codacy MCP has been available in any session so far. This isn't a config accident — Codacy required payment for a private repo, and **this repo is private** (`git remote -v` → `tuckcode/rhizome-agent`), so the paid-tier blocker still applies here. (The Desktop rules this was imported from said the repo "went public," which was true of `knispo/rhizome` and is *not* true of this one — corrected 2026-08-09.) Until someone confirms free-tier eligibility, **say so explicitly in the completion comment** ("Codacy: not run — no MCP tool, no `.codacy/` directory in this session") rather than silently skipping the gate.
 - **Always fix Critical and High severity findings introduced by your change** before considering the change releasable.
 - Review Medium findings. Fix them when they are real defects or security-sensitive; otherwise explain why they are acceptable in the completion comment.
 - Never silence a Codacy rule just to pass the scan. Prefer small code changes that remove the finding.
