@@ -12,8 +12,9 @@ export interface AiWorkspaceSizing {
 
 const DEFAULT_DOCKED_WORKSPACE_SIZE = { height: 540, width: 560 }
 const MIN_DOCKED_WORKSPACE_SIZE = { height: 360, width: 460 }
-const DEFAULT_SIDE_WORKSPACE_WIDTH = 320
+const DEFAULT_SIDE_WORKSPACE_WIDTH = 420
 const MIN_SIDE_WORKSPACE_WIDTH = 320
+/** Soft default for chat-primary interim (narrow rail still allowed via resize). */
 const SIDE_WORKSPACE_WIDTH_STORAGE_KEY = 'rhizome:ai-workspace-side-width'
 const DEFAULT_SIDEBAR_WIDTH = 168
 const MIN_SIDEBAR_WIDTH = 132
@@ -36,8 +37,11 @@ function readStoredSideWorkspaceWidth(): number {
   if (typeof localStorage === 'undefined') return DEFAULT_SIDE_WORKSPACE_WIDTH
 
   try {
-    const parsed = Number(localStorage.getItem(SIDE_WORKSPACE_WIDTH_STORAGE_KEY))
-    if (!Number.isFinite(parsed)) return DEFAULT_SIDE_WORKSPACE_WIDTH
+    const raw = localStorage.getItem(SIDE_WORKSPACE_WIDTH_STORAGE_KEY)
+    // null → Number(null) === 0 (finite) and would clamp to MIN — treat missing as default.
+    if (raw === null || raw.trim() === '') return DEFAULT_SIDE_WORKSPACE_WIDTH
+    const parsed = Number(raw)
+    if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_SIDE_WORKSPACE_WIDTH
     return clampNumber(parsed, MIN_SIDE_WORKSPACE_WIDTH, maxDockedWorkspaceSize().width)
   } catch {
     return DEFAULT_SIDE_WORKSPACE_WIDTH

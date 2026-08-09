@@ -22,7 +22,7 @@ import { isFeatureEnabled } from '../lib/telemetry'
  * channel/QA without disturbing the current shell. Add real flags here as
  * features adopt them; keep at least one so the type never widens to string.
  */
-export type FeatureFlagName = 'shell_command_rail'
+export type FeatureFlagName = 'shell_command_rail' | 'chat_primary_shell'
 
 export function useFeatureFlag(flag: FeatureFlagName): boolean {
   try {

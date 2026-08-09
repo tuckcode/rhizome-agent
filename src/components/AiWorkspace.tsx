@@ -50,6 +50,7 @@ import { ResizeHandle } from './ResizeHandle'
 import { SideWorkspaceHeader } from './AiWorkspaceSideHeader'
 import { useAiPanelController } from './useAiPanelController'
 import { buildAiWorkspaceTargetGroups, type AiWorkspaceTargetGroups } from './aiWorkspaceTargetGroups'
+import { useFeatureFlag } from '../hooks/useFeatureFlag'
 import {
   activeConversationForState,
   canArchiveConversation,
@@ -725,6 +726,28 @@ function resolveAiWorkspaceProps(props: AiWorkspaceProps): ResolvedAiWorkspacePr
   }
 }
 
+const SIDE_EXPANDED_STORAGE_KEY = 'rhizome:ai-workspace-side-expanded'
+
+function readStoredSideExpanded(fallback: boolean): boolean {
+  if (typeof localStorage === 'undefined') return fallback
+  try {
+    const raw = localStorage.getItem(SIDE_EXPANDED_STORAGE_KEY)
+    if (raw === null) return fallback
+    return raw === 'true'
+  } catch {
+    return fallback
+  }
+}
+
+function writeStoredSideExpanded(expanded: boolean): void {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(SIDE_EXPANDED_STORAGE_KEY, expanded ? 'true' : 'false')
+  } catch {
+    // ignore
+  }
+}
+
 function SideAiWorkspaceLayout({
   model,
   sizing,
@@ -734,8 +757,17 @@ function SideAiWorkspaceLayout({
   sizing: AiWorkspaceSizing
   workspace: ResolvedAiWorkspaceProps
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const chatPrimary = useFeatureFlag('chat_primary_shell')
+  const [expanded, setExpanded] = useState(() => readStoredSideExpanded(chatPrimary))
   const [headerSeparated, setHeaderSeparated] = useState(false)
+
+  const toggleExpanded = useCallback(() => {
+    setExpanded((current) => {
+      const next = !current
+      writeStoredSideExpanded(next)
+      return next
+    })
+  }, [])
 
   return (
     <section
@@ -744,7 +776,8 @@ function SideAiWorkspaceLayout({
       data-testid="ai-workspace"
       data-ai-workspace-mode="side"
       data-ai-workspace-expanded={expanded ? 'true' : 'false'}
-      role="complementary"
+      data-chat-primary={chatPrimary ? 'true' : 'false'}
+      role={expanded ? 'main' : 'complementary'}
       aria-label={translate(workspace.locale, 'ai.workspace.title')}
     >
       {!expanded && <WorkspaceResizeHandles mode="side" onResize={sizing.onWorkspaceResize} />}
@@ -760,7 +793,7 @@ function SideAiWorkspaceLayout({
           onRename={model.renameConversation}
           onReorder={model.reorderConversation}
           onSelect={model.setActiveId}
-          onToggleExpanded={() => setExpanded((current) => !current)}
+          onToggleExpanded={toggleExpanded}
           separated={headerSeparated}
           statuses={model.statuses}
         />
