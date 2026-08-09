@@ -29,6 +29,10 @@ interface AiPanelHeaderProps {
   permissionMode: AiAgentPermissionMode
   permissionModeDisabled: boolean
   onPermissionModeChange: (mode: AiAgentPermissionMode) => void
+  /** Prime product: hide Safe/Power toggle (default toolkit only). */
+  hidePermissionMode?: boolean
+  /** Lightweight skills affordance, e.g. "rhizome-vault". */
+  skillsLabel?: string | null
   onClose: () => void
   onNewChat: () => void
 }
@@ -334,13 +338,17 @@ export const AiPanelHeader = memo(function AiPanelHeader({
   permissionMode,
   permissionModeDisabled,
   onPermissionModeChange,
+  hidePermissionMode = false,
+  skillsLabel = null,
   onClose,
   onNewChat,
 }: AiPanelHeaderProps) {
   const t = createTranslator(locale)
-  const modeLabel = targetKind === 'api_model'
-    ? t('ai.panel.mode.chat')
-    : aiAgentPermissionModeLabels(permissionMode, locale).short
+  const modeLabel = hidePermissionMode
+    ? t('ai.panel.mode.harness')
+    : targetKind === 'api_model'
+      ? t('ai.panel.mode.chat')
+      : aiAgentPermissionModeLabels(permissionMode, locale).short
   const working = agentStatus === 'thinking' || agentStatus === 'tool-executing'
 
   return (
@@ -384,7 +392,16 @@ export const AiPanelHeader = memo(function AiPanelHeader({
           <X size={16} />
         </Button>
       </div>
-      {targetKind === 'agent' ? (
+      {hidePermissionMode ? (
+        <div
+          className="rounded-md border border-border bg-muted px-3 py-2 text-[11px] leading-5 text-muted-foreground"
+          data-testid="ai-harness-skills"
+        >
+          {skillsLabel
+            ? t('ai.panel.skills.withVault', { skills: skillsLabel })
+            : t('ai.panel.skills.default')}
+        </div>
+      ) : targetKind === 'agent' ? (
         <AiPermissionModeToggle
           value={permissionMode}
           locale={locale}

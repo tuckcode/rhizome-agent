@@ -19,6 +19,7 @@ function renderRail(overrides: Partial<React.ComponentProps<typeof CommandRail>>
     activeDestination: 'notes',
     onSelectNotes: vi.fn(),
     onSelectGraph: vi.fn(),
+    onSelectMycelium: vi.fn(),
     onOpenResearch: vi.fn(),
     onSelectChanges: vi.fn(),
     onOpenSettings: vi.fn(),

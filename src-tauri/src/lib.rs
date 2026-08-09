@@ -29,6 +29,7 @@ pub mod mcp;
 pub mod menu;
 mod menu_bar_capture;
 mod menu_bar_companion;
+pub mod mycelium;
 pub mod opencode_cli;
 mod opencode_config;
 mod opencode_discovery;
@@ -553,6 +554,10 @@ macro_rules! app_invoke_handler {
             commands::prime_session_new_session,
             commands::abort_prime_session_turn,
             commands::stream_prime_session,
+            commands::list_prime_sessions,
+            commands::which_binary,
+            commands::run_mindwalk_open,
+            commands::bridge_and_open_prime_session,
             commands::stream_ai_model,
             commands::save_ai_model_provider_api_key,
             commands::delete_ai_model_provider_api_key,

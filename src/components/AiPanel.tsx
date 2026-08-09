@@ -227,6 +227,8 @@ export function AiPanelView({
           permissionMode={permissionMode}
           permissionModeDisabled={isActive}
           onPermissionModeChange={handlePermissionModeChange}
+          hidePermissionMode={isPrimeTarget}
+          skillsLabel={isPrimeTarget ? 'rhizome-vault' : null}
           onClose={onClose}
           onNewChat={handleNewChat}
         />
