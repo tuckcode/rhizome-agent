@@ -54,7 +54,7 @@ pub fn list_prime_sessions() -> Result<Vec<PrimeSessionEntry>, String> {
             mtime_ms: mtime_ms(&path),
         });
     }
-    entries.sort_by(|a, b| b.mtime_ms.cmp(&a.mtime_ms));
+    entries.sort_by_key(|entry| std::cmp::Reverse(entry.mtime_ms));
     Ok(entries)
 }
 
