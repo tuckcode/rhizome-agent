@@ -1,0 +1,281 @@
+{
+  "children": [
+    {
+      "type": "frame",
+      "id": "vault_menu_remove",
+      "name": "Vault Menu — Remove from List",
+      "x": 0,
+      "y": 0,
+      "width": 380,
+      "height": 320,
+      "fill": "#F7F6F3",
+      "layout": "vertical",
+      "gap": 16,
+      "padding": [24, 24, 24, 24],
+      "theme": { "Mode": "Light" },
+      "children": [
+        {
+          "type": "text",
+          "id": "vault_menu_title",
+          "content": "Vault Menu — Remove Action",
+          "fill": "#37352F",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "600"
+        },
+        {
+          "type": "frame",
+          "id": "vault_menu_dropdown",
+          "name": "Vault Dropdown",
+          "width": "fill_container",
+          "height": "fit_content",
+          "fill": "#FFFFFF",
+          "cornerRadius": [6, 6, 6, 6],
+          "stroke": "#E9E9E7",
+          "strokeThickness": 1,
+          "layout": "vertical",
+          "padding": [4, 4, 4, 4],
+          "gap": 0,
+          "children": [
+            {
+              "type": "frame",
+              "id": "vault_item_active",
+              "name": "Active Vault Item",
+              "width": "fill_container",
+              "height": 32,
+              "fill": "#EBEBEA",
+              "cornerRadius": [4, 4, 4, 4],
+              "layout": "horizontal",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "padding": [4, 8, 4, 8],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "vault_item_active_left",
+                  "layout": "horizontal",
+                  "alignItems": "center",
+                  "gap": 6,
+                  "children": [
+                    { "type": "text", "id": "vault_check", "content": "✓", "fill": "#37352F", "fontFamily": "Inter", "fontSize": 12 },
+                    { "type": "text", "id": "vault_label_active", "content": "My Vault", "fill": "#37352F", "fontFamily": "Inter", "fontSize": 12 }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "remove_btn_active",
+                  "name": "Remove Button",
+                  "width": 18,
+                  "height": 18,
+                  "cornerRadius": [3, 3, 3, 3],
+                  "layout": "vertical",
+                  "alignItems": "center",
+                  "justifyContent": "center",
+                  "children": [
+                    { "type": "text", "id": "x_icon_active", "content": "×", "fill": "#787774", "fontFamily": "Inter", "fontSize": 12 }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "vault_item_other",
+              "name": "Other Vault Item",
+              "width": "fill_container",
+              "height": 32,
+              "cornerRadius": [4, 4, 4, 4],
+              "layout": "horizontal",
+              "alignItems": "center",
+              "justifyContent": "space-between",
+              "padding": [4, 8, 4, 8],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "vault_item_other_left",
+                  "layout": "horizontal",
+                  "alignItems": "center",
+                  "gap": 6,
+                  "children": [
+                    { "type": "text", "id": "vault_spacer", "content": " ", "fill": "transparent", "fontFamily": "Inter", "fontSize": 12 },
+                    { "type": "text", "id": "vault_label_other", "content": "Work Vault", "fill": "#787774", "fontFamily": "Inter", "fontSize": 12 }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "remove_btn_other",
+                  "name": "Remove Button",
+                  "width": 18,
+                  "height": 18,
+                  "cornerRadius": [3, 3, 3, 3],
+                  "layout": "vertical",
+                  "alignItems": "center",
+                  "justifyContent": "center",
+                  "children": [
+                    { "type": "text", "id": "x_icon_other", "content": "×", "fill": "#787774", "fontFamily": "Inter", "fontSize": 12 }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "vault_separator",
+              "name": "Separator",
+              "width": "fill_container",
+              "height": 1,
+              "fill": "#E9E9E7"
+            },
+            {
+              "type": "frame",
+              "id": "vault_open_folder",
+              "name": "Open Local Folder",
+              "width": "fill_container",
+              "height": 32,
+              "cornerRadius": [4, 4, 4, 4],
+              "layout": "horizontal",
+              "alignItems": "center",
+              "gap": 6,
+              "padding": [4, 8, 4, 8],
+              "children": [
+                { "type": "text", "id": "folder_icon", "content": "📁", "fontFamily": "Inter", "fontSize": 12 },
+                { "type": "text", "id": "open_folder_label", "content": "Open local folder", "fill": "#787774", "fontFamily": "Inter", "fontSize": 12 }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "vault_menu_note",
+          "content": "× button removes vault from list without deleting files.\nAvailable when 2+ vaults in list.",
+          "fill": "#787774",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "width": "fill_container"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "cmd_k_vault_commands",
+      "name": "Cmd+K — Vault Commands",
+      "x": 420,
+      "y": 0,
+      "width": 520,
+      "height": 320,
+      "fill": "#F7F6F3",
+      "layout": "vertical",
+      "gap": 16,
+      "padding": [24, 24, 24, 24],
+      "theme": { "Mode": "Light" },
+      "children": [
+        {
+          "type": "text",
+          "id": "cmdk_title",
+          "content": "Command Palette — Vault Commands",
+          "fill": "#37352F",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "600"
+        },
+        {
+          "type": "frame",
+          "id": "cmdk_palette",
+          "name": "Command Palette",
+          "width": "fill_container",
+          "height": "fit_content",
+          "fill": "#FFFFFF",
+          "cornerRadius": [8, 8, 8, 8],
+          "stroke": "#E9E9E7",
+          "strokeThickness": 1,
+          "layout": "vertical",
+          "padding": [0, 0, 0, 0],
+          "gap": 0,
+          "children": [
+            {
+              "type": "frame",
+              "id": "cmdk_search",
+              "name": "Search Input",
+              "width": "fill_container",
+              "height": 44,
+              "layout": "horizontal",
+              "alignItems": "center",
+              "padding": [0, 16, 0, 16],
+              "children": [
+                { "type": "text", "id": "cmdk_search_text", "content": "vault", "fill": "#37352F", "fontFamily": "Inter", "fontSize": 14 }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "cmdk_separator",
+              "width": "fill_container",
+              "height": 1,
+              "fill": "#E9E9E7"
+            },
+            {
+              "type": "frame",
+              "id": "cmdk_group_header",
+              "name": "Settings Group",
+              "width": "fill_container",
+              "height": 28,
+              "layout": "horizontal",
+              "alignItems": "center",
+              "padding": [0, 12, 0, 12],
+              "children": [
+                { "type": "text", "id": "group_label", "content": "Settings", "fill": "#B4B4B4", "fontFamily": "Inter", "fontSize": 11, "fontWeight": "500" }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "cmdk_open_vault",
+              "name": "Open Vault Command",
+              "width": "fill_container",
+              "height": 36,
+              "layout": "horizontal",
+              "alignItems": "center",
+              "padding": [0, 12, 0, 12],
+              "children": [
+                { "type": "text", "id": "cmd_open_vault", "content": "Open Vault…", "fill": "#37352F", "fontFamily": "Inter", "fontSize": 13 }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "cmdk_remove_vault",
+              "name": "Remove Vault Command (highlighted)",
+              "width": "fill_container",
+              "height": 36,
+              "fill": "#E8F4FE",
+              "layout": "horizontal",
+              "alignItems": "center",
+              "padding": [0, 12, 0, 12],
+              "children": [
+                { "type": "text", "id": "cmd_remove_vault", "content": "Remove Vault from List", "fill": "#37352F", "fontFamily": "Inter", "fontSize": 13 }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "cmdk_restore_gs",
+              "name": "Restore Getting Started Command",
+              "width": "fill_container",
+              "height": 36,
+              "layout": "horizontal",
+              "alignItems": "center",
+              "padding": [0, 12, 0, 12],
+              "children": [
+                { "type": "text", "id": "cmd_restore_gs", "content": "Restore Getting Started Vault", "fill": "#37352F", "fontFamily": "Inter", "fontSize": 13 }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "cmdk_note",
+          "content": "• 'Remove Vault from List' removes active vault (disabled if only 1 vault)\n• 'Restore Getting Started Vault' shown when GS vault is hidden\n• Both accessible via Cmd+K search with 'vault' keyword",
+          "fill": "#787774",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "width": "fill_container"
+        }
+      ]
+    }
+  ],
+  "variables": {}
+}

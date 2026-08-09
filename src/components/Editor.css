@@ -1,0 +1,528 @@
+/* Wikilink inline content — color is set via inline style per note type */
+.wikilink {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.wikilink:hover {
+  text-decoration-style: solid;
+  opacity: 0.85;
+}
+
+/* Broken wikilink: dashed underline + lower opacity */
+.wikilink--broken {
+  text-decoration-style: dashed;
+  opacity: 0.7;
+}
+
+.wikilink--broken:hover {
+  opacity: 0.55;
+}
+
+/* Breadcrumb bar: border can still react to the data attribute, but the
+   breadcrumb filename/title stays visible at all times. */
+.breadcrumb-bar {
+  container-type: inline-size;
+  --breadcrumb-bar-left-padding: 16px;
+  transition: border-color 0.2s ease;
+}
+
+body.mac-chrome .app:not(:has(.app__sidebar)):not(:has(.app__note-list)) .breadcrumb-bar {
+  --breadcrumb-bar-left-padding: 90px;
+}
+
+.breadcrumb-bar[data-title-hidden] {
+  border-bottom-color: var(--border);
+}
+
+.breadcrumb-bar__title {
+  display: flex;
+}
+
+.breadcrumb-bar__actions [data-slot='button'] {
+  width: auto;
+  height: auto;
+  min-width: 0;
+  padding: 0;
+  border-radius: 0;
+}
+
+.breadcrumb-bar__actions [data-slot='button']:hover {
+  background: transparent;
+}
+
+.breadcrumb-bar__overflow-menu {
+  display: flex;
+}
+
+.breadcrumb-bar__actions[data-overflow-collapsed='true'] .breadcrumb-bar__overflowable-action {
+  display: none;
+}
+
+/* Scroll area wrapping title + editor — single scroll context for alignment */
+.editor-scroll-area {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* Prevent browser scroll anchoring from shifting long BlockNote documents
+     when side menus appear near the viewport edge. */
+  overflow-anchor: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-scroll-area--sheet {
+  overflow: hidden;
+  position: relative;
+  isolation: isolate;
+  contain: layout paint;
+}
+
+/* BlockNote container */
+.editor__blocknote-container {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  position: relative;
+  cursor: text;
+}
+
+/* Drag-over state: subtle border highlight */
+.editor__blocknote-container--drag-over {
+  outline: 2px dashed var(--border-focus);
+  outline-offset: -2px;
+}
+
+/* Drop overlay shown when dragging images over the editor */
+.editor__drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--state-drag-target);
+  pointer-events: none;
+}
+
+.editor__drop-overlay-label {
+  padding: 10px 20px;
+  border-radius: 8px;
+  background: var(--surface-popover);
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px var(--shadow-dialog);
+}
+
+.editor__blocknote-container .bn-container {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 15px;
+  /* Override BlockNote's internal color variables so .bn-editor background
+     matches our vault theme instead of BlockNote's hardcoded light/dark defaults. */
+  --bn-colors-editor-background: var(--bg-primary);
+  --bn-colors-editor-text: var(--text-primary);
+  --bn-colors-menu-background: var(--surface-popover);
+  --bn-colors-menu-text: var(--text-primary);
+  --bn-colors-tooltip-background: var(--state-hover-subtle);
+  --bn-colors-tooltip-text: var(--text-primary);
+  --bn-colors-hovered-background: var(--state-hover);
+  --bn-colors-hovered-text: var(--text-primary);
+  --bn-colors-selected-background: var(--bg-selected);
+  --bn-colors-selected-text: var(--text-primary);
+  --bn-colors-border: var(--border-dialog);
+  --bn-colors-shadow: var(--shadow-dialog);
+  --bn-colors-side-menu: var(--text-muted);
+}
+
+.editor__blocknote-container .bn-editor {
+  width: 100%;
+  padding: 20px 0;
+}
+
+.editor__blocknote-container .bn-suggestion-menu {
+  border: 1px solid var(--border-dialog) !important;
+  background: var(--surface-popover) !important;
+  box-shadow: 0 8px 32px var(--shadow-dialog) !important;
+}
+
+.editor__blocknote-container .bn-suggestion-menu-label {
+  color: var(--text-secondary) !important;
+}
+
+.editor__blocknote-container .bn-suggestion-menu-item {
+  color: var(--text-primary) !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 3px 8px !important;
+}
+
+.editor__blocknote-container .bn-mt-suggestion-menu-item-section[data-position="left"] {
+  width: 28px;
+  min-width: 28px;
+  margin-inline-end: 8px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  color: var(--text-primary) !important;
+}
+
+.editor__blocknote-container .bn-mt-suggestion-menu-item-section[data-position="right"] {
+  margin-inline-start: 12px !important;
+  color: var(--text-muted) !important;
+}
+
+.editor__blocknote-container .bn-mt-suggestion-menu-item-section[data-position="right"] .mantine-Badge-root {
+  min-width: 0 !important;
+  height: auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  text-transform: none !important;
+}
+
+.editor__blocknote-container .bn-mt-suggestion-menu-item-body {
+  justify-content: center !important;
+  padding-right: 0 !important;
+}
+
+.editor__blocknote-container .bn-mt-suggestion-menu-item-subtitle {
+  display: none !important;
+}
+
+.editor__blocknote-container .rhizome-slash-menu-icon {
+  position: relative;
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+}
+
+.editor__blocknote-container .rhizome-slash-menu-icon__fill {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.editor__blocknote-container .bn-suggestion-menu-item:is(:hover, [aria-selected="true"]) .rhizome-slash-menu-icon__regular {
+  opacity: 0;
+}
+
+.editor__blocknote-container .bn-suggestion-menu-item:is(:hover, [aria-selected="true"]) .rhizome-slash-menu-icon__fill {
+  opacity: 1;
+}
+
+/* =============================================
+   Bear-style live preview: zero horizontal shift
+   ============================================= */
+
+/* FIX 1: Remove header underlines */
+.cm-heading-line {
+  border-bottom: none !important;
+  text-decoration: none !important;
+}
+
+/* FIX 2: Heading markers in left gutter area
+   The ## markers are absolutely positioned in the content's left padding (40px),
+   so they never affect text flow — zero horizontal shift. */
+.cm-heading-line {
+  position: relative;
+}
+
+.cm-heading-line .cm-formatting-block {
+  position: absolute !important;
+  top: 50%;
+  transform: translateY(-50%);
+  right: 100%;
+  padding-right: 4px;
+  font-size: 0.75rem !important;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s ease-out !important;
+  white-space: nowrap;
+  pointer-events: none;
+  color: var(--text-faint);
+}
+
+.cm-heading-line .cm-formatting-block.cm-formatting-block-visible {
+  font-size: 0.75rem !important;
+  opacity: 0.5;
+  pointer-events: auto;
+}
+
+/* FIX 3: List/block bullets — always visible, fixed width, zero shift
+   Override the library's font-size animation so the marker always occupies
+   the same space regardless of cursor position. */
+.cm-line:not(.cm-heading-line) .cm-formatting-block {
+  font-size: 1em !important;
+  display: inline-block !important;
+  min-width: 1.5em !important;
+  vertical-align: baseline;
+  transition: color 0.15s ease-out, opacity 0.15s ease-out !important;
+}
+
+/* Inactive state: hide source text, show bullet dot via ::before */
+.cm-line:not(.cm-heading-line) .cm-formatting-block:not(.cm-formatting-block-visible) {
+  color: transparent !important;
+  opacity: 1 !important;
+  position: relative;
+  overflow: visible !important;
+}
+
+.cm-line:not(.cm-heading-line) .cm-formatting-block:not(.cm-formatting-block-visible)::before {
+  content: '\2022';
+  position: absolute;
+  left: 0;
+  color: var(--text-tertiary);
+}
+
+/* Active state: show source marker (-, *, +, etc.) */
+.cm-line:not(.cm-heading-line) .cm-formatting-block.cm-formatting-block-visible {
+  color: var(--text-faint) !important;
+  opacity: 1 !important;
+}
+
+/* --- Editor content wrapper: single source of truth for horizontal padding --- */
+.editor-content-wrapper {
+  max-width: var(--editor-max-width, 760px);
+  margin: 0 auto;
+  padding: 0 var(--editor-padding-horizontal, 40px);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.editor-content-width--wide .editor-content-wrapper {
+  max-width: none;
+  padding-left: clamp(24px, 4vw, 72px);
+  padding-right: clamp(24px, 4vw, 72px);
+}
+
+@page {
+  margin: 18mm;
+}
+
+@media print {
+  html:has(body.tolaria-note-pdf-exporting),
+  body.tolaria-note-pdf-exporting {
+    background: #fff !important;
+    color: #111 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  body.tolaria-note-pdf-exporting * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    visibility: hidden !important;
+  }
+
+  body.tolaria-note-pdf-exporting :is(.app__sidebar, .app__note-list, .breadcrumb-bar, .editor-memory-probe) {
+    display: none !important;
+  }
+
+  body.tolaria-note-pdf-exporting .editor > .relative > :not(:has([data-note-pdf-export-root="true"])) {
+    display: none !important;
+  }
+
+  body.tolaria-note-pdf-exporting :is(#root, .app-shell, .app, .app__editor, .editor, .editor > .relative, .editor-content-width--normal, .editor-content-width--wide, .editor-scroll-area) {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    width: auto !important;
+  }
+
+  body.tolaria-note-pdf-exporting [data-note-pdf-export-root="true"],
+  body.tolaria-note-pdf-exporting [data-note-pdf-export-root="true"] * {
+    visibility: visible !important;
+  }
+
+  body.tolaria-note-pdf-exporting [data-note-pdf-export-root="true"] {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  body.tolaria-note-pdf-exporting .editor__blocknote-container,
+  body.tolaria-note-pdf-exporting .bn-container,
+  body.tolaria-note-pdf-exporting .bn-editor {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  body.tolaria-note-pdf-exporting .bn-editor {
+    padding: 0 !important;
+  }
+
+  body.tolaria-note-pdf-exporting :is(.bn-block-outer, figure, table, pre, .math-block-shell, .mermaid-diagram, .tldraw-whiteboard) {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.tolaria-note-pdf-exporting :is(img, svg, canvas) {
+    max-width: 100% !important;
+  }
+
+  body.tolaria-note-pdf-exporting :is(a, .wikilink) {
+    color: #111 !important;
+    text-decoration: underline !important;
+  }
+
+  body.tolaria-note-pdf-exporting .bn-block-content[data-content-type="codeBlock"] {
+    border-color: #d0d7de !important;
+    background: #f6f8fa !important;
+    color: #111 !important;
+  }
+
+  body.tolaria-note-pdf-exporting :is(.editor__code-block-copy, .mermaid-diagram__expand-button, .tldraw-whiteboard__resize-handle, .tlui-layout, .tlui-popover, [data-radix-popper-content-wrapper]) {
+    display: none !important;
+  }
+}
+
+.raw-editor-codemirror {
+  width: 100%;
+  margin: 0;
+}
+
+/* --- Note Icon Area --- */
+.note-icon-area {
+  display: flex;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+.note-icon-button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.note-icon-button:disabled {
+  cursor: default;
+}
+
+.note-icon-button--active {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  font-size: 36px;
+  line-height: 1;
+  transition: transform 0.1s;
+}
+
+.note-icon-button--active:hover:not(:disabled) {
+  transform: scale(1.1);
+}
+
+.note-icon-button--active :is(img, svg) {
+  display: block;
+}
+
+.note-icon-button--add {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-faint);
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.note-icon-button--add:focus-visible {
+  opacity: 1;
+}
+
+.note-icon-button__plus {
+  font-size: 16px;
+  font-weight: 300;
+}
+
+.note-icon-button__label {
+  font-size: 12px;
+}
+
+.note-icon-menu {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  border-radius: 8px;
+  border: 1px solid var(--border-dialog);
+  background: var(--popover);
+  box-shadow: 0 4px 16px var(--shadow-dialog);
+  padding: 4px;
+}
+
+.note-icon-menu__item {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--foreground);
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+
+.note-icon-menu__item:hover {
+  background: var(--accent);
+}
+
+.note-icon-menu__item--danger {
+  color: var(--destructive);
+}
+
+/* =============================================
+   Disable BlockNote/Mantine editor animations
+   =============================================
+   Scoped to .editor__blocknote-container so app-wide
+   components (dialogs, sidebar, etc.) are unaffected.
+   Preserves cursor blink and text selection. */
+.editor__blocknote-container *,
+.editor__blocknote-container *::before,
+.editor__blocknote-container *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Reduce padding at narrow editor widths so content isn't cramped */
+@container editor (max-width: 600px) {
+  .editor-content-wrapper {
+    padding: 0 16px;
+  }
+  .editor__blocknote-container .bn-editor {
+    padding: 12px 0;
+  }
+}

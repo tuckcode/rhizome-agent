@@ -1,0 +1,170 @@
+.sheet-editor {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.sheet-editor--workbook {
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+  isolation: isolate;
+  contain: layout paint;
+}
+
+.sheet-editor--workbook > * {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.sheet-editor--single-sheet div:has(> button[title="Undo"]),
+.sheet-editor--single-sheet div:has(> button[title="Add sheet"]),
+.sheet-editor--single-sheet div:has(> a[href="https://www.ironcalc.com"]) {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+}
+
+.sheet-editor--single-sheet a[href="https://www.ironcalc.com"],
+.sheet-editor--single-sheet button[title="Add sheet"],
+.sheet-editor--single-sheet button[title="Export Selected area as Markdown"],
+.sheet-editor--single-sheet button[title="Export Selected area as PNG"],
+.sheet-editor--single-sheet button[title="Name manager"],
+.sheet-editor--single-sheet button[title="Sheet list"] {
+  display: none !important;
+}
+
+.sheet-editor--single-sheet [tabindex="0"] {
+  outline: none;
+}
+
+.sheet-editor--single-sheet .sheet-container,
+.sheet-editor--single-sheet canvas {
+  display: block;
+}
+
+.sheet-editor--single-sheet .sheet-container [style*="cursor: crosshair"][style*="rgb(242, 153, 74)"] {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.sheet-editor--passive .sheet-container [data-tolaria-selection-chrome="true"] {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.sheet-editor--single-sheet > div > .scroll {
+  top: 40px !important;
+  height: calc(100% - 40px) !important;
+}
+
+.sheet-editor--status {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.sheet-formula-autocomplete {
+  position: absolute;
+  z-index: 30;
+  max-width: 420px;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--border, #d8d8d8);
+  border-radius: 6px;
+  background: var(--popover, #ffffff);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 14%);
+  color: var(--popover-foreground, var(--text-primary));
+  font-size: 12px;
+}
+
+.sheet-wikilink-autocomplete {
+  position: absolute;
+  z-index: 35;
+}
+
+.sheet-formula-autocomplete__item {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 10px;
+  row-gap: 2px;
+  padding: 7px 9px;
+  cursor: pointer;
+}
+
+.sheet-formula-autocomplete__item[aria-selected="true"] {
+  background: var(--accent, #f1f5f9);
+}
+
+.sheet-formula-autocomplete__name {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-weight: 700;
+}
+
+.sheet-formula-autocomplete__signature {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted-foreground, var(--text-secondary));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-formula-autocomplete__category {
+  overflow: hidden;
+  color: var(--muted-foreground, var(--text-secondary));
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-formula-autocomplete__description {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-context-menu {
+  position: absolute;
+  z-index: 40;
+  width: 220px;
+  overflow: hidden;
+  border: 1px solid var(--border, #d8d8d8);
+  border-radius: 6px;
+  background: var(--popover, #ffffff);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 16%);
+  color: var(--popover-foreground, var(--text-primary));
+  padding: 4px;
+}
+
+.sheet-context-menu__group {
+  padding: 3px 0;
+}
+
+.sheet-context-menu__group + .sheet-context-menu__group {
+  border-top: 1px solid var(--border, #e5e5e5);
+}
+
+.sheet-context-menu__item {
+  width: 100%;
+  justify-content: flex-start;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 400;
+}

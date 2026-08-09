@@ -1,0 +1,697 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Brand wordmark font — bundled locally so the `rhizome` lockup renders
+   offline (every other font still comes from the Google Fonts link in
+   index.html; this one is a fixed brand element and must not fall back). */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./assets/fonts/jetbrains-mono-600-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ============================================================
+   Theme Variables — app-owned light/dark contract
+   ============================================================ */
+
+:root {
+  /* --- Font defaults --- */
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Oxygen, Ubuntu, Cantarell, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-size: 14px;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* --- Semantic surfaces (light mode) --- */
+  --surface-app: #EFF1EC;
+  --surface-sidebar: #E9ECE5;
+  --surface-panel: #F7F8F5;
+  --surface-card: #F7F8F5;
+  --surface-popover: #FBFCFA;
+  --surface-input: #FBFCFA;
+  --surface-button: #E3E7DE;
+  --surface-dialog: #F9FAF7;
+  --surface-editor: #EFF1EC;
+  --surface-overlay: rgba(26, 30, 22, 0.3);
+
+  /* --- Semantic text (light mode) --- */
+  --text-primary: #23281F;
+  --text-secondary: #4C5546;
+  --text-tertiary: #616A59;
+  --text-muted: #77806E;
+  --text-faint: #97A08D;
+  --text-heading: #1B2017;
+  --text-inverse: #F7F8F5;
+
+  /* --- Semantic borders (light mode) --- */
+  --border-default: #D6DBCF;
+  --border-subtle: #E1E5DA;
+  --border-strong: #C2C9B8;
+  --border-input: #CBD2C2;
+  --border-dialog: #D6DBCF;
+  --border-focus: #2E6B4F;
+
+  /* --- Interaction states (light mode) --- */
+  --state-hover: #E5E9DF;
+  --state-hover-subtle: #EBEEE6;
+  --state-selected: #DFE9E2;
+  --state-selected-strong: #CFDFD4;
+  --state-active: #DFE9E2;
+  --state-focus-ring: #2E6B4F;
+  --state-drag-target: #2E6B4F18;
+  --state-disabled: #EBEEE6;
+
+  /* --- Accent roles (light mode) --- */
+  --accent-blue: #2E6B4F;
+  --accent-blue-bg: #2E6B4F18;
+  --accent-blue-hover: #245741;
+  --accent-blue-light: #2E6B4F14;
+  --accent-green: #38A169;
+  --accent-green-light: rgba(56, 161, 105, 0.1);
+  --accent-orange: #B4552D;
+  --accent-orange-light: rgba(180, 85, 45, 0.12);
+  --accent-red: #C03D30;
+  --accent-red-light: rgba(192, 61, 48, 0.1);
+  --accent-purple: #7C5CB8;
+  --accent-purple-light: rgba(124, 92, 184, 0.1);
+  --accent-yellow: #B08A25;
+  --accent-yellow-light: rgba(176, 138, 37, 0.12);
+  --accent-teal: #2E7D78;
+  --accent-teal-light: rgba(46, 125, 120, 0.1);
+  --accent-pink: #B84A7E;
+  --accent-pink-light: rgba(184, 74, 126, 0.1);
+  --accent-gray: #6E7867;
+  --accent-gray-light: rgba(110, 120, 103, 0.1);
+
+  /* --- Feedback roles (light mode) --- */
+  --feedback-info-text: var(--accent-blue);
+  --feedback-info-bg: var(--accent-blue-light);
+  --feedback-success-text: var(--accent-green);
+  --feedback-success-bg: var(--accent-green-light);
+  --feedback-warning-text: #8A4A16;
+  --feedback-warning-bg: #F2E8CE;
+  --feedback-warning-border: #B4552D;
+  --feedback-error-text: var(--accent-red);
+  --feedback-error-bg: var(--accent-red-light);
+
+  /* --- Syntax and diff roles (light mode) --- */
+  --syntax-heading: #2E6B4F;
+  --syntax-link: #2E6B4F;
+  --syntax-monospace: #B4552D;
+  --syntax-monospace-bg: rgba(119, 128, 110, 0.14);
+  --syntax-muted: #616A59;
+  --syntax-frontmatter-key: #B4552D;
+  --syntax-frontmatter-value: #2E6B4F;
+  --syntax-highlight-comment: #77806E;
+  --syntax-highlight-keyword: #A6403C;
+  --syntax-highlight-string: #23503C;
+  --syntax-highlight-number: #2E6E7D;
+  --syntax-highlight-title: #6B4FA3;
+  --syntax-highlight-type: #96551F;
+  --syntax-highlight-deletion: #A8322E;
+  --syntax-highlight-deletion-bg: #F5E2DE;
+  --diff-added-text: #2F7D4F;
+  --diff-added-bg: rgba(47, 125, 79, 0.12);
+  --diff-removed-text: #BF4136;
+  --diff-removed-bg: rgba(191, 65, 54, 0.12);
+  --diff-hunk-bg: rgba(46, 107, 79, 0.08);
+  --editor-code-block-background: var(--surface-sidebar);
+  --editor-code-block-border: var(--border-subtle);
+  --editor-code-block-text: var(--text-primary);
+  --editor-code-block-language: var(--text-secondary);
+
+  /* --- Overlays and shadows (light mode) --- */
+  --shadow-overlay: var(--surface-overlay);
+  --shadow-dialog: rgba(26, 30, 22, 0.15);
+
+  /* --- shadcn theme aliases (light mode) --- */
+  --radius: 0.5rem;
+  --background: var(--surface-app);
+  --foreground: var(--text-primary);
+  --card: var(--surface-card);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-popover);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--accent-blue);
+  --primary-foreground: var(--text-inverse);
+  --secondary: var(--state-hover);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--state-hover-subtle);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--state-hover);
+  --accent-foreground: var(--text-primary);
+  --destructive: var(--accent-red);
+  --destructive-foreground: var(--text-inverse);
+  --border: var(--border-default);
+  --input: var(--border-input);
+  --ring: var(--state-focus-ring);
+  --sidebar: var(--surface-sidebar);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--accent-blue);
+  --sidebar-primary-foreground: var(--text-inverse);
+  --sidebar-accent: var(--state-hover);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border-default);
+  --sidebar-ring: var(--state-focus-ring);
+
+  /* --- Compatibility aliases for existing product code --- */
+  --bg-primary: var(--surface-app);
+  --bg-sidebar: var(--surface-sidebar);
+  --bg-card: var(--surface-card);
+  --bg-hover: var(--state-hover);
+  --bg-hover-subtle: var(--state-hover-subtle);
+  --bg-selected: var(--state-selected);
+  --bg-input: var(--surface-input);
+  --bg-button: var(--surface-button);
+  --bg-dialog: var(--surface-dialog);
+  --border-primary: var(--border-default);
+  --hover: var(--state-hover);
+  --link-color: var(--accent-blue);
+  --link-hover: var(--accent-blue-hover);
+}
+
+:root.dark,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* --- Semantic surfaces (dark mode) --- */
+  --surface-app: #0E120C;
+  --surface-sidebar: #10150E;
+  --surface-panel: #151A12;
+  --surface-card: #151A12;
+  --surface-popover: #1B2117;
+  --surface-input: #0E120C;
+  --surface-button: #222A1C;
+  --surface-dialog: #181E14;
+  --surface-editor: #0E120C;
+  --surface-overlay: rgba(4, 6, 3, 0.6);
+
+  /* --- Semantic text (dark mode) --- */
+  --text-primary: #E6EBE0;
+  --text-secondary: #ADB6A3;
+  --text-tertiary: #929C86;
+  --text-muted: #79836F;
+  --text-faint: #5C6553;
+  --text-heading: #F2F6ED;
+  --text-inverse: #0E120C;
+
+  /* --- Semantic borders (dark mode) --- */
+  --border-default: #232A1F;
+  --border-subtle: #1A2016;
+  --border-strong: #333D2B;
+  --border-input: #2A3224;
+  --border-dialog: #2A3224;
+  --border-focus: #6FE3A0;
+
+  /* --- Interaction states (dark mode) --- */
+  --state-hover: #1B2117;
+  --state-hover-subtle: #161C12;
+  --state-selected: #1B2E22;
+  --state-selected-strong: #223A2B;
+  --state-active: #1E3326;
+  --state-focus-ring: #6FE3A0;
+  --state-drag-target: rgba(111, 227, 160, 0.18);
+  --state-disabled: #161B12;
+
+  /* --- Accent roles (dark mode) --- */
+  --accent-blue: #6FE3A0;
+  --accent-blue-bg: rgba(111, 227, 160, 0.18);
+  --accent-blue-hover: #8FEBB4;
+  --accent-blue-light: rgba(111, 227, 160, 0.14);
+  --accent-green: #9BCF7E;
+  --accent-green-light: rgba(155, 207, 126, 0.16);
+  --accent-orange: #E0A458;
+  --accent-orange-light: rgba(224, 164, 88, 0.16);
+  --accent-red: #E8837C;
+  --accent-red-light: rgba(232, 131, 124, 0.16);
+  --accent-purple: #B4A0E8;
+  --accent-purple-light: rgba(180, 160, 232, 0.16);
+  --accent-yellow: #E4C97A;
+  --accent-yellow-light: rgba(228, 201, 122, 0.16);
+  --accent-teal: #64D1C8;
+  --accent-teal-light: rgba(100, 209, 200, 0.16);
+  --accent-pink: #E594BB;
+  --accent-pink-light: rgba(229, 148, 187, 0.16);
+  --accent-gray: #9AA491;
+  --accent-gray-light: rgba(154, 164, 145, 0.14);
+
+  /* --- Feedback roles (dark mode) --- */
+  --feedback-info-text: var(--accent-blue);
+  --feedback-info-bg: var(--accent-blue-light);
+  --feedback-success-text: var(--accent-green);
+  --feedback-success-bg: var(--accent-green-light);
+  --feedback-warning-text: #E0A458;
+  --feedback-warning-bg: rgba(224, 164, 88, 0.14);
+  --feedback-warning-border: #B87F35;
+  --feedback-error-text: var(--accent-red);
+  --feedback-error-bg: var(--accent-red-light);
+
+  /* --- Syntax and diff roles (dark mode) --- */
+  --syntax-heading: #6FE3A0;
+  --syntax-link: #6FE3A0;
+  --syntax-monospace: #E0A458;
+  --syntax-monospace-bg: rgba(121, 131, 111, 0.16);
+  --syntax-muted: #929C86;
+  --syntax-frontmatter-key: #E0A458;
+  --syntax-frontmatter-value: #8CDFA6;
+  --syntax-highlight-comment: #6E7863;
+  --syntax-highlight-keyword: #E8938A;
+  --syntax-highlight-string: #A5D8C8;
+  --syntax-highlight-number: #8FBEDB;
+  --syntax-highlight-title: #C3B2F0;
+  --syntax-highlight-type: #E5B171;
+  --syntax-highlight-deletion: #E8938A;
+  --syntax-highlight-deletion-bg: rgba(232, 131, 124, 0.15);
+  --diff-added-text: #6FE3A0;
+  --diff-added-bg: rgba(111, 227, 160, 0.13);
+  --diff-removed-text: #E8837C;
+  --diff-removed-bg: rgba(232, 131, 124, 0.14);
+  --diff-hunk-bg: rgba(224, 164, 88, 0.12);
+  --editor-code-block-background: #0A0D08;
+  --editor-code-block-border: transparent;
+  --editor-code-block-text: #E6EBE0;
+  --editor-code-block-language: rgba(230, 235, 224, 0.65);
+
+  /* --- Overlays and shadows (dark mode) --- */
+  --shadow-overlay: var(--surface-overlay);
+  --shadow-dialog: rgba(0, 0, 0, 0.45);
+
+  /* --- shadcn theme aliases (dark mode) --- */
+  --background: var(--surface-app);
+  --foreground: var(--text-primary);
+  --card: var(--surface-card);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-popover);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--accent-blue);
+  --primary-foreground: var(--text-inverse);
+  --secondary: var(--state-hover);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--state-hover-subtle);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--state-hover);
+  --accent-foreground: var(--text-primary);
+  --destructive: var(--accent-red);
+  --destructive-foreground: var(--text-inverse);
+  --border: var(--border-default);
+  --input: var(--border-input);
+  --ring: var(--state-focus-ring);
+  --sidebar: var(--surface-sidebar);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--accent-blue);
+  --sidebar-primary-foreground: var(--text-inverse);
+  --sidebar-accent: var(--state-hover);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border-default);
+  --sidebar-ring: var(--state-focus-ring);
+
+  /* --- Compatibility aliases for existing product code --- */
+  --bg-primary: var(--surface-app);
+  --bg-sidebar: var(--surface-sidebar);
+  --bg-card: var(--surface-card);
+  --bg-hover: var(--state-hover);
+  --bg-hover-subtle: var(--state-hover-subtle);
+  --bg-selected: var(--state-selected);
+  --bg-input: var(--surface-input);
+  --bg-button: var(--surface-button);
+  --bg-dialog: var(--surface-dialog);
+  --border-primary: var(--border-default);
+  --hover: var(--state-hover);
+  --link-color: var(--accent-blue);
+  --link-hover: var(--accent-blue-hover);
+}
+
+/* --- Accent color overrides (rhizome theme only) ---
+   Maps the data-accent attribute set by applyAppearanceToDocument()
+   to the correct --accent-* CSS variables. No blue-hover / blue-bg
+   variants for non-blue accents exist yet, so link-hover falls back
+   to the base accent color. */
+:root[data-accent="red"] {
+  --primary: var(--accent-red);
+  --sidebar-primary: var(--accent-red);
+  --link-color: var(--accent-red);
+  --link-hover: var(--accent-red);
+  --feedback-info-text: var(--accent-red);
+  --feedback-info-bg: var(--accent-red-light);
+}
+:root[data-accent="orange"] {
+  --primary: var(--accent-orange);
+  --sidebar-primary: var(--accent-orange);
+  --link-color: var(--accent-orange);
+  --link-hover: var(--accent-orange);
+  --feedback-info-text: var(--accent-orange);
+  --feedback-info-bg: var(--accent-orange-light);
+}
+:root[data-accent="yellow"] {
+  --primary: var(--accent-yellow);
+  --sidebar-primary: var(--accent-yellow);
+  --link-color: var(--accent-yellow);
+  --link-hover: var(--accent-yellow);
+  --feedback-info-text: var(--accent-yellow);
+  --feedback-info-bg: var(--accent-yellow-light);
+}
+:root[data-accent="green"] {
+  --primary: var(--accent-green);
+  --sidebar-primary: var(--accent-green);
+  --link-color: var(--accent-green);
+  --link-hover: var(--accent-green);
+  --feedback-info-text: var(--accent-green);
+  --feedback-info-bg: var(--accent-green-light);
+}
+:root[data-accent="blue"] {
+  --primary: var(--accent-blue);
+  --sidebar-primary: var(--accent-blue);
+  --link-color: var(--accent-blue);
+  --link-hover: var(--accent-blue-hover);
+  --feedback-info-text: var(--accent-blue);
+  --feedback-info-bg: var(--accent-blue-light);
+}
+:root[data-accent="purple"] {
+  --primary: var(--accent-purple);
+  --sidebar-primary: var(--accent-purple);
+  --link-color: var(--accent-purple);
+  --link-hover: var(--accent-purple);
+  --feedback-info-text: var(--accent-purple);
+  --feedback-info-bg: var(--accent-purple-light);
+}
+:root[data-accent="pink"] {
+  --primary: var(--accent-pink);
+  --sidebar-primary: var(--accent-pink);
+  --link-color: var(--accent-pink);
+  --link-hover: var(--accent-pink);
+  --feedback-info-text: var(--accent-pink);
+  --feedback-info-bg: var(--accent-pink-light);
+}
+:root[data-accent="gray"] {
+  --primary: var(--accent-gray);
+  --sidebar-primary: var(--accent-gray);
+  --link-color: var(--accent-gray);
+  --link-hover: var(--accent-gray);
+  --feedback-info-text: var(--accent-gray);
+  --feedback-info-bg: var(--accent-gray-light);
+}
+
+/* --- Tailwind v4 theme inline: register colors + radii --- */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-surface-app: var(--surface-app);
+  --color-surface-sidebar: var(--surface-sidebar);
+  --color-surface-panel: var(--surface-panel);
+  --color-surface-card: var(--surface-card);
+  --color-surface-popover: var(--surface-popover);
+  --color-surface-editor: var(--surface-editor);
+  --color-state-hover: var(--state-hover);
+  --color-state-selected: var(--state-selected);
+  --color-border-default: var(--border-default);
+  --color-border-subtle: var(--border-subtle);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* --- Base layer --- */
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  body.custom-window-chrome {
+    padding-top: 32px;
+  }
+  html, body {
+    height: 100%;
+    width: 100%;
+  }
+  #root {
+    width: 100%;
+    height: 100%;
+  }
+  html.ai-workspace-native-window,
+  html.ai-workspace-native-window body,
+  html.ai-workspace-native-window #root {
+    background: transparent;
+    overflow: hidden;
+  }
+  html.ai-workspace-native-window body {
+    padding: 20px;
+  }
+  html.ai-workspace-native-window #root {
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.10);
+  }
+  html.ai-workspace-native-window.dark #root,
+  html.ai-workspace-native-window[data-theme="dark"] #root {
+    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.30), 0 1px 4px rgba(0, 0, 0, 0.22);
+  }
+  /* Interactive controls should advertise clickability unless disabled. */
+  :where(
+    button:not(:disabled):not([aria-disabled="true"]),
+    [role="button"]:not([aria-disabled="true"]):not([data-disabled]),
+    [role="menuitem"]:not([aria-disabled="true"]):not([data-disabled]),
+    [role="menuitemcheckbox"]:not([aria-disabled="true"]):not([data-disabled]),
+    [role="menuitemradio"]:not([aria-disabled="true"]):not([data-disabled]),
+    [role="option"]:not([aria-disabled="true"]):not([data-disabled])
+  ) {
+    cursor: pointer;
+  }
+}
+
+/* --- Label typography (Inter, sentence case) --- */
+/* t8: Section labels, metadata tags — 11px medium */
+.font-mono-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* t9: Overlines, category labels — 10px regular */
+.font-mono-overline {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+.referenced-by-panel button:hover {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+/* --- AI Chat markdown rendering --- */
+
+.ai-markdown {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.ai-markdown > :first-child { margin-top: 0; }
+.ai-markdown > :last-child { margin-bottom: 0; }
+
+.ai-markdown p { margin: 0.5em 0; }
+
+.ai-markdown strong { font-weight: 600; }
+
+.ai-markdown h1,
+.ai-markdown h2,
+.ai-markdown h3,
+.ai-markdown h4 {
+  font-weight: 600;
+  margin: 0.8em 0 0.4em;
+  line-height: 1.3;
+}
+.ai-markdown h1 { font-size: 1.25em; }
+.ai-markdown h2 { font-size: 1.15em; }
+.ai-markdown h3 { font-size: 1.05em; }
+.ai-markdown h4 { font-size: 1em; }
+
+.ai-markdown ul,
+.ai-markdown ol {
+  margin: 0.4em 0;
+  padding-inline-start: 1.5em;
+}
+.ai-markdown li { margin: 0.15em 0; }
+.ai-markdown li > ul,
+.ai-markdown li > ol { margin: 0.1em 0; }
+
+.ai-markdown code {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.9em;
+  background: var(--muted);
+  border-radius: 3px;
+  padding: 0.15em 0.35em;
+  overflow-wrap: anywhere;
+}
+
+.ai-markdown pre {
+  margin: 0.5em 0;
+  border-radius: 6px;
+  background: var(--muted);
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.ai-markdown pre code {
+  display: block;
+  padding: 0.75em 1em;
+  background: none;
+  border-radius: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.ai-markdown blockquote {
+  margin: 0.5em 0;
+  padding: 0.25em 0.75em;
+  border-inline-start: 3px solid var(--border);
+  color: var(--muted-foreground);
+}
+
+.ai-markdown a {
+  color: var(--link-color);
+  text-decoration: none;
+}
+.ai-markdown a:hover { text-decoration: underline; }
+
+.ai-markdown .chat-wikilink {
+  display: inline;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  border-radius: 4px;
+  padding: 0 4px;
+  cursor: pointer;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+.ai-markdown .chat-wikilink:hover {
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+  text-decoration: underline;
+}
+
+.ai-markdown hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0.75em 0;
+}
+
+.ai-markdown table {
+  border-collapse: collapse;
+  display: block;
+  margin: 0.5em 0;
+  font-size: 12px;
+  max-width: 100%;
+  overflow-x: auto;
+  width: 100%;
+}
+.ai-markdown th,
+.ai-markdown td {
+  border: 1px solid var(--border);
+  padding: 0.35em 0.6em;
+  text-align: start;
+}
+.ai-markdown th {
+  background: var(--muted);
+  font-weight: 600;
+}
+
+/* --- highlight.js light theme (GitHub-style) --- */
+
+.ai-markdown .hljs { color: var(--foreground); }
+.ai-markdown .hljs-comment,
+.ai-markdown .hljs-quote { color: var(--syntax-highlight-comment); font-style: italic; }
+.ai-markdown .hljs-keyword,
+.ai-markdown .hljs-selector-tag { color: var(--syntax-highlight-keyword); }
+.ai-markdown .hljs-string,
+.ai-markdown .hljs-addition { color: var(--syntax-highlight-string); }
+.ai-markdown .hljs-number,
+.ai-markdown .hljs-literal { color: var(--syntax-highlight-number); }
+.ai-markdown .hljs-title,
+.ai-markdown .hljs-section { color: var(--syntax-highlight-title); }
+.ai-markdown .hljs-built_in,
+.ai-markdown .hljs-type { color: var(--syntax-highlight-type); }
+.ai-markdown .hljs-attr,
+.ai-markdown .hljs-name,
+.ai-markdown .hljs-attribute { color: var(--syntax-highlight-number); }
+.ai-markdown .hljs-deletion { color: var(--syntax-highlight-deletion); background: var(--syntax-highlight-deletion-bg); }
+.ai-markdown .hljs-meta { color: var(--syntax-highlight-comment); }
+
+/* --- AI panel working border animation --- */
+
+@keyframes ai-border-pulse {
+  0%, 100% { border-color: var(--accent-blue); opacity: 1; }
+  50% { border-color: var(--accent-blue-hover); opacity: 0.6; }
+}
+
+/* --- Typing indicator dots --- */
+
+.typing-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+  animation: typing-bounce 1.2s ease-in-out infinite;
+}
+
+@keyframes typing-bounce {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}

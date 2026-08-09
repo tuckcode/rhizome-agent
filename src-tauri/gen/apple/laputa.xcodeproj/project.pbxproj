@@ -1,0 +1,566 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1662961784944D479C9E1B0D /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E3FC10F8A144BB158574C774 /* Metal.framework */; };
+		1C55EF711F7ACEAC173C344E /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3CF0D094B920E757356FC3AD /* libapp.a */; };
+		4A94802D0295ECD102C21BA1 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A34681D9D4CE45CDF83ABA59 /* UIKit.framework */; };
+		534929E6730B15780117F21F /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 05C322F5E5E2ACB0CBC644EE /* MetalKit.framework */; };
+		5AAD7159BB4D20588044B3BC /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 43C29783A8194F596483AD35 /* Security.framework */; };
+		74A9072960AF0CB774BEB749 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3AB6F4BD2E768B4B6EDF7EA4 /* QuartzCore.framework */; };
+		799F0FF5DD8053B287C9CA46 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3D8616031E45547278A88B60 /* main.mm */; };
+		7EF9AA3C7F58D96F21743FB4 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 27D33799362DF41B226D7635 /* WebKit.framework */; };
+		9BD440BEBCDBD633C9EE2C26 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A70EB7513BFD74428B2C6ED1 /* CoreGraphics.framework */; };
+		A2279B6B796C960A2951E7C5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F8E52CF938A81FD9ABC1B23F /* Assets.xcassets */; };
+		DACF8A23100E74CEA0BE1ED9 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 9274F38B9AA0A9A44A3CBEAA /* LaunchScreen.storyboard */; };
+		E0FB400669725FC03B8E9B39 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 1BC846C6372AE88FE28EA984 /* assets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		05C322F5E5E2ACB0CBC644EE /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		077AD05C7FB4A784D360399B /* commands.rs */ = {isa = PBXFileReference; path = commands.rs; sourceTree = "<group>"; };
+		0AE733EAA82134418C0AC89F /* api.rs */ = {isa = PBXFileReference; path = api.rs; sourceTree = "<group>"; };
+		0CA7012668D8606FE9709D6D /* yaml.rs */ = {isa = PBXFileReference; path = yaml.rs; sourceTree = "<group>"; };
+		0FB1053AF590466CC8971679 /* parsing.rs */ = {isa = PBXFileReference; path = parsing.rs; sourceTree = "<group>"; };
+		16CCC72C07657AEBC320B099 /* auth.rs */ = {isa = PBXFileReference; path = auth.rs; sourceTree = "<group>"; };
+		1BC846C6372AE88FE28EA984 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+		1D65CB9525835A85C38D3136 /* migration.rs */ = {isa = PBXFileReference; path = migration.rs; sourceTree = "<group>"; };
+		27D33799362DF41B226D7635 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		2D31CB45BB367FD6A7FA0B67 /* rename.rs */ = {isa = PBXFileReference; path = rename.rs; sourceTree = "<group>"; };
+		2D38A9417EA6B0A133D0D55F /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		34F1C40770F83FDC21036505 /* laputa_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = laputa_iOS.entitlements; sourceTree = "<group>"; };
+		3AB6F4BD2E768B4B6EDF7EA4 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		3CF0D094B920E757356FC3AD /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		3D8616031E45547278A88B60 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		3E23075B718E12551904D3B6 /* frontmatter.rs */ = {isa = PBXFileReference; path = frontmatter.rs; sourceTree = "<group>"; };
+		43C29783A8194F596483AD35 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		4AAEE16E1AC0E472E9EAF907 /* conflict.rs */ = {isa = PBXFileReference; path = conflict.rs; sourceTree = "<group>"; };
+		4F4C2FE8D3697D180E1D4304 /* entry.rs */ = {isa = PBXFileReference; path = entry.rs; sourceTree = "<group>"; };
+		50B53E0FE0FC2A5515B48A28 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		517A653F5A674050430C1167 /* commit.rs */ = {isa = PBXFileReference; path = commit.rs; sourceTree = "<group>"; };
+		5800BA1A3E5C03124E02E946 /* title_sync.rs */ = {isa = PBXFileReference; path = title_sync.rs; sourceTree = "<group>"; };
+		5F28F393EB20BA7F8F2102EF /* config_seed.rs */ = {isa = PBXFileReference; path = config_seed.rs; sourceTree = "<group>"; };
+		6288FD61B10C36115B12B4A4 /* cache.rs */ = {isa = PBXFileReference; path = cache.rs; sourceTree = "<group>"; };
+		692CE75FC8E670478C4209C8 /* remote.rs */ = {isa = PBXFileReference; path = remote.rs; sourceTree = "<group>"; };
+		6A5C3DA38846B440DD56E98A /* claude_cli.rs */ = {isa = PBXFileReference; path = claude_cli.rs; sourceTree = "<group>"; };
+		6AC39E9370FCCB01E81EC824 /* ai_chat.rs */ = {isa = PBXFileReference; path = ai_chat.rs; sourceTree = "<group>"; };
+		6F67F5CDD6BB137126C5AABB /* menu.rs */ = {isa = PBXFileReference; path = menu.rs; sourceTree = "<group>"; };
+		71EDBD38A067DA56FD3E375F /* getting_started.rs */ = {isa = PBXFileReference; path = getting_started.rs; sourceTree = "<group>"; };
+		7D94F0F22CD503903B63FFE7 /* file.rs */ = {isa = PBXFileReference; path = file.rs; sourceTree = "<group>"; };
+		7FCDD5B9C3D021A45C402A43 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		81C8EBDD5CAD14B7F366AA54 /* trash.rs */ = {isa = PBXFileReference; path = trash.rs; sourceTree = "<group>"; };
+		84ECD74B7841E52AD6549346 /* image.rs */ = {isa = PBXFileReference; path = image.rs; sourceTree = "<group>"; };
+		87F0375DE367A8192708C2D8 /* pulse.rs */ = {isa = PBXFileReference; path = pulse.rs; sourceTree = "<group>"; };
+		9274F38B9AA0A9A44A3CBEAA /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		94B5B4BBA850E2BCAE3E4CC7 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		A17AA2469F233241B0DF8BE3 /* vault_list.rs */ = {isa = PBXFileReference; path = vault_list.rs; sourceTree = "<group>"; };
+		A34681D9D4CE45CDF83ABA59 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		A70EB7513BFD74428B2C6ED1 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		AA64014FA2D16950AD4DF619 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		ACCD8318FA6543BA013E37E4 /* ops.rs */ = {isa = PBXFileReference; path = ops.rs; sourceTree = "<group>"; };
+		BA9FA5D7A7A7574FF74589C8 /* telemetry.rs */ = {isa = PBXFileReference; path = telemetry.rs; sourceTree = "<group>"; };
+		BB4E3DD2D3BA34BB86C908B6 /* status.rs */ = {isa = PBXFileReference; path = status.rs; sourceTree = "<group>"; };
+		C39B460DE1A3B78A0937BFDD /* settings.rs */ = {isa = PBXFileReference; path = settings.rs; sourceTree = "<group>"; };
+		C80E8FDDA822F4F167B601C1 /* mod_tests.rs */ = {isa = PBXFileReference; path = mod_tests.rs; sourceTree = "<group>"; };
+		CEDEEAE68B0DB4CD43ED89A8 /* laputa_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = laputa_iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D0900BA51E68887E5DA395B7 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		DDC76F9C00A29C8C52345249 /* history.rs */ = {isa = PBXFileReference; path = history.rs; sourceTree = "<group>"; };
+		E1428C0A0CC22F741B7A4A0C /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		E36BAA25D76F212157A06395 /* search.rs */ = {isa = PBXFileReference; path = search.rs; sourceTree = "<group>"; };
+		E3FC10F8A144BB158574C774 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		F87684B058BB66A215F98DCF /* mcp.rs */ = {isa = PBXFileReference; path = mcp.rs; sourceTree = "<group>"; };
+		F8E52CF938A81FD9ABC1B23F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F9FF9FD3CEB0EB658CA17305 /* clone.rs */ = {isa = PBXFileReference; path = clone.rs; sourceTree = "<group>"; };
+		FBB08655AD50E526ACEAE8A2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		50978AC1976616D3342459ED /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1C55EF711F7ACEAC173C344E /* libapp.a in Frameworks */,
+				9BD440BEBCDBD633C9EE2C26 /* CoreGraphics.framework in Frameworks */,
+				1662961784944D479C9E1B0D /* Metal.framework in Frameworks */,
+				534929E6730B15780117F21F /* MetalKit.framework in Frameworks */,
+				74A9072960AF0CB774BEB749 /* QuartzCore.framework in Frameworks */,
+				5AAD7159BB4D20588044B3BC /* Security.framework in Frameworks */,
+				4A94802D0295ECD102C21BA1 /* UIKit.framework in Frameworks */,
+				7EF9AA3C7F58D96F21743FB4 /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		021259EC384B5D897634CFF8 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				CEDEEAE68B0DB4CD43ED89A8 /* laputa_iOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		109126B51C7DDFCA7CD8B9EA /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				DC6461BBBF0BDFBB28352CF9 /* laputa */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		1189728653A76416E01221D7 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A70EB7513BFD74428B2C6ED1 /* CoreGraphics.framework */,
+				3CF0D094B920E757356FC3AD /* libapp.a */,
+				E3FC10F8A144BB158574C774 /* Metal.framework */,
+				05C322F5E5E2ACB0CBC644EE /* MetalKit.framework */,
+				3AB6F4BD2E768B4B6EDF7EA4 /* QuartzCore.framework */,
+				43C29783A8194F596483AD35 /* Security.framework */,
+				A34681D9D4CE45CDF83ABA59 /* UIKit.framework */,
+				27D33799362DF41B226D7635 /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		314C2D9104FDC1DE81AC36AD = {
+			isa = PBXGroup;
+			children = (
+				1BC846C6372AE88FE28EA984 /* assets */,
+				F8E52CF938A81FD9ABC1B23F /* Assets.xcassets */,
+				9274F38B9AA0A9A44A3CBEAA /* LaunchScreen.storyboard */,
+				FD3AA61436162714FAEC418D /* Externals */,
+				56AC65AB30CBAEB08FD782A6 /* laputa_iOS */,
+				109126B51C7DDFCA7CD8B9EA /* Sources */,
+				FA63A5561E1F084B5F13E265 /* src */,
+				1189728653A76416E01221D7 /* Frameworks */,
+				021259EC384B5D897634CFF8 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		56AC65AB30CBAEB08FD782A6 /* laputa_iOS */ = {
+			isa = PBXGroup;
+			children = (
+				FBB08655AD50E526ACEAE8A2 /* Info.plist */,
+				34F1C40770F83FDC21036505 /* laputa_iOS.entitlements */,
+			);
+			path = laputa_iOS;
+			sourceTree = "<group>";
+		};
+		5D80057D94E84FA08C34A8B0 /* frontmatter */ = {
+			isa = PBXGroup;
+			children = (
+				94B5B4BBA850E2BCAE3E4CC7 /* mod.rs */,
+				ACCD8318FA6543BA013E37E4 /* ops.rs */,
+				0CA7012668D8606FE9709D6D /* yaml.rs */,
+			);
+			path = frontmatter;
+			sourceTree = "<group>";
+		};
+		6A109CE663DEBC9C99A47D0B /* github */ = {
+			isa = PBXGroup;
+			children = (
+				0AE733EAA82134418C0AC89F /* api.rs */,
+				16CCC72C07657AEBC320B099 /* auth.rs */,
+				F9FF9FD3CEB0EB658CA17305 /* clone.rs */,
+				2D38A9417EA6B0A133D0D55F /* mod.rs */,
+			);
+			path = github;
+			sourceTree = "<group>";
+		};
+		85465A1346B035D3C3DA6236 /* git */ = {
+			isa = PBXGroup;
+			children = (
+				517A653F5A674050430C1167 /* commit.rs */,
+				4AAEE16E1AC0E472E9EAF907 /* conflict.rs */,
+				DDC76F9C00A29C8C52345249 /* history.rs */,
+				7FCDD5B9C3D021A45C402A43 /* mod.rs */,
+				87F0375DE367A8192708C2D8 /* pulse.rs */,
+				692CE75FC8E670478C4209C8 /* remote.rs */,
+				BB4E3DD2D3BA34BB86C908B6 /* status.rs */,
+			);
+			path = git;
+			sourceTree = "<group>";
+		};
+		A44D28635D2D14F8A9E644BC /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				D0900BA51E68887E5DA395B7 /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
+		AE0DF532B1E0DADFEDFE383A /* vault */ = {
+			isa = PBXGroup;
+			children = (
+				6288FD61B10C36115B12B4A4 /* cache.rs */,
+				5F28F393EB20BA7F8F2102EF /* config_seed.rs */,
+				4F4C2FE8D3697D180E1D4304 /* entry.rs */,
+				7D94F0F22CD503903B63FFE7 /* file.rs */,
+				3E23075B718E12551904D3B6 /* frontmatter.rs */,
+				71EDBD38A067DA56FD3E375F /* getting_started.rs */,
+				84ECD74B7841E52AD6549346 /* image.rs */,
+				1D65CB9525835A85C38D3136 /* migration.rs */,
+				C80E8FDDA822F4F167B601C1 /* mod_tests.rs */,
+				AA64014FA2D16950AD4DF619 /* mod.rs */,
+				0FB1053AF590466CC8971679 /* parsing.rs */,
+				2D31CB45BB367FD6A7FA0B67 /* rename.rs */,
+				5800BA1A3E5C03124E02E946 /* title_sync.rs */,
+				81C8EBDD5CAD14B7F366AA54 /* trash.rs */,
+			);
+			path = vault;
+			sourceTree = "<group>";
+		};
+		DC6461BBBF0BDFBB28352CF9 /* laputa */ = {
+			isa = PBXGroup;
+			children = (
+				3D8616031E45547278A88B60 /* main.mm */,
+				A44D28635D2D14F8A9E644BC /* bindings */,
+			);
+			path = laputa;
+			sourceTree = "<group>";
+		};
+		FA63A5561E1F084B5F13E265 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				6AC39E9370FCCB01E81EC824 /* ai_chat.rs */,
+				6A5C3DA38846B440DD56E98A /* claude_cli.rs */,
+				077AD05C7FB4A784D360399B /* commands.rs */,
+				E1428C0A0CC22F741B7A4A0C /* lib.rs */,
+				50B53E0FE0FC2A5515B48A28 /* main.rs */,
+				F87684B058BB66A215F98DCF /* mcp.rs */,
+				6F67F5CDD6BB137126C5AABB /* menu.rs */,
+				E36BAA25D76F212157A06395 /* search.rs */,
+				C39B460DE1A3B78A0937BFDD /* settings.rs */,
+				BA9FA5D7A7A7574FF74589C8 /* telemetry.rs */,
+				A17AA2469F233241B0DF8BE3 /* vault_list.rs */,
+				5D80057D94E84FA08C34A8B0 /* frontmatter */,
+				85465A1346B035D3C3DA6236 /* git */,
+				6A109CE663DEBC9C99A47D0B /* github */,
+				AE0DF532B1E0DADFEDFE383A /* vault */,
+			);
+			name = src;
+			path = ../../src;
+			sourceTree = "<group>";
+		};
+		FD3AA61436162714FAEC418D /* Externals */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Externals;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		DAF25BBC5B5E1A3750AF7F8E /* laputa_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F8ED295B21C1E1D8BE1CBAB2 /* Build configuration list for PBXNativeTarget "laputa_iOS" */;
+			buildPhases = (
+				72D053FB9C1C9BF219367CA2 /* Build Rust Code */,
+				2FA764A26841E6D98B919C1A /* Sources */,
+				46BE17F676877ABAEEFB1ACF /* Resources */,
+				50978AC1976616D3342459ED /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = laputa_iOS;
+			packageProductDependencies = (
+			);
+			productName = laputa_iOS;
+			productReference = CEDEEAE68B0DB4CD43ED89A8 /* laputa_iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		2E2C059AB505791AB84204D8 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 02446155D1A36B8D10250861 /* Build configuration list for PBXProject "laputa" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 314C2D9104FDC1DE81AC36AD;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 021259EC384B5D897634CFF8 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				DAF25BBC5B5E1A3750AF7F8E /* laputa_iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		46BE17F676877ABAEEFB1ACF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A2279B6B796C960A2951E7C5 /* Assets.xcassets in Resources */,
+				DACF8A23100E74CEA0BE1ED9 /* LaunchScreen.storyboard in Resources */,
+				E0FB400669725FC03B8E9B39 /* assets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		72D053FB9C1C9BF219367CA2 /* Build Rust Code */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Code";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a",
+				"$(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "npm run -- tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		2FA764A26841E6D98B919C1A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				799F0FF5DD8053B287C9CA46 /* main.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		3CC8721F138177C2FE029D95 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = debug;
+		};
+		44D6538EB5E448ECCC49165C /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = release;
+		};
+		487BF5A97BEC469EBD248159 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = laputa_iOS/laputa_iOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = laputa_iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = club.refactoring.tolaria;
+				PRODUCT_NAME = Tolaria;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = debug;
+		};
+		FE69C38FBEB0C14D7D5AC27E /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = laputa_iOS/laputa_iOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = laputa_iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = club.refactoring.tolaria;
+				PRODUCT_NAME = Tolaria;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		02446155D1A36B8D10250861 /* Build configuration list for PBXProject "laputa" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3CC8721F138177C2FE029D95 /* debug */,
+				44D6538EB5E448ECCC49165C /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+		F8ED295B21C1E1D8BE1CBAB2 /* Build configuration list for PBXNativeTarget "laputa_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				487BF5A97BEC469EBD248159 /* debug */,
+				FE69C38FBEB0C14D7D5AC27E /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 2E2C059AB505791AB84204D8 /* Project object */;
+}

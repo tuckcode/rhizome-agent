@@ -1,0 +1,559 @@
+[
+  {
+    "title": "Index",
+    "path": "pages/index.md",
+    "url": "/",
+    "section": "home",
+    "headings": []
+  },
+  {
+    "title": "First Launch",
+    "path": "pages/start/first-launch.md",
+    "url": "/start/first-launch",
+    "section": "start",
+    "headings": [
+      "What You Choose",
+      "What Rhizome Creates",
+      "First Commands To Try",
+      "AI Setup Prompt"
+    ]
+  },
+  {
+    "title": "Getting Started Vault",
+    "path": "pages/start/getting-started-vault.md",
+    "url": "/start/getting-started-vault",
+    "section": "start",
+    "headings": [
+      "What It Demonstrates",
+      "Local-Only By Default",
+      "Use It Alongside Your Own Vaults",
+      "When To Move On"
+    ]
+  },
+  {
+    "title": "Install Rhizome",
+    "path": "pages/start/install.md",
+    "url": "/start/install",
+    "section": "start",
+    "headings": [
+      "Download",
+      "Homebrew",
+      "Platform Status",
+      "Managed Windows Devices",
+      "After Installing"
+    ]
+  },
+  {
+    "title": "Open Or Create A Vault",
+    "path": "pages/start/open-or-create-vault.md",
+    "url": "/start/open-or-create-vault",
+    "section": "start",
+    "headings": [
+      "Open An Existing Folder",
+      "Create A New Vault",
+      "Use More Than One Vault",
+      "Git Is Recommended, Not Required"
+    ]
+  },
+  {
+    "title": "AI",
+    "path": "pages/concepts/ai.md",
+    "url": "/concepts/ai",
+    "section": "concepts",
+    "headings": [
+      "Coding Agents",
+      "Direct Models",
+      "External MCP Setup",
+      "Why Git Matters For AI"
+    ]
+  },
+  {
+    "title": "Editor",
+    "path": "pages/concepts/editor.md",
+    "url": "/concepts/editor",
+    "section": "concepts",
+    "headings": [
+      "Rich Editing",
+      "Raw Mode",
+      "Table Of Contents",
+      "Width"
+    ]
+  },
+  {
+    "title": "Files And Media",
+    "path": "pages/concepts/files-and-media.md",
+    "url": "/concepts/files-and-media",
+    "section": "concepts",
+    "headings": [
+      "Mermaid Diagrams",
+      "Attachments",
+      "Previews",
+      "Whiteboards",
+      "Git Boundary"
+    ]
+  },
+  {
+    "title": "Git",
+    "path": "pages/concepts/git.md",
+    "url": "/concepts/git",
+    "section": "concepts",
+    "headings": [
+      "What Rhizome Uses Git For",
+      "History And Diffs",
+      "Local Commits",
+      "Remotes"
+    ]
+  },
+  {
+    "title": "Inbox",
+    "path": "pages/concepts/inbox.md",
+    "url": "/concepts/inbox",
+    "section": "concepts",
+    "headings": [
+      "Why It Exists",
+      "Organizing Inbox Notes",
+      "Healthy Inbox Habit"
+    ]
+  },
+  {
+    "title": "Notes",
+    "path": "pages/concepts/notes.md",
+    "url": "/concepts/notes",
+    "section": "concepts",
+    "headings": [
+      "Anatomy",
+      "Titles",
+      "Body Links",
+      "Frontmatter"
+    ]
+  },
+  {
+    "title": "Properties",
+    "path": "pages/concepts/properties.md",
+    "url": "/concepts/properties",
+    "section": "concepts",
+    "headings": [
+      "Suggested Properties",
+      "System Properties",
+      "Property Editing"
+    ]
+  },
+  {
+    "title": "Relationships",
+    "path": "pages/concepts/relationships.md",
+    "url": "/concepts/relationships",
+    "section": "concepts",
+    "headings": [
+      "Relationship Fields",
+      "Body Links Versus Relationship Fields",
+      "Backlinks"
+    ]
+  },
+  {
+    "title": "Spreadsheets",
+    "path": "pages/concepts/spreadsheets.md",
+    "url": "/concepts/spreadsheets",
+    "section": "concepts",
+    "headings": [
+      "Read Next",
+      "Why Sheet Notes",
+      "One Note, One Sheet",
+      "Editing",
+      "Wikilinks In Cells",
+      "Cross-Sheet Formulas",
+      "Storage",
+      "Formulas"
+    ]
+  },
+  {
+    "title": "Types",
+    "path": "pages/concepts/types.md",
+    "url": "/concepts/types",
+    "section": "concepts",
+    "headings": [
+      "Type Field",
+      "Prefer Types Over Folders",
+      "Type Documents",
+      "What Types Control",
+      "New Note Defaults"
+    ]
+  },
+  {
+    "title": "Vaults",
+    "path": "pages/concepts/vaults.md",
+    "url": "/concepts/vaults",
+    "section": "concepts",
+    "headings": [
+      "Core Rules",
+      "Why Local Files Matter",
+      "Git Is A Capability",
+      "Multiple Vaults At The Same Time",
+      "App State Versus Vault State"
+    ]
+  },
+  {
+    "title": "Build Custom Views",
+    "path": "pages/guides/build-custom-views.md",
+    "url": "/guides/build-custom-views",
+    "section": "guides",
+    "headings": [
+      "Good View Candidates",
+      "View Definition",
+      "Filters",
+      "Design The Question First"
+    ]
+  },
+  {
+    "title": "Capture A Note",
+    "path": "pages/guides/capture-a-note.md",
+    "url": "/guides/capture-a-note",
+    "section": "guides",
+    "headings": [
+      "Steps",
+      "Capture Well",
+      "When To Add Structure Immediately"
+    ]
+  },
+  {
+    "title": "Manage Git Manually Or With AutoGit",
+    "path": "pages/guides/commit-and-push.md",
+    "url": "/guides/commit-and-push",
+    "section": "guides",
+    "headings": [
+      "Manual Git",
+      "AutoGit",
+      "Use Small Commits"
+    ]
+  },
+  {
+    "title": "Configure AI Models",
+    "path": "pages/guides/configure-ai-models.md",
+    "url": "/guides/configure-ai-models",
+    "section": "guides",
+    "headings": [
+      "Local Models",
+      "API Models",
+      "Test The Connection",
+      "Select The Target"
+    ]
+  },
+  {
+    "title": "Connect A Git Remote",
+    "path": "pages/guides/connect-a-git-remote.md",
+    "url": "/guides/connect-a-git-remote",
+    "section": "guides",
+    "headings": [
+      "Before You Start",
+      "Steps",
+      "Recommended Auth"
+    ]
+  },
+  {
+    "title": "Create Types",
+    "path": "pages/guides/create-types.md",
+    "url": "/guides/create-types",
+    "section": "guides",
+    "headings": [
+      "Steps",
+      "Use Types Sparingly",
+      "Templates"
+    ]
+  },
+  {
+    "title": "Manage Display Preferences",
+    "path": "pages/guides/manage-display-preferences.md",
+    "url": "/guides/manage-display-preferences",
+    "section": "guides",
+    "headings": [
+      "Theme",
+      "Note Width",
+      "Sidebar Labels",
+      "Vault Content"
+    ]
+  },
+  {
+    "title": "Organize The Inbox",
+    "path": "pages/guides/organize-inbox.md",
+    "url": "/guides/organize-inbox",
+    "section": "guides",
+    "headings": [
+      "Remove A Note From Inbox",
+      "Review Checklist",
+      "Make Notes Navigable",
+      "Avoid Over-Structuring"
+    ]
+  },
+  {
+    "title": "Use The AI",
+    "path": "pages/guides/use-ai-panel.md",
+    "url": "/guides/use-ai-panel",
+    "section": "guides",
+    "headings": [
+      "Choose How To Prompt",
+      "Choose A Target",
+      "Permission Mode",
+      "Good Requests",
+      "Review Changes"
+    ]
+  },
+  {
+    "title": "Use The Command Palette",
+    "path": "pages/guides/use-command-palette.md",
+    "url": "/guides/use-command-palette",
+    "section": "guides",
+    "headings": [
+      "Common Commands",
+      "Keyboard-First Workflow"
+    ]
+  },
+  {
+    "title": "Use Media Previews",
+    "path": "pages/guides/use-media-previews.md",
+    "url": "/guides/use-media-previews",
+    "section": "guides",
+    "headings": [
+      "Open A File",
+      "All Notes Visibility",
+      "Attachments",
+      "Troubleshooting"
+    ]
+  },
+  {
+    "title": "Use Spreadsheets",
+    "path": "pages/guides/use-spreadsheets.md",
+    "url": "/guides/use-spreadsheets",
+    "section": "guides",
+    "headings": [
+      "Create A Sheet",
+      "Enter Values",
+      "Enter Formulas",
+      "Select And Edit Ranges",
+      "Format Cells",
+      "Add Wikilinks",
+      "Reference Another Sheet Note",
+      "Work With The Raw File"
+    ]
+  },
+  {
+    "title": "Use The Table Of Contents",
+    "path": "pages/guides/use-table-of-contents.md",
+    "url": "/guides/use-table-of-contents",
+    "section": "guides",
+    "headings": [
+      "Open It",
+      "How It Works",
+      "Good Uses"
+    ]
+  },
+  {
+    "title": "Use Wikilinks",
+    "path": "pages/guides/use-wikilinks.md",
+    "url": "/guides/use-wikilinks",
+    "section": "guides",
+    "headings": [
+      "Link From The Body",
+      "Link From Frontmatter",
+      "Keep Links Stable"
+    ]
+  },
+  {
+    "title": "Portent",
+    "path": "pages/templates/portent.md",
+    "url": "/templates/portent",
+    "section": "templates",
+    "headings": [
+      "Core Questions",
+      "Types",
+      "Relationships",
+      "Lifecycle",
+      "Why Use It",
+      "Start From The Template",
+      "Learn More"
+    ]
+  },
+  {
+    "title": "Contribute",
+    "path": "pages/reference/contribute.md",
+    "url": "/reference/contribute",
+    "section": "reference",
+    "headings": [
+      "Sponsor Or Support",
+      "Feature Requests",
+      "Discussions",
+      "Contribute Code",
+      "Report A Bug"
+    ]
+  },
+  {
+    "title": "Docs Maintenance",
+    "path": "pages/reference/docs-maintenance.md",
+    "url": "/reference/docs-maintenance",
+    "section": "reference",
+    "headings": [
+      "Update Docs When You Change",
+      "Suggested Workflow",
+      "Page Types",
+      "Review Checklist"
+    ]
+  },
+  {
+    "title": "File Layout",
+    "path": "pages/reference/file-layout.md",
+    "url": "/reference/file-layout",
+    "section": "reference",
+    "headings": [
+      "Root Notes",
+      "Special Folders",
+      "Git Files"
+    ]
+  },
+  {
+    "title": "Frontmatter Fields",
+    "path": "pages/reference/frontmatter-fields.md",
+    "url": "/reference/frontmatter-fields",
+    "section": "reference",
+    "headings": [
+      "Custom Fields",
+      "System Fields"
+    ]
+  },
+  {
+    "title": "Keyboard Shortcuts",
+    "path": "pages/reference/keyboard-shortcuts.md",
+    "url": "/reference/keyboard-shortcuts",
+    "section": "reference",
+    "headings": []
+  },
+  {
+    "title": "Release Channels",
+    "path": "pages/reference/release-channels.md",
+    "url": "/reference/release-channels",
+    "section": "reference",
+    "headings": [
+      "Stable",
+      "Alpha",
+      "Before Switching"
+    ]
+  },
+  {
+    "title": "Spreadsheet File Format",
+    "path": "pages/reference/spreadsheet-format.md",
+    "url": "/reference/spreadsheet-format",
+    "section": "reference",
+    "headings": [
+      "Structure",
+      "Frontmatter",
+      "Body",
+      "`_sheet` Metadata",
+      "Number Formats",
+      "Markdown Style Import",
+      "Wikilinks",
+      "Guidance For Agents And Scripts"
+    ]
+  },
+  {
+    "title": "Spreadsheet Formulas",
+    "path": "pages/reference/spreadsheet-functions.md",
+    "url": "/reference/spreadsheet-functions",
+    "section": "reference",
+    "headings": [
+      "Basic Syntax",
+      "Rhizome Cross-Sheet References",
+      "Autocomplete Functions",
+      "Logical",
+      "Math and trigonometry",
+      "Lookup and reference",
+      "Text",
+      "Information",
+      "Statistical",
+      "Date and time",
+      "Financial",
+      "Engineering",
+      "Examples",
+      "Totals",
+      "Growth And Percentages",
+      "Conditional Logic",
+      "Dates",
+      "Text",
+      "Lookup",
+      "Cross-Sheet Model",
+      "IronCalc Function Families"
+    ]
+  },
+  {
+    "title": "Supported Platforms",
+    "path": "pages/reference/supported-platforms.md",
+    "url": "/reference/supported-platforms",
+    "section": "reference",
+    "headings": [
+      "Support Policy",
+      "Reporting Platform Bugs"
+    ]
+  },
+  {
+    "title": "View Filters",
+    "path": "pages/reference/view-filters.md",
+    "url": "/reference/view-filters",
+    "section": "reference",
+    "headings": [
+      "Common Filter Ideas",
+      "Sorting",
+      "Operators",
+      "Keep Views Focused"
+    ]
+  },
+  {
+    "title": "AI Agent Not Found",
+    "path": "pages/troubleshooting/ai-agent-not-found.md",
+    "url": "/troubleshooting/ai-agent-not-found",
+    "section": "troubleshooting",
+    "headings": [
+      "Symptoms",
+      "Checks",
+      "Path Issues"
+    ]
+  },
+  {
+    "title": "Git Authentication",
+    "path": "pages/troubleshooting/git-auth.md",
+    "url": "/troubleshooting/git-auth",
+    "section": "troubleshooting",
+    "headings": [
+      "Symptoms",
+      "Checks",
+      "Common Fixes"
+    ]
+  },
+  {
+    "title": "Model Provider Connection",
+    "path": "pages/troubleshooting/model-provider-connection.md",
+    "url": "/troubleshooting/model-provider-connection",
+    "section": "troubleshooting",
+    "headings": [
+      "Local Providers",
+      "API Providers",
+      "Chat Mode Boundary"
+    ]
+  },
+  {
+    "title": "Sync Conflicts",
+    "path": "pages/troubleshooting/sync-conflicts.md",
+    "url": "/troubleshooting/sync-conflicts",
+    "section": "troubleshooting",
+    "headings": [
+      "What To Do",
+      "Prevent Conflicts"
+    ]
+  },
+  {
+    "title": "Vault Not Loading",
+    "path": "pages/troubleshooting/vault-not-loading.md",
+    "url": "/troubleshooting/vault-not-loading",
+    "section": "troubleshooting",
+    "headings": [
+      "Check The Folder",
+      "Check Git",
+      "Reload"
+    ]
+  }
+]

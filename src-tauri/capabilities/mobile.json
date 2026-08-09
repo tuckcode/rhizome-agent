@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile",
+  "description": "permissions for iOS/iPadOS",
+  "windows": [
+    "main"
+  ],
+  "platforms": ["iOS", "android"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-set-title",
+    "dialog:default"
+  ]
+}

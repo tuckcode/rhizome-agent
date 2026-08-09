@@ -1,0 +1,143 @@
+import { act, renderHook } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ACCENT_COLOR_STORAGE_KEY, COLOR_THEME_STORAGE_KEY, THEME_MODE_STORAGE_KEY } from '../lib/themeMode'
+import { useThemeMode } from './useThemeMode'
+
+function createStorageMock(): Storage {
+  const values = new Map<string, string>()
+  return {
+    get length() { return values.size },
+    clear: vi.fn(() => { values.clear() }),
+    getItem: vi.fn((key: string) => values.get(key) ?? null),
+    key: vi.fn((index: number) => Array.from(values.keys())[index] ?? null),
+    removeItem: vi.fn((key: string) => { values.delete(key) }),
+    setItem: vi.fn((key: string, value: string) => { values.set(key, value) }),
+  }
+}
+
+describe('useThemeMode', () => {
+  const localStorageMock = createStorageMock()
+
+  beforeEach(() => {
+    Object.defineProperty(window, 'localStorage', { value: localStorageMock, configurable: true })
+    installMatchMedia(false)
+    document.documentElement.removeAttribute('data-theme')
+    document.documentElement.classList.remove('dark')
+    window.localStorage.clear()
+  })
+
+  it('waits until settings have loaded', () => {
+    renderHook(() => useThemeMode('dark', false))
+
+    expect(document.documentElement).not.toHaveAttribute('data-theme')
+  })
+
+  it('applies and mirrors the loaded settings mode', () => {
+    renderHook(() => useThemeMode('dark', true))
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveClass('dark')
+    expect(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)).toBe('dark')
+  })
+
+  it('uses the storage mirror when persisted settings are empty', () => {
+    window.localStorage.setItem(THEME_MODE_STORAGE_KEY, 'dark')
+
+    renderHook(() => useThemeMode(null, true))
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+  })
+
+  it('keeps system stored while applying the resolved OS appearance', () => {
+    installMatchMedia(true)
+
+    renderHook(() => useThemeMode('system', true))
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveClass('dark')
+    expect(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)).toBe('system')
+  })
+
+  it('updates the document theme when the OS appearance changes in system mode', () => {
+    const media = installMatchMedia(true)
+
+    const { unmount } = renderHook(() => useThemeMode('system', true))
+
+    act(() => media.setMatches(false))
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).not.toHaveClass('dark')
+
+    unmount()
+    act(() => media.setMatches(true))
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+  })
+
+  it('applies a non-default color theme and pins the resolved mode to its polarity', () => {
+    renderHook(() => useThemeMode('light', true, 'dracula', 'blue'))
+
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'dracula')
+    // Dracula is dark-polarity — overrides the 'light' mode argument.
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveClass('dark')
+    expect(window.localStorage.getItem(COLOR_THEME_STORAGE_KEY)).toBe('dracula')
+  })
+
+  it('applies a non-default accent only alongside the rhizome theme, and mirrors it to storage', () => {
+    renderHook(() => useThemeMode('light', true, 'rhizome', 'green'))
+
+    expect(document.documentElement).toHaveAttribute('data-accent', 'green')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(window.localStorage.getItem(ACCENT_COLOR_STORAGE_KEY)).toBe('green')
+  })
+
+  it('a fixed color theme suppresses the system-mode media query subscription', () => {
+    const media = installMatchMedia(true)
+
+    renderHook(() => useThemeMode('system', true, 'github-light', 'blue'))
+
+    // github-light pins light regardless of the system's dark preference,
+    // and — being a fixed theme — shouldn't react to further OS changes.
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    act(() => media.setMatches(false))
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+  })
+})
+
+function installMatchMedia(initialMatches: boolean) {
+  let matches = initialMatches
+  const listeners = new Set<(event: MediaQueryListEvent) => void>()
+  const media = '(prefers-color-scheme: dark)'
+  const mediaQueryList: MediaQueryList = {
+    get matches() { return matches },
+    media,
+    onchange: null,
+    addEventListener: (_type, listener) => {
+      if (_type !== 'change' || typeof listener !== 'function') return
+      listeners.add(listener)
+    },
+    removeEventListener: (_type, listener) => {
+      if (_type !== 'change' || typeof listener !== 'function') return
+      listeners.delete(listener)
+    },
+    addListener: (listener) => listeners.add(listener),
+    removeListener: (listener) => listeners.delete(listener),
+    dispatchEvent: () => true,
+  }
+
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: vi.fn(() => mediaQueryList),
+  })
+
+  return {
+    setMatches(nextMatches: boolean) {
+      matches = nextMatches
+      const event = new Event('change') as MediaQueryListEvent
+      Object.defineProperties(event, {
+        matches: { value: nextMatches },
+        media: { value: media },
+      })
+      for (const listener of listeners) listener(event)
+    },
+  }
+}

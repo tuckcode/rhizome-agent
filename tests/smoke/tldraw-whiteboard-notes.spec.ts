@@ -1,0 +1,380 @@
+import { expect, test, type Locator, type Page } from '@playwright/test'
+import fs from 'fs'
+import path from 'path'
+import { createFixtureVaultCopy, openFixtureVault, removeFixtureVaultCopy } from '../helpers/fixtureVault'
+import { executeCommand, openCommandPalette } from './helpers'
+
+let tempVaultDir: string
+
+type TauriHarnessWindow = Window & typeof globalThis & {
+  isTauri?: boolean
+  __TAURI__?: unknown
+  __TAURI_INTERNALS__?: {
+    invoke?: () => Promise<never>
+  }
+}
+
+const WHITEBOARD_NOTE = [
+  '# Whiteboard Embed',
+  '',
+  'Context before the board.',
+  '',
+  '```tldraw id="planning-map"',
+  '{}',
+  '```',
+  '',
+  'Context after the board.',
+  '',
+].join('\n')
+const TAURI_CONTEXT_MENU_TEST = 'embedded tldraw context menu opens from a native right-click path'
+
+test.beforeEach(async ({ page }, testInfo) => {
+  testInfo.setTimeout(90_000)
+  tempVaultDir = createFixtureVaultCopy()
+  fs.writeFileSync(path.join(tempVaultDir, 'note', 'whiteboard-embed.md'), WHITEBOARD_NOTE)
+  if (testInfo.title === TAURI_CONTEXT_MENU_TEST) {
+    await installTauriContextMenuHarness(page)
+  }
+  await openFixtureVault(page, tempVaultDir)
+})
+
+test.afterEach(async () => {
+  removeFixtureVaultCopy(tempVaultDir)
+})
+
+async function openNote(page: Page, title: string): Promise<void> {
+  await page.locator('[data-testid="note-list-container"]').getByText(title, { exact: true }).click()
+  await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
+}
+
+async function installTauriContextMenuHarness(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const harnessWindow = window as TauriHarnessWindow
+    harnessWindow.isTauri = false
+    harnessWindow.__TAURI__ = harnessWindow.__TAURI__ ?? {}
+    harnessWindow.__TAURI_INTERNALS__ = {
+      ...harnessWindow.__TAURI_INTERNALS__,
+      invoke: async () => {
+        throw new Error('No native bridge in context menu harness')
+      },
+    }
+  })
+}
+
+async function toggleRawMode(page: Page, visibleSelector: '.bn-editor' | '.cm-content'): Promise<void> {
+  await openCommandPalette(page)
+  await executeCommand(page, 'Toggle Raw')
+  await expect(page.locator(visibleSelector)).toBeVisible({ timeout: 5_000 })
+}
+
+async function getRawEditorContent(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    type CodeMirrorHost = Element & {
+      cmTile?: {
+        view?: {
+          state: {
+            doc: {
+              toString(): string
+            }
+          }
+        }
+      }
+    }
+
+    const host = document.querySelector('.cm-content') as CodeMirrorHost | null
+    return host?.cmTile?.view?.state.doc.toString() ?? host?.textContent ?? ''
+  })
+}
+
+async function hasSelectedEditorNode(page: Page): Promise<boolean> {
+  return page.evaluate(() => document.querySelector('.ProseMirror-selectednode') !== null)
+}
+
+async function expectNoEditorNodeSelection(page: Page): Promise<void> {
+  expect(await hasSelectedEditorNode(page)).toBe(false)
+}
+
+async function expectPaintedTldrawIcon(icon: Locator): Promise<void> {
+  await expect(icon).toBeVisible({ timeout: 5_000 })
+  const paintState = await icon.evaluate((element) => {
+    const iconElement = element as HTMLElement
+    const style = getComputedStyle(iconElement)
+    const rect = iconElement.getBoundingClientRect()
+
+    return {
+      backgroundColor: style.backgroundColor,
+      height: rect.height,
+      inlineWebkitMask: iconElement.style.getPropertyValue('-webkit-mask'),
+      maskImage: style.getPropertyValue('mask-image'),
+      webkitMaskImage: style.getPropertyValue('-webkit-mask-image'),
+      width: rect.width,
+    }
+  })
+
+  expect(paintState.width).toBeGreaterThan(0)
+  expect(paintState.height).toBeGreaterThan(0)
+  expect(paintState.backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
+  expect([
+    paintState.inlineWebkitMask,
+    paintState.webkitMaskImage,
+    paintState.maskImage,
+  ].some((value) => value.trim() !== '' && value !== 'none')).toBe(true)
+}
+
+async function applyZoom(page: Page, percent: number): Promise<void> {
+  await page.evaluate((pct) => {
+    document.documentElement.style.setProperty('zoom', `${pct}%`)
+    window.dispatchEvent(new Event('laputa-zoom-change'))
+  }, percent)
+  await page.waitForTimeout(250)
+}
+
+async function firstTldrawShapeOrigin(page: Page): Promise<{ x: number, y: number } | null> {
+  return page.locator('.tl-shape').first().evaluate((element) => {
+    const whiteboard = element.closest('.tldraw-whiteboard')
+    if (!whiteboard) return null
+
+    const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform)
+    const boardBox = whiteboard.getBoundingClientRect()
+    const zoomStyle = document.documentElement.style.getPropertyValue('zoom')
+      || getComputedStyle(document.documentElement).zoom
+    const parsedZoom = Number.parseFloat(zoomStyle)
+    const zoom = Number.isFinite(parsedZoom) && parsedZoom > 0
+      ? zoomStyle.endsWith('%') ? parsedZoom / 100 : parsedZoom
+      : 1
+
+    return {
+      x: boardBox.x + matrix.m41 * zoom,
+      y: boardBox.y + matrix.m42 * zoom,
+    }
+  })
+}
+
+test('tldraw whiteboard fences render as embedded canvases and remain Markdown-durable', async ({ page }) => {
+  await openNote(page, 'Whiteboard Embed')
+
+  await expect(page.locator('.tldraw-whiteboard')).toBeVisible({ timeout: 20_000 })
+  await expect(page.locator('.tldraw-whiteboard .tl-container')).toBeVisible({ timeout: 20_000 })
+  await expect(page.locator('.bn-editor')).toContainText('Context before the board.')
+  await expect(page.locator('.bn-editor')).toContainText('Context after the board.')
+
+  await page.waitForTimeout(500)
+  await toggleRawMode(page, '.cm-content')
+  const rawAfterRichMode = await getRawEditorContent(page)
+
+  expect(rawAfterRichMode).toContain('```tldraw id="planning-map" height="520"')
+  expect(rawAfterRichMode).toContain('{}')
+  expect(rawAfterRichMode).not.toContain('@@TOLARIA_TLDRAW')
+})
+
+test('embedded tldraw whiteboards follow Tolaria theme changes', async ({ page }) => {
+  await openNote(page, 'Whiteboard Embed')
+
+  const tldrawContainer = page.locator('.tldraw-whiteboard .tl-container').first()
+  await expect(tldrawContainer).toBeVisible({ timeout: 20_000 })
+
+  const initialMode = await tldrawContainer.evaluate((element) =>
+    element.classList.contains('tl-theme__dark') ? 'dark' : 'light'
+  )
+
+  await page.getByTestId('status-theme-mode').click()
+  const toggledMode = initialMode === 'dark' ? 'light' : 'dark'
+  await expect(tldrawContainer).toHaveClass(new RegExp(`tl-theme__${toggledMode}`))
+  await expect(tldrawContainer).toHaveAttribute('data-color-mode', toggledMode)
+
+  await page.getByTestId('status-theme-mode').click()
+  await expect(tldrawContainer).toHaveClass(new RegExp(`tl-theme__${initialMode}`))
+  await expect(tldrawContainer).toHaveAttribute('data-color-mode', initialMode)
+})
+
+test('embedded tldraw toolbar and style panel icons keep a WebKit paint mask', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await openNote(page, 'Whiteboard Embed')
+
+  const whiteboard = page.locator('.tldraw-whiteboard')
+  await expect(whiteboard).toBeVisible({ timeout: 20_000 })
+
+  await expectPaintedTldrawIcon(whiteboard.locator('.tlui-main-toolbar .tlui-icon').first())
+  await expectPaintedTldrawIcon(whiteboard.locator('.tlui-style-panel .tlui-icon').first())
+})
+
+test('embedded tldraw interactions stay inside the whiteboard', async ({ page }) => {
+  await openNote(page, 'Whiteboard Embed')
+
+  const whiteboard = page.locator('.tldraw-whiteboard')
+  await expect(whiteboard).toBeVisible({ timeout: 20_000 })
+
+  const boardBox = await whiteboard.boundingBox()
+  expect(boardBox).not.toBeNull()
+
+  await page.mouse.click(boardBox!.x + boardBox!.width / 2, boardBox!.y + boardBox!.height / 2)
+  await expectNoEditorNodeSelection(page)
+
+  await page.getByTestId('tools.select').click()
+  await expectNoEditorNodeSelection(page)
+
+  const pageMenuButton = page.getByTestId('page-menu.button')
+  const buttonBox = await pageMenuButton.boundingBox()
+  expect(buttonBox).not.toBeNull()
+
+  await pageMenuButton.click()
+
+  const pageMenu = page.locator('.tlui-page-menu__wrapper')
+  await expect(pageMenu).toBeVisible({ timeout: 5_000 })
+
+  const menuBox = await pageMenu.boundingBox()
+  expect(menuBox).not.toBeNull()
+  expect(menuBox!.x).toBeGreaterThanOrEqual(boardBox!.x - 1)
+  expect(menuBox!.x).toBeLessThanOrEqual(buttonBox!.x + 1)
+  await expectNoEditorNodeSelection(page)
+
+  await page.getByTestId('tools.more-button').click()
+  const ellipseTool = page.getByTestId('tools.more.ellipse')
+  await expect(ellipseTool).toBeVisible({ timeout: 5_000 })
+  await ellipseTool.click()
+  await expect(page.getByTestId('tools.ellipse')).toHaveAttribute('aria-pressed', 'true')
+  await expectNoEditorNodeSelection(page)
+})
+
+test('embedded tldraw whiteboards can expand to a full-window workspace', async ({ page }) => {
+  await openNote(page, 'Whiteboard Embed')
+
+  const whiteboard = page.locator('.tldraw-whiteboard')
+  await expect(whiteboard).toBeVisible({ timeout: 20_000 })
+  const embeddedBox = await whiteboard.boundingBox()
+  expect(embeddedBox).not.toBeNull()
+
+  const fullscreenToggle = page.getByTestId('tldraw-whiteboard-fullscreen-toggle')
+  await expect(fullscreenToggle).toBeVisible({ timeout: 5_000 })
+  await fullscreenToggle.click()
+  await expect(whiteboard).toHaveClass(/tldraw-whiteboard--fullscreen/u)
+
+  const fullscreenBox = await whiteboard.boundingBox()
+  const viewport = page.viewportSize()
+  expect(fullscreenBox).not.toBeNull()
+  expect(viewport).not.toBeNull()
+  expect(fullscreenBox!.x).toBeLessThanOrEqual(8)
+  expect(fullscreenBox!.y).toBeLessThanOrEqual(8)
+  expect(fullscreenBox!.width).toBeGreaterThanOrEqual(viewport!.width - 16)
+  expect(fullscreenBox!.height).toBeGreaterThanOrEqual(viewport!.height - 16)
+
+  await page.getByTestId('tools.more-button').click()
+  await expect(page.getByTestId('tools.more.ellipse')).toBeVisible({ timeout: 5_000 })
+  await expect(whiteboard).toHaveClass(/tldraw-whiteboard--fullscreen/u)
+  await expectNoEditorNodeSelection(page)
+
+  await fullscreenToggle.click()
+  await expect(whiteboard).not.toHaveClass(/tldraw-whiteboard--fullscreen/u)
+
+  const restoredBox = await whiteboard.boundingBox()
+  expect(restoredBox).not.toBeNull()
+  expect(Math.abs(restoredBox!.height - embeddedBox!.height)).toBeLessThan(4)
+})
+
+test('embedded tldraw dialogs appear and release focus when closed', async ({ page }) => {
+  await openNote(page, 'Whiteboard Embed')
+
+  const whiteboard = page.locator('.tldraw-whiteboard')
+  await expect(whiteboard).toBeVisible({ timeout: 20_000 })
+
+  await page.getByTestId('main-menu.button').click()
+  await page.getByTestId('main-menu.keyboard-shortcuts-button').click()
+
+  const shortcutsDialog = page.locator('.tldraw-whiteboard .tlui-dialog__content')
+  await expect(shortcutsDialog).toBeVisible({ timeout: 5_000 })
+  await expect(shortcutsDialog).toContainText('Keyboard shortcuts')
+
+  const dialogBox = await shortcutsDialog.boundingBox()
+  const boardBox = await whiteboard.boundingBox()
+  expect(dialogBox).not.toBeNull()
+  expect(boardBox).not.toBeNull()
+  expect(dialogBox!.x).toBeGreaterThanOrEqual(boardBox!.x)
+  expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(boardBox!.x + boardBox!.width)
+
+  await page.getByTestId('dialog.close').click()
+  await expect(shortcutsDialog).toHaveCount(0)
+
+  await page.getByTestId('tools.select').click()
+  await expect(page.getByTestId('tools.select')).toHaveAttribute('aria-pressed', 'true')
+  await expectNoEditorNodeSelection(page)
+})
+
+test('embedded tldraw insert embed dialog opens without crashing the note', async ({ page }) => {
+  await openNote(page, 'Whiteboard Embed')
+
+  const whiteboard = page.locator('.tldraw-whiteboard')
+  await expect(whiteboard).toBeVisible({ timeout: 20_000 })
+
+  await page.getByTestId('main-menu.button').click()
+  await page.getByTestId('main-menu.insert-embed').click()
+
+  const embedDialog = page.locator('.tldraw-whiteboard .tlui-dialog__content')
+  await expect(embedDialog).toBeVisible({ timeout: 5_000 })
+  await expect(embedDialog).toContainText('Insert embed')
+  await expect(page.locator('.error-boundary')).toHaveCount(0)
+
+  const dialogBox = await embedDialog.boundingBox()
+  const boardBox = await whiteboard.boundingBox()
+  expect(dialogBox).not.toBeNull()
+  expect(boardBox).not.toBeNull()
+  expect(dialogBox!.x).toBeGreaterThanOrEqual(boardBox!.x)
+  expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(boardBox!.x + boardBox!.width)
+})
+
+test(TAURI_CONTEXT_MENU_TEST, async ({ page }) => {
+  await openNote(page, 'Whiteboard Embed')
+
+  const whiteboard = page.locator('.tldraw-whiteboard')
+  await expect(whiteboard).toBeVisible({ timeout: 20_000 })
+  const boardBox = await whiteboard.boundingBox()
+  expect(boardBox).not.toBeNull()
+
+  const canvas = page.getByTestId('canvas')
+  await canvas.click({ position: { x: 160, y: 160 } })
+  await canvas.click({ button: 'right', position: { x: 160, y: 160 } })
+
+  const contextMenu = page.getByTestId('context-menu')
+  await expect(contextMenu).toBeVisible({ timeout: 5_000 })
+  const menuBox = await contextMenu.boundingBox()
+  expect(menuBox).not.toBeNull()
+  expect(menuBox!.x).toBeGreaterThanOrEqual(boardBox!.x - 1)
+  expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(boardBox!.x + boardBox!.width + 1)
+  await expectNoEditorNodeSelection(page)
+
+  await page.keyboard.press('Escape')
+  await expect(contextMenu).toHaveCount(0)
+})
+
+test('embedded tldraw drawing uses the clicked coordinates while zoomed', async ({ page }) => {
+  await openNote(page, 'Whiteboard Embed')
+  await applyZoom(page, 110)
+
+  const whiteboard = page.locator('.tldraw-whiteboard')
+  await expect(whiteboard).toBeVisible({ timeout: 20_000 })
+  const boardBox = await whiteboard.boundingBox()
+  expect(boardBox).not.toBeNull()
+
+  await page.getByTestId('tools.draw').click()
+
+  const start = {
+    x: boardBox!.x + 180,
+    y: boardBox!.y + 180,
+  }
+  const end = {
+    x: start.x + 120,
+    y: start.y + 90,
+  }
+
+  await page.mouse.move(start.x, start.y)
+  await page.mouse.down()
+  await page.mouse.move(end.x, end.y, { steps: 8 })
+  await page.mouse.up()
+
+  const shape = page.locator('.tl-shape').first()
+  await expect(shape).toBeVisible({ timeout: 5_000 })
+
+  const shapeOrigin = await firstTldrawShapeOrigin(page)
+  expect(shapeOrigin).not.toBeNull()
+  expect(Math.abs(shapeOrigin!.x - start.x)).toBeLessThan(30)
+  expect(Math.abs(shapeOrigin!.y - start.y)).toBeLessThan(30)
+})

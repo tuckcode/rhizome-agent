@@ -1,0 +1,10 @@
+tests/
+e2e/
+node_modules/
+dist/
+coverage/
+test-results/
+src-tauri/target/
+target/
+src-tauri/gen/apple/assets/mcp-server/index.js
+src-tauri/gen/apple/assets/mcp-server/ws-bridge.js

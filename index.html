@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet" />
+    <script>
+      (function () {
+        function isResizeObserverLoopMessage(message) {
+          return typeof message === 'string'
+            && (
+              message.indexOf('ResizeObserver loop completed with undelivered notifications') !== -1
+              || message.indexOf('ResizeObserver loop limit exceeded') !== -1
+            );
+        }
+        window.addEventListener('error', function (event) {
+          if (isResizeObserverLoopMessage(event.message)) {
+            event.preventDefault();
+          }
+        });
+        window.addEventListener('unhandledrejection', function (event) {
+          var reason = event.reason && (event.reason.stack || event.reason.message || String(event.reason));
+          if (isResizeObserverLoopMessage(reason)) {
+            event.preventDefault();
+          }
+        });
+
+        try {
+          if (new URLSearchParams(window.location.search).get('window') === 'ai-workspace') {
+            document.documentElement.classList.add('ai-workspace-native-window');
+          }
+        } catch {
+          // Leave the normal app chrome untouched if URL parsing is unavailable.
+        }
+      })();
+    </script>
+    <style>
+      :root {
+        color-scheme: light;
+        background: #FFFFFF;
+        color: #37352F;
+      }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        background: #1F1E1B;
+        color: #E6E1D8;
+      }
+      body {
+        background: inherit;
+        color: inherit;
+      }
+      :root.ai-workspace-native-window,
+      :root.ai-workspace-native-window body {
+        background: transparent;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        width: 100%;
+      }
+      :root.ai-workspace-native-window body {
+        box-sizing: border-box;
+        padding: 20px;
+      }
+      :root.ai-workspace-native-window #root {
+        background: #FFFFFF;
+        border: 1px solid #E9E9E7;
+        border-radius: 12px;
+        box-sizing: border-box;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.10);
+        height: 100%;
+        overflow: hidden;
+        width: 100%;
+      }
+      :root.ai-workspace-native-window[data-theme="dark"] #root {
+        background: #1F1E1B;
+        border-color: #34322D;
+        box-shadow: 0 12px 26px rgba(0, 0, 0, 0.30), 0 1px 4px rgba(0, 0, 0, 0.22);
+      }
+    </style>
+    <title>Rhizome Agent</title>
+  </head>
+  <body>
+    <script>
+      (function () {
+        var key = 'tolaria-theme';
+        var legacyKey = 'laputa-theme';
+        var colorThemeKey = 'tolaria-color-theme';
+        var accentKey = 'tolaria-accent';
+        var systemDarkQuery = '(prefers-color-scheme: dark)';
+        // Mirrors COLOR_THEMES in src/lib/themeMode.ts — keep in sync. Fixed
+        // themes pin the resolved mode to their polarity so there is no
+        // flash even when the mode toggle disagrees (e.g. system=light but
+        // the chosen fixed theme is dark).
+        var THEME_POLARITY = {
+          dracula: 'dark', nord: 'dark', 'gruvbox-dark': 'dark', 'gruvbox-light': 'light',
+          'solarized-light': 'light', 'solarized-dark': 'dark', 'catppuccin-mocha': 'dark',
+          'catppuccin-latte': 'light', 'tokyo-night': 'dark', 'one-dark': 'dark',
+          'rose-pine': 'dark', 'github-light': 'light', everforest: 'dark', 'monokai-pro': 'dark',
+        };
+        var ACCENT_KEYS = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'gray'];
+        function normalizeTheme(value) {
+          return value === 'dark' || value === 'light' || value === 'system' ? value : null;
+        }
+        function normalizeColorTheme(value) {
+          return value === 'rhizome' || Object.prototype.hasOwnProperty.call(THEME_POLARITY, value) ? value : null;
+        }
+        function normalizeAccent(value) {
+          return ACCENT_KEYS.indexOf(value) !== -1 ? value : null;
+        }
+        function prefersDarkTheme() {
+          try {
+            return typeof window.matchMedia === 'function' && window.matchMedia(systemDarkQuery).matches;
+          } catch {
+            return false;
+          }
+        }
+        function resolveTheme(value) {
+          var mode = normalizeTheme(value) || 'light';
+          return mode === 'system' ? (prefersDarkTheme() ? 'dark' : 'light') : mode;
+        }
+        function applyTheme(modeValue, colorThemeValue, accentValue) {
+          var colorTheme = normalizeColorTheme(colorThemeValue) || 'rhizome';
+          var accent = normalizeAccent(accentValue) || 'blue';
+          var polarity = THEME_POLARITY[colorTheme];
+          var mode = polarity || resolveTheme(modeValue);
+
+          document.documentElement.setAttribute('data-theme', mode);
+          document.documentElement.classList.toggle('dark', mode === 'dark');
+
+          if (colorTheme === 'rhizome') {
+            document.documentElement.removeAttribute('data-color-theme');
+          } else {
+            document.documentElement.setAttribute('data-color-theme', colorTheme);
+          }
+          if (colorTheme === 'rhizome' && accent !== 'blue') {
+            document.documentElement.setAttribute('data-accent', accent);
+          } else {
+            document.documentElement.removeAttribute('data-accent');
+          }
+        }
+        try {
+          var mode = normalizeTheme(localStorage.getItem(key));
+          if (mode === null) {
+            mode = normalizeTheme(localStorage.getItem(legacyKey));
+            if (mode !== null) localStorage.setItem(key, mode);
+          }
+          applyTheme(mode, localStorage.getItem(colorThemeKey), localStorage.getItem(accentKey));
+        } catch {
+          applyTheme('light', null, null);
+        }
+      })();
+    </script>
+    <script>
+      (function () {
+        var readyEventName = 'tolaria:frontend-ready';
+        var reloadAttemptKey = 'tolaria:startup-reload-attempted';
+        var startupTimeoutMs = 10000;
+        var isTauri = '__TAURI__' in window || '__TAURI_INTERNALS__' in window;
+
+        if (!isTauri) return;
+
+        function hasReloadAttempted() {
+          try {
+            return sessionStorage.getItem(reloadAttemptKey) === '1';
+          } catch {
+            return true;
+          }
+        }
+
+        function markReloadAttempted() {
+          try {
+            sessionStorage.setItem(reloadAttemptKey, '1');
+            return true;
+          } catch {
+            return false;
+          }
+        }
+
+        function clearReloadAttempt() {
+          try {
+            sessionStorage.removeItem(reloadAttemptKey);
+          } catch {
+            // Storage can be unavailable in hardened WebView/privacy modes.
+          }
+        }
+
+        window.addEventListener(readyEventName, clearReloadAttempt, { once: true });
+        window.setTimeout(function () {
+          if (window.__tolariaFrontendReady === true) return;
+          if (hasReloadAttempted()) return;
+          if (!markReloadAttempted()) return;
+
+          window.location.reload();
+        }, startupTimeoutMs);
+      })();
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,22 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Rhizome "3c Network" OS icon — R1 Network Core color rendering.
+       Brand-fixed tokens (never themed): tile #0F1B14, core #95D5B2,
+       node A #74C69D, node B #B7E4C7, links #52796F.
+       macOS squircle radius ~27px at 120px tile → ~230px at 1024. -->
+  <rect x="0" y="0" width="1024" height="1024" rx="230" fill="#0F1B14"/>
+  <!-- Mark geometry: README 100x100 viewBox source, scaled x8.2, centered
+       (100 * 8.2 = 820; offset (1024-820)/2 = 102). -->
+  <g transform="translate(102 102) scale(8.2)">
+    <path d="M50 52 L27 33" stroke="#52796F" stroke-width="7" stroke-linecap="round"/>
+    <path d="M50 52 L74 30" stroke="#52796F" stroke-width="7" stroke-linecap="round"/>
+    <path d="M50 52 L30 73" stroke="#52796F" stroke-width="7" stroke-linecap="round"/>
+    <path d="M50 52 L71 70" stroke="#52796F" stroke-width="7" stroke-linecap="round"/>
+    <path d="M50 52 L50 24" stroke="#52796F" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="50" cy="52" r="12" fill="#95D5B2"/>
+    <circle cx="27" cy="33" r="7" fill="#74C69D"/>
+    <circle cx="74" cy="30" r="8" fill="#B7E4C7"/>
+    <circle cx="30" cy="73" r="6.5" fill="#74C69D"/>
+    <circle cx="71" cy="70" r="7.5" fill="#B7E4C7"/>
+    <circle cx="50" cy="22" r="5" fill="#74C69D"/>
+  </g>
+</svg>

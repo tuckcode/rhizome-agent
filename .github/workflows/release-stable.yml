@@ -1,0 +1,356 @@
+name: Release (Stable)
+
+on:
+  push:
+    tags:
+      - 'stable-v*'
+      - 'v20*'
+
+concurrency:
+  group: release-stable-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Phase 1: Compute the stable version string once
+  # ─────────────────────────────────────────────────────────────
+  version:
+    name: Compute stable version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      display_version: ${{ steps.ver.outputs.display_version }}
+      tag: ${{ steps.ver.outputs.tag }}
+    steps:
+      - id: ver
+        shell: bash
+        run: |
+          python3 <<'PY' > version.env
+          import os
+          import re
+          from datetime import date
+
+          tag = os.environ["GITHUB_REF_NAME"]
+          legacy_match = re.fullmatch(r"stable-v(\d{4})\.(\d{1,2})\.(\d{1,2})", tag)
+          date_match = re.fullmatch(r"v(\d{4})-(\d{2})-(\d{2})", tag)
+
+          if date_match:
+              year, month, day = map(int, date_match.groups())
+              date(year, month, day)
+              version = f"{year}.{month}.{day}"
+              display_version = tag
+          elif legacy_match:
+              year, month, day = map(int, legacy_match.groups())
+              date(year, month, day)
+              version = f"{year}.{month}.{day}"
+              display_version = version
+          else:
+              raise SystemExit(f"Stable tags must use vYYYY-MM-DD or stable-vYYYY.M.D, got {tag}")
+
+          print(f"version={version}")
+          print(f"display_version={display_version}")
+          print(f"tag={tag}")
+          PY
+
+          cat version.env >> "$GITHUB_OUTPUT"
+          DISPLAY_VERSION=$(grep '^display_version=' version.env | cut -d= -f2-)
+          echo "### Stable version: \`$DISPLAY_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # -------------------------------------------------------------
+  # Phase 2: Build shared release artifacts
+  # -------------------------------------------------------------
+  build-artifacts:
+    name: Build release artifacts
+    needs: version
+    uses: ./.github/workflows/release-build-artifacts.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      macos_bundles: ""
+      upload_macos_dmg: true
+    secrets: inherit
+
+  # ─────────────────────────────────────────────────────────────
+  # Phase 3: Publish GitHub Release
+  # ─────────────────────────────────────────────────────────────
+  release:
+    name: GitHub Release (stable)
+    needs: [version, build-artifacts]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Normalize macOS release artifact names
+        run: |
+          # .sig is optional (unsigned builds). Intel Mac dropped from matrix.
+          normalize_macos_artifacts() {
+            local arch="$1"
+            local normalized_updater="$2"
+            local normalized_dmg="$3"
+            local updater_dir="updater-${arch}"
+            local updater_file
+            if [ ! -d "$updater_dir" ]; then
+              echo "::error::Missing macOS artifact directory ${updater_dir}" >&2
+              return 1
+            fi
+            updater_file=$(find "$updater_dir" -maxdepth 1 -name "*.app.tar.gz" -print -quit)
+            if [ -z "$updater_file" ]; then
+              echo "::error::Missing macOS .app.tar.gz artifact in ${updater_dir}" >&2
+              return 1
+            fi
+
+            local sig_file="${updater_file}.sig"
+            local normalized_sig="${normalized_updater}.sig"
+            if [ "$updater_file" != "$normalized_updater" ]; then
+              mv "$updater_file" "$normalized_updater"
+            fi
+            if [ -f "$sig_file" ]; then
+              if [ "$sig_file" != "$normalized_sig" ]; then
+                mv "$sig_file" "$normalized_sig"
+              fi
+            else
+              echo "::warning::No .sig for ${normalized_updater} — publishing without updater signature."
+            fi
+
+            local dmg_dir="dmg-${arch}"
+            local dmg_file
+            dmg_file=$(find "$dmg_dir" -maxdepth 1 -name "*.dmg" -print -quit)
+            if [ -z "$dmg_file" ]; then
+              echo "::error::Missing macOS DMG artifact in ${dmg_dir}" >&2
+              return 1
+            fi
+
+            if [ "$dmg_file" != "$normalized_dmg" ]; then
+              mv "$dmg_file" "$normalized_dmg"
+            fi
+          }
+
+          normalize_macos_artifacts aarch64 \
+            "updater-aarch64/Rhizome_${{ needs.version.outputs.version }}_macOS_Silicon.app.tar.gz" \
+            "dmg-aarch64/Rhizome_${{ needs.version.outputs.version }}_macOS_Silicon.dmg"
+
+      - name: Generate release notes
+        run: |
+          NOTES_FILE="release-notes/${{ needs.version.outputs.tag }}.md"
+          if [ -f "$NOTES_FILE" ]; then
+            cat "$NOTES_FILE" > release_notes.md
+          else
+            PREV_TAG=$(git for-each-ref --sort=-creatordate --format='%(refname:short)' refs/tags/v20* refs/tags/stable-v* | grep -vx "${{ needs.version.outputs.tag }}" | head -n 1 || echo "")
+            if [ -z "$PREV_TAG" ]; then
+              NOTES=$(git log --oneline --no-merges -20)
+            else
+              NOTES=$(git log --oneline --no-merges "${PREV_TAG}..${{ needs.version.outputs.tag }}")
+            fi
+            {
+              echo "## What's Changed"
+              echo ""
+              echo "$NOTES" | while IFS= read -r line; do echo "- $line"; done
+            } > release_notes.md
+          fi
+          {
+            echo ""
+            echo "---"
+            echo "**Stable release — manually promoted from \`main\`**"
+            echo ""
+            echo "**Includes macOS (Apple Silicon), Windows x64, and Linux x64 bundles**"
+            echo ""
+            echo "*Built from \`$(git rev-parse --short ${{ needs.version.outputs.tag }})\` on $(date -u +%Y-%m-%d)*"
+          } >> release_notes.md
+
+      - name: Build stable-latest.json
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          TAG="${{ needs.version.outputs.tag }}"
+          REPO="${GITHUB_REPOSITORY}"
+          REPO_NAME="${REPO#*/}"
+          PAGES_URL="https://refactoringhq.github.io/${REPO_NAME}/"
+
+          # .sig is optional — unsigned builds publish download URLs only.
+          # updater.endpoints is [] so nothing in-app consumes signatures.
+          find_first() {
+            for pattern in "$@"; do
+              # shellcheck disable=SC2086
+              set -- $pattern
+              if [ -e "$1" ]; then
+                printf '%s\n' "$1"
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          find_required() {
+            local patterns=("$@")
+            if path=$(find_first "${patterns[@]}"); then
+              printf '%s\n' "$path"
+              return 0
+            fi
+            echo "::error::Missing required artifact matching one of: ${patterns[*]}" >&2
+            return 1
+          }
+
+          platform_json_macos() {
+            local key="$1"
+            local tarball_file="$2"
+            local dmg_file="$3"
+            local tarball_base dmg_base
+            tarball_base=$(basename "$tarball_file")
+            dmg_base=$(basename "$dmg_file")
+            local tarball_url="https://github.com/${REPO}/releases/download/${TAG}/${tarball_base}"
+            local dmg_url="https://github.com/${REPO}/releases/download/${TAG}/${dmg_base}"
+            local sig_file
+            sig_file=$(find_first "${tarball_file}.sig" || true)
+            if [ -n "$sig_file" ] && [ -f "$sig_file" ]; then
+              local sig
+              sig=$(cat "$sig_file")
+              printf '      "%s": {\n        "signature": "%s",\n        "url": "%s",\n        "dmg_url": "%s"\n      }' \
+                "$key" "$sig" "$tarball_url" "$dmg_url"
+            else
+              echo "::warning::No .sig for ${key} — publishing dmg_url/url without updater signature." >&2
+              printf '      "%s": {\n        "url": "%s",\n        "dmg_url": "%s"\n      }' \
+                "$key" "$tarball_url" "$dmg_url"
+            fi
+          }
+
+          platform_json_download() {
+            local key="$1"
+            local download_file="$2"
+            shift 2
+            local sig_patterns=("$@")
+            local download_base
+            download_base=$(basename "$download_file")
+            local download_url="https://github.com/${REPO}/releases/download/${TAG}/${download_base}"
+            local sig_file=""
+            if [ ${#sig_patterns[@]} -gt 0 ]; then
+              sig_file=$(find_first "${sig_patterns[@]}" || true)
+            fi
+            if [ -n "$sig_file" ] && [ -f "$sig_file" ]; then
+              local updater_file="${sig_file%.sig}"
+              local updater_base
+              updater_base=$(basename "$updater_file")
+              local updater_url="https://github.com/${REPO}/releases/download/${TAG}/${updater_base}"
+              local sig
+              sig=$(cat "$sig_file")
+              printf '      "%s": {\n        "signature": "%s",\n        "url": "%s",\n        "download_url": "%s"\n      }' \
+                "$key" "$sig" "$updater_url" "$download_url"
+            else
+              echo "::warning::No .sig for ${key} — publishing download_url only." >&2
+              printf '      "%s": {\n        "url": "%s",\n        "download_url": "%s"\n      }' \
+                "$key" "$download_url" "$download_url"
+            fi
+          }
+
+          ARM_TARBALL_FILE=$(find_required "updater-aarch64/*.app.tar.gz")
+          ARM_DMG_FILE=$(find_required "dmg-aarch64/*.dmg")
+          LINUX_DOWNLOAD=$(find_required \
+            "linux-x86_64-bundles/*/*.AppImage" \
+            "linux-x86_64-bundles/*/*.deb" \
+            "linux-x86_64-bundles/*/*.AppImage.tar.gz" \
+            "linux-x86_64-bundles/*.AppImage" \
+            "linux-x86_64-bundles/*.deb" \
+            "linux-x86_64-bundles/*.AppImage.tar.gz")
+          WINDOWS_DOWNLOAD=$(find_required \
+            "windows-x86_64-bundles/*/*-setup.exe" \
+            "windows-x86_64-bundles/*/*.msi" \
+            "windows-x86_64-bundles/*/*.nsis.zip" \
+            "windows-x86_64-bundles/*/*.msi.zip" \
+            "windows-x86_64-bundles/*-setup.exe" \
+            "windows-x86_64-bundles/*.msi" \
+            "windows-x86_64-bundles/*.nsis.zip" \
+            "windows-x86_64-bundles/*.msi.zip")
+
+          ARM_JSON=$(platform_json_macos "darwin-aarch64" "$ARM_TARBALL_FILE" "$ARM_DMG_FILE")
+          LINUX_JSON=$(platform_json_download "linux-x86_64" "$LINUX_DOWNLOAD" \
+            "linux-x86_64-bundles/*/*.AppImage.sig" \
+            "linux-x86_64-bundles/*/*.AppImage.tar.gz.sig" \
+            "linux-x86_64-bundles/*/*.deb.sig" \
+            "linux-x86_64-bundles/*.AppImage.sig" \
+            "linux-x86_64-bundles/*.AppImage.tar.gz.sig" \
+            "linux-x86_64-bundles/*.deb.sig")
+          WINDOWS_JSON=$(platform_json_download "windows-x86_64" "$WINDOWS_DOWNLOAD" \
+            "windows-x86_64-bundles/*/*-setup.exe.sig" \
+            "windows-x86_64-bundles/*/*.msi.sig" \
+            "windows-x86_64-bundles/*/*.nsis.zip.sig" \
+            "windows-x86_64-bundles/*/*.msi.zip.sig" \
+            "windows-x86_64-bundles/*-setup.exe.sig" \
+            "windows-x86_64-bundles/*.msi.sig" \
+            "windows-x86_64-bundles/*.nsis.zip.sig" \
+            "windows-x86_64-bundles/*.msi.zip.sig")
+
+          cat > stable-latest.json << EOF
+          {
+            "version": "${VERSION}",
+            "notes": "Stable release. See ${PAGES_URL} for full release notes.",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+          ${ARM_JSON},
+          ${LINUX_JSON},
+          ${WINDOWS_JSON}
+            }
+          }
+          EOF
+          echo "stable-latest.json:"; cat stable-latest.json
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: Rhizome ${{ needs.version.outputs.display_version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          files: |
+            dmg-aarch64/*.dmg
+            updater-aarch64/*.app.tar.gz
+            updater-aarch64/*.app.tar.gz.sig
+            linux-x86_64-bundles/*.deb
+            linux-x86_64-bundles/*.deb.sig
+            linux-x86_64-bundles/*.rpm
+            linux-x86_64-bundles/*.AppImage
+            linux-x86_64-bundles/*.AppImage.sig
+            linux-x86_64-bundles/*.AppImage.tar.gz
+            linux-x86_64-bundles/*.AppImage.tar.gz.sig
+            linux-x86_64-bundles/*/*.deb
+            linux-x86_64-bundles/*/*.deb.sig
+            linux-x86_64-bundles/*/*.rpm
+            linux-x86_64-bundles/*/*.AppImage
+            linux-x86_64-bundles/*/*.AppImage.sig
+            linux-x86_64-bundles/*/*.AppImage.tar.gz
+            linux-x86_64-bundles/*/*.AppImage.tar.gz.sig
+            windows-x86_64-bundles/*.exe
+            windows-x86_64-bundles/*.exe.sig
+            windows-x86_64-bundles/*.msi
+            windows-x86_64-bundles/*.msi.sig
+            windows-x86_64-bundles/*.zip
+            windows-x86_64-bundles/*.zip.sig
+            windows-x86_64-bundles/*/*.exe
+            windows-x86_64-bundles/*/*.exe.sig
+            windows-x86_64-bundles/*/*.msi
+            windows-x86_64-bundles/*/*.msi.sig
+            windows-x86_64-bundles/*/*.zip
+            windows-x86_64-bundles/*/*.zip.sig
+            stable-latest.json
+
+  # ─────────────────────────────────────────────────────────────
+  # Phase 4: Trigger the main-branch GitHub Pages deployment
+  # ─────────────────────────────────────────────────────────────
+  pages:
+    name: Update docs and release pages
+    needs: [version, release]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch docs deployment from main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run deploy-docs.yml --repo ${{ github.repository }} --ref main
+          echo "Triggered deploy-docs.yml on main after publishing ${{ needs.version.outputs.tag }}."

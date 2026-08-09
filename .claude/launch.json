@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tauri-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["tauri", "dev"],
+      "port": 1420
+    },
+    {
+      "name": "vite-only",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev"],
+      "port": 5202
+    }
+  ]
+}

@@ -1,0 +1,387 @@
+{
+  "children": [
+    {
+      "type": "frame",
+      "id": "cp_new_ev",
+      "name": "Command Palette — type \"new ev\" autocomplete",
+      "x": 0,
+      "y": 0,
+      "width": 620,
+      "height": "fit_content(500)",
+      "fill": "$--background",
+      "layout": "vertical",
+      "gap": 24,
+      "padding": [32, 32],
+      "theme": { "Mode": "Light" },
+      "children": [
+        {
+          "type": "text",
+          "id": "cp_new_title",
+          "content": "Command Palette — \"new ev\" autocomplete",
+          "fill": "$--foreground",
+          "fontFamily": "Inter",
+          "fontSize": 16,
+          "fontWeight": "600"
+        },
+        {
+          "type": "frame",
+          "id": "cp_new_dialog",
+          "name": "Palette Dialog",
+          "width": 520,
+          "height": "fit_content(440)",
+          "fill": "$--popover",
+          "layout": "vertical",
+          "cornerRadius": [12, 12, 12, 12],
+          "stroke": "$--border",
+          "strokeThickness": 1,
+          "children": [
+            {
+              "type": "frame",
+              "id": "cp_new_input_row",
+              "width": "fill_container",
+              "height": 48,
+              "padding": [0, 16],
+              "layout": "horizontal",
+              "verticalAlign": "center",
+              "stroke": "$--border",
+              "strokeSides": ["bottom"],
+              "strokeThickness": 1,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "cp_new_query",
+                  "content": "new ev",
+                  "fill": "$--foreground",
+                  "fontFamily": "Inter",
+                  "fontSize": 15
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "cp_new_results",
+              "name": "Results",
+              "width": "fill_container",
+              "layout": "vertical",
+              "padding": [4, 0],
+              "children": [
+                {
+                  "type": "text",
+                  "id": "cp_new_group_label",
+                  "content": "NOTE",
+                  "fill": "$--muted-foreground",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "600",
+                  "letterSpacing": 1,
+                  "padding": [8, 16, 4, 16]
+                },
+                {
+                  "type": "frame",
+                  "id": "cp_new_row1",
+                  "name": "New Event (selected)",
+                  "width": "fill_container",
+                  "height": 36,
+                  "padding": [0, 12],
+                  "layout": "horizontal",
+                  "verticalAlign": "center",
+                  "horizontalAlign": "spaceBetween",
+                  "cornerRadius": [6, 6, 6, 6],
+                  "fill": "$--accent",
+                  "margin": [0, 4],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "cp_new_row1_label",
+                      "content": "New Event",
+                      "fill": "$--foreground",
+                      "fontFamily": "Inter",
+                      "fontSize": 14
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "cp_new_row2",
+                  "name": "New Event Log",
+                  "width": "fill_container",
+                  "height": 36,
+                  "padding": [0, 12],
+                  "layout": "horizontal",
+                  "verticalAlign": "center",
+                  "horizontalAlign": "spaceBetween",
+                  "cornerRadius": [6, 6, 6, 6],
+                  "margin": [0, 4],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "cp_new_row2_label",
+                      "content": "New Event Log",
+                      "fill": "$--foreground",
+                      "fontFamily": "Inter",
+                      "fontSize": 14
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "cp_new_row3",
+                  "name": "New Experiment",
+                  "width": "fill_container",
+                  "height": 36,
+                  "padding": [0, 12],
+                  "layout": "horizontal",
+                  "verticalAlign": "center",
+                  "horizontalAlign": "spaceBetween",
+                  "cornerRadius": [6, 6, 6, 6],
+                  "margin": [0, 4],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "cp_new_row3_label",
+                      "content": "New Experiment",
+                      "fill": "$--foreground",
+                      "fontFamily": "Inter",
+                      "fontSize": 14
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "cp_new_footer",
+              "width": "fill_container",
+              "height": 32,
+              "padding": [0, 16],
+              "layout": "horizontal",
+              "verticalAlign": "center",
+              "gap": 16,
+              "stroke": "$--border",
+              "strokeSides": ["top"],
+              "strokeThickness": 1,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "cp_new_hint1",
+                  "content": "↑↓ navigate",
+                  "fill": "$--muted-foreground",
+                  "fontFamily": "Inter",
+                  "fontSize": 11
+                },
+                {
+                  "type": "text",
+                  "id": "cp_new_hint2",
+                  "content": "↵ select",
+                  "fill": "$--muted-foreground",
+                  "fontFamily": "Inter",
+                  "fontSize": 11
+                },
+                {
+                  "type": "text",
+                  "id": "cp_new_hint3",
+                  "content": "esc close",
+                  "fill": "$--muted-foreground",
+                  "fontFamily": "Inter",
+                  "fontSize": 11
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "cp_list_pe",
+      "name": "Command Palette — type \"list pe\" autocomplete",
+      "x": 720,
+      "y": 0,
+      "width": 620,
+      "height": "fit_content(500)",
+      "fill": "$--background",
+      "layout": "vertical",
+      "gap": 24,
+      "padding": [32, 32],
+      "theme": { "Mode": "Light" },
+      "children": [
+        {
+          "type": "text",
+          "id": "cp_list_title",
+          "content": "Command Palette — \"list pe\" autocomplete",
+          "fill": "$--foreground",
+          "fontFamily": "Inter",
+          "fontSize": 16,
+          "fontWeight": "600"
+        },
+        {
+          "type": "frame",
+          "id": "cp_list_dialog",
+          "name": "Palette Dialog",
+          "width": 520,
+          "height": "fit_content(440)",
+          "fill": "$--popover",
+          "layout": "vertical",
+          "cornerRadius": [12, 12, 12, 12],
+          "stroke": "$--border",
+          "strokeThickness": 1,
+          "children": [
+            {
+              "type": "frame",
+              "id": "cp_list_input_row",
+              "width": "fill_container",
+              "height": 48,
+              "padding": [0, 16],
+              "layout": "horizontal",
+              "verticalAlign": "center",
+              "stroke": "$--border",
+              "strokeSides": ["bottom"],
+              "strokeThickness": 1,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "cp_list_query",
+                  "content": "list pe",
+                  "fill": "$--foreground",
+                  "fontFamily": "Inter",
+                  "fontSize": 15
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "cp_list_results",
+              "name": "Results",
+              "width": "fill_container",
+              "layout": "vertical",
+              "padding": [4, 0],
+              "children": [
+                {
+                  "type": "text",
+                  "id": "cp_list_group_label",
+                  "content": "NAVIGATION",
+                  "fill": "$--muted-foreground",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "600",
+                  "letterSpacing": 1,
+                  "padding": [8, 16, 4, 16]
+                },
+                {
+                  "type": "frame",
+                  "id": "cp_list_row1",
+                  "name": "List People (selected)",
+                  "width": "fill_container",
+                  "height": 36,
+                  "padding": [0, 12],
+                  "layout": "horizontal",
+                  "verticalAlign": "center",
+                  "horizontalAlign": "spaceBetween",
+                  "cornerRadius": [6, 6, 6, 6],
+                  "fill": "$--accent",
+                  "margin": [0, 4],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "cp_list_row1_label",
+                      "content": "List People",
+                      "fill": "$--foreground",
+                      "fontFamily": "Inter",
+                      "fontSize": 14
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "cp_list_row2",
+                  "name": "List Procedures",
+                  "width": "fill_container",
+                  "height": 36,
+                  "padding": [0, 12],
+                  "layout": "horizontal",
+                  "verticalAlign": "center",
+                  "horizontalAlign": "spaceBetween",
+                  "cornerRadius": [6, 6, 6, 6],
+                  "margin": [0, 4],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "cp_list_row2_label",
+                      "content": "List Procedures",
+                      "fill": "$--foreground",
+                      "fontFamily": "Inter",
+                      "fontSize": 14
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "cp_list_row3",
+                  "name": "List Projects",
+                  "width": "fill_container",
+                  "height": 36,
+                  "padding": [0, 12],
+                  "layout": "horizontal",
+                  "verticalAlign": "center",
+                  "horizontalAlign": "spaceBetween",
+                  "cornerRadius": [6, 6, 6, 6],
+                  "margin": [0, 4],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "cp_list_row3_label",
+                      "content": "List Projects",
+                      "fill": "$--foreground",
+                      "fontFamily": "Inter",
+                      "fontSize": 14
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "cp_list_footer",
+              "width": "fill_container",
+              "height": 32,
+              "padding": [0, 16],
+              "layout": "horizontal",
+              "verticalAlign": "center",
+              "gap": 16,
+              "stroke": "$--border",
+              "strokeSides": ["top"],
+              "strokeThickness": 1,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "cp_list_hint1",
+                  "content": "↑↓ navigate",
+                  "fill": "$--muted-foreground",
+                  "fontFamily": "Inter",
+                  "fontSize": 11
+                },
+                {
+                  "type": "text",
+                  "id": "cp_list_hint2",
+                  "content": "↵ select",
+                  "fill": "$--muted-foreground",
+                  "fontFamily": "Inter",
+                  "fontSize": 11
+                },
+                {
+                  "type": "text",
+                  "id": "cp_list_hint3",
+                  "content": "esc close",
+                  "fill": "$--muted-foreground",
+                  "fontFamily": "Inter",
+                  "fontSize": 11
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {}
+}

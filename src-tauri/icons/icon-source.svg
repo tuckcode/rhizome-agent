@@ -1,0 +1,27 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Rhizome "3c Network" OS icon — grayscale rendering (2026-07-13).
+       Tile stays #0F1B14 (near-black, unchanged). Mark recolored to true
+       grayscale, luminance-mapped 1:1 from the original green palette so
+       the depth/shading relationship (bright core, brighter satellite
+       highlights, dim links) is preserved — only hue is removed, not the
+       tonal structure. Y = 0.2126R+0.7152G+0.0722B per original hex:
+       links #52796F (Y112) -> #707070, core #95D5B2 (Y197) -> #C5C5C5,
+       satellite-A #74C69D (Y178) -> #B2B2B2, satellite-B #B7E4C7 (Y216) -> #D8D8D8.
+       macOS squircle radius ~27px at 120px tile → ~230px at 1024. -->
+  <rect x="0" y="0" width="1024" height="1024" rx="230" fill="#0F1B14"/>
+  <!-- Mark geometry: README 100x100 viewBox source, scaled x8.2, centered
+       (100 * 8.2 = 820; offset (1024-820)/2 = 102). -->
+  <g transform="translate(102 102) scale(8.2)">
+    <path d="M50 52 L27 33" stroke="#707070" stroke-width="7" stroke-linecap="round"/>
+    <path d="M50 52 L74 30" stroke="#707070" stroke-width="7" stroke-linecap="round"/>
+    <path d="M50 52 L30 73" stroke="#707070" stroke-width="7" stroke-linecap="round"/>
+    <path d="M50 52 L71 70" stroke="#707070" stroke-width="7" stroke-linecap="round"/>
+    <path d="M50 52 L50 24" stroke="#707070" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="50" cy="52" r="12" fill="#C5C5C5"/>
+    <circle cx="27" cy="33" r="7" fill="#B2B2B2"/>
+    <circle cx="74" cy="30" r="8" fill="#D8D8D8"/>
+    <circle cx="30" cy="73" r="6.5" fill="#B2B2B2"/>
+    <circle cx="71" cy="70" r="7.5" fill="#D8D8D8"/>
+    <circle cx="50" cy="22" r="5" fill="#B2B2B2"/>
+  </g>
+</svg>

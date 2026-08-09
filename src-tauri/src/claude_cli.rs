@@ -1,0 +1,1729 @@
+pub use crate::cli_agent_runtime::AgentStreamRequest;
+use crate::cli_agent_runtime::EnvName;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::process::{ExitStatus, Stdio};
+
+const CLAUDE_PROVIDER_ENV_KEYS: &[EnvName<'static>] = &[
+    EnvName::trusted("ANTHROPIC_API_KEY"),
+    EnvName::trusted("ANTHROPIC_AUTH_TOKEN"),
+    EnvName::trusted("ANTHROPIC_BASE_URL"),
+    EnvName::trusted("ANTHROPIC_CUSTOM_HEADERS"),
+    EnvName::trusted("ANTHROPIC_MODEL"),
+    EnvName::trusted("ANTHROPIC_SMALL_FAST_MODEL"),
+    EnvName::trusted("CLAUDE_CODE_USE_BEDROCK"),
+    EnvName::trusted("CLAUDE_CODE_USE_VERTEX"),
+    EnvName::trusted("AWS_ACCESS_KEY_ID"),
+    EnvName::trusted("AWS_SECRET_ACCESS_KEY"),
+    EnvName::trusted("AWS_SESSION_TOKEN"),
+    EnvName::trusted("AWS_PROFILE"),
+    EnvName::trusted("AWS_REGION"),
+    EnvName::trusted("AWS_DEFAULT_REGION"),
+    EnvName::trusted("GOOGLE_APPLICATION_CREDENTIALS"),
+    EnvName::trusted("CLOUD_ML_REGION"),
+    EnvName::trusted("VERTEX_REGION"),
+    EnvName::trusted("HTTPS_PROXY"),
+    EnvName::trusted("HTTP_PROXY"),
+    EnvName::trusted("NO_PROXY"),
+    EnvName::trusted("SSL_CERT_FILE"),
+    EnvName::trusted("SSL_CERT_DIR"),
+    EnvName::trusted("NODE_EXTRA_CA_CERTS"),
+];
+const LOCALIZED_ERROR_PREFIX: &str = "rhizome:i18n-error:";
+const CLAUDE_TOO_MANY_REDIRECTS_KEY: &str = "ai.error.claude.tooManyRedirects";
+
+/// Status returned by `check_claude_cli`.
+#[derive(Debug, Serialize, Clone)]
+pub struct ClaudeCliStatus {
+    pub installed: bool,
+    pub version: Option<String>,
+}
+
+/// Event emitted to the frontend during a streaming claude session.
+#[derive(Debug, Serialize, Clone)]
+#[serde(tag = "kind")]
+pub enum ClaudeStreamEvent {
+    /// Session initialised — carries the session ID for future `--resume`.
+    Init { session_id: String },
+    /// Incremental text chunk.
+    TextDelta { text: String },
+    /// Incremental thinking/reasoning chunk.
+    ThinkingDelta { text: String },
+    /// A tool call started (agent mode only).
+    ToolStart {
+        tool_name: String,
+        tool_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        input: Option<String>,
+    },
+    /// A tool call finished (agent mode only).
+    ToolDone {
+        tool_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        output: Option<String>,
+    },
+    /// Final result text + session ID.
+    Result { text: String, session_id: String },
+    /// Something went wrong.
+    Error { message: String },
+    /// Stream finished.
+    Done,
+}
+
+/// Parameters accepted by `stream_claude_chat`.
+#[derive(Debug, Deserialize)]
+pub struct ChatStreamRequest {
+    pub message: String,
+    pub system_prompt: Option<String>,
+    pub session_id: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Finding the `claude` binary
+// ---------------------------------------------------------------------------
+
+pub(crate) fn find_claude_binary() -> Result<PathBuf, String> {
+    if let Some(binary) = find_claude_binary_on_path() {
+        return Ok(binary);
+    }
+
+    if let Some(binary) = find_claude_binary_in_user_shell() {
+        return Ok(binary);
+    }
+
+    if let Some(binary) = crate::cli_agent_runtime::find_executable_binary_candidate(
+        claude_binary_candidates(),
+        "Claude CLI",
+    )? {
+        return Ok(binary);
+    }
+
+    Err("Claude CLI not found. Install it: https://docs.anthropic.com/en/docs/claude-code".into())
+}
+
+fn find_claude_binary_on_path() -> Option<PathBuf> {
+    crate::hidden_command(claude_path_lookup_command())
+        .arg("claude")
+        .output()
+        .ok()
+        .and_then(|output| path_from_successful_output(&output))
+}
+
+fn claude_path_lookup_command() -> &'static str {
+    if cfg!(windows) {
+        "where"
+    } else {
+        "which"
+    }
+}
+
+fn find_claude_binary_in_user_shell() -> Option<PathBuf> {
+    user_shell_candidates()
+        .into_iter()
+        .filter(|shell| shell.exists())
+        .find_map(|shell| claude_path_from_shell(&shell))
+}
+
+fn user_shell_candidates() -> Vec<PathBuf> {
+    let mut shells = Vec::new();
+    if let Some(shell) = std::env::var_os("SHELL") {
+        if !shell.is_empty() {
+            shells.push(PathBuf::from(shell));
+        }
+    }
+    shells.push(PathBuf::from("/bin/zsh"));
+    shells.push(PathBuf::from("/bin/bash"));
+    shells
+}
+
+fn claude_path_from_shell(shell: &Path) -> Option<PathBuf> {
+    crate::hidden_command(shell)
+        .arg("-lc")
+        .arg("command -v claude")
+        .output()
+        .ok()
+        .and_then(|output| path_from_successful_output(&output))
+}
+
+fn path_from_successful_output(output: &std::process::Output) -> Option<PathBuf> {
+    if output.status.success() {
+        first_existing_path(&String::from_utf8_lossy(&output.stdout))
+    } else {
+        None
+    }
+}
+
+fn first_existing_path(stdout: &str) -> Option<PathBuf> {
+    first_existing_path_for_platform(stdout, cfg!(windows))
+}
+
+fn first_existing_path_for_platform(stdout: &str, windows: bool) -> Option<PathBuf> {
+    let mut paths = stdout.lines().filter_map(existing_path);
+    if windows {
+        return paths.find(|path| is_windows_claude_code_candidate(path));
+    }
+
+    paths.next()
+}
+
+fn is_windows_claude_code_candidate(path: &Path) -> bool {
+    crate::cli_agent_runtime::has_windows_cli_extension(path)
+        && !is_windows_claude_desktop_execution_alias(path)
+}
+
+fn is_windows_claude_desktop_execution_alias(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.eq_ignore_ascii_case("Claude.exe"))
+        && contains_component_sequence(path, &["Microsoft", "WindowsApps"])
+}
+
+fn contains_component_sequence(path: &Path, expected: &[&str]) -> bool {
+    let components = path
+        .components()
+        .filter_map(|component| component.as_os_str().to_str())
+        .collect::<Vec<_>>();
+
+    components.windows(expected.len()).any(|window| {
+        window
+            .iter()
+            .zip(expected)
+            .all(|(actual, expected)| actual.eq_ignore_ascii_case(expected))
+    })
+}
+
+fn existing_path(line: &str) -> Option<PathBuf> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let candidate = PathBuf::from(trimmed);
+    candidate.exists().then_some(candidate)
+}
+
+fn claude_binary_candidates() -> Vec<PathBuf> {
+    dirs::home_dir()
+        .map(|home| claude_binary_candidates_for_home(&home))
+        .unwrap_or_default()
+}
+
+fn claude_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
+    let mut candidates = vec![
+        home.join(".local/bin/claude"),
+        home.join(".local/bin/claude.exe"),
+        home.join(".claude/local/claude"),
+        home.join(".claude/local/claude.exe"),
+        home.join(".local/share/mise/shims/claude"),
+        home.join(".local/share/mise/shims/claude.exe"),
+        home.join(".asdf/shims/claude"),
+        home.join(".asdf/shims/claude.exe"),
+        home.join(".npm-global/bin/claude"),
+        home.join(".npm-global/bin/claude.cmd"),
+        home.join(".npm-global/bin/claude.exe"),
+        home.join(".npm/bin/claude"),
+        home.join(".npm/bin/claude.cmd"),
+        home.join(".npm/bin/claude.exe"),
+        home.join(".linuxbrew/bin/claude"),
+        home.join("AppData/Roaming/npm/claude.cmd"),
+        home.join("AppData/Roaming/npm/claude.exe"),
+        home.join("AppData/Local/pnpm/claude.cmd"),
+        home.join("AppData/Local/pnpm/claude.exe"),
+        home.join("scoop/shims/claude.exe"),
+        PathBuf::from("/home/linuxbrew/.linuxbrew/bin/claude"),
+        PathBuf::from("/opt/homebrew/bin/claude"),
+        PathBuf::from("/usr/local/bin/claude"),
+    ];
+    candidates.extend(nvm_claude_binary_candidates_for_home(home));
+    candidates
+}
+
+fn nvm_claude_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(home.join(".nvm/versions/node")) else {
+        return Vec::new();
+    };
+
+    let mut candidates = entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .map(|path| path.join("bin").join("claude"))
+        .collect::<Vec<_>>();
+    candidates.sort();
+    candidates
+}
+
+// ---------------------------------------------------------------------------
+// Public Tauri commands
+// ---------------------------------------------------------------------------
+
+/// Check whether the `claude` CLI is installed and return its version.
+pub fn check_cli() -> ClaudeCliStatus {
+    let bin = match find_claude_binary() {
+        Ok(b) => b,
+        Err(_) => {
+            return ClaudeCliStatus {
+                installed: false,
+                version: None,
+            }
+        }
+    };
+
+    ClaudeCliStatus {
+        installed: true,
+        version: crate::cli_agent_runtime::version_for_binary(&bin),
+    }
+}
+
+/// Spawn `claude -p` for a simple chat (no tools) and stream events via the
+/// provided callback.  Returns the session ID for future `--resume` calls.
+pub fn run_chat_stream<F>(req: ChatStreamRequest, mut emit: F) -> Result<String, String>
+where
+    F: FnMut(ClaudeStreamEvent),
+{
+    let bin = find_claude_binary()?;
+    let invocation = crate::claude_invocation::chat(&req);
+    run_claude_subprocess(
+        ClaudeSubprocessRequest {
+            bin: &bin,
+            args: &invocation.args,
+            fallback_args: &invocation.fallback_args,
+            stdin_text: invocation.stdin_text.as_deref(),
+            cwd: None,
+        },
+        &mut emit,
+    )
+}
+
+/// Spawn `claude -p` with full tool access and MCP vault tools for an agent task.
+pub fn run_agent_stream<F>(req: AgentStreamRequest, mut emit: F) -> Result<String, String>
+where
+    F: FnMut(ClaudeStreamEvent),
+{
+    let bin = find_claude_binary()?;
+    let invocation = crate::claude_invocation::agent(&req)?;
+    run_claude_subprocess(
+        ClaudeSubprocessRequest {
+            bin: &bin,
+            args: &invocation.args,
+            fallback_args: &invocation.fallback_args,
+            stdin_text: invocation.stdin_text.as_deref(),
+            cwd: Some(&req.vault_path),
+        },
+        &mut emit,
+    )
+}
+
+/// Mutable state accumulated across the JSON stream for a single subprocess.
+struct StreamState {
+    session_id: String,
+    /// Accumulates `input_json_delta` chunks keyed by tool_use id.
+    tool_inputs: HashMap<String, String>,
+    /// The tool_use id of the block currently being streamed.
+    current_tool_id: Option<String>,
+    /// Tracks whether response text has already been emitted for this run.
+    emitted_text: bool,
+}
+
+struct ClaudeSubprocessRequest<'a> {
+    bin: &'a Path,
+    args: &'a [String],
+    fallback_args: &'a [Vec<String>],
+    stdin_text: Option<&'a str>,
+    cwd: Option<&'a str>,
+}
+
+struct ClaudeCommandRequest<'a> {
+    bin: &'a Path,
+    args: &'a [String],
+    cwd: Option<&'a str>,
+}
+
+#[derive(Clone, Copy)]
+struct ClaudeStderr<'a>(&'a str);
+
+impl<'a> ClaudeStderr<'a> {
+    fn is_empty(self) -> bool {
+        self.0.is_empty()
+    }
+
+    fn lines(self) -> std::str::Lines<'a> {
+        self.0.lines()
+    }
+
+    fn to_ascii_lowercase(self) -> String {
+        self.0.to_ascii_lowercase()
+    }
+}
+
+struct ClaudeFailure<'a> {
+    stderr: ClaudeStderr<'a>,
+    status: ExitStatus,
+}
+
+#[derive(Clone, Copy)]
+struct TextDeltaChunk<'a>(&'a str);
+
+impl<'a> TextDeltaChunk<'a> {
+    fn is_empty(self) -> bool {
+        self.0.is_empty()
+    }
+
+    fn as_str(self) -> &'a str {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy)]
+struct ToolUseId<'a>(&'a str);
+
+impl<'a> ToolUseId<'a> {
+    fn as_str(self) -> &'a str {
+        self.0
+    }
+}
+
+/// Core subprocess runner shared by chat and agent modes.
+/// When `cwd` is `Some`, the subprocess starts with that working directory.
+fn run_claude_subprocess<F>(
+    request: ClaudeSubprocessRequest<'_>,
+    emit: &mut F,
+) -> Result<String, String>
+where
+    F: FnMut(ClaudeStreamEvent),
+{
+    let attempts = std::iter::once(request.args)
+        .chain(request.fallback_args.iter().map(Vec::as_slice))
+        .enumerate();
+
+    for (index, attempt_args) in attempts {
+        let mut state = StreamState {
+            session_id: String::new(),
+            tool_inputs: HashMap::new(),
+            current_tool_id: None,
+            emitted_text: false,
+        };
+
+        let cmd = build_claude_command(ClaudeCommandRequest {
+            bin: request.bin,
+            args: attempt_args,
+            cwd: request.cwd,
+        })?;
+        let process = crate::cli_agent_runtime::JsonLineProcess::new(cmd, "claude")
+            .with_stdin(request.stdin_text);
+        let run = crate::cli_agent_runtime::run_json_line_process_with_stdin(
+            process,
+            emit,
+            |message| ClaudeStreamEvent::Error { message },
+            |json, emit, session_id| {
+                dispatch_event(json, &mut state, emit);
+                *session_id = state.session_id.clone();
+            },
+        )?;
+
+        if !run.status.success() && state.session_id.is_empty() {
+            let has_fallback = index < request.fallback_args.len();
+            let stderr = ClaudeStderr(&run.stderr_output);
+            if has_fallback && is_unsupported_claude_flag_error(stderr) {
+                continue;
+            }
+
+            emit(ClaudeStreamEvent::Error {
+                message: format_failed_claude_exit(ClaudeFailure {
+                    stderr,
+                    status: run.status,
+                }),
+            });
+        }
+
+        emit(ClaudeStreamEvent::Done);
+        return Ok(state.session_id);
+    }
+
+    Ok(String::new())
+}
+
+fn build_claude_command(
+    request: ClaudeCommandRequest<'_>,
+) -> Result<std::process::Command, String> {
+    let target = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(request.bin)?;
+    let mut cmd = crate::hidden_command(&target.program);
+    configure_claude_command_environment(&mut cmd, request.bin);
+    if let Some(first_arg) = target.first_arg {
+        cmd.arg(first_arg);
+    }
+    cmd.args(request.args)
+        .env_remove("CLAUDECODE") // prevent "nested session" guard
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    if let Some(dir) = request.cwd {
+        cmd.current_dir(dir);
+    }
+    Ok(cmd)
+}
+
+fn configure_claude_command_environment(cmd: &mut std::process::Command, bin: &Path) {
+    crate::cli_agent_runtime::configure_agent_command_environment(cmd, bin);
+    crate::cli_agent_runtime::apply_user_shell_env_vars_if_missing(cmd, CLAUDE_PROVIDER_ENV_KEYS);
+}
+
+fn format_failed_claude_exit(failure: ClaudeFailure<'_>) -> String {
+    if is_claude_too_many_redirects_error(failure.stderr) {
+        return localized_error(CLAUDE_TOO_MANY_REDIRECTS_KEY);
+    }
+
+    if is_claude_auth_error(failure.stderr) {
+        return "Claude CLI is not authenticated. Run `claude auth login` in your terminal.".into();
+    }
+
+    if failure.stderr.is_empty() {
+        format!("claude exited with status {}", failure.status)
+    } else {
+        failure
+            .stderr
+            .lines()
+            .take(3)
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
+fn localized_error(key: &str) -> String {
+    let payload = serde_json::json!({
+        "key": key,
+        "values": {},
+    });
+    format!("{LOCALIZED_ERROR_PREFIX}{payload}")
+}
+
+fn is_claude_too_many_redirects_error(stderr: ClaudeStderr<'_>) -> bool {
+    let lower = stderr.to_ascii_lowercase();
+    lower.contains("toomanyredirects") || lower.contains("too many redirects")
+}
+
+fn is_claude_auth_error(stderr: ClaudeStderr<'_>) -> bool {
+    let lower = stderr.to_ascii_lowercase();
+    ["not logged in", "authentication", "auth"]
+        .iter()
+        .any(|pattern| lower.contains(pattern))
+}
+
+fn is_unsupported_claude_flag_error(stderr: ClaudeStderr<'_>) -> bool {
+    let lower = stderr.to_ascii_lowercase();
+    let mentions_compat_flag = ["--tools", "--no-session-persistence"]
+        .iter()
+        .any(|flag| lower.contains(flag));
+    let looks_unsupported = [
+        "unknown option",
+        "unknown argument",
+        "unrecognized option",
+        "unexpected argument",
+        "unknown command-line option",
+    ]
+    .iter()
+    .any(|pattern| lower.contains(pattern));
+
+    mentions_compat_flag && looks_unsupported
+}
+
+/// Parse a single JSON line from the stream and emit the appropriate event.
+fn dispatch_event<F>(json: &serde_json::Value, state: &mut StreamState, emit: &mut F)
+where
+    F: FnMut(ClaudeStreamEvent),
+{
+    let msg_type = json["type"].as_str().unwrap_or("");
+
+    match msg_type {
+        // --- System init → capture session_id ---
+        "system" if json["subtype"].as_str() == Some("init") => {
+            if let Some(sid) = json["session_id"].as_str() {
+                state.session_id = sid.to_string();
+                emit(ClaudeStreamEvent::Init {
+                    session_id: sid.to_string(),
+                });
+            }
+        }
+
+        // --- Streaming partial events (text deltas, tool_use starts) ---
+        "stream_event" => {
+            dispatch_stream_event(json, state, emit);
+        }
+
+        // --- Tool progress (agent mode) ---
+        "tool_progress" => {
+            if let (Some(name), Some(id)) =
+                (json["tool_name"].as_str(), json["tool_use_id"].as_str())
+            {
+                emit(ClaudeStreamEvent::ToolStart {
+                    tool_name: name.to_string(),
+                    tool_id: id.to_string(),
+                    input: None,
+                });
+            }
+        }
+
+        // --- Tool result (agent mode) ---
+        "tool_result" => {
+            if let Some(id) = json["tool_use_id"].as_str() {
+                let output = extract_tool_result_text(json);
+                emit(ClaudeStreamEvent::ToolDone {
+                    tool_id: id.to_string(),
+                    output,
+                });
+            }
+        }
+
+        // --- Final result ---
+        "result" => {
+            let sid = json["session_id"].as_str().unwrap_or("").to_string();
+            if !sid.is_empty() {
+                state.session_id = sid.clone();
+            }
+            let text = if state.emitted_text {
+                String::new()
+            } else {
+                let text = json["result"].as_str().unwrap_or("").to_string();
+                if !text.is_empty() {
+                    state.emitted_text = true;
+                }
+                text
+            };
+            emit(ClaudeStreamEvent::Result {
+                text,
+                session_id: sid,
+            });
+        }
+
+        // --- Complete assistant message (fallback for text when no partials) ---
+        "assistant" => {
+            if let Some(content) = json["message"]["content"].as_array() {
+                let emit_text = !state.emitted_text;
+                for block in content {
+                    dispatch_assistant_content_block(block, emit_text, state, emit);
+                }
+            }
+        }
+
+        _ => {} // ignore other event types
+    }
+}
+
+/// Handle a `stream_event` (partial assistant message).
+fn dispatch_stream_event<F>(json: &serde_json::Value, state: &mut StreamState, emit: &mut F)
+where
+    F: FnMut(ClaudeStreamEvent),
+{
+    let event = &json["event"];
+    let event_type = event["type"].as_str().unwrap_or("");
+
+    match event_type {
+        "content_block_delta" => {
+            let delta = &event["delta"];
+            match delta["type"].as_str() {
+                Some("text_delta") => {
+                    if let Some(text) = delta["text"].as_str() {
+                        emit_text_delta(TextDeltaChunk(text), state, emit);
+                    }
+                }
+                Some("thinking_delta") => {
+                    if let Some(text) = delta["thinking"].as_str() {
+                        emit(ClaudeStreamEvent::ThinkingDelta {
+                            text: text.to_string(),
+                        });
+                    }
+                }
+                Some("input_json_delta") => {
+                    if let (Some(partial), Some(ref tid)) =
+                        (delta["partial_json"].as_str(), &state.current_tool_id)
+                    {
+                        state
+                            .tool_inputs
+                            .entry(tid.clone())
+                            .or_default()
+                            .push_str(partial);
+                    }
+                }
+                _ => {}
+            }
+        }
+        "content_block_start" => {
+            let block = &event["content_block"];
+            if block["type"].as_str() == Some("tool_use") {
+                if let (Some(id), Some(name)) = (block["id"].as_str(), block["name"].as_str()) {
+                    state.current_tool_id = Some(id.to_string());
+                    state.tool_inputs.entry(id.to_string()).or_default();
+                    emit(ClaudeStreamEvent::ToolStart {
+                        tool_name: name.to_string(),
+                        tool_id: id.to_string(),
+                        input: None,
+                    });
+                }
+            }
+        }
+        "content_block_stop" => {
+            state.current_tool_id = None;
+        }
+        _ => {}
+    }
+}
+
+fn dispatch_assistant_content_block<F>(
+    block: &serde_json::Value,
+    emit_text: bool,
+    state: &mut StreamState,
+    emit: &mut F,
+) where
+    F: FnMut(ClaudeStreamEvent),
+{
+    match block["type"].as_str() {
+        Some("text") if emit_text => {
+            if let Some(text) = block["text"].as_str() {
+                emit_text_delta(TextDeltaChunk(text), state, emit);
+            }
+        }
+        Some("tool_use") => {
+            if let (Some(id), Some(name)) = (block["id"].as_str(), block["name"].as_str()) {
+                let input = format_tool_input(&block["input"], state, ToolUseId(id));
+                emit(ClaudeStreamEvent::ToolStart {
+                    tool_name: name.to_string(),
+                    tool_id: id.to_string(),
+                    input,
+                });
+            }
+        }
+        _ => {}
+    }
+}
+
+fn emit_text_delta<F>(text: TextDeltaChunk<'_>, state: &mut StreamState, emit: &mut F)
+where
+    F: FnMut(ClaudeStreamEvent),
+{
+    if !text.is_empty() {
+        state.emitted_text = true;
+    }
+    emit(ClaudeStreamEvent::TextDelta {
+        text: text.as_str().to_string(),
+    });
+}
+
+/// Build the tool input string, preferring accumulated delta chunks over the
+/// block's `input` field (which may be empty at stream start).
+fn format_tool_input(
+    block_input: &serde_json::Value,
+    state: &StreamState,
+    tool_id: ToolUseId<'_>,
+) -> Option<String> {
+    if let Some(accumulated) = state.tool_inputs.get(tool_id.as_str()) {
+        if !accumulated.is_empty() {
+            return Some(accumulated.clone());
+        }
+    }
+    if !block_input.is_null() && block_input.as_object().is_some_and(|o| !o.is_empty()) {
+        return Some(block_input.to_string());
+    }
+    None
+}
+
+/// Extract displayable text from a `tool_result` event.
+fn extract_tool_result_text(json: &serde_json::Value) -> Option<String> {
+    // String content field
+    if let Some(s) = json["content"].as_str() {
+        return Some(s.to_string());
+    }
+    // Array of content blocks (Claude format)
+    if let Some(arr) = json["content"].as_array() {
+        let texts: Vec<&str> = arr.iter().filter_map(|b| b["text"].as_str()).collect();
+        if !texts.is_empty() {
+            return Some(texts.join("\n"));
+        }
+    }
+    // Fallback: "output" field
+    json["output"].as_str().map(|s| s.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ai_agents::AiAgentPermissionMode;
+    use std::ffi::OsStr;
+    use std::ffi::OsString;
+    use std::process::Command;
+
+    #[cfg(target_os = "linux")]
+    fn current_test_binary() -> PathBuf {
+        std::fs::read_link("/proc/self/exe").unwrap()
+    }
+
+    #[cfg(target_os = "macos")]
+    fn current_test_binary() -> PathBuf {
+        let pid = std::process::id().to_string();
+        let output = Command::new("/bin/ps")
+            .args(["-p", pid.as_str(), "-o", "comm="])
+            .output()
+            .unwrap();
+        let path = String::from_utf8(output.stdout).unwrap();
+        PathBuf::from(path.trim())
+    }
+
+    fn assert_binary_candidates_include(home: &Path, expected: &[PathBuf]) {
+        let candidates = claude_binary_candidates_for_home(home);
+        for candidate in expected {
+            assert!(
+                candidates.contains(candidate),
+                "missing {}",
+                candidate.display()
+            );
+        }
+    }
+
+    #[test]
+    fn check_cli_returns_status() {
+        let status = check_cli();
+        if status.installed {
+            assert!(status.version.is_some());
+        } else {
+            assert!(status.version.is_none());
+        }
+    }
+
+    #[test]
+    fn claude_binary_candidates_include_nvm_managed_node_installs() {
+        let home = tempfile::tempdir().unwrap();
+        let claude = home.path().join(".nvm/versions/node/v22.12.0/bin/claude");
+        std::fs::create_dir_all(claude.parent().unwrap()).unwrap();
+        std::fs::write(&claude, "#!/bin/sh\n").unwrap();
+
+        let candidates = claude_binary_candidates_for_home(home.path());
+
+        assert!(candidates.contains(&claude), "missing {}", claude.display());
+    }
+
+    #[test]
+    fn windows_path_lookup_prefers_cmd_shim_over_extensionless_npm_script() {
+        let dir = tempfile::tempdir().unwrap();
+        let shell_script = dir.path().join("claude");
+        let cmd_shim = dir.path().join("claude.cmd");
+        std::fs::write(&shell_script, "#!/bin/sh\n").unwrap();
+        std::fs::write(&cmd_shim, "@ECHO off\n").unwrap();
+
+        let stdout = format!("{}\n{}\n", shell_script.display(), cmd_shim.display());
+
+        assert_eq!(
+            first_existing_path_for_platform(&stdout, true),
+            Some(cmd_shim)
+        );
+    }
+
+    #[test]
+    fn windows_path_lookup_skips_claude_desktop_execution_alias() {
+        let dir = tempfile::tempdir().unwrap();
+        let desktop_alias = dir
+            .path()
+            .join("AppData")
+            .join("Local")
+            .join("Microsoft")
+            .join("WindowsApps")
+            .join("Claude.exe");
+        let cli_binary = dir.path().join(".local").join("bin").join("claude.exe");
+        std::fs::create_dir_all(desktop_alias.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(cli_binary.parent().unwrap()).unwrap();
+        std::fs::write(&desktop_alias, "desktop alias").unwrap();
+        std::fs::write(&cli_binary, "claude code cli").unwrap();
+        let stdout = format!("{}\n{}\n", desktop_alias.display(), cli_binary.display());
+
+        assert_eq!(
+            first_existing_path_for_platform(&stdout, true),
+            Some(cli_binary)
+        );
+    }
+
+    #[test]
+    fn unsupported_claude_flag_errors_are_detected() {
+        assert!(is_unsupported_claude_flag_error(ClaudeStderr(
+            "error: unknown option '--tools'"
+        )));
+        assert!(is_unsupported_claude_flag_error(ClaudeStderr(
+            "Unknown argument: --no-session-persistence"
+        )));
+        assert!(!is_unsupported_claude_flag_error(ClaudeStderr(
+            "Claude CLI is not authenticated"
+        )));
+    }
+
+    #[test]
+    fn format_failed_claude_exit_sanitizes_too_many_redirects() {
+        let message = format_failed_claude_exit(ClaudeFailure {
+            stderr: ClaudeStderr(
+                "API Error: Unable to connect to API (TooManyRedirects)\nredirected to https://example.invalid/callback?token=secret",
+            ),
+            status: failed_exit_status(),
+        });
+
+        assert_eq!(
+            (
+                message.starts_with("rhizome:i18n-error:"),
+                message.contains(r#""key":"ai.error.claude.tooManyRedirects""#),
+                message.contains("https://example.invalid"),
+                message.contains("secret"),
+            ),
+            (true, true, false, false)
+        );
+    }
+
+    // --- dispatch_event / dispatch_stream_event ---
+
+    #[cfg(unix)]
+    fn failed_exit_status() -> ExitStatus {
+        use std::os::unix::process::ExitStatusExt;
+
+        ExitStatus::from_raw(1 << 8)
+    }
+
+    #[cfg(windows)]
+    fn failed_exit_status() -> ExitStatus {
+        use std::os::windows::process::ExitStatusExt;
+
+        ExitStatus::from_raw(1)
+    }
+
+    fn new_state() -> StreamState {
+        StreamState {
+            session_id: String::new(),
+            tool_inputs: HashMap::new(),
+            current_tool_id: None,
+            emitted_text: false,
+        }
+    }
+
+    /// Run dispatch_event on the given JSON and return (session_id, events).
+    fn run_dispatch(json: serde_json::Value) -> (String, Vec<ClaudeStreamEvent>) {
+        let mut state = new_state();
+        let mut events = vec![];
+        dispatch_event(&json, &mut state, &mut |e| events.push(e));
+        (state.session_id, events)
+    }
+
+    #[derive(Clone, Copy)]
+    struct InitialSessionId<'a>(&'a str);
+
+    /// Run dispatch_event with a pre-set session_id.
+    fn run_dispatch_with_sid(
+        json: serde_json::Value,
+        initial_sid: InitialSessionId<'_>,
+    ) -> (String, Vec<ClaudeStreamEvent>) {
+        let mut state = new_state();
+        state.session_id = initial_sid.0.to_string();
+        let mut events = vec![];
+        dispatch_event(&json, &mut state, &mut |e| events.push(e));
+        (state.session_id, events)
+    }
+
+    /// Run multiple dispatch_event calls sharing state (for multi-event sequences).
+    fn run_dispatch_sequence(
+        events_json: Vec<serde_json::Value>,
+    ) -> (StreamState, Vec<ClaudeStreamEvent>) {
+        let mut state = new_state();
+        let mut events = vec![];
+        for json in &events_json {
+            dispatch_event(json, &mut state, &mut |e| events.push(e));
+        }
+        (state, events)
+    }
+
+    #[test]
+    fn dispatch_event_handles_init() {
+        let (sid, events) = run_dispatch(serde_json::json!({
+            "type": "system", "subtype": "init", "session_id": "test-session-123"
+        }));
+        assert_eq!(sid, "test-session-123");
+        assert!(
+            matches!(&events[0], ClaudeStreamEvent::Init { session_id } if session_id == "test-session-123")
+        );
+    }
+
+    #[test]
+    fn dispatch_event_system_without_init_subtype_is_ignored() {
+        let (_, events) = run_dispatch(serde_json::json!({ "type": "system", "subtype": "other" }));
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn dispatch_event_system_init_without_session_id_is_ignored() {
+        let (sid, events) =
+            run_dispatch(serde_json::json!({ "type": "system", "subtype": "init" }));
+        assert!(events.is_empty());
+        assert!(sid.is_empty());
+    }
+
+    #[test]
+    fn dispatch_event_handles_text_delta() {
+        let (_, events) = run_dispatch(serde_json::json!({
+            "type": "stream_event",
+            "event": { "type": "content_block_delta", "index": 0, "delta": { "type": "text_delta", "text": "Hello" } }
+        }));
+        assert!(matches!(&events[0], ClaudeStreamEvent::TextDelta { text } if text == "Hello"));
+    }
+
+    #[test]
+    fn dispatch_event_handles_tool_start() {
+        let (_, events) = run_dispatch(serde_json::json!({
+            "type": "stream_event",
+            "event": { "type": "content_block_start", "index": 1, "content_block": { "type": "tool_use", "id": "tool_abc", "name": "read_note", "input": {} } }
+        }));
+        assert!(
+            matches!(&events[0], ClaudeStreamEvent::ToolStart { tool_name, tool_id, .. } if tool_name == "read_note" && tool_id == "tool_abc")
+        );
+    }
+
+    #[test]
+    fn dispatch_event_handles_result() {
+        let (sid, events) = run_dispatch(serde_json::json!({
+            "type": "result", "subtype": "success", "result": "All done!", "session_id": "sess-456"
+        }));
+        assert_eq!(sid, "sess-456");
+        assert!(
+            matches!(&events[0], ClaudeStreamEvent::Result { text, session_id } if text == "All done!" && session_id == "sess-456")
+        );
+    }
+
+    #[test]
+    fn dispatch_event_result_with_empty_session_id() {
+        let (sid, events) = run_dispatch_with_sid(
+            serde_json::json!({ "type": "result", "result": "text here" }),
+            InitialSessionId("prev-session"),
+        );
+        assert_eq!(sid, "prev-session");
+        assert!(
+            matches!(&events[0], ClaudeStreamEvent::Result { text, .. } if text == "text here")
+        );
+    }
+
+    #[test]
+    fn dispatch_event_handles_tool_progress() {
+        let (_, events) = run_dispatch(serde_json::json!({
+            "type": "tool_progress", "tool_name": "search_notes", "tool_use_id": "tool_xyz"
+        }));
+        assert!(
+            matches!(&events[0], ClaudeStreamEvent::ToolStart { tool_name, tool_id, .. } if tool_name == "search_notes" && tool_id == "tool_xyz")
+        );
+    }
+
+    #[test]
+    fn dispatch_event_tool_progress_missing_fields_is_ignored() {
+        let (_, events) =
+            run_dispatch(serde_json::json!({ "type": "tool_progress", "tool_name": "x" }));
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn dispatch_event_handles_assistant_with_tool_use() {
+        let (_, events) = run_dispatch(serde_json::json!({
+            "type": "assistant",
+            "message": { "content": [
+                { "type": "text", "text": "Let me search." },
+                { "type": "tool_use", "id": "tu_1", "name": "search_notes", "input": {} }
+            ] }
+        }));
+        assert_eq!(events.len(), 2);
+        assert!(
+            matches!(&events[0], ClaudeStreamEvent::TextDelta { text } if text == "Let me search.")
+        );
+        assert!(
+            matches!(&events[1], ClaudeStreamEvent::ToolStart { tool_name, tool_id, .. } if tool_name == "search_notes" && tool_id == "tu_1")
+        );
+    }
+
+    #[test]
+    fn dispatch_event_result_after_text_delta_does_not_duplicate_response_text() {
+        let (state, events) = run_dispatch_sequence(vec![
+            serde_json::json!({
+                "type": "stream_event",
+                "event": { "type": "content_block_delta", "delta": { "type": "text_delta", "text": "Visible reply" } }
+            }),
+            serde_json::json!({
+                "type": "result",
+                "session_id": "session-1",
+                "result": "Visible reply"
+            }),
+        ]);
+
+        assert_eq!(state.session_id, "session-1");
+        assert!(matches!(&events[..],
+                [
+                    ClaudeStreamEvent::TextDelta { text },
+                    ClaudeStreamEvent::Result { text: result_text, session_id },
+                ] if text == "Visible reply" && result_text.is_empty() && session_id == "session-1"));
+    }
+
+    #[test]
+    fn dispatch_event_assistant_without_content_is_noop() {
+        let (_, events) = run_dispatch(serde_json::json!({ "type": "assistant", "message": {} }));
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn dispatch_event_ignores_unknown() {
+        let (_, events) =
+            run_dispatch(serde_json::json!({ "type": "some_future_type", "data": 42 }));
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn dispatch_stream_event_input_json_delta_accumulates_silently() {
+        // input_json_delta doesn't emit events directly — it accumulates in state
+        let (_, events) = run_dispatch(serde_json::json!({
+            "type": "stream_event",
+            "event": { "type": "content_block_delta", "index": 0, "delta": { "type": "input_json_delta", "partial_json": "{}" } }
+        }));
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn dispatch_stream_event_non_tool_block_start_is_ignored() {
+        let (_, events) = run_dispatch(serde_json::json!({
+            "type": "stream_event",
+            "event": { "type": "content_block_start", "index": 0, "content_block": { "type": "text", "text": "" } }
+        }));
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn dispatch_stream_event_unknown_type_is_ignored() {
+        let (_, events) = run_dispatch(serde_json::json!({
+            "type": "stream_event", "event": { "type": "message_stop" }
+        }));
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn dispatch_event_handles_tool_result_string_content() {
+        let (_, events) = run_dispatch(serde_json::json!({
+            "type": "tool_result",
+            "tool_use_id": "tool_abc",
+            "content": "Found 3 notes matching query"
+        }));
+        assert_eq!(events.len(), 1);
+        assert!(
+            matches!(&events[0], ClaudeStreamEvent::ToolDone { tool_id, output }
+                if tool_id == "tool_abc" && output.as_deref() == Some("Found 3 notes matching query"))
+        );
+    }
+
+    #[test]
+    fn dispatch_event_handles_tool_result_array_content() {
+        let (_, events) = run_dispatch(serde_json::json!({
+            "type": "tool_result",
+            "tool_use_id": "tool_def",
+            "content": [{ "type": "text", "text": "Line 1" }, { "type": "text", "text": "Line 2" }]
+        }));
+        assert!(
+            matches!(&events[0], ClaudeStreamEvent::ToolDone { output, .. }
+                if output.as_deref() == Some("Line 1\nLine 2"))
+        );
+    }
+
+    #[test]
+    fn dispatch_event_tool_result_missing_tool_id_is_ignored() {
+        let (_, events) = run_dispatch(serde_json::json!({
+            "type": "tool_result", "content": "result text"
+        }));
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn dispatch_accumulates_input_json_deltas() {
+        let (_, events) = run_dispatch_sequence(vec![
+            // Start tool_use block
+            serde_json::json!({
+                "type": "stream_event",
+                "event": { "type": "content_block_start", "content_block": { "type": "tool_use", "id": "t1", "name": "search_notes", "input": {} } }
+            }),
+            // Input delta chunks
+            serde_json::json!({
+                "type": "stream_event",
+                "event": { "type": "content_block_delta", "delta": { "type": "input_json_delta", "partial_json": "{\"query\":" } }
+            }),
+            serde_json::json!({
+                "type": "stream_event",
+                "event": { "type": "content_block_delta", "delta": { "type": "input_json_delta", "partial_json": "\"test\"}" } }
+            }),
+            // Stop block
+            serde_json::json!({
+                "type": "stream_event",
+                "event": { "type": "content_block_stop" }
+            }),
+            // Assistant message triggers ToolStart with accumulated input
+            serde_json::json!({
+                "type": "assistant",
+                "message": { "content": [
+                    { "type": "tool_use", "id": "t1", "name": "search_notes", "input": { "query": "test" } }
+                ] }
+            }),
+        ]);
+        // First event: ToolStart with no input (from content_block_start)
+        assert!(matches!(
+            &events[0],
+            ClaudeStreamEvent::ToolStart { input: None, .. }
+        ));
+        // Second event: ToolStart with accumulated input (from assistant)
+        assert!(
+            matches!(&events[1], ClaudeStreamEvent::ToolStart { input: Some(inp), .. }
+                if inp == "{\"query\":\"test\"}")
+        );
+    }
+
+    #[test]
+    fn dispatch_assistant_uses_block_input_when_no_deltas() {
+        let (_, events) = run_dispatch(serde_json::json!({
+            "type": "assistant",
+            "message": { "content": [
+                { "type": "tool_use", "id": "tu_x", "name": "create_note", "input": { "title": "Hello", "content": "world" } }
+            ] }
+        }));
+        assert!(
+            matches!(&events[0], ClaudeStreamEvent::ToolStart { input: Some(inp), .. }
+                if inp.contains("title") && inp.contains("Hello"))
+        );
+    }
+
+    #[test]
+    fn content_block_stop_clears_current_tool() {
+        let (state, _) = run_dispatch_sequence(vec![
+            serde_json::json!({
+                "type": "stream_event",
+                "event": { "type": "content_block_start", "content_block": { "type": "tool_use", "id": "t1", "name": "x", "input": {} } }
+            }),
+            serde_json::json!({
+                "type": "stream_event",
+                "event": { "type": "content_block_stop" }
+            }),
+        ]);
+        assert!(state.current_tool_id.is_none());
+    }
+
+    // --- run_claude_subprocess with mock scripts ---
+
+    #[test]
+    fn build_claude_command_keeps_streaming_process_contract() {
+        let bin = PathBuf::from("claude");
+        let args = vec!["-p".to_string(), "hello".to_string()];
+        let command = build_claude_command(ClaudeCommandRequest {
+            bin: &bin,
+            args: &args,
+            cwd: Some("/tmp/vault"),
+        })
+        .unwrap();
+        let actual_args: Vec<OsString> = command.get_args().map(OsStr::to_os_string).collect();
+        let claude_code_env = command
+            .get_envs()
+            .find(|(key, _)| *key == OsStr::new("CLAUDECODE"))
+            .map(|(_, value)| value.map(OsStr::to_os_string));
+
+        assert_eq!(
+            (
+                command.get_program().to_os_string(),
+                actual_args,
+                command.get_current_dir().map(Path::to_path_buf),
+                claude_code_env,
+            ),
+            (
+                OsString::from("claude"),
+                vec![OsString::from("-p"), OsString::from("hello")],
+                Some(PathBuf::from("/tmp/vault")),
+                Some(None),
+            ),
+        );
+    }
+
+    #[test]
+    fn build_claude_command_avoids_windows_cmd_shim_for_prompt_args() {
+        let dir = tempfile::tempdir().unwrap();
+        let shim = dir.path().join("claude.cmd");
+        let script = dir
+            .path()
+            .join("node_modules")
+            .join("@anthropic-ai")
+            .join("claude-code")
+            .join("cli.js");
+        std::fs::create_dir_all(script.parent().unwrap()).unwrap();
+        std::fs::write(&script, "console.log('claude')\n").unwrap();
+        std::fs::write(
+            &shim,
+            r#"@ECHO off
+"%_prog%" "%~dp0\node_modules\@anthropic-ai\claude-code\cli.js" %*
+"#,
+        )
+        .unwrap();
+
+        let args = vec![
+            "-p".to_string(),
+            "Rename the note after reading the active vault".to_string(),
+        ];
+        let command = build_claude_command(ClaudeCommandRequest {
+            bin: &shim,
+            args: &args,
+            cwd: Some("/tmp/vault"),
+        })
+        .unwrap();
+        let actual_args = command.get_args().collect::<Vec<_>>();
+
+        assert_ne!(
+            command.get_program(),
+            shim.as_os_str(),
+            "Claude npm .cmd shims cannot safely receive prompt args directly"
+        );
+        assert_eq!(actual_args.first().copied(), Some(script.as_os_str()));
+        assert!(actual_args.iter().any(|arg| *arg == OsStr::new("-p")));
+        assert!(actual_args
+            .iter()
+            .any(|arg| *arg == OsStr::new("Rename the note after reading the active vault")));
+        assert_eq!(command.get_current_dir(), Some(Path::new("/tmp/vault")));
+    }
+
+    #[test]
+    fn claude_provider_env_keys_include_reported_anthropic_overrides() {
+        assert!(CLAUDE_PROVIDER_ENV_KEYS.contains(&EnvName::trusted("ANTHROPIC_API_KEY")));
+        assert!(CLAUDE_PROVIDER_ENV_KEYS.contains(&EnvName::trusted("ANTHROPIC_BASE_URL")));
+    }
+
+    #[cfg(unix)]
+    #[derive(Clone, Copy)]
+    struct MockClaudeScript<'a>(&'a str);
+
+    #[cfg(unix)]
+    #[derive(Clone, Copy)]
+    struct MockClaudeArgs<'a>(&'a [String]);
+
+    #[cfg(unix)]
+    #[derive(Clone, Copy)]
+    struct MockClaudeStdin<'a>(Option<&'a str>);
+
+    #[cfg(unix)]
+    fn run_mock_script(
+        script: MockClaudeScript<'_>,
+    ) -> (Result<String, String>, Vec<ClaudeStreamEvent>) {
+        run_mock_script_with_args(script, MockClaudeArgs(&[]))
+    }
+
+    #[cfg(unix)]
+    fn run_mock_script_with_args(
+        script: MockClaudeScript<'_>,
+        args: MockClaudeArgs<'_>,
+    ) -> (Result<String, String>, Vec<ClaudeStreamEvent>) {
+        run_mock_script_with_args_and_stdin(script, args, MockClaudeStdin(None))
+    }
+
+    #[cfg(unix)]
+    fn run_mock_script_with_args_and_stdin(
+        script: MockClaudeScript<'_>,
+        args: MockClaudeArgs<'_>,
+        stdin_text: MockClaudeStdin<'_>,
+    ) -> (Result<String, String>, Vec<ClaudeStreamEvent>) {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mock-claude");
+        std::fs::write(&path, script.0).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let mut events = vec![];
+        let result = run_claude_subprocess(
+            ClaudeSubprocessRequest {
+                bin: &path,
+                args: args.0,
+                fallback_args: &[],
+                stdin_text: stdin_text.0,
+                cwd: None,
+            },
+            &mut |e| events.push(e),
+        );
+        (result, events)
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_subprocess_parses_ndjson_stream() {
+        let (result, events) = run_mock_script(MockClaudeScript(concat!(
+            "#!/bin/sh\n",
+            "echo '{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"s1\"}'\n",
+            "echo '{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hi\"}}}'\n",
+            "echo '{\"type\":\"result\",\"result\":\"Done\",\"session_id\":\"s1\"}'\n",
+        )));
+        assert_eq!(result.unwrap(), "s1");
+        assert!(matches!(&events[0], ClaudeStreamEvent::Init { session_id } if session_id == "s1"));
+        assert!(matches!(&events[1], ClaudeStreamEvent::TextDelta { text } if text == "Hi"));
+        assert!(matches!(&events[2], ClaudeStreamEvent::Result { .. }));
+        assert!(matches!(&events[3], ClaudeStreamEvent::Done));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_subprocess_retries_with_fallback_args_for_removed_flags() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mock-claude");
+        std::fs::write(
+            &path,
+            concat!(
+                "#!/bin/sh\n",
+                "for arg in \"$@\"; do\n",
+                "  if [ \"$arg\" = \"--tools\" ]; then\n",
+                "    echo \"error: unknown option '--tools'\" >&2\n",
+                "    exit 1\n",
+                "  fi\n",
+                "done\n",
+                "echo '{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"fallback\"}'\n",
+                "echo '{\"type\":\"result\",\"result\":\"Done\",\"session_id\":\"fallback\"}'\n",
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let args = vec!["--tools".to_string(), "Read".to_string()];
+        let fallback_args = vec![vec!["--allowedTools".to_string(), "Read".to_string()]];
+        let mut events = vec![];
+        let result = run_claude_subprocess(
+            ClaudeSubprocessRequest {
+                bin: &path,
+                args: &args,
+                fallback_args: &fallback_args,
+                stdin_text: None,
+                cwd: None,
+            },
+            &mut |event| events.push(event),
+        );
+
+        assert_eq!(result.unwrap(), "fallback");
+        assert!(matches!(
+            events.first(),
+            Some(ClaudeStreamEvent::Init { session_id }) if session_id == "fallback"
+        ));
+        assert!(!events
+            .iter()
+            .any(|event| matches!(event, ClaudeStreamEvent::Error { .. })));
+        assert!(matches!(events.last(), Some(ClaudeStreamEvent::Done)));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_subprocess_closes_stdin_even_when_parent_stdin_pipe_is_open() {
+        use std::io::Read;
+        use std::time::{Duration, Instant};
+
+        let mut child = Command::new(current_test_binary())
+            .arg("stdin_probe_parent_child")
+            .arg("--ignored")
+            .arg("--nocapture")
+            .env("TOLARIA_STDIN_PROBE_CHILD", "1")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let child_stdin = child.stdin.take().unwrap();
+        let mut stdout = child.stdout.take().unwrap();
+        let mut stderr = child.stderr.take().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(30);
+
+        let status = loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                break status;
+            }
+            if Instant::now() >= deadline {
+                child.kill().unwrap();
+                drop(child_stdin);
+                panic!("stdin probe child timed out");
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        };
+
+        drop(child_stdin);
+        let mut stdout_text = String::new();
+        let mut stderr_text = String::new();
+        stdout.read_to_string(&mut stdout_text).unwrap();
+        stderr.read_to_string(&mut stderr_text).unwrap();
+
+        assert!(
+            status.success(),
+            "stdin probe child failed with {status}\nstdout:\n{stdout_text}\nstderr:\n{stderr_text}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[ignore = "spawned by run_subprocess_closes_stdin_even_when_parent_stdin_pipe_is_open"]
+    #[test]
+    fn stdin_probe_parent_child() {
+        if std::env::var_os("TOLARIA_STDIN_PROBE_CHILD").is_none() {
+            return;
+        }
+
+        let (result, events) = run_mock_script(MockClaudeScript(concat!(
+            "#!/bin/sh\n",
+            "stdin=\"$(cat)\"\n",
+            "if [ -n \"$stdin\" ]; then\n",
+            "  echo \"stdin was not closed\" >&2\n",
+            "  exit 9\n",
+            "fi\n",
+            "printf '%s\\n' '{\"type\":\"result\",\"result\":\"stdin closed\",\"session_id\":\"stdin-ok\"}'\n",
+        )));
+
+        assert_eq!(result.unwrap(), "stdin-ok");
+        assert!(matches!(
+            events.first(),
+            Some(ClaudeStreamEvent::Result { text, session_id })
+                if text == "stdin closed" && session_id == "stdin-ok"
+        ));
+        assert!(matches!(events.last(), Some(ClaudeStreamEvent::Done)));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_subprocess_skips_blank_and_non_json_lines() {
+        let (result, events) = run_mock_script(MockClaudeScript(concat!(
+            "#!/bin/sh\n",
+            "echo ''\n",
+            "echo 'not json at all'\n",
+            "echo '{\"type\":\"result\",\"result\":\"ok\",\"session_id\":\"s2\"}'\n",
+        )));
+        assert_eq!(result.unwrap(), "s2");
+        assert!(matches!(&events[0], ClaudeStreamEvent::Result { text, .. } if text == "ok"));
+        assert!(matches!(&events[1], ClaudeStreamEvent::Done));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_subprocess_emits_error_on_nonzero_exit() {
+        let (_, events) = run_mock_script(MockClaudeScript(
+            "#!/bin/sh\necho 'auth problem' >&2\nexit 1\n",
+        ));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, ClaudeStreamEvent::Error { .. })));
+        assert!(matches!(events.last().unwrap(), ClaudeStreamEvent::Done));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_subprocess_detects_auth_error_in_stderr() {
+        let (_, events) = run_mock_script(MockClaudeScript(
+            "#!/bin/sh\necho 'not logged in' >&2\nexit 1\n",
+        ));
+        assert!(events.iter().any(|e| matches!(e, ClaudeStreamEvent::Error { message } if message.contains("not authenticated"))));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_subprocess_reports_exit_code_on_empty_stderr() {
+        let (_, events) = run_mock_script(MockClaudeScript("#!/bin/sh\nexit 2\n"));
+        assert!(events.iter().any(
+            |e| matches!(e, ClaudeStreamEvent::Error { message } if message.contains("exited with"))
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_subprocess_success_with_no_events() {
+        let (result, events) = run_mock_script(MockClaudeScript("#!/bin/sh\nexit 0\n"));
+        assert!(result.is_ok());
+        assert!(matches!(events.last().unwrap(), ClaudeStreamEvent::Done));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_subprocess_passes_args_through() {
+        let args: Vec<String> = vec!["--foo".into(), "bar".into()];
+        let (_, events) = run_mock_script_with_args(
+            MockClaudeScript(concat!(
+                "#!/bin/sh\n",
+                "echo \"{\\\"type\\\":\\\"result\\\",\\\"result\\\":\\\"$*\\\",\\\"session_id\\\":\\\"sx\\\"}\"\n",
+            )),
+            MockClaudeArgs(&args),
+        );
+        let text = events.iter().find_map(|e| match e {
+            ClaudeStreamEvent::Result { text, .. } => Some(text.as_str()),
+            _ => None,
+        });
+        assert!(text.unwrap().contains("--foo"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_subprocess_writes_prompt_to_stdin() {
+        let args: Vec<String> = vec!["-p".into()];
+        let (result, events) = run_mock_script_with_args_and_stdin(
+            MockClaudeScript(concat!(
+                "#!/bin/sh\n",
+                "stdin=$(cat)\n",
+                "if [ \"$stdin\" != \"hello from stdin\" ]; then\n",
+                "  echo \"unexpected stdin: $stdin\" >&2\n",
+                "  exit 3\n",
+                "fi\n",
+                "echo '{\"type\":\"result\",\"result\":\"stdin ok\",\"session_id\":\"sx\"}'\n",
+            )),
+            MockClaudeArgs(&args),
+            MockClaudeStdin(Some("hello from stdin")),
+        );
+
+        assert_eq!(result.unwrap(), "sx");
+        assert!(events.iter().any(
+            |event| matches!(event, ClaudeStreamEvent::Result { text, .. } if text == "stdin ok")
+        ));
+    }
+
+    // --- find_claude_binary ---
+
+    #[test]
+    fn claude_binary_candidates_include_supported_local_and_toolchain_installs() {
+        let home = PathBuf::from("/Users/alex");
+        let expected = [
+            home.join(".local/bin/claude"),
+            home.join(".claude/local/claude"),
+            home.join(".local/share/mise/shims/claude"),
+            home.join(".npm-global/bin/claude"),
+        ];
+
+        assert_binary_candidates_include(&home, &expected);
+    }
+
+    #[test]
+    fn claude_binary_candidates_include_linuxbrew_installs() {
+        let home = PathBuf::from("/home/alex");
+        let expected = [
+            home.join(".linuxbrew/bin/claude"),
+            PathBuf::from("/home/linuxbrew/.linuxbrew/bin/claude"),
+        ];
+
+        assert_binary_candidates_include(&home, &expected);
+    }
+
+    #[test]
+    fn claude_binary_candidates_include_windows_exe_installs() {
+        let home = PathBuf::from(r"C:\Users\alex");
+        let expected = [
+            home.join(".local/bin/claude.exe"),
+            home.join(".claude/local/claude.exe"),
+            home.join("AppData/Roaming/npm/claude.cmd"),
+        ];
+
+        assert_binary_candidates_include(&home, &expected);
+    }
+
+    #[test]
+    fn claude_path_lookup_command_matches_current_platform() {
+        let expected = if cfg!(windows) { "where" } else { "which" };
+
+        assert_eq!(claude_path_lookup_command(), expected);
+    }
+
+    #[test]
+    fn find_existing_binary_finds_windows_exe_candidate() {
+        let dir = tempfile::tempdir().unwrap();
+        let claude = dir.path().join(".local/bin/claude.exe");
+        std::fs::create_dir_all(claude.parent().unwrap()).unwrap();
+        std::fs::write(&claude, "").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            std::fs::set_permissions(&claude, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        assert_eq!(
+            crate::cli_agent_runtime::find_executable_binary_candidate(
+                claude_binary_candidates_for_home(dir.path()),
+                "Claude CLI",
+            )
+            .unwrap(),
+            Some(claude)
+        );
+    }
+
+    #[test]
+    fn find_claude_binary_returns_result() {
+        let result = find_claude_binary();
+        // On dev machines claude may be installed; on CI it may not.
+        // Either way, the function should return Ok(path) or Err(message).
+        match &result {
+            Ok(path) => assert!(path.exists()),
+            Err(msg) => assert!(msg.contains("not found")),
+        }
+    }
+
+    // --- run_chat_stream / run_agent_stream error paths ---
+
+    #[test]
+    fn run_chat_stream_returns_result() {
+        let req = ChatStreamRequest {
+            message: "test".into(),
+            system_prompt: None,
+            session_id: None,
+        };
+        let mut events = vec![];
+        // This will either succeed (if claude is installed) or fail (if not).
+        let result = run_chat_stream(req, |e| events.push(e));
+        // Either way the function should have returned without panicking.
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[test]
+    fn run_agent_stream_returns_result() {
+        let req = AgentStreamRequest {
+            message: "test".into(),
+            system_prompt: Some("sys".into()),
+            vault_path: "/tmp/nonexistent".into(),
+            vault_paths: Vec::new(),
+            permission_mode: AiAgentPermissionMode::Safe,
+        };
+        let mut events = vec![];
+        let result = run_agent_stream(req, |e| events.push(e));
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[test]
+    fn run_subprocess_spawn_failure() {
+        let fake_bin = PathBuf::from("/nonexistent/binary/path");
+        let mut events = vec![];
+        let result = run_claude_subprocess(
+            ClaudeSubprocessRequest {
+                bin: &fake_bin,
+                args: &[],
+                fallback_args: &[],
+                stdin_text: None,
+                cwd: None,
+            },
+            &mut |e| events.push(e),
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Failed to start claude"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_subprocess_with_tool_progress_and_assistant() {
+        let (result, events) = run_mock_script(MockClaudeScript(concat!(
+            "#!/bin/sh\n",
+            "echo '{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"s3\"}'\n",
+            "echo '{\"type\":\"tool_progress\",\"tool_name\":\"search\",\"tool_use_id\":\"t1\"}'\n",
+            "echo '{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t2\",\"name\":\"read\",\"input\":{}}]}}'\n",
+            "echo '{\"type\":\"result\",\"result\":\"fin\",\"session_id\":\"s3\"}'\n",
+        )));
+        assert_eq!(result.unwrap(), "s3");
+        assert!(events.len() >= 4);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_subprocess_success_exit_with_session_id_skips_error() {
+        let (_, events) = run_mock_script(MockClaudeScript(concat!(
+            "#!/bin/sh\n",
+            "echo '{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"s4\"}'\n",
+            "echo 'some warning' >&2\n",
+            "exit 1\n",
+        )));
+        // Should NOT have an error event because session_id is non-empty
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e, ClaudeStreamEvent::Error { .. })));
+    }
+}

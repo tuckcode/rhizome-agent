@@ -1,0 +1,97 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Rhizome Agent",
+  "version": "0.1.0",
+  "identifier": "ai.rhizome.agent",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5202",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build && pnpm bundle-mcp && pnpm agent-docs"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "title": "Rhizome Agent",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 480,
+        "minHeight": 400,
+        "resizable": true,
+        "fullscreen": false,
+        "titleBarStyle": "Overlay",
+        "trafficLightPosition": {
+          "x": 58,
+          "y": 24
+        },
+        "hiddenTitle": true,
+        "backgroundColor": "#F7F6F3",
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self' ipc: http://ipc.localhost",
+        "script-src": "'self' 'wasm-unsafe-eval' https://us.i.posthog.com https://eu.i.posthog.com https://us-assets.i.posthog.com https://eu-assets.i.posthog.com",
+        "connect-src": "'self' ipc: http://ipc.localhost data: ws://localhost:9710 ws://127.0.0.1:9710 ws://localhost:9711 ws://127.0.0.1:9711 https:",
+        "img-src": "'self' asset: http://asset.localhost data: blob: https:",
+        "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "style-src-elem": "'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "style-src-attr": "'unsafe-inline'",
+        "font-src": "'self' data: https://fonts.gstatic.com",
+        "media-src": "'self' asset: http://asset.localhost data: blob: https:",
+        "object-src": "'self' asset: http://asset.localhost"
+      },
+      "devCsp": "default-src 'self' ipc: http://ipc.localhost http://localhost:5202 http://127.0.0.1:5202 asset: http://asset.localhost data: blob: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:5202 http://127.0.0.1:5202 https://us.i.posthog.com https://eu.i.posthog.com https://us-assets.i.posthog.com https://eu-assets.i.posthog.com; connect-src 'self' ipc: http://ipc.localhost http://localhost:5202 http://127.0.0.1:5202 data: ws://localhost:5202 ws://127.0.0.1:5202 ws://localhost:9710 ws://127.0.0.1:9710 ws://localhost:9711 ws://127.0.0.1:9711 https:; img-src 'self' asset: http://asset.localhost data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-attr 'unsafe-inline'; font-src 'self' data: https://fonts.gstatic.com; media-src 'self' asset: http://asset.localhost data: blob: https:; object-src 'self' asset: http://asset.localhost",
+      "dangerousDisableAssetCspModification": [
+        "style-src"
+      ],
+      "assetProtocol": {
+        "enable": true,
+        "scope": []
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": false,
+    "category": "Productivity",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
+    },
+    "resources": {
+      "resources/mcp-server/**/*": "mcp-server/",
+      "resources/agent-docs/**/*": "agent-docs/"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "shortDescription": "Chat shell powered by Prime Agent",
+    "longDescription": "Rhizome Agent is a separate app from Rhizome Desktop. It embeds a chat UI on the Prime Agent harness and uses Rhizome MCP for vault tools."
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "rhizome"
+        ]
+      }
+    },
+    "updater": {
+      "endpoints": [],
+      "windows": {
+        "installMode": "passive"
+      },
+      "pubkey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMqZyxsITWsSOd+dH911o+b0gjI6Qi1DHQP9ir0J91Wo"
+    }
+  }
+}

@@ -1,0 +1,145 @@
+export type AiAgentId = 'claude_code' | 'codex' | 'opencode' | 'pi' | 'antigravity' | 'kiro' | 'hermes'
+type LegacyAiAgentId = 'gemini'
+type AiAgentsStatusPayload = Partial<Record<AiAgentId | LegacyAiAgentId, { installed?: boolean | null; version?: string | null }>>
+
+export type AiAgentStatus = 'checking' | 'installed' | 'missing'
+export type AiAgentReadiness = 'checking' | 'ready' | 'missing'
+
+export interface AiAgentAvailability {
+  status: AiAgentStatus
+  version: string | null
+}
+
+export type AiAgentsStatus = Record<AiAgentId, AiAgentAvailability>
+
+export interface AiAgentDefinition {
+  id: AiAgentId
+  label: string
+  shortLabel: string
+  installUrl: string
+}
+
+export const DEFAULT_AI_AGENT: AiAgentId = 'claude_code'
+
+export const AI_AGENT_DEFINITIONS: readonly AiAgentDefinition[] = [
+  {
+    id: 'claude_code',
+    label: 'Claude Code',
+    shortLabel: 'Claude',
+    installUrl: 'https://docs.anthropic.com/en/docs/claude-code',
+  },
+  {
+    id: 'codex',
+    label: 'Codex',
+    shortLabel: 'Codex',
+    installUrl: 'https://developers.openai.com/codex/cli',
+  },
+  {
+    id: 'opencode',
+    label: 'OpenCode',
+    shortLabel: 'OpenCode',
+    installUrl: 'https://opencode.ai/docs/',
+  },
+  {
+    id: 'pi',
+    label: 'Pi',
+    shortLabel: 'Pi',
+    installUrl: 'https://pi.dev',
+  },
+  {
+    id: 'antigravity',
+    label: 'Antigravity CLI',
+    shortLabel: 'Antigravity',
+    installUrl: 'https://antigravity.google/docs/cli/install',
+  },
+  {
+    id: 'kiro',
+    label: 'Kiro',
+    shortLabel: 'Kiro',
+    installUrl: 'https://kiro.dev/docs/cli',
+  },
+  {
+    id: 'hermes',
+    label: 'Hermes Agent',
+    shortLabel: 'Hermes',
+    installUrl: 'https://hermes-agent.nousresearch.com/docs/getting-started/quickstart',
+  },
+] as const
+
+export function createAiAgentAvailability(status: AiAgentStatus = 'checking', version: string | null = null): AiAgentAvailability {
+  return { status, version }
+}
+
+function createAiAgentsStatus(status: AiAgentStatus): AiAgentsStatus {
+  return Object.fromEntries(
+    AI_AGENT_DEFINITIONS.map((definition) => [
+      definition.id,
+      createAiAgentAvailability(status),
+    ]),
+  ) as AiAgentsStatus
+}
+
+export function createCheckingAiAgentsStatus(): AiAgentsStatus {
+  return createAiAgentsStatus('checking')
+}
+
+export function createMissingAiAgentsStatus(): AiAgentsStatus {
+  return createAiAgentsStatus('missing')
+}
+
+export function normalizeStoredAiAgent(value: string | null | undefined): AiAgentId | null {
+  if (value === 'gemini') return 'antigravity'
+  if (AI_AGENT_DEFINITIONS.some((definition) => definition.id === value)) return value as AiAgentId
+  return null
+}
+
+export function resolveDefaultAiAgent(value: string | null | undefined): AiAgentId {
+  return normalizeStoredAiAgent(value) ?? DEFAULT_AI_AGENT
+}
+
+export function getAiAgentDefinition(agent: AiAgentId): AiAgentDefinition {
+  return AI_AGENT_DEFINITIONS.find((definition) => definition.id === agent) ?? AI_AGENT_DEFINITIONS[0]
+}
+
+function normalizeAvailability(agent: { installed?: boolean | null; version?: string | null } | null | undefined): AiAgentAvailability {
+  if (agent?.installed) {
+    return createAiAgentAvailability('installed', agent.version ?? null)
+  }
+
+  return createAiAgentAvailability('missing', agent?.version ?? null)
+}
+
+function payloadForAgent(payload: AiAgentsStatusPayload | null | undefined, agent: AiAgentId) {
+  return agent === 'antigravity' ? payload?.antigravity ?? payload?.gemini : payload?.[agent]
+}
+
+export function normalizeAiAgentsStatus(payload: AiAgentsStatusPayload | null | undefined): AiAgentsStatus {
+  return Object.fromEntries(
+    AI_AGENT_DEFINITIONS.map((definition) => [
+      definition.id,
+      normalizeAvailability(payloadForAgent(payload, definition.id)),
+    ]),
+  ) as AiAgentsStatus
+}
+
+export function getAiAgentAvailability(statuses: Partial<AiAgentsStatus>, agent: AiAgentId): AiAgentAvailability {
+  return statuses[agent] ?? createAiAgentAvailability('missing')
+}
+
+export function isAiAgentsStatusChecking(statuses: Partial<AiAgentsStatus>): boolean {
+  return AI_AGENT_DEFINITIONS.some((definition) => getAiAgentAvailability(statuses, definition.id).status === 'checking')
+}
+
+export function isAiAgentInstalled(statuses: Partial<AiAgentsStatus>, agent: AiAgentId): boolean {
+  return getAiAgentAvailability(statuses, agent).status === 'installed'
+}
+
+export function hasAnyInstalledAiAgent(statuses: Partial<AiAgentsStatus>): boolean {
+  return AI_AGENT_DEFINITIONS.some((definition) => isAiAgentInstalled(statuses, definition.id))
+}
+
+export function getNextAiAgentId(current: AiAgentId): AiAgentId {
+  const currentIndex = AI_AGENT_DEFINITIONS.findIndex((definition) => definition.id === current)
+  if (currentIndex < 0) return DEFAULT_AI_AGENT
+  return AI_AGENT_DEFINITIONS[(currentIndex + 1) % AI_AGENT_DEFINITIONS.length].id
+}

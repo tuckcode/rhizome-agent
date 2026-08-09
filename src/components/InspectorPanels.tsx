@@ -1,0 +1,8 @@
+export { DynamicRelationshipsPanel } from './inspector/RelationshipsPanel'
+export { BacklinksPanel } from './inspector/BacklinksPanel'
+export type { BacklinkItem } from './inspector/BacklinksPanel'
+export { ReferencedByPanel } from './inspector/ReferencedByPanel'
+export type { ReferencedByItem } from './inspector/ReferencedByPanel'
+export { GitHistoryPanel } from './inspector/GitHistoryPanel'
+export { InstancesPanel } from './inspector/InstancesPanel'
+export { NoteInfoPanel } from './inspector/NoteInfoPanel'
