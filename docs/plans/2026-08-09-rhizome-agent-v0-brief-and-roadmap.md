@@ -1,6 +1,7 @@
 # Rhizome Agent — v0 product brief & roadmap
 
-Status: **agreed 2026-08-09** via `/grill-with-docs` (rounds 1–5).  
+Status: **agreed 2026-08-09** via `/grill-with-docs` (rounds 1–5).
+Frontend/IA: `docs/plans/2026-08-09-rhizome-agent-frontend-design-roadmap.md`.  
 Glossary: root `CONTEXT.md`.  
 Session host spike (slice 1): `2026-08-09-prime-harness-chat-spike.md`.
 
