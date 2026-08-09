@@ -517,6 +517,7 @@ function createCommandRegistryCoreConfig(
     onSetDefaultNoteWidth: config.onSetDefaultNoteWidth,
     onToggleAIChat: enabledAiChatToggle(config),
     onToggleTableOfContents: config.onToggleTableOfContents,
+    onKeyboardShortcuts: config.onKeyboardShortcuts,
   }
 }
 
