@@ -7,9 +7,9 @@ import {
 } from './sessionAutoDistill'
 
 describe('sessionAutoDistill', () => {
-  it('defaults ON when unset', () => {
-    expect(isSessionAutoDistillEnabled(null)).toBe(true)
-    expect(isSessionAutoDistillEnabled(undefined)).toBe(true)
+  it('defaults OFF when unset (explicit promote is the product path)', () => {
+    expect(isSessionAutoDistillEnabled(null)).toBe(false)
+    expect(isSessionAutoDistillEnabled(undefined)).toBe(false)
     expect(isSessionAutoDistillEnabled(false)).toBe(false)
     expect(isSessionAutoDistillEnabled(true)).toBe(true)
   })

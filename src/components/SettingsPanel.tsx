@@ -1231,7 +1231,7 @@ function AiAgentSettingsSection({
     ai_model_providers: aiModelProviders,
   } as Settings)
   const vaultConfig = useSyncExternalStore(subscribeVaultConfig, getVaultConfig, getVaultConfig)
-  const sessionAutoDistillEnabled = vaultConfig.session_auto_distill_enabled !== false
+  const sessionAutoDistillEnabled = vaultConfig.session_auto_distill_enabled === true
 
   return (
     <>

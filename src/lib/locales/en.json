@@ -373,7 +373,7 @@
   "settings.workflow.inboxAutomation": "Automate wiki inbox",
   "settings.workflow.inboxAutomationDescription": "For Rhizome wiki vaults: drop a file into raw/inbox/ and it is automatically distilled or imported into the wiki, then moved to raw/processed/.",
   "settings.aiAgents.sessionAutoDistill": "Auto-save chat knowledge to wiki",
-  "settings.aiAgents.sessionAutoDistillDescription": "After each AI chat turn, silently distill durable decisions and facts into the wiki. Skips turns that already called distill. Turn off if you prefer manual Distill only.",
+  "settings.aiAgents.sessionAutoDistillDescription": "After each AI chat turn, distill durable decisions into the wiki. Off by default — turn on only if you want silent saves. Prefer explicit promote/save for trusted knowledge. Skips error/OAuth/tooling failures and turns that already called distill.",
   "settings.workflow.adoptPortentTypes": "Adopt Portent types",
   "settings.workflow.adoptPortentTypesDescription": "Add Portent's default knowledge-base types (Project, Operation, Responsibility, Task, Event, Topic, Person) to this vault. Safe to run more than once — existing custom types are never touched.",
   "settings.privacy.title": "Telemetry",

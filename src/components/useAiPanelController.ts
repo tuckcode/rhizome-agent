@@ -71,7 +71,7 @@ function useVaultAiAgentPermissionMode(): AiAgentPermissionMode {
 
 function useVaultSessionAutoDistillEnabled(): boolean {
   const vaultConfig = useSyncExternalStore(subscribeVaultConfig, getVaultConfig)
-  return vaultConfig.session_auto_distill_enabled !== false
+  return vaultConfig.session_auto_distill_enabled === true
 }
 
 function useAgentFileCallbacks({
