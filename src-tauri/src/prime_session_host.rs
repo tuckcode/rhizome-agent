@@ -810,6 +810,20 @@ mod tests {
     use super::*;
     use std::path::Path;
     use std::sync::atomic::AtomicBool;
+    use std::sync::MutexGuard;
+
+    /// Every test that touches `host_slot()` must hold this.
+    ///
+    /// The host registry is a process-wide `OnceLock`, so parallel tests
+    /// otherwise tear down each other's host mid-assertion: `shutdown_host()`
+    /// in one test races `run_prompt_stream` in another. That passed by
+    /// scheduling luck rather than by construction, which is exactly the
+    /// determinism the repo's test rules ask for.
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn host_guard() -> MutexGuard<'static, ()> {
+        TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner())
+    }
 
     #[cfg(unix)]
     fn mock_rpc_script(dir: &Path, body: &str) -> PathBuf {
@@ -830,6 +844,7 @@ import sys, json, time
     #[cfg(unix)]
     #[test]
     fn host_prompt_maps_events_and_survives_two_turns() {
+        let _guard = host_guard();
         let dir = tempfile::tempdir().unwrap();
         let vault = tempfile::tempdir().unwrap();
         let binary = mock_rpc_script(
@@ -953,8 +968,9 @@ for line in sys.stdin:
     #[cfg(unix)]
     #[test]
     fn abort_returns_false_when_no_host() {
+        let _guard = host_guard();
         let _ = shutdown_host();
-        assert_eq!(abort_turn().unwrap(), false);
+        assert!(!abort_turn().unwrap());
     }
 
     #[test]
@@ -967,6 +983,7 @@ for line in sys.stdin:
 
     #[test]
     fn status_reports_not_running_without_host() {
+        let _guard = host_guard();
         let _ = shutdown_host();
         let status = get_status();
         assert!(!status.running);
@@ -976,4 +993,358 @@ for line in sys.stdin:
     // Silence unused import warning on non-unix where mock isn't compiled.
     #[allow(dead_code)]
     static _KEEP: AtomicBool = AtomicBool::new(false);
+
+    // ── Pure helpers (no child process) ─────────────────────────────────────
+
+    #[test]
+    fn normalize_cwd_falls_back_to_home_for_blank_paths() {
+        let home = dirs::home_dir().expect("home dir");
+        assert_eq!(normalize_cwd("").unwrap(), home);
+        assert_eq!(normalize_cwd("   ").unwrap(), home);
+    }
+
+    #[test]
+    fn normalize_cwd_expands_tilde_and_trims() {
+        let home = dirs::home_dir().expect("home dir");
+        assert_eq!(normalize_cwd("  ~/vault  ").unwrap(), home.join("vault"));
+        assert_eq!(
+            normalize_cwd("/tmp/plain").unwrap(),
+            PathBuf::from("/tmp/plain")
+        );
+    }
+
+    #[test]
+    fn response_error_prefers_error_then_message_then_whole_body() {
+        let both = serde_json::json!({ "error": "boom", "message": "ignored" });
+        assert_eq!(response_error(&both, "prompt"), "boom");
+
+        let message_only = serde_json::json!({ "message": "softer" });
+        assert_eq!(response_error(&message_only, "prompt"), "softer");
+
+        // Neither field: the command name must survive so the caller can tell
+        // which RPC failed, not just that something did.
+        let neither = serde_json::json!({ "success": false });
+        let fallback = response_error(&neither, "set_model");
+        assert!(fallback.contains("set_model"), "{fallback}");
+    }
+
+    #[test]
+    fn route_stdout_line_delivers_response_to_the_waiting_caller() {
+        let pending: Mutex<HashMap<String, PendingResponse>> = Mutex::new(HashMap::new());
+        let (reply_tx, reply_rx) = mpsc::channel();
+        pending
+            .lock()
+            .unwrap()
+            .insert("rhizome-7".into(), PendingResponse { tx: reply_tx });
+        let (event_tx, event_rx) = mpsc::channel();
+
+        route_stdout_line(
+            serde_json::json!({ "type": "response", "id": "rhizome-7", "success": true }),
+            &pending,
+            &event_tx,
+        );
+
+        let delivered = reply_rx.try_recv().expect("response reached the caller");
+        assert_eq!(delivered["id"], "rhizome-7");
+        // A matched response must NOT also land on the event stream, or the
+        // turn loop would try to interpret an RPC reply as an agent event.
+        assert!(event_rx.try_recv().is_err());
+        // The entry is consumed, so a duplicate id cannot double-deliver.
+        assert!(pending.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn route_stdout_line_forwards_unmatched_and_non_response_lines_as_events() {
+        let pending: Mutex<HashMap<String, PendingResponse>> = Mutex::new(HashMap::new());
+        let (event_tx, event_rx) = mpsc::channel();
+
+        // Response for an id nobody is waiting on — forwarded, not dropped.
+        route_stdout_line(
+            serde_json::json!({ "type": "response", "id": "stale", "success": true }),
+            &pending,
+            &event_tx,
+        );
+        // Ordinary agent event.
+        route_stdout_line(
+            serde_json::json!({ "type": "agent_end" }),
+            &pending,
+            &event_tx,
+        );
+
+        let first = event_rx.try_recv().expect("stale response forwarded");
+        assert!(matches!(first, OutboundLine::Event(ref v) if v["id"] == "stale"));
+        let second = event_rx.try_recv().expect("agent event forwarded");
+        assert!(matches!(second, OutboundLine::Event(ref v) if v["type"] == "agent_end"));
+    }
+
+    #[test]
+    fn next_id_values_are_monotonic_and_namespaced() {
+        let ids: Vec<String> = (0..5).map(|_| next_id()).collect();
+        let unique: std::collections::HashSet<&String> = ids.iter().collect();
+        assert_eq!(unique.len(), ids.len(), "ids must not repeat: {ids:?}");
+        assert!(ids.iter().all(|id| id.starts_with("rhizome-")));
+    }
+
+    // ── Turn-level failure paths (mock RPC child) ───────────────────────────
+
+    #[cfg(unix)]
+    fn install_mock_host(dir: &Path, vault: &Path, body: &str) {
+        let binary = mock_rpc_script(dir, body);
+        let host = PrimeHost::spawn(binary, vault.to_path_buf()).unwrap();
+        let slot = host_slot();
+        let mut guard = slot.host.lock().unwrap();
+        *guard = Some(host);
+    }
+
+    #[cfg(unix)]
+    fn prompt_request(vault: &Path, new_session: bool) -> PrimePromptRequest {
+        PrimePromptRequest {
+            message: "hi".into(),
+            system_prompt: None,
+            vault_path: vault.to_string_lossy().into_owned(),
+            event_name: None,
+            provider: None,
+            model_id: None,
+            new_session,
+        }
+    }
+
+    /// The mock's shared preamble: respond/emit helpers plus a get_state that
+    /// reports a session id and a model, so status has something to surface.
+    #[cfg(unix)]
+    const MOCK_PREAMBLE: &str = r#"
+session_id = "sess-a"
+def respond(cmd, ok=True, **extra):
+    out = {"type": "response", "command": cmd.get("type"), "success": ok, "id": cmd.get("id")}
+    out.update(extra)
+    sys.stdout.write(json.dumps(out) + "\n"); sys.stdout.flush()
+def emit(obj):
+    sys.stdout.write(json.dumps(obj) + "\n"); sys.stdout.flush()
+def state():
+    return {"sessionId": session_id, "isStreaming": False,
+            "model": {"provider": "anthropic", "id": "claude-x", "name": "Claude X"}}
+"#;
+
+    /// Concatenate preamble + body. `body` is a runtime value, so its braces
+    /// are never parsed as format placeholders.
+    #[cfg(unix)]
+    fn mock_body(body: &str) -> String {
+        format!("{MOCK_PREAMBLE}{body}")
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn prompt_rejected_by_host_emits_error_then_done_and_clears_streaming() {
+        let _guard = host_guard();
+        let dir = tempfile::tempdir().unwrap();
+        let vault = tempfile::tempdir().unwrap();
+        install_mock_host(
+            dir.path(),
+            vault.path(),
+            &mock_body(
+                r#"
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    cmd = json.loads(line)
+    if cmd.get("type") == "get_state":
+        respond(cmd, data=state())
+    elif cmd.get("type") == "prompt":
+        respond(cmd, ok=False, error="model is rate limited")
+    else:
+        respond(cmd)
+"#,
+            ),
+        );
+
+        let mut events = Vec::new();
+        run_prompt_stream(prompt_request(vault.path(), false), |e| events.push(e)).unwrap();
+
+        assert!(
+            events.iter().any(
+                |e| matches!(e, AiAgentStreamEvent::Error { message } if message.contains("rate limited"))
+            ),
+            "host error must reach the user verbatim: {events:?}"
+        );
+        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
+        // A failed prompt must not leave the host wedged as "streaming",
+        // or the composer stays disabled with no turn in flight.
+        assert!(!get_status().is_streaming);
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn new_session_request_emits_init_with_the_refreshed_id() {
+        let _guard = host_guard();
+        let dir = tempfile::tempdir().unwrap();
+        let vault = tempfile::tempdir().unwrap();
+        install_mock_host(
+            dir.path(),
+            vault.path(),
+            &mock_body(
+                r#"
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    cmd = json.loads(line)
+    ty = cmd.get("type")
+    if ty == "get_state":
+        respond(cmd, data=state())
+    elif ty == "new_session":
+        session_id = "sess-fresh"
+        respond(cmd)
+    elif ty == "prompt":
+        respond(cmd)
+        emit({"type": "agent_end", "messages": []})
+    else:
+        respond(cmd)
+"#,
+            ),
+        );
+
+        let mut events = Vec::new();
+        let session =
+            run_prompt_stream(prompt_request(vault.path(), true), |e| events.push(e)).unwrap();
+
+        assert_eq!(session, "sess-fresh");
+        let inits: Vec<&AiAgentStreamEvent> = events
+            .iter()
+            .filter(|e| matches!(e, AiAgentStreamEvent::Init { .. }))
+            .collect();
+        assert!(
+            matches!(inits.first(), Some(AiAgentStreamEvent::Init { session_id }) if session_id == "sess-fresh"),
+            "{events:?}"
+        );
+        // Exactly one Init — the post-turn refresh must not re-announce the
+        // same session the new_session branch already emitted.
+        assert_eq!(inits.len(), 1, "duplicate Init: {events:?}");
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn extension_ui_request_is_auto_cancelled_so_the_turn_can_finish() {
+        let _guard = host_guard();
+        let dir = tempfile::tempdir().unwrap();
+        let vault = tempfile::tempdir().unwrap();
+        // The child only emits agent_end AFTER it receives our cancel reply,
+        // so the turn completing at all proves the auto-cancel round-tripped.
+        install_mock_host(
+            dir.path(),
+            vault.path(),
+            &mock_body(
+                r#"
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    cmd = json.loads(line)
+    ty = cmd.get("type")
+    if ty == "get_state":
+        respond(cmd, data=state())
+    elif ty == "prompt":
+        respond(cmd)
+        emit({"type": "extension_ui_confirm", "id": "ui-1", "prompt": "ok?"})
+    elif ty == "response" and cmd.get("id") == "ui-1":
+        emit({"type": "message_update",
+              "assistantMessageEvent": {"type": "text_delta", "delta": "after-cancel"}})
+        emit({"type": "agent_end", "messages": []})
+    else:
+        respond(cmd)
+"#,
+            ),
+        );
+
+        let mut events = Vec::new();
+        run_prompt_stream(prompt_request(vault.path(), false), |e| events.push(e)).unwrap();
+
+        assert!(
+            events.iter().any(
+                |e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "after-cancel")
+            ),
+            "turn must proceed past the extension UI request: {events:?}"
+        );
+        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn status_surfaces_session_and_model_metadata_while_a_host_runs() {
+        let _guard = host_guard();
+        let dir = tempfile::tempdir().unwrap();
+        let vault = tempfile::tempdir().unwrap();
+        install_mock_host(
+            dir.path(),
+            vault.path(),
+            &mock_body(
+                r#"
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    cmd = json.loads(line)
+    if cmd.get("type") == "get_state":
+        respond(cmd, data=state())
+    else:
+        respond(cmd)
+"#,
+            ),
+        );
+
+        let status = get_status();
+        assert!(status.running);
+        assert_eq!(status.session_id.as_deref(), Some("sess-a"));
+        assert_eq!(status.model_provider.as_deref(), Some("anthropic"));
+        assert_eq!(status.model_id.as_deref(), Some("claude-x"));
+        assert_eq!(status.model_name.as_deref(), Some("Claude X"));
+
+        assert!(shutdown_host().unwrap(), "shutdown reports it took a host");
+        assert!(!get_status().running);
+        assert!(
+            !shutdown_host().unwrap(),
+            "second shutdown is a no-op, not an error"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn abort_reports_false_and_clears_the_slot_when_the_child_is_gone() {
+        let _guard = host_guard();
+        let dir = tempfile::tempdir().unwrap();
+        let vault = tempfile::tempdir().unwrap();
+        install_mock_host(
+            dir.path(),
+            vault.path(),
+            &mock_body(
+                r#"
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    cmd = json.loads(line)
+    if cmd.get("type") == "get_state":
+        respond(cmd, data=state())
+    else:
+        respond(cmd)
+"#,
+            ),
+        );
+
+        // Kill the child out from under the host, as a crash would.
+        {
+            let slot = host_slot();
+            let mut guard = slot.host.lock().unwrap();
+            let host = guard.as_mut().unwrap();
+            let _ = host.child.kill();
+            let _ = host.child.wait();
+        }
+
+        assert!(!abort_turn().unwrap(), "dead host cannot abort a turn");
+        // The dead host must be evicted, not left behind reporting `running`.
+        assert!(!get_status().running);
+
+        let _ = shutdown_host();
+    }
 }
