@@ -76,6 +76,6 @@ describe('buildAgentSystemPrompt', () => {
 
   it('tells Prime vault tools are unavailable without a vault', () => {
     const prompt = buildAgentSystemPrompt({ agent: 'prime', permissionMode: 'safe' })
-    expect(prompt).toContain('no vault is attached')
+    expect(prompt).toContain('no Rhizome vault is attached')
   })
 
