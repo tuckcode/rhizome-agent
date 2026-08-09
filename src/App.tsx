@@ -1,3 +1,4 @@
+import { persistNewNote } from './hooks/useNoteCreation'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { CommandRail, type CommandRailDestination } from './components/CommandRail'
@@ -17,6 +18,7 @@ import { StatusBar } from './components/StatusBar'
 // Lazy: keeps three.js/3d-force-graph out of the main bundle chunk.
 const GraphView = lazy(() => import('./components/graph/GraphView'))
 import { AppAiWorkspaceSurface } from './components/AppAiWorkspaceSurface'
+import { buildPromoteNoteFromChat } from './utils/promoteChatToVault'
 import { AiWorkspaceFloatingButton } from './components/AiWorkspaceFloatingButton'
 import { AiWorkspaceWindowApp } from './components/AiWorkspaceWindowApp'
 import { SettingsPanel } from './components/SettingsPanel'
@@ -1627,6 +1629,26 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const handleAiWorkspaceConversationsChange = useCallback((conversations: AiWorkspaceConversationSetting[]) => {
     void saveSettings({ ...settings, ai_workspace_conversations: conversations })
   }, [saveSettings, settings])
+  const handlePromoteChatToVault = useCallback(async (text: string) => {
+    const body = text.trim()
+    if (!body) return
+    const vaultPath = activeEditorVaultPath
+    if (!vaultPath) {
+      setToastMessage(translate(appLocale, 'ai.message.saveToVaultNoVault'))
+      return
+    }
+    try {
+      const note = buildPromoteNoteFromChat(body)
+      await persistNewNote({ path: note.path, content: note.content, vaultPath })
+      vaultBridge.handleAgentFileCreated(note.path)
+      setToastMessage(translate(appLocale, 'ai.message.saveToVaultDone', { title: note.title }))
+    } catch (error) {
+      setToastMessage(translate(appLocale, 'ai.message.saveToVaultFailed', {
+        error: error instanceof Error ? error.message : String(error),
+      }))
+    }
+  }, [activeEditorVaultPath, appLocale, vaultBridge])
+
   const aiWorkspaceSurface = (
     <AppAiWorkspaceSurface
       mode="side"
@@ -1652,6 +1674,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       onConversationSettingsChange={handleAiWorkspaceConversationsChange}
       onOpenAiSettings={handleOpenAiSettings}
       onOpenNote={notes.handleNavigateWikilink}
+      onPromoteToVault={handlePromoteChatToVault}
       onRestoreVaultAiGuidance={aiFeaturesEnabled ? () => { void restoreVaultAiGuidance() } : undefined}
       onUnsupportedAiPaste={setToastMessage}
       onFileCreated={vaultBridge.handleAgentFileCreated}

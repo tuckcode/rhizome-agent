@@ -32,6 +32,7 @@ interface AppAiWorkspaceSurfaceProps {
   onFileModified?: (relativePath: string) => void
   onOpenAiSettings?: () => void
   onOpenNote?: (path: string) => void
+  onPromoteToVault?: (text: string) => void
   onPopOut?: (context?: { activeConversationId?: string }) => void
   onRestoreVaultAiGuidance?: () => void
   onUnsupportedAiPaste?: (message: string) => void
@@ -69,6 +70,7 @@ export function AppAiWorkspaceSurface({
   onFileModified,
   onOpenAiSettings,
   onOpenNote,
+  onPromoteToVault,
   onPopOut,
   onRestoreVaultAiGuidance,
   onUnsupportedAiPaste,
@@ -106,6 +108,7 @@ export function AppAiWorkspaceSurface({
       onPopOut={onPopOut}
       onOpenAiSettings={onOpenAiSettings}
       onOpenNote={onOpenNote}
+      onPromoteToVault={onPromoteToVault}
       onRestoreVaultAiGuidance={onRestoreVaultAiGuidance}
       onUnsupportedAiPaste={onUnsupportedAiPaste}
       onFileCreated={onFileCreated}

@@ -943,5 +943,9 @@
   "shortcuts.group.go": "Go",
   "shortcuts.group.search": "Search",
   "editor.toolbar.reloadVault": "Reload vault",
-  "editor.toolbar.reloadVaultShortcut": "⌘⇧R"
+  "editor.toolbar.reloadVaultShortcut": "⌘⇧R",
+  "ai.message.saveToVault": "Save to vault",
+  "ai.message.saveToVaultDone": "Saved “{title}” to the vault",
+  "ai.message.saveToVaultFailed": "Could not save to vault: {error}",
+  "ai.message.saveToVaultNoVault": "Attach a vault to save chat into notes"
 }

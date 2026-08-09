@@ -4,8 +4,11 @@ import { AppPreferencesProvider, useAppPreferences } from '../hooks/useAppPrefer
 import { useAiAgentsStatus } from '../hooks/useAiAgentsStatus'
 import { useSettings } from '../hooks/useSettings'
 import { useVaultAiGuidanceStatus } from '../hooks/useVaultAiGuidanceStatus'
+import { persistNewNote } from '../hooks/useNoteCreation'
 import { isTauri } from '../mock-tauri'
 import { areAiFeaturesEnabled } from '../lib/aiFeatures'
+import { translate } from '../lib/i18n'
+import { buildPromoteNoteFromChat } from '../utils/promoteChatToVault'
 import {
   aiWorkspaceWindowSharedContextSnapshot,
   subscribeAiWorkspaceWindowSharedContext,
@@ -274,6 +277,24 @@ export function AiWorkspaceWindowApp() {
   const handleFileCreated = useMainWindowEvent<string>(AI_WORKSPACE_FILE_CREATED_EVENT)
   const handleFileModified = useMainWindowEvent<string>(AI_WORKSPACE_FILE_MODIFIED_EVENT)
   const handleVaultChanged = useMainWindowEvent<null>(AI_WORKSPACE_VAULT_CHANGED_EVENT)
+  const handlePromoteToVault = useCallback(async (text: string) => {
+    const body = text.trim()
+    if (!body) return
+    if (!vaultPath) {
+      setToastMessage(translate(preferences.appLocale, 'ai.message.saveToVaultNoVault'))
+      return
+    }
+    try {
+      const note = buildPromoteNoteFromChat(body)
+      await persistNewNote({ path: note.path, content: note.content, vaultPath })
+      handleFileCreated(note.path)
+      setToastMessage(translate(preferences.appLocale, 'ai.message.saveToVaultDone', { title: note.title }))
+    } catch (error) {
+      setToastMessage(translate(preferences.appLocale, 'ai.message.saveToVaultFailed', {
+        error: error instanceof Error ? error.message : String(error),
+      }))
+    }
+  }, [handleFileCreated, preferences.appLocale, vaultPath])
 
   return (
     <AppPreferencesProvider dateDisplayFormat={preferences.dateDisplayFormat}>
@@ -302,6 +323,7 @@ export function AiWorkspaceWindowApp() {
             onConversationSettingsChange={handleConversationSettingsChange}
             onDock={handleDock}
             onOpenNote={handleOpenNote}
+            onPromoteToVault={handlePromoteToVault}
             onUnsupportedAiPaste={setToastMessage}
             onFileCreated={handleFileCreated}
             onFileModified={handleFileModified}

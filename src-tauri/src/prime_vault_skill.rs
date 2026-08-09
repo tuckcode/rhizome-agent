@@ -105,13 +105,16 @@ fn resolve_cli_call_path() -> Result<PathBuf, String> {
 
 fn skill_markdown(cli_call: &Path, vault_path: &str) -> String {
     let cli = cli_call.display();
+    // r## so embedded "# Idea" / .md" examples do not terminate the raw string.
     format!(
-        r#"---
+        r##"---
 name: rhizome-vault
-description: Call Rhizome vault tools (search, read note, vault context) for the attached vault via the local MCP one-shot CLI. Use when the user asks about notes, wiki content, or vault structure.
+description: Call Rhizome vault tools (search, read, create note, open note) for the attached vault via the local MCP one-shot CLI. Prefer these tools over raw filesystem walks of the vault.
 ---
 
 # Rhizome vault tools
+
+Default toolkit for this vault. Prefer these over IPython/`find` crawls of Obsidian or vault paths. Install more Prime skills when you need broader tooling — there is no separate Safe/Power product mode.
 
 The active vault root is:
 
@@ -125,7 +128,7 @@ Call tools with the one-shot CLI (always set VAULT_PATH):
 VAULT_PATH={vault_path_q} node {cli_q} <toolName> '<jsonArgs>'
 ```
 
-## Safe tools (default)
+## Tools
 
 | Tool | Args example | Purpose |
 |------|----------------|---------|
@@ -133,22 +136,29 @@ VAULT_PATH={vault_path_q} node {cli_q} <toolName> '<jsonArgs>'
 | `get_vault_context` | `{{}}` | Types, note count, folders |
 | `get_note` | `{{"path":"wiki/foo.md"}}` | Read one note |
 | `list_vaults` | `{{}}` | Active vault roots |
+| `create_note` | `{{"path":"inbox/idea.md","content":"# Idea\n\n..."}}` | Create a new markdown note (no overwrite) |
+| `open_note` | `{{"path":"inbox/idea.md"}}` | Open note in Rhizome UI |
+| `refresh_vault` | `{{}}` | Rescan so new files appear |
 
-## Power / write tools (only if user enabled Power User)
+## Promote (durable memory)
 
-| Tool | Notes |
-|------|--------|
-| `create_note` | Create markdown note |
-| `open_note` | Ask Rhizome UI to open a path |
-| `refresh_vault` | Rescan vault |
+When the user wants to **keep** something from chat, write a vault note with `create_note`, then `open_note` (and `refresh_vault` if the list looks stale). Do **not** dual-write every turn. Good default path: `inbox/YYYYMMDD-short-slug.md` with YAML frontmatter + H1.
+
+Example:
+
+```bash
+VAULT_PATH={vault_path_q} node {cli_q} create_note '{{"path":"inbox/20260809-example.md","content":"---\ntitle: Example\nis_a: Note\n---\n\n# Example\n\nBody here.\n"}}'
+VAULT_PATH={vault_path_q} node {cli_q} open_note '{{"path":"inbox/20260809-example.md"}}'
+```
 
 ## Rules
 
 1. Prefer `search_notes` then `get_note` over guessing paths.
 2. Paths are vault-relative unless absolute under the vault root.
 3. Do not claim vault tools work if VAULT_PATH is missing or the CLI errors.
-4. Durable knowledge the user wants to keep should be written with `create_note` (or promote flows) — not only summarized in chat.
-"#,
+4. Prefer this skill for vault Q&A; do not roam the whole disk looking for notes.
+5. Durable knowledge the user wants to keep → `create_note` (or the UI Save to vault control) — not only a chat summary.
+"##,
         vault_path = vault_path,
         vault_path_q = shell_single_quote(vault_path),
         cli_q = shell_single_quote(&cli.to_string()),
@@ -231,12 +241,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn skill_markdown_lists_safe_tools() {
+    fn skill_markdown_lists_default_tools_and_promote() {
         let skill = skill_markdown(Path::new("/opt/rhizome/mcp-server/cli-call.mjs"), "/vault");
         assert!(skill.contains("search_notes"));
         assert!(skill.contains("get_note"));
+        assert!(skill.contains("create_note"));
+        assert!(skill.contains("Promote"));
         assert!(skill.contains("rhizome-vault"));
         assert!(skill.contains("/vault"));
+        assert!(!skill.contains("Power User"));
+        assert!(!skill.contains("Safe tools"));
     }
 
     #[test]

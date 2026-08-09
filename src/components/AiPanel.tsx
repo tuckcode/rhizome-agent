@@ -24,6 +24,7 @@ export type { AiAgentMessage } from '../hooks/useCliAiAgent'
 interface AiPanelProps {
   onClose: () => void
   onOpenNote?: (path: string) => void
+  onPromoteToVault?: (text: string) => void
   onUnsupportedAiPaste?: (message: string) => void
   defaultAiAgent?: AiAgentId
   defaultAiTarget?: AiTarget
@@ -48,6 +49,7 @@ interface AiPanelViewProps {
   controller: AiPanelController
   onClose: () => void
   onOpenNote?: (path: string) => void
+  onPromoteToVault?: (text: string) => void
   onUnsupportedAiPaste?: (message: string) => void
   defaultAiAgent?: AiAgentId
   defaultAiTarget?: AiTarget
@@ -145,6 +147,7 @@ export function AiPanelView({
   controller,
   onClose,
   onOpenNote,
+  onPromoteToVault,
   onUnsupportedAiPaste,
   defaultAiAgent: providedDefaultAiAgent,
   defaultAiTarget,
@@ -238,6 +241,7 @@ export function AiPanelView({
         onOpenNote={onOpenNote}
         onNavigateWikilink={handleNavigateWikilink}
         onRegenerateMessage={agent.regenerateMessage}
+        onPromoteToVault={onPromoteToVault}
         onScrollStateChange={onMessageHistoryScrollStateChange}
         hasContext={hasContext}
       />
@@ -262,6 +266,7 @@ export function AiPanelView({
 export function AiPanel({
   onClose,
   onOpenNote,
+  onPromoteToVault,
   onUnsupportedAiPaste,
   defaultAiAgent: providedDefaultAiAgent,
   defaultAiTarget,
@@ -307,6 +312,7 @@ export function AiPanel({
       controller={controller}
       onClose={onClose}
       onOpenNote={onOpenNote}
+      onPromoteToVault={onPromoteToVault}
       onUnsupportedAiPaste={onUnsupportedAiPaste}
       defaultAiAgent={providedDefaultAiAgent}
       defaultAiTarget={defaultAiTarget}
