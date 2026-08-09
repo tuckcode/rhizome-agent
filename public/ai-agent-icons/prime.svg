@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" aria-hidden="true">
+  <title>Prime Agent</title>
+  <!-- Rounded tile -->
+  <rect x="1.5" y="1.5" width="21" height="21" rx="5.5" fill="#7C5CFF"/>
+  <!-- Stylized P + node accent (harness / intellect cue) -->
+  <path fill="#F4F1FF" d="M8.25 6.5h5.1c2.55 0 4.15 1.45 4.15 3.55 0 2.05-1.55 3.5-4.05 3.5H10.4v3.95H8.25V6.5zm2.15 1.85v3.35h2.7c1.25 0 1.95-.65 1.95-1.7 0-1.05-.7-1.65-1.95-1.65h-2.7z"/>
+  <circle cx="17.35" cy="16.85" r="1.55" fill="#C4B5FD"/>
+</svg>

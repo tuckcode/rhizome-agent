@@ -102,7 +102,7 @@ Aligns with product phases in the v0 brief. Each milestone is **demoable UX**, n
 - [x] Prime streams in AI rail  
 - [x] Prime-only product agent list (picker + onboarding)  
 - [x] Chat without vault allowed for Prime  
-- [ ] **Prime icon** in `AiAgentIcon` + `public/ai-agent-icons/prime.svg` (or mark)  
+- [x] **Prime icon** in `AiAgentIcon` + `public/ai-agent-icons/prime.svg` (placeholder mark)  
 - [ ] Composer/empty states never mention Claude/Hermes/Codex as peers  
 
 **Exit:** No missing-field errors; Prime labeled everywhere chat starts.
