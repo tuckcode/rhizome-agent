@@ -2,6 +2,20 @@
 
 Living doc. Update in place each session. This file is "what's true right now," not a history log. Detailed per-session records go in `docs/plans/*-session-status.md`.
 
+## Session handoff — 2026-08-09 (chat default-open + Phase 3 closed)
+
+**Shipped**
+- Prime panel tests updated for harness chrome (no Safe/Power)
+- Onboarding AI copy → Prime-only
+- Auto-open AI chat once per app session (`useAgentDefaultOpenChat`) for harness-first launch
+- GH #1–#4 closed (MCP via skill+CLI documented on #1)
+
+**Next**
+- UI-2 chat-primary layout (main column = conversation) — Open Design brief ready
+- Native dogfood: promote, open-note, Mycelium→Mindwalk, chat opens on launch
+
+---
+
 ## Session handoff — 2026-08-09 (harness chrome + Mycelium M1)
 
 **Shipped**

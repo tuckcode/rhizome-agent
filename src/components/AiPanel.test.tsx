@@ -164,10 +164,12 @@ describe('AiPanel', () => {
   it('renders panel with the default CLI agent header', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
     expect(screen.getByText('Prime')).toBeTruthy()
-    expect(screen.getByText('Prime Agent · Safe')).toBeTruthy()
+    expect(screen.getByText('Prime Agent · Harness')).toBeTruthy()
+    expect(screen.getByTestId('ai-harness-skills')).toBeTruthy()
+    expect(screen.queryByTestId('ai-permission-mode-toggle')).toBeNull()
   })
 
-  it('passes the vault permission mode to the AI agent session', () => {
+  it('still seeds the session permission mode from vault config under the hood', () => {
     bindVaultConfigStore({
       ...getVaultConfig(),
       ai_agent_permission_mode: 'power_user',
@@ -175,7 +177,8 @@ describe('AiPanel', () => {
 
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
 
-    expect(screen.getByText('Prime Agent · Power User')).toBeTruthy()
+    // Prime UI hides Safe/Power; session still receives stored mode for legacy backends.
+    expect(screen.getByText('Prime Agent · Harness')).toBeTruthy()
     expect(mockUseCliAiAgent).toHaveBeenCalledWith(
       '/tmp/vault',
       undefined,
@@ -185,42 +188,20 @@ describe('AiPanel', () => {
     )
   })
 
-  it('persists permission mode changes and records a local transcript marker', () => {
-    const save = vi.fn()
-    bindVaultConfigStore({
-      ...getVaultConfig(),
-      ai_agent_permission_mode: 'safe',
-    }, save)
-    mockMessages = [{
-      userMessage: 'Existing question',
-      actions: [],
-      response: 'Existing answer.',
-      id: 'msg-existing',
-    }]
-
+  it('does not expose a permission mode toggle for Prime', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
-    fireEvent.click(screen.getByRole('radio', { name: 'Power User' }))
-
-    expect(getVaultConfig().ai_agent_permission_mode).toBe('power_user')
-    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({
-      ai_agent_permission_mode: 'power_user',
-    }))
-    expect(mockAddLocalMarker).toHaveBeenCalledWith(
-      'AI permission mode changed to Power User. It will apply to the next message.',
-    )
-    expect(trackEventMock).toHaveBeenCalledWith('ai_agent_permission_mode_changed', {
-      agent: 'prime',
-      permission_mode: 'power_user',
-    })
+    expect(screen.queryByTestId('ai-permission-mode-toggle')).toBeNull()
+    expect(screen.queryByRole('radio', { name: 'Power User' })).toBeNull()
+    expect(screen.getByTestId('ai-harness-skills').textContent).toMatch(/rhizome-vault/)
   })
 
-  it('disables permission mode changes while the AI agent is running', () => {
+  it('shows working status while the AI agent is running', () => {
     mockStatus = 'thinking'
 
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
 
-    expect(screen.getByRole('radio', { name: 'Vault Safe' })).toBeDisabled()
-    expect(screen.getByRole('radio', { name: 'Power User' })).toBeDisabled()
+    expect(screen.getByText(/working/i)).toBeTruthy()
+    expect(screen.queryByTestId('ai-permission-mode-toggle')).toBeNull()
   })
 
   it('replaces the composer send button with a stop button while the AI agent is running', () => {
@@ -238,31 +219,9 @@ describe('AiPanel', () => {
     expect(mockStopMessage).toHaveBeenCalledOnce()
   })
 
-  it('renders the permission mode toggle with high contrast selected state and per-mode tooltips', async () => {
+  it('shows the default toolkit skills strip for Prime', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
-
-    expect(screen.getByTestId('ai-permission-mode-toggle')).toHaveClass('border', 'bg-muted')
-
-    const safeMode = screen.getByRole('radio', { name: 'Vault Safe' })
-    const powerUserMode = screen.getByRole('radio', { name: 'Power User' })
-    expect(safeMode).toHaveAttribute('aria-checked', 'true')
-    expect(safeMode).toHaveClass('bg-background', 'text-foreground', 'shadow-xs')
-    expect(powerUserMode).toHaveClass('text-muted-foreground')
-
-    fireEvent.focus(safeMode)
-
-    expect(await screen.findByTestId('ai-permission-mode-tooltip')).toHaveTextContent(
-      'Vault Safe keeps agents limited to file, search, and edit tools.',
-    )
-
-    fireEvent.blur(safeMode)
-    fireEvent.focus(powerUserMode)
-
-    await waitFor(() => {
-      expect(screen.getByTestId('ai-permission-mode-tooltip')).toHaveTextContent(
-        'Power User also allows local shell commands for this vault.',
-      )
-    })
+    expect(screen.getByTestId('ai-harness-skills')).toHaveTextContent('rhizome-vault')
   })
 
   it('renders data-testid ai-panel', () => {
@@ -307,7 +266,7 @@ describe('AiPanel', () => {
 
   it('renders empty state without context', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
-    expect(screen.getByText('Open a note, then ask Prime Agent about it')).toBeTruthy()
+    expect(screen.getByText('Message Prime Agent')).toBeTruthy()
   })
 
   it('renders contextual empty state when active entry is provided', () => {
@@ -315,7 +274,7 @@ describe('AiPanel', () => {
     render(
       <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" activeEntry={entry} entries={[entry]} />
     )
-    expect(screen.getByText('Ask anything to Prime Agent')).toBeTruthy()
+    expect(screen.getByText('Message Prime Agent')).toBeTruthy()
   })
 
   it('does not render a context bar for the active entry', () => {
