@@ -18,7 +18,7 @@ const ICON_STYLE: CSSProperties = {
 }
 
 const AI_AGENT_ICON_SOURCES: Record<AiAgentId, string> = {
-  prime: '/ai-agent-icons/prime.svg',
+  prime: '/ai-agent-icons/prime.png',
   claude_code: '/ai-agent-icons/claude-code.svg',
   codex: '/ai-agent-icons/codex.svg',
   opencode: '/ai-agent-icons/opencode.svg',

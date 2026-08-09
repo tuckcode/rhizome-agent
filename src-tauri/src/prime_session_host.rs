@@ -54,6 +54,15 @@ pub struct PrimeHostStatus {
     pub session_id: Option<String>,
     pub is_streaming: bool,
     pub binary_path: Option<String>,
+    /// Provider id from Prime get_state model, when known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_provider: Option<String>,
+    /// Model id from Prime get_state, when known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_id: Option<String>,
+    /// Display name from Prime get_state model, when known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_name: Option<String>,
 }
 
 // ── Process-wide host registry ──────────────────────────────────────────────
@@ -93,6 +102,9 @@ struct PrimeHost {
     event_tx: Sender<OutboundLine>,
     event_rx: Arc<Mutex<Receiver<OutboundLine>>>,
     session_id: Option<String>,
+    model_provider: Option<String>,
+    model_id: Option<String>,
+    model_name: Option<String>,
     binary: PathBuf,
     cwd: PathBuf,
     is_streaming: bool,
@@ -132,6 +144,9 @@ pub fn get_status() -> PrimeHostStatus {
             session_id: host.session_id.clone(),
             is_streaming: host.is_streaming,
             binary_path: Some(host.binary.to_string_lossy().into_owned()),
+            model_provider: host.model_provider.clone(),
+            model_id: host.model_id.clone(),
+            model_name: host.model_name.clone(),
         },
         None => PrimeHostStatus {
             installed: availability.installed,
@@ -140,6 +155,9 @@ pub fn get_status() -> PrimeHostStatus {
             session_id: None,
             is_streaming: false,
             binary_path,
+            model_provider: None,
+            model_id: None,
+            model_name: None,
         },
     }
 }
@@ -570,6 +588,9 @@ impl PrimeHost {
             event_tx,
             event_rx,
             session_id: None,
+            model_provider: None,
+            model_id: None,
+            model_name: None,
             binary,
             cwd,
             is_streaming: false,
@@ -579,9 +600,7 @@ impl PrimeHost {
         match host.send_command(serde_json::json!({ "type": "get_state" })) {
             Ok(response) if response["success"].as_bool() == Some(true) => {
                 if let Some(data) = response.get("data") {
-                    if let Some(id) = crate::prime_events::session_id_from_state(data) {
-                        host.session_id = Some(id.to_string());
-                    }
+                    host.apply_state_data(data);
                 }
             }
             Ok(response) => {
@@ -666,12 +685,31 @@ impl PrimeHost {
         let response = self.send_command(serde_json::json!({ "type": "get_state" }))?;
         if response["success"].as_bool() == Some(true) {
             if let Some(data) = response.get("data") {
-                if let Some(id) = crate::prime_events::session_id_from_state(data) {
-                    self.session_id = Some(id.to_string());
-                }
+                self.apply_state_data(data);
             }
         }
         Ok(())
+    }
+
+    fn apply_state_data(&mut self, data: &serde_json::Value) {
+        if let Some(id) = crate::prime_events::session_id_from_state(data) {
+            self.session_id = Some(id.to_string());
+        }
+        let model = &data["model"];
+        if model.is_null() {
+            return;
+        }
+        self.model_provider = model["provider"].as_str().map(str::to_string).or_else(|| {
+            model
+                .get("provider")
+                .and_then(|v| v.as_str())
+                .map(str::to_string)
+        });
+        self.model_id = model["id"].as_str().map(str::to_string);
+        self.model_name = model["name"]
+            .as_str()
+            .or_else(|| model["id"].as_str())
+            .map(str::to_string);
     }
 }
 

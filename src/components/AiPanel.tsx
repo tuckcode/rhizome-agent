@@ -17,6 +17,7 @@ import type { VaultEntry } from '../types'
 import { useAiPanelController, type AiPanelController } from './useAiPanelController'
 import { useAiPanelPromptQueue } from './useAiPanelPromptQueue'
 import { useAiPanelFocus } from './useAiPanelFocus'
+import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 
 export type { AiAgentMessage } from '../hooks/useCliAiAgent'
 
@@ -183,6 +184,9 @@ export function AiPanelView({
     handlePermissionModeChange,
     handleNewChat,
   } = controller
+  const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime'
+  const primeHost = usePrimeHostStatus(isPrimeTarget)
+  const modelLabel = isPrimeTarget ? primeModelLabel(primeHost) : null
 
   useAiPanelPromptQueue({
     agent,
@@ -213,6 +217,8 @@ export function AiPanelView({
         <AiPanelHeader
           agentLabel={view.agentLabel}
           agentReadiness={view.defaultAiAgentReadiness}
+          agentStatus={agent.status}
+          modelLabel={modelLabel}
           targetKind={view.targetKind}
           locale={locale}
           permissionMode={permissionMode}
