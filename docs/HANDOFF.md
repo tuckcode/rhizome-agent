@@ -6,6 +6,20 @@ Living doc. Update in place each session. This file is "what's true right now," 
 
 **This is `tuckcode/rhizome-agent` (private), not `knispo/rhizome`.** See `docs/IDENTITY.md`. Desktop history below is inherited from the Option C bootstrap snapshot and is useful background; product direction here is Prime harness chat.
 
+## Session handoff — 2026-08-09 (frontend design roadmap)
+
+**Added** `docs/plans/2026-08-09-rhizome-agent-frontend-design-roadmap.md`
+
+- Dogfood: Agent still reads as Desktop shell + Prime rail; chat path works
+- Target: chat-primary harness desktop; Desktop network-shell spec is not Agent destination
+- UI milestones UI-0…UI-4 aligned to product phases; Prime icon = UI-0 leftover
+- Open Design optional for prototypes later — not a gate
+
+**Next UI:** Prime icon (UI-0) → harness chrome (UI-1) → chat-primary spike (UI-2).  
+**Next eng capability:** issue #1 MCP (parallel).
+
+---
+
 ## Session handoff — 2026-08-09 (Phase 1 Prime chat path)
 
 **Done**
