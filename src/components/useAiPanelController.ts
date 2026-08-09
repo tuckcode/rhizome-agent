@@ -208,7 +208,15 @@ export function useAiPanelController({
   const handleNewChat = useCallback(() => {
     agent.clearConversation()
     setInput('')
-  }, [agent])
+    // Prime long-lived host: reset RPC session so multi-turn context does not leak.
+    if (defaultAiAgent === 'prime') {
+      void import('@tauri-apps/api/core')
+        .then(({ invoke }) => invoke<string>('prime_session_new_session'))
+        .catch(() => {
+          // Host may not be running yet; next prompt will spawn fresh enough.
+        })
+    }
+  }, [agent, defaultAiAgent])
 
   return {
     agent,
