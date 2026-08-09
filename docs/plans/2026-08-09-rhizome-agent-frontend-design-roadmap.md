@@ -76,6 +76,7 @@ Optional later tooling (not required to execute this roadmap): Open Design / `DE
 | Surface | Policy |
 |---------|--------|
 | Graph, network shell, graph dock | Hide or do not feature; Desktop-era |
+| **Mycelium** (agent run map) | **Named track** — rail with Graph; see `docs/plans/2026-08-09-mycelium-run-map.md`. Not v0 chat-primary blocker. |
 | Multi-agent picker / onboarding list | Hidden (productVisible = Prime only) |
 | Full research panel as Desktop knew it | Defer; research happens *in* Prime chat + later vault tools |
 | Command rail as Desktop wave destination | Not Agent v0 destination; may keep code dead |
@@ -122,6 +123,10 @@ Aligns with product phases in the v0 brief. Each milestone is **demoable UX**, n
 | Prime identity | **Done:** official mark in composer/onboarding; header title “Prime” |
 
 **Exit:** User can answer “is Prime working?” and “which model?” without a terminal.
+
+### UI-Mycelium — Run map (with Graph)
+
+Named 2026-08-09. Command rail destination beside **Graph**. Shows Prime/Pi session footprint on a repo (Mindwalk-class). Spec: `docs/plans/2026-08-09-mycelium-run-map.md`. Ship after or parallel to promote/save; not a chat-primary prerequisite.
 
 ### UI-2 — Chat-primary shell (product Phase 2–3 bridge)
 

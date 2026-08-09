@@ -34,7 +34,7 @@ Not v0: second full wiki/PKM product; multi-CLI agent matrix as product; silent 
 2. **Vault is SoT for durable knowledge.** Prime session + continual harness stay operational; they are not the wiki.  
 3. **Memory loop:** chat → work → **promote/save into vault** → search/open later. At least one first-class save path in v0.  
 4. **No vault required to chat.** Attach vault to unlock memory tools and promote.  
-5. **Safe default / Power explicit** when vault tools are on.  
+5. **Default toolkit** (vault skill first); no Safe/Power product mode for circle v0 — extend via more Prime skills. *(Was Safe/Power; reframed 2026-08-09.)*  
 6. **Chat-first UX** with enough note UI to open/edit from tools (not full Desktop chrome).  
 7. **Circle v0 may BYO `prime-agent`.** Bundled runtime is a later phase exit criterion.  
 8. **v0 harness depth = core loop + skills/extensions + working status.** Broader Hermes-like parity is post-v0 (“D eventually”).
@@ -50,7 +50,7 @@ On a machine that can install the app + Prime (BYO):
 - [ ] Attach vault → search/read via tools  
 - [ ] **Save or promote one durable note into the vault and reopen it**  
 - [ ] Open-note from a tool/promote result  
-- [ ] Safe default; Power toggle exists  
+- [ ] Default vault toolkit seeded; no mandatory Power toggle (circle v0)  
 - [ ] Other agent backends not offered in UI  
 
 **Packaging phase exit (later):** same loop with **bundled** Prime/runtime (no CLI install for friends).
@@ -179,3 +179,7 @@ Track in issues / tickets when executing — already decided enough to build:
 | Date | Change |
 |------|--------|
 | 2026-08-09 | Initial brief + roadmap from grill-with-docs (Q1–Q30 locked). |
+
+## Mycelium (named 2026-08-09)
+
+Agent **run footprint** rail destination **with Graph**. Mindwalk-class visualization; Prime-on-Pi + bridge. See `docs/plans/2026-08-09-mycelium-run-map.md`. Parallel track — not a substitute for promote/save.

@@ -17,7 +17,7 @@ still lives in `docs/ARCHITECTURE.md` / `docs/ABSTRACTIONS.md` (Desktop inherita
 
 | Term | Meaning |
 |------|---------|
-| **Prime / Prime Agent** | The **only** agent runtime in Agent product UI. Long-lived session engine (`prime-agent --mode rpc`), skills, extensions, providers/models, compaction, continual harness. |
+| **Prime / Prime Agent** | The **only** agent runtime in Agent product UI. Long-lived session engine (`prime-agent --mode rpc`), skills, extensions, providers/models, compaction, continual harness. **Built on Pi** — session JSONL under `~/.prime/agent/sessions/` is Pi-shaped (Mindwalk already labels it `harness: pi`). |
 | **Harness** | Prime’s tooling and infrastructure embedded in the chat desktop shell (Hermes-Desktop-class ambition over time; v0 = core loop + skills/status). |
 | **Session host** | In-process Rust owner of one long-lived Prime RPC child (`prime_session_host`). Process-global for v0; cwd follows active vault path when set. |
 | **Model** | An LLM selected **through Prime** (e.g. xAI/OpenAI/Anthropic as configured in `~/.prime`). Not a separate in-app “agent backend.” |
@@ -38,8 +38,7 @@ still lives in `docs/ARCHITECTURE.md` / `docs/ABSTRACTIONS.md` (Desktop inherita
 
 | Term | Meaning |
 |------|---------|
-| **Safe mode** | Default tool policy when vault MCP is attached: read/search + limited structured writes (capture/promote to agreed paths). |
-| **Power mode** | Explicit user toggle: broader write/edit and fewer guards. |
+| **Default toolkit** | Curated vault tools via `rhizome-vault` skill (search/read/create/open). Prefer these over raw FS/IPython vault crawls. **No Safe/Power product mode** for circle v0 — power users install more Prime skills naturally. |
 | **BYO Prime** | User installs/logs in `prime-agent` themselves; acceptable for circle v0. |
 | **Bundled runtime** | App ships Node/Prime (or equivalent) so non-CLI friends get a smooth install — packaging phase exit, not the first circle v0 gate. |
 
@@ -50,6 +49,7 @@ still lives in `docs/ARCHITECTURE.md` / `docs/ABSTRACTIONS.md` (Desktop inherita
 | **Chat-first** | Primary surface is conversation with Prime, not the full Desktop wiki chrome. |
 | **Vault-aware** | With a vault attached: MCP tools, open-note from results, save/promote. Without vault: chat still works; memory depth locked. |
 | **Open-note** | Enough note UI to open/edit a vault file from a tool hit or promote result — not full graph/onboarding parity. |
+| **Mycelium** | Rail destination **with Graph** (node map): agent **run footprint** on a repo — where the session searched/read/edited. Product name for the Mindwalk-class lens. v1 = BYO [Mindwalk](https://github.com/cosmtrek/mindwalk) (MIT) + Prime `ipython`/`%%bash` → paths bridge; not a rewrite of the citymap engine. Optional later fork/rebrand. Complements Graph (wiki links) and Changes (git). |
 
 ## Related docs
 
