@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { directionForCalloutMarkerText } from './richEditorTextDirection'
 
 describe('directionForCalloutMarkerText', () => {
-  it('uses the first strong RTL character after an Obsidian callout marker', () => {
+  it('uses the first strong RTL character after a callout marker', () => {
     expect(directionForCalloutMarkerText('[!note] כותרת חשובה')).toBe('rtl')
     expect(directionForCalloutMarkerText('[!warning]- مرحبا بالعالم')).toBe('rtl')
   })

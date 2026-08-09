@@ -93,7 +93,7 @@ function primeVaultSkillInstructions(agent?: AiAgentId, vaultPaths?: string[]): 
     return [
       'Prime vault tools: no Rhizome vault is attached.',
       'Chat freely, but do not invent vault search results.',
-      'Do not browse the user personal Obsidian vault (for example Documents/Obsidian Vault) unless they explicitly ask for that path.',
+      'Do not browse the user\'s personal notes vault (Claude Memory, session logs) unless they explicitly ask for that path.',
     ].join(' ')
   }
   const rootsList = roots.map((path) => `- ${path}`).join('\n')
@@ -102,7 +102,7 @@ function primeVaultSkillInstructions(agent?: AiAgentId, vaultPaths?: string[]): 
     `Active Rhizome vault root(s):\n${rootsList}`,
     'A project skill named rhizome-vault is seeded under the vault .prime/agent/skills/ directory.',
     'For vault search/read, prefer that skill CLI (VAULT_PATH + node .../cli-call.mjs search_notes|get_note|get_vault_context) over ad-hoc Python filesystem walks.',
-    'Do not treat the personal Obsidian vault (Claude Memory, Session Logs under Documents/Obsidian Vault) as the Rhizome wiki unless the user explicitly asks about that path.',
+    'Do not treat the user\'s personal notes vault (Claude Memory, Session Logs) as the Rhizome wiki unless they explicitly ask about that path.',
     'Do not save error strings, OAuth failures, or tooling glitches as vault notes.',
     'Save durable knowledge with create_note only when the user wants a lasting note (or Power mode allows writes).',
   ].join('\n')
