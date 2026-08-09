@@ -89,6 +89,7 @@ vi.mock('../utils/aiConversationTitle', () => ({
 function installedStatuses(): AiAgentsStatus {
   return {
     ...createMissingAiAgentsStatus(),
+    prime: createAiAgentAvailability('installed', '0.1.0'),
     claude_code: createAiAgentAvailability('installed', '1.0.0'),
     codex: createAiAgentAvailability('installed', '0.9.0'),
     antigravity: createAiAgentAvailability('missing', null),
@@ -172,14 +173,17 @@ describe('AiWorkspace', () => {
     generateTitleMock.mockReset()
     generateTitleMock.mockResolvedValue('Quarterly sponsor outreach')
     localStorage.clear()
+    // Deterministic side width/expand: opt out of chat-primary default expanded.
+    localStorage.setItem('ff_chat_primary_shell', 'false')
     resetVaultConfigStore()
   })
 
-  it('groups installed agents and configured local/API models', () => {
+  it('groups product-visible agents and configured local/API models', () => {
     const groups = buildAiWorkspaceTargetGroups(installedStatuses(), providers)
 
-    expect(groups.localAgents.map((target) => target.agent)).toEqual(['claude_code', 'codex'])
-    expect(groups.localAgents.some((target) => target.agent === 'antigravity')).toBe(false)
+    // Product UI is Prime-only; legacy CLIs stay hidden even if "installed".
+    expect(groups.localAgents.map((target) => target.agent)).toEqual(['prime'])
+    expect(groups.localAgents.some((target) => target.agent === 'claude_code')).toBe(false)
     expect(groups.localModels.map((target) => target.shortLabel)).toEqual(['Llama 3.2'])
     expect(groups.apiModels.map((target) => target.shortLabel)).toEqual(['GPT-4.1'])
   })
@@ -214,7 +218,7 @@ describe('AiWorkspace', () => {
     expect(workspace).toHaveAttribute('data-ai-workspace-expanded', 'false')
     expect(workspace).not.toHaveClass('fixed')
     expect(workspace).toHaveClass('bg-sidebar')
-    expect(workspace).toHaveStyle({ width: '320px', minWidth: '320px' })
+    expect(workspace).toHaveStyle({ width: '420px', minWidth: '320px' })
     const header = screen.getByTestId('ai-workspace-side-header')
     const tabStrip = screen.getByTestId('ai-workspace-side-tabs')
     expect(header).not.toHaveClass('border-b')
@@ -245,6 +249,15 @@ describe('AiWorkspace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Close AI workspace' }))
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  
+  it('chat-primary defaults the side workspace expanded', () => {
+    localStorage.setItem('ff_chat_primary_shell', 'true')
+    localStorage.removeItem('rhizome:ai-workspace-side-expanded')
+    render(<AiWorkspace open mode="side" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
+    expect(screen.getByTestId('ai-workspace')).toHaveAttribute('data-ai-workspace-expanded', 'true')
+    expect(screen.getByTestId('ai-workspace')).toHaveAttribute('data-chat-primary', 'true')
   })
 
   it('opens AI settings from the composer controls', () => {
@@ -361,12 +374,12 @@ describe('AiWorkspace', () => {
     fireEvent.mouseDown(screen.getByTestId('ai-workspace-left-resize'), { clientX: 100, clientY: 20 })
     fireEvent.mouseMove(window, { clientX: 40, clientY: 20 })
     fireEvent.mouseUp(window)
-    expect(workspace).toHaveStyle({ width: '380px' })
+    expect(workspace).toHaveStyle({ width: '480px' })
 
     unmount()
     render(<AiWorkspace open mode="side" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
 
-    expect(screen.getByTestId('ai-workspace')).toHaveStyle({ width: '380px' })
+    expect(screen.getByTestId('ai-workspace')).toHaveStyle({ width: '480px' })
   })
 
   it('separates the guidance warning from the header and uses a short restore action', () => {
@@ -529,8 +542,9 @@ describe('AiWorkspace', () => {
     expect(within(menu).getByText('Local agents')).toBeTruthy()
     expect(within(menu).getByText('Local models')).toBeTruthy()
     expect(within(menu).getByText('API models')).toBeTruthy()
-    expect(within(menu).getByText('Claude Code')).toBeTruthy()
-    expect(within(menu).getByText('Codex')).toBeTruthy()
+    expect(within(menu).getByText('Prime Agent')).toBeTruthy()
+    expect(within(menu).queryByText('Claude Code')).toBeNull()
+    expect(within(menu).queryByText('Codex')).toBeNull()
     expect(within(menu).queryByText('Antigravity CLI')).toBeNull()
     expect(within(menu).getByText('Ollama · Llama 3.2')).toBeTruthy()
     expect(within(menu).getByText('OpenAI · GPT-4.1')).toBeTruthy()
@@ -552,8 +566,8 @@ describe('AiWorkspace', () => {
 
     await waitFor(() => {
       expect(onActiveTargetChange).toHaveBeenCalledWith(expect.objectContaining({
-        agent: 'claude_code',
-        id: 'agent:claude_code',
+        agent: 'prime',
+        id: 'agent:prime',
         kind: 'agent',
       }))
     })
@@ -564,13 +578,12 @@ describe('AiWorkspace', () => {
       fireEvent.keyDown(trigger, { key: 'ArrowDown' })
     })
     const menu = await screen.findByRole('menu')
-    fireEvent.click(within(menu).getByRole('menuitemradio', { name: /Codex/i }))
+    fireEvent.click(within(menu).getByRole('menuitemradio', { name: /Llama 3\.2/i }))
 
     await waitFor(() => {
       expect(onActiveTargetChange).toHaveBeenLastCalledWith(expect.objectContaining({
-        agent: 'codex',
-        id: 'agent:codex',
-        kind: 'agent',
+        kind: 'api_model',
+        shortLabel: 'Llama 3.2',
       }))
     })
   })
@@ -583,7 +596,7 @@ describe('AiWorkspace', () => {
         mode="docked"
         aiAgentsStatus={installedStatuses()}
         aiModelProviders={[]}
-        defaultAiAgent="codex"
+        defaultAiAgent="prime"
         vaultPath="/tmp/vault"
         onActiveTargetChange={onActiveTargetChange}
         onClose={vi.fn()}
@@ -594,8 +607,8 @@ describe('AiWorkspace', () => {
       expect(onActiveTargetChange).toHaveBeenCalledTimes(1)
     })
     expect(onActiveTargetChange).toHaveBeenLastCalledWith(expect.objectContaining({
-      agent: 'codex',
-      id: 'agent:codex',
+      agent: 'prime',
+      id: 'agent:prime',
       kind: 'agent',
     }))
 
@@ -606,7 +619,7 @@ describe('AiWorkspace', () => {
           mode="docked"
           aiAgentsStatus={installedStatuses()}
           aiModelProviders={[]}
-          defaultAiAgent="codex"
+          defaultAiAgent="prime"
           vaultPath="/tmp/vault"
           onActiveTargetChange={onActiveTargetChange}
           onClose={vi.fn()}
@@ -649,7 +662,7 @@ describe('AiWorkspace', () => {
       assistantResponse: 'The next step is to follow up with the sponsor pipeline.',
       permissionMode: 'safe',
       prompt: 'summarize quarterly sponsor outreach',
-      target: expect.objectContaining({ kind: 'agent', agent: 'claude_code' }),
+      target: expect.objectContaining({ kind: 'agent', agent: 'prime' }),
       targetReady: true,
       vaultPath: '/tmp/vault',
     }))

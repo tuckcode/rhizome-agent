@@ -2,6 +2,19 @@
 
 Living doc. Update in place each session. This file is "what's true right now," not a history log. Detailed per-session records go in `docs/plans/*-session-status.md`.
 
+## Session handoff — 2026-08-09 (UI-2 chat-primary slice)
+
+**Shipped**
+- Feature flag `chat_primary_shell` (default ON): side AI workspace starts **expanded** (fills editor column); user restore/expand persisted
+- Default side width 420; fix stored-width reader so missing localStorage does not clamp to MIN (Number(null)===0 bug)
+- role=main when expanded; data-chat-primary marker
+
+**Dogfood:** launch → chat open + expanded over editor; header "Restore panel" to rail width; Mycelium still on rail.
+
+**Next:** fuller chat-primary (collapse vault chrome by default); Open Design mocks optional.
+
+---
+
 ## Session handoff — 2026-08-09 (chat default-open + Phase 3 closed)
 
 **Shipped**

@@ -255,6 +255,8 @@ export function updatePostHogIdentify(releaseChannel: ReleaseChannel): void {
  */
 const FEATURE_DEFAULTS: Record<string, boolean> = {
   shell_command_rail: true,
+  /** Agent v0: conversation fills the editor column by default (expandable side workspace). */
+  chat_primary_shell: true,
 }
 
 let currentReleaseChannel: ReleaseChannel = 'stable'
