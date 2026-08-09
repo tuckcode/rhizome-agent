@@ -6,6 +6,16 @@ Living doc. Update in place each session. This file is "what's true right now," 
 
 **This is `tuckcode/rhizome-agent` (private), not `knispo/rhizome`.** See `docs/IDENTITY.md`. Desktop history below is inherited from the Option C bootstrap snapshot and is useful background; product direction here is Prime harness chat.
 
+## Session handoff — 2026-08-09 (Mycelium named)
+
+**Product:** **Mycelium** = agent run footprint lens on the command rail **with Graph** (node map).  
+Mindwalk (MIT) as engine; Prime-on-Pi sessions already parse; need `ipython`/`%%bash` bridge for glow.  
+Track: `docs/plans/2026-08-09-mycelium-run-map.md`. Parallel to memory loop — does not block #3 promote/save.
+
+**Also locked:** No Safe/Power product mode for circle v0 — default toolkit + install more skills.
+
+---
+
 ## Session handoff — 2026-08-09 (Prime dogfood PASS + UI chrome)
 
 **Dogfood (vault tools / session) — COMPLETE PASS**
