@@ -370,6 +370,7 @@ mod tests {
         assert!(!is_junk_distill_title("Event Sourcing"));
     }
 
+    #[test]
     fn falls_back_to_untitled_when_response_is_empty() {
         let card = parse_agent_response("   \n  \n");
         assert_eq!(card.title, "Untitled");

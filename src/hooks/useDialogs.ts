@@ -5,6 +5,7 @@ export function useDialogs() {
   const [showCreateTypeDialog, setShowCreateTypeDialog] = useState(false)
   const [showQuickOpen, setShowQuickOpen] = useState(false)
   const [showCommandPalette, setShowCommandPalette] = useState(false)
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showCloneVault, setShowCloneVault] = useState(false)
@@ -19,6 +20,8 @@ export function useDialogs() {
   const closeQuickOpen = useCallback(() => setShowQuickOpen(false), [])
   const openCommandPalette = useCallback(() => setShowCommandPalette(true), [])
   const closeCommandPalette = useCallback(() => setShowCommandPalette(false), [])
+  const openKeyboardShortcuts = useCallback(() => setShowKeyboardShortcuts(true), [])
+  const closeKeyboardShortcuts = useCallback(() => setShowKeyboardShortcuts(false), [])
   const openSettings = useCallback(() => setShowSettings(true), [])
   const closeSettings = useCallback(() => setShowSettings(false), [])
   const openCloneVault = useCallback(() => setShowCloneVault(true), [])
@@ -41,6 +44,7 @@ export function useDialogs() {
     showCreateTypeDialog, openCreateType, closeCreateType,
     showQuickOpen, openQuickOpen, closeQuickOpen,
     showCommandPalette, openCommandPalette, closeCommandPalette,
+    showKeyboardShortcuts, openKeyboardShortcuts, closeKeyboardShortcuts,
     showAIChat, openAIChat, closeAIChat, toggleAIChat,
     showSettings, openSettings, closeSettings,
     showCloneVault, openCloneVault, closeCloneVault,

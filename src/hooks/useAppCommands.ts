@@ -26,6 +26,7 @@ interface AppCommandsConfig {
   selection: SidebarSelection
   onQuickOpen: () => void
   onCommandPalette: () => void
+  onKeyboardShortcuts?: () => void
   onSearch: () => void
   onFindInNote?: () => void
   onUndo?: () => void
@@ -281,6 +282,7 @@ function createKeyboardActions(
   return {
     onQuickOpen: config.onQuickOpen,
     onCommandPalette: config.onCommandPalette,
+    onKeyboardShortcuts: config.onKeyboardShortcuts,
     onSearch: config.onSearch,
     onFindInNote: config.onFindInNote,
     onReplaceInNote: config.onReplaceInNote,
@@ -366,6 +368,7 @@ function createMenuEventActionHandlers(
     onOpenSettings: config.onOpenSettings,
     onToggleInspector: config.onToggleInspector,
     onCommandPalette: config.onCommandPalette,
+    onKeyboardShortcuts: config.onKeyboardShortcuts,
     onZoomIn: config.onZoomIn,
     onZoomOut: config.onZoomOut,
     onZoomReset: config.onZoomReset,

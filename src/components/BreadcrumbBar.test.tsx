@@ -245,6 +245,23 @@ describe('BreadcrumbBar — archive/unarchive', () => {
   })
 })
 
+describe('BreadcrumbBar — reload vault', () => {
+  it('shows a reload control when onReloadVault is provided', () => {
+    const onReloadVault = vi.fn()
+    renderBreadcrumb({}, { onReloadVault })
+
+    const button = screen.getByTestId('breadcrumb-reload-vault')
+    fireEvent.click(button)
+
+    expect(onReloadVault).toHaveBeenCalledTimes(1)
+  })
+
+  it('hides the reload control when onReloadVault is omitted', () => {
+    renderBreadcrumb()
+    expect(screen.queryByTestId('breadcrumb-reload-vault')).toBeNull()
+  })
+})
+
 describe('BreadcrumbBar — file actions', () => {
   it('reveals the current file from the breadcrumb toolbar', () => {
     const onRevealFile = vi.fn()

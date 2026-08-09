@@ -34,6 +34,7 @@ type BreadcrumbActions = Pick<
   | 'onToggleOrganized'
   | 'onEnterNeighborhood'
   | 'onRevealFile'
+  | 'onReloadVault'
   | 'onCopyFilePath'
   | 'onCopyDeepLink'
   | 'onCopyGitUrl'
@@ -192,6 +193,7 @@ function ActiveTabBreadcrumb({
       onToggleOrganized={bindPath(actions.onToggleOrganized, path)}
       onEnterNeighborhood={actions.onEnterNeighborhood}
       onRevealFile={actions.onRevealFile}
+      onReloadVault={actions.onReloadVault}
       onCopyFilePath={actions.onCopyFilePath}
       onCopyDeepLink={actions.onCopyDeepLink}
       onCopyGitUrl={actions.onCopyGitUrl}
@@ -260,6 +262,7 @@ function buildBreadcrumbActions(model: EditorContentModel): BreadcrumbActions {
     onToggleOrganized: model.onToggleOrganized,
     onEnterNeighborhood: model.onEnterNeighborhood,
     onRevealFile: model.onRevealFile,
+    onReloadVault: model.onReloadVault,
     onCopyFilePath: model.onCopyFilePath,
     onCopyDeepLink: model.onCopyDeepLink,
     onCopyGitUrl: model.onCopyGitUrl,

@@ -42,6 +42,7 @@ export interface EditorContentProps {
   onToggleOrganized?: (path: string) => void
   onEnterNeighborhood?: (entry: VaultEntry) => void
   onRevealFile?: (path: string) => void
+  onReloadVault?: () => void
   onCopyFilePath?: (path: string) => void
   onCopyDeepLink?: (entry: VaultEntry) => void
   onCopyGitUrl?: (entry: VaultEntry) => void

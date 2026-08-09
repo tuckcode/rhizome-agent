@@ -8,6 +8,7 @@ import { CreateTypeDialog } from './components/CreateTypeDialog'
 import { CreateViewDialog } from './components/CreateViewDialog'
 import { QuickOpenPalette } from './components/QuickOpenPalette'
 import { CommandPalette } from './components/CommandPalette'
+import { KeyboardShortcutsDialog } from './components/KeyboardShortcutsDialog'
 import { SearchPanel } from './components/SearchPanel'
 import { Toast } from './components/Toast'
 import { CommitDialog } from './components/CommitDialog'
@@ -1310,6 +1311,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     dialogs.showCreateTypeDialog
     || dialogs.showQuickOpen
     || dialogs.showCommandPalette
+    || dialogs.showKeyboardShortcuts
     || effectiveShowAIChat
     || dialogs.showSettings
     || dialogs.showCloneVault
@@ -1512,6 +1514,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     activeNoteModified,
     selection: effectiveSelection,
     onQuickOpen: dialogs.openQuickOpen, onCommandPalette: dialogs.openCommandPalette,
+    onKeyboardShortcuts: dialogs.openKeyboardShortcuts,
     onSearch: dialogs.openSearch,
     onFindInNote: findInNoteCommand,
     onReplaceInNote: activeDeletedFile ? undefined : replaceInNoteCommand,
@@ -1784,6 +1787,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               onToggleOrganized={activeDeletedFile || !explicitOrganizationEnabled ? undefined : toggleOrganizedCommand}
               onEnterNeighborhood={activeDeletedFile ? undefined : handleEnterNeighborhood}
               onRevealFile={fileActions.revealFile}
+              onReloadVault={handleManualVaultReload}
               onCopyFilePath={fileActions.copyFilePath}
               onCopyDeepLink={activeDeletedFile ? undefined : deepLinks.copyEntryDeepLink}
               onCopyGitUrl={activeDeletedFile || !activeTabEntry || !noteGitUrls.canCopyEntryGitUrl(activeTabEntry) ? undefined : noteGitUrls.copyEntryGitUrl}
@@ -1849,6 +1853,14 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           aiPromptTargetId={quickPromptTarget.id}
           locale={appLocale}
           onClose={dialogs.closeCommandPalette}
+        />
+        <KeyboardShortcutsDialog
+          open={dialogs.showKeyboardShortcuts}
+          onOpenChange={(open) => {
+            if (open) dialogs.openKeyboardShortcuts()
+            else dialogs.closeKeyboardShortcuts()
+          }}
+          locale={appLocale}
         />
         <SearchPanel open={dialogs.showSearch} vaultPath={resolvedPath} entries={visibleEntries} onSelectNote={notes.handleSelectNote} onClose={dialogs.closeSearch} />
         <CreateTypeDialog open={dialogs.showCreateTypeDialog} onClose={dialogs.closeCreateType} onCreate={handleCreateType} />

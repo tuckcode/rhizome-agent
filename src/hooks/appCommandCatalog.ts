@@ -195,6 +195,7 @@ const MENU_LABEL_KEYS = {
   'Zoom Out': 'menu.view.zoomOut',
   'Actual Size': 'menu.view.actualSize',
   'Command Palette': 'menu.view.commandPalette',
+  'Keyboard Shortcuts': 'menu.view.keyboardShortcuts',
   'All Notes': 'menu.go.allNotes',
   Archived: 'menu.go.archived',
   Changes: 'menu.go.changes',
