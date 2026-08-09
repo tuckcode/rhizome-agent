@@ -168,8 +168,8 @@ describe('streamAiAgent', () => {
     expect(invokeMock).toHaveBeenCalledWith('stream_prime_session', {
       request: expect.objectContaining({
         message: 'Hello',
-        vault_path: '',
-        event_name: listenedEventName,
+        vaultPath: '',
+        eventName: listenedEventName,
       }),
     })
     expect(callbacks.onText).toHaveBeenCalledWith('hi from prime')
