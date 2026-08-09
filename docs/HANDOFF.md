@@ -2,6 +2,35 @@
 
 Living doc. Update in place each session. This file is "what's true right now," not a history log. Detailed per-session records go in `docs/plans/*-session-status.md`.
 
+## Rhizome Agent — identity
+
+**This is `tuckcode/rhizome-agent` (private), not `knispo/rhizome`.** See `docs/IDENTITY.md`. Desktop history below is inherited from the Option C bootstrap snapshot and is useful background; product direction here is Prime harness chat.
+
+## Session handoff — 2026-08-09 (Prime RPC session-host spike)
+
+**Done**
+- `pnpm install` clean on this machine.
+- Slice 1 of `docs/plans/2026-08-09-prime-harness-chat-spike.md`: long-lived `prime-agent --mode rpc` host.
+  - `src-tauri/src/prime_discovery.rs` — binary discovery (`prime-agent` on PATH + common install locations).
+  - `src-tauri/src/prime_events.rs` — RPC event → `AiAgentStreamEvent` (same shapes as Pi for text/thinking/tools).
+  - `src-tauri/src/prime_session_host.rs` — spawn once, JSONL stdin/stdout, prompt / abort / new_session, multi-turn.
+  - Tauri commands registered: `get_prime_session_host_status`, `ensure_prime_session_host`, `shutdown_prime_session_host`, `prime_session_new_session`, `abort_prime_session_turn`, `stream_prime_session`.
+- Tests: `cargo test --lib prime_` → 9 passed. Live smoke against installed `prime-agent` (`get_state` + `abort`) OK; local default model observed as xAI `grok-4.5`.
+
+**Next**
+1. Frontend AI target “Prime” that calls `stream_prime_session` (multi-turn, same host).
+2. Do not store API keys in app settings — rely on `~/.prime` OAuth/login.
+3. Rhizome MCP injection + Safe/Power tool policy.
+4. Only then prune unused desktop panels.
+
+**Not done / out of scope this session**
+- No frontend wiring, no MCP injection, no DMG bundling of Node/Prime.
+- Codacy: not run — no MCP tool, no `.codacy/` directory in this session.
+- Localization: no UI copy changes.
+- PostHog: no event needed (backend host only).
+
+---
+
 ## Session handoff — 2026-08-02
 
 **Pushing is still blocked — GitHub account `knispo` is suspended (appeal filed 2026-07-31, not yet resolved).** SSH auth itself succeeds (`ssh -T` → "Hi knispo!"); it's an account-level block, so `git push` is refused and `api.github.com/users/knispo` + the repo both 404 to anonymous callers (expected hide). The `gh` CLI's "token in keyring is invalid" is *downstream* of the suspension — don't burn time re-authing it. Commit locally as normal; only push and CI are blocked.
