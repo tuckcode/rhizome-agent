@@ -43,15 +43,17 @@ Not v0: second full wiki/PKM product; multi-CLI agent matrix as product; silent 
 
 On a machine that can install the app + Prime (BYO):
 
-- [ ] Multi-turn Prime chat in-app (same long-lived host; abort + new session)  
-- [ ] Auth/models via `~/.prime` (no app-stored provider API keys)  
-- [ ] At least one skill/extension path works and is visible enough to trust  
-- [ ] Clear “agent working / tools running” status  
-- [ ] Attach vault → search/read via tools  
-- [ ] **Save or promote one durable note into the vault and reopen it**  
-- [ ] Open-note from a tool/promote result  
-- [ ] Default vault toolkit seeded; no mandatory Power toggle (circle v0)  
-- [ ] Other agent backends not offered in UI  
+- [x] Multi-turn Prime chat in-app (same long-lived host; abort + new session) — eng shipped + dogfood PASS (`8ae177e`, session status 03:49)  
+- [x] Auth/models via `~/.prime` (no app-stored provider API keys) — settings pruned; posture documented (§8 P1-3)  
+- [x] At least one skill/extension path works and is visible enough to trust — `rhizome-vault` skill + Skills chip (`204822a`)  
+- [x] Clear “agent working / tools running” status — status + model chrome (`73b2676`, dogfood PASS)  
+- [x] Attach vault → search/read via tools — vault CLI tools PASS in dogfood  
+- [x] **Save or promote one durable note into the vault and reopen it** — `2381f68` (+ tests)  
+- [x] Open-note from a tool/promote result — `e2cd77f` (+ tests)  
+- [x] Default vault toolkit seeded; no mandatory Power toggle (circle v0) — `2381f68`, chrome `204822a`  
+- [x] Other agent backends not offered in UI — Prime-only product picker (`204822a`/`fa230a6`)  
+
+> **2026-08-09 refresh:** all 9 eng criteria shipped. Remaining sign-off = one **native** (`pnpm tauri dev`) pass of the promote→open loop by the user (on their machine, BYO Prime). Packaging phase exit (bundled runtime) is separate — see §8 P4b.
 
 **Packaging phase exit (later):** same loop with **bundled** Prime/runtime (no CLI install for friends).
 
@@ -70,7 +72,7 @@ On a machine that can install the app + Prime (BYO):
 
 **Outcome:** Daily multi-turn Prime chat is the product center.
 
-**Status (2026-08-09):** Eng wiring landed — Prime default target, stream/abort routed to session host, legacy backends hidden from product picker. Native dogfood still recommended (`pnpm tauri dev`).
+**Status (2026-08-09 refresh):** ENG COMPLETE — Prime default target, stream/abort/new-session, Prime-only picker, auth posture documented. Remaining: native dogfood sign-off.
 
 Eng (under this phase):
 
@@ -85,6 +87,8 @@ Eng (under this phase):
 
 **Outcome:** Feels like a harness desktop, not a thin RPC pipe.
 
+**Status (2026-08-09 refresh):** Skills chip + rhizome-vault toolkit shipped (`204822a`/`2381f68`); working status + model display chrome (`73b2676`). Remaining: in-app model picker, host hardening (reconnect/cwd/vault-switch policy). 
+
 Eng:
 
 1. Skills/extensions discovery from user/project Prime paths  
@@ -95,6 +99,8 @@ Eng:
 ### Phase 3 — Vault-aware memory
 
 **Outcome:** Memory loop is real.
+
+**Status (2026-08-09 refresh):** ENG COMPLETE for circle v0 — MCP via skill+CLI (`88b0fe0`, GH #1 documents why not host HTTP), promote (`2381f68`), open-note (`e2cd77f`); Safe/Power replaced by default-toolkit decision (product principle #5). Vault chrome retained for open/edit.
 
 Eng:
 
@@ -179,6 +185,7 @@ Track in issues / tickets when executing — already decided enough to build:
 | Date | Change |
 |------|--------|
 | 2026-08-09 | Initial brief + roadmap from grill-with-docs (Q1–Q30 locked). |
+| 2026-08-09 | Status refresh: all 9 v0 exit criteria eng-shipped (`2381f68`→`056cb75`); phases 1+3 eng complete. |
 
 ## Mycelium (named 2026-08-09)
 
