@@ -66,6 +66,7 @@ interface BreadcrumbBarProps {
   onArchive?: () => void
   onUnarchive?: () => void
   onEnterNeighborhood?: (entry: VaultEntry) => void
+  onReloadVault?: () => void
   onRenameFilename?: (path: string, newFilenameStem: string) => void
   noteWidth?: NoteWidthMode
   onToggleNoteWidth?: () => void
@@ -843,6 +844,7 @@ function BreadcrumbActions({
   onArchive,
   onUnarchive,
   onEnterNeighborhood,
+  onReloadVault,
   actionsRef,
   overflowCollapsed,
   locale = 'en',
@@ -859,6 +861,18 @@ function BreadcrumbActions({
     >
       <FavoriteAction favorite={entry.favorite} locale={locale} onToggleFavorite={onToggleFavorite} />
       <OrganizedAction organized={entry.organized} locale={locale} onToggleOrganized={onToggleOrganized} />
+      {onReloadVault && (
+        <IconActionButton
+          copy={{
+            label: translate(locale, 'editor.toolbar.reloadVault'),
+            shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.vaultReload) ?? formatShortcutDisplay({ display: '⌘⇧R' }),
+          }}
+          onClick={onReloadVault}
+          testId="breadcrumb-reload-vault"
+        >
+          <ArrowsClockwise size={16} className={BREADCRUMB_ICON_CLASS} />
+        </IconActionButton>
+      )}
       <OverflowToolbarAction>
         <NeighborhoodAction entry={entry} locale={locale} onEnterNeighborhood={onEnterNeighborhood} />
       </OverflowToolbarAction>

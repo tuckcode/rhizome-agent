@@ -40,6 +40,7 @@ function makeHandlers(): AppCommandHandlers {
     onOpenSettings: vi.fn(),
     onToggleInspector: vi.fn(),
     onCommandPalette: vi.fn(),
+    onKeyboardShortcuts: vi.fn(),
     onZoomIn: vi.fn(),
     onZoomOut: vi.fn(),
     onZoomReset: vi.fn(),
@@ -363,3 +364,44 @@ describe('appCommandDispatcher', () => {
     expect(handlers.onGoBack).not.toHaveBeenCalled()
   })
 })
+
+describe('keyboard shortcuts and reload vault commands', () => {
+  it('dispatches onKeyboardShortcuts for view-keyboard-shortcuts', () => {
+    const handlers = makeHandlers()
+    expect(executeAppCommand(APP_COMMAND_IDS.viewKeyboardShortcuts, handlers, 'renderer-keyboard')).toBe(true)
+    expect(handlers.onKeyboardShortcuts).toHaveBeenCalledTimes(1)
+  })
+
+  it('dispatches onReloadVault for vault-reload', () => {
+    const handlers = makeHandlers()
+    expect(executeAppCommand(APP_COMMAND_IDS.vaultReload, handlers, 'renderer-keyboard')).toBe(true)
+    expect(handlers.onReloadVault).toHaveBeenCalledTimes(1)
+  })
+
+  it('matches Cmd+/ to keyboard shortcuts on mac', () => {
+    setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')
+    const event = {
+      key: '/',
+      code: 'Slash',
+      metaKey: true,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+    } as KeyboardEvent
+    expect(findShortcutCommandIdForEvent(event)).toBe(APP_COMMAND_IDS.viewKeyboardShortcuts)
+  })
+
+  it('matches Cmd+Shift+R to vault reload on mac', () => {
+    setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')
+    const event = {
+      key: 'r',
+      code: 'KeyR',
+      metaKey: true,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: true,
+    } as KeyboardEvent
+    expect(findShortcutCommandIdForEvent(event)).toBe(APP_COMMAND_IDS.vaultReload)
+  })
+})
+

@@ -929,5 +929,19 @@
   "locale.beLatn": "벨라루스어 (라틴 문자)",
   "locale.idID": "인도네시아 공화국",
   "locale.ukUA": "우크라이나어",
-  "locale.svSE": "스웨덴어"
+  "locale.svSE": "스웨덴어",
+  "command.view.keyboardShortcuts": "Keyboard Shortcuts",
+  "menu.view.keyboardShortcuts": "Keyboard Shortcuts",
+  "shortcuts.title": "Keyboard shortcuts",
+  "shortcuts.description": "Common shortcuts for Rhizome Agent. Open the command palette for the full list.",
+  "shortcuts.close": "Close",
+  "shortcuts.group.file": "File",
+  "shortcuts.group.edit": "Edit",
+  "shortcuts.group.view": "View",
+  "shortcuts.group.note": "Note",
+  "shortcuts.group.vault": "Vault",
+  "shortcuts.group.go": "Go",
+  "shortcuts.group.search": "Search",
+  "editor.toolbar.reloadVault": "Reload vault",
+  "editor.toolbar.reloadVaultShortcut": "⌘⇧R"
 }

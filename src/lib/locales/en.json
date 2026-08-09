@@ -1105,5 +1105,19 @@
   "ai.panel.status.working": "{agent} · working…",
   "ai.panel.status.tools": "{agent} · running tools…",
   "ai.panel.status.error": "{agent} · error",
-  "ai.panel.status.readyWithModel": "{agent} · {mode} · {model}"
+  "ai.panel.status.readyWithModel": "{agent} · {mode} · {model}",
+  "command.view.keyboardShortcuts": "Keyboard Shortcuts",
+  "menu.view.keyboardShortcuts": "Keyboard Shortcuts",
+  "shortcuts.title": "Keyboard shortcuts",
+  "shortcuts.description": "Common shortcuts for Rhizome Agent. Open the command palette for the full list.",
+  "shortcuts.close": "Close",
+  "shortcuts.group.file": "File",
+  "shortcuts.group.edit": "Edit",
+  "shortcuts.group.view": "View",
+  "shortcuts.group.note": "Note",
+  "shortcuts.group.vault": "Vault",
+  "shortcuts.group.go": "Go",
+  "shortcuts.group.search": "Search",
+  "editor.toolbar.reloadVault": "Reload vault",
+  "editor.toolbar.reloadVaultShortcut": "⌘⇧R"
 }

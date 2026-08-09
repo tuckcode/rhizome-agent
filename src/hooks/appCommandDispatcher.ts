@@ -36,6 +36,7 @@ export interface AppCommandHandlers {
   onOpenSettings: () => void
   onToggleInspector: () => void
   onCommandPalette: () => void
+  onKeyboardShortcuts?: () => void
   onZoomIn: () => void
   onZoomOut: () => void
   onZoomReset: () => void
@@ -96,6 +97,7 @@ type SimpleHandlerKey = keyof Pick<
   | 'onToggleTableOfContents'
   | 'onExportNoteAsPdf'
   | 'onCommandPalette'
+  | 'onKeyboardShortcuts'
   | 'onZoomIn'
   | 'onZoomOut'
   | 'onZoomReset'
@@ -144,6 +146,7 @@ const SIMPLE_HANDLER_EXECUTORS: readonly [SimpleHandlerKey, SimpleHandlerExecuto
   ['onToggleTableOfContents', (handlers) => handlers.onToggleTableOfContents?.()],
   ['onExportNoteAsPdf', (handlers) => handlers.onExportNoteAsPdf?.()],
   ['onCommandPalette', (handlers) => handlers.onCommandPalette()],
+  ['onKeyboardShortcuts', (handlers) => handlers.onKeyboardShortcuts?.()],
   ['onZoomIn', (handlers) => handlers.onZoomIn()],
   ['onZoomOut', (handlers) => handlers.onZoomOut()],
   ['onZoomReset', (handlers) => handlers.onZoomReset()],

@@ -66,6 +66,7 @@ const STATIC_LABEL_KEYS: Partial<Record<string, TranslationKey>> = {
   'remove-vault': 'command.settings.removeVault',
   'restore-getting-started': 'command.settings.restoreGettingStarted',
   'reload-vault': 'command.settings.reloadVault',
+  'view-keyboard-shortcuts': 'command.view.keyboardShortcuts',
   'repair-vault': 'command.settings.repairVault',
   'use-light-mode': 'command.settings.useLightMode',
   'use-dark-mode': 'command.settings.useDarkMode',

@@ -12,6 +12,7 @@ export type KeyboardActions = Pick<
   AppCommandHandlers,
   | 'onQuickOpen'
   | 'onCommandPalette'
+  | 'onKeyboardShortcuts'
   | 'onSearch'
   | 'onCreateNote'
   | 'onSave'
