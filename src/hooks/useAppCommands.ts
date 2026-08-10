@@ -192,6 +192,7 @@ type CommandRegistryCoreActions = Pick<
   | 'onToggleInspector'
   | 'onToggleDiff'
   | 'onToggleRawEditor'
+  | 'onKeyboardShortcuts'
   | 'selectedViewName'
   | 'onMoveSelectedViewUp'
   | 'onMoveSelectedViewDown'
@@ -357,6 +358,7 @@ function createMenuEventActionHandlers(
   | 'onGoBack'
   | 'onGoForward'
   | 'onCheckForUpdates'
+  | 'onKeyboardShortcuts'
   | 'onSelectFilter'
 > {
   return {
