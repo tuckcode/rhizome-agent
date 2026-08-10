@@ -771,7 +771,7 @@ function SideAiWorkspaceLayout({
 
   return (
     <section
-      className={workspaceClassName('side', expanded)}
+      className={workspaceClassName('side')}
       style={workspaceStyle('side', sizing.workspaceSize, expanded)}
       data-testid="ai-workspace"
       data-ai-workspace-mode="side"

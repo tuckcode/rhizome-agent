@@ -14,6 +14,12 @@ const DEFAULT_DOCKED_WORKSPACE_SIZE = { height: 540, width: 560 }
 const MIN_DOCKED_WORKSPACE_SIZE = { height: 360, width: 460 }
 const DEFAULT_SIDE_WORKSPACE_WIDTH = 420
 const MIN_SIDE_WORKSPACE_WIDTH = 320
+/**
+ * Chat-primary share of the shell. DESIGN.md §5: "Conversation owns >=55%
+ * width; note split is secondary, never full takeover." 60% keeps chat
+ * clearly primary while leaving the editor a usable 40% column.
+ */
+const CHAT_PRIMARY_WIDTH = '60%'
 /** Soft default for chat-primary interim (narrow rail still allowed via resize). */
 const SIDE_WORKSPACE_WIDTH_STORAGE_KEY = 'rhizome:ai-workspace-side-width'
 const DEFAULT_SIDEBAR_WIDTH = 168
@@ -58,11 +64,11 @@ function writeStoredSideWorkspaceWidth(width: number): void {
   }
 }
 
-export function workspaceClassName(mode: AiWorkspaceMode, expanded = false): string {
+export function workspaceClassName(mode: AiWorkspaceMode): string {
   if (mode === 'side') {
     return cn(
       'z-20 flex h-full min-h-0 overflow-hidden border-l border-sidebar-border bg-sidebar text-sidebar-foreground',
-      expanded ? 'absolute inset-0 border-l-0' : 'relative shrink-0',
+      'relative shrink-0',
     )
   }
 
@@ -80,7 +86,9 @@ export function workspaceStyle(
 ): CSSProperties | undefined {
   if (mode === 'window') return undefined
   if (mode === 'side') {
-    if (expanded) return undefined
+    // Expanded takes a bounded majority share, never the whole parent — the
+    // editor column stays in flow and reachable.
+    if (expanded) return { minWidth: MIN_SIDE_WORKSPACE_WIDTH, width: CHAT_PRIMARY_WIDTH }
     return {
       minWidth: MIN_SIDE_WORKSPACE_WIDTH,
       width: size.width,
