@@ -3,7 +3,11 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { SettingsPanel } from './SettingsPanel'
 import type { Settings } from '../types'
 import { THEME_MODE_STORAGE_KEY } from '../lib/themeMode'
-import type { AiAgentsStatus } from '../lib/aiAgents'
+import {
+  createAiAgentAvailability,
+  createMissingAiAgentsStatus,
+  type AiAgentsStatus,
+} from '../lib/aiAgents'
 import type { VaultOption } from './StatusBar'
 
 const { trackEventMock } = vi.hoisted(() => ({
@@ -133,12 +137,10 @@ describe('SettingsPanel', () => {
 
   it('separates local agents, local models, and API models in AI settings', async () => {
     const aiAgentsStatus: AiAgentsStatus = {
-      claude_code: { status: 'installed', version: '2.1.18' },
-      codex: { status: 'missing', version: null },
-      opencode: { status: 'missing', version: null },
-      pi: { status: 'missing', version: null },
-      antigravity: { status: 'missing', version: null },
-      kiro: { status: 'missing', version: null },
+      ...createMissingAiAgentsStatus(),
+      prime: createAiAgentAvailability('installed', '2.1.18'),
+      // Legacy backends stay probe-only — they must not surface in settings.
+      claude_code: createAiAgentAvailability('installed', '1.0.20'),
     }
     render(
       <SettingsPanel
@@ -151,8 +153,9 @@ describe('SettingsPanel', () => {
     )
 
     expect(screen.getByText('Recognized local agents')).toBeInTheDocument()
-    expect(screen.getByText('Claude Code')).toBeInTheDocument()
+    expect(screen.getByText('Prime Agent')).toBeInTheDocument()
     expect(screen.getByText('2.1.18')).toBeInTheDocument()
+    expect(screen.queryByText('Claude Code')).not.toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Local model' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'API model' })).toBeInTheDocument()
 
@@ -702,7 +705,7 @@ describe('SettingsPanel', () => {
     fireEvent.keyDown(trigger, { key: 'ArrowDown', code: 'ArrowDown' })
 
     expect(document.querySelector('[data-anchor-strategy="popper"]')).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: /Codex/i })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Prime Agent/i })).toBeInTheDocument()
   })
 
   it('treats a legacy beta release channel as stable', () => {
@@ -1005,7 +1008,7 @@ describe('SettingsPanel', () => {
     act(() => {
       fireEvent.pointerDown(screen.getByTestId('settings-default-ai-agent'), { button: 0, pointerType: 'mouse' })
     })
-    const option = screen.getByRole('option', { name: /Codex/i })
+    const option = screen.getByRole('option', { name: /Prime Agent/i })
     act(() => {
       option.focus()
     })
