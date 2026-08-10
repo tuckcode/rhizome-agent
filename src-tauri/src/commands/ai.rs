@@ -374,6 +374,25 @@ pub fn get_prime_session_host_status() -> crate::prime_session_host::PrimeHostSt
 
 #[cfg(desktop)]
 #[tauri::command]
+pub fn get_prime_session_stats() -> Result<crate::prime_session_host::PrimeSessionStats, String> {
+    crate::prime_session_host::get_session_stats()
+}
+
+/// Compact now. Returns tokens held before compaction when Prime reports it.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn compact_prime_session(custom_instructions: Option<String>) -> Result<Option<u64>, String> {
+    crate::prime_session_host::compact(custom_instructions)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn set_prime_auto_compaction(enabled: bool) -> Result<(), String> {
+    crate::prime_session_host::set_auto_compaction(enabled)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
 pub fn ensure_prime_session_host(vault_path: String) -> Result<String, String> {
     let vault_path = expand_tilde(&vault_path).into_owned();
     crate::prime_session_host::ensure_host(&vault_path)

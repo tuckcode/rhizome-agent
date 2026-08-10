@@ -89,6 +89,16 @@ pub enum AiAgentStreamEvent {
     Error {
         message: String,
     },
+    /// Context compaction. `phase` is "start" | "end" | "aborted". Emitted so a
+    /// long session never loses context silently — the transcript can show
+    /// what happened and roughly how much was compacted.
+    Compaction {
+        phase: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tokens_before: Option<u64>,
+    },
     Done,
 }
 
