@@ -41,6 +41,7 @@ function createCallbacks() {
     onToolStart: vi.fn(),
     onToolDone: vi.fn(),
     onError: vi.fn(),
+    onCompaction: vi.fn(),
     onDone: vi.fn(),
   }
 }
@@ -318,5 +319,27 @@ describe('streamAiAgent', () => {
     expect(first.onText).not.toHaveBeenCalledWith('second response')
     expect(second.onText).toHaveBeenCalledWith('second response')
     expect(second.onText).not.toHaveBeenCalledWith('first response')
+  })
+
+  it('surfaces compaction so a long session never loses context silently', async () => {
+    isTauriState.value = true
+    let eventHandler: ((event: { payload: unknown }) => void) | undefined
+    listenMock.mockImplementation(async (_eventName: string, handler: typeof eventHandler) => {
+      eventHandler = handler
+      return vi.fn()
+    })
+    invokeMock.mockImplementation(async () => {
+      eventHandler?.({ payload: { kind: 'Compaction', phase: 'start', reason: 'threshold' } })
+      eventHandler?.({ payload: { kind: 'Compaction', phase: 'end', reason: 'threshold', tokens_before: 150000 } })
+      eventHandler?.({ payload: { kind: 'Done' } })
+      return 'evt'
+    })
+
+    const callbacks = createCallbacks()
+    await streamAiAgent({ agent: 'pi', message: 'hi', vaultPath: '/vault', callbacks })
+
+    expect(callbacks.onCompaction).toHaveBeenCalledWith('start', 'threshold', undefined)
+    expect(callbacks.onCompaction).toHaveBeenCalledWith('end', 'threshold', 150000)
+    expect(callbacks.onError).not.toHaveBeenCalled()
   })
 })

@@ -65,6 +65,50 @@ pub struct PrimeHostStatus {
     pub model_name: Option<String>,
 }
 
+/// Token / cost / context-window snapshot for the live Prime session.
+///
+/// Every field is optional on purpose: Prime omits them on a fresh session,
+/// and a missing value must stay unknown rather than collapsing to zero. "0%
+/// of context used" and "we don't know yet" are different claims and the UI
+/// must not render the second as the first.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrimeSessionStats {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_messages: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u64>,
+    /// Percent of the context window in use (0-100).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_percent: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost: Option<f64>,
+}
+
+impl PrimeSessionStats {
+    fn from_state_data(data: &serde_json::Value) -> Self {
+        let usage = &data["contextUsage"];
+        Self {
+            session_id: crate::prime_events::session_id_from_state(data).map(str::to_string),
+            total_messages: data["totalMessages"].as_u64(),
+            tool_calls: data["toolCalls"].as_u64(),
+            total_tokens: data["tokens"]["total"].as_u64(),
+            context_tokens: usage["tokens"].as_u64(),
+            context_window: usage["contextWindow"].as_u64(),
+            context_percent: usage["percent"].as_f64(),
+            cost: data["cost"].as_f64(),
+        }
+    }
+}
+
 // ── Process-wide host registry ──────────────────────────────────────────────
 
 struct HostSlot {
@@ -188,6 +232,48 @@ pub fn new_session() -> Result<String, String> {
         // Refresh session id from get_state.
         host.refresh_session_id()?;
         Ok(host.session_id.clone().unwrap_or_default())
+    })
+}
+
+/// Token / cost / context usage for the live session.
+pub fn get_session_stats() -> Result<PrimeSessionStats, String> {
+    with_host_mut(|host| {
+        let response = host.send_command(serde_json::json!({ "type": "get_session_stats" }))?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, "get_session_stats"));
+        }
+        Ok(PrimeSessionStats::from_state_data(
+            response.get("data").unwrap_or(&serde_json::Value::Null),
+        ))
+    })
+}
+
+/// Compact the conversation now. Returns tokens held before compaction when
+/// Prime reports it, so the caller can show what the run actually reclaimed.
+pub fn compact(custom_instructions: Option<String>) -> Result<Option<u64>, String> {
+    with_host_mut(|host| {
+        let mut command = serde_json::json!({ "type": "compact" });
+        if let Some(instructions) = custom_instructions.filter(|s| !s.trim().is_empty()) {
+            command["customInstructions"] = serde_json::Value::String(instructions);
+        }
+        let response = host.send_command(command)?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, "compact"));
+        }
+        Ok(response["data"]["tokensBefore"].as_u64())
+    })
+}
+
+pub fn set_auto_compaction(enabled: bool) -> Result<(), String> {
+    with_host_mut(|host| {
+        let response = host.send_command(serde_json::json!({
+            "type": "set_auto_compaction",
+            "enabled": enabled,
+        }))?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, "set_auto_compaction"));
+        }
+        Ok(())
     })
 }
 
@@ -963,6 +1049,43 @@ for line in sys.stdin:
         assert_eq!(sid, "sess-2");
 
         let _ = shutdown_host();
+    }
+
+    /// Context usage is the whole point of the stats call — a long session
+    /// needs to show how full the window is before it compacts, not after.
+    #[test]
+    fn session_stats_parse_context_usage_and_cost_from_prime_payload() {
+        let data = serde_json::json!({
+            "sessionId": "abc123",
+            "totalMessages": 22,
+            "toolCalls": 12,
+            "tokens": {"input": 50000, "output": 10000, "total": 105000},
+            "cost": 0.45,
+            "contextUsage": {"tokens": 60000, "contextWindow": 200000, "percent": 30}
+        });
+
+        let stats = PrimeSessionStats::from_state_data(&data);
+
+        assert_eq!(stats.session_id.as_deref(), Some("abc123"));
+        assert_eq!(stats.total_messages, Some(22));
+        assert_eq!(stats.tool_calls, Some(12));
+        assert_eq!(stats.total_tokens, Some(105_000));
+        assert_eq!(stats.context_window, Some(200_000));
+        assert_eq!(stats.context_percent, Some(30.0));
+        assert_eq!(stats.cost, Some(0.45));
+    }
+
+    /// Prime omits fields on a fresh session. Missing must stay `None` rather
+    /// than defaulting to 0 — "0% context used" and "unknown" are different
+    /// claims, and the UI must not render a confident zero.
+    #[test]
+    fn session_stats_leave_absent_fields_unknown_rather_than_zero() {
+        let stats = PrimeSessionStats::from_state_data(&serde_json::json!({}));
+
+        assert_eq!(stats.context_percent, None);
+        assert_eq!(stats.total_tokens, None);
+        assert_eq!(stats.cost, None);
+        assert_eq!(stats.session_id, None);
     }
 
     #[cfg(unix)]

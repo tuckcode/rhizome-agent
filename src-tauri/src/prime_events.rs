@@ -22,6 +22,7 @@ where
         "tool_execution_start" => emit_tool_start(json, emit),
         "tool_execution_end" => emit_tool_done(json, emit),
         "error" | "extension_error" => emit_error_event(json, emit),
+        "compaction_start" | "compaction_end" => emit_compaction(json, emit),
         // agent_end / turn_end / message_end / response are host-lifecycle
         // signals handled by prime_session_host, not UI stream events.
         _ => {}
@@ -53,6 +54,26 @@ pub(crate) fn format_empty_turn() -> String {
         "values": {},
     });
     format!("{LOCALIZED_ERROR_PREFIX}{payload}")
+}
+
+/// Prime signals compaction with a start/end pair; an aborted run still
+/// arrives as `compaction_end` with `aborted: true`, which is NOT a completed
+/// compaction and must not be reported as one.
+fn emit_compaction<F>(json: &serde_json::Value, emit: &mut F)
+where
+    F: FnMut(AiAgentStreamEvent),
+{
+    let aborted = json["aborted"].as_bool().unwrap_or(false);
+    let phase = match json["type"].as_str().unwrap_or_default() {
+        "compaction_start" => "start",
+        _ if aborted => "aborted",
+        _ => "end",
+    };
+    emit(AiAgentStreamEvent::Compaction {
+        phase: phase.to_string(),
+        reason: json["reason"].as_str().map(str::to_string),
+        tokens_before: json["result"]["tokensBefore"].as_u64(),
+    });
 }
 
 fn emit_session_event<F>(json: &serde_json::Value, emit: &mut F)
@@ -168,6 +189,56 @@ mod tests {
         let mut events = Vec::new();
         dispatch_event(&json, &mut |event| events.push(event));
         events
+    }
+
+    /// Long-running sessions compact silently today — Prime emits
+    /// compaction_start/end and nothing surfaced them, so the transcript
+    /// would lose context with no explanation visible to the user.
+    #[test]
+    fn surfaces_compaction_so_context_loss_is_never_silent() {
+        let start = collect(serde_json::json!({
+            "type": "compaction_start",
+            "reason": "threshold"
+        }));
+        assert!(
+            matches!(
+                &start[0],
+                AiAgentStreamEvent::Compaction { phase, reason, tokens_before }
+                    if phase == "start" && reason.as_deref() == Some("threshold")
+                        && tokens_before.is_none()
+            ),
+            "start={start:?}"
+        );
+
+        let end = collect(serde_json::json!({
+            "type": "compaction_end",
+            "reason": "threshold",
+            "result": {"summary": "...", "tokensBefore": 150000},
+            "aborted": false
+        }));
+        assert!(
+            matches!(
+                &end[0],
+                AiAgentStreamEvent::Compaction { phase, tokens_before, .. }
+                    if phase == "end" && *tokens_before == Some(150_000)
+            ),
+            "end={end:?}"
+        );
+    }
+
+    /// An aborted compaction is not a completed one — reporting it as `end`
+    /// would tell the user context was compacted when it was not.
+    #[test]
+    fn aborted_compaction_reports_aborted_not_end() {
+        let events = collect(serde_json::json!({
+            "type": "compaction_end",
+            "reason": "threshold",
+            "aborted": true
+        }));
+        assert!(
+            matches!(&events[0], AiAgentStreamEvent::Compaction { phase, .. } if phase == "aborted"),
+            "events={events:?}"
+        );
     }
 
     #[test]
