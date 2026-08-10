@@ -2,6 +2,7 @@ import {
   memo,
   type MouseEvent as ReactMouseEvent,
   useCallback,
+  useEffect,
   useMemo,
 } from 'react'
 import {
@@ -9,6 +10,7 @@ import {
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import type { FolderCreationParent, FolderNode, SidebarSelection } from '../types'
+import { CREATE_FOLDER_REQUESTED_EVENT } from '../utils/aiPromptBridge'
 import { FolderContextMenu } from './folder-tree/FolderContextMenu'
 import { FolderNameInput } from './folder-tree/FolderNameInput'
 import { FolderTreeRow } from './folder-tree/FolderTreeRow'
@@ -186,9 +188,18 @@ export const FolderTree = memo(function FolderTree({
     openCreateForm()
   }, [closeContextMenu, openCreateForm])
 
+  // File > New Folder / command palette reach the create form through the
+  // window-event bridge; the form itself is local state.
+  useEffect(() => {
+    if (!onCreateFolder) return
+    const onRequest = () => { handleCreateFolderClick() }
+    window.addEventListener(CREATE_FOLDER_REQUESTED_EVENT, onRequest)
+    return () => window.removeEventListener(CREATE_FOLDER_REQUESTED_EVENT, onRequest)
+  }, [handleCreateFolderClick, onCreateFolder])
+
   const { displayedExpanded, displayedFolders } = useDisplayedFolders(folders, expanded, vaultRootPath, locale)
 
-  if (displayedFolders.length === 0 && !isCreating) return null
+  if (displayedFolders.length === 0 && !isCreating && !onCreateFolder) return null
 
   return (
     <div className="border-b border-border" style={{ padding: '0 6px' }}>

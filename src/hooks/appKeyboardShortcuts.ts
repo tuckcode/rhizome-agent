@@ -11,6 +11,7 @@ import {
 export type KeyboardActions = Pick<
   AppCommandHandlers,
   | 'onQuickOpen'
+  | 'onCreateFolder'
   | 'onCommandPalette'
   | 'onKeyboardShortcuts'
   | 'onSearch'

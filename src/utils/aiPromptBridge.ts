@@ -8,6 +8,14 @@ export const AI_WORKSPACE_OPEN_NOTE_REQUESTED_EVENT = 'tolaria:ai-workspace-open
 export const AI_WORKSPACE_FILE_CREATED_EVENT = 'tolaria:ai-workspace-file-created'
 export const AI_WORKSPACE_FILE_MODIFIED_EVENT = 'tolaria:ai-workspace-file-modified'
 export const AI_WORKSPACE_VAULT_CHANGED_EVENT = 'tolaria:ai-workspace-vault-changed'
+/** File > New Folder. The create form is local state inside FolderTree, so the
+ *  menu/palette command reaches it through the same window-event bridge the AI
+ *  workspace commands already use rather than lifting that state to App. */
+export const CREATE_FOLDER_REQUESTED_EVENT = 'rhizome:create-folder-requested'
+
+export function requestCreateFolder(): void {
+  window.dispatchEvent(new CustomEvent(CREATE_FOLDER_REQUESTED_EVENT))
+}
 
 export interface QueuedAiPrompt {
   id: number
