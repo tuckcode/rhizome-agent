@@ -32,6 +32,7 @@ function makeHandlers(): AppCommandHandlers {
   return {
     onSetViewMode: vi.fn(),
     onCreateNote: vi.fn(),
+    onCreateFolder: vi.fn(),
     onCreateType: vi.fn(),
     onQuickOpen: vi.fn(),
     onSave: vi.fn(),
@@ -249,6 +250,12 @@ describe('appCommandDispatcher', () => {
     const handlers = makeHandlers()
     expect(dispatchAppCommand(APP_COMMAND_IDS.fileNewNote, handlers)).toBe(true)
     expect(handlers.onCreateNote).toHaveBeenCalled()
+  })
+
+  it('dispatches create folder through the shared command path', () => {
+    const handlers = makeHandlers()
+    expect(dispatchAppCommand(APP_COMMAND_IDS.fileNewFolder, handlers)).toBe(true)
+    expect(handlers.onCreateFolder).toHaveBeenCalled()
   })
 
   it('dispatches inspector toggle through the shared command path', () => {

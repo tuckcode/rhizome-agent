@@ -10,7 +10,7 @@
       "shortcut": {
         "combo": "command-or-ctrl",
         "key": ",",
-        "display": "⌘,",
+        "display": "\u2318,",
         "accelerator": "CmdOrCtrl+,",
         "requiresManualNativeAcceleratorQa": true
       }
@@ -34,7 +34,7 @@
         "combo": "command-or-ctrl",
         "key": "n",
         "code": "KeyN",
-        "display": "⌘N",
+        "display": "\u2318N",
         "accelerator": "CmdOrCtrl+N",
         "requiresManualNativeAcceleratorQa": true
       }
@@ -61,7 +61,7 @@
           "o"
         ],
         "code": "KeyP",
-        "display": "⌘P / ⌘O",
+        "display": "\u2318P / \u2318O",
         "accelerator": "CmdOrCtrl+P",
         "requiresManualNativeAcceleratorQa": true
       }
@@ -77,7 +77,7 @@
         "combo": "command-or-ctrl",
         "key": "s",
         "code": "KeyS",
-        "display": "⌘S",
+        "display": "\u2318S",
         "accelerator": "CmdOrCtrl+S",
         "requiresManualNativeAcceleratorQa": true
       }
@@ -94,7 +94,7 @@
         "combo": "command-or-ctrl",
         "key": "z",
         "code": "KeyZ",
-        "display": "⌘Z",
+        "display": "\u2318Z",
         "accelerator": "CmdOrCtrl+Z",
         "requiresManualNativeAcceleratorQa": true
       }
@@ -111,7 +111,7 @@
         "combo": "command-or-ctrl-shift",
         "key": "z",
         "code": "KeyZ",
-        "display": "⌘⇧Z",
+        "display": "\u2318\u21e7Z",
         "accelerator": "CmdOrCtrl+Shift+Z",
         "requiresManualNativeAcceleratorQa": true
       }
@@ -128,7 +128,7 @@
         "combo": "command-or-ctrl",
         "key": "f",
         "code": "KeyF",
-        "display": "⌘F",
+        "display": "\u2318F",
         "accelerator": "CmdOrCtrl+F",
         "requiresManualNativeAcceleratorQa": true
       }
@@ -152,7 +152,7 @@
         "combo": "command-or-ctrl-shift",
         "key": "f",
         "code": "KeyF",
-        "display": "⌘⇧F",
+        "display": "\u2318\u21e7F",
         "accelerator": "CmdOrCtrl+Shift+F",
         "requiresManualNativeAcceleratorQa": true
       }
@@ -168,7 +168,7 @@
         "combo": "command-or-ctrl-shift",
         "key": "v",
         "code": "KeyV",
-        "display": "⌘⇧V",
+        "display": "\u2318\u21e7V",
         "accelerator": "CmdOrCtrl+Shift+V",
         "requiresManualNativeAcceleratorQa": true
       }
@@ -184,7 +184,7 @@
         "combo": "command-or-ctrl",
         "key": "\\",
         "code": "Backslash",
-        "display": "⌘\\",
+        "display": "\u2318\\",
         "accelerator": "CmdOrCtrl+\\"
       }
     },
@@ -206,7 +206,7 @@
       "shortcut": {
         "combo": "command-or-ctrl",
         "key": "1",
-        "display": "⌘1",
+        "display": "\u23181",
         "accelerator": "CmdOrCtrl+1"
       }
     },
@@ -220,7 +220,7 @@
       "shortcut": {
         "combo": "command-or-ctrl",
         "key": "2",
-        "display": "⌘2",
+        "display": "\u23182",
         "accelerator": "CmdOrCtrl+2"
       }
     },
@@ -234,7 +234,7 @@
       "shortcut": {
         "combo": "command-or-ctrl",
         "key": "3",
-        "display": "⌘3",
+        "display": "\u23183",
         "accelerator": "CmdOrCtrl+3"
       }
     },
@@ -250,7 +250,7 @@
         "combo": "command-or-ctrl-shift",
         "key": "i",
         "code": "KeyI",
-        "display": "⌘⇧I",
+        "display": "\u2318\u21e7I",
         "accelerator": "CmdOrCtrl+Shift+I"
       }
     },
@@ -265,7 +265,7 @@
         "combo": "command-or-ctrl-shift",
         "key": "l",
         "code": "KeyL",
-        "display": "⌘⇧L",
+        "display": "\u2318\u21e7L",
         "accelerator": "CmdOrCtrl+Shift+L",
         "requiresManualNativeAcceleratorQa": true
       }
@@ -281,7 +281,7 @@
         "combo": "command-or-ctrl-shift",
         "key": "t",
         "code": "KeyT",
-        "display": "⌘⇧T",
+        "display": "\u2318\u21e7T",
         "accelerator": "CmdOrCtrl+Shift+T",
         "requiresManualNativeAcceleratorQa": true
       }
@@ -305,7 +305,7 @@
         "combo": "command-or-ctrl",
         "key": "k",
         "code": "KeyK",
-        "display": "⌘K",
+        "display": "\u2318K",
         "accelerator": "CmdOrCtrl+K",
         "requiresManualNativeAcceleratorQa": true
       }
@@ -323,7 +323,7 @@
         "aliases": [
           "+"
         ],
-        "display": "⌘=",
+        "display": "\u2318=",
         "accelerator": "CmdOrCtrl+="
       }
     },
@@ -337,7 +337,7 @@
       "shortcut": {
         "combo": "command-or-ctrl",
         "key": "-",
-        "display": "⌘-",
+        "display": "\u2318-",
         "accelerator": "CmdOrCtrl+-"
       }
     },
@@ -351,7 +351,7 @@
       "shortcut": {
         "combo": "command-or-ctrl",
         "key": "0",
-        "display": "⌘0",
+        "display": "\u23180",
         "accelerator": "CmdOrCtrl+0"
       }
     },
@@ -366,7 +366,7 @@
         "combo": "command-or-ctrl",
         "key": "ArrowLeft",
         "code": "ArrowLeft",
-        "display": "⌘←",
+        "display": "\u2318\u2190",
         "accelerator": "CmdOrCtrl+Left"
       }
     },
@@ -381,7 +381,7 @@
         "combo": "command-or-ctrl",
         "key": "ArrowRight",
         "code": "ArrowRight",
-        "display": "⌘→",
+        "display": "\u2318\u2192",
         "accelerator": "CmdOrCtrl+Right"
       }
     },
@@ -428,7 +428,7 @@
         "combo": "command-or-ctrl",
         "key": "e",
         "code": "KeyE",
-        "display": "⌘E",
+        "display": "\u2318E",
         "accelerator": "CmdOrCtrl+E",
         "requiresManualNativeAcceleratorQa": true
       }
@@ -444,7 +444,7 @@
         "combo": "command-or-ctrl",
         "key": "d",
         "code": "KeyD",
-        "display": "⌘D",
+        "display": "\u2318D",
         "accelerator": "CmdOrCtrl+D",
         "requiresManualNativeAcceleratorQa": true
       }
@@ -470,7 +470,7 @@
         "aliases": [
           "Delete"
         ],
-        "display": "⌘⌫",
+        "display": "\u2318\u232b",
         "accelerator": "CmdOrCtrl+Backspace"
       }
     },
@@ -485,7 +485,7 @@
         "combo": "command-or-ctrl-shift",
         "key": "o",
         "code": "KeyO",
-        "display": "⌘⇧O",
+        "display": "\u2318\u21e7O",
         "accelerator": "CmdOrCtrl+Shift+O"
       }
     },
@@ -588,7 +588,7 @@
         "combo": "command-or-ctrl-shift",
         "key": "r",
         "code": "KeyR",
-        "display": "⌘⇧R",
+        "display": "\u2318\u21e7R",
         "accelerator": "CmdOrCtrl+Shift+R",
         "requiresManualNativeAcceleratorQa": true
       },
@@ -613,11 +613,19 @@
         "combo": "command-or-ctrl",
         "key": "/",
         "code": "Slash",
-        "display": "⌘/",
+        "display": "\u2318/",
         "accelerator": "CmdOrCtrl+/",
         "requiresManualNativeAcceleratorQa": true
       },
       "preferredShortcutQaMode": "renderer-shortcut-event"
+    },
+    "fileNewFolder": {
+      "id": "file-new-folder",
+      "route": {
+        "kind": "handler",
+        "handler": "onCreateFolder"
+      },
+      "menuOwned": true
     }
   },
   "menus": [
@@ -633,6 +641,11 @@
           "kind": "command",
           "command": "fileNewType",
           "label": "New Type"
+        },
+        {
+          "kind": "command",
+          "command": "fileNewFolder",
+          "label": "New Folder"
         },
         {
           "kind": "command",
@@ -880,7 +893,7 @@
         {
           "kind": "command",
           "command": "vaultOpen",
-          "label": "Open Vault…"
+          "label": "Open Vault\u2026"
         },
         {
           "kind": "command",
@@ -898,7 +911,7 @@
         {
           "kind": "command",
           "command": "vaultAddRemote",
-          "label": "Add Remote…",
+          "label": "Add Remote\u2026",
           "enabled": false
         },
         {
@@ -938,7 +951,7 @@
         {
           "kind": "command",
           "command": "vaultInstallMcp",
-          "label": "Set Up External AI Tools…"
+          "label": "Set Up External AI Tools\u2026"
         }
       ]
     }

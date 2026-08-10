@@ -15,6 +15,7 @@ import type { ViewMode } from './useViewMode'
 import type { ImmediateCreateOptions } from './useNoteCreation'
 import type { NoteListMultiSelectionCommands } from '../components/note-list/multiSelectionCommands'
 import type { GitRepositoryOption } from '../utils/gitRepositories'
+import { requestCreateFolder } from '../utils/aiPromptBridge'
 
 interface AppCommandsConfig {
   activeTabPath: string | null
@@ -289,6 +290,7 @@ function createKeyboardActions(
     onReplaceInNote: config.onReplaceInNote,
     onPastePlainText: config.onPastePlainText,
     onCreateNote: config.onCreateNote,
+    onCreateFolder: requestCreateFolder,
     onSave: config.onSave,
     onUndo: config.onUndo,
     onRedo: config.onRedo,
