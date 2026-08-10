@@ -19,7 +19,7 @@ type AiAgentResponseText = string
 type AiAgentToolCount = number
 type AiAgentResponseTextFlag = 'had_text' | 'had_partial_response'
 type SheetFormulaFunctionName = string
-type RailDestination = 'notes' | 'graph' | 'research' | 'changes'
+type RailDestination = 'notes' | 'graph' | 'mycelium' | 'research' | 'changes'
 type StatusBarPill = 'vault' | 'agents'
 
 const ALL_NOTES_VISIBILITY_CATEGORIES: ReadonlyArray<keyof AllNotesFileVisibility> = [
