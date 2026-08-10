@@ -2,6 +2,25 @@
 
 Living doc. Update in place each session. This file is "what's true right now," not a history log. Detailed per-session records go in `docs/plans/*-session-status.md`.
 
+## Session handoff — 2026-08-09 (push-unblock: A1 OPEN — this is the current state)
+
+**Where we are:** first `git push` attempt since the fork ran the pre-push gates for the first time on **30 unpushed commits** (the Agent-fork → Prime-harness-chat arc). Build is fixed; **19 frontend tests still fail → push stays blocked**. See **A1-OPEN** in Open threads below.
+
+**Fixed (build, same day):**
+- `tsc -b` 4 errors — Mycelium rail missing `RailDestination` + label map; `onKeyboardShortcuts` missing from 2 `Pick<>` unions (`76539bd`)
+- Clippy 3 pre-existing `-D warnings` — `mycelium.rs`, `rhizome_distill.rs` (`e89e8cd`)
+- Prime RPC host failure/lifecycle test coverage (`7e820c7`); AGENTS.md origin/visibility residues (`cb3a299`)
+
+**⛔ A1 — next action, blocks push:** `pnpm test` = 5168 pass / **19 fail** across App(5), ResearchPanel(4), SettingsPanel(3), AiAgentsOnboardingPrompt(2), AiWorkspaceFloatingButton(2), useAiAgentPreferences(2), aiAgentStreamCallbacks(1). Hypothesis: inherited Desktop tests still asserting the multi-agent UI the Prime-only fork removed (`204822a`/`fa230a6`) — not yet confirmed per-test. Fix/update → `pnpm test` green → re-attempt push.
+
+**⚠️ Gate gotchas:** the gate runs `tsc -b` — `tsc --noEmit` is NOT proof the build passes. `cargo fmt --check` only runs in pre-push — run it manually before committing Rust.
+
+**Arc context for a fresh model:** this repo is the Prime-harness-chat fork of Desktop. Read `docs/IDENTITY.md`; roadmap `docs/plans/2026-08-09-rhizome-agent-v0-brief-and-roadmap.md` (9/9 v0 exit criteria eng-shipped); UI-2 brief `docs/design/2026-08-09-opendesign-harness-desktop-prompt.md`; session detail `docs/plans/2026-08-09-*-session-status.md`. Product decisions: Prime-only UI (no Safe/Power, default toolkit), MCP via skill+CLI not host HTTP, Mycelium = Mindwalk bridge (BYO `mindwalk`).
+
+**After push:** native dogfood sign-off (promote→open loop), in-app model picker, collapse vault chrome by default, wiki triage (intake audit stale 14d; wiki repo has uncommitted dirt).
+
+---
+
 ## Session handoff — 2026-08-09 (UI-2 chat-primary slice)
 
 **Shipped**
