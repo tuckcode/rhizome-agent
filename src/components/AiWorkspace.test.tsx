@@ -244,7 +244,11 @@ describe('AiWorkspace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand AI workspace' }))
     expect(workspace).toHaveAttribute('data-ai-workspace-expanded', 'true')
-    expect(workspace).toHaveClass('absolute')
+    // Expanded takes a bounded majority share, never `absolute inset-0` over
+    // the shell — DESIGN.md §5, "note split is secondary, never full takeover".
+    expect(workspace).not.toHaveClass('absolute')
+    expect(workspace).toHaveClass('relative')
+    expect(workspace).toHaveStyle({ width: '60%' })
     expect(screen.getByRole('button', { name: 'Restore AI workspace panel' })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Close AI workspace' }))
