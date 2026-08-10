@@ -169,6 +169,21 @@ const mockCommandResults: Record<string, unknown> = {
   get_default_vault_path: expectedDefaultVaultPath,
   list_themes: [],
   get_vault_settings: { theme: null },
+  // The chat panel auto-opens once per app session (useAgentDefaultOpenChat),
+  // so AiPanelView — and usePrimeHostStatus with it — mounts in the very first
+  // App render of this file. An unlisted command resolves to null here, and
+  // primeModelLabel(null) throws, taking the whole tree down.
+  get_prime_session_host_status: {
+    installed: true,
+    version: 'mock',
+    running: false,
+    sessionId: null,
+    isStreaming: false,
+    binaryPath: '/mock/prime-agent',
+    modelProvider: 'xai',
+    modelId: 'grok-4.5',
+    modelName: 'Grok 4.5',
+  },
 }
 
 function buildNeighborhoodEntry({
@@ -759,7 +774,7 @@ describe('App', () => {
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByText('AI is ready')).toBeInTheDocument()
+      expect(screen.getByText('Prime is ready')).toBeInTheDocument()
     }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
 
     await waitFor(() => {
@@ -774,13 +789,13 @@ describe('App', () => {
       expect(screen.getByText('Manage External AI Tools')).toBeInTheDocument()
     })
     expect(screen.getByTestId('mcp-setup-dialog')).toBeInTheDocument()
-    expect(screen.queryByText('AI is ready')).not.toBeInTheDocument()
+    expect(screen.queryByText('Prime is ready')).not.toBeInTheDocument()
   })
 
   it('routes right-panel AI chat messages to the selected default agent', async () => {
     mockCommandResults.get_settings = createSettings({
       auto_advance_inbox_after_organize: null,
-      default_ai_agent: 'codex',
+      default_ai_agent: 'prime',
     })
     mockCommandResults.get_ai_agents_status = {
       prime: { installed: true, version: 'mock' },
@@ -798,7 +813,7 @@ describe('App', () => {
 
     const input = await screen.findByTestId('agent-input')
     await waitFor(() => {
-      expect(input).toHaveAttribute('aria-placeholder', 'Ask Codex')
+      expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime Agent')
     })
 
     input.textContent = 'Summarize the active vault'
@@ -807,7 +822,7 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(streamAiAgent).toHaveBeenCalledWith(expect.objectContaining({
-        agent: 'codex',
+        agent: 'prime',
       }))
     })
   })
@@ -842,12 +857,12 @@ describe('App', () => {
     await act(async () => {
       resolveSettings?.(createSettings({
         auto_advance_inbox_after_organize: null,
-        default_ai_agent: 'codex',
+        default_ai_agent: 'prime',
       }))
     })
 
     await waitFor(() => {
-      expect(input).toHaveAttribute('aria-placeholder', 'Ask Codex')
+      expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime Agent')
     })
 
     input.textContent = 'Summarize the active vault'
@@ -856,7 +871,7 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(streamAiAgent).toHaveBeenCalledWith(expect.objectContaining({
-        agent: 'codex',
+        agent: 'prime',
       }))
     })
   })
@@ -1029,7 +1044,7 @@ describe('App', () => {
     await waitFor(() => {
       expect(screen.getByTestId('ai-agents-onboarding-screen')).toBeInTheDocument()
     }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
-    expect(screen.getByText('AI setup is optional')).toBeInTheDocument()
+    expect(screen.getByText('Prime Agent is optional for first open')).toBeInTheDocument()
 
     promptSpy.mockRestore()
   })
