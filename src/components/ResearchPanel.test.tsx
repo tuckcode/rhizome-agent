@@ -10,8 +10,8 @@ vi.mock('../utils/url', () => ({
   openExternalUrl: (...args: unknown[]) => mockOpenExternalUrl(...args),
 }))
 
-function statusWithClaudeCode(overrides: Partial<AiAgentsStatus['claude_code']>): AiAgentsStatus {
-  return { ...createMissingAiAgentsStatus(), claude_code: { ...createAiAgentAvailability('missing'), ...overrides } }
+function statusWithPrime(overrides: Partial<AiAgentsStatus['prime']>): AiAgentsStatus {
+  return { ...createMissingAiAgentsStatus(), prime: { ...createAiAgentAvailability('missing'), ...overrides } }
 }
 
 const BASE_SETTINGS: Settings = {
@@ -173,7 +173,7 @@ describe('ResearchPanel', () => {
         onClose={onClose}
         vaultPath="/vault"
         onOpenNote={onOpenNote}
-        aiAgentsStatus={statusWithClaudeCode({ status: 'missing' })}
+        aiAgentsStatus={statusWithPrime({ status: 'missing' })}
       />
     )
 
@@ -186,7 +186,7 @@ describe('ResearchPanel', () => {
     expect(screen.getByRole('button', { name: /^distill/i })).toBeDisabled()
 
     fireEvent.click(screen.getByRole('button', { name: /install/i }))
-    expect(mockOpenExternalUrl).toHaveBeenCalledWith(expect.stringContaining('claude-code'))
+    expect(mockOpenExternalUrl).toHaveBeenCalledWith(expect.stringContaining('prime-agent'))
     expect(mockInvokeFn).not.toHaveBeenCalledWith('call_rhizome_tool', expect.objectContaining({ name: 'rhizome_distill' }))
   })
 
@@ -217,7 +217,7 @@ describe('ResearchPanel', () => {
         onClose={onClose}
         vaultPath="/vault"
         onOpenNote={onOpenNote}
-        aiAgentsStatus={statusWithClaudeCode({ status: 'installed', version: '1.0.0' })}
+        aiAgentsStatus={statusWithPrime({ status: 'installed', version: '1.0.0' })}
       />
     )
 
@@ -673,7 +673,7 @@ describe('ResearchPanel', () => {
     await waitFor(() => {
       expect(mockInvokeFn).toHaveBeenCalledWith('start_rhizome_job', expect.objectContaining({
         name: 'rhizome_repo_research',
-        args: expect.objectContaining({ target: agentTargetId('claude_code') }),
+        args: expect.objectContaining({ target: agentTargetId('prime') }),
       }))
     })
 
@@ -686,7 +686,7 @@ describe('ResearchPanel', () => {
     await waitFor(() => {
       expect(mockInvokeFn).toHaveBeenCalledWith('start_rhizome_job', expect.objectContaining({
         name: 'rhizome_distill',
-        args: expect.objectContaining({ target: agentTargetId('claude_code') }),
+        args: expect.objectContaining({ target: agentTargetId('prime') }),
       }))
     })
   })
@@ -698,7 +698,7 @@ describe('ResearchPanel', () => {
         onClose={onClose}
         vaultPath="/vault"
         onOpenNote={onOpenNote}
-        aiAgentsStatus={statusWithClaudeCode({ status: 'missing' })}
+        aiAgentsStatus={statusWithPrime({ status: 'missing' })}
         settings={{ ...BASE_SETTINGS, ai_model_providers: [] }}
       />
     )
@@ -711,7 +711,7 @@ describe('ResearchPanel', () => {
         onClose={onClose}
         vaultPath="/vault"
         onOpenNote={onOpenNote}
-        aiAgentsStatus={statusWithClaudeCode({ status: 'missing' })}
+        aiAgentsStatus={statusWithPrime({ status: 'missing' })}
         settings={{ ...BASE_SETTINGS, ai_model_providers: [anthropicProvider] }}
       />
     )
@@ -724,7 +724,7 @@ describe('ResearchPanel', () => {
         onClose={onClose}
         vaultPath="/vault"
         onOpenNote={onOpenNote}
-        aiAgentsStatus={statusWithClaudeCode({ status: 'installed', version: '1.0.0' })}
+        aiAgentsStatus={statusWithPrime({ status: 'installed', version: '1.0.0' })}
         settings={{ ...BASE_SETTINGS, ai_model_providers: [anthropicProvider] }}
       />
     )
@@ -739,7 +739,7 @@ describe('ResearchPanel', () => {
         onClose={onClose}
         vaultPath="/vault"
         onOpenNote={onOpenNote}
-        aiAgentsStatus={statusWithClaudeCode({ status: 'missing' })}
+        aiAgentsStatus={statusWithPrime({ status: 'missing' })}
         settings={{ ...BASE_SETTINGS, ai_model_providers: [anthropicProvider] }}
       />
     )
@@ -774,7 +774,7 @@ describe('ResearchPanel', () => {
         onClose={onClose}
         vaultPath="/vault"
         onOpenNote={onOpenNote}
-        aiAgentsStatus={statusWithClaudeCode({ status: 'missing' })}
+        aiAgentsStatus={statusWithPrime({ status: 'missing' })}
         settings={{ ...BASE_SETTINGS, ai_model_providers: [anthropicProvider] }}
       />
     )

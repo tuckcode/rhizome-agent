@@ -56,8 +56,8 @@ describe('AiAgentsOnboardingPrompt', () => {
       hermes: { status: 'installed', version: '0.20.0' },
     })
 
-    expect(screen.getByText('AI is ready')).toBeInTheDocument()
-    expect(screen.getByText('Detected on this machine')).toBeInTheDocument()
+    expect(screen.getByText('Prime is ready')).toBeInTheDocument()
+    expect(screen.getByText('Prime on this machine')).toBeInTheDocument()
     expect(screen.getByText('Prime Agent')).toBeInTheDocument()
     expect(screen.queryByText('Claude Code')).not.toBeInTheDocument()
     expect(screen.queryByText('Hermes Agent')).not.toBeInTheDocument()
@@ -67,10 +67,10 @@ describe('AiAgentsOnboardingPrompt', () => {
   it('shows the missing state when Prime is not installed', () => {
     renderPrompt()
 
-    expect(screen.getByText('AI setup is optional')).toBeInTheDocument()
+    expect(screen.getByText('Prime Agent is optional for first open')).toBeInTheDocument()
     expect(screen.queryByTestId('ai-agents-onboarding-empty')).not.toBeInTheDocument()
     expect(screen.queryByTestId('ai-agents-onboarding-detected-list')).not.toBeInTheDocument()
-    expect(screen.getByText('More AI options')).toBeInTheDocument()
+    expect(screen.getByText('Models & providers')).toBeInTheDocument()
     expect(screen.queryByTestId('ai-agents-onboarding-install-claude_code')).not.toBeInTheDocument()
     expect(screen.getByTestId('ai-agents-onboarding-continue')).toHaveTextContent('Set up later')
   })
