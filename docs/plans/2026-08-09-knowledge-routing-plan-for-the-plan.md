@@ -112,10 +112,48 @@ moving files, before committing to move files.
 Deliverable: one table — tool, destination model, who decides, user-
 extensible without code, and what Rhizome should copy or reject.
 
-## Sequencing bet
+## DECIDED 2026-08-10 — Q6 answered by the user
 
-Do 6 first. If a "Reference" bucket absorbs most of the 126, the router
-shrinks to a much smaller problem and the design changes shape.
+> "I want more folders than just projects. This could be for research,
+> files, anything. So yeah, unassigned, whatever we name it — but yes."
+
+**"No project" is not a failure state.** UNASSIGNED is a missing *bucket*,
+not a missing assignment. Top-level buckets are wanted for research, files,
+and whatever else the user decides — Projects is one bucket among several,
+not the only one.
+
+### This settles Q1 as well
+
+If buckets are user-definable, a closed `ArtifactKind` enum in Rust is
+**definitively the wrong model** — every new bucket would be a code change
+and a release. Destinations must be vault-defined data, not code.
+
+That is a bigger change than the cheap "add a Reference bucket" fix this
+doc originally bet on, and it inverts the sequencing: the destination model
+comes first, and routing is meaningless until it exists.
+
+### What is now settled vs still open
+
+| | |
+|---|---|
+| Settled | Multiple top-level buckets, user-definable, Projects is one of them |
+| Settled | Destinations are vault data, not a Rust enum |
+| Open | Q2 who decides · Q3 when it runs · Q4 the 126 backfill · Q5 the two unfiled rules |
+
+### Revised sequence
+
+1. **Destination model** — how a bucket is declared, where that lives, how
+   the sidebar and `rhizome_write_location` both read it. Note the type
+   system is already vault-defined data (`type: Type` notes at vault root);
+   buckets should probably follow that precedent rather than invent a second
+   mechanism.
+2. **Backfill** — the 126 get a home once homes exist.
+3. **Routing** — only then, and it may turn out to be mostly manual plus a
+   good "move to bucket" affordance.
+
+The Dataview question below still stands and now matters more: if a bucket
+is really a saved query over frontmatter, buckets cost almost nothing and
+nothing has to move on disk.
 
 ## Related, deliberately out of scope here
 
@@ -126,6 +164,10 @@ shrinks to a much smaller problem and the design changes shape.
 
 ## Next action
 
-Run the peer research above, answer question 6, then write the real design
-doc. The research is delegable to a subagent; question 6 is a product call
-and is not.
+Q6 is answered. Run the peer research above — focused on the destination
+model now, not routing — then write the real design doc. The research is
+delegable to a subagent.
+
+First question for that research, given the decision: **do peers store
+destinations as data or as code?** Anything with a hardcoded category list
+is the anti-pattern to avoid, not a model to copy.
