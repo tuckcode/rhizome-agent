@@ -77,6 +77,41 @@ missing."
    *assignment* — this is the cheapest possible fix and should be considered
    before building a router.
 
+## Peer research (required before the design doc)
+
+Do not design routing from first principles. Four philosophies of "who
+decides a save happens" were already catalogued in
+`docs/plans/2026-08-02-competitor-trigger-research.md` (Mem0/OpenMemory,
+Letta/MemGPT, ChatGPT memory, Claude Code memory, Obsidian Templater).
+**That research covered triggers — when to save. It did not cover routing —
+where it goes.** This is the open half.
+
+Specific question for each peer: *given a saved memory, what decides its
+destination, and can a user add a new destination without a code change?*
+
+| Tool | Why it is worth reading |
+|---|---|
+| **Mem0 / OpenMemory** | Explicit memory *categories* with an extraction pass that assigns them. Closest to the ArtifactKind problem. Are categories user-extensible at runtime? |
+| **Letta / MemGPT** | Core vs archival memory tiers, agent-managed. Answers "who decides" with: the agent, via tools. Does routing survive compaction? |
+| **Zep / Graphiti** | Temporal knowledge graph — routing by *entity resolution* rather than folders. Would sidestep the folder question entirely. |
+| **Basic Memory** | Markdown-native, Obsidian-compatible, MCP. Closest file-layout analogue to Rhizome. How does it decide the path? |
+| **Cursor / Claude Code memory** | Flat file plus prompt convention, no routing at all. The null hypothesis — evidence that routing may not be worth building. |
+| **Obsidian: Dataview, Templater, Auto Note Mover** | Auto Note Mover routes by regex/tag rules; Dataview makes folders irrelevant by querying frontmatter. Two opposite answers, both shipping. |
+
+Also worth a look because they are adjacent and already in the repo's
+orbit: **Mindwalk**'s citymap treats a repo as the structure rather than
+imposing one, and **Prime's continual harness** stores memories, skills, and
+subagent specs without folders at all.
+
+The Dataview angle is the one most likely to change the design: if
+frontmatter queries are good enough, **the answer may be fewer folders and
+better views**, not a router. Rhizome already has typed frontmatter and a
+search index — check whether a saved view over `type:` beats physically
+moving files, before committing to move files.
+
+Deliverable: one table — tool, destination model, who decides, user-
+extensible without code, and what Rhizome should copy or reject.
+
 ## Sequencing bet
 
 Do 6 first. If a "Reference" bucket absorbs most of the 126, the router
@@ -91,4 +126,6 @@ shrinks to a much smaller problem and the design changes shape.
 
 ## Next action
 
-Read this, answer question 6, then write the real design doc.
+Run the peer research above, answer question 6, then write the real design
+doc. The research is delegable to a subagent; question 6 is a product call
+and is not.
