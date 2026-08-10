@@ -9,15 +9,15 @@ import {
 } from '../lib/aiAgents'
 import { AiWorkspaceFloatingButton } from './AiWorkspaceFloatingButton'
 
-function createCodexReadyStatus(): AiAgentsStatus {
+function createPrimeReadyStatus(): AiAgentsStatus {
   return {
     ...createMissingAiAgentsStatus(),
-    codex: createAiAgentAvailability('installed', '0.12.0'),
+    prime: createAiAgentAvailability('installed', '0.12.0'),
   }
 }
 
 function renderButton({
-  statuses = createCodexReadyStatus(),
+  statuses = createPrimeReadyStatus(),
   updateBannerVisible = false,
 }: {
   statuses?: AiAgentsStatus
@@ -26,7 +26,7 @@ function renderButton({
   return render(
     <TooltipProvider>
       <AiWorkspaceFloatingButton
-        defaultAgent="codex"
+        defaultAgent="prime"
         statuses={statuses}
         updateBannerVisible={updateBannerVisible}
         onOpen={vi.fn()}
@@ -52,7 +52,7 @@ describe('AiWorkspaceFloatingButton', () => {
     renderButton()
 
     const iconImage = screen.getByTestId('ai-workspace-floating-button').querySelector('img')
-    expect(iconImage).toHaveAttribute('src', '/ai-agent-icons/codex.svg')
+    expect(iconImage).toHaveAttribute('src', '/ai-agent-icons/prime.png')
   })
 
   it('falls back to sparkles when no selected agent is available', () => {
@@ -65,12 +65,12 @@ describe('AiWorkspaceFloatingButton', () => {
     renderButton({
       statuses: {
         ...createMissingAiAgentsStatus(),
-        codex: createAiAgentAvailability('checking', null),
+        prime: createAiAgentAvailability('checking', null),
       },
     })
 
     const iconImage = screen.getByTestId('ai-workspace-floating-button').querySelector('img')
-    expect(iconImage).toHaveAttribute('src', '/ai-agent-icons/codex.svg')
+    expect(iconImage).toHaveAttribute('src', '/ai-agent-icons/prime.png')
   })
 
   it('shows the AI panel shortcut in the tooltip', async () => {

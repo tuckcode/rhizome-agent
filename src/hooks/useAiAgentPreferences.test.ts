@@ -1,5 +1,10 @@
 import { renderHook, act } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  createAiAgentAvailability,
+  createMissingAiAgentsStatus,
+  type AiAgentsStatus,
+} from '../lib/aiAgents'
 import { useAiAgentPreferences } from './useAiAgentPreferences'
 
 const settings = {
@@ -9,17 +14,12 @@ const settings = {
   analytics_enabled: false,
   anonymous_id: null,
   release_channel: 'stable',
-  default_ai_agent: 'claude_code' as const,
+  default_ai_agent: 'prime' as const,
 }
 
-const aiAgentsStatus = {
-  claude_code: { status: 'installed' as const, version: '1.0.20' },
-  codex: { status: 'missing' as const, version: null },
-  opencode: { status: 'missing' as const, version: null },
-  pi: { status: 'missing' as const, version: null },
-  antigravity: { status: 'missing' as const, version: null },
-  kiro: { status: 'missing' as const, version: null },
-  hermes: { status: 'missing' as const, version: null },
+const aiAgentsStatus: AiAgentsStatus = {
+  ...createMissingAiAgentsStatus(),
+  prime: createAiAgentAvailability('installed', '1.0.20'),
 }
 
 describe('useAiAgentPreferences', () => {
@@ -35,10 +35,25 @@ describe('useAiAgentPreferences', () => {
       aiAgentsStatus,
     }))
 
-    expect(result.current.defaultAiAgent).toBe('claude_code')
-    expect(result.current.defaultAiAgentLabel).toBe('Claude Code')
+    expect(result.current.defaultAiAgent).toBe('prime')
+    expect(result.current.defaultAiAgentLabel).toBe('Prime Agent')
     expect(result.current.defaultAiAgentReadiness).toBe('ready')
     expect(result.current.defaultAiAgentReady).toBe(true)
+  })
+
+  it('coerces a legacy stored agent to Prime, the only product-visible target', () => {
+    const { result } = renderHook(() => useAiAgentPreferences({
+      settings: { ...settings, default_ai_agent: 'claude_code' },
+      settingsLoaded: true,
+      saveSettings: vi.fn(),
+      aiAgentsStatus: {
+        ...aiAgentsStatus,
+        claude_code: createAiAgentAvailability('installed', '1.0.20'),
+      },
+    }))
+
+    expect(result.current.defaultAiAgent).toBe('prime')
+    expect(result.current.defaultAiAgentLabel).toBe('Prime Agent')
   })
 
   it('keeps the selected agent unavailable while settings are loading', () => {
@@ -53,7 +68,7 @@ describe('useAiAgentPreferences', () => {
     expect(result.current.defaultAiAgentReady).toBe(false)
   })
 
-  it('cycles to the next agent and persists the selection', () => {
+  it('cycles within the product agent list — Prime-only, so it stays on Prime — and persists it', () => {
     const saveSettings = vi.fn()
     const onToast = vi.fn()
 
@@ -71,10 +86,10 @@ describe('useAiAgentPreferences', () => {
 
     expect(saveSettings).toHaveBeenCalledWith({
       ...settings,
-      default_ai_agent: 'codex',
-      default_ai_target: 'agent:codex',
+      default_ai_agent: 'prime',
+      default_ai_target: 'agent:prime',
     })
-    expect(onToast).toHaveBeenCalledWith('Default AI agent: Codex')
+    expect(onToast).toHaveBeenCalledWith('Default AI agent: Prime Agent')
   })
 
   it('keeps the browser mock agent composer enabled when no CLI is installed', () => {
@@ -82,15 +97,7 @@ describe('useAiAgentPreferences', () => {
       settings,
       settingsLoaded: true,
       saveSettings: vi.fn(),
-      aiAgentsStatus: {
-        claude_code: { status: 'missing', version: null },
-        codex: { status: 'missing', version: null },
-        opencode: { status: 'missing', version: null },
-        pi: { status: 'missing', version: null },
-        antigravity: { status: 'missing', version: null },
-        kiro: { status: 'missing', version: null },
-        hermes: { status: 'missing', version: null },
-      },
+      aiAgentsStatus: createMissingAiAgentsStatus(),
     }))
 
     expect(result.current.defaultAiAgentReady).toBe(true)

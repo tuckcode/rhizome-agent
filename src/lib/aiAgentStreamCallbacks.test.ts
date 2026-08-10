@@ -106,7 +106,9 @@ describe('aiAgentStreamCallbacks', () => {
         actions: [{
           tool: 'Write',
           toolId: 'tool-1',
-          label: 'Wrote file',
+          // Tool cards carry the note path so the card can offer "Open".
+          label: 'Wrote file · /vault/note.md',
+          path: '/vault/note.md',
           status: 'done',
           input: '{"path":"/vault/note.md"}',
           output: 'saved',
