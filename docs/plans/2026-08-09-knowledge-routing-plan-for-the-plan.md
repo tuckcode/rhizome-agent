@@ -94,9 +94,9 @@ destination, and can a user add a new destination without a code change?*
 | **Mem0 / OpenMemory** | Explicit memory *categories* with an extraction pass that assigns them. Closest to the ArtifactKind problem. Are categories user-extensible at runtime? |
 | **Letta / MemGPT** | Core vs archival memory tiers, agent-managed. Answers "who decides" with: the agent, via tools. Does routing survive compaction? |
 | **Zep / Graphiti** | Temporal knowledge graph — routing by *entity resolution* rather than folders. Would sidestep the folder question entirely. |
-| **Basic Memory** | Markdown-native, Obsidian-compatible, MCP. Closest file-layout analogue to Rhizome. How does it decide the path? |
+| **Basic Memory** | Markdown-native, MCP-served. Closest file-layout analogue to Rhizome. How does it decide the path? |
 | **Cursor / Claude Code memory** | Flat file plus prompt convention, no routing at all. The null hypothesis — evidence that routing may not be worth building. |
-| **Obsidian: Dataview, Templater, Auto Note Mover** | Auto Note Mover routes by regex/tag rules; Dataview makes folders irrelevant by querying frontmatter. Two opposite answers, both shipping. |
+| **Dataview / Auto Note Mover** (Obsidian plugins) | Read for the *pattern*, not the platform — Rhizome has no Obsidian dependency and the user does not use it. Auto Note Mover routes by regex/tag rules; Dataview makes folders irrelevant by querying frontmatter. Two opposite answers to the same question, both shipping at scale. |
 
 Also worth a look because they are adjacent and already in the repo's
 orbit: **Mindwalk**'s citymap treats a repo as the structure rather than
@@ -162,11 +162,23 @@ queries are a view layer on top, not the primary assignment.**
 
 ### Why folders, not frontmatter-only
 
-The product's differentiator is markdown files the user owns. If a bucket
-exists only as frontmatter, the vault on disk stays flat — open it in
-Finder, git, or another editor and there is no structure. That makes
-Rhizome's organisation proprietary, which is the one thing this product is
-explicitly not.
+**Not** "so it opens nicely in Obsidian." Rhizome incorporated Tolaria
+precisely so there is no third-party editor dependency, and the user does
+not use Obsidian. An earlier draft of this section argued from editor
+portability; that reasoning was wrong and is corrected here.
+
+The real reason is **agents read the filesystem.**
+
+Every agent path into this vault is path-based: Prime's `rhizome-vault`
+skill, `rhizome-tool <verb> <vault_path>`, MCP `create_note(notePath)`,
+`search_notes` returning paths, and the wikilinks agents write. Folders are
+already the API surface agents navigate. A bucket that exists only in
+frontmatter is invisible to every one of them unless each separately learns
+to query it — whereas a folder is legible to all of them for free, today,
+with no new contract.
+
+Secondary, still real: git history and diffs are structural, and the user
+browses files in Finder.
 
 Folders are also already vault-defined data. That satisfies the "not a Rust
 enum" requirement with the cheapest mechanism available — the filesystem.
@@ -228,12 +240,13 @@ design doc:
 1. **Verify the wikilink-safety claim** — does `.rhizome/move-manifests/`
    actually cover folder moves? Cheap, and the reframe depends on it.
 2. **Peer research**, now narrowed: given the folders-as-buckets decision,
-   the useful question is no longer "data or code" but **how peers keep a
-   physical layout legible outside their own app while still offering
-   cross-cutting views**. Basic Memory and the Obsidian ecosystem
-   (Dataview + Auto Note Mover) are the two most relevant; the memory-tier
-   tools (Letta, Mem0, Zep) are now less relevant because they do not have
-   a user-owned file layout to preserve.
+   the useful question is **how peers keep a physical layout legible to
+   agents while still offering cross-cutting views**. Basic Memory is the
+   closest analogue (markdown + MCP, no editor dependency). Dataview and
+   Auto Note Mover are worth reading for the folders-vs-queries pattern
+   only — not as a platform to integrate with. The memory-tier tools
+   (Letta, Mem0, Zep) are least relevant: they have no user-owned file
+   layout to preserve, which is the whole constraint here.
 
 Delegable to a subagent. Skip anything that only answers the routing
 question — that is no longer the bottleneck.
