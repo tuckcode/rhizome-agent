@@ -529,6 +529,16 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     kiro: { installed: false, version: null },
     hermes: { installed: false, version: null },
   }),
+  get_prime_session_stats: () => ({
+    sessionId: 'mock-session',
+    totalMessages: 12,
+    toolCalls: 5,
+    totalTokens: 84_000,
+    contextTokens: 62_000,
+    contextWindow: 200_000,
+    contextPercent: 31,
+    cost: 0.21,
+  }),
   get_prime_session_host_status: () => ({
     installed: true,
     version: 'mock',

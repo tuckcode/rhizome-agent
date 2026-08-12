@@ -18,6 +18,8 @@ import { useAiPanelController, type AiPanelController } from './useAiPanelContro
 import { useAiPanelPromptQueue } from './useAiPanelPromptQueue'
 import { useAiPanelFocus } from './useAiPanelFocus'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
+import { usePrimeSessionStats } from '../hooks/usePrimeSessionStats'
+import { PrimeContextMeter } from './PrimeContextMeter'
 
 export type { AiAgentMessage } from '../hooks/useCliAiAgent'
 
@@ -190,6 +192,9 @@ export function AiPanelView({
   const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime'
   const primeHost = usePrimeHostStatus(isPrimeTarget)
   const modelLabel = isPrimeTarget ? primeModelLabel(primeHost) : null
+  // Refresh when a turn finishes rather than only on the interval, so context
+  // usage reflects the exchange that just happened.
+  const primeStats = usePrimeSessionStats(isPrimeTarget, agent.status)
 
   useAiPanelPromptQueue({
     agent,
@@ -247,6 +252,11 @@ export function AiPanelView({
         onScrollStateChange={onMessageHistoryScrollStateChange}
         hasContext={hasContext}
       />
+      {isPrimeTarget && (
+        <div style={{ padding: '0 12px 6px' }}>
+          <PrimeContextMeter stats={primeStats} locale={locale} />
+        </div>
+      )}
       <AiPanelComposer
         entries={entries ?? []}
         agentLabel={view.agentLabel}
