@@ -252,11 +252,33 @@ The actual safety comes from `RenameWorkspace`'s transaction log plus
 mechanism and getting the right answer is exactly the kind of thing a later
 session would inherit as fact.
 
-### Still open for the design phase
+### ANSWERED 2026-08-10 — move-to-folder is command-palette only
 
-Whether `move_note_to_folder` is reachable from the UI, or only from the
-command layer. A bucket model needs a "move to bucket" affordance, and the
-Rust command existing does not mean a button does.
+The full chain works: palette command `move-note-to-folder`
+(`src/hooks/commands/localizeCommands.ts:39`, label "Move Note to Folder…")
+opens a dialog via `useNoteRetargeting`, gated on
+`canMoveActiveNoteToFolder`, and invokes the transactional Rust command.
+
+**But that is the only surface.** It is absent from:
+
+- the Note menu (Toggle Organized / Archive / Delete / Restore / Open in
+  New Window / Export PDF / Toggle Raw / ToC / Backlinks — no move)
+- any note-list or sidebar context menu
+- `appCommandManifest.json` entirely, so no native menu entry and no
+  keyboard shortcut
+
+Same shape as New Folder before it was fixed: capability complete, reach
+limited to one surface a user has to already know about. Worse here,
+because it also requires the right note to be active.
+
+**Design implication:** a bucket model makes moving between buckets a
+primary action, so palette-only is not sufficient. The design doc should
+budget for a note-list context-menu entry and a manifest command at
+minimum — and drag-to-folder is worth considering, since the folder tree
+is already rendered.
+
+Cheap, because the hard part (transactional move + wikilink rewrite) is
+done. This is surfacing, not building.
 
 ## Related, deliberately out of scope here
 
