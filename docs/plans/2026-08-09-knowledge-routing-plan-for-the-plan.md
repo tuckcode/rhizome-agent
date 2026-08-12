@@ -155,6 +155,64 @@ The Dataview question below still stands and now matters more: if a bucket
 is really a saved query over frontmatter, buckets cost almost nothing and
 nothing has to move on disk.
 
+## DECIDED 2026-08-10 — buckets are folders, views are queries
+
+Agreed after Q6. **Top-level folders are the destination model. Frontmatter
+queries are a view layer on top, not the primary assignment.**
+
+### Why folders, not frontmatter-only
+
+The product's differentiator is markdown files the user owns. If a bucket
+exists only as frontmatter, the vault on disk stays flat — open it in
+Finder, git, or another editor and there is no structure. That makes
+Rhizome's organisation proprietary, which is the one thing this product is
+explicitly not.
+
+Folders are also already vault-defined data. That satisfies the "not a Rust
+enum" requirement with the cheapest mechanism available — the filesystem.
+No schema, no registry, no new concept to maintain.
+
+### The finding that shrinks the work
+
+The vault already has the structure: `agents/`, `projects/`, `resources/`,
+`concepts/`, `entities/`, `sources/`, `meta/`, `skills/`, `queries/`.
+
+**The 126 "unassigned" notes are mostly already in folders.** The project
+tree groups by `project:` frontmatter and ignores the folder tree entirely
+— even though FOLDERS is a separate sidebar section rendering the same
+vault. This is not 126 homeless notes; it is a sidebar that does not look
+where the notes live.
+
+| Assumed | Actually |
+|---|---|
+| Design a destination model | Top-level folders are the model |
+| Build a router | Mostly unnecessary — writes already land in folders |
+| Backfill 126 notes | Mostly unnecessary — render what is on disk |
+
+### Accepted trade-off
+
+**One note, one folder.** No multi-bucket membership. Cross-cutting needs
+(everything touching `rhizome`, everything from last week, everything
+untyped) are saved views over frontmatter — that is what `queries/` and the
+sidebar's Create view already exist for. Many views, one home.
+
+### Reframe for the design doc
+
+Not "build a routing system". Instead:
+
+1. **Make the sidebar render the folders that already exist** as buckets,
+   rather than grouping solely by `project:` frontmatter.
+2. **Make `rhizome_write_location` resolve a folder** instead of a closed
+   `ArtifactKind` enum.
+3. Routing, if still needed after 1 and 2, is a much smaller problem — and
+   may reduce to a good "move to folder" affordance.
+
+### Must confirm before committing
+
+Moving a note between folders must not break wikilinks.
+`.rhizome/move-manifests/` exists, so the machinery is at least partly
+there — verify coverage before designing on top of it.
+
 ## Related, deliberately out of scope here
 
 - `ArtifactKind` extension is also what `raw/` routing needs — same change,
@@ -164,10 +222,18 @@ nothing has to move on disk.
 
 ## Next action
 
-Q6 is answered. Run the peer research above — focused on the destination
-model now, not routing — then write the real design doc. The research is
-delegable to a subagent.
+Q6 and the destination model are both answered. Two things left before the
+design doc:
 
-First question for that research, given the decision: **do peers store
-destinations as data or as code?** Anything with a hardcoded category list
-is the anti-pattern to avoid, not a model to copy.
+1. **Verify the wikilink-safety claim** — does `.rhizome/move-manifests/`
+   actually cover folder moves? Cheap, and the reframe depends on it.
+2. **Peer research**, now narrowed: given the folders-as-buckets decision,
+   the useful question is no longer "data or code" but **how peers keep a
+   physical layout legible outside their own app while still offering
+   cross-cutting views**. Basic Memory and the Obsidian ecosystem
+   (Dataview + Auto Note Mover) are the two most relevant; the memory-tier
+   tools (Letta, Mem0, Zep) are now less relevant because they do not have
+   a user-owned file layout to preserve.
+
+Delegable to a subagent. Skip anything that only answers the routing
+question — that is no longer the bottleneck.
