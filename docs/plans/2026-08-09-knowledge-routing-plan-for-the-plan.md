@@ -219,11 +219,44 @@ Not "build a routing system". Instead:
 3. Routing, if still needed after 1 and 2, is a much smaller problem — and
    may reduce to a good "move to folder" affordance.
 
-### Must confirm before committing
+### VERIFIED 2026-08-10 — folder moves are wikilink-safe
 
-Moving a note between folders must not break wikilinks.
-`.rhizome/move-manifests/` exists, so the machinery is at least partly
-there — verify coverage before designing on top of it.
+Checked, because the whole reframe depends on it. `move_note_to_folder`
+(`src-tauri/src/vault/rename.rs:439`) does four things in order:
+
+1. `recover_pending_rename_transactions(vault)` — crash recovery runs first
+2. `RenameWorkspace` + `.rename_exact(...)` — the move is **transactional**,
+   not a bare `fs::rename`
+3. `collect_legacy_wikilink_targets(&old_title, &old_path_stem)` — gathers
+   both link forms, so `[[Some Note]]` and `[[folder/some-note]]` are both
+   covered
+4. `finalize_rename` → `update_wikilinks_in_vault(vault, old_targets,
+   &new_path_stem, new_file)` (`rename.rs:239`)
+
+`RenameResult` returns `updated_files` **and `failed_updates`**, so partial
+failures surface rather than being swallowed.
+
+**Conclusion: moving notes between folders does not require building move
+safety first.** This precondition is cleared.
+
+### Correction: `.rhizome/move-manifests/` is not the mechanism
+
+An earlier note in this doc claimed move-manifests provided the wikilink
+safety. That was wrong. **Nothing in this repo writes that directory** — the
+only occurrence of the string is a test comment in `src-tauri/src/git/mod.rs`
+listing what `.rhizome/` holds. It is residue from the Python CLI era (4 KB
+in the real vault, gitignored, harmless).
+
+The actual safety comes from `RenameWorkspace`'s transaction log plus
+`update_wikilinks_in_vault`. Recorded because pointing at the wrong
+mechanism and getting the right answer is exactly the kind of thing a later
+session would inherit as fact.
+
+### Still open for the design phase
+
+Whether `move_note_to_folder` is reachable from the UI, or only from the
+command layer. A bucket model needs a "move to bucket" affordance, and the
+Rust command existing does not mean a button does.
 
 ## Related, deliberately out of scope here
 
@@ -237,8 +270,8 @@ there — verify coverage before designing on top of it.
 Q6 and the destination model are both answered. Two things left before the
 design doc:
 
-1. **Verify the wikilink-safety claim** — does `.rhizome/move-manifests/`
-   actually cover folder moves? Cheap, and the reframe depends on it.
+1. ~~Verify the wikilink-safety claim.~~ **Done 2026-08-10 — moves are safe.**
+   See the VERIFIED section above.
 2. **Peer research**, now narrowed: given the folders-as-buckets decision,
    the useful question is **how peers keep a physical layout legible to
    agents while still offering cross-cutting views**. Basic Memory is the
