@@ -187,7 +187,9 @@ No schema, no registry, no new concept to maintain.
 ### The finding that shrinks the work
 
 The vault already has the structure: `agents/`, `projects/`, `resources/`,
-`concepts/`, `entities/`, `sources/`, `meta/`, `skills/`, `queries/`.
+`concepts/`, `entities/`, `sources/`, `meta/`, `skills/`, `queries/`
+(note: `queries/` is legacy Python-CLI content — the view mechanism is
+`views/*.yml`, see `src-tauri/src/vault/views.rs:195`).
 
 **The 126 "unassigned" notes are mostly already in folders.** The project
 tree groups by `project:` frontmatter and ignores the folder tree entirely
@@ -205,8 +207,20 @@ where the notes live.
 
 **One note, one folder.** No multi-bucket membership. Cross-cutting needs
 (everything touching `rhizome`, everything from last week, everything
-untyped) are saved views over frontmatter — that is what `queries/` and the
-sidebar's Create view already exist for. Many views, one home.
+untyped) are saved views over frontmatter — that is what `views/*.yml` and
+the sidebar's Create view already exist for. Many views, one home.
+
+**Caveat found by peer research 2026-08-10:** this trade-off is not yet
+expressible. `resolve_condition_field` (`src-tauri/src/vault/views.rs:345`)
+handles `type`/`isA`, `status`, `title`, `body`, then falls through to
+frontmatter properties and relationships — there is **no `folder` or `path`
+field**, so a view cannot say "everything in `resources/`". Both peer query
+layers have this (Obsidian Bases `file.inFolder()`, Dataview `FROM
+"folder"`). `VaultEntry.path: String` already exists
+(`src-tauri/src/vault/entry.rs:10`), so this is a two-arm match addition —
+but until it lands, "one note, one folder" costs the user something with no
+compensating view. **Ship the folder filter before or with the bucket
+model, not after.**
 
 ### Reframe for the design doc
 
