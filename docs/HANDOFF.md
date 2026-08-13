@@ -79,8 +79,25 @@ OAuth / API / OpenAI-compatible provider. Do not record or "correct" whichever
 model a dev machine happens to default to. (The 2026-08-09 entry below carries a
 `xai/grok-4.5` preference note — that is a dev preference, not a product fact.)
 
-**Next:** spec the session list (`/grill-with-docs` → `/to-spec`) with C23 and
-the Mycelium overlap on the table. The model picker is closer than recorded —
+**Session list — slices 1, 2 and the bridge are landed.** Spec:
+`docs/plans/2026-08-13-prime-session-list-spec.md`. `prime_sessions` owns
+enumeration + transcript replay; `list_prime_session_summaries` and
+`read_prime_session_transcript` are registered Tauri commands.
+**Next is slice 3, the UI** (grouped list, rehydrate on select), then slice 4
+(`switch_session`, which takes `sessionPath` = the full log file path).
+
+⚠️ **Slice 3 is the first slice with product-rule surface area** — slices 1–2
+had none. It triggers localization (`en.json` + `pnpm l10n:translate`, and
+C18 means `l10n:validate` already fails on all 19 locales for want of
+credentials), shadcn/ui-only components, a PostHog event for session switch,
+and `mockCommandResults` entries for anything `<App/>` renders.
+
+**Verify against the real thing, not your reading of it.** Two defects this
+session were invisible to passing fixture tests: a `model_change` parse that
+invented a nested object no real log contains, and a C23 finding that was a
+misread of a fresh session. Both were caught by probing the live binary and a
+real log. `PRIME_SESSION_LOG=<path> cargo test --lib prime_sessions --
+--ignored` exists for exactly this. The model picker is closer than recorded —
 `get_available_models` + `set_model` + `cycle_model` all answer live, and
 BYO-model makes that surface load-bearing rather than second-tier.
 
@@ -424,6 +441,7 @@ Note what this implies about the record: sessions in this window that report "al
 
   `cargo test --lib`: 1317 passed, 0 failed, 10 ignored (baseline unchanged from C20's fix). `cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings`: clean. `cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check`: clean. `pnpm test`: 5160 passed / 484 files (baseline was 5158/484; +2 for the new themeMode fallback regression tests). `npx tsc --noEmit`: clean. `pnpm lint`: clean. Final `grep -rniE "tolaria|laputa"` over the 8 touched files shows only the intentional legacy-fallback constants/lists and their explanatory comments. Codacy: not run — no MCP tool, no `.codacy/` directory in this session (same standing gap noted in prior sessions).
 
+- **C23-CORRECTED (2026-08-13, same day): `get_messages` is not broken — I misread a fresh session.** Probing after `switch_session` returned **125 messages**, a full conversation. The original finding (only the user message) was a fresh session **mid-turn**: `get_messages` reflects *persisted* history and a just-finished turn is not persisted at the moment you ask. The decision to read transcripts from disk still stands, but for a **different and better reason**: `get_messages` returns *post-compaction working history* while the disk log holds *everything* — the same session gives 125 via RPC and 375 message lines on disk. Those are two legitimate different things ("what the model still remembers" vs "what was actually said"), and a scrollback transcript wants the second. Recorded because the original C23 wording would have sent a future session hunting a bug that does not exist.
 - **C23-RESOLVED (2026-08-13): the transcript comes from the on-disk `.jsonl`, not `get_messages`.** Decided in `docs/plans/2026-08-13-prime-session-list-spec.md`. The disk log is the only source describing a session the app is not currently running — the whole point of a switchable list — and is strictly richer (`parentId` fork lineage, `model_change`, `compaction`). `get_messages` stays as landed, correct for the live session, no longer load-bearing. Original finding retained below for the record.
 - **C23-OPEN (original finding): `get_messages` is not sufficient for transcript rehydration.** Found 2026-08-13 while verifying the newly-landed command against the live `prime-agent --mode rpc` binary. Within a **single** host process: send `prompt` → wait for `agent_end` → `agent_end` carries `messages` with **both** roles (`['user','assistant']`) → then `get_messages` on that same process returns **only the user message**. Reproduced across two runs. Not investigated further, so the cause is unknown — plausible readings are that `get_messages` reads a persisted store while `agent_end` reflects in-memory turn state, or that the assistant message commits on some later event. **Why it matters:** the roadmap recorded `get_messages` as the thing blocking the whole session story, which assumed it returns the conversation. It returns *a* conversation view that is missing the assistant side. Rehydration therefore needs a decision — capture `agent_end.messages` as the transcript source, find the persist trigger that makes `get_messages` complete, or reconstruct from the session `.jsonl` on disk (which `mycelium.rs` already reads). **Do not build the session list until this is settled**; all three options change its shape. The command itself is landed, tested and correct for what it returns — this is a sufficiency gap, not a defect in the parse.
 
