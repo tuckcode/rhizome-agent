@@ -20,10 +20,6 @@ pub struct WhichBinaryResult {
     pub path: Option<String>,
 }
 
-fn prime_sessions_dir() -> Option<PathBuf> {
-    dirs::home_dir().map(|h| h.join(".prime").join("agent").join("sessions"))
-}
-
 fn mtime_ms(path: &Path) -> Option<u64> {
     let meta = std::fs::metadata(path).ok()?;
     let modified = meta.modified().ok()?;
@@ -31,31 +27,24 @@ fn mtime_ms(path: &Path) -> Option<u64> {
     Some(duration.as_millis() as u64)
 }
 
+/// Sessions available to bridge into Mindwalk, newest first.
+///
+/// The scan itself lives in `prime_sessions` — Mycelium and the session list
+/// read the same directory for different jobs, and two scanners drift. This
+/// keeps Mycelium's own row shape (filename as `name`) so its view is
+/// unchanged; the session list derives a human title instead.
 pub fn list_prime_sessions() -> Result<Vec<PrimeSessionEntry>, String> {
-    let dir = prime_sessions_dir().ok_or_else(|| "Could not resolve home directory".to_string())?;
-    if !dir.is_dir() {
-        return Ok(vec![]);
-    }
-    let mut entries = Vec::new();
-    let read = std::fs::read_dir(&dir).map_err(|e| format!("read sessions dir: {e}"))?;
-    for entry in read.flatten() {
-        let path = entry.path();
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if !name.ends_with(".jsonl") {
-            continue;
-        }
-        // Skip bridge artifacts
-        if name.contains(".mindwalk-bridge.") {
-            continue;
-        }
-        entries.push(PrimeSessionEntry {
-            name,
-            path: path.to_string_lossy().into_owned(),
+    Ok(crate::prime_sessions::session_files()?
+        .into_iter()
+        .map(|path| PrimeSessionEntry {
+            name: path
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_default(),
             mtime_ms: mtime_ms(&path),
-        });
-    }
-    entries.sort_by_key(|entry| std::cmp::Reverse(entry.mtime_ms));
-    Ok(entries)
+            path: path.to_string_lossy().into_owned(),
+        })
+        .collect())
 }
 
 pub fn which_binary(name: &str) -> WhichBinaryResult {
