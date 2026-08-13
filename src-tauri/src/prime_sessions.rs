@@ -97,7 +97,10 @@ pub fn session_files() -> Result<Vec<PathBuf>, String> {
                 .is_some_and(is_session_log)
         })
         .collect();
-    files.sort_by_key(|path| std::cmp::Reverse(mtime_ms(path)));
+    // `sort_by_key` would call this key O(n log n) times, and each call is a
+    // filesystem `metadata()` syscall — hundreds of them to draw one list.
+    // `sort_by_cached_key` computes each key exactly once.
+    files.sort_by_cached_key(|path| std::cmp::Reverse(mtime_ms(path)));
     Ok(files)
 }
 
