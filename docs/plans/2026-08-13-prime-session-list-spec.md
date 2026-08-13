@@ -104,16 +104,47 @@ files — read only what the row needs. The transcript parse must skip
 
 Ordering note: 1 and 2 are independently testable and land before any UI.
 
-## Open questions
+## Answered since (probes, 2026-08-13)
 
-- Does `switch_session` want the file path or the session directory? Probe
-  before slice 4.
-- What does `switch_session` do to a *streaming* host? Do not find out in
-  production — the steering work already established this instinct.
-- Are message `id`s the entry ids `fork` wants? Answer before the fork slice,
-  not now.
+**`switch_session` takes `sessionPath` — the full log file path.** Not `path`,
+not `sessionId`; those and nine other names all fail identically with a
+`paths[0] … undefined` error that names no parameter. Verified working: after
+switching, `get_state.sessionId` becomes the target session's id.
+
+**C23 was half wrong, and the correction matters.** `get_messages` *does*
+return a full conversation — 125 messages after switching into a real session.
+The original finding (only the user message) was a **fresh session mid-turn**:
+it reflects *persisted* history, and a just-finished turn is not persisted at
+the moment you ask. It is not broken.
+
+What is true, and is the better reason for the disk decision: **`get_messages`
+returns post-compaction working history, the disk log holds everything.** The
+same session gives 125 via RPC and 375 message lines on disk, because a
+compaction dropped the rest. Those are two different things and both are
+legitimate — "what the model still remembers" vs "what was actually said". A
+transcript the user scrolls back through wants the second. The disk decision
+stands, on firmer ground than the one it was made on.
+
+**A session has five roles, not two:** `user`, `assistant`, `toolResult`,
+`custom`, `compactionSummary`. Tool results are their own messages, not blocks
+inside assistant messages. `compactionSummary` carries no `content` at all —
+it has `summary`, `tokensBefore`, `retainedMessageCount`.
+
+**`model_change` is flat** — `{provider, modelId}`, no nested `model` object
+and no display name. The first parse of it guessed wrong and every fixture
+test passed; there is now an `#[ignore]`d real-log test (`PRIME_SESSION_LOG`)
+because hand-written fixtures only ever prove the parse matches its author's
+reading of the format.
+
+## Still open
+
+- What does `switch_session` do to a *streaming* host? Still unprobed. Do not
+  find out in production — the steering work established this instinct.
+- Are message `id`s the entry ids `fork` wants? Answer before the fork slice.
 - Is the sessions directory stable across Prime versions? It is not our
   directory.
+- `thinking_level_change` is a fifth line type, currently ignored by the
+  replay. Harmless, but it is a real state change a transcript could show.
 
 ## Closes
 
