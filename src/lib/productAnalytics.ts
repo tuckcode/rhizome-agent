@@ -5,7 +5,7 @@ import type { AllNotesFileVisibility } from '../utils/allNotesFileVisibility'
 import type { DateDisplayFormat } from '../utils/dateDisplay'
 import type { FilePreviewKind } from '../utils/filePreview'
 import type { NoteWidthMode } from '../types'
-import type { PrimeSessionGroupKey } from './primeSessionGroups'
+import type { PrimeSessionAge } from './primeSessionMeta'
 import type { ThemeMode } from './themeMode'
 
 type TrackedPreviewKind = FilePreviewKind | 'unsupported'
@@ -260,11 +260,11 @@ export function trackPrimeSessionListOpened(sessionCount: number): void {
 }
 
 /**
- * A past session was opened from the list. `group` says how old it was, which
- * is what tells us whether people reach for yesterday's work or last month's.
+ * A past session was opened from the list. `age` says how old it was, which
+ * tells us whether people reach for yesterday's work or last month's.
  */
-export function trackPrimeSessionOpened(group: PrimeSessionGroupKey): void {
-  trackEvent('prime_session_opened', { group })
+export function trackPrimeSessionOpened(age: PrimeSessionAge): void {
+  trackEvent('prime_session_opened', { age })
 }
 
 /** Coarse buckets — an exact count of someone's sessions is not our business. */

@@ -330,6 +330,33 @@ pub fn get_messages() -> Result<Vec<PrimeMessage>, String> {
     })
 }
 
+/// Load a past session into the live host.
+///
+/// Prime names the argument `sessionPath` and wants the log file itself —
+/// established by probing the binary, which rejects `path`, `sessionId` and
+/// ten other spellings with an error that names no parameter.
+///
+/// Refuses while a turn is streaming. Prime's docs do not say what switching
+/// mid-turn does to the running turn, and the place to find that out is not a
+/// user's session — the same caution `steer` already applies.
+pub fn switch_session(session_path: &str) -> Result<String, String> {
+    crate::prime_sessions::ensure_inside_sessions_dir(std::path::Path::new(session_path))?;
+    with_host_mut(|host| {
+        if host.is_streaming {
+            return Err("Cannot switch sessions while a turn is running".into());
+        }
+        let response = host.send_command(serde_json::json!({
+            "type": "switch_session",
+            "sessionPath": session_path,
+        }))?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, "switch_session"));
+        }
+        host.refresh_session_id()?;
+        Ok(host.session_id.clone().unwrap_or_default())
+    })
+}
+
 /// Compact the conversation now. Returns tokens held before compaction when
 /// Prime reports it, so the caller can show what the run actually reclaimed.
 pub fn compact(custom_instructions: Option<String>) -> Result<Option<u64>, String> {

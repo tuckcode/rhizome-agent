@@ -558,6 +558,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   list_prime_sessions: () => [],
   list_prime_session_summaries: () => [],
   read_prime_session_transcript: () => [],
+  switch_prime_session: () => 'mock-session',
   which_binary: ({ name }: { name: string }) => ({ found: name === 'mindwalk', path: name === 'mindwalk' ? '/usr/bin/mindwalk' : null }),
   run_mindwalk_open: ({ path }: { path: string }) => path,
   bridge_and_open_prime_session: ({ path }: { path: string }) => path,
