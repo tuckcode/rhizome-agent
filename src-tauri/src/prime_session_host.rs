@@ -109,6 +109,69 @@ impl PrimeSessionStats {
     }
 }
 
+/// One message from Prime's conversation history.
+///
+/// `content` is passed through as raw JSON rather than modelled here. Prime
+/// discriminates content blocks by `type` — `text`, plus tool and thinking
+/// shapes — and a Rust-side enum would silently drop any block kind it did not
+/// anticipate. That is exactly the data a rehydrated transcript needs most, so
+/// the parse is deliberately lossless. The frontend already understands
+/// Prime's block shapes from the streaming path (`prime_events`).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrimeMessage {
+    pub role: String,
+    /// Verbatim `content` as Prime sent it. Never reshaped.
+    pub content: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<u64>,
+    /// Concatenated `text` blocks, for callers that only want the prose.
+    /// A convenience over `content`, never a replacement for it.
+    pub text: String,
+}
+
+impl PrimeMessage {
+    fn from_value(value: &serde_json::Value) -> Self {
+        let content = value
+            .get("content")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+        Self {
+            role: value["role"].as_str().unwrap_or_default().to_string(),
+            text: text_from_content(&content),
+            timestamp: value["timestamp"].as_u64(),
+            content,
+        }
+    }
+}
+
+/// Flatten the `text` blocks of a content payload.
+///
+/// Accepts a bare string as well as a block array: Prime's own message shape is
+/// an array, but a plain string is the obvious degenerate form and treating it
+/// as "no text" would be a silent data loss for one character of tolerance.
+fn text_from_content(content: &serde_json::Value) -> String {
+    if let Some(text) = content.as_str() {
+        return text.to_string();
+    }
+    let Some(blocks) = content.as_array() else {
+        return String::new();
+    };
+    blocks
+        .iter()
+        .filter(|block| block["type"].as_str() == Some("text"))
+        .filter_map(|block| block["text"].as_str())
+        .collect::<Vec<_>>()
+        .join("")
+}
+
+fn messages_from_response(data: &serde_json::Value) -> Vec<PrimeMessage> {
+    data["messages"]
+        .as_array()
+        .map(|messages| messages.iter().map(PrimeMessage::from_value).collect())
+        .unwrap_or_default()
+}
+
 // ── Process-wide host registry ──────────────────────────────────────────────
 
 struct HostSlot {
@@ -243,6 +306,22 @@ pub fn get_session_stats() -> Result<PrimeSessionStats, String> {
             return Err(response_error(&response, "get_session_stats"));
         }
         Ok(PrimeSessionStats::from_state_data(
+            response.get("data").unwrap_or(&serde_json::Value::Null),
+        ))
+    })
+}
+
+/// Fetch the live session's conversation history.
+///
+/// This is what a transcript rehydrates from: reopening a session, or
+/// recovering the panel after a reload, without replaying the stream.
+pub fn get_messages() -> Result<Vec<PrimeMessage>, String> {
+    with_host_mut(|host| {
+        let response = host.send_command(serde_json::json!({ "type": "get_messages" }))?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, "get_messages"));
+        }
+        Ok(messages_from_response(
             response.get("data").unwrap_or(&serde_json::Value::Null),
         ))
     })
@@ -1151,6 +1230,90 @@ for line in sys.stdin:
         assert_eq!(stats.context_window, Some(200_000));
         assert_eq!(stats.context_percent, Some(30.0));
         assert_eq!(stats.cost, Some(0.45));
+    }
+
+    #[test]
+    fn messages_parse_role_text_and_timestamp_from_prime_payload() {
+        let data = serde_json::json!({
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [{"type": "text", "text": "hello"}],
+                    "timestamp": 1_723_000_000_000u64
+                },
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "text", "text": "hi "},
+                        {"type": "text", "text": "there"}
+                    ]
+                }
+            ]
+        });
+
+        let messages = messages_from_response(&data);
+
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[0].role, "user");
+        assert_eq!(messages[0].text, "hello");
+        assert_eq!(messages[0].timestamp, Some(1_723_000_000_000));
+        // Adjacent text blocks are one utterance, not two.
+        assert_eq!(messages[1].text, "hi there");
+        assert_eq!(messages[1].timestamp, None);
+    }
+
+    /// The parse must not become a text extractor. A rehydrated transcript
+    /// needs the tool calls too, and Prime's block taxonomy is not ours to
+    /// enumerate — anything we fail to recognise still has to survive.
+    #[test]
+    fn messages_preserve_non_text_content_blocks_verbatim() {
+        let data = serde_json::json!({
+            "messages": [{
+                "role": "assistant",
+                "content": [
+                    {"type": "thinking", "thinking": "weighing options"},
+                    {"type": "text", "text": "Reading the file."},
+                    {"type": "tool_use", "id": "t1", "name": "read", "input": {"path": "a.md"}},
+                    {"type": "some_future_block", "payload": {"nested": true}}
+                ]
+            }]
+        });
+
+        let messages = messages_from_response(&data);
+
+        assert_eq!(messages[0].text, "Reading the file.");
+        let blocks = messages[0]
+            .content
+            .as_array()
+            .expect("content stays an array");
+        assert_eq!(blocks.len(), 4, "no block may be dropped");
+        assert_eq!(blocks[2]["name"], "read");
+        assert_eq!(blocks[2]["input"]["path"], "a.md");
+        assert_eq!(
+            blocks[3]["payload"]["nested"], true,
+            "an unrecognised block kind must round-trip untouched"
+        );
+    }
+
+    /// A fresh session answers `{"messages": []}`, and a malformed payload must
+    /// not be louder than an empty one — neither is an error the UI can act on.
+    #[test]
+    fn messages_are_empty_rather_than_an_error_when_absent() {
+        assert!(messages_from_response(&serde_json::json!({"messages": []})).is_empty());
+        assert!(messages_from_response(&serde_json::json!({})).is_empty());
+        assert!(messages_from_response(&serde_json::Value::Null).is_empty());
+    }
+
+    /// Tolerate a bare string where a block array was expected. Treating it as
+    /// "no text" would lose the whole message for one character of strictness.
+    #[test]
+    fn message_text_accepts_a_bare_string_content() {
+        let messages = messages_from_response(&serde_json::json!({
+            "messages": [{"role": "user", "content": "plain"}]
+        }));
+
+        assert_eq!(messages[0].text, "plain");
+        assert_eq!(messages[0].content, serde_json::json!("plain"));
     }
 
     /// Prime omits fields on a fresh session. Missing must stay `None` rather
