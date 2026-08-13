@@ -330,6 +330,80 @@ pub fn get_messages() -> Result<Vec<PrimeMessage>, String> {
     })
 }
 
+/// A model the live Prime host can switch to.
+///
+/// Only the fields a picker needs. Prime reports ~78 models with pricing,
+/// thinking-level maps and base URLs; carrying all of that across the IPC
+/// boundary to render a menu would be waste.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrimeModel {
+    pub id: String,
+    pub name: String,
+    pub provider: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u64>,
+    pub reasoning: bool,
+}
+
+fn models_from_response(data: &serde_json::Value) -> Vec<PrimeModel> {
+    data["models"]
+        .as_array()
+        .map(|models| {
+            models
+                .iter()
+                .filter_map(|model| {
+                    let id = model["id"].as_str()?;
+                    let provider = model["provider"].as_str()?;
+                    Some(PrimeModel {
+                        id: id.to_string(),
+                        // Fall back to the id: a model with no display name is
+                        // still selectable, and a blank row is not.
+                        name: model["name"].as_str().unwrap_or(id).to_string(),
+                        provider: provider.to_string(),
+                        context_window: model["contextWindow"].as_u64(),
+                        reasoning: model["reasoning"].as_bool().unwrap_or(false),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Every model the host can switch to, as Prime reports them.
+pub fn get_available_models() -> Result<Vec<PrimeModel>, String> {
+    with_host_mut(|host| {
+        let response = host.send_command(serde_json::json!({ "type": "get_available_models" }))?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, "get_available_models"));
+        }
+        Ok(models_from_response(
+            response.get("data").unwrap_or(&serde_json::Value::Null),
+        ))
+    })
+}
+
+/// Switch the live host's model.
+///
+/// Prime names these `provider` and `modelId` and needs both — sending one
+/// alone fails with `Model not found: opencode/undefined`.
+pub fn set_model(provider: &str, model_id: &str) -> Result<(), String> {
+    if provider.trim().is_empty() || model_id.trim().is_empty() {
+        return Err("A model needs both a provider and an id".into());
+    }
+    with_host_mut(|host| {
+        let response = host.send_command(serde_json::json!({
+            "type": "set_model",
+            "provider": provider,
+            "modelId": model_id,
+        }))?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, "set_model"));
+        }
+        Ok(())
+    })
+}
+
 /// Load a past session into the live host.
 ///
 /// Prime names the argument `sessionPath` and wants the log file itself —
@@ -1260,6 +1334,44 @@ for line in sys.stdin:
         assert_eq!(stats.context_window, Some(200_000));
         assert_eq!(stats.context_percent, Some(30.0));
         assert_eq!(stats.cost, Some(0.45));
+    }
+
+    #[test]
+    fn models_parse_the_fields_a_picker_needs() {
+        let data = serde_json::json!({
+            "models": [
+                {"id": "grok-4.5", "name": "Grok 4.5", "provider": "xai",
+                 "contextWindow": 256000, "reasoning": true, "cost": {"input": 3.0}},
+                {"id": "bare", "provider": "local"}
+            ]
+        });
+
+        let models = models_from_response(&data);
+
+        assert_eq!(models.len(), 2);
+        assert_eq!(models[0].provider, "xai");
+        assert_eq!(models[0].context_window, Some(256_000));
+        assert!(models[0].reasoning);
+        // A model with no display name is still selectable; a blank row is not.
+        assert_eq!(models[1].name, "bare");
+        assert!(!models[1].reasoning);
+    }
+
+    /// A model without an id or provider cannot be switched to, so offering it
+    /// would be a menu entry that always fails.
+    #[test]
+    fn models_without_an_id_or_provider_are_dropped() {
+        let models = models_from_response(&serde_json::json!({
+            "models": [{"name": "no id", "provider": "x"}, {"id": "no provider"}]
+        }));
+
+        assert!(models.is_empty());
+    }
+
+    #[test]
+    fn set_model_refuses_a_half_specified_model() {
+        assert!(set_model("", "grok-4.5").is_err());
+        assert!(set_model("xai", "  ").is_err());
     }
 
     #[test]

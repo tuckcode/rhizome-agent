@@ -559,6 +559,11 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   list_prime_session_summaries: () => [],
   read_prime_session_transcript: () => [],
   switch_prime_session: () => 'mock-session',
+  get_available_prime_models: () => [
+    { id: 'grok-4.5', name: 'Grok 4.5', provider: 'xai', contextWindow: 256000, reasoning: true },
+    { id: 'claude-fable-5', name: 'Claude Fable 5', provider: 'anthropic', reasoning: true },
+  ],
+  set_prime_model: () => null,
   which_binary: ({ name }: { name: string }) => ({ found: name === 'mindwalk', path: name === 'mindwalk' ? '/usr/bin/mindwalk' : null }),
   run_mindwalk_open: ({ path }: { path: string }) => path,
   bridge_and_open_prime_session: ({ path }: { path: string }) => path,

@@ -58,3 +58,16 @@ function inferHomeDir(path: string): string | null {
   const match = /^(\/(?:Users|home)\/[^/]+)/.exec(path)
   return match ? match[1] : null
 }
+
+/**
+ * Just the vault's folder name, for the composer chip.
+ *
+ * The subhead already carries the path; down at the composer the question is
+ * only "which vault", and a path would crowd out the other chips.
+ */
+export function vaultLabelFromPath(vaultPath: string | null | undefined): string | null {
+  const trimmed = vaultPath?.trim().replace(/\/+$/, '')
+  if (!trimmed) return null
+  const name = trimmed.slice(trimmed.lastIndexOf('/') + 1)
+  return name || null
+}

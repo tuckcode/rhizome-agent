@@ -633,6 +633,20 @@ pub fn read_prime_session_transcript(
     crate::prime_sessions::read_transcript(std::path::Path::new(&path))
 }
 
+/// Every model the live Prime host can switch to.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn get_available_prime_models() -> Result<Vec<crate::prime_session_host::PrimeModel>, String> {
+    crate::prime_session_host::get_available_models()
+}
+
+/// Switch the live Prime host's model.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn set_prime_model(provider: String, model_id: String) -> Result<(), String> {
+    crate::prime_session_host::set_model(&provider, &model_id)
+}
+
 /// Load a past session into the live Prime host.
 ///
 /// Returns the session id the host reports afterwards, so the caller can

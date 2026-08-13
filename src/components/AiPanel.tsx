@@ -55,6 +55,8 @@ interface AiPanelProps {
   noteListFilter?: { type: string | null; query: string }
   /** Chat-home hides the panel header; the window chrome carries that role. */
   showHeader?: boolean
+  /** Chips rendered in the composer's control row (Frame A's control deck). */
+  composerControls?: ReactNode
 }
 
 interface AiPanelViewProps {
@@ -354,6 +356,7 @@ export function AiPanelView({
 export function AiPanel({
   onClose,
   showHeader,
+  composerControls,
   onOpenNote,
   onPromoteToVault,
   onUnsupportedAiPaste,
@@ -400,6 +403,7 @@ export function AiPanel({
     <AiPanelView
       controller={controller}
       showHeader={showHeader}
+      composerControls={composerControls}
       onClose={onClose}
       onOpenNote={onOpenNote}
       onPromoteToVault={onPromoteToVault}
