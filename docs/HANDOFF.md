@@ -21,6 +21,35 @@ Living doc. Update in place each session. This file is "what's true right now," 
 
 ---
 
+## Session handoff — 2026-08-10 (Prime harness: context meter + steering)
+
+**Full detail: `docs/plans/2026-08-10-prime-harness-session-status.md`. Read that first.**
+
+**Shipped** — 7 pushes, all six gates green. `main` had a broken build that no
+gate had ever run (the push had never succeeded since the fork), fixed first.
+
+- Prime RPC coverage **7 → 12 of ~45**: session stats, compact,
+  set_auto_compaction, **steer**, follow_up, plus `Compaction` and
+  `QueueUpdate` events
+- **Context meter** above the composer — `62.0k / 200.0k (31%)`, pressure-coloured
+- **Steering** — composer stays live during a turn; typed text = "Steer
+  response", empty = "Stop response"
+- `prime_session_host.rs` 67.23% → 81.53% coverage (4 tests → 15, plus a
+  TEST_LOCK for the process-global host the old tests raced on)
+- Chat-primary regression fixed (`absolute inset-0` was painting over the editor)
+- File → New Folder + fresh-vault fix; 19 pre-existing test failures cleared
+
+**Next**: `get_messages` (blocks the whole session-list story) → session list →
+surface QueueUpdate → in-app Mycelium via `mindwalk serve` sidecar.
+
+**Traps, do not relearn** — `npx tsc --noEmit` is NOT the build gate (`tsc -b`
+is, and they disagree); Desktop and Agent have diverged so Desktop knowledge
+does not transfer (`consolidation.rs`/ADR-0163 exist there, not here;
+auto-distill defaults ON there, OFF here); zsh does not word-split unquoted
+`$VAR`; the manifest can declare a handler a `Pick<>` union silently lacks.
+
+---
+
 ## Session handoff — 2026-08-09 (UI-2 chat-primary slice)
 
 **Shipped**
