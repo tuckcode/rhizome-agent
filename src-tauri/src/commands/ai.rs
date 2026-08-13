@@ -633,6 +633,16 @@ pub fn read_prime_session_transcript(
     crate::prime_sessions::read_transcript(std::path::Path::new(&path))
 }
 
+/// Load a past session into the live Prime host.
+///
+/// Returns the session id the host reports afterwards, so the caller can
+/// confirm the switch landed rather than assuming it did.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn switch_prime_session(path: String) -> Result<String, String> {
+    crate::prime_session_host::switch_session(&path)
+}
+
 // --- Mycelium / Mindwalk ---
 
 #[tauri::command]

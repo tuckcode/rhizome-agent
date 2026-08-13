@@ -179,5 +179,25 @@ export function useCliAiAgent(
     addAgentLocalMarker(runtime, text)
   }
 
-  return { messages, status, sendMessage, stopMessage, regenerateMessage, clearConversation, addLocalMarker }
+  /**
+   * Replace the whole conversation, for rehydrating a switched-to session.
+   *
+   * Deliberately a replace rather than an append: the panel is now showing a
+   * different session, and merging two conversations would attribute one
+   * session's turns to another.
+   */
+  function replaceMessages(next: AiAgentMessage[]): void {
+    runtime.setMessages(next)
+  }
+
+  return {
+    messages,
+    status,
+    sendMessage,
+    stopMessage,
+    regenerateMessage,
+    clearConversation,
+    addLocalMarker,
+    replaceMessages,
+  }
 }

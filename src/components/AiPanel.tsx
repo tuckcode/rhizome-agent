@@ -8,6 +8,10 @@ import { ClockCounterClockwise } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { translate } from '../lib/i18n'
 import PrimeSessionList from './PrimeSessionList'
+import { primeTranscriptToConversation, type PrimeTranscriptItem } from '../lib/primeTranscriptToConversation'
+import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
+import { isTauri, mockInvoke } from '../mock-tauri'
+import { invoke } from '@tauri-apps/api/core'
 import {
   DEFAULT_AI_AGENT,
   getAiAgentDefinition,
@@ -224,11 +228,32 @@ export function AiPanelView({
   }, [handleSend, isActive, onSendPrompt])
 
   const [sessionsOpen, setSessionsOpen] = useState(false)
-  // Slice 4 loads the transcript and calls switch_session. Until then choosing
-  // a session closes the list rather than silently doing nothing.
-  const handleSelectSession = useCallback(() => {
-    setSessionsOpen(false)
-  }, [])
+  const [activeSessionPath, setActiveSessionPath] = useState<string | null>(null)
+  const [switchError, setSwitchError] = useState<string | null>(null)
+
+  /**
+   * Switch the live host to a past session and rehydrate the transcript.
+   *
+   * The switch goes first: if the host refuses (it will not switch mid-turn),
+   * the panel must keep showing the conversation it is actually on rather than
+   * a transcript from a session that was never loaded.
+   */
+  const handleSelectSession = useCallback(async (session: PrimeSessionSummary) => {
+    const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
+      isTauri() ? invoke<T>(cmd, args) : mockInvoke<T>(cmd, args)
+    setSwitchError(null)
+    try {
+      await call<string>('switch_prime_session', { path: session.path })
+      const transcript = await call<PrimeTranscriptItem[]>('read_prime_session_transcript', {
+        path: session.path,
+      })
+      agent.replaceMessages(primeTranscriptToConversation(transcript))
+      setActiveSessionPath(session.path)
+      setSessionsOpen(false)
+    } catch (e) {
+      setSwitchError(e instanceof Error ? e.message : String(e))
+    }
+  }, [agent])
 
   return (
     <AiPanelFrame panelRef={panelRef} isActive={isActive} showLeftBorder={showLeftBorder} surface={surface}>
@@ -265,6 +290,11 @@ export function AiPanelView({
           </Button>
         </div>
       )}
+      {switchError ? (
+        <p className="shrink-0 px-3 py-1.5 text-xs text-destructive" role="alert">
+          {switchError}
+        </p>
+      ) : null}
       <div className="flex min-h-0 flex-1">
         {sessionsOpen && (
           // Design system: sessions are a 228px column beside the transcript,
@@ -272,7 +302,13 @@ export function AiPanelView({
           // 900px matches the design system's own breakpoint for `.ra-sessions`;
           // below it the transcript takes the whole panel.
           <div className="hidden w-[228px] shrink-0 border-r border-border min-[900px]:flex">
-            <PrimeSessionList locale={locale} onSelectSession={handleSelectSession} />
+            <PrimeSessionList
+              locale={locale}
+              onSelectSession={(session) => void handleSelectSession(session)}
+              onNewChat={handleNewChat}
+              activeSessionPath={activeSessionPath}
+              working={isActive}
+            />
           </div>
         )}
       <AiPanelMessageHistory

@@ -305,7 +305,7 @@ fn transcript_from_lines<I: Iterator<Item = String>>(lines: I) -> Vec<PrimeTrans
 /// is an arbitrary-file read: anything on disk whose lines happen to be JSON
 /// would come back through the IPC boundary. Both ends are canonicalised so
 /// `..` segments and symlinks cannot walk out of the directory.
-fn ensure_inside_sessions_dir(path: &Path) -> Result<(), String> {
+pub(crate) fn ensure_inside_sessions_dir(path: &Path) -> Result<(), String> {
     let dir = sessions_dir().ok_or_else(|| "Could not resolve home directory".to_string())?;
     let dir = std::fs::canonicalize(&dir).map_err(|e| format!("resolve sessions dir: {e}"))?;
     let resolved = std::fs::canonicalize(path).map_err(|e| format!("resolve session log: {e}"))?;

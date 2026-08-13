@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PrimeSessionList from './PrimeSessionList'
-import type { PrimeSessionSummary } from '../lib/primeSessionGroups'
+import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
 
 const invoked = vi.hoisted(() => ({ calls: [] as string[], result: [] as unknown[], fail: '' }))
 
@@ -17,7 +17,7 @@ vi.mock('../mock-tauri', () => ({
 const tracked = vi.hoisted(() => ({ opened: [] as number[], selected: [] as string[] }))
 vi.mock('../lib/productAnalytics', () => ({
   trackPrimeSessionListOpened: (count: number) => tracked.opened.push(count),
-  trackPrimeSessionOpened: (group: string) => tracked.selected.push(group),
+  trackPrimeSessionOpened: (age: string) => tracked.selected.push(age),
 }))
 
 const NOW = new Date(2026, 7, 13, 15, 0, 0).getTime()
@@ -37,29 +37,30 @@ beforeEach(() => {
 })
 
 describe('PrimeSessionList', () => {
-  it('reads summaries only — never a transcript', async () => {
+  it('reads summaries only — opening the list never reads a transcript', async () => {
     render(<PrimeSessionList now={NOW} />)
 
     await waitFor(() => expect(invoked.calls).toContain('list_prime_session_summaries'))
-    // Opening the list must not read a 2 MB log for every row.
     expect(invoked.calls).not.toContain('read_prime_session_transcript')
   })
 
-  it('renders sessions under their time group', async () => {
+  /** Frame F: a flat list where each row carries its own day in the meta. */
+  it('lists sessions newest first with a day-stamped meta line', async () => {
     invoked.result = [
-      summary({ id: 'a', title: 'today work', mtimeMs: NOW - HOUR }),
-      summary({ id: 'b', title: 'older work', mtimeMs: NOW - 4 * DAY }),
+      summary({ id: 'old', title: 'older work', mtimeMs: NOW - DAY - HOUR }),
+      summary({ id: 'new', title: 'todays work', mtimeMs: new Date(2026, 7, 13, 14, 8).getTime() }),
     ]
 
     render(<PrimeSessionList now={NOW} />)
 
-    expect(await screen.findByText('today work')).toBeInTheDocument()
-    expect(screen.getByText('older work')).toBeInTheDocument()
-    expect(screen.getByText('Today')).toBeInTheDocument()
-    expect(screen.getByText('Previous 7 days')).toBeInTheDocument()
+    expect(await screen.findByText('Today · 14:08')).toBeInTheDocument()
+    expect(screen.getByText('Yesterday')).toBeInTheDocument()
+
+    const rows = screen.getAllByRole('button').filter((b) => b.getAttribute('aria-current') !== null || /work/.test(b.textContent ?? ''))
+    expect(rows[0]).toHaveTextContent('todays work')
   })
 
-  it('hands the chosen session to the caller rather than loading it itself', async () => {
+  it('hands the chosen session to the caller rather than switching itself', async () => {
     invoked.result = [summary({ id: 'a', title: 'pick me' })]
     const onSelectSession = vi.fn()
 
@@ -67,7 +68,7 @@ describe('PrimeSessionList', () => {
     fireEvent.click(await screen.findByRole('button', { name: /pick me/ }))
 
     expect(onSelectSession).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }))
-    expect(invoked.calls).not.toContain('read_prime_session_transcript')
+    expect(invoked.calls).not.toContain('switch_prime_session')
   })
 
   /** A uuid filename names nothing to a human — never show it as the label. */
@@ -81,25 +82,26 @@ describe('PrimeSessionList', () => {
     expect(screen.queryByText(/\.jsonl/)).not.toBeInTheDocument()
   })
 
-  // The design system's session item is title over a meta line; meta answers
-  // "which project, how stale" — never the full path.
-  it('shows the project and how stale a session is, not its whole path', async () => {
+  it('marks the session the host is on as current', async () => {
     invoked.result = [
-      summary({ title: 'work', cwd: '/Users/dtc/code/projects/rhizome-agent', mtimeMs: NOW - 2 * HOUR }),
+      summary({ id: 'a', title: 'active one', path: '/sessions/a.jsonl' }),
+      summary({ id: 'b', title: 'other one', path: '/sessions/b.jsonl' }),
     ]
 
-    render(<PrimeSessionList now={NOW} />)
+    render(<PrimeSessionList now={NOW} activeSessionPath="/sessions/a.jsonl" />)
 
-    expect(await screen.findByText('rhizome-agent · 2h ago')).toBeInTheDocument()
-    expect(screen.queryByText(/\/Users\/dtc/)).not.toBeInTheDocument()
+    const active = await screen.findByRole('button', { name: /active one/ })
+    expect(active).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByRole('button', { name: /other one/ })).not.toHaveAttribute('aria-current')
   })
 
-  it('still renders a row for a session with no cwd and no timestamp', async () => {
-    invoked.result = [summary({ title: 'bare', cwd: null, mtimeMs: null })]
+  /** What a session is doing now matters more than when it last changed. */
+  it('says a working session is working instead of when it changed', async () => {
+    invoked.result = [summary({ id: 'a', title: 'busy', path: '/sessions/a.jsonl' })]
 
-    render(<PrimeSessionList now={NOW} />)
+    render(<PrimeSessionList now={NOW} activeSessionPath="/sessions/a.jsonl" working />)
 
-    expect(await screen.findByText('bare')).toBeInTheDocument()
+    expect(await screen.findByText('Working · tools')).toBeInTheDocument()
   })
 
   it('explains an empty list instead of rendering nothing', async () => {
@@ -113,17 +115,27 @@ describe('PrimeSessionList', () => {
 
     render(<PrimeSessionList now={NOW} />)
 
-    const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent(/permission denied/)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/permission denied/)
   })
 
   it('reports the list size in buckets and the age of what was opened', async () => {
-    invoked.result = [summary({ id: 'a', title: 'pick me', mtimeMs: NOW - 4 * DAY })]
+    invoked.result = [summary({ id: 'a', title: 'pick me', mtimeMs: NOW - 3 * DAY })]
 
     render(<PrimeSessionList now={NOW} />)
     fireEvent.click(await screen.findByRole('button', { name: /pick me/ }))
 
     await waitFor(() => expect(tracked.opened).toEqual([1]))
     expect(tracked.selected).toEqual(['week'])
+  })
+
+  it('offers a new chat only when the caller can start one', async () => {
+    const onNewChat = vi.fn()
+    const { rerender } = render(<PrimeSessionList now={NOW} onNewChat={onNewChat} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'New chat' }))
+    expect(onNewChat).toHaveBeenCalled()
+
+    rerender(<PrimeSessionList now={NOW} />)
+    expect(screen.queryByRole('button', { name: 'New chat' })).not.toBeInTheDocument()
   })
 })
