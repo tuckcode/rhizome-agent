@@ -372,6 +372,21 @@ pub fn get_prime_session_host_status() -> crate::prime_session_host::PrimeHostSt
     crate::prime_session_host::get_status()
 }
 
+/// Redirect the running turn. Returns false when nothing is streaming —
+/// the caller should send a normal prompt instead.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn steer_prime_session(message: String) -> Result<bool, String> {
+    crate::prime_session_host::steer(&message)
+}
+
+/// Queue a message for after the current turn. Returns false when idle.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn follow_up_prime_session(message: String) -> Result<bool, String> {
+    crate::prime_session_host::follow_up(&message)
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 pub fn get_prime_session_stats() -> Result<crate::prime_session_host::PrimeSessionStats, String> {

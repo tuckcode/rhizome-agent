@@ -550,6 +550,8 @@ macro_rules! app_invoke_handler {
             commands::abort_ai_agent_stream,
             commands::get_prime_session_host_status,
             commands::get_prime_session_stats,
+            commands::steer_prime_session,
+            commands::follow_up_prime_session,
             commands::compact_prime_session,
             commands::set_prime_auto_compaction,
             commands::ensure_prime_session_host,

@@ -70,6 +70,9 @@ interface AiPanelComposerProps {
   onChange: (value: string) => void
   onSend: (text: string, references: NoteReference[]) => void
   onStop: () => void
+  /** Redirect a running turn instead of aborting it. When absent the composer
+   *  stays disabled while streaming, which is the pre-steering behaviour. */
+  onSteer?: (text: string, references: NoteReference[]) => void
   onUnsupportedAiPaste?: (message: string) => void
 }
 
@@ -563,15 +566,32 @@ export function AiPanelComposer({
   onChange,
   onSend,
   onStop,
+  onSteer,
   onUnsupportedAiPaste,
 }: AiPanelComposerProps) {
   const t = createTranslator(locale)
-  const composerDisabled = isActive || agentReadiness !== 'ready'
-  const canSend = !composerDisabled && input.trim().length > 0
+  // Steering keeps the input live during a turn. Without an onSteer handler the
+  // composer locks while streaming, exactly as it did before.
+  const canSteer = isActive && typeof onSteer === 'function'
+  const composerDisabled = (isActive && !canSteer) || agentReadiness !== 'ready'
+  const hasInput = input.trim().length > 0
+  const canSend = !composerDisabled && hasInput
   const placeholder = getComposerPlaceholder(agentLabel, agentReadiness, t)
   const hasControls = controls !== undefined && controls !== null
+  // While a turn runs: typed text steers it, empty input stops it. The button
+  // says which, so the affordance is never ambiguous.
   const sendButton = isActive
-    ? <ComposerStopButton label={t('ai.panel.stop')} onStop={onStop} />
+    ? (canSteer && hasInput
+        ? (
+            <ComposerSendButton
+              canSend
+              entries={entries}
+              input={input}
+              label={t('ai.panel.steer')}
+              onSend={onSteer}
+            />
+          )
+        : <ComposerStopButton label={t('ai.panel.stop')} onStop={onStop} />)
     : (
         <ComposerSendButton
           canSend={canSend}

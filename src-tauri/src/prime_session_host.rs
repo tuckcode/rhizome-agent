@@ -277,6 +277,43 @@ pub fn set_auto_compaction(enabled: bool) -> Result<(), String> {
     })
 }
 
+fn build_queue_command(kind: &str, message: &str) -> serde_json::Value {
+    serde_json::json!({ "type": kind, "message": message })
+}
+
+/// Queue a steering message for the running turn, or a follow-up for after it.
+///
+/// Returns `Ok(false)` when nothing is streaming. Prime's docs do not say what
+/// `steer` does with no active run, so we do not find out the hard way — the
+/// caller is expected to send a normal prompt instead, which is what a user
+/// pressing enter on an idle session means anyway.
+fn queue_message(kind: &str, message: &str) -> Result<bool, String> {
+    let trimmed = message.trim();
+    if trimmed.is_empty() {
+        return Err("Cannot queue an empty message".into());
+    }
+    with_host_mut(|host| {
+        if !host.is_streaming {
+            return Ok(false);
+        }
+        let response = host.send_command(build_queue_command(kind, trimmed))?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, kind));
+        }
+        Ok(true)
+    })
+}
+
+/// Redirect the turn that is currently running, without discarding its work.
+pub fn steer(message: &str) -> Result<bool, String> {
+    queue_message("steer", message)
+}
+
+/// Queue a message to run after the current turn finishes.
+pub fn follow_up(message: &str) -> Result<bool, String> {
+    queue_message("follow_up", message)
+}
+
 pub fn abort_turn() -> Result<bool, String> {
     let slot = host_slot();
     let mut guard = slot.host.lock().map_err(poison)?;
@@ -1049,6 +1086,47 @@ for line in sys.stdin:
         assert_eq!(sid, "sess-2");
 
         let _ = shutdown_host();
+    }
+
+    /// Steering is the whole point of this slice: redirect a running turn
+    /// without throwing its work away. `abort` was the only interrupt before.
+    #[test]
+    fn steer_and_follow_up_send_the_message_prime_expects() {
+        assert_eq!(
+            build_queue_command("steer", "focus on error handling"),
+            serde_json::json!({"type": "steer", "message": "focus on error handling"})
+        );
+        assert_eq!(
+            build_queue_command("follow_up", "then summarise"),
+            serde_json::json!({"type": "follow_up", "message": "then summarise"})
+        );
+    }
+
+    /// Prime's queue state arrives as one event carrying both lists. The UI
+    /// needs the count to show "2 queued" without tracking sends itself.
+    #[test]
+    fn session_action_update_reports_queue_depth() {
+        let json = serde_json::json!({
+            "type": "session_action_update",
+            "actions": {
+                "queuedCount": 2,
+                "steering": ["focus on error handling"],
+                "followUps": ["then summarise"]
+            }
+        });
+        let queued = crate::prime_events::queued_action_count(&json);
+        assert_eq!(queued, Some(2));
+    }
+
+    /// A payload without an explicit count still has the lists — falling back
+    /// to their combined length keeps the indicator honest rather than blank.
+    #[test]
+    fn queue_depth_falls_back_to_list_lengths_when_count_is_absent() {
+        let json = serde_json::json!({
+            "type": "session_action_update",
+            "actions": {"steering": ["a"], "followUps": ["b", "c"]}
+        });
+        assert_eq!(crate::prime_events::queued_action_count(&json), Some(3));
     }
 
     /// Context usage is the whole point of the stats call — a long session

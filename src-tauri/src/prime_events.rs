@@ -23,6 +23,7 @@ where
         "tool_execution_end" => emit_tool_done(json, emit),
         "error" | "extension_error" => emit_error_event(json, emit),
         "compaction_start" | "compaction_end" => emit_compaction(json, emit),
+        "session_action_update" => emit_queue_update(json, emit),
         // agent_end / turn_end / message_end / response are host-lifecycle
         // signals handled by prime_session_host, not UI stream events.
         _ => {}
@@ -54,6 +55,31 @@ pub(crate) fn format_empty_turn() -> String {
         "values": {},
     });
     format!("{LOCALIZED_ERROR_PREFIX}{payload}")
+}
+
+/// Depth of Prime's steering/follow-up queue. Prefers the reported
+/// `queuedCount`; falls back to the combined list lengths so a payload
+/// without the count still yields an honest number rather than nothing.
+pub(crate) fn queued_action_count(json: &serde_json::Value) -> Option<u64> {
+    let actions = &json["actions"];
+    if let Some(count) = actions["queuedCount"].as_u64() {
+        return Some(count);
+    }
+    let steering = actions["steering"].as_array().map(Vec::len).unwrap_or(0);
+    let follow_ups = actions["followUps"].as_array().map(Vec::len).unwrap_or(0);
+    if actions["steering"].is_null() && actions["followUps"].is_null() {
+        return None;
+    }
+    Some((steering + follow_ups) as u64)
+}
+
+fn emit_queue_update<F>(json: &serde_json::Value, emit: &mut F)
+where
+    F: FnMut(AiAgentStreamEvent),
+{
+    if let Some(queued) = queued_action_count(json) {
+        emit(AiAgentStreamEvent::QueueUpdate { queued });
+    }
 }
 
 /// Prime signals compaction with a start/end pair; an aborted run still

@@ -14,6 +14,7 @@ type AiAgentStreamEvent =
   | { kind: 'ToolStart'; tool_name: string; tool_id: string; input?: string }
   | { kind: 'ToolDone'; tool_id: string; output?: string }
   | { kind: 'Error'; message: string }
+  | { kind: 'QueueUpdate'; queued: number }
   | { kind: 'Compaction'; phase: string; reason?: string; tokens_before?: number }
   | { kind: 'Done' }
 
@@ -25,6 +26,8 @@ export interface AgentStreamCallbacks {
   onError: (message: string) => void
   /** Context compaction. Optional so existing callers are unaffected. */
   onCompaction?: (phase: string, reason?: string, tokensBefore?: number) => void
+  /** Steering/follow-up queue depth changed. Optional. */
+  onQueueUpdate?: (queued: number) => void
   onDone: () => void
 }
 
@@ -72,6 +75,9 @@ function handleStreamEvent(data: AiAgentStreamEvent, callbacks: AgentStreamCallb
       return
     case 'Compaction':
       callbacks.onCompaction?.(data.phase, data.reason, data.tokens_before)
+      return
+    case 'QueueUpdate':
+      callbacks.onQueueUpdate?.(data.queued)
       return
     case 'Done':
       callbacks.onDone()

@@ -1,0 +1,69 @@
+import { describe, expect, it, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { AiPanelComposer } from './AiPanelChrome'
+
+/**
+ * Steering is the difference between chatting with an agent and submitting a
+ * job to it. Before this, the composer was fully disabled for the whole turn
+ * (`composerDisabled = isActive || …`), so the only interrupt was Stop — which
+ * throws the turn's work away.
+ *
+ * The contract: while a turn runs, typed text steers it and empty input stops
+ * it, and the button says which. Without an `onSteer` handler the composer
+ * behaves exactly as it did before, so non-Prime agents are unaffected.
+ */
+function renderComposer(props: Partial<React.ComponentProps<typeof AiPanelComposer>> = {}) {
+  return render(
+    <AiPanelComposer
+      entries={[]}
+      agentLabel="Prime"
+      agentReadiness="ready"
+      input=""
+      inputRef={{ current: null }}
+      isActive={false}
+      onChange={vi.fn()}
+      onSend={vi.fn()}
+      onStop={vi.fn()}
+      {...props}
+    />,
+  )
+}
+
+describe('AiPanelComposer steering', () => {
+  it('offers Steer while a turn is running and the user has typed something', () => {
+    renderComposer({ isActive: true, input: 'focus on error handling', onSteer: vi.fn() })
+
+    expect(screen.getByRole('button', { name: 'Steer response' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Stop response' })).toBeNull()
+  })
+
+  it('offers Stop while running with an empty composer', () => {
+    renderComposer({ isActive: true, input: '', onSteer: vi.fn() })
+
+    expect(screen.getByRole('button', { name: 'Stop response' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Steer response' })).toBeNull()
+  })
+
+  /** Whitespace is not a steering instruction. */
+  it('treats a whitespace-only composer as empty', () => {
+    renderComposer({ isActive: true, input: '   ', onSteer: vi.fn() })
+
+    expect(screen.getByRole('button', { name: 'Stop response' })).toBeTruthy()
+  })
+
+  /** Agents without steering support must keep the old locked behaviour rather
+   *  than offering an action their backend cannot honour. */
+  it('falls back to Stop-only when the agent cannot steer', () => {
+    renderComposer({ isActive: true, input: 'redirect please' })
+
+    expect(screen.getByRole('button', { name: 'Stop response' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Steer response' })).toBeNull()
+  })
+
+  it('still sends normally when no turn is running', () => {
+    renderComposer({ isActive: false, input: 'hello', onSteer: vi.fn() })
+
+    expect(screen.getByRole('button', { name: 'Send message' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Steer response' })).toBeNull()
+  })
+})
