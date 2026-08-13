@@ -1,9 +1,13 @@
-import { useCallback, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react'
+import { useCallback, useState, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import {
   AiPanelComposer,
   AiPanelHeader,
   AiPanelMessageHistory,
 } from './AiPanelChrome'
+import { ClockCounterClockwise } from '@phosphor-icons/react'
+import { Button } from '@/components/ui/button'
+import { translate } from '../lib/i18n'
+import PrimeSessionList from './PrimeSessionList'
 import {
   DEFAULT_AI_AGENT,
   getAiAgentDefinition,
@@ -219,6 +223,13 @@ export function AiPanelView({
     handleSend(text, references)
   }, [handleSend, isActive, onSendPrompt])
 
+  const [sessionsOpen, setSessionsOpen] = useState(false)
+  // Slice 4 loads the transcript and calls switch_session. Until then choosing
+  // a session closes the list rather than silently doing nothing.
+  const handleSelectSession = useCallback(() => {
+    setSessionsOpen(false)
+  }, [])
+
   return (
     <AiPanelFrame panelRef={panelRef} isActive={isActive} showLeftBorder={showLeftBorder} surface={surface}>
       {showHeader && (
@@ -238,6 +249,32 @@ export function AiPanelView({
           onNewChat={handleNewChat}
         />
       )}
+      {isPrimeTarget && (
+        <div className="flex shrink-0 justify-end px-3 pt-1.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="h-6 w-6 p-0 [&_svg:not([class*=size-])]:size-4"
+            onClick={() => setSessionsOpen((open) => !open)}
+            aria-pressed={sessionsOpen}
+            aria-label={translate(locale, sessionsOpen ? 'ai.sessions.close' : 'ai.sessions.open')}
+            title={translate(locale, sessionsOpen ? 'ai.sessions.close' : 'ai.sessions.open')}
+          >
+            <ClockCounterClockwise size={16} />
+          </Button>
+        </div>
+      )}
+      <div className="flex min-h-0 flex-1">
+        {sessionsOpen && (
+          // Design system: sessions are a 228px column beside the transcript,
+          // never a view that replaces it. Conversation owns the room.
+          // 900px matches the design system's own breakpoint for `.ra-sessions`;
+          // below it the transcript takes the whole panel.
+          <div className="hidden w-[228px] shrink-0 border-r border-border min-[900px]:flex">
+            <PrimeSessionList locale={locale} onSelectSession={handleSelectSession} />
+          </div>
+        )}
       <AiPanelMessageHistory
         agentLabel={view.agentLabel}
         agentReadiness={view.defaultAiAgentReadiness}
@@ -252,6 +289,7 @@ export function AiPanelView({
         onScrollStateChange={onMessageHistoryScrollStateChange}
         hasContext={hasContext}
       />
+      </div>
       {isPrimeTarget && (
         <div style={{ padding: '0 12px 6px' }}>
           <PrimeContextMeter stats={primeStats} locale={locale} />
