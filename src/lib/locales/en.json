@@ -1139,5 +1139,19 @@
   "mycelium.hint": "Prime ipython/%%bash turns are rewritten so Mindwalk can light file targets.",
   "mycelium.error": "Could not open Mycelium: {error}",
   "ai.panel.contextWindow": "Context window",
-  "ai.panel.steer": "Steer response"
+  "ai.panel.steer": "Steer response",
+  "ai.sessions.title": "Sessions",
+  "ai.sessions.open": "Open sessions",
+  "ai.sessions.close": "Close sessions",
+  "ai.sessions.refresh": "Refresh",
+  "ai.sessions.empty": "No Prime sessions yet. Start a conversation and it will appear here.",
+  "ai.sessions.error": "Could not read your Prime sessions. {message}",
+  "ai.sessions.untitled": "Untitled session",
+  "ai.sessions.loading": "Loading sessions",
+  "ai.sessions.group.today": "Today",
+  "ai.sessions.group.yesterday": "Yesterday",
+  "ai.sessions.group.week": "Previous 7 days",
+  "ai.sessions.group.earlier": "Earlier",
+  "ai.sessions.group.undated": "Undated",
+  "ai.sessions.selectAria": "Open session {title}"
 }

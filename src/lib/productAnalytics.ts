@@ -5,6 +5,7 @@ import type { AllNotesFileVisibility } from '../utils/allNotesFileVisibility'
 import type { DateDisplayFormat } from '../utils/dateDisplay'
 import type { FilePreviewKind } from '../utils/filePreview'
 import type { NoteWidthMode } from '../types'
+import type { PrimeSessionGroupKey } from './primeSessionGroups'
 import type { ThemeMode } from './themeMode'
 
 type TrackedPreviewKind = FilePreviewKind | 'unsupported'
@@ -244,4 +245,33 @@ export function trackBridgeTokenCopied(): void {
  */
 export function trackGraphLegendToggled(state: 'opened' | 'closed'): void {
   trackEvent('graph_legend_toggled', { state })
+}
+
+/**
+ * The Prime session list was opened. Tells us whether anyone finds it — the
+ * whole reason the list exists is that past conversations were unreachable.
+ * `session_count` is a size bucket, never a path or title: what the user
+ * talked about is theirs.
+ */
+export function trackPrimeSessionListOpened(sessionCount: number): void {
+  trackEvent('prime_session_list_opened', {
+    session_count: sessionCountBucket(sessionCount),
+  })
+}
+
+/**
+ * A past session was opened from the list. `group` says how old it was, which
+ * is what tells us whether people reach for yesterday's work or last month's.
+ */
+export function trackPrimeSessionOpened(group: PrimeSessionGroupKey): void {
+  trackEvent('prime_session_opened', { group })
+}
+
+/** Coarse buckets — an exact count of someone's sessions is not our business. */
+function sessionCountBucket(count: number): '0' | '1-5' | '6-20' | '21-50' | '50+' {
+  if (count <= 0) return '0'
+  if (count <= 5) return '1-5'
+  if (count <= 20) return '6-20'
+  if (count <= 50) return '21-50'
+  return '50+'
 }
