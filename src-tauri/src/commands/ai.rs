@@ -610,6 +610,29 @@ mod tests {
     }
 }
 
+// --- Prime session list ---
+
+/// Every Prime session on disk, newest first, summarised for a list.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn list_prime_session_summaries(
+) -> Result<Vec<crate::prime_sessions::PrimeSessionSummary>, String> {
+    crate::prime_sessions::list_sessions()
+}
+
+/// Replay one session's conversation from its log.
+///
+/// Takes the `path` from a summary rather than a session id: the log file is
+/// what both this and `switch_session` address, and re-deriving a path from an
+/// id would be a second way to name the same thing.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn read_prime_session_transcript(
+    path: String,
+) -> Result<Vec<crate::prime_sessions::PrimeTranscriptItem>, String> {
+    crate::prime_sessions::read_transcript(std::path::Path::new(&path))
+}
+
 // --- Mycelium / Mindwalk ---
 
 #[tauri::command]

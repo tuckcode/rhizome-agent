@@ -299,11 +299,36 @@ fn transcript_from_lines<I: Iterator<Item = String>>(lines: I) -> Vec<PrimeTrans
     items
 }
 
+/// Reject any path that is not a session log inside Prime's sessions directory.
+///
+/// This path arrives from the frontend, so without the check `read_transcript`
+/// is an arbitrary-file read: anything on disk whose lines happen to be JSON
+/// would come back through the IPC boundary. Both ends are canonicalised so
+/// `..` segments and symlinks cannot walk out of the directory.
+fn ensure_inside_sessions_dir(path: &Path) -> Result<(), String> {
+    let dir = sessions_dir().ok_or_else(|| "Could not resolve home directory".to_string())?;
+    let dir = std::fs::canonicalize(&dir).map_err(|e| format!("resolve sessions dir: {e}"))?;
+    let resolved = std::fs::canonicalize(path).map_err(|e| format!("resolve session log: {e}"))?;
+
+    if !resolved.starts_with(&dir) {
+        return Err("Not a Prime session log".into());
+    }
+    let is_log = resolved
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(is_session_log);
+    if !is_log {
+        return Err("Not a Prime session log".into());
+    }
+    Ok(())
+}
+
 /// Read one session's full transcript from disk.
 ///
 /// Unbounded by design, unlike `summarize_file`: the caller asked for this
 /// specific conversation, so the whole file is the point.
 pub fn read_transcript(path: &Path) -> Result<Vec<PrimeTranscriptItem>, String> {
+    ensure_inside_sessions_dir(path)?;
     let file = std::fs::File::open(path).map_err(|e| format!("open session log: {e}"))?;
     let lines = BufReader::new(file).lines().map_while(Result::ok);
     Ok(transcript_from_lines(lines))
@@ -620,6 +645,23 @@ mod tests {
                 .unwrap_or_else(|| path.to_string()),
             None => path.to_string(),
         }
+    }
+
+    /// `read_transcript` takes a path straight from the frontend. Without this
+    /// guard it is an arbitrary-file read across the IPC boundary.
+    #[test]
+    fn reading_a_transcript_outside_the_sessions_dir_is_refused() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let outside = dir.path().join("not-a-session.jsonl");
+        std::fs::write(&outside, r#"{"type":"message"}"#).expect("write");
+
+        let error = read_transcript(&outside).expect_err("must refuse");
+        assert!(error.contains("Not a Prime session log"), "{error}");
+
+        // An ordinary file that merely exists is refused for the same reason.
+        let secret = dir.path().join("id_rsa");
+        std::fs::write(&secret, "PRIVATE KEY").expect("write");
+        assert!(read_transcript(&secret).is_err());
     }
 
     #[test]

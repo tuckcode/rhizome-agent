@@ -552,6 +552,8 @@ macro_rules! app_invoke_handler {
             commands::get_prime_session_host_status,
             commands::get_prime_session_stats,
             commands::get_prime_session_messages,
+            commands::list_prime_session_summaries,
+            commands::read_prime_session_transcript,
             commands::steer_prime_session,
             commands::follow_up_prime_session,
             commands::compact_prime_session,
