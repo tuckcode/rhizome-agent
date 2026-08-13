@@ -21,6 +21,23 @@ Hybrid bootstrap (Option C):
 
 Do **not** add `knispo/rhizome` as `origin`. Desktop and Agent stay separate remotes forever unless we deliberately vendor a crate later.
 
+## Prime first, when Prime already does it
+
+**If Prime has a mechanism that works, use Prime's — do not build a Rhizome
+equivalent beside it.** Two reasons: a second implementation is a second thing
+to keep correct, and anything that duplicates or contends with Prime's own
+behaviour risks breaking the harness we are building on.
+
+One distinction this does *not* erase: Prime's mechanisms operate on Prime's
+harness state (`~/.prime/agent`), not on the vault. So "use Prime's" means
+adopt its **design** for vault-side work — `/refine`'s two-stage judge, its
+per-entry versioning and rollback — rather than letting harness state become
+the memory store. Durable knowledge still lands in the vault as markdown; that
+is the product.
+
+Where Prime has nothing, Rhizome builds it. Where Prime has something worse,
+say so explicitly and record why before diverging.
+
 ## Near-term direction
 
 - UI: chat-like experience (existing AI panel as starting point).

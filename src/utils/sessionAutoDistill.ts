@@ -1,7 +1,8 @@
 /**
  * After an AI turn finishes, optionally distill the turn into the wiki.
  * Host-owned (not agent-whim) — mirrors mem0/Zep "extract after the fact."
- * Default ON when unset; explicit false opts out.
+ * Default OFF — explicit `true` opts in. (The Desktop repo defaults this ON;
+ * the fork deliberately flipped it, see the note on the enable check below.)
  */
 
 const MIN_ASSISTANT_CHARS = 80
