@@ -18,6 +18,7 @@ import { StatusBar } from './components/StatusBar'
 // Lazy: keeps three.js/3d-force-graph out of the main bundle chunk.
 const GraphView = lazy(() => import('./components/graph/GraphView'))
 const MyceliumView = lazy(() => import('./components/MyceliumView'))
+const ChatHome = lazy(() => import('./components/ChatHome'))
 import { AppAiWorkspaceSurface } from './components/AppAiWorkspaceSurface'
 import { buildPromoteNoteFromChat } from './utils/promoteChatToVault'
 import { AiWorkspaceFloatingButton } from './components/AiWorkspaceFloatingButton'
@@ -481,12 +482,20 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   // off → this block is inert and the shell renders byte-identical.
   const commandRailEnabled = useFeatureFlag('shell_command_rail')
   const railActiveDestination = useMemo((): CommandRailDestination => {
+    if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'chat') return 'chat'
     if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'graph') return 'graph'
     if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'mycelium') return 'mycelium'
     if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'changes') return 'changes'
     if (showResearch) return 'research'
     return 'notes'
   }, [effectiveSelection, showResearch])
+  // Frame A: chat owns the whole window. No note list, no editor, no sidebar —
+  // "conversation owns the room" is the design system's rule for this surface.
+  const isChatDestination =
+    effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'chat'
+  const handleRailSelectChat = useCallback(() => {
+    handleSetSelection({ kind: 'filter', filter: 'chat' })
+  }, [handleSetSelection])
   const handleRailSelectNotes = useCallback(() => {
     handleSetSelection({ kind: 'filter', filter: explicitOrganizationEnabled ? 'inbox' : 'all' })
   }, [handleSetSelection, explicitOrganizationEnabled])
@@ -1733,6 +1742,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
             <CommandRail
               locale={appLocale}
               activeDestination={railActiveDestination}
+              onSelectChat={handleRailSelectChat}
               onSelectNotes={handleRailSelectNotes}
               onSelectGraph={handleRailSelectGraph}
               onSelectMycelium={handleRailSelectMycelium}
@@ -1741,7 +1751,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               onOpenSettings={handleOpenSettings}
             />
           )}
-          {sidebarVisible && (
+          {sidebarVisible && !isChatDestination && (
             <>
               <div className="app__sidebar" style={{ width: layout.sidebarWidth }}>
                 <Sidebar entries={visibleEntries} isWikiVault={isWikiVault} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onUpdateViewDefinition={handleSidebarUpdateViewDefinition} onReorderViews={canReorderSavedViews ? viewOrdering.onReorderViews : undefined} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} allNotesFileVisibility={allNotesFileVisibility} pluralizeTypeLabels={settings.sidebar_type_pluralization_enabled ?? true} onCollapse={handleCollapseSidebar} onGoBack={handleGoBack} onGoForward={handleGoForward} canGoBack={canGoBack} canGoForward={canGoForward} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} workspaceOrder={vaultWorkspaceOrder} />
@@ -1749,7 +1759,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               <ResizeHandle onResize={layout.handleSidebarResize} />
             </>
           )}
-          {noteListVisible && !(effectiveSelection.kind === 'filter' && (effectiveSelection.filter === 'graph' || effectiveSelection.filter === 'mycelium')) && (
+          {noteListVisible && !isChatDestination && !(effectiveSelection.kind === 'filter' && (effectiveSelection.filter === 'graph' || effectiveSelection.filter === 'mycelium')) && (
             <>
               <div className={`app__note-list${aiActivity.highlightElement === 'notelist' ? ' ai-highlight' : ''}`} style={{ width: layout.noteListWidth }}>
                 {effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse' ? (
@@ -1773,6 +1783,26 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                 </Suspense>
                 {effectiveShowAIChat && aiWorkspaceSurface}
               </div>
+            ) : isChatDestination ? (
+              <Suspense fallback={<div className="flex h-full flex-1 items-center justify-center text-sm text-muted-foreground" data-testid="chat-home-suspense">{translate(appLocale, 'rail.chat')}</div>}>
+              <ChatHome
+                locale={appLocale}
+                defaultAiAgent={aiAgentPreferences.defaultAiAgent}
+                defaultAiTarget={aiAgentPreferences.defaultAiTarget}
+                defaultAiAgentReadiness={aiAgentPreferences.defaultAiAgentReadiness}
+                defaultAiAgentReady={aiAgentPreferences.defaultAiAgentReady}
+                onExit={handleRailSelectNotes}
+                vaultPath={activeEditorVaultPath}
+                vaultPaths={writableVaultPaths}
+                entries={visibleEntries}
+                onOpenNote={notes.handleNavigateWikilink}
+                onPromoteToVault={handlePromoteChatToVault}
+                onFileCreated={vaultBridge.handleAgentFileCreated}
+                onFileModified={vaultBridge.handleAgentFileModified}
+                onVaultChanged={vaultBridge.handleAgentVaultChanged}
+                onUnsupportedAiPaste={setToastMessage}
+              />
+              </Suspense>
             ) : effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'mycelium' ? (
               <div className="relative flex flex-1 min-h-0">
                 <Suspense fallback={<div className="flex h-full flex-1 items-center justify-center text-sm text-muted-foreground" data-testid="mycelium-suspense">{translate(appLocale, 'mycelium.title')}</div>}>

@@ -1,15 +1,16 @@
-import { CirclesThree, GearSix, GitBranch, ListBullets, MagnifyingGlass, ShareNetwork } from '@phosphor-icons/react'
+import { ChatCircle, CirclesThree, GearSix, GitBranch, ListBullets, MagnifyingGlass, ShareNetwork } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { ActionTooltip } from './ui/action-tooltip'
 import { Button } from './ui/button'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { trackRailDestinationClicked } from '../lib/productAnalytics'
 
-export type CommandRailDestination = 'notes' | 'graph' | 'mycelium' | 'research' | 'changes'
+export type CommandRailDestination = 'chat' | 'notes' | 'graph' | 'mycelium' | 'research' | 'changes'
 
 interface CommandRailProps {
   locale: AppLocale
   activeDestination: CommandRailDestination
+  onSelectChat: () => void
   onSelectNotes: () => void
   onSelectGraph: () => void
   onSelectMycelium: () => void
@@ -68,6 +69,7 @@ function RailButton({
 export function CommandRail({
   locale,
   activeDestination,
+  onSelectChat,
   onSelectNotes,
   onSelectGraph,
   onSelectMycelium,
@@ -95,6 +97,13 @@ export function CommandRail({
         borderRight: '1px solid var(--border-subtle)',
       }}
     >
+      <RailButton
+        active={activeDestination === 'chat'}
+        icon={ChatCircle}
+        label={t('rail.chat')}
+        onClick={() => handleSelect('chat', onSelectChat)}
+        testId="command-rail-chat"
+      />
       <RailButton
         active={activeDestination === 'notes'}
         icon={ListBullets}

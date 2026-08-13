@@ -53,6 +53,8 @@ interface AiPanelProps {
   openTabs?: VaultEntry[]
   noteList?: NoteListItem[]
   noteListFilter?: { type: string | null; query: string }
+  /** Chat-home hides the panel header; the window chrome carries that role. */
+  showHeader?: boolean
 }
 
 interface AiPanelViewProps {
@@ -351,6 +353,7 @@ export function AiPanelView({
 
 export function AiPanel({
   onClose,
+  showHeader,
   onOpenNote,
   onPromoteToVault,
   onUnsupportedAiPaste,
@@ -396,6 +399,7 @@ export function AiPanel({
   return (
     <AiPanelView
       controller={controller}
+      showHeader={showHeader}
       onClose={onClose}
       onOpenNote={onOpenNote}
       onPromoteToVault={onPromoteToVault}
