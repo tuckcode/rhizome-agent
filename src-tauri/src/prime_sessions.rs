@@ -226,14 +226,33 @@ pub enum PrimeTranscriptItem {
     #[serde(rename_all = "camelCase")]
     Compaction {
         #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        parent_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         timestamp: Option<String>,
+        /// What replaced the compacted turns. This *is* the conversation for
+        /// everything above it — a compaction rendered as a bare divider hides
+        /// the only remaining record of what was said.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        summary: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tokens_before: Option<u64>,
     },
     #[serde(rename_all = "camelCase")]
     ModelChange {
         #[serde(skip_serializing_if = "Option::is_none")]
-        timestamp: Option<String>,
+        id: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        model: Option<String>,
+        parent_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        timestamp: Option<String>,
+        /// Provider and model id as the log records them (`xai`, `grok-4.5`).
+        /// There is no display name on disk — do not invent one here.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        provider: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        model_id: Option<String>,
     },
 }
 
@@ -261,15 +280,18 @@ fn transcript_from_lines<I: Iterator<Item = String>>(lines: I) -> Vec<PrimeTrans
                 });
             }
             "compaction" => items.push(PrimeTranscriptItem::Compaction {
+                id: event["id"].as_str().map(str::to_string),
+                parent_id: event["parentId"].as_str().map(str::to_string),
                 timestamp: event["timestamp"].as_str().map(str::to_string),
+                summary: event["summary"].as_str().map(str::to_string),
+                tokens_before: event["tokensBefore"].as_u64(),
             }),
             "model_change" => items.push(PrimeTranscriptItem::ModelChange {
+                id: event["id"].as_str().map(str::to_string),
+                parent_id: event["parentId"].as_str().map(str::to_string),
                 timestamp: event["timestamp"].as_str().map(str::to_string),
-                model: event["model"]["name"]
-                    .as_str()
-                    .or_else(|| event["model"]["id"].as_str())
-                    .or_else(|| event["model"].as_str())
-                    .map(str::to_string),
+                provider: event["provider"].as_str().map(str::to_string),
+                model_id: event["modelId"].as_str().map(str::to_string),
             }),
             _ => {}
         }
@@ -453,28 +475,68 @@ mod tests {
     fn compaction_and_model_change_are_items_in_place_not_dropped() {
         let items = transcript_from_lines(lines(&[
             r#"{"type":"message","message":{"role":"user","content":[{"type":"text","text":"before"}]}}"#,
-            r#"{"type":"compaction","timestamp":"2026-08-09T11:00:00Z"}"#,
-            r#"{"type":"model_change","timestamp":"2026-08-09T11:05:00Z","model":{"id":"deepseek-v4-pro","name":"DeepSeek V4 Pro"}}"#,
+            r###"{"type":"compaction","id":"dae4c7ca","parentId":"98119d8a","timestamp":"2026-08-09T13:34:20.050Z","summary":"## Goal\nContinue rhizome-agent","tokensBefore":120000}"###,
+            r#"{"type":"model_change","id":"358ed70f","parentId":null,"timestamp":"2026-08-09T11:21:12.521Z","provider":"xai","modelId":"grok-4.5"}"#,
             r#"{"type":"message","message":{"role":"user","content":[{"type":"text","text":"after"}]}}"#,
         ]));
 
         assert_eq!(items.len(), 4, "markers keep their position in the order");
-        assert_eq!(
-            items[1],
+        match &items[1] {
             PrimeTranscriptItem::Compaction {
-                timestamp: Some("2026-08-09T11:00:00Z".into())
+                id,
+                summary,
+                tokens_before,
+                ..
+            } => {
+                assert_eq!(id.as_deref(), Some("dae4c7ca"));
+                assert_eq!(*tokens_before, Some(120_000));
+                // Once compacted, the summary IS the conversation above it.
+                assert!(summary.as_deref().unwrap_or_default().contains("Goal"));
             }
-        );
+            other => panic!("expected a compaction, got {other:?}"),
+        }
         match &items[2] {
-            PrimeTranscriptItem::ModelChange { model, .. } => {
-                assert_eq!(
-                    model.as_deref(),
-                    Some("DeepSeek V4 Pro"),
-                    "prefer the display name"
-                )
+            PrimeTranscriptItem::ModelChange {
+                provider, model_id, ..
+            } => {
+                assert_eq!(provider.as_deref(), Some("xai"));
+                assert_eq!(model_id.as_deref(), Some("grok-4.5"));
             }
             other => panic!("expected a model change, got {other:?}"),
         }
+    }
+
+    /// `compactionSummary` is a real role carrying no `content` at all — it has
+    /// `summary`/`tokensBefore` instead. It must parse to an empty-text message
+    /// rather than being dropped.
+    #[test]
+    fn a_compaction_summary_role_parses_without_content() {
+        let items = transcript_from_lines(lines(&[
+            r#"{"type":"message","message":{"role":"compactionSummary","summary":"prior work","tokensBefore":98000}}"#,
+        ]));
+
+        match &items[0] {
+            PrimeTranscriptItem::Message { message, .. } => {
+                assert_eq!(message.role, "compactionSummary");
+                assert_eq!(message.text, "");
+            }
+            other => panic!("expected a message, got {other:?}"),
+        }
+    }
+
+    /// A live session reports five roles, not two: user, assistant, toolResult,
+    /// custom, compactionSummary. Nothing may be filtered out on role.
+    #[test]
+    fn every_role_survives_replay() {
+        let items = transcript_from_lines(lines(&[
+            r#"{"type":"message","message":{"role":"user","content":[]}}"#,
+            r#"{"type":"message","message":{"role":"assistant","content":[]}}"#,
+            r#"{"type":"message","message":{"role":"toolResult","content":[]}}"#,
+            r#"{"type":"message","message":{"role":"custom","content":[]}}"#,
+            r#"{"type":"message","message":{"role":"compactionSummary"}}"#,
+        ]));
+
+        assert_eq!(items.len(), 5);
     }
 
     /// Tool and thinking blocks must survive replay — a transcript that keeps
@@ -506,6 +568,58 @@ mod tests {
         ]));
 
         assert_eq!(items.len(), 1);
+    }
+
+    /// Parse a real session log, when one is pointed at.
+    ///
+    /// Ignored by default and never committed with a fixture: these logs are
+    /// somebody's actual conversations and do not belong in the repo. But
+    /// hand-written fixtures only prove the parse matches *my reading* of the
+    /// format — an earlier version of this module invented a nested `model`
+    /// object that no real log has ever contained, and every fixture test
+    /// passed. Run it against a real file when touching this parse:
+    ///
+    /// ```text
+    /// PRIME_SESSION_LOG=~/.prime/agent/sessions/<id>.jsonl \
+    ///   cargo test --lib prime_sessions -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "needs PRIME_SESSION_LOG pointing at a real session log"]
+    fn a_real_session_log_parses_into_a_plausible_transcript() {
+        let Ok(raw_path) = std::env::var("PRIME_SESSION_LOG") else {
+            panic!("set PRIME_SESSION_LOG to a real session log path");
+        };
+        let path = PathBuf::from(shellexpand_home(&raw_path));
+
+        let summary = summarize_file(&path).expect("summarize a real log");
+        let transcript = read_transcript(&path).expect("replay a real log");
+
+        let messages = transcript
+            .iter()
+            .filter(|item| matches!(item, PrimeTranscriptItem::Message { .. }))
+            .count();
+        let markers = transcript.len() - messages;
+        println!(
+            "id={} title={:?} cwd={:?}\nmessages={messages} markers={markers}",
+            summary.id, summary.title, summary.cwd
+        );
+
+        assert!(!summary.id.is_empty(), "a real log has a session header");
+        assert!(messages > 0, "a real log has messages");
+        // agent_status is the bulk of these files and must never reach here.
+        assert!(
+            markers * 10 < messages.max(10),
+            "markers ({markers}) should be rare next to messages ({messages})"
+        );
+    }
+
+    fn shellexpand_home(path: &str) -> String {
+        match path.strip_prefix("~/") {
+            Some(rest) => dirs::home_dir()
+                .map(|home| home.join(rest).to_string_lossy().into_owned())
+                .unwrap_or_else(|| path.to_string()),
+            None => path.to_string(),
+        }
     }
 
     #[test]
