@@ -1138,5 +1138,6 @@
   "mycelium.lastSession": "Latest session",
   "mycelium.hint": "Prime ipython/%%bash turns are rewritten so Mindwalk can light file targets.",
   "mycelium.error": "Could not open Mycelium: {error}",
-  "ai.panel.contextWindow": "Context window"
+  "ai.panel.contextWindow": "Context window",
+  "ai.panel.steer": "Steer response"
 }

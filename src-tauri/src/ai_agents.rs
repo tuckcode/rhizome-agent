@@ -89,6 +89,11 @@ pub enum AiAgentStreamEvent {
     Error {
         message: String,
     },
+    /// Steering / follow-up queue depth changed. Lets the composer show
+    /// "2 queued" without tracking its own sends.
+    QueueUpdate {
+        queued: u64,
+    },
     /// Context compaction. `phase` is "start" | "end" | "aborted". Emitted so a
     /// long session never loses context silently — the transcript can show
     /// what happened and roughly how much was compacted.
