@@ -1152,5 +1152,10 @@
   "ai.subhead.live": "Prime session live",
   "ai.subhead.idle": "Prime idle",
   "ai.subhead.model": "model",
-  "ai.subhead.vault": "vault"
+  "ai.subhead.vault": "vault",
+  "ai.composer.model": "Change model",
+  "ai.composer.modelUnknown": "Model",
+  "ai.composer.modelsLoading": "Loading models…",
+  "ai.composer.modelsEmpty": "No models available",
+  "ai.composer.vault": "Attached vault"
 }

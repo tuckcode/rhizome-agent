@@ -275,3 +275,12 @@ function sessionCountBucket(count: number): '0' | '1-5' | '6-20' | '21-50' | '50
   if (count <= 50) return '21-50'
   return '50+'
 }
+
+/**
+ * The user switched Prime's model from the composer. Provider only — the model
+ * id is fine to record, but provider is what answers the question this exists
+ * for: which of their own connections people actually run on.
+ */
+export function trackPrimeModelChanged(provider: string): void {
+  trackEvent('prime_model_changed', { provider })
+}

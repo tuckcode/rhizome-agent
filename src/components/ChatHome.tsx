@@ -1,5 +1,7 @@
 import { AiPanel } from './AiPanel'
 import { PrimeSessionSubhead } from './PrimeSessionSubhead'
+import { ChatComposerDeck } from './ChatComposerDeck'
+import { vaultLabelFromPath } from '../lib/primeSubheadLabels'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 import type { AiAgentId, AiAgentReadiness } from '../lib/aiAgents'
 import type { AiTarget } from '../lib/aiTargets'
@@ -81,6 +83,16 @@ export default function ChatHome({
           onVaultChanged={onVaultChanged}
           onUnsupportedAiPaste={onUnsupportedAiPaste}
           showHeader={false}
+          composerControls={
+            isPrimeTarget ? (
+              <ChatComposerDeck
+                locale={locale}
+                modelLabel={primeModelLabel(primeHost)}
+                vaultLabel={vaultLabelFromPath(vaultPath)}
+                skillsLabel="rhizome-vault"
+              />
+            ) : undefined
+          }
           onClose={onExit}
         />
       </div>

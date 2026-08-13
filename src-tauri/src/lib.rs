@@ -555,6 +555,8 @@ macro_rules! app_invoke_handler {
             commands::list_prime_session_summaries,
             commands::read_prime_session_transcript,
             commands::switch_prime_session,
+            commands::get_available_prime_models,
+            commands::set_prime_model,
             commands::steer_prime_session,
             commands::follow_up_prime_session,
             commands::compact_prime_session,
