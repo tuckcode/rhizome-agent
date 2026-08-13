@@ -50,6 +50,42 @@ auto-distill defaults ON there, OFF here); zsh does not word-split unquoted
 
 ---
 
+## Session handoff — 2026-08-13 (get_messages + a roadmap correction)
+
+**Shipped:** `get_messages` (Prime RPC **13 of ~45**) + `get_prime_session_messages`
+Tauri command. `PrimeMessage` keeps `content` as raw JSON — Prime discriminates
+blocks by `type` and a Rust enum would silently drop kinds we did not anticipate,
+which is exactly what a rehydrated transcript needs. Derived `text` field
+flattens text blocks. 4 new tests, `cargo test --lib` 1361 (was 1357).
+
+**⛔ The roadmap premise was wrong — see C23.** `get_messages` was recorded as
+"blocks everything in the session story." It is necessary but **not sufficient**:
+`agent_end` carries the full transcript while `get_messages` returned only the
+user message on the same host process. Rehydration needs a decision, not just
+this command.
+
+**Capability probe against the live binary — these all exist and answer**
+(argument errors, not `Unknown command`): `switch_session`, `fork`,
+`set_session_name`, `observe`, `set_thinking_level`, `set_model`,
+`get_available_models`, `cycle_model`. **`list_sessions` does NOT exist** —
+session *enumeration* is a disk scan of `~/.prime/agent/sessions/*.jsonl`
+(`mycelium.rs:34`), already consumed by `MyceliumView.tsx:47`. So the session
+list is a **hybrid**: disk for the list, RPC for the actions, and it overlaps a
+component that already exists. That overlap is a design question — spec it
+before building. `clone` was not cleanly verified either way.
+
+**Model defaults are not a product concern.** BYO-model: users connect any
+OAuth / API / OpenAI-compatible provider. Do not record or "correct" whichever
+model a dev machine happens to default to. (The 2026-08-09 entry below carries a
+`xai/grok-4.5` preference note — that is a dev preference, not a product fact.)
+
+**Next:** spec the session list (`/grill-with-docs` → `/to-spec`) with C23 and
+the Mycelium overlap on the table. The model picker is closer than recorded —
+`get_available_models` + `set_model` + `cycle_model` all answer live, and
+BYO-model makes that surface load-bearing rather than second-tier.
+
+---
+
 ## Session handoff — 2026-08-09 (UI-2 chat-primary slice)
 
 **Shipped**
@@ -387,6 +423,8 @@ Note what this implies about the record: sessions in this window that report "al
   **Out of scope, confirmed not bugs, left untouched:** `antigravity_config.rs`'s `["tolaria", "laputa"]` legacy-cleanup list; `git/mod.rs`'s `!lower.contains("tolaria")`-style protective regression assertions; `git/pulse.rs`'s `#[cfg(test)]`-only `LaputaVault` fixture; arbitrary test-fixture strings in `git/commit.rs:238`, `frontmatter/ops.rs`, `commands/pdf_export.rs`, `git/credentials.rs`; all ADRs/release-notes/README/trademarks/VISION.md/demo-vault-v2 historical content (never edited after the fact, by repo rule); and two internal test-only env-var sentinel names (`TOLARIA_STDIN_PROBE_CHILD` in `claude_cli.rs`, `TOLARIA_CODEX_STDIN_PROBE_PARENT_CHILD` in `codex_cli.rs`) that don't match the `tolaria-codex` literal-string pattern this pass was scoped to and carry no user- or dashboard-visible branding.
 
   `cargo test --lib`: 1317 passed, 0 failed, 10 ignored (baseline unchanged from C20's fix). `cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings`: clean. `cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check`: clean. `pnpm test`: 5160 passed / 484 files (baseline was 5158/484; +2 for the new themeMode fallback regression tests). `npx tsc --noEmit`: clean. `pnpm lint`: clean. Final `grep -rniE "tolaria|laputa"` over the 8 touched files shows only the intentional legacy-fallback constants/lists and their explanatory comments. Codacy: not run — no MCP tool, no `.codacy/` directory in this session (same standing gap noted in prior sessions).
+
+- **C23-OPEN: `get_messages` is not sufficient for transcript rehydration.** Found 2026-08-13 while verifying the newly-landed command against the live `prime-agent --mode rpc` binary. Within a **single** host process: send `prompt` → wait for `agent_end` → `agent_end` carries `messages` with **both** roles (`['user','assistant']`) → then `get_messages` on that same process returns **only the user message**. Reproduced across two runs. Not investigated further, so the cause is unknown — plausible readings are that `get_messages` reads a persisted store while `agent_end` reflects in-memory turn state, or that the assistant message commits on some later event. **Why it matters:** the roadmap recorded `get_messages` as the thing blocking the whole session story, which assumed it returns the conversation. It returns *a* conversation view that is missing the assistant side. Rehydration therefore needs a decision — capture `agent_end.messages` as the transcript source, find the persist trigger that makes `get_messages` complete, or reconstruct from the session `.jsonl` on disk (which `mycelium.rs` already reads). **Do not build the session list until this is settled**; all three options change its shape. The command itself is landed, tested and correct for what it returns — this is a sufficiency gap, not a defect in the parse.
 
 - **C22-OPEN: on Windows, minimizing Rhizome and then clicking the taskbar icon does not bring the window back.** Reported directly by the user 2026-08-02, **not yet investigated or reproduced** — logged so it isn't lost, not because it's understood. Likely area: `src-tauri/src/lib.rs` and `src-tauri/src/window_state.rs` both reference tray/window-event handling and are the right starting point (found via a quick `grep -rln "tray\|minimize\|restore\|WindowEvent" src-tauri/src/*.rs`, not read yet). Windows-specific per the report — check whether the tray-click / taskbar-restore handler is platform-gated (`cfg(windows)` vs `cfg(desktop)`) and whether it's actually wired to a restore call, or only to show/hide on other platforms. No repro steps beyond "minimize, then try to click it back up" captured yet — get those from the user before starting, and check whether this reproduces on macOS too or is genuinely Windows-only (relevant since `linux_appimage.rs`/`window_state.rs` suggest per-platform window handling already exists and may just be incomplete for one target).
 
