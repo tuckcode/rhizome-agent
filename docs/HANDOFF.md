@@ -103,6 +103,41 @@ BYO-model makes that surface load-bearing rather than second-tier.
 
 ---
 
+## Session handoff — 2026-08-13b (Frame A: chat owns the window)
+
+**Next agent: read `docs/plans/2026-08-13-frame-a-handoff-for-next-agent.md`.**
+It is self-contained and covers the two remaining Frame A pieces.
+
+**Shipped** — session list slices 1–4, then Frame A slices A1–A3.
+`pnpm test` 5254 / 498 files · `cargo test --lib` 1380 · all gates green.
+
+- **Chat is a rail destination that owns the window** — no sidebar, no note
+  list, no editor. First surface where "conversation owns the room" is true.
+- **Telemetry subhead** — live · sess_xxxx · model · vault, mono and muted.
+- **Composer control deck** — Prime · model ▾ · vault · Skills, with a
+  **working model picker** (`get_available_prime_models` / `set_prime_model`,
+  78 models grouped by provider, fetched on open).
+- **Session list** — enumerate from disk, replay a transcript, `switch_session`,
+  rehydrate the panel with tool cards intact.
+
+**Remaining in Frame A:** the composer foot row (`Working · last tool X` /
+`Esc stop · ⌘.`) and A4 titlebar chips. Both specified in the handoff doc.
+
+**The design system is authoritative for UI:**
+`/Users/dtc/Desktop/rhizome-agent-design-system/`, artboards in
+`rhizome-agent-desktop-ui.html` (Frame A at line 1642, Frame F at 2139). It
+corrected three decisions already shipped this session. **Model names in the
+artboards are examples only** — Rhizome Agent is BYO-model, so never hardcode
+one.
+
+**The browser preview found three bugs no test caught:** a toggle rendered into
+a header the workspace mounts with `showHeader={false}` (unreachable, tests
+green — the `AiAgentsBadge` failure again); a list rendering 102px inside its
+228px column; and Radix menus opening on `pointerdown`, so a synthetic
+`.click()` did nothing. Look at UI before shipping it.
+
+---
+
 ## Session handoff — 2026-08-09 (UI-2 chat-primary slice)
 
 **Shipped**
