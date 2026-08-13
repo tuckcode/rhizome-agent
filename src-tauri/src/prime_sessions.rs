@@ -204,6 +204,89 @@ pub fn list_sessions() -> Result<Vec<PrimeSessionSummary>, String> {
         .collect())
 }
 
+/// One item in a replayed conversation, in the order it happened.
+///
+/// Compaction and model changes are items rather than metadata because they
+/// explain discontinuities. Without them a transcript shows the model losing
+/// the thread or changing voice for no visible reason, and the reader blames
+/// the model for what the harness did.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum PrimeTranscriptItem {
+    #[serde(rename_all = "camelCase")]
+    Message {
+        /// Entry id. `fork` addresses entries by this, so it must survive.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+        /// Parent entry. The log is a tree, not a list — forks share a prefix.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        parent_id: Option<String>,
+        message: crate::prime_session_host::PrimeMessage,
+    },
+    #[serde(rename_all = "camelCase")]
+    Compaction {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        timestamp: Option<String>,
+    },
+    #[serde(rename_all = "camelCase")]
+    ModelChange {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        timestamp: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
+    },
+}
+
+/// Replay a session log into an ordered transcript.
+///
+/// Pure, so it is tested without disk. `agent_status` dominates these files
+/// (2125 of ~2500 lines in one real session) and is dropped first — it is
+/// progress spinner state, not conversation.
+fn transcript_from_lines<I: Iterator<Item = String>>(lines: I) -> Vec<PrimeTranscriptItem> {
+    let mut items = Vec::new();
+    for line in lines {
+        let Ok(event) = serde_json::from_str::<serde_json::Value>(&line) else {
+            continue;
+        };
+        match event["type"].as_str().unwrap_or_default() {
+            "message" => {
+                let message = &event["message"];
+                if !message.is_object() {
+                    continue;
+                }
+                items.push(PrimeTranscriptItem::Message {
+                    id: event["id"].as_str().map(str::to_string),
+                    parent_id: event["parentId"].as_str().map(str::to_string),
+                    message: crate::prime_session_host::PrimeMessage::from_value(message),
+                });
+            }
+            "compaction" => items.push(PrimeTranscriptItem::Compaction {
+                timestamp: event["timestamp"].as_str().map(str::to_string),
+            }),
+            "model_change" => items.push(PrimeTranscriptItem::ModelChange {
+                timestamp: event["timestamp"].as_str().map(str::to_string),
+                model: event["model"]["name"]
+                    .as_str()
+                    .or_else(|| event["model"]["id"].as_str())
+                    .or_else(|| event["model"].as_str())
+                    .map(str::to_string),
+            }),
+            _ => {}
+        }
+    }
+    items
+}
+
+/// Read one session's full transcript from disk.
+///
+/// Unbounded by design, unlike `summarize_file`: the caller asked for this
+/// specific conversation, so the whole file is the point.
+pub fn read_transcript(path: &Path) -> Result<Vec<PrimeTranscriptItem>, String> {
+    let file = std::fs::File::open(path).map_err(|e| format!("open session log: {e}"))?;
+    let lines = BufReader::new(file).lines().map_while(Result::ok);
+    Ok(transcript_from_lines(lines))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -312,6 +395,117 @@ mod tests {
         assert!(is_session_log("019fe641.jsonl"));
         assert!(!is_session_log("019fe641.mindwalk-bridge.jsonl"));
         assert!(!is_session_log("notes.md"));
+    }
+
+    #[test]
+    fn transcript_keeps_messages_in_order_with_their_entry_ids() {
+        let items = transcript_from_lines(lines(&[
+            r#"{"type":"session","id":"s1"}"#,
+            r#"{"type":"message","id":"m1","message":{"role":"user","content":[{"type":"text","text":"first"}]}}"#,
+            r#"{"type":"message","id":"m2","parentId":"m1","message":{"role":"assistant","content":[{"type":"text","text":"second"}]}}"#,
+        ]));
+
+        assert_eq!(
+            items.len(),
+            2,
+            "the session header is not a transcript item"
+        );
+        match &items[0] {
+            PrimeTranscriptItem::Message {
+                id,
+                parent_id,
+                message,
+            } => {
+                assert_eq!(id.as_deref(), Some("m1"));
+                assert_eq!(parent_id.as_deref(), None);
+                assert_eq!(message.text, "first");
+                assert_eq!(message.role, "user");
+            }
+            other => panic!("expected a message, got {other:?}"),
+        }
+        // parentId is what makes this a tree; fork depends on it surviving.
+        match &items[1] {
+            PrimeTranscriptItem::Message { parent_id, .. } => {
+                assert_eq!(parent_id.as_deref(), Some("m1"))
+            }
+            other => panic!("expected a message, got {other:?}"),
+        }
+    }
+
+    /// `agent_status` is 2125 of ~2500 lines in a real session. It is spinner
+    /// state, not conversation, and must never reach the transcript.
+    #[test]
+    fn transcript_drops_agent_status_noise() {
+        let items = transcript_from_lines(lines(&[
+            r#"{"type":"agent_status","status":"thinking"}"#,
+            r#"{"type":"session_state","x":1}"#,
+            r#"{"type":"custom","x":1}"#,
+            r#"{"type":"message","message":{"role":"user","content":[{"type":"text","text":"kept"}]}}"#,
+        ]));
+
+        assert_eq!(items.len(), 1);
+    }
+
+    /// A compaction mid-transcript is why the model appears to forget. Showing
+    /// the conversation without it makes the harness's work look like the
+    /// model's failure.
+    #[test]
+    fn compaction_and_model_change_are_items_in_place_not_dropped() {
+        let items = transcript_from_lines(lines(&[
+            r#"{"type":"message","message":{"role":"user","content":[{"type":"text","text":"before"}]}}"#,
+            r#"{"type":"compaction","timestamp":"2026-08-09T11:00:00Z"}"#,
+            r#"{"type":"model_change","timestamp":"2026-08-09T11:05:00Z","model":{"id":"deepseek-v4-pro","name":"DeepSeek V4 Pro"}}"#,
+            r#"{"type":"message","message":{"role":"user","content":[{"type":"text","text":"after"}]}}"#,
+        ]));
+
+        assert_eq!(items.len(), 4, "markers keep their position in the order");
+        assert_eq!(
+            items[1],
+            PrimeTranscriptItem::Compaction {
+                timestamp: Some("2026-08-09T11:00:00Z".into())
+            }
+        );
+        match &items[2] {
+            PrimeTranscriptItem::ModelChange { model, .. } => {
+                assert_eq!(
+                    model.as_deref(),
+                    Some("DeepSeek V4 Pro"),
+                    "prefer the display name"
+                )
+            }
+            other => panic!("expected a model change, got {other:?}"),
+        }
+    }
+
+    /// Tool and thinking blocks must survive replay — a transcript that keeps
+    /// only prose loses what the assistant actually did.
+    #[test]
+    fn transcript_preserves_tool_and_thinking_blocks() {
+        let items = transcript_from_lines(lines(&[
+            r#"{"type":"message","message":{"role":"assistant","content":[{"type":"thinking","thinking":"hm"},{"type":"text","text":"reading"},{"type":"tool_use","name":"read","input":{"path":"a.md"}}]}}"#,
+        ]));
+
+        match &items[0] {
+            PrimeTranscriptItem::Message { message, .. } => {
+                assert_eq!(message.text, "reading");
+                let blocks = message.content.as_array().expect("blocks");
+                assert_eq!(blocks.len(), 3, "no block dropped on replay");
+                assert_eq!(blocks[2]["name"], "read");
+            }
+            other => panic!("expected a message, got {other:?}"),
+        }
+    }
+
+    /// A truncated final line is normal for a log still being written to.
+    #[test]
+    fn transcript_survives_a_malformed_or_empty_message_line() {
+        let items = transcript_from_lines(lines(&[
+            r#"{"type":"message","message":null}"#,
+            r#"{"type":"message"#,
+            r#"{"type":"message","message":{"role":"user","content":[{"type":"text","text":"ok"}]}}"#,
+        ]));
+
+        assert_eq!(items.len(), 1);
     }
 
     #[test]

@@ -117,7 +117,7 @@ impl PrimeSessionStats {
 /// anticipate. That is exactly the data a rehydrated transcript needs most, so
 /// the parse is deliberately lossless. The frontend already understands
 /// Prime's block shapes from the streaming path (`prime_events`).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrimeMessage {
     pub role: String,
@@ -131,7 +131,10 @@ pub struct PrimeMessage {
 }
 
 impl PrimeMessage {
-    fn from_value(value: &serde_json::Value) -> Self {
+    /// Parse one message object. Shared with `prime_sessions`, which finds the
+    /// identical shape nested inside each `message` line of the on-disk log —
+    /// so a live transcript and a replayed one are the same type.
+    pub(crate) fn from_value(value: &serde_json::Value) -> Self {
         let content = value
             .get("content")
             .cloned()
