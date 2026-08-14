@@ -3,6 +3,11 @@
 Written 2026-08-13 by Claude Opus 5 for whichever model picks this up next.
 Self-contained: you should not need the conversation that produced it.
 
+**Status 2026-08-14:** foot row shipped (`aeee08c`, `7f7f19a`). **A4 skipped** —
+no Frame A titlebar exists; vault/last-tool already live on subhead/deck/foot.
+Optional leftover: New chat on the subhead (header is `showHeader={false}`).
+See `docs/HANDOFF.md` § 2026-08-13b. Traps below still apply.
+
 **If you are not Claude, read `docs/CROSS-MODEL-HANDOFF.md` first.** It lists
 traps a previous non-Anthropic session already hit here. This document adds the
 Frame A-specific ones.

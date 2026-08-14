@@ -105,11 +105,12 @@ BYO-model makes that surface load-bearing rather than second-tier.
 
 ## Session handoff — 2026-08-13b (Frame A: chat owns the window)
 
-**Next agent: read `docs/plans/2026-08-13-frame-a-handoff-for-next-agent.md`.**
-It is self-contained and covers the two remaining Frame A pieces.
+**Next agent: Frame A leftover is closed except an optional New-chat
+affordance.** The dated plan still has the traps (rail unions, preview
+bugs, real-log verify). Do not build A4 titlebar chips — skipped below.
 
-**Shipped** — session list slices 1–4, then Frame A slices A1–A3.
-`pnpm test` 5254 / 498 files · `cargo test --lib` 1380 · all gates green.
+**Shipped** — session list slices 1–4, then Frame A slices A1–A3 plus the
+composer foot row (`aeee08c`, `7f7f19a`).
 
 - **Chat is a rail destination that owns the window** — no sidebar, no note
   list, no editor. First surface where "conversation owns the room" is true.
@@ -117,11 +118,20 @@ It is self-contained and covers the two remaining Frame A pieces.
 - **Composer control deck** — Prime · model ▾ · vault · Skills, with a
   **working model picker** (`get_available_prime_models` / `set_prime_model`,
   78 models grouped by provider, fetched on open).
+- **Composer foot row** — `Working · last tool {name}` / `Idle · ready`, with
+  Esc stop · ⌘. vs ⌘↵ send. Last-tool name is a pure function
+  (`lastToolName`) rendered inside `AiPanel`, not the deck.
 - **Session list** — enumerate from disk, replay a transcript, `switch_session`,
   rehydrate the panel with tool cards intact.
 
-**Remaining in Frame A:** the composer foot row (`Working · last tool X` /
-`Esc stop · ⌘.`) and A4 titlebar chips. Both specified in the handoff doc.
+**A4-SKIPPED (2026-08-14):** do not build Frame A titlebar chips. This app has
+no custom Frame A titlebar — status bar is the bottom strip, subhead is the
+top strip. Artboard chips are already covered: vault (subhead + deck +
+status-bar pill), last tool (composer foot). `Running tools · N` is the only
+new datum and is not worth a third chrome band. **Real leftover, not A4:**
+New chat is on `AiPanelHeader`, which ChatHome mounts with `showHeader={false}`,
+so Frame A only has New chat inside the sessions drawer. If that gap hurts,
+put a button on the subhead — do not invent a titlebar.
 
 **The design system is authoritative for UI:**
 `/Users/dtc/Desktop/rhizome-agent-design-system/`, artboards in
@@ -479,6 +489,8 @@ Note what this implies about the record: sessions in this window that report "al
 - **C23-CORRECTED (2026-08-13, same day): `get_messages` is not broken — I misread a fresh session.** Probing after `switch_session` returned **125 messages**, a full conversation. The original finding (only the user message) was a fresh session **mid-turn**: `get_messages` reflects *persisted* history and a just-finished turn is not persisted at the moment you ask. The decision to read transcripts from disk still stands, but for a **different and better reason**: `get_messages` returns *post-compaction working history* while the disk log holds *everything* — the same session gives 125 via RPC and 375 message lines on disk. Those are two legitimate different things ("what the model still remembers" vs "what was actually said"), and a scrollback transcript wants the second. Recorded because the original C23 wording would have sent a future session hunting a bug that does not exist.
 - **C23-RESOLVED (2026-08-13): the transcript comes from the on-disk `.jsonl`, not `get_messages`.** Decided in `docs/plans/2026-08-13-prime-session-list-spec.md`. The disk log is the only source describing a session the app is not currently running — the whole point of a switchable list — and is strictly richer (`parentId` fork lineage, `model_change`, `compaction`). `get_messages` stays as landed, correct for the live session, no longer load-bearing. Original finding retained below for the record.
 - **C23-OPEN (original finding): `get_messages` is not sufficient for transcript rehydration.** Found 2026-08-13 while verifying the newly-landed command against the live `prime-agent --mode rpc` binary. Within a **single** host process: send `prompt` → wait for `agent_end` → `agent_end` carries `messages` with **both** roles (`['user','assistant']`) → then `get_messages` on that same process returns **only the user message**. Reproduced across two runs. Not investigated further, so the cause is unknown — plausible readings are that `get_messages` reads a persisted store while `agent_end` reflects in-memory turn state, or that the assistant message commits on some later event. **Why it matters:** the roadmap recorded `get_messages` as the thing blocking the whole session story, which assumed it returns the conversation. It returns *a* conversation view that is missing the assistant side. Rehydration therefore needs a decision — capture `agent_end.messages` as the transcript source, find the persist trigger that makes `get_messages` complete, or reconstruct from the session `.jsonl` on disk (which `mycelium.rs` already reads). **Do not build the session list until this is settled**; all three options change its shape. The command itself is landed, tested and correct for what it returns — this is a sufficiency gap, not a defect in the parse.
+
+- **C24-OPEN: `src/utils/primeSessionToMindwalk.ts` has three dead exports that now duplicate the Rust session reader.** Found 2026-08-13 by `pnpm deadcode` after building `prime_sessions.rs`. `listPrimeSessionCandidates` (filters `*.jsonl` and sorts) and `PRIME_SESSIONS_DIR_DEFAULT` (`'~/.prime/agent/sessions'`) are referenced by nothing — verified with a repo-wide grep excluding their own file — and both restate what `prime_sessions::session_files()` and `sessions_dir()` now do authoritatively in Rust. `BridgedSessionResult` is also unreferenced. **Not deleted here**: this session did not otherwise touch that file, and `AGENTS.md` says to fix what your change touches rather than mass-delete the backlog in an unrelated commit. The rest of the module is live (Mycelium's Mindwalk bridge), so this is a three-export removal, not a file deletion. Whoever next touches Mycelium should delete them and confirm the bridge still resolves its sessions directory — the constant is the one to check, since removing it means the bridge must get that path from somewhere. **Run `npx tsc -b` after deleting anything knip flagged**, per the ambient-declaration warning in `AGENTS.md`.
 
 - **C22-OPEN: on Windows, minimizing Rhizome and then clicking the taskbar icon does not bring the window back.** Reported directly by the user 2026-08-02, **not yet investigated or reproduced** — logged so it isn't lost, not because it's understood. Likely area: `src-tauri/src/lib.rs` and `src-tauri/src/window_state.rs` both reference tray/window-event handling and are the right starting point (found via a quick `grep -rln "tray\|minimize\|restore\|WindowEvent" src-tauri/src/*.rs`, not read yet). Windows-specific per the report — check whether the tray-click / taskbar-restore handler is platform-gated (`cfg(windows)` vs `cfg(desktop)`) and whether it's actually wired to a restore call, or only to show/hide on other platforms. No repro steps beyond "minimize, then try to click it back up" captured yet — get those from the user before starting, and check whether this reproduces on macOS too or is genuinely Windows-only (relevant since `linux_appimage.rs`/`window_state.rs` suggest per-platform window handling already exists and may just be incomplete for one target).
 
