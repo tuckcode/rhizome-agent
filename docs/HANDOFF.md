@@ -16,8 +16,9 @@ see ChatHome, dual-agent workflow, traps).
 **Do not:** rebuild A4; hardcode a model; treat the Desktop wiki shell as
 the design; resume the 08-09 "19 tests fail / push blocked" story.
 
-**Next:** look at live ChatHome, then Frame B. New chat is on the
-subhead now. C24 on next Mycelium touch.
+**Next:** look at live ChatHome (Open on a tool card should split, not
+leave chat). Frame B chrome is in; body is still empty. C24 on next
+Mycelium touch.
 
 
 ---

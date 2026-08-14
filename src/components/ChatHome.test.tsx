@@ -7,11 +7,19 @@ const startNewChat = vi.fn()
 vi.mock('./AiPanel', () => ({
   AiPanel: ({
     newChatRef,
+    onOpenNote,
   }: {
     newChatRef?: MutableRefObject<(() => void) | null>
+    onOpenNote?: (path: string) => void
   }) => {
     if (newChatRef) newChatRef.current = startNewChat
-    return <div data-testid="ai-panel-stub" />
+    return (
+      <div data-testid="ai-panel-stub">
+        <button type="button" onClick={() => onOpenNote?.('/Users/dtc/Documents/Laputa/wiki/decisions/memory-loop.md')}>
+          Open
+        </button>
+      </div>
+    )
   },
 }))
 
@@ -46,5 +54,31 @@ describe('ChatHome', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
     expect(startNewChat).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens a note beside chat instead of leaving ChatHome', () => {
+    const onOpenNote = vi.fn()
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath="/Users/dtc/Documents/Laputa"
+        vaultPaths={['/Users/dtc/Documents/Laputa']}
+        entries={[]}
+        onOpenNote={onOpenNote}
+        onExit={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }))
+
+    expect(screen.getByTestId('chat-home')).toBeInTheDocument()
+    expect(screen.getByTestId('chat-note-pane')).toHaveTextContent('wiki/decisions/memory-loop.md')
+    expect(onOpenNote).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close note' }))
+    expect(screen.queryByTestId('chat-note-pane')).not.toBeInTheDocument()
   })
 })

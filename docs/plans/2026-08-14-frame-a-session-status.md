@@ -115,8 +115,9 @@ wiki CMS + side AI Chat — that is the old default, not a failed Frame A.
 1. **Look at live ChatHome** before more UI. Clear session key if the tab
    already ran (see below).
 2. **C24 delete** on next Mycelium touch only.
-3. **Frame B** (note split) — next design slice that changes how it *looks*.
-   Open-note today calls `notes.handleNavigateWikilink` and leaves ChatHome.
+3. **Frame B body** — pane chrome is in; it does not yet load
+   `get_note_content` / Markdown. Composer still sits only in the chat
+   column (artboard wants it full-width under both). Save is Frame C.
 
 ---
 

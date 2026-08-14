@@ -1,9 +1,11 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { AiPanel } from './AiPanel'
 import { PrimeSessionSubhead } from './PrimeSessionSubhead'
 import { ChatComposerDeck } from './ChatComposerDeck'
+import { ChatNotePane } from './ChatNotePane'
 import { vaultLabelFromPath } from '../lib/primeSubheadLabels'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
+import { resolveChatOpenNote } from '../utils/resolveChatOpenNote'
 import type { AiAgentId, AiAgentReadiness } from '../lib/aiAgents'
 import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
@@ -33,8 +35,8 @@ interface ChatHomeProps {
  *
  * The conversation is the primary surface here rather than a panel beside an
  * editor: a telemetry subhead across the top, then the transcript and composer
- * filling everything under it. There is no note list and no editor, which is
- * the point — the vault is reachable from the rail when you want it.
+ * filling everything under it. Open-note is a secondary pane (Frame B), not
+ * an editor takeover — the vault is still a rail click away.
  */
 export default function ChatHome({
   locale,
@@ -45,7 +47,6 @@ export default function ChatHome({
   vaultPath,
   vaultPaths,
   entries,
-  onOpenNote,
   onPromoteToVault,
   onFileCreated,
   onFileModified,
@@ -56,6 +57,7 @@ export default function ChatHome({
   const isPrimeTarget = defaultAiTarget?.kind !== 'api_model' && defaultAiAgent === 'prime'
   const primeHost = usePrimeHostStatus(isPrimeTarget)
   const newChatRef = useRef<(() => void) | null>(null)
+  const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="chat-home">
@@ -70,6 +72,7 @@ export default function ChatHome({
         />
       ) : null}
       <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 min-w-[55%] flex-1">
         <AiPanel
           locale={locale}
           defaultAiAgent={defaultAiAgent}
@@ -79,7 +82,10 @@ export default function ChatHome({
           vaultPath={vaultPath}
           vaultPaths={vaultPaths}
           entries={entries}
-          onOpenNote={onOpenNote}
+          onOpenNote={(target) => {
+            const resolved = resolveChatOpenNote(target, vaultPath)
+            if (resolved) setOpenNote(resolved)
+          }}
           onPromoteToVault={onPromoteToVault}
           onFileCreated={onFileCreated}
           onFileModified={onFileModified}
@@ -99,6 +105,14 @@ export default function ChatHome({
           }
           onClose={onExit}
         />
+        </div>
+        {openNote ? (
+          <ChatNotePane
+            locale={locale}
+            label={openNote.label}
+            onClose={() => setOpenNote(null)}
+          />
+        ) : null}
       </div>
     </div>
   )
