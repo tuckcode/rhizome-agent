@@ -288,6 +288,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   )
   const aiWorkspaceWindowContext = useMemo(() => aiWorkspaceWindowContextForPath(resolvedPath), [resolvedPath])
   const [settingsInitialSectionId, setSettingsInitialSectionId] = useState<string | null>(null)
+  const openChatHome = useCallback(() => {
+    handleSetSelection({ kind: 'filter', filter: 'chat' })
+  }, [handleSetSelection])
   const {
     effectiveShowAIChat,
     handleOpenAiSettings,
@@ -297,9 +300,12 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     aiWorkspaceWindow,
     closeAIChat,
     openAIChat,
+    openChatHome,
     openSettings: dialogs.openSettings,
     setSettingsInitialSectionId,
     showAIChat,
+    suppressDefaultOpen: Boolean(noteWindowParams),
+    vaultReady: vaultSwitcher.loaded,
   })
   const handleToggleAiWorkspace = useCallback(() => {
     if (effectiveShowAIChat) {

@@ -106,8 +106,8 @@ BYO-model makes that surface load-bearing rather than second-tier.
 ## Session handoff — 2026-08-13b (Frame A: chat owns the window)
 
 **Next agent: Frame A leftover is closed except an optional New-chat
-affordance.** The dated plan still has the traps (rail unions, preview
-bugs, real-log verify). Do not build A4 titlebar chips — skipped below.
+affordance.** Launch now opens ChatHome (not the side AI panel). The dated
+plan still has the traps. Do not build A4 titlebar chips — skipped below.
 
 **Shipped** — session list slices 1–4, then Frame A slices A1–A3 plus the
 composer foot row (`aeee08c`, `7f7f19a`).
@@ -123,6 +123,9 @@ composer foot row (`aeee08c`, `7f7f19a`).
   (`lastToolName`) rendered inside `AiPanel`, not the deck.
 - **Session list** — enumerate from disk, replay a transcript, `switch_session`,
   rehydrate the panel with tool cards intact.
+- **Launch = ChatHome** — `useAgentDefaultOpenChat` selects `filter: 'chat'`
+  after the vault switcher loads (so persist `onSwitch` cannot clobber it).
+  Note windows suppressed. Side panel still opens from status bar / events.
 
 **A4-SKIPPED (2026-08-14):** do not build Frame A titlebar chips. This app has
 no custom Frame A titlebar — status bar is the bottom strip, subhead is the
