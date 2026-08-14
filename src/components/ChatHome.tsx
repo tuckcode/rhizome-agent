@@ -72,7 +72,6 @@ export default function ChatHome({
         />
       ) : null}
       <div className="flex min-h-0 flex-1">
-        <div className="flex min-h-0 min-w-[55%] flex-1">
         <AiPanel
           locale={locale}
           defaultAiAgent={defaultAiAgent}
@@ -93,6 +92,21 @@ export default function ChatHome({
           onUnsupportedAiPaste={onUnsupportedAiPaste}
           showHeader={false}
           newChatRef={newChatRef}
+          notePane={
+            openNote ? (
+              <ChatNotePane
+                locale={locale}
+                label={openNote.label}
+                path={openNote.path}
+                vaultPath={vaultPath}
+                onClose={() => setOpenNote(null)}
+                onOpenNote={(target) => {
+                  const resolved = resolveChatOpenNote(target, vaultPath)
+                  if (resolved) setOpenNote(resolved)
+                }}
+              />
+            ) : null
+          }
           composerControls={
             isPrimeTarget ? (
               <ChatComposerDeck
@@ -105,20 +119,6 @@ export default function ChatHome({
           }
           onClose={onExit}
         />
-        </div>
-        {openNote ? (
-          <ChatNotePane
-            locale={locale}
-            label={openNote.label}
-            path={openNote.path}
-            vaultPath={vaultPath}
-            onClose={() => setOpenNote(null)}
-            onOpenNote={(target) => {
-              const resolved = resolveChatOpenNote(target, vaultPath)
-              if (resolved) setOpenNote(resolved)
-            }}
-          />
-        ) : null}
       </div>
     </div>
   )

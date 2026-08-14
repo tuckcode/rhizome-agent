@@ -258,6 +258,20 @@ describe('AiPanel', () => {
     expect(mockClearConversation).toHaveBeenCalledOnce()
   })
 
+  it('keeps the composer under a note pane', () => {
+    render(
+      <AiPanel
+        onClose={vi.fn()}
+        vaultPath="/tmp/vault"
+        notePane={<aside data-testid="chat-note-pane">note</aside>}
+      />,
+    )
+
+    const pane = screen.getByTestId('chat-note-pane')
+    const input = screen.getByTestId('agent-input')
+    expect(pane.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('keeps the MCP config action out of the AI panel header', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
 
