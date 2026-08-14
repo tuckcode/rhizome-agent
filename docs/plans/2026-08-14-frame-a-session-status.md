@@ -114,10 +114,9 @@ wiki CMS + side AI Chat — that is the old default, not a failed Frame A.
 
 1. **Look at live ChatHome** before more UI. Clear session key if the tab
    already ran (see below).
-2. **New chat on the subhead.** Header is `showHeader={false}` on ChatHome.
-   Only inside the sessions drawer today. Do not build a titlebar.
-3. **C24 delete** on next Mycelium touch only.
-4. **Frame B** (note split) — next design slice that changes how it *looks*.
+2. **C24 delete** on next Mycelium touch only.
+3. **Frame B** (note split) — next design slice that changes how it *looks*.
+   Open-note today calls `notes.handleNavigateWikilink` and leaves ChatHome.
 
 ---
 

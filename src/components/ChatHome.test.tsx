@@ -1,0 +1,50 @@
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+import type { MutableRefObject } from 'react'
+
+const startNewChat = vi.fn()
+
+vi.mock('./AiPanel', () => ({
+  AiPanel: ({
+    newChatRef,
+  }: {
+    newChatRef?: MutableRefObject<(() => void) | null>
+  }) => {
+    if (newChatRef) newChatRef.current = startNewChat
+    return <div data-testid="ai-panel-stub" />
+  },
+}))
+
+vi.mock('../hooks/usePrimeHostStatus', () => ({
+  primeModelLabel: () => 'xai / grok-4.5',
+  usePrimeHostStatus: () => ({
+    running: true,
+    sessionId: '019fe641-61fa-73e9-82ef-91fc90097aab',
+    modelName: 'Grok 4.5',
+    modelProvider: 'xai',
+    modelId: 'grok-4.5',
+  }),
+}))
+
+import ChatHome from './ChatHome'
+
+describe('ChatHome', () => {
+  it('starts a new chat from the Frame A subhead', () => {
+    startNewChat.mockClear()
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath="/Users/dtc/Documents/Laputa"
+        vaultPaths={['/Users/dtc/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    expect(startNewChat).toHaveBeenCalledTimes(1)
+  })
+})

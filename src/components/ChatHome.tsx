@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { AiPanel } from './AiPanel'
 import { PrimeSessionSubhead } from './PrimeSessionSubhead'
 import { ChatComposerDeck } from './ChatComposerDeck'
@@ -54,6 +55,7 @@ export default function ChatHome({
 }: ChatHomeProps) {
   const isPrimeTarget = defaultAiTarget?.kind !== 'api_model' && defaultAiAgent === 'prime'
   const primeHost = usePrimeHostStatus(isPrimeTarget)
+  const newChatRef = useRef<(() => void) | null>(null)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="chat-home">
@@ -64,6 +66,7 @@ export default function ChatHome({
           sessionId={primeHost?.sessionId ?? null}
           model={primeModelLabel(primeHost)}
           vaultPath={vaultPath}
+          onNewChat={() => newChatRef.current?.()}
         />
       ) : null}
       <div className="flex min-h-0 flex-1">
@@ -83,6 +86,7 @@ export default function ChatHome({
           onVaultChanged={onVaultChanged}
           onUnsupportedAiPaste={onUnsupportedAiPaste}
           showHeader={false}
+          newChatRef={newChatRef}
           composerControls={
             isPrimeTarget ? (
               <ChatComposerDeck

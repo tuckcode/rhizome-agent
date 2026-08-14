@@ -200,7 +200,7 @@ describe('AiPanel', () => {
 
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
 
-    expect(screen.getByText(/working/i)).toBeTruthy()
+    expect(screen.getByText('Prime Agent · working…')).toBeTruthy()
     expect(screen.queryByTestId('ai-permission-mode-toggle')).toBeNull()
   })
 
