@@ -34,8 +34,9 @@ git status -sb
 git log --oneline origin/main..HEAD
 ```
 
-When written: `main` **ahead 5** of `origin/main`, working tree **clean**.
-**Not pushed.** Atticus has not asked to push.
+When written: working tree **clean after this commit**. **Not pushed.**
+Count them: `git rev-list --count origin/main..HEAD`. Atticus has not
+asked to push.
 
 | SHA | Trailer | What |
 |---|---|---|
@@ -43,7 +44,8 @@ When written: `main` **ahead 5** of `origin/main`, working tree **clean**.
 | `7f7f19a` | Grok 4.6 | `ChatComposerFoot` + en.json keys + AiPanel wire |
 | `1b6cbb2` | Grok 4.6 | A4 skipped in docs; C24 logged (Claude's finding) |
 | `15a8448` | Grok 4.6 | Launch opens ChatHome, not the side AI panel |
-| `f2eb0c3` | Grok 4.6 | This handoff (first cut) |
+| `f2eb0c3` | Grok 4.6 | First handoff cut |
+| `1fb1728` | Grok 4.6 | This expanded Claude Code pickup |
 
 Prior Frame A / session-list work is already on `origin/main` (Claude,
 through `606c3c3` / `c25b505`).

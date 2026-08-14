@@ -8,9 +8,10 @@ Living doc. Update in place each session. This file is "what's true right now," 
 It is the self-contained pickup (what shipped, what is prototype, how to
 see ChatHome, dual-agent workflow, traps).
 
-**`main` is 5 commits ahead of `origin/main`, not pushed.** Re-verify.
+**Unpushed — count them, do not trust a number here:**
+`git rev-list --count origin/main..HEAD`. Atticus has not asked to push.
 `aeee08c` lastToolName · `7f7f19a` foot · `1b6cbb2` A4 skip + C24 ·
-`15a8448` launch ChatHome · `f2eb0c3`+ later = this handoff.
+`15a8448` launch ChatHome · `f2eb0c3` / `1fb1728`+ handoff docs.
 
 **Do not:** rebuild A4; hardcode a model; treat the Desktop wiki shell as
 the design; resume the 08-09 "19 tests fail / push blocked" story.
