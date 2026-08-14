@@ -16,8 +16,8 @@ see ChatHome, dual-agent workflow, traps).
 **Do not:** rebuild A4; hardcode a model; treat the Desktop wiki shell as
 the design; resume the 08-09 "19 tests fail / push blocked" story.
 
-**Next:** Frame B composer now spans under the note pane. Save is Frame C.
-C24 on next Mycelium touch.
+**Next:** Frame C Save is a labeled visible button. Frame D (no vault /
+locked memory) is the next artboard. C24 on next Mycelium touch.
 
 
 ---
