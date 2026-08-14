@@ -8,9 +8,11 @@ vi.mock('./AiPanel', () => ({
   AiPanel: ({
     newChatRef,
     onOpenNote,
+    notePane,
   }: {
     newChatRef?: MutableRefObject<(() => void) | null>
     onOpenNote?: (path: string) => void
+    notePane?: React.ReactNode
   }) => {
     if (newChatRef) newChatRef.current = startNewChat
     return (
@@ -18,6 +20,7 @@ vi.mock('./AiPanel', () => ({
         <button type="button" onClick={() => onOpenNote?.('/Users/dtc/Documents/Laputa/wiki/decisions/memory-loop.md')}>
           Open
         </button>
+        {notePane}
       </div>
     )
   },

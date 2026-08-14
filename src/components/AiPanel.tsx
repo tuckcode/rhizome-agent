@@ -61,6 +61,8 @@ interface AiPanelProps {
   newChatRef?: MutableRefObject<(() => void) | null>
   /** Chips rendered in the composer's control row (Frame A's control deck). */
   composerControls?: ReactNode
+  /** Frame B note split — sits beside the transcript so the composer spans both. */
+  notePane?: ReactNode
 }
 
 interface AiPanelViewProps {
@@ -81,6 +83,7 @@ interface AiPanelViewProps {
   showLeftBorder?: boolean
   surface?: 'default' | 'sidebar'
   composerControls?: ReactNode
+  notePane?: ReactNode
   onForkMessage?: (messageId: string) => void
   onQueuedPromptTarget?: (targetId: string) => void
   onSendPrompt?: (text: string) => void
@@ -178,6 +181,7 @@ export function AiPanelView({
   showLeftBorder = true,
   surface = 'default',
   composerControls,
+  notePane,
   onForkMessage,
   onQueuedPromptTarget,
   onSendPrompt,
@@ -319,6 +323,7 @@ export function AiPanelView({
             />
           </div>
         )}
+      <div className="flex min-h-0 min-w-[55%] flex-1">
       <AiPanelMessageHistory
         agentLabel={view.agentLabel}
         agentReadiness={view.defaultAiAgentReadiness}
@@ -333,6 +338,8 @@ export function AiPanelView({
         onScrollStateChange={onMessageHistoryScrollStateChange}
         hasContext={hasContext}
       />
+      </div>
+      {notePane}
       </div>
       {isPrimeTarget && (
         <div style={{ padding: '0 12px 6px' }}>
@@ -388,6 +395,7 @@ export function AiPanel({
   noteList,
   noteListFilter,
   newChatRef,
+  notePane,
 }: AiPanelProps) {
   const defaultAiAgentReadiness = providedDefaultAiAgentReadiness
     ?? readinessFromReadyFlag(providedDefaultAiAgentReady)
@@ -421,6 +429,7 @@ export function AiPanel({
       controller={controller}
       showHeader={showHeader}
       composerControls={composerControls}
+      notePane={notePane}
       onClose={onClose}
       onOpenNote={onOpenNote}
       onPromoteToVault={onPromoteToVault}
