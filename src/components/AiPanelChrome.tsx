@@ -74,6 +74,8 @@ interface AiPanelComposerProps {
    *  stays disabled while streaming, which is the pre-steering behaviour. */
   onSteer?: (text: string, references: NoteReference[]) => void
   onUnsupportedAiPaste?: (message: string) => void
+  /** Frame A foot row. Rendered under the box so it can see controller state. */
+  foot?: ReactNode
 }
 
 function getComposerPlaceholder(
@@ -568,6 +570,7 @@ export function AiPanelComposer({
   onStop,
   onSteer,
   onUnsupportedAiPaste,
+  foot,
 }: AiPanelComposerProps) {
   const t = createTranslator(locale)
   // Steering keeps the input live during a turn. Without an onSteer handler the
@@ -627,6 +630,7 @@ export function AiPanelComposer({
           {controls}
         </ComposerControlsRow>
       </div>
+      {foot}
     </div>
   )
 }
