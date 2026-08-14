@@ -74,4 +74,14 @@ describe('AiPanelComposer steering', () => {
       'Working · last tool get_note',
     )
   })
+
+  it('puts the control deck above the input', () => {
+    renderComposer({
+      controls: <div data-testid="chat-composer-deck">Prime</div>,
+    })
+
+    const deck = screen.getByTestId('chat-composer-deck')
+    const input = screen.getByTestId('agent-input')
+    expect(deck.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
 })

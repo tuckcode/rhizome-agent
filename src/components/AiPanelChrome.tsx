@@ -610,10 +610,16 @@ export function AiPanelComposer({
       className="flex shrink-0 flex-col"
       style={{ padding: '6px 10px' }}
     >
+      {hasControls ? (
+        <div className="mb-1.5 min-w-0">
+          {controls}
+        </div>
+      ) : null}
       <div className={cn(
-        hasControls ? 'rounded-xl border border-border bg-background px-2 py-1.5 shadow-xs' : 'flex items-end gap-2',
+        'flex items-end gap-2',
+        hasControls && 'rounded-xl border border-border bg-background px-2 py-1.5 shadow-xs',
       )}>
-        <div className={cn('min-w-0 flex-1', hasControls && 'w-full')}>
+        <div className="min-w-0 flex-1">
           <ComposerInput
             disabled={composerDisabled}
             entries={entries}
@@ -626,9 +632,7 @@ export function AiPanelComposer({
             placeholder={placeholder}
           />
         </div>
-        <ComposerControlsRow hasControls={hasControls} sendButton={sendButton}>
-          {controls}
-        </ComposerControlsRow>
+        <ComposerControlsRow hasControls={false} sendButton={sendButton} />
       </div>
       {foot}
     </div>
