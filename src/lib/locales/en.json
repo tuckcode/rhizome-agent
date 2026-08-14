@@ -1164,5 +1164,7 @@
   "ai.composer.foot.stop": "stop",
   "ai.composer.foot.send": "send",
   "ai.chatNote.tag": "Note",
-  "ai.chatNote.close": "Close note"
+  "ai.chatNote.close": "Close note",
+  "ai.chatNote.loading": "Loading note…",
+  "ai.chatNote.error": "Could not open this note."
 }

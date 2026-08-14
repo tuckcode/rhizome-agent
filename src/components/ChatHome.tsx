@@ -110,7 +110,13 @@ export default function ChatHome({
           <ChatNotePane
             locale={locale}
             label={openNote.label}
+            path={openNote.path}
+            vaultPath={vaultPath}
             onClose={() => setOpenNote(null)}
+            onOpenNote={(target) => {
+              const resolved = resolveChatOpenNote(target, vaultPath)
+              if (resolved) setOpenNote(resolved)
+            }}
           />
         ) : null}
       </div>

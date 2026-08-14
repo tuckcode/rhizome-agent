@@ -1,23 +1,58 @@
+import { useEffect, useState } from 'react'
 import { X } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { createTranslator, type AppLocale } from '../lib/i18n'
+import { loadChatNoteContent } from '../utils/loadChatNoteContent'
+import { MarkdownContent } from './MarkdownContent'
 
 interface ChatNotePaneProps {
   locale?: AppLocale
   label: string
+  path?: string
+  vaultPath?: string
   onClose: () => void
+  onOpenNote?: (target: string) => void
 }
 
 /**
  * Frame B — secondary note split. Chat stays on screen.
- * Read-only chrome for now; Save belongs with promote, not this slice.
+ * Read-only body; Save belongs with promote, not this slice.
  */
 export function ChatNotePane({
   locale = 'en',
   label,
+  path,
+  vaultPath,
   onClose,
+  onOpenNote,
 }: ChatNotePaneProps) {
   const t = createTranslator(locale)
+  const [loaded, setLoaded] = useState<{ path: string; body: string } | null>(null)
+  const [failedPath, setFailedPath] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!path || !vaultPath) return
+    const requested = path
+    let cancelled = false
+    void loadChatNoteContent(requested, vaultPath)
+      .then((content) => {
+        if (cancelled) return
+        setLoaded({ path: requested, body: content })
+        setFailedPath(null)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setFailedPath(requested)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [path, vaultPath])
+
+  const body = path && loaded?.path === path ? loaded.body : null
+  const error = Boolean(path && failedPath === path)
+  const loading = Boolean(path && vaultPath && !body && !error)
 
   return (
     <aside
@@ -41,6 +76,17 @@ export function ChatNotePane({
           <X size={14} />
         </Button>
       </div>
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="px-3 py-3 text-sm">
+          {error ? (
+            <p className="text-xs text-destructive" role="alert">{t('ai.chatNote.error')}</p>
+          ) : loading ? (
+            <p className="text-xs text-muted-foreground">{t('ai.chatNote.loading')}</p>
+          ) : body ? (
+            <MarkdownContent content={body} onWikilinkClick={onOpenNote} />
+          ) : null}
+        </div>
+      </ScrollArea>
     </aside>
   )
 }
