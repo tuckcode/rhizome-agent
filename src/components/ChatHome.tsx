@@ -113,6 +113,7 @@ export default function ChatHome({
                 locale={locale}
                 modelLabel={primeModelLabel(primeHost)}
                 vaultLabel={vaultLabelFromPath(vaultPath)}
+                contextLabel={openNote ? openNote.label.split('/').filter(Boolean).at(-1) ?? openNote.label : null}
                 skillsLabel="rhizome-vault"
               />
             ) : undefined

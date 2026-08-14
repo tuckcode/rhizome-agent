@@ -8,6 +8,8 @@ interface ChatComposerDeckProps {
   modelLabel?: string | null
   vaultLabel?: string | null
   skillsLabel?: string | null
+  /** Frame B — the note open in the secondary pane. */
+  contextLabel?: string | null
   /** True while a turn is running — the model cannot change mid-turn. */
   working?: boolean
 }
@@ -48,6 +50,7 @@ export function ChatComposerDeck({
   modelLabel,
   vaultLabel,
   skillsLabel,
+  contextLabel,
   working = false,
 }: ChatComposerDeckProps) {
   const t = createTranslator(locale)
@@ -66,6 +69,7 @@ export function ChatComposerDeck({
       />
 
       {vaultLabel ? <Chip title={t('ai.composer.vault')}>{vaultLabel}</Chip> : null}
+      {contextLabel ? <Chip>{t('ai.composer.context', { note: contextLabel })}</Chip> : null}
       {skillsLabel ? (
         <Chip>{t('ai.panel.skills.withVault', { skills: skillsLabel })}</Chip>
       ) : null}
