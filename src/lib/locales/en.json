@@ -1157,5 +1157,10 @@
   "ai.composer.modelUnknown": "Model",
   "ai.composer.modelsLoading": "Loading models…",
   "ai.composer.modelsEmpty": "No models available",
-  "ai.composer.vault": "Attached vault"
+  "ai.composer.vault": "Attached vault",
+  "ai.composer.foot.working": "Working · last tool {tool}",
+  "ai.composer.foot.workingBare": "Working",
+  "ai.composer.foot.idle": "Idle · ready",
+  "ai.composer.foot.stop": "stop",
+  "ai.composer.foot.send": "send"
 }

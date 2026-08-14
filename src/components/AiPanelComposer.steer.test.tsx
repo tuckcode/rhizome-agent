@@ -66,4 +66,12 @@ describe('AiPanelComposer steering', () => {
     expect(screen.getByRole('button', { name: 'Send message' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Steer response' })).toBeNull()
   })
+
+  it('renders a foot row under the composer when one is provided', () => {
+    renderComposer({ foot: <div data-testid="chat-composer-foot">Working · last tool get_note</div> })
+
+    expect(screen.getByTestId('chat-composer-foot')).toHaveTextContent(
+      'Working · last tool get_note',
+    )
+  })
 })

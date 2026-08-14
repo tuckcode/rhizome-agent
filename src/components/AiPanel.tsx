@@ -28,6 +28,8 @@ import { useAiPanelFocus } from './useAiPanelFocus'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 import { usePrimeSessionStats } from '../hooks/usePrimeSessionStats'
 import { PrimeContextMeter } from './PrimeContextMeter'
+import { ChatComposerFoot } from './ChatComposerFoot'
+import { lastToolName } from '../utils/lastToolName'
 
 export type { AiAgentMessage } from '../hooks/useCliAiAgent'
 
@@ -348,6 +350,13 @@ export function AiPanelView({
         onSend={handleComposerSend}
         onStop={handleStop}
         onUnsupportedAiPaste={onUnsupportedAiPaste}
+        foot={isPrimeTarget ? (
+          <ChatComposerFoot
+            locale={locale}
+            working={isActive}
+            lastToolName={lastToolName(agent.messages)}
+          />
+        ) : undefined}
       />
     </AiPanelFrame>
   )
