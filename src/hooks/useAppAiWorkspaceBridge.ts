@@ -6,16 +6,22 @@ import {
   OPEN_AI_CHAT_EVENT,
 } from '../utils/aiPromptBridge'
 
-const AGENT_CHAT_OPENED_SESSION_KEY = 'rhizome:agent-chat-opened-session'
+export const AGENT_CHAT_OPENED_SESSION_KEY = 'rhizome:agent-chat-opened-session'
 
 interface UseAppAiWorkspaceBridgeOptions {
   aiFeaturesEnabled: boolean
   aiWorkspaceWindow: boolean
   closeAIChat: () => void
   openAIChat: () => void
+  /** Frame A — conversation owns the window. Launch goes here, not the side panel. */
+  openChatHome: () => void
   openSettings: () => void
   setSettingsInitialSectionId: (sectionId: string | null) => void
   showAIChat: boolean
+  /** Note windows / detached shells keep their own surface. */
+  suppressDefaultOpen?: boolean
+  /** Wait for the vault switcher to finish initial load so onSwitch cannot clobber ChatHome. */
+  vaultReady?: boolean
 }
 
 interface AppAiWorkspaceBridge {
@@ -61,19 +67,22 @@ function useCloseDisabledAiWorkspace(aiFeaturesEnabled: boolean, closeAIChat: ()
 }
 
 /**
- * Agent product: open the Prime chat surface once per browser/app session
- * so launch feels harness-first. User can still close it; we do not force reopen.
+ * Agent product: open Frame A (ChatHome) once per browser/app session
+ * so launch is conversation-first. User can still leave via the rail.
  */
 function useAgentDefaultOpenChat(
   aiFeaturesEnabled: boolean,
   aiWorkspaceWindow: boolean,
   showAIChat: boolean,
-  openAIChat: () => void,
+  openChatHome: () => void,
+  suppressDefaultOpen = false,
+  vaultReady = false,
 ) {
   const didTry = useRef(false)
   useEffect(() => {
     if (didTry.current) return
-    if (!aiFeaturesEnabled || aiWorkspaceWindow || showAIChat) return
+    if (!vaultReady) return
+    if (!aiFeaturesEnabled || aiWorkspaceWindow || showAIChat || suppressDefaultOpen) return
     try {
       if (sessionStorage.getItem(AGENT_CHAT_OPENED_SESSION_KEY) === '1') {
         didTry.current = true
@@ -84,9 +93,9 @@ function useAgentDefaultOpenChat(
       // private mode / denied storage — still open once this mount
     }
     didTry.current = true
-    openAIChat()
-    trackEvent('ai_workspace_open', { source: 'agent_default' })
-  }, [aiFeaturesEnabled, aiWorkspaceWindow, openAIChat, showAIChat])
+    openChatHome()
+    trackEvent('ai_workspace_open', { source: 'agent_default_chat_home' })
+  }, [aiFeaturesEnabled, aiWorkspaceWindow, openChatHome, showAIChat, suppressDefaultOpen, vaultReady])
 }
 
 export function useAppAiWorkspaceBridge({
@@ -94,13 +103,23 @@ export function useAppAiWorkspaceBridge({
   aiWorkspaceWindow,
   closeAIChat,
   openAIChat,
+  openChatHome,
   openSettings,
   setSettingsInitialSectionId,
   showAIChat,
+  suppressDefaultOpen = false,
+  vaultReady = false,
 }: UseAppAiWorkspaceBridgeOptions): AppAiWorkspaceBridge {
   useCloseDisabledAiWorkspace(aiFeaturesEnabled, closeAIChat, showAIChat)
   useDockRequestEvent(aiFeaturesEnabled, aiWorkspaceWindow, openAIChat)
-  useAgentDefaultOpenChat(aiFeaturesEnabled, aiWorkspaceWindow, showAIChat, openAIChat)
+  useAgentDefaultOpenChat(
+    aiFeaturesEnabled,
+    aiWorkspaceWindow,
+    showAIChat,
+    openChatHome,
+    suppressDefaultOpen,
+    vaultReady,
+  )
 
   const handleOpenAiSettings = useCallback(() => {
     setSettingsInitialSectionId(SETTINGS_SECTION_IDS.ai)

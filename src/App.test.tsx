@@ -2,6 +2,7 @@ import { act, render as testingLibraryRender, screen, fireEvent, waitFor, within
 import type { ReactElement, ReactNode } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { DEFAULT_VAULTS } from './hooks/useVaultSwitcher'
+import { AGENT_CHAT_OPENED_SESSION_KEY } from './hooks/useAppAiWorkspaceBridge'
 import { formatShortcutDisplay } from './hooks/appCommandCatalog'
 import { invoke } from '@tauri-apps/api/core'
 import type { Settings, ViewDefinition, ViewFile } from './types'
@@ -504,6 +505,10 @@ describe('App', () => {
     vi.mocked(isTauri).mockReturnValue(false)
     vi.mocked(useUpdater).mockReturnValue(createMockUpdaterResult())
     localStorage.clear()
+    sessionStorage.clear()
+    // App tests assert the notes shell. Launch now opens ChatHome once per
+    // session — mark it done so these stay on the four-panel layout.
+    sessionStorage.setItem(AGENT_CHAT_OPENED_SESSION_KEY, '1')
     window.history.replaceState({}, '', '/')
     localStorage.setItem(CLAUDE_CODE_ONBOARDING_DISMISSED_STORAGE_NAME, '1')
   })
@@ -511,6 +516,13 @@ describe('App', () => {
   it('renders the four-panel layout', async () => {
     render(<App />)
     expect(await screen.findByText('All Notes', {}, { timeout: 5000 })).toBeInTheDocument()
+  })
+
+  it('lands on ChatHome at launch instead of the notes shell', async () => {
+    sessionStorage.removeItem(AGENT_CHAT_OPENED_SESSION_KEY)
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.queryByText('All Notes')).not.toBeInTheDocument()
   })
 
   it('creates custom views with a portable fallback filename for symbol-only names', async () => {
