@@ -1,3 +1,5 @@
+import { Plus } from '@phosphor-icons/react'
+import { Button } from '@/components/ui/button'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { shortPrimeSessionId, tildeVaultPath } from '../lib/primeSubheadLabels'
 
@@ -8,6 +10,8 @@ interface PrimeSessionSubheadProps {
   sessionId?: string | null
   model?: string | null
   vaultPath?: string | null
+  /** Frame A hides AiPanelHeader — New chat lives here instead. */
+  onNewChat?: () => void
 }
 
 function Separator() {
@@ -28,6 +32,7 @@ export function PrimeSessionSubhead({
   sessionId,
   model,
   vaultPath,
+  onNewChat,
 }: PrimeSessionSubheadProps) {
   const t = createTranslator(locale)
   const shortId = shortPrimeSessionId(sessionId)
@@ -73,6 +78,20 @@ export function PrimeSessionSubhead({
             {t('ai.subhead.vault')} <strong className="font-medium text-foreground">{vault}</strong>
           </span>
         </>
+      ) : null}
+
+      {onNewChat ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="ml-auto h-6 w-6 shrink-0 p-0 [&_svg:not([class*=size-])]:size-3.5"
+          onClick={onNewChat}
+          aria-label={t('ai.sessions.newChat')}
+          title={t('ai.sessions.newChat')}
+        >
+          <Plus size={14} />
+        </Button>
       ) : null}
     </div>
   )

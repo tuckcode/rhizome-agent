@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react'
+import { useCallback, useEffect, useState, useRef, type CSSProperties, type MutableRefObject, type ReactNode, type RefObject } from 'react'
 import {
   AiPanelComposer,
   AiPanelHeader,
@@ -57,6 +57,8 @@ interface AiPanelProps {
   noteListFilter?: { type: string | null; query: string }
   /** Chat-home hides the panel header; the window chrome carries that role. */
   showHeader?: boolean
+  /** Frame A subhead New chat — panel controller owns the reset. */
+  newChatRef?: MutableRefObject<(() => void) | null>
   /** Chips rendered in the composer's control row (Frame A's control deck). */
   composerControls?: ReactNode
 }
@@ -385,6 +387,7 @@ export function AiPanel({
   openTabs,
   noteList,
   noteListFilter,
+  newChatRef,
 }: AiPanelProps) {
   const defaultAiAgentReadiness = providedDefaultAiAgentReadiness
     ?? readinessFromReadyFlag(providedDefaultAiAgentReady)
@@ -407,6 +410,11 @@ export function AiPanel({
     onFileModified,
     onVaultChanged,
   })
+
+  useEffect(() => {
+    if (!newChatRef) return
+    newChatRef.current = controller.handleNewChat
+  }, [controller.handleNewChat, newChatRef])
 
   return (
     <AiPanelView

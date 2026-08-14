@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { PrimeSessionSubhead } from './PrimeSessionSubhead'
 
 describe('PrimeSessionSubhead', () => {
@@ -42,5 +42,13 @@ describe('PrimeSessionSubhead', () => {
     expect(screen.queryByText(/sess_/)).not.toBeInTheDocument()
     expect(screen.queryByText('model')).not.toBeInTheDocument()
     expect(screen.getByText('vault')).toBeInTheDocument()
+  })
+
+  it('starts a new chat from the subhead when given a handler', () => {
+    const onNewChat = vi.fn()
+    render(<PrimeSessionSubhead live onNewChat={onNewChat} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    expect(onNewChat).toHaveBeenCalledTimes(1)
   })
 })
