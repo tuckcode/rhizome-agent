@@ -2,7 +2,29 @@
 
 Living doc. Update in place each session. This file is "what's true right now," not a history log. Detailed per-session records go in `docs/plans/*-session-status.md`.
 
-## Session handoff — 2026-08-09 (push-unblock: A1 OPEN — this is the current state)
+## Session handoff — 2026-08-14 (Frame A close + launch ChatHome)
+
+**Read first: `docs/plans/2026-08-14-frame-a-session-status.md`.** Self-contained.
+
+**`main` is 4 commits ahead of `origin/main`, not pushed.** Tree was clean when
+this header was written — re-verify. SHAs: `aeee08c` lastToolName, `7f7f19a`
+composer foot, `1b6cbb2` A4 skip + C24, `15a8448` launch → ChatHome.
+
+**Shipped this window:** Frame A foot row; A4 titlebar chips **skipped** (no
+titlebar to hang them on); launch opens ChatHome after vault load instead of
+the Desktop side AI panel.
+
+**Do not:** rebuild A4; hardcode a model; treat the Desktop wiki shell as the
+design target. Design system:
+`/Users/dtc/Desktop/rhizome-agent-design-system/`.
+
+**Next:** look at live ChatHome (clear `rhizome:agent-chat-opened-session` if
+the tab already ran), then Frame B note-split. Optional: New chat on the
+subhead; C24 dead Mycelium exports on the next Mycelium touch.
+
+---
+
+## Session handoff — 2026-08-09 (push-unblock: A1 — historical, superseded)
 
 **Where we are:** first `git push` attempt since the fork ran the pre-push gates for the first time on **30 unpushed commits** (the Agent-fork → Prime-harness-chat arc). Build is fixed; **19 frontend tests still fail → push stays blocked**. See **A1-OPEN** in Open threads below.
 
