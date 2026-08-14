@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { CaretRight, CaretDown, Brain, ArrowsClockwise, Copy, FloppyDisk, GitBranch, Terminal } from '@phosphor-icons/react'
+import { CaretRight, CaretDown, Brain, Terminal } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { AiActionCard, type AiActionStatus } from './AiActionCard'
 import { MarkdownContent } from './MarkdownContent'
@@ -257,59 +257,59 @@ function ResponseActions({
 
   return (
     <div
-      className="mt-1.5 flex items-center gap-1 opacity-0 transition-opacity group-hover/ai-response:opacity-100 group-focus-within/ai-response:opacity-100"
+      className="mt-1.5 flex flex-wrap items-center gap-1"
       data-testid="ai-message-actions"
     >
       <Button
         type="button"
         variant="ghost"
-        size="icon-xs"
-        className="h-6 w-6 rounded-md p-0 text-muted-foreground hover:text-foreground"
+        size="sm"
+        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
         disabled={regenerateDisabled}
         aria-label={translate(locale, 'ai.message.regenerate')}
         title={translate(locale, 'ai.message.regenerate')}
         onClick={() => messageId && onRegenerate?.(messageId)}
         data-testid="ai-message-regenerate"
       >
-        <ArrowsClockwise size={14} />
+        {translate(locale, 'ai.message.regenerate')}
       </Button>
       <Button
         type="button"
         variant="ghost"
-        size="icon-xs"
-        className="h-6 w-6 rounded-md p-0 text-muted-foreground hover:text-foreground"
+        size="sm"
+        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
         aria-label={translate(locale, 'ai.message.copy')}
         title={translate(locale, 'ai.message.copy')}
         onClick={onCopy}
         data-testid="ai-message-copy"
       >
-        <Copy size={14} />
+        {translate(locale, 'ai.message.copy')}
       </Button>
       <Button
         type="button"
         variant="ghost"
-        size="icon-xs"
-        className="h-6 w-6 rounded-md p-0 text-muted-foreground hover:text-foreground"
+        size="sm"
+        className="h-7 px-2 text-xs text-primary hover:text-primary"
         disabled={saveDisabled}
         aria-label={translate(locale, 'ai.message.saveToVault')}
         title={translate(locale, 'ai.message.saveToVault')}
         onClick={() => onPromoteToVault?.()}
         data-testid="ai-message-save-to-vault"
       >
-        <FloppyDisk size={14} />
+        {translate(locale, 'ai.message.saveToVault')}
       </Button>
       <Button
         type="button"
         variant="ghost"
-        size="icon-xs"
-        className="h-6 w-6 rounded-md p-0 text-muted-foreground hover:text-foreground"
+        size="sm"
+        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
         disabled={forkDisabled}
         aria-label={translate(locale, 'ai.message.fork')}
         title={translate(locale, 'ai.message.fork')}
         onClick={() => messageId && onFork?.(messageId)}
         data-testid="ai-message-fork"
       >
-        <GitBranch size={14} />
+        {translate(locale, 'ai.message.fork')}
       </Button>
     </div>
   )

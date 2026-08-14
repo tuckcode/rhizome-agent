@@ -178,6 +178,22 @@ describe('AiMessage', () => {
     expect(screen.getByTestId('ai-message-save-to-vault')).toBeDisabled()
   })
 
+  it('shows Save to vault as a visible labeled control', () => {
+    render(
+      <AiMessage
+        userMessage="Ask"
+        actions={[]}
+        response="Done"
+        onPromoteToVault={vi.fn()}
+      />,
+    )
+
+    const save = screen.getByTestId('ai-message-save-to-vault')
+    expect(save).toHaveTextContent('Save to vault')
+    expect(save).toBeVisible()
+    expect(screen.getByTestId('ai-message-actions')).not.toHaveClass('opacity-0')
+  })
+
   it('does not render reasoning block when no reasoning', () => {
     render(<AiMessage userMessage="Ask" actions={[]} />)
     expect(screen.queryByTestId('reasoning-toggle')).toBeNull()
