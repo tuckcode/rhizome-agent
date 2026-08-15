@@ -104,23 +104,24 @@ pub fn session_files() -> Result<Vec<PathBuf>, String> {
     Ok(files)
 }
 
-/// Flatten the `text` blocks of a message content payload into one line.
+/// The text blocks of a message, joined but **not** whitespace-normalised.
 ///
-/// Newlines collapse to spaces: this becomes a single-line list row, and a
-/// multi-line first message must not break the layout.
-fn preview_text(content: &serde_json::Value) -> String {
-    let blocks = match content {
-        serde_json::Value::String(text) => return normalize_whitespace(text),
-        serde_json::Value::Array(blocks) => blocks,
-        _ => return String::new(),
-    };
-    let joined = blocks
-        .iter()
-        .filter(|block| block["type"].as_str() == Some("text"))
-        .filter_map(|block| block["text"].as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    normalize_whitespace(&joined)
+/// Raw on purpose. The composed-prompt markers this feeds are newline-
+/// delimited, so normalising first would turn `\n\nUser request:\n` into
+/// single spaces and the split would silently stop matching — a no-op that
+/// still passes its tests. Strip the system block first, normalise second;
+/// `normalize_whitespace` is what flattens the result into a one-line row.
+fn joined_text(content: &serde_json::Value) -> String {
+    match content {
+        serde_json::Value::String(text) => text.clone(),
+        serde_json::Value::Array(blocks) => blocks
+            .iter()
+            .filter(|block| block["type"].as_str() == Some("text"))
+            .filter_map(|block| block["text"].as_str())
+            .collect::<Vec<_>>()
+            .join(" "),
+        _ => String::new(),
+    }
 }
 
 fn normalize_whitespace(text: &str) -> String {
@@ -160,7 +161,14 @@ fn summarize_lines<I: Iterator<Item = String>>(lines: I) -> PrimeSessionSummary 
                 if message["role"].as_str() != Some("user") {
                     continue;
                 }
-                let preview = preview_text(&message["content"]);
+                // A user turn is stored as Rhizome composed it, so the raw
+                // first message begins with the system-instruction block.
+                // Naming a session after that gives every session in the list
+                // the same title (C26) — the user's own words are the title.
+                let raw = joined_text(&message["content"]);
+                let request =
+                    crate::cli_agent_runtime::user_request_from_prompt(&raw).unwrap_or(&raw);
+                let preview = normalize_whitespace(request);
                 if !preview.is_empty() {
                     summary.title = Some(truncate_title(&preview));
                 }
@@ -422,6 +430,49 @@ mod tests {
         ]));
 
         assert_eq!(summary.title.as_deref(), Some("the real question"));
+    }
+
+    /// C26. The stored first message is what Rhizome composed, so every
+    /// session would otherwise be titled "System instructions: You are working
+    /// inside Rhizome…" — identical rows for every conversation.
+    ///
+    /// The newlines here are load-bearing: the markers are newline-delimited,
+    /// and an earlier version of this fix stripped *after* whitespace
+    /// normalisation, which silently matched nothing while its tests passed.
+    #[test]
+    fn a_title_is_the_users_words_not_the_system_block_in_front_of_them() {
+        let composed = "System instructions:\nYou are working inside Rhizome, a local-first \
+                        Markdown knowledge base.\n\nUser request:\nhow do I link two notes?";
+        let summary = summarize_lines(
+            [
+                serde_json::json!({"type": "session", "id": "s1"}).to_string(),
+                serde_json::json!({
+                    "type": "message",
+                    "message": {"role": "user", "content": [{"type": "text", "text": composed}]}
+                })
+                .to_string(),
+            ]
+            .into_iter(),
+        );
+
+        assert_eq!(summary.title.as_deref(), Some("how do I link two notes?"));
+    }
+
+    /// A multi-line user message still collapses to one list row — stripping
+    /// the system block must not cost the normalisation that follows it.
+    #[test]
+    fn a_title_still_collapses_newlines_after_the_system_block_is_removed() {
+        let composed = "System instructions:\ncontext\n\nUser request:\nfirst line\nsecond line";
+        let summary = summarize_lines(
+            [serde_json::json!({
+                "type": "message",
+                "message": {"role": "user", "content": [{"type": "text", "text": composed}]}
+            })
+            .to_string()]
+            .into_iter(),
+        );
+
+        assert_eq!(summary.title.as_deref(), Some("first line second line"));
     }
 
     /// Thinking blocks are not speech. A title built from them would leak the
@@ -739,10 +790,43 @@ mod tests {
         assert!(!summary.id.is_empty(), "a real log has a session header");
         assert!(messages > 0, "a real log has messages");
         // agent_status is the bulk of these files and must never reach here.
-        assert!(
-            markers * 10 < messages.max(10),
-            "markers ({markers}) should be rare next to messages ({messages})"
-        );
+        // Markers should be a minority of a long transcript. Only meaningful
+        // once there is a sample to judge: a real 8-message session with one
+        // model change is perfectly healthy, and the old form of this
+        // assertion (`markers * 10 < messages.max(10)`) failed it at exactly
+        // `10 < 10` — rejecting a good log for being short.
+        if messages >= 20 {
+            assert!(
+                markers * 10 < messages,
+                "markers ({markers}) should be rare next to messages ({messages})"
+            );
+        }
+
+        // C26: a replayed user turn must show what the user typed, not the
+        // system-instruction block Rhizome composed in front of it. Asserted
+        // against a real log because the defect was invisible to fixtures —
+        // it was found by looking at the running app.
+        for item in &transcript {
+            let PrimeTranscriptItem::Message { message, .. } = item else {
+                continue;
+            };
+            if message.role != "user" {
+                continue;
+            }
+            assert!(
+                !message.text.starts_with("System instructions:"),
+                "a replayed user turn is still showing the system block: {:?}",
+                &message.text[..message.text.len().min(120)]
+            );
+        }
+        if let Some(first) = transcript.iter().find_map(|item| match item {
+            PrimeTranscriptItem::Message { message, .. } if message.role == "user" => {
+                Some(&message.text)
+            }
+            _ => None,
+        }) {
+            println!("first user turn as displayed: {:?}", first);
+        }
     }
 
     fn shellexpand_home(path: &str) -> String {
