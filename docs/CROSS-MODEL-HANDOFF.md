@@ -419,3 +419,19 @@ The Python fallback in `mcp-server/index.js` is `AGENTS.md`'s
 responsibility to document until packaging picks it up. See
 `docs/CROSS-MODEL-HANDOFF.md` §3 for the release-pipeline interaction.
 
+## 17. When you patch a helper, prove it from a caller that bypasses it
+
+Launch now opens ChatHome. Notes-shell Playwright needs
+`AGENT_CHAT_OPENED_SESSION_KEY`. Pinning that only inside
+`installFixtureVaultInitScript` (`0b94652`) made a green
+`create-note-backing-file` look like proof — that spec **uses** the
+fixture, so it structurally could not fail. Pre-push died twice on
+`wikilink-path-fix` first describe: bare `page.goto('/')`.
+
+41 specs navigate that way. Export `pinNotesShellLaunch` and call it
+**before** first `goto` (`de1a437`). Do not bury launch behaviour only
+inside the fixture file — the next spec author will never see it.
+
+“Run more tests” is the weak reading. Proof is a spec that **does not**
+use the helper you patched, then `pnpm playwright:smoke` (26).
+
