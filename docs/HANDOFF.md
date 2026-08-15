@@ -27,6 +27,39 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Session handoff — 2026-08-15c (harness reframe; next is the slash-command surface)
+
+**Next agent: read `docs/plans/2026-08-15-harness-surface-pickup.md` first.**
+It supersedes both earlier 08-15 pickups as "what is true now".
+
+**The reframe:** Prime is a supervisor, not a model in a chat box — persistent
+goals with budgets, self-scheduled heartbeats, programmatically-invoked
+subagents, daemon continuity, and a continual harness that `/refine` updates
+with evidence. Rhizome renders almost none of it.
+
+**Three counts got confused and must not be again:** the "~16 of ~45 RPC" score
+is JSONL protocol verbs; `get_commands` returns 100 *skills* of which 89 are
+Atticus's own installs, not Prime capability; Prime's actual surface is 11
+bundled skills plus its slash commands plus RLM. Only the third is the harness.
+
+**Next build: the slash-command surface** (`/goal`, `/heartbeat`,
+`/autonomous`, `/rlm-max-depth`, `/refine`, `/fork`, `/tree`, `/model`,
+`/effort`, `/skill:name`), documented in
+`~/.local/lib/node_modules/prime-agent/docs/usage.md`. Rhizome offers none of
+them. **Spec it** — `/grill-with-docs` → `/to-spec` → `/to-tickets` in one
+window — rather than slicing at it.
+
+**Shipped today:** tool cards now name the real vault tool behind `ipython` and
+offer Open; transcript replay no longer drops every tool card (`toolCall`, not
+`tool_use`); `fork` wired; `AgentActivityBand`; C22 closed and verified; status
+colour decoupled from the user's brand accent; Playwright smoke lane green.
+
+**Model picker verified end to end** — `set_model` to another provider and the
+next turn was answered by that model. Grok 4.6 is absent from Prime's 78-model
+catalog; that is Prime's list, not ours.
+
+---
+
 ## Session handoff — 2026-08-15b (Claude review + push blocker cleared)
 
 **Next agent: read `docs/plans/2026-08-15-claude-review-of-native-loop.md`,
