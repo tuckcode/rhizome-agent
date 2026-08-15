@@ -1167,5 +1167,11 @@
   "ai.chatNote.tag": "Note",
   "ai.chatNote.close": "Close note",
   "ai.chatNote.loading": "Loading note…",
-  "ai.chatNote.error": "Could not open this note."
+  "ai.chatNote.error": "Could not open this note.",
+  "ai.activity.goal": "Goal active",
+  "ai.activity.goalWithObjective": "Goal · {objective}",
+  "ai.activity.budgetLeft": "{tokens} left",
+  "ai.activity.heartbeats": "{count} heartbeat(s)",
+  "ai.activity.schedules": "{count} scheduled",
+  "ai.activity.thinking": "thinking {level}"
 }

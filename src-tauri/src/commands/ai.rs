@@ -633,6 +633,14 @@ pub fn read_prime_session_transcript(
     crate::prime_sessions::read_transcript(std::path::Path::new(&path))
 }
 
+/// Goal, heartbeats and schedules for the live Prime session.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn get_prime_agent_activity() -> Result<crate::prime_agent_activity::PrimeAgentActivity, String>
+{
+    crate::prime_session_host::agent_activity()
+}
+
 /// Branch a new Prime session from a past transcript entry.
 #[cfg(desktop)]
 #[tauri::command]
