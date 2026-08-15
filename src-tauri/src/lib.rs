@@ -707,6 +707,18 @@ fn handle_run_event(app_handle: &tauri::AppHandle, event: &tauri::RunEvent) {
     }
 
     if let tauri::RunEvent::Exit = event {
+        // Quitting is the one moment Rhizome decides anything about Prime's
+        // lifetime. Closing the window only detaches (ADR-0163); here we stop
+        // the background service if nothing still needs it, and leave it
+        // running if something is booked to fire or another client is using
+        // it. `shutdown_daemon_if_idle` owns that rule — see #12.
+        match crate::prime_session_host::shutdown_daemon_if_idle() {
+            Ok(disposition) => log::info!("Prime service on quit: {disposition:?}"),
+            // Never block the exit on this. A service that outlives a failed
+            // shutdown is the safe direction to fail in.
+            Err(error) => log::debug!("Could not settle the Prime service on quit: {error}"),
+        }
+
         let state: tauri::State<'_, WsBridgeChild> = app_handle.state();
         let mut guard = state.0.lock().unwrap();
         stop_ws_bridge_child(&mut guard);

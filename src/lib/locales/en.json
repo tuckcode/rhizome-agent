@@ -1155,7 +1155,7 @@
   "ai.subhead.vault": "vault",
   "ai.subhead.uptime": "up",
   "ai.subhead.problem.notInstalled": "Prime is not installed — run npm i -g prime-agent",
-  "ai.subhead.problem.serviceUnreachable": "Prime service is not running — run prime-agent daemon",
+  "ai.subhead.problem.serviceUnreachable": "Prime service is not reachable — check prime-agent status",
   "ai.subhead.problem.serviceTooOld": "Prime {installed} is too old — update to {required}",
   "ai.subhead.problem.serviceTooOldUnknown": "This Prime is too old — update to {required}",
   "ai.composer.model": "Change model",
