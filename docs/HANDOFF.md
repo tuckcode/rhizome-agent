@@ -27,6 +27,109 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Session handoff — 2026-08-16b (#12 quit semantics; and a product reframe that outranks it)
+
+**Next: #13 (menu bar dropdown) or the branding mechanism below.** #6, #7, #8
+are closed. #12 is closed except its menu-bar half.
+
+### The reframe — read this before picking up any remaining #5 ticket
+
+Atticus, verbatim: *"Rhizome is really just a convenient app that I already
+have built that kind of works as a shell for an agent harness like prime
+agent. Prime agent as a harness should be the primary figure. Rhizome is just
+going to be the nice extra overcoat of tooling and really good memory."*
+
+Consequences that are **not** yet reflected in `CONTEXT.md` or the #5 spec:
+
+- **`CONTEXT.md` reserves "agent" for the Rhizome product.** Under this framing
+  that is backwards — the agent is Prime; Rhizome is the shell. The vocabulary
+  rule is load-bearing across the whole ticket set. Decide it deliberately.
+- **The spec has Rhizome reimplementing Prime's built-in commands.** Forced by
+  the protocol (forwarded text no-ops), but the instinct behind it — "Rhizome
+  owns the surface" — is inverted by this framing.
+- **Most of #9–#22 is rendering Prime's harness in a window, which Prime's own
+  TUI already does.** The differentiated work is the memory loop (vault as
+  source of truth, promote, retrieve). Worth asking whether those tickets
+  outrank memory work rather than working the list in order.
+
+### #12 — quit semantics, reframed mid-ticket
+
+The ticket said quitting should *"shut the service down cleanly"*. **That was
+wrong and is not what shipped.** Prime's own `daemon.md`: the supervisor is
+internal infrastructure that starts itself and is restarted by a worker if it
+dies, and `prime-agent shutdown` stops **every agent on the machine** — it has
+no `--daemon-socket` flag, so the CLI always hits the default service. Killing
+it would have taken out terminal sessions belonging to other clients.
+
+Atticus's framing settled it: when you exit Claude Code, *your agent* stops —
+it does not shut down a shared background service. So quitting now sends
+`kill` for **our own `activeSessionId`** only. The daemon is never ours to
+stop. `78c6131` shipped the machine-wide version; `2a5e857` replaced it.
+
+**Setting:** `keep_sessions_running_on_quit`, default **off**, toggle in
+Settings → AI Agents (`84c3e56`). Off = agents stop when Rhizome is fully
+closed. On = session outlives the app so heartbeats still fire.
+
+**Demonstrated both ways against real isolated daemons** started with
+`prime-agent --mode daemon --daemon-socket <path>` — never the developer's
+default service. Default quit stopped the session and it left the resident
+list; opted-in kept it alive.
+
+**⚠️ Interaction worth knowing:** with the default on, **#7's reattach only
+helps after closing the *window*, not after quitting.** Quit ends the session
+by design, so reopening starts fresh and the prior conversation is
+history-on-disk. That makes #7 narrower than its ticket sounds. Observed
+unplanned: `tauri dev` restarting the app fired `RunEvent::Exit` and ended a
+live 10-message session, transcript intact on disk.
+
+### Naming — do not standardise on a name yet
+
+**`prime-agent` is Prime Intellect's** (`PrimeIntellect-ai/prime-agent`, MIT,
+author Mario Zechner). Atticus holds an account with them. MIT licenses the
+*code*, not the *name* — putting "Prime" in the product name risks reading as
+an official Prime Intellect product. **Put it in a descriptor, never the
+product name.**
+
+A `/adhd` divergence run (8 frames, 48 ideas) produced one finding that
+outranks every candidate name: **make the rename cheap rather than correct.**
+This repo already ran the experiment — ADR-0162 renamed tolaria→rhizome and
+**C19/C20/C21 record eight live residues found weeks later**. Proposed:
+`brand/brand.json` normative, everything else generated; `build.rs` emits
+`BRAND_DISPLAY_NAME` so a literal in `.rs` is an anomaly; locale values carry
+`{appName}` so a rename never touches 19 files. **Critical distinction the run
+surfaced:** `displayName` is cheap; `identifier` (`ai.rhizome.agent`) is also
+the data directory, keychain service and URL scheme — changing it **orphans
+every user's sessions**. Freeze the identifier behind its own gate.
+
+Best name candidate was **Hypha** (singular; extends the owned botanical
+family, maps onto `rlm(...)` recursion, contains neither Prime nor Agent). Its
+own branch found the flaw: *Rhizome / Rhizome Desktop / Hypha* is three
+filament-network names in one family, and two are already confused enough that
+`AGENTS.md` opens with a wrong-tree STOP block. **Ship the mechanism first,
+then test the name.**
+
+### Debt
+
+- **Six locale keys are English-only** (#8's four, #12's two). `pnpm
+  l10n:translate` needs `LARA_ACCESS_KEY_ID`/`SECRET` — C18, deferred by
+  Atticus. Missing keys fall back to English, so nothing renders a raw key.
+- **A failed transcript read does not retry** (#7). Panel would sit empty over
+  a live session until the session changes or the app restarts. Documented in
+  the hook rather than claimed and not built.
+- **#12's menu-bar half** is unbuilt. It now has a coherent trigger it lacked
+  before: the toggle being on.
+
+### The pattern this session kept proving
+
+Four defects were invisible to green tests and caught only by looking at the
+artefact: `create` silently ignoring a top-level `cwd`; the system-prompt wall
+(spotted by Atticus in a screenshot); a title fix that was a **silent no-op**
+because normalisation ran before the strip; and `prime-agent daemon` shipped
+in #8's error copy as a command that **does not exist**. Verify against the
+binary, and look at the running app.
+
+---
+
 ## Session handoff — 2026-08-16 (#6, #7 and #8 shipped; Rhizome is a window onto Prime)
 
 **#8 shipped: the version floor and the unreachable-service states.** Three
