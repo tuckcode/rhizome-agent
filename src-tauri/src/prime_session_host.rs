@@ -189,9 +189,23 @@ impl PrimeMessage {
             .get("content")
             .cloned()
             .unwrap_or(serde_json::Value::Null);
+        let role = value["role"].as_str().unwrap_or_default().to_string();
+        let text = text_from_content(&content);
+        // A user turn is stored as Rhizome composed it: the message with a
+        // system-instruction block in front. Showing that back is showing the
+        // user words they never wrote (C26), so the prose field carries what
+        // they actually typed. `content` stays verbatim — the composition is
+        // real, and this is a display concern, not a reason to rewrite history.
+        let text = if role == "user" {
+            crate::cli_agent_runtime::user_request_from_prompt(&text)
+                .map(str::to_string)
+                .unwrap_or(text)
+        } else {
+            text
+        };
         Self {
-            role: value["role"].as_str().unwrap_or_default().to_string(),
-            text: text_from_content(&content),
+            role,
+            text,
             timestamp: value["timestamp"].as_u64(),
             content,
         }
@@ -2931,6 +2945,78 @@ mod tests {
 
     /// Tolerate a bare string where a block array was expected. Treating it as
     /// "no text" would lose the whole message for one character of strictness.
+    /// C26. What Prime is sent — and therefore what the log stores — is the
+    /// user's message behind a system-instruction block. Replaying that
+    /// verbatim showed "hi" as a screenful of instructions the user never
+    /// wrote. Pinned from a real session log, not composed here.
+    #[test]
+    fn a_replayed_user_turn_shows_what_the_user_typed_not_the_system_block() {
+        let stored = "System instructions:\nYou are working inside Rhizome, a local-first \
+                      Markdown knowledge base.\n\nNotes are Markdown files with YAML \
+                      frontmatter.\n\nUser request:\nhi";
+        let messages = messages_from_response(&serde_json::json!({
+            "messages": [{ "role": "user", "content": [{"type": "text", "text": stored}] }]
+        }));
+
+        assert_eq!(messages[0].text, "hi");
+        // The composition really happened, so the raw record keeps it. This is
+        // a display concern, not a licence to rewrite the transcript.
+        assert!(
+            messages[0].content[0]["text"]
+                .as_str()
+                .unwrap()
+                .starts_with("System instructions:"),
+            "content stays verbatim"
+        );
+    }
+
+    /// Only the user side is composed. An assistant message that happens to
+    /// quote the marker must not be cut apart.
+    #[test]
+    fn an_assistant_message_is_never_split_on_the_prompt_marker() {
+        let quoted = "The prompt looks like:\n\nUser request:\nhi";
+        let messages = messages_from_response(&serde_json::json!({
+            "messages": [{ "role": "assistant", "content": [{"type": "text", "text": quoted}] }]
+        }));
+
+        assert_eq!(messages[0].text, quoted);
+    }
+
+    /// A prompt sent without a system block is already the user's own words.
+    #[test]
+    fn a_user_turn_with_no_system_block_is_left_alone() {
+        let messages = messages_from_response(&serde_json::json!({
+            "messages": [{ "role": "user", "content": [{"type": "text", "text": "plain ask"}] }]
+        }));
+
+        assert_eq!(messages[0].text, "plain ask");
+    }
+
+    /// Whatever `build_prompt` composes, this must give back exactly the
+    /// message that went in — including one that quotes the marker itself,
+    /// where truncating the user is the worse of the two failure modes.
+    #[test]
+    fn composing_then_recovering_a_prompt_returns_the_original_message() {
+        use crate::cli_agent_runtime::{build_prompt, user_request_from_prompt};
+
+        for message in [
+            "hi",
+            "",
+            "multi\nline ask",
+            "quoting\n\nUser request:\nitself",
+        ] {
+            let composed = build_prompt(message, Some("system context here"));
+            assert_eq!(
+                user_request_from_prompt(&composed),
+                Some(message),
+                "round trip failed for {message:?}"
+            );
+        }
+
+        // No system block: nothing to recover, and the caller keeps the text.
+        assert_eq!(user_request_from_prompt("just a message"), None);
+    }
+
     #[test]
     fn message_text_accepts_a_bare_string_content() {
         let messages = messages_from_response(&serde_json::json!({

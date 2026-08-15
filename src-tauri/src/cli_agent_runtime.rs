@@ -75,16 +75,45 @@ impl<'a> JsonLineProcess<'a> {
     }
 }
 
+/// The two halves of the shape `build_prompt` composes. They live beside both
+/// the function that writes it and the one that reads it back, so the encoding
+/// cannot drift apart into a parser that silently stops matching.
+const SYSTEM_INSTRUCTIONS_PREFIX: &str = "System instructions:\n";
+const USER_REQUEST_MARKER: &str = "\n\nUser request:\n";
+
 pub(crate) fn build_prompt(message: &str, system_prompt: Option<&str>) -> String {
     match system_prompt
         .map(str::trim)
         .filter(|prompt| !prompt.is_empty())
     {
         Some(system_prompt) => {
-            format!("System instructions:\n{system_prompt}\n\nUser request:\n{message}")
+            format!("{SYSTEM_INSTRUCTIONS_PREFIX}{system_prompt}{USER_REQUEST_MARKER}{message}")
         }
         None => message.to_string(),
     }
+}
+
+/// Recover the user's own words from a prompt `build_prompt` composed.
+///
+/// What reaches Prime — and therefore what the session log stores — is the
+/// user's message with a system-instruction block in front of it. Replaying
+/// that verbatim renders a two-character message as a screenful of
+/// instructions the user never wrote (C26). The context block is rebuilt from
+/// the open note on every turn, so it cannot simply be moved to session
+/// creation instead; the composition is right, and only the *display* of it
+/// was wrong.
+///
+/// Returns `None` when the prompt carries no system block, which is the
+/// ordinary case for anything Rhizome did not compose.
+///
+/// Splits on the **first** marker. A system prompt containing the marker would
+/// leak a little of itself into the message, while splitting on the last would
+/// truncate a user who quoted it — and losing the user's own words is the
+/// worse of the two failures.
+pub(crate) fn user_request_from_prompt(prompt: &str) -> Option<&str> {
+    let rest = prompt.strip_prefix(SYSTEM_INSTRUCTIONS_PREFIX)?;
+    let marker = rest.find(USER_REQUEST_MARKER)?;
+    Some(&rest[marker + USER_REQUEST_MARKER.len()..])
 }
 
 pub(crate) fn mcp_server_path_string() -> Result<String, String> {
