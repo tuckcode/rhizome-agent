@@ -331,7 +331,9 @@ an open decision (skip-vs-build, invent chrome).
 
 User launches native. Vite they want opened when they cannot reopen.
 
-Do not push until asked. When asked: full pre-push, no `--no-verify`.
+~~Do not push until asked.~~ **Superseded 2026-08-15** — push when the
+pre-push gates pass; see the standing rule correction at the top of
+`docs/HANDOFF.md`. Still true: full pre-push, no `--no-verify`.
 Cheap focused tests before cooking the laptop.
 
 Uncommitted tracker edits must not mix with product commits.

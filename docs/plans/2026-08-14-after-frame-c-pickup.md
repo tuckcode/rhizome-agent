@@ -8,7 +8,8 @@ Origin: `tuckcode/rhizome-agent` (private). **Not** Desktop.
 Design: `/Users/dtc/Desktop/rhizome-agent-design-system/`  
 Named frame → that artboard first. Artboard vs app → flag, don’t invent.
 
-Unpushed: `git rev-list --count origin/main..HEAD`. Do not push until asked.
+Unpushed: `git rev-list --count origin/main..HEAD`. ~~Do not push until
+asked.~~ **Superseded** — see `docs/HANDOFF.md` standing rule correction.
 
 ---
 
