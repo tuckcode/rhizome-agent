@@ -82,7 +82,7 @@ export default function ChatHome({
           vaultPaths={vaultPaths}
           entries={entries}
           onOpenNote={(target) => {
-            const resolved = resolveChatOpenNote(target, vaultPath)
+            const resolved = resolveChatOpenNote(target, vaultPath, entries)
             if (resolved) setOpenNote(resolved)
           }}
           onPromoteToVault={onPromoteToVault}
@@ -101,7 +101,7 @@ export default function ChatHome({
                 vaultPath={vaultPath}
                 onClose={() => setOpenNote(null)}
                 onOpenNote={(target) => {
-                  const resolved = resolveChatOpenNote(target, vaultPath)
+                  const resolved = resolveChatOpenNote(target, vaultPath, entries)
                   if (resolved) setOpenNote(resolved)
                 }}
               />

@@ -22,4 +22,22 @@ describe('resolveChatOpenNote', () => {
       label: 'wiki/decisions/memory-loop.md',
     })
   })
+
+  it('resolves a wikilink title to the vault file path', () => {
+    const entries = [{
+      path: '/Users/dtc/Documents/Rhizome Vault/inbox/20260814-promote-loop.md',
+      filename: '20260814-promote-loop.md',
+      title: 'Promote loop check',
+      aliases: [],
+    }] as unknown as import('../types').VaultEntry[]
+
+    expect(resolveChatOpenNote(
+      'Promote loop check',
+      '/Users/dtc/Documents/Rhizome Vault',
+      entries,
+    )).toEqual({
+      path: '/Users/dtc/Documents/Rhizome Vault/inbox/20260814-promote-loop.md',
+      label: 'inbox/20260814-promote-loop.md',
+    })
+  })
 })

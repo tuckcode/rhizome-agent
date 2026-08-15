@@ -1,12 +1,17 @@
 import { normalizeNotePathSeparators } from './notePathIdentity'
+import { resolveEntry } from './wikilink'
+import type { VaultEntry } from '../types'
 
 export function resolveChatOpenNote(
   target: string,
   vaultPath?: string | null,
+  entries: VaultEntry[] = [],
 ): { path: string; label: string } | null {
-  const path = target.trim()
-  if (!path) return null
+  const raw = target.trim()
+  if (!raw) return null
 
+  const hit = entries.length > 0 ? resolveEntry(entries, raw) : undefined
+  const path = hit?.path ?? raw
   const label = vaultRelativeLabel(path, vaultPath)
   return { path, label }
 }
