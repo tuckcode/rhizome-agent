@@ -322,14 +322,35 @@ pub(crate) fn window_hides_instead_of_closing(label: &str) -> bool {
     label == "main"
 }
 
+/// Should a dock/reopen click restore the main window?
+///
+/// Only when nothing is already on screen. Clicking the dock while a window is
+/// visible must not steal focus or raise a window the user did not ask for.
+pub(crate) fn should_reopen_main_window(has_visible_windows: bool) -> bool {
+    !has_visible_windows
+}
+
 #[cfg(desktop)]
 fn focus_main_window(app_handle: &tauri::AppHandle) {
     use tauri::Manager;
 
+    // Unhide the *application* first. Once C22's fix hides the last window,
+    // macOS treats the app as hidden, and `window.show()` alone leaves it
+    // off-screen — which is what made the dock and tray look dead even though
+    // the window still existed.
+    #[cfg(target_os = "macos")]
+    if let Err(err) = app_handle.show() {
+        log::warn!("could not unhide the application: {err}");
+    }
+
     if let Some(window) = app_handle.get_webview_window("main") {
         let _ = window.unminimize();
-        let _ = window.show();
+        if let Err(err) = window.show() {
+            log::warn!("could not show the main window: {err}");
+        }
         let _ = window.set_focus();
+    } else {
+        log::warn!("reopen requested but no main window exists");
     }
 }
 
@@ -671,6 +692,20 @@ fn handle_run_event(app_handle: &tauri::AppHandle, event: &tauri::RunEvent) {
 
     window_state::handle_run_event(app_handle, event);
 
+    // macOS dock click. Without this, a window hidden by the C22 close fix has
+    // no way back: `focus_main_window` is only reached by the tray and by a
+    // second app instance, neither of which a dock click triggers.
+    #[cfg(target_os = "macos")]
+    if let tauri::RunEvent::Reopen {
+        has_visible_windows,
+        ..
+    } = event
+    {
+        if should_reopen_main_window(*has_visible_windows) {
+            focus_main_window(app_handle);
+        }
+    }
+
     if let tauri::RunEvent::Exit = event {
         let state: tauri::State<'_, WsBridgeChild> = app_handle.state();
         let mut guard = state.0.lock().unwrap();
@@ -724,6 +759,7 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
+    use super::should_reopen_main_window;
     use super::should_use_native_desktop_menu;
     use super::window_hides_instead_of_closing;
 
@@ -732,6 +768,13 @@ mod tests {
     #[test]
     fn the_main_window_hides_on_close_so_it_can_be_reopened() {
         assert!(window_hides_instead_of_closing("main"));
+    }
+
+    /// A dock click with a window already up must not steal focus.
+    #[test]
+    fn reopen_restores_only_when_nothing_is_on_screen() {
+        assert!(should_reopen_main_window(false));
+        assert!(!should_reopen_main_window(true));
     }
 
     /// Note windows are disposable — keeping them alive hidden would leak a
