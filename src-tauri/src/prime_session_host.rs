@@ -330,6 +330,16 @@ pub fn get_messages() -> Result<Vec<PrimeMessage>, String> {
     })
 }
 
+/// What a fork produced: the session now live, and what it branched from.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrimeForkResult {
+    pub session_id: String,
+    /// The user message at the branch point, as Prime reports it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub branched_from: Option<String>,
+}
+
 /// A model the live Prime host can switch to.
 ///
 /// Only the fields a picker needs. Prime reports ~78 models with pricing,
@@ -402,6 +412,44 @@ pub fn set_model(provider: &str, model_id: &str) -> Result<(), String> {
         }
         host.refresh_session_id()?;
         Ok(())
+    })
+}
+
+/// Branch a new session from a past entry.
+///
+/// Prime names the argument `entryId` and takes the `id` from a message line in
+/// the session log — the same id `prime_sessions` already carries on every
+/// replayed entry. Probed 2026-08-15: `id`, `messageId`, `entry`, `from` and
+/// five other spellings all fail with `Invalid entry ID for forking`.
+///
+/// The host **switches into the fork**: afterwards `get_state` reports a new
+/// session id and history is truncated at the branch point. Returns the user
+/// message at that entry, which Prime hands back, so the caller can say what
+/// was branched from.
+///
+/// Refuses mid-turn for the same reason `switch_session` does — Prime does not
+/// document what forking does to a running turn.
+pub fn fork(entry_id: &str) -> Result<PrimeForkResult, String> {
+    let trimmed = entry_id.trim();
+    if trimmed.is_empty() {
+        return Err("Cannot fork without an entry id".into());
+    }
+    with_host_mut(|host| {
+        if host.is_streaming {
+            return Err("Cannot fork while a turn is running".into());
+        }
+        let response = host.send_command(serde_json::json!({
+            "type": "fork",
+            "entryId": trimmed,
+        }))?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, "fork"));
+        }
+        host.refresh_session_id()?;
+        Ok(PrimeForkResult {
+            session_id: host.session_id.clone().unwrap_or_default(),
+            branched_from: response["data"]["text"].as_str().map(str::to_string),
+        })
     })
 }
 
@@ -1367,6 +1415,12 @@ for line in sys.stdin:
         }));
 
         assert!(models.is_empty());
+    }
+
+    #[test]
+    fn fork_refuses_without_an_entry_id() {
+        assert!(fork("").is_err());
+        assert!(fork("   ").is_err());
     }
 
     #[test]

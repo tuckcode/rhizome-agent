@@ -140,6 +140,25 @@ describe('primeTranscriptToConversation', () => {
     expect(turns[0].response).toBeUndefined()
   })
 
+  /**
+   * `fork` addresses entries by Prime's id, and only replayed turns have one —
+   * the live stream reports no entry ids at all. Carrying it is what makes the
+   * fork button possible; losing it would silently disable the feature.
+   */
+  it('carries the Prime entry id so a turn can be forked from', () => {
+    const turns = primeTranscriptToConversation([userMessage('branch here', 'entry-7')])
+
+    expect(turns[0].primeEntryId).toBe('entry-7')
+  })
+
+  it('leaves primeEntryId unset when the log entry had no id', () => {
+    const turns = primeTranscriptToConversation([
+      { kind: 'message', message: { role: 'user', content: [], text: 'no id' } },
+    ])
+
+    expect(turns[0].primeEntryId).toBeUndefined()
+  })
+
   it('returns nothing for an empty transcript', () => {
     expect(primeTranscriptToConversation([])).toEqual([])
   })

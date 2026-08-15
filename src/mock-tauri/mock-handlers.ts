@@ -564,6 +564,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     { id: 'claude-fable-5', name: 'Claude Fable 5', provider: 'anthropic', reasoning: true },
   ],
   set_prime_model: () => null,
+  fork_prime_session: () => ({ sessionId: 'mock-fork', branchedFrom: 'branch point' }),
   which_binary: ({ name }: { name: string }) => ({ found: name === 'mindwalk', path: name === 'mindwalk' ? '/usr/bin/mindwalk' : null }),
   run_mindwalk_open: ({ path }: { path: string }) => path,
   bridge_and_open_prime_session: ({ path }: { path: string }) => path,

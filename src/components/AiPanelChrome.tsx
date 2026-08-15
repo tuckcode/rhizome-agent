@@ -50,6 +50,8 @@ interface AiPanelMessageHistoryProps {
   messages: AiAgentMessage[]
   isActive: boolean
   onForkMessage?: (messageId: string) => void
+  /** Fork branches the Prime session rather than copying the conversation. */
+  forkTargetsPrimeEntry?: boolean
   onOpenNote?: (path: string) => void
   onNavigateWikilink?: (target: string) => void
   onRegenerateMessage?: (messageId: string) => void
@@ -505,6 +507,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
   messages,
   isActive,
   onForkMessage,
+  forkTargetsPrimeEntry = false,
   onOpenNote,
   onNavigateWikilink,
   onRegenerateMessage,
@@ -544,6 +547,10 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
           {...message}
           locale={locale}
           messageId={message.id}
+          // ChatHome forks the Prime session and needs its entry id, which
+          // only replayed turns carry; the AI workspace copies its own
+          // conversation and uses the local id.
+          forkTargetId={forkTargetsPrimeEntry ? message.primeEntryId : message.id}
           onFork={onForkMessage}
           onOpenNote={onOpenNote}
           onNavigateWikilink={onNavigateWikilink}

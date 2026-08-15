@@ -63,6 +63,9 @@ interface AiPanelProps {
   composerControls?: ReactNode
   /** Frame B note split — sits beside the transcript so the composer spans both. */
   notePane?: ReactNode
+  onForkMessage?: (entryId: string) => void
+  /** Fork branches the Prime session rather than copying the conversation. */
+  forkTargetsPrimeEntry?: boolean
 }
 
 interface AiPanelViewProps {
@@ -85,6 +88,7 @@ interface AiPanelViewProps {
   composerControls?: ReactNode
   notePane?: ReactNode
   onForkMessage?: (messageId: string) => void
+  forkTargetsPrimeEntry?: boolean
   onQueuedPromptTarget?: (targetId: string) => void
   onSendPrompt?: (text: string) => void
   onMessageHistoryScrollStateChange?: (scrolled: boolean) => void
@@ -183,6 +187,7 @@ export function AiPanelView({
   composerControls,
   notePane,
   onForkMessage,
+  forkTargetsPrimeEntry,
   onQueuedPromptTarget,
   onSendPrompt,
   onMessageHistoryScrollStateChange,
@@ -250,6 +255,41 @@ export function AiPanelView({
    * the panel must keep showing the conversation it is actually on rather than
    * a transcript from a session that was never loaded.
    */
+  /**
+   * Branch a new session from a past entry, then show the branch.
+   *
+   * Only replayed turns carry a Prime entry id — the live stream has none — so
+   * the button is disabled elsewhere and this always receives a real one. The
+   * fork switches the host into the new session and truncates history at the
+   * branch point, so the panel rehydrates from the branch's own log rather
+   * than trimming what it already had.
+   */
+  const handleForkFromEntry = useCallback(async (entryId: string) => {
+    const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
+      isTauri() ? invoke<T>(cmd, args) : mockInvoke<T>(cmd, args)
+    setSwitchError(null)
+    try {
+      const forked = await call<{ sessionId: string }>('fork_prime_session', { entryId })
+      const summaries = await call<PrimeSessionSummary[]>('list_prime_session_summaries')
+      const branch = summaries.find((session) => session.id === forked.sessionId)
+      if (!branch) {
+        // Prime writes the branch log asynchronously. The fork succeeded; the
+        // transcript will be there on the next open, so this does not report
+        // a failure that did not happen.
+        setActiveSessionPath(null)
+        return
+      }
+      const transcript = await call<PrimeTranscriptItem[]>('read_prime_session_transcript', {
+        path: branch.path,
+      })
+      agent.replaceMessages(primeTranscriptToConversation(transcript))
+      setActiveSessionPath(branch.path)
+      setSessionsOpen(false)
+    } catch (e) {
+      setSwitchError(e instanceof Error ? e.message : String(e))
+    }
+  }, [agent])
+
   const handleSelectSession = useCallback(async (session: PrimeSessionSummary) => {
     const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
       isTauri() ? invoke<T>(cmd, args) : mockInvoke<T>(cmd, args)
@@ -330,7 +370,8 @@ export function AiPanelView({
         locale={locale}
         messages={agent.messages}
         isActive={isActive}
-        onForkMessage={onForkMessage}
+        onForkMessage={forkTargetsPrimeEntry ? (entryId) => void handleForkFromEntry(entryId) : onForkMessage}
+        forkTargetsPrimeEntry={forkTargetsPrimeEntry}
         onOpenNote={onOpenNote}
         onNavigateWikilink={handleNavigateWikilink}
         onRegenerateMessage={agent.regenerateMessage}
@@ -375,6 +416,8 @@ export function AiPanel({
   onClose,
   showHeader,
   composerControls,
+  onForkMessage: providedOnForkMessage,
+  forkTargetsPrimeEntry,
   onOpenNote,
   onPromoteToVault,
   onUnsupportedAiPaste,
@@ -429,6 +472,8 @@ export function AiPanel({
       controller={controller}
       showHeader={showHeader}
       composerControls={composerControls}
+      onForkMessage={providedOnForkMessage}
+      forkTargetsPrimeEntry={forkTargetsPrimeEntry}
       notePane={notePane}
       onClose={onClose}
       onOpenNote={onOpenNote}

@@ -25,6 +25,15 @@ export interface AiAgentMessage {
   response?: string
   isStreaming?: boolean
   id?: string
+  /**
+   * Prime's entry id for this turn, when it came from a session log.
+   *
+   * Only replayed turns have one: the live stream carries no entry ids
+   * (`agent_end` reports role/content/model/usage and no `id`), they exist
+   * solely on the log envelope. `fork` addresses entries by this, so its
+   * presence is what makes forking possible at all.
+   */
+  primeEntryId?: string
 }
 
 export type AgentStatus = 'idle' | 'thinking' | 'tool-executing' | 'done' | 'error'
