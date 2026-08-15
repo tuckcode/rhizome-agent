@@ -17,9 +17,22 @@ import type { AiAgentMessage } from './aiAgentConversation'
 
 /** Mirrors `PrimeTranscriptItem` in `src-tauri/src/prime_sessions.rs`. */
 export type PrimeTranscriptItem =
-  | { kind: 'message'; id?: string; parentId?: string; message: PrimeMessage }
+  | {
+      kind: 'message'
+      id?: string
+      parentId?: string
+      message: PrimeMessage
+      /** Tool calls, already unwrapped from their shell wrapper in Rust. */
+      tools?: PrimeTranscriptTool[]
+    }
   | { kind: 'compaction'; id?: string; timestamp?: string; summary?: string; tokensBefore?: number }
   | { kind: 'modelChange'; id?: string; timestamp?: string; provider?: string; modelId?: string }
+
+export interface PrimeTranscriptTool {
+  id?: string
+  tool: string
+  path?: string
+}
 
 export interface PrimeMessage {
   role: string
@@ -30,48 +43,32 @@ export interface PrimeMessage {
 
 interface ContentBlock {
   type?: string
-  text?: string
   thinking?: string
-  name?: string
-  id?: string
-  input?: Record<string, unknown>
 }
 
 function blocksOf(content: unknown): ContentBlock[] {
   return Array.isArray(content) ? (content as ContentBlock[]) : []
 }
 
-/** Prime records a path under several key names depending on the tool. */
-function pathFromInput(input: Record<string, unknown> | undefined): string | undefined {
-  if (!input) return undefined
-  for (const key of ['path', 'file_path', 'notePath', 'note_path']) {
-    const value = input[key]
-    if (typeof value === 'string' && value.trim()) return value
-  }
-  return undefined
-}
-
 /**
- * Tool calls in an assistant message, as action cards.
+ * Tool calls on a replayed message, as action cards.
+ *
+ * Reads the `tools` the Rust side already unwrapped rather than re-parsing
+ * content blocks. The vault skill shells out through ipython, and duplicating
+ * that unwrap here would give a replayed card a different name from the live
+ * one it is replaying.
  *
  * Status is always `done`: this is history, and nothing replayed from a log is
- * still running. A card left `pending` would show a spinner forever.
+ * still running. A card left `pending` would spin forever.
  */
-function actionsFrom(message: PrimeMessage, seed: number): AiAction[] {
-  return blocksOf(message.content)
-    .filter((block) => block.type === 'tool_use')
-    .map((block, index) => {
-      const path = pathFromInput(block.input)
-      const tool = block.name ?? 'tool'
-      return {
-        tool,
-        toolId: block.id ?? `replay-${seed}-${index}`,
-        label: path ? `${tool} ${path}` : tool,
-        ...(path ? { path } : {}),
-        status: 'done' as const,
-        ...(block.input ? { input: JSON.stringify(block.input) } : {}),
-      }
-    })
+function actionsFrom(tools: PrimeTranscriptTool[] | undefined, seed: number): AiAction[] {
+  return (tools ?? []).map((tool, index) => ({
+    tool: tool.tool,
+    toolId: tool.id ?? `replay-${seed}-${index}`,
+    label: tool.path ? `${tool.tool} ${tool.path}` : tool.tool,
+    ...(tool.path ? { path: tool.path } : {}),
+    status: 'done' as const,
+  }))
 }
 
 function reasoningFrom(message: PrimeMessage): string {
@@ -135,7 +132,7 @@ export function primeTranscriptToConversation(items: PrimeTranscriptItem[]): AiA
       case 'assistant': {
         const turn = current()
         const reasoning = reasoningFrom(message)
-        const actions = actionsFrom(message, index++)
+        const actions = actionsFrom(item.tools, index++)
         if (reasoning) {
           turn.reasoning = turn.reasoning ? `${turn.reasoning}\n\n${reasoning}` : reasoning
           turn.reasoningDone = true

@@ -222,6 +222,13 @@ pub enum PrimeTranscriptItem {
         #[serde(skip_serializing_if = "Option::is_none")]
         parent_id: Option<String>,
         message: crate::prime_session_host::PrimeMessage,
+        /// Tool calls, already unwrapped from any shell wrapper.
+        ///
+        /// Computed here rather than in the frontend so the live stream and a
+        /// replay name a tool the same way — they share
+        /// `prime_tool_unwrap`. `content` above stays verbatim.
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        tools: Vec<PrimeTranscriptTool>,
     },
     #[serde(rename_all = "camelCase")]
     Compaction {
@@ -256,6 +263,46 @@ pub enum PrimeTranscriptItem {
     },
 }
 
+/// One tool call on a replayed message, named as the user should see it.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrimeTranscriptTool {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    pub tool: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+}
+
+/// Pull tool calls out of a message's content blocks.
+///
+/// Real logs write `toolCall` with `arguments`; `tool_use` with `input` is
+/// accepted too because that is the shape the live Anthropic-style stream uses
+/// and neither is ours to guarantee.
+fn tools_from_message(content: &serde_json::Value) -> Vec<PrimeTranscriptTool> {
+    let Some(blocks) = content.as_array() else {
+        return Vec::new();
+    };
+    blocks
+        .iter()
+        .filter(|block| matches!(block["type"].as_str(), Some("toolCall") | Some("tool_use")))
+        .map(|block| {
+            let name = block["name"].as_str().unwrap_or_default();
+            let args = block
+                .get("arguments")
+                .or_else(|| block.get("input"))
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            let unwrapped = crate::prime_tool_unwrap::unwrap_tool(name, &args);
+            PrimeTranscriptTool {
+                id: block["id"].as_str().map(str::to_string),
+                tool: unwrapped.tool,
+                path: unwrapped.path,
+            }
+        })
+        .collect()
+}
+
 /// Replay a session log into an ordered transcript.
 ///
 /// Pure, so it is tested without disk. `agent_status` dominates these files
@@ -276,6 +323,7 @@ fn transcript_from_lines<I: Iterator<Item = String>>(lines: I) -> Vec<PrimeTrans
                 items.push(PrimeTranscriptItem::Message {
                     id: event["id"].as_str().map(str::to_string),
                     parent_id: event["parentId"].as_str().map(str::to_string),
+                    tools: tools_from_message(&message["content"]),
                     message: crate::prime_session_host::PrimeMessage::from_value(message),
                 });
             }
@@ -462,6 +510,7 @@ mod tests {
                 id,
                 parent_id,
                 message,
+                ..
             } => {
                 assert_eq!(id.as_deref(), Some("m1"));
                 assert_eq!(parent_id.as_deref(), None);
@@ -481,6 +530,64 @@ mod tests {
 
     /// `agent_status` is 2125 of ~2500 lines in a real session. It is spinner
     /// state, not conversation, and must never reach the transcript.
+    #[test]
+    fn replayed_tool_calls_use_the_real_block_shape_and_are_unwrapped() {
+        // Real logs write `toolCall` with `arguments`, not `tool_use` with
+        // `input`. An earlier version of this parse looked for the latter and
+        // silently dropped every tool card from a replayed session.
+        let code = "node '/r/mcp-server/cli-call.mjs' get_note '{\"path\":\"wiki/foo.md\"}'";
+        let line = serde_json::json!({
+            "type": "message",
+            "id": "m1",
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {"type": "toolCall", "id": "call-1", "name": "ipython",
+                     "arguments": {"code": code}}
+                ]
+            }
+        })
+        .to_string();
+
+        let items = transcript_from_lines(lines(&[&line]));
+
+        match &items[0] {
+            PrimeTranscriptItem::Message { tools, message, .. } => {
+                assert_eq!(tools.len(), 1, "the tool call must survive replay");
+                assert_eq!(
+                    tools[0].tool, "get_note",
+                    "shared unwrap with the live path"
+                );
+                assert_eq!(tools[0].path.as_deref(), Some("wiki/foo.md"));
+                assert_eq!(tools[0].id.as_deref(), Some("call-1"));
+                // Content is still verbatim — unwrapping rides alongside it.
+                assert_eq!(message.content.as_array().expect("blocks").len(), 1);
+            }
+            other => panic!("expected a message, got {other:?}"),
+        }
+    }
+
+    /// The Anthropic-style shape is accepted too; neither is ours to guarantee.
+    #[test]
+    fn replayed_tool_use_blocks_are_also_read() {
+        let line = serde_json::json!({
+            "type": "message",
+            "message": {"role": "assistant", "content": [
+                {"type": "tool_use", "id": "t1", "name": "get_note",
+                 "input": {"path": "wiki/a.md"}}
+            ]}
+        })
+        .to_string();
+
+        match &transcript_from_lines(lines(&[&line]))[0] {
+            PrimeTranscriptItem::Message { tools, .. } => {
+                assert_eq!(tools[0].tool, "get_note");
+                assert_eq!(tools[0].path.as_deref(), Some("wiki/a.md"));
+            }
+            other => panic!("expected a message, got {other:?}"),
+        }
+    }
+
     #[test]
     fn transcript_drops_agent_status_noise() {
         let items = transcript_from_lines(lines(&[
