@@ -60,6 +60,46 @@ function inferHomeDir(path: string): string | null {
 }
 
 /**
+ * How long the attached session has been alive, as a glanceable label.
+ *
+ * Closing the window no longer ends a session (ADR-0163), so "how long has
+ * this been going" stops being obvious from the app being open — a session can
+ * outlive several launches. Uptime is what separates *working* from *stuck*:
+ * three minutes of silence is thinking, three hours of it is not.
+ *
+ * Coarse on purpose. Seconds would tick distractingly in a status strip and
+ * answer a question nobody asks; below a minute reads as `<1m`.
+ *
+ * Returns `null` for a missing or unparseable timestamp, and for one in the
+ * future — a clock skew should show nothing rather than a negative age.
+ */
+export function primeSessionUptime(
+  startedAt: string | null | undefined,
+  now: number = Date.now(),
+): string | null {
+  const trimmed = startedAt?.trim()
+  if (!trimmed) return null
+
+  const started = Date.parse(trimmed)
+  if (Number.isNaN(started)) return null
+
+  const elapsedMinutes = Math.floor((now - started) / 60_000)
+  if (elapsedMinutes < 0) return null
+  if (elapsedMinutes < 1) return '<1m'
+  if (elapsedMinutes < 60) return `${elapsedMinutes}m`
+
+  const hours = Math.floor(elapsedMinutes / 60)
+  if (hours < 24) {
+    const minutes = elapsedMinutes % 60
+    return minutes ? `${hours}h ${minutes}m` : `${hours}h`
+  }
+
+  const days = Math.floor(hours / 24)
+  const remainingHours = hours % 24
+  return remainingHours ? `${days}d ${remainingHours}h` : `${days}d`
+}
+
+/**
  * Just the vault's folder name, for the composer chip.
  *
  * The subhead already carries the path; down at the composer the question is

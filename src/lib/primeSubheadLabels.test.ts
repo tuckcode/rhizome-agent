@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { shortPrimeSessionId, tildeVaultPath } from './primeSubheadLabels'
+import { primeSessionUptime, shortPrimeSessionId, tildeVaultPath } from './primeSubheadLabels'
 
 describe('shortPrimeSessionId', () => {
   /**
@@ -44,5 +44,41 @@ describe('tildeVaultPath', () => {
   it('has nothing to show without a path', () => {
     expect(tildeVaultPath(null)).toBeNull()
     expect(tildeVaultPath('  ')).toBeNull()
+  })
+})
+
+describe('primeSessionUptime', () => {
+  const started = '2026-08-15T09:00:00.000Z'
+  const at = (iso: string) => Date.parse(iso)
+
+  /// Uptime is the difference between working and stuck: a few minutes of
+  /// silence is thinking, a few hours of it is not.
+  it('reads as minutes, then hours, then days', () => {
+    expect(primeSessionUptime(started, at('2026-08-15T09:12:00.000Z'))).toBe('12m')
+    expect(primeSessionUptime(started, at('2026-08-15T10:04:00.000Z'))).toBe('1h 4m')
+    expect(primeSessionUptime(started, at('2026-08-17T12:00:00.000Z'))).toBe('2d 3h')
+  })
+
+  /// A round hour or day should not read "3h 0m".
+  it('drops an empty trailing unit', () => {
+    expect(primeSessionUptime(started, at('2026-08-15T12:00:00.000Z'))).toBe('3h')
+    expect(primeSessionUptime(started, at('2026-08-17T09:00:00.000Z'))).toBe('2d')
+  })
+
+  /// Seconds would tick distractingly in a status strip and answer a question
+  /// nobody asks.
+  it('collapses anything under a minute', () => {
+    expect(primeSessionUptime(started, at('2026-08-15T09:00:30.000Z'))).toBe('<1m')
+    expect(primeSessionUptime(started, at('2026-08-15T09:00:00.000Z'))).toBe('<1m')
+  })
+
+  /// A session with no start time, or an unreadable one, shows nothing rather
+  /// than a wrong number — and clock skew must not render a negative age.
+  it('shows nothing rather than a wrong number', () => {
+    expect(primeSessionUptime(null)).toBeNull()
+    expect(primeSessionUptime(undefined)).toBeNull()
+    expect(primeSessionUptime('   ')).toBeNull()
+    expect(primeSessionUptime('not a date')).toBeNull()
+    expect(primeSessionUptime(started, at('2026-08-15T08:59:00.000Z'))).toBeNull()
   })
 })
