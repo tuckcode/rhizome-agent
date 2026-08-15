@@ -27,6 +27,82 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Session handoff — 2026-08-15e (#6 shipped: Rhizome is a client of the daemon)
+
+**Next: #7 (detach on close, reattach on open).** #6 is done and pushed. The
+transport is no longer the blocker for anything in the #5 set.
+
+**The assumption under ADR-0163 and 16 tickets was tested first, and it
+holds.** An external client — a Python script using nothing of Prime's own JS —
+opened the socket, completed `daemon_hello`, attached with `slim_attach`, read
+session state, drove a streamed turn, and the session outlived the client
+disconnecting. That check took twenty minutes and would have redrawn the spec
+at ticket one if it had failed.
+
+**Shipped:** `prime_session_host` rewritten against the daemon socket. Public
+functions unchanged, frontend untouched. Sessions are created with
+`lifecycle: "resident"` and closing detaches — it never kills.
+
+**Three things the type declarations would not have told you.** All three were
+found by probing the live 0.7.1 binary, and each would have shipped as a quiet
+wrong behaviour rather than an error:
+
+- **`create` has no top-level `cwd`.** It rides inside `config`. Sent at the
+  top level it is accepted and ignored, and the session lands in the daemon's
+  own directory — so the vault tools would have been reading the wrong tree
+  with everything apparently working.
+- **Scheduled work is `heartbeats_list` / `cron_list`.** The RPC spellings
+  (`list_heartbeats`, `list_schedules`) answer `Unknown daemon command`, and
+  `agent_activity` degrades a failed sub-request to empty — the wrong names
+  would have emptied the activity band in silence.
+- **Agent events arrive wrapped in `session_event`, but the inner object is
+  byte-identical to RPC mode's.** Unwrapping exactly one layer in the reader is
+  the whole reason `prime_events` needed no change.
+
+**A failure mode that did not exist before.** A session log can only be live in
+one worker, and the daemon holds every client's, so switching into a session
+another client has open is refused (`errorInfo.code =
+"session_already_active"`). Switching into an unheld session rehydrates
+normally — verified live. Rhizome now explains the conflict instead of
+surfacing Prime's wording, which names an internal worker id and a file path.
+
+**Two corrections to this repo's own lore, both from watching rather than
+reading:**
+
+- **ADR-0163 says the daemon protocol declares "roughly three times" the RPC
+  surface. Measured, it is twice: 96 commands against 48.** The conclusion is
+  untouched — the harness commands really are daemon-only — but the ratio is
+  wrong and should not be requoted.
+- **`AGENTS.md` warns that editing `src-tauri/` while `tauri dev` runs does not
+  rebuild.** It did, three times, unprompted (`Info File … changed. Rebuilding
+  application…`). Do not rely on the old binary sticking around. The related
+  half of that trap is still worth heeding: each restart is a fresh connection.
+
+**Sessions accumulate, one per app launch.** Every start creates a session;
+quitting leaves it resident. Sessions with no messages are `lifecycle: draft`
+and the ones carrying work are `live`, which is the distinction #7 and #12 will
+need. Three empty drafts from this session's rebuilds are still resident — they
+were left rather than deleted, since culling state in the user's runtime is not
+this ticket's call.
+
+**Demonstrated against real Prime, not a fixture**, which is the
+non-negotiable bar in every ticket of this set:
+
+- `live_daemon_round_trip` (`cargo test --lib prime_session_host::tests::live_daemon -- --ignored`)
+  — streamed text, real stats (500k window, real cost), history, detach then
+  reconnect. Ignored by default; it needs a running daemon and spends tokens.
+- In the running app: a real conversation with real tool calls, in a session
+  whose cwd was correctly the vault. **The app was then quit and the session
+  survived with all eight messages, `lifecycle: live`.** That is user story #1,
+  observed rather than argued.
+
+**Gates:** `cargo test --lib` 1422 passed; coverage TOTAL 85.24% (gate 85);
+`pnpm test` 5294 passed across 507 files; `npx tsc -b` clean; clippy
+`-D warnings` clean; `cargo fmt` clean. Codacy: not run — no MCP tool and no
+`.codacy/` directory, as on every prior session.
+
+---
+
 ## Session handoff — 2026-08-15d (the surface is specced; the transport it assumed was wrong)
 
 **Next agent: read `docs/adr/0163-connect-to-the-prime-daemon.md`, then issue
