@@ -400,6 +400,7 @@ pub fn set_model(provider: &str, model_id: &str) -> Result<(), String> {
         if response["success"].as_bool() != Some(true) {
             return Err(response_error(&response, "set_model"));
         }
+        host.refresh_session_id()?;
         Ok(())
     })
 }
@@ -1372,6 +1373,46 @@ for line in sys.stdin:
     fn set_model_refuses_a_half_specified_model() {
         assert!(set_model("", "grok-4.5").is_err());
         assert!(set_model("xai", "  ").is_err());
+    }
+
+    /// The composer chip reads `get_status`, which is a cache of the last
+    /// `get_state`. Switching the model without refreshing that cache leaves
+    /// the chip on the previous model even when Prime accepted the switch.
+    #[cfg(unix)]
+    #[test]
+    fn set_model_updates_status_to_the_model_just_chosen() {
+        let _guard = host_guard();
+        let dir = tempfile::tempdir().unwrap();
+        let vault = tempfile::tempdir().unwrap();
+        install_mock_host(
+            dir.path(),
+            vault.path(),
+            &mock_body(
+                r#"
+model = {"provider": "anthropic", "id": "claude-x", "name": "Claude X"}
+def state():
+    return {"sessionId": session_id, "isStreaming": False, "model": model}
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    cmd = json.loads(line)
+    ty = cmd.get("type")
+    if ty == "get_state":
+        respond(cmd, data=state())
+    elif ty == "set_model":
+        model = {"provider": cmd.get("provider"), "id": cmd.get("modelId"), "name": cmd.get("modelId")}
+        respond(cmd)
+    else:
+        respond(cmd)
+"#,
+            ),
+        );
+
+        assert_eq!(get_status().model_id.as_deref(), Some("claude-x"));
+        set_model("xai", "grok-4.5").unwrap();
+        let status = get_status();
+        assert_eq!(status.model_provider.as_deref(), Some("xai"));
+        assert_eq!(status.model_id.as_deref(), Some("grok-4.5"));
     }
 
     #[test]
