@@ -4,7 +4,11 @@ import type { CSSProperties } from 'react'
 import { cn } from '@/lib/utils'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { subheadTrafficLightInset } from '../utils/trafficLights'
-import { shortPrimeSessionId, tildeVaultPath } from '../lib/primeSubheadLabels'
+import {
+  primeSessionUptime,
+  shortPrimeSessionId,
+  tildeVaultPath,
+} from '../lib/primeSubheadLabels'
 
 interface PrimeSessionSubheadProps {
   locale?: AppLocale
@@ -13,6 +17,13 @@ interface PrimeSessionSubheadProps {
   sessionId?: string | null
   model?: string | null
   vaultPath?: string | null
+  /**
+   * When the attached session started, ISO-8601.
+   *
+   * A session outlives the window now (ADR-0163), so how long it has been
+   * running is no longer implied by how long the app has been open.
+   */
+  startedAt?: string | null
   /** Frame A hides AiPanelHeader — New chat lives here instead. */
   onNewChat?: () => void
 }
@@ -35,12 +46,18 @@ export function PrimeSessionSubhead({
   sessionId,
   model,
   vaultPath,
+  startedAt,
   onNewChat,
 }: PrimeSessionSubheadProps) {
   const t = createTranslator(locale)
   const trafficLightInset = subheadTrafficLightInset() as CSSProperties
   const shortId = shortPrimeSessionId(sessionId)
   const vault = tildeVaultPath(vaultPath)
+  // Recomputed on render rather than on a timer of its own. Host status polls
+  // every few seconds and re-renders this strip, which is frequent enough for
+  // a minute-resolution label — and if polling stops, a frozen uptime is the
+  // honest reading, since nothing is confirming the session is alive.
+  const uptime = live ? primeSessionUptime(startedAt) : null
 
   return (
     <div
@@ -95,6 +112,16 @@ export function PrimeSessionSubhead({
           <Separator />
           <span className="min-w-0 truncate">
             {t('ai.subhead.vault')} <strong className="font-medium text-foreground">{vault}</strong>
+          </span>
+        </>
+      ) : null}
+
+      {uptime ? (
+        <>
+          <Separator />
+          <span className="shrink-0">
+            {t('ai.subhead.uptime')}{' '}
+            <strong className="font-medium text-foreground">{uptime}</strong>
           </span>
         </>
       ) : null}

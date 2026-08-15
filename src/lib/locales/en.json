@@ -1153,6 +1153,7 @@
   "ai.subhead.idle": "Prime idle",
   "ai.subhead.model": "model",
   "ai.subhead.vault": "vault",
+  "ai.subhead.uptime": "up",
   "ai.composer.model": "Change model",
   "ai.composer.modelUnknown": "Model",
   "ai.composer.modelsLoading": "Loading models…",

@@ -69,6 +69,7 @@ export default function ChatHome({
           sessionId={primeHost?.sessionId ?? null}
           model={primeModelLabel(primeHost)}
           vaultPath={vaultPath}
+          startedAt={primeHost?.startedAt ?? null}
           onNewChat={() => newChatRef.current?.()}
         />
       ) : null}

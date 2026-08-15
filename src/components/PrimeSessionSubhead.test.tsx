@@ -51,4 +51,38 @@ describe('PrimeSessionSubhead', () => {
     fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
     expect(onNewChat).toHaveBeenCalledTimes(1)
   })
+  /**
+   * A session outlives the window now (ADR-0163), so how long it has been
+   * running is no longer implied by how long the app has been open — and it is
+   * what separates a session that is working from one that is stuck.
+   */
+  it('shows how long the attached session has been running', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-15T11:30:00.000Z'))
+    render(<PrimeSessionSubhead live startedAt="2026-08-15T09:00:00.000Z" />)
+
+    expect(screen.getByText('up')).toBeInTheDocument()
+    expect(screen.getByText('2h 30m')).toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  /**
+   * Nothing is confirming the session is alive when the host is down, so an
+   * age would be an assertion the strip cannot back up.
+   */
+  it('shows no uptime when the host is not live', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-15T11:30:00.000Z'))
+    render(<PrimeSessionSubhead live={false} startedAt="2026-08-15T09:00:00.000Z" />)
+
+    expect(screen.queryByText('up')).not.toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  /** A session with no start time omits the segment rather than guessing. */
+  it('omits uptime when the session start is unknown', () => {
+    render(<PrimeSessionSubhead live sessionId="abcd-1234" />)
+
+    expect(screen.queryByText('up')).not.toBeInTheDocument()
+  })
 })
