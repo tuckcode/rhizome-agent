@@ -3,6 +3,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import type { FolderNode } from '../../src/types'
+import { AGENT_CHAT_OPENED_SESSION_KEY } from '../../src/hooks/useAppAiWorkspaceBridge'
 import { installFixtureVaultDesktopBridgeInBrowser } from './fixtureVaultDesktopBridge'
 
 const FIXTURE_VAULT = path.resolve('tests/fixtures/test-vault')
@@ -72,9 +73,11 @@ export function removeFixtureVaultCopy(tempVaultDir: string | null | undefined):
 }
 
 async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folders }: FixtureVaultPageArgs): Promise<void> {
-  await page.addInitScript(({ dismissedKey, fixtureFolders, initialIsGitRepo, resolvedVaultPath }: { dismissedKey: string; fixtureFolders: FolderNode[]; initialIsGitRepo: boolean; resolvedVaultPath: string }) => {
+  await page.addInitScript(({ dismissedKey, fixtureFolders, initialIsGitRepo, resolvedVaultPath, agentChatOpenedKey }: { dismissedKey: string; fixtureFolders: FolderNode[]; initialIsGitRepo: boolean; resolvedVaultPath: string; agentChatOpenedKey: string }) => {
     localStorage.clear()
     localStorage.setItem(dismissedKey, '1')
+    // Notes-shell smokes. Launch opens ChatHome once per session otherwise.
+    sessionStorage.setItem(agentChatOpenedKey, '1')
     let gitRepoReady = initialIsGitRepo
 
     const jsonHeaders = { 'Content-Type': 'application/json' }
@@ -507,6 +510,7 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folde
     fixtureFolders: folders,
     initialIsGitRepo: isGitRepo,
     resolvedVaultPath: vaultPath,
+    agentChatOpenedKey: AGENT_CHAT_OPENED_SESSION_KEY,
   })
 }
 
