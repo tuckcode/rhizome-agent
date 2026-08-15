@@ -35,10 +35,19 @@ describe('graph view mounts the AI workspace surface', () => {
     expect(graphBranch()).toContain('aiWorkspaceSurface')
   })
 
-  it('gates that surface on the same flag that hides the floating button', () => {
-    // The button renders on `!effectiveShowAIChat`; if the panel used a
-    // different condition the two could disagree and strand the user again.
+  /**
+   * The floating bubble this originally paired with was removed 2026-08-15 —
+   * it was Desktop leftover, and chat is now a rail destination that owns the
+   * window. Only half the original invariant survives: the graph branch must
+   * still mount the surface on the same flag that opens it, so the status bar
+   * and `OPEN_AI_CHAT_EVENT` (which still open the side panel) cannot set a
+   * flag that nothing renders.
+   */
+  it('mounts the surface on the flag that opens it, so no opener can strand', () => {
     expect(graphBranch()).toContain('effectiveShowAIChat && aiWorkspaceSurface')
-    expect(source).toContain('aiFeaturesEnabled && !effectiveShowAIChat')
+  })
+
+  it('no longer renders the removed floating bubble', () => {
+    expect(source).not.toContain('AiWorkspaceFloatingButton')
   })
 })

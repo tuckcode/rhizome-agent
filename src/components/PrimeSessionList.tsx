@@ -71,7 +71,7 @@ function SessionRow({
         className={cn(
           'mt-[5px] size-1.5 rounded-full border',
           working
-            ? 'border-primary bg-primary ring-2 ring-primary/25'
+            ? 'border-[var(--accent-green)] bg-[var(--accent-green)] ring-2 ring-[var(--accent-green)]/25'
             : 'border-muted-foreground/50 bg-transparent',
         )}
       />

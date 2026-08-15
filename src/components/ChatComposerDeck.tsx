@@ -30,7 +30,7 @@ function Chip({
       className={cn(
         'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5',
         'font-mono text-[10.5px] text-muted-foreground',
-        accent ? 'border-primary/40 text-foreground' : 'border-border',
+        accent ? 'border-[var(--accent-green)]/40 text-foreground' : 'border-border',
       )}
     >
       {children}
@@ -60,7 +60,8 @@ export function ChatComposerDeck({
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1.5" data-testid="chat-composer-deck">
       <Chip accent>
-        <span aria-hidden="true" className="size-1.5 rounded-full bg-primary" />
+        {/* Status, not brand — see PrimeSessionSubhead. */}
+        <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--accent-green)]" />
         {t('ai.panel.title')}
       </Chip>
 
