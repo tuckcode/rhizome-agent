@@ -2,21 +2,21 @@
 
 Living doc. Update in place each session. This file is "what's true right now," not a history log. Detailed per-session records go in `docs/plans/*-session-status.md`.
 
-## Session handoff — 2026-08-14 evening (after Frame C look)
+## Session handoff — 2026-08-15 (native loop + failed push)
 
-**Next agent: read `docs/plans/2026-08-14-after-frame-c-pickup.md` first.**
-Frame A leftover plan is closed. Do not start Frame D because it is the
-next HTML tab. Do not fill remaining Prime RPCs.
+**Next agent: read `docs/plans/2026-08-15-native-loop-handoff-for-claude.md` first.**
+08-14 leftover plan and 08-14-evening pickup are historical.
 
 **Unpushed — count them:** `git rev-list --count origin/main..HEAD`.
-Atticus has not asked to push.
+Atticus asked to push. It did **not** land. `origin/main` still the
+pre-stretch SHA until a green pre-push succeeds.
 
-**Do not:** rebuild A4; hardcode a model; treat the Notes-rail wiki as
-ChatHome; resume the 08-09 "19 tests fail / push blocked" story.
+**Do not:** rebuild A4; start Frame D; fill remaining Prime RPCs;
+hardcode a model; treat Notes-rail as ChatHome; resume 08-09
+push-unblock; claim the push succeeded.
 
-**Next:** native `pnpm tauri dev` promote → Open. Vite cannot prove the
-loop. QueueUpdate chrome only if native is blocked. C24 on next
-Mycelium touch.
+**Next:** native re-check of `[[Promote loop check]]` body after
+`0b44e5f`, or push again if asked. Not both at once.
 
 
 ---
