@@ -1158,6 +1158,8 @@
   "ai.subhead.problem.serviceUnreachable": "Prime service is not reachable — check prime-agent status",
   "ai.subhead.problem.serviceTooOld": "Prime {installed} is too old — update to {required}",
   "ai.subhead.problem.serviceTooOldUnknown": "This Prime is too old — update to {required}",
+  "settings.aiAgents.keepSessionsRunning": "Keep sessions running after quit",
+  "settings.aiAgents.keepSessionsRunningDescription": "Leave agents running when Rhizome is fully closed, so scheduled work still happens. Off by default: quitting stops the agent.",
   "ai.composer.model": "Change model",
   "ai.composer.modelUnknown": "Model",
   "ai.composer.modelsLoading": "Loading models…",
