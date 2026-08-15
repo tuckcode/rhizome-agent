@@ -1,28 +1,67 @@
-//! Long-lived Prime Agent RPC session host.
+//! Client of the Prime Agent daemon.
 //!
-//! Spawns `prime-agent --mode rpc` once and keeps it alive across turns.
-//! Commands are LF-delimited JSONL on stdin; events/responses come back on
-//! stdout (strict `\n` framing — never Unicode line separators).
+//! Rhizome connects to Prime's background service over its unix socket and
+//! attaches to one session. It does **not** own Prime: closing the connection
+//! detaches, and the session keeps running inside the daemon (ADR-0163).
 //!
-//! Spike surface (slice 1 of `docs/plans/2026-08-09-prime-harness-chat-spike.md`):
-//! ensure host → prompt → abort → new_session → map events → `AiAgentStreamEvent`.
+//! Wire format is LF-delimited JSONL, strict `\n` framing — never Unicode line
+//! separators. Commands go out inside a protocol envelope; the daemon answers
+//! with `response` lines correlated by id, and pushes agent activity as
+//! `session_event` wrappers whose inner `event` object is the same shape RPC
+//! mode emitted. That is why `prime_events` needed no change: the reader
+//! unwraps one layer and everything downstream sees what it always saw.
+//!
+//! Every session-scoped command carries `activeSessionId`, the daemon's handle
+//! for the attached session. It is stable across `new_session` (which mints a
+//! fresh Prime `sessionId` behind the same handle), so the handle and the
+//! session id are deliberately two different fields here.
 
 use crate::ai_agents::{AiAgentAvailability, AiAgentStreamEvent};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
-use std::process::{Child, ChildStdin, ChildStdout, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
-const RPC_RESPONSE_TIMEOUT: Duration = Duration::from_secs(30);
+const DAEMON_RESPONSE_TIMEOUT: Duration = Duration::from_secs(30);
+const DAEMON_HELLO_TIMEOUT: Duration = Duration::from_secs(10);
 const TURN_IDLE_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 
+/// Protocol Rhizome speaks. Verified against `prime-agent` 0.7.1, whose
+/// `DAEMON_PROTOCOL_VERSION` is 7 — the first version accepting the command
+/// envelope (`DAEMON_COMMAND_ENVELOPE_MIN_PROTOCOL_VERSION`).
+const DAEMON_PROTOCOL_NAME: &str = "prime-agent.daemon";
+const DAEMON_PROTOCOL_VERSION: u64 = 7;
+
+/// What this client can handle. `slim_attach` keeps the attach reply small by
+/// omitting the duplicated top-level `state`/`messages` — the snapshot carries
+/// both. We deliberately do **not** claim `extension_ui`: Rhizome has no UI for
+/// an extension's prompts, and not claiming it means the daemon never routes
+/// one here to hang the turn.
+const DAEMON_CLIENT_CAPABILITIES: [&str; 3] = ["attach_snapshot", "event_sequence", "slim_attach"];
+
+/// Points the client at a different daemon socket.
+///
+/// This is the transport's only injection point, and it is what the tests
+/// drive a fake daemon through.
+const DAEMON_SOCKET_ENV: &str = "RHIZOME_PRIME_DAEMON_SOCKET";
+
 static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
+
+/// The socket type per platform.
+///
+/// Prime listens on a unix socket everywhere except Windows, where it uses a
+/// named pipe this client does not speak yet. Aliasing the type keeps the
+/// `cfg` to the one function that actually connects, rather than smearing it
+/// across every method that touches a stream.
+#[cfg(unix)]
+type DaemonStream = std::os::unix::net::UnixStream;
+#[cfg(not(unix))]
+type DaemonStream = std::net::TcpStream;
 
 // ── Public types ────────────────────────────────────────────────────────────
 
@@ -202,22 +241,130 @@ struct PendingResponse {
 }
 
 struct PrimeHost {
-    child: Child,
-    stdin: ChildStdin,
-    /// Correlates RPC `id` → oneshot response channel.
+    /// Write half of the daemon connection. The reader thread holds a clone.
+    stream: DaemonStream,
+    /// Correlates command `id` → oneshot response channel.
     pending: Arc<Mutex<HashMap<String, PendingResponse>>>,
-    /// Fan-out of non-response stdout lines (agent events).
+    /// Fan-out of non-response lines (agent events).
     /// Kept so the sender side of the channel outlives the reader thread join.
     #[allow(dead_code)]
     event_tx: Sender<OutboundLine>,
     event_rx: Arc<Mutex<Receiver<OutboundLine>>>,
+    /// Cleared by the reader on EOF, socket error, or `daemon_closing`. There
+    /// is no child process to `try_wait` any more, so liveness is something the
+    /// connection tells us rather than something we can ask the OS.
+    connected: Arc<AtomicBool>,
+    /// The daemon's handle for the attached session. Every session-scoped
+    /// command carries it. Stable across `new_session`.
+    active_session_id: String,
+    /// Prime's own session id, from `get_state`. Changes on `new_session`.
     session_id: Option<String>,
     model_provider: Option<String>,
     model_id: Option<String>,
     model_name: Option<String>,
-    binary: PathBuf,
+    socket_path: PathBuf,
     cwd: PathBuf,
     is_streaming: bool,
+}
+
+// ── Socket discovery ────────────────────────────────────────────────────────
+
+/// Where Prime's daemon listens.
+///
+/// Prime computes this as `<tmpdir>/prime-agent-<uid>/daemon.sock`
+/// (`defaultDaemonSocketPath`, read from the installed 0.7.1 build). Checked in
+/// order: the env override, then that default, then whatever `prime-agent
+/// status` reports — the last covers a daemon deliberately started elsewhere,
+/// and costs a subprocess only when the default is absent.
+fn daemon_socket_path() -> Result<PathBuf, String> {
+    if let Some(path) = std::env::var_os(DAEMON_SOCKET_ENV) {
+        let path = PathBuf::from(path);
+        if path.as_os_str().is_empty() {
+            return Err(format!("{DAEMON_SOCKET_ENV} is set but empty"));
+        }
+        return Ok(path);
+    }
+
+    if let Some(path) = default_daemon_socket_path() {
+        if path.exists() {
+            return Ok(path);
+        }
+    }
+
+    reported_daemon_socket_path().ok_or_else(|| {
+        "Prime's background service is not running. Start it with `prime-agent daemon`, \
+         or check `prime-agent status`."
+            .to_string()
+    })
+}
+
+/// `<tmpdir>/prime-agent-<uid>/daemon.sock`, or `None` when the uid is unknown.
+fn default_daemon_socket_path() -> Option<PathBuf> {
+    Some(
+        std::env::temp_dir()
+            .join(format!("prime-agent-{}", current_uid()?))
+            .join("daemon.sock"),
+    )
+}
+
+/// This process's uid, read off the home directory rather than via libc.
+///
+/// Prime keys the socket directory by `process.getuid()`. Rust's std has no
+/// portable `getuid`, and adding a `libc` dependency to read one integer is a
+/// poor trade — the owner of `$HOME` is the same uid in every case where the
+/// socket is reachable anyway.
+#[cfg(unix)]
+fn current_uid() -> Option<u32> {
+    use std::os::unix::fs::MetadataExt;
+    std::fs::metadata(dirs::home_dir()?).ok().map(|m| m.uid())
+}
+
+#[cfg(not(unix))]
+fn current_uid() -> Option<u32> {
+    None
+}
+
+/// Ask the CLI where its daemon is. Used only when the default path is absent.
+fn reported_daemon_socket_path() -> Option<PathBuf> {
+    let binary = crate::prime_discovery::find_binary().ok()?;
+    let target =
+        crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(&binary).ok()?;
+    let mut command = crate::hidden_command(&target.program);
+    crate::cli_agent_runtime::configure_agent_command_environment(&mut command, &binary);
+    if let Some(first_arg) = target.first_arg {
+        command.arg(first_arg);
+    }
+    let output = command.arg("status").output().ok()?;
+    parse_status_socket_path(&String::from_utf8_lossy(&output.stdout))
+}
+
+/// Pull the socket path out of `prime-agent status`.
+///
+/// The table marks the default background service with a trailing `*`, which is
+/// part of the display and not of the path.
+fn parse_status_socket_path(stdout: &str) -> Option<PathBuf> {
+    stdout
+        .lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with('/'))
+        .find_map(|line| line.split_whitespace().next())
+        .filter(|path| path.ends_with(".sock"))
+        .map(PathBuf::from)
+}
+
+#[cfg(unix)]
+fn connect_stream(path: &Path) -> Result<DaemonStream, String> {
+    DaemonStream::connect(path).map_err(|error| {
+        format!(
+            "Could not reach Prime's background service at {}: {error}",
+            path.display()
+        )
+    })
+}
+
+#[cfg(not(unix))]
+fn connect_stream(_path: &Path) -> Result<DaemonStream, String> {
+    Err("Rhizome cannot reach Prime's background service on this platform yet".into())
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────
@@ -253,7 +400,10 @@ pub fn get_status() -> PrimeHostStatus {
             running: true,
             session_id: host.session_id.clone(),
             is_streaming: host.is_streaming,
-            binary_path: Some(host.binary.to_string_lossy().into_owned()),
+            // Where `prime-agent` is installed. The connection no longer owns a
+            // binary — it owns a socket — but this field has always meant
+            // "where Prime lives" to the UI, and that is still the CLI path.
+            binary_path,
             model_provider: host.model_provider.clone(),
             model_id: host.model_id.clone(),
             model_name: host.model_name.clone(),
@@ -429,15 +579,19 @@ pub fn agent_activity() -> Result<crate::prime_agent_activity::PrimeAgentActivit
             .cloned()
             .unwrap_or(serde_json::Value::Null);
 
+        // Named `heartbeats_list` / `cron_list` on the daemon, not the
+        // `list_heartbeats` / `list_schedules` RPC mode answered to. Probed
+        // against 0.7.1: the RPC spellings return `Unknown daemon command`,
+        // and would have degraded both sections to empty in silence.
         let heartbeats = host
-            .send_command(serde_json::json!({ "type": "list_heartbeats" }))
+            .send_command(serde_json::json!({ "type": "heartbeats_list" }))
             .ok()
             .and_then(|response| response.get("data").cloned())
             .map(|data| activity::scheduled_work_from_response(&data, &["heartbeats"]))
             .unwrap_or_default();
 
         let schedules = host
-            .send_command(serde_json::json!({ "type": "list_schedules" }))
+            .send_command(serde_json::json!({ "type": "cron_list" }))
             .ok()
             .and_then(|response| response.get("data").cloned())
             .map(|data| activity::scheduled_work_from_response(&data, &["jobs", "schedules"]))
@@ -785,22 +939,20 @@ fn ensure_host_for_cwd(cwd: PathBuf) -> Result<String, String> {
                 let _ = crate::prime_vault_skill::seed_vault_skill(&cwd);
                 return Ok(host.session_id.clone().unwrap_or_default());
             }
-            // Dead or wrong cwd → tear down and respawn.
+            // Disconnected or wrong cwd → detach and open a new session.
             let _ = host.shutdown();
             *guard = None;
         }
     }
-    spawn_and_store(cwd)
+    connect_and_store(cwd)
 }
 
-fn spawn_and_store(cwd: PathBuf) -> Result<String, String> {
-    let binary = crate::prime_discovery::find_binary()
-        .map_err(|error| crate::prime_events::format_spawn_error(&error))?;
-    let host = PrimeHost::spawn(binary, cwd)?;
+fn connect_and_store(cwd: PathBuf) -> Result<String, String> {
+    let host = PrimeHost::connect(cwd)?;
     let session_id = host.session_id.clone().unwrap_or_default();
     let slot = host_slot();
     let mut guard = slot.host.lock().map_err(poison)?;
-    // If something raced us, shut the loser down.
+    // If something raced us, detach the loser.
     if let Some(mut existing) = guard.take() {
         let _ = existing.shutdown();
     }
@@ -873,18 +1025,27 @@ fn stream_until_agent_end(mut on_event: impl FnMut(&serde_json::Value)) -> Resul
                     on_event(&json);
                     return Ok(());
                 }
-                // Extension UI requests are not supported in the spike —
-                // auto-cancel so the agent doesn't hang forever.
-                if ty.starts_with("extension_ui_") {
-                    let id = json.get("id").cloned().unwrap_or(serde_json::Value::Null);
+                // Rhizome does not claim the `extension_ui` capability, so the
+                // daemon should never route one of these here. If one arrives
+                // anyway, cancel it rather than let the turn hang on a prompt
+                // no surface in this app can answer.
+                if ty.starts_with("extension_ui") {
+                    let request_id = json["requestId"]
+                        .as_str()
+                        .or_else(|| json["id"].as_str())
+                        .unwrap_or_default()
+                        .to_string();
                     let _ = with_host_mut(|host| {
-                        // Best-effort: many UI requests want a response with cancelled.
-                        let _ = host.write_raw(&serde_json::json!({
-                            "id": id,
-                            "type": "response",
-                            "success": false,
-                            "error": "extension UI not supported in Rhizome Agent spike",
-                        }));
+                        let command = host.command_envelope(
+                            serde_json::json!({
+                                "type": "extension_ui_response",
+                                "activeSessionId": host.active_session_id,
+                                "requestId": request_id,
+                                "response": { "cancelled": true },
+                            }),
+                            &next_id(),
+                        );
+                        let _ = host.write_raw(&command);
                         Ok(())
                     });
                     continue;
@@ -911,10 +1072,17 @@ fn next_id() -> String {
 }
 
 impl PrimeHost {
-    fn spawn(binary: PathBuf, cwd: PathBuf) -> Result<Self, String> {
+    /// Open a connection, create a session in `cwd`, and attach to it.
+    ///
+    /// Creating rather than adopting an existing session preserves today's
+    /// behaviour exactly: `ensure_host` has always produced a session scoped to
+    /// the vault it was handed. Reattaching to work left running is #7's job,
+    /// and needs a UI to choose *which* session — a choice this function has no
+    /// standing to make on the user's behalf.
+    fn connect(cwd: PathBuf) -> Result<Self, String> {
         std::fs::create_dir_all(&cwd).map_err(|error| {
             format!(
-                "Failed to create Prime host working directory {}: {error}",
+                "Failed to create Prime session working directory {}: {error}",
                 cwd.display()
             )
         })?;
@@ -935,77 +1103,77 @@ impl PrimeHost {
             }
         }
 
-        let target = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(&binary)?;
-        let mut command = crate::hidden_command(&target.program);
-        crate::cli_agent_runtime::configure_agent_command_environment(&mut command, &binary);
-        if let Some(first_arg) = target.first_arg {
-            command.arg(first_arg);
-        }
-        command
-            .arg("--mode")
-            .arg("rpc")
-            .arg("--cwd")
-            .arg(&cwd)
-            // Session persistence is fine (Prime owns ~/.prime/agent). Spike
-            // keeps default so multi-turn works; callers can new_session.
-            .current_dir(&cwd)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-
-        let mut child = command.spawn().map_err(|error| {
-            crate::prime_events::format_spawn_error(&format!(
-                "Failed to spawn prime-agent: {error}"
-            ))
-        })?;
-
-        let stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| "Failed to open prime-agent stdin".to_string())?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| "Failed to open prime-agent stdout".to_string())?;
-        // Drain stderr so the child never blocks on a full pipe.
-        if let Some(stderr) = child.stderr.take() {
-            thread::Builder::new()
-                .name("prime-rpc-stderr".into())
-                .spawn(move || {
-                    let reader = BufReader::new(stderr);
-                    for line in reader.lines().map_while(Result::ok) {
-                        let trimmed = line.trim();
-                        if !trimmed.is_empty() {
-                            log::debug!("prime-agent stderr: {trimmed}");
-                        }
-                    }
-                })
-                .map_err(|error| format!("Failed to spawn prime stderr reader: {error}"))?;
-        }
+        let socket_path = daemon_socket_path()?;
+        let stream = connect_stream(&socket_path)?;
+        let reader_stream = stream
+            .try_clone()
+            .map_err(|error| format!("Failed to split the Prime daemon connection: {error}"))?;
 
         let pending: Arc<Mutex<HashMap<String, PendingResponse>>> =
             Arc::new(Mutex::new(HashMap::new()));
         let (event_tx, event_rx) = mpsc::channel::<OutboundLine>();
         let event_rx = Arc::new(Mutex::new(event_rx));
+        let connected = Arc::new(AtomicBool::new(true));
 
-        spawn_stdout_reader(stdout, Arc::clone(&pending), event_tx.clone())?;
+        spawn_daemon_reader(
+            reader_stream,
+            Arc::clone(&pending),
+            event_tx.clone(),
+            Arc::clone(&connected),
+        )?;
 
         let mut host = Self {
-            child,
-            stdin,
+            stream,
             pending,
             event_tx,
             event_rx,
+            connected,
+            active_session_id: String::new(),
             session_id: None,
             model_provider: None,
             model_id: None,
             model_name: None,
-            binary,
-            cwd,
+            socket_path,
+            cwd: cwd.clone(),
             is_streaming: false,
         };
 
-        // Warm-up: get_state confirms the RPC loop is alive and yields sessionId.
+        // The daemon greets first. Reading it is the handshake — it carries the
+        // protocol version and confirms we are talking to a daemon at all.
+        host.await_hello()?;
+
+        // `create` takes cwd inside `config`, not at the top level. Sending it
+        // at the top level is silently ignored and the session lands in the
+        // daemon's own directory, which is how the vault tools would quietly
+        // start operating on the wrong tree.
+        let created = host.send_bare_command(serde_json::json!({
+            "type": "create",
+            "config": { "cwd": cwd.to_string_lossy() },
+            // Explicit rather than defaulted: outliving this client is the
+            // property ADR-0163 exists for, so it should not rest on a default.
+            "lifecycle": "resident",
+        }))?;
+        if created["success"].as_bool() != Some(true) {
+            let _ = host.shutdown();
+            return Err(response_error(&created, "create"));
+        }
+        let Some(active_session_id) = created["data"]["activeSessionId"].as_str() else {
+            let _ = host.shutdown();
+            return Err("Prime's daemon created a session without an id".into());
+        };
+        host.active_session_id = active_session_id.to_string();
+
+        let attached = host.send_bare_command(serde_json::json!({
+            "type": "attach",
+            "activeSessionId": host.active_session_id,
+            "capabilities": DAEMON_CLIENT_CAPABILITIES,
+        }))?;
+        if attached["success"].as_bool() != Some(true) {
+            let _ = host.shutdown();
+            return Err(response_error(&attached, "attach"));
+        }
+
+        // Warm-up: get_state confirms the session answers and yields sessionId.
         match host.send_command(serde_json::json!({ "type": "get_state" })) {
             Ok(response) if response["success"].as_bool() == Some(true) => {
                 if let Some(data) = response.get("data") {
@@ -1025,42 +1193,127 @@ impl PrimeHost {
         Ok(host)
     }
 
-    fn is_alive(&mut self) -> bool {
-        match self.child.try_wait() {
-            Ok(None) => true,
-            Ok(Some(_)) => false,
-            Err(_) => false,
+    /// Wait for the daemon's opening `daemon_hello`.
+    ///
+    /// Anything else arriving first is forwarded, not dropped — a stray line
+    /// before the greeting is not a reason to lose it.
+    fn await_hello(&mut self) -> Result<(), String> {
+        let deadline = Instant::now() + DAEMON_HELLO_TIMEOUT;
+        let rx = Arc::clone(&self.event_rx);
+        let rx = rx.lock().map_err(poison)?;
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Err(format!(
+                    "Prime's background service did not answer within {}s",
+                    DAEMON_HELLO_TIMEOUT.as_secs()
+                ));
+            }
+            match rx.recv_timeout(remaining) {
+                Ok(OutboundLine::Event(json)) => {
+                    if json["type"].as_str() == Some("daemon_hello") {
+                        log::info!(
+                            "Connected to Prime daemon {} (protocol {}) at {}",
+                            json["appVersion"].as_str().unwrap_or("unknown"),
+                            json["protocol"]["version"],
+                            self.socket_path.display()
+                        );
+                        return Ok(());
+                    }
+                }
+                Ok(OutboundLine::Closed(error)) => {
+                    return Err(error.unwrap_or_else(|| {
+                        "Prime's background service closed the connection during the handshake"
+                            .into()
+                    }));
+                }
+                Err(RecvTimeoutError::Timeout) => continue,
+                Err(RecvTimeoutError::Disconnected) => {
+                    return Err("Prime daemon connection closed during the handshake".into());
+                }
+            }
         }
     }
 
+    fn is_alive(&self) -> bool {
+        self.connected.load(Ordering::Relaxed)
+    }
+
+    /// Detach and drop the connection.
+    ///
+    /// Deliberately not a kill. The daemon is not ours to stop — that is the
+    /// whole of ADR-0163, and the reason work survives closing the window.
     fn shutdown(&mut self) -> Result<(), String> {
-        // Drop stdin first so the child sees EOF and exits cleanly.
-        // (ChildStdin is dropped when we replace... we can't easily drop field.
-        // Kill instead if still alive.)
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        if !self.active_session_id.is_empty() && self.is_alive() {
+            let _ = self.write_raw(&self.command_envelope(
+                serde_json::json!({
+                    "type": "detach",
+                    "activeSessionId": self.active_session_id,
+                }),
+                &next_id(),
+            ));
+        }
+        self.connected.store(false, Ordering::Relaxed);
+        // Half-close: the daemon sees EOF after the detach it has yet to read,
+        // and closes its end, which in turn unblocks our reader thread.
+        // Closing both halves here would tear the socket down before the
+        // detach had been consumed.
+        #[cfg(unix)]
+        let _ = self.stream.shutdown(std::net::Shutdown::Write);
         Ok(())
     }
 
-    fn write_raw(&mut self, value: &serde_json::Value) -> Result<(), String> {
-        let mut line = serde_json::to_string(value)
-            .map_err(|error| format!("Failed to serialize Prime RPC command: {error}"))?;
-        line.push('\n');
-        self.stdin
-            .write_all(line.as_bytes())
-            .and_then(|_| self.stdin.flush())
-            .map_err(|error| format!("Failed to write Prime RPC command: {error}"))
+    /// Wrap a command in the protocol envelope the daemon expects at v7.
+    fn command_envelope(&self, mut command: serde_json::Value, id: &str) -> serde_json::Value {
+        if let Some(object) = command.as_object_mut() {
+            object.insert("id".into(), serde_json::Value::String(id.to_string()));
+        }
+        serde_json::json!({
+            "type": "command",
+            "id": id,
+            "protocol": { "name": DAEMON_PROTOCOL_NAME, "version": DAEMON_PROTOCOL_VERSION },
+            "command": command,
+        })
     }
 
+    fn write_raw(&self, value: &serde_json::Value) -> Result<(), String> {
+        let mut line = serde_json::to_string(value)
+            .map_err(|error| format!("Failed to serialize Prime daemon command: {error}"))?;
+        line.push('\n');
+        (&self.stream)
+            .write_all(line.as_bytes())
+            .and_then(|_| (&self.stream).flush())
+            .map_err(|error| format!("Failed to write Prime daemon command: {error}"))
+    }
+
+    /// Send a session-scoped command, filling in `activeSessionId`.
     fn send_command(
         &mut self,
         mut command: serde_json::Value,
     ) -> Result<serde_json::Value, String> {
-        let id = next_id();
-        command
+        let object = command
             .as_object_mut()
-            .ok_or_else(|| "Prime RPC command must be a JSON object".to_string())?
-            .insert("id".into(), serde_json::Value::String(id.clone()));
+            .ok_or_else(|| "Prime daemon command must be a JSON object".to_string())?;
+        if !object.contains_key("activeSessionId") && !self.active_session_id.is_empty() {
+            object.insert(
+                "activeSessionId".into(),
+                serde_json::Value::String(self.active_session_id.clone()),
+            );
+        }
+        self.send_bare_command(command)
+    }
+
+    /// Send a command exactly as given. Used for the pre-attach handshake,
+    /// where there is no session to scope to yet.
+    fn send_bare_command(
+        &mut self,
+        command: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        if !command.is_object() {
+            return Err("Prime daemon command must be a JSON object".into());
+        }
+        let id = next_id();
+        let envelope = self.command_envelope(command, &id);
 
         let (tx, rx) = mpsc::channel();
         {
@@ -1068,24 +1321,24 @@ impl PrimeHost {
             pending.insert(id.clone(), PendingResponse { tx });
         }
 
-        if let Err(error) = self.write_raw(&command) {
+        if let Err(error) = self.write_raw(&envelope) {
             let mut pending = self.pending.lock().map_err(poison)?;
             pending.remove(&id);
             return Err(error);
         }
 
-        match rx.recv_timeout(RPC_RESPONSE_TIMEOUT) {
+        match rx.recv_timeout(DAEMON_RESPONSE_TIMEOUT) {
             Ok(response) => Ok(response),
             Err(RecvTimeoutError::Timeout) => {
                 let mut pending = self.pending.lock().map_err(poison)?;
                 pending.remove(&id);
                 Err(format!(
-                    "Prime RPC command timed out after {}s (id={id})",
-                    RPC_RESPONSE_TIMEOUT.as_secs()
+                    "Prime daemon command timed out after {}s (id={id})",
+                    DAEMON_RESPONSE_TIMEOUT.as_secs()
                 ))
             }
             Err(RecvTimeoutError::Disconnected) => {
-                Err("Prime RPC response channel closed (host died?)".into())
+                Err("Prime daemon response channel closed (connection lost?)".into())
             }
         }
     }
@@ -1122,22 +1375,24 @@ impl PrimeHost {
     }
 }
 
-fn spawn_stdout_reader(
-    stdout: ChildStdout,
+fn spawn_daemon_reader(
+    stream: DaemonStream,
     pending: Arc<Mutex<HashMap<String, PendingResponse>>>,
     event_tx: Sender<OutboundLine>,
+    connected: Arc<AtomicBool>,
 ) -> Result<(), String> {
     thread::Builder::new()
-        .name("prime-rpc-stdout".into())
+        .name("prime-daemon-reader".into())
         .spawn(move || {
             // Strict LF framing: BufRead::read_until(b'\n') only splits on \n,
             // never on U+2028/U+2029 (the trap Node's readline hits).
-            let mut reader = BufReader::new(stdout);
+            let mut reader = BufReader::new(stream);
             let mut buffer = Vec::new();
             loop {
                 buffer.clear();
                 match reader.read_until(b'\n', &mut buffer) {
                     Ok(0) => {
+                        connected.store(false, Ordering::Relaxed);
                         let _ = event_tx.send(OutboundLine::Closed(None));
                         break;
                     }
@@ -1157,25 +1412,36 @@ fn spawn_stdout_reader(
                             Err(_) => continue,
                         };
                         let Ok(json) = serde_json::from_str::<serde_json::Value>(line) else {
-                            log::debug!("prime-agent non-json stdout: {line}");
+                            log::debug!("prime daemon non-json line: {line}");
                             continue;
                         };
-                        route_stdout_line(json, &pending, &event_tx);
+                        if json["type"].as_str() == Some("daemon_closing") {
+                            connected.store(false, Ordering::Relaxed);
+                        }
+                        route_daemon_line(json, &pending, &event_tx);
                     }
                     Err(error) => {
+                        connected.store(false, Ordering::Relaxed);
                         let _ = event_tx.send(OutboundLine::Closed(Some(format!(
-                            "prime-agent stdout read error: {error}"
+                            "Prime daemon connection read error: {error}"
                         ))));
                         break;
                     }
                 }
             }
         })
-        .map_err(|error| format!("Failed to spawn prime stdout reader: {error}"))?;
+        .map_err(|error| format!("Failed to start the Prime daemon reader: {error}"))?;
     Ok(())
 }
 
-fn route_stdout_line(
+/// Route one line from the daemon: responses to their caller, everything else
+/// onto the event stream.
+///
+/// Agent activity arrives wrapped as `{"type":"session_event","event":{…}}`
+/// with the daemon's own sequencing metadata alongside. The inner object is
+/// byte-identical to what RPC mode emitted, so unwrapping exactly one layer
+/// here is what lets `prime_events` stay untouched by the transport swap.
+fn route_daemon_line(
     json: serde_json::Value,
     pending: &Mutex<HashMap<String, PendingResponse>>,
     event_tx: &Sender<OutboundLine>,
@@ -1192,6 +1458,14 @@ fn route_stdout_line(
         }
         // Unsolicited response — still forward so it isn't lost.
     }
+
+    if json["type"].as_str() == Some("session_event") {
+        if let Some(event) = json.get("event") {
+            let _ = event_tx.send(OutboundLine::Event(event.clone()));
+            return;
+        }
+    }
+
     let _ = event_tx.send(OutboundLine::Event(json));
 }
 
@@ -1200,125 +1474,424 @@ fn route_stdout_line(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
-    use std::sync::atomic::AtomicBool;
     use std::sync::MutexGuard;
 
     /// Every test that touches `host_slot()` must hold this.
     ///
     /// The host registry is a process-wide `OnceLock`, so parallel tests
-    /// otherwise tear down each other's host mid-assertion: `shutdown_host()`
-    /// in one test races `run_prompt_stream` in another. That passed by
-    /// scheduling luck rather than by construction, which is exactly the
-    /// determinism the repo's test rules ask for.
+    /// otherwise tear down each other's connection mid-assertion:
+    /// `shutdown_host()` in one test races `run_prompt_stream` in another. It
+    /// also guards `RHIZOME_PRIME_DAEMON_SOCKET`, which is process-global: two
+    /// tests pointing it at different fake daemons at once would connect to
+    /// each other's.
     static TEST_LOCK: Mutex<()> = Mutex::new(());
 
     fn host_guard() -> MutexGuard<'static, ()> {
         TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner())
     }
 
+    // ── Fake daemon ─────────────────────────────────────────────────────────
+    //
+    // The one seam this work adds. It is a real unix socket speaking the real
+    // envelope framing, not a stub of our own client — so a test passing here
+    // means the bytes on the wire were parsed, not that a mock was called.
+
     #[cfg(unix)]
-    fn mock_rpc_script(dir: &Path, body: &str) -> PathBuf {
-        use std::os::unix::fs::PermissionsExt;
-        let script = dir.join("prime-agent");
-        // Minimal fake: read JSONL commands, write scripted responses/events.
-        let full = format!(
-            r#"#!/usr/bin/env python3
-import sys, json, time
-{body}
-"#
-        );
-        std::fs::write(&script, full).unwrap();
-        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
-        script
+    const FAKE_ACTIVE_SESSION_ID: &str = "daemon-1";
+
+    #[cfg(unix)]
+    struct FakeDaemon {
+        path: PathBuf,
+        /// Every command the daemon received, inner command object only.
+        received: Arc<Mutex<Vec<serde_json::Value>>>,
+        _dir: tempfile::TempDir,
     }
 
     #[cfg(unix)]
-    #[test]
-    fn host_prompt_maps_events_and_survives_two_turns() {
-        let _guard = host_guard();
-        let dir = tempfile::tempdir().unwrap();
-        let vault = tempfile::tempdir().unwrap();
-        let binary = mock_rpc_script(
-            dir.path(),
-            r#"
-# State
-session_id = "sess-1"
-turn = 0
-
-def respond(cmd, **extra):
-    out = {"type": "response", "command": cmd.get("type"), "success": True, "id": cmd.get("id")}
-    out.update(extra)
-    sys.stdout.write(json.dumps(out) + "\n")
-    sys.stdout.flush()
-
-def emit(obj):
-    sys.stdout.write(json.dumps(obj) + "\n")
-    sys.stdout.flush()
-
-for line in sys.stdin:
-    line = line.strip()
-    if not line:
-        continue
-    cmd = json.loads(line)
-    ty = cmd.get("type")
-    if ty == "get_state":
-        respond(cmd, data={"sessionId": session_id, "isStreaming": False, "messageCount": turn})
-    elif ty == "new_session":
-        session_id = "sess-2"
-        respond(cmd, data={"cancelled": False})
-    elif ty == "abort":
-        respond(cmd)
-    elif ty == "prompt":
-        turn += 1
-        respond(cmd)
-        emit({"type": "agent_start"})
-        emit({
-            "type": "message_update",
-            "assistantMessageEvent": {"type": "text_delta", "delta": f"turn-{turn}"}
-        })
-        emit({
-            "type": "tool_execution_start",
-            "toolCallId": f"t{turn}",
-            "toolName": "read",
-            "args": {"path": "a.md"}
-        })
-        emit({
-            "type": "tool_execution_end",
-            "toolCallId": f"t{turn}",
-            "result": "ok"
-        })
-        emit({"type": "agent_end", "messages": []})
-    else:
-        respond(cmd)
-"#,
-        );
-
-        // Bypass discovery: inject host directly.
-        let host = PrimeHost::spawn(binary.clone(), vault.path().to_path_buf()).unwrap();
-        assert_eq!(host.session_id.as_deref(), Some("sess-1"));
+    impl FakeDaemon {
+        /// Start a listener. `overrides` answers a command, or returns `None`
+        /// to fall through to the handshake defaults.
+        fn start<H>(overrides: H) -> Self
+        where
+            H: Fn(&serde_json::Value, &str) -> Option<Vec<serde_json::Value>>
+                + Send
+                + Sync
+                + 'static,
         {
-            let slot = host_slot();
-            let mut guard = slot.host.lock().unwrap();
-            *guard = Some(host);
+            use std::os::unix::net::UnixListener;
+
+            let dir = tempfile::tempdir().unwrap();
+            // Keep the filename short: macOS caps a unix socket path at 104
+            // bytes, and a tempdir already spends about sixty of them.
+            let path = dir.path().join("d.sock");
+            let listener = UnixListener::bind(&path).unwrap();
+            let received = Arc::new(Mutex::new(Vec::new()));
+
+            let thread_received = Arc::clone(&received);
+            let overrides = Arc::new(overrides);
+            thread::spawn(move || {
+                let session_id = Arc::new(Mutex::new("sess-a".to_string()));
+                for stream in listener.incoming() {
+                    let Ok(stream) = stream else { break };
+                    let received = Arc::clone(&thread_received);
+                    let overrides = Arc::clone(&overrides);
+                    let session_id = Arc::clone(&session_id);
+                    thread::spawn(move || {
+                        serve_fake_client(stream, received, overrides, session_id);
+                    });
+                }
+            });
+
+            Self {
+                path,
+                received,
+                _dir: dir,
+            }
         }
 
-        let mut events = Vec::new();
-        let session = run_prompt_stream(
-            PrimePromptRequest {
-                message: "hello".into(),
-                system_prompt: None,
-                vault_path: vault.path().to_string_lossy().into_owned(),
-                event_name: None,
-                provider: None,
-                model_id: None,
-                new_session: false,
-            },
-            |event| events.push(event),
-        )
-        .unwrap();
+        /// Point the transport at this daemon and clear any previous host.
+        fn install(&self) {
+            std::env::set_var(DAEMON_SOCKET_ENV, &self.path);
+            let slot = host_slot();
+            let mut guard = slot.host.lock().unwrap_or_else(|p| p.into_inner());
+            *guard = None;
+        }
 
-        assert_eq!(session, "sess-1");
+        fn commands(&self) -> Vec<String> {
+            self.received
+                .lock()
+                .unwrap()
+                .iter()
+                .filter_map(|command| command["type"].as_str().map(str::to_string))
+                .collect()
+        }
+
+        fn command(&self, kind: &str) -> Option<serde_json::Value> {
+            self.received
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|command| command["type"].as_str() == Some(kind))
+                .cloned()
+        }
+
+        /// Wait for a command to arrive, up to a bound.
+        ///
+        /// Commands the client does not await a response for — `detach` is the
+        /// only one — are in flight when the call that sent them returns.
+        /// Polling to a deadline keeps that deterministic: it either arrives
+        /// or the test fails, with no sleep tuned to a machine's speed.
+        fn wait_for_command(&self, kind: &str, within: Duration) -> Option<serde_json::Value> {
+            let deadline = Instant::now() + within;
+            while Instant::now() < deadline {
+                if let Some(command) = self.command(kind) {
+                    return Some(command);
+                }
+                thread::yield_now();
+            }
+            self.command(kind)
+        }
+    }
+
+    #[cfg(unix)]
+    type Overrides = Arc<
+        dyn Fn(&serde_json::Value, &str) -> Option<Vec<serde_json::Value>> + Send + Sync + 'static,
+    >;
+
+    #[cfg(unix)]
+    fn serve_fake_client(
+        stream: std::os::unix::net::UnixStream,
+        received: Arc<Mutex<Vec<serde_json::Value>>>,
+        overrides: Overrides,
+        session_id: Arc<Mutex<String>>,
+    ) {
+        let mut writer = stream.try_clone().unwrap();
+        let write = |writer: &mut std::os::unix::net::UnixStream, value: &serde_json::Value| {
+            let _ = writeln!(writer, "{value}");
+            let _ = writer.flush();
+        };
+
+        // The daemon greets before the client says anything.
+        write(&mut writer, &fake_hello());
+
+        let mut reader = BufReader::new(stream);
+        let mut line = String::new();
+        loop {
+            line.clear();
+            match reader.read_line(&mut line) {
+                Ok(0) | Err(_) => break,
+                Ok(_) => {}
+            }
+            let Ok(envelope) = serde_json::from_str::<serde_json::Value>(line.trim()) else {
+                continue;
+            };
+            let id = envelope["id"].as_str().unwrap_or_default().to_string();
+            let command = envelope
+                .get("command")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            received.lock().unwrap().push(command.clone());
+
+            let kind = command["type"].as_str().unwrap_or_default();
+            let lines = overrides(&command, &id).unwrap_or_else(|| {
+                let current = session_id.lock().unwrap().clone();
+                match kind {
+                    "create" => vec![ok(
+                        &id,
+                        kind,
+                        serde_json::json!({ "activeSessionId": FAKE_ACTIVE_SESSION_ID }),
+                    )],
+                    "attach" => vec![ok(
+                        &id,
+                        kind,
+                        serde_json::json!({
+                            "activeSessionId": FAKE_ACTIVE_SESSION_ID,
+                            "snapshot": {
+                                "activeSessionId": FAKE_ACTIVE_SESSION_ID,
+                                "messages": [],
+                                "lastEventSequence": 0
+                            }
+                        }),
+                    )],
+                    "get_state" => vec![ok(&id, kind, fake_state(&current))],
+                    _ => vec![ok(&id, kind, serde_json::Value::Null)],
+                }
+            });
+            for value in lines {
+                write(&mut writer, &value);
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    fn fake_hello() -> serde_json::Value {
+        serde_json::json!({
+            "type": "daemon_hello",
+            "socketPath": "/fake/daemon.sock",
+            "protocol": { "name": DAEMON_PROTOCOL_NAME, "version": DAEMON_PROTOCOL_VERSION },
+            "schemaId": "protocol-7-schema-13-816309b1cd50",
+            "appVersion": "0.7.1",
+            "clientId": "fake-client",
+            "serverCapabilities": ["attach_snapshot", "event_sequence", "slim_attach"],
+        })
+    }
+
+    #[cfg(unix)]
+    fn fake_state(session_id: &str) -> serde_json::Value {
+        serde_json::json!({
+            "activeSessionId": FAKE_ACTIVE_SESSION_ID,
+            "sessionId": session_id,
+            "isStreaming": false,
+            "model": { "provider": "anthropic", "id": "claude-x", "name": "Claude X" },
+        })
+    }
+
+    #[cfg(unix)]
+    fn ok(id: &str, command: &str, data: serde_json::Value) -> serde_json::Value {
+        serde_json::json!({
+            "type": "response", "id": id, "command": command, "success": true, "data": data
+        })
+    }
+
+    #[cfg(unix)]
+    fn failed(id: &str, command: &str, error: &str) -> serde_json::Value {
+        serde_json::json!({
+            "type": "response", "id": id, "command": command, "success": false, "error": error
+        })
+    }
+
+    /// Wrap an agent event the way the daemon does. The inner object is the
+    /// shape RPC mode emitted, pinned from a live 0.7.1 capture.
+    #[cfg(unix)]
+    fn session_event(event: serde_json::Value) -> serde_json::Value {
+        serde_json::json!({
+            "type": "session_event",
+            "activeSessionId": FAKE_ACTIVE_SESSION_ID,
+            "event": event,
+            "meta": {
+                "id": "daemon-1:1",
+                "protocol": { "name": DAEMON_PROTOCOL_NAME, "version": DAEMON_PROTOCOL_VERSION },
+                "activeSessionId": FAKE_ACTIVE_SESSION_ID,
+                "sequence": 1,
+                "emittedAt": "2026-08-15T00:00:00.000Z",
+            },
+        })
+    }
+
+    #[cfg(unix)]
+    fn text_delta(text: &str) -> serde_json::Value {
+        serde_json::json!({
+            "type": "message_update",
+            "assistantMessageEvent": { "type": "text_delta", "delta": text }
+        })
+    }
+
+    #[cfg(unix)]
+    fn connect_host(vault: &Path) -> Result<String, String> {
+        ensure_host(&vault.to_string_lossy())
+    }
+
+    #[cfg(unix)]
+    fn prompt_request(vault: &Path, new_session: bool) -> PrimePromptRequest {
+        PrimePromptRequest {
+            message: "hi".into(),
+            system_prompt: None,
+            vault_path: vault.to_string_lossy().into_owned(),
+            event_name: None,
+            provider: None,
+            model_id: None,
+            new_session,
+        }
+    }
+
+    // ── Handshake ───────────────────────────────────────────────────────────
+
+    /// The order is the contract: read the greeting, create a session, attach
+    /// to it, then read state. Attaching before the daemon has greeted, or
+    /// issuing a session command before attaching, is how a client gets
+    /// rejected in ways that look like an unreachable service.
+    #[cfg(unix)]
+    #[test]
+    fn connecting_greets_creates_attaches_then_reads_state() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+
+        let session_id = connect_host(vault.path()).unwrap();
+
+        assert_eq!(session_id, "sess-a");
+        assert_eq!(daemon.commands(), vec!["create", "attach", "get_state"]);
+        let _ = shutdown_host();
+    }
+
+    /// `create` carries cwd inside `config`. Prime's create command has no
+    /// top-level `cwd` field, so sending it there is accepted and ignored —
+    /// and the session silently lands in the daemon's own directory, which is
+    /// how the vault tools would start reading the wrong tree.
+    #[cfg(unix)]
+    #[test]
+    fn create_sends_the_vault_path_as_the_session_cwd() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+
+        connect_host(vault.path()).unwrap();
+
+        let create = daemon.command("create").expect("create was sent");
+        assert_eq!(
+            create["config"]["cwd"].as_str(),
+            Some(vault.path().to_string_lossy().as_ref()),
+            "cwd must ride inside config: {create}"
+        );
+        // Outliving this client is the property ADR-0163 exists for; it should
+        // be asked for rather than inherited from a default.
+        assert_eq!(create["lifecycle"].as_str(), Some("resident"));
+        let _ = shutdown_host();
+    }
+
+    /// Every session-scoped command carries the daemon's session handle. A
+    /// command sent without it is rejected by the daemon, which would surface
+    /// as an inexplicable failure of a feature that used to work.
+    #[cfg(unix)]
+    #[test]
+    fn session_commands_carry_the_daemon_session_handle() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let _ = get_session_stats();
+
+        let stats = daemon
+            .command("get_session_stats")
+            .expect("get_session_stats was sent");
+        assert_eq!(
+            stats["activeSessionId"].as_str(),
+            Some(FAKE_ACTIVE_SESSION_ID)
+        );
+        let _ = shutdown_host();
+    }
+
+    /// The whole of ADR-0163 in one assertion. Rhizome does not own Prime, so
+    /// closing the connection must detach and leave the session running. A
+    /// `kill` here would destroy the user's work on window close.
+    #[cfg(unix)]
+    #[test]
+    fn shutdown_detaches_and_never_kills_the_session() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        assert!(shutdown_host().unwrap(), "shutdown reports it took a host");
+
+        let detach = daemon.wait_for_command("detach", Duration::from_secs(5));
+        assert!(
+            detach.is_some(),
+            "closing must detach: {:?}",
+            daemon.commands()
+        );
+        assert_eq!(
+            detach.unwrap()["activeSessionId"].as_str(),
+            Some(FAKE_ACTIVE_SESSION_ID),
+            "detach names the session it is releasing"
+        );
+        let commands = daemon.commands();
+        assert!(
+            !commands.iter().any(|c| c == "kill" || c == "shutdown"),
+            "closing must not stop the session or the daemon: {commands:?}"
+        );
+    }
+
+    // ── Turns ───────────────────────────────────────────────────────────────
+
+    /// Multi-turn on one connection, with the daemon's `session_event`
+    /// wrapper. If the unwrap were missing every event would be an unknown
+    /// type and the transcript would render empty while the turn "succeeded".
+    #[cfg(unix)]
+    #[test]
+    fn prompt_maps_wrapped_events_and_survives_two_turns() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let turn = Arc::new(AtomicU64::new(0));
+        let daemon = {
+            let turn = Arc::clone(&turn);
+            FakeDaemon::start(move |command, id| {
+                if command["type"].as_str() != Some("prompt") {
+                    return None;
+                }
+                let n = turn.fetch_add(1, Ordering::SeqCst) + 1;
+                Some(vec![
+                    ok(id, "prompt", serde_json::Value::Null),
+                    session_event(serde_json::json!({ "type": "agent_start" })),
+                    session_event(text_delta(&format!("turn-{n}"))),
+                    session_event(serde_json::json!({
+                        "type": "tool_execution_start",
+                        "toolCallId": format!("t{n}"),
+                        "toolName": "read",
+                        "args": { "path": "a.md" }
+                    })),
+                    session_event(serde_json::json!({
+                        "type": "tool_execution_end",
+                        "toolCallId": format!("t{n}"),
+                        "result": "ok"
+                    })),
+                    session_event(serde_json::json!({ "type": "agent_end", "messages": [] })),
+                ])
+            })
+        };
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let mut events = Vec::new();
+        let session =
+            run_prompt_stream(prompt_request(vault.path(), false), |e| events.push(e)).unwrap();
+
+        assert_eq!(session, "sess-a");
         assert!(
             events
                 .iter()
@@ -1330,32 +1903,442 @@ for line in sys.stdin:
         ));
         assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
 
-        // Second turn on the SAME process — multi-turn is the whole point.
+        // Second turn on the SAME connection — multi-turn is the whole point.
         let mut events2 = Vec::new();
-        let session2 = run_prompt_stream(
-            PrimePromptRequest {
-                message: "again".into(),
-                system_prompt: None,
-                vault_path: vault.path().to_string_lossy().into_owned(),
-                event_name: None,
-                provider: None,
-                model_id: None,
-                new_session: false,
-            },
-            |event| events2.push(event),
-        )
-        .unwrap();
-        assert_eq!(session2, "sess-1");
-        assert!(events2
-            .iter()
-            .any(|e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "turn-2")));
-
-        // new_session flips id
-        let sid = new_session().unwrap();
-        assert_eq!(sid, "sess-2");
+        run_prompt_stream(prompt_request(vault.path(), false), |e| events2.push(e)).unwrap();
+        assert!(
+            events2
+                .iter()
+                .any(|e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "turn-2")),
+            "events={events2:?}"
+        );
+        // One connection, not one per turn.
+        assert_eq!(
+            daemon
+                .commands()
+                .iter()
+                .filter(|c| c.as_str() == "create")
+                .count(),
+            1
+        );
 
         let _ = shutdown_host();
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn prompt_rejected_by_the_daemon_emits_error_then_done_and_clears_streaming() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| {
+            (command["type"].as_str() == Some("prompt"))
+                .then(|| vec![failed(id, "prompt", "model is rate limited")])
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let mut events = Vec::new();
+        run_prompt_stream(prompt_request(vault.path(), false), |e| events.push(e)).unwrap();
+
+        assert!(
+            events.iter().any(
+                |e| matches!(e, AiAgentStreamEvent::Error { message } if message.contains("rate limited"))
+            ),
+            "daemon error must reach the user verbatim: {events:?}"
+        );
+        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
+        // A failed prompt must not leave the host wedged as "streaming",
+        // or the composer stays disabled with no turn in flight.
+        assert!(!get_status().is_streaming);
+
+        let _ = shutdown_host();
+    }
+
+    /// `new_session` keeps the daemon handle and mints a fresh Prime session
+    /// id behind it — verified against 0.7.1. The Init the UI rehydrates from
+    /// must carry the new id, and must be emitted exactly once.
+    #[cfg(unix)]
+    #[test]
+    fn new_session_emits_one_init_with_the_refreshed_id() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let fresh = Arc::new(AtomicBool::new(false));
+        let daemon = {
+            let fresh = Arc::clone(&fresh);
+            FakeDaemon::start(move |command, id| match command["type"].as_str() {
+                Some("new_session") => {
+                    fresh.store(true, Ordering::SeqCst);
+                    Some(vec![ok(
+                        id,
+                        "new_session",
+                        serde_json::json!({ "cancelled": false }),
+                    )])
+                }
+                Some("get_state") => {
+                    let session = if fresh.load(Ordering::SeqCst) {
+                        "sess-fresh"
+                    } else {
+                        "sess-a"
+                    };
+                    Some(vec![ok(id, "get_state", fake_state(session))])
+                }
+                Some("prompt") => Some(vec![
+                    ok(id, "prompt", serde_json::Value::Null),
+                    session_event(serde_json::json!({ "type": "agent_end", "messages": [] })),
+                ]),
+                _ => None,
+            })
+        };
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let mut events = Vec::new();
+        let session =
+            run_prompt_stream(prompt_request(vault.path(), true), |e| events.push(e)).unwrap();
+
+        assert_eq!(session, "sess-fresh");
+        let inits: Vec<&AiAgentStreamEvent> = events
+            .iter()
+            .filter(|e| matches!(e, AiAgentStreamEvent::Init { .. }))
+            .collect();
+        assert!(
+            matches!(inits.first(), Some(AiAgentStreamEvent::Init { session_id }) if session_id == "sess-fresh"),
+            "{events:?}"
+        );
+        // Exactly one Init — the post-turn refresh must not re-announce the
+        // same session the new_session branch already emitted.
+        assert_eq!(inits.len(), 1, "duplicate Init: {events:?}");
+
+        // The daemon handle survives new_session; only Prime's id changes.
+        let new_session_command = daemon.command("new_session").unwrap();
+        assert_eq!(
+            new_session_command["activeSessionId"].as_str(),
+            Some(FAKE_ACTIVE_SESSION_ID)
+        );
+
+        let _ = shutdown_host();
+    }
+
+    /// Rhizome does not claim the `extension_ui` capability, so the daemon
+    /// should never route one here. If one arrives anyway the turn must not
+    /// hang on a prompt this app has no surface to answer.
+    #[cfg(unix)]
+    #[test]
+    fn an_unexpected_extension_ui_request_is_cancelled_so_the_turn_finishes() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        // The daemon only finishes the turn AFTER it sees the cancel, so the
+        // turn completing at all proves the reply round-tripped.
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("prompt") => Some(vec![
+                ok(id, "prompt", serde_json::Value::Null),
+                session_event(serde_json::json!({
+                    "type": "extension_ui_request",
+                    "requestId": "ui-1",
+                    "prompt": "ok?"
+                })),
+            ]),
+            Some("extension_ui_response") => Some(vec![
+                session_event(text_delta("after-cancel")),
+                session_event(serde_json::json!({ "type": "agent_end", "messages": [] })),
+            ]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let mut events = Vec::new();
+        run_prompt_stream(prompt_request(vault.path(), false), |e| events.push(e)).unwrap();
+
+        assert!(
+            events.iter().any(
+                |e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "after-cancel")
+            ),
+            "turn must proceed past the extension UI request: {events:?}"
+        );
+        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
+        let cancel = daemon.command("extension_ui_response").unwrap();
+        assert_eq!(cancel["requestId"].as_str(), Some("ui-1"));
+        assert_eq!(cancel["response"]["cancelled"], true);
+
+        let _ = shutdown_host();
+    }
+
+    // ── Status and harness reads ────────────────────────────────────────────
+
+    #[cfg(unix)]
+    #[test]
+    fn status_surfaces_session_and_model_metadata_while_connected() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let status = get_status();
+        assert!(status.running);
+        assert_eq!(status.session_id.as_deref(), Some("sess-a"));
+        assert_eq!(status.model_provider.as_deref(), Some("anthropic"));
+        assert_eq!(status.model_id.as_deref(), Some("claude-x"));
+        assert_eq!(status.model_name.as_deref(), Some("Claude X"));
+
+        assert!(shutdown_host().unwrap(), "shutdown reports it took a host");
+        assert!(!get_status().running);
+        assert!(
+            !shutdown_host().unwrap(),
+            "second shutdown is a no-op, not an error"
+        );
+    }
+
+    /// The RPC host asked for `list_heartbeats` / `list_schedules`. The daemon
+    /// answers `Unknown daemon command` to both, and `agent_activity` degrades
+    /// a failed sub-request to empty — so the wrong names would have emptied
+    /// the band in silence rather than failing loudly.
+    #[cfg(unix)]
+    #[test]
+    fn agent_activity_asks_for_the_daemon_names_for_scheduled_work() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("heartbeats_list") => Some(vec![ok(
+                id,
+                "heartbeats_list",
+                serde_json::json!({ "heartbeats": [{ "id": "hb-1", "prompt": "check in" }] }),
+            )]),
+            Some("cron_list") => Some(vec![ok(
+                id,
+                "cron_list",
+                serde_json::json!({ "jobs": [{ "id": "job-1", "prompt": "nightly" }] }),
+            )]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let activity = agent_activity().unwrap();
+
+        let asked = daemon.commands();
+        assert!(asked.contains(&"heartbeats_list".to_string()), "{asked:?}");
+        assert!(asked.contains(&"cron_list".to_string()), "{asked:?}");
+        assert!(
+            !asked.iter().any(|c| c.starts_with("list_")),
+            "the RPC spellings are gone: {asked:?}"
+        );
+        assert_eq!(activity.heartbeats.len(), 1);
+        assert_eq!(activity.schedules.len(), 1);
+
+        let _ = shutdown_host();
+    }
+
+    /// A connection that has gone away must be evicted, not left reporting
+    /// `running` — the UI would offer a composer wired to nothing.
+    #[cfg(unix)]
+    #[test]
+    fn abort_reports_false_and_clears_the_slot_when_the_connection_is_gone() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        // Drop the connection out from under the host, as a daemon restart would.
+        {
+            let slot = host_slot();
+            let mut guard = slot.host.lock().unwrap();
+            let host = guard.as_mut().unwrap();
+            host.connected.store(false, Ordering::Relaxed);
+        }
+
+        assert!(!abort_turn().unwrap(), "a lost connection cannot abort");
+        assert!(!get_status().running);
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn abort_returns_false_when_no_host() {
+        let _guard = host_guard();
+        let _ = shutdown_host();
+        assert!(!abort_turn().unwrap());
+    }
+
+    #[test]
+    fn status_reports_not_running_without_host() {
+        let _guard = host_guard();
+        let _ = shutdown_host();
+        let status = get_status();
+        assert!(!status.running);
+        assert!(!status.is_streaming);
+    }
+
+    // ── Socket discovery ────────────────────────────────────────────────────
+
+    /// The env override is the transport's only injection point. Without it
+    /// the tests would drive the developer's own daemon.
+    #[test]
+    fn the_env_override_wins_over_the_default_socket_path() {
+        let _guard = host_guard();
+        std::env::set_var(DAEMON_SOCKET_ENV, "/tmp/fake-prime/daemon.sock");
+        assert_eq!(
+            daemon_socket_path().unwrap(),
+            PathBuf::from("/tmp/fake-prime/daemon.sock")
+        );
+        std::env::remove_var(DAEMON_SOCKET_ENV);
+    }
+
+    /// An empty override is a misconfiguration, not "use the default" — the
+    /// silent fallback would connect somewhere the operator did not ask for.
+    #[test]
+    fn an_empty_env_override_is_an_error_rather_than_a_fallback() {
+        let _guard = host_guard();
+        std::env::set_var(DAEMON_SOCKET_ENV, "");
+        assert!(daemon_socket_path().is_err());
+        std::env::remove_var(DAEMON_SOCKET_ENV);
+    }
+
+    /// Pinned from real `prime-agent status` output. The trailing `*` marks the
+    /// default background service and is display, not path — including it
+    /// would produce a socket that cannot be opened.
+    #[test]
+    fn status_output_yields_the_socket_path_without_its_default_marker() {
+        let stdout = "socket                                   pid    version  status   sessions  uptime\n\
+                      /var/folders/_9/hp/T/prime-agent-501/daemon.sock *  54409  0.7.1    current  0\n\
+                      \n* default background service\n";
+
+        assert_eq!(
+            parse_status_socket_path(stdout),
+            Some(PathBuf::from(
+                "/var/folders/_9/hp/T/prime-agent-501/daemon.sock"
+            ))
+        );
+    }
+
+    #[test]
+    fn status_output_without_a_socket_yields_nothing() {
+        assert_eq!(parse_status_socket_path("no daemon running\n"), None);
+        assert_eq!(parse_status_socket_path(""), None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_default_socket_path_matches_primes_own_layout() {
+        let path = default_daemon_socket_path().expect("a uid on unix");
+
+        assert_eq!(path.file_name().unwrap(), "daemon.sock");
+        let dir = path
+            .parent()
+            .unwrap()
+            .file_name()
+            .unwrap()
+            .to_string_lossy();
+        assert!(
+            dir.starts_with("prime-agent-"),
+            "Prime keys the socket dir by uid: {dir}"
+        );
+        assert!(path.starts_with(std::env::temp_dir()));
+    }
+
+    // ── Line routing ────────────────────────────────────────────────────────
+
+    #[test]
+    fn route_delivers_a_response_to_the_waiting_caller() {
+        let pending: Mutex<HashMap<String, PendingResponse>> = Mutex::new(HashMap::new());
+        let (reply_tx, reply_rx) = mpsc::channel();
+        pending
+            .lock()
+            .unwrap()
+            .insert("rhizome-7".into(), PendingResponse { tx: reply_tx });
+        let (event_tx, event_rx) = mpsc::channel();
+
+        route_daemon_line(
+            serde_json::json!({ "type": "response", "id": "rhizome-7", "success": true }),
+            &pending,
+            &event_tx,
+        );
+
+        let delivered = reply_rx.try_recv().expect("response reached the caller");
+        assert_eq!(delivered["id"], "rhizome-7");
+        // A matched response must NOT also land on the event stream, or the
+        // turn loop would try to interpret a reply as an agent event.
+        assert!(event_rx.try_recv().is_err());
+        // The entry is consumed, so a duplicate id cannot double-deliver.
+        assert!(pending.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn route_forwards_unmatched_and_non_response_lines_as_events() {
+        let pending: Mutex<HashMap<String, PendingResponse>> = Mutex::new(HashMap::new());
+        let (event_tx, event_rx) = mpsc::channel();
+
+        // Response for an id nobody is waiting on — forwarded, not dropped.
+        route_daemon_line(
+            serde_json::json!({ "type": "response", "id": "stale", "success": true }),
+            &pending,
+            &event_tx,
+        );
+        route_daemon_line(
+            serde_json::json!({ "type": "daemon_hello", "clientId": "c1" }),
+            &pending,
+            &event_tx,
+        );
+
+        let first = event_rx.try_recv().expect("stale response forwarded");
+        assert!(matches!(first, OutboundLine::Event(ref v) if v["id"] == "stale"));
+        let second = event_rx.try_recv().expect("hello forwarded");
+        assert!(matches!(second, OutboundLine::Event(ref v) if v["type"] == "daemon_hello"));
+    }
+
+    /// The unwrap that lets `prime_events` survive the transport swap. The
+    /// daemon nests agent activity one level deeper than RPC mode did; without
+    /// this the whole transcript would arrive as an unrecognised event type.
+    #[test]
+    fn route_unwraps_session_events_to_the_shape_prime_events_parses() {
+        let pending: Mutex<HashMap<String, PendingResponse>> = Mutex::new(HashMap::new());
+        let (event_tx, event_rx) = mpsc::channel();
+
+        route_daemon_line(
+            serde_json::json!({
+                "type": "session_event",
+                "activeSessionId": "daemon-1",
+                "event": { "type": "agent_end", "messages": [] },
+                "meta": { "sequence": 12 }
+            }),
+            &pending,
+            &event_tx,
+        );
+
+        let forwarded = event_rx.try_recv().expect("event forwarded");
+        let OutboundLine::Event(value) = forwarded else {
+            panic!("expected an event");
+        };
+        assert_eq!(
+            value["type"], "agent_end",
+            "the turn loop terminates on the inner type, not the wrapper"
+        );
+        assert!(
+            value.get("meta").is_none(),
+            "daemon sequencing metadata is transport detail: {value}"
+        );
+    }
+
+    /// A wrapper with no inner event must not be silently swallowed.
+    #[test]
+    fn route_forwards_a_session_event_wrapper_that_carries_no_event() {
+        let pending: Mutex<HashMap<String, PendingResponse>> = Mutex::new(HashMap::new());
+        let (event_tx, event_rx) = mpsc::channel();
+
+        route_daemon_line(
+            serde_json::json!({ "type": "session_event", "activeSessionId": "d1" }),
+            &pending,
+            &event_tx,
+        );
+
+        let forwarded = event_rx.try_recv().expect("nothing may be dropped");
+        assert!(matches!(forwarded, OutboundLine::Event(ref v) if v["type"] == "session_event"));
+    }
+
+    // ── Pure helpers ────────────────────────────────────────────────────────
 
     /// Steering is the whole point of this slice: redirect a running turn
     /// without throwing its work away. `abort` was the only interrupt before.
@@ -1473,37 +2456,48 @@ for line in sys.stdin:
     #[test]
     fn set_model_updates_status_to_the_model_just_chosen() {
         let _guard = host_guard();
-        let dir = tempfile::tempdir().unwrap();
         let vault = tempfile::tempdir().unwrap();
-        install_mock_host(
-            dir.path(),
-            vault.path(),
-            &mock_body(
-                r#"
-model = {"provider": "anthropic", "id": "claude-x", "name": "Claude X"}
-def state():
-    return {"sessionId": session_id, "isStreaming": False, "model": model}
-for line in sys.stdin:
-    line = line.strip()
-    if not line: continue
-    cmd = json.loads(line)
-    ty = cmd.get("type")
-    if ty == "get_state":
-        respond(cmd, data=state())
-    elif ty == "set_model":
-        model = {"provider": cmd.get("provider"), "id": cmd.get("modelId"), "name": cmd.get("modelId")}
-        respond(cmd)
-    else:
-        respond(cmd)
-"#,
-            ),
-        );
+        let chosen: Arc<Mutex<Option<(String, String)>>> = Arc::new(Mutex::new(None));
+        let daemon = {
+            let chosen = Arc::clone(&chosen);
+            FakeDaemon::start(move |command, id| match command["type"].as_str() {
+                Some("set_model") => {
+                    *chosen.lock().unwrap() = Some((
+                        command["provider"].as_str().unwrap_or_default().to_string(),
+                        command["modelId"].as_str().unwrap_or_default().to_string(),
+                    ));
+                    Some(vec![ok(id, "set_model", serde_json::Value::Null)])
+                }
+                Some("get_state") => {
+                    let model = match chosen.lock().unwrap().clone() {
+                        Some((provider, model_id)) => serde_json::json!({
+                            "provider": provider, "id": model_id, "name": model_id
+                        }),
+                        None => serde_json::json!({
+                            "provider": "anthropic", "id": "claude-x", "name": "Claude X"
+                        }),
+                    };
+                    Some(vec![ok(
+                        id,
+                        "get_state",
+                        serde_json::json!({
+                            "sessionId": "sess-a", "isStreaming": false, "model": model
+                        }),
+                    )])
+                }
+                _ => None,
+            })
+        };
+        daemon.install();
+        connect_host(vault.path()).unwrap();
 
         assert_eq!(get_status().model_id.as_deref(), Some("claude-x"));
         set_model("xai", "grok-4.5").unwrap();
         let status = get_status();
         assert_eq!(status.model_provider.as_deref(), Some("xai"));
         assert_eq!(status.model_id.as_deref(), Some("grok-4.5"));
+
+        let _ = shutdown_host();
     }
 
     #[test]
@@ -1603,14 +2597,6 @@ for line in sys.stdin:
         assert_eq!(stats.session_id, None);
     }
 
-    #[cfg(unix)]
-    #[test]
-    fn abort_returns_false_when_no_host() {
-        let _guard = host_guard();
-        let _ = shutdown_host();
-        assert!(!abort_turn().unwrap());
-    }
-
     #[test]
     fn next_id_is_unique() {
         let a = next_id();
@@ -1618,21 +2604,6 @@ for line in sys.stdin:
         assert_ne!(a, b);
         assert!(a.starts_with("rhizome-"));
     }
-
-    #[test]
-    fn status_reports_not_running_without_host() {
-        let _guard = host_guard();
-        let _ = shutdown_host();
-        let status = get_status();
-        assert!(!status.running);
-        assert!(!status.is_streaming);
-    }
-
-    // Silence unused import warning on non-unix where mock isn't compiled.
-    #[allow(dead_code)]
-    static _KEEP: AtomicBool = AtomicBool::new(false);
-
-    // ── Pure helpers (no child process) ─────────────────────────────────────
 
     #[test]
     fn normalize_cwd_falls_back_to_home_for_blank_paths() {
@@ -1660,59 +2631,92 @@ for line in sys.stdin:
         assert_eq!(response_error(&message_only, "prompt"), "softer");
 
         // Neither field: the command name must survive so the caller can tell
-        // which RPC failed, not just that something did.
+        // which command failed, not just that something did.
         let neither = serde_json::json!({ "success": false });
         let fallback = response_error(&neither, "set_model");
         assert!(fallback.contains("set_model"), "{fallback}");
     }
 
+    // ── Live ────────────────────────────────────────────────────────────────
+
+    /// Drive a real Prime daemon end to end.
+    ///
+    /// ```sh
+    /// cargo test --lib prime_session_host::tests::live_daemon -- --ignored --nocapture
+    /// ```
+    ///
+    /// Ignored by default because it needs `prime-agent daemon` running and
+    /// spends real tokens. It exists because this repo has shipped code that
+    /// passed every test and was unreachable in the app: a fake socket proves
+    /// the framing, and only the real daemon proves the framing was right.
+    #[cfg(unix)]
     #[test]
-    fn route_stdout_line_delivers_response_to_the_waiting_caller() {
-        let pending: Mutex<HashMap<String, PendingResponse>> = Mutex::new(HashMap::new());
-        let (reply_tx, reply_rx) = mpsc::channel();
-        pending
-            .lock()
-            .unwrap()
-            .insert("rhizome-7".into(), PendingResponse { tx: reply_tx });
-        let (event_tx, event_rx) = mpsc::channel();
+    #[ignore = "requires a running prime-agent daemon (see `prime-agent status`)"]
+    fn live_daemon_round_trip() {
+        let _guard = host_guard();
+        // Use the real socket, not whatever a sibling test last pointed at.
+        std::env::remove_var(DAEMON_SOCKET_ENV);
+        let vault = tempfile::tempdir().unwrap();
 
-        route_stdout_line(
-            serde_json::json!({ "type": "response", "id": "rhizome-7", "success": true }),
-            &pending,
-            &event_tx,
+        let socket = daemon_socket_path().expect("a reachable daemon");
+        println!("socket: {}", socket.display());
+
+        let session_id = ensure_host(&vault.path().to_string_lossy()).expect("connect + attach");
+        println!("session: {session_id}");
+        assert!(!session_id.is_empty(), "a live session must report an id");
+
+        let mut events = Vec::new();
+        run_prompt_stream(
+            PrimePromptRequest {
+                message: "Reply with exactly the word: pong".into(),
+                system_prompt: None,
+                vault_path: vault.path().to_string_lossy().into_owned(),
+                event_name: None,
+                provider: None,
+                model_id: None,
+                new_session: false,
+            },
+            |event| events.push(event),
+        )
+        .expect("a live turn");
+
+        let text: String = events
+            .iter()
+            .filter_map(|event| match event {
+                AiAgentStreamEvent::TextDelta { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        println!("assistant: {text:?}");
+        assert!(
+            !text.trim().is_empty(),
+            "a live turn must stream text: {events:?}"
         );
+        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
 
-        let delivered = reply_rx.try_recv().expect("response reached the caller");
-        assert_eq!(delivered["id"], "rhizome-7");
-        // A matched response must NOT also land on the event stream, or the
-        // turn loop would try to interpret an RPC reply as an agent event.
-        assert!(event_rx.try_recv().is_err());
-        // The entry is consumed, so a duplicate id cannot double-deliver.
-        assert!(pending.lock().unwrap().is_empty());
-    }
-
-    #[test]
-    fn route_stdout_line_forwards_unmatched_and_non_response_lines_as_events() {
-        let pending: Mutex<HashMap<String, PendingResponse>> = Mutex::new(HashMap::new());
-        let (event_tx, event_rx) = mpsc::channel();
-
-        // Response for an id nobody is waiting on — forwarded, not dropped.
-        route_stdout_line(
-            serde_json::json!({ "type": "response", "id": "stale", "success": true }),
-            &pending,
-            &event_tx,
+        // The reads the UI depends on, against real payloads.
+        let stats = get_session_stats().expect("live stats");
+        println!("stats: {stats:?}");
+        assert!(
+            stats.context_window.unwrap_or(0) > 0,
+            "a live session knows its context window: {stats:?}"
         );
-        // Ordinary agent event.
-        route_stdout_line(
-            serde_json::json!({ "type": "agent_end" }),
-            &pending,
-            &event_tx,
+        let messages = get_messages().expect("live messages");
+        assert!(
+            messages.len() >= 2,
+            "the turn above is history now: {messages:?}"
         );
+        assert!(get_status().running);
 
-        let first = event_rx.try_recv().expect("stale response forwarded");
-        assert!(matches!(first, OutboundLine::Event(ref v) if v["id"] == "stale"));
-        let second = event_rx.try_recv().expect("agent event forwarded");
-        assert!(matches!(second, OutboundLine::Event(ref v) if v["type"] == "agent_end"));
+        // Detach, then reconnect: the daemon outlives this client, which is
+        // the property the whole transport change exists for.
+        assert!(shutdown_host().unwrap());
+        assert!(!get_status().running);
+        let reconnected = ensure_host(&vault.path().to_string_lossy())
+            .expect("the daemon is still there after we let go of it");
+        println!("reconnected session: {reconnected}");
+        assert!(!reconnected.is_empty());
+        let _ = shutdown_host();
     }
 
     #[test]
@@ -1721,268 +2725,5 @@ for line in sys.stdin:
         let unique: std::collections::HashSet<&String> = ids.iter().collect();
         assert_eq!(unique.len(), ids.len(), "ids must not repeat: {ids:?}");
         assert!(ids.iter().all(|id| id.starts_with("rhizome-")));
-    }
-
-    // ── Turn-level failure paths (mock RPC child) ───────────────────────────
-
-    #[cfg(unix)]
-    fn install_mock_host(dir: &Path, vault: &Path, body: &str) {
-        let binary = mock_rpc_script(dir, body);
-        let host = PrimeHost::spawn(binary, vault.to_path_buf()).unwrap();
-        let slot = host_slot();
-        let mut guard = slot.host.lock().unwrap();
-        *guard = Some(host);
-    }
-
-    #[cfg(unix)]
-    fn prompt_request(vault: &Path, new_session: bool) -> PrimePromptRequest {
-        PrimePromptRequest {
-            message: "hi".into(),
-            system_prompt: None,
-            vault_path: vault.to_string_lossy().into_owned(),
-            event_name: None,
-            provider: None,
-            model_id: None,
-            new_session,
-        }
-    }
-
-    /// The mock's shared preamble: respond/emit helpers plus a get_state that
-    /// reports a session id and a model, so status has something to surface.
-    #[cfg(unix)]
-    const MOCK_PREAMBLE: &str = r#"
-session_id = "sess-a"
-def respond(cmd, ok=True, **extra):
-    out = {"type": "response", "command": cmd.get("type"), "success": ok, "id": cmd.get("id")}
-    out.update(extra)
-    sys.stdout.write(json.dumps(out) + "\n"); sys.stdout.flush()
-def emit(obj):
-    sys.stdout.write(json.dumps(obj) + "\n"); sys.stdout.flush()
-def state():
-    return {"sessionId": session_id, "isStreaming": False,
-            "model": {"provider": "anthropic", "id": "claude-x", "name": "Claude X"}}
-"#;
-
-    /// Concatenate preamble + body. `body` is a runtime value, so its braces
-    /// are never parsed as format placeholders.
-    #[cfg(unix)]
-    fn mock_body(body: &str) -> String {
-        format!("{MOCK_PREAMBLE}{body}")
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn prompt_rejected_by_host_emits_error_then_done_and_clears_streaming() {
-        let _guard = host_guard();
-        let dir = tempfile::tempdir().unwrap();
-        let vault = tempfile::tempdir().unwrap();
-        install_mock_host(
-            dir.path(),
-            vault.path(),
-            &mock_body(
-                r#"
-for line in sys.stdin:
-    line = line.strip()
-    if not line: continue
-    cmd = json.loads(line)
-    if cmd.get("type") == "get_state":
-        respond(cmd, data=state())
-    elif cmd.get("type") == "prompt":
-        respond(cmd, ok=False, error="model is rate limited")
-    else:
-        respond(cmd)
-"#,
-            ),
-        );
-
-        let mut events = Vec::new();
-        run_prompt_stream(prompt_request(vault.path(), false), |e| events.push(e)).unwrap();
-
-        assert!(
-            events.iter().any(
-                |e| matches!(e, AiAgentStreamEvent::Error { message } if message.contains("rate limited"))
-            ),
-            "host error must reach the user verbatim: {events:?}"
-        );
-        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
-        // A failed prompt must not leave the host wedged as "streaming",
-        // or the composer stays disabled with no turn in flight.
-        assert!(!get_status().is_streaming);
-
-        let _ = shutdown_host();
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn new_session_request_emits_init_with_the_refreshed_id() {
-        let _guard = host_guard();
-        let dir = tempfile::tempdir().unwrap();
-        let vault = tempfile::tempdir().unwrap();
-        install_mock_host(
-            dir.path(),
-            vault.path(),
-            &mock_body(
-                r#"
-for line in sys.stdin:
-    line = line.strip()
-    if not line: continue
-    cmd = json.loads(line)
-    ty = cmd.get("type")
-    if ty == "get_state":
-        respond(cmd, data=state())
-    elif ty == "new_session":
-        session_id = "sess-fresh"
-        respond(cmd)
-    elif ty == "prompt":
-        respond(cmd)
-        emit({"type": "agent_end", "messages": []})
-    else:
-        respond(cmd)
-"#,
-            ),
-        );
-
-        let mut events = Vec::new();
-        let session =
-            run_prompt_stream(prompt_request(vault.path(), true), |e| events.push(e)).unwrap();
-
-        assert_eq!(session, "sess-fresh");
-        let inits: Vec<&AiAgentStreamEvent> = events
-            .iter()
-            .filter(|e| matches!(e, AiAgentStreamEvent::Init { .. }))
-            .collect();
-        assert!(
-            matches!(inits.first(), Some(AiAgentStreamEvent::Init { session_id }) if session_id == "sess-fresh"),
-            "{events:?}"
-        );
-        // Exactly one Init — the post-turn refresh must not re-announce the
-        // same session the new_session branch already emitted.
-        assert_eq!(inits.len(), 1, "duplicate Init: {events:?}");
-
-        let _ = shutdown_host();
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn extension_ui_request_is_auto_cancelled_so_the_turn_can_finish() {
-        let _guard = host_guard();
-        let dir = tempfile::tempdir().unwrap();
-        let vault = tempfile::tempdir().unwrap();
-        // The child only emits agent_end AFTER it receives our cancel reply,
-        // so the turn completing at all proves the auto-cancel round-tripped.
-        install_mock_host(
-            dir.path(),
-            vault.path(),
-            &mock_body(
-                r#"
-for line in sys.stdin:
-    line = line.strip()
-    if not line: continue
-    cmd = json.loads(line)
-    ty = cmd.get("type")
-    if ty == "get_state":
-        respond(cmd, data=state())
-    elif ty == "prompt":
-        respond(cmd)
-        emit({"type": "extension_ui_confirm", "id": "ui-1", "prompt": "ok?"})
-    elif ty == "response" and cmd.get("id") == "ui-1":
-        emit({"type": "message_update",
-              "assistantMessageEvent": {"type": "text_delta", "delta": "after-cancel"}})
-        emit({"type": "agent_end", "messages": []})
-    else:
-        respond(cmd)
-"#,
-            ),
-        );
-
-        let mut events = Vec::new();
-        run_prompt_stream(prompt_request(vault.path(), false), |e| events.push(e)).unwrap();
-
-        assert!(
-            events.iter().any(
-                |e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "after-cancel")
-            ),
-            "turn must proceed past the extension UI request: {events:?}"
-        );
-        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
-
-        let _ = shutdown_host();
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn status_surfaces_session_and_model_metadata_while_a_host_runs() {
-        let _guard = host_guard();
-        let dir = tempfile::tempdir().unwrap();
-        let vault = tempfile::tempdir().unwrap();
-        install_mock_host(
-            dir.path(),
-            vault.path(),
-            &mock_body(
-                r#"
-for line in sys.stdin:
-    line = line.strip()
-    if not line: continue
-    cmd = json.loads(line)
-    if cmd.get("type") == "get_state":
-        respond(cmd, data=state())
-    else:
-        respond(cmd)
-"#,
-            ),
-        );
-
-        let status = get_status();
-        assert!(status.running);
-        assert_eq!(status.session_id.as_deref(), Some("sess-a"));
-        assert_eq!(status.model_provider.as_deref(), Some("anthropic"));
-        assert_eq!(status.model_id.as_deref(), Some("claude-x"));
-        assert_eq!(status.model_name.as_deref(), Some("Claude X"));
-
-        assert!(shutdown_host().unwrap(), "shutdown reports it took a host");
-        assert!(!get_status().running);
-        assert!(
-            !shutdown_host().unwrap(),
-            "second shutdown is a no-op, not an error"
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn abort_reports_false_and_clears_the_slot_when_the_child_is_gone() {
-        let _guard = host_guard();
-        let dir = tempfile::tempdir().unwrap();
-        let vault = tempfile::tempdir().unwrap();
-        install_mock_host(
-            dir.path(),
-            vault.path(),
-            &mock_body(
-                r#"
-for line in sys.stdin:
-    line = line.strip()
-    if not line: continue
-    cmd = json.loads(line)
-    if cmd.get("type") == "get_state":
-        respond(cmd, data=state())
-    else:
-        respond(cmd)
-"#,
-            ),
-        );
-
-        // Kill the child out from under the host, as a crash would.
-        {
-            let slot = host_slot();
-            let mut guard = slot.host.lock().unwrap();
-            let host = guard.as_mut().unwrap();
-            let _ = host.child.kill();
-            let _ = host.child.wait();
-        }
-
-        assert!(!abort_turn().unwrap(), "dead host cannot abort a turn");
-        // The dead host must be evicted, not left behind reporting `running`.
-        assert!(!get_status().running);
-
-        let _ = shutdown_host();
     }
 }
