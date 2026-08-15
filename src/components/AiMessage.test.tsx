@@ -155,6 +155,9 @@ describe('AiMessage', () => {
         userMessage="Ask"
         actions={[]}
         messageId="message-1"
+        // Hosts always supply this: the workspace passes the local id, ChatHome
+        // passes Prime's entry id. Fork is disabled without it on purpose.
+        forkTargetId="message-1"
         response="Done"
         onFork={onFork}
         onPromoteToVault={onPromoteToVault}
@@ -268,5 +271,37 @@ describe('AiMessage', () => {
     // Collapse first card
     fireEvent.click(headers[0])
     expect(screen.getAllByTestId('action-card-details')).toHaveLength(1)
+  })
+
+  describe('fork', () => {
+    const props = { userMessage: 'q', response: 'a', actions: [] }
+
+    /**
+     * ChatHome forks the Prime session, which addresses entries by Prime's own
+     * id. Only replayed turns carry one, so a live turn must not offer a
+     * button that can only fail.
+     */
+    it('is disabled when there is no id to branch from', () => {
+      render(<AiMessage {...props} messageId="local-1" onFork={vi.fn()} />)
+
+      expect(screen.getByTestId('ai-message-fork')).toBeDisabled()
+    })
+
+    it('branches from the id its host chose, not the local message id', () => {
+      const onFork = vi.fn()
+      render(
+        <AiMessage {...props} messageId="local-1" forkTargetId="entry-7" onFork={onFork} />,
+      )
+
+      fireEvent.click(screen.getByTestId('ai-message-fork'))
+
+      expect(onFork).toHaveBeenCalledWith('entry-7')
+    })
+
+    it('stays disabled when the host offers no fork handler at all', () => {
+      render(<AiMessage {...props} forkTargetId="entry-7" />)
+
+      expect(screen.getByTestId('ai-message-fork')).toBeDisabled()
+    })
   })
 })

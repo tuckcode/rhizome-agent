@@ -24,6 +24,8 @@ export interface AiMessageProps {
   localMarker?: string
   locale?: AppLocale
   messageId?: string
+  /** Entry to fork from; hosts differ, see ResponseActions. */
+  forkTargetId?: string
   reasoning?: string
   reasoningDone?: boolean
   actions: AiAction[]
@@ -237,6 +239,7 @@ function ToolUseBlock({
 function ResponseActions({
   locale,
   messageId,
+  forkTargetId,
   onCopy,
   onFork,
   onPromoteToVault,
@@ -250,9 +253,15 @@ function ResponseActions({
   onPromoteToVault?: () => void
   onRegenerate?: (messageId: string) => void
   promoteDisabled?: boolean
+  /**
+   * What a fork branches from. Hosts differ: the AI workspace copies its own
+   * conversation and uses the local message id, ChatHome branches the Prime
+   * session and needs its entry id — which only replayed turns have.
+   */
+  forkTargetId?: string
 }) {
   const regenerateDisabled = !messageId || !onRegenerate
-  const forkDisabled = !messageId || !onFork
+  const forkDisabled = !forkTargetId || !onFork
   const saveDisabled = promoteDisabled || !onPromoteToVault
 
   return (
@@ -306,7 +315,7 @@ function ResponseActions({
         disabled={forkDisabled}
         aria-label={translate(locale, 'ai.message.fork')}
         title={translate(locale, 'ai.message.fork')}
-        onClick={() => messageId && onFork?.(messageId)}
+        onClick={() => forkTargetId && onFork?.(forkTargetId)}
         data-testid="ai-message-fork"
       >
         {translate(locale, 'ai.message.fork')}
@@ -318,6 +327,7 @@ function ResponseActions({
 function ResponseBlock({
   locale,
   messageId,
+  forkTargetId,
   onFork,
   onNavigateWikilink,
   onPromoteToVault,
@@ -326,6 +336,7 @@ function ResponseBlock({
 }: {
   locale: AppLocale
   messageId?: string
+  forkTargetId?: string
   onFork?: (messageId: string) => void
   onNavigateWikilink?: (target: string) => void
   onPromoteToVault?: (text: string) => void
@@ -351,6 +362,7 @@ function ResponseBlock({
       <ResponseActions
         locale={locale}
         messageId={messageId}
+        forkTargetId={forkTargetId}
         onCopy={handleCopy}
         onFork={onFork}
         onPromoteToVault={onPromoteToVault ? handlePromote : undefined}
@@ -381,7 +393,7 @@ export function AiMessage(props: AiMessageProps) {
   return <ConversationMessage {...props} />
 }
 
-function ConversationMessage({ userMessage, references, locale = 'en', messageId, reasoning, reasoningDone, actions, response, isStreaming, onFork, onOpenNote, onNavigateWikilink, onPromoteToVault, onRegenerate }: AiMessageProps) {
+function ConversationMessage({ userMessage, references, locale = 'en', messageId, forkTargetId, reasoning, reasoningDone, actions, response, isStreaming, onFork, onOpenNote, onNavigateWikilink, onPromoteToVault, onRegenerate }: AiMessageProps) {
   // Manual override: null = follow auto behavior, true/false = user forced
   const [userOverride, setUserOverride] = useState(false)
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())
@@ -427,6 +439,7 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
         <ResponseBlock
           locale={locale}
           messageId={messageId}
+          forkTargetId={forkTargetId}
           text={response}
           onFork={onFork}
           onNavigateWikilink={onNavigateWikilink}

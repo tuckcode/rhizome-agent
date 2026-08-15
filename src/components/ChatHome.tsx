@@ -91,6 +91,7 @@ export default function ChatHome({
           onVaultChanged={onVaultChanged}
           onUnsupportedAiPaste={onUnsupportedAiPaste}
           showHeader={false}
+          forkTargetsPrimeEntry
           newChatRef={newChatRef}
           notePane={
             openNote ? (

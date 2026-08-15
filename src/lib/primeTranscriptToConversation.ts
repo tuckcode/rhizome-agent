@@ -127,7 +127,11 @@ export function primeTranscriptToConversation(items: PrimeTranscriptItem[]): AiA
     const { message } = item
     switch (message.role) {
       case 'user':
-        turns.push({ ...emptyTurn(message.text, item.id ?? `replay-${index++}`) })
+        turns.push({
+          ...emptyTurn(message.text, item.id ?? `replay-${index++}`),
+          // What `fork` branches from. Absent on live turns by necessity.
+          primeEntryId: item.id,
+        })
         break
       case 'assistant': {
         const turn = current()

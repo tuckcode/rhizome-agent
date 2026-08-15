@@ -633,6 +633,15 @@ pub fn read_prime_session_transcript(
     crate::prime_sessions::read_transcript(std::path::Path::new(&path))
 }
 
+/// Branch a new Prime session from a past transcript entry.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn fork_prime_session(
+    entry_id: String,
+) -> Result<crate::prime_session_host::PrimeForkResult, String> {
+    crate::prime_session_host::fork(&entry_id)
+}
+
 /// Every model the live Prime host can switch to.
 #[cfg(desktop)]
 #[tauri::command]
