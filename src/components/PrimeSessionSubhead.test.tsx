@@ -93,7 +93,7 @@ describe('PrimeSessionSubhead', () => {
   it('names the action for a service that is not running', () => {
     render(<PrimeSessionSubhead live={false} problem={{ code: 'service_unreachable' }} />)
 
-    expect(screen.getByText(/prime-agent daemon/)).toBeInTheDocument()
+    expect(screen.getByText(/prime-agent status/)).toBeInTheDocument()
     expect(screen.queryByText('Prime idle')).not.toBeInTheDocument()
   })
 

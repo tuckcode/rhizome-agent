@@ -383,8 +383,7 @@ fn daemon_socket_path() -> Result<PathBuf, String> {
     }
 
     reported_daemon_socket_path().ok_or_else(|| {
-        "Prime's background service is not running. Start it with `prime-agent daemon`, \
-         or check `prime-agent status`."
+        "Prime's background service is not reachable. Check it with `prime-agent status`."
             .to_string()
     })
 }
@@ -1213,7 +1212,12 @@ fn describe_problem(problem: &PrimeConnectionProblem) -> String {
             "Prime is not installed. Install it with `npm i -g prime-agent`.".to_string()
         }
         PrimeConnectionProblem::ServiceUnreachable { .. } => {
-            "Prime's background service is not running. Start it with `prime-agent daemon`."
+            // Not "start it with `prime-agent daemon`": that command does not
+            // exist, and per Prime's own daemon.md the supervisor is internal
+            // infrastructure that starts itself and is restarted by a worker if
+            // it dies. `status` is a real, read-only command that shows whether
+            // it is there.
+            "Prime's background service is not reachable. Check it with `prime-agent status`."
                 .to_string()
         }
         PrimeConnectionProblem::ServiceTooOld {
@@ -1230,6 +1234,115 @@ fn describe_problem(problem: &PrimeConnectionProblem) -> String {
             ),
         },
     }
+}
+
+/// What quitting Rhizome should do with Prime's background service.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "outcome", rename_all = "snake_case")]
+pub enum QuitDisposition {
+    /// Nothing depends on it: stop the service rather than leave it behind.
+    StopService,
+    /// Work is booked to run: leave it, and say so where the user can see it.
+    KeepForScheduledWork { scheduled: usize },
+    /// Somebody else is using it. Not ours to stop.
+    KeepForOtherClients { clients: usize },
+    /// Not connected, so there is nothing to decide.
+    NotConnected,
+}
+
+/// Decide what quitting should do, from what is running.
+///
+/// Pure so the rule is testable without a socket, and so the two guards are
+/// legible next to each other rather than buried in a query.
+///
+/// **Scheduled work wins over tidiness.** A heartbeat or cron job is a promise
+/// that something fires later, and stopping the service breaks it silently —
+/// the spec's "a timer I set means what it says". Schedules are persisted to
+/// `session-artifacts/<id>/scheduled-jobs.json` and survive a restart, so
+/// nothing is *lost* by stopping; it simply never fires, which is worse than
+/// leaving a process running.
+///
+/// **Other clients win too.** `shutdown` stops every agent on the machine, not
+/// Rhizome's share, so a terminal session someone is mid-conversation with
+/// would die with it. Cleaning up after ourselves does not extend to ending
+/// someone else's work.
+fn quit_disposition(scheduled_work: usize, other_attached_clients: usize) -> QuitDisposition {
+    if scheduled_work > 0 {
+        return QuitDisposition::KeepForScheduledWork {
+            scheduled: scheduled_work,
+        };
+    }
+    if other_attached_clients > 0 {
+        return QuitDisposition::KeepForOtherClients {
+            clients: other_attached_clients,
+        };
+    }
+    QuitDisposition::StopService
+}
+
+/// Count clients attached to sessions other than ours.
+fn other_attached_clients(data: &serde_json::Value, ours: &str) -> usize {
+    data["sessions"]
+        .as_array()
+        .map(|sessions| {
+            sessions
+                .iter()
+                .filter(|session| session["activeSessionId"].as_str().unwrap_or_default() != ours)
+                .map(|session| session["attachedClients"].as_u64().unwrap_or(0) as usize)
+                .sum()
+        })
+        .unwrap_or(0)
+}
+
+/// Stop Prime's background service on quit, unless something still needs it.
+///
+/// Returns what it decided so the caller can surface the reason — a service
+/// left running has to be visible, or Rhizome is leaving processes behind with
+/// no explanation.
+pub fn shutdown_daemon_if_idle() -> Result<QuitDisposition, String> {
+    let slot = host_slot();
+    let mut guard = slot.host.lock().map_err(poison)?;
+    let Some(host) = guard.as_mut() else {
+        return Ok(QuitDisposition::NotConnected);
+    };
+    if !host.is_alive() {
+        return Ok(QuitDisposition::NotConnected);
+    }
+
+    // The supervisor merges worker summaries, so these are machine-wide rather
+    // than this session's — which is the right scope for "is anything booked".
+    let scheduled = count_scheduled(host, "heartbeats_list", &["heartbeats"])
+        + count_scheduled(host, "cron_list", &["jobs", "schedules"]);
+
+    let others = host
+        .send_bare_command(serde_json::json!({ "type": "list" }))
+        .ok()
+        .filter(|response| response["success"].as_bool() == Some(true))
+        .and_then(|response| response.get("data").cloned())
+        .map(|data| other_attached_clients(&data, &host.active_session_id))
+        .unwrap_or(0);
+
+    let disposition = quit_disposition(scheduled, others);
+    if disposition == QuitDisposition::StopService {
+        // Best effort: the app is exiting either way, and a service that
+        // outlives a failed shutdown is the safe direction to fail in.
+        let _ = host.send_bare_command(serde_json::json!({ "type": "shutdown" }));
+    }
+    Ok(disposition)
+}
+
+/// How many entries a scheduling command reports, or 0 if it cannot say.
+///
+/// A failed query counts as zero *work*, not as "safe to stop": the caller
+/// pairs it with the other-clients guard, and an unreachable daemon is one we
+/// cannot stop anyway.
+fn count_scheduled(host: &mut PrimeHost, command: &str, keys: &[&str]) -> usize {
+    host.send_command(serde_json::json!({ "type": command }))
+        .ok()
+        .filter(|response| response["success"].as_bool() == Some(true))
+        .and_then(|response| response.get("data").cloned())
+        .map(|data| crate::prime_agent_activity::scheduled_work_from_response(&data, keys).len())
+        .unwrap_or(0)
 }
 
 /// Explain a refused session switch.
@@ -2512,7 +2625,7 @@ mod tests {
         let unreachable = describe_problem(&PrimeConnectionProblem::ServiceUnreachable {
             detail: "connection refused".into(),
         });
-        assert!(unreachable.contains("prime-agent daemon"), "{unreachable}");
+        assert!(unreachable.contains("prime-agent status"), "{unreachable}");
 
         let too_old = describe_problem(&PrimeConnectionProblem::ServiceTooOld {
             installed_version: Some("0.6.4".into()),
@@ -2536,6 +2649,145 @@ mod tests {
         assert!(MINIMUM_PRIME_VERSION
             .chars()
             .all(|c| c.is_ascii_digit() || c == '.'));
+    }
+
+    // ── Quit semantics (#12) ────────────────────────────────────────────────
+
+    /// Nothing booked and nobody else using it: stop the service rather than
+    /// leave a process behind for no reason.
+    #[test]
+    fn quitting_with_nothing_pending_stops_the_service() {
+        assert_eq!(quit_disposition(0, 0), QuitDisposition::StopService);
+    }
+
+    /// A heartbeat or cron job is a promise that something fires later.
+    /// Stopping the service breaks it silently — "a timer I set means what it
+    /// says" is the whole point, and tidiness does not outrank it.
+    #[test]
+    fn scheduled_work_keeps_the_service_alive() {
+        assert_eq!(
+            quit_disposition(1, 0),
+            QuitDisposition::KeepForScheduledWork { scheduled: 1 }
+        );
+        assert_eq!(
+            quit_disposition(3, 2),
+            QuitDisposition::KeepForScheduledWork { scheduled: 3 },
+            "scheduled work is reported even when other clients also hold it"
+        );
+    }
+
+    /// `shutdown` stops every agent on the machine, not Rhizome's share, so a
+    /// terminal session someone is mid-conversation with would die with it.
+    /// Cleaning up after ourselves does not extend to ending someone else's
+    /// work.
+    #[test]
+    fn another_client_using_the_service_keeps_it_alive() {
+        assert_eq!(
+            quit_disposition(0, 1),
+            QuitDisposition::KeepForOtherClients { clients: 1 }
+        );
+    }
+
+    /// Our own attachment must not count as "somebody else is using it", or
+    /// Rhizome could never stop a service it is the only client of.
+    #[test]
+    fn our_own_session_is_not_counted_as_another_client() {
+        let sessions = serde_json::json!({
+            "sessions": [
+                { "activeSessionId": "ours", "attachedClients": 1 },
+                { "activeSessionId": "theirs", "attachedClients": 2 },
+                { "activeSessionId": "nobody", "attachedClients": 0 },
+            ]
+        });
+
+        assert_eq!(other_attached_clients(&sessions, "ours"), 2);
+    }
+
+    #[test]
+    fn a_list_with_nothing_in_it_counts_no_other_clients() {
+        assert_eq!(
+            other_attached_clients(&serde_json::json!({ "sessions": [] }), "ours"),
+            0
+        );
+        assert_eq!(other_attached_clients(&serde_json::Value::Null, "ours"), 0);
+    }
+
+    /// Quitting without a connection has nothing to decide and must not error
+    /// on the way out of the app.
+    #[cfg(unix)]
+    #[test]
+    fn quitting_without_a_connection_is_a_no_op() {
+        let _guard = host_guard();
+        let _ = shutdown_host();
+
+        assert_eq!(
+            shutdown_daemon_if_idle().unwrap(),
+            QuitDisposition::NotConnected
+        );
+    }
+
+    /// End to end at the transport: an idle service is asked to stop.
+    #[cfg(unix)]
+    #[test]
+    fn quitting_an_idle_service_sends_shutdown() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("heartbeats_list") => Some(vec![ok(
+                id,
+                "heartbeats_list",
+                serde_json::json!({ "heartbeats": [] }),
+            )]),
+            Some("cron_list") => Some(vec![ok(id, "cron_list", serde_json::json!({ "jobs": [] }))]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        assert_eq!(
+            shutdown_daemon_if_idle().unwrap(),
+            QuitDisposition::StopService
+        );
+        assert!(
+            daemon
+                .wait_for_command("shutdown", Duration::from_secs(5))
+                .is_some(),
+            "an idle service is stopped: {:?}",
+            daemon.commands()
+        );
+
+        let _ = shutdown_host();
+    }
+
+    /// End to end at the transport: a service with work booked is left alone.
+    #[cfg(unix)]
+    #[test]
+    fn quitting_with_a_heartbeat_booked_leaves_the_service_running() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("heartbeats_list") => Some(vec![ok(
+                id,
+                "heartbeats_list",
+                serde_json::json!({ "heartbeats": [{ "id": "hb-1", "prompt": "check in" }] }),
+            )]),
+            Some("cron_list") => Some(vec![ok(id, "cron_list", serde_json::json!({ "jobs": [] }))]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        assert_eq!(
+            shutdown_daemon_if_idle().unwrap(),
+            QuitDisposition::KeepForScheduledWork { scheduled: 1 }
+        );
+        assert!(
+            !daemon.commands().contains(&"shutdown".to_string()),
+            "booked work must survive quitting: {:?}",
+            daemon.commands()
+        );
+
+        let _ = shutdown_host();
     }
 
     // ── Turns ───────────────────────────────────────────────────────────────
@@ -3590,6 +3842,89 @@ mod tests {
             "a fixed problem must stop being reported"
         );
         let _ = shutdown_host();
+        record_problem(None);
+    }
+
+    /// Quit semantics against **real** Prime daemons, both ways.
+    ///
+    /// ```sh
+    /// RHIZOME_TEST_DAEMON_SOCKET=/tmp/a/t.sock \
+    /// RHIZOME_TEST_DAEMON_SOCKET_2=/tmp/b/t2.sock \
+    ///   cargo test --lib prime_session_host::tests::live_quit -- --ignored --nocapture
+    /// ```
+    ///
+    /// Needs **two** isolated daemons, each started on its own socket
+    /// (`prime-agent --mode daemon --daemon-socket <path>`), because the idle
+    /// case really does call `shutdown` — which stops every agent on the
+    /// machine and would take the developer's own background service with it.
+    /// Proving a destructive path is not a reason to be destructive. The
+    /// second daemon is needed because a daemon stopped by the first half is
+    /// no longer there to exercise the second.
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "requires two isolated daemons; see the doc comment"]
+    fn live_quit_stops_an_idle_service_and_spares_a_busy_one() {
+        let _guard = host_guard();
+        let idle_socket = std::env::var("RHIZOME_TEST_DAEMON_SOCKET")
+            .expect("set RHIZOME_TEST_DAEMON_SOCKET to an isolated daemon socket");
+        let busy_socket = std::env::var("RHIZOME_TEST_DAEMON_SOCKET_2")
+            .expect("set RHIZOME_TEST_DAEMON_SOCKET_2 to a second isolated daemon socket");
+        let vault = tempfile::tempdir().unwrap();
+
+        // ── Idle: nothing booked, so the service is stopped ──────────────
+        std::env::set_var(DAEMON_SOCKET_ENV, &idle_socket);
+        record_problem(None);
+        ensure_host(&vault.path().to_string_lossy()).expect("connect to the idle daemon");
+        let idle = shutdown_daemon_if_idle().expect("decide when idle");
+        println!("idle daemon -> {idle:?}");
+        assert_eq!(
+            idle,
+            QuitDisposition::StopService,
+            "nothing is booked, so nothing should be left running"
+        );
+        let _ = shutdown_host();
+
+        // It really stopped: a fresh connection no longer finds it.
+        std::thread::sleep(Duration::from_secs(2));
+        let reconnect = connect_stream(std::path::Path::new(&idle_socket));
+        println!("reconnect after shutdown -> {:?}", reconnect.is_err());
+        assert!(
+            reconnect.is_err(),
+            "the service was asked to stop and should be gone"
+        );
+
+        // ── Busy: work booked, so the service survives ───────────────────
+        std::env::set_var(DAEMON_SOCKET_ENV, &busy_socket);
+        record_problem(None);
+        ensure_host(&vault.path().to_string_lossy()).expect("connect to the busy daemon");
+        let booked = with_host_mut(|host| {
+            host.send_command(serde_json::json!({
+                "type": "heartbeat_set",
+                "prompt": "check in",
+                "every": "1h",
+            }))
+        })
+        .expect("book a heartbeat");
+        assert_eq!(
+            booked["success"].as_bool(),
+            Some(true),
+            "the keep-alive half is only proven if work was really booked: {booked}"
+        );
+
+        let busy = shutdown_daemon_if_idle().expect("decide with work booked");
+        println!("busy daemon -> {busy:?}");
+        assert!(
+            matches!(busy, QuitDisposition::KeepForScheduledWork { .. }),
+            "booked work must outrank tidiness: {busy:?}"
+        );
+        let _ = shutdown_host();
+        std::thread::sleep(Duration::from_secs(1));
+        assert!(
+            connect_stream(std::path::Path::new(&busy_socket)).is_ok(),
+            "a service with work booked must survive quitting"
+        );
+
+        std::env::remove_var(DAEMON_SOCKET_ENV);
         record_problem(None);
     }
 
