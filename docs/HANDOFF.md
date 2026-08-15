@@ -85,6 +85,21 @@ need. Three empty drafts from this session's rebuilds are still resident — the
 were left rather than deleted, since culling state in the user's runtime is not
 this ticket's call.
 
+**Two lifecycle leaks found reviewing the diff, both left for #7/#12 rather
+than widening #6.** Neither is a regression; both are reachable in ways they
+were not before:
+
+- **A lost race in `ensure_host` orphans a draft.** Two concurrent calls with
+  different cwds both connect; the loser is now *detached* rather than killed,
+  so its empty session lingers in the daemon. Owning a child process meant the
+  loser died.
+- **A dropped connection silently reconnects into a new session mid-
+  conversation.** RPC mode did the same on respawn, so the behaviour is
+  unchanged — but a shared daemon disconnects more plausibly than a child did
+  (Prime self-updating, for one), so the path is far more reachable. This
+  belongs with #8's unreachable-service states: the user should be told, not
+  quietly moved to a fresh session.
+
 **Demonstrated against real Prime, not a fixture**, which is the
 non-negotiable bar in every ticket of this set:
 
