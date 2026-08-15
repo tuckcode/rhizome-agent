@@ -2,10 +2,36 @@
 
 Living doc. Update in place each session. This file is "what's true right now," not a history log. Detailed per-session records go in `docs/plans/*-session-status.md`.
 
-## Session handoff — 2026-08-15 (native loop + failed push)
+## Session handoff — 2026-08-15b (Claude review + push blocker cleared)
 
-**Next agent: read `docs/plans/2026-08-15-native-loop-handoff-for-claude.md` first.**
-08-14 leftover plan and 08-14-evening pickup are historical.
+**Next agent: read `docs/plans/2026-08-15-claude-review-of-native-loop.md`,
+then `docs/plans/2026-08-15-native-loop-handoff-for-claude.md`** (still accurate
+for the native loop itself). 08-14 leftover plan and 08-14-evening pickup are
+historical.
+
+**Reviewed the Hermes/Grok stretch as the original author of the Frame A and
+session-list slices. The work is sound** — every product file has a matching
+test, A4-skip and C24-log were both the right calls, and the two easy-to-get-
+wrong details (host spawned once outside the poll interval; absolute-path guard
+before `joinVaultPath`) are both correct.
+
+**One incomplete fix found and closed — it is why both pushes failed.**
+`0b94652` pinned the notes shell inside `installFixtureVaultInitScript`, which
+only reaches specs calling `openFixtureVault`. 41 specs navigate with a bare
+`page.goto('/')`. The curated lane runs 13 of them, so exactly one surfaced and
+stopped pre-push at step 5/6 both times. `de1a437` exports
+`pinNotesShellLaunch(page)` and applies it to the 22 bare-goto specs that assert
+on notes-shell selectors. **`pnpm playwright:smoke` 26 passed** — the push gate
+is green for the first time since `15a8448`.
+
+**Still not pushed.** Count the ahead-number yourself.
+
+**C25 opened:** two regression-lane specs fail on stale content expectations,
+verified independent of the pin (3 failures before it, 2 after). Not in the
+push gate.
+
+**Next:** re-check Frame B natively (the `0b44e5f` wikilink-title fix was never
+re-dogfooded — Vite cannot prove it), then push if asked.
 
 **Unpushed — count them:** `git rev-list --count origin/main..HEAD`.
 Atticus asked to push. It did **not** land. `origin/main` still the
@@ -513,6 +539,8 @@ Note what this implies about the record: sessions in this window that report "al
 - **C23-OPEN (original finding): `get_messages` is not sufficient for transcript rehydration.** Found 2026-08-13 while verifying the newly-landed command against the live `prime-agent --mode rpc` binary. Within a **single** host process: send `prompt` → wait for `agent_end` → `agent_end` carries `messages` with **both** roles (`['user','assistant']`) → then `get_messages` on that same process returns **only the user message**. Reproduced across two runs. Not investigated further, so the cause is unknown — plausible readings are that `get_messages` reads a persisted store while `agent_end` reflects in-memory turn state, or that the assistant message commits on some later event. **Why it matters:** the roadmap recorded `get_messages` as the thing blocking the whole session story, which assumed it returns the conversation. It returns *a* conversation view that is missing the assistant side. Rehydration therefore needs a decision — capture `agent_end.messages` as the transcript source, find the persist trigger that makes `get_messages` complete, or reconstruct from the session `.jsonl` on disk (which `mycelium.rs` already reads). **Do not build the session list until this is settled**; all three options change its shape. The command itself is landed, tested and correct for what it returns — this is a sufficiency gap, not a defect in the parse.
 
 - **C24-OPEN: `src/utils/primeSessionToMindwalk.ts` has three dead exports that now duplicate the Rust session reader.** Found 2026-08-13 by `pnpm deadcode` after building `prime_sessions.rs`. `listPrimeSessionCandidates` (filters `*.jsonl` and sorts) and `PRIME_SESSIONS_DIR_DEFAULT` (`'~/.prime/agent/sessions'`) are referenced by nothing — verified with a repo-wide grep excluding their own file — and both restate what `prime_sessions::session_files()` and `sessions_dir()` now do authoritatively in Rust. `BridgedSessionResult` is also unreferenced. **Not deleted here**: this session did not otherwise touch that file, and `AGENTS.md` says to fix what your change touches rather than mass-delete the backlog in an unrelated commit. The rest of the module is live (Mycelium's Mindwalk bridge), so this is a three-export removal, not a file deletion. Whoever next touches Mycelium should delete them and confirm the bridge still resolves its sessions directory — the constant is the one to check, since removing it means the bridge must get that path from somewhere. **Run `npx tsc -b` after deleting anything knip flagged**, per the ambient-declaration warning in `AGENTS.md`.
+
+- **C25-OPEN: two `tests/smoke/` regression-lane specs fail on stale content expectations, unrelated to the launch change.** Found 2026-08-15 while repairing the notes-shell pin (below). `visible-type-property.spec.ts:11` asserts `labels.length > 3` for sidebar type sections and receives **1**; `type-create-note.spec.ts:32` ("clicking + in All Notes creates generic note") also fails. **Both fail with and without the notes-shell pin** — verified by stashing the pin and re-running: 3 failed before, 2 after, so the pin fixed one of the three and these two are a separate problem. The shell renders (the selector matches one label rather than none), so this is a stale expectation about mock-vault type sections, not a missing note list. **Neither is in the push gate** — `pnpm playwright:smoke` is the curated 13-spec lane and is fully green; these only run under `pnpm playwright:regression`. Whoever next touches the sidebar or the mock vault should re-baseline both, or delete them if the behaviour they pin is gone.
 
 - **C22-OPEN: on Windows, minimizing Rhizome and then clicking the taskbar icon does not bring the window back.** Reported directly by the user 2026-08-02, **not yet investigated or reproduced** — logged so it isn't lost, not because it's understood. Likely area: `src-tauri/src/lib.rs` and `src-tauri/src/window_state.rs` both reference tray/window-event handling and are the right starting point (found via a quick `grep -rln "tray\|minimize\|restore\|WindowEvent" src-tauri/src/*.rs`, not read yet). Windows-specific per the report — check whether the tray-click / taskbar-restore handler is platform-gated (`cfg(windows)` vs `cfg(desktop)`) and whether it's actually wired to a restore call, or only to show/hide on other platforms. No repro steps beyond "minimize, then try to click it back up" captured yet — get those from the user before starting, and check whether this reproduces on macOS too or is genuinely Windows-only (relevant since `linux_appimage.rs`/`window_state.rs` suggest per-platform window handling already exists and may just be incomplete for one target).
 
