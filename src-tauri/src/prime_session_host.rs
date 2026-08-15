@@ -415,6 +415,43 @@ pub fn set_model(provider: &str, model_id: &str) -> Result<(), String> {
     })
 }
 
+/// What the harness is doing besides answering: goal, heartbeats, schedules.
+///
+/// One host lock for three round-trips. A sub-request that fails degrades that
+/// section to empty rather than failing the whole band — a missing heartbeat
+/// list should not hide an active goal.
+pub fn agent_activity() -> Result<crate::prime_agent_activity::PrimeAgentActivity, String> {
+    use crate::prime_agent_activity as activity;
+    with_host_mut(|host| {
+        let state = host.send_command(serde_json::json!({ "type": "get_state" }))?;
+        let state_data = state
+            .get("data")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+
+        let heartbeats = host
+            .send_command(serde_json::json!({ "type": "list_heartbeats" }))
+            .ok()
+            .and_then(|response| response.get("data").cloned())
+            .map(|data| activity::scheduled_work_from_response(&data, &["heartbeats"]))
+            .unwrap_or_default();
+
+        let schedules = host
+            .send_command(serde_json::json!({ "type": "list_schedules" }))
+            .ok()
+            .and_then(|response| response.get("data").cloned())
+            .map(|data| activity::scheduled_work_from_response(&data, &["jobs", "schedules"]))
+            .unwrap_or_default();
+
+        Ok(activity::PrimeAgentActivity {
+            goal: activity::goal_from_state(&state_data),
+            heartbeats,
+            schedules,
+            thinking_level: state_data["thinkingLevel"].as_str().map(str::to_string),
+        })
+    })
+}
+
 /// Branch a new session from a past entry.
 ///
 /// Prime names the argument `entryId` and takes the `id` from a message line in

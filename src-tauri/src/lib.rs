@@ -38,6 +38,7 @@ pub mod pi_cli;
 mod pi_config;
 mod pi_discovery;
 mod pi_events;
+pub mod prime_agent_activity;
 mod prime_discovery;
 mod prime_events;
 pub mod prime_session_host;
@@ -573,6 +574,7 @@ macro_rules! app_invoke_handler {
             commands::get_available_prime_models,
             commands::set_prime_model,
             commands::fork_prime_session,
+            commands::get_prime_agent_activity,
             commands::steer_prime_session,
             commands::follow_up_prime_session,
             commands::compact_prime_session,
