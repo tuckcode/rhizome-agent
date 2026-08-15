@@ -27,6 +27,71 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Session handoff — 2026-08-16 (#6 and #7 shipped; Rhizome is a window onto Prime)
+
+**Next: #8 (version floor and unreachable-service states), or #12 (quit
+semantics).** #6 and #7 are both closed and pushed. The transport and its
+continuity story are done; what is left in the #5 set is the surface on top.
+
+**#7 shipped in three slices**, each demonstrated against a real daemon:
+
+- **Rejoin on open.** Opening looks for work already running in this directory
+  and attaches to it; creating is the no-candidate path. Selection is a pure
+  function — same cwd, nobody else holding it, most recently active wins.
+  `lastActivityAt` is ISO-8601 UTC so lexicographic order is chronological.
+  Enumeration is an optimisation, not a precondition: a daemon that cannot
+  `list` still opens a session. **This also closed the accumulation leak logged
+  against #6** — relaunching reuses rather than stranding one session per launch.
+- **Transcript on rejoin.** The panel shows the rejoined conversation instead of
+  an empty box over a live session. Reads the session's own log file
+  (`sessionPath` on host status) rather than matching an id against a disk scan.
+  Guarded to run once per session path — status polls every few seconds and
+  would otherwise fight the live stream for the conversation.
+- **Uptime.** Minutes, then hours, then days, hidden when the host is not live.
+  No timer of its own; the status poll re-renders it often enough.
+
+**Proof, not argument:** quit the app on an 8-message conversation, relaunched,
+watched it log `Reattaching to Prime session 7373ae48ae6a`, and the transcript
+came back with tool cards and reasoning intact. The daemon confirmed
+`attachedClients` 0 → 1 and no new session.
+
+**C26 found and fixed, and it was two bugs.** A replayed user turn rendered the
+entire composed system prompt — "hi" became a screenful of instructions — and
+the session-list title had the same defect, which would have given every
+session an identical name. **The fix direction first recorded for C26 was
+wrong**: it proposed moving the system prompt to `create`'s
+`config.systemPrompt`, but the context block is rebuilt every turn from the
+active note and open tabs, so that would have frozen it. The composition was
+correct; only its display was not. See the C26 entry for what shipped.
+
+**Three defects this session were invisible to green tests and were caught by
+looking at the artefact.** Worth internalising, because it is now a pattern
+rather than an anecdote:
+
+- `create` silently ignores a top-level `cwd` — the session lands in the
+  daemon's directory and the vault tools read the wrong tree.
+- The system-prompt wall was found by *looking at the running app*. Every test
+  was green and the logs said `Reattaching`.
+- The C26 title fix was briefly a **silent no-op**, because whitespace
+  normalisation ran before the strip and collapsed the newline-delimited
+  markers. Its test passed either way.
+
+**Known limitation, deliberately not built:** a failed transcript read does not
+retry. The session is attached and live regardless, but the panel would sit
+empty over it until the session changes or the app restarts. Documented in the
+hook and its test rather than claimed and not built. Revisit if seen in practice.
+
+**Localization is behind.** `ai.subhead.uptime` is in `en.json` only —
+`pnpm l10n:translate` fails for want of `LARA_ACCESS_KEY_ID`/`SECRET` (C18,
+not new). Missing keys fall back to the English catalog, so nothing renders a
+raw key, but 18 locales need a run with credentials.
+
+**Gates:** five pushes, all six gates green each time. `cargo test --lib` 1437;
+`pnpm test` 5308 across 508 files; Rust coverage above the 85 floor; Playwright
+core smoke green. Codacy: not run — no MCP tool and no `.codacy/`, as ever.
+
+---
+
 ## Session handoff — 2026-08-15e (#6 shipped: Rhizome is a client of the daemon)
 
 **Next: #7 (detach on close, reattach on open).** #6 is done and pushed. The
