@@ -149,11 +149,39 @@ fn emit_tool_start<F>(json: &serde_json::Value, emit: &mut F)
 where
     F: FnMut(AiAgentStreamEvent),
 {
+    let args = json.get("args").cloned().unwrap_or(serde_json::Value::Null);
+    // The vault skill shells out through ipython, so the reported name is the
+    // wrapper. Recover the real operation before it reaches a card.
+    let unwrapped = crate::prime_tool_unwrap::unwrap_tool(&tool_name(json), &args);
+
     emit(AiAgentStreamEvent::ToolStart {
-        tool_name: tool_name(json),
+        tool_name: unwrapped.tool,
         tool_id: tool_id(json),
-        input: json.get("args").map(|args| args.to_string()),
+        input: tool_input_with_path(&args, unwrapped.path.as_deref()),
     });
+}
+
+/// Merge a recovered note path into the tool arguments.
+///
+/// The frontend already offers **Open** for any tool whose input parses to an
+/// object carrying `path` (`notePathFromToolInput`). Putting the unwrapped path
+/// there means the affordance works for shelled-out calls without the UI
+/// needing to know wrappers exist.
+fn tool_input_with_path(args: &serde_json::Value, path: Option<&str>) -> Option<String> {
+    let Some(path) = path else {
+        return (!args.is_null()).then(|| args.to_string());
+    };
+
+    let mut merged = args.clone();
+    match merged.as_object_mut() {
+        Some(object) => {
+            object.insert("path".into(), serde_json::Value::String(path.to_string()));
+            Some(merged.to_string())
+        }
+        // Arguments that are not an object (a bare command string) still have
+        // to yield a path, so wrap them rather than dropping either one.
+        None => Some(serde_json::json!({ "path": path, "raw": args }).to_string()),
+    }
 }
 
 fn emit_tool_done<F>(json: &serde_json::Value, emit: &mut F)
@@ -286,6 +314,59 @@ mod tests {
             &think[0],
             AiAgentStreamEvent::ThinkingDelta { text } if text == "hmm"
         ));
+    }
+
+    #[test]
+    fn a_shelled_out_vault_call_reaches_the_ui_named_and_openable() {
+        // Exactly what the rhizome-vault skill emits: the operation is a shell
+        // command inside ipython, so the card used to read "ipython" with no
+        // path and therefore no Open button.
+        let code = "VAULT_PATH='/v' node '/r/mcp-server/cli-call.mjs' get_note '{\"path\":\"wiki/foo.md\"}'";
+        let events = collect(serde_json::json!({
+            "type": "tool_execution_start",
+            "toolName": "ipython",
+            "toolCallId": "call-1",
+            "args": {"code": code},
+        }));
+
+        match &events[0] {
+            AiAgentStreamEvent::ToolStart {
+                tool_name, input, ..
+            } => {
+                assert_eq!(tool_name, "get_note", "the wrapper must not be the label");
+                let parsed: serde_json::Value =
+                    serde_json::from_str(input.as_deref().unwrap()).expect("input is json");
+                // What `notePathFromToolInput` reads to offer Open.
+                assert_eq!(parsed["path"], "wiki/foo.md");
+                // The original call survives for the card's detail view.
+                assert!(parsed["code"].as_str().unwrap().contains("cli-call.mjs"));
+            }
+            other => panic!("expected a tool start, got {other:?}"),
+        }
+    }
+
+    /// A wrapper doing something unrelated keeps its own name and offers no
+    /// Open — a card pointing at a note it never touched is worse than none.
+    #[test]
+    fn an_unrelated_wrapper_call_gains_no_path() {
+        let events = collect(serde_json::json!({
+            "type": "tool_execution_start",
+            "toolName": "ipython",
+            "toolCallId": "call-2",
+            "args": {"code": "print(1 + 1)"},
+        }));
+
+        match &events[0] {
+            AiAgentStreamEvent::ToolStart {
+                tool_name, input, ..
+            } => {
+                assert_eq!(tool_name, "ipython");
+                let parsed: serde_json::Value =
+                    serde_json::from_str(input.as_deref().unwrap()).expect("input is json");
+                assert!(parsed.get("path").is_none());
+            }
+            other => panic!("expected a tool start, got {other:?}"),
+        }
     }
 
     #[test]

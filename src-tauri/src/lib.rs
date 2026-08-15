@@ -42,6 +42,7 @@ mod prime_discovery;
 mod prime_events;
 pub mod prime_session_host;
 pub mod prime_sessions;
+pub mod prime_tool_unwrap;
 mod prime_vault_skill;
 pub mod rhizome_api;
 pub mod rhizome_commands;

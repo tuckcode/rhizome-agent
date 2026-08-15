@@ -12,8 +12,12 @@ function userMessage(text: string, id = 'u1'): PrimeTranscriptItem {
   }
 }
 
-function assistant(content: unknown[], text = ''): PrimeTranscriptItem {
-  return { kind: 'message', id: 'a1', message: { role: 'assistant', content, text } }
+function assistant(
+  content: unknown[],
+  text = '',
+  tools?: Array<{ id?: string; tool: string; path?: string }>,
+): PrimeTranscriptItem {
+  return { kind: 'message', id: 'a1', message: { role: 'assistant', content, text }, tools }
 }
 
 describe('primeTranscriptToConversation', () => {
@@ -33,16 +37,16 @@ describe('primeTranscriptToConversation', () => {
   })
 
   /** Frame A shows tool cards in the transcript; prose-only replay loses them. */
-  it('rebuilds tool cards from tool_use blocks, with the path when there is one', () => {
+  it('rebuilds tool cards from the unwrapped tools, with the path when there is one', () => {
     const turns = primeTranscriptToConversation([
       userMessage('read it'),
       assistant(
-        [
-          { type: 'tool_use', id: 't1', name: 'search_notes', input: { query: 'promote vault' } },
-          { type: 'tool_use', id: 't2', name: 'get_note', input: { path: 'wiki/memory-loop.md' } },
-          { type: 'text', text: 'Found a decision note.' },
-        ],
+        [{ type: 'text', text: 'Found a decision note.' }],
         'Found a decision note.',
+        [
+          { id: 't1', tool: 'search_notes' },
+          { id: 't2', tool: 'get_note', path: 'wiki/memory-loop.md' },
+        ],
       ),
     ])
 
@@ -60,7 +64,7 @@ describe('primeTranscriptToConversation', () => {
   it('marks every replayed action done, never pending', () => {
     const turns = primeTranscriptToConversation([
       userMessage('go'),
-      assistant([{ type: 'tool_use', id: 't1', name: 'read', input: { path: 'a.md' } }]),
+      assistant([], '', [{ id: 't1', tool: 'read', path: 'a.md' }]),
     ])
 
     expect(turns[0].actions.every((action) => action.status === 'done')).toBe(true)
@@ -127,7 +131,7 @@ describe('primeTranscriptToConversation', () => {
   it('ignores toolResult and custom roles, whose effect is already on the cards', () => {
     const turns = primeTranscriptToConversation([
       userMessage('go'),
-      assistant([{ type: 'tool_use', id: 't1', name: 'read', input: {} }]),
+      assistant([], '', [{ id: 't1', tool: 'read' }]),
       { kind: 'message', id: 'r', message: { role: 'toolResult', content: [], text: 'file body' } },
       { kind: 'message', id: 'c', message: { role: 'custom', content: [], text: 'state' } },
     ])
