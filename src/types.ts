@@ -129,6 +129,14 @@ export interface Settings {
   anonymous_id: string | null
   release_channel: string | null
   automatic_update_checks_enabled?: boolean | null
+  /**
+   * Keep Prime sessions running after Rhizome is fully closed.
+   *
+   * Off by default: quitting stops the agent, the way Claude Code and Hermes
+   * behave. On, a session outlives the app so a heartbeat or goal can still
+   * fire. Governs the *session*, not Prime's shared background service.
+   */
+  keep_sessions_running_on_quit?: boolean | null
   theme_mode?: ThemeMode | null
   color_theme?: string | null
   accent_color?: AccentColor | null
