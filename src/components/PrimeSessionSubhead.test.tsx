@@ -85,4 +85,55 @@ describe('PrimeSessionSubhead', () => {
 
     expect(screen.queryByText('up')).not.toBeInTheDocument()
   })
+  /**
+   * Connecting to a service Rhizome does not own brings failure modes owning a
+   * child process did not. ADR-0163 requires each be visible and actionable —
+   * a spinner, or a bare "idle", is what this replaces.
+   */
+  it('names the action for a service that is not running', () => {
+    render(<PrimeSessionSubhead live={false} problem={{ code: 'service_unreachable' }} />)
+
+    expect(screen.getByText(/prime-agent daemon/)).toBeInTheDocument()
+    expect(screen.queryByText('Prime idle')).not.toBeInTheDocument()
+  })
+
+  it('names the action when Prime is not installed', () => {
+    render(<PrimeSessionSubhead live={false} problem={{ code: 'not_installed' }} />)
+
+    expect(screen.getByText(/npm i -g prime-agent/)).toBeInTheDocument()
+  })
+
+  /** A version floor is only actionable if it says which version. */
+  it('names both versions when the service is too old', () => {
+    render(
+      <PrimeSessionSubhead
+        live={false}
+        problem={{ code: 'service_too_old', installedVersion: '0.6.4', requiredVersion: '0.7.1' }}
+      />,
+    )
+
+    const message = screen.getByText(/too old/)
+    expect(message).toHaveTextContent('0.6.4')
+    expect(message).toHaveTextContent('0.7.1')
+  })
+
+  /** A daemon that does not report its version still gets a target to hit. */
+  it('still names the required version when the installed one is unknown', () => {
+    render(
+      <PrimeSessionSubhead
+        live={false}
+        problem={{ code: 'service_too_old', requiredVersion: '0.7.1' }}
+      />,
+    )
+
+    expect(screen.getByText(/too old/)).toHaveTextContent('0.7.1')
+  })
+
+  /** Connected is connected — a stale problem must not shout over it. */
+  it('shows the live state rather than a problem once connected', () => {
+    render(<PrimeSessionSubhead live problem={{ code: 'not_installed' }} />)
+
+    expect(screen.getByText('Prime session live')).toBeInTheDocument()
+    expect(screen.queryByText(/npm i -g/)).not.toBeInTheDocument()
+  })
 })

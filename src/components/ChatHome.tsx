@@ -70,6 +70,7 @@ export default function ChatHome({
           model={primeModelLabel(primeHost)}
           vaultPath={vaultPath}
           startedAt={primeHost?.startedAt ?? null}
+          problem={primeHost?.problem ?? null}
           onNewChat={() => newChatRef.current?.()}
         />
       ) : null}

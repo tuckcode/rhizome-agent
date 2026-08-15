@@ -44,6 +44,60 @@ const DAEMON_PROTOCOL_VERSION: u64 = 7;
 /// one here to hang the turn.
 const DAEMON_CLIENT_CAPABILITIES: [&str; 3] = ["attach_snapshot", "event_sequence", "slim_attach"];
 
+/// The oldest `prime-agent` Rhizome can talk to.
+///
+/// Named separately from the protocol version because a version number is what
+/// a user can act on — "update to 0.7.1" is a instruction, "protocol 7" is not.
+/// 0.7.1 is the build that ships daemon protocol 7, verified against it.
+pub const MINIMUM_PRIME_VERSION: &str = "0.7.1";
+
+/// Why Rhizome cannot reach Prime.
+///
+/// A typed state rather than a message, because each case has a *different*
+/// action behind it: install the CLI, start the service, or update it. ADR-0163
+/// requires these be visible and actionable rather than a spinner — a client of
+/// a service it does not own has failure modes owning a child process did not.
+///
+/// There is deliberately no "fell back to RPC mode" case. A silent fallback
+/// would make "close the app, work continues" quietly untrue with no
+/// explanation, so the RPC transport was removed rather than kept as a spare.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "code", rename_all = "snake_case")]
+pub enum PrimeConnectionProblem {
+    /// No `prime-agent` binary on this machine.
+    NotInstalled,
+    /// The binary is installed, but its background service is not answering.
+    ServiceUnreachable { detail: String },
+    /// The service answered, but speaks a protocol older than this client.
+    ServiceTooOld {
+        /// What the daemon reports it is, when it says.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        installed_version: Option<String>,
+        required_version: String,
+    },
+}
+
+/// The last reason a connection attempt failed, cleared when one succeeds.
+///
+/// Remembered rather than recomputed because the version case can only be
+/// learned from a handshake, and re-handshaking on every status poll would open
+/// a socket every few seconds to answer a question whose answer changes only
+/// when the daemon restarts.
+fn last_problem() -> &'static Mutex<Option<PrimeConnectionProblem>> {
+    static PROBLEM: OnceLock<Mutex<Option<PrimeConnectionProblem>>> = OnceLock::new();
+    PROBLEM.get_or_init(|| Mutex::new(None))
+}
+
+fn record_problem(problem: Option<PrimeConnectionProblem>) {
+    if let Ok(mut slot) = last_problem().lock() {
+        *slot = problem;
+    }
+}
+
+fn current_problem() -> Option<PrimeConnectionProblem> {
+    last_problem().lock().ok().and_then(|slot| slot.clone())
+}
+
 /// Points the client at a different daemon socket.
 ///
 /// This is the transport's only injection point, and it is what the tests
@@ -113,6 +167,9 @@ pub struct PrimeHostStatus {
     /// is always the session actually attached.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_path: Option<String>,
+    /// Why Prime is unreachable, when it is. `None` while connected.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub problem: Option<PrimeConnectionProblem>,
 }
 
 /// Token / cost / context-window snapshot for the live Prime session.
@@ -332,6 +389,20 @@ fn daemon_socket_path() -> Result<PathBuf, String> {
     })
 }
 
+/// Classify a failure to reach the service.
+///
+/// A missing binary and a stopped service look the same to a socket call and
+/// need different actions from the user, so they are separated here rather
+/// than collapsed into one "unavailable".
+fn unreachable_problem(detail: &str) -> PrimeConnectionProblem {
+    if crate::prime_discovery::find_binary().is_err() {
+        return PrimeConnectionProblem::NotInstalled;
+    }
+    PrimeConnectionProblem::ServiceUnreachable {
+        detail: detail.to_string(),
+    }
+}
+
 /// `<tmpdir>/prime-agent-<uid>/daemon.sock`, or `None` when the uid is unknown.
 fn default_daemon_socket_path() -> Option<PathBuf> {
     Some(
@@ -444,6 +515,8 @@ pub fn get_status() -> PrimeHostStatus {
             reattached: host.reattached,
             started_at: host.started_at.clone(),
             session_path: host.session_path.clone(),
+            // Connected: whatever went wrong before is history.
+            problem: None,
         },
         None => PrimeHostStatus {
             installed: availability.installed,
@@ -458,6 +531,7 @@ pub fn get_status() -> PrimeHostStatus {
             reattached: false,
             started_at: None,
             session_path: None,
+            problem: current_problem(),
         },
     }
 }
@@ -1128,6 +1202,36 @@ fn pick_resumable_session(data: &serde_json::Value, cwd: &Path) -> Option<String
         .map(str::to_string)
 }
 
+/// The actionable sentence for a connection problem.
+///
+/// Each names the one action that fixes it. Rust-side English, matching the
+/// convention of the other transport errors here; the frontend renders its own
+/// localized copy from the `code` and only falls back to this.
+fn describe_problem(problem: &PrimeConnectionProblem) -> String {
+    match problem {
+        PrimeConnectionProblem::NotInstalled => {
+            "Prime is not installed. Install it with `npm i -g prime-agent`.".to_string()
+        }
+        PrimeConnectionProblem::ServiceUnreachable { .. } => {
+            "Prime's background service is not running. Start it with `prime-agent daemon`."
+                .to_string()
+        }
+        PrimeConnectionProblem::ServiceTooOld {
+            installed_version,
+            required_version,
+        } => match installed_version {
+            Some(installed) => format!(
+                "Prime {installed} is too old for Rhizome. Update to {required_version} or \
+                 newer with `npm i -g prime-agent@latest`."
+            ),
+            None => format!(
+                "This version of Prime is too old for Rhizome. Update to {required_version} or \
+                 newer with `npm i -g prime-agent@latest`."
+            ),
+        },
+    }
+}
+
 /// Explain a refused session switch.
 ///
 /// The daemon holds every client's sessions, so a session log can already be
@@ -1197,8 +1301,18 @@ impl PrimeHost {
             }
         }
 
-        let socket_path = daemon_socket_path()?;
-        let stream = connect_stream(&socket_path)?;
+        let socket_path = daemon_socket_path().map_err(|detail| {
+            let problem = unreachable_problem(&detail);
+            let message = describe_problem(&problem);
+            record_problem(Some(problem));
+            message
+        })?;
+        let stream = connect_stream(&socket_path).map_err(|detail| {
+            let problem = unreachable_problem(&detail);
+            let message = describe_problem(&problem);
+            record_problem(Some(problem));
+            message
+        })?;
         let reader_stream = stream
             .try_clone()
             .map_err(|error| format!("Failed to split the Prime daemon connection: {error}"))?;
@@ -1273,6 +1387,8 @@ impl PrimeHost {
                 if let Some(data) = response.get("data") {
                     host.apply_state_data(data);
                 }
+                // Reached it: whatever was wrong before no longer is.
+                record_problem(None);
             }
             Ok(response) => {
                 let _ = host.shutdown();
@@ -1344,10 +1460,22 @@ impl PrimeHost {
             match rx.recv_timeout(remaining) {
                 Ok(OutboundLine::Event(json)) => {
                     if json["type"].as_str() == Some("daemon_hello") {
+                        // The greeting is also the compatibility check. A
+                        // daemon older than this protocol cannot serve the
+                        // harness commands the product is built on, and
+                        // ADR-0163 forbids quietly dropping to the old
+                        // transport instead — so this is a hard stop with a
+                        // version the user can act on.
+                        let protocol = json["protocol"]["version"].as_u64().unwrap_or(0);
+                        if protocol < DAEMON_PROTOCOL_VERSION {
+                            return Err(self.fail_with(PrimeConnectionProblem::ServiceTooOld {
+                                installed_version: json["appVersion"].as_str().map(str::to_string),
+                                required_version: MINIMUM_PRIME_VERSION.to_string(),
+                            }));
+                        }
                         log::info!(
-                            "Connected to Prime daemon {} (protocol {}) at {}",
+                            "Connected to Prime daemon {} (protocol {protocol}) at {}",
                             json["appVersion"].as_str().unwrap_or("unknown"),
-                            json["protocol"]["version"],
                             self.socket_path.display()
                         );
                         return Ok(());
@@ -1365,6 +1493,17 @@ impl PrimeHost {
                 }
             }
         }
+    }
+
+    /// Record a problem and render it as the error the caller sees.
+    ///
+    /// Both halves matter: the string is what a failed command reports now,
+    /// and the recorded state is what the polled status surfaces afterwards,
+    /// so the UI can stay actionable rather than reverting to a bare "idle".
+    fn fail_with(&self, problem: PrimeConnectionProblem) -> String {
+        let message = describe_problem(&problem);
+        record_problem(Some(problem));
+        message
     }
 
     fn is_alive(&self) -> bool {
@@ -1656,6 +1795,17 @@ mod tests {
                 + Sync
                 + 'static,
         {
+            Self::start_with_hello(overrides, fake_hello())
+        }
+
+        /// Start with a chosen greeting, for exercising the version floor.
+        fn start_with_hello<H>(overrides: H, hello: serde_json::Value) -> Self
+        where
+            H: Fn(&serde_json::Value, &str) -> Option<Vec<serde_json::Value>>
+                + Send
+                + Sync
+                + 'static,
+        {
             use std::os::unix::net::UnixListener;
 
             let dir = tempfile::tempdir().unwrap();
@@ -1667,6 +1817,7 @@ mod tests {
 
             let thread_received = Arc::clone(&received);
             let overrides = Arc::new(overrides);
+            let hello = Arc::new(hello);
             thread::spawn(move || {
                 let session_id = Arc::new(Mutex::new("sess-a".to_string()));
                 for stream in listener.incoming() {
@@ -1674,8 +1825,9 @@ mod tests {
                     let received = Arc::clone(&thread_received);
                     let overrides = Arc::clone(&overrides);
                     let session_id = Arc::clone(&session_id);
+                    let hello = Arc::clone(&hello);
                     thread::spawn(move || {
-                        serve_fake_client(stream, received, overrides, session_id);
+                        serve_fake_client(stream, received, overrides, session_id, &hello);
                     });
                 }
             });
@@ -1742,6 +1894,7 @@ mod tests {
         received: Arc<Mutex<Vec<serde_json::Value>>>,
         overrides: Overrides,
         session_id: Arc<Mutex<String>>,
+        hello: &serde_json::Value,
     ) {
         let mut writer = stream.try_clone().unwrap();
         let write = |writer: &mut std::os::unix::net::UnixStream, value: &serde_json::Value| {
@@ -1750,7 +1903,7 @@ mod tests {
         };
 
         // The daemon greets before the client says anything.
-        write(&mut writer, &fake_hello());
+        write(&mut writer, hello);
 
         let mut reader = BufReader::new(stream);
         let mut line = String::new();
@@ -2216,6 +2369,173 @@ mod tests {
         );
 
         let _ = shutdown_host();
+    }
+
+    // ── Version floor and unreachable states (#8) ───────────────────────────
+
+    /// A daemon too old to speak this protocol is a hard stop with a version
+    /// number the user can act on. ADR-0163 forbids the alternative — quietly
+    /// dropping to the old transport would make "close the app, work
+    /// continues" untrue with no explanation.
+    #[cfg(unix)]
+    #[test]
+    fn a_daemon_older_than_the_floor_is_refused_and_names_the_version() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start_with_hello(
+            |_, _| None,
+            serde_json::json!({
+                "type": "daemon_hello",
+                "protocol": { "name": DAEMON_PROTOCOL_NAME, "version": 6 },
+                "appVersion": "0.6.4",
+                "clientId": "fake-client",
+                "serverCapabilities": [],
+            }),
+        );
+        daemon.install();
+
+        let error = connect_host(vault.path()).expect_err("an old daemon must be refused");
+
+        assert!(error.contains("0.6.4"), "names what is installed: {error}");
+        assert!(
+            error.contains(MINIMUM_PRIME_VERSION),
+            "names what is required: {error}"
+        );
+        // Refused, not downgraded: no session was created behind the user's back.
+        assert!(
+            daemon.command("create").is_none(),
+            "a refused connection must not start work: {:?}",
+            daemon.commands()
+        );
+        assert!(!get_status().running);
+        assert_eq!(
+            get_status().problem,
+            Some(PrimeConnectionProblem::ServiceTooOld {
+                installed_version: Some("0.6.4".into()),
+                required_version: MINIMUM_PRIME_VERSION.into(),
+            })
+        );
+
+        record_problem(None);
+    }
+
+    /// A daemon newer than this client still speaks the envelope, so a version
+    /// floor must not become a ceiling that breaks on every Prime release.
+    #[cfg(unix)]
+    #[test]
+    fn a_newer_daemon_is_accepted_rather_than_treated_as_incompatible() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start_with_hello(
+            |_, _| None,
+            serde_json::json!({
+                "type": "daemon_hello",
+                "protocol": { "name": DAEMON_PROTOCOL_NAME, "version": 9 },
+                "appVersion": "0.9.0",
+                "clientId": "fake-client",
+                "serverCapabilities": [],
+            }),
+        );
+        daemon.install();
+
+        connect_host(vault.path()).expect("a newer daemon is still a daemon");
+
+        assert!(get_status().running);
+        assert_eq!(get_status().problem, None);
+        let _ = shutdown_host();
+    }
+
+    /// A socket nothing is listening on is the "service is not running" case,
+    /// and must be distinguishable from Prime not being installed at all —
+    /// they need different actions from the user.
+    #[cfg(unix)]
+    #[test]
+    fn an_unreachable_service_is_reported_as_a_state_the_user_can_act_on() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        // A path with no listener: connect fails the way a stopped daemon does.
+        std::env::set_var(DAEMON_SOCKET_ENV, dir.path().join("absent.sock"));
+        {
+            let slot = host_slot();
+            *slot.host.lock().unwrap_or_else(|p| p.into_inner()) = None;
+        }
+        record_problem(None);
+
+        let error = connect_host(vault.path()).expect_err("nothing is listening");
+
+        assert!(!error.is_empty());
+        let status = get_status();
+        assert!(!status.running);
+        // Which of the two it is depends on whether this machine has the CLI;
+        // both are actionable, and neither may be silence.
+        let problem = status.problem.expect("an unreachable service is reported");
+        assert!(
+            matches!(
+                problem,
+                PrimeConnectionProblem::ServiceUnreachable { .. }
+                    | PrimeConnectionProblem::NotInstalled
+            ),
+            "{problem:?}"
+        );
+
+        record_problem(None);
+    }
+
+    /// Reconnecting must clear the state, or the app would keep telling a user
+    /// to fix something they already fixed.
+    #[cfg(unix)]
+    #[test]
+    fn connecting_successfully_clears_a_previous_problem() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        record_problem(Some(PrimeConnectionProblem::NotInstalled));
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+
+        connect_host(vault.path()).unwrap();
+
+        assert_eq!(
+            get_status().problem,
+            None,
+            "a stale problem must not linger"
+        );
+        let _ = shutdown_host();
+    }
+
+    /// Each case names the one action that fixes it. A message that says only
+    /// "unavailable" is the spinner this ticket exists to remove.
+    #[test]
+    fn every_problem_names_the_action_that_fixes_it() {
+        assert!(describe_problem(&PrimeConnectionProblem::NotInstalled).contains("npm i -g"));
+
+        let unreachable = describe_problem(&PrimeConnectionProblem::ServiceUnreachable {
+            detail: "connection refused".into(),
+        });
+        assert!(unreachable.contains("prime-agent daemon"), "{unreachable}");
+
+        let too_old = describe_problem(&PrimeConnectionProblem::ServiceTooOld {
+            installed_version: Some("0.6.4".into()),
+            required_version: MINIMUM_PRIME_VERSION.into(),
+        });
+        assert!(too_old.contains("0.6.4") && too_old.contains(MINIMUM_PRIME_VERSION));
+
+        // An unknown installed version still gives the required one.
+        let unknown = describe_problem(&PrimeConnectionProblem::ServiceTooOld {
+            installed_version: None,
+            required_version: MINIMUM_PRIME_VERSION.into(),
+        });
+        assert!(unknown.contains(MINIMUM_PRIME_VERSION), "{unknown}");
+    }
+
+    /// The version floor is a version, not a protocol number, because that is
+    /// what a user can act on.
+    #[test]
+    fn the_version_floor_is_a_version_a_user_could_install() {
+        assert!(MINIMUM_PRIME_VERSION.split('.').count() >= 2);
+        assert!(MINIMUM_PRIME_VERSION
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '.'));
     }
 
     // ── Turns ───────────────────────────────────────────────────────────────
@@ -3216,6 +3536,61 @@ mod tests {
         println!("reconnected session: {reconnected}");
         assert!(!reconnected.is_empty());
         let _ = shutdown_host();
+    }
+
+    /// Live counterpart to the version-floor tests: a real daemon must report
+    /// no problem, and taking it away must produce an actionable one.
+    ///
+    /// ```sh
+    /// cargo test --lib prime_session_host::tests::live_unreachable -- --ignored --nocapture
+    /// ```
+    ///
+    /// The too-old case is not forced here — downgrading the developer's
+    /// `prime-agent` to prove a version check is a worse trade than the fake
+    /// daemon that already covers it. That gap is deliberate and stated rather
+    /// than papered over.
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "requires a running prime-agent daemon (see `prime-agent status`)"]
+    fn live_unreachable_service_is_actionable_and_recovers() {
+        let _guard = host_guard();
+        std::env::remove_var(DAEMON_SOCKET_ENV);
+        record_problem(None);
+        let vault = tempfile::tempdir().unwrap();
+
+        // A real daemon: connected, nothing to report.
+        ensure_host(&vault.path().to_string_lossy()).expect("the real daemon");
+        let healthy = get_status();
+        assert!(healthy.running);
+        assert_eq!(healthy.problem, None, "a reachable service reports nothing");
+        let _ = shutdown_host();
+
+        // Forced failure: point at a socket nothing is listening on.
+        let dir = tempfile::tempdir().unwrap();
+        std::env::set_var(DAEMON_SOCKET_ENV, dir.path().join("gone.sock"));
+        let error = ensure_host(&vault.path().to_string_lossy())
+            .expect_err("a missing service must not look like success");
+        println!("forced failure: {error}");
+        let broken = get_status();
+        assert!(!broken.running);
+        let problem = broken.problem.expect("an actionable state, not silence");
+        println!("reported: {problem:?}");
+        assert!(matches!(
+            problem,
+            PrimeConnectionProblem::ServiceUnreachable { .. }
+                | PrimeConnectionProblem::NotInstalled
+        ));
+
+        // Recovery: the real daemon is still there, and the state must clear.
+        std::env::remove_var(DAEMON_SOCKET_ENV);
+        ensure_host(&vault.path().to_string_lossy()).expect("reconnect to the real daemon");
+        assert_eq!(
+            get_status().problem,
+            None,
+            "a fixed problem must stop being reported"
+        );
+        let _ = shutdown_host();
+        record_problem(None);
     }
 
     #[test]
