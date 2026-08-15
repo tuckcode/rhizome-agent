@@ -27,7 +27,86 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Session handoff — 2026-08-15d (the surface is specced; the transport it assumed was wrong)
+
+**Next agent: read `docs/adr/0163-connect-to-the-prime-daemon.md`, then issue
+#5.** Together they supersede the "next build" section of
+`docs/plans/2026-08-15-harness-surface-pickup.md`. The rest of that pickup — the
+reframe, the three confused counts, the traps — is still accurate and still
+worth reading.
+
+**The correction.** 08-15c said the next build was a slash-command palette, and
+scoped it against the RPC transport. Verified against installed `prime-agent`
+0.7.1 rather than its docs: **RPC mode declares 48 commands; the daemon
+protocol declares roughly three times that**, and the harness commands the
+palette existed to carry — `get_session_tree`, `navigate_tree`,
+`start_side_question`, `set_rlm_max_depth`, `get_context_tree`,
+`get_system_prompt`, `set_scoped_models`, `cron_*` — are **daemon-only**.
+Prime's own `rpc.md` closes the workaround: built-in commands are excluded from
+`get_commands` and do not execute when sent via `prompt`. A palette on RPC
+would have been roughly one-third inert, and would have looked like it worked.
+
+**Two live findings settled the lifecycle**, both from probing rather than
+reading:
+
+- **A Prime daemon was already running on this machine** — `prime-agent status`
+  reports it at `$TMPDIR/prime-agent-501/daemon.sock`, marked *default
+  background service*. Rhizome has never been able to see it.
+- **Detaching is Prime's designed behaviour**, not a feature to add. Closing a
+  client detaches; `prime-agent agents` / `attach` / `stop` exist to rejoin
+  running work.
+
+So owning the process and killing it on exit was working against the runtime.
+**Rhizome becomes a window onto Prime, not the thing that runs it** (ADR-0163).
+
+**Shipped:** ADR-0163; `CONTEXT.md` rewritten where the decision made it wrong
+(the `Session host` entry, plus the three-way collision on "agent" — the
+product, the legacy Desktop backends, and a running unit of work); the spec at
+`docs/plans/2026-08-15-harness-surface-spec.md`, published as **issue #5**, with
+**17 tickets at #6–#22** wired in dependency order.
+
+**Vocabulary is now binding.** `session` is the only user-facing noun for a
+running thing; `worker` stays inside the transport layer; `subagent` for
+children; `agent` means the product. This follows **Hermes Agent**, which meets
+the identical collision and never introduces the third sense — there is no
+`hermes agents` command; the unit a user lists, names and resumes is a session.
+
+**Next: `/implement` on #6 or #11.** They are the only two takeable now and they
+are independent — #6 is the daemon connection and gates everything else; #11 is
+Mycelium moving in-app, which touches nothing #6 touches. `/clear` between
+tickets; each is written to stand alone.
+
+**Two things this session got wrong, recorded so they are not re-learned:**
+
+- I "corrected" the pickup doc's "11 bundled skills" to 13 by listing the
+  package directory. A live `get_commands` probe settles it: **13 ship, 11
+  load** — `linear` and `notion` do not. The doc was right. This is the repo's
+  own standing lesson (*verify against the artefact*) applied to itself, and it
+  was made while quoting that lesson.
+- I twice recommended staying on RPC mode on the grounds that a transport swap
+  would swallow the feature work. That weighed the migration cost without
+  having established that the feature was **impossible** on RPC. Establish
+  reachability before estimating effort.
+
+**The docs push ran no gates.** The pre-push hook skipped app checks
+(docs-only diff) and reported "passed in 0s". That is correct behaviour and
+**not** evidence of a healthy tree — the first ticket touching code is where
+the suite gets its say.
+
+**Loose end:** a research file was expected this session and never appeared.
+The spec notes that nothing in it depends on one; if a file lands and
+contradicts the transport finding, the spec loses to it.
+
+**Still open, unchanged:** C24, C25 and the status-bar green flash, all as
+recorded in the 08-15 pickup. None were touched.
+
+---
+
 ## Session handoff — 2026-08-15c (harness reframe; next is the slash-command surface)
+
+> **Superseded in part by 08-15d above.** The "next build" section below scopes
+> the slash-command surface against the RPC transport; ADR-0163 replaces that.
+> Everything else here — the reframe, the three counts, the traps — still holds.
 
 **Next agent: read `docs/plans/2026-08-15-harness-surface-pickup.md` first.**
 It supersedes both earlier 08-15 pickups as "what is true now".
