@@ -92,6 +92,9 @@ mod desktop {
                 _ => {}
             })
             .on_tray_icon_event(|tray, event| {
+                // Double-click only was too easy to miss once the window could
+                // be hidden rather than closed (C22): the tray became the main
+                // way back and a single click did nothing.
                 if let TrayIconEvent::DoubleClick {
                     button: MouseButton::Left,
                     ..
