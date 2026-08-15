@@ -699,11 +699,17 @@ pub fn run() {
 
     with_invoke_handler(builder)
         .on_window_event(|window, event| {
-            #[cfg(desktop)]
+            // Deliberately not `#[cfg(desktop)]`-gated inside the closure: a cfg
+            // that did not hold would delete the body and leave a handler that
+            // silently does nothing, which is indistinguishable from the bug it
+            // fixes. `WindowEvent` is core to Tauri on every target.
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window_hides_instead_of_closing(window.label()) {
+                    log::info!("main window close requested — hiding, not closing (C22)");
                     api.prevent_close();
-                    let _ = window.hide();
+                    if let Err(err) = window.hide() {
+                        log::warn!("main window hide failed, it will close: {err}");
+                    }
                 }
             }
         })
