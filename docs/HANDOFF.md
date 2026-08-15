@@ -27,6 +27,39 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Session handoff — 2026-08-16 (#6, #7 and #8 shipped; Rhizome is a window onto Prime)
+
+**#8 shipped: the version floor and the unreachable-service states.** Three
+typed states, kept separate because the action differs — Prime not installed
+(install it), service not answering (start it), service too old (update it). A
+missing binary and a stopped daemon look identical to a socket call, so they
+are classified rather than collapsed into one useless "unavailable".
+
+The floor is enforced **at the handshake**, the only place the answer is known:
+`daemon_hello` carries the protocol version, and anything below 7 is refused
+before a session is created. Surfaced to the user as a version number, because
+"update to 0.7.1" is an instruction and "protocol 7" is not. **Newer daemons
+are accepted** — a floor must not become a ceiling that breaks on every Prime
+release.
+
+**No RPC fallback, verified structurally rather than asserted:** `--mode rpc`
+appears nowhere in `src-tauri` since #6 removed it.
+
+The state is *remembered* from the last connect attempt rather than recomputed
+per poll — the version case can only be learned from a handshake, and
+re-handshaking every four seconds to answer a question that changes only when
+the daemon restarts is waste. It clears on a successful connect, so the app
+stops telling users to fix what they have fixed.
+
+**Demonstrated with a forced failure** (`live_unreachable_service_is_actionable_and_recovers`):
+real daemon reports nothing, a socket with no listener yields "Prime's
+background service is not running. Start it with `prime-agent daemon`.", and
+reconnecting clears it. **The too-old case was not forced live** — proving it
+would mean downgrading the developer's `prime-agent`, a worse trade than the
+fake daemon reporting protocol 6 that covers it. Stated rather than implied.
+
+---
+
 ## Session handoff — 2026-08-16 (#6 and #7 shipped; Rhizome is a window onto Prime)
 
 **Next: #8 (version floor and unreachable-service states), or #12 (quit
