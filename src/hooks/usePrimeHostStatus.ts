@@ -12,6 +12,12 @@ export interface PrimeHostStatus {
   modelProvider?: string | null
   modelId?: string | null
   modelName?: string | null
+  /** True when the host rejoined a session that was already running (#7). */
+  reattached?: boolean
+  /** When the attached session started, ISO-8601. Uptime is derived from it. */
+  startedAt?: string | null
+  /** The attached session's log file, for rehydrating its transcript. */
+  sessionPath?: string | null
 }
 
 const EMPTY: PrimeHostStatus = {
@@ -24,6 +30,9 @@ const EMPTY: PrimeHostStatus = {
   modelProvider: null,
   modelId: null,
   modelName: null,
+  reattached: false,
+  startedAt: null,
+  sessionPath: null,
 }
 
 function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
