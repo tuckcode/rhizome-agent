@@ -707,16 +707,23 @@ fn handle_run_event(app_handle: &tauri::AppHandle, event: &tauri::RunEvent) {
     }
 
     if let tauri::RunEvent::Exit = event {
-        // Quitting is the one moment Rhizome decides anything about Prime's
-        // lifetime. Closing the window only detaches (ADR-0163); here we stop
-        // the background service if nothing still needs it, and leave it
-        // running if something is booked to fire or another client is using
-        // it. `shutdown_daemon_if_idle` owns that rule — see #12.
-        match crate::prime_session_host::shutdown_daemon_if_idle() {
-            Ok(disposition) => log::info!("Prime service on quit: {disposition:?}"),
-            // Never block the exit on this. A service that outlives a failed
-            // shutdown is the safe direction to fail in.
-            Err(error) => log::debug!("Could not settle the Prime service on quit: {error}"),
+        // Quitting is the one moment Rhizome decides anything about a
+        // session's lifetime — closing the window only detaches (ADR-0163).
+        // Default is to stop the agent, the way Claude Code and Hermes do;
+        // the setting exists for work that should outlive the app, such as a
+        // heartbeat that would otherwise only fire while a window is open.
+        //
+        // Scoped to *our* session. Prime's background service is shared
+        // infrastructure that starts itself and hosts other clients' work, so
+        // it is never Rhizome's to stop. See #12.
+        let keep_running = crate::settings::get_settings()
+            .ok()
+            .and_then(|settings| settings.keep_sessions_running_on_quit)
+            .unwrap_or(false);
+        match crate::prime_session_host::settle_session_on_quit(keep_running) {
+            Ok(disposition) => log::info!("Prime session on quit: {disposition:?}"),
+            // Never block the exit on this.
+            Err(error) => log::debug!("Could not settle the Prime session on quit: {error}"),
         }
 
         let state: tauri::State<'_, WsBridgeChild> = app_handle.state();
