@@ -130,6 +130,7 @@ interface SettingsDraft {
   autoGitInactiveThresholdSeconds: number
   autoAdvanceInboxAfterOrganize: boolean
   aiFeaturesEnabled: boolean
+  keepSessionsRunningOnQuit: boolean
   defaultAiAgent: AiAgentId
   defaultAiTarget: string
   aiModelProviders: AiModelProvider[]
@@ -169,6 +170,8 @@ interface SettingsBodyProps {
   setAutoAdvanceInboxAfterOrganize: (value: boolean) => void
   aiFeaturesEnabled: boolean
   setAiFeaturesEnabled: (value: boolean) => void
+  keepSessionsRunningOnQuit: boolean
+  setKeepSessionsRunningOnQuit: (value: boolean) => void
   aiAgentsStatus: AiAgentsStatus
   defaultAiAgent: AiAgentId
   setDefaultAiAgent: (value: AiAgentId) => void
@@ -247,6 +250,9 @@ function createSettingsDraft(
     ),
     autoAdvanceInboxAfterOrganize: settings.auto_advance_inbox_after_organize ?? false,
     aiFeaturesEnabled: areAiFeaturesEnabled(settings),
+    // Off unless the user has said otherwise: quitting stops the agent, the
+    // way Claude Code and Hermes behave.
+    keepSessionsRunningOnQuit: settings.keep_sessions_running_on_quit === true,
     defaultAiAgent: resolveDefaultAiAgent(settings.default_ai_agent),
     defaultAiTarget: resolveAiTarget(settings).id,
     aiModelProviders: normalizeAiModelProviders(settings.ai_model_providers),
@@ -324,6 +330,7 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     sidebar_type_pluralization_enabled: draft.sidebarTypePluralizationEnabled,
     initial_h1_auto_rename_enabled: draft.initialH1AutoRename,
     ai_features_enabled: draft.aiFeaturesEnabled,
+    keep_sessions_running_on_quit: draft.keepSessionsRunningOnQuit,
     default_ai_agent: draft.defaultAiAgent,
     default_ai_target: draft.defaultAiTarget,
     ai_model_providers: draft.aiModelProviders.length > 0 ? draft.aiModelProviders : null,
@@ -648,6 +655,10 @@ function SettingsBodyFromDraft({
       setAutoAdvanceInboxAfterOrganize={(value) => updateDraft('autoAdvanceInboxAfterOrganize', value)}
       aiFeaturesEnabled={draft.aiFeaturesEnabled}
       setAiFeaturesEnabled={(value) => updateDraft('aiFeaturesEnabled', value)}
+      keepSessionsRunningOnQuit={draft.keepSessionsRunningOnQuit}
+      setKeepSessionsRunningOnQuit={(value) =>
+        updateDraft('keepSessionsRunningOnQuit', value)
+      }
       aiAgentsStatus={aiAgentsStatus}
       defaultAiAgent={draft.defaultAiAgent}
       setDefaultAiAgent={(value) => updateDraft('defaultAiAgent', value)}
@@ -853,6 +864,8 @@ function SettingsAgentWorkflowSections({
   setAutoAdvanceInboxAfterOrganize,
   aiFeaturesEnabled,
   setAiFeaturesEnabled,
+  keepSessionsRunningOnQuit,
+  setKeepSessionsRunningOnQuit,
   aiAgentsStatus,
   defaultAiAgent,
   setDefaultAiAgent,
@@ -878,6 +891,8 @@ function SettingsAgentWorkflowSections({
           t={t}
           aiFeaturesEnabled={aiFeaturesEnabled}
           setAiFeaturesEnabled={setAiFeaturesEnabled}
+          keepSessionsRunningOnQuit={keepSessionsRunningOnQuit}
+          setKeepSessionsRunningOnQuit={setKeepSessionsRunningOnQuit}
           aiAgentsStatus={aiAgentsStatus}
           defaultAiAgent={defaultAiAgent}
           setDefaultAiAgent={setDefaultAiAgent}
@@ -1203,6 +1218,8 @@ function AiAgentSettingsSection({
   t,
   aiFeaturesEnabled,
   setAiFeaturesEnabled,
+  keepSessionsRunningOnQuit,
+  setKeepSessionsRunningOnQuit,
   aiAgentsStatus,
   defaultAiAgent,
   setDefaultAiAgent,
@@ -1216,6 +1233,8 @@ function AiAgentSettingsSection({
   | 't'
   | 'aiFeaturesEnabled'
   | 'setAiFeaturesEnabled'
+  | 'keepSessionsRunningOnQuit'
+  | 'setKeepSessionsRunningOnQuit'
   | 'aiAgentsStatus'
   | 'defaultAiAgent'
   | 'setDefaultAiAgent'
@@ -1253,6 +1272,13 @@ function AiAgentSettingsSection({
           checked={sessionAutoDistillEnabled}
           onChange={(value) => updateVaultConfigField('session_auto_distill_enabled', value)}
           testId="settings-session-auto-distill-enabled"
+        />
+        <SettingsSwitchRow
+          label={t('settings.aiAgents.keepSessionsRunning')}
+          description={t('settings.aiAgents.keepSessionsRunningDescription')}
+          checked={keepSessionsRunningOnQuit}
+          onChange={setKeepSessionsRunningOnQuit}
+          testId="settings-keep-sessions-running-on-quit"
         />
       </SettingsGroup>
 
