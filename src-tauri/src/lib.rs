@@ -307,6 +307,20 @@ fn setup_common_plugins(app: &mut tauri::App) -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
+/// The main window is hidden on close, not destroyed.
+///
+/// C22: closing the window used to destroy it while the app stayed alive for
+/// the menu-bar companion, so every reopen path — tray, dock, single-instance —
+/// called `show()` on a window that no longer existed and silently did nothing.
+/// The app was running with no way to get back to it. Reported on Windows,
+/// reproduced on macOS 2026-08-15; it was never platform-specific.
+///
+/// Only the main window. Note windows are genuinely disposable, and quitting
+/// still works because Cmd+Q raises `ExitRequested`, not `CloseRequested`.
+pub(crate) fn window_hides_instead_of_closing(label: &str) -> bool {
+    label == "main"
+}
+
 #[cfg(desktop)]
 fn focus_main_window(app_handle: &tauri::AppHandle) {
     use tauri::Manager;
@@ -681,6 +695,15 @@ pub fn run() {
         .manage(rhizome_search::service::RhizomeSearchService::default());
 
     with_invoke_handler(builder)
+        .on_window_event(|window, event| {
+            #[cfg(desktop)]
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window_hides_instead_of_closing(window.label()) {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
         .setup(setup_app)
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -693,6 +716,23 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::should_use_native_desktop_menu;
+    use super::window_hides_instead_of_closing;
+
+    /// C22 regression: the app stayed alive with an unreachable window because
+    /// closing destroyed it and every reopen path called `show()` on nothing.
+    #[test]
+    fn the_main_window_hides_on_close_so_it_can_be_reopened() {
+        assert!(window_hides_instead_of_closing("main"));
+    }
+
+    /// Note windows are disposable — keeping them alive hidden would leak a
+    /// window per note opened.
+    #[test]
+    fn other_windows_still_close_for_real() {
+        assert!(!window_hides_instead_of_closing("note-1"));
+        assert!(!window_hides_instead_of_closing("ai-workspace"));
+        assert!(!window_hides_instead_of_closing(""));
+    }
     use super::MACOS_WEBVIEW_RESERVED_COMMAND_KEYS;
     use super::MACOS_WEBVIEW_RESERVED_COMMAND_SHIFT_KEYS;
 
