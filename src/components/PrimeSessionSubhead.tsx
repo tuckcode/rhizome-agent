@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import type { CSSProperties } from 'react'
 import { cn } from '@/lib/utils'
 import { createTranslator, type AppLocale } from '../lib/i18n'
+import type { PrimeConnectionProblem } from '../hooks/usePrimeHostStatus'
 import { subheadTrafficLightInset } from '../utils/trafficLights'
 import {
   primeSessionUptime,
@@ -24,8 +25,46 @@ interface PrimeSessionSubheadProps {
    * running is no longer implied by how long the app has been open.
    */
   startedAt?: string | null
+  /**
+   * Why Prime is unreachable, when it is.
+   *
+   * Connecting to a service Rhizome does not own brings failure modes owning
+   * a child process did not, and ADR-0163 requires they be visible and
+   * actionable rather than a spinner.
+   */
+  problem?: PrimeConnectionProblem | null
   /** Frame A hides AiPanelHeader — New chat lives here instead. */
   onNewChat?: () => void
+}
+
+/**
+ * The actionable sentence for a connection problem.
+ *
+ * Returns `null` when there is nothing wrong, so the caller can fall back to
+ * the ordinary idle label rather than rendering an empty alarm.
+ */
+function describeProblem(
+  problem: PrimeConnectionProblem | null | undefined,
+  t: ReturnType<typeof createTranslator>,
+): string | null {
+  if (!problem) return null
+  switch (problem.code) {
+    case 'not_installed':
+      return t('ai.subhead.problem.notInstalled')
+    case 'service_unreachable':
+      return t('ai.subhead.problem.serviceUnreachable')
+    case 'service_too_old':
+      return problem.installedVersion
+        ? t('ai.subhead.problem.serviceTooOld', {
+            installed: problem.installedVersion,
+            required: problem.requiredVersion,
+          })
+        : t('ai.subhead.problem.serviceTooOldUnknown', { required: problem.requiredVersion })
+    default:
+      // An unrecognised code from a newer backend: say nothing rather than
+      // render a raw enum at the user.
+      return null
+  }
 }
 
 function Separator() {
@@ -47,6 +86,7 @@ export function PrimeSessionSubhead({
   model,
   vaultPath,
   startedAt,
+  problem,
   onNewChat,
 }: PrimeSessionSubheadProps) {
   const t = createTranslator(locale)
@@ -58,6 +98,7 @@ export function PrimeSessionSubhead({
   // a minute-resolution label — and if polling stops, a frozen uptime is the
   // honest reading, since nothing is confirming the session is alive.
   const uptime = live ? primeSessionUptime(startedAt) : null
+  const problemMessage = describeProblem(problem, t)
 
   return (
     <div
@@ -84,8 +125,15 @@ export function PrimeSessionSubhead({
             live ? 'bg-[var(--accent-green)]' : 'bg-muted-foreground/50',
           )}
         />
-        <span className={live ? 'text-[var(--accent-green)]' : undefined}>
-          {live ? t('ai.subhead.live') : t('ai.subhead.idle')}
+        <span
+          className={cn(
+            live && 'text-[var(--accent-green)]',
+            // A problem is not the same as idle: idle is a resting state, this
+            // is something the user has to act on.
+            !live && problemMessage && 'text-[var(--accent-amber,inherit)] text-foreground',
+          )}
+        >
+          {live ? t('ai.subhead.live') : (problemMessage ?? t('ai.subhead.idle'))}
         </span>
       </span>
 

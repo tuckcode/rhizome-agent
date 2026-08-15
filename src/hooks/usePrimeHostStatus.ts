@@ -2,6 +2,18 @@ import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 
+/**
+ * Why Prime is unreachable, when it is.
+ *
+ * A typed state rather than a message because each case has a different action
+ * behind it — install, start, or update. Mirrors `PrimeConnectionProblem` in
+ * `src-tauri/src/prime_session_host.rs`.
+ */
+export type PrimeConnectionProblem =
+  | { code: 'not_installed' }
+  | { code: 'service_unreachable'; detail?: string }
+  | { code: 'service_too_old'; installedVersion?: string | null; requiredVersion: string }
+
 export interface PrimeHostStatus {
   installed: boolean
   version: string | null
@@ -18,6 +30,8 @@ export interface PrimeHostStatus {
   startedAt?: string | null
   /** The attached session's log file, for rehydrating its transcript. */
   sessionPath?: string | null
+  /** Why Prime is unreachable. Absent while connected. */
+  problem?: PrimeConnectionProblem | null
 }
 
 const EMPTY: PrimeHostStatus = {
@@ -33,6 +47,7 @@ const EMPTY: PrimeHostStatus = {
   reattached: false,
   startedAt: null,
   sessionPath: null,
+  problem: null,
 }
 
 function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
