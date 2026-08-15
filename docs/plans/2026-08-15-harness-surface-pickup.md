@@ -1,5 +1,18 @@
 # Pickup — 2026-08-15 (Claude Opus 5) → next session
 
+> ⛔ **Partly superseded (2026-08-15d).** The section "**The slash-command
+> surface — the next build**" scopes that work against the RPC transport. That
+> scoping is wrong: the commands it names are mostly **daemon-only**, and
+> Prime's built-in commands do not execute when sent via `prompt`. See
+> `docs/adr/0163-connect-to-the-prime-daemon.md` and issue #5 (spec, 17 tickets
+> at #6–#22). The chain it prescribes — `/grill-with-docs` → `/to-spec` →
+> `/to-tickets` in one window — **was run, and produced those.**
+>
+> Everything else below stands: the reframe, the three confused counts, what
+> landed, what was verified, the open threads, and the traps. One correction —
+> "Prime's own 11 skills" is **right**; a later session's "correction" to 13 was
+> wrong. 13 ship; `linear` and `notion` do not load.
+
 Supersedes `2026-08-15-native-loop-handoff-for-claude.md` and
 `2026-08-15-claude-review-of-native-loop.md` as "what is true now". Both remain
 accurate history.
