@@ -108,6 +108,11 @@ pub struct PrimeHostStatus {
     /// it, so "working" can be told apart from "stuck".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub started_at: Option<String>,
+    /// The attached session's log file. Rehydrating on reattach reads this
+    /// rather than matching an id against a disk scan, so the transcript shown
+    /// is always the session actually attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_path: Option<String>,
 }
 
 /// Token / cost / context-window snapshot for the live Prime session.
@@ -272,6 +277,8 @@ struct PrimeHost {
     /// derived in the UI so a long-running session can be told from a stuck
     /// one without this having to tick.
     started_at: Option<String>,
+    /// The attached session's log file, from `get_state`.
+    session_path: Option<String>,
     model_provider: Option<String>,
     model_id: Option<String>,
     model_name: Option<String>,
@@ -422,6 +429,7 @@ pub fn get_status() -> PrimeHostStatus {
             model_name: host.model_name.clone(),
             reattached: host.reattached,
             started_at: host.started_at.clone(),
+            session_path: host.session_path.clone(),
         },
         None => PrimeHostStatus {
             installed: availability.installed,
@@ -435,6 +443,7 @@ pub fn get_status() -> PrimeHostStatus {
             model_name: None,
             reattached: false,
             started_at: None,
+            session_path: None,
         },
     }
 }
@@ -1203,6 +1212,7 @@ impl PrimeHost {
             session_id: None,
             reattached: false,
             started_at: None,
+            session_path: None,
             model_provider: None,
             model_id: None,
             model_name: None,
@@ -1467,6 +1477,9 @@ impl PrimeHost {
         }
         if let Some(created) = data["created"].as_str() {
             self.started_at = Some(created.to_string());
+        }
+        if let Some(session_file) = data["sessionFile"].as_str() {
+            self.session_path = Some(session_file.to_string());
         }
         let model = &data["model"];
         if model.is_null() {

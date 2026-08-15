@@ -26,6 +26,7 @@ import { useAiPanelController, type AiPanelController } from './useAiPanelContro
 import { useAiPanelPromptQueue } from './useAiPanelPromptQueue'
 import { useAiPanelFocus } from './useAiPanelFocus'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
+import { usePrimeSessionRehydrate } from '../hooks/usePrimeSessionRehydrate'
 import { usePrimeSessionStats } from '../hooks/usePrimeSessionStats'
 import { PrimeContextMeter } from './PrimeContextMeter'
 import { ChatComposerFoot } from './ChatComposerFoot'
@@ -220,6 +221,15 @@ export function AiPanelView({
   // Refresh when a turn finishes rather than only on the interval, so context
   // usage reflects the exchange that just happened.
   const primeStats = usePrimeSessionStats(isPrimeTarget, agent.status)
+
+  // Reopening lands back in work the daemon kept running, so the panel has to
+  // show that conversation rather than an empty one over a live session (#7).
+  usePrimeSessionRehydrate({
+    enabled: isPrimeTarget,
+    reattached: primeHost.reattached ?? false,
+    sessionPath: primeHost.sessionPath,
+    onTranscript: agent.replaceMessages,
+  })
 
   useAiPanelPromptQueue({
     agent,
