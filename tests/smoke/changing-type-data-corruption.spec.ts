@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 /** Click the first non-Theme note with a visible type selector, starting from startIndex. */
 async function clickNonThemeNote(page: import('@playwright/test').Page, startIndex = 0) {
@@ -22,6 +23,7 @@ async function clickNonThemeNote(page: import('@playwright/test').Page, startInd
 test.describe('Changing note type preserves content', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 900 })
+    await pinNotesShellLaunch(page)
     await page.goto('/')
     await page.waitForLoadState('networkidle')
   })

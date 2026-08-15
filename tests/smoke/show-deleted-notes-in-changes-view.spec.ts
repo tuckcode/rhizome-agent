@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { openCommandPalette, executeCommand } from './helpers'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 async function navigateToChanges(page: import('@playwright/test').Page) {
   await openCommandPalette(page)
@@ -9,6 +10,7 @@ async function navigateToChanges(page: import('@playwright/test').Page) {
 
 test.describe('Show deleted notes in Changes view', () => {
   test.beforeEach(async ({ page }) => {
+    await pinNotesShellLaunch(page)
     await page.goto('/')
     await page.waitForLoadState('networkidle')
   })

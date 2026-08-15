@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { executeCommand, openCommandPalette } from './helpers'
 import { seedAutoGitSavedChange } from './testBridge'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 type MockHandler = (args?: Record<string, unknown>) => unknown
 
@@ -202,6 +203,7 @@ async function triggerQuickCommit(page: Page) {
 
 test('@smoke AutoGit checkpoints on idle, and the bottom bar reuses the same message', async ({ page }) => {
   await page.addInitScript(installAutoGitMocks)
+  await pinNotesShellLaunch(page)
   await page.goto('/')
   await page.waitForLoadState('networkidle')
 

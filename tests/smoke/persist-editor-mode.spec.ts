@@ -1,11 +1,13 @@
 import { test, expect } from '@playwright/test'
 import { openCommandPalette, executeCommand } from './helpers'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 const RAW_EDITOR = '[data-testid="raw-editor-codemirror"]'
 const BLOCKNOTE_EDITOR = '.bn-editor'
 
 test.describe('Persist editor mode (raw/preview) across note switches', () => {
   test.beforeEach(async ({ page }) => {
+    await pinNotesShellLaunch(page)
     await page.goto('/')
     await page.waitForLoadState('networkidle')
     const noteList = page.locator('[data-testid="note-list-container"]')

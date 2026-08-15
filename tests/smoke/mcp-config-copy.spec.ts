@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test'
 import { sendShortcut } from './helpers'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 test.describe('MCP config copy', () => {
   test.beforeEach(async ({ page }) => {
     await page.route('**/api/vault/ping', route => route.fulfill({ status: 503 }))
+    await pinNotesShellLaunch(page)
     await page.goto('/')
     await expect(page.getByTestId('note-list-container')).toBeVisible({ timeout: 5_000 })
   })

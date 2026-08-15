@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test'
 import { executeCommand, openCommandPalette } from './helpers'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 test('clicking + in type section creates note with that type', async ({ page }) => {
+  await pinNotesShellLaunch(page)
   await page.goto('/')
   await page.waitForTimeout(2000)
 

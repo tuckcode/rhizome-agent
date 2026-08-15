@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 test.describe('Sidebar duplicate sections', () => {
   test.beforeEach(async ({ page }) => {
+    await pinNotesShellLaunch(page)
     await page.goto('/')
     await page.waitForLoadState('networkidle')
   })

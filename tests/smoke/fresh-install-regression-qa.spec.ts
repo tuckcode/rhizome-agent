@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { sendShortcut, openCommandPalette, findCommand } from './helpers'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 /**
  * Fresh-install regression QA: verify all 7 Done tasks work on a fresh
@@ -17,6 +18,7 @@ import { sendShortcut, openCommandPalette, findCommand } from './helpers'
 test.describe('Fresh-install regression: AI panel renders and works', () => {
   test.beforeEach(async ({ page }) => {
     await page.route('**/api/vault/ping', route => route.fulfill({ status: 503 }))
+    await pinNotesShellLaunch(page)
     await page.goto('/')
     await page.waitForTimeout(500)
   })

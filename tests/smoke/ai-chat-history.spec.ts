@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { installMockAiAgent, sendShortcut } from './helpers'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 function visibleAgentInput(page: Page) {
   return page.locator('[data-testid="agent-input"]:visible')
@@ -18,6 +19,8 @@ test.describe('AI chat conversation history', () => {
     await installMockAiAgent(page)
     // Block vault API so mock entries are used
     await page.route('**/api/vault/ping', route => route.fulfill({ status: 503 }))
+
+    await pinNotesShellLaunch(page)
 
     await page.goto('/')
     await page.waitForTimeout(500)
