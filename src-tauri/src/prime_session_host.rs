@@ -664,7 +664,7 @@ pub fn switch_session(session_path: &str) -> Result<String, String> {
             "sessionPath": session_path,
         }))?;
         if response["success"].as_bool() != Some(true) {
-            return Err(response_error(&response, "switch_session"));
+            return Err(switch_session_error(&response));
         }
         host.refresh_session_id()?;
         Ok(host.session_id.clone().unwrap_or_default())
@@ -1054,6 +1054,28 @@ fn stream_until_agent_end(mut on_event: impl FnMut(&serde_json::Value)) -> Resul
             }
         }
     }
+}
+
+/// Explain a refused session switch.
+///
+/// The daemon holds every client's sessions, so a session log can already be
+/// live in another worker — a conflict RPC mode could not produce, because
+/// Rhizome's own child was the only thing holding anything. ADR-0163 calls
+/// this out: connecting to a shared service buys failure modes owning a
+/// process did not have, and they have to be actionable rather than raw.
+///
+/// Prime's own wording names an internal worker id and a session file path.
+/// Neither is something a user can do anything about, and `worker` is
+/// transport vocabulary that must not surface in the UI (`CONTEXT.md`).
+/// Matched on the structured `errorInfo.code` rather than the prose, which is
+/// free to change between Prime versions.
+fn switch_session_error(response: &serde_json::Value) -> String {
+    if response["errorInfo"]["code"].as_str() == Some("session_already_active") {
+        return "That session is already open in another Prime client. \
+                Close it there, or choose a different session."
+            .to_string();
+    }
+    response_error(response, "switch_session")
 }
 
 fn response_error(response: &serde_json::Value, command: &str) -> String {
@@ -2635,6 +2657,62 @@ mod tests {
         let neither = serde_json::json!({ "success": false });
         let fallback = response_error(&neither, "set_model");
         assert!(fallback.contains("set_model"), "{fallback}");
+    }
+
+    /// A failure mode the daemon introduces and RPC mode could not produce:
+    /// one session log can only be live in one worker, and the daemon holds
+    /// every client's. Pinned from a live 0.7.1 refusal.
+    ///
+    /// The raw message names an internal worker id and a full path. Neither is
+    /// something a user can act on, and `worker` is transport vocabulary that
+    /// must never reach the UI (`CONTEXT.md`).
+    #[test]
+    fn a_session_held_elsewhere_is_explained_rather_than_leaked() {
+        let refusal = serde_json::json!({
+            "type": "response",
+            "command": "switch_session",
+            "success": false,
+            "error": "Session is already active in ba59aa844040: \
+                      /Users/dtc/.prime/agent/sessions/01a005b2-9453.jsonl",
+            "errorInfo": {
+                "code": "session_already_active",
+                "sessionPath": "/Users/dtc/.prime/agent/sessions/01a005b2-9453.jsonl",
+                "activeSessionId": "ba59aa844040"
+            }
+        });
+
+        let message = switch_session_error(&refusal);
+
+        assert!(
+            !message.contains("ba59aa844040"),
+            "an internal worker id is not actionable: {message}"
+        );
+        assert!(
+            !message.contains(".jsonl"),
+            "a session file path is not actionable: {message}"
+        );
+        assert!(
+            !message.to_lowercase().contains("worker"),
+            "`worker` stays in the transport layer: {message}"
+        );
+        assert!(
+            message.to_lowercase().contains("already open"),
+            "the user must learn what is wrong: {message}"
+        );
+    }
+
+    /// Any other refusal keeps Prime's own wording — inventing a friendlier
+    /// message for an error we have not seen would hide what went wrong.
+    #[test]
+    fn other_switch_failures_keep_primes_own_wording() {
+        let refusal = serde_json::json!({
+            "type": "response",
+            "command": "switch_session",
+            "success": false,
+            "error": "Session file is corrupt"
+        });
+
+        assert_eq!(switch_session_error(&refusal), "Session file is corrupt");
     }
 
     // ── Live ────────────────────────────────────────────────────────────────
