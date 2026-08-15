@@ -201,6 +201,36 @@ mod tests {
         assert!(unwrapped.unwrapped);
     }
 
+    /// Captured verbatim from a live `tool_execution_start` on 2026-08-15,
+    /// running the real vault skill against the real vault. Two things here
+    /// were not in the hand-written fixtures: the `%%bash` cell magic, and a
+    /// space inside the vault path.
+    #[test]
+    fn the_live_skill_invocation_unwraps() {
+        let code = "%%bash\nVAULT_PATH='/Users/dtc/Documents/Rhizome Vault' node '/Users/dtc/code/projects/rhizome-agent/mcp-server/cli-call.mjs' get_note '{\"path\":\"inbox/20260814-promote-loop.md\"}'";
+
+        let unwrapped = unwrap_tool("ipython", &serde_json::json!({ "code": code }));
+
+        assert_eq!(unwrapped.tool, "get_note");
+        assert_eq!(
+            unwrapped.path.as_deref(),
+            Some("inbox/20260814-promote-loop.md")
+        );
+        assert!(unwrapped.unwrapped);
+    }
+
+    /// The same turn's other call: reading the skill file itself. Not a vault
+    /// operation, so it must stay `ipython` and offer no Open.
+    #[test]
+    fn the_live_skill_read_is_not_mistaken_for_a_vault_call() {
+        let code = "from pathlib import Path\nprint(Path('/Users/dtc/Documents/Rhizome Vault/.prime/agent/skills/rhizome-vault/SKILL.md').read_text())";
+
+        let unwrapped = unwrap_tool("ipython", &serde_json::json!({ "code": code }));
+
+        assert_eq!(unwrapped.tool, "ipython");
+        assert_eq!(unwrapped.path, None);
+    }
+
     #[test]
     fn create_note_survives_a_multiline_python_wrapper() {
         let code = "import subprocess\nsubprocess.run(\"\"\"VAULT_PATH='/v' node '/r/mcp-server/cli-call.mjs' create_note '{\"path\":\"inbox/idea.md\",\"content\":\"# Idea\"}'\"\"\", shell=True)";

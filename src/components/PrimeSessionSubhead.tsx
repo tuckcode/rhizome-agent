@@ -1,6 +1,9 @@
 import { Plus } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import type { CSSProperties } from 'react'
+import { cn } from '@/lib/utils'
 import { createTranslator, type AppLocale } from '../lib/i18n'
+import { subheadTrafficLightInset } from '../utils/trafficLights'
 import { shortPrimeSessionId, tildeVaultPath } from '../lib/primeSubheadLabels'
 
 interface PrimeSessionSubheadProps {
@@ -35,20 +38,36 @@ export function PrimeSessionSubhead({
   onNewChat,
 }: PrimeSessionSubheadProps) {
   const t = createTranslator(locale)
+  const trafficLightInset = subheadTrafficLightInset() as CSSProperties
   const shortId = shortPrimeSessionId(sessionId)
   const vault = tildeVaultPath(vaultPath)
 
   return (
     <div
-      className="flex min-h-[30px] shrink-0 items-center gap-2.5 border-b border-border px-3 font-mono text-[10.5px] tracking-[0.03em] text-muted-foreground"
+      className={cn(
+        'flex min-h-[30px] shrink-0 items-center gap-2.5 border-b border-border pr-3',
+        'font-mono text-[10.5px] tracking-[0.03em] text-muted-foreground',
+        // macOS puts the traffic lights at x=58 (tauri.conf.json) and this strip
+        // is the topmost band on ChatHome, so nothing else absorbs them. The
+        // design system's own `.subhead` carries the same clearance as
+        // `padding-left: 60px`; it is measured from the window edge, so the
+        // 46px rail to our left comes off it.
+        'pl-[var(--subhead-traffic-light-inset,0.75rem)]',
+      )}
+      style={trafficLightInset}
       data-testid="prime-session-subhead"
     >
       <span className="inline-flex shrink-0 items-center gap-1.5">
         <span
           aria-hidden="true"
-          className={live ? 'size-[5px] rounded-full bg-primary' : 'size-[5px] rounded-full bg-muted-foreground/50'}
+          className={cn(
+            'size-[5px] rounded-full',
+            // Status, not brand: --primary follows the user's accent choice, so
+            // a red accent would make a healthy session read as an error.
+            live ? 'bg-[var(--accent-green)]' : 'bg-muted-foreground/50',
+          )}
         />
-        <span className={live ? 'text-primary' : undefined}>
+        <span className={live ? 'text-[var(--accent-green)]' : undefined}>
           {live ? t('ai.subhead.live') : t('ai.subhead.idle')}
         </span>
       </span>
