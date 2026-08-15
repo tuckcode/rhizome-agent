@@ -184,7 +184,8 @@ session — put these in practice tomorrow, do not just file them:
    in preview. This session failed to start `pnpm dev` from Hermes
    (background flag). **You** start the server; Atticus launches native
    apps. Do not loop on a stuck tool.
-7. **Do not push unless Atticus says push.** Pre-push needs LLVM vars
+7. ~~**Do not push unless Atticus says push.**~~ **Superseded** — push when
+   gates pass, see `docs/HANDOFF.md`. Pre-push needs LLVM vars
    (below). Parent of a dual session owns full pre-push if both of you
    committed.
 8. **Path fence if you ever run parallel.** Typical: one agent on

@@ -2,6 +2,31 @@
 
 Living doc. Update in place each session. This file is "what's true right now," not a history log. Detailed per-session records go in `docs/plans/*-session-status.md`.
 
+## ⛔ Standing rule correction — pushing (2026-08-15)
+
+**Push when the pre-push gates pass. You do not need to ask.** That is what
+`AGENTS.md` §"Commits & pushes" says and always said: *"Commit locally, push to
+origin main when pre-push gates pass."*
+
+Session handoffs dated 08-14 and 08-15 carry a contradicting rule ("do not push
+until asked"). **It is stale.** It began as a workaround while the **`knispo`**
+GitHub account was suspended (C8) and every push errored, then propagated by
+each handoff copying the previous one until it outranked the binding doc.
+
+This repo's origin is **`tuckcode/rhizome-agent`** — a different account, which
+pushed successfully twice on 2026-08-15. C8 never applied here; it is inherited
+Desktop context, like the rest of the pre-fork history.
+
+What it cost: 20 commits sat unpushed behind two failed attempts, and the
+failure cause (an incomplete Playwright fixture pin) went undiagnosed until
+someone ran the lane. Unpushed work also diverges quietly when more than one
+agent is committing to the tree.
+
+Still true, and not what this rule was about: **never `--no-verify`**, and a
+push is not a release — releases are tagged builds with signed installers.
+
+---
+
 ## Session handoff — 2026-08-15b (Claude review + push blocker cleared)
 
 **Next agent: read `docs/plans/2026-08-15-claude-review-of-native-loop.md`,
@@ -506,7 +531,7 @@ Note what this implies about the record: sessions in this window that report "al
 - ~~C4-OPEN: tolaria MCP server path mismatch across live configs~~ **RESOLVED `2fa620a5`**
 - ~~C6-OPEN: inbox automation default~~ **RESOLVED 2026-07-31.** Default ON for new vaults, plus a one-time per-vault migration for existing ones. See "Investigation done" item 1 above.
 - C7-OPEN: native QA for shell waves — requires a real `.app` bundle or Accessibility permission. Do not graduate shell flags without it.
-- **C8-OPEN: GitHub account suspended** — blocks push + Windows CI release for friend build. Unblock tonight from home device/`knispo13@gmail.com`.
+- **C8-NOT-APPLICABLE-HERE: GitHub account suspended** — this is the **`knispo`** account, inherited from the pre-fork Desktop history. This repo pushes to **`tuckcode/rhizome-agent`**, which works (verified 2026-08-15, two successful pushes). Left in the list rather than deleted because it is still the origin of the stale "do not push until asked" rule corrected at the top of this file. Original entry: GitHub account suspended — blocks push + Windows CI release for friend build. Unblock tonight from home device/`knispo13@gmail.com`.
 - **C11-OPEN: `GETTING_STARTED_REPO_URL` still clones `refactoringhq/tolaria-getting-started.git`** (`src-tauri/src/vault/getting_started.rs:6`) — an unrelated upstream project. The seeded `AGENTS.md` link was removed 2026-07-31, but this one is a *functional* clone URL behind the Getting Started flow, so it can't just be deleted. Needs a replacement starter-vault repo under `knispo` — blocked on GitHub access. Full breakdown incl. what must NOT be renamed: CROSS-MODEL-HANDOFF §6.
 - C9-OPEN: optional first-run Welcome even when a default vault already exists (user wants optional onboard with skip-to-existing). Product decision pending.
 - C10-OPEN: spotlight onboarding walkthrough still unbuilt (`docs/design/onboarding-walkthrough.md`).
