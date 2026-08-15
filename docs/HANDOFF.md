@@ -2,22 +2,21 @@
 
 Living doc. Update in place each session. This file is "what's true right now," not a history log. Detailed per-session records go in `docs/plans/*-session-status.md`.
 
-## Session handoff — 2026-08-14 (Frame A close + launch ChatHome)
+## Session handoff — 2026-08-14 evening (after Frame C look)
 
-**Claude Code: read `docs/plans/2026-08-14-frame-a-session-status.md` first.**
-It is the self-contained pickup (what shipped, what is prototype, how to
-see ChatHome, dual-agent workflow, traps).
+**Next agent: read `docs/plans/2026-08-14-after-frame-c-pickup.md` first.**
+Frame A leftover plan is closed. Do not start Frame D because it is the
+next HTML tab. Do not fill remaining Prime RPCs.
 
-**Unpushed — count them, do not trust a number here:**
-`git rev-list --count origin/main..HEAD`. Atticus has not asked to push.
-`aeee08c` lastToolName · `7f7f19a` foot · `1b6cbb2` A4 skip + C24 ·
-`15a8448` launch ChatHome · `f2eb0c3` / `1fb1728`+ handoff docs.
+**Unpushed — count them:** `git rev-list --count origin/main..HEAD`.
+Atticus has not asked to push.
 
-**Do not:** rebuild A4; hardcode a model; treat the Desktop wiki shell as
-the design; resume the 08-09 "19 tests fail / push blocked" story.
+**Do not:** rebuild A4; hardcode a model; treat the Notes-rail wiki as
+ChatHome; resume the 08-09 "19 tests fail / push blocked" story.
 
-**Next:** Frame C Save is a labeled visible button. Frame D (no vault /
-locked memory) is the next artboard. C24 on next Mycelium touch.
+**Next:** native `pnpm tauri dev` promote → Open. Vite cannot prove the
+loop. QueueUpdate chrome only if native is blocked. C24 on next
+Mycelium touch.
 
 
 ---
