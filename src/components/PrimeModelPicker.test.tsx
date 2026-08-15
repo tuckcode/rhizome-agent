@@ -54,6 +54,20 @@ describe('PrimeModelPicker', () => {
     await waitFor(() => expect(cmds()).toContain('get_available_prime_models'))
   })
 
+  it('starts the Prime host before listing models', async () => {
+    render(<PrimeModelPicker label={null} vaultPath="/Users/dtc/Documents/Rhizome Vault" />)
+    fireEvent.pointerDown(
+      screen.getByTestId('prime-model-chip'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+
+    await waitFor(() => {
+      expect(cmds()[0]).toBe('ensure_prime_session_host')
+      expect(invoked.calls[0]?.args).toEqual({ vaultPath: '/Users/dtc/Documents/Rhizome Vault' })
+    })
+    expect(cmds()).toContain('get_available_prime_models')
+  })
+
   it('shows the current model on the chip', () => {
     render(<PrimeModelPicker label="Grok 4.5" />)
 
