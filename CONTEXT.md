@@ -17,11 +17,21 @@ still lives in `docs/ARCHITECTURE.md` / `docs/ABSTRACTIONS.md` (Desktop inherita
 
 | Term | Meaning |
 |------|---------|
-| **Prime / Prime Agent** | The **only** agent runtime in Agent product UI. Long-lived session engine (`prime-agent --mode rpc`), skills, extensions, providers/models, compaction, continual harness. **Built on Pi** — session JSONL under `~/.prime/agent/sessions/` is Pi-shaped (Mindwalk already labels it `harness: pi`). |
+| **Prime / Prime Agent** | The **only** agent runtime in Agent product UI. Long-lived session engine, skills, extensions, providers/models, compaction, continual harness. **Built on Pi** — session JSONL under `~/.prime/agent/sessions/` is Pi-shaped (Mindwalk already labels it `harness: pi`). |
 | **Harness** | Prime’s tooling and infrastructure embedded in the chat desktop shell (Hermes-Desktop-class ambition over time; v0 = core loop + skills/status). |
-| **Session host** | In-process Rust owner of one long-lived Prime RPC child (`prime_session_host`). Process-global for v0; cwd follows active vault path when set. |
+| **Prime daemon** | Prime’s own background service. Runs independently of any client and outlives them; hosts workers. Rhizome connects to it, does not own it (ADR-0163). |
+| **Session host** | Rhizome’s Rust client of the [[Prime daemon]] (`prime_session_host`). A *connection*, not a parent — closing Rhizome detaches it and leaves sessions running. Superseded the RPC-child owner it was until 2026-08-15. |
+| **Session** | The user-facing unit of work: one conversation with Prime, listed, named, switched and resumed. **The only word the UI uses** for a running thing. Follows Hermes Agent, which meets the same product-name collision and resolves it the same way. |
+| **Worker** | The daemon-side process holding one or more sessions. **Internal to the transport layer** — never surfaced in UI or product copy. |
+| **Subagent** | A session Prime spawned from another session (Prime’s RLM recursion). Subordinate by name, so it does not compete with [[Session]]. |
+| **Agent** | Reserved for the product, **Rhizome Agent**. Never a running thing — that is a [[Session]]. |
 | **Model** | An LLM selected **through Prime** (e.g. xAI/OpenAI/Anthropic as configured in `~/.prime`). Not a separate in-app “agent backend.” |
-| **Agent backend** (legacy) | Desktop-era CLI targets (Claude Code, Codex, Hermes, …). **Hidden** in Agent UI; code may remain until prune. Not part of the product story. |
+| **Agent backend** (legacy) | Desktop-era CLI targets (Claude Code, Codex, Hermes, …). **Hidden** in Agent UI. Retains the old third sense of “agent”; rename on contact so [[Agent]] means only the product. |
+| **Goal** | A persistent objective a [[Session]] works toward, with a token budget. Readable from Prime’s state; **set by invoking Prime’s own `goal` skill**, not by a protocol call — the one harness control without a direct mechanism. |
+| **Heartbeat** | A recurring prompt a [[Session]] scheduled for *itself* — Prime re-entering its own work on a timer. |
+| **Schedule** | A one-off or recurring job on the [[Prime daemon]]. Distinct from [[Heartbeat]]: a heartbeat is the session waking itself, a schedule is work booked on the daemon. |
+| **Harness controls** | The interactive surface for [[Goal]], [[Heartbeat]], [[Schedule]], model and thinking level. State you *read and set* — as opposed to the [[Command menu]], which is actions you *run*. |
+| **Command menu** | The `/`-triggered list in the composer. Carries Prime’s own commands and Rhizome-installed skills only — **never the user’s own `~/.agents/skills`**, which are a personal coding toolkit and not part of this product. |
 
 ## Memory
 
@@ -49,7 +59,7 @@ still lives in `docs/ARCHITECTURE.md` / `docs/ABSTRACTIONS.md` (Desktop inherita
 | **Chat-first** | Primary surface is conversation with Prime, not the full Desktop wiki chrome. |
 | **Vault-aware** | With a vault attached: MCP tools, open-note from results, save/promote. Without vault: chat still works; memory depth locked. |
 | **Open-note** | Enough note UI to open/edit a vault file from a tool hit or promote result — not full graph/onboarding parity. |
-| **Mycelium** | Rail destination **with Graph** (node map): agent **run footprint** on a repo — where the session searched/read/edited. Product name for the Mindwalk-class lens. v1 = BYO [Mindwalk](https://github.com/cosmtrek/mindwalk) (MIT) + Prime `ipython`/`%%bash` → paths bridge; not a rewrite of the citymap engine. Optional later fork/rebrand. Complements Graph (wiki links) and Changes (git). |
+| **Mycelium** | The **run footprint** lens: where a [[Session]] searched, read and edited. Complements Graph (wiki links) and Changes (git). Rendered **inside Rhizome** and carrying Rhizome’s own visual language — not a launcher for another app, which is what it was until 2026-08-15. Engine remains [Mindwalk](https://github.com/cosmtrek/mindwalk), run as a local sidecar and credited per its licence; forking it is a later call, not a prerequisite. Two entry points: rail = across all sessions, in-session button = this session only. |
 
 ## Related docs
 
