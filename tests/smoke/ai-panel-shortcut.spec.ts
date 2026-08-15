@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test'
 import { sendShortcut } from './helpers'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 test.describe('AI panel shortcut', () => {
   test.beforeEach(async ({ page }) => {
     await page.route('**/api/vault/ping', route => route.fulfill({ status: 503 }))
+    await pinNotesShellLaunch(page)
     await page.goto('/')
     await expect(page.locator('[data-testid="note-list-container"]')).toBeVisible({ timeout: 5_000 })
   })

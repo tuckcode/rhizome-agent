@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { openCommandPalette, executeCommand } from './helpers'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 /**
  * Smoke test: editing in raw (CodeMirror) mode and switching back to
@@ -54,6 +55,7 @@ async function setRawEditorContent(page: Page, content: string) {
 test.describe('Raw editor ↔ BlockNote sync', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 900 })
+    await pinNotesShellLaunch(page)
     await page.goto('/')
     await page.waitForLoadState('networkidle')
   })

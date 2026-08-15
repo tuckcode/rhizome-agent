@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 async function openFirstNoteWithProperties(page: Page) {
   const noteList = page.locator('[data-testid="note-list-container"]')
@@ -73,6 +74,7 @@ async function restoreOriginalType(page: Page, originalType: string) {
 test.describe('Raw editor type propagation', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 900 })
+    await pinNotesShellLaunch(page)
     await page.goto('/')
     await page.waitForLoadState('networkidle')
   })

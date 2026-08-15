@@ -4,6 +4,7 @@ import path from 'path'
 import {
   createFixtureVaultCopy,
   openFixtureVault,
+  pinNotesShellLaunch,
   removeFixtureVaultCopy,
 } from '../helpers/fixtureVault'
 
@@ -95,6 +96,10 @@ async function dispatchModifiedLinkActivation(link: ReturnType<Page['locator']>)
 
 test.describe('Wikilink insertion and navigation', () => {
   test.beforeEach(async ({ page }) => {
+    // This block navigates without openFixtureVault, so it does not inherit
+    // that helper's notes-shell pin. Without it, launch opens ChatHome and
+    // `.app__note-list` never renders.
+    await pinNotesShellLaunch(page)
     await page.route('**/api/vault/ping', route => route.fulfill({ status: 503 }))
     await page.goto('/')
     await page.waitForTimeout(500)

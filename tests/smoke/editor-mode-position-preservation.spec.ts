@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { sendShortcut } from './helpers'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 interface RawEditorState {
   lineCount: number
@@ -164,6 +165,7 @@ async function selectDeepRawBodyLine(page: Page): Promise<RawLineTarget> {
 test.describe('Editor mode position preservation', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 900 })
+    await pinNotesShellLaunch(page)
     await page.goto('/')
     await page.waitForLoadState('networkidle')
     await page.locator('[data-testid="note-list-container"]').waitFor({ timeout: 5_000 })

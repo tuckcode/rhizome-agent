@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test'
 import { openCommandPalette, executeCommand } from './helpers'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 const LIST_ITEM_MARKER = /^[-*+]\s/
 const HEADING_MARKER = /^#{1,6}\s/
@@ -124,6 +125,7 @@ function expectNoExtraBlankLinesAfterHeadings(rawContent: MarkdownContent) {
 test.describe('BlockNote serializer blank lines fix', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 900 })
+    await pinNotesShellLaunch(page)
     await page.goto('/')
     await page.waitForLoadState('networkidle')
   })

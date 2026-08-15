@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { executeCommand, openCommandPalette } from './helpers'
 import { seedAutoGitSavedChange } from './testBridge'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 type MockHandler = (args?: Record<string, unknown>) => unknown
 
@@ -156,6 +157,7 @@ async function expectPushCount(page: Page, expectedCount: number) {
 
 test('@smoke commit entry opens the manual modal when AutoGit is off and switches back immediately when enabled', async ({ page }) => {
   await page.addInitScript(installCommitFlowMocks)
+  await pinNotesShellLaunch(page)
   await page.goto('/')
   await page.waitForLoadState('networkidle')
 

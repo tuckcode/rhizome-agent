@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { openCommandPalette, executeCommand } from './helpers'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 async function openFirstNoteInRawMode(page: Page) {
   const noteList = page.locator('[data-testid="note-list-container"]')
@@ -50,6 +51,7 @@ async function getSelectionLength(page: Page): Promise<number> {
 test.describe('CodeMirror cursor at non-100% zoom', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 900 })
+    await pinNotesShellLaunch(page)
     await page.goto('/')
     await page.waitForLoadState('networkidle')
   })

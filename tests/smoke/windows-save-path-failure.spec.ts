@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { executeCommand, openCommandPalette, sendShortcut } from './helpers'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 const RAW_EDITOR = '.cm-content'
 
@@ -60,6 +61,8 @@ test('failed Windows path saves show a recoverable toast and retry the draft', a
   await page.route('**/api/vault/ping', async (route) => {
     await route.fulfill({ status: 404, body: '' })
   })
+
+  await pinNotesShellLaunch(page)
 
   await page.goto('/')
   await openFirstNote(page)

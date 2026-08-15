@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test'
 import { openCommandPalette, findCommand } from './helpers'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 test.describe('Cache invalidation on vault open', () => {
   test.beforeEach(async ({ page }) => {
+    await pinNotesShellLaunch(page)
     await page.goto('/')
     await page.waitForLoadState('networkidle')
   })

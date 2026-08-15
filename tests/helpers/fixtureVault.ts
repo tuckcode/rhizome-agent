@@ -52,6 +52,23 @@ function copyDirSync({ src, dest }: CopyDirArgs): void {
   }
 }
 
+/**
+ * Keep a page on the notes shell across `page.goto('/')`.
+ *
+ * Launch opens ChatHome once per browser session (`useAppAiWorkspaceBridge`),
+ * which is correct product behaviour and wrong for a spec asserting on
+ * `.app__note-list`. `openFixtureVault` already pins this; specs that navigate
+ * with a bare `goto` do not go through it and need this directly.
+ *
+ * Call before the first `goto` — `addInitScript` only applies to navigations
+ * that happen after it is registered.
+ */
+export async function pinNotesShellLaunch(page: Page): Promise<void> {
+  await page.addInitScript((key: string) => {
+    sessionStorage.setItem(key, '1')
+  }, AGENT_CHAT_OPENED_SESSION_KEY)
+}
+
 export function createFixtureVaultCopy(): string {
   const tempVaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'laputa-test-vault-'))
   copyDirSync({ src: FIXTURE_VAULT, dest: tempVaultDir })

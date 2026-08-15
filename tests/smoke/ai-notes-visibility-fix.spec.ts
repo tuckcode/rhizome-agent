@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { WebSocketServer } from 'ws'
+import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 const NEW_NOTE_PATH = '/Users/luca/Laputa/note/ai-created-note.md'
 const NEW_NOTE_TITLE = 'AI Created Note'
@@ -83,6 +84,8 @@ test.describe('AI-created note visibility', () => {
       data[NEW_NOTE_PATH] = NEW_NOTE_CONTENT
       await route.fulfill({ json: data })
     })
+
+    await pinNotesShellLaunch(page)
 
     await page.goto('/')
 
