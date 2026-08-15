@@ -55,7 +55,7 @@ export default function ChatHome({
   onExit,
 }: ChatHomeProps) {
   const isPrimeTarget = defaultAiTarget?.kind !== 'api_model' && defaultAiAgent === 'prime'
-  const primeHost = usePrimeHostStatus(isPrimeTarget)
+  const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
 
@@ -113,6 +113,7 @@ export default function ChatHome({
                 locale={locale}
                 modelLabel={primeModelLabel(primeHost)}
                 vaultLabel={vaultLabelFromPath(vaultPath)}
+                vaultPath={vaultPath}
                 contextLabel={openNote ? openNote.label.split('/').filter(Boolean).at(-1) ?? openNote.label : null}
                 skillsLabel="rhizome-vault"
               />

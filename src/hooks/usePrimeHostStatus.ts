@@ -26,15 +26,15 @@ const EMPTY: PrimeHostStatus = {
   modelName: null,
 }
 
-function call<T>(command: string): Promise<T> {
-  return isTauri() ? invoke<T>(command) : mockInvoke<T>(command)
+function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  return isTauri() ? invoke<T>(command, args) : mockInvoke<T>(command, args)
 }
 
 /**
  * Lightweight poll of the long-lived Prime RPC host status (model name, running).
  * Used for AI panel chrome — not a substitute for stream events.
  */
-export function usePrimeHostStatus(enabled = true): PrimeHostStatus {
+export function usePrimeHostStatus(enabled = true, vaultPath?: string): PrimeHostStatus {
   const [status, setStatus] = useState<PrimeHostStatus>(EMPTY)
 
   useEffect(() => {
@@ -51,13 +51,24 @@ export function usePrimeHostStatus(enabled = true): PrimeHostStatus {
         })
     }
 
-    refresh()
+    const start = async () => {
+      if (vaultPath) {
+        try {
+          await call('ensure_prime_session_host', { vaultPath })
+        } catch {
+          // Status poll still runs — chip shows not-running instead of hanging.
+        }
+      }
+      if (!cancelled) refresh()
+    }
+
+    void start()
     const id = window.setInterval(refresh, 4000)
     return () => {
       cancelled = true
       window.clearInterval(id)
     }
-  }, [enabled])
+  }, [enabled, vaultPath])
 
   return status
 }

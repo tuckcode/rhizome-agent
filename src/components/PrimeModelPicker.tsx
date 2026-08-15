@@ -26,6 +26,8 @@ interface PrimeModelPickerProps {
   label?: string | null
   disabled?: boolean
   side?: 'top' | 'bottom'
+  /** Vault the host should attach to. Required to spawn if nothing is running. */
+  vaultPath?: string
 }
 
 /**
@@ -41,6 +43,7 @@ export function PrimeModelPicker({
   label,
   disabled = false,
   side = 'top',
+  vaultPath,
 }: PrimeModelPickerProps) {
   const t = createTranslator(locale)
   const [open, setOpen] = useState(false)
@@ -54,6 +57,9 @@ export function PrimeModelPicker({
       let listed: PrimeModel[] = []
       let failure: string | null = null
       try {
+        if (vaultPath) {
+          await call('ensure_prime_session_host', { vaultPath })
+        }
         listed = await call<PrimeModel[]>('get_available_prime_models')
       } catch (e) {
         failure = e instanceof Error ? e.message : String(e)
@@ -65,20 +71,23 @@ export function PrimeModelPicker({
     return () => {
       cancelled = true
     }
-  }, [open, models])
+  }, [open, models, vaultPath])
 
   // No success callback: `usePrimeHostStatus` polls the host, so the chip's
   // label follows the switch on its own within one interval.
   const select = useCallback(
     async (model: PrimeModel) => {
       try {
+        if (vaultPath) {
+          await call('ensure_prime_session_host', { vaultPath })
+        }
         await call('set_prime_model', { provider: model.provider, modelId: model.id })
         trackPrimeModelChanged(model.provider)
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
       }
     },
-    [],
+    [vaultPath],
   )
 
   const groups = groupModelsByProvider(models ?? [])
