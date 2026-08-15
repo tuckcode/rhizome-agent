@@ -102,6 +102,12 @@ pub struct PrimeHostStatus {
     /// Display name from Prime get_state model, when known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_name: Option<String>,
+    /// True when this connection rejoined a session that was already running.
+    pub reattached: bool,
+    /// When the attached session started, ISO-8601. The UI derives uptime from
+    /// it, so "working" can be told apart from "stuck".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
 }
 
 /// Token / cost / context-window snapshot for the live Prime session.
@@ -259,6 +265,13 @@ struct PrimeHost {
     active_session_id: String,
     /// Prime's own session id, from `get_state`. Changes on `new_session`.
     session_id: Option<String>,
+    /// True when this connection rejoined work that was already running,
+    /// rather than starting something new.
+    reattached: bool,
+    /// When the attached session was created, ISO-8601 from Prime. Uptime is
+    /// derived in the UI so a long-running session can be told from a stuck
+    /// one without this having to tick.
+    started_at: Option<String>,
     model_provider: Option<String>,
     model_id: Option<String>,
     model_name: Option<String>,
@@ -407,6 +420,8 @@ pub fn get_status() -> PrimeHostStatus {
             model_provider: host.model_provider.clone(),
             model_id: host.model_id.clone(),
             model_name: host.model_name.clone(),
+            reattached: host.reattached,
+            started_at: host.started_at.clone(),
         },
         None => PrimeHostStatus {
             installed: availability.installed,
@@ -418,6 +433,8 @@ pub fn get_status() -> PrimeHostStatus {
             model_provider: None,
             model_id: None,
             model_name: None,
+            reattached: false,
+            started_at: None,
         },
     }
 }
@@ -1056,6 +1073,38 @@ fn stream_until_agent_end(mut on_event: impl FnMut(&serde_json::Value)) -> Resul
     }
 }
 
+/// Choose which running session reopening should land in.
+///
+/// Three rules, in order:
+///
+/// - **Same working directory.** A session rooted somewhere else is somebody
+///   else's work; opening a vault must not adopt it.
+/// - **Nobody else is holding it.** The daemon allows several clients on one
+///   session, but this product shows one conversation per window (#5, out of
+///   scope: multi-window). Taking a session another client is displaying would
+///   be a hijack, so those are skipped and a fresh one is made instead.
+/// - **Most recently active wins**, which is what "where I left off" means when
+///   several are running.
+///
+/// `lastActivityAt` is ISO-8601 in UTC with a `Z` suffix, so lexicographic
+/// order is chronological order and no date parsing is needed. A session
+/// missing the field sorts oldest rather than winning by accident.
+fn pick_resumable_session(data: &serde_json::Value, cwd: &Path) -> Option<String> {
+    let cwd = cwd.to_string_lossy();
+    data["sessions"]
+        .as_array()?
+        .iter()
+        .filter(|session| session["cwd"].as_str() == Some(cwd.as_ref()))
+        .filter(|session| session["attachedClients"].as_u64().unwrap_or(0) == 0)
+        .max_by_key(|session| session["lastActivityAt"].as_str().unwrap_or(""))
+        .and_then(|session| {
+            session["activeSessionId"]
+                .as_str()
+                .or_else(|| session["id"].as_str())
+        })
+        .map(str::to_string)
+}
+
 /// Explain a refused session switch.
 ///
 /// The daemon holds every client's sessions, so a session log can already be
@@ -1152,6 +1201,8 @@ impl PrimeHost {
             connected,
             active_session_id: String::new(),
             session_id: None,
+            reattached: false,
+            started_at: None,
             model_provider: None,
             model_id: None,
             model_name: None,
@@ -1164,26 +1215,23 @@ impl PrimeHost {
         // protocol version and confirms we are talking to a daemon at all.
         host.await_hello()?;
 
-        // `create` takes cwd inside `config`, not at the top level. Sending it
-        // at the top level is silently ignored and the session lands in the
-        // daemon's own directory, which is how the vault tools would quietly
-        // start operating on the wrong tree.
-        let created = host.send_bare_command(serde_json::json!({
-            "type": "create",
-            "config": { "cwd": cwd.to_string_lossy() },
-            // Explicit rather than defaulted: outliving this client is the
-            // property ADR-0163 exists for, so it should not rest on a default.
-            "lifecycle": "resident",
-        }))?;
-        if created["success"].as_bool() != Some(true) {
-            let _ = host.shutdown();
-            return Err(response_error(&created, "create"));
+        // Rejoin work left running here before starting anything new. This is
+        // what makes closing the window a detach rather than a loss (#7): the
+        // daemon kept the session, so reopening should land back in it.
+        match host.find_resumable_session(&cwd) {
+            Ok(Some(found)) => {
+                log::info!("Reattaching to Prime session {found}");
+                host.active_session_id = found;
+                host.reattached = true;
+            }
+            Ok(None) => host.create_session(&cwd)?,
+            Err(error) => {
+                // Enumeration is an optimisation, not a precondition. Failing
+                // to list is no reason to refuse to open — start fresh.
+                log::debug!("Could not enumerate Prime sessions, creating one: {error}");
+                host.create_session(&cwd)?;
+            }
         }
-        let Some(active_session_id) = created["data"]["activeSessionId"].as_str() else {
-            let _ = host.shutdown();
-            return Err("Prime's daemon created a session without an id".into());
-        };
-        host.active_session_id = active_session_id.to_string();
 
         let attached = host.send_bare_command(serde_json::json!({
             "type": "attach",
@@ -1213,6 +1261,44 @@ impl PrimeHost {
         }
 
         Ok(host)
+    }
+
+    /// Create a fresh session rooted at `cwd`, and adopt it.
+    ///
+    /// `create` takes cwd inside `config`, not at the top level. Sending it at
+    /// the top level is silently ignored and the session lands in the daemon's
+    /// own directory, which is how the vault tools would quietly start
+    /// operating on the wrong tree.
+    fn create_session(&mut self, cwd: &Path) -> Result<(), String> {
+        let created = self.send_bare_command(serde_json::json!({
+            "type": "create",
+            "config": { "cwd": cwd.to_string_lossy() },
+            // Explicit rather than defaulted: outliving this client is the
+            // property ADR-0163 exists for, so it should not rest on a default.
+            "lifecycle": "resident",
+        }))?;
+        if created["success"].as_bool() != Some(true) {
+            let _ = self.shutdown();
+            return Err(response_error(&created, "create"));
+        }
+        let Some(active_session_id) = created["data"]["activeSessionId"].as_str() else {
+            let _ = self.shutdown();
+            return Err("Prime's daemon created a session without an id".into());
+        };
+        self.active_session_id = active_session_id.to_string();
+        Ok(())
+    }
+
+    /// Find a session already running here that this client can rejoin.
+    fn find_resumable_session(&mut self, cwd: &Path) -> Result<Option<String>, String> {
+        let response = self.send_bare_command(serde_json::json!({ "type": "list" }))?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, "list"));
+        }
+        Ok(pick_resumable_session(
+            response.get("data").unwrap_or(&serde_json::Value::Null),
+            cwd,
+        ))
     }
 
     /// Wait for the daemon's opening `daemon_hello`.
@@ -1378,6 +1464,9 @@ impl PrimeHost {
     fn apply_state_data(&mut self, data: &serde_json::Value) {
         if let Some(id) = crate::prime_events::session_id_from_state(data) {
             self.session_id = Some(id.to_string());
+        }
+        if let Some(created) = data["created"].as_str() {
+            self.started_at = Some(created.to_string());
         }
         let model = &data["model"];
         if model.is_null() {
@@ -1768,22 +1857,28 @@ mod tests {
 
     // ── Handshake ───────────────────────────────────────────────────────────
 
-    /// The order is the contract: read the greeting, create a session, attach
-    /// to it, then read state. Attaching before the daemon has greeted, or
-    /// issuing a session command before attaching, is how a client gets
-    /// rejected in ways that look like an unreachable service.
+    /// The order is the contract: read the greeting, look for work already
+    /// running here, create only if there is none, attach, then read state.
+    /// Attaching before the daemon has greeted, or issuing a session command
+    /// before attaching, is how a client gets rejected in ways that look like
+    /// an unreachable service.
     #[cfg(unix)]
     #[test]
-    fn connecting_greets_creates_attaches_then_reads_state() {
+    fn connecting_greets_looks_for_running_work_then_attaches_and_reads_state() {
         let _guard = host_guard();
         let vault = tempfile::tempdir().unwrap();
+        // The default handler answers `list` with no data, so there is nothing
+        // to rejoin and this is the first-run path.
         let daemon = FakeDaemon::start(|_, _| None);
         daemon.install();
 
         let session_id = connect_host(vault.path()).unwrap();
 
         assert_eq!(session_id, "sess-a");
-        assert_eq!(daemon.commands(), vec!["create", "attach", "get_state"]);
+        assert_eq!(
+            daemon.commands(),
+            vec!["list", "create", "attach", "get_state"]
+        );
         let _ = shutdown_host();
     }
 
@@ -1867,6 +1962,233 @@ mod tests {
             !commands.iter().any(|c| c == "kill" || c == "shutdown"),
             "closing must not stop the session or the daemon: {commands:?}"
         );
+    }
+
+    // ── Reattach (#7) ───────────────────────────────────────────────────────
+
+    #[cfg(unix)]
+    fn listed(sessions: serde_json::Value) -> serde_json::Value {
+        serde_json::json!({ "sessions": sessions })
+    }
+
+    fn session_row(
+        id: &str,
+        cwd: &str,
+        last_activity: &str,
+        attached_clients: u64,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "id": id,
+            "activeSessionId": id,
+            "cwd": cwd,
+            "lastActivityAt": last_activity,
+            "attachedClients": attached_clients,
+            "lifecycle": "live",
+            "messageCount": 4,
+        })
+    }
+
+    /// "Where I left off" is the most recently active session, not the first
+    /// the daemon happens to list.
+    #[test]
+    fn the_most_recently_active_session_is_the_one_to_rejoin() {
+        let data = serde_json::json!({
+            "sessions": [
+                session_row("older", "/vault", "2026-08-15T09:00:00.000Z", 0),
+                session_row("newest", "/vault", "2026-08-15T14:30:00.000Z", 0),
+                session_row("middle", "/vault", "2026-08-15T11:00:00.000Z", 0),
+            ]
+        });
+
+        assert_eq!(
+            pick_resumable_session(&data, Path::new("/vault")),
+            Some("newest".to_string())
+        );
+    }
+
+    /// A session rooted somewhere else is another vault's work. Opening a
+    /// vault must never adopt it.
+    #[test]
+    fn a_session_from_another_directory_is_never_adopted() {
+        let data = serde_json::json!({
+            "sessions": [
+                session_row("elsewhere", "/other-vault", "2026-08-15T14:30:00.000Z", 0),
+            ]
+        });
+
+        assert_eq!(pick_resumable_session(&data, Path::new("/vault")), None);
+    }
+
+    /// The daemon permits several clients on one session, but this product
+    /// shows one conversation per window. Taking a session another client is
+    /// displaying would be a hijack, so a fresh one is made instead.
+    #[test]
+    fn a_session_another_client_is_holding_is_left_alone() {
+        let data = serde_json::json!({
+            "sessions": [
+                session_row("held", "/vault", "2026-08-15T14:30:00.000Z", 1),
+                session_row("free", "/vault", "2026-08-15T09:00:00.000Z", 0),
+            ]
+        });
+
+        // The held one is newer, and still loses.
+        assert_eq!(
+            pick_resumable_session(&data, Path::new("/vault")),
+            Some("free".to_string())
+        );
+    }
+
+    /// Nothing running here means there is nothing to rejoin — the caller
+    /// creates. An empty list must not be mistaken for a candidate.
+    #[test]
+    fn nothing_running_here_yields_no_candidate() {
+        let vault = Path::new("/vault");
+        assert_eq!(
+            pick_resumable_session(&serde_json::json!({ "sessions": [] }), vault),
+            None
+        );
+        assert_eq!(
+            pick_resumable_session(&serde_json::Value::Null, vault),
+            None
+        );
+        assert_eq!(pick_resumable_session(&serde_json::json!({}), vault), None);
+    }
+
+    /// A row with no `lastActivityAt` must sort oldest rather than win by
+    /// accident — otherwise a malformed row could outrank real work.
+    #[test]
+    fn a_session_with_no_activity_timestamp_does_not_outrank_real_work() {
+        let data = serde_json::json!({
+            "sessions": [
+                serde_json::json!({
+                    "id": "undated", "activeSessionId": "undated",
+                    "cwd": "/vault", "attachedClients": 0
+                }),
+                session_row("dated", "/vault", "2026-08-15T09:00:00.000Z", 0),
+            ]
+        });
+
+        assert_eq!(
+            pick_resumable_session(&data, Path::new("/vault")),
+            Some("dated".to_string())
+        );
+    }
+
+    /// The whole of #7 at the transport seam: reopening rejoins the session
+    /// the daemon kept running, instead of stranding it and starting over.
+    #[cfg(unix)]
+    #[test]
+    fn opening_rejoins_the_session_left_running_here() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let cwd = vault.path().to_string_lossy().into_owned();
+        let daemon = {
+            let cwd = cwd.clone();
+            FakeDaemon::start(move |command, id| {
+                (command["type"].as_str() == Some("list")).then(|| {
+                    vec![ok(
+                        id,
+                        "list",
+                        listed(serde_json::json!([session_row(
+                            "left-running",
+                            &cwd,
+                            "2026-08-15T14:30:00.000Z",
+                            0
+                        )])),
+                    )]
+                })
+            })
+        };
+        daemon.install();
+
+        connect_host(vault.path()).unwrap();
+
+        let commands = daemon.commands();
+        assert!(
+            !commands.contains(&"create".to_string()),
+            "rejoining must not strand the running session and start over: {commands:?}"
+        );
+        let attach = daemon.command("attach").expect("attached");
+        assert_eq!(attach["activeSessionId"].as_str(), Some("left-running"));
+        assert!(
+            get_status().reattached,
+            "the UI has to be able to tell a rejoin from a fresh start"
+        );
+
+        let _ = shutdown_host();
+    }
+
+    /// With nothing to rejoin, opening still creates — #6's behaviour has to
+    /// survive #7, or a first run would land nowhere.
+    #[cfg(unix)]
+    #[test]
+    fn opening_with_nothing_running_still_creates_a_session() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| {
+            (command["type"].as_str() == Some("list"))
+                .then(|| vec![ok(id, "list", listed(serde_json::json!([])))])
+        });
+        daemon.install();
+
+        connect_host(vault.path()).unwrap();
+
+        assert!(
+            daemon.command("create").is_some(),
+            "a first run must create"
+        );
+        assert!(
+            !get_status().reattached,
+            "a fresh session is not a reattach"
+        );
+
+        let _ = shutdown_host();
+    }
+
+    /// Enumeration is an optimisation, not a precondition. A daemon that
+    /// cannot list must not leave the user unable to open the app at all.
+    #[cfg(unix)]
+    #[test]
+    fn a_failed_enumeration_still_opens_a_session() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| {
+            (command["type"].as_str() == Some("list"))
+                .then(|| vec![failed(id, "list", "enumeration exploded")])
+        });
+        daemon.install();
+
+        let session = connect_host(vault.path()).expect("opening must survive a failed list");
+
+        assert_eq!(session, "sess-a");
+        assert!(daemon.command("create").is_some());
+
+        let _ = shutdown_host();
+    }
+
+    /// Uptime is how a user tells working from stuck, so the session's start
+    /// time has to reach status rather than being computed from "now".
+    #[cfg(unix)]
+    #[test]
+    fn status_carries_the_session_start_time_for_uptime() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| {
+            (command["type"].as_str() == Some("get_state")).then(|| {
+                let mut state = fake_state("sess-a");
+                state["created"] = serde_json::json!("2026-08-15T09:00:00.000Z");
+                vec![ok(id, "get_state", state)]
+            })
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        assert_eq!(
+            get_status().started_at.as_deref(),
+            Some("2026-08-15T09:00:00.000Z")
+        );
+
+        let _ = shutdown_host();
     }
 
     // ── Turns ───────────────────────────────────────────────────────────────
