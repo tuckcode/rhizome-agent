@@ -4,8 +4,25 @@ const COMMAND_INPUT = 'input[placeholder="Type a command..."]'
 type KeyboardModifier = 'Meta' | 'Control' | 'Shift' | 'Alt'
 const COMMAND_MODIFIER: KeyboardModifier = process.platform === 'darwin' ? 'Meta' : 'Control'
 
+/**
+ * The renderer attaches its global keydown listener from a `useEffect` in
+ * `useAppKeyboard`, which fires before `FrontendReadyMarker`'s own effect
+ * (it is committed as `<RootApp /><FrontendReadyMarker />` — later siblings'
+ * passive effects run after earlier siblings' subtrees in the same commit).
+ * Under CPU contention the gap between "sidebar is painted" and "the keydown
+ * listener is actually attached" widens enough that a synthesized shortcut
+ * sent right after `body.click()` can land before anything is listening.
+ * Waiting on this flag is a real readiness signal, not a timing guess.
+ */
+export async function waitForKeyboardShortcutsReady(page: Page): Promise<void> {
+  await page.waitForFunction(() => window.__tolariaFrontendReady === true, undefined, {
+    timeout: 10_000,
+  })
+}
+
 export async function openCommandPalette(page: Page): Promise<void> {
   const input = page.locator(COMMAND_INPUT)
+  await waitForKeyboardShortcutsReady(page)
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await page.locator('body').click()
@@ -13,6 +30,7 @@ export async function openCommandPalette(page: Page): Promise<void> {
 
     try {
       await input.waitFor({ state: 'visible', timeout: 2_000 })
+      await expect(input).toBeFocused({ timeout: 2_000 })
       return
     } catch {
       if (attempt === 2) {

@@ -5,6 +5,7 @@ import {
   findCommand,
   sendShortcut,
   verifyVisible,
+  waitForKeyboardShortcutsReady,
 } from './helpers'
 
 test.describe('Command Palette smoke tests', () => {
@@ -54,11 +55,15 @@ test.describe('Keyboard shortcuts smoke tests', () => {
   })
 
   test('Cmd+P opens quick open palette @smoke', async ({ page }) => {
+    await waitForKeyboardShortcutsReady(page)
     await page.locator('body').click()
     await sendShortcut(page, 'p', ['Control'])
-    await expect(
-      page.locator('input[placeholder="Search notes..."]'),
-    ).toBeVisible()
+    const searchInput = page.locator('input[placeholder="Search notes..."]')
+    await expect(searchInput).toBeVisible()
+    // QuickOpenPalette autofocuses its input once mounted; waiting for focus
+    // (rather than just visibility) confirms the palette has actually
+    // finished settling instead of being mid-mount.
+    await expect(searchInput).toBeFocused()
   })
 
   test('Escape closes command palette after Cmd+K', async ({ page }) => {
