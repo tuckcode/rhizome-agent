@@ -16,6 +16,7 @@ interface HandleSuggestionKeysArgs {
   suggestionsOpen: boolean
   onCycleSuggestions: (direction: 1 | -1) => void
   onSelectSuggestion: () => void
+  onDismissSuggestions?: () => void
 }
 
 function handleSuggestionKeys({
@@ -24,6 +25,7 @@ function handleSuggestionKeys({
   suggestionsOpen,
   onCycleSuggestions,
   onSelectSuggestion,
+  onDismissSuggestions,
 }: HandleSuggestionKeysArgs): boolean {
   if (!suggestionsOpen) return false
   if (isInlineWikilinkCompositionEvent(event, isComposing)) return false
@@ -43,6 +45,13 @@ function handleSuggestionKeys({
   if (event.key === 'Enter') {
     event.preventDefault()
     onSelectSuggestion()
+    return true
+  }
+
+  if (event.key === 'Escape' && onDismissSuggestions) {
+    event.preventDefault()
+    event.stopPropagation()
+    onDismissSuggestions()
     return true
   }
 
@@ -107,6 +116,7 @@ interface HandleInlineWikilinkKeyDownArgs {
   suggestionsOpen: boolean
   onCycleSuggestions: (direction: 1 | -1) => void
   onSelectSuggestion: () => void
+  onDismissSuggestions?: () => void
   onDeleteContent: (direction: 'backward' | 'forward') => void
   canSubmit: boolean
   onSubmit: () => void
@@ -119,6 +129,7 @@ export function handleInlineWikilinkKeyDown({
   suggestionsOpen,
   onCycleSuggestions,
   onSelectSuggestion,
+  onDismissSuggestions,
   onDeleteContent,
   canSubmit,
   onSubmit,
@@ -131,6 +142,7 @@ export function handleInlineWikilinkKeyDown({
     suggestionsOpen,
     onCycleSuggestions,
     onSelectSuggestion,
+    onDismissSuggestions,
   })) {
     return
   }

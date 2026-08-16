@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import type { VaultEntry } from '../types'
 import type { NoteReference } from '../utils/ai-context'
 import { InlineWikilinkInput } from './InlineWikilinkInput'
+import type { CommandMenuAction, CommandMenuEntry } from '../lib/primeCommandMenu'
 
 interface WikilinkChatInputProps {
   entries: VaultEntry[]
@@ -15,6 +16,11 @@ interface WikilinkChatInputProps {
   inputRef?: React.RefObject<HTMLDivElement | null>
   editorClassName?: string
   editorStyle?: CSSProperties
+  commandEntries?: CommandMenuEntry[]
+  commandDisabled?: Record<string, string>
+  commandSkillLabel?: string
+  commandInstantLabel?: string
+  onCommandAction?: (action: CommandMenuAction, nextValue: string) => void
 }
 
 export function WikilinkChatInput({
@@ -29,6 +35,11 @@ export function WikilinkChatInput({
   inputRef,
   editorClassName,
   editorStyle,
+  commandEntries,
+  commandDisabled,
+  commandSkillLabel,
+  commandInstantLabel,
+  onCommandAction,
 }: WikilinkChatInputProps) {
   return (
     <InlineWikilinkInput
@@ -43,6 +54,11 @@ export function WikilinkChatInput({
       inputRef={inputRef}
       editorClassName={editorClassName}
       editorStyle={editorStyle}
+      commandEntries={commandEntries}
+      commandDisabled={commandDisabled}
+      commandSkillLabel={commandSkillLabel}
+      commandInstantLabel={commandInstantLabel}
+      onCommandAction={onCommandAction}
     />
   )
 }

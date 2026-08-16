@@ -284,3 +284,8 @@ function sessionCountBucket(count: number): '0' | '1-5' | '6-20' | '21-50' | '50
 export function trackPrimeModelChanged(provider: string): void {
   trackEvent('prime_model_changed', { provider })
 }
+
+/** A `/` menu command ran. Slash name only — never the prompt body. */
+export function trackPrimeCommandRun(command: string, kind: 'skill' | 'instant'): void {
+  trackEvent('prime_command_run', { command, kind })
+}

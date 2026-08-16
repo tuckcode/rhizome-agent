@@ -15,6 +15,7 @@ import {
 } from './InlineWikilinkInput'
 import { isInsertBeforeInput } from './inlineWikilinkBeforeInput'
 import type { VaultEntry } from '../types'
+import type { CommandMenuEntry } from '../lib/primeCommandMenu'
 
 type NativeDropPayload = {
   type: string
@@ -806,5 +807,78 @@ describe('WikilinkChatInput', () => {
 
     updateEditorText('still works')
     expect(screen.getByTestId('agent-input').textContent).toContain('still works')
+  })
+})
+
+const commandEntries: CommandMenuEntry[] = [
+  { name: 'fork', slash: 'fork', description: 'Branch from a past message', kind: 'instant' },
+  { name: 'compact', slash: 'compact', description: 'Compact this conversation', kind: 'instant' },
+  { name: 'skill:goal', slash: 'goal', description: 'Set a persistent objective', kind: 'skill' },
+]
+
+describe('WikilinkChatInput command menu', () => {
+  it('opens on / and lists working commands', () => {
+    render(
+      <WikilinkChatInput
+        entries={entries}
+        value="/"
+        onChange={vi.fn()}
+        onSend={vi.fn()}
+        commandEntries={commandEntries}
+      />,
+    )
+
+    expect(screen.getByTestId('command-menu')).toHaveTextContent('/compact')
+    expect(screen.getByTestId('command-menu')).toHaveTextContent('Set a persistent objective')
+  })
+
+  it('does not open on a date', () => {
+    render(
+      <WikilinkChatInput
+        entries={entries}
+        value="due 2026/08/16"
+        onChange={vi.fn()}
+        onSend={vi.fn()}
+        commandEntries={commandEntries}
+      />,
+    )
+
+    expect(screen.queryByTestId('command-menu')).toBeNull()
+  })
+
+  it('leaves the slash in the input when Escape dismisses the menu', () => {
+    const onChange = vi.fn()
+    render(
+      <WikilinkChatInput
+        entries={entries}
+        value="/comp"
+        onChange={onChange}
+        onSend={vi.fn()}
+        commandEntries={commandEntries}
+      />,
+    )
+
+    fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Escape' })
+    expect(screen.queryByTestId('command-menu')).toBeNull()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('runs an instant command without sending prompt text', () => {
+    const onSend = vi.fn()
+    const onCommandAction = vi.fn()
+    render(
+      <WikilinkChatInput
+        entries={entries}
+        value="/compact"
+        onChange={vi.fn()}
+        onSend={onSend}
+        commandEntries={commandEntries}
+        onCommandAction={onCommandAction}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('command-menu-item-compact'))
+    expect(onSend).not.toHaveBeenCalled()
+    expect(onCommandAction).toHaveBeenCalledWith({ kind: 'instant', name: 'compact' }, '')
   })
 })
