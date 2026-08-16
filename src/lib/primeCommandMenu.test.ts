@@ -165,16 +165,35 @@ describe('buildCommandMenu', () => {
 })
 
 describe('applyCommandMenuSelection', () => {
-  it('clears the token when a skill is chosen and sends it as prompt text', () => {
+  /**
+   * A skill takes arguments, so picking one must leave the composer ready to
+   * type into rather than sending immediately. Reported from live use
+   * 2026-08-16: picking a skill fired the turn instantly and there was no way
+   * to pass it anything.
+   */
+  it('completes a chosen skill in the composer and does not send it', () => {
     expect(applyCommandMenuSelection('please /go', 10, {
       name: 'skill:goal',
       slash: 'goal',
       description: 'Set a persistent objective',
       kind: 'skill',
     })).toEqual({
-      value: 'please ',
-      nextSelectionIndex: 7,
-      action: { kind: 'prompt', text: '/goal' },
+      value: 'please /goal ',
+      nextSelectionIndex: 13,
+      action: { kind: 'compose', name: 'goal' },
+    })
+  })
+
+  it('keeps whatever followed the token when completing a skill', () => {
+    expect(applyCommandMenuSelection('/go tail', 3, {
+      name: 'skill:goal',
+      slash: 'goal',
+      description: 'Set a persistent objective',
+      kind: 'skill',
+    })).toEqual({
+      value: '/goal  tail',
+      nextSelectionIndex: 6,
+      action: { kind: 'compose', name: 'goal' },
     })
   })
 
