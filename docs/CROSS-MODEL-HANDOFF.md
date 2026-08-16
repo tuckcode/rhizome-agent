@@ -357,13 +357,22 @@ both hit it, so this is corroborated, not a one-off:
 clean.** Before concluding you regressed coverage:
 
 ```bash
-cargo llvm-cov clean --workspace
+cargo llvm-cov clean --workspace --manifest-path src-tauri/Cargo.toml
 LLVM_COV="$(brew --prefix llvm)/bin/llvm-cov" \
 LLVM_PROFDATA="$(brew --prefix llvm)/bin/llvm-profdata" \
   cargo llvm-cov --manifest-path src-tauri/Cargo.toml --fail-under-lines 85
 ```
 
 A `--no-clean` *pass* is trustworthy; only failures need the clean re-run.
+
+**⚠️ A clean re-run can also confirm the failure — see C27 in `HANDOFF.md`.**
+Measured 2026-08-16: `--no-clean` 84.86%, clean 84.86%, and `origin/main`
+itself at 84.87% in a detached worktree. When the two numbers agree, the
+coverage shortfall is real and this section does not apply. Check the clean
+number before reaching for the stale-profile explanation — otherwise this
+section becomes a way to explain away a genuine regression.
+(The `clean` line above lacked `--manifest-path` until 2026-08-16 and simply
+errored with `could not find Cargo.toml`; there is no root manifest.)
 
 Related environment note: this machine has Homebrew rust and **no `rustup`**, so
 `cargo llvm-cov` fails outright with `failed to find llvm-tools-preview` unless
