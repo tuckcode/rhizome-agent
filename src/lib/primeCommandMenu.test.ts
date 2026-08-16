@@ -165,15 +165,15 @@ describe('buildCommandMenu', () => {
 })
 
 describe('applyCommandMenuSelection', () => {
-  it('replaces the slash token with the skill as prompt text', () => {
+  it('clears the token when a skill is chosen and sends it as prompt text', () => {
     expect(applyCommandMenuSelection('please /go', 10, {
       name: 'skill:goal',
       slash: 'goal',
       description: 'Set a persistent objective',
       kind: 'skill',
     })).toEqual({
-      value: 'please /goal',
-      nextSelectionIndex: 12,
+      value: 'please ',
+      nextSelectionIndex: 7,
       action: { kind: 'prompt', text: '/goal' },
     })
   })
