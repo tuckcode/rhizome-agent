@@ -657,6 +657,20 @@ pub fn get_available_prime_models() -> Result<Vec<crate::prime_session_host::Pri
     crate::prime_session_host::get_available_models()
 }
 
+/// Export a saved Prime session to standalone HTML, returning the file written.
+///
+/// Goes through `prime_sessions`, not the session host: Prime offers export
+/// only as a CLI subcommand over a session file, never over the daemon
+/// protocol.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn export_prime_session(
+    session_path: String,
+    output_path: Option<String>,
+) -> Result<String, String> {
+    crate::prime_sessions::export_session(&session_path, output_path)
+}
+
 /// Skills and extension commands the live session reports via `get_commands`.
 #[cfg(desktop)]
 #[tauri::command]

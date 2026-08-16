@@ -305,15 +305,20 @@ export function AiPanelView({
 
   const commandEntries = usePrimeCommandMenu(isPrimeTarget, primeHost.sessionId)
   const latestPrimeEntryId = [...agent.messages].reverse().find((message) => message.primeEntryId)?.primeEntryId
-  const commandDisabled = latestPrimeEntryId
-    ? undefined
-    : { fork: translate(locale, 'ai.command.forkNeedsEntry') }
+  const commandDisabled = {
+    ...(latestPrimeEntryId ? {} : { fork: translate(locale, 'ai.command.forkNeedsEntry') }),
+    // Export reads the session log off disk, so it needs one to exist.
+    ...(primeHost.sessionPath ? {} : { export: translate(locale, 'ai.command.exportNeedsSession') }),
+  }
   const localizedCommands = commandEntries.map((entry) => {
     if (entry.slash === 'fork') {
       return { ...entry, description: translate(locale, 'ai.command.forkDescription') }
     }
     if (entry.slash === 'compact') {
       return { ...entry, description: translate(locale, 'ai.command.compactDescription') }
+    }
+    if (entry.slash === 'export') {
+      return { ...entry, description: translate(locale, 'ai.command.exportDescription') }
     }
     return entry
   })
@@ -345,8 +350,20 @@ export function AiPanelView({
       } catch (e) {
         setSwitchError(e instanceof Error ? e.message : String(e))
       }
+      return
     }
-  }, [agent, handleForkFromEntry, latestPrimeEntryId, locale, setInput])
+    if (action.name === 'export') {
+      if (!primeHost.sessionPath) return
+      try {
+        const path = await call<string>('export_prime_session', {
+          sessionPath: primeHost.sessionPath,
+        })
+        agent.addLocalMarker(translate(locale, 'ai.command.exported', { path }))
+      } catch (e) {
+        setSwitchError(e instanceof Error ? e.message : String(e))
+      }
+    }
+  }, [agent, handleForkFromEntry, latestPrimeEntryId, locale, primeHost.sessionPath, setInput])
 
   const handleSelectSession = useCallback(async (session: PrimeSessionSummary) => {
     const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>

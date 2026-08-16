@@ -108,13 +108,19 @@ export function matchCommandMenuEntries(
 }
 
 /**
- * Protocol commands Rhizome implements itself. Prime's TUI `/fork`,
- * `/compact` and `/export` are not in `get_commands` and would no-op if
- * forwarded as prompt text — so they live here, not in the skill list.
+ * Commands Rhizome implements itself. Prime's `/fork`, `/compact` and
+ * `/export` are not in `get_commands` and would no-op if forwarded as prompt
+ * text — so they live here, not in the skill list.
+ *
+ * They are not all the same mechanism underneath: fork and compact are daemon
+ * protocol calls, while export is a CLI subcommand over the session file on
+ * disk (`export` is absent from the daemon's `serverCapabilities`). The menu
+ * deliberately hides that difference from the user.
  */
 export const PROTOCOL_COMMANDS: CommandMenuEntry[] = [
   { name: 'fork', slash: 'fork', description: 'Branch from a past message', kind: 'instant' },
   { name: 'compact', slash: 'compact', description: 'Compact this conversation', kind: 'instant' },
+  { name: 'export', slash: 'export', description: 'Save this conversation as HTML', kind: 'instant' },
 ]
 
 export function buildCommandMenu(

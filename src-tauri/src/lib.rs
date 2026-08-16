@@ -594,6 +594,7 @@ macro_rules! app_invoke_handler {
             commands::switch_prime_session,
             commands::get_available_prime_models,
             commands::get_prime_commands,
+            commands::export_prime_session,
             commands::set_prime_model,
             commands::fork_prime_session,
             commands::get_prime_agent_activity,
