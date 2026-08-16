@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { McpStatus } from '../hooks/useMcpStatus'
 import type { ThemeMode } from '../lib/themeMode'
 import type { AppLocale } from '../lib/i18n'
@@ -99,6 +99,7 @@ interface StatusBarProps {
   onOpenResearch?: () => void
   buildNumber?: string
   onCheckForUpdates?: () => void
+  versionUpdateIndicator?: ReactNode
   onRemoveVault?: (path: string) => void
   onReorderVaults?: (orderedPaths: string[]) => void
   onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
@@ -149,6 +150,7 @@ function StatusBarPrimaryFromFooter({
   onOpenConflictResolver,
   buildNumber,
   onCheckForUpdates,
+  versionUpdateIndicator,
   onRemoveVault,
   onReorderVaults,
   onUpdateWorkspaceIdentity,
@@ -196,6 +198,7 @@ function StatusBarPrimaryFromFooter({
       onOpenConflictResolver={onOpenConflictResolver}
       buildNumber={buildNumber}
       onCheckForUpdates={onCheckForUpdates}
+      versionUpdateIndicator={versionUpdateIndicator}
       onRemoveVault={onRemoveVault}
       onReorderVaults={onReorderVaults}
       onUpdateWorkspaceIdentity={onUpdateWorkspaceIdentity}

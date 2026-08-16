@@ -550,6 +550,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     modelId: 'grok-4.5',
     modelName: 'Grok 4.5',
   }),
+  check_prime_update: () => null,
   ensure_prime_session_host: () => 'mock-session',
   shutdown_prime_session_host: () => false,
   prime_session_new_session: () => 'mock-session',

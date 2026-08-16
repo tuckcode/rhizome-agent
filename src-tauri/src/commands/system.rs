@@ -454,6 +454,20 @@ pub async fn download_and_install_app_update(
     Err("App updates are not available on mobile".into())
 }
 
+/// Checks GitHub's real release feed for a Prime version newer than what's
+/// currently connected. Never installs anything — see `prime_update.rs` for
+/// why Prime can't be auto-updated by Rhizome at all.
+#[tauri::command]
+pub async fn check_prime_update(
+    installed_version: Option<String>,
+) -> Result<Option<crate::prime_update::PrimeReleaseInfo>, String> {
+    tokio::task::spawn_blocking(move || {
+        crate::prime_update::check_prime_update(installed_version.as_deref())
+    })
+    .await
+    .map_err(|error| format!("Prime update check panicked: {error}"))?
+}
+
 #[tauri::command]
 pub fn reinit_telemetry() {
     crate::telemetry::reinit_sentry();

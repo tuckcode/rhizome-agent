@@ -43,6 +43,7 @@ mod prime_discovery;
 mod prime_events;
 pub mod prime_session_host;
 pub mod prime_sessions;
+pub mod prime_update;
 pub mod prime_tool_unwrap;
 mod prime_vault_skill;
 pub mod rhizome_api;
@@ -633,6 +634,7 @@ macro_rules! app_invoke_handler {
             commands::get_settings,
             commands::get_ai_workspace_sessions,
             commands::check_for_app_update,
+            commands::check_prime_update,
             commands::update_menu_state,
             commands::update_app_icon,
             commands::trigger_menu_command,
