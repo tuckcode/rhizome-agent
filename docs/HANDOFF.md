@@ -1425,6 +1425,16 @@ Note what this implies about the record: sessions in this window that report "al
 
   **Do not "fix" this by widening the wait or dropping the `@smoke` tag.** A user hitting Cmd+N and not seeing their note in the list is the actual defect the test is catching.
 
+  **Root cause, found 2026-08-16 but NOT yet fixed — start here.** An initial or background vault scan can still be reading disk when `Cmd+N` optimistically adds the new note to the workspace. When that scan resolves *afterward*, `replaceLoadedWorkspaceEntries` overwrites the list with the scan's **pre-create snapshot**, silently wiping the new note back out. That is why it is a stuck state and not a slow one — nothing ever re-adds it. Relevant path: `loadInitialVaultEntriesState` in `src/hooks/useVaultLoader.ts`, plus `src/hooks/vaultWorkspaceEntries.ts`.
+
+  The fix direction that was in progress: track optimistically-created paths in a ref and have the reconcile step refuse to drop a path the user just created. **That work is unfinished and was NOT committed** — the agent writing it hit a session limit mid-task, leaving `console.debug('[C29-DEBUG]')` instrumentation in the tree. It was stashed rather than shipped:
+
+  ```
+  git stash list          # "C29 partial (debug logs, unverified)"
+  ```
+
+  Treat the stash as a lead, not a solution: it was never verified against the ~30-40% intermittency, and it needs its debug logging stripped. Re-verify with at least 6 consecutive runs of `tests/smoke/fix-crash-create-note.spec.ts` before believing it.
+
 ## Links out
 
 - Full history + session details → `docs/plans/` (see classification in `docs/plans/handoff-classification.md`)
