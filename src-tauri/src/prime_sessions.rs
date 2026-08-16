@@ -60,6 +60,27 @@ pub struct PrimeSessionSummary {
     pub mtime_ms: Option<u64>,
 }
 
+/// The log a session id writes to.
+///
+/// The daemon only reports `sessionFile` on some state payloads, so a live
+/// session can have an id and no path — which silently disabled `/export`.
+/// Prime names each log after the session id, so the id is enough.
+pub(crate) fn log_path_for_session(session_id: &str, dir: &Path) -> Option<PathBuf> {
+    let id = session_id.trim();
+    // Guard the id before it becomes a path: it arrives over the wire.
+    if id.is_empty() || id.contains(['/', '\\']) || id.starts_with('.') {
+        return None;
+    }
+    Some(dir.join(format!("{id}.jsonl")))
+}
+
+/// Same, resolved against Prime's real sessions directory.
+pub fn session_log_path(session_id: &str) -> Option<String> {
+    let dir = sessions_dir()?;
+    let path = log_path_for_session(session_id, &dir)?;
+    path.exists().then(|| path.to_string_lossy().into_owned())
+}
+
 fn sessions_dir() -> Option<PathBuf> {
     dirs::home_dir().map(|home| home.join(".prime").join("agent").join("sessions"))
 }
@@ -452,6 +473,34 @@ pub fn export_session(session_path: &str, output_path: Option<String>) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A live session can carry an id with no path, because the daemon sends
+    /// `sessionFile` on only some state payloads. The id names the log.
+    #[test]
+    fn a_session_id_resolves_to_its_log() {
+        assert_eq!(
+            log_path_for_session(
+                "01a009fc-98f1-7219-858e-5bd22e766bc1",
+                Path::new("/Users/dtc/.prime/agent/sessions")
+            ),
+            Some(PathBuf::from(
+                "/Users/dtc/.prime/agent/sessions/01a009fc-98f1-7219-858e-5bd22e766bc1.jsonl"
+            ))
+        );
+    }
+
+    /// The id crosses the wire, so it must not be able to walk out of the
+    /// sessions directory before it reaches the exporter.
+    #[test]
+    fn a_session_id_cannot_escape_the_sessions_directory() {
+        for hostile in ["", "  ", "../../etc/passwd", "a/b", "a\\b", ".hidden"] {
+            assert_eq!(
+                log_path_for_session(hostile, Path::new("/sessions")),
+                None,
+                "{hostile:?} should be refused"
+            );
+        }
+    }
 
     /// The default name carries the session's own id, so exporting two
     /// different sessions cannot land on the same file.
