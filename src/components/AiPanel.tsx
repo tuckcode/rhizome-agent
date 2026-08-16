@@ -249,7 +249,9 @@ export function AiPanelView({
       objective,
       tokenBudget: tokenBudget ?? undefined,
     })
-    trackEvent('prime_goal_set', { has_budget: tokenBudget !== null })
+    // ProductAnalyticsProperties is Record<string, string | number> — a raw
+    // boolean does not typecheck under the build's stricter pass.
+    trackEvent('prime_goal_set', { has_budget: tokenBudget !== null ? 'yes' : 'no' })
     return goal
   }, [])
   const handleClearGoal = useCallback(async () => {
