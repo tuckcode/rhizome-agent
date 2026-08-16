@@ -34,6 +34,8 @@ export interface CommandMenuEntry {
   slash: string
   description: string
   kind: CommandMenuKind
+  /** What to type after the command, e.g. `<question>`. Absent when the command takes no argument. */
+  argumentHint?: string
 }
 
 function slashName(name: string): string {
@@ -62,11 +64,14 @@ export function selectCommandMenuEntries(
     const name = command.name?.trim()
     if (!name || !isProductCommand(command)) continue
 
+    const argumentHint = command.argumentHint?.trim()
+
     entries.push({
       name,
       slash: slashName(name),
       description: command.description?.trim() ?? '',
       kind: command.source === 'skill' || name.startsWith('skill:') ? 'skill' : 'instant',
+      ...(argumentHint ? { argumentHint } : {}),
     })
   }
 

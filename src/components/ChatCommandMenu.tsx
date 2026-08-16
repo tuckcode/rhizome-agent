@@ -65,7 +65,14 @@ export function ChatCommandMenu({
             }}
           >
             <span className="flex w-full items-baseline justify-between gap-3">
-              <span className="truncate text-sm text-foreground">/{entry.slash}</span>
+              <span className="flex min-w-0 items-baseline gap-2">
+                <span className="truncate text-sm text-foreground">/{entry.slash}</span>
+                {entry.argumentHint ? (
+                  <span className="truncate font-mono text-[11px] text-muted-foreground">
+                    {entry.argumentHint}
+                  </span>
+                ) : null}
+              </span>
               <span className="shrink-0 text-[11px] text-muted-foreground">
                 {entry.kind === 'skill' ? skillLabel : instantLabel}
               </span>
