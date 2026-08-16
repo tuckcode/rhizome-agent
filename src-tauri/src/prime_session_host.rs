@@ -513,7 +513,13 @@ pub fn get_status() -> PrimeHostStatus {
             model_name: host.model_name.clone(),
             reattached: host.reattached,
             started_at: host.started_at.clone(),
-            session_path: host.session_path.clone(),
+            // The daemon reports `sessionFile` on only some state payloads,
+            // so fall back to the log the session id names.
+            session_path: host.session_path.clone().or_else(|| {
+                host.session_id
+                    .as_deref()
+                    .and_then(crate::prime_sessions::session_log_path)
+            }),
             // Connected: whatever went wrong before is history.
             problem: None,
         },
