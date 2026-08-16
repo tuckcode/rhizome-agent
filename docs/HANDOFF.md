@@ -27,6 +27,112 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Session handoff — 2026-08-16d (Hermes: #10 + #16 slash menu — partial)
+
+**If you are not Claude, read `docs/CROSS-MODEL-HANDOFF.md` first.** Then this
+entry. Claude's 08-16c Hermes-research block below still holds for architecture
+context; its "concrete next task" for #10+#16 is what this session started.
+
+**State:** `main` = `10b4cd3`, tree clean, **ahead 6 of `origin/main` — not
+pushed.** Full pre-push was **not** run this session (focused vitest + eslint
+only). #6/#7/#8/#12 status unchanged. Tracker issues **#10 and #16 still OPEN**
+— do not close them from this handoff alone.
+
+### What shipped (REAL)
+
+Six local commits after Claude's docs handoff `2272492`:
+
+| SHA | What |
+|---|---|
+| `a5598f1` | Origin filter: keep `sourceInfo.source === builtin` and `auto`+`project`; drop user auto skills; fail closed if no `sourceInfo` |
+| `e934441` | `/` token detector (not dates/paths); match; seed fork+compact as instant |
+| `f7c94df` | Apply pick / Escape leave slash |
+| `e9f40e5` | Host `get_commands` parser + Tauri `get_prime_commands` + mock |
+| `175472b` | Composer overlay: `ChatCommandMenu`, wire through `InlineWikilinkInput` → composer → `AiPanel` |
+| `10b4cd3` | Fix: menu reopens after a pick (dismiss-key collision on bare `/`) |
+
+**Live probe (isolated daemon, not default service):** Prime **0.7.2**, protocol
+7. `get_commands` → **101** skills: **89** `auto`+`user` under
+`~/.agents/skills`, **11** `builtin`, **1** project `skill:rhizome-vault`.
+Shape is `sourceInfo.{path,source,scope,origin}` — **not** the flatter
+`source`/`location` still in Prime's docs. Dump was at
+`/tmp/rhizome-get-commands-probe.json` (ephemeral).
+
+**Product behavior now:**
+
+- `/` anywhere as its **own token** opens the menu (not only position 0).
+- Dates (`2026/08/16`) and paths (`src/lib/foo`, `/usr/bin`) do **not** open it.
+- Menu = protocol **fork** + **compact** + filtered skills (builtins + project
+  rhizome-vault). User personal skills excluded.
+- Skills → send as prompt text `/name` (clears the composer token).
+- **Compact** → `compact_prime_session` IPC + local transcript marker.
+- **Fork** → listed, **disabled** until a replayed turn has `primeEntryId`
+  ("Needs a past message to branch from").
+- Escape dismisses menu, leaves `/`, does **not** close the AI panel
+  (`defaultPrevented` on panel Escape handler).
+- Skills vs instant visually distinct (Skill / Command labels).
+- `en.json` keys under `ai.command.*` — **English only**, LARA unfunded (C18).
+
+**Key files:**
+
+- `src/lib/primeCommandMenu.ts` — filter, trigger, match, apply
+- `src/hooks/usePrimeCommandMenu.ts` — loads `get_prime_commands`
+- `src/components/ChatCommandMenu.tsx` — overlay list
+- `src/components/InlineWikilinkInput.tsx` — shares cursor with `[[`
+- `src/components/AiPanel.tsx` — run compact / skill send / fork gate
+- `src-tauri/src/prime_session_host.rs` — `get_commands` / types
+- `src-tauri/src/commands/ai.rs` — `get_prime_commands`
+
+### What is NOT done
+
+- **#10 / #16 acceptance incomplete.** Issues still open. Missing:
+  - **Export** — ticket named it; no host `export_html` wiring; deliberately
+    dropped from the menu this session so we don't ship a dead entry.
+  - **Live native demo** against real Prime (daemon). Vite mock only.
+  - Full pre-push (tsc -b, cargo coverage, playwright smoke) + **push**.
+  - Closing GH issues with evidence.
+- **Fork click path** not proven end-to-end from the menu (disabled until
+  rehydrate brings a `primeEntryId`).
+- Argument hints (#21) not started.
+- Locale translate not run (C18).
+
+### Critical gotcha — Vite vs real Prime (user hit this)
+
+Vite preview (`pnpm dev` / `:5202`) uses **`streamAiAgent` mock**. Every
+skill/prompt returns the same canned line:
+
+`[mock-prime agent] You said: "/whatever" — This note is related to [[Build Laputa App]] and [[Matteo Cellini]].`
+
+That is **not** skill execution. Proving skills/commands need **`pnpm tauri
+dev`** (or the built app) with Prime's daemon up. Do not diagnose "skills
+broken" from mock replies.
+
+### Bug fixed mid-session (do not reintroduce)
+
+After picking a command from a bare `/`, dismiss state was keyed `0:`. The
+next bare `/` is the same key → menu stayed closed. Fix: clear token on pick
+**and** reset dismiss state (`10b4cd3`). Regression test: *opens again on a
+new slash after a command ran*.
+
+### Process notes for the next agent
+
+- Session started from Claude's handoff paste; intake verified
+  `2272492` then built. Early stretch was library-only without UI — recovered
+  into overlay + host IPC. User asked for a break; stop here.
+- **Do not claim #10/#16 closed.** Partial surface + mock QA only.
+- Push when ready: set `LLVM_COV` / `LLVM_PROFDATA`, full pre-push, then push.
+  Standing rule: push when gates pass; no ask required.
+- Optional next: native look (compact + fork after reattach), wire export, or
+  Tier 1 rest (#13 menu bar) / Tier 2 #24 promote quality.
+
+### Still true, unchanged
+
+C18 LARA. Transcript read no retry (#7). Uptime/#8 never by eye. C24/C25 open.
+#12 menu-bar half still open. Hermes research / ADR-0163 asymmetry still
+valid (see 08-16c below).
+
+---
+
 ## Session handoff — 2026-08-16c (Hermes research; next agent may not be Claude)
 
 **If you are not Claude, read `docs/CROSS-MODEL-HANDOFF.md` first** — it lists
