@@ -1263,6 +1263,48 @@ Note what this implies about the record: sessions in this window that report "al
   - **The 19th is not the Prime story:** `aiAgentStreamCallbacks.test.ts` expected the pre-`e2cd77f` tool-action shape, before tool cards carried `path` and a path-suffixed `label` for the "Open" affordance.
   **⚠️ Worth knowing (not a fix, no C-number opened — no product defect found).** 3 of the 5 `App.test.tsx` failures were one crash, not assertion drift: `useAgentDefaultOpenChat` (`fa230a6`) auto-opens the chat panel once per app *session* and guards it in **sessionStorage**, which `beforeEach`'s `localStorage.clear()` does not reset — so `AiPanelView` mounts only in the file's first `render(<App/>)` (plus the two tests that open the panel explicitly). It calls `usePrimeHostStatus`, whose command was missing from `mockCommandResults`; that table returns `result ?? null` for anything unlisted, and `primeModelLabel(null)` dereferenced `.modelName` and threw, unmounting the whole tree — which is why the failures read as "All Notes not found" / empty `<body>`. The real Tauri command returns a non-`Option` `PrimeHostStatus`, so the null is a property of the test double, not the product. Two standing implications: **(a)** any test that renders `<App/>` first in its file now mounts the AI panel, so its fake-IPC table must cover the panel's commands; **(b)** there is no error boundary above `AiPanelView`, so a malformed status payload blanks the app rather than degrading the panel.
 
+- **C27-OPEN: the Rust coverage pre-push gate fails on `origin/main` itself — every push is blocked until someone raises it.** Measured 2026-08-16 with clean runs (not `--no-clean`), LLVM env vars exported:
+
+  | Tree | Lines | Missed | Coverage | `--fail-under-lines 85` |
+  |---|---|---|---|---|
+  | `origin/main` (`2272492`) | 40293 | 6097 | **84.87%** | exit 1 |
+  | `main` (`fc9a37d`, slash menu) | 40381 | 6113 | **84.86%** | exit 1 |
+
+  **This is not the slash-menu branch's doing.** That branch added 88 executable
+  Rust lines with 72 covered (~82%, *above* the repo average) and moved the
+  total by 0.01pp. It was measured in a detached worktree at `origin/main` to
+  prove the baseline rather than assert it — the branch inherits the failure,
+  it does not cause it.
+
+  `HANDOFF.md`'s 2026-08-09 entry records a passing run at **85.24%**, so this
+  regressed somewhere between then and `2272492` and nobody's gate caught it,
+  because the last several sessions all recorded "full pre-push **not** run"
+  (see `2026-08-14-frame-a-session-status.md:155` and the 08-16d status doc).
+  A gate nobody runs is a gate that rots.
+
+  **Do not diagnose this via `docs/CROSS-MODEL-HANDOFF.md` §13.** That section
+  is about `--no-clean` reporting a *falsely* low number, and it says a
+  `--no-clean` failure is not evidence until re-run clean. That was checked
+  here: `--no-clean` gave 84.88%, a full clean run gave 84.86%. The trap is
+  real but it is **not** what is happening — §13 does not explain this one, and
+  reaching for it will send the next session in a circle.
+
+  **Deficit is ~56 lines** (need missed ≤ 6057 at the current line count).
+  Fixing it means real tests, not padding. The genuinely under-covered pure
+  logic worth aiming at, from the clean run: `view_relationships.rs` 57.94%
+  (45 missed), `view_value_conversions.rs` 53.85% (12), `view_date_filters.rs`
+  83.75% (13). Deliberately **not** on that list: `commands/ai.rs` (30.18%) and
+  the daemon-touching arms of `prime_session_host.rs` — those are
+  `#[tauri::command]` wrappers and live-socket paths that cannot be covered
+  without a running daemon, which is why the existing `live_*` tests are
+  `#[ignore]`. Padding those would be chasing the number, not the coverage.
+
+  **Also correct §13's snippet while here:** it gives
+  `cargo llvm-cov clean --workspace`, which fails in this repo with
+  `could not find Cargo.toml` — there is no root manifest. It needs
+  `--manifest-path src-tauri/Cargo.toml`, same as every other cargo invocation
+  in these docs.
+
 ## Links out
 
 - Full history + session details → `docs/plans/` (see classification in `docs/plans/handoff-classification.md`)
