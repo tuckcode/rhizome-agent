@@ -27,6 +27,46 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Session handoff — 2026-08-16e (Claude Opus 5: full pre-push, C27, pushed)
+
+**State:** `main` = `6c1edcc`, **pushed — `origin/main` in sync, ahead 0**,
+tree clean. The 08-16d entry below is still the reference for *what the slash
+menu does*; its "ahead 6, not pushed" line is now historical.
+
+**The full pre-push suite ran for the first time in several sessions** and all
+six steps passed (5m26s): lint, `tsc --noEmit`, 5342 frontend tests @ 84.65%,
+13 MCP tests, 1449 Rust lib tests @ **85.09%**, 26 Playwright smoke @ 1.8m.
+CodeScene step self-skips (no PAT — expected, dropped 2026-07-09).
+
+**Two real problems found, both fixed:**
+
+1. **C27 — the Rust coverage gate was already failing on `origin/main`**
+   (84.87%), blocking every push regardless of what a session changed. Proven
+   by building and covering a detached worktree at `origin/main`, not assumed.
+   The slash-menu branch was **not** the cause — it added 88 executable lines
+   with 72 covered, above repo average, moving the total 0.01pp. Fixed to
+   85.09% in `c1d28c8`. **Headroom is ~36 lines** — see the C27 entry.
+2. **`cargo fmt --check` failed** on 08-16d's `get_prime_commands` in
+   `commands/ai.rs`. Single missed `cargo fmt`, nothing else in `src-tauri/`
+   was unformatted. Fixed in `3639dad`. That session's Rust *logic* is sound:
+   `get_commands()` matches its sibling `get_available_models()` structurally,
+   and clippy is clean at `-D warnings`.
+
+**Do not diagnose a coverage failure via `CROSS-MODEL-HANDOFF` §13 without
+re-measuring.** §13 was the first explanation reached for here and it was
+wrong — it describes `--no-clean` reporting *falsely* low, but clean and
+`--no-clean` agreed to within 0.02pp. §13 has been amended, and its snippet
+fixed (it omitted `--manifest-path` and simply errored).
+
+**Unchanged, still not done — #10 and #16 remain OPEN** (verified via `gh`,
+not inferred): export unwired, no live native demo against a real Prime
+daemon, fork-from-menu unproven end-to-end, #21 not started, C18 unchanged.
+Nothing about this session's gate work advances that acceptance.
+
+Detail: `docs/plans/2026-08-16-coverage-gate-session-status.md`.
+
+---
+
 ## Session handoff — 2026-08-16d (Hermes: #10 + #16 slash menu — partial)
 
 **If you are not Claude, read `docs/CROSS-MODEL-HANDOFF.md` first.** Then this
