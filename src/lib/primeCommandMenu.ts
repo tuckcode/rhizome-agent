@@ -72,3 +72,56 @@ export function selectCommandMenuEntries(
 
   return entries
 }
+
+export interface ActiveSlashQuery {
+  start: number
+  query: string
+}
+
+/**
+ * `/` opens a command anywhere in the composer, but only as its own token.
+ * A date (`2026/08/16`) or a path (`src/lib/foo.ts`, `/usr/bin`) is not a
+ * command — those are why the menu must get out of the way mid-sentence.
+ */
+export function findActiveSlashQuery(
+  value: string,
+  selectionIndex: number,
+): ActiveSlashQuery | null {
+  const clamped = Math.max(0, Math.min(selectionIndex, value.length))
+  const before = value.slice(0, clamped)
+  const start = before.lastIndexOf('/')
+  if (start < 0) return null
+  if (start > 0 && !/\s/.test(before.charAt(start - 1))) return null
+
+  const query = before.slice(start + 1)
+  if (query.includes('/') || /[\s\r\n]/.test(query)) return null
+  return { start, query }
+}
+
+export function matchCommandMenuEntries(
+  entries: readonly CommandMenuEntry[],
+  query: string,
+): CommandMenuEntry[] {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return [...entries]
+  return entries.filter((entry) => entry.slash.toLowerCase().startsWith(needle))
+}
+
+/**
+ * Protocol commands Rhizome implements itself. Prime's TUI `/fork`,
+ * `/compact` and `/export` are not in `get_commands` and would no-op if
+ * forwarded as prompt text — so they live here, not in the skill list.
+ */
+export const PROTOCOL_COMMANDS: CommandMenuEntry[] = [
+  { name: 'fork', slash: 'fork', description: 'Branch from a past message', kind: 'instant' },
+  { name: 'compact', slash: 'compact', description: 'Compact this conversation', kind: 'instant' },
+  { name: 'export', slash: 'export', description: 'Export this session as HTML', kind: 'instant' },
+]
+
+export function buildCommandMenu(
+  commands: readonly PrimeReportedCommand[],
+): CommandMenuEntry[] {
+  const reserved = new Set(PROTOCOL_COMMANDS.map((entry) => entry.slash))
+  const skills = selectCommandMenuEntries(commands).filter((entry) => !reserved.has(entry.slash))
+  return [...PROTOCOL_COMMANDS, ...skills]
+}

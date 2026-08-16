@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildCommandMenu,
+  findActiveSlashQuery,
+  matchCommandMenuEntries,
   selectCommandMenuEntries,
+  type CommandMenuEntry,
   type PrimeReportedCommand,
 } from './primeCommandMenu'
 
@@ -92,5 +96,69 @@ describe('selectCommandMenuEntries', () => {
     ])
 
     expect(menu).toEqual([])
+  })
+})
+
+describe('findActiveSlashQuery', () => {
+  it('opens on a slash at the start of the input', () => {
+    expect(findActiveSlashQuery('/', 1)).toEqual({ start: 0, query: '' })
+  })
+
+  it('opens on a slash after whitespace, not only at position zero', () => {
+    expect(findActiveSlashQuery('please /go', 10)).toEqual({ start: 7, query: 'go' })
+  })
+
+  it('does not treat a date as a command', () => {
+    expect(findActiveSlashQuery('due 2026/08/16', 14)).toBeNull()
+  })
+
+  it('does not treat a relative path as a command', () => {
+    expect(findActiveSlashQuery('see src/lib/foo.ts', 18)).toBeNull()
+  })
+
+  it('closes once a second slash makes it a file path', () => {
+    expect(findActiveSlashQuery('/usr/bin', 8)).toBeNull()
+  })
+
+  it('closes once a space ends the command token', () => {
+    expect(findActiveSlashQuery('/compact now', 12)).toBeNull()
+  })
+})
+
+const sampleMenu: CommandMenuEntry[] = [
+  { name: 'fork', slash: 'fork', description: 'Branch from a past message', kind: 'instant' },
+  { name: 'skill:goal', slash: 'goal', description: 'Set a persistent objective', kind: 'skill' },
+]
+
+describe('matchCommandMenuEntries', () => {
+  it('shows every entry on a bare slash', () => {
+    expect(matchCommandMenuEntries(sampleMenu, '').map((entry) => entry.slash)).toEqual([
+      'fork',
+      'goal',
+    ])
+  })
+
+  it('filters by the command name', () => {
+    expect(matchCommandMenuEntries(sampleMenu, 'go').map((entry) => entry.slash)).toEqual(['goal'])
+  })
+
+  it('returns nothing when nothing matches, so the menu can close', () => {
+    expect(matchCommandMenuEntries(sampleMenu, 'zzzz')).toEqual([])
+  })
+})
+
+describe('buildCommandMenu', () => {
+  it('puts fork, compact and export on the menu as instant commands', () => {
+    const menu = buildCommandMenu([])
+    expect(menu.filter((entry) => entry.kind === 'instant').map((entry) => entry.slash)).toEqual([
+      'fork',
+      'compact',
+      'export',
+    ])
+  })
+
+  it('does not let a user skill leak in beside the protocol commands', () => {
+    const menu = buildCommandMenu([reported({ name: 'skill:ask-matt' })])
+    expect(menu.map((entry) => entry.slash)).toEqual(['fork', 'compact', 'export'])
   })
 })
