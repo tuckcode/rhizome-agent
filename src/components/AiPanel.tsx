@@ -4,7 +4,7 @@ import {
   AiPanelHeader,
   AiPanelMessageHistory,
 } from './AiPanelChrome'
-import { ClockCounterClockwise } from '@phosphor-icons/react'
+import { ClockCounterClockwise, Target } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { translate } from '../lib/i18n'
 import PrimeSessionList from './PrimeSessionList'
@@ -34,6 +34,9 @@ import { lastToolName } from '../utils/lastToolName'
 import { usePrimeCommandMenu } from '../hooks/usePrimeCommandMenu'
 import { type CommandMenuAction } from '../lib/primeCommandMenu'
 import { trackPrimeCommandRun } from '../lib/productAnalytics'
+import { trackEvent } from '../lib/telemetry'
+import { PrimeGoalDialog } from './PrimeGoalDialog'
+import type { PrimeAgentActivity } from './AgentActivityBand'
 
 export type { AiAgentMessage } from '../hooks/useCliAiAgent'
 
@@ -224,6 +227,37 @@ export function AiPanelView({
   // Refresh when a turn finishes rather than only on the interval, so context
   // usage reflects the exchange that just happened.
   const primeStats = usePrimeSessionStats(isPrimeTarget, agent.status)
+
+  // Goal dialog (#20): opened on demand, not polled — the goal strip
+  // (`AgentActivityBand`, wired in `ChatHome`) already polls for display.
+  // This only needs a fresh read at the moment the dialog opens, so the
+  // "current goal" shown there can never be stale.
+  const [goalDialogOpen, setGoalDialogOpen] = useState(false)
+  const [goalDialogGoal, setGoalDialogGoal] = useState<PrimeAgentActivity['goal'] | null>(null)
+  const handleOpenGoalDialog = useCallback(() => {
+    const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
+      isTauri() ? invoke<T>(cmd, args) : mockInvoke<T>(cmd, args)
+    setGoalDialogOpen(true)
+    void call<PrimeAgentActivity>('get_prime_agent_activity')
+      .then((activity) => setGoalDialogGoal(activity?.goal ?? null))
+      .catch(() => setGoalDialogGoal(null))
+  }, [])
+  const handleSetGoal = useCallback(async (objective: string, tokenBudget: number | null) => {
+    const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
+      isTauri() ? invoke<T>(cmd, args) : mockInvoke<T>(cmd, args)
+    const goal = await call<{ objective?: string }>('set_prime_goal', {
+      objective,
+      tokenBudget: tokenBudget ?? undefined,
+    })
+    trackEvent('prime_goal_set', { has_budget: tokenBudget !== null })
+    return goal
+  }, [])
+  const handleClearGoal = useCallback(async () => {
+    const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
+      isTauri() ? invoke<T>(cmd, args) : mockInvoke<T>(cmd, args)
+    await call<void>('clear_prime_goal')
+    trackEvent('prime_goal_cleared')
+  }, [])
 
   // Reopening lands back in work the daemon kept running, so the panel has to
   // show that conversation rather than an empty one over a live session (#7).
@@ -458,9 +492,28 @@ export function AiPanelView({
       {notePane}
       </div>
       {isPrimeTarget && (
-        <div style={{ padding: '0 12px 6px' }}>
+        <div style={{ padding: '0 12px 6px' }} className="flex items-center justify-between gap-2">
           <PrimeContextMeter stats={primeStats} locale={locale} />
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={handleOpenGoalDialog}
+            data-testid="prime-goal-trigger"
+          >
+            <Target size={12} weight="regular" aria-hidden="true" />
+            {translate(locale, 'ai.goal.trigger')}
+          </Button>
         </div>
+      )}
+      {isPrimeTarget && (
+        <PrimeGoalDialog
+          open={goalDialogOpen}
+          onOpenChange={setGoalDialogOpen}
+          locale={locale}
+          currentGoal={goalDialogGoal}
+          onSetGoal={handleSetGoal}
+          onClearGoal={handleClearGoal}
+        />
       )}
       <AiPanelComposer
         entries={entries ?? []}
