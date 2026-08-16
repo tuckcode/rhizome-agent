@@ -576,7 +576,7 @@ export function InlineWikilinkInput({
     onChange(applied.value)
     setSelectionRange(collapseSelectionRange(applied.nextSelectionIndex))
     window.setTimeout(() => focusSelectionRange(collapseSelectionRange(applied.nextSelectionIndex)), 0)
-    setCommandState({ key: slashKey, dismissed: true, index: 0 })
+    setCommandState({ key: '', dismissed: false, index: 0 })
     onCommandAction?.(applied.action, applied.value)
   }
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {

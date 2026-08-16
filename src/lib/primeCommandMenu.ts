@@ -148,21 +148,13 @@ export function applyCommandMenuSelection(
   if (!active) return null
 
   const after = value.slice(selectionIndex)
-  if (entry.kind === 'instant') {
-    const next = `${value.slice(0, active.start)}${after}`
-    return {
-      value: next,
-      nextSelectionIndex: active.start,
-      action: { kind: 'instant', name: entry.slash },
-    }
-  }
-
-  const token = `/${entry.slash}`
-  const next = `${value.slice(0, active.start)}${token}${after}`
+  const next = `${value.slice(0, active.start)}${after}`
   return {
     value: next,
-    nextSelectionIndex: active.start + token.length,
-    action: { kind: 'prompt', text: token },
+    nextSelectionIndex: active.start,
+    action: entry.kind === 'instant'
+      ? { kind: 'instant', name: entry.slash }
+      : { kind: 'prompt', text: `/${entry.slash}` },
   }
 }
 

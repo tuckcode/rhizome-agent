@@ -881,4 +881,27 @@ describe('WikilinkChatInput command menu', () => {
     expect(onSend).not.toHaveBeenCalled()
     expect(onCommandAction).toHaveBeenCalledWith({ kind: 'instant', name: 'compact' }, '')
   })
+
+  it('opens again on a new slash after a command ran', () => {
+    function Replay() {
+      const [value, setValue] = useState('/')
+      return (
+        <WikilinkChatInput
+          entries={entries}
+          value={value}
+          onChange={setValue}
+          onSend={vi.fn()}
+          commandEntries={commandEntries}
+          onCommandAction={(_action, nextValue) => setValue(nextValue)}
+        />
+      )
+    }
+
+    render(<Replay />)
+    fireEvent.click(screen.getByTestId('command-menu-item-goal'))
+    expect(screen.queryByTestId('command-menu')).toBeNull()
+
+    updateEditorText('/')
+    expect(screen.getByTestId('command-menu')).toBeInTheDocument()
+  })
 })
