@@ -660,7 +660,8 @@ pub fn get_available_prime_models() -> Result<Vec<crate::prime_session_host::Pri
 /// Skills and extension commands the live session reports via `get_commands`.
 #[cfg(desktop)]
 #[tauri::command]
-pub fn get_prime_commands() -> Result<Vec<crate::prime_session_host::PrimeReportedCommand>, String> {
+pub fn get_prime_commands() -> Result<Vec<crate::prime_session_host::PrimeReportedCommand>, String>
+{
     crate::prime_session_host::get_commands()
 }
 
