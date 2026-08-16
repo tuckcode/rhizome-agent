@@ -40,6 +40,14 @@ import { handleInlineWikilinkKeyDown } from './inlineWikilinkKeydown'
 import { useInlineWikilinkSelection } from './useInlineWikilinkSelection'
 import { useInlineWikilinkSuggestionsState } from './useInlineWikilinkSuggestionsState'
 import { normalizeInlineWikilinkValue } from './inlineWikilinkTokens'
+import { ChatCommandMenu } from './ChatCommandMenu'
+import {
+  applyCommandMenuSelection,
+  findActiveSlashQuery,
+  matchCommandMenuEntries,
+  type CommandMenuAction,
+  type CommandMenuEntry,
+} from '../lib/primeCommandMenu'
 import {
   isInsertBeforeInput,
   isPlainTextBeforeInput,
@@ -66,6 +74,11 @@ interface InlineWikilinkInputProps {
   paletteHeader?: ReactNode
   paletteEmptyState?: ReactNode
   paletteFooter?: ReactNode
+  commandEntries?: CommandMenuEntry[]
+  commandDisabled?: Record<string, string>
+  commandSkillLabel?: string
+  commandInstantLabel?: string
+  onCommandAction?: (action: CommandMenuAction, nextValue: string) => void
 }
 
 function collapseSelectionRange(nextSelectionIndex: number) {
@@ -212,6 +225,11 @@ export function InlineWikilinkInput({
   paletteHeader,
   paletteEmptyState,
   paletteFooter,
+  commandEntries,
+  commandDisabled,
+  commandSkillLabel = 'Skill',
+  commandInstantLabel = 'Command',
+  onCommandAction,
 }: InlineWikilinkInputProps) {
   const [renderVersion, forceRender] = useState(0)
   const isComposingRef = useRef(false)
@@ -254,6 +272,28 @@ export function InlineWikilinkInput({
       : null,
     [selectionIndex, selectionRange.end, selectionRange.start, value],
   )
+  const [commandState, setCommandState] = useState({ key: '', dismissed: false, index: 0 })
+  const activeSlash = useMemo(
+    () => {
+      if (!commandEntries?.length) return null
+      if (selectionRange.start !== selectionRange.end) return null
+      return findActiveSlashQuery(value, selectionIndex)
+    },
+    [commandEntries, selectionIndex, selectionRange.end, selectionRange.start, value],
+  )
+  const slashKey = activeSlash ? `${activeSlash.start}:${activeSlash.query}` : ''
+  const commandDismissed = commandState.key === slashKey ? commandState.dismissed : false
+  const commandIndex = commandState.key === slashKey ? commandState.index : 0
+  const commandMatches = useMemo(
+    () => (activeSlash && !commandDismissed
+      ? matchCommandMenuEntries(commandEntries ?? [], activeSlash.query)
+      : []),
+    [activeSlash, commandDismissed, commandEntries],
+  )
+  const commandMenuOpen = commandMatches.length > 0
+  const selectedCommandIndex = commandMenuOpen
+    ? Math.min(commandIndex, commandMatches.length - 1)
+    : 0
   const references = useMemo(() => extractInlineWikilinkReferences(value, entries), [entries, value])
   const {
     suggestions,
@@ -528,6 +568,17 @@ export function InlineWikilinkInput({
   }
   const submitValue = () =>
     submitInlineValue({ onSubmit, submitOnEmpty, value, references })
+  const selectCommand = (index: number) => {
+    const entry = commandMatches[index]
+    if (!entry || commandDisabled?.[entry.slash]) return
+    const applied = applyCommandMenuSelection(value, selectionIndex, entry)
+    if (!applied) return
+    onChange(applied.value)
+    setSelectionRange(collapseSelectionRange(applied.nextSelectionIndex))
+    window.setTimeout(() => focusSelectionRange(collapseSelectionRange(applied.nextSelectionIndex)), 0)
+    setCommandState({ key: slashKey, dismissed: true, index: 0 })
+    onCommandAction?.(applied.action, applied.value)
+  }
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!disabled && isLineBreakShortcut(event, isComposingRef.current)) {
       event.preventDefault()
@@ -549,9 +600,26 @@ export function InlineWikilinkInput({
       event,
       disabled,
       isComposing: isComposingRef.current,
-      suggestionsOpen: suggestions.length > 0,
-      onCycleSuggestions: cycleSuggestions,
-      onSelectSuggestion: () => selectSuggestion(selectedSuggestionIndex),
+      suggestionsOpen: commandMenuOpen || suggestions.length > 0,
+      onCycleSuggestions: commandMenuOpen
+        ? (direction) => {
+            setCommandState((current) => {
+              const count = commandMatches.length
+              if (count === 0) return { key: slashKey, dismissed: false, index: 0 }
+              const from = current.key === slashKey ? current.index : 0
+              const next = direction > 0
+                ? (from + 1) % count
+                : (from <= 0 ? count - 1 : from - 1)
+              return { key: slashKey, dismissed: false, index: next }
+            })
+          }
+        : cycleSuggestions,
+      onSelectSuggestion: commandMenuOpen
+        ? () => selectCommand(selectedCommandIndex)
+        : () => selectSuggestion(selectedSuggestionIndex),
+      onDismissSuggestions: commandMenuOpen
+        ? () => setCommandState({ key: slashKey, dismissed: true, index: 0 })
+        : undefined,
       onDeleteContent: deleteContent,
       canSubmit: onSubmit !== undefined,
       onSubmit: submitValue,
@@ -601,5 +669,21 @@ export function InlineWikilinkInput({
       />
     )
   }
-  return <div className="relative">{editor}{suggestionList}</div>
+  return (
+    <div className="relative">
+      {editor}
+      {commandMenuOpen ? (
+        <ChatCommandMenu
+          entries={commandMatches}
+          selectedIndex={selectedCommandIndex}
+          onHover={(index) => setCommandState({ key: slashKey, dismissed: false, index })}
+          onSelect={selectCommand}
+          onDismiss={() => setCommandState({ key: slashKey, dismissed: true, index: 0 })}
+          skillLabel={commandSkillLabel}
+          instantLabel={commandInstantLabel}
+          disabled={commandDisabled}
+        />
+      ) : suggestionList}
+    </div>
+  )
 }

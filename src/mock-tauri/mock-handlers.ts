@@ -579,6 +579,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   ],
   set_prime_model: () => null,
   fork_prime_session: () => ({ sessionId: 'mock-fork', branchedFrom: 'branch point' }),
+  compact_prime_session: () => 12000,
   get_prime_agent_activity: () => ({ goal: { active: false }, heartbeats: [], schedules: [] }),
   which_binary: ({ name }: { name: string }) => ({ found: name === 'mindwalk', path: name === 'mindwalk' ? '/usr/bin/mindwalk' : null }),
   run_mindwalk_open: ({ path }: { path: string }) => path,

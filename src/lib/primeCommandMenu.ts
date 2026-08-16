@@ -115,7 +115,6 @@ export function matchCommandMenuEntries(
 export const PROTOCOL_COMMANDS: CommandMenuEntry[] = [
   { name: 'fork', slash: 'fork', description: 'Branch from a past message', kind: 'instant' },
   { name: 'compact', slash: 'compact', description: 'Compact this conversation', kind: 'instant' },
-  { name: 'export', slash: 'export', description: 'Export this session as HTML', kind: 'instant' },
 ]
 
 export function buildCommandMenu(

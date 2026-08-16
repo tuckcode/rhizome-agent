@@ -155,13 +155,12 @@ describe('buildCommandMenu', () => {
     expect(menu.filter((entry) => entry.kind === 'instant').map((entry) => entry.slash)).toEqual([
       'fork',
       'compact',
-      'export',
     ])
   })
 
   it('does not let a user skill leak in beside the protocol commands', () => {
     const menu = buildCommandMenu([reported({ name: 'skill:ask-matt' })])
-    expect(menu.map((entry) => entry.slash)).toEqual(['fork', 'compact', 'export'])
+    expect(menu.map((entry) => entry.slash)).toEqual(['fork', 'compact'])
   })
 })
 

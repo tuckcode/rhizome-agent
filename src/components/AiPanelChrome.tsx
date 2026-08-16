@@ -15,6 +15,7 @@ import type { AiAgentMessage } from '../hooks/useCliAiAgent'
 import type { AiAgentReadiness } from '../lib/aiAgents'
 import type { NoteReference } from '../utils/ai-context'
 import type { VaultEntry } from '../types'
+import type { CommandMenuAction, CommandMenuEntry } from '../lib/primeCommandMenu'
 import { cn } from '@/lib/utils'
 
 interface AiPanelHeaderProps {
@@ -78,6 +79,11 @@ interface AiPanelComposerProps {
   onUnsupportedAiPaste?: (message: string) => void
   /** Frame A foot row. Rendered under the box so it can see controller state. */
   foot?: ReactNode
+  commandEntries?: CommandMenuEntry[]
+  commandDisabled?: Record<string, string>
+  commandSkillLabel?: string
+  commandInstantLabel?: string
+  onCommandAction?: (action: CommandMenuAction, nextValue: string) => void
 }
 
 function getComposerPlaceholder(
@@ -128,6 +134,11 @@ function ComposerInput({
   onSend,
   onUnsupportedAiPaste,
   placeholder,
+  commandEntries,
+  commandDisabled,
+  commandSkillLabel,
+  commandInstantLabel,
+  onCommandAction,
 }: {
   disabled: boolean
   entries: VaultEntry[]
@@ -138,6 +149,11 @@ function ComposerInput({
   onSend: (text: string, references: NoteReference[]) => void
   onUnsupportedAiPaste?: (message: string) => void
   placeholder: string
+  commandEntries?: CommandMenuEntry[]
+  commandDisabled?: Record<string, string>
+  commandSkillLabel?: string
+  commandInstantLabel?: string
+  onCommandAction?: (action: CommandMenuAction, nextValue: string) => void
 }) {
   return (
     <WikilinkChatInput
@@ -150,6 +166,11 @@ function ComposerInput({
       placeholder={placeholder}
       placeholderClassName={hasControls ? 'px-2 py-1.5 text-[13px] leading-5' : undefined}
       inputRef={inputRef}
+      commandEntries={commandEntries}
+      commandDisabled={commandDisabled}
+      commandSkillLabel={commandSkillLabel}
+      commandInstantLabel={commandInstantLabel}
+      onCommandAction={onCommandAction}
       editorClassName={cn(
         'max-h-[120px] overflow-y-auto overscroll-contain',
         hasControls && 'min-h-[34px] border-0 px-2 py-1.5 leading-5',
@@ -578,6 +599,11 @@ export function AiPanelComposer({
   onSteer,
   onUnsupportedAiPaste,
   foot,
+  commandEntries,
+  commandDisabled,
+  commandSkillLabel,
+  commandInstantLabel,
+  onCommandAction,
 }: AiPanelComposerProps) {
   const t = createTranslator(locale)
   // Steering keeps the input live during a turn. Without an onSteer handler the
@@ -637,6 +663,11 @@ export function AiPanelComposer({
             onSend={onSend}
             onUnsupportedAiPaste={onUnsupportedAiPaste}
             placeholder={placeholder}
+            commandEntries={commandEntries}
+            commandDisabled={commandDisabled}
+            commandSkillLabel={commandSkillLabel}
+            commandInstantLabel={commandInstantLabel}
+            onCommandAction={onCommandAction}
           />
         </div>
         <ComposerControlsRow hasControls={false} sendButton={sendButton} />

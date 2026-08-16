@@ -56,6 +56,7 @@ export function useAiPanelFocus({
   }, [enabled, inputRef, panelRef, shouldFocusPanel])
 
   const handleEscape = useCallback((event: KeyboardEvent) => {
+    if (event.defaultPrevented) return
     if (!shouldHandleEscape(event, panelRef)) return
 
     event.preventDefault()

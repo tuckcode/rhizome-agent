@@ -31,6 +31,9 @@ import { usePrimeSessionStats } from '../hooks/usePrimeSessionStats'
 import { PrimeContextMeter } from './PrimeContextMeter'
 import { ChatComposerFoot } from './ChatComposerFoot'
 import { lastToolName } from '../utils/lastToolName'
+import { usePrimeCommandMenu } from '../hooks/usePrimeCommandMenu'
+import { type CommandMenuAction } from '../lib/primeCommandMenu'
+import { trackPrimeCommandRun } from '../lib/productAnalytics'
 
 export type { AiAgentMessage } from '../hooks/useCliAiAgent'
 
@@ -300,6 +303,51 @@ export function AiPanelView({
     }
   }, [agent])
 
+  const commandEntries = usePrimeCommandMenu(isPrimeTarget, primeHost.sessionId)
+  const latestPrimeEntryId = [...agent.messages].reverse().find((message) => message.primeEntryId)?.primeEntryId
+  const commandDisabled = latestPrimeEntryId
+    ? undefined
+    : { fork: translate(locale, 'ai.command.forkNeedsEntry') }
+  const localizedCommands = commandEntries.map((entry) => {
+    if (entry.slash === 'fork') {
+      return { ...entry, description: translate(locale, 'ai.command.forkDescription') }
+    }
+    if (entry.slash === 'compact') {
+      return { ...entry, description: translate(locale, 'ai.command.compactDescription') }
+    }
+    return entry
+  })
+
+  const handleCommandAction = useCallback(async (action: CommandMenuAction, nextValue: string) => {
+    const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
+      isTauri() ? invoke<T>(cmd, args) : mockInvoke<T>(cmd, args)
+    setInput(nextValue)
+    if (action.kind === 'prompt') {
+      trackPrimeCommandRun(action.text.replace(/^\//, ''), 'skill')
+      handleSend(action.text, [])
+      setInput('')
+      return
+    }
+    trackPrimeCommandRun(action.name, 'instant')
+    if (action.name === 'fork') {
+      if (!latestPrimeEntryId) return
+      await handleForkFromEntry(latestPrimeEntryId)
+      return
+    }
+    if (action.name === 'compact') {
+      try {
+        const tokens = await call<number | null>('compact_prime_session')
+        agent.addLocalMarker(
+          typeof tokens === 'number'
+            ? translate(locale, 'ai.command.compactedTokens', { tokens: String(tokens) })
+            : translate(locale, 'ai.command.compacted'),
+        )
+      } catch (e) {
+        setSwitchError(e instanceof Error ? e.message : String(e))
+      }
+    }
+  }, [agent, handleForkFromEntry, handleSend, latestPrimeEntryId, locale, setInput])
+
   const handleSelectSession = useCallback(async (session: PrimeSessionSummary) => {
     const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
       isTauri() ? invoke<T>(cmd, args) : mockInvoke<T>(cmd, args)
@@ -417,6 +465,11 @@ export function AiPanelView({
             lastToolName={lastToolName(agent.messages)}
           />
         ) : undefined}
+        commandEntries={isPrimeTarget ? localizedCommands : undefined}
+        commandDisabled={isPrimeTarget ? commandDisabled : undefined}
+        commandSkillLabel={translate(locale, 'ai.command.skill')}
+        commandInstantLabel={translate(locale, 'ai.command.instant')}
+        onCommandAction={isPrimeTarget ? (action, nextValue) => void handleCommandAction(action, nextValue) : undefined}
       />
     </AiPanelFrame>
   )
