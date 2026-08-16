@@ -80,8 +80,8 @@ struct GithubReleaseResponse {
 /// Split out from the network fetch so it can be tested against a canned
 /// response body without a live network call.
 fn parse_release_response(body: &str) -> Result<PrimeReleaseInfo, String> {
-    let release: GithubReleaseResponse =
-        serde_json::from_str(body).map_err(|error| format!("Failed to parse GitHub release: {error}"))?;
+    let release: GithubReleaseResponse = serde_json::from_str(body)
+        .map_err(|error| format!("Failed to parse GitHub release: {error}"))?;
 
     Ok(PrimeReleaseInfo {
         version: strip_tag_prefix(&release.tag_name).to_string(),
@@ -125,7 +125,9 @@ fn fetch_latest_prime_release() -> Result<PrimeReleaseInfo, String> {
 /// not newer than what's installed. Returns `Err` only on an actual check
 /// failure (network, parse) so the caller can tell "checked, none found"
 /// apart from "couldn't check".
-pub fn check_prime_update(installed_version: Option<&str>) -> Result<Option<PrimeReleaseInfo>, String> {
+pub fn check_prime_update(
+    installed_version: Option<&str>,
+) -> Result<Option<PrimeReleaseInfo>, String> {
     let Some(installed_version) = installed_version.filter(|v| !v.trim().is_empty()) else {
         return Ok(None);
     };
