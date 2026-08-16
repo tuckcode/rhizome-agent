@@ -1347,6 +1347,51 @@ Note what this implies about the record: sessions in this window that report "al
   `--manifest-path src-tauri/Cargo.toml`, same as every other cargo invocation
   in these docs.
 
+- **C28-OPEN: three `@smoke` specs fail under CPU load — the pre-push Playwright lane is not deterministic.** Observed 2026-08-16 on one machine, twice, with a clean tree:
+
+  | Run | Wall clock | Result |
+  |---|---|---|
+  | Full lane, machine idle (`6c1edcc`) | 1m48s | 26 passed |
+  | Full lane, machine loaded (`f65ac10`) | **2m48s** | **3 failed**, 23 passed |
+  | The 3 failures re-run in isolation | 14.6s | **all pass** |
+
+  Failing specs, all keyboard-shortcut driven:
+
+  - `example.spec.ts:16` — Cmd+K opens the command palette
+  - `example.spec.ts:56` — Cmd+P opens quick open
+  - `fix-crash-create-note.spec.ts:109` — Cmd+N creates a note
+
+  **Not a product regression.** The change in the tree at the time
+  (`f65ac10`) touches `AiPanel.tsx` and `primeCommandMenu.ts` only — nothing
+  in keyboard routing, quick open, or note creation — and the captured
+  `error-context.md` page snapshot shows the app fully rendered (sidebar,
+  nav, Inbox). Nothing crashed; the synthesized shortcut just never
+  registered. The 55% wall-clock increase is the tell: these fail on timing
+  when the CPU is contended.
+
+  **Why this is tracked rather than shrugged off.** `fix-crash-create-note`
+  was *already* recorded as timing-flaky in `CROSS-MODEL-HANDOFF` §14, filed
+  as a known annoyance and left there. The two `example.spec.ts` cases are
+  new, which means the flaky surface is **wider than documented and
+  growing** — and it sits on the one lane that gates every push. A gate that
+  fails on machine load teaches people the failure is noise, which is
+  precisely how a real failure gets waved through. `AGENTS.md` says "fix
+  flaky tests first"; this is the entry that stops it being rediscovered per
+  session.
+
+  **Likely cause worth checking first:** contention from concurrently
+  running test processes. This machine had orphaned
+  `run-vitest-coverage-shards.mjs` / `vitest --shard=2/2` processes alive
+  under a *different* runtime (`~/.hermes/node`) during the failing run —
+  either a second agent working the same tree or leaked shards from an
+  earlier coverage run. Before rewriting waits, check whether the lane is
+  simply racing another test run: `pgrep -fl vitest`.
+
+  Fixing it means making these three assert on a settled condition rather
+  than an implicit timing window. Do not "fix" it by retrying harder or by
+  dropping the `@smoke` tag — that removes the coverage instead of the
+  flake.
+
 ## Links out
 
 - Full history + session details → `docs/plans/` (see classification in `docs/plans/handoff-classification.md`)
