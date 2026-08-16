@@ -12,7 +12,7 @@ import {
   Warning as AlertTriangle,
   type IconProps,
 } from '@phosphor-icons/react'
-import type { ComponentType, MouseEventHandler } from 'react'
+import type { ComponentType, MouseEventHandler, ReactNode } from 'react'
 import type { McpStatus } from '../../hooks/useMcpStatus'
 import type { ThemeMode } from '../../lib/themeMode'
 import { translate, type AppLocale, type TranslationKey } from '../../lib/i18n'
@@ -87,6 +87,11 @@ interface StatusBarPrimarySectionProps {
   onOpenConflictResolver?: () => void
   buildNumber?: string
   onCheckForUpdates?: () => void
+  /** Single Rhizome+Prime update indicator (issue #19), composed by the
+   *  caller so this file doesn't need its own update-status hooks. Renders
+   *  as nothing when neither has an update, so it never adds a second
+   *  version number next to the build-number pill above. */
+  versionUpdateIndicator?: ReactNode
   onRemoveVault?: (path: string) => void
   onReorderVaults?: (orderedPaths: string[]) => void
   onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
@@ -568,6 +573,7 @@ export function StatusBarPrimarySection({
   onOpenConflictResolver,
   buildNumber,
   onCheckForUpdates,
+  versionUpdateIndicator,
   onRemoveVault,
   onReorderVaults,
   onUpdateWorkspaceIdentity,
@@ -605,6 +611,7 @@ export function StatusBarPrimarySection({
       />
       {pillMode ? null : <PrimarySeparator compact={compact} />}
       <BuildNumberButton buildNumber={buildNumber} onCheckForUpdates={onCheckForUpdates} compact={compact} locale={locale} />
+      {versionUpdateIndicator}
       <StatusBarGitControls
         commandRailActive={commandRailActive}
         modifiedCount={modifiedCount}
