@@ -1251,8 +1251,12 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   // status independently for its own chrome); this is a second lightweight
   // poll of the same cheap command, not a new connection to Prime.
   const primeHostStatusForUpdates = usePrimeHostStatus(aiFeaturesEnabled, resolvedPath)
+  // Optional-chained deliberately: the hook resolves to null whenever its
+  // command is absent from a test's fake-IPC table, and dereferencing that
+  // unmounts the whole app rather than degrading this one badge. The same
+  // shape already broke App.test.tsx once via primeModelLabel(null).
   const { status: primeUpdateStatus, actions: primeUpdateActions } = usePrimeUpdate(
-    primeHostStatusForUpdates.version,
+    primeHostStatusForUpdates?.version,
   )
   const versionUpdateIndicator = (
     <VersionUpdateIndicator
