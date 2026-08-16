@@ -619,6 +619,95 @@ pub struct PrimeModel {
     pub reasoning: bool,
 }
 
+/// One entry from Prime `get_commands`, as the daemon actually reports it.
+///
+/// Origin is `source_info`, not the flatter `source`/`location` still in
+/// Prime's docs. The frontend filter (#16) reads these fields; inventing a
+/// different shape here would silently drop every skill.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrimeCommandSourceInfo {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub origin: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base_dir: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrimeReportedCommand {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub argument_hint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_info: Option<PrimeCommandSourceInfo>,
+}
+
+fn opt_str(value: &serde_json::Value, key: &str) -> Option<String> {
+    value[key]
+        .as_str()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+}
+
+fn source_info_from_value(value: &serde_json::Value) -> Option<PrimeCommandSourceInfo> {
+    if !value.is_object() {
+        return None;
+    }
+    Some(PrimeCommandSourceInfo {
+        path: opt_str(value, "path"),
+        source: opt_str(value, "source"),
+        scope: opt_str(value, "scope"),
+        origin: opt_str(value, "origin"),
+        base_dir: opt_str(value, "baseDir"),
+    })
+}
+
+fn commands_from_response(data: &serde_json::Value) -> Vec<PrimeReportedCommand> {
+    data["commands"]
+        .as_array()
+        .map(|commands| {
+            commands
+                .iter()
+                .filter_map(|command| {
+                    let name = opt_str(command, "name")?;
+                    Some(PrimeReportedCommand {
+                        name,
+                        description: opt_str(command, "description"),
+                        source: opt_str(command, "source"),
+                        argument_hint: opt_str(command, "argumentHint"),
+                        source_info: source_info_from_value(&command["sourceInfo"]),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Skills and extension commands the live session can invoke via `/`.
+pub fn get_commands() -> Result<Vec<PrimeReportedCommand>, String> {
+    with_host_mut(|host| {
+        let response = host.send_command(serde_json::json!({ "type": "get_commands" }))?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, "get_commands"));
+        }
+        Ok(commands_from_response(
+            response.get("data").unwrap_or(&serde_json::Value::Null),
+        ))
+    })
+}
+
 fn models_from_response(data: &serde_json::Value) -> Vec<PrimeModel> {
     data["models"]
         .as_array()
@@ -3288,6 +3377,56 @@ mod tests {
         }));
 
         assert!(models.is_empty());
+    }
+
+    /// Live 0.7.2 probe: sourceInfo is the origin, not the flatter
+    /// source/location layout still in Prime's docs.
+    #[test]
+    fn commands_parse_the_source_info_the_menu_filters_on() {
+        let data = serde_json::json!({
+            "commands": [
+                {
+                    "name": "skill:ask-matt",
+                    "description": "Ask which skill fits",
+                    "source": "skill",
+                    "sourceInfo": {
+                        "path": "/Users/dtc/.agents/skills/ask-matt/SKILL.md",
+                        "source": "auto",
+                        "scope": "user",
+                        "origin": "top-level"
+                    }
+                },
+                {
+                    "name": "skill:goal",
+                    "description": "Set a persistent objective",
+                    "source": "skill",
+                    "sourceInfo": {
+                        "path": "/opt/prime/skills/goal/SKILL.md",
+                        "source": "builtin",
+                        "scope": "user"
+                    }
+                },
+                { "description": "nameless" }
+            ]
+        });
+
+        let commands = commands_from_response(&data);
+        assert_eq!(commands.len(), 2);
+        assert_eq!(commands[0].name, "skill:ask-matt");
+        assert_eq!(commands[0].source.as_deref(), Some("skill"));
+        assert_eq!(
+            commands[0].source_info.as_ref().unwrap().source.as_deref(),
+            Some("auto")
+        );
+        assert_eq!(
+            commands[0].source_info.as_ref().unwrap().scope.as_deref(),
+            Some("user")
+        );
+        assert_eq!(commands[1].name, "skill:goal");
+        assert_eq!(
+            commands[1].source_info.as_ref().unwrap().source.as_deref(),
+            Some("builtin")
+        );
     }
 
     #[test]

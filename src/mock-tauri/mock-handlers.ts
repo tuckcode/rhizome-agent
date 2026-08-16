@@ -563,6 +563,20 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     { id: 'grok-4.5', name: 'Grok 4.5', provider: 'xai', contextWindow: 256000, reasoning: true },
     { id: 'claude-fable-5', name: 'Claude Fable 5', provider: 'anthropic', reasoning: true },
   ],
+  get_prime_commands: () => [
+    {
+      name: 'skill:goal',
+      description: 'Set a persistent objective',
+      source: 'skill',
+      sourceInfo: { source: 'builtin', scope: 'user', path: '/mock/skills/goal/SKILL.md' },
+    },
+    {
+      name: 'skill:rhizome-vault',
+      description: 'Call Rhizome vault tools',
+      source: 'skill',
+      sourceInfo: { source: 'auto', scope: 'project', path: '/mock/vault/.prime/agent/skills/rhizome-vault/SKILL.md' },
+    },
+  ],
   set_prime_model: () => null,
   fork_prime_session: () => ({ sessionId: 'mock-fork', branchedFrom: 'branch point' }),
   get_prime_agent_activity: () => ({ goal: { active: false }, heartbeats: [], schedules: [] }),
