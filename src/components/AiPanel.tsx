@@ -322,10 +322,10 @@ export function AiPanelView({
     const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
       isTauri() ? invoke<T>(cmd, args) : mockInvoke<T>(cmd, args)
     setInput(nextValue)
-    if (action.kind === 'prompt') {
-      trackPrimeCommandRun(action.text.replace(/^\//, ''), 'skill')
-      handleSend(action.text, [])
-      setInput('')
+    // A skill is completed into the composer, not sent — it takes arguments,
+    // and sending on pick fired the turn before the user could type any.
+    if (action.kind === 'compose') {
+      trackPrimeCommandRun(action.name, 'skill')
       return
     }
     trackPrimeCommandRun(action.name, 'instant')
@@ -346,7 +346,7 @@ export function AiPanelView({
         setSwitchError(e instanceof Error ? e.message : String(e))
       }
     }
-  }, [agent, handleForkFromEntry, handleSend, latestPrimeEntryId, locale, setInput])
+  }, [agent, handleForkFromEntry, latestPrimeEntryId, locale, setInput])
 
   const handleSelectSession = useCallback(async (session: PrimeSessionSummary) => {
     const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>

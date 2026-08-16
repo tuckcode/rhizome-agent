@@ -126,7 +126,8 @@ export function buildCommandMenu(
 }
 
 export type CommandMenuAction =
-  | { kind: 'prompt'; text: string }
+  /** Skill completed into the composer; the user sends it themselves. */
+  | { kind: 'compose'; name: string }
   | { kind: 'instant'; name: string }
 
 export interface CommandMenuEdit {
@@ -135,26 +136,39 @@ export interface CommandMenuEdit {
 }
 
 /**
- * Replace the active `/token` with the chosen command. Skills stay as
- * prompt text (`/goal`); instant commands leave the box empty so they
- * are not forwarded to Prime as a no-op.
+ * Replace the active `/token` with the chosen command.
+ *
+ * A **skill** is completed into the composer as `/name ` with the caret after
+ * it, because skills take arguments — sending on pick would fire the turn
+ * before the user could type any (reported from live use 2026-08-16).
+ *
+ * An **instant** command leaves the box empty: it runs over the protocol, and
+ * forwarding its name to Prime as prompt text would silently no-op.
  */
 export function applyCommandMenuSelection(
   value: string,
   selectionIndex: number,
   entry: CommandMenuEntry,
-): CommandMenuEdit & { action: CommandMenuAction } | null {
+): (CommandMenuEdit & { action: CommandMenuAction }) | null {
   const active = findActiveSlashQuery(value, selectionIndex)
   if (!active) return null
 
+  const before = value.slice(0, active.start)
   const after = value.slice(selectionIndex)
-  const next = `${value.slice(0, active.start)}${after}`
+
+  if (entry.kind === 'instant') {
+    return {
+      value: `${before}${after}`,
+      nextSelectionIndex: active.start,
+      action: { kind: 'instant', name: entry.slash },
+    }
+  }
+
+  const completion = `/${entry.slash} `
   return {
-    value: next,
-    nextSelectionIndex: active.start,
-    action: entry.kind === 'instant'
-      ? { kind: 'instant', name: entry.slash }
-      : { kind: 'prompt', text: `/${entry.slash}` },
+    value: `${before}${completion}${after}`,
+    nextSelectionIndex: active.start + completion.length,
+    action: { kind: 'compose', name: entry.slash },
   }
 }
 
