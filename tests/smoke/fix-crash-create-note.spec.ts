@@ -1,7 +1,12 @@
 import fs from 'fs'
 import path from 'path'
 import { test, expect, type Page } from '@playwright/test'
-import { executeCommand, openCommandPalette, sendShortcut } from './helpers'
+import {
+  executeCommand,
+  openCommandPalette,
+  sendShortcut,
+  waitForKeyboardShortcutsReady,
+} from './helpers'
 import { createFixtureVaultCopy, openFixtureVault, removeFixtureVaultCopy } from '../helpers/fixtureVault'
 
 let tempVaultDir: string
@@ -109,7 +114,11 @@ test.describe('Create note crash fix', () => {
   test('Cmd+N creates a note without crashing @smoke', async ({ page }) => {
     await openTestVault(page)
     await expectUntitledNoteWithoutCrash(page, 'note', async () => {
-      await page.waitForTimeout(300)
+      // Wait on the renderer's own readiness signal instead of a fixed
+      // sleep: the global keydown listener attaches in a `useEffect` that
+      // fires before `FrontendReadyMarker`'s effect, so this flag is a real
+      // guarantee the shortcut has something to land on.
+      await waitForKeyboardShortcutsReady(page)
       await page.locator('body').click()
       await sendShortcut(page, 'n', ['Control'])
     })
