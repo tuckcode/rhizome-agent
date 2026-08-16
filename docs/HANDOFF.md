@@ -1417,6 +1417,14 @@ Note what this implies about the record: sessions in this window that report "al
   dropping the `@smoke` tag — that removes the coverage instead of the
   flake.
 
+- **C29-OPEN: after `Cmd+N`, the note list does not refresh — the new note never appears in it.** Found 2026-08-16 while fixing C28, in `tests/smoke/fix-crash-create-note.spec.ts:114`. **This is a product bug, not test flake**, and it is now the dominant source of flakiness in the smoke lane (~30-40% of isolated runs).
+
+  **Why it is not a timeout problem.** Instrumented with timing logs: when it passes, the note appears in the list in ~180ms. When it fails, it **never** appears — raising the timeout to 30s does not help. The editor opens with the new note correctly; the left-hand note list stays at the old count and contents. That is a stuck state, not a slow one.
+
+  Root cause is somewhere in the list-refresh path after note creation in `src/` — deliberately not chased, because the agent that found it was scoped to `tests/` only. Start there rather than in the spec: the spec is asserting the right thing.
+
+  **Do not "fix" this by widening the wait or dropping the `@smoke` tag.** A user hitting Cmd+N and not seeing their note in the list is the actual defect the test is catching.
+
 ## Links out
 
 - Full history + session details → `docs/plans/` (see classification in `docs/plans/handoff-classification.md`)
