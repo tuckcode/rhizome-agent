@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyCommandMenuSelection,
   buildCommandMenu,
+  dismissSlashQuery,
   findActiveSlashQuery,
   matchCommandMenuEntries,
   selectCommandMenuEntries,
@@ -160,5 +162,42 @@ describe('buildCommandMenu', () => {
   it('does not let a user skill leak in beside the protocol commands', () => {
     const menu = buildCommandMenu([reported({ name: 'skill:ask-matt' })])
     expect(menu.map((entry) => entry.slash)).toEqual(['fork', 'compact', 'export'])
+  })
+})
+
+describe('applyCommandMenuSelection', () => {
+  it('replaces the slash token with the skill as prompt text', () => {
+    expect(applyCommandMenuSelection('please /go', 10, {
+      name: 'skill:goal',
+      slash: 'goal',
+      description: 'Set a persistent objective',
+      kind: 'skill',
+    })).toEqual({
+      value: 'please /goal',
+      nextSelectionIndex: 12,
+      action: { kind: 'prompt', text: '/goal' },
+    })
+  })
+
+  it('clears the token when an instant command is chosen', () => {
+    expect(applyCommandMenuSelection('/fork', 5, {
+      name: 'fork',
+      slash: 'fork',
+      description: 'Branch from a past message',
+      kind: 'instant',
+    })).toEqual({
+      value: '',
+      nextSelectionIndex: 0,
+      action: { kind: 'instant', name: 'fork' },
+    })
+  })
+})
+
+describe('dismissSlashQuery', () => {
+  it('leaves the slash in the input', () => {
+    expect(dismissSlashQuery('/compact', 8)).toEqual({
+      value: '/compact',
+      nextSelectionIndex: 8,
+    })
   })
 })

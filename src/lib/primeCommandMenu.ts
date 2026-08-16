@@ -125,3 +125,52 @@ export function buildCommandMenu(
   const skills = selectCommandMenuEntries(commands).filter((entry) => !reserved.has(entry.slash))
   return [...PROTOCOL_COMMANDS, ...skills]
 }
+
+export type CommandMenuAction =
+  | { kind: 'prompt'; text: string }
+  | { kind: 'instant'; name: string }
+
+export interface CommandMenuEdit {
+  value: string
+  nextSelectionIndex: number
+}
+
+/**
+ * Replace the active `/token` with the chosen command. Skills stay as
+ * prompt text (`/goal`); instant commands leave the box empty so they
+ * are not forwarded to Prime as a no-op.
+ */
+export function applyCommandMenuSelection(
+  value: string,
+  selectionIndex: number,
+  entry: CommandMenuEntry,
+): CommandMenuEdit & { action: CommandMenuAction } | null {
+  const active = findActiveSlashQuery(value, selectionIndex)
+  if (!active) return null
+
+  const after = value.slice(selectionIndex)
+  if (entry.kind === 'instant') {
+    const next = `${value.slice(0, active.start)}${after}`
+    return {
+      value: next,
+      nextSelectionIndex: active.start,
+      action: { kind: 'instant', name: entry.slash },
+    }
+  }
+
+  const token = `/${entry.slash}`
+  const next = `${value.slice(0, active.start)}${token}${after}`
+  return {
+    value: next,
+    nextSelectionIndex: active.start + token.length,
+    action: { kind: 'prompt', text: token },
+  }
+}
+
+/** Escape closes the menu and leaves the slash in the input. */
+export function dismissSlashQuery(
+  value: string,
+  selectionIndex: number,
+): CommandMenuEdit {
+  return { value, nextSelectionIndex: selectionIndex }
+}
