@@ -390,9 +390,112 @@ pub fn read_transcript(path: &Path) -> Result<Vec<PrimeTranscriptItem>, String> 
     Ok(transcript_from_lines(lines))
 }
 
+/// Where an exported session lands when the caller doesn't name a file.
+///
+/// Named after the session log's own stem so exporting twice from different
+/// sessions cannot silently overwrite one file.
+pub(crate) fn default_export_path(session_path: &Path, dir: &Path) -> PathBuf {
+    let stem = session_path
+        .file_stem()
+        .and_then(|name| name.to_str())
+        // A dotfile-shaped log ("`.jsonl`") reports the whole name as its
+        // stem, which would render as `prime-session-.jsonl.html`.
+        .filter(|name| !name.is_empty() && !name.starts_with('.'))
+        .unwrap_or("session");
+    dir.join(format!("prime-session-{stem}.html"))
+}
+
+/// Export a saved session to a standalone HTML file.
+///
+/// **This is a CLI operation, not a daemon one.** `export` is absent from the
+/// daemon's `serverCapabilities`; Prime exposes it only as
+/// `prime-agent session export <file> [output]` over a file on disk. So this
+/// lives here with the other session-file readers rather than beside
+/// `fork`/`compact` in `prime_session_host`, which are protocol calls on the
+/// live connection.
+pub fn export_session(session_path: &str, output_path: Option<String>) -> Result<String, String> {
+    let path = Path::new(session_path);
+    ensure_inside_sessions_dir(path)?;
+
+    let binary = crate::prime_discovery::find_binary()?;
+    let output = match output_path {
+        Some(chosen) => PathBuf::from(chosen),
+        None => {
+            let dir = dirs::download_dir()
+                .or_else(dirs::home_dir)
+                .ok_or_else(|| "Could not resolve a folder to export into".to_string())?;
+            default_export_path(path, &dir)
+        }
+    };
+
+    let result = std::process::Command::new(&binary)
+        .arg("session")
+        .arg("export")
+        .arg(path)
+        .arg(&output)
+        .output()
+        .map_err(|e| format!("Could not run prime-agent: {e}"))?;
+
+    if !result.status.success() {
+        // Prefer Prime's own wording so the user sees what it actually said.
+        let stderr = String::from_utf8_lossy(&result.stderr).trim().to_string();
+        return Err(if stderr.is_empty() {
+            "Export failed".to_string()
+        } else {
+            stderr
+        });
+    }
+
+    Ok(output.to_string_lossy().into_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The default name carries the session's own id, so exporting two
+    /// different sessions cannot land on the same file.
+    #[test]
+    fn an_exported_session_is_named_after_its_log() {
+        let out = default_export_path(
+            Path::new("/Users/dtc/.prime/agent/sessions/019fe2e7-e9dd-701f.jsonl"),
+            Path::new("/Users/dtc/Downloads"),
+        );
+        assert_eq!(
+            out,
+            PathBuf::from("/Users/dtc/Downloads/prime-session-019fe2e7-e9dd-701f.html")
+        );
+
+        let other = default_export_path(
+            Path::new("/Users/dtc/.prime/agent/sessions/aaaabbbb-1111.jsonl"),
+            Path::new("/Users/dtc/Downloads"),
+        );
+        assert_ne!(out, other);
+    }
+
+    #[test]
+    fn an_unnamed_log_still_produces_a_usable_export_name() {
+        assert_eq!(
+            default_export_path(Path::new(".jsonl"), Path::new("/tmp")),
+            PathBuf::from("/tmp/prime-session-session.html")
+        );
+    }
+
+    /// Export shells out to another tool with a caller-supplied path, so the
+    /// sessions-dir guard has to hold before anything is spawned.
+    #[test]
+    fn exporting_something_outside_the_sessions_dir_is_refused() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let outsider = dir.path().join("not-a-session.jsonl");
+        std::fs::write(&outsider, "{}").expect("write");
+
+        let error = export_session(outsider.to_str().expect("utf8"), None)
+            .expect_err("a file outside the sessions dir must be refused");
+        assert!(
+            error.contains("Not a Prime session log") || error.contains("resolve"),
+            "unexpected error: {error}"
+        );
+    }
 
     fn lines(raw: &[&str]) -> std::vec::IntoIter<String> {
         raw.iter()
