@@ -5,8 +5,24 @@
 //! **schedules**), and spawns subagents. Rhizome rendered none of it, so the
 //! app showed a chatbot while the harness ran underneath.
 //!
-//! This gathers the parts the RPC surface exposes. Probed 2026-08-15:
-//! `get_state.goal`, `list_heartbeats` and `list_schedules` all answer.
+//! **Correction, 2026-08-16, re-probed against the daemon transport Rhizome
+//! actually uses (0.7.2):** a prior pass (2026-08-15) claimed `get_state.goal`
+//! answers. That was wrong for the daemon — confirmed live by sending
+//! `get_state` right after creating a real goal and getting back a payload
+//! with no `goal` key at all (`modes/daemon/daemon-session-list.js`'s
+//! `summaryForActiveSession`, what daemon `get_state` returns, never sets one;
+//! only RPC mode's summarizer does). The daemon command that does carry it is
+//! `get_connection_state` (`createConnectionState` in the installed daemon,
+//! wrapping `createAgentConnectionState` from `modes/agent-connection/
+//! snapshot.js`, which sets `goal: session.goalState` directly). Its shape
+//! also differs from what was assumed: the budget field is `tokenBudget`, not
+//! `remainingTokens` — captured live from a real active goal:
+//! `{active, status, goalId, objective, tokenBudget, tokensUsed,
+//! timeUsedSeconds, continuationsUsed, createdAt, updatedAt}`.
+//!
+//! `list_heartbeats` and `list_schedules` were not re-verified against a real
+//! heartbeat/schedule in this pass; `heartbeats_list`/`cron_list` (the daemon
+//! command names actually used) are unchanged from the 2026-08-15 probe.
 //!
 //! **We do not own these shapes.** Every field is optional and unknown keys are
 //! ignored, so a Prime release that adds or renames one degrades to a quieter
@@ -16,11 +32,13 @@ use serde::Serialize;
 
 /// The persistent objective the harness re-prompts toward across turns.
 ///
-/// Observed idle shape: `{active, status, tokensUsed, timeUsedSeconds,
-/// continuationsUsed}`. An active goal also carries its objective text and a
-/// remaining budget; those are optional here because an idle session never
-/// shows them and inventing a name for a field we have not seen is how the
-/// `model_change` parse went wrong.
+/// Observed idle shape (via `get_connection_state`):
+/// `{active, status, tokensUsed, timeUsedSeconds, continuationsUsed}`. An
+/// active goal also carries `objective` and `tokenBudget`; `remaining_tokens`
+/// is derived here as `tokenBudget - tokensUsed` since Prime's payload has no
+/// remaining-budget field of its own — inventing one that matched neither
+/// name is how the `model_change` parse went wrong previously, so this
+/// computes it instead of guessing a key.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrimeGoalState {
@@ -31,6 +49,8 @@ pub struct PrimeGoalState {
     pub objective: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tokens_used: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token_budget: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub remaining_tokens: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -71,21 +91,31 @@ pub struct PrimeAgentActivity {
     pub thinking_level: Option<String>,
 }
 
-/// Read the goal out of a `get_state` payload.
+/// Read the goal out of a `get_connection_state` payload.
 ///
-/// Returns `None` when the key is absent entirely — an older Prime, or a shape
-/// change — so the band omits the goal rather than claiming an idle one.
+/// Returns `None` when the key is absent entirely — an older Prime, a shape
+/// change, or (as `get_state` turned out to be) simply the wrong command —
+/// so the band omits the goal rather than claiming an idle one.
 pub fn goal_from_state(state: &serde_json::Value) -> Option<PrimeGoalState> {
     let goal = state.get("goal")?;
     if !goal.is_object() {
         return None;
     }
+    let tokens_used = goal["tokensUsed"].as_u64();
+    let token_budget = first_u64(goal, &["tokenBudget", "token_budget"]);
+    // Prime reports usage and budget, not what's left — derive it rather than
+    // guess at a remaining-budget field name it does not send.
+    let remaining_tokens = match (token_budget, tokens_used) {
+        (Some(budget), Some(used)) => Some(budget.saturating_sub(used)),
+        _ => first_u64(goal, &["remainingTokens", "tokenBudgetRemaining"]),
+    };
     Some(PrimeGoalState {
         active: goal["active"].as_bool().unwrap_or(false),
         status: goal["status"].as_str().map(str::to_string),
         objective: first_string(goal, &["objective", "text", "description", "prompt"]),
-        tokens_used: goal["tokensUsed"].as_u64(),
-        remaining_tokens: first_u64(goal, &["remainingTokens", "tokenBudgetRemaining"]),
+        tokens_used,
+        token_budget,
+        remaining_tokens,
         time_used_seconds: goal["timeUsedSeconds"].as_u64(),
         continuations_used: goal["continuationsUsed"].as_u64(),
     })
@@ -130,7 +160,7 @@ fn first_u64(value: &serde_json::Value, keys: &[&str]) -> Option<u64> {
 mod tests {
     use super::*;
 
-    /// Captured from a live `get_state` on 2026-08-15, idle session.
+    /// Captured from a live `get_connection_state` on 2026-08-16, idle session.
     #[test]
     fn an_idle_goal_parses_without_inventing_an_objective() {
         let state = serde_json::json!({
@@ -151,16 +181,24 @@ mod tests {
         assert_eq!(goal.tokens_used, Some(0));
     }
 
+    /// Captured verbatim from a live `get_connection_state` on 2026-08-16
+    /// against an active goal — Prime sends `tokenBudget`, not
+    /// `remainingTokens`; this is the shape a guessed field name would have
+    /// silently missed.
     #[test]
-    fn an_active_goal_reports_its_objective_and_budget() {
+    fn an_active_goal_derives_remaining_budget_from_token_budget_and_tokens_used() {
         let state = serde_json::json!({
             "goal": {
                 "active": true,
-                "status": "running",
+                "status": "active",
+                "goalId": "ef5e700c-f2c1-417d-9db1-13876a625531",
                 "objective": "ship the release notes",
+                "tokenBudget": 200_000,
                 "tokensUsed": 120_000,
-                "remainingTokens": 80_000,
-                "continuationsUsed": 3
+                "timeUsedSeconds": 12,
+                "continuationsUsed": 3,
+                "createdAt": 1_786_915_608_002_u64,
+                "updatedAt": 1_786_915_608_002_u64
             }
         });
 
@@ -169,7 +207,28 @@ mod tests {
         assert!(goal.active);
         assert_eq!(goal.objective.as_deref(), Some("ship the release notes"));
         assert_eq!(goal.tokens_used, Some(120_000));
+        assert_eq!(goal.token_budget, Some(200_000));
         assert_eq!(goal.remaining_tokens, Some(80_000));
+    }
+
+    /// A future Prime that actually sends a remaining-budget field directly
+    /// (rather than budget + used) must still be read, not ignored because
+    /// `tokenBudget` was absent.
+    #[test]
+    fn remaining_tokens_falls_back_to_an_explicit_field_when_budget_is_absent() {
+        let state = serde_json::json!({
+            "goal": {
+                "active": true,
+                "objective": "ship it",
+                "tokensUsed": 1000,
+                "remainingTokens": 500
+            }
+        });
+
+        let goal = goal_from_state(&state).expect("goal present");
+
+        assert_eq!(goal.token_budget, None);
+        assert_eq!(goal.remaining_tokens, Some(500));
     }
 
     /// An older Prime, or a renamed key. The band should omit the goal rather

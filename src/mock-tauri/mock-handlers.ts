@@ -172,6 +172,11 @@ let mockVaultAiGuidanceStatus = {
   can_restore: false,
 } as const
 
+/** Mirrors the Rust `PrimeGoalState` idle shape until `set_prime_goal` mutates it. */
+let mockPrimeGoal: { active: boolean; objective?: string; remainingTokens?: number } = {
+  active: false,
+}
+
 function normalizeMockVaultPath(path: string | null | undefined): string | null {
   const trimmed = path?.trim()
   return trimmed ? trimmed : null
@@ -583,7 +588,15 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   compact_prime_session: () => 12000,
   export_prime_session: ({ sessionPath }: { sessionPath: string }) =>
     `~/Downloads/prime-session-${sessionPath.split('/').pop()?.replace(/\.jsonl$/, '') ?? 'session'}.html`,
-  get_prime_agent_activity: () => ({ goal: { active: false }, heartbeats: [], schedules: [] }),
+  get_prime_agent_activity: () => ({ goal: mockPrimeGoal, heartbeats: [], schedules: [] }),
+  set_prime_goal: ({ objective, tokenBudget }: { objective: string; tokenBudget?: number }) => {
+    mockPrimeGoal = { active: true, objective, remainingTokens: tokenBudget }
+    return mockPrimeGoal
+  },
+  clear_prime_goal: () => {
+    mockPrimeGoal = { active: false }
+    return null
+  },
   which_binary: ({ name }: { name: string }) => ({ found: name === 'mindwalk', path: name === 'mindwalk' ? '/usr/bin/mindwalk' : null }),
   run_mindwalk_open: ({ path }: { path: string }) => path,
   bridge_and_open_prime_session: ({ path }: { path: string }) => path,

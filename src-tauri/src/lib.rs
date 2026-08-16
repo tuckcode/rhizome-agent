@@ -599,6 +599,8 @@ macro_rules! app_invoke_handler {
             commands::set_prime_model,
             commands::fork_prime_session,
             commands::get_prime_agent_activity,
+            commands::set_prime_goal,
+            commands::clear_prime_goal,
             commands::steer_prime_session,
             commands::follow_up_prime_session,
             commands::compact_prime_session,

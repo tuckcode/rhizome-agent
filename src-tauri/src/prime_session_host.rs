@@ -781,7 +781,12 @@ pub fn set_model(provider: &str, model_id: &str) -> Result<(), String> {
 pub fn agent_activity() -> Result<crate::prime_agent_activity::PrimeAgentActivity, String> {
     use crate::prime_agent_activity as activity;
     with_host_mut(|host| {
-        let state = host.send_command(serde_json::json!({ "type": "get_state" }))?;
+        // Not `get_state`: probed live against 0.7.2, the daemon's `get_state`
+        // never carries a `goal` key at all (its summarizer just does not set
+        // one). `get_connection_state` does — it wraps the same
+        // `session.goalState` the daemon forwards in `goal_update` events —
+        // and also carries `thinkingLevel`, so one command covers both.
+        let state = host.send_command(serde_json::json!({ "type": "get_connection_state" }))?;
         let state_data = state
             .get("data")
             .cloned()
@@ -812,6 +817,175 @@ pub fn agent_activity() -> Result<crate::prime_agent_activity::PrimeAgentActivit
             thinking_level: state_data["thinkingLevel"].as_str().map(str::to_string),
         })
     })
+}
+
+/// How long to keep re-reading state for a goal change to land, and how often.
+///
+/// Prime updates goal state synchronously — before any model call — as part
+/// of parsing `/goal`, so this normally confirms on the first or second read.
+/// It stays bounded rather than blocking indefinitely because #20 requires a
+/// set that did not take to report as failed, not hang forever pretending it
+/// might still succeed.
+const GOAL_CONFIRM_ATTEMPTS: u32 = 16;
+const GOAL_CONFIRM_INTERVAL: Duration = Duration::from_millis(250);
+
+/// Not `get_state` — see the note in `agent_activity`: the daemon's
+/// `get_state` never carries a `goal` key, `get_connection_state` does.
+fn read_goal_state() -> Result<Option<crate::prime_agent_activity::PrimeGoalState>, String> {
+    with_host_mut(|host| {
+        let response = host.send_command(serde_json::json!({ "type": "get_connection_state" }))?;
+        let data = response
+            .get("data")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+        Ok(crate::prime_agent_activity::goal_from_state(&data))
+    })
+}
+
+/// Re-read goal state until `matches` accepts it, or give up.
+///
+/// `Some(goal)` on the outside means confirmed (the inner `Option` is the
+/// confirmed goal itself, which is legitimately `None` for a cleared goal).
+/// `None` on the outside means the wait ran out without a matching read —
+/// the caller must treat this as failure, never fall back to the send
+/// response.
+fn poll_goal_until(
+    matches: impl Fn(Option<&crate::prime_agent_activity::PrimeGoalState>) -> bool,
+) -> Option<Option<crate::prime_agent_activity::PrimeGoalState>> {
+    for attempt in 0..GOAL_CONFIRM_ATTEMPTS {
+        if attempt > 0 {
+            thread::sleep(GOAL_CONFIRM_INTERVAL);
+        }
+        if let Ok(goal) = read_goal_state() {
+            if matches(goal.as_ref()) {
+                return Some(goal);
+            }
+        }
+    }
+    None
+}
+
+/// Send `/goal ...` text as an ordinary prompt.
+///
+/// There is no protocol command for goal changes — probed against 0.7.2's
+/// `DAEMON_COMMAND_TYPES`, which lists neither `goal_create` nor any
+/// variant. Prime's own CLI sets a goal the same way: `/goal` text is parsed
+/// as a session command before the model ever sees it (`SESSION_SLASH_COMMAND_NAMES`
+/// in the installed daemon), so this is the same mechanism Prime's own
+/// interface uses, not an invented one.
+///
+/// A success here means Prime *admitted* the text, not that the goal change
+/// landed — an active goal also queues a follow-up turn, which can take a
+/// while and does not gate this response. Callers must re-read state.
+/// Prime's own `isStreaming`, from `get_connection_state` — not the client's
+/// `host.is_streaming`, which only tracks turns *this* process started via
+/// `run_prompt_stream`.
+///
+/// Needed because a `/goal` sent while the session is mid-turn is not parsed
+/// as a session command at all: observed live, a `/goal clear` sent during
+/// the continuation an active goal itself triggers landed in
+/// `sessionActions.steering` rather than clearing anything — the send
+/// reported success and nothing happened.
+fn session_is_streaming() -> bool {
+    with_host_mut(|host| {
+        let response = host.send_command(serde_json::json!({ "type": "get_connection_state" }))?;
+        Ok(response["data"]["isStreaming"].as_bool().unwrap_or(false))
+    })
+    .unwrap_or(false)
+}
+
+/// Interrupt the running turn and wait for the session to go idle.
+fn abort_and_wait_for_idle() -> Result<(), String> {
+    with_host_mut(|host| {
+        let _ = host.send_command(serde_json::json!({ "type": "abort" }));
+        Ok(())
+    })?;
+    for attempt in 0..GOAL_CONFIRM_ATTEMPTS {
+        if attempt > 0 {
+            thread::sleep(GOAL_CONFIRM_INTERVAL);
+        }
+        if !session_is_streaming() {
+            return Ok(());
+        }
+    }
+    Err("Prime is still busy after aborting the current turn — try again".into())
+}
+
+fn send_goal_command(text: &str) -> Result<(), String> {
+    // A turn *this* Rhizome window started (the user's own in-flight chat
+    // message) is left alone — changing the goal must not silently cancel
+    // something the user is watching stream. Refuse outright instead.
+    if with_host_mut(|host| Ok(host.is_streaming)).unwrap_or(false) {
+        return Err("Cannot change the goal while a turn is running".into());
+    }
+    // The session can still be busy server-side without Rhizome having
+    // started it — most commonly the goal's own auto-continuation, which
+    // this same set/clear call is what's about to redirect. Interrupting
+    // that is what "replace" and "clear" mean; queuing behind it would just
+    // silently no-op instead.
+    if session_is_streaming() {
+        abort_and_wait_for_idle()?;
+    }
+    with_host_mut(|host| {
+        let response = host.send_command(serde_json::json!({
+            "type": "prompt",
+            "message": text,
+        }))?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, "prompt"));
+        }
+        Ok(())
+    })
+}
+
+/// Give the session a persistent objective, replacing any goal already active.
+///
+/// Confirmation comes from re-reading `get_state`, never from the send
+/// response (#20): a set that did not take is reported as an error here, not
+/// as success.
+pub fn set_goal(
+    objective: &str,
+    token_budget: Option<u64>,
+) -> Result<crate::prime_agent_activity::PrimeGoalState, String> {
+    let objective = objective.trim();
+    if objective.is_empty() {
+        return Err("Goal objective must not be empty".into());
+    }
+    if token_budget == Some(0) {
+        return Err("Goal token budget must be a positive integer".into());
+    }
+
+    // Prime refuses to create a goal while one is active, paused, or
+    // budget-limited — replacing means clearing first, confirmed the same
+    // way a fresh set is.
+    if let Some(existing) = read_goal_state()? {
+        if existing.active {
+            clear_goal()?;
+        }
+    }
+
+    let command_text = match token_budget {
+        Some(budget) => format!("/goal --budget {budget} {objective}"),
+        None => format!("/goal {objective}"),
+    };
+    send_goal_command(&command_text)?;
+
+    match poll_goal_until(|goal| {
+        goal.map(|g| g.active && g.objective.as_deref() == Some(objective))
+            .unwrap_or(false)
+    }) {
+        Some(Some(goal)) => Ok(goal),
+        _ => Err("Prime did not confirm the goal was set".into()),
+    }
+}
+
+/// Clear the active goal, confirmed by re-reading state.
+pub fn clear_goal() -> Result<(), String> {
+    send_goal_command("/goal clear")?;
+    match poll_goal_until(|goal| goal.map(|g| !g.active).unwrap_or(true)) {
+        Some(_) => Ok(()),
+        None => Err("Prime did not confirm the goal was cleared".into()),
+    }
 }
 
 /// Branch a new session from a past entry.
@@ -2024,6 +2198,17 @@ mod tests {
                 .cloned()
         }
 
+        /// Every command of one type, in the order the daemon received them.
+        fn commands_matching(&self, kind: &str) -> Vec<serde_json::Value> {
+            self.received
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|command| command["type"].as_str() == Some(kind))
+                .cloned()
+                .collect()
+        }
+
         /// Wait for a command to arrive, up to a bound.
         ///
         /// Commands the client does not await a response for — `detach` is the
@@ -3078,6 +3263,254 @@ mod tests {
         let _ = shutdown_host();
     }
 
+    // ── Goal set / clear (#20) ──────────────────────────────────────────────
+
+    #[cfg(unix)]
+    fn goal_state_json(goal: &Option<(String, Option<u64>)>) -> serde_json::Value {
+        match goal {
+            None => serde_json::json!({ "active": false, "status": "idle", "tokensUsed": 0 }),
+            Some((objective, budget)) => serde_json::json!({
+                "active": true,
+                "status": "active",
+                "objective": objective,
+                "tokensUsed": 0,
+                "tokenBudget": budget,
+            }),
+        }
+    }
+
+    /// A fake daemon that tracks goal state like Prime's own session-command
+    /// parser does: `/goal clear` empties it, `/goal [--budget N] <objective>`
+    /// sets it, and `get_state` always reports whatever it currently holds.
+    /// `prompt` never carries goal data itself — only admits the text — so a
+    /// test relying on the send response instead of a re-read would pass
+    /// against this fake even though it proves nothing about confirmation.
+    #[cfg(unix)]
+    fn goal_tracking_daemon(initial: Option<(String, Option<u64>)>) -> FakeDaemon {
+        goal_tracking_daemon_with_streaming(initial, false)
+    }
+
+    /// `initially_streaming` reproduces what the real daemon does while a
+    /// turn is running: a `/goal` sent through `prompt` is admitted (still
+    /// returns success) but never updates goal state, because it is queued
+    /// as steering/follow-up rather than parsed as a session command
+    /// (confirmed live, 2026-08-16 — see `send_goal_command`'s doc). Only
+    /// `abort` clears the streaming flag here, matching what actually
+    /// unblocks it.
+    #[cfg(unix)]
+    fn goal_tracking_daemon_with_streaming(
+        initial: Option<(String, Option<u64>)>,
+        initially_streaming: bool,
+    ) -> FakeDaemon {
+        let goal = Arc::new(Mutex::new(initial));
+        let streaming = Arc::new(std::sync::atomic::AtomicBool::new(initially_streaming));
+        FakeDaemon::start(move |command, id| match command["type"].as_str() {
+            Some("abort") => {
+                streaming.store(false, Ordering::Relaxed);
+                Some(vec![ok(id, "abort", serde_json::Value::Null)])
+            }
+            Some("prompt") => {
+                if streaming.load(Ordering::Relaxed) {
+                    // Admitted, but a busy session queues it instead of
+                    // running the session-command parser — goal state does
+                    // not change.
+                    return Some(vec![ok(id, "prompt", serde_json::Value::Null)]);
+                }
+                let text = command["message"].as_str().unwrap_or_default();
+                let mut current = goal.lock().unwrap();
+                if text.trim() == "/goal clear" {
+                    *current = None;
+                } else if let Some(rest) = text.strip_prefix("/goal ") {
+                    if let Some(budget_text) = rest.strip_prefix("--budget ") {
+                        let mut parts = budget_text.splitn(2, ' ');
+                        let budget = parts.next().and_then(|n| n.parse::<u64>().ok());
+                        let objective = parts.next().unwrap_or_default().to_string();
+                        *current = Some((objective, budget));
+                    } else {
+                        *current = Some((rest.to_string(), None));
+                    }
+                }
+                Some(vec![ok(id, "prompt", serde_json::Value::Null)])
+            }
+            Some("get_connection_state") => {
+                let current = goal.lock().unwrap();
+                Some(vec![ok(
+                    id,
+                    "get_connection_state",
+                    serde_json::json!({
+                        "activeSessionId": FAKE_ACTIVE_SESSION_ID,
+                        "sessionId": "sess-a",
+                        "isStreaming": streaming.load(Ordering::Relaxed),
+                        "goal": goal_state_json(&current),
+                    }),
+                )])
+            }
+            _ => None,
+        })
+    }
+
+    /// Confirmation must come from re-reading state. `prompt`'s own response
+    /// carries no goal data at all here — if `set_goal` returned success from
+    /// that response alone, it would be trusting nothing.
+    #[cfg(unix)]
+    #[test]
+    fn set_goal_confirms_from_a_re_read_not_the_send_response() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = goal_tracking_daemon(None);
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let goal = set_goal("ship the release notes", Some(5000)).unwrap();
+
+        assert!(goal.active);
+        assert_eq!(goal.objective.as_deref(), Some("ship the release notes"));
+        assert_eq!(goal.remaining_tokens, Some(5000));
+
+        let sent = daemon.command("prompt").unwrap();
+        assert_eq!(
+            sent["message"].as_str(),
+            Some("/goal --budget 5000 ship the release notes")
+        );
+
+        let _ = shutdown_host();
+    }
+
+    /// Prime refuses `/goal <new>` while a goal is already active, so
+    /// replacing one means clearing first — both steps confirmed the same
+    /// way a fresh set is.
+    #[cfg(unix)]
+    #[test]
+    fn set_goal_replaces_an_active_goal_by_clearing_first() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = goal_tracking_daemon(Some(("old objective".to_string(), Some(1000))));
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let goal = set_goal("new objective", None).unwrap();
+
+        assert!(goal.active);
+        assert_eq!(goal.objective.as_deref(), Some("new objective"));
+
+        let prompts: Vec<String> = daemon
+            .commands_matching("prompt")
+            .into_iter()
+            .map(|c| c["message"].as_str().unwrap_or_default().to_string())
+            .collect();
+        assert_eq!(prompts, vec!["/goal clear", "/goal new objective"]);
+
+        let _ = shutdown_host();
+    }
+
+    /// A set that never shows up in state must fail, not report success
+    /// because the daemon accepted the text.
+    #[cfg(unix)]
+    #[test]
+    fn set_goal_fails_when_state_never_confirms_it() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        // Accepts the prompt but never actually updates goal state — the
+        // daemon equivalent of Prime silently no-op'ing the command.
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("prompt") => Some(vec![ok(id, "prompt", serde_json::Value::Null)]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let result = set_goal("ship the release notes", None);
+
+        assert!(matches!(result, Err(message) if message.contains("did not confirm")));
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn clear_goal_confirms_the_goal_is_gone() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = goal_tracking_daemon(Some(("ship the release notes".to_string(), Some(5000))));
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        clear_goal().unwrap();
+
+        let activity = agent_activity().unwrap();
+        assert!(!activity.goal.map(|g| g.active).unwrap_or(false));
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn set_goal_rejects_an_empty_objective_without_contacting_the_daemon() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = goal_tracking_daemon(None);
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let result = set_goal("   ", None);
+
+        assert!(matches!(result, Err(message) if message.contains("must not be empty")));
+        assert!(!daemon.commands().contains(&"prompt".to_string()));
+
+        let _ = shutdown_host();
+    }
+
+    /// A `/goal` sent while the session is server-side busy (most commonly
+    /// the goal's own auto-continuation) is queued rather than parsed, so
+    /// `set_goal`/`clear_goal` must interrupt it first — otherwise the send
+    /// reports success and nothing actually changes (observed live).
+    #[cfg(unix)]
+    #[test]
+    fn clear_goal_aborts_a_busy_session_before_sending_the_clear() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = goal_tracking_daemon_with_streaming(
+            Some(("ship the release notes".to_string(), Some(5000))),
+            true,
+        );
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        clear_goal().unwrap();
+
+        assert!(daemon.commands().contains(&"abort".to_string()));
+        let activity = agent_activity().unwrap();
+        assert!(!activity.goal.map(|g| g.active).unwrap_or(false));
+
+        let _ = shutdown_host();
+    }
+
+    /// A turn *this* Rhizome client started must never be silently cancelled
+    /// just because the goal dialog was also used — that would cut off a
+    /// response the user is actively watching stream.
+    #[cfg(unix)]
+    #[test]
+    fn set_goal_refuses_rather_than_interrupting_our_own_in_flight_turn() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = goal_tracking_daemon(None);
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+        with_host_mut(|host| {
+            host.is_streaming = true;
+            Ok(())
+        })
+        .unwrap();
+
+        let result = set_goal("ship the release notes", None);
+
+        assert!(matches!(result, Err(message) if message.contains("turn is running")));
+        assert!(!daemon.commands().contains(&"prompt".to_string()));
+        assert!(!daemon.commands().contains(&"abort".to_string()));
+
+        let _ = shutdown_host();
+    }
+
     /// A connection that has gone away must be evicted, not left reporting
     /// `running` — the UI would offer a composer wired to nothing.
     #[cfg(unix)]
@@ -3842,6 +4275,52 @@ mod tests {
             .expect("the daemon is still there after we let go of it");
         println!("reconnected session: {reconnected}");
         assert!(!reconnected.is_empty());
+        let _ = shutdown_host();
+    }
+
+    /// Live counterpart to the goal fake-daemon tests (#20): set, replace and
+    /// clear a goal against a real `prime-agent daemon`, proving the
+    /// `/goal [--budget N] <objective>` text this module sends is actually
+    /// what the installed daemon's session-command parser accepts — a fake
+    /// daemon only proves our own assumption about that text, not Prime's.
+    ///
+    /// ```sh
+    /// cargo test --lib prime_session_host::tests::live_goal_round_trip -- --ignored --nocapture
+    /// ```
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "requires a running prime-agent daemon (see `prime-agent status`)"]
+    fn live_goal_round_trip() {
+        let _guard = host_guard();
+        std::env::remove_var(DAEMON_SOCKET_ENV);
+        let vault = tempfile::tempdir().unwrap();
+
+        let session_id = ensure_host(&vault.path().to_string_lossy()).expect("connect + attach");
+        println!("session: {session_id}");
+
+        let goal = set_goal("rhizome-agent live goal demo", Some(1234)).expect("set_goal");
+        println!("set: {goal:?}");
+        assert!(goal.active);
+        assert_eq!(
+            goal.objective.as_deref(),
+            Some("rhizome-agent live goal demo")
+        );
+        assert_eq!(goal.remaining_tokens, Some(1234));
+
+        let replaced = set_goal("rhizome-agent live goal demo (replaced)", None)
+            .expect("set_goal replaces an active goal");
+        println!("replaced: {replaced:?}");
+        assert!(replaced.active);
+        assert_eq!(
+            replaced.objective.as_deref(),
+            Some("rhizome-agent live goal demo (replaced)")
+        );
+
+        clear_goal().expect("clear_goal");
+        let activity = agent_activity().expect("agent_activity after clear");
+        println!("after clear: {:?}", activity.goal);
+        assert!(!activity.goal.map(|g| g.active).unwrap_or(false));
+
         let _ = shutdown_host();
     }
 

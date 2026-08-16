@@ -641,6 +641,27 @@ pub fn get_prime_agent_activity() -> Result<crate::prime_agent_activity::PrimeAg
     crate::prime_session_host::agent_activity()
 }
 
+/// Set or replace the live session's goal, confirmed by re-reading state.
+///
+/// `token_budget` of zero is rejected rather than silently treated as "no
+/// budget" — a caller that meant to pass a budget and typo'd zero should see
+/// an error, not a goal that quietly runs unbounded.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn set_prime_goal(
+    objective: String,
+    token_budget: Option<u64>,
+) -> Result<crate::prime_agent_activity::PrimeGoalState, String> {
+    crate::prime_session_host::set_goal(&objective, token_budget)
+}
+
+/// Clear the live session's goal, confirmed by re-reading state.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn clear_prime_goal() -> Result<(), String> {
+    crate::prime_session_host::clear_goal()
+}
+
 /// Branch a new Prime session from a past transcript entry.
 #[cfg(desktop)]
 #[tauri::command]
