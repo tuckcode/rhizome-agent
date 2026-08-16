@@ -99,6 +99,41 @@ describe('selectCommandMenuEntries', () => {
 
     expect(menu).toEqual([])
   })
+
+  it('carries the argument hint through for a command that takes one', () => {
+    const menu = selectCommandMenuEntries([
+      reported({
+        name: 'skill:ask-repo',
+        argumentHint: '<question>',
+        sourceInfo: { path: '/vault/.prime/agent/skills/ask-repo/SKILL.md', source: 'builtin' },
+      }),
+    ])
+
+    expect(menu[0].argumentHint).toBe('<question>')
+  })
+
+  it('leaves the argument hint undefined for a command that takes none', () => {
+    const menu = selectCommandMenuEntries([
+      reported({
+        name: 'skill:goal',
+        sourceInfo: { path: '/vault/.prime/agent/skills/goal/SKILL.md', source: 'builtin' },
+      }),
+    ])
+
+    expect(menu[0].argumentHint).toBeUndefined()
+  })
+
+  it('treats a blank argument hint the same as none', () => {
+    const menu = selectCommandMenuEntries([
+      reported({
+        name: 'skill:goal',
+        argumentHint: '   ',
+        sourceInfo: { path: '/vault/.prime/agent/skills/goal/SKILL.md', source: 'builtin' },
+      }),
+    ])
+
+    expect(menu[0].argumentHint).toBeUndefined()
+  })
 })
 
 describe('findActiveSlashQuery', () => {

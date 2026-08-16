@@ -35,6 +35,30 @@ describe('ChatCommandMenu', () => {
     expect(menu).toHaveTextContent('Set a persistent objective')
   })
 
+  it('shows the argument hint for a command that takes one', () => {
+    renderMenu({
+      entries: [
+        {
+          name: 'skill:ask-repo',
+          slash: 'ask-repo',
+          description: 'Ask a question about this repo',
+          kind: 'skill',
+          argumentHint: '<question>',
+        },
+      ],
+    })
+
+    expect(screen.getByTestId('command-menu-item-ask-repo')).toHaveTextContent('<question>')
+  })
+
+  it('shows no argument hint for a command that takes none', () => {
+    renderMenu()
+
+    expect(screen.getByTestId('command-menu-item-goal')).not.toHaveTextContent(
+      /[<[]/,
+    )
+  })
+
   it('marks skills as distinct from instant commands', () => {
     renderMenu()
 
