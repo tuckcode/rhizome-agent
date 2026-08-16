@@ -1265,6 +1265,17 @@ Note what this implies about the record: sessions in this window that report "al
 - C16-OPEN: leg (a) of the 2026-07-19 save/trigger question — test the full save loop against a blank vault. Legs (b) and (c) are done (2026-08-02); this is the one that needs a human at `pnpm tauri dev`, same blocker shape as C13.
 - ~~C17-OPEN: Ask-tab vs. Library-panel path-prefix mismatch.~~ **RESOLVED 2026-08-02.** Fixed at the API boundary, not the index: `rhizome_search::wiki_root_prefix(vault_path)` (next to `wiki_root`, `rhizome_search/mod.rs`) returns `"wiki/"` on nested layout or `""` on flat, and `rhizome_api::format_search_hits` — the single point both `search_with_service` and `search_standalone_with_embedder` funnel through before crossing to the frontend — now re-prefixes `hit.id` with it before building `AskResultDto.path`. The tantivy index's own on-disk id format (wiki-root-relative) is untouched, so no reindex is forced. `mcp-server/`'s `search_notes` (JS-native) was checked and doesn't share the bug — it walks from `vaultPath` directly and computes `path.relative(vaultPath, ...)`, already vault-root-relative; `rhizome_search` (the other MCP tool) shells out to the same Rust `search` CLI path and inherits the fix for free. New tests: `wiki_root_prefix_is_wiki_slash_for_nested_and_empty_for_flat` (`rhizome_search/mod.rs`), `format_search_hits_serializes_path_title_snippet` (updated) + `format_search_hits_adds_no_prefix_on_flat_layout` (`rhizome_api.rs`), and `search_result_path_matches_library_scan_path_on_nested_layout` (`rhizome_commands.rs`) — the last asserts a search-result path and a `scan_vault_library` path for the same underlying file on a nested `wiki/`-layout vault are byte-identical (`"wiki/entities/alice.md"`), the contract that should have been asserted from the start.
 - **C18-OPEN: `pnpm l10n:validate` fails on all 19 non-English locales — no `LARA_ACCESS_KEY_ID`/`SECRET` in any session's environment.** **Verified still present and worse 2026-08-02**: 172 missing keys per locale now, up from ~69 on 2026-07-10 — the gap accumulates every session that adds UI copy without a real translation pass. Named as a known gap in at least three prior docs (`2026-07-10-one-brain-step4c-session-status.md`, `2026-07-03-research-panel-handoff.md`, `docs/design/onboarding-walkthrough.md`) with no fix and no owner. Needs one translate run with real credentials (`pnpm l10n:translate`) — not code, an environment/access problem, but it should stop being silently re-discovered.
+
+  **DECIDED 2026-08-16 — localization is deliberately out of scope for v0. Stop treating this as a blocker.** Atticus: *"If I go public and there's demand for multiple languages, then I'll consider it. Until then I'm not worried."* This is consistent with `CONTEXT.md`, which defines v0 as the **trusted circle** — "Atticus + small trusted users, not strangers-first." Nineteen locales is a strangers-first concern.
+
+  **Consequences, so nobody re-litigates this:**
+  - The `pnpm l10n:translate` acceptance box on **#10 and #16 is waived for v0**. Those issues may close with English-only copy. Say so on the issue rather than silently ticking it.
+  - New UI copy still goes in `src/lib/locales/en.json`. That rule stands — it keeps strings out of components so a future translate run is one command, not an archaeology project.
+  - Do **not** run `pnpm l10n:translate` speculatively.
+
+  **Cost, priced 2026-08-16 so the next session doesn't re-research it:** Lara has a free tier of **10,000 characters/month**, no card required — *not* enough. `en.json` is 73KB across 1,189 keys; the ~172-key backfill across 19 locales is roughly **146,000 source characters** (Lara bills source only, per target language). That's ~$4 of usage on the $24.99-per-1M plan, but the plan is the minimum purchase. So: trivial money, real friction, zero v0 value.
+
+  **Re-open when:** the app goes public *and* non-English demand actually shows up. Demand first, then the key.
 - ~~C20-OPEN: global app-config directory still named `com.tolaria.app`/`com.laputa.app`.~~ **RESOLVED 2026-08-02.** `src-tauri/src/app_config.rs`'s `APP_CONFIG_DIR` (the literal OS folder name for global config — `settings.json`, `vaults.json`, `last-vault.txt`, `ai-provider-secrets.json`, `ai-workspace-sessions.json`) was still `"com.tolaria.app"` with `"com.laputa.app"` as a single legacy fallback; neither the tolaria→rhizome identity rename (ADR-0162) nor whatever produced "laputa" before it had ever reached this file. This is a config-dir *rename with fallback*, not a data migration: every write already went through `preferred_app_config_path()` and every read through `resolve_existing_or_preferred_app_config_path()`, so nothing needed an explicit copy step. Fixed: `APP_CONFIG_DIR` → `"com.rhizome.app"`; `LEGACY_APP_CONFIG_DIR` (single `&str`) generalized to `LEGACY_APP_CONFIG_DIRS: &[&str] = &["com.tolaria.app", "com.laputa.app"]` (most-recently-current name checked first), mirroring the `LEGACY_MCP_SERVER_NAMES` pattern already used in `mcp.rs`. `existing_or_preferred_path_in_dirs` now loops over the legacy list per config dir (preferred, then each legacy name in order, before moving to the next config dir) — `previous_platform_config_dir_is_read_when_primary_dir_is_empty` confirms the priority-across-dirs-then-within-dir behavior survived. Existing users' settings are found via the legacy chain on next read and land under `com.rhizome.app` automatically the next time anything saves (e.g. any settings change) — no migration code, no data copy. New test `older_legacy_path_is_read_when_preferred_and_newer_legacy_are_absent` (`app_config.rs`) proves the fallback chain covers *both* old names, not just the newer one — a user who hasn't opened the app since the "laputa" era (skipped "tolaria" entirely) still resolves correctly. `cargo test --lib`: 1317 passed, 0 failed. `cargo clippy -- -D warnings` and `cargo fmt -- --check` both clean.
 - ~~C19-OPEN: `DEFAULT_GITIGNORE` seeded stale branding and a dead path.~~ **RESOLVED 2026-08-02.** `src-tauri/src/git/mod.rs`'s `DEFAULT_GITIGNORE` constant (used by `ensure_gitignore`, which only writes `.gitignore` for a vault that doesn't have one yet) had a `# Tolaria app files` comment and ignored `.laputa/settings.json` — neither term matches this app's current name or anything it actually writes; grepped `src-tauri/src/` for vault-scoped `settings.json` writers and found none, that concept is vestigial. Meanwhile the real per-vault data directory, `.rhizome/` (confirmed live via `rhizome_commands.rs:339`, `vault_events.rs:96`, `rhizome_write_location.rs:83/95`, `rhizome_repo_research.rs:141`), holding `events.jsonl` and full cloned-repo caches under `repo-cache/<slug>/`, wasn't ignored at all. Fixed: comment now says `# Rhizome app files`, ignore line is now `.rhizome/` (checked `grep -rn '"\.rhizome"' src-tauri/src/` first — every hit is cache/log/marker use, nothing meant to be shared across machines, so a blanket directory ignore is correct, no negation needed). New/updated tests in `src-tauri/src/git/mod.rs`: `test_ensure_gitignore_creates_file` now also asserts no `laputa`/`tolaria` residue, `test_init_repo_creates_gitignore` now asserts `.rhizome/` is present and no stale branding, and a new `test_default_gitignore_ignores_rhizome_dir_and_has_no_stale_branding` asserts the constant's own content directly. **Scope note — what this does NOT do:** `ensure_gitignore` is create-only, so this only changes what *new* vaults get; it does not retroactively fix any already-created vault's `.gitignore`, and it does not untrack anything already committed to a real vault's git history. One real vault outside this repo was found during this investigation with `.rhizome/events.jsonl`, multiple full `repo-cache/<repo>` clones, and `repo-runs/*.json` already tracked in its own git history — that needs its own separate `git rm --cached` pass, a decision for that vault's owner, not something to do automatically from here.
 
@@ -1379,13 +1390,27 @@ Note what this implies about the record: sessions in this window that report "al
   flaky tests first"; this is the entry that stops it being rediscovered per
   session.
 
-  **Likely cause worth checking first:** contention from concurrently
-  running test processes. This machine had orphaned
-  `run-vitest-coverage-shards.mjs` / `vitest --shard=2/2` processes alive
-  under a *different* runtime (`~/.hermes/node`) during the failing run —
-  either a second agent working the same tree or leaked shards from an
-  earlier coverage run. Before rewriting waits, check whether the lane is
-  simply racing another test run: `pgrep -fl vitest`.
+  **Likely cause:** contention from concurrently running test processes. This
+  machine had orphaned `run-vitest-coverage-shards.mjs` / `vitest --shard=2/2`
+  processes alive during the failing run. Before rewriting waits, check whether
+  the lane is simply racing another test run: `pgrep -fl vitest`. The clean
+  push minutes later — with `pgrep -fl vitest` empty — came back 26/26 in
+  1m48s, matching the idle baseline exactly.
+
+  **Correction, same day — one lead in the original entry was wrong.** It
+  flagged those processes as running under "a *different* runtime
+  (`~/.hermes/node`), either a second agent or leaked shards." That inference
+  was junk: `~/.hermes/node` is simply a node install on this machine
+  (`prime-agent` itself runs on it, per the daemon's own
+  `runtime.executablePath`). It is not evidence of another agent. The
+  processes were almost certainly leaked shards from this session's own
+  repeated coverage runs. **Do not go hunting for a second agent.**
+
+  **Also ruled out: the hook is not fighting itself.** `.husky/pre-push` runs
+  its six steps sequentially under `set -e` — no `&`, no `wait`, no
+  `xargs -P`. Contention comes from *outside* the gate, so the fix is either
+  killing stray runs before pushing or making the three specs wait on a
+  settled condition instead of a timing window.
 
   Fixing it means making these three assert on a settled condition rather
   than an implicit timing window. Do not "fix" it by retrying harder or by
