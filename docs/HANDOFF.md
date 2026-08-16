@@ -27,6 +27,63 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Plan of record — 2026-08-16 (re-ordered under the reframe)
+
+**Tracker is now accurate.** #6, #7, #8 closed with evidence. #12 annotated —
+partly shipped, open only for its menu-bar half, and its first acceptance
+criterion is recorded as *wrong* rather than outstanding. Open: #5 (spec),
+#9–#22, plus **#23–#25 (memory, new)**.
+
+**The gap the reframe exposed.** Every one of the 13 remaining #5 tickets is
+harness *surface* — rendering Prime's controls in a window, which Prime's own
+TUI already does. Meanwhile the differentiator had **no forward roadmap**:
+#1–#4 shipped the memory loop on 2026-08-09 and nothing has been ticketed
+since. "The overcoat of tooling and really good memory" had thirteen tickets
+for the tooling half and zero for the memory half. Hence #23–#25.
+
+**Vocabulary settled (`CONTEXT.md`).** **Agent** now means the runtime that
+does the work — **Prime**. It previously meant the Rhizome product, which put
+the shell where the figure belongs. Rhizome is referred to by name, never as
+"the agent". `Session` still means a running unit; `worker` stays in the
+transport; the legacy `agent backend` row is the last competing sense and is
+renamed on contact. The word "Agent" in the *app's name* is a separate open
+naming question and does not govern the common noun.
+
+### Order of work
+
+**Tier 1 — the shell must not be worse than the terminal**
+- **#10 + #16 together.** The slash menu is the biggest "worse than the TUI"
+  gap, and #16 is not optional alongside it: without the origin filter, #10
+  leaks ~89 of Atticus's personal `~/.agents/skills` into the product. Only
+  11 of the ~100 `get_commands` entries are Prime's own.
+- **#13, which also closes #12.** A menu bar dropdown is genuinely
+  desktop-native — the one thing a terminal cannot do — and it is the surface
+  #12's remaining half needs.
+
+**Tier 2 — memory, the differentiated half**
+- **#24 promote quality.** Editorial, not mechanical: promote three real
+  conversations and read what lands. A test suite cannot tell you the notes
+  are bad.
+- **#23 session search.** The largest body of knowledge the product generates
+  is currently unfindable.
+
+**Tier 3 — integrity and supervisor visibility**
+- #18 transcript markers (cheap, high integrity), #19 version indicator (pairs
+  with the finished #8), #14 schedules visible — which #12 now *needs*, since
+  a user can keep sessions alive for scheduled work but cannot see it.
+
+**Tier 4 — the RLM story**
+- #15/#20 goals, #17 branch navigation, #9 model+thinking consolidation (lower
+  than it looks — a working model picker already ships).
+
+**Tier 5 — deferred**
+- #11/#22 Mycelium, #21 argument hints, #25 retrieval provenance (triage
+  first — the design question decides whether it is a day or a week).
+  **Note:** #23 may be the better answer to the question #11/#22 were asked
+  to solve; settle that before building Mycelium twice.
+
+---
+
 ## Session handoff — 2026-08-16b (#12 quit semantics; and a product reframe that outranks it)
 
 **Next: #13 (menu bar dropdown) or the branding mechanism below.** #6, #7, #8

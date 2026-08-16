@@ -8,10 +8,17 @@ still lives in `docs/ARCHITECTURE.md` / `docs/ABSTRACTIONS.md` (Desktop inherita
 
 | Term | Meaning |
 |------|---------|
-| **Rhizome Agent** | Desktop app (`ai.rhizome.agent`, `tuckcode/rhizome-agent`): research & **memory** product whose **harness** is Prime Agent. Not Rhizome Desktop. |
+| **Rhizome Agent** | Desktop app (`ai.rhizome.agent`, `tuckcode/rhizome-agent`): a **shell** over Prime Agent, plus a research & **memory** product. Prime is the figure; Rhizome is the overcoat of tooling and memory (Atticus, 2026-08-16). Not Rhizome Desktop. The word “Agent” in the app's *name* is a naming question still open — see `docs/HANDOFF.md`; it does not govern the common noun below. |
 | **Rhizome Desktop** | Separate product (`ai.rhizome.desktop`, `knispo/rhizome`): full vault/wiki shell. Do not push Agent work to Desktop origin. |
 | **v0** | Circle-ready bar: daily multi-turn Prime chat, vault tools when attached, auth via `~/.prime`, skills+status smooth; BYO `prime-agent` OK. Not full harness-desktop parity. |
 | **Trusted circle** | v0 audience: Atticus + small trusted users — not strangers-first launch. |
+
+> **Framing (2026-08-16).** Prime Agent is the primary figure. Rhizome is a
+> shell over it plus a memory product. Two consequences: (1) Rhizome renders
+> Prime's capability faithfully rather than building a parallel product on top
+> of it; (2) the differentiated work is the **memory loop**, not the harness
+> surface — the surface is the cost of the shell not being worse than Prime's
+> own terminal. See `docs/HANDOFF.md` for the ticket re-ordering this implies.
 
 ## Harness
 
@@ -24,9 +31,9 @@ still lives in `docs/ARCHITECTURE.md` / `docs/ABSTRACTIONS.md` (Desktop inherita
 | **Session** | The user-facing unit of work: one conversation with Prime, listed, named, switched and resumed. **The only word the UI uses** for a running thing. Follows Hermes Agent, which meets the same product-name collision and resolves it the same way. |
 | **Worker** | The daemon-side process holding one or more sessions. **Internal to the transport layer** — never surfaced in UI or product copy. |
 | **Subagent** | A session Prime spawned from another session (Prime’s RLM recursion). Subordinate by name, so it does not compete with [[Session]]. |
-| **Agent** | Reserved for the product, **Rhizome Agent**. Never a running thing — that is a [[Session]]. |
+| **Agent** | The runtime that does the work: **Prime**. Reversed 2026-08-16 — this previously meant the Rhizome product, which put the shell where the figure belongs. Rhizome is referred to by name, never as “the agent”. Still never a *running* thing — that is a [[Session]]. |
 | **Model** | An LLM selected **through Prime** (e.g. xAI/OpenAI/Anthropic as configured in `~/.prime`). Not a separate in-app “agent backend.” |
-| **Agent backend** (legacy) | Desktop-era CLI targets (Claude Code, Codex, Hermes, …). **Hidden** in Agent UI. Retains the old third sense of “agent”; rename on contact so [[Agent]] means only the product. |
+| **Agent backend** (legacy) | Desktop-era CLI targets (Claude Code, Codex, Hermes, …). **Hidden** in Rhizome's UI. The last surviving competing sense of “agent”; rename on contact so [[Agent]] means only the runtime. |
 | **Goal** | A persistent objective a [[Session]] works toward, with a token budget. Readable from Prime’s state; **set by invoking Prime’s own `goal` skill**, not by a protocol call — the one harness control without a direct mechanism. |
 | **Heartbeat** | A recurring prompt a [[Session]] scheduled for *itself* — Prime re-entering its own work on a timer. |
 | **Schedule** | A one-off or recurring job on the [[Prime daemon]]. Distinct from [[Heartbeat]]: a heartbeat is the session waking itself, a schedule is work booked on the daemon. |
