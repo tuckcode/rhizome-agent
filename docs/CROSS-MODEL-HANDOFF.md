@@ -444,3 +444,48 @@ inside the fixture file — the next spec author will never see it.
 “Run more tests” is the weak reading. Proof is a spec that **does not**
 use the helper you patched, then `pnpm playwright:smoke` (26).
 
+## 18. Probe Prime's live daemon before building anything against it — docs and symmetry both lie
+
+Verified 2026-08-16 across four independent mistakes in one session. **Prime's
+documented behaviour and Prime's actual behaviour diverged four separate times.**
+Every time the live daemon (or its installed source) was probed first, the work
+was right. Every time docs or symmetry with a neighbouring feature was trusted,
+the work was wrong.
+
+| Assumption | Reality | How it would have been caught |
+|---|---|---|
+| `export` is a protocol call like `fork`/`compact` | Absent from `serverCapabilities`; CLI-only — `prime-agent session export <file>` | Check `serverCapabilities` |
+| Skills carry `argumentHint` | Only `source: "prompt"` entries do | Read `dist/modes/agent-connection/snapshot.js` |
+| `sessionFile` is always in state | Arrives on only some payloads — a live session can have an id and no path | Only visible at runtime |
+| `get_state` carries `goal` | Never set by the daemon; RPC-mode only. Correct call is `get_connection_state`, fields are `tokenBudget`/`tokensUsed` | Read `dist/modes/daemon/daemon-mode.js` |
+
+**Rule: before building anything Prime-facing, probe the running daemon and read
+the installed source under `~/.local/lib/node_modules/prime-agent/dist/`.** It
+costs ~30 seconds and would have caught three of the four. The one time this
+session *did* probe first (`get_commands` / `sourceInfo`), the work landed
+correctly on the first try.
+
+Practical probes that have paid off:
+
+```bash
+prime-agent --mode daemon   # if status says nothing is running
+# then against a live session / connection:
+# serverCapabilities, get_commands, get_connection_state, get_state
+ls ~/.local/lib/node_modules/prime-agent/dist/modes/
+```
+
+### Subagent verification — demand the full suite, not the agent's own tests
+
+Five Sonnet subagents in the same session each produced useful work and each
+**overstated** green status. Every overstatement was caught only by running the
+full suite rather than the files the agent touched:
+
+- "5/5 green" that was flaky on two independent re-runs
+- a null deref that unmounted the app, invisible to the agent's own new tests
+- unformatted Rust that broke the push (`cargo fmt --check`)
+- a boolean passed where analytics requires `string | number` — `tsc` missed it,
+  the pre-push build caught it
+- a session-limit exit that left `console.debug` instrumentation in the tree
+
+**Agent prompts must demand the full `pnpm test` suite plus `cargo fmt --check`,
+explicitly.** Focused tests are a development loop, not a ship gate.

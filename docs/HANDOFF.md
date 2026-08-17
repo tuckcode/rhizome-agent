@@ -27,6 +27,82 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Session handoff — 2026-08-16f (docs handoff close-out; next model picks up C29)
+
+**If you are not Claude, read `docs/CROSS-MODEL-HANDOFF.md` first** — especially
+§18 (probe-first against Prime). Then this entry.
+
+**State:** `main` in sync with `origin/main` after this docs push, tree clean.
+Top of history before the docs commit was `e518b0c`. All pre-push gates were
+green on that tip. `git stash list` still holds
+`stash@{0} "C29 partial (debug logs, unverified)"` — deliberately not shipped.
+
+### What the previous coding session actually closed
+
+- **#10** and **#16** are **CLOSED** on the tracker with live-daemon evidence
+  (slash menu + origin filter excluding ~89 personal skills).
+- **#20** goal set/replace/clear and the **#15** goal-band data-source fix
+  shipped (`a816dba`). #15 had been silently dead: it read `get_state.goal`,
+  which the daemon never sets; correct source is `get_connection_state`.
+- **#19** version indicator shipped (`f8f7fe5` + null-guard `5ad4de7`). Issue
+  may still show OPEN on the tracker until closed with evidence — the code is
+  on `main`.
+- **#21** argument hints were **built but left OPEN on purpose**: on Prime
+  0.7.2 the daemon supplies no `argumentHint` for skills, so the UI correctly
+  renders nothing. Blocked on Prime, or on Rhizome ingesting prompt templates
+  as a second command surface.
+- **C27** (Rust coverage floor failing on `origin/main`) and **C28** (smoke
+  auto-navigation race) are **RESOLVED**.
+- **C29** (Cmd+N note list never refreshes) is **OPEN** with a known root
+  cause and a stashed partial fix — see the C29 entry and ranked pickup below.
+
+### Two things dormant, not broken
+
+- Rhizome's updater is a stub: `app_updater.rs` returns `Ok(None)` — no
+  signing key / release feed. #19's Rhizome half cannot fire until signing
+  exists.
+- `prime-agent` is not on npm (`registry.npmjs.org/prime-agent` 404s). #19's
+  Prime signal uses GitHub releases instead.
+
+### Follow-ups recorded this close-out (not decisions to re-litigate)
+
+- **#19 PostHog gap.** The version indicator shipped without instrumentation.
+  The implementing subagent flagged this rather than hiding it. Add an event
+  when someone next touches that surface; do not mistake the omission for a
+  product decision.
+- **C30** — `window.__tolariaFrontendReady` residue (see Open threads). Live
+  and correctly used by smoke helpers; tracked so it stops being rediscovered
+  as an unnumbered leftover from the C21 rename sweep.
+
+### Ranked pickup for the next model
+
+1. **C12 — rotate the exposed GitHub PAT.** Security; needs a human.
+2. **C29 — Cmd+N note list.** Root cause in HANDOFF Open threads; partial fix
+   in `git stash@{0}`. Strip `console.debug`, verify across **≥6 consecutive**
+   runs of `tests/smoke/fix-crash-create-note.spec.ts` (bug is ~30–40%
+   intermittent — one green run proves nothing).
+3. **#13 menu bar dropdown / #14 schedules + heartbeats.** Remaining harness
+   surface bulk.
+4. **#21** stays blocked until Prime supplies skill argument hints (or Rhizome
+   grows a second command surface from prompt templates).
+
+### Standing rules (do not relearn)
+
+- Never `--no-verify`. Probe Prime live before building against it (§18).
+- Localization **waived for v0** (C18) — do not run `pnpm l10n:translate`;
+  English copy still goes in `en.json`.
+- This is **Rhizome Agent** (`ai.rhizome.agent`), not Desktop.
+- Vite mock returns one canned reply for every prompt — use `pnpm tauri dev`.
+- Subagent "tests pass" is not evidence; demand full `pnpm test` +
+  `cargo fmt --check`.
+- Rust coverage headroom above 85% is ~40 lines — do not add untested Rust
+  casually.
+- Export `LLVM_COV` / `LLVM_PROFDATA` before any push (Homebrew llvm; no rustup).
+
+Detail: `docs/plans/2026-08-16-harness-surface-session-status.md`.
+
+---
+
 ## Session handoff — 2026-08-16e (Claude Opus 5: full pre-push, C27, pushed)
 
 **State:** `main` = `6c1edcc`, **pushed — `origin/main` in sync, ahead 0**,
@@ -1434,6 +1510,9 @@ Note what this implies about the record: sessions in this window that report "al
   ```
 
   Treat the stash as a lead, not a solution: it was never verified against the ~30-40% intermittency, and it needs its debug logging stripped. Re-verify with at least 6 consecutive runs of `tests/smoke/fix-crash-create-note.spec.ts` before believing it.
+
+
+- **C30-OPEN: `window.__tolariaFrontendReady` branding residue survived the C21 rename sweep.** Found 2026-08-16 while closing out the harness-surface session. Live sites: `src/utils/frontendReady.ts` (sets/reads the flag), `src/components/FrontendReadyMarker.tsx`, `src/main.tsx`, `src/main.test.ts`, `src/utils/frontendReady.test.ts`, and — load-bearing for CI — `tests/smoke/helpers.ts` waits on `window.__tolariaFrontendReady === true` before driving the app. **Correctly used today**; low priority to rename. The point of the number is that noting a residue without tracking it is what C21 existed to stop. When renamed, treat it like other window/localStorage renames: update the ambient `Window` typing, every reader/writer, smoke helpers, and tests in one commit; run `npx tsc --noEmit` and `pnpm playwright:smoke` because the smoke lane is a real consumer. Do not leave a dual-name fallback unless a released build is known to depend on the old flag across an upgrade boundary (smoke runs against the build under test, so a hard rename is usually enough).
 
 ## Links out
 
