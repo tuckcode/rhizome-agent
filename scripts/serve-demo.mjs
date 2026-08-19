@@ -155,8 +155,8 @@ function markdownTitle(bodyText, aliases, filePath) {
   return h1 || aliases[0] || path.basename(filePath, '.md')
 }
 
-function createdAtMillis(frontmatter) {
-  return frontmatter['Created at'] ? new Date(frontmatter['Created at']).getTime() : null
+function createdAtSeconds(frontmatter) {
+  return frontmatter['Created at'] ? Math.floor(new Date(frontmatter['Created at']).getTime() / 1000) : null
 }
 
 function snippetFrom(bodyText) {
@@ -186,8 +186,8 @@ function parseMarkdownFile(filePath) {
       status: fm['Status'] ?? null,
       owner: fm['Owner'] ?? null,
       cadence: fm['Cadence'] ?? null,
-      modifiedAt: stat.mtimeMs,
-      createdAt: createdAtMillis(fm),
+      modifiedAt: Math.floor(stat.mtimeMs / 1000),
+      createdAt: createdAtSeconds(fm),
       fileSize: stat.size,
       snippet: snippetFrom(bodyText),
       relationships: frontmatterRelationships(fm),
