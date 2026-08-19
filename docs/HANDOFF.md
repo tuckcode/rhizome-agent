@@ -37,7 +37,15 @@ push is not a release — releases are tagged builds with signed installers.
 **Closed this session:** #19 and #20 (both shipped earlier but left open —
 closed with commit evidence), and **#13**, the menu-bar running-session list.
 
-**#13 is DONE except its last acceptance criterion.** Quick capture is
+**#13 is DONE except its last acceptance criterion**, which was attempted and
+blocked by the machine rather than the code: screen capture failed at the
+system level (`ScreenCaptureKit ... audio/video capture failure`, black
+full-desktop grab) while `check_permissions` reported both TCC grants
+present — consistent with a locked or sleeping display. Check the screen is
+awake before spending anything on native QA next time; details in the
+session-status doc.
+
+**#13's shipped behaviour.** Quick capture is
 unchanged and still first; running sessions list beneath it with what each is
 doing; subagents are a count, not a tree; clicking a row opens the main window
 onto that session; nothing running renders nothing at all — no heading, no
