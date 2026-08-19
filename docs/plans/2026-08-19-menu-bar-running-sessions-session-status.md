@@ -70,5 +70,33 @@ thing. Budget tests with any new Rust, or claw coverage back first.
 ## Not done
 
 - **Native QA with the main window closed** — the issue's last acceptance
-  criterion. Not demonstrated; see HANDOFF for what remains.
+  criterion. **Attempted and blocked by the machine, not by the code.**
+
+  `pnpm tauri dev` built and ran fine; `cua-driver list_windows` found
+  `RhizomeAgent` pid 88381 with the main window (`379`, titled "Rhizome
+  Agent") and the hidden companion popover (`381`). Both observation routes
+  then failed:
+
+  - **Pixel capture:** `px_capture_unavailable` — "ScreenCaptureKit capture
+    failed ... Failed to start stream due to audio/video capture failure",
+    and the `screencapture` shell fallback failed too ("could not create
+    image from window"). A full-desktop grab returned a uniformly black
+    image.
+  - **Accessibility:** `ax_window_unresolved` — zero `AXWindow` elements
+    under that pid report window 379's CGWindowID, so the tree came back
+    deliberately empty.
+
+  `check_permissions` reported `accessibility: true` and
+  `screen_recording: true`, so this is **not** a TCC grant problem. A black
+  full-screen capture while `list_windows` still enumerates everything is
+  consistent with the display being locked or asleep — capture is refused at
+  the system level while window metadata keeps working.
+
+  **Next session: check the screen is awake and unlocked before spending
+  anything on native QA**, and expect the AX side to stay empty regardless —
+  the field notes already record that `pnpm tauri dev` produces a bare
+  binary rather than a registered `.app`, so a `pnpm tauri build` bundle is
+  the route that actually exposes the window. The roster itself is verified
+  by the live-daemon test above; what is unverified is only the popover's
+  on-screen rendering.
 - C12 (needs a human), #14, #21.
