@@ -28,7 +28,13 @@ function mockBackend({
   activeVault = '/vault',
   label = 'My Vault',
   events = [] as Array<Record<string, unknown>>,
-}: { activeVault?: string | null; label?: string; events?: Array<Record<string, unknown>> } = {}) {
+  running = [] as Array<Record<string, unknown>>,
+}: {
+  activeVault?: string | null
+  label?: string
+  events?: Array<Record<string, unknown>>
+  running?: Array<Record<string, unknown>>
+} = {}) {
   invokeMock.mockImplementation((cmd: string) => {
     if (cmd === 'load_vault_list') {
       return Promise.resolve({
@@ -37,8 +43,24 @@ function mockBackend({
       })
     }
     if (cmd === 'call_rhizome_tool') return Promise.resolve(JSON.stringify(events))
+    if (cmd === 'list_prime_running_sessions') return Promise.resolve(running)
     return Promise.resolve(undefined)
   })
+}
+
+/** A running top-level session as the daemon's `list` reports it. */
+function runningSession(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'root',
+    activeSessionId: 'root',
+    sessionFile: '/Users/dtc/.prime/agent/sessions/root.jsonl',
+    activity: 'working',
+    runtimeKind: 'top-level',
+    rlmDepth: 0,
+    firstMessage: 'Ship the menu bar roster',
+    cwd: '/repo',
+    ...overrides,
+  }
 }
 
 describe('MenuBarCompanionApp', () => {
@@ -171,5 +193,73 @@ describe('MenuBarCompanionApp', () => {
     await waitFor(() =>
       expect(screen.getByTestId('menu-bar-companion-activity')).toHaveTextContent('Event Sourcing'),
     )
+  })
+
+  it('stays quiet when nothing is running rather than showing an empty frame', async () => {
+    mockBackend({ running: [runningSession({ activity: 'idle' })] })
+    render(<MenuBarCompanionApp />)
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith('list_prime_running_sessions'),
+    )
+    expect(screen.queryByTestId('menu-bar-companion-running')).not.toBeInTheDocument()
+  })
+
+  it('stays quiet when the daemon is unreachable', async () => {
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === 'load_vault_list') {
+        return Promise.resolve({ vaults: [], active_vault: null })
+      }
+      if (cmd === 'list_prime_running_sessions') return Promise.reject(new Error('no daemon'))
+      return Promise.resolve(undefined)
+    })
+    render(<MenuBarCompanionApp />)
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith('list_prime_running_sessions'),
+    )
+    expect(screen.queryByTestId('menu-bar-companion-running')).not.toBeInTheDocument()
+  })
+
+  it('keeps quick capture first, above the running list', async () => {
+    mockBackend({ running: [runningSession()] })
+    render(<MenuBarCompanionApp />)
+    const roster = await screen.findByTestId('menu-bar-companion-running')
+    const capture = screen.getByTestId('menu-bar-companion-capture')
+    // Node.compareDocumentPosition: FOLLOWING === 4. Capture must precede the
+    // roster in document order — #13 is explicit that capture is what the
+    // popover is opened for and must not be displaced.
+    expect(capture.compareDocumentPosition(roster) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('lists a running session with what it is doing', async () => {
+    mockBackend({ running: [runningSession({ summary: 'Reading the vault loader' })] })
+    render(<MenuBarCompanionApp />)
+    const rows = await screen.findAllByTestId('menu-bar-companion-running-row')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toHaveTextContent('Ship the menu bar roster')
+    expect(rows[0]).toHaveTextContent('Reading the vault loader')
+  })
+
+  it('shows subagents as a count and not as rows', async () => {
+    mockBackend({
+      running: [
+        runningSession(),
+        runningSession({ id: 'kid1', activeSessionId: 'kid1', runtimeKind: 'subagent', rlmDepth: 1, parentActiveSessionId: 'root' }),
+        runningSession({ id: 'kid2', activeSessionId: 'kid2', runtimeKind: 'subagent', rlmDepth: 1, parentActiveSessionId: 'root' }),
+      ],
+    })
+    render(<MenuBarCompanionApp />)
+    const rows = await screen.findAllByTestId('menu-bar-companion-running-row')
+    expect(rows).toHaveLength(1)
+    expect(screen.getByTestId('menu-bar-companion-running-subagents')).toBeInTheDocument()
+  })
+
+  it('opens the main window onto the clicked session', async () => {
+    mockBackend({ running: [runningSession()] })
+    render(<MenuBarCompanionApp />)
+    const rows = await screen.findAllByTestId('menu-bar-companion-running-row')
+    fireEvent.click(rows[0])
+    expect(invokeMock).toHaveBeenCalledWith('open_main_from_menu_bar_companion', {
+      sessionFile: '/Users/dtc/.prime/agent/sessions/root.jsonl',
+    })
   })
 })
