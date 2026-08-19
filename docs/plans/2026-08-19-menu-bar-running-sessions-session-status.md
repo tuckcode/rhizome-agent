@@ -69,8 +69,24 @@ thing. Budget tests with any new Rust, or claw coverage back first.
 
 ## Not done
 
-- **Native QA with the main window closed** — the issue's last acceptance
-  criterion. **Attempted and blocked by the machine, not by the code.**
+- ~~Native QA~~ — **done.** Atticus ran `pnpm tauri dev` and the popover
+  rendered the RUNNING section beneath quick capture with four live sessions,
+  each with a status dot and activity line. The earlier capture failure below
+  was a locked/sleeping display, nothing more.
+
+  **The first real screenshot found a defect no test had caught.** All four
+  rows showed a *cwd folder name* rather than a session title — none of the
+  sessions had a `firstMessage`, because a session with no messages has none —
+  and two were rooted at `/Users/dtc`, so **two rows both read "dtc"**,
+  identical and unclickable-by-meaning. Fixed by suffixing the short session id
+  onto colliding titles only (`dtc · 835a6b`), leaving unique titles alone.
+
+  This is worth remembering as a shape: the unit tests all used fixtures with a
+  `firstMessage` set, because that is the interesting case to write. Production
+  handed us four sessions where the *fallback* was the only path taken, and the
+  fallback was not unique. Fixture-shaped optimism, caught only by looking.
+
+- **The original capture failure, kept for the next person who hits it.**
 
   `pnpm tauri dev` built and ran fine; `cua-driver list_windows` found
   `RhizomeAgent` pid 88381 with the main window (`379`, titled "Rhizome

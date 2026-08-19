@@ -37,13 +37,22 @@ push is not a release — releases are tagged builds with signed installers.
 **Closed this session:** #19 and #20 (both shipped earlier but left open —
 closed with commit evidence), and **#13**, the menu-bar running-session list.
 
-**#13 is DONE except its last acceptance criterion**, which was attempted and
-blocked by the machine rather than the code: screen capture failed at the
-system level (`ScreenCaptureKit ... audio/video capture failure`, black
-full-desktop grab) while `check_permissions` reported both TCC grants
-present — consistent with a locked or sleeping display. Check the screen is
-awake before spending anything on native QA next time; details in the
-session-status doc.
+**#13 is DONE, native demo included.** The popover was run for real and
+rendered the RUNNING section beneath quick capture with four live sessions.
+(An agent-driven attempt had failed first with `ScreenCaptureKit ...
+audio/video capture failure` and a black desktop grab while both TCC grants
+showed present — a locked or sleeping display. Check the screen is awake
+before spending anything on agent-driven native QA.)
+
+**That first real screenshot immediately found a defect the whole test suite
+had missed:** every row rendered a *cwd folder name* instead of a title,
+because none of the running sessions had a `firstMessage` (a session with no
+messages has none) — and two shared `/Users/dtc`, so two rows both read
+"dtc", identical and impossible to tell apart. Colliding titles now get the
+short session id appended. The lesson is cheap to reuse: the fixtures all set
+`firstMessage` because that is the interesting case to write, so the fallback
+path — the only one production actually took — was never exercised for
+uniqueness.
 
 **#13's shipped behaviour.** Quick capture is
 unchanged and still first; running sessions list beneath it with what each is
