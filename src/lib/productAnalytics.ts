@@ -67,6 +67,29 @@ export function trackFilePreviewFailed(previewKind: FilePreviewKind): void {
   trackEvent('file_preview_failed', { preview_kind: previewKind })
 }
 
+/**
+ * A running-session row was opened from the menu-bar roster (#13).
+ *
+ * The point of the roster is discovery — whether anyone actually uses the menu
+ * bar to get back to work, or only ever opens it to capture. No session id,
+ * title, path, or summary: those carry note and prompt content.
+ *
+ * `working` and the subagent count are numbers, not booleans — `trackEvent`
+ * takes `Record<string, string | number>` and a raw boolean gets through
+ * `npx tsc --noEmit` only to fail the stricter pre-push build (see e518b0c).
+ */
+export function trackMenuBarSessionOpened(options: {
+  working: boolean
+  subagentCount: number
+  visibleCount: number
+}): void {
+  trackEvent('menu_bar_session_opened', {
+    working: options.working ? 1 : 0,
+    subagent_count: options.subagentCount,
+    visible_count: options.visibleCount,
+  })
+}
+
 export function trackNotePdfExportStarted(source: NotePdfExportSource): void {
   trackEvent('note_pdf_export_started', { source })
 }

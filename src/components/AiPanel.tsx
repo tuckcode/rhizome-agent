@@ -11,6 +11,7 @@ import PrimeSessionList from './PrimeSessionList'
 import { primeTranscriptToConversation, type PrimeTranscriptItem } from '../lib/primeTranscriptToConversation'
 import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
 import { isTauri, mockInvoke } from '../mock-tauri'
+import { useMenuBarSessionOpen } from '../hooks/useMenuBarSessionOpen'
 import { invoke } from '@tauri-apps/api/core'
 import {
   DEFAULT_AI_AGENT,
@@ -417,6 +418,14 @@ export function AiPanelView({
       setSwitchError(e instanceof Error ? e.message : String(e))
     }
   }, [agent])
+
+  // A roster row clicked in the menu bar lands here (#13). Reuses the same
+  // switch path as the in-app session list so there is one way to change
+  // sessions, not two that can drift.
+  const handleOpenSessionFromMenuBar = useCallback((sessionPath: string) => {
+    void handleSelectSession({ id: sessionPath, path: sessionPath })
+  }, [handleSelectSession])
+  useMenuBarSessionOpen(handleOpenSessionFromMenuBar)
 
   return (
     <AiPanelFrame panelRef={panelRef} isActive={isActive} showLeftBorder={showLeftBorder} surface={surface}>

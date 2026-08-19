@@ -1537,6 +1537,113 @@ fn quit_disposition(keep_running: bool) -> QuitDisposition {
     }
 }
 
+/// How long a roster query will wait before giving up on the daemon.
+///
+/// Much shorter than `DAEMON_RESPONSE_TIMEOUT`: this runs when the menu-bar
+/// popover opens, and a popover that hangs for 30s is worse than one that
+/// quietly shows nothing.
+const ROSTER_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Every session the daemon is hosting right now, newest state included.
+///
+/// A deliberately short-lived, standalone connection: connect, greet, `list`,
+/// disconnect. It does **not** touch the attached `PrimeSessionHost`, because
+/// the menu-bar companion asks this question when no vault is open and no host
+/// exists — routing it through the host would make "is anything running?"
+/// answerable only while the main window is up, which is the opposite of what
+/// the menu bar is for.
+///
+/// Returns the daemon's session objects unchanged rather than a narrowed Rust
+/// struct. The shaping lives in `src/lib/primeRunningSessions.ts`, and keeping
+/// one shape instead of two means a field Prime adds does not have to be
+/// re-declared here before the UI can read it.
+///
+/// An unreachable daemon is `Ok(vec![])`, not `Err`: "nothing is running" and
+/// "the service is down" render the same quiet way in the popover, and the
+/// popover must not show an error banner for a service the user never started.
+pub fn list_running_sessions() -> Result<Vec<serde_json::Value>, String> {
+    let Ok(socket_path) = daemon_socket_path() else {
+        return Ok(Vec::new());
+    };
+    let Ok(stream) = DaemonStream::connect(&socket_path) else {
+        return Ok(Vec::new());
+    };
+    let _ = stream.set_read_timeout(Some(ROSTER_TIMEOUT));
+    let _ = stream.set_write_timeout(Some(ROSTER_TIMEOUT));
+
+    read_roster_over(stream)
+}
+
+/// The protocol half of `list_running_sessions`, split out so the exchange can
+/// be tested against the fake daemon without binding the real socket path.
+fn read_roster_over(stream: DaemonStream) -> Result<Vec<serde_json::Value>, String> {
+    let mut writer = stream
+        .try_clone()
+        .map_err(|error| format!("Failed to clone Prime daemon socket: {error}"))?;
+    let mut reader = BufReader::new(stream);
+
+    let deadline = Instant::now() + ROSTER_TIMEOUT;
+    let mut greeted = false;
+    let mut line = String::new();
+
+    loop {
+        if Instant::now() >= deadline {
+            return Ok(Vec::new());
+        }
+        line.clear();
+        match reader.read_line(&mut line) {
+            Ok(0) | Err(_) => return Ok(Vec::new()),
+            Ok(_) => {}
+        }
+        let Ok(message) = serde_json::from_str::<serde_json::Value>(line.trim()) else {
+            continue;
+        };
+
+        // The daemon greets first; asking before the greeting is not answered.
+        if !greeted && message["type"].as_str() == Some("daemon_hello") {
+            greeted = true;
+            let envelope = serde_json::json!({
+                "type": "command",
+                "id": ROSTER_COMMAND_ID,
+                "protocol": { "name": DAEMON_PROTOCOL_NAME, "version": DAEMON_PROTOCOL_VERSION },
+                "command": { "type": "list", "id": ROSTER_COMMAND_ID },
+            });
+            if writeln!(writer, "{envelope}")
+                .and_then(|_| writer.flush())
+                .is_err()
+            {
+                return Ok(Vec::new());
+            }
+            continue;
+        }
+
+        // Match on the command id: the daemon interleaves session events with
+        // command responses on the same line-delimited stream.
+        if message["id"].as_str() == Some(ROSTER_COMMAND_ID)
+            || message["command"].as_str() == Some("list")
+        {
+            if message["success"].as_bool() == Some(false) {
+                return Ok(Vec::new());
+            }
+            return Ok(roster_sessions(&message));
+        }
+    }
+}
+
+const ROSTER_COMMAND_ID: &str = "rhizome-roster";
+
+/// Pull the session array out of a `list` response.
+///
+/// Tolerates both `data.sessions` (what 0.7.2 sends) and a bare `sessions`, so
+/// a shape change one level up does not silently empty the menu bar.
+fn roster_sessions(response: &serde_json::Value) -> Vec<serde_json::Value> {
+    response["data"]["sessions"]
+        .as_array()
+        .or_else(|| response["sessions"].as_array())
+        .cloned()
+        .unwrap_or_default()
+}
+
 /// Settle Rhizome's session on quit, per the user's preference.
 ///
 /// Returns what it decided so the caller can log it and, later, surface a
@@ -4470,5 +4577,235 @@ mod tests {
         let unique: std::collections::HashSet<&String> = ids.iter().collect();
         assert_eq!(unique.len(), ids.len(), "ids must not repeat: {ids:?}");
         assert!(ids.iter().all(|id| id.starts_with("rhizome-")));
+    }
+
+    // ── Menu-bar roster (#13) ───────────────────────────────────────────────
+
+    #[test]
+    fn roster_sessions_reads_the_daemon_shape() {
+        let response = serde_json::json!({
+            "success": true,
+            "data": { "sessions": [{ "id": "a" }, { "id": "b" }] }
+        });
+        let sessions = roster_sessions(&response);
+        assert_eq!(sessions.len(), 2);
+        assert_eq!(sessions[0]["id"], "a");
+    }
+
+    #[test]
+    fn roster_sessions_tolerates_a_bare_sessions_array() {
+        let response = serde_json::json!({ "sessions": [{ "id": "only" }] });
+        assert_eq!(roster_sessions(&response).len(), 1);
+    }
+
+    #[test]
+    fn roster_sessions_is_empty_when_the_shape_is_unrecognised() {
+        assert!(roster_sessions(&serde_json::json!({ "data": {} })).is_empty());
+        assert!(roster_sessions(&serde_json::json!({})).is_empty());
+        assert!(roster_sessions(&serde_json::json!({ "data": { "sessions": 7 } })).is_empty());
+    }
+
+    /// Drive `read_roster_over` against a scripted daemon on the other end of a
+    /// socket pair. Returns what the roster query produced plus every command
+    /// the fake daemon received, so the exchange itself can be asserted.
+    #[cfg(unix)]
+    fn roster_against_fake_daemon(
+        script: impl Fn(&serde_json::Value) -> Vec<serde_json::Value> + Send + 'static,
+        greet: bool,
+    ) -> (
+        Result<Vec<serde_json::Value>, String>,
+        Vec<serde_json::Value>,
+    ) {
+        let (client, server) = std::os::unix::net::UnixStream::pair().unwrap();
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let thread_received = Arc::clone(&received);
+
+        let daemon = thread::spawn(move || {
+            let mut writer = server.try_clone().unwrap();
+            if greet {
+                let _ = writeln!(writer, "{}", fake_hello());
+                let _ = writer.flush();
+            }
+            let mut reader = BufReader::new(server);
+            let mut line = String::new();
+            if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                return;
+            }
+            let Ok(envelope) = serde_json::from_str::<serde_json::Value>(line.trim()) else {
+                return;
+            };
+            thread_received.lock().unwrap().push(envelope.clone());
+            for value in script(&envelope) {
+                let _ = writeln!(writer, "{value}");
+                let _ = writer.flush();
+            }
+        });
+
+        let _ = client.set_read_timeout(Some(Duration::from_secs(5)));
+        let result = read_roster_over(client);
+        let _ = daemon.join();
+        let commands = received.lock().unwrap().clone();
+        (result, commands)
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn roster_query_greets_then_lists() {
+        let (result, commands) = roster_against_fake_daemon(
+            |envelope| {
+                let id = envelope["id"].as_str().unwrap_or_default().to_string();
+                vec![serde_json::json!({
+                    "type": "response",
+                    "id": id,
+                    "command": "list",
+                    "success": true,
+                    "data": { "sessions": [
+                        { "id": "root", "activity": "working" },
+                        { "id": "kid", "runtimeKind": "subagent" }
+                    ] }
+                })]
+            },
+            true,
+        );
+
+        let sessions = result.expect("roster");
+        assert_eq!(sessions.len(), 2);
+        assert_eq!(sessions[0]["activity"], "working");
+
+        // The command must go out inside the protocol envelope, after the
+        // greeting — a bare `list` written first is simply never answered.
+        assert_eq!(commands.len(), 1);
+        assert_eq!(commands[0]["type"], "command");
+        assert_eq!(commands[0]["command"]["type"], "list");
+        assert_eq!(commands[0]["protocol"]["name"], DAEMON_PROTOCOL_NAME);
+        assert_eq!(commands[0]["protocol"]["version"], DAEMON_PROTOCOL_VERSION);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn roster_query_skips_events_before_the_response() {
+        // The daemon interleaves session events with command responses on one
+        // stream; matching on anything less than the command id reads an event
+        // as the answer and returns an empty roster.
+        let (result, _) = roster_against_fake_daemon(
+            |envelope| {
+                let id = envelope["id"].as_str().unwrap_or_default().to_string();
+                vec![
+                    serde_json::json!({ "type": "session_event", "event": { "type": "agent_end" } }),
+                    serde_json::json!({ "type": "response", "id": "someone-else", "success": true,
+                                        "data": { "sessions": [] } }),
+                    serde_json::json!({
+                        "type": "response", "id": id, "command": "list", "success": true,
+                        "data": { "sessions": [{ "id": "mine" }] }
+                    }),
+                ]
+            },
+            true,
+        );
+        let sessions = result.expect("roster");
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0]["id"], "mine");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn roster_query_is_quiet_when_the_daemon_refuses() {
+        // "Nothing running" and "the service said no" must render the same
+        // quiet way; an error banner for a service the user never started is
+        // noise in a popover opened to capture a thought.
+        let (result, _) = roster_against_fake_daemon(
+            |envelope| {
+                let id = envelope["id"].as_str().unwrap_or_default().to_string();
+                vec![serde_json::json!({
+                    "type": "response", "id": id, "command": "list",
+                    "success": false, "error": "enumeration exploded"
+                })]
+            },
+            true,
+        );
+        assert_eq!(result.expect("roster"), Vec::<serde_json::Value>::new());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn roster_query_is_quiet_when_the_daemon_hangs_up() {
+        let (result, _) = roster_against_fake_daemon(|_| Vec::new(), true);
+        assert_eq!(result.expect("roster"), Vec::<serde_json::Value>::new());
+    }
+
+    /// End-to-end against whatever `prime-agent` daemon is actually running.
+    ///
+    /// Ignored by default — it needs a live daemon, so it is environment
+    /// dependent and has no business in the push gate. Run it by hand when
+    /// changing the roster protocol:
+    ///
+    /// ```text
+    /// cargo test --manifest-path src-tauri/Cargo.toml --lib \
+    ///   roster_against_the_live_daemon -- --ignored --nocapture
+    /// ```
+    ///
+    /// It exists because every other roster test speaks to a fake daemon of
+    /// our own making: they prove the framing is parsed, not that the real
+    /// daemon answers `list` the way this client expects.
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "needs a running prime-agent daemon"]
+    fn roster_against_the_live_daemon() {
+        let _guard = host_guard();
+        let sessions = list_running_sessions().expect("roster");
+        println!("live daemon reported {} sessions", sessions.len());
+        for session in &sessions {
+            println!(
+                "  {} kind={} activity={} depth={}",
+                session["id"].as_str().unwrap_or("?"),
+                session["runtimeKind"].as_str().unwrap_or("?"),
+                session["activity"].as_str().unwrap_or("?"),
+                session["rlmDepth"],
+            );
+        }
+        assert!(
+            !sessions.is_empty(),
+            "expected at least one session; start one with `prime-agent --mode daemon`",
+        );
+        // The three fields the menu-bar roster is built on. If the daemon ever
+        // stops sending these, the list silently renders as nothing.
+        assert!(sessions.iter().all(|s| s["activeSessionId"].is_string()));
+        assert!(sessions.iter().any(|s| s["runtimeKind"].is_string()));
+        assert!(sessions.iter().any(|s| s["activity"].is_string()));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn roster_is_empty_when_no_daemon_is_listening() {
+        // The ordinary case on a fresh boot: the socket path resolves but
+        // nothing is behind it. The menu bar must show nothing, not an error.
+        let _guard = host_guard();
+        let dir = tempfile::tempdir().unwrap();
+        std::env::set_var(DAEMON_SOCKET_ENV, dir.path().join("absent.sock"));
+        let sessions = list_running_sessions().expect("roster");
+        std::env::remove_var(DAEMON_SOCKET_ENV);
+        assert!(sessions.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn roster_is_empty_when_the_socket_path_cannot_be_resolved() {
+        let _guard = host_guard();
+        // An empty override is the one input `daemon_socket_path` rejects
+        // outright, so this exercises the unresolvable branch.
+        std::env::set_var(DAEMON_SOCKET_ENV, "");
+        let sessions = list_running_sessions().expect("roster");
+        std::env::remove_var(DAEMON_SOCKET_ENV);
+        assert!(sessions.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn roster_query_is_quiet_when_the_daemon_never_greets() {
+        // No greeting means the command is never sent; the connection closing
+        // must end the loop rather than spin until the deadline.
+        let (result, commands) = roster_against_fake_daemon(|_| Vec::new(), false);
+        assert_eq!(result.expect("roster"), Vec::<serde_json::Value>::new());
+        assert!(commands.is_empty(), "must not ask before being greeted");
     }
 }

@@ -4,7 +4,10 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { createTranslator, DEFAULT_APP_LOCALE } from '../lib/i18n'
 import { isTauri } from '../mock-tauri'
 import { useMenuBarCompanionVault } from '../hooks/useMenuBarCompanionVault'
+import { useMenuBarRunningSessions } from '../hooks/useMenuBarRunningSessions'
+import type { RunningSessionRow } from '../lib/primeRunningSessions'
 import { buildCaptureNote } from '../utils/menuBarCapture'
+import { trackMenuBarSessionOpened } from '../lib/productAnalytics'
 
 /**
  * Menu-bar companion popover. Capture writes a real note to the active
@@ -22,6 +25,8 @@ export function MenuBarCompanionApp() {
   const [selectedType, setSelectedType] = useState<string | null>(null)
   const [savedFlash, setSavedFlash] = useState(false)
   const { activeVaultPath, vaultLabel, activity, refresh } = useMenuBarCompanionVault()
+  const running = useMenuBarRunningSessions()
+  const { setPolling } = running
 
   useEffect(() => {
     document.body.classList.add('menu-bar-companion')
@@ -38,7 +43,9 @@ export function MenuBarCompanionApp() {
       .onFocusChanged(({ payload: focused }) => {
         if (focused) {
           refresh()
+          setPolling(true)
         } else {
+          setPolling(false)
           void Promise.resolve(invoke('hide_menu_bar_companion')).catch(() => {})
         }
       })
@@ -48,16 +55,21 @@ export function MenuBarCompanionApp() {
     return () => {
       unlisten?.()
     }
-  }, [refresh])
+  }, [refresh, setPolling])
 
   const hide = useCallback(() => {
     if (!isTauri()) return
     void Promise.resolve(invoke('hide_menu_bar_companion')).catch(() => {})
   }, [])
 
-  const openMain = useCallback(() => {
+  const openMain = useCallback((sessionFile?: string) => {
     if (!isTauri()) return
-    void Promise.resolve(invoke('open_main_from_menu_bar_companion')).catch(() => {})
+    // Called with no argument by the plain "Open Rhizome" action; the roster
+    // rows pass the session to land on.
+    const open = sessionFile
+      ? invoke('open_main_from_menu_bar_companion', { sessionFile })
+      : invoke('open_main_from_menu_bar_companion')
+    void Promise.resolve(open).catch(() => {})
   }, [])
 
   const saveCapture = useCallback(() => {
@@ -226,6 +238,44 @@ export function MenuBarCompanionApp() {
           />
         </div>
 
+        {running.rows.length > 0 ? (
+          <>
+            <div className="border-t border-[var(--border-subtle,var(--border))] px-3.5 pb-1 pt-2 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-tertiary,var(--muted-foreground))]">
+              {t('menuBarCompanion.running')}
+            </div>
+            <ul className="flex flex-col px-1.5 py-0.5" data-testid="menu-bar-companion-running">
+              {running.rows.map((row) => (
+                <RunningSessionItem
+                  key={row.id}
+                  row={row}
+                  subagentLabel={
+                    row.subagentCount === 1
+                      ? t('menuBarCompanion.runningSubagent')
+                      : t('menuBarCompanion.runningSubagents', { count: row.subagentCount })
+                  }
+                  openLabel={t('menuBarCompanion.runningOpenSession')}
+                  onOpen={() => {
+                    trackMenuBarSessionOpened({
+                      working: row.working,
+                      subagentCount: row.subagentCount,
+                      visibleCount: running.rows.length,
+                    })
+                    openMain(row.sessionFile)
+                  }}
+                />
+              ))}
+            </ul>
+            {running.overflow > 0 ? (
+              <div
+                className="px-3.5 pb-1.5 font-mono text-[10.5px] text-[var(--text-muted,var(--muted-foreground))]"
+                data-testid="menu-bar-companion-running-overflow"
+              >
+                {t('menuBarCompanion.runningMore', { count: running.overflow })}
+              </div>
+            ) : null}
+          </>
+        ) : null}
+
         <div className="border-t border-[var(--border-subtle,var(--border))] px-3.5 pb-1 pt-2 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-tertiary,var(--muted-foreground))]">
           {t('menuBarCompanion.networkActivity')}
         </div>
@@ -287,11 +337,68 @@ export function MenuBarCompanionApp() {
             label={t('menuBarCompanion.openRhizome')}
             shortcut="⌥R"
             accent
-            onClick={openMain}
+            onClick={() => openMain()}
           />
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * One running session. Subagents are a count, never a nested list — a tree in
+ * a 360px popover is unreadable, and the full picture belongs in the main
+ * window (#13).
+ */
+function RunningSessionItem({
+  row,
+  subagentLabel,
+  openLabel,
+  onOpen,
+}: {
+  row: RunningSessionRow
+  subagentLabel: string
+  openLabel: string
+  onOpen: () => void
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        title={openLabel}
+        aria-label={openLabel}
+        data-testid="menu-bar-companion-running-row"
+        data-session-id={row.id}
+        className="flex w-full flex-col gap-0.5 rounded-[8px] px-2 py-1.5 text-left transition-colors hover:bg-[var(--state-hover,var(--accent))]"
+        onClick={onOpen}
+      >
+        <span className="flex items-center gap-1.5">
+          <span
+            aria-hidden="true"
+            data-testid="menu-bar-companion-running-dot"
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+              row.working
+                ? 'bg-[var(--accent-green,var(--primary))]'
+                : 'bg-[var(--text-tertiary,var(--muted-foreground))]'
+            }`}
+          />
+          <span className="flex-1 truncate text-[12.5px] font-medium text-[var(--text-primary,var(--foreground))]">
+            {row.title}
+          </span>
+          {row.subagentCount > 0 ? (
+            <span
+              data-testid="menu-bar-companion-running-subagents"
+              className="shrink-0 rounded-full bg-[var(--surface-button,var(--muted))] px-1.5 font-mono text-[10px] text-[var(--text-secondary,var(--muted-foreground))]"
+            >
+              {subagentLabel}
+            </span>
+          ) : null}
+        </span>
+        <span className="truncate pl-3 font-mono text-[10.5px] text-[var(--text-muted,var(--muted-foreground))]">
+          {row.activityLabel}
+        </span>
+      </button>
+    </li>
   )
 }
 

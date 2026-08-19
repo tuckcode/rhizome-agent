@@ -27,6 +27,50 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Session handoff — 2026-08-19 (Claude Opus 5: #13 menu bar roster)
+
+**If you are not Claude, read `docs/CROSS-MODEL-HANDOFF.md` first.** Then this entry.
+
+**State:** `main` in sync with `origin/main`, tree clean, all gates green.
+`stash@{0}` from C29 was dropped; the stash list is empty.
+
+**Closed this session:** #19 and #20 (both shipped earlier but left open —
+closed with commit evidence), and **#13**, the menu-bar running-session list.
+
+**#13 is DONE except its last acceptance criterion.** Quick capture is
+unchanged and still first; running sessions list beneath it with what each is
+doing; subagents are a count, not a tree; clicking a row opens the main window
+onto that session; nothing running renders nothing at all — no heading, no
+empty frame. **Not demonstrated: the popover driven natively with the main
+window closed and real work running.** Everything else is covered by unit,
+component and live-daemon tests. Do that demo before calling #13 closed.
+
+**The probe rule paid for itself again (§16).** `sessionName` is declared in
+`daemon-session-list.d.ts` and is **never sent** by a live daemon — a row title
+built on it renders blank for every real session. Titles fall back to
+`firstMessage`. See `docs/plans/2026-08-19-menu-bar-running-sessions-session-status.md`.
+
+**⚠️ Rust coverage is at 85.03% against an 85% gate** — down from 85.26%,
+roughly five lines of headroom. New `#[cfg(desktop)]` command wrappers are not
+unit-testable and ate the margin. Budget tests with any new Rust or you will
+break the push gate for everyone, exactly as C27 did for weeks.
+
+**One thing standing on read source, not a probe:** subagent parentage
+(`parentActiveSessionId`). No subagents were running to observe, so the counts
+follow the daemon's `buildRlmChildSnapshots`. First place to look if counts
+read wrong.
+
+### Ranked pickup for the next model
+
+1. **C12 — rotate the exposed GitHub PAT.** Security; needs a human.
+2. **#13's native demo** — the one criterion left, ~20 minutes with cua-driver.
+3. **#14** — schedules and heartbeats. `heartbeat_catalog` /
+   `heartbeat_management` are already advertised as daemon server capabilities,
+   and `heartbeats_list` / `cron_list` are already spoken by the client.
+4. **#21** stays blocked until Prime supplies skill argument hints.
+
+---
+
 ## Session handoff — 2026-08-16g (Grok 4.6: C29 Cmd+N note list)
 
 **If you are not Claude, read `docs/CROSS-MODEL-HANDOFF.md` first.** Then this entry.
@@ -1549,6 +1593,10 @@ Note what this implies about the record: sessions in this window that report "al
 
 
 - **C30-OPEN: `window.__tolariaFrontendReady` branding residue survived the C21 rename sweep.** Found 2026-08-16 while closing out the harness-surface session. Live sites: `src/utils/frontendReady.ts` (sets/reads the flag), `src/components/FrontendReadyMarker.tsx`, `src/main.tsx`, `src/main.test.ts`, `src/utils/frontendReady.test.ts`, and — load-bearing for CI — `tests/smoke/helpers.ts` waits on `window.__tolariaFrontendReady === true` before driving the app. **Correctly used today**; low priority to rename. The point of the number is that noting a residue without tracking it is what C21 existed to stop. When renamed, treat it like other window/localStorage renames: update the ambient `Window` typing, every reader/writer, smoke helpers, and tests in one commit; run `npx tsc --noEmit` and `pnpm playwright:smoke` because the smoke lane is a real consumer. Do not leave a dual-name fallback unless a released build is known to depend on the old flag across an upgrade boundary (smoke runs against the build under test, so a hard rename is usually enough).
+
+- **C31-OPEN: `pnpm test` produced one unhandled error that would not reproduce.** Seen 2026-08-19 while landing #13: a full run reported `Tests 5433 passed` alongside `Errors 1` and exited non-zero. Three further full runs on the same tree exited 0 with no error line, and the error text was never captured — it did not appear in the tail, and greps for `Unhandled`/`rejection` came back empty on the clean runs. **Not attributed to that session's change and not shown to predate it either**; nobody has run this down. It matters because the push gate runs `pnpm test`: a 1-in-4 unhandled error is a push that fails for no visible reason, and the natural reaction — re-run and move on — is exactly how it stays unfixed. Next time it appears, capture the whole run to a file before doing anything else (`pnpm test > /tmp/t.txt 2>&1`), because the message is only in the block vitest prints between the file list and the summary.
+
+- **C32-OPEN: `ARCHITECTURE.md` and `ABSTRACTIONS.md` contain no mention of Prime at all.** Confirmed 2026-08-19 by grepping both files for `Prime` — zero hits in either, while `src-tauri/src/prime_session_host.rs` alone is ~4,600 lines and the daemon client, session host, goal, fork, compact, heartbeat and roster surfaces all live outside the docs. AGENTS.md requires updating these two after "any Tauri command, new component/hook, data model change, or new integration", so every harness session has been in technical violation of that rule and every one of them has let it pass. The practical cost: a new session has no structural map of the harness and re-derives it from source each time — this session spent a meaningful chunk of its budget rediscovering that `prime_session_host.rs` is a full daemon client and that `prime_sessions.rs` is a *disk* reader that cannot answer "what is running". Do not fix this as a side quest inside a feature commit; it is its own piece of work.
 
 ## Links out
 

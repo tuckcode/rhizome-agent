@@ -8,6 +8,10 @@
 /// Stable webview label — also listed in `capabilities/default.json`.
 pub const WINDOW_LABEL: &str = "menu-bar-companion";
 
+/// Emitted to the main window when a menu-bar roster row is clicked (#13).
+/// Payload is the session file path.
+pub const OPEN_SESSION_EVENT: &str = "menu-bar-open-session";
+
 #[cfg(desktop)]
 mod desktop {
     use super::WINDOW_LABEL;
@@ -256,16 +260,37 @@ pub fn hide_menu_bar_companion(app: tauri::AppHandle) -> Result<(), String> {
     }
 }
 
+/// Focus the main window, optionally landing on a specific Prime session.
+///
+/// `session_file` is the roster's `sessionFile` — the same path
+/// `switch_prime_session` takes. The switch itself happens in the main
+/// window (it owns the transcript state), so this focuses and then emits;
+/// a companion popover cannot drive another window's React tree directly.
 #[tauri::command]
-pub fn open_main_from_menu_bar_companion(app: tauri::AppHandle) -> Result<(), String> {
+pub fn open_main_from_menu_bar_companion(
+    app: tauri::AppHandle,
+    session_file: Option<String>,
+) -> Result<(), String> {
     #[cfg(desktop)]
     {
+        use tauri::{Emitter, Manager};
+
         desktop::focus_main_window(&app);
+        if let Some(session_file) = session_file.filter(|path| !path.is_empty()) {
+            if let Some(main) = app.get_webview_window("main") {
+                // Best-effort: the roster row still opened the app, which is
+                // the majority of the value, so a failed emit must not read
+                // back to the popover as "nothing happened".
+                if let Err(error) = main.emit(OPEN_SESSION_EVENT, session_file) {
+                    log::warn!("failed to route menu-bar session open: {error}");
+                }
+            }
+        }
         Ok(())
     }
     #[cfg(not(desktop))]
     {
-        let _ = app;
+        let _ = (app, session_file);
         Err("menu-bar companion is desktop-only".into())
     }
 }

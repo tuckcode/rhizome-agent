@@ -372,6 +372,17 @@ pub fn get_prime_session_host_status() -> crate::prime_session_host::PrimeHostSt
     crate::prime_session_host::get_status()
 }
 
+/// Every Prime session the daemon is hosting, for the menu-bar roster (#13).
+///
+/// Standalone one-shot query — deliberately not routed through the attached
+/// session host, so the menu bar can answer "is anything running?" with the
+/// main window closed and no vault open.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn list_prime_running_sessions() -> Result<Vec<serde_json::Value>, String> {
+    crate::prime_session_host::list_running_sessions()
+}
+
 /// Redirect the running turn. Returns false when nothing is streaming —
 /// the caller should send a normal prompt instead.
 #[cfg(desktop)]

@@ -458,6 +458,7 @@ the work was wrong.
 | Skills carry `argumentHint` | Only `source: "prompt"` entries do | Read `dist/modes/agent-connection/snapshot.js` |
 | `sessionFile` is always in state | Arrives on only some payloads — a live session can have an id and no path | Only visible at runtime |
 | `get_state` carries `goal` | Never set by the daemon; RPC-mode only. Correct call is `get_connection_state`, fields are `tokenBudget`/`tokensUsed` | Read `dist/modes/daemon/daemon-mode.js` |
+| `SessionSummary.sessionName` names a session | **Declared in the `.d.ts` and never sent.** No live session carries it; `prime-agent list` prints a blank `name` column. Fall back to `firstMessage` | `list` against the live daemon (added 2026-08-19, #13) |
 
 **Rule: before building anything Prime-facing, probe the running daemon and read
 the installed source under `~/.local/lib/node_modules/prime-agent/dist/`.** It
@@ -473,6 +474,25 @@ prime-agent --mode daemon   # if status says nothing is running
 # serverCapabilities, get_commands, get_connection_state, get_state
 ls ~/.local/lib/node_modules/prime-agent/dist/modes/
 ```
+
+**Fifth instance, 2026-08-19 (#13).** The menu-bar roster was built from the
+daemon's `list` command. The `.d.ts` declares `sessionName?: string` on
+`SessionSummary`; a live probe showed no session carries it, so a row title
+built on `sessionName` would have rendered blank for every real session. The
+same probe *confirmed* `summary`, `runtimeKind`, `rlmDepth` and
+`hasRunningRlmChildren` are all really sent — so the probe is not only for
+catching absences, it is what lets you use an optional field with confidence.
+
+**A `.d.ts` optional marker tells you nothing about whether the field arrives.**
+Every field on `SessionSummary` past the first four is optional; in practice
+some are always present and some never are, and the type cannot distinguish
+them. Probe, then treat what you saw as the contract.
+
+**When you cannot probe something, say so in the code.** #13 could not observe
+subagent parentage — no subagents were running — so it follows the daemon's own
+`buildRlmChildSnapshots` source and the module comment names that as the one
+unprobed assumption. A future reader debugging bad subagent counts starts at
+the right line instead of re-deriving what was and wasn't verified.
 
 ### Subagent verification — demand the full suite, not the agent's own tests
 
