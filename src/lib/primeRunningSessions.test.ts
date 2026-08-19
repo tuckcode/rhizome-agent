@@ -210,6 +210,36 @@ describe('toRunningSessionRows', () => {
     expect(rows.map((row) => row.id)).toEqual(['new', 'old', 'waiting'])
   })
 
+  it('disambiguates rows that would otherwise render the same title', () => {
+    // Seen live: four running sessions, none with a firstMessage, two of them
+    // rooted at /Users/dtc. Both rows rendered "dtc" and the user had no way
+    // to tell which was which -- or that they were different sessions at all.
+    const rows = toRunningSessionRows([
+      session({ id: 'aaa1bbb2ccc3', activeSessionId: 'aaa1bbb2ccc3', activity: 'working', firstMessage: undefined, cwd: '/Users/dtc' }),
+      session({ id: 'ddd4eee5fff6', activeSessionId: 'ddd4eee5fff6', activity: 'working', firstMessage: undefined, cwd: '/Users/dtc' }),
+    ])
+    expect(rows).toHaveLength(2)
+    expect(rows[0].title).not.toBe(rows[1].title)
+    expect(rows[0].title.startsWith('dtc')).toBe(true)
+    expect(rows[1].title.startsWith('dtc')).toBe(true)
+  })
+
+  it('leaves a unique title alone', () => {
+    const rows = toRunningSessionRows([
+      session({ id: 'aaa1', activeSessionId: 'aaa1', activity: 'working', firstMessage: undefined, cwd: '/Users/dtc' }),
+      session({ id: 'bbb2', activeSessionId: 'bbb2', activity: 'working', firstMessage: undefined, cwd: '/repo/demo-vault-v2' }),
+    ])
+    expect(rows.map((row) => row.title).sort()).toEqual(['demo-vault-v2', 'dtc'])
+  })
+
+  it('disambiguates duplicate first messages too, not just cwd fallbacks', () => {
+    const rows = toRunningSessionRows([
+      session({ id: 'aaa1', activeSessionId: 'aaa1', activity: 'working', firstMessage: 'Pickup' }),
+      session({ id: 'bbb2', activeSessionId: 'bbb2', activity: 'working', firstMessage: 'Pickup' }),
+    ])
+    expect(rows[0].title).not.toBe(rows[1].title)
+  })
+
   it('caps the list so the popover cannot grow without bound', () => {
     const many = Array.from({ length: 12 }, (_, index) =>
       session({ id: `s${index}`, activeSessionId: `s${index}`, activity: 'working' }),
