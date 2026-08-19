@@ -1150,6 +1150,132 @@ describe('useVaultLoader', () => {
       warnSpy.mockRestore()
     })
 
+    it('C29: keeps a just-created note in the list when an in-flight reload resolves with a stale (pre-create) snapshot', async () => {
+      // Regression for C29: Cmd+N persists the note then calls addEntry()
+      // optimistically. If a full vault reload was already in flight (e.g.
+      // from the file-system watcher) and its disk read happened before the
+      // new file existed, the reload used to resolve *after* addEntry and
+      // blow away the optimistic entry with the stale full-entries snapshot
+      // — the note vanished from the list and never came back.
+      const reload = createDeferred<VaultEntry[]>()
+      backendInvokeFn.mockImplementation(((cmd: string) => {
+        if (cmd === 'list_vault') return Promise.resolve(mockEntries)
+        if (cmd === 'reload_vault') return reload.promise
+        if (cmd === 'get_modified_files') return Promise.resolve([])
+        if (cmd === 'list_vault_folders') return Promise.resolve([])
+        if (cmd === 'list_views') return Promise.resolve([])
+        return Promise.resolve(null)
+      }) as typeof defaultMockInvoke)
+
+      const { result } = await renderVaultLoader()
+
+      const newEntry: VaultEntry = {
+        ...mockEntries[0],
+        path: '/vault/note/untitled-note.md',
+        filename: 'untitled-note.md',
+        title: 'Untitled note',
+      }
+
+      // A reload starts (its disk read captured the world *before* the new
+      // note existed) ...
+      let pendingReload: Promise<VaultEntry[]> | null = null
+      act(() => {
+        pendingReload = result.current.reloadVault()
+      })
+
+      // ... then Cmd+N persists the note and optimistically adds it.
+      act(() => {
+        result.current.addEntry(newEntry)
+      })
+      expect(result.current.entries.map((e) => e.path)).toContain(newEntry.path)
+
+      // The stale reload now resolves with a snapshot that predates the note.
+      await act(async () => {
+        reload.resolve(mockEntries)
+        await pendingReload!
+      })
+
+      // The note must still be in the list — it was not dropped by the
+      // stale reload's overwrite.
+      expect(result.current.entries.map((e) => e.path)).toContain(newEntry.path)
+    })
+
+    it('C29: a genuinely deleted note is not resurrected by a later stale reload', async () => {
+      const reload = createDeferred<VaultEntry[]>()
+      backendInvokeFn.mockImplementation(((cmd: string) => {
+        if (cmd === 'list_vault') return Promise.resolve(mockEntries)
+        if (cmd === 'reload_vault') return reload.promise
+        if (cmd === 'get_modified_files') return Promise.resolve([])
+        if (cmd === 'list_vault_folders') return Promise.resolve([])
+        if (cmd === 'list_views') return Promise.resolve([])
+        return Promise.resolve(null)
+      }) as typeof defaultMockInvoke)
+
+      const { result } = await renderVaultLoader()
+
+      const newEntry: VaultEntry = {
+        ...mockEntries[0],
+        path: '/vault/note/untitled-note.md',
+        filename: 'untitled-note.md',
+        title: 'Untitled note',
+      }
+
+      let pendingReload: Promise<VaultEntry[]> | null = null
+      act(() => {
+        pendingReload = result.current.reloadVault()
+      })
+
+      act(() => {
+        result.current.addEntry(newEntry)
+      })
+      act(() => {
+        result.current.removeEntry(newEntry.path)
+      })
+      expect(result.current.entries.map((e) => e.path)).not.toContain(newEntry.path)
+
+      await act(async () => {
+        reload.resolve(mockEntries)
+        await pendingReload!
+      })
+
+      expect(result.current.entries.map((e) => e.path)).not.toContain(newEntry.path)
+    })
+
+    it('C29: keeps a just-created note when the initial vault scan resolves after addEntry', async () => {
+      const initial = createDeferred<VaultEntry[]>()
+      backendInvokeFn.mockImplementation(((cmd: string) => {
+        if (cmd === 'list_vault') return initial.promise
+        if (cmd === 'reload_vault') return Promise.resolve(mockEntries)
+        if (cmd === 'get_modified_files') return Promise.resolve([])
+        if (cmd === 'list_vault_folders') return Promise.resolve([])
+        if (cmd === 'list_views') return Promise.resolve([])
+        return Promise.resolve(null)
+      }) as typeof defaultMockInvoke)
+
+      const { result } = renderHook(() => useVaultLoader('/vault'))
+
+      const newEntry: VaultEntry = {
+        ...mockEntries[0],
+        path: '/vault/note/untitled-note.md',
+        filename: 'untitled-note.md',
+        title: 'Untitled note',
+      }
+
+      act(() => {
+        result.current.addEntry(newEntry)
+      })
+      expect(result.current.entries.map((e) => e.path)).toContain(newEntry.path)
+
+      await act(async () => {
+        initial.resolve(mockEntries)
+      })
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+      })
+
+      expect(result.current.entries.map((e) => e.path)).toContain(newEntry.path)
+    })
+
     it('clears stale entries and marks the vault unavailable when the active vault disappears', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const initialViews = [{

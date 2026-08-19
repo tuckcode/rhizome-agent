@@ -44,6 +44,8 @@ interface InitialVaultLoadStateOptions {
   forceReload: boolean, reloadIfEmpty: boolean
   handleVaultUnavailable: (path: string) => void
   isCurrentVaultPath: (path: string) => boolean
+  newPathsRef: MutableRefObject<Set<string>>
+  newEntriesRef: MutableRefObject<Map<string, VaultEntry>>
   setEntries: Dispatch<SetStateAction<VaultEntry[]>>
   setFolders: (folders: FolderNode[]) => void
   setIsLoading: (isLoading: boolean) => void
@@ -89,7 +91,7 @@ async function loadInitialVaultChromeState(options: InitialVaultChromeOptions): 
 
 async function loadInitialVaultEntriesState(options: Pick<
   InitialVaultLoadStateOptions,
-  'defaultWorkspacePath' | 'forceReload' | 'handleVaultAvailable' | 'handleVaultUnavailable' | 'isCurrentVaultPath' | 'path' | 'reloadIfEmpty' | 'setEntries' | 'vaults'
+  'defaultWorkspacePath' | 'forceReload' | 'handleVaultAvailable' | 'handleVaultUnavailable' | 'isCurrentVaultPath' | 'newEntriesRef' | 'newPathsRef' | 'path' | 'reloadIfEmpty' | 'setEntries' | 'vaults'
 >): Promise<boolean> {
   const { handleVaultAvailable, handleVaultUnavailable, isCurrentVaultPath, path, setEntries } = options
 
@@ -103,11 +105,17 @@ async function loadInitialVaultEntriesState(options: Pick<
     })
     if (isCurrentVaultPath(path)) {
       handleVaultAvailable(path)
+      // See reconcileReloadedEntries: an initial/background scan can still
+      // be reading disk when Cmd+N optimistically adds a brand-new note. If
+      // that scan resolves afterward, don't let its pre-create snapshot wipe
+      // the note back out of the workspace it belongs to.
       setEntries((currentEntries) => replaceLoadedWorkspaceEntries({
         defaultWorkspacePath: options.defaultWorkspacePath,
         entries: currentEntries,
         fallbackVaultPath: path,
         loadedEntries: entries,
+        protectedPaths: options.newPathsRef.current,
+        protectedEntries: options.newEntriesRef.current,
         vaults: options.vaults,
       }))
     }
@@ -192,14 +200,52 @@ function useCoalescedAsyncTask<T>(runTask: () => Promise<T>) {
 
 function useNewNoteTracker() {
   const [newPaths, setNewPaths] = useState<Set<string>>(new Set())
+  // Mirrors `newPaths` but updates synchronously in the same callback that
+  // mutates state, instead of waiting for a `useEffect` to observe the new
+  // render. Async vault-load reconciliation (see reconcileReloadedEntries
+  // and preserveMissingProtectedEntries) reads these refs at promise-resolve
+  // time; an effect-synced ref left a window where a reload could resolve
+  // between addEntry()'s setState and the effect flushing, reading a stale
+  // (pre-create) snapshot and dropping the just-created note anyway.
+  //
+  // `newEntriesRef` keeps the optimistic VaultEntry itself. The load-reset
+  // effect can empty `entries` before a stale scan resolves, so restoring
+  // only from "what was in current entries" has nothing to put back.
+  const newPathsRef = useRef<Set<string>>(new Set())
+  const newEntriesRef = useRef<Map<string, VaultEntry>>(new Map())
 
-  const trackNew = useCallback((path: string) => {
-    setNewPaths((prev) => new Set(prev).add(path))
+  const trackNew = useCallback((entry: VaultEntry) => {
+    setNewPaths((prev) => {
+      const next = new Set(prev).add(entry.path)
+      newPathsRef.current = next
+      const nextEntries = new Map(newEntriesRef.current)
+      nextEntries.set(entry.path, entry)
+      newEntriesRef.current = nextEntries
+      return next
+    })
   }, [])
 
-  const clear = useCallback(() => setNewPaths(new Set()), [])
+  const untrack = useCallback((path: string) => {
+    setNewPaths((prev) => {
+      if (!prev.has(path)) return prev
+      const next = new Set(prev)
+      next.delete(path)
+      newPathsRef.current = next
+      const nextEntries = new Map(newEntriesRef.current)
+      nextEntries.delete(path)
+      newEntriesRef.current = nextEntries
+      return next
+    })
+  }, [])
 
-  return { newPaths, trackNew, clear }
+  const clear = useCallback(() => {
+    const next = new Set<string>()
+    newPathsRef.current = next
+    newEntriesRef.current = new Map()
+    setNewPaths(next)
+  }, [])
+
+  return { newPaths, newPathsRef, newEntriesRef, trackNew, untrack, clear }
 }
 
 function useUnsavedTracker() {
@@ -291,6 +337,8 @@ interface InitialVaultLoadOptions {
   isWorkspacePathLoaded: (path: string) => boolean
   vaultPath: string
   vaults?: VaultOption[]
+  newPathsRef: MutableRefObject<Set<string>>
+  newEntriesRef: MutableRefObject<Map<string, VaultEntry>>
   tracker: ReturnType<typeof useNewNoteTracker>
   unsaved: ReturnType<typeof useUnsavedTracker>
   isCurrentVaultPath: (path: string) => boolean
@@ -339,7 +387,10 @@ function resetInitialVaultLoadState(options: InitialVaultLoadEffectOptions, pres
   clearPrefetchCache()
   options.setViews([])
   resetVaultState({
-    clearNewPaths: options.clearNewPaths,
+    // A Cmd+N during startup can land between the first scan and the
+    // vaults-arrived effect re-run. Clearing protection here is what let a
+    // stale scan wipe the new note with nothing left to restore.
+    clearNewPaths: preserveWorkspaceEntries ? () => {} : options.clearNewPaths,
     clearUnsaved: options.clearUnsaved,
     setEntries: preserveWorkspaceEntries ? () => {} : options.setEntries,
     setFolders: options.setFolders,
@@ -382,6 +433,8 @@ function startFreshInitialVaultLoad(
     vaults: loadOptions.vaults,
     folderVaults: options.folderVaults,
     defaultWorkspacePath: loadOptions.defaultWorkspacePath, forceReload: loadOptions.forceReload, reloadIfEmpty: loadOptions.reloadIfEmpty,
+    newPathsRef: options.newPathsRef,
+    newEntriesRef: options.newEntriesRef,
     setEntries: options.setEntries,
     setFolders: options.setFolders,
     setIsLoading: options.setIsLoading,
@@ -395,6 +448,8 @@ function useInitialVaultLoad(options: InitialVaultLoadOptions) {
     handleVaultUnavailable,
     isWorkspacePathLoaded,
     vaultPath,
+    newPathsRef,
+    newEntriesRef,
     tracker,
     unsaved,
     isCurrentVaultPath,
@@ -425,6 +480,8 @@ function useInitialVaultLoad(options: InitialVaultLoadOptions) {
       resetReloading,
       clearNewPaths: tracker.clear,
       clearUnsaved: unsaved.clearAll,
+      newPathsRef,
+      newEntriesRef,
       setEntries, setFolders, setIsLoading, setModifiedFiles, setModifiedFilesError, setViews,
       vaultPath, folderVaults,
     }
@@ -451,6 +508,8 @@ function useInitialVaultLoad(options: InitialVaultLoadOptions) {
     unsaved.clearAll,
     isCurrentVaultPath,
     isWorkspacePathLoaded,
+    newPathsRef,
+    newEntriesRef,
     resetReloading,
     setEntries, setFolders, setIsLoading, setModifiedFiles, setModifiedFilesError, setViews,
     loadOptionsRef,
@@ -503,7 +562,8 @@ function useModifiedFilesLoader(vaultPath: string, isCurrentVaultPath: (path: st
 
 function useEntryMutations(
   setEntries: Dispatch<SetStateAction<VaultEntry[]>>,
-  trackNew: (path: string) => void,
+  trackNew: (entry: VaultEntry) => void,
+  untrackNew: (path: string) => void,
 ) {
   const addEntry = useCallback((entry: VaultEntry) => {
     const normalizedEntry = normalizeVaultEntry(entry)
@@ -511,7 +571,7 @@ function useEntryMutations(
       if (prev.some(e => e.path === normalizedEntry.path)) return prev
       return [normalizedEntry, ...prev]
     })
-    trackNew(normalizedEntry.path)
+    trackNew(normalizedEntry)
   }, [setEntries, trackNew])
 
   const updateEntry = useCallback((path: string, patch: Partial<VaultEntry>) => {
@@ -530,12 +590,14 @@ function useEntryMutations(
 
   const removeEntry = useCallback((path: string) => {
     setEntries((prev) => removeEntryByPath(prev, path))
-  }, [setEntries])
+    untrackNew(path)
+  }, [setEntries, untrackNew])
 
   const removeEntries = useCallback((paths: string[]) => {
     if (paths.length === 0) return
     setEntries((prev) => removeEntriesByPath(prev, paths))
-  }, [setEntries])
+    for (const path of paths) untrackNew(path)
+  }, [setEntries, untrackNew])
 
   const replaceEntry = useCallback((oldPath: string, patch: Partial<VaultEntry> & { path: string }) => {
     setEntries((prev) => replaceEntryByPath(prev, oldPath, patch))
@@ -610,7 +672,9 @@ interface VaultReloadOptions {
   vaultPath: string
   isCurrentVaultPath: (path: string) => boolean
   loadModifiedFiles: () => Promise<void>
-  setEntries: (entries: VaultEntry[]) => void
+  newPathsRef: MutableRefObject<Set<string>>
+  newEntriesRef: MutableRefObject<Map<string, VaultEntry>>
+  setEntries: Dispatch<SetStateAction<VaultEntry[]>>
   setFolders: (folders: FolderNode[]) => void
   setViews: (views: ViewFile[]) => void
   vaults?: VaultOption[]
@@ -619,6 +683,38 @@ interface VaultReloadOptions {
 interface EntryReloadOptions extends VaultReloadOptions {
   beginReload: () => void
   finishReload: () => void
+}
+
+// A full vault reload reads a directory snapshot that can lose a race against
+// a just-created note: the reload's disk read can be in flight (or its result
+// can reflect a listing taken) before the new file is visible, and resolves
+// *after* the optimistic addEntry() that already put the note in state. Since
+// runEntryReload replaces `entries` outright, that stale snapshot would
+// silently drop the new note from the list forever — nothing else re-adds it.
+// Guard by re-appending any entry the app knows it just created (tracked via
+// addEntry -> trackNew) that the fresh snapshot is missing. removeEntry(s)
+// untracks on delete, so a genuinely deleted note is not resurrected.
+export function reconcileReloadedEntries(
+  previousEntries: VaultEntry[],
+  reloadedEntries: VaultEntry[],
+  protectedPaths: Set<string>,
+  protectedEntries?: Map<string, VaultEntry>,
+): VaultEntry[] {
+  if (protectedPaths.size === 0 && (!protectedEntries || protectedEntries.size === 0)) {
+    return reloadedEntries
+  }
+  const paths = protectedEntries && protectedEntries.size > 0
+    ? new Set(protectedEntries.keys())
+    : protectedPaths
+  const reloadedPaths = new Set(reloadedEntries.map((entry) => entry.path))
+  const previousByPath = new Map(previousEntries.map((entry) => [entry.path, entry]))
+  const missingProtectedEntries: VaultEntry[] = []
+  for (const path of paths) {
+    if (reloadedPaths.has(path)) continue
+    const restored = protectedEntries?.get(path) ?? previousByPath.get(path)
+    if (restored) missingProtectedEntries.push(restored)
+  }
+  return missingProtectedEntries.length === 0 ? reloadedEntries : [...missingProtectedEntries, ...reloadedEntries]
 }
 
 interface CollectionReloadOptions<T> {
@@ -669,6 +765,8 @@ function useEntryReload({
   handleVaultUnavailable,
   isCurrentVaultPath,
   loadModifiedFiles,
+  newPathsRef,
+  newEntriesRef,
   setEntries,
   vaultPath,
   vaults,
@@ -683,9 +781,18 @@ function useEntryReload({
       const entries = await reloadVaultEntries({ vaultPath: path, vaults, defaultWorkspacePath })
       if (!isCurrentVaultPath(path)) return [] as VaultEntry[]
       handleVaultAvailable(path)
-      setEntries(entries)
+      let reconciledEntries = entries
+      setEntries((prev) => {
+        reconciledEntries = reconcileReloadedEntries(
+          prev,
+          entries,
+          newPathsRef.current,
+          newEntriesRef.current,
+        )
+        return reconciledEntries
+      })
       void loadModifiedFiles()
-      return entries
+      return reconciledEntries
     } catch (err) {
       if (await handleUnavailableVaultPath({ handleVaultUnavailable, isCurrentVaultPath, path })) return [] as VaultEntry[]
       console.warn('Vault reload failed:', err)
@@ -693,7 +800,7 @@ function useEntryReload({
     } finally {
       finishReload()
     }
-  }, [handleVaultAvailable, handleVaultUnavailable, vaultPath, vaults, defaultWorkspacePath, beginReload, finishReload, loadModifiedFiles, isCurrentVaultPath, setEntries])
+  }, [handleVaultAvailable, handleVaultUnavailable, vaultPath, vaults, defaultWorkspacePath, beginReload, finishReload, loadModifiedFiles, isCurrentVaultPath, setEntries, newPathsRef, newEntriesRef])
 
   return useCoalescedAsyncTask(runEntryReload)
 }
@@ -819,6 +926,8 @@ function useVaultUnavailable(vaultPath: string, state: ReturnType<typeof useVaul
 interface VaultLoaderStartupOptions {
   defaultWorkspacePath?: string | null
   folderVaults?: VaultOption[]
+  newPathsRef: MutableRefObject<Set<string>>
+  newEntriesRef: MutableRefObject<Map<string, VaultEntry>>
   reloadIfEmpty: boolean
   setInitialFolders: (folders: FolderNode[]) => void
   state: ReturnType<typeof useVaultState>
@@ -832,6 +941,8 @@ function useVaultLoaderStartup(options: VaultLoaderStartupOptions) {
   const {
     defaultWorkspacePath,
     folderVaults,
+    newPathsRef,
+    newEntriesRef,
     reloadIfEmpty,
     setInitialFolders,
     state,
@@ -846,6 +957,8 @@ function useVaultLoaderStartup(options: VaultLoaderStartupOptions) {
     entries: state.entries,
     isCurrentVaultPath: state.isCurrentVaultPath,
     isLoading: state.isLoading,
+    newPathsRef,
+    newEntriesRef,
     setEntries: state.setEntries,
     vaultPath,
     vaults,
@@ -861,6 +974,8 @@ function useVaultLoaderStartup(options: VaultLoaderStartupOptions) {
     folderVaults,
     defaultWorkspacePath,
     isWorkspacePathLoaded,
+    newPathsRef,
+    newEntriesRef,
     tracker: state.tracker,
     unsaved: state.unsaved,
     isCurrentVaultPath: state.isCurrentVaultPath,
@@ -1048,6 +1163,8 @@ function loadMissingWorkspaceEntries({
   isCurrentVaultPath,
   loadedPaths,
   loadingPaths,
+  newPathsRef,
+  newEntriesRef,
   setEntries,
   vault,
   vaultPath,
@@ -1057,6 +1174,8 @@ function loadMissingWorkspaceEntries({
   isCurrentVaultPath: (path: string) => boolean
   loadedPaths: Set<string>
   loadingPaths: Set<string>
+  newPathsRef: MutableRefObject<Set<string>>
+  newEntriesRef: MutableRefObject<Map<string, VaultEntry>>
   setEntries: Dispatch<SetStateAction<VaultEntry[]>>
   vault: VaultOption
   vaultPath: string
@@ -1075,6 +1194,8 @@ function loadMissingWorkspaceEntries({
         fallbackVaultPath: vaultPath,
         loadedEntries,
         loadedWorkspacePath: vault.path,
+        protectedPaths: newPathsRef.current,
+        protectedEntries: newEntriesRef.current,
         vaults,
       }))
     })
@@ -1094,6 +1215,8 @@ function useMissingWorkspaceLoads({
   isLoading,
   loadedWorkspacePathsRef,
   loadingWorkspacePathsRef,
+  newPathsRef,
+  newEntriesRef,
   setEntries,
   vaultPath,
   vaults,
@@ -1105,6 +1228,8 @@ function useMissingWorkspaceLoads({
   isLoading: boolean
   loadedWorkspacePathsRef: MutableRefObject<Set<string>>
   loadingWorkspacePathsRef: MutableRefObject<Set<string>>
+  newPathsRef: MutableRefObject<Set<string>>
+  newEntriesRef: MutableRefObject<Map<string, VaultEntry>>
   setEntries: Dispatch<SetStateAction<VaultEntry[]>>
   vaultPath: string
   vaults?: VaultOption[]
@@ -1125,6 +1250,8 @@ function useMissingWorkspaceLoads({
         isCurrentVaultPath,
         loadedPaths,
         loadingPaths,
+        newPathsRef,
+        newEntriesRef,
         setEntries,
         vault,
         vaultPath,
@@ -1139,6 +1266,8 @@ function useMissingWorkspaceLoads({
     isLoading,
     loadedWorkspacePathsRef,
     loadingWorkspacePathsRef,
+    newPathsRef,
+    newEntriesRef,
     setEntries,
     vaultPath,
     vaults
@@ -1150,6 +1279,8 @@ function useWorkspaceEntrySync({
   entries,
   isCurrentVaultPath,
   isLoading,
+  newPathsRef,
+  newEntriesRef,
   setEntries,
   vaultPath,
   vaults,
@@ -1158,6 +1289,8 @@ function useWorkspaceEntrySync({
   entries: VaultEntry[]
   isCurrentVaultPath: (path: string) => boolean
   isLoading: boolean
+  newPathsRef: MutableRefObject<Set<string>>
+  newEntriesRef: MutableRefObject<Map<string, VaultEntry>>
   setEntries: Dispatch<SetStateAction<VaultEntry[]>>
   vaultPath: string
   vaults?: VaultOption[]
@@ -1181,6 +1314,8 @@ function useWorkspaceEntrySync({
     desiredWorkspacePaths,
     isCurrentVaultPath,
     isLoading,
+    newPathsRef,
+    newEntriesRef,
     setEntries,
     vaultPath,
     vaults,
@@ -1243,9 +1378,11 @@ function useVaultLoaderResult({
 export function useVaultLoader(vaultPath: string, vaults?: VaultOption[], defaultWorkspacePath?: string | null, folderVaults?: VaultOption[]) {
   const state = useVaultState(vaultPath)
   const setInitialFolders = useInitialFolderSetter(folderVaults, state.setFolders)
-  const entryMutations = useEntryMutations(state.setEntries, state.tracker.trackNew)
+  const entryMutations = useEntryMutations(state.setEntries, state.tracker.trackNew, state.tracker.untrack)
   const gitLoaders = useGitLoaders(vaultPath)
   const unavailableVault = useVaultUnavailable(vaultPath, state)
+  const newPathsRef = state.tracker.newPathsRef
+  const newEntriesRef = state.tracker.newEntriesRef
   const vaultReloads = useVaultReloads({
     handleVaultAvailable: unavailableVault.markVaultAvailable,
     handleVaultUnavailable: unavailableVault.markVaultUnavailable,
@@ -1255,6 +1392,8 @@ export function useVaultLoader(vaultPath: string, vaults?: VaultOption[], defaul
     vaults,
     isCurrentVaultPath: state.isCurrentVaultPath,
     loadModifiedFiles: state.modified.loadModifiedFiles,
+    newPathsRef,
+    newEntriesRef,
     setEntries: state.setEntries,
     setFolders: state.setFolders,
     setViews: state.setViews,
@@ -1266,6 +1405,8 @@ export function useVaultLoader(vaultPath: string, vaults?: VaultOption[], defaul
   useVaultLoaderStartup({
     defaultWorkspacePath,
     folderVaults,
+    newPathsRef,
+    newEntriesRef,
     reloadIfEmpty: !isNoteWindow(),
     setInitialFolders,
     state,

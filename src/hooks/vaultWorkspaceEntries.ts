@@ -125,12 +125,66 @@ export function pruneEntriesOutsideWorkspaceSet({
   return nextEntries.length === entries.length ? entries : nextEntries
 }
 
+export type ProtectedWorkspaceEntries = {
+  paths?: Set<string>
+  entries?: Map<string, VaultEntry>
+}
+
+function protectedPathSet(protection?: ProtectedWorkspaceEntries): Set<string> | undefined {
+  if (protection?.entries && protection.entries.size > 0) {
+    return new Set(protection.entries.keys())
+  }
+  return protection?.paths
+}
+
+// A workspace-scoped entries replace can race a just-created note the same
+// way a full reload can (see reconcileReloadedEntries in useVaultLoader.ts):
+// the disk scan that produced `loadedEntries` can predate a note that was
+// optimistically added to `entries` in the meantime. Re-append any protected
+// path `loadedEntries` does not already account for.
+//
+// Restore from `protectedEntries` first, then from `droppedEntries`. The
+// load-reset path can empty `entries` before the stale scan resolves, so
+// relying only on dropped current-state rows leaves nothing to put back.
+// A genuinely deleted note is unaffected: removeEntry also drops its path
+// from the tracked set, so it stops being protected.
+function preserveMissingProtectedEntries(
+  droppedEntries: VaultEntry[],
+  loadedEntries: VaultEntry[],
+  fallbackVaultPath: string,
+  protection?: ProtectedWorkspaceEntries,
+): VaultEntry[] {
+  const protectedPaths = protectedPathSet(protection)
+  if (!protectedPaths || protectedPaths.size === 0) return loadedEntries
+
+  const loadedPaths = new Set(loadedEntries.map((entry) => entry.path))
+  const droppedByPath = new Map(droppedEntries.map((entry) => [entry.path, entry]))
+  const replacedWorkspaces = new Set([
+    ...droppedEntries.map((entry) => entryWorkspacePath(entry, fallbackVaultPath)),
+    ...loadedWorkspacePathsFromEntries(loadedEntries, fallbackVaultPath),
+  ])
+  const missingProtected: VaultEntry[] = []
+  for (const path of protectedPaths) {
+    if (loadedPaths.has(path)) continue
+    const restored = droppedByPath.get(path) ?? protection?.entries?.get(path)
+    if (!restored) continue
+    // A protected note in another workspace is already in `keptEntries`.
+    // Putting it into this snapshot again duplicated it when Cmd+N landed
+    // in workspace B while workspace A was the scan that just resolved.
+    if (!replacedWorkspaces.has(entryWorkspacePath(restored, fallbackVaultPath))) continue
+    missingProtected.push(restored)
+  }
+  return missingProtected.length === 0 ? loadedEntries : [...missingProtected, ...loadedEntries]
+}
+
 export function replaceWorkspaceEntries({
   defaultWorkspacePath,
   entries,
   fallbackVaultPath,
   loadedEntries,
   loadedWorkspacePath,
+  protectedPaths,
+  protectedEntries,
   vaults,
 }: {
   defaultWorkspacePath?: string | null
@@ -138,13 +192,20 @@ export function replaceWorkspaceEntries({
   fallbackVaultPath: string
   loadedEntries: VaultEntry[]
   loadedWorkspacePath: string
+  protectedPaths?: Set<string>
+  protectedEntries?: Map<string, VaultEntry>
   vaults?: VaultOption[]
 }): VaultEntry[] {
+  const keptEntries = entries.filter((entry) => entryWorkspacePath(entry, fallbackVaultPath) !== loadedWorkspacePath)
+  const droppedEntries = entries.filter((entry) => entryWorkspacePath(entry, fallbackVaultPath) === loadedWorkspacePath)
   return retagEntriesForWorkspaceMetadata({
     defaultWorkspacePath,
     entries: [
-      ...entries.filter((entry) => entryWorkspacePath(entry, fallbackVaultPath) !== loadedWorkspacePath),
-      ...loadedEntries,
+      ...keptEntries,
+      ...preserveMissingProtectedEntries(droppedEntries, loadedEntries, fallbackVaultPath, {
+        paths: protectedPaths,
+        entries: protectedEntries,
+      }),
     ],
     fallbackVaultPath,
     vaults,
@@ -156,20 +217,29 @@ export function replaceLoadedWorkspaceEntries({
   entries,
   fallbackVaultPath,
   loadedEntries,
+  protectedPaths,
+  protectedEntries,
   vaults,
 }: {
   defaultWorkspacePath?: string | null
   entries: VaultEntry[]
   fallbackVaultPath: string
   loadedEntries: VaultEntry[]
+  protectedPaths?: Set<string>
+  protectedEntries?: Map<string, VaultEntry>
   vaults?: VaultOption[]
 }): VaultEntry[] {
   const loadedPathSet = new Set(loadedWorkspacePathsFromEntries(loadedEntries, fallbackVaultPath))
+  const keptEntries = entries.filter((entry) => !loadedPathSet.has(entryWorkspacePath(entry, fallbackVaultPath)))
+  const droppedEntries = entries.filter((entry) => loadedPathSet.has(entryWorkspacePath(entry, fallbackVaultPath)))
   return retagEntriesForWorkspaceMetadata({
     defaultWorkspacePath,
     entries: [
-      ...entries.filter((entry) => !loadedPathSet.has(entryWorkspacePath(entry, fallbackVaultPath))),
-      ...loadedEntries,
+      ...keptEntries,
+      ...preserveMissingProtectedEntries(droppedEntries, loadedEntries, fallbackVaultPath, {
+        paths: protectedPaths,
+        entries: protectedEntries,
+      }),
     ],
     fallbackVaultPath,
     vaults,

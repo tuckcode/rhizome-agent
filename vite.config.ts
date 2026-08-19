@@ -439,8 +439,12 @@ function parseMarkdownFile(filePath: string): VaultEntry | null {
       archived: frontmatterBool(fm, 'archived') ?? false,
       trashed: frontmatterBool(fm, 'trashed') ?? false,
       trashedAt: null,
-      modifiedAt: stats.mtimeMs,
-      createdAt: stats.birthtimeMs,
+      // VaultEntry timestamps are unix seconds (matches Tauri/Rust). Node's
+      // mtimeMs/birthtimeMs are milliseconds — emitting them raw makes every
+      // fixture note sort as year ~58k, so a just-created note (correct seconds)
+      // sinks to the bottom of the Virtuoso list and looks "missing" (C29).
+      modifiedAt: Math.floor(stats.mtimeMs / 1000),
+      createdAt: Math.floor(stats.birthtimeMs / 1000),
       fileSize: stats.size,
       snippet,
       wordCount: bodyText.split(/\s+/).filter(Boolean).length,

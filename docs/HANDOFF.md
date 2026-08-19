@@ -27,6 +27,58 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Session handoff — 2026-08-16g (Grok 4.6: C29 Cmd+N note list)
+
+**If you are not Claude, read `docs/CROSS-MODEL-HANDOFF.md` first.** Then this entry.
+
+**State:** C29 shipped and pushed; tree clean, all gates green. No Rust changed.
+`stash@{0}` ("C29 partial") is superseded by this commit and safe to drop --
+left in place deliberately so a human decides, not an agent.
+
+Independently re-verified 2026-08-19 (Claude Opus 5) before the push: the
+18/18 claim below reproduces. One environment trap on the way -- Playwright
+had been updated without its browser binary, so the whole spec failed 18/18
+with `Executable doesn't exist ... chrome-headless-shell` and looked exactly
+like a total C29 regression. It is not one. Run `pnpm exec playwright install
+chromium` and re-run before believing a uniform smoke failure.
+
+**C29 is RESOLVED.** `tests/smoke/fix-crash-create-note.spec.ts` went
+**18/18** across 6 consecutive isolated runs with `--retries=0` (Cmd+N,
+type-section +, command palette). Unit coverage: 101 vault-loader tests.
+
+The stashed "protected paths" lead was right about the stale scan, and
+incomplete in two ways that kept the ~33% flake after the first attempt:
+
+1. **Load-reset cleared the protection set.** `resetInitialVaultLoadState`
+   called `tracker.clear()` on every vaults-arrived effect re-run, so the
+   reconcile step had no paths left to keep. It now skips that clear when
+   workspace entries are being preserved.
+2. **Restore only looked at current `entries`.** If a reset emptied the
+   list first, there was no dropped row to put back. `addEntry` now stores
+   the optimistic `VaultEntry` in a ref; reconcile restores from that map
+   when the stale snapshot is missing the path. Restore is scoped to the
+   workspace being replaced so a note in workspace B is not duplicated
+   when workspace A's scan resolves.
+
+A third, smoke-only, trap: Vite fixture timestamps were `mtimeMs` (ms).
+Inbox sorts `createdAt` desc, so fixture notes landed in year ~58595 and
+a correctly-seconded new note sank off the Virtuoso viewport — the list
+looked unchanged even when the entry was present. `vite.config.ts` and
+`scripts/serve-demo.mjs` now emit unix seconds, matching Tauri.
+
+**Do not drop the `@smoke` tag or widen the wait.** The spec was right.
+
+### Ranked pickup for the next model
+
+1. **C12 — rotate the exposed GitHub PAT.** Security; needs a human.
+2. **#13 / #14** — menu bar dropdown, schedules + heartbeats.
+3. **#21** stays blocked until Prime supplies skill argument hints.
+4. Drop `stash@{0} "C29 partial"` — superseded.
+
+Detail: `docs/plans/2026-08-16-c29-note-list-session-status.md`.
+
+---
+
 ## Session handoff — 2026-08-16f (docs handoff close-out; next model picks up C29)
 
 **If you are not Claude, read `docs/CROSS-MODEL-HANDOFF.md` first** — especially
@@ -1493,23 +1545,7 @@ Note what this implies about the record: sessions in this window that report "al
   dropping the `@smoke` tag — that removes the coverage instead of the
   flake.
 
-- **C29-OPEN: after `Cmd+N`, the note list does not refresh — the new note never appears in it.** Found 2026-08-16 while fixing C28, in `tests/smoke/fix-crash-create-note.spec.ts:114`. **This is a product bug, not test flake**, and it is now the dominant source of flakiness in the smoke lane (~30-40% of isolated runs).
-
-  **Why it is not a timeout problem.** Instrumented with timing logs: when it passes, the note appears in the list in ~180ms. When it fails, it **never** appears — raising the timeout to 30s does not help. The editor opens with the new note correctly; the left-hand note list stays at the old count and contents. That is a stuck state, not a slow one.
-
-  Root cause is somewhere in the list-refresh path after note creation in `src/` — deliberately not chased, because the agent that found it was scoped to `tests/` only. Start there rather than in the spec: the spec is asserting the right thing.
-
-  **Do not "fix" this by widening the wait or dropping the `@smoke` tag.** A user hitting Cmd+N and not seeing their note in the list is the actual defect the test is catching.
-
-  **Root cause, found 2026-08-16 but NOT yet fixed — start here.** An initial or background vault scan can still be reading disk when `Cmd+N` optimistically adds the new note to the workspace. When that scan resolves *afterward*, `replaceLoadedWorkspaceEntries` overwrites the list with the scan's **pre-create snapshot**, silently wiping the new note back out. That is why it is a stuck state and not a slow one — nothing ever re-adds it. Relevant path: `loadInitialVaultEntriesState` in `src/hooks/useVaultLoader.ts`, plus `src/hooks/vaultWorkspaceEntries.ts`.
-
-  The fix direction that was in progress: track optimistically-created paths in a ref and have the reconcile step refuse to drop a path the user just created. **That work is unfinished and was NOT committed** — the agent writing it hit a session limit mid-task, leaving `console.debug('[C29-DEBUG]')` instrumentation in the tree. It was stashed rather than shipped:
-
-  ```
-  git stash list          # "C29 partial (debug logs, unverified)"
-  ```
-
-  Treat the stash as a lead, not a solution: it was never verified against the ~30-40% intermittency, and it needs its debug logging stripped. Re-verify with at least 6 consecutive runs of `tests/smoke/fix-crash-create-note.spec.ts` before believing it.
+- **C29-RESOLVED (2026-08-16g): after `Cmd+N`, the note list did not refresh.** A stale vault scan (or a load-reset that cleared the just-created protection set) overwrote `entries` with a pre-create snapshot. Fixed by keeping the optimistic `VaultEntry` in a ref, refusing to drop that path on reconcile, and not clearing the protection set when a load reset is preserving workspace entries. Vite fixture timestamps were also converted to unix seconds so a new note is not sorted off-screen behind year-58595 fixture dates. Verified: 18/18 on `fix-crash-create-note.spec.ts` × 6, `--retries=0`.
 
 
 - **C30-OPEN: `window.__tolariaFrontendReady` branding residue survived the C21 rename sweep.** Found 2026-08-16 while closing out the harness-surface session. Live sites: `src/utils/frontendReady.ts` (sets/reads the flag), `src/components/FrontendReadyMarker.tsx`, `src/main.tsx`, `src/main.test.ts`, `src/utils/frontendReady.test.ts`, and — load-bearing for CI — `tests/smoke/helpers.ts` waits on `window.__tolariaFrontendReady === true` before driving the app. **Correctly used today**; low priority to rename. The point of the number is that noting a residue without tracking it is what C21 existed to stop. When renamed, treat it like other window/localStorage renames: update the ambient `Window` typing, every reader/writer, smoke helpers, and tests in one commit; run `npx tsc --noEmit` and `pnpm playwright:smoke` because the smoke lane is a real consumer. Do not leave a dual-name fallback unless a released build is known to depend on the old flag across an upgrade boundary (smoke runs against the build under test, so a hard rename is usually enough).
