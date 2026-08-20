@@ -1626,6 +1626,18 @@ Note what this implies about the record: sessions in this window that report "al
 
 ## Open threads
 
+- **C34-OPEN: the menu-bar roster's activity labels are not localized.** Every
+  string `activityLabelFor` returns (`src/lib/primeRunningSessions.ts`) is an
+  English literal in the module — "Compacting", "Running a command", "Running
+  tools", "Replying", "Working", "Waiting on subagents", "Waiting on a
+  heartbeat", and now "Waiting for you". None are in `src/lib/locales/en.json`,
+  so `pnpm l10n:translate` has never seen them and the popover stays English in
+  every locale. Pre-existing — the labels shipped this way with #13 on
+  2026-08-19 — and logged here rather than fixed in passing because moving all
+  eight into the locale file is its own change with its own translation run.
+  Whoever does it should check the rest of `MenuBarCompanionApp.tsx` at the same
+  time.
+
 - ~~C4-OPEN: tolaria MCP server path mismatch across live configs~~ **RESOLVED `2fa620a5`**
 - ~~C6-OPEN: inbox automation default~~ **RESOLVED 2026-07-31.** Default ON for new vaults, plus a one-time per-vault migration for existing ones. See "Investigation done" item 1 above.
 - C7-OPEN: native QA for shell waves — requires a real `.app` bundle or Accessibility permission. Do not graduate shell flags without it.
