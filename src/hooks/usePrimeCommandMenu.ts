@@ -1,15 +1,11 @@
 import { useEffect, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
-import { isTauri, mockInvoke } from '../mock-tauri'
+import { callHost } from '../lib/callHost'
 import {
   buildCommandMenu,
   type CommandMenuEntry,
   type PrimeReportedCommand,
 } from '../lib/primeCommandMenu'
 
-function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-  return isTauri() ? invoke<T>(command, args) : mockInvoke<T>(command, args)
-}
 
 const PROTOCOL_ONLY = buildCommandMenu([])
 
@@ -26,7 +22,7 @@ export function usePrimeCommandMenu(enabled: boolean, sessionId: string | null):
     if (!enabled) return
 
     let cancelled = false
-    void call<PrimeReportedCommand[]>('get_prime_commands')
+    void callHost<PrimeReportedCommand[]>('get_prime_commands')
       .then((commands) => {
         if (!cancelled) setEntries(buildCommandMenu(commands))
       })

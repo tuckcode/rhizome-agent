@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { callHost } from '../lib/callHost'
 import { CaretDown } from '@phosphor-icons/react'
 import {
   DropdownMenu,
@@ -13,13 +14,7 @@ import { createTranslator, type AppLocale } from '../lib/i18n'
 import { groupModelsByProvider, type PrimeModel } from '../lib/primeModels'
 import { modelThinkingLabel, thinkingLevelLabel } from '../lib/primeThinkingLevels'
 import { trackPrimeModelChanged, trackPrimeThinkingLevelChanged } from '../lib/productAnalytics'
-import { isTauri, mockInvoke } from '../mock-tauri'
-import { invoke } from '@tauri-apps/api/core'
 
-async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  if (isTauri()) return invoke<T>(cmd, args)
-  return mockInvoke<T>(cmd, args)
-}
 
 interface PrimeModelPickerProps {
   locale?: AppLocale
@@ -72,14 +67,14 @@ export function PrimeModelPicker({
       let failure: string | null = null
       try {
         if (vaultPath) {
-          await call('ensure_prime_session_host', { vaultPath })
+          await callHost('ensure_prime_session_host', { vaultPath })
         }
-        listed = await call<PrimeModel[]>('get_available_prime_models')
+        listed = await callHost<PrimeModel[]>('get_available_prime_models')
         // The level list comes from the host too (#9: nothing hardcoded).
         // Its own failure must not blank the model list, which is the larger
         // half of this menu.
         try {
-          const listedLevels = await call<string[]>('get_prime_thinking_levels')
+          const listedLevels = await callHost<string[]>('get_prime_thinking_levels')
           if (!cancelled) setLevels(Array.isArray(listedLevels) ? listedLevels : [])
         } catch {
           if (!cancelled) setLevels([])
@@ -102,9 +97,9 @@ export function PrimeModelPicker({
     async (model: PrimeModel) => {
       try {
         if (vaultPath) {
-          await call('ensure_prime_session_host', { vaultPath })
+          await callHost('ensure_prime_session_host', { vaultPath })
         }
-        await call('set_prime_model', { provider: model.provider, modelId: model.id })
+        await callHost('set_prime_model', { provider: model.provider, modelId: model.id })
         trackPrimeModelChanged(model.provider)
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
@@ -117,9 +112,9 @@ export function PrimeModelPicker({
     async (level: string) => {
       try {
         if (vaultPath) {
-          await call('ensure_prime_session_host', { vaultPath })
+          await callHost('ensure_prime_session_host', { vaultPath })
         }
-        await call('set_prime_thinking_level', { level })
+        await callHost('set_prime_thinking_level', { level })
         trackPrimeThinkingLevelChanged(level)
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))

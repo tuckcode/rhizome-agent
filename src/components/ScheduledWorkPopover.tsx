@@ -1,17 +1,12 @@
 import { useCallback, useState } from 'react'
+import { callHost } from '../lib/callHost'
 import { CaretDown, Pause, Play, X } from '@phosphor-icons/react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { createTranslator, type AppLocale } from '../lib/i18n'
-import { isTauri, mockInvoke } from '../mock-tauri'
-import { invoke } from '@tauri-apps/api/core'
 import { trackPrimeScheduledWorkAction } from '../lib/productAnalytics'
 import { scheduledWorkNextRun, type PrimeScheduledWork } from '../lib/primeScheduledWork'
 
-async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  if (isTauri()) return invoke<T>(cmd, args)
-  return mockInvoke<T>(cmd, args)
-}
 
 /**
  * The list behind a band entry: every scheduled prompt, individually, with the
@@ -53,9 +48,9 @@ export function ScheduledWorkPopover({
       setError(null)
       try {
         if (action === 'cancel') {
-          await call('cancel_prime_scheduled_work', { jobId: item.id })
+          await callHost('cancel_prime_scheduled_work', { jobId: item.id })
         } else {
-          await call('manage_prime_heartbeat', { jobId: item.id, action })
+          await callHost('manage_prime_heartbeat', { jobId: item.id, action })
         }
         trackPrimeScheduledWorkAction(action, item.source ?? 'unknown')
         onChanged()

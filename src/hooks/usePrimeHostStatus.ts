@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
-import { isTauri, mockInvoke } from '../mock-tauri'
+import { callHost } from '../lib/callHost'
 
 /**
  * Why Prime is unreachable, when it is.
@@ -57,9 +56,6 @@ const EMPTY: PrimeHostStatus = {
   problem: null,
 }
 
-function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-  return isTauri() ? invoke<T>(command, args) : mockInvoke<T>(command, args)
-}
 
 /**
  * Lightweight poll of the long-lived Prime RPC host status (model name, running).
@@ -73,7 +69,7 @@ export function usePrimeHostStatus(enabled = true, vaultPath?: string): PrimeHos
 
     let cancelled = false
     const refresh = () => {
-      void call<PrimeHostStatus>('get_prime_session_host_status')
+      void callHost<PrimeHostStatus>('get_prime_session_host_status')
         .then((next) => {
           if (!cancelled) setStatus(next)
         })
@@ -85,7 +81,7 @@ export function usePrimeHostStatus(enabled = true, vaultPath?: string): PrimeHos
     const start = async () => {
       if (vaultPath) {
         try {
-          await call('ensure_prime_session_host', { vaultPath })
+          await callHost('ensure_prime_session_host', { vaultPath })
         } catch {
           // Status poll still runs — chip shows not-running instead of hanging.
         }

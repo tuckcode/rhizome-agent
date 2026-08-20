@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
-import { isTauri, mockInvoke } from '../mock-tauri'
+import { callHost } from '../lib/callHost'
 
 /**
  * Token / cost / context-window snapshot for the live Prime session.
@@ -23,9 +22,6 @@ export interface PrimeSessionStats {
 
 const EMPTY: PrimeSessionStats = {}
 
-function call<T>(command: string): Promise<T> {
-  return isTauri() ? invoke<T>(command) : mockInvoke<T>(command)
-}
 
 /** Compact token count: 669_500 -> "669.5k", 1_000_000 -> "1.0M". */
 export function formatTokenCount(tokens: number | null | undefined): string | null {
@@ -83,7 +79,7 @@ export function usePrimeSessionStats(enabled = true, refreshKey?: unknown): Prim
   const [stats, setStats] = useState<PrimeSessionStats>(EMPTY)
 
   const refresh = useCallback(() => {
-    void call<PrimeSessionStats>('get_prime_session_stats')
+    void callHost<PrimeSessionStats>('get_prime_session_stats')
       .then((next) => setStats(next ?? EMPTY))
       // No host, or Prime too old for the command — show nothing rather than
       // a stale meter from a previous session.
