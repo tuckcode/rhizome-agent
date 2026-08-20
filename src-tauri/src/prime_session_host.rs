@@ -814,6 +814,14 @@ pub fn set_thinking_level(level: &str) -> Result<(), String> {
         if response["success"].as_bool() != Some(true) {
             return Err(response_error(&response, "set_thinking_level"));
         }
+        // Refresh the cached state, exactly as `set_model` does. `get_status`
+        // -- what the strip polls every 4s -- reads that cache and does not
+        // re-issue `get_state` itself, so without this the strip keeps showing
+        // the level the user just changed away from until something unrelated
+        // happens to refresh it. #9 requires the strip to reflect the change
+        // immediately, and a control whose label does not move reads as one
+        // that did not work.
+        host.refresh_session_id()?;
         Ok(())
     })
 }
@@ -4164,6 +4172,54 @@ mod tests {
 
         set_thinking_level("high").unwrap();
         assert_eq!(sent.lock().unwrap().clone().as_deref(), Some("high"));
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn setting_a_level_updates_what_the_strip_will_read() {
+        // The strip polls `get_status`, which reads a cache rather than asking
+        // the daemon. Setting a level must refresh that cache or the label
+        // never moves -- which reads as a broken control, not a slow one.
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let level: Arc<Mutex<String>> = Arc::new(Mutex::new("off".to_string()));
+        let daemon = {
+            let level = Arc::clone(&level);
+            FakeDaemon::start(move |command, id| match command["type"].as_str() {
+                Some("set_thinking_level") => {
+                    *level.lock().unwrap() =
+                        command["level"].as_str().unwrap_or_default().to_string();
+                    Some(vec![ok(id, "set_thinking_level", serde_json::Value::Null)])
+                }
+                Some("get_state") => {
+                    let current = level.lock().unwrap().clone();
+                    Some(vec![ok(
+                        id,
+                        "get_state",
+                        serde_json::json!({
+                            "sessionId": "sess-a",
+                            "isStreaming": false,
+                            "thinkingLevel": current,
+                            "model": { "provider": "xai", "id": "grok-4.5", "name": "Grok 4.5" }
+                        }),
+                    )])
+                }
+                _ => None,
+            })
+        };
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+        assert_eq!(get_status().thinking_level.as_deref(), Some("off"));
+
+        set_thinking_level("high").unwrap();
+
+        assert_eq!(
+            get_status().thinking_level.as_deref(),
+            Some("high"),
+            "the strip polls this cache; without a refresh it shows the old level",
+        );
 
         let _ = shutdown_host();
     }
