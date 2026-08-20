@@ -393,6 +393,25 @@ pub fn get_prime_thinking_levels() -> Vec<String> {
         .collect()
 }
 
+/// Pause, resume, or stop one heartbeat (#14).
+///
+/// Only heartbeats accept this. The daemon has no `cron_pause`, so a plain
+/// schedule can be cancelled but never paused — the UI must not offer it.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn manage_prime_heartbeat(job_id: String, action: String) -> Result<(), String> {
+    crate::prime_session_host::manage_heartbeat(&job_id, &action)
+}
+
+/// Cancel a scheduled prompt — heartbeat or plain schedule (#14).
+///
+/// Irreversible: the job is removed, not paused.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn cancel_prime_scheduled_work(job_id: String) -> Result<(), String> {
+    crate::prime_session_host::cancel_scheduled_work(&job_id)
+}
+
 /// Every Prime session the daemon is hosting, for the menu-bar roster (#13).
 ///
 /// Standalone one-shot query — deliberately not routed through the attached

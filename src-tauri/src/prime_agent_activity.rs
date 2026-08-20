@@ -61,10 +61,20 @@ pub struct PrimeGoalState {
 
 /// A recurring internal prompt the agent scheduled for itself.
 ///
-/// Field names are read defensively: no live heartbeat existed while this was
-/// written (`list_heartbeats` returned `[]`), so the item shape is inferred
-/// from the `rlm-heartbeat` skill's API rather than observed. Anything missing
-/// simply does not render.
+/// **Shape observed live against prime-agent 0.7.4**, replacing the earlier
+/// inferred one. The previous version guessed from the `rlm-heartbeat` skill's
+/// API because no live heartbeat existed to look at, and it guessed wrong in
+/// two ways that made it silently useless:
+///
+/// - `heartbeats_list` returns `data.heartbeats[]` where **each item wraps the
+///   job in a `job` envelope** (`{"job": {...}}`), so reading `id`/`status` at
+///   the top level yielded `None` for every field of every heartbeat.
+/// - `schedule` is an **object** (`{kind, expression, intervalMs}`), not a
+///   string, so the old `interval` lookup never matched anything.
+///
+/// `cron_list` returns `data.jobs[]` containing **both** kinds, tagged by
+/// `source` (`"cron"` | `"heartbeat"` | `"rlm_heartbeat"`), which is what makes
+/// the two distinguishable in the UI (#14) — and why one call now replaces two.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrimeScheduledWork {
@@ -72,10 +82,31 @@ pub struct PrimeScheduledWork {
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
+    /// Human-readable cadence, from `schedule.expression`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interval: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
+    /// `cron` | `heartbeat` | `rlm_heartbeat` — what kind of work this is.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    /// ISO-8601 next fire time, so the UI can say when rather than only what.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_run_at: Option<String>,
+}
+
+impl PrimeScheduledWork {
+    /// True when this entry is a heartbeat rather than a plain schedule.
+    ///
+    /// Heartbeats can be paused/resumed (`heartbeat_manage`); plain cron jobs
+    /// can only be cancelled (`cron_cancel`). The daemon offers no
+    /// `cron_pause`, so the UI must not present pause on a schedule.
+    pub fn is_heartbeat(&self) -> bool {
+        matches!(
+            self.source.as_deref(),
+            Some("heartbeat") | Some("rlm_heartbeat")
+        )
+    }
 }
 
 /// Everything the band shows, in one payload.
@@ -129,18 +160,47 @@ pub fn scheduled_work_from_response(
 ) -> Vec<PrimeScheduledWork> {
     keys.iter()
         .find_map(|key| data.get(*key).and_then(|value| value.as_array()))
-        .map(|items| {
-            items
-                .iter()
-                .map(|item| PrimeScheduledWork {
-                    id: first_string(item, &["id", "jobId", "job_id"]),
-                    label: first_string(item, &["label", "name", "prompt", "description"]),
-                    interval: first_string(item, &["interval", "every", "schedule", "cron"]),
-                    status: first_string(item, &["status", "state"]),
-                })
-                .collect()
-        })
+        .map(|items| items.iter().map(scheduled_work_from_item).collect())
         .unwrap_or_default()
+}
+
+/// One entry, from either list shape.
+///
+/// `heartbeats_list` wraps the job in a `job` envelope and `cron_list` does
+/// not, so unwrap first and read one shape afterwards. Reading through the
+/// envelope is what the previous version failed to do.
+fn scheduled_work_from_item(item: &serde_json::Value) -> PrimeScheduledWork {
+    let job = item
+        .get("job")
+        .filter(|job| job.is_object())
+        .unwrap_or(item);
+    PrimeScheduledWork {
+        id: first_string(job, &["id", "jobId", "job_id"]),
+        label: first_string(job, &["label", "name", "prompt", "description"]),
+        // `schedule` is an object; its `expression` is the human-readable
+        // cadence ("every 30 minutes", "0 9 * * 1-5"). The flat keys stay as a
+        // fallback for any shape that does send a bare string.
+        interval: job
+            .get("schedule")
+            .and_then(|schedule| first_string(schedule, &["expression", "cron", "every"]))
+            .or_else(|| first_string(job, &["interval", "every", "cron"])),
+        status: first_string(job, &["status", "state"]),
+        source: first_string(job, &["source"]),
+        next_run_at: first_string(job, &["nextRunAt", "next_run_at"]),
+    }
+}
+
+/// Split one `cron_list` response into heartbeats and plain schedules.
+///
+/// `cron_list` returns both kinds in `data.jobs`, tagged by `source`. Calling
+/// `heartbeats_list` as well returns the same heartbeats a second time in a
+/// different envelope, so this replaces two round-trips with one and removes
+/// the duplication that produced.
+pub fn split_scheduled_work(
+    data: &serde_json::Value,
+) -> (Vec<PrimeScheduledWork>, Vec<PrimeScheduledWork>) {
+    let all = scheduled_work_from_response(data, &["jobs", "schedules"]);
+    all.into_iter().partition(PrimeScheduledWork::is_heartbeat)
 }
 
 fn first_string(value: &serde_json::Value, keys: &[&str]) -> Option<String> {
@@ -279,5 +339,142 @@ mod tests {
 
         assert_eq!(work.len(), 1);
         assert_eq!(work[0].label, None);
+    }
+
+    // ── Real shapes, captured from prime-agent 0.7.4 (#14) ──────────────────
+    //
+    // These fixtures are copied from an actual daemon response after creating
+    // a real cron job and a real heartbeat, not inferred from a skill's docs.
+    // The previous inferred shape parsed every heartbeat field to None.
+
+    fn cron_list_data() -> serde_json::Value {
+        serde_json::json!({
+            "jobs": [
+                {
+                    "id": "8a44b0c4-7835-4e00-814a-45cc362c9877",
+                    "status": "active",
+                    "source": "heartbeat",
+                    "runtimeKind": "top-level",
+                    "deliveryMode": "steer",
+                    "activeSessionId": "a802e69a4df7",
+                    "cwd": "/Users/dtc",
+                    "prompt": "RHIZOME PROBE heartbeat - safe to delete",
+                    "schedule": { "kind": "interval", "expression": "every 30 minutes", "intervalMs": 1800000 },
+                    "nextRunAt": "2026-08-20T04:24:19.124Z",
+                    "runCount": 0
+                },
+                {
+                    "id": "f064de6d-ea7a-41fe-ba49-cef987d8f258",
+                    "status": "active",
+                    "source": "cron",
+                    "runtimeKind": "top-level",
+                    "activeSessionId": "a802e69a4df7",
+                    "cwd": "/Users/dtc",
+                    "prompt": "RHIZOME PROBE - safe to delete",
+                    "schedule": { "kind": "cron", "expression": "0 9 * * 1-5" },
+                    "nextRunAt": "2026-08-20T14:00:00.000Z",
+                    "runCount": 0
+                }
+            ]
+        })
+    }
+
+    /// `heartbeats_list` wraps each job in an envelope; `cron_list` does not.
+    fn heartbeats_list_data() -> serde_json::Value {
+        serde_json::json!({
+            "heartbeats": [
+                { "job": {
+                    "id": "8a44b0c4-7835-4e00-814a-45cc362c9877",
+                    "status": "active",
+                    "source": "heartbeat",
+                    "prompt": "RHIZOME PROBE heartbeat - safe to delete",
+                    "schedule": { "kind": "interval", "expression": "every 30 minutes", "intervalMs": 1800000 },
+                    "nextRunAt": "2026-08-20T04:24:19.124Z"
+                } }
+            ]
+        })
+    }
+
+    #[test]
+    fn reads_the_cadence_out_of_the_schedule_object() {
+        // `schedule` is an object. The old parser looked for a *string* under
+        // that key, so `interval` was None for every entry ever listed.
+        let work = scheduled_work_from_response(&cron_list_data(), &["jobs"]);
+        assert_eq!(work[0].interval.as_deref(), Some("every 30 minutes"));
+        assert_eq!(work[1].interval.as_deref(), Some("0 9 * * 1-5"));
+    }
+
+    #[test]
+    fn reads_a_heartbeat_through_its_job_envelope() {
+        // Every field of every heartbeat parsed to None before this.
+        let work = scheduled_work_from_response(&heartbeats_list_data(), &["heartbeats"]);
+        assert_eq!(work.len(), 1);
+        assert_eq!(
+            work[0].id.as_deref(),
+            Some("8a44b0c4-7835-4e00-814a-45cc362c9877")
+        );
+        assert_eq!(work[0].status.as_deref(), Some("active"));
+        assert_eq!(work[0].interval.as_deref(), Some("every 30 minutes"));
+        assert!(work[0].is_heartbeat());
+    }
+
+    #[test]
+    fn splits_one_cron_list_into_heartbeats_and_schedules() {
+        let (heartbeats, schedules) = split_scheduled_work(&cron_list_data());
+        assert_eq!(
+            heartbeats.len(),
+            1,
+            "source=heartbeat belongs to heartbeats"
+        );
+        assert_eq!(schedules.len(), 1, "source=cron belongs to schedules");
+        assert_eq!(
+            heartbeats[0].label.as_deref(),
+            Some("RHIZOME PROBE heartbeat - safe to delete")
+        );
+        assert_eq!(schedules[0].interval.as_deref(), Some("0 9 * * 1-5"));
+    }
+
+    #[test]
+    fn a_heartbeat_never_appears_in_both_lists() {
+        // cron_list carries both kinds. Listing heartbeats separately as well
+        // showed each one twice -- once broken, once not.
+        let (heartbeats, schedules) = split_scheduled_work(&cron_list_data());
+        for h in &heartbeats {
+            assert!(
+                !schedules.iter().any(|s| s.id == h.id),
+                "duplicated: {:?}",
+                h.id
+            );
+        }
+    }
+
+    #[test]
+    fn rlm_heartbeats_count_as_heartbeats() {
+        let data = serde_json::json!({ "jobs": [
+            { "id": "x", "source": "rlm_heartbeat", "schedule": { "expression": "every 5 minutes" } }
+        ]});
+        let (heartbeats, schedules) = split_scheduled_work(&data);
+        assert_eq!(heartbeats.len(), 1);
+        assert!(schedules.is_empty());
+    }
+
+    #[test]
+    fn an_untagged_job_is_treated_as_a_schedule_not_a_heartbeat() {
+        // Fail safe: without `source` we must not offer pause on something the
+        // daemon has no way to pause.
+        let data = serde_json::json!({ "jobs": [{ "id": "x", "status": "active" }] });
+        let (heartbeats, schedules) = split_scheduled_work(&data);
+        assert!(heartbeats.is_empty());
+        assert_eq!(schedules.len(), 1);
+        assert!(!schedules[0].is_heartbeat());
+    }
+
+    #[test]
+    fn keeps_the_next_fire_time() {
+        let work = scheduled_work_from_response(&cron_list_data(), &["jobs"]);
+        assert_eq!(
+            work[0].next_run_at.as_deref(),
+            Some("2026-08-20T04:24:19.124Z")
+        );
     }
 }
