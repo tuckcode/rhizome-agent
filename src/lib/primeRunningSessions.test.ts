@@ -255,3 +255,101 @@ describe('toRunningSessionRows', () => {
     expect(runningSessionOverflow(many, 5)).toBe(2)
   })
 })
+
+/**
+ * Probed live against 0.7.4 on 2026-08-20: `firstMessage` is the *composed*
+ * prompt Rhizome sends, so every Rhizome session's first message begins
+ * "System instructions: You are working inside Rhizome…". Titled from it raw,
+ * every row in the popover reads the same sentence.
+ *
+ * `prime_sessions.rs` already fixed exactly this for the history list (C26).
+ * The roster is the second surface with the same input and never got the fix.
+ */
+describe('a roster title is the user’s words, not the system block', () => {
+  const composed =
+    'System instructions:\nYou are working inside Rhizome, a local-first Markdown ' +
+    'knowledge base.\n\nUser request:\nhow do I link two notes?'
+
+  it('strips the composed prompt down to what the user typed', () => {
+    expect(rosterSessionTitle({ activeSessionId: 'a', firstMessage: composed })).toBe(
+      'how do I link two notes?',
+    )
+  })
+
+  it('leaves a plain first message alone', () => {
+    expect(
+      rosterSessionTitle({ activeSessionId: 'a', firstMessage: 'just a question' }),
+    ).toBe('just a question')
+  })
+
+  it('keeps two sessions distinguishable when both were composed', () => {
+    const rows = toRunningSessionRows([
+      {
+        activeSessionId: 'one',
+        activity: 'working',
+        firstMessage: `${composed}`,
+      },
+      {
+        activeSessionId: 'two',
+        activity: 'working',
+        firstMessage:
+          'System instructions:\nYou are working inside Rhizome, a local-first Markdown ' +
+          'knowledge base.\n\nUser request:\nsummarise today’s notes',
+      },
+    ])
+    expect(rows.map((row) => row.title)).toEqual([
+      'how do I link two notes?',
+      'summarise today’s notes',
+    ])
+  })
+})
+
+/**
+ * `taskState` is sent by 0.7.4 (values `needs_input` and `completed`) and was
+ * absent from this module's interface, so a session sitting waiting for the
+ * user fell through every branch and rendered as "Working" — the one thing it
+ * is not doing.
+ */
+describe('a session waiting on the user does not claim to be working', () => {
+  it('says it is waiting rather than working', () => {
+    const rows = toRunningSessionRows([
+      {
+        activeSessionId: 'waiting',
+        // Counted as running because the session is held open, but the agent
+        // is not turning: no stream, no tools, no compaction, no children.
+        // This is the case that fell through every branch to "Working".
+        isSessionActive: true,
+        activity: 'idle',
+        taskState: 'needs_input',
+        firstMessage: 'check the deploy',
+      },
+    ])
+    expect(rows[0]?.activityLabel).toBe('Waiting for you')
+  })
+
+  it('prefers the heartbeat explanation, which says more', () => {
+    const rows = toRunningSessionRows([
+      {
+        activeSessionId: 'beating',
+        hasActiveHeartbeat: true,
+        activity: 'idle',
+        taskState: 'needs_input',
+        firstMessage: 'check the deploy',
+      },
+    ])
+    expect(rows[0]?.activityLabel).toBe('Waiting on a heartbeat')
+  })
+
+  it('still reports real work when the agent is turning', () => {
+    const rows = toRunningSessionRows([
+      {
+        activeSessionId: 'busy',
+        activity: 'working',
+        isStreaming: true,
+        taskState: 'needs_input',
+        firstMessage: 'check the deploy',
+      },
+    ])
+    expect(rows[0]?.activityLabel).toBe('Replying')
+  })
+})

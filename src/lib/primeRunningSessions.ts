@@ -51,6 +51,12 @@ export interface PrimeRosterSession {
   attachedClients?: number
   messageCount?: number
   lastActivityAt?: string
+  /**
+   * What the session is waiting on, as Prime computes it: `needs_input` when
+   * the last turn ended on the user, `completed` when the task finished.
+   * Probed live against 0.7.4 — it is absent from `daemon-session-list.d.ts`.
+   */
+  taskState?: 'needs_input' | 'completed'
 }
 
 /** A single row in the menu-bar roster. */
@@ -95,6 +101,37 @@ function sessionHandle(session: PrimeRosterSession): string | undefined {
 }
 
 /**
+ * The markers `cli_agent_runtime::build_prompt` composes a prompt with. Kept
+ * as literals rather than imported because the Rust side owns them and there
+ * is no shared source; `prime_sessions.rs` holds the same pair for the history
+ * list, and `a_title_is_the_users_words_not_the_system_block_in_front_of_them`
+ * is its regression test.
+ */
+const SYSTEM_INSTRUCTIONS_PREFIX = 'System instructions:\n'
+const USER_REQUEST_MARKER = '\n\nUser request:\n'
+
+/**
+ * Recover what the user typed from a composed first message.
+ *
+ * `firstMessage` is the prompt Rhizome *sent*, not the words the user wrote,
+ * so every Rhizome session's begins with the same system block. Titled raw,
+ * every row in the popover reads "System instructions: You are working inside
+ * Rhizome…" and no two rows can be told apart. C26 fixed this for the history
+ * list; the roster is the same input on a second surface.
+ *
+ * **Strip before normalising.** The markers are newline-delimited, so
+ * collapsing whitespace first turns `\n\nUser request:\n` into a single space
+ * and the split silently stops matching — a no-op that still passes its tests.
+ * That exact mistake was made once already in the Rust version.
+ */
+function userWordsFrom(message: string): string {
+  if (!message.startsWith(SYSTEM_INSTRUCTIONS_PREFIX)) return message
+  const marker = message.indexOf(USER_REQUEST_MARKER)
+  if (marker < 0) return message
+  return message.slice(marker + USER_REQUEST_MARKER.length)
+}
+
+/**
  * Whether a roster entry counts as running.
  *
  * Deliberately mirrors Prime's own `classifySessionRosterStatus` — a second,
@@ -122,7 +159,7 @@ export function rosterSessionTitle(
   const named = collapseWhitespace(session.sessionName ?? '')
   if (named) return truncate(named, maxLength)
 
-  const message = collapseWhitespace(session.firstMessage ?? '')
+  const message = collapseWhitespace(userWordsFrom(session.firstMessage ?? ''))
   if (message) return truncate(message, maxLength)
 
   const cwd = collapseWhitespace(session.cwd ?? '').replace(/\/+$/, '')
@@ -181,6 +218,10 @@ function activityLabelFor(session: PrimeRosterSession): string {
   if (session.activity === 'working') return 'Working'
   if (session.hasRunningRlmChildren) return 'Waiting on subagents'
   if (session.hasActiveHeartbeat) return 'Waiting on a heartbeat'
+  // Last, and only once nothing more specific applies: a session held open
+  // with no turn running is waiting on the user, not working. Without this it
+  // fell through to "Working" — the one thing it is definitely not doing.
+  if (session.taskState === 'needs_input') return 'Waiting for you'
   return 'Working'
 }
 
