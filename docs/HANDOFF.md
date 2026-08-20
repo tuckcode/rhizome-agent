@@ -27,6 +27,27 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Session handoff — 2026-08-20b (Claude Opus 5: candidate 3 finished)
+
+**State:** committed locally as `e276738`, **not pushed** — the frontend gates
+have not been run this session (the change is Rust-only). Rust coverage
+**85.29%** (up from 85.12%). Prime **0.7.4**.
+
+**Shipped:** `e276738` — the remaining fifteen envelope sites folded onto
+`PrimeHost::call`. Candidate 3 is **done**; nothing is left of it but the
+deliberate exclusions listed below, which are policy sites and should stay.
+
+Five error-path tests were written first as a safety net (refused model list,
+refused command list, refused compact, successful compact, refused
+auto-compaction toggle). Characterization, not red-green: the refactor changed
+no behaviour, so there was no failing state to start from. **12 of 24 envelope
+sites still have no error-path test** — was 16.
+
+**Next:** candidate 4, revised — one producer for `thinking_level`, detailed
+under "Ranked pickup" below (that list's item 1 is now done).
+
+---
+
 ## Session handoff — 2026-08-20 (Claude Opus 5: architecture review, verified)
 
 **State:** `main` in sync, tree clean, all gates green. Rust coverage **85.12%**
