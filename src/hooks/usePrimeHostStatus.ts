@@ -24,6 +24,12 @@ export interface PrimeHostStatus {
   modelProvider?: string | null
   modelId?: string | null
   modelName?: string | null
+  /**
+   * Reasoning level the session is running at, when Prime reports one.
+   * Same payload as the model, so the strip's combined control (#9) reads
+   * both from one poll rather than two that can disagree mid-change.
+   */
+  thinkingLevel?: string | null
   /** True when the host rejoined a session that was already running (#7). */
   reattached?: boolean
   /** When the attached session started, ISO-8601. Uptime is derived from it. */
@@ -44,6 +50,7 @@ const EMPTY: PrimeHostStatus = {
   modelProvider: null,
   modelId: null,
   modelName: null,
+  thinkingLevel: null,
   reattached: false,
   startedAt: null,
   sessionPath: null,

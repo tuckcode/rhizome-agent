@@ -68,6 +68,7 @@ export default function ChatHome({
           live={Boolean(primeHost?.running)}
           sessionId={primeHost?.sessionId ?? null}
           model={primeModelLabel(primeHost)}
+          thinkingLevel={primeHost?.thinkingLevel ?? null}
           vaultPath={vaultPath}
           startedAt={primeHost?.startedAt ?? null}
           problem={primeHost?.problem ?? null}
@@ -116,9 +117,7 @@ export default function ChatHome({
             isPrimeTarget ? (
               <ChatComposerDeck
                 locale={locale}
-                modelLabel={primeModelLabel(primeHost)}
                 vaultLabel={vaultLabelFromPath(vaultPath)}
-                vaultPath={vaultPath}
                 contextLabel={openNote ? openNote.label.split('/').filter(Boolean).at(-1) ?? openNote.label : null}
                 skillsLabel="rhizome-vault"
               />

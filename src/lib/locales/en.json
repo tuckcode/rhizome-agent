@@ -1165,6 +1165,8 @@
   "ai.subhead.live": "Prime session live",
   "ai.subhead.idle": "Prime idle",
   "ai.subhead.model": "model",
+  "ai.subhead.thinking": "thinking",
+  "ai.subhead.modelAndThinking": "Model and thinking level",
   "ai.subhead.vault": "vault",
   "ai.subhead.uptime": "up",
   "ai.subhead.problem.notInstalled": "Prime is not installed — run npm i -g prime-agent",

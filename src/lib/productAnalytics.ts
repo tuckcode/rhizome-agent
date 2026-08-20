@@ -78,6 +78,17 @@ export function trackFilePreviewFailed(previewKind: FilePreviewKind): void {
  * takes `Record<string, string | number>` and a raw boolean gets through
  * `npx tsc --noEmit` only to fail the stricter pre-push build (see e518b0c).
  */
+/**
+ * The reasoning level was changed from the strip control (#9).
+ *
+ * The level id is a fixed, non-identifying enum from Prime's own list, so it
+ * is safe to record as-is; it tells us whether anyone actually moves off the
+ * default, which is the whole question behind putting the control on the strip.
+ */
+export function trackPrimeThinkingLevelChanged(level: string): void {
+  trackEvent('prime_thinking_level_changed', { level })
+}
+
 export function trackMenuBarSessionOpened(options: {
   working: boolean
   subagentCount: number
