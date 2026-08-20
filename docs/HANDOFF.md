@@ -1450,7 +1450,20 @@ Note what this implies about the record: sessions in this window that report "al
 - **C11-OPEN: `GETTING_STARTED_REPO_URL` still clones `refactoringhq/tolaria-getting-started.git`** (`src-tauri/src/vault/getting_started.rs:6`) — an unrelated upstream project. The seeded `AGENTS.md` link was removed 2026-07-31, but this one is a *functional* clone URL behind the Getting Started flow, so it can't just be deleted. Needs a replacement starter-vault repo under `knispo` — blocked on GitHub access. Full breakdown incl. what must NOT be renamed: CROSS-MODEL-HANDOFF §6.
 - C9-OPEN: optional first-run Welcome even when a default vault already exists (user wants optional onboard with skip-to-existing). Product decision pending.
 - C10-OPEN: spotlight onboarding walkthrough still unbuilt (`docs/design/onboarding-walkthrough.md`).
-- **C12-RESOLVED (2026-08-19): the exposed GitHub PAT is revoked and no local copy remains.** A fine-grained PAT (`github_pat_…`) had been configured as `mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN`, inlined into the process command line (world-readable via `ps aux`) and captured into session transcripts.
+- **C12-RESOLVED (2026-08-19): the exposed GitHub PAT is revoked and no local copy remains.** A fine-grained PAT (`github_pat_…`) had been configured as `mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN`, captured into session transcripts.
+
+  **How it actually leaked — measured, and not what this entry previously claimed.** The original note blamed `ps aux` making the env var world-readable. The redacted transcripts show otherwise: **76 of the 78 occurrences are the MCP config block itself**, in the form `"command":"npx","args":["-y","@modelcontextprotocol/server-github"],"env":{"GITHUB_PERSONAL_ACCESS_TOKEN":"…"}`. The remaining 2 are later sessions discussing the leak. The vector was mundane — the secret lived in a file that agents routinely read (`~/.claude.json`), so every config inspection copied it into a transcript. `ps aux` exposure is real but is not what happened here, and the distinction matters because the prevention is different.
+
+  **The controlled comparison is on the same machine.** Over the same period, with the same agents reading the same kinds of things:
+
+  | Credential | Stored in | Occurrences in transcripts |
+  |---|---|---|
+  | the exposed PAT | `~/.claude.json`, plaintext | **78** |
+  | the `gh` OAuth token | macOS keyring | **0** |
+
+  **Rule: a secret in a config file will eventually reach a transcript; a secret in a keychain will not.** Point MCP servers at a wrapper that reads the credential at launch (e.g. `security find-generic-password -w -s <name>`) so the config holds a reference rather than the value. Plaintext `env` blocks are the *documented* MCP pattern, which is exactly why this needs saying — following the standard setup is what created the exposure.
+
+  Note also that `src/lib/sensitiveTextRedaction.ts` already recognises `ghp_`/`gho_`/`github_pat_`/`sk-`/`xox*`, but is wired only into telemetry and feedback diagnostics — what leaves the machine. Nothing redacts what is written to conversation logs.
 
   Closed on two independent axes, both verified:
 
