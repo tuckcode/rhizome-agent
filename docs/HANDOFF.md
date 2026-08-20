@@ -27,6 +27,80 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Session handoff — 2026-08-19b (Claude Opus 5: #9, #14, C12, architecture review)
+
+**If you are not Claude, read `docs/CROSS-MODEL-HANDOFF.md` first.** Then this entry.
+
+**State:** `main` in sync with `origin/main`, tree clean, all gates green.
+13 commits, `e75a161..53e8131`. Prime is on **0.7.4** and the daemon was
+restarted onto it.
+
+**Shipped:** C29 (verified independently before landing), **#13**, **#9**,
+**#14**, and architecture-review candidate 1 (`src/lib/callHost.ts`).
+**#19/#20** closed. **C12 closed** — the PAT is revoked and all 78 local
+copies across 11 transcripts were redacted.
+
+### Read this before writing a feature
+
+**Every real bug this session was found by Atticus using the app; none by the
+suite.** Three for three — #13 shipped with two rows both reading `dtc`, #9
+shipped where picking a thinking level never updated the strip, and #14's read
+path had been broken since it was written. The shape is always the same: **the
+tests assert the right request went out on the wire, never that the resulting
+screen is one a person can act on.** #9 even had a passing test proving the
+command was sent with the right level. Write at least one assertion per feature
+about what the user ends up seeing.
+
+**Probe-first paid for itself four separate times** (§18 of
+CROSS-MODEL-HANDOFF, now with a fifth and sixth instance). `sessionName` is
+declared and never sent; `heartbeats_list` wraps jobs in a `{"job": …}`
+envelope; `schedule` is an object not a string; and `model_catalog` is
+advertised in `serverCapabilities` but answers `Unknown daemon command`.
+**Advertised is not routable — check `daemon-mode.js` for a real `case`.**
+
+### Architecture review — candidate 1 done, do 3 then 4
+
+Atticus ran a review over the last 60 commits of the Prime harness surface.
+Candidate 1 (one adapter seam) shipped as `53e8131`. Next, in its recommended
+order: **3 — absorb the daemon envelope** (self-contained, Rust-only, the
+`success`/`response_error`/`data` triple repeats verbatim in 18 functions),
+then **4 — one harness snapshot, one poll** (three pollers, one global mutex,
+and `thinkingLevel` served by two commands — which is the structural cause of
+the bug `7c5f7c9` patched symptomatically). Full detail in the session-status
+doc.
+
+### Environment traps that cost real time
+
+- **`prime-agent update` does not restart the daemon.** The CLI reports the
+  new version while `status` shows the old one flagged `stale`. Use
+  `prime-agent shutdown --force` (plain `shutdown` refuses without a TTY).
+- **The model catalog is baked into the installed bundle**, so the picker is
+  capped by the installed Prime version.
+- **Model and thinking level are per-session**; new sessions start from
+  `~/.prime/agent/settings.json`.
+- **Agent-driven native QA needs the screen unlocked.** cua-driver reporting
+  `desktop_unlocked: false` means capture returns black while `list_windows`
+  still works — it reads as a code failure and is not one.
+- **Never ask a model what model it is.** It claimed to be Claude while served
+  by `big-pickle`. Read `provider`/`model` off the assistant message in
+  `~/.prime/agent/sessions/*.jsonl` instead.
+
+### Ranked pickup
+
+1. **Architecture candidate 3** — absorb the daemon envelope. Rust-only, no
+   cross-cutting risk, and it shrinks the file that dominates uncovered lines.
+2. **#26** — update Prime from inside Rhizome. `prime-agent update` already
+   exists; only the button is missing.
+3. **#28 / #27** — the history list is half empty sessions all rendering
+   "Untitled"; #27's filter dissolves most of it.
+4. **#29** — redact credentials before chat content is committed to the vault
+   and pushed. The detector exists; it is wired only to telemetry.
+5. **C33** — `npx tsc --noEmit` typechecks no test file at all.
+
+Detail: `docs/plans/2026-08-19-harness-surface-and-architecture-review-session-status.md`.
+
+---
+
 ## Session handoff — 2026-08-19 (Claude Opus 5: #13 menu bar roster)
 
 **If you are not Claude, read `docs/CROSS-MODEL-HANDOFF.md` first.** Then this entry.
