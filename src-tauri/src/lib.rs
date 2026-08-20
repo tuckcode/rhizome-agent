@@ -598,6 +598,8 @@ macro_rules! app_invoke_handler {
             commands::get_prime_commands,
             commands::export_prime_session,
             commands::set_prime_model,
+            commands::set_prime_thinking_level,
+            commands::get_prime_thinking_levels,
             commands::fork_prime_session,
             commands::get_prime_agent_activity,
             commands::set_prime_goal,

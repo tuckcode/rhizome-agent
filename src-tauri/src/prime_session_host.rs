@@ -773,6 +773,42 @@ pub fn set_model(provider: &str, model_id: &str) -> Result<(), String> {
     })
 }
 
+/// The reasoning levels Prime accepts, in increasing order of effort.
+///
+/// Mirrors `ThinkingLevel` in `@earendil-works/pi-agent-core`, confirmed twice:
+/// the type in `pi-agent-core/dist/types.d.ts` and `prime-agent --help`'s
+/// `--thinking` line agree exactly. Ordered because the UI renders them as a
+/// scale, not an unordered set.
+pub const PRIME_THINKING_LEVELS: [&str; 7] =
+    ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+
+/// Set the attached session's reasoning level.
+///
+/// Validated against `PRIME_THINKING_LEVELS` before it goes out rather than
+/// forwarded blind: the daemon takes a typed `ThinkingLevel`, so an unknown
+/// string is a command that fails at the far end with a less useful message —
+/// and a level silently not applied reads to the user as the control being
+/// broken, since the strip would keep showing the old value.
+pub fn set_thinking_level(level: &str) -> Result<(), String> {
+    let level = level.trim();
+    if !PRIME_THINKING_LEVELS.contains(&level) {
+        return Err(format!(
+            "Unknown thinking level {level:?}. Expected one of: {}",
+            PRIME_THINKING_LEVELS.join(", "),
+        ));
+    }
+    with_host_mut(|host| {
+        let response = host.send_command(serde_json::json!({
+            "type": "set_thinking_level",
+            "level": level,
+        }))?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, "set_thinking_level"));
+        }
+        Ok(())
+    })
+}
+
 /// What the harness is doing besides answering: goal, heartbeats, schedules.
 ///
 /// One host lock for three round-trips. A sub-request that fails degrades that
@@ -3990,6 +4026,75 @@ mod tests {
     /// The composer chip reads `get_status`, which is a cache of the last
     /// `get_state`. Switching the model without refreshing that cache leaves
     /// the chip on the previous model even when Prime accepted the switch.
+    #[test]
+    fn set_thinking_level_refuses_a_level_prime_does_not_have() {
+        // Fails here rather than at the daemon: an unapplied level leaves the
+        // strip showing the old value, which reads as a broken control.
+        assert!(set_thinking_level("turbo").is_err());
+        assert!(set_thinking_level("").is_err());
+        assert!(set_thinking_level("HIGH").is_err(), "levels are lower-case");
+    }
+
+    #[test]
+    fn set_thinking_level_accepts_every_level_prime_documents() {
+        // Guards the list against drift: `prime-agent --help` and
+        // pi-agent-core's ThinkingLevel both name exactly these seven.
+        assert_eq!(
+            PRIME_THINKING_LEVELS,
+            ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn set_thinking_level_sends_the_level_to_the_daemon() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let sent: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let daemon = {
+            let sent = Arc::clone(&sent);
+            FakeDaemon::start(move |command, id| match command["type"].as_str() {
+                Some("set_thinking_level") => {
+                    *sent.lock().unwrap() =
+                        Some(command["level"].as_str().unwrap_or_default().to_string());
+                    Some(vec![ok(id, "set_thinking_level", serde_json::Value::Null)])
+                }
+                _ => None,
+            })
+        };
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        set_thinking_level("high").unwrap();
+        assert_eq!(sent.lock().unwrap().clone().as_deref(), Some("high"));
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn set_thinking_level_surfaces_a_daemon_refusal() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("set_thinking_level") => Some(vec![failed(
+                id,
+                "set_thinking_level",
+                "model has no reasoning",
+            )]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        // A model without reasoning support is a real refusal the user needs
+        // to see, not something to swallow into a silently unchanged strip.
+        let error = set_thinking_level("high").unwrap_err();
+        assert!(error.contains("model has no reasoning"), "got: {error}");
+
+        let _ = shutdown_host();
+    }
+
     #[cfg(unix)]
     #[test]
     fn set_model_updates_status_to_the_model_just_chosen() {
