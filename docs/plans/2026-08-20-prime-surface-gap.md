@@ -25,7 +25,7 @@ surface we speak), `sdk.md` (1123), `long-running-agents.md` (241),
 `daemon.md` (166), `extensions.md` (2589, what `xai-oauth.ts` is written
 against).
 
-## Correction: two recorded findings were wrong
+## Correction: three recorded findings were wrong
 
 - **"183 models; no Grok 4.6 in 0.7.4"** (2026-08-19 status). False. 0.7.4's
   built-in catalog has `xai/grok-4.6`. It was invisible because
@@ -38,8 +38,15 @@ against).
   if not set." Nothing sets it, so it is always absent. The field works; we
   never call the setter. That is #27's mechanism and #28's likely fix.
 
-`model_catalog` remains genuinely unroutable: **zero** `case` handlers in the
-bundle, and no doc mentions it. That probe finding stands.
+- **"`model_catalog` is advertised in `serverCapabilities` but returns
+  `Unknown daemon command`."** Half right, and the wrong half is the useful
+  one. `model_catalog` really is not a command — it is a *capability flag*, and
+  the daemon advertises it truthfully. The command is named
+  **`get_model_catalog`**, and it is in `DAEMON_COMMAND_TYPES`. Probed
+  unattached it returns `Supervisor cannot route daemon command`, meaning it
+  exists but is worker-scoped (see the refusal table below). So the model
+  picker is probably not capped at whatever `get_available_models` returns —
+  worth an attached probe before the next model-picker change.
 
 ## Naming: we use undocumented aliases
 
@@ -108,6 +115,36 @@ model catalog is "advertised but not routable" was half wrong: the name is
 `get_model_catalog` (not `model_catalog`), and it is very likely reachable
 after attach. **Not yet probed attached** — doing so needs a throwaway session,
 since attaching to a live one disturbs whoever holds it.
+
+### 1a. `observe` exists — one layer down, and family-scoped
+
+Prime ships a bundled skill at
+`~/.local/lib/node_modules/prime-agent/skills/agent-observe/`:
+
+> "Read-only observation of an agent's parent, siblings, and direct children.
+> Use to inspect family status and bounded recent-message previews without
+> mutating sessions."
+
+It is a **kernel-side Python skill the model calls**, not a client command:
+
+```python
+await agent_observe.list_agents()                       # self, parent, siblings, direct children
+await agent_observe.get_agent(target)                   # one agent summary
+await agent_observe.recent_messages(target, limit=8)    # bounded previews, limit 1-50
+```
+
+That is why `observe` bounced off the socket: the capability lives at the agent
+layer, and `rpc.md` documents a third spelling at a third layer. Three layers,
+three vocabularies, one word.
+
+**It would not have solved #13 or #27 anyway.** Its own SKILL.md: observation is
+"limited to family members in the same worker; root siblings in other workers
+are not observable yet." Rhizome's roster is exactly a list of root siblings in
+other workers — the one case it excludes.
+
+Where it *is* useful: RLM subagents. A parent session watching its own children
+is precisely the family scope this covers, and children are a surface we have
+never built (see item 7).
 
 ### 1b. What actually delivers "see what another session is doing"
 
