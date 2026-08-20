@@ -1,16 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
+import { callHost } from '../lib/callHost'
 import { Target, Heartbeat, CalendarDots, Brain } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { createTranslator, type AppLocale } from '../lib/i18n'
-import { isTauri, mockInvoke } from '../mock-tauri'
-import { invoke } from '@tauri-apps/api/core'
 import { ScheduledWorkPopover } from './ScheduledWorkPopover'
 import { withHeartbeatFlag, type PrimeScheduledWork } from '../lib/primeScheduledWork'
 
-async function call<T>(cmd: string): Promise<T> {
-  if (isTauri()) return invoke<T>(cmd)
-  return mockInvoke<T>(cmd)
-}
 
 /** Mirrors `PrimeAgentActivity` in `src-tauri/src/prime_agent_activity.rs`. */
 export interface PrimeAgentActivity {
@@ -83,7 +78,7 @@ export function AgentActivityBand({
   const refresh = useCallback(async () => {
     if (!enabled || now) return
     try {
-      setActivity(await call<PrimeAgentActivity>('get_prime_agent_activity'))
+      setActivity(await callHost<PrimeAgentActivity>('get_prime_agent_activity'))
     } catch {
       // The host may not be up yet. Staying quiet is right: this band is
       // ambient, and an error strip for background state would be noise.
@@ -96,7 +91,7 @@ export function AgentActivityBand({
     let cancelled = false
     const read = async () => {
       try {
-        const next = await call<PrimeAgentActivity>('get_prime_agent_activity')
+        const next = await callHost<PrimeAgentActivity>('get_prime_agent_activity')
         if (!cancelled) setActivity(next)
       } catch {
         if (!cancelled) setActivity(null)

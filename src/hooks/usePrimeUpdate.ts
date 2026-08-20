@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
-import { isTauri, mockInvoke } from '../mock-tauri'
+import { callHost } from '../lib/callHost'
+import { isTauri } from '../mock-tauri'
 import { openExternalUrl } from '../utils/url'
 
 export interface PrimeReleaseInfo {
@@ -27,9 +27,6 @@ export interface PrimeUpdateActions {
   openPrimeReleasePage: () => void
 }
 
-function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-  return isTauri() ? invoke<T>(command, args) : mockInvoke<T>(command, args)
-}
 
 /**
  * Checks whether a newer Prime release is available than the version
@@ -52,7 +49,7 @@ export function usePrimeUpdate(primeVersion: string | null | undefined): {
     setStatus({ state: 'checking' })
 
     try {
-      const release = await call<PrimeReleaseInfo | null>('check_prime_update', {
+      const release = await callHost<PrimeReleaseInfo | null>('check_prime_update', {
         installedVersion: primeVersion,
       })
 

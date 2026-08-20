@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { invoke } from '@tauri-apps/api/core'
-import { isTauri, mockInvoke } from '../mock-tauri'
+import { callHost } from '../lib/callHost'
 import { primeTranscriptToConversation, type PrimeTranscriptItem } from '../lib/primeTranscriptToConversation'
 import { trackEvent } from '../lib/telemetry'
 import type { AiAgentMessage } from '../lib/aiAgentConversation'
@@ -52,10 +51,8 @@ export function usePrimeSessionRehydrate({
     rehydrated.current = sessionPath
 
     let cancelled = false
-    const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
-      isTauri() ? invoke<T>(cmd, args) : mockInvoke<T>(cmd, args)
 
-    void call<PrimeTranscriptItem[]>('read_prime_session_transcript', { path: sessionPath })
+    void callHost<PrimeTranscriptItem[]>('read_prime_session_transcript', { path: sessionPath })
       .then((transcript) => {
         if (cancelled) return
         const messages = primeTranscriptToConversation(transcript)

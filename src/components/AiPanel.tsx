@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useRef, type CSSProperties, type MutableRefObject, type ReactNode, type RefObject } from 'react'
+import { callHost } from '../lib/callHost'
 import {
   AiPanelComposer,
   AiPanelHeader,
@@ -10,9 +11,7 @@ import { translate } from '../lib/i18n'
 import PrimeSessionList from './PrimeSessionList'
 import { primeTranscriptToConversation, type PrimeTranscriptItem } from '../lib/primeTranscriptToConversation'
 import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
-import { isTauri, mockInvoke } from '../mock-tauri'
 import { useMenuBarSessionOpen } from '../hooks/useMenuBarSessionOpen'
-import { invoke } from '@tauri-apps/api/core'
 import {
   DEFAULT_AI_AGENT,
   getAiAgentDefinition,
@@ -236,17 +235,15 @@ export function AiPanelView({
   const [goalDialogOpen, setGoalDialogOpen] = useState(false)
   const [goalDialogGoal, setGoalDialogGoal] = useState<PrimeAgentActivity['goal'] | null>(null)
   const handleOpenGoalDialog = useCallback(() => {
-    const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
-      isTauri() ? invoke<T>(cmd, args) : mockInvoke<T>(cmd, args)
+
     setGoalDialogOpen(true)
-    void call<PrimeAgentActivity>('get_prime_agent_activity')
+    void callHost<PrimeAgentActivity>('get_prime_agent_activity')
       .then((activity) => setGoalDialogGoal(activity?.goal ?? null))
       .catch(() => setGoalDialogGoal(null))
   }, [])
   const handleSetGoal = useCallback(async (objective: string, tokenBudget: number | null) => {
-    const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
-      isTauri() ? invoke<T>(cmd, args) : mockInvoke<T>(cmd, args)
-    const goal = await call<{ objective?: string }>('set_prime_goal', {
+
+    const goal = await callHost<{ objective?: string }>('set_prime_goal', {
       objective,
       tokenBudget: tokenBudget ?? undefined,
     })
@@ -256,9 +253,8 @@ export function AiPanelView({
     return goal
   }, [])
   const handleClearGoal = useCallback(async () => {
-    const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
-      isTauri() ? invoke<T>(cmd, args) : mockInvoke<T>(cmd, args)
-    await call<void>('clear_prime_goal')
+
+    await callHost<void>('clear_prime_goal')
     trackEvent('prime_goal_cleared')
   }, [])
 
@@ -315,12 +311,11 @@ export function AiPanelView({
    * than trimming what it already had.
    */
   const handleForkFromEntry = useCallback(async (entryId: string) => {
-    const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
-      isTauri() ? invoke<T>(cmd, args) : mockInvoke<T>(cmd, args)
+
     setSwitchError(null)
     try {
-      const forked = await call<{ sessionId: string }>('fork_prime_session', { entryId })
-      const summaries = await call<PrimeSessionSummary[]>('list_prime_session_summaries')
+      const forked = await callHost<{ sessionId: string }>('fork_prime_session', { entryId })
+      const summaries = await callHost<PrimeSessionSummary[]>('list_prime_session_summaries')
       const branch = summaries.find((session) => session.id === forked.sessionId)
       if (!branch) {
         // Prime writes the branch log asynchronously. The fork succeeded; the
@@ -329,7 +324,7 @@ export function AiPanelView({
         setActiveSessionPath(null)
         return
       }
-      const transcript = await call<PrimeTranscriptItem[]>('read_prime_session_transcript', {
+      const transcript = await callHost<PrimeTranscriptItem[]>('read_prime_session_transcript', {
         path: branch.path,
       })
       agent.replaceMessages(primeTranscriptToConversation(transcript))
@@ -361,8 +356,7 @@ export function AiPanelView({
   })
 
   const handleCommandAction = useCallback(async (action: CommandMenuAction, nextValue: string) => {
-    const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
-      isTauri() ? invoke<T>(cmd, args) : mockInvoke<T>(cmd, args)
+
     setInput(nextValue)
     // A skill is completed into the composer, not sent — it takes arguments,
     // and sending on pick fired the turn before the user could type any.
@@ -378,7 +372,7 @@ export function AiPanelView({
     }
     if (action.name === 'compact') {
       try {
-        const tokens = await call<number | null>('compact_prime_session')
+        const tokens = await callHost<number | null>('compact_prime_session')
         agent.addLocalMarker(
           typeof tokens === 'number'
             ? translate(locale, 'ai.command.compactedTokens', { tokens: String(tokens) })
@@ -392,7 +386,7 @@ export function AiPanelView({
     if (action.name === 'export') {
       if (!primeHost.sessionPath) return
       try {
-        const path = await call<string>('export_prime_session', {
+        const path = await callHost<string>('export_prime_session', {
           sessionPath: primeHost.sessionPath,
         })
         agent.addLocalMarker(translate(locale, 'ai.command.exported', { path }))
@@ -403,12 +397,11 @@ export function AiPanelView({
   }, [agent, handleForkFromEntry, latestPrimeEntryId, locale, primeHost.sessionPath, setInput])
 
   const handleSelectSession = useCallback(async (session: PrimeSessionSummary) => {
-    const call = <T,>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
-      isTauri() ? invoke<T>(cmd, args) : mockInvoke<T>(cmd, args)
+
     setSwitchError(null)
     try {
-      await call<string>('switch_prime_session', { path: session.path })
-      const transcript = await call<PrimeTranscriptItem[]>('read_prime_session_transcript', {
+      await callHost<string>('switch_prime_session', { path: session.path })
+      const transcript = await callHost<PrimeTranscriptItem[]>('read_prime_session_transcript', {
         path: session.path,
       })
       agent.replaceMessages(primeTranscriptToConversation(transcript))

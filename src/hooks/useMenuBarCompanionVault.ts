@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { callHost } from '../lib/callHost'
 import { isTauri } from '../mock-tauri'
 import { toActivityRows, type ActivityRow } from '../utils/menuBarActivity'
 
@@ -40,13 +40,13 @@ export function useMenuBarCompanionVault(): MenuBarCompanionVault {
     if (!isTauri()) return
     void (async () => {
       try {
-        const list = (await invoke('load_vault_list')) as VaultListResult
+        const list = (await callHost('load_vault_list')) as VaultListResult
         const active = list.active_vault ?? list.default_workspace_path ?? null
         setActiveVaultPath(active)
         setVaultLabel(list.vaults.find((v) => v.path === active)?.label ?? null)
 
         if (active) {
-          const raw = (await invoke('call_rhizome_tool', {
+          const raw = (await callHost('call_rhizome_tool', {
             name: 'rhizome_read_events',
             args: { vaultPath: active },
           })) as string

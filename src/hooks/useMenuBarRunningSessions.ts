@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { callHost } from '../lib/callHost'
 import { isTauri } from '../mock-tauri'
 import {
   runningSessionOverflow,
@@ -48,7 +48,7 @@ export function useMenuBarRunningSessions(): MenuBarRunningSessions {
     inFlight.current = true
     void (async () => {
       try {
-        const roster = (await invoke('list_prime_running_sessions')) as PrimeRosterSession[]
+        const roster = (await callHost('list_prime_running_sessions')) as PrimeRosterSession[]
         setRows(toRunningSessionRows(roster))
         setOverflow(runningSessionOverflow(roster))
       } catch {
