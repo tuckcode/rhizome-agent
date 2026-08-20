@@ -569,10 +569,7 @@ pub fn shutdown_host() -> Result<bool, String> {
 
 pub fn new_session() -> Result<String, String> {
     with_host_mut(|host| {
-        let response = host.send_command(serde_json::json!({ "type": "new_session" }))?;
-        if response["success"].as_bool() != Some(true) {
-            return Err(response_error(&response, "new_session"));
-        }
+        host.call(serde_json::json!({ "type": "new_session" }))?;
         // Refresh session id from get_state.
         host.refresh_session_id()?;
         Ok(host.session_id.clone().unwrap_or_default())
@@ -582,13 +579,8 @@ pub fn new_session() -> Result<String, String> {
 /// Token / cost / context usage for the live session.
 pub fn get_session_stats() -> Result<PrimeSessionStats, String> {
     with_host_mut(|host| {
-        let response = host.send_command(serde_json::json!({ "type": "get_session_stats" }))?;
-        if response["success"].as_bool() != Some(true) {
-            return Err(response_error(&response, "get_session_stats"));
-        }
-        Ok(PrimeSessionStats::from_state_data(
-            response.get("data").unwrap_or(&serde_json::Value::Null),
-        ))
+        let data = host.call(serde_json::json!({ "type": "get_session_stats" }))?;
+        Ok(PrimeSessionStats::from_state_data(&data))
     })
 }
 
@@ -598,13 +590,8 @@ pub fn get_session_stats() -> Result<PrimeSessionStats, String> {
 /// recovering the panel after a reload, without replaying the stream.
 pub fn get_messages() -> Result<Vec<PrimeMessage>, String> {
     with_host_mut(|host| {
-        let response = host.send_command(serde_json::json!({ "type": "get_messages" }))?;
-        if response["success"].as_bool() != Some(true) {
-            return Err(response_error(&response, "get_messages"));
-        }
-        Ok(messages_from_response(
-            response.get("data").unwrap_or(&serde_json::Value::Null),
-        ))
+        let data = host.call(serde_json::json!({ "type": "get_messages" }))?;
+        Ok(messages_from_response(&data))
     })
 }
 
@@ -713,13 +700,8 @@ fn commands_from_response(data: &serde_json::Value) -> Vec<PrimeReportedCommand>
 /// Skills and extension commands the live session can invoke via `/`.
 pub fn get_commands() -> Result<Vec<PrimeReportedCommand>, String> {
     with_host_mut(|host| {
-        let response = host.send_command(serde_json::json!({ "type": "get_commands" }))?;
-        if response["success"].as_bool() != Some(true) {
-            return Err(response_error(&response, "get_commands"));
-        }
-        Ok(commands_from_response(
-            response.get("data").unwrap_or(&serde_json::Value::Null),
-        ))
+        let data = host.call(serde_json::json!({ "type": "get_commands" }))?;
+        Ok(commands_from_response(&data))
     })
 }
 
@@ -750,13 +732,8 @@ fn models_from_response(data: &serde_json::Value) -> Vec<PrimeModel> {
 /// Every model the host can switch to, as Prime reports them.
 pub fn get_available_models() -> Result<Vec<PrimeModel>, String> {
     with_host_mut(|host| {
-        let response = host.send_command(serde_json::json!({ "type": "get_available_models" }))?;
-        if response["success"].as_bool() != Some(true) {
-            return Err(response_error(&response, "get_available_models"));
-        }
-        Ok(models_from_response(
-            response.get("data").unwrap_or(&serde_json::Value::Null),
-        ))
+        let data = host.call(serde_json::json!({ "type": "get_available_models" }))?;
+        Ok(models_from_response(&data))
     })
 }
 
@@ -769,14 +746,11 @@ pub fn set_model(provider: &str, model_id: &str) -> Result<(), String> {
         return Err("A model needs both a provider and an id".into());
     }
     with_host_mut(|host| {
-        let response = host.send_command(serde_json::json!({
+        host.call(serde_json::json!({
             "type": "set_model",
             "provider": provider,
             "modelId": model_id,
         }))?;
-        if response["success"].as_bool() != Some(true) {
-            return Err(response_error(&response, "set_model"));
-        }
         host.refresh_session_id()?;
         Ok(())
     })
@@ -807,13 +781,10 @@ pub fn set_thinking_level(level: &str) -> Result<(), String> {
         ));
     }
     with_host_mut(|host| {
-        let response = host.send_command(serde_json::json!({
+        host.call(serde_json::json!({
             "type": "set_thinking_level",
             "level": level,
         }))?;
-        if response["success"].as_bool() != Some(true) {
-            return Err(response_error(&response, "set_thinking_level"));
-        }
         // Refresh the cached state, exactly as `set_model` does. `get_status`
         // -- what the strip polls every 4s -- reads that cache and does not
         // re-issue `get_state` itself, so without this the strip keeps showing
@@ -842,14 +813,11 @@ pub fn manage_heartbeat(job_id: &str, action: &str) -> Result<(), String> {
         ));
     }
     with_host_mut(|host| {
-        let response = host.send_command(serde_json::json!({
+        host.call(serde_json::json!({
             "type": "heartbeat_manage",
             "jobId": job_id,
             "action": action,
         }))?;
-        if response["success"].as_bool() != Some(true) {
-            return Err(response_error(&response, "heartbeat_manage"));
-        }
         Ok(())
     })
 }
@@ -865,13 +833,10 @@ pub fn cancel_scheduled_work(job_id: &str) -> Result<(), String> {
         return Err("A scheduled prompt needs an id to cancel".into());
     }
     with_host_mut(|host| {
-        let response = host.send_command(serde_json::json!({
+        host.call(serde_json::json!({
             "type": "cron_cancel",
             "jobId": job_id,
         }))?;
-        if response["success"].as_bool() != Some(true) {
-            return Err(response_error(&response, "cron_cancel"));
-        }
         Ok(())
     })
 }
@@ -1050,13 +1015,10 @@ fn send_goal_command(text: &str) -> Result<(), String> {
         abort_and_wait_for_idle()?;
     }
     with_host_mut(|host| {
-        let response = host.send_command(serde_json::json!({
+        host.call(serde_json::json!({
             "type": "prompt",
             "message": text,
         }))?;
-        if response["success"].as_bool() != Some(true) {
-            return Err(response_error(&response, "prompt"));
-        }
         Ok(())
     })
 }
@@ -1134,17 +1096,14 @@ pub fn fork(entry_id: &str) -> Result<PrimeForkResult, String> {
         if host.is_streaming {
             return Err("Cannot fork while a turn is running".into());
         }
-        let response = host.send_command(serde_json::json!({
+        let data = host.call(serde_json::json!({
             "type": "fork",
             "entryId": trimmed,
         }))?;
-        if response["success"].as_bool() != Some(true) {
-            return Err(response_error(&response, "fork"));
-        }
         host.refresh_session_id()?;
         Ok(PrimeForkResult {
             session_id: host.session_id.clone().unwrap_or_default(),
-            branched_from: response["data"]["text"].as_str().map(str::to_string),
+            branched_from: data["text"].as_str().map(str::to_string),
         })
     })
 }
@@ -1184,23 +1143,17 @@ pub fn compact(custom_instructions: Option<String>) -> Result<Option<u64>, Strin
         if let Some(instructions) = custom_instructions.filter(|s| !s.trim().is_empty()) {
             command["customInstructions"] = serde_json::Value::String(instructions);
         }
-        let response = host.send_command(command)?;
-        if response["success"].as_bool() != Some(true) {
-            return Err(response_error(&response, "compact"));
-        }
-        Ok(response["data"]["tokensBefore"].as_u64())
+        let data = host.call(command)?;
+        Ok(data["tokensBefore"].as_u64())
     })
 }
 
 pub fn set_auto_compaction(enabled: bool) -> Result<(), String> {
     with_host_mut(|host| {
-        let response = host.send_command(serde_json::json!({
+        host.call(serde_json::json!({
             "type": "set_auto_compaction",
             "enabled": enabled,
         }))?;
-        if response["success"].as_bool() != Some(true) {
-            return Err(response_error(&response, "set_auto_compaction"));
-        }
         Ok(())
     })
 }
@@ -1224,10 +1177,7 @@ fn queue_message(kind: &str, message: &str) -> Result<bool, String> {
         if !host.is_streaming {
             return Ok(false);
         }
-        let response = host.send_command(build_queue_command(kind, trimmed))?;
-        if response["success"].as_bool() != Some(true) {
-            return Err(response_error(&response, kind));
-        }
+        host.call(build_queue_command(kind, trimmed))?;
         Ok(true)
     })
 }
@@ -1292,14 +1242,11 @@ where
         request.model_id.as_deref().filter(|s| !s.is_empty()),
     ) {
         if let Err(error) = with_host_mut(|host| {
-            let response = host.send_command(serde_json::json!({
+            host.call(serde_json::json!({
                 "type": "set_model",
                 "provider": provider,
                 "modelId": model_id,
             }))?;
-            if response["success"].as_bool() != Some(true) {
-                return Err(response_error(&response, "set_model"));
-            }
             Ok(())
         }) {
             emit(AiAgentStreamEvent::Error { message: error });
@@ -4557,6 +4504,110 @@ mod tests {
         // which reads as the control being broken.
         let error = manage_heartbeat("gone", "pause").unwrap_err();
         assert!(error.contains("no such job"), "got: {error}");
+
+        let _ = shutdown_host();
+    }
+
+    /// The envelope check is what stops a refusal from reading as an answer.
+    /// Every command that returns a list must fail loudly rather than hand the
+    /// UI an empty one: an empty model picker and a refused daemon look
+    /// identical on screen, and only one of them is the user's problem.
+    #[cfg(unix)]
+    #[test]
+    fn a_refused_model_list_is_not_reported_as_no_models() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("get_available_models") => Some(vec![failed(
+                id,
+                "get_available_models",
+                "no provider configured",
+            )]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let error = get_available_models().unwrap_err();
+        assert!(error.contains("no provider configured"), "got: {error}");
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_refused_command_list_is_not_reported_as_no_commands() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("get_commands") => Some(vec![failed(id, "get_commands", "session not attached")]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let error = get_commands().unwrap_err();
+        assert!(error.contains("session not attached"), "got: {error}");
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_refused_compact_surfaces_the_reason_rather_than_no_tokens() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("compact") => Some(vec![failed(id, "compact", "nothing to compact")]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        // `Ok(None)` here would render as "compaction ran, reclaimed nothing".
+        let error = compact(None).unwrap_err();
+        assert!(error.contains("nothing to compact"), "got: {error}");
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_successful_compact_still_reports_the_tokens_it_reclaimed() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("compact") => Some(vec![ok(
+                id,
+                "compact",
+                serde_json::json!({ "tokensBefore": 41_000 }),
+            )]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        assert_eq!(compact(None).unwrap(), Some(41_000));
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_refused_auto_compaction_toggle_is_surfaced_not_swallowed() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("set_auto_compaction") => {
+                Some(vec![failed(id, "set_auto_compaction", "unsupported")])
+            }
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let error = set_auto_compaction(true).unwrap_err();
+        assert!(error.contains("unsupported"), "got: {error}");
 
         let _ = shutdown_host();
     }
