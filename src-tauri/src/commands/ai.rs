@@ -578,7 +578,10 @@ mod tests {
     #[test]
     fn setting_an_unknown_thinking_level_is_refused_before_any_host_call() {
         let error = set_prime_thinking_level("turbo".into()).unwrap_err();
-        assert!(error.contains("turbo"), "the message must name the bad level: {error}");
+        assert!(
+            error.contains("turbo"),
+            "the message must name the bad level: {error}"
+        );
         assert!(error.contains("off"), "and list the valid ones: {error}");
     }
 
