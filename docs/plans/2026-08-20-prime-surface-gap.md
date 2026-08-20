@@ -43,33 +43,95 @@ bundle, and no doc mentions it. That probe finding stands.
 
 ## Naming: we use undocumented aliases
 
-| We send | Documented equivalent |
-|---|---|
-| `cron_list` | `list_schedules` (+ `list_heartbeats`) |
-| `cron_cancel` | `cancel_schedule` |
-| `heartbeat_manage` | `manage_heartbeat` |
+| We send | `rpc.md` documents | Routable on the daemon socket? |
+|---|---|---|
+| `cron_list` | `list_schedules` | **ours only** |
+| `cron_cancel` | `cancel_schedule` | **ours only** |
+| `heartbeat_manage` | `manage_heartbeat` | both names are in the daemon set |
+| — | `observe` / `unobserve` | **neither** |
 
-Both sets have real `case` handlers in the bundle, so ours are not wrong — but
-they are aliases nobody documents, which is why four sessions had to probe the
-shapes by hand. Prefer the documented names for anything new; do not churn
-working call sites just to rename them.
+Our names are the correct ones for this transport. The documented names are the
+RPC-mode spelling and mostly do not route here. **Do not "fix" our call sites to
+match the docs** — that would break working code in the direction of a
+different client's protocol.
 
 ## The gap list
 
 Everything below is documented Prime behaviour with no desktop surface.
 Ordered by how much of the product premise it recovers.
 
-### 1. Observe another session without attaching — `observe` / `unobserve`
-`rpc.md` §Daemon Coordination. Subscribe to another root or subagent session;
-the response carries its current messages, and later events arrive wrapped as
-`observed_session_event` so they cannot be confused with your own.
-`observed_session_closed` ends it.
+### 1. ~~Observe another session without attaching~~ — **does not exist here**
 
-This is the missing half of **#13** (roster) and **#27** (session sidebar). The
-roster today lists sessions; `observe` is how a row shows what that session is
-*doing* — live — without stealing it. Attaching is currently the only way to
-see another session, and attaching is destructive to whoever holds it (C12's
-whole territory).
+**Probed 2026-08-20 against the live daemon socket. It is not routable:**
+
+```
+observe          → {"success": false, "error": "Unknown daemon command: observe"}
+list_schedules   → Unknown daemon command
+list_heartbeats  → Unknown daemon command
+```
+
+`rpc.md`'s "Daemon Coordination" table documents the **RPC-mode** client
+(`prime-agent --mode rpc`, stdin/stdout), not the daemon socket Rhizome speaks.
+The two vocabularies overlap but are not the same, and the doc never says so.
+This is the same trap as `model_catalog`, and reading the docs walked straight
+into it — the earlier draft of this file recommended building on `observe`.
+
+**The authoritative list is `DAEMON_COMMAND_TYPES` in
+`dist/modes/daemon/daemon-supervisor.js` — 98 commands.** Extract it before
+planning anything; it is the only source that is neither aspirational nor
+stale:
+
+```bash
+python3 - <<'EOF'
+import re
+s = open('/Users/dtc/.local/lib/node_modules/prime-agent/dist/modes/daemon/daemon-supervisor.js', errors='replace').read()
+m = re.search(r'DAEMON_COMMAND_TYPES\s*=\s*new Set\(', s)
+j = s.index('(', m.end()-1); d = 0
+for k in range(j, len(s)):
+    d += (s[k]=='(') - (s[k]==')')
+    if d == 0: break
+print(" ".join(sorted(set(re.findall(r'"([a-zA-Z_]+)"', s[j:k+1])))))
+EOF
+```
+
+**Two different refusals, two different meanings** — worth knowing before
+concluding a command is missing:
+
+| Message | Means |
+|---|---|
+| `Unknown daemon command: X` | Not in `DAEMON_COMMAND_TYPES`. It does not exist on this transport. |
+| `Supervisor cannot route daemon command: X` | It exists, but is worker-scoped — the client must `attach` first. |
+
+`get_model_catalog`, `get_session_tree` and `get_session_header` all return the
+*second* message to an unattached client. So the recorded finding that the
+model catalog is "advertised but not routable" was half wrong: the name is
+`get_model_catalog` (not `model_catalog`), and it is very likely reachable
+after attach. **Not yet probed attached** — doing so needs a throwaway session,
+since attaching to a live one disturbs whoever holds it.
+
+### 1b. What actually delivers "see what another session is doing"
+
+The `list` response already carries per-session live state, and we throw almost
+all of it away. Probed shape, one entry:
+
+```
+activeSessionId  activity        attachedClients  created     cwd
+diagnostics      hasRunningRlmChildren           id           isBashRunning
+isCompacting     isRunningTools  isSessionActive  isStreaming  lastActivityAt
+lifecycle        messageCount    model            modified     rlmDepth
+runtimeKind      sessionActions  sessionFile      sessionId    thinkingLevel
+unfinishedActionCount            workerPid        workerState
+```
+
+`roster_sessions` (`prime_session_host.rs:1709`) hands the array through, and
+the menu-bar roster reads `lastActivityAt` and `messageCount` from it. Nothing
+reads `isStreaming`, `isRunningTools`, `isCompacting`, `activity`,
+`workerState`, `model`, or `thinkingLevel` — which is exactly the "what is that
+session doing right now" that `observe` was wanted for, already arriving on
+every poll, for free, with no attach and no new command.
+
+Live per-row status is therefore a **read-more-of-what-we-already-fetch** job,
+not a new transport feature. That is the honest replacement for this item.
 
 ### 2. Creating scheduled work, not just watching it
 **#14 ships read + pause + cancel.** `set_heartbeat` (schedule, prompt,
@@ -124,9 +186,11 @@ sessions are a product surface we have never looked at.
 
 ## What this does not change
 
-Probe-first still applies. The docs describe the RPC client contract; our Rust
-speaks the daemon socket, and the two have already been shown to diverge in
-naming, in what is routable (`model_catalog`), and in envelope shape
+Probe-first still applies, and this session is the proof: the docs sent me to
+build on a command that does not exist on our transport, and one probe caught
+it before any code was written. The docs describe the RPC client contract; our
+Rust speaks the daemon socket, and the two diverge in naming, in what is
+routable (`observe`, `list_schedules`, `list_heartbeats`), and in envelope shape
 (`heartbeats_list` wrapping each job in `{"job": …}` — a shape no doc
 mentions). Read the doc, then check `daemon-mode.js` for a `case` handler, then
 probe the shape. All three.
