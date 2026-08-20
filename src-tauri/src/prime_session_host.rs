@@ -889,11 +889,11 @@ pub fn agent_activity() -> Result<crate::prime_agent_activity::PrimeAgentActivit
         // one). `get_connection_state` does — it wraps the same
         // `session.goalState` the daemon forwards in `goal_update` events —
         // and also carries `thinkingLevel`, so one command covers both.
-        let state = host.send_command(serde_json::json!({ "type": "get_connection_state" }))?;
-        let state_data = state
-            .get("data")
-            .cloned()
-            .unwrap_or(serde_json::Value::Null);
+        // `call`, not `send_command`: reading `data` without checking `success`
+        // made a daemon refusal indistinguishable from "no goal and no
+        // thinking level". The band's caller already treats an error as
+        // "render nothing", so propagating is both honest and harmless.
+        let state_data = host.call(serde_json::json!({ "type": "get_connection_state" }))?;
 
         // `cron_list` alone, not `cron_list` + `heartbeats_list`. Probed live
         // against 0.7.4: `cron_list` returns BOTH kinds in `data.jobs`, tagged
@@ -904,12 +904,18 @@ pub fn agent_activity() -> Result<crate::prime_agent_activity::PrimeAgentActivit
         // Named `cron_list`, not the `list_schedules` spelling RPC mode
         // answers to — that returns `Unknown daemon command` and would
         // degrade the section to empty in silence.
-        let (heartbeats, schedules) = host
-            .send_command(serde_json::json!({ "type": "cron_list" }))
-            .ok()
-            .and_then(|response| response.get("data").cloned())
-            .map(|data| activity::split_scheduled_work(&data))
-            .unwrap_or_default();
+        // Deliberately tolerant: a failed schedule read degrades this one
+        // section to empty rather than hiding an active goal. That policy is
+        // kept — but it now logs, because the previous version could not tell
+        // "nothing scheduled" from "the daemon refused" and said nothing
+        // either way.
+        let (heartbeats, schedules) = match host.call(serde_json::json!({ "type": "cron_list" })) {
+            Ok(data) => activity::split_scheduled_work(&data),
+            Err(error) => {
+                log::warn!("Prime cron_list failed; scheduled work shown as empty: {error}");
+                Default::default()
+            }
+        };
 
         Ok(activity::PrimeAgentActivity {
             goal: activity::goal_from_state(&state_data),
@@ -934,11 +940,10 @@ const GOAL_CONFIRM_INTERVAL: Duration = Duration::from_millis(250);
 /// `get_state` never carries a `goal` key, `get_connection_state` does.
 fn read_goal_state() -> Result<Option<crate::prime_agent_activity::PrimeGoalState>, String> {
     with_host_mut(|host| {
-        let response = host.send_command(serde_json::json!({ "type": "get_connection_state" }))?;
-        let data = response
-            .get("data")
-            .cloned()
-            .unwrap_or(serde_json::Value::Null);
+        // A refusal here previously produced `None`, which the confirm loop
+        // reads as "the goal is cleared" — turning a transport failure into a
+        // false confirmation.
+        let data = host.call(serde_json::json!({ "type": "get_connection_state" }))?;
         Ok(crate::prime_agent_activity::goal_from_state(&data))
     })
 }
@@ -989,16 +994,33 @@ fn poll_goal_until(
 /// reported success and nothing happened.
 fn session_is_streaming() -> bool {
     with_host_mut(|host| {
-        let response = host.send_command(serde_json::json!({ "type": "get_connection_state" }))?;
-        Ok(response["data"]["isStreaming"].as_bool().unwrap_or(false))
+        let data = host.call(serde_json::json!({ "type": "get_connection_state" }))?;
+        Ok(data["isStreaming"].as_bool().unwrap_or(false))
     })
-    .unwrap_or(false)
+    .unwrap_or_else(|error| {
+        // Fail closed. Answering "idle" on a daemon error is not a harmless
+        // default: `send_goal_command` skips its abort and sends `/goal`
+        // straight into a running turn, which is precisely the failure the
+        // caller exists to prevent (see its note — the send reports success
+        // and nothing happens). `abort_and_wait_for_idle` would likewise
+        // declare success without the session ever going idle.
+        //
+        // Claiming "still busy" instead costs a bounded wait and then a clear
+        // error, which is the honest outcome.
+        log::warn!("Prime streaming check failed; assuming the turn is still running: {error}");
+        true
+    })
 }
 
 /// Interrupt the running turn and wait for the session to go idle.
 fn abort_and_wait_for_idle() -> Result<(), String> {
     with_host_mut(|host| {
-        let _ = host.send_command(serde_json::json!({ "type": "abort" }));
+        // A failed abort is not fatal — the wait loop below is what actually
+        // decides the outcome — but discarding it silently meant a daemon
+        // that never received the abort looked identical to one that did.
+        if let Err(error) = host.call(serde_json::json!({ "type": "abort" })) {
+            log::warn!("Prime abort request failed; waiting for idle anyway: {error}");
+        }
         Ok(())
     })?;
     for attempt in 0..GOAL_CONFIRM_ATTEMPTS {
@@ -2100,6 +2122,29 @@ impl PrimeHost {
     }
 
     /// Send a session-scoped command, filling in `activeSessionId`.
+    /// Send a command and unwrap the daemon's envelope, returning `data`.
+    ///
+    /// The command name in the error comes from `command["type"]`, so it
+    /// cannot drift from what was actually sent. Written out by hand, the
+    /// name appears twice per call — once in the payload, once in the error —
+    /// and nothing makes the two agree.
+    ///
+    /// Callers that must apply their own error *policy* (emit an event, return
+    /// a bool, map a specific `errorInfo.code` to user-facing advice, or shut
+    /// the host down before failing) keep using `send_command` directly. The
+    /// policy is the point there, not boilerplate.
+    fn call(&mut self, command: serde_json::Value) -> Result<serde_json::Value, String> {
+        let name = command["type"].as_str().unwrap_or("command").to_string();
+        let response = self.send_command(command)?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, &name));
+        }
+        Ok(response
+            .get("data")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null))
+    }
+
     fn send_command(
         &mut self,
         mut command: serde_json::Value,
@@ -4255,6 +4300,172 @@ mod tests {
             all.iter().all(|item| item.source.is_some()),
             "source distinguishes the two kinds"
         );
+
+        let _ = shutdown_host();
+    }
+
+    // ── The daemon envelope, and what a refusal must not look like ─────────
+    //
+    // Five call sites used to read `data` without checking `success`, so a
+    // `{"success": false}` was indistinguishable from an empty answer. These
+    // pin the policy each one now has.
+
+    #[cfg(unix)]
+    #[test]
+    fn a_failed_streaming_check_refuses_the_goal_instead_of_sending_it_mid_turn() {
+        // The dangerous one. `session_is_streaming` answered `false` on any
+        // daemon error, so `send_goal_command` skipped its abort and sent
+        // `/goal` into a running turn — where, per its own note, the send
+        // reports success and nothing happens. Failing closed turns that
+        // silent corruption into a bounded wait and a clear error.
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let aborts = Arc::new(Mutex::new(0usize));
+        let prompts = Arc::new(Mutex::new(0usize));
+        let daemon = {
+            let aborts = Arc::clone(&aborts);
+            let prompts = Arc::clone(&prompts);
+            FakeDaemon::start(move |command, id| match command["type"].as_str() {
+                // The state read fails, as a wedged daemon would.
+                Some("get_connection_state") => {
+                    Some(vec![failed(id, "get_connection_state", "socket wedged")])
+                }
+                Some("abort") => {
+                    *aborts.lock().unwrap() += 1;
+                    Some(vec![ok(id, "abort", serde_json::Value::Null)])
+                }
+                Some("prompt") => {
+                    *prompts.lock().unwrap() += 1;
+                    Some(vec![ok(id, "prompt", serde_json::Value::Null)])
+                }
+                _ => None,
+            })
+        };
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let result = clear_goal();
+
+        assert!(
+            result.is_err(),
+            "a goal command must not claim success when the session state is unknown",
+        );
+        assert_eq!(
+            *prompts.lock().unwrap(),
+            0,
+            "no /goal prompt may be sent while the turn state is unknown",
+        );
+        assert!(
+            *aborts.lock().unwrap() > 0,
+            "it must try to abort rather than assume the session is idle",
+        );
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn call_names_the_command_from_the_payload_it_sent() {
+        // Written by hand, the name appears twice per call — in the payload and
+        // in the error — with nothing keeping them in step.
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("cron_list") => Some(vec![failed(id, "cron_list", "nope")]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let error = with_host_mut(|host| {
+            host.call(serde_json::json!({ "type": "cron_list" }))?;
+            Ok(())
+        })
+        .unwrap_err();
+        assert!(error.contains("nope"), "got: {error}");
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn call_returns_the_data_payload_not_the_envelope() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("cron_list") => Some(vec![ok(
+                id,
+                "cron_list",
+                serde_json::json!({ "jobs": [{ "id": "a" }] }),
+            )]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let data =
+            with_host_mut(|host| host.call(serde_json::json!({ "type": "cron_list" }))).unwrap();
+        assert!(data["jobs"].is_array(), "data should be unwrapped: {data}");
+        assert!(data.get("success").is_none(), "envelope should be gone");
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_refused_state_read_is_not_reported_as_an_absent_goal() {
+        // `read_goal_state` returning None on refusal let the confirm loop
+        // treat a transport failure as "the goal is cleared".
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("get_connection_state") => {
+                Some(vec![failed(id, "get_connection_state", "session gone")])
+            }
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let result = agent_activity();
+        assert!(
+            result.is_err(),
+            "a refusal must not render as an idle harness"
+        );
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_refused_schedule_read_empties_only_its_own_section() {
+        // The tolerant policy is deliberate and stays: one failed section must
+        // not hide an active goal.
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("get_connection_state") => Some(vec![ok(
+                id,
+                "get_connection_state",
+                serde_json::json!({
+                    "thinkingLevel": "high",
+                    "goal": { "active": true, "objective": "ship it" }
+                }),
+            )]),
+            Some("cron_list") => Some(vec![failed(id, "cron_list", "cron exploded")]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let activity = agent_activity().expect("goal must survive a cron failure");
+        assert!(
+            activity.goal.is_some(),
+            "the goal section must still render"
+        );
+        assert_eq!(activity.thinking_level.as_deref(), Some("high"));
+        assert!(activity.heartbeats.is_empty());
+        assert!(activity.schedules.is_empty());
 
         let _ = shutdown_host();
     }
