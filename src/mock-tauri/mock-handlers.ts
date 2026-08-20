@@ -565,6 +565,8 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   list_prime_session_summaries: () => [],
   read_prime_session_transcript: () => [],
   switch_prime_session: () => 'mock-session',
+  get_prime_thinking_levels: () => ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+  set_prime_thinking_level: () => null,
   get_available_prime_models: () => [
     { id: 'grok-4.5', name: 'Grok 4.5', provider: 'xai', contextWindow: 256000, reasoning: true },
     { id: 'claude-fable-5', name: 'Claude Fable 5', provider: 'anthropic', reasoning: true },

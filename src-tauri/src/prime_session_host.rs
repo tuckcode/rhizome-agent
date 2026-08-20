@@ -156,6 +156,12 @@ pub struct PrimeHostStatus {
     /// Display name from Prime get_state model, when known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_name: Option<String>,
+    /// Reasoning level the session is running at, when the daemon reports one.
+    /// Read from the same state payload as the model so the strip's one
+    /// control has one source (#9), rather than polling two commands that can
+    /// disagree mid-change.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking_level: Option<String>,
     /// True when this connection rejoined a session that was already running.
     pub reattached: bool,
     /// When the attached session started, ISO-8601. The UI derives uptime from
@@ -353,6 +359,7 @@ struct PrimeHost {
     model_provider: Option<String>,
     model_id: Option<String>,
     model_name: Option<String>,
+    thinking_level: Option<String>,
     socket_path: PathBuf,
     cwd: PathBuf,
     is_streaming: bool,
@@ -511,6 +518,7 @@ pub fn get_status() -> PrimeHostStatus {
             model_provider: host.model_provider.clone(),
             model_id: host.model_id.clone(),
             model_name: host.model_name.clone(),
+            thinking_level: host.thinking_level.clone(),
             reattached: host.reattached,
             started_at: host.started_at.clone(),
             // The daemon reports `sessionFile` on only some state payloads,
@@ -533,6 +541,7 @@ pub fn get_status() -> PrimeHostStatus {
             model_provider: None,
             model_id: None,
             model_name: None,
+            thinking_level: None,
             reattached: false,
             started_at: None,
             session_path: None,
@@ -1820,6 +1829,7 @@ impl PrimeHost {
             model_provider: None,
             model_id: None,
             model_name: None,
+            thinking_level: None,
             socket_path,
             cwd: cwd.clone(),
             is_streaming: false,
@@ -2109,6 +2119,11 @@ impl PrimeHost {
         }
         if let Some(session_file) = data["sessionFile"].as_str() {
             self.session_path = Some(session_file.to_string());
+        }
+        // Read before the model early-return below: a session whose model is
+        // momentarily null would otherwise silently keep a stale level.
+        if let Some(level) = data["thinkingLevel"].as_str() {
+            self.thinking_level = Some(level.to_string());
         }
         let model = &data["model"];
         if model.is_null() {
@@ -4026,6 +4041,88 @@ mod tests {
     /// The composer chip reads `get_status`, which is a cache of the last
     /// `get_state`. Switching the model without refreshing that cache leaves
     /// the chip on the previous model even when Prime accepted the switch.
+    #[cfg(unix)]
+    #[test]
+    fn status_reports_the_thinking_level_the_daemon_sent() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("get_state") => Some(vec![ok(
+                id,
+                "get_state",
+                serde_json::json!({
+                    "sessionId": "sess-a",
+                    "isStreaming": false,
+                    "thinkingLevel": "high",
+                    "model": { "provider": "xai", "id": "grok-4.5", "name": "Grok 4.5" }
+                }),
+            )]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        assert_eq!(get_status().thinking_level.as_deref(), Some("high"));
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn thinking_level_survives_a_state_payload_with_no_model() {
+        // apply_state_data returns early when `model` is null. Anything read
+        // after that point is silently dropped, so the level is read before
+        // it -- this test is the guard on that ordering.
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let calls = Arc::new(Mutex::new(0usize));
+        let daemon = {
+            let calls = Arc::clone(&calls);
+            FakeDaemon::start(move |command, id| match command["type"].as_str() {
+                Some("get_state") => {
+                    let mut n = calls.lock().unwrap();
+                    *n += 1;
+                    // First reply carries a model, second does not.
+                    let model = if *n <= 1 {
+                        serde_json::json!({ "provider": "xai", "id": "grok-4.5", "name": "Grok 4.5" })
+                    } else {
+                        serde_json::Value::Null
+                    };
+                    Some(vec![ok(
+                        id,
+                        "get_state",
+                        serde_json::json!({
+                            "sessionId": "sess-a",
+                            "isStreaming": false,
+                            "thinkingLevel": if *n <= 1 { "low" } else { "max" },
+                            "model": model
+                        }),
+                    )])
+                }
+                _ => None,
+            })
+        };
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+        assert_eq!(get_status().thinking_level.as_deref(), Some("low"));
+
+        // Force another state read; the model is null this time.
+        let _ = with_host_mut(|host| {
+            let response = host.send_command(serde_json::json!({ "type": "get_state" }))?;
+            if let Some(data) = response.get("data") {
+                host.apply_state_data(data);
+            }
+            Ok(())
+        });
+        assert_eq!(
+            get_status().thinking_level.as_deref(),
+            Some("max"),
+            "a null model must not swallow the level",
+        );
+
+        let _ = shutdown_host();
+    }
+
     #[test]
     fn set_thinking_level_refuses_a_level_prime_does_not_have() {
         // Fails here rather than at the daemon: an unapplied level leaves the

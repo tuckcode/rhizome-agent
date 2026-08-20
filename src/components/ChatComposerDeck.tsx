@@ -1,18 +1,13 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { createTranslator, type AppLocale } from '../lib/i18n'
-import { PrimeModelPicker } from './PrimeModelPicker'
 
 interface ChatComposerDeckProps {
   locale?: AppLocale
-  modelLabel?: string | null
   vaultLabel?: string | null
   skillsLabel?: string | null
-  vaultPath?: string
   /** Frame B — the note open in the secondary pane. */
   contextLabel?: string | null
-  /** True while a turn is running — the model cannot change mid-turn. */
-  working?: boolean
 }
 
 function Chip({
@@ -41,19 +36,19 @@ function Chip({
 /**
  * Frame A's composer control deck.
  *
- * Says what this message is about to be sent to — agent, model, vault, skills
- * — at the point of sending, rather than in a settings screen the user is not
- * looking at. In a chat-first window this row is the only standing answer to
- * "what am I talking to right now".
+ * Says what this message is about to be sent to — agent, vault, skills — at
+ * the point of sending, rather than in a settings screen the user is not
+ * looking at.
+ *
+ * The model is deliberately absent: #9 moved it to the telemetry strip, where
+ * it sits with the thinking level as a single control. Two places to read the
+ * model meant two places that could disagree about which one answered.
  */
 export function ChatComposerDeck({
   locale = 'en',
-  modelLabel,
   vaultLabel,
   skillsLabel,
-  vaultPath,
   contextLabel,
-  working = false,
 }: ChatComposerDeckProps) {
   const t = createTranslator(locale)
 
@@ -65,12 +60,10 @@ export function ChatComposerDeck({
         {t('ai.panel.title')}
       </Chip>
 
-      <PrimeModelPicker
-        locale={locale}
-        label={modelLabel}
-        disabled={working}
-        vaultPath={vaultPath}
-      />
+      {/* The model picker moved to the telemetry strip and is deliberately
+          NOT duplicated here (#9): one place to read the model, one place to
+          change it, and they are the same place. The deck keeps vault and
+          skills. */}
 
       {vaultLabel ? <Chip title={t('ai.composer.vault')}>{vaultLabel}</Chip> : null}
       {contextLabel ? <Chip>{t('ai.composer.context', { note: contextLabel })}</Chip> : null}

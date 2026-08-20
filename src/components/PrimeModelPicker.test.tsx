@@ -5,6 +5,7 @@ import { PrimeModelPicker } from './PrimeModelPicker'
 const invoked = vi.hoisted(() => ({
   calls: [] as Array<{ cmd: string; args?: Record<string, unknown> }>,
   models: [] as unknown[],
+  levels: ['off', 'low', 'high'] as string[],
   fail: '',
 }))
 
@@ -14,13 +15,15 @@ vi.mock('../mock-tauri', () => ({
     invoked.calls.push({ cmd, args })
     if (cmd === 'set_prime_model' && invoked.fail) return Promise.reject(new Error(invoked.fail))
     if (cmd === 'get_available_prime_models') return Promise.resolve(invoked.models)
+    if (cmd === 'get_prime_thinking_levels') return Promise.resolve(invoked.levels)
     return Promise.resolve(null)
   },
 }))
 
-const tracked = vi.hoisted(() => ({ providers: [] as string[] }))
+const tracked = vi.hoisted(() => ({ providers: [] as string[], levels: [] as string[] }))
 vi.mock('../lib/productAnalytics', () => ({
   trackPrimeModelChanged: (provider: string) => tracked.providers.push(provider),
+  trackPrimeThinkingLevelChanged: (level: string) => tracked.levels.push(level),
 }))
 
 const MODELS = [
@@ -102,5 +105,34 @@ describe('PrimeModelPicker', () => {
       expect(call?.args).toEqual({ provider: 'anthropic', modelId: 'claude-fable-5' })
     })
     expect(tracked.providers).toEqual(['anthropic'])
+  })
+
+  it('offers Prime\'s thinking levels and sets the one picked (#9)', async () => {
+    render(<PrimeModelPicker variant="strip" label="Grok 4.5" thinkingLevel="off" />)
+
+    // Radix opens on pointerdown, not click.
+    fireEvent.pointerDown(
+      screen.getByTestId('prime-model-thinking-control'),
+      new PointerEvent('pointerdown', { bubbles: true, ctrlKey: false, button: 0 }),
+    )
+    await waitFor(() => expect(cmds()).toContain('get_prime_thinking_levels'))
+
+    const high = await screen.findByTestId('prime-thinking-level-high')
+    fireEvent.click(high)
+    await waitFor(() => expect(cmds()).toContain('set_prime_thinking_level'))
+    expect(tracked.levels).toContain('high')
+  })
+
+  it('takes the level list from the host rather than a hardcoded copy', async () => {
+    // #9: no hardcoded model or level anywhere in the frontend. If this ever
+    // renders levels without asking the host, the list has been duplicated.
+    render(<PrimeModelPicker variant="strip" label="Grok 4.5" />)
+    expect(screen.queryByTestId('prime-thinking-levels')).not.toBeInTheDocument()
+
+    fireEvent.pointerDown(
+      screen.getByTestId('prime-model-thinking-control'),
+      new PointerEvent('pointerdown', { bubbles: true, ctrlKey: false, button: 0 }),
+    )
+    await waitFor(() => expect(cmds()).toContain('get_prime_thinking_levels'))
   })
 })

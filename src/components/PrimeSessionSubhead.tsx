@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import type { PrimeConnectionProblem } from '../hooks/usePrimeHostStatus'
 import { subheadTrafficLightInset } from '../utils/trafficLights'
+import { PrimeModelPicker } from './PrimeModelPicker'
 import {
   primeSessionUptime,
   shortPrimeSessionId,
@@ -17,6 +18,9 @@ interface PrimeSessionSubheadProps {
   live: boolean
   sessionId?: string | null
   model?: string | null
+  /** Reasoning level, rendered as one control with the model (#9). */
+  thinkingLevel?: string | null
+  /** Vault the picker attaches to when it has to spawn a host. */
   vaultPath?: string | null
   /**
    * When the attached session started, ISO-8601.
@@ -84,6 +88,7 @@ export function PrimeSessionSubhead({
   live,
   sessionId,
   model,
+  thinkingLevel,
   vaultPath,
   startedAt,
   problem,
@@ -149,9 +154,16 @@ export function PrimeSessionSubhead({
       {model ? (
         <>
           <Separator />
-          <span className="min-w-0 truncate">
-            {t('ai.subhead.model')} <strong className="font-medium text-foreground">{model}</strong>
-          </span>
+          {/* One control, one place to read it and to change it (#9). The
+              composer deck no longer carries a second model picker. */}
+          <PrimeModelPicker
+            locale={locale}
+            label={model}
+            thinkingLevel={thinkingLevel}
+            side="bottom"
+            variant="strip"
+            vaultPath={vaultPath ?? undefined}
+          />
         </>
       ) : null}
 
