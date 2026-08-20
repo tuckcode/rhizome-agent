@@ -43,8 +43,22 @@ auto-compaction toggle). Characterization, not red-green: the refactor changed
 no behaviour, so there was no failing state to start from. **12 of 24 envelope
 sites still have no error-path test** — was 16.
 
-**Next:** candidate 4, revised — one producer for `thinking_level`, detailed
-under "Ranked pickup" below (that list's item 1 is now done).
+**Next:** read `docs/plans/2026-08-20-prime-surface-gap.md` before more harness
+work. Prime ships 35 docs with every install
+(`~/.local/lib/node_modules/prime-agent/docs/`), verified current against
+upstream `main` on 2026-08-20. Reading them turned up an `observe`/`unobserve`
+command that is the missing half of #13 and #27, a #14 that can watch and
+cancel scheduled work but never create it, and agent-to-agent messaging and
+autonomous mode with no desktop surface at all.
+
+**Two recorded findings were wrong** and are corrected in that doc: 0.7.4
+*does* ship `xai/grok-4.6` (an extension's `registerProvider` replaces the
+provider's built-in model list — that was the bug, since fixed locally), and
+`sessionName` is not "never sent" — it is omitted until `set_session_name` is
+called, which nothing in our tree does.
+
+Then candidate 4, revised — one producer for `thinking_level`, detailed under
+"Ranked pickup" below (that list's item 1 is now done).
 
 ---
 
