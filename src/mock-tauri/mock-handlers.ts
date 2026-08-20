@@ -565,6 +565,8 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   list_prime_session_summaries: () => [],
   read_prime_session_transcript: () => [],
   switch_prime_session: () => 'mock-session',
+  manage_prime_heartbeat: () => null,
+  cancel_prime_scheduled_work: () => null,
   get_prime_thinking_levels: () => ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
   set_prime_thinking_level: () => null,
   get_available_prime_models: () => [

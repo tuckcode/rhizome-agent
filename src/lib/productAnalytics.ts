@@ -89,6 +89,19 @@ export function trackPrimeThinkingLevelChanged(level: string): void {
   trackEvent('prime_thinking_level_changed', { level })
 }
 
+/**
+ * A scheduled prompt was paused, resumed, or cancelled from the band (#14).
+ *
+ * Both fields are fixed enums from Prime's own vocabulary — no prompt text,
+ * no job id, no session id. The prompt of a heartbeat is user content.
+ */
+export function trackPrimeScheduledWorkAction(
+  action: 'pause' | 'resume' | 'cancel',
+  source: string,
+): void {
+  trackEvent('prime_scheduled_work_action', { action, source })
+}
+
 export function trackMenuBarSessionOpened(options: {
   working: boolean
   subagentCount: number

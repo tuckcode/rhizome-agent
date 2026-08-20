@@ -826,6 +826,56 @@ pub fn set_thinking_level(level: &str) -> Result<(), String> {
     })
 }
 
+/// Pause, resume, or stop one heartbeat.
+///
+/// `stop` is the daemon's word for cancel. Only heartbeats accept this — the
+/// daemon has no `cron_pause`, so a plain schedule can be cancelled
+/// (`cancel_scheduled_work`) but never paused. Probed against 0.7.4.
+pub fn manage_heartbeat(job_id: &str, action: &str) -> Result<(), String> {
+    let job_id = job_id.trim();
+    if job_id.is_empty() {
+        return Err("A heartbeat needs an id to manage".into());
+    }
+    if !matches!(action, "pause" | "resume" | "stop") {
+        return Err(format!(
+            "Unknown heartbeat action {action:?}. Expected one of: pause, resume, stop",
+        ));
+    }
+    with_host_mut(|host| {
+        let response = host.send_command(serde_json::json!({
+            "type": "heartbeat_manage",
+            "jobId": job_id,
+            "action": action,
+        }))?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, "heartbeat_manage"));
+        }
+        Ok(())
+    })
+}
+
+/// Cancel a scheduled prompt.
+///
+/// Works for both kinds: `cron_cancel` takes any job id. Cancelling is
+/// irreversible — the job is gone, not paused — which is why the UI must not
+/// present it as the same weight of action as pause.
+pub fn cancel_scheduled_work(job_id: &str) -> Result<(), String> {
+    let job_id = job_id.trim();
+    if job_id.is_empty() {
+        return Err("A scheduled prompt needs an id to cancel".into());
+    }
+    with_host_mut(|host| {
+        let response = host.send_command(serde_json::json!({
+            "type": "cron_cancel",
+            "jobId": job_id,
+        }))?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, "cron_cancel"));
+        }
+        Ok(())
+    })
+}
+
 /// What the harness is doing besides answering: goal, heartbeats, schedules.
 ///
 /// One host lock for three round-trips. A sub-request that fails degrades that
@@ -845,22 +895,20 @@ pub fn agent_activity() -> Result<crate::prime_agent_activity::PrimeAgentActivit
             .cloned()
             .unwrap_or(serde_json::Value::Null);
 
-        // Named `heartbeats_list` / `cron_list` on the daemon, not the
-        // `list_heartbeats` / `list_schedules` RPC mode answered to. Probed
-        // against 0.7.1: the RPC spellings return `Unknown daemon command`,
-        // and would have degraded both sections to empty in silence.
-        let heartbeats = host
-            .send_command(serde_json::json!({ "type": "heartbeats_list" }))
-            .ok()
-            .and_then(|response| response.get("data").cloned())
-            .map(|data| activity::scheduled_work_from_response(&data, &["heartbeats"]))
-            .unwrap_or_default();
-
-        let schedules = host
+        // `cron_list` alone, not `cron_list` + `heartbeats_list`. Probed live
+        // against 0.7.4: `cron_list` returns BOTH kinds in `data.jobs`, tagged
+        // by `source`, and `heartbeats_list` returns the same heartbeats again
+        // wrapped in a `{"job": …}` envelope. Two calls meant every heartbeat
+        // appeared twice, and the enveloped copy parsed to all-None fields.
+        //
+        // Named `cron_list`, not the `list_schedules` spelling RPC mode
+        // answers to — that returns `Unknown daemon command` and would
+        // degrade the section to empty in silence.
+        let (heartbeats, schedules) = host
             .send_command(serde_json::json!({ "type": "cron_list" }))
             .ok()
             .and_then(|response| response.get("data").cloned())
-            .map(|data| activity::scheduled_work_from_response(&data, &["jobs", "schedules"]))
+            .map(|data| activity::split_scheduled_work(&data))
             .unwrap_or_default();
 
         Ok(activity::PrimeAgentActivity {
@@ -3393,21 +3441,26 @@ mod tests {
     /// answers `Unknown daemon command` to both, and `agent_activity` degrades
     /// a failed sub-request to empty — so the wrong names would have emptied
     /// the band in silence rather than failing loudly.
+    ///
+    /// Updated for #14: `cron_list` alone now serves both sections. It returns
+    /// heartbeats *and* cron jobs tagged by `source`, so the extra
+    /// `heartbeats_list` round-trip only re-delivered the same heartbeats in a
+    /// `{"job": …}` envelope — showing each one twice, once unparseable.
     #[cfg(unix)]
     #[test]
     fn agent_activity_asks_for_the_daemon_names_for_scheduled_work() {
         let _guard = host_guard();
         let vault = tempfile::tempdir().unwrap();
         let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
-            Some("heartbeats_list") => Some(vec![ok(
-                id,
-                "heartbeats_list",
-                serde_json::json!({ "heartbeats": [{ "id": "hb-1", "prompt": "check in" }] }),
-            )]),
             Some("cron_list") => Some(vec![ok(
                 id,
                 "cron_list",
-                serde_json::json!({ "jobs": [{ "id": "job-1", "prompt": "nightly" }] }),
+                serde_json::json!({ "jobs": [
+                    { "id": "hb-1", "source": "heartbeat", "prompt": "check in",
+                      "schedule": { "expression": "every 30 minutes" } },
+                    { "id": "job-1", "source": "cron", "prompt": "nightly",
+                      "schedule": { "expression": "0 3 * * *" } }
+                ] }),
             )]),
             _ => None,
         });
@@ -3417,14 +3470,21 @@ mod tests {
         let activity = agent_activity().unwrap();
 
         let asked = daemon.commands();
-        assert!(asked.contains(&"heartbeats_list".to_string()), "{asked:?}");
         assert!(asked.contains(&"cron_list".to_string()), "{asked:?}");
+        assert!(
+            !asked.contains(&"heartbeats_list".to_string()),
+            "one call serves both sections now: {asked:?}"
+        );
         assert!(
             !asked.iter().any(|c| c.starts_with("list_")),
             "the RPC spellings are gone: {asked:?}"
         );
-        assert_eq!(activity.heartbeats.len(), 1);
-        assert_eq!(activity.schedules.len(), 1);
+        assert_eq!(activity.heartbeats.len(), 1, "split by source");
+        assert_eq!(activity.schedules.len(), 1, "split by source");
+        assert_eq!(
+            activity.heartbeats[0].interval.as_deref(),
+            Some("every 30 minutes")
+        );
 
         let _ = shutdown_host();
     }
@@ -4127,6 +4187,165 @@ mod tests {
             Some("max"),
             "a null model must not swallow the level",
         );
+
+        let _ = shutdown_host();
+    }
+
+    /// End-to-end against a real daemon holding real scheduled work.
+    ///
+    /// Ignored by default — needs a live daemon with a session in $HOME that
+    /// has at least one cron job or heartbeat. Set one up with:
+    ///
+    /// ```text
+    /// prime-agent schedule add <agent> "0 9 * * 1-5" -- "probe"
+    /// ```
+    ///
+    /// then:
+    ///
+    /// ```text
+    /// cargo test --manifest-path src-tauri/Cargo.toml --lib \
+    ///   scheduled_work_against_the_live_daemon -- --ignored --nocapture
+    /// ```
+    ///
+    /// This exists because the previous shape for this data was *inferred*
+    /// from a skill's docs rather than observed, and was wrong in two ways
+    /// that made every heartbeat parse to all-None. Every other test here
+    /// feeds fixtures; only this one proves the real daemon agrees.
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "needs a running prime-agent daemon with scheduled work"]
+    fn scheduled_work_against_the_live_daemon() {
+        let _guard = host_guard();
+        let home = dirs::home_dir().expect("home");
+        connect_host(&home).expect("connect");
+
+        let activity = agent_activity().expect("activity");
+        println!(
+            "heartbeats={} schedules={}",
+            activity.heartbeats.len(),
+            activity.schedules.len()
+        );
+        for item in activity.heartbeats.iter().chain(activity.schedules.iter()) {
+            println!(
+                "  source={:?} status={:?} interval={:?} next={:?} label={:?}",
+                item.source, item.status, item.interval, item.next_run_at, item.label
+            );
+        }
+
+        let all: Vec<_> = activity
+            .heartbeats
+            .iter()
+            .chain(activity.schedules.iter())
+            .collect();
+        assert!(
+            !all.is_empty(),
+            "expected at least one scheduled job; add one with `prime-agent schedule add`",
+        );
+        // The three fields the UI is built on. Any of them coming back None
+        // means the shape moved again.
+        assert!(
+            all.iter().all(|item| item.id.is_some()),
+            "every job needs an id to act on"
+        );
+        assert!(
+            all.iter().all(|item| item.interval.is_some()),
+            "cadence must parse"
+        );
+        assert!(
+            all.iter().all(|item| item.source.is_some()),
+            "source distinguishes the two kinds"
+        );
+
+        let _ = shutdown_host();
+    }
+
+    #[test]
+    fn managing_a_heartbeat_refuses_an_action_the_daemon_does_not_have() {
+        assert!(
+            manage_heartbeat("job-1", "cancel").is_err(),
+            "the daemon calls it stop"
+        );
+        assert!(manage_heartbeat("job-1", "delete").is_err());
+        assert!(manage_heartbeat("", "pause").is_err(), "an id is required");
+        assert!(cancel_scheduled_work("   ").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn pausing_a_heartbeat_sends_the_job_id_and_action() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let seen: Arc<Mutex<Option<(String, String)>>> = Arc::new(Mutex::new(None));
+        let daemon = {
+            let seen = Arc::clone(&seen);
+            FakeDaemon::start(move |command, id| match command["type"].as_str() {
+                Some("heartbeat_manage") => {
+                    *seen.lock().unwrap() = Some((
+                        command["jobId"].as_str().unwrap_or_default().to_string(),
+                        command["action"].as_str().unwrap_or_default().to_string(),
+                    ));
+                    Some(vec![ok(id, "heartbeat_manage", serde_json::Value::Null)])
+                }
+                _ => None,
+            })
+        };
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        manage_heartbeat("8a44b0c4", "pause").unwrap();
+        assert_eq!(
+            seen.lock().unwrap().clone(),
+            Some(("8a44b0c4".to_string(), "pause".to_string())),
+        );
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancelling_scheduled_work_uses_cron_cancel_for_either_kind() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let seen: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+        let daemon = {
+            let seen = Arc::clone(&seen);
+            FakeDaemon::start(move |command, id| match command["type"].as_str() {
+                Some("cron_cancel") => {
+                    seen.lock()
+                        .unwrap()
+                        .push(command["jobId"].as_str().unwrap_or_default().to_string());
+                    Some(vec![ok(id, "cron_cancel", serde_json::Value::Null)])
+                }
+                _ => None,
+            })
+        };
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        // A heartbeat and a plain schedule both cancel through the same call.
+        cancel_scheduled_work("heartbeat-job").unwrap();
+        cancel_scheduled_work("cron-job").unwrap();
+        assert_eq!(*seen.lock().unwrap(), vec!["heartbeat-job", "cron-job"]);
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_refused_pause_is_surfaced_not_swallowed() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("heartbeat_manage") => Some(vec![failed(id, "heartbeat_manage", "no such job")]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        // A pause that silently fails leaves the row showing the old state,
+        // which reads as the control being broken.
+        let error = manage_heartbeat("gone", "pause").unwrap_err();
+        assert!(error.contains("no such job"), "got: {error}");
 
         let _ = shutdown_host();
     }

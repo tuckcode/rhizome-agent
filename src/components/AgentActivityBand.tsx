@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Target, Heartbeat, CalendarDots, Brain } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { invoke } from '@tauri-apps/api/core'
+import { ScheduledWorkPopover } from './ScheduledWorkPopover'
+import { withHeartbeatFlag, type PrimeScheduledWork } from '../lib/primeScheduledWork'
 
 async function call<T>(cmd: string): Promise<T> {
   if (isTauri()) return invoke<T>(cmd)
@@ -20,8 +22,8 @@ export interface PrimeAgentActivity {
     remainingTokens?: number
     continuationsUsed?: number
   }
-  heartbeats?: Array<{ id?: string; label?: string; interval?: string }>
-  schedules?: Array<{ id?: string; label?: string; interval?: string }>
+  heartbeats?: PrimeScheduledWork[]
+  schedules?: PrimeScheduledWork[]
   thinkingLevel?: string
 }
 
@@ -75,6 +77,20 @@ export function AgentActivityBand({
   const t = createTranslator(locale)
   const [activity, setActivity] = useState<PrimeAgentActivity | null>(now ?? null)
 
+  // Exposed so a pause/cancel can re-read immediately rather than waiting up
+  // to POLL_MS for the row to change — #14 requires the action to be reflected
+  // right away, and a 15s lag reads as the control not having worked.
+  const refresh = useCallback(async () => {
+    if (!enabled || now) return
+    try {
+      setActivity(await call<PrimeAgentActivity>('get_prime_agent_activity'))
+    } catch {
+      // The host may not be up yet. Staying quiet is right: this band is
+      // ambient, and an error strip for background state would be noise.
+      setActivity(null)
+    }
+  }, [enabled, now])
+
   useEffect(() => {
     if (!enabled || now) return
     let cancelled = false
@@ -83,8 +99,6 @@ export function AgentActivityBand({
         const next = await call<PrimeAgentActivity>('get_prime_agent_activity')
         if (!cancelled) setActivity(next)
       } catch {
-        // The host may not be up yet. Staying quiet is right: this band is
-        // ambient, and an error strip for background state would be noise.
         if (!cancelled) setActivity(null)
       }
     }
@@ -125,18 +139,26 @@ export function AgentActivityBand({
         </Item>
       ) : null}
 
-      {heartbeats.length > 0 ? (
-        <Item icon={Heartbeat}>
-          {t('ai.activity.heartbeats', { count: String(heartbeats.length) })}
-          {heartbeats[0]?.interval ? ` · ${heartbeats[0].interval}` : null}
-        </Item>
-      ) : null}
+      {/* Counts alone could not be acted on. Each group now opens the list
+          behind it so an individual entry can be paused or cancelled (#14). */}
+      <ScheduledWorkPopover
+        locale={locale}
+        icon={Heartbeat}
+        summary={
+          t('ai.activity.heartbeats', { count: String(heartbeats.length) }) +
+          (heartbeats[0]?.interval ? ` · ${heartbeats[0].interval}` : '')
+        }
+        items={withHeartbeatFlag(heartbeats)}
+        onChanged={() => void refresh()}
+      />
 
-      {schedules.length > 0 ? (
-        <Item icon={CalendarDots}>
-          {t('ai.activity.schedules', { count: String(schedules.length) })}
-        </Item>
-      ) : null}
+      <ScheduledWorkPopover
+        locale={locale}
+        icon={CalendarDots}
+        summary={t('ai.activity.schedules', { count: String(schedules.length) })}
+        items={withHeartbeatFlag(schedules)}
+        onChanged={() => void refresh()}
+      />
 
       {activity.thinkingLevel ? (
         <Item icon={Brain}>

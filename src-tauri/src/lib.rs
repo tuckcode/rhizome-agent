@@ -602,6 +602,8 @@ macro_rules! app_invoke_handler {
             commands::get_prime_thinking_levels,
             commands::fork_prime_session,
             commands::get_prime_agent_activity,
+            commands::manage_prime_heartbeat,
+            commands::cancel_prime_scheduled_work,
             commands::set_prime_goal,
             commands::clear_prime_goal,
             commands::steer_prime_session,
