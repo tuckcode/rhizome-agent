@@ -27,6 +27,80 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Session handoff — 2026-08-20 (Claude Opus 5: architecture review, verified)
+
+**State:** `main` in sync, tree clean, all gates green. Rust coverage **85.12%**
+(up from 85.03% two sessions ago). Prime **0.7.4**, daemon restarted onto it.
+
+**Shipped:** `53e8131` (review candidate 1 — `src/lib/callHost.ts`) and
+`41bb8cb` (candidate 3, first half — five sites where a daemon refusal read as
+an empty answer).
+
+### The method that mattered: verify a review before building on it
+
+Atticus ran an architecture review over the Prime harness surface (report in
+`$TMPDIR/architecture-review-*.html`). Before implementing, three independent
+agents re-derived candidates 3, 4 and 5 **from the code, without being told what
+the review concluded**. All three disagreed materially, and every correction made
+the work smaller and safer:
+
+- **Candidate 3** — 24 envelope sites, not the 18 I had grepped. Plus five that
+  never check `success` at all, which nobody had surfaced. And a warning that
+  mechanically folding `refresh_session_id` / `cron_list` would turn a
+  deliberately degraded section into a hard error across a panel.
+- **Candidate 4 — reversed.** Do **not** merge the three poll commands.
+  `get_status` does *no daemon RPC* (cached fields); `agent_activity` does two
+  round-trips. Merging makes the cheapest, most-watched signal hostage to the
+  slowest — at a 30s timeout the strip freezes for the length of a stall.
+  *Differing rates is a weak argument; differing failure blast radius is the
+  strong one.*
+- **Candidate 5 — reversed.** Do **not** extract the panel handlers yet.
+  Moving ~110 lines with zero tests is refactoring with no safety net. Write
+  ~120 test lines first using the harness that already exists
+  (`AiPanelView` takes `controller`; `QueuedPromptTargetHarness` at
+  `AiPanel.test.tsx:88-137`; `mock-handlers.ts:567-601` already implements all
+  seven commands).
+
+**Do this again.** A review with no independent check has soft numbers — this
+one said "40 times" (41), "five sites skip mockInvoke" (its own markup drew
+seven), and called a Tauri-only component "divergent" when it matched its
+neighbours. Structurally it was right every time; its counts were not.
+
+### What is left of candidate 3
+
+`PrimeHost::call` exists and is used by the five fixed sites. **~15 repetitive
+sites remain to fold onto it** — a mechanical follow-up. Do **not** convert:
+`abort_turn` (manual slot lock, returns bool), `read_roster_over` (no host
+exists), both `run_prompt_stream` paths (emit events; one runs outside
+`with_host_mut`), `switch_session` (maps `session_already_active` to real user
+advice), or `connect`'s shutdown-then-error (a resource decision). In each, the
+error *policy* is the point.
+
+**Still uncovered: 16 of 24 envelope sites have no error-path test.**
+
+### Ranked pickup
+
+1. **Candidate 3, second half** — fold the ~15 remaining sites onto
+   `PrimeHost::call`. Mechanical, Rust-only.
+2. **Candidate 4, revised** — one producer for `thinking_level`. It exists twice:
+   `PrimeHostStatus.thinking_level` (cached, written only via
+   `refresh_session_id`, i.e. after a turn or explicit set) and
+   `PrimeAgentActivity.thinking_level` (live, every 15s). They diverge on any
+   agent-initiated change, second client, or in-prompt directive — the band
+   updates, **the picker label stays stale until the next turn ends**. `7c5f7c9`
+   only fixed the explicit-set path. Cheapest fix: have `agent_activity` write
+   its live value into the host cache, then delete `7c5f7c9`'s forced refresh.
+   Also: `usePrimeHostStatus` is mounted by **three** components
+   (`ChatHome.tsx:59`, `AiPanel.tsx:225`, `App.tsx:1253`) — three 4s timers on
+   one mutex. Put it behind context.
+3. **Candidate 5, revised** — the ~120 test lines described above.
+4. **#26 / #28 / #27 / #29**, then candidate 2 (last, reduced scope).
+
+Full detail: `docs/plans/2026-08-19-harness-surface-and-architecture-review-session-status.md`
+and the plan at `~/.claude/plans/unified-splashing-puddle.md`.
+
+---
+
 ## Session handoff — 2026-08-19b (Claude Opus 5: #9, #14, C12, architecture review)
 
 **If you are not Claude, read `docs/CROSS-MODEL-HANDOFF.md` first.** Then this entry.
