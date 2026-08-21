@@ -58,6 +58,14 @@ pub struct PrimeSessionSummary {
     /// File mtime — what "last active" sorts on.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mtime_ms: Option<u64>,
+    /// Whether the log holds any message at all, of any role.
+    ///
+    /// Separate from `title` because the two answer different questions: a
+    /// session can be a real conversation with nothing quotable to name it
+    /// (agent-started, heartbeat-driven), and an unused draft has neither.
+    /// `list_sessions` drops the drafts — see #28.
+    #[serde(default)]
+    pub has_conversation: bool,
 }
 
 /// The log a session id writes to.
@@ -164,6 +172,7 @@ fn truncate_title(text: &str) -> String {
 fn summarize_lines<I: Iterator<Item = String>>(lines: I) -> PrimeSessionSummary {
     let mut summary = PrimeSessionSummary::default();
     let mut have_header = false;
+    let mut agent_opening: Option<String> = None;
 
     for line in lines.take(SUMMARY_SCAN_LINE_LIMIT) {
         let Ok(event) = serde_json::from_str::<serde_json::Value>(&line) else {
@@ -178,8 +187,20 @@ fn summarize_lines<I: Iterator<Item = String>>(lines: I) -> PrimeSessionSummary 
                 have_header = true;
             }
             "message" if summary.title.is_none() => {
+                summary.has_conversation = true;
                 let message = &event["message"];
-                if message["role"].as_str() != Some("user") {
+                let role = message["role"].as_str();
+                if role != Some("user") {
+                    // No user turn to quote yet. Remember the agent's first
+                    // words so a session it started is not left nameless, but
+                    // keep scanning: a later user turn still wins (see
+                    // `title_comes_from_the_user_not_the_assistant`).
+                    if role == Some("assistant") && agent_opening.is_none() {
+                        let preview = normalize_whitespace(&joined_text(&message["content"]));
+                        if !preview.is_empty() {
+                            agent_opening = Some(truncate_title(&preview));
+                        }
+                    }
                     continue;
                 }
                 // A user turn is stored as Rhizome composed it, so the raw
@@ -194,11 +215,15 @@ fn summarize_lines<I: Iterator<Item = String>>(lines: I) -> PrimeSessionSummary 
                     summary.title = Some(truncate_title(&preview));
                 }
             }
+            "message" => summary.has_conversation = true,
             _ => {}
         }
         if have_header && summary.title.is_some() {
             break;
         }
+    }
+    if summary.title.is_none() {
+        summary.title = agent_opening;
     }
     summary
 }
@@ -222,15 +247,34 @@ pub fn summarize_file(path: &Path) -> Result<PrimeSessionSummary, String> {
     Ok(summary)
 }
 
-/// Every session, newest first, summarised for a list.
+/// Drop the sessions that were created and never used.
+///
+/// Rhizome opens a session when it attaches to a vault, so every launch nobody
+/// types into leaves a five-line log behind. Measured on a real store
+/// (2026-08-20): **41 of 91 logs held no message at all**, and they rendered as
+/// half a history list of "Untitled session" rows that open onto nothing. #28.
+///
+/// Split out from `list_sessions` because that function reads the user's home
+/// directory and cannot be exercised in a test; this is where the decision
+/// lives, and it is pure.
+fn worth_listing(summaries: Vec<PrimeSessionSummary>) -> Vec<PrimeSessionSummary> {
+    summaries
+        .into_iter()
+        .filter(|summary| summary.has_conversation)
+        .collect()
+}
+
+/// Every session that holds a conversation, newest first, summarised for a list.
 ///
 /// A log that cannot be read is skipped rather than failing the whole list:
 /// one unreadable file must not hide every other session.
 pub fn list_sessions() -> Result<Vec<PrimeSessionSummary>, String> {
-    Ok(session_files()?
-        .iter()
-        .filter_map(|path| summarize_file(path).ok())
-        .collect())
+    Ok(worth_listing(
+        session_files()?
+            .iter()
+            .filter_map(|path| summarize_file(path).ok())
+            .collect(),
+    ))
 }
 
 /// One item in a replayed conversation, in the order it happened.
@@ -568,6 +612,78 @@ mod tests {
         assert_eq!(
             summary.started_at.as_deref(),
             Some("2026-08-09T11:21:12.442Z")
+        );
+    }
+
+    #[test]
+    fn the_list_drops_drafts_and_keeps_conversations() {
+        let draft = PrimeSessionSummary {
+            id: "draft".into(),
+            has_conversation: false,
+            ..Default::default()
+        };
+        let real = PrimeSessionSummary {
+            id: "real".into(),
+            has_conversation: true,
+            title: Some("how do I link two notes?".into()),
+            ..Default::default()
+        };
+
+        let listed = worth_listing(vec![draft, real]);
+
+        assert_eq!(listed.len(), 1, "an unused draft is not a session to open");
+        assert_eq!(listed[0].id, "real");
+    }
+
+    /// #28. Measured on a real store on 2026-08-20: **41 of 91 session logs
+    /// had zero messages of any kind** — five lines of header, model, thinking
+    /// level, service tier and state, and nothing else. Rhizome creates a
+    /// session when it attaches to a vault, so every launch that goes unused
+    /// leaves one behind. They filled about half the history list as "Untitled
+    /// session", and no naming scheme fixes that: there is nothing in them to
+    /// name.
+    #[test]
+    fn a_session_that_was_never_used_carries_no_conversation() {
+        let summary = summarize_lines(lines(&[
+            r#"{"type":"session","id":"draft","timestamp":"2026-08-20T19:03:05.620Z"}"#,
+            r#"{"type":"model_change","model":"grok-4.6"}"#,
+            r#"{"type":"thinking_level_change","level":"medium"}"#,
+            r#"{"type":"service_tier_change","tier":"standard"}"#,
+            r#"{"type":"session_state","state":"idle"}"#,
+        ]));
+
+        assert!(
+            !summary.has_conversation,
+            "a log with no message events is an unused draft, not a conversation",
+        );
+    }
+
+    #[test]
+    fn one_message_is_enough_to_count_as_a_conversation() {
+        let summary = summarize_lines(lines(&[
+            r#"{"type":"session","id":"s1"}"#,
+            r#"{"type":"message","message":{"role":"user","content":[{"type":"text","text":"hi"}]}}"#,
+        ]));
+
+        assert!(summary.has_conversation);
+    }
+
+    /// Six of those 91 had messages but no user turn — an agent-started or
+    /// heartbeat-driven session. They are real conversations and must stay
+    /// listed, so `has_conversation` cannot be a synonym for "has a title".
+    #[test]
+    fn an_assistant_only_session_is_still_a_conversation() {
+        let summary = summarize_lines(lines(&[
+            r#"{"type":"session","id":"s1"}"#,
+            r#"{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"Checking the deploy."}]}}"#,
+        ]));
+
+        assert!(summary.has_conversation, "assistant turns are conversation");
+        assert_eq!(
+            summary.title.as_deref(),
+            Some("Checking the deploy."),
+            "with no user turn to quote, the agent's own first words name it \
+             better than \"Untitled session\" does",
         );
     }
 

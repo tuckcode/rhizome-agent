@@ -18,6 +18,12 @@ export interface PrimeSessionSummary {
   startedAt?: string | null
   gitBranch?: string | null
   mtimeMs?: number | null
+  /**
+   * Whether the log holds any message at all. Sessions without one are unused
+   * drafts and are already filtered out by `list_sessions` (#28); the field is
+   * mirrored here so the shape matches what Rust serialises.
+   */
+  hasConversation?: boolean
 }
 
 /** Coarse age, for analytics only — never rendered. */
