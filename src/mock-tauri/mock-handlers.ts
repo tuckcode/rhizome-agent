@@ -173,8 +173,38 @@ let mockVaultAiGuidanceStatus = {
 } as const
 
 /** Mirrors the Rust `PrimeGoalState` idle shape until `set_prime_goal` mutates it. */
-let mockPrimeGoal: { active: boolean; objective?: string; remainingTokens?: number } = {
+/**
+ * `status` mirrors what the daemon actually sends — `active`, `paused`,
+ * `completed` or `failed` — which the mock omitted. Anything watching for a
+ * goal *finishing* rather than merely disappearing reads that field, so a mock
+ * without it cannot exercise the difference.
+ */
+let mockPrimeGoal: {
+  active: boolean
+  status?: string
+  objective?: string
+  remainingTokens?: number
+} = {
   active: false,
+}
+
+/**
+ * Drive the mock's goal from a browser console during QA.
+ *
+ * A completed goal is otherwise unreachable without a live daemon and a real
+ * agent finishing real work, which makes the one visible consequence — the
+ * celebration — impossible to look at. Dev builds only.
+ */
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  ;(window as unknown as { __rhizomeMockGoal?: unknown }).__rhizomeMockGoal = {
+    complete: () => {
+      mockPrimeGoal = { ...mockPrimeGoal, active: false, status: 'completed' }
+    },
+    start: (objective = 'Ship the thing') => {
+      mockPrimeGoal = { active: true, status: 'active', objective }
+    },
+    read: () => mockPrimeGoal,
+  }
 }
 
 function normalizeMockVaultPath(path: string | null | undefined): string | null {
@@ -594,7 +624,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     `~/Downloads/prime-session-${sessionPath.split('/').pop()?.replace(/\.jsonl$/, '') ?? 'session'}.html`,
   get_prime_agent_activity: () => ({ goal: mockPrimeGoal, heartbeats: [], schedules: [] }),
   set_prime_goal: ({ objective, tokenBudget }: { objective: string; tokenBudget?: number }) => {
-    mockPrimeGoal = { active: true, objective, remainingTokens: tokenBudget }
+    mockPrimeGoal = { active: true, status: 'active', objective, remainingTokens: tokenBudget }
     return mockPrimeGoal
   },
   clear_prime_goal: () => {

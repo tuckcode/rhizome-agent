@@ -40,6 +40,7 @@ import { isInboxAutomationEnabled } from './utils/inboxAutomation'
 import { useRecentVaultWrites, useVaultWatcher } from './hooks/useVaultWatcher'
 import { useSettings } from './hooks/useSettings'
 import { CelebrationProvider } from './components/CelebrationProvider'
+import { PrimeActivityProvider } from './components/PrimeActivityProvider'
 import { readCelebrationsEnabled } from './lib/celebration'
 import { useNoteWidthMode } from './hooks/useNoteWidthMode'
 import { useNoteActions } from './hooks/useNoteActions'
@@ -1769,6 +1770,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   return (
     <AppPreferencesProvider dateDisplayFormat={dateDisplayFormat}>
       <CelebrationProvider enabled={readCelebrationsEnabled(settings.celebrations_enabled)}>
+      <PrimeActivityProvider enabled={aiFeaturesEnabled}>
       <div className="app-shell">
         <div className="app">
           {commandRailEnabled && (
@@ -2023,6 +2025,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           aiAgentsStatus={aiAgentsStatus}
         />
       </div>
+    </PrimeActivityProvider>
     </CelebrationProvider>
     </AppPreferencesProvider>
   )

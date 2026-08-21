@@ -28,6 +28,14 @@ describe('ConfettiCannon', () => {
     expect(() => render(<ConfettiCannon fireKey={3} />)).not.toThrow()
   })
 
+  it('reports how many bursts it has fired', () => {
+    const { rerender } = render(<ConfettiCannon fireKey={0} />)
+    expect(screen.getByTestId('confetti-cannon')).toHaveAttribute('data-burst-count', '0')
+
+    rerender(<ConfettiCannon fireKey={2} />)
+    expect(screen.getByTestId('confetti-cannon')).toHaveAttribute('data-burst-count', '2')
+  })
+
   it('stays mounted but silent when disabled', () => {
     render(<ConfettiCannon fireKey={2} enabled={false} />)
     expect(screen.getByTestId('confetti-cannon')).toBeInTheDocument()

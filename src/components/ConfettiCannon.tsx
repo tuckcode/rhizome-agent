@@ -165,6 +165,11 @@ export function ConfettiCannon({ fireKey, enabled = true }: ConfettiCannonProps)
     <canvas
       ref={canvasRef}
       data-testid="confetti-cannon"
+      // How many bursts this cannon has fired. The animation itself lives in
+      // a worker-owned canvas whose pixels the page cannot read, so without
+      // this there is no way for a test — or a person poking at the console —
+      // to tell a working celebration from a silent one.
+      data-burst-count={fireKey}
       aria-hidden
       className="pointer-events-none fixed inset-0 z-[9999]"
       // Sized explicitly because a canvas is a replaced element: `inset-0`

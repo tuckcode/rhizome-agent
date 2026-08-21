@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
-import { callHost } from '../lib/callHost'
 import { Target, Heartbeat, CalendarDots, Brain } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { ScheduledWorkPopover } from './ScheduledWorkPopover'
 import { withHeartbeatFlag, type PrimeScheduledWork } from '../lib/primeScheduledWork'
+import { usePrimeActivity } from './primeActivityContext'
 
 
 /** Mirrors `PrimeAgentActivity` in `src-tauri/src/prime_agent_activity.rs`. */
@@ -22,9 +21,6 @@ export interface PrimeAgentActivity {
   thinkingLevel?: string
 }
 
-/** How often the band re-reads. Slower than the host poll — this is background
- *  work, not turn state, and nothing here changes second to second. */
-const POLL_MS = 15_000
 
 function Item({
   icon: Icon,
@@ -70,40 +66,12 @@ export function AgentActivityBand({
   now?: PrimeAgentActivity
 }) {
   const t = createTranslator(locale)
-  const [activity, setActivity] = useState<PrimeAgentActivity | null>(now ?? null)
-
-  // Exposed so a pause/cancel can re-read immediately rather than waiting up
-  // to POLL_MS for the row to change — #14 requires the action to be reflected
-  // right away, and a 15s lag reads as the control not having worked.
-  const refresh = useCallback(async () => {
-    if (!enabled || now) return
-    try {
-      setActivity(await callHost<PrimeAgentActivity>('get_prime_agent_activity'))
-    } catch {
-      // The host may not be up yet. Staying quiet is right: this band is
-      // ambient, and an error strip for background state would be noise.
-      setActivity(null)
-    }
-  }, [enabled, now])
-
-  useEffect(() => {
-    if (!enabled || now) return
-    let cancelled = false
-    const read = async () => {
-      try {
-        const next = await callHost<PrimeAgentActivity>('get_prime_agent_activity')
-        if (!cancelled) setActivity(next)
-      } catch {
-        if (!cancelled) setActivity(null)
-      }
-    }
-    void read()
-    const id = window.setInterval(() => void read(), POLL_MS)
-    return () => {
-      cancelled = true
-      window.clearInterval(id)
-    }
-  }, [enabled, now])
+  const shared = usePrimeActivity()
+  // `now` stays a test seam; otherwise the reading comes from the app-level
+  // poll. This component used to own that poll, which quietly meant nothing
+  // watched the harness unless the Chat destination was on screen.
+  const activity = now ?? shared.activity
+  const refresh = shared.refresh
 
   if (!enabled || !activity) return null
 
