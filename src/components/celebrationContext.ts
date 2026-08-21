@@ -1,6 +1,11 @@
 import { createContext, useContext } from 'react'
 import type { CelebrationReason } from '../lib/celebration'
 
+export interface CelebrationDetails {
+  message?: string
+  from?: string
+}
+
 /**
  * The seam between "something happened" and "show confetti".
  *
@@ -11,7 +16,12 @@ import type { CelebrationReason } from '../lib/celebration'
 
 export interface CelebrationContextValue {
   /** Returns whether this actually fired. */
-  celebrate: (reason: CelebrationReason) => boolean
+  /**
+   * Ask for a celebration. `details.message` is the agent's own words, shown
+   * as a toast when the celebration actually happens — a refused celebration
+   * shows nothing at all, message or not.
+   */
+  celebrate: (reason: CelebrationReason, details?: CelebrationDetails) => boolean
   enabled: boolean
 }
 

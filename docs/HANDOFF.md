@@ -1762,14 +1762,14 @@ Note what this implies about the record: sessions in this window that report "al
 
 ## Open threads
 
-- **C36-OPEN: a celebration's `message` has nowhere to go.** `show_confetti`
-  accepts an optional one-line congratulation and carries it all the way to
-  `CelebrationProvider`, which drops it — this app has no toast surface at all
-  (no sonner, no `useToast`, nothing in `components/ui`). Confetti alone is a
-  complete answer, so nothing is broken, but the tool's schema promises
-  something the UI does not deliver. Either build a toast (Cursor shows one for
-  4.5s with a "From <agent>" attribution) or drop `message` from the tool.
-  Leaving it half-wired is the one option that goes stale.
+- **C36-RESOLVED (2026-08-21): a celebration's `message` now has somewhere to
+  go.** `CelebrationToast` shows the agent's line for 4.5s with an optional
+  "From <name>", dismissable early. It appears only when the celebration
+  actually fires — a refusal is silent in both halves, since showing the words
+  while suppressing the confetti would turn the cooldown into a second, quieter
+  celebration. `role="status"` because the cannon's canvas is `aria-hidden`
+  decoration, making the toast the only part of a celebration a screen reader
+  can reach.
 
 - **C34-OPEN (half done): the menu-bar roster's activity labels.** The eight
   statuses are no longer English literals in `primeRunningSessions.ts` — the
