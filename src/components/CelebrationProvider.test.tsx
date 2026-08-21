@@ -1,6 +1,6 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CelebrationProvider } from './CelebrationProvider'
+import { CELEBRATION_TOAST_MS, CelebrationProvider } from './CelebrationProvider'
 import { useCelebration } from './celebrationContext'
 import { CELEBRATION_COOLDOWN_MS } from '../lib/celebration'
 import { requestCelebration } from '../lib/celebrationEvents'
@@ -150,6 +150,93 @@ describe('CelebrationProvider', () => {
     })
 
     expect(tracked.calls).toEqual([{ reason: 'agent', shown: false, refusal: 'disabled' }])
+  })
+
+  it('shows the agent’s words alongside the confetti', () => {
+    render(
+      <CelebrationProvider>
+        <Trigger onResult={vi.fn()} />
+      </CelebrationProvider>,
+    )
+
+    act(() => {
+      requestCelebration({ message: 'Migration landed', from: 'Prime' })
+    })
+
+    expect(screen.getByTestId('celebration-toast')).toBeInTheDocument()
+    expect(screen.getByText('Migration landed')).toBeInTheDocument()
+    expect(screen.getByText('From Prime')).toBeInTheDocument()
+  })
+
+  it('says nothing when the agent sent no words', () => {
+    render(
+      <CelebrationProvider>
+        <Trigger onResult={vi.fn()} />
+      </CelebrationProvider>,
+    )
+
+    act(() => {
+      requestCelebration({})
+    })
+
+    expect(screen.queryByTestId('celebration-toast')).not.toBeInTheDocument()
+  })
+
+  /**
+   * A refusal is silent in both halves. Showing the words while suppressing
+   * the confetti would turn the cooldown into a second, quieter celebration —
+   * which is the thing the cooldown exists to prevent.
+   */
+  it('stays silent when the celebration was refused', () => {
+    render(
+      <CelebrationProvider enabled={false}>
+        <Trigger onResult={vi.fn()} />
+      </CelebrationProvider>,
+    )
+
+    act(() => {
+      requestCelebration({ message: 'Migration landed' })
+    })
+
+    expect(screen.queryByTestId('celebration-toast')).not.toBeInTheDocument()
+  })
+
+  it('clears the words after a few seconds', () => {
+    vi.useFakeTimers()
+    render(
+      <CelebrationProvider>
+        <Trigger onResult={vi.fn()} />
+      </CelebrationProvider>,
+    )
+
+    act(() => {
+      requestCelebration({ message: 'Migration landed' })
+    })
+    expect(screen.getByTestId('celebration-toast')).toBeInTheDocument()
+
+    act(() => {
+      vi.advanceTimersByTime(CELEBRATION_TOAST_MS + 1)
+    })
+
+    expect(screen.queryByTestId('celebration-toast')).not.toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it('can be dismissed before it expires', () => {
+    render(
+      <CelebrationProvider>
+        <Trigger onResult={vi.fn()} />
+      </CelebrationProvider>,
+    )
+
+    act(() => {
+      requestCelebration({ message: 'Migration landed' })
+    })
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    })
+
+    expect(screen.queryByTestId('celebration-toast')).not.toBeInTheDocument()
   })
 
   it('is a no-op outside a provider rather than a crash', () => {

@@ -1774,7 +1774,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
 
   return (
     <AppPreferencesProvider dateDisplayFormat={dateDisplayFormat}>
-      <CelebrationProvider enabled={readCelebrationsEnabled(settings.celebrations_enabled)}>
+      <CelebrationProvider
+        enabled={readCelebrationsEnabled(settings.celebrations_enabled)}
+        locale={appLocale}
+      >
       <PrimeActivityProvider enabled={aiFeaturesEnabled}>
       <div className="app-shell">
         <div className="app">
