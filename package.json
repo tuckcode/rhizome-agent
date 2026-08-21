@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
     "agent-docs": "node scripts/build-agent-docs.mjs",
     "bundle-mcp": "node scripts/bundle-mcp-server.mjs",
     "docs:dev": "vitepress dev site --host 127.0.0.1",
