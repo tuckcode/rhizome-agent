@@ -5,7 +5,7 @@ import { createTranslator, DEFAULT_APP_LOCALE } from '../lib/i18n'
 import { isTauri } from '../mock-tauri'
 import { useMenuBarCompanionVault } from '../hooks/useMenuBarCompanionVault'
 import { useMenuBarRunningSessions } from '../hooks/useMenuBarRunningSessions'
-import type { RunningSessionRow } from '../lib/primeRunningSessions'
+import { rosterActivityMessageKey, type RunningSessionRow } from '../lib/primeRunningSessions'
 import { buildCaptureNote } from '../utils/menuBarCapture'
 import { trackMenuBarSessionOpened } from '../lib/productAnalytics'
 
@@ -254,6 +254,13 @@ export function MenuBarCompanionApp() {
                       : t('menuBarCompanion.runningSubagents', { count: row.subagentCount })
                   }
                   openLabel={t('menuBarCompanion.runningOpenSession')}
+                  // Prose from the daemon is passed through untranslated; a
+                  // status is copy we own, so it goes through the locale file.
+                  activityLabel={
+                    row.activity.kind === 'summary'
+                      ? row.activity.text
+                      : t(rosterActivityMessageKey(row.activity.key))
+                  }
                   onOpen={() => {
                     trackMenuBarSessionOpened({
                       working: row.working,
@@ -354,11 +361,13 @@ function RunningSessionItem({
   row,
   subagentLabel,
   openLabel,
+  activityLabel,
   onOpen,
 }: {
   row: RunningSessionRow
   subagentLabel: string
   openLabel: string
+  activityLabel: string
   onOpen: () => void
 }) {
   return (
@@ -395,7 +404,7 @@ function RunningSessionItem({
           ) : null}
         </span>
         <span className="truncate pl-3 font-mono text-[10.5px] text-[var(--text-muted,var(--muted-foreground))]">
-          {row.activityLabel}
+          {activityLabel}
         </span>
       </button>
     </li>

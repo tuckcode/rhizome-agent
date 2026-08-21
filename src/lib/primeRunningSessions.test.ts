@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ROSTER_ACTIVITY_KEYS,
   isRosterSessionRunning,
+  rosterActivityMessageKey,
   rosterSessionTitle,
   runningSessionOverflow,
   toRunningSessionRows,
@@ -166,24 +168,24 @@ describe('toRunningSessionRows', () => {
     const rows = toRunningSessionRows([
       session({ activity: 'working', summary: 'Reading the vault loader' }),
     ])
-    expect(rows[0].activityLabel).toBe('Reading the vault loader')
+    expect(rows[0].activity).toEqual({ kind: 'summary', text: 'Reading the vault loader' })
   })
 
   it('describes what it is doing when the daemon has no summary yet', () => {
     const compacting = toRunningSessionRows([session({ activity: 'working', isCompacting: true })])
-    expect(compacting[0].activityLabel).toBe('Compacting')
+    expect(compacting[0].activity).toEqual({ kind: 'status', key: 'compacting' })
 
     const bash = toRunningSessionRows([session({ activity: 'working', isBashRunning: true })])
-    expect(bash[0].activityLabel).toBe('Running a command')
+    expect(bash[0].activity).toEqual({ kind: 'status', key: 'runningCommand' })
 
     const tools = toRunningSessionRows([session({ activity: 'working', isRunningTools: true })])
-    expect(tools[0].activityLabel).toBe('Running tools')
+    expect(tools[0].activity).toEqual({ kind: 'status', key: 'runningTools' })
 
     const streaming = toRunningSessionRows([session({ activity: 'working', isStreaming: true })])
-    expect(streaming[0].activityLabel).toBe('Replying')
+    expect(streaming[0].activity).toEqual({ kind: 'status', key: 'replying' })
 
     const bare = toRunningSessionRows([session({ activity: 'working' })])
-    expect(bare[0].activityLabel).toBe('Working')
+    expect(bare[0].activity).toEqual({ kind: 'status', key: 'working' })
   })
 
   it('reports waiting on subagents when only the children are busy', () => {
@@ -191,14 +193,14 @@ describe('toRunningSessionRows', () => {
       session({ id: 'root', activeSessionId: 'root', activity: 'idle', hasRunningRlmChildren: true }),
       session({ id: 'kid', activeSessionId: 'kid', runtimeKind: 'subagent', rlmDepth: 1, parentActiveSessionId: 'root' }),
     ])
-    expect(rows[0].activityLabel).toBe('Waiting on subagents')
+    expect(rows[0].activity).toEqual({ kind: 'status', key: 'waitingOnSubagents' })
   })
 
   it('collapses a multi-line summary to one line', () => {
     const rows = toRunningSessionRows([
       session({ activity: 'working', summary: 'Reading\nthe   loader' }),
     ])
-    expect(rows[0].activityLabel).toBe('Reading the loader')
+    expect(rows[0].activity).toEqual({ kind: 'summary', text: 'Reading the loader' })
   })
 
   it('sorts working sessions above merely-busy ones, then by recency', () => {
@@ -324,7 +326,7 @@ describe('a session waiting on the user does not claim to be working', () => {
         firstMessage: 'check the deploy',
       },
     ])
-    expect(rows[0]?.activityLabel).toBe('Waiting for you')
+    expect(rows[0]?.activity).toEqual({ kind: 'status', key: 'waitingForYou' })
   })
 
   it('prefers the heartbeat explanation, which says more', () => {
@@ -337,7 +339,7 @@ describe('a session waiting on the user does not claim to be working', () => {
         firstMessage: 'check the deploy',
       },
     ])
-    expect(rows[0]?.activityLabel).toBe('Waiting on a heartbeat')
+    expect(rows[0]?.activity).toEqual({ kind: 'status', key: 'waitingOnHeartbeat' })
   })
 
   it('still reports real work when the agent is turning', () => {
@@ -350,6 +352,28 @@ describe('a session waiting on the user does not claim to be working', () => {
         firstMessage: 'check the deploy',
       },
     ])
-    expect(rows[0]?.activityLabel).toBe('Replying')
+    expect(rows[0]?.activity).toEqual({ kind: 'status', key: 'replying' })
+  })
+})
+
+/**
+ * C34. Every status this module produced was an English literal, so the
+ * popover stayed English in every locale. The module is pure and has no
+ * translator, so it names the status and the view supplies the words.
+ */
+describe('activity statuses are named, not written', () => {
+  it('gives every known status a key the locale file can translate', () => {
+    const keys = ROSTER_ACTIVITY_KEYS
+    expect(new Set(keys).size).toBe(keys.length)
+    for (const key of keys) {
+      expect(rosterActivityMessageKey(key)).toBe(`menuBarCompanion.activity.${key}`)
+    }
+  })
+
+  it('passes the daemon’s own summary through as prose, not a key', () => {
+    const rows = toRunningSessionRows([
+      { activeSessionId: 'a', activity: 'working', summary: 'Rebuilding the index' },
+    ])
+    expect(rows[0]?.activity).toEqual({ kind: 'summary', text: 'Rebuilding the index' })
   })
 })
