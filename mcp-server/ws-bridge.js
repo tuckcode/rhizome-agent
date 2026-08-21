@@ -146,6 +146,7 @@ const TOOL_EXECUTORS = [
   ['highlight_editor', highlightTool],
   ['ui_set_filter', uiSetFilterTool],
   ['refresh_vault', refreshVaultTool],
+  ['show_confetti', (args) => toolService.showConfetti(args)],
   ['rhizome_search', (args) => toolService.searchNotes(args)],
   ['rhizome_lint', async (args) => {
     const { execFileSync } = await import('node:child_process')

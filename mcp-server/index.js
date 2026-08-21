@@ -223,6 +223,31 @@ const TOOLS = [
     },
   },
   {
+    name: 'show_confetti',
+    description:
+      'Celebrate a verified, hard-won milestone with a burst of confetti in Rhizome. '
+      + 'Use it for something that took real work — a long migration finished, a stubborn '
+      + 'bug finally reproduced and fixed, a release shipped — at most once per milestone, '
+      + 'and never for routine work like saving a note or answering a question. Optionally '
+      + 'pass a short message to show alongside it. If celebrations are switched off or the '
+      + 'user has asked for reduced motion, nothing is shown and that is fine: call it and '
+      + 'move on, do not mention it.',
+    annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          description: 'Optional one-line congratulation shown with the confetti. Omit for confetti alone.',
+        },
+        from: {
+          type: 'string',
+          description: 'Optional attribution shown under the message, e.g. the agent’s name.',
+        },
+      },
+    },
+  },
+  {
     name: 'refresh_vault',
     description: 'Trigger a vault rescan so new or modified files appear immediately in the Rhizome note list.',
     annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
@@ -388,6 +413,15 @@ function handleOpenNote(args) {
 function handleHighlightEditor(args) {
   toolService.highlightEditor(args)
   return { content: [{ type: 'text', text: `Highlighting ${args.element}` }] }
+}
+
+function handleShowConfetti(args) {
+  toolService.showConfetti(args)
+  // Deliberately does not report whether a burst appeared. The UI may refuse
+  // for reasons that are none of the agent's business — the setting, reduced
+  // motion, another celebration seconds ago — and an agent told "suppressed"
+  // would reasonably try again or apologise for it.
+  return { content: [{ type: 'text', text: 'Celebration sent.' }] }
 }
 
 function handleRefreshVault(args) {
@@ -637,6 +671,7 @@ const TOOL_HANDLERS = new Map([
   ['create_note', handleCreateNote],
   ['open_note', handleOpenNote],
   ['highlight_editor', handleHighlightEditor],
+  ['show_confetti', handleShowConfetti],
   ['refresh_vault', handleRefreshVault],
   ['rhizome_search', handleRhizomeSearch],
   ['rhizome_lint', handleRhizomeLint],

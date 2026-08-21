@@ -102,6 +102,34 @@ export function createMcpToolService({
     return { targetPath }
   }
 
+  /** Longest toast the celebration will carry. */
+  const MAX_CELEBRATION_MESSAGE = 140
+
+  function trimmedOrUndefined(value, maxLength) {
+    if (typeof value !== 'string') return undefined
+    const trimmed = value.trim()
+    if (!trimmed) return undefined
+    return trimmed.length > maxLength ? `${trimmed.slice(0, maxLength - 1)}\u2026` : trimmed
+  }
+
+  /**
+   * Ask the app to celebrate something the agent judged worth marking.
+   *
+   * Carries the request and nothing else. Whether a burst actually happens is
+   * the UI's decision — the setting, the reduced-motion preference and the
+   * cooldown that stops two sources celebrating one milestone all live there,
+   * and a second copy of that judgement here could only ever disagree with it.
+   */
+  function showConfetti(args = {}) {
+    const message = trimmedOrUndefined(args.message, MAX_CELEBRATION_MESSAGE)
+    const from = trimmedOrUndefined(args.from, 60)
+    emitUiAction('celebrate', {
+      ...(message ? { message } : {}),
+      ...(from ? { from } : {}),
+    })
+    return { ok: true }
+  }
+
   function highlightEditor(args = {}) {
     emitUiAction('highlight', { element: args.element, path: args.path })
   }
@@ -155,6 +183,7 @@ export function createMcpToolService({
     listVaults,
     openNoteAsTab,
     openNoteInEditor,
+    showConfetti,
     readNote,
     refreshVault,
     requestedVaultPath,

@@ -1762,6 +1762,15 @@ Note what this implies about the record: sessions in this window that report "al
 
 ## Open threads
 
+- **C36-OPEN: a celebration's `message` has nowhere to go.** `show_confetti`
+  accepts an optional one-line congratulation and carries it all the way to
+  `CelebrationProvider`, which drops it — this app has no toast surface at all
+  (no sonner, no `useToast`, nothing in `components/ui`). Confetti alone is a
+  complete answer, so nothing is broken, but the tool's schema promises
+  something the UI does not deliver. Either build a toast (Cursor shows one for
+  4.5s with a "From <agent>" attribution) or drop `message` from the tool.
+  Leaving it half-wired is the one option that goes stale.
+
 - **C34-OPEN (half done): the menu-bar roster's activity labels.** The eight
   statuses are no longer English literals in `primeRunningSessions.ts` — the
   module now returns a `RosterActivity` (`{kind:'summary'}` for the daemon's own

@@ -42,6 +42,7 @@ import { useSettings } from './hooks/useSettings'
 import { CelebrationProvider } from './components/CelebrationProvider'
 import { PrimeActivityProvider } from './components/PrimeActivityProvider'
 import { readCelebrationsEnabled } from './lib/celebration'
+import { requestCelebration } from './lib/celebrationEvents'
 import { useNoteWidthMode } from './hooks/useNoteWidthMode'
 import { useNoteActions } from './hooks/useNoteActions'
 import { useCommitFlow } from './hooks/useCommitFlow'
@@ -857,6 +858,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       handleSetSelection({ kind: 'sectionGroup', type: filterType })
     },
     onVaultChanged: (path) => { void handlePulledVaultUpdate(path ? [path] : [], resolvedPath) },
+    // Handed to the celebration gate rather than acted on here: whether a
+    // burst appears depends on the setting, reduced motion, and whether
+    // something already celebrated moments ago.
+    onCelebrate: (details) => { requestCelebration(details) },
   })
 
   const handleInitializeProperties = useCallback((path: string) => {

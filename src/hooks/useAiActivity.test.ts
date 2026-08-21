@@ -167,3 +167,28 @@ describe('useAiActivity', () => {
     expect(lastWsInstance).not.toBe(firstWs)
   })
 })
+
+describe('the agent asking to celebrate', () => {
+  it('passes the message and attribution through', () => {
+    const onCelebrate = vi.fn()
+    renderHook(() => useAiActivity({ onCelebrate }))
+
+    act(() => {
+      sendWsMessage({ type: 'ui_action', action: 'celebrate', message: 'Migration landed', from: 'Prime' })
+    })
+
+    expect(onCelebrate).toHaveBeenCalledWith({ message: 'Migration landed', from: 'Prime' })
+  })
+
+  /** Confetti with no words is a complete request. */
+  it('accepts a bare celebration', () => {
+    const onCelebrate = vi.fn()
+    renderHook(() => useAiActivity({ onCelebrate }))
+
+    act(() => {
+      sendWsMessage({ type: 'ui_action', action: 'celebrate' })
+    })
+
+    expect(onCelebrate).toHaveBeenCalledWith({ message: undefined, from: undefined })
+  })
+})

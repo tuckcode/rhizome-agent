@@ -12,6 +12,11 @@ export interface AiActivityCallbacks {
   onOpenTab?: (path: string) => void
   onSetFilter?: (type: string) => void
   onVaultChanged?: (path?: string) => void
+  /**
+   * The agent asked to celebrate something it judged worth marking. Whether
+   * anything is shown is the celebration gate's decision, not this hook's.
+   */
+  onCelebrate?: (details: { message?: string; from?: string }) => void
 }
 
 const WS_UI_URL = 'ws://localhost:9711'
@@ -114,6 +119,13 @@ function dispatchUiActionMessage(
   }
   if (message.action === 'vault_changed') {
     callbacksRef.current?.onVaultChanged?.(optionalString(message.path))
+    return
+  }
+  if (message.action === 'celebrate') {
+    callbacksRef.current?.onCelebrate?.({
+      message: optionalString(message.message),
+      from: optionalString(message.from),
+    })
     return
   }
   if (!isStringPayloadAction(message.action)) return

@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CelebrationProvider } from './CelebrationProvider'
 import { useCelebration } from './celebrationContext'
 import { CELEBRATION_COOLDOWN_MS } from '../lib/celebration'
+import { requestCelebration } from '../lib/celebrationEvents'
 
 const tracked = vi.hoisted(() => ({ calls: [] as unknown[] }))
 vi.mock('../lib/productAnalytics', () => ({
@@ -95,6 +96,60 @@ describe('CelebrationProvider', () => {
     expect(tracked.calls).toEqual([
       { reason: 'goal-completed', shown: false, refusal: 'disabled' },
     ])
+  })
+
+  /**
+   * The agent's `show_confetti` arrives over the WebSocket, is dispatched as a
+   * browser event by `App`, and lands here. It goes through the same gate as
+   * the goal trigger — the whole point of ADR-0164 is that the agent cannot
+   * bypass the cooldown or the setting by asking loudly.
+   */
+  it('celebrates when the agent asks', () => {
+    render(
+      <CelebrationProvider>
+        <Trigger onResult={vi.fn()} />
+      </CelebrationProvider>,
+    )
+
+    act(() => {
+      requestCelebration({ message: 'Migration landed', from: 'Prime' })
+    })
+
+    expect(tracked.calls).toEqual([{ reason: 'agent', shown: true, refusal: undefined }])
+  })
+
+  it('refuses the agent inside the cooldown, exactly as it refuses anything else', () => {
+    const results: boolean[] = []
+    render(
+      <CelebrationProvider>
+        <Trigger onResult={(fired) => results.push(fired)} />
+      </CelebrationProvider>,
+    )
+
+    screen.getByRole('button', { name: 'celebrate' }).click()
+    act(() => {
+      requestCelebration({ message: 'And again' })
+    })
+
+    expect(results).toEqual([true])
+    expect(tracked.calls).toEqual([
+      { reason: 'goal-completed', shown: true, refusal: undefined },
+      { reason: 'agent', shown: false, refusal: 'cooldown' },
+    ])
+  })
+
+  it('ignores the agent entirely when celebrations are off', () => {
+    render(
+      <CelebrationProvider enabled={false}>
+        <Trigger onResult={vi.fn()} />
+      </CelebrationProvider>,
+    )
+
+    act(() => {
+      requestCelebration({})
+    })
+
+    expect(tracked.calls).toEqual([{ reason: 'agent', shown: false, refusal: 'disabled' }])
   })
 
   it('is a no-op outside a provider rather than a crash', () => {

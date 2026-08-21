@@ -154,3 +154,57 @@ async function seedVault(vaultPath, files) {
 function noteFixture(title, body) {
   return `---\ntitle: ${JSON.stringify(title)}\ntype: Note\n---\n\n# ${title}\n\n${body}\n`
 }
+
+describe('showConfetti', () => {
+  /**
+   * Prime decides when something was worth marking; the app decides whether to
+   * show it. This tool only carries the request across — every refusal (the
+   * setting, reduced motion, the cooldown) belongs to the gate in the UI, and
+   * duplicating any of that judgement here would let the two disagree.
+   */
+  it('asks the UI to celebrate, passing the message and attribution', () => {
+    const actions = []
+    const service = createMcpToolService({
+      resolveVaultPaths: () => ({ vaultPath: firstVault, vaultPaths: [firstVault] }),
+      emitUiAction: (action, payload) => actions.push({ action, payload }),
+    })
+
+    const result = service.showConfetti({ message: 'Migration landed', from: 'Prime' })
+
+    assert.deepEqual(actions, [
+      { action: 'celebrate', payload: { message: 'Migration landed', from: 'Prime' } },
+    ])
+    assert.equal(result.ok, true)
+  })
+
+  it('works with no message at all — confetti on its own is a complete answer', () => {
+    const actions = []
+    const service = createMcpToolService({
+      resolveVaultPaths: () => ({ vaultPath: firstVault, vaultPaths: [firstVault] }),
+      emitUiAction: (action, payload) => actions.push({ action, payload }),
+    })
+
+    service.showConfetti()
+
+    assert.deepEqual(actions, [{ action: 'celebrate', payload: {} }])
+  })
+
+  /**
+   * A toast is a one-line congratulation, not a place to report. Prime is
+   * capable of sending several paragraphs, and the trim keeps a stray essay
+   * from covering the window it is celebrating.
+   */
+  it('trims and truncates an overlong message rather than refusing it', () => {
+    const actions = []
+    const service = createMcpToolService({
+      resolveVaultPaths: () => ({ vaultPath: firstVault, vaultPaths: [firstVault] }),
+      emitUiAction: (action, payload) => actions.push({ action, payload }),
+    })
+
+    service.showConfetti({ message: `  ${'x'.repeat(500)}  `, from: '   ' })
+
+    const sent = actions[0].payload
+    assert.equal(sent.message.length <= 140, true)
+    assert.equal('from' in sent, false, 'a blank attribution is omitted, not sent empty')
+  })
+})

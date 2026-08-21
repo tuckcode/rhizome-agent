@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ConfettiCannon } from './ConfettiCannon'
 import { CelebrationContext } from './celebrationContext'
 import {
@@ -7,6 +7,7 @@ import {
   type CelebrationGateState,
   type CelebrationReason,
 } from '../lib/celebration'
+import { onCelebrationRequested } from '../lib/celebrationEvents'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import { trackCelebration } from '../lib/productAnalytics'
 
@@ -52,6 +53,13 @@ export function CelebrationProvider({ children, enabled = true }: CelebrationPro
     },
     [enabled],
   )
+
+  // The agent's own requests arrive here, through the same gate as everything
+  // else. `message` and `from` are accepted and currently unused: there is no
+  // toast surface in this app yet, and confetti alone is a complete answer.
+  useEffect(() => onCelebrationRequested(() => {
+    celebrate('agent')
+  }), [celebrate])
 
   const value = useMemo(() => ({ celebrate, enabled }), [celebrate, enabled])
 
