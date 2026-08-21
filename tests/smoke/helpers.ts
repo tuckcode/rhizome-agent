@@ -25,7 +25,13 @@ export async function openCommandPalette(page: Page): Promise<void> {
   await waitForKeyboardShortcutsReady(page)
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    await page.locator('body').click()
+    // Focus the page without pressing anything. `body.click()` with no
+    // position clicks the element's *centre* — the middle of the window —
+    // which lands on whatever the layout happens to put there. It quietly
+    // selected a note row the moment the command rail got wider (2026-08-20),
+    // and the resulting failure looked like a note-creation bug three steps
+    // later. The top-left corner is chrome padding in every layout.
+    await page.locator('body').click({ position: { x: 2, y: 2 } })
     await sendShortcut(page, 'k', ['Control'])
 
     try {
