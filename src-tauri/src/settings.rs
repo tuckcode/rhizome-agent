@@ -163,6 +163,12 @@ pub struct Settings {
     /// daemon is shared infrastructure that starts itself and hosts other
     /// clients' work; Rhizome stops what it started and nothing else.
     pub keep_sessions_running_on_quit: Option<bool>,
+    /// Whether finishing something worth marking shows a burst of confetti.
+    ///
+    /// `None` means "never chosen", which reads as on — the effect is opt-out.
+    /// A system-level reduced-motion preference suppresses it regardless of
+    /// this, and that check lives in the UI, where the media query is.
+    pub celebrations_enabled: Option<bool>,
     /// Shared secret a browser extension presents to the MCP tool bridge.
     /// Generated once per install by [`ensure_bridge_token`] and never shown
     /// to anyone but the user. See `docs/adr/0159-bridge-token-auth.md`.
@@ -305,6 +311,7 @@ pub fn normalize_ui_language(value: Option<&str>) -> Option<String> {
 fn normalize_settings(settings: Settings) -> Settings {
     Settings {
         keep_sessions_running_on_quit: settings.keep_sessions_running_on_quit,
+        celebrations_enabled: settings.celebrations_enabled,
         auto_pull_interval_minutes: settings.auto_pull_interval_minutes,
         git_enabled: settings.git_enabled,
         autogit_enabled: settings.autogit_enabled,
@@ -637,6 +644,7 @@ mod tests {
     fn test_settings_json_roundtrip() {
         let settings = Settings {
             keep_sessions_running_on_quit: Some(true),
+            celebrations_enabled: Some(false),
             auto_pull_interval_minutes: Some(10),
             git_enabled: Some(false),
             autogit_enabled: Some(true),

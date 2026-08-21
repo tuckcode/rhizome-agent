@@ -336,3 +336,25 @@ export function trackPrimeModelChanged(provider: string): void {
 export function trackPrimeCommandRun(command: string, kind: 'skill' | 'instant'): void {
   trackEvent('prime_command_run', { command, kind })
 }
+
+/**
+ * A celebration was requested. `shown` says whether it actually fired, and
+ * `refusal` says what stopped it — which is the interesting half: a stream of
+ * `cooldown` refusals means two sources keep noticing the same milestone, and
+ * a stream of `disabled` means people turn this off.
+ */
+export function trackCelebration({
+  reason,
+  shown,
+  refusal,
+}: {
+  reason: string
+  shown: boolean
+  refusal?: string
+}): void {
+  trackEvent('celebration_requested', {
+    reason,
+    shown: shown ? 'yes' : 'no',
+    refusal: refusal ?? 'none',
+  })
+}

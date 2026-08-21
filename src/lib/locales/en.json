@@ -1185,6 +1185,8 @@
   "ai.subhead.problem.serviceTooOldUnknown": "This Prime is too old — update to {required}",
   "settings.aiAgents.keepSessionsRunning": "Keep sessions running after quit",
   "settings.aiAgents.keepSessionsRunningDescription": "Leave agents running when Rhizome is fully closed, so scheduled work still happens. Off by default: quitting stops the agent.",
+  "settings.celebrations.enable": "Celebrate milestones",
+  "settings.celebrations.enableDescription": "Show a burst of confetti when a goal finishes or the agent marks a hard-won milestone. Always off when your system asks for reduced motion.",
   "ai.composer.model": "Change model",
   "ai.composer.modelUnknown": "Model",
   "ai.composer.modelsLoading": "Loading models…",
