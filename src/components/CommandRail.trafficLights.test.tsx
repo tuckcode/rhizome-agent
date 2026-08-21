@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 
 vi.mock('../lib/productAnalytics', () => ({ trackRailDestinationClicked: vi.fn() }))
+const platform = vi.hoisted(() => ({ mac: true }))
+vi.mock('../utils/platform', () => ({ isMac: () => platform.mac }))
 vi.mock('./ui/action-tooltip', () => ({
   ActionTooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
@@ -43,6 +45,7 @@ function configuredTrafficLightX(): number {
 describe('CommandRail vs macOS traffic lights', () => {
   beforeEach(() => {
     localStorage.clear()
+    platform.mac = true
   })
 
   // The window uses titleBarStyle "Overlay", so the system buttons float over
@@ -60,13 +63,30 @@ describe('CommandRail vs macOS traffic lights', () => {
     expect(configuredTrafficLightX() + TRAFFIC_LIGHT_SPAN).toBeLessThan(136)
   })
 
-  it('does not offset a collapsed rail, since the lights sit beside it', () => {
+  /**
+   * A collapsed rail clears the lights horizontally — x=58 is past its 46px —
+   * but that only means they are *beside* the first destination rather than on
+   * it, close enough that the audit read them as belonging to it. Content
+   * starts below the lights in both states now, as it does in every macOS
+   * sidebar.
+   */
+  it('offsets a collapsed rail too, so nothing sits level with the lights', () => {
     localStorage.setItem(APP_STORAGE_KEYS.commandRailExpanded, '0')
 
     const rail = renderRail()
 
-    // Symmetric padding via `py-2`; an asymmetric top inset would leave a
-    // visible empty band at the rail's top for no reason.
+    expect(Number.parseInt(rail.style.paddingTop, 10)).toBeGreaterThanOrEqual(40)
+  })
+
+  /**
+   * Off-Mac there are no lights to make room for, and the inset would be a
+   * dent in the top of the rail with nothing in it.
+   */
+  it('leaves the rail alone where the window has no traffic lights', () => {
+    platform.mac = false
+
+    const rail = renderRail()
+
     expect(rail.className).toContain('py-2')
     expect(rail.style.paddingTop).toBe('')
   })
@@ -78,7 +98,7 @@ describe('CommandRail vs macOS traffic lights', () => {
    * so the wide state makes room vertically instead — which is what every
    * macOS sidebar does with the lights sitting in its top band.
    */
-  it('offsets an expanded rail, which now reaches under the lights', () => {
+  it('offsets an expanded rail, which reaches under the lights', () => {
     localStorage.setItem(APP_STORAGE_KEYS.commandRailExpanded, '1')
 
     const rail = renderRail()

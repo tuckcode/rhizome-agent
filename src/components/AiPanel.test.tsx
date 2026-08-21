@@ -137,6 +137,33 @@ function QueuedPromptTargetHarness({ onTargetChange }: { onTargetChange: (target
   )
 }
 
+/** The smallest controller `AiPanelView` will render — mirrors the one
+ *  `QueuedPromptTargetHarness` builds, without the queued-prompt wiring. */
+function primeController(): AiPanelController {
+  return {
+    agent: {
+      messages: [],
+      status: 'idle',
+      sendMessage: () => Promise.resolve(),
+      stopMessage: vi.fn(),
+      regenerateMessage: () => Promise.resolve(),
+      clearConversation: vi.fn(),
+      addLocalMarker: vi.fn(),
+    },
+    input: '',
+    setInput: vi.fn(),
+    linkedEntries: [],
+    hasContext: false,
+    isActive: false,
+    permissionMode: 'safe',
+    handleSend: vi.fn(),
+    handleStop: vi.fn(),
+    handleNavigateWikilink: vi.fn(),
+    handlePermissionModeChange: vi.fn(),
+    handleNewChat: vi.fn(),
+  }
+}
+
 describe('AiPanel', () => {
   beforeEach(() => {
     mockMessages = []
@@ -540,33 +567,6 @@ describe('Chat home opens with its sessions column', () => {
     localStorage.clear()
   })
 
-  /** The smallest controller `AiPanelView` will render — mirrors the one
-   *  `QueuedPromptTargetHarness` builds, without the queued-prompt wiring. */
-  function primeController(): AiPanelController {
-    return {
-      agent: {
-        messages: [],
-        status: 'idle',
-        sendMessage: () => Promise.resolve(),
-        stopMessage: vi.fn(),
-        regenerateMessage: () => Promise.resolve(),
-        clearConversation: vi.fn(),
-        addLocalMarker: vi.fn(),
-      },
-      input: '',
-      setInput: vi.fn(),
-      linkedEntries: [],
-      hasContext: false,
-      isActive: false,
-      permissionMode: 'safe',
-      handleSend: vi.fn(),
-      handleStop: vi.fn(),
-      handleNavigateWikilink: vi.fn(),
-      handlePermissionModeChange: vi.fn(),
-      handleNewChat: vi.fn(),
-    }
-  }
-
   function renderPrimePanel() {
     return render(
       <AiPanelView
@@ -605,5 +605,33 @@ describe('Chat home opens with its sessions column', () => {
       'aria-pressed',
       'false',
     )
+  })
+})
+
+/**
+ * The visual audit found Goal in two places: hard left with no context meter,
+ * far right once a session reported usage. `justify-between` on a row whose
+ * first child renders null puts the survivor on the left, so the button moved
+ * because of state the user never chose.
+ */
+describe('the Goal button has one home', () => {
+  function goalRow() {
+    render(
+      <AiPanelView
+        controller={primeController()}
+        onClose={vi.fn()}
+        showHeader={false}
+        targetId="agent:prime"
+      />,
+    )
+    return screen.getByTestId('prime-goal-trigger').parentElement
+  }
+
+  it('keeps the meter’s slot even when the meter shows nothing', () => {
+    const row = goalRow()
+
+    // Two slots, always: whatever the meter decides to render, and the button.
+    expect(row?.querySelector('[data-testid="prime-context-meter-slot"]')).toBeInTheDocument()
+    expect(row?.className).not.toContain('justify-between')
   })
 })
