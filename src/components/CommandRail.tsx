@@ -1,9 +1,12 @@
-import { ChatCircle, CirclesThree, GearSix, GitBranch, ListBullets, MagnifyingGlass, ShareNetwork } from '@phosphor-icons/react'
+import { useState } from 'react'
+import { CaretLeft, CaretRight, ChatCircle, CirclesThree, GearSix, GitBranch, ListBullets, MagnifyingGlass, ShareNetwork } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { ActionTooltip } from './ui/action-tooltip'
 import { Button } from './ui/button'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { trackRailDestinationClicked } from '../lib/productAnalytics'
+import { APP_STORAGE_KEYS } from '../constants/appStorage'
+import { readStoredBooleanPreference, writeStoredBooleanPreference } from '../lib/uiPreference'
 
 export type CommandRailDestination = 'chat' | 'notes' | 'graph' | 'mycelium' | 'research' | 'changes'
 
@@ -21,40 +24,64 @@ interface CommandRailProps {
 
 const RAIL_BUTTON_SIZE = 30
 const RAIL_ICON_SIZE = 16
+const RAIL_COLLAPSED_WIDTH = 46
+const RAIL_EXPANDED_WIDTH = 168
+/**
+ * Room for the macOS traffic lights when the rail is wide enough to sit under
+ * them. `tauri.conf.json` puts them at x=58, which clears a 46px rail but not
+ * a 168px one, so expanding pushes the first destination below them — the same
+ * thing every macOS sidebar does. Collapsed, the lights sit beside the rail
+ * and no inset is needed, which is what `CommandRail.trafficLights.test.tsx`
+ * pins.
+ */
+const RAIL_TRAFFIC_LIGHT_INSET = 52
 
 function RailButton({
   active,
+  expanded,
   icon: IconComponent,
   label,
   onClick,
   testId,
 }: {
   active: boolean
+  expanded: boolean
   icon: Icon
   label: string
   onClick: () => void
   testId: string
 }) {
-  return (
+  const button = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={active}
+      data-testid={testId}
+      className={
+        expanded
+          ? 'flex w-full items-center justify-start gap-2 rounded-[var(--radius)] px-2'
+          : 'rounded-[var(--radius)] p-0'
+      }
+      style={{
+        width: expanded ? '100%' : RAIL_BUTTON_SIZE,
+        height: RAIL_BUTTON_SIZE,
+        color: active ? 'var(--accent-blue)' : 'var(--text-muted)',
+        backgroundColor: active ? 'var(--accent-blue-bg)' : 'transparent',
+      }}
+    >
+      <IconComponent size={RAIL_ICON_SIZE} weight={active ? 'fill' : 'regular'} />
+      {expanded ? <span className="truncate text-[13px] leading-none">{label}</span> : null}
+    </Button>
+  )
+
+  // A tooltip that repeats a label already on screen is noise, and it steals
+  // the pointer from a target the user can already read.
+  return expanded ? button : (
     <ActionTooltip copy={{ label }} side="right">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        onClick={onClick}
-        aria-label={label}
-        aria-pressed={active}
-        data-testid={testId}
-        className="rounded-[var(--radius)] p-0"
-        style={{
-          width: RAIL_BUTTON_SIZE,
-          height: RAIL_BUTTON_SIZE,
-          color: active ? 'var(--accent-blue)' : 'var(--text-muted)',
-          backgroundColor: active ? 'var(--accent-blue-bg)' : 'transparent',
-        }}
-      >
-        <IconComponent size={RAIL_ICON_SIZE} weight={active ? 'fill' : 'regular'} />
-      </Button>
+      {button}
     </ActionTooltip>
   )
 }
@@ -78,6 +105,16 @@ export function CommandRail({
   onOpenSettings,
 }: CommandRailProps) {
   const t = createTranslator(locale)
+  const [expanded, setExpanded] = useState(() =>
+    readStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, true),
+  )
+  const toggleExpanded = () => {
+    setExpanded((open) => {
+      const next = !open
+      writeStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, next)
+      return next
+    })
+  }
   const handleSelect = (destination: CommandRailDestination, action: () => void) => {
     trackRailDestinationClicked(destination)
     action()
@@ -85,20 +122,23 @@ export function CommandRail({
 
   return (
     <div
-      className="flex shrink-0 flex-col items-center gap-1 py-2"
+      className={`flex shrink-0 flex-col gap-1 py-2 ${expanded ? 'items-stretch px-2' : 'items-center'}`}
       data-testid="command-rail"
+      data-expanded={expanded ? 'true' : 'false'}
       style={{
-        width: 46,
-        // No traffic-light offset needed: tauri.conf.json positions them at
-        // x=58, clear of this 46px rail, so they sit in the sidebar's top band
-        // instead of straddling the rail/sidebar divider.
-
+        width: expanded ? RAIL_EXPANDED_WIDTH : RAIL_COLLAPSED_WIDTH,
+        // Collapsed, no traffic-light offset is needed: tauri.conf.json
+        // positions them at x=58, clear of a 46px rail, so they sit in the
+        // sidebar's top band instead of straddling the rail/sidebar divider.
+        // Expanded, the rail reaches under them and has to make room.
+        paddingTop: expanded ? RAIL_TRAFFIC_LIGHT_INSET : undefined,
         background: 'var(--surface-sidebar)',
         borderRight: '1px solid var(--border-subtle)',
       }}
     >
       <RailButton
         active={activeDestination === 'chat'}
+        expanded={expanded}
         icon={ChatCircle}
         label={t('rail.chat')}
         onClick={() => handleSelect('chat', onSelectChat)}
@@ -106,6 +146,7 @@ export function CommandRail({
       />
       <RailButton
         active={activeDestination === 'notes'}
+        expanded={expanded}
         icon={ListBullets}
         label={t('rail.notes')}
         onClick={() => handleSelect('notes', onSelectNotes)}
@@ -113,6 +154,7 @@ export function CommandRail({
       />
       <RailButton
         active={activeDestination === 'graph'}
+        expanded={expanded}
         icon={ShareNetwork}
         label={t('rail.graph')}
         onClick={() => handleSelect('graph', onSelectGraph)}
@@ -120,6 +162,7 @@ export function CommandRail({
       />
       <RailButton
         active={activeDestination === 'mycelium'}
+        expanded={expanded}
         icon={CirclesThree}
         label={t('rail.mycelium')}
         onClick={() => handleSelect('mycelium', onSelectMycelium)}
@@ -127,6 +170,7 @@ export function CommandRail({
       />
       <RailButton
         active={activeDestination === 'research'}
+        expanded={expanded}
         icon={MagnifyingGlass}
         label={t('rail.research')}
         onClick={() => handleSelect('research', onOpenResearch)}
@@ -134,6 +178,7 @@ export function CommandRail({
       />
       <RailButton
         active={activeDestination === 'changes'}
+        expanded={expanded}
         icon={GitBranch}
         label={t('rail.changes')}
         onClick={() => handleSelect('changes', onSelectChanges)}
@@ -144,6 +189,16 @@ export function CommandRail({
 
       <RailButton
         active={false}
+        expanded={expanded}
+        icon={expanded ? CaretLeft : CaretRight}
+        label={t(expanded ? 'rail.collapse' : 'rail.expand')}
+        onClick={toggleExpanded}
+        testId="command-rail-toggle"
+      />
+
+      <RailButton
+        active={false}
+        expanded={expanded}
         icon={GearSix}
         label={t('rail.settings')}
         onClick={onOpenSettings}
