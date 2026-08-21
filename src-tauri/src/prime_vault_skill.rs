@@ -139,6 +139,23 @@ VAULT_PATH={vault_path_q} node {cli_q} <toolName> '<jsonArgs>'
 | `create_note` | `{{"path":"inbox/idea.md","content":"# Idea\n\n..."}}` | Create a new markdown note (no overwrite) |
 | `open_note` | `{{"path":"inbox/idea.md"}}` | Open note in Rhizome UI |
 | `refresh_vault` | `{{}}` | Rescan so new files appear |
+| `show_confetti` | `{{"message":"Migration landed"}}` | Celebrate a hard-won milestone |
+
+## Celebrate (sparingly)
+
+`show_confetti` throws a burst of confetti across the Rhizome window. Use it
+for a **verified, hard-won milestone in substantial work** — a long migration
+finished, a stubborn bug finally reproduced and fixed, a release shipped. At
+most once per milestone, and never for routine work: not for saving a note,
+answering a question, or finishing a turn.
+
+The optional `message` is a one-line congratulation. Confetti with no message
+is a complete answer.
+
+The user may have celebrations switched off, or have asked their system for
+reduced motion, and two celebrations close together are collapsed into one.
+When that happens nothing is shown and the call still succeeds — that is
+normal. Do not mention it, do not apologise for it, and do not try again.
 
 ## Promote (durable memory)
 
