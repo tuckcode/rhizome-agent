@@ -27,6 +27,34 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Session handoff — 2026-08-20d (visual frontend audit)
+
+**State:** `main` was `98bff09` at session start (`origin/main`). Prime
+**0.7.4**. Daemon was restarted off `orphan-file` before the walk. Tree
+should only gain the audit doc + this header.
+
+**Shipped this session:** the punch list, not code.
+`docs/plans/2026-08-20-frontend-ui-audit.md`.
+
+Walked `pnpm tauri dev` with cua-driver (Cursor IDE cannot see the window).
+Atticus's glance was right: no sessions column on Chat home, Goal jumps to
+the far right on a live session, traffic lights share a vertical band with
+the Chat rail icon, and the 46px rail is icon-only with no expand.
+
+**Next session: one visible chrome fix**, not candidate 4. Ranked in the
+audit: (1) expandable rail or labels, (2) sessions list as the default left
+column (#27), (3) traffic-light y, (4) Goal not `justify-between` against
+the meter. #28 (Untitled) and #26 (no `prime-agent update` button) confirmed.
+grok-4.6 shows in the live strip; jsonl `xai/grok-4.6`.
+
+Menu-bar roster was not visually re-checked (companion window off-screen).
+Do not build on `observe`. Do not start candidate 4 until the column exists
+or is explicitly deferred.
+
+**Then:** candidate 4, attached `get_model_catalog` probe, C34, #26–#29.
+
+---
+
 ## Session handoff — 2026-08-20c (frontend UI audit is next)
 
 **State:** `main` in sync with `origin/main` at `34b840e`. Tree clean (ignore
@@ -49,7 +77,8 @@ gap analysis + probe corrections (`ad27041` `870aedf` `da02b96`), roster
 title + waiting-label fix (`34b840e`). Outside the repo:
 `~/.prime/agent/extensions/xai-oauth.ts` now lists `grok-4.6` at 500k/500k.
 
-**Next session: visual frontend audit**, not candidate 4.
+**Next session: visual frontend audit**, not candidate 4. **Done 2026-08-20d**
+— see the header above and `docs/plans/2026-08-20-frontend-ui-audit.md`.
 
 Atticus's goal is eyes on the running app so we know what is broken,
 half-done, or missing — especially the Prime / chat surface. Playbook:
