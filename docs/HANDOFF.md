@@ -27,11 +27,55 @@ push is not a release — releases are tagged builds with signed installers.
 
 ---
 
+## Session handoff — 2026-08-20c (frontend UI audit is next)
+
+**State:** `main` in sync with `origin/main` at `34b840e`. Tree clean (ignore
+`.cursor/`). All six commits from 2026-08-20b **were pushed** — the header
+below still says they were not; that is stale. Gates: 5482 frontend tests,
+88.05% lines; 1534 Rust tests, 85.29% lines; 26 Playwright smoke. Prime
+**0.7.4**.
+
+**Daemon when this was written:** `orphan-file` — restart before anything
+that talks to Prime:
+
+```bash
+prime-agent shutdown --force
+prime-agent --mode daemon >/dev/null 2>&1 &
+sleep 2 && prime-agent status
+```
+
+**Shipped today (already on origin):** candidate 3 (`e276738`), Prime surface
+gap analysis + probe corrections (`ad27041` `870aedf` `da02b96`), roster
+title + waiting-label fix (`34b840e`). Outside the repo:
+`~/.prime/agent/extensions/xai-oauth.ts` now lists `grok-4.6` at 500k/500k.
+
+**Next session: visual frontend audit**, not candidate 4.
+
+Atticus's goal is eyes on the running app so we know what is broken,
+half-done, or missing — especially the Prime / chat surface. Playbook:
+`docs/plans/2026-08-20-frontend-ui-audit-pickup.md`. Launch `pnpm tauri dev`
+with the screen unlocked, walk AI panel → roster → history → vault sanity →
+agent settings, score each screen, write
+`docs/plans/YYYY-MM-DD-frontend-ui-audit.md`. Do not fix-as-you-go unless
+the screen is lying in one line.
+
+Cursor IDE chat cannot see the Rhizome window. SuperGrok Heavy / Cursor Ultra
+does not change that. Use computer-use. Grok Bot is a separate app with its
+own cloud computer; it is not the audit tool.
+
+**Do not start from `observe`.** Probed: `Unknown daemon command`. The
+replacement for live-row status is already on the `list` payload; `34b840e`
+fixed the two actual defects. Read the gap doc before inventing transport.
+
+**Then** (after the punch list exists): candidate 4, attached
+`get_model_catalog` probe, C34, #26–#29.
+
+---
+
 ## Session handoff — 2026-08-20b (Claude Opus 5: candidate 3 finished)
 
-**State:** committed locally as `e276738`, **not pushed** — the frontend gates
-have not been run this session (the change is Rust-only). Rust coverage
-**85.29%** (up from 85.12%). Prime **0.7.4**.
+**State:** this header was written before push. The work **did land** as
+`6ce86d1..34b840e` on origin. Rust coverage **85.29%**. Prime **0.7.4**.
 
 **Shipped:** `e276738` — the remaining fifteen envelope sites folded onto
 `PrimeHost::call`. Candidate 3 is **done**; nothing is left of it but the
