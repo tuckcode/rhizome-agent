@@ -15,6 +15,14 @@ export default defineConfig([
     'src-tauri/target/',
     'src-tauri/gen/',
     'tools/',
+    // Playwright's output. It is build product, never source — and it is
+    // *deleted and recreated* at the start of a run, so a lint walking the
+    // tree while the smoke lane starts crashes on a directory that vanished
+    // mid-glob. That became reachable when the pre-push gates started running
+    // their lanes concurrently (C37); it was always wrong to lint it.
+    'test-results/',
+    'playwright-report/',
+    'blob-report/',
     // Nested worktrees (.claude/worktrees/<name>/) are separate checkouts
     // with their own src-tauri/gen/ etc. — the anchored ignores above don't
     // reach inside them, so a project-wide `eslint .` from the main tree
