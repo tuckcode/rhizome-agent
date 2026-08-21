@@ -83,7 +83,7 @@ When adding or changing a meaningful user-facing feature, include the event name
 — TypeScript picks it up from the project include — so knip reports it as an
 unused file. `src/types/rhizomeTestBridge.ts` is exactly this: five source
 files fail to typecheck without it, and it is listed in `knip.json`'s
-`ignore` for that reason. **Always run `npx tsc --noEmit` after deleting
+`ignore` for that reason. **Always run `pnpm typecheck` after deleting
 anything knip flagged**, and check for `declare global` before believing a
 file is dead. Ambient-declaration files are knip's most dangerous false
 positive.
@@ -103,10 +103,20 @@ Use Codacy as a security and static-analysis gate before a task is considered re
 
 ### Check suite (runs on every push)
 ```bash
-pnpm lint && npx tsc --noEmit && pnpm test && pnpm test:coverage  # frontend ≥70%
+pnpm lint && pnpm typecheck && pnpm test && pnpm test:coverage  # frontend ≥70%
 pnpm test:mcp   # mcp-server/*.test.js — node:test, NOT picked up by vitest
 cargo test && cargo llvm-cov --manifest-path src-tauri/Cargo.toml --no-clean --fail-under-lines 85
 ```
+
+**`pnpm typecheck` is `tsc -b`, and `npx tsc --noEmit` is a no-op.** Measured
+2026-08-20: appending `export const X: number = "nope"` to a source file and
+running `npx tsc --noEmit` exits **0**. The root `tsconfig.json` declares
+`"files": []` and only project references, and `--noEmit` does not follow
+references — so the command every session has been running as its typecheck
+gate compiles zero files. `tsc -b` catches the same error immediately. This had
+been noticed three separate times in `HANDOFF.md` and written down as a
+gotcha each time while the documented command stayed wrong; the script exists
+so the right command is the easy one.
 
 `pnpm test:mcp` exists because vitest's `include` is
 `src/**/*.{test,spec}.{ts,tsx}`, so nothing under `mcp-server/` was ever run

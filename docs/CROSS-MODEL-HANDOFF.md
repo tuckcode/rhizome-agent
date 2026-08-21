@@ -22,7 +22,9 @@ is exactly this: five source files (`main.tsx`, `App.tsx`, `useMenuEvents.ts`,
 `useDeepLinks.ts`, `SingleEditorView.tsx`) fail to typecheck without it, and
 a smoke spec drives the runtime bridge it types.
 
-**Rule: always run `npx tsc --noEmit` after deleting anything knip flagged.**
+**Rule: always run `pnpm typecheck` after deleting anything knip flagged.**
+(`npx tsc --noEmit` is a no-op here — root `tsconfig.json` is `"files": []`
+plus references, which `--noEmit` does not follow. Measured 2026-08-20.)
 It's already in `knip.json`'s `ignore` list — if knip flags a NEW ambient
 file, check for `declare global` before believing it's dead.
 
@@ -47,7 +49,7 @@ Rhizome app itself, and an external MCP client). The full chain works.
 `src/hooks/useMcpBridge.ts` is still genuinely unimported and is dead code
 in the ordinary sense — but it is NOT evidence of a broken bridge, because
 the bridge doesn't depend on it. It can be deleted on its own merits;
-just run `npx tsc --noEmit` after (see #1).
+just run `pnpm typecheck` after (see #1).
 
 **General lesson: before concluding "this export has no callers," check for
 a self-invoking entrypoint at the bottom of the same file, and prefer

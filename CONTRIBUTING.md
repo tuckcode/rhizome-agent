@@ -7,7 +7,7 @@ Rhizome is a **public AGPL-3.0** project in **alpha**. Outside contributions are
 1. Read [AGENTS.md](AGENTS.md) for TDD, coverage gates, and commit style.
 2. Run the local gates you touch:
    ```bash
-   pnpm lint && pnpm exec tsc --noEmit && pnpm test
+   pnpm lint && pnpm typecheck && pnpm test
    # if you change Rust:
    cargo test --manifest-path src-tauri/Cargo.toml
    cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
