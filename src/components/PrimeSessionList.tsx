@@ -115,7 +115,13 @@ export default function PrimeSessionList({
       let listed: PrimeSessionSummary[] = []
       let failure: string | null = null
       try {
-        listed = await call<PrimeSessionSummary[]>('list_prime_session_summaries')
+        const answer = await call<PrimeSessionSummary[]>('list_prime_session_summaries')
+        // Not every host answers with a list: a mock with no handler for this
+        // command, a Tauri build where it is absent, or a command that returns
+        // null all reach here. Trusting the type threw inside the effect,
+        // which surfaces as an unhandled rejection instead of an empty list
+        // the panel can render.
+        listed = Array.isArray(answer) ? answer : []
       } catch (e) {
         failure = e instanceof Error ? e.message : String(e)
       }

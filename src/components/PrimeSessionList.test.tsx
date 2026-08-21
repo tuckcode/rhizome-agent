@@ -37,6 +37,22 @@ beforeEach(() => {
 })
 
 describe('PrimeSessionList', () => {
+  /**
+   * The host can answer with something that is not a list — a mock that has no
+   * handler for the command, a Tauri command that returns null, a build where
+   * the command is absent. `listed.length` then threw inside the effect, which
+   * surfaces as an unhandled rejection rather than an error the panel can show.
+   * Found when Chat home started opening this list by default: every `App`
+   * test suddenly mounted it and three unhandled rejections appeared.
+   */
+  it('survives a host that answers with no list at all', async () => {
+    invoked.result = null as unknown as unknown[]
+
+    render(<PrimeSessionList onSelect={vi.fn()} locale="en" />)
+
+    expect(await screen.findByText('No Prime sessions yet. Start a conversation and it will appear here.')).toBeInTheDocument()
+  })
+
   it('reads summaries only — opening the list never reads a transcript', async () => {
     render(<PrimeSessionList now={NOW} />)
 
