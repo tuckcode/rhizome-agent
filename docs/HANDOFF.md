@@ -101,6 +101,52 @@ fixed the two actual defects. Read the gap doc before inventing transport.
 
 ---
 
+## Session handoff — 2026-08-20e (Claude Opus 5: unattended run)
+
+**State:** all gates green, pushed. Rust coverage **85.34%**. Prime 0.7.4,
+daemon running **detached** (pid 76297) — the previous one was started in a
+foreground terminal and died when that window closed. Start it with
+`(prime-agent --mode daemon >/dev/null 2>&1 &)`, not in the foreground.
+
+**Shipped:** C34 (roster statuses are keys now, view supplies the words),
+**#28 fixed**, the frontend audit committed, the containerized-workers
+proposal recorded, and `get_model_catalog` probed attached.
+
+### #28 was never a naming problem
+
+41 of 91 session logs on the real store held **no message of any kind** — five
+lines of header, model, thinking level, tier, state. Rhizome opens a session
+whenever it attaches to a vault, so every unused launch leaves one. They were
+half the history list. `list_sessions` now drops them.
+
+**The root cause is still there:** Rhizome creates a session it may never use.
+Creating it lazily — on first prompt rather than on attach — is what stops the
+litter, and it changes attach behaviour, so it wants its own change and its own
+probe. Filtering the display was the safe half.
+
+### The model picker is not capped
+
+Probed attached: `get_available_models` (ours) returns **185** models for the 4
+providers with credentials; `get_model_catalog` returns **1252** across 20+
+including `openrouter` 289 and `vercel-ai-gateway` 220, plus
+`configuredProviders`. The two answer different questions and ours is the right
+one. The opportunity is showing what connecting a provider would unlock — a
+BYO-model surface, not a wider list.
+
+### Next, and why not what I did
+
+The visual audit (`docs/plans/2026-08-20-frontend-ui-audit.md`) ranks a
+**left column for Chat home** first — expandable rail with labels, or the
+sessions list open by default, or both. I deliberately did not touch it
+unattended: choosing between those is a product call, and I could not judge the
+result without eyes on the window. Everything I did instead was verifiable by
+unit test or by probing the daemon.
+
+Also untouched for the same reason: traffic-light `y` (audit item 3) and the
+Goal button's two homes (item 4). Both are visual judgements.
+
+---
+
 ## Session handoff — 2026-08-20b (Claude Opus 5: candidate 3 finished)
 
 **State:** this header was written before push. The work **did land** as
