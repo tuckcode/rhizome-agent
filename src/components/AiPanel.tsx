@@ -525,8 +525,17 @@ export function AiPanelView({
       {notePane}
       </div>
       {isPrimeTarget && (
-        <div style={{ padding: '0 12px 6px' }} className="flex items-center justify-between gap-2">
-          <PrimeContextMeter stats={primeStats} locale={locale} />
+        <div style={{ padding: '0 12px 6px' }} className="flex items-center gap-2">
+          {/*
+            The meter keeps its slot even when it renders nothing. With
+            `justify-between` and a meter that returns null before any tokens
+            are used, Goal was the row's only child and sat hard left — then
+            jumped to the far right the moment a session reported usage. One
+            control, two homes, depending on state the user never chose.
+          */}
+          <div className="min-w-0 flex-1" data-testid="prime-context-meter-slot">
+            <PrimeContextMeter stats={primeStats} locale={locale} />
+          </div>
           <Button
             variant="ghost"
             size="xs"

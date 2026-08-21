@@ -7,6 +7,7 @@ import { createTranslator, type AppLocale } from '../lib/i18n'
 import { trackRailDestinationClicked } from '../lib/productAnalytics'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import { readStoredBooleanPreference, writeStoredBooleanPreference } from '../lib/uiPreference'
+import { isMac } from '../utils/platform'
 
 export type CommandRailDestination = 'chat' | 'notes' | 'graph' | 'mycelium' | 'research' | 'changes'
 
@@ -27,12 +28,17 @@ const RAIL_ICON_SIZE = 16
 const RAIL_COLLAPSED_WIDTH = 46
 const RAIL_EXPANDED_WIDTH = 168
 /**
- * Room for the macOS traffic lights when the rail is wide enough to sit under
- * them. `tauri.conf.json` puts them at x=58, which clears a 46px rail but not
- * a 168px one, so expanding pushes the first destination below them — the same
- * thing every macOS sidebar does. Collapsed, the lights sit beside the rail
- * and no inset is needed, which is what `CommandRail.trafficLights.test.tsx`
- * pins.
+ * Room for the macOS traffic lights, in both rail states.
+ *
+ * `tauri.conf.json` puts them at x=58, y=24. Expanded, the 168px rail runs
+ * underneath them. Collapsed, the 46px rail clears them horizontally — but the
+ * lights then sit level with the first destination, close enough to read as
+ * part of it. The visual audit's words: "the lights themselves still look
+ * parked on the first destination."
+ *
+ * So the inset applies whenever the lights exist, and content starts below
+ * them the way it does in every macOS sidebar. Off-Mac there are no lights to
+ * make room for, and the space would just be a dent in the top of the rail.
  */
 const RAIL_TRAFFIC_LIGHT_INSET = 52
 
@@ -115,6 +121,9 @@ export function CommandRail({
       return next
     })
   }
+  // Read once per render rather than memoised: the platform does not change,
+  // and a stale memo here would be a dent in the wrong place.
+  const trafficLightRoom = isMac()
   const handleSelect = (destination: CommandRailDestination, action: () => void) => {
     trackRailDestinationClicked(destination)
     action()
@@ -127,11 +136,7 @@ export function CommandRail({
       data-expanded={expanded ? 'true' : 'false'}
       style={{
         width: expanded ? RAIL_EXPANDED_WIDTH : RAIL_COLLAPSED_WIDTH,
-        // Collapsed, no traffic-light offset is needed: tauri.conf.json
-        // positions them at x=58, clear of a 46px rail, so they sit in the
-        // sidebar's top band instead of straddling the rail/sidebar divider.
-        // Expanded, the rail reaches under them and has to make room.
-        paddingTop: expanded ? RAIL_TRAFFIC_LIGHT_INSET : undefined,
+        paddingTop: trafficLightRoom ? RAIL_TRAFFIC_LIGHT_INSET : undefined,
         background: 'var(--surface-sidebar)',
         borderRight: '1px solid var(--border-subtle)',
       }}
