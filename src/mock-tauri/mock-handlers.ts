@@ -194,8 +194,12 @@ let mockPrimeGoal: {
  * A completed goal is otherwise unreachable without a live daemon and a real
  * agent finishing real work, which makes the one visible consequence — the
  * celebration — impossible to look at. Dev builds only.
+ *
+ * `import.meta.env` is read defensively: Playwright loads this module through
+ * its own config, outside Vite, where `env` is undefined and a bare
+ * `import.meta.env.DEV` throws before a single test runs.
  */
-if (import.meta.env.DEV && typeof window !== 'undefined') {
+if (import.meta.env?.DEV && typeof window !== 'undefined') {
   ;(window as unknown as { __rhizomeMockGoal?: unknown }).__rhizomeMockGoal = {
     complete: () => {
       mockPrimeGoal = { ...mockPrimeGoal, active: false, status: 'completed' }
