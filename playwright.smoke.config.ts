@@ -21,7 +21,12 @@ export default defineConfig({
   testDir: './tests',
   timeout: 30_000,
   retries: 1,
-  workers: 1,
+  // One worker meant 26 tests ran strictly one at a time — ~110s of the
+  // pre-push wall clock on a 15-core machine. Each test copies its own
+  // fixture vault (`createFixtureVaultCopy`) and gets its own browser context,
+  // so they do not share state; the server they share only serves the app.
+  // Tunable for a machine where the contention is not worth it.
+  workers: Number(process.env.PLAYWRIGHT_SMOKE_WORKERS ?? 4),
   grep: /@smoke/,
   use: {
     baseURL,

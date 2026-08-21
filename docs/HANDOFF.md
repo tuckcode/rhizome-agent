@@ -1787,6 +1787,12 @@ Note what this implies about the record: sessions in this window that report "al
   behaviour. This machine has 15 cores; the lanes barely overlap in what they
   use.
 
+  **The smoke lane was never about test count.** `playwright.smoke.config.ts`
+  had `workers: 1`, so 26 tests ran strictly one at a time — ~110s on a
+  15-core machine. At `workers: 4` the same 26 tests take **~34s**, verified
+  stable across two runs with retries disabled. No test was cut: the lane was
+  not too big, it was single-file. `PLAYWRIGHT_SMOKE_WORKERS` tunes it.
+
   Also fixed while in there: `.chunk/config.json`'s `typecheck` gate ran
   `npx tsc --noEmit`, which C35 proved typechecks **zero files**. It is
   `pnpm typecheck` now — so if the sidecar is ever revived, its typecheck lane
