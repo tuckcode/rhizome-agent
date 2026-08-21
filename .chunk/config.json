@@ -10,7 +10,7 @@
     },
     {
       "name": "typecheck",
-      "run": "npx tsc --noEmit",
+      "run": "pnpm typecheck",
       "role": "gate",
       "fileExt": ".ts,.tsx",
       "timeout": 180,

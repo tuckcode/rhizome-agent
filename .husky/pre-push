@@ -177,86 +177,148 @@ run_sidecar_automatic_checks() {
   exit "$SIDECAR_STATUS"
 }
 
+# ── Local fallback: three lanes, run together ─────────────────────────────
+#
+# The sidecar path exists so these do not run on the developer's laptop at
+# all. When it is unavailable they do, and running them one after another
+# costs ~4.5 minutes a push (measured 2026-08-21) for gates that barely touch
+# each other: the frontend lane does not need cargo, the Rust lane does not
+# need vite, and Playwright waits on a browser more than on a CPU.
+#
+# So the fallback runs them concurrently and reports per lane. Output is
+# captured rather than interleaved — three streams racing into one terminal is
+# unreadable, and the only output that matters is the failing lane's, which is
+# printed in full.
+#
+# `LAPUTA_PREPUSH_SERIAL=1` restores the old one-at-a-time behaviour for a
+# machine where the contention is worse than the wait.
+run_lane() {
+  local name="$1"
+  local log="$2"
+  shift 2
+
+  if bash -c "$*" >"$log" 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
+report_lane_failure() {
+  local name="$1"
+  local log="$2"
+
+  echo ""
+  echo "❌ ${name} lane FAILED — its output follows:"
+  echo "────────────────────────────────────────────────────────"
+  cat "$log"
+  echo "────────────────────────────────────────────────────────"
+}
+
 if ! run_sidecar_automatic_checks; then
   ensure_cargo_tooling
 
-  # ── 0. Frontend lint ───────────────────────────────────────────────────
-  echo ""
-  echo "🔎 [0/6] Frontend lint..."
-  pnpm lint
-  echo "  ✅ Lint OK"
+  LANE_LOG_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rhizome-prepush.XXXXXX")"
+  trap 'rm -rf "$LANE_LOG_DIR"' EXIT
 
-  # ── 1. TypeScript + Vite build ──────────────────────────────────────────
-  echo ""
-  echo "📦 [1/6] TypeScript + Vite build..."
-  pnpm build
-  echo "  ✅ Build OK"
+  FRONTEND_LANE="pnpm lint && pnpm build && FRONTEND_COVERAGE_CONCURRENCY=\"${FRONTEND_COVERAGE_CONCURRENCY:-1}\" node scripts/run-vitest-coverage-shards.mjs --silent && pnpm test:mcp"
 
-  # ── 2. Frontend coverage (≥70%) — includes all unit tests ───────────────
-  echo ""
-  echo "📊 [2/6] Frontend tests + coverage (≥70%)..."
-  FRONTEND_COVERAGE_CONCURRENCY="${FRONTEND_COVERAGE_CONCURRENCY:-1}" \
-    node scripts/run-vitest-coverage-shards.mjs --silent
-  echo "  ✅ Frontend coverage OK"
-
-  # ── 2b. MCP server tests (node:test) ───────────────────────────────────
-  # Not covered by vitest, whose include is src/**/*.{test,spec}.{ts,tsx}.
-  # These existed since the MCP server was written and were run by nothing
-  # until 2026-07-31 — five silently ungated tests. Runs in <1s.
-  # Use the glob, never `node --test mcp-server/`: the directory form imports
-  # index.js, which starts the MCP server and never exits.
-  echo ""
-  echo "🔌 [2b/6] MCP server tests..."
-  pnpm test:mcp
-  echo "  ✅ MCP server tests OK"
-
-  # ── 3. Rust lint (clippy + fmt) — fast, run before coverage ─────────────
-  echo ""
-  if [ "$RUST_CHANGED" = true ]; then
-    echo "🔧 [3/6] Clippy + rustfmt..."
-    cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings
-    cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check
-    echo "  ✅ Rust lint OK"
-  else
-    echo "⏭️  [3/6] Rust lint — skipped (no src-tauri/ changes)"
+  # Unset GIT_DIR so git tests create isolated repos without inheriting hook
+  # context. `--no-clean` keeps the incremental build; LAPUTA_FULL_COVERAGE=1
+  # forces a clean one.
+  RUST_COV_FLAGS="--no-clean"
+  if [ "${LAPUTA_FULL_COVERAGE:-0}" = "1" ]; then
+    RUST_COV_FLAGS=""
   fi
+  RUST_LANE="unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE; cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings && cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check && cargo llvm-cov --manifest-path src-tauri/Cargo.toml ${RUST_COV_FLAGS} --ignore-filename-regex \"lib\\.rs|main\\.rs|menu\\.rs\" --fail-under-lines 85 -- --test-threads=1"
 
-  # ── 4. Rust coverage (≥85% lines) ──────────────────────────────────────
-  echo ""
-  if [ "$RUST_CHANGED" = true ]; then
-    LLVM_COV_FLAGS="--no-clean"
-    if [ "${LAPUTA_FULL_COVERAGE:-0}" = "1" ]; then
-      LLVM_COV_FLAGS=""
-      echo "🦀 [4/6] Rust coverage — FULL (LAPUTA_FULL_COVERAGE=1)..."
-    else
-      echo "🦀 [4/6] Rust coverage (≥85%, incremental)..."
-    fi
-    # Unset GIT_DIR so git tests create isolated repos without inheriting hook context
-    unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
-    # shellcheck disable=SC2086
-    cargo llvm-cov \
-      --manifest-path src-tauri/Cargo.toml \
-      $LLVM_COV_FLAGS \
-      --ignore-filename-regex "lib\.rs|main\.rs|menu\.rs" \
-      --fail-under-lines 85 \
-      -- --test-threads=1
-    echo "  ✅ Rust coverage OK"
-  else
-    echo "⏭️  [4/6] Rust coverage — skipped (no src-tauri/ changes)"
-  fi
-
-  # ── 5. Playwright core smoke lane (if any exist) ──────────────────────
-  echo ""
   SMOKE_FILES=$(find tests/smoke tests/integration -name '*.spec.ts' 2>/dev/null | head -1)
-  if [ -n "$SMOKE_FILES" ]; then
-    echo "🎭 [5/6] Playwright core smoke tests..."
-    if ! pnpm playwright:smoke; then
-      echo "  ❌ Core smoke tests FAILED"
+  PLAYWRIGHT_LANE="pnpm playwright:smoke"
+
+  if [ "${LAPUTA_PREPUSH_SERIAL:-0}" = "1" ]; then
+    echo ""
+    echo "🐌 Running gates serially (LAPUTA_PREPUSH_SERIAL=1)"
+    LANE_MODE="serial"
+  else
+    echo ""
+    echo "⚡ Running frontend, Rust and Playwright lanes together"
+    LANE_MODE="parallel"
+  fi
+
+  FRONTEND_LOG="$LANE_LOG_DIR/frontend.log"
+  RUST_LOG="$LANE_LOG_DIR/rust.log"
+  PLAYWRIGHT_LOG="$LANE_LOG_DIR/playwright.log"
+  FRONTEND_PID=""
+  RUST_PID=""
+  PLAYWRIGHT_PID=""
+  LANE_FAILED=""
+
+  # Started here rather than from a helper: a background job launched inside a
+  # command substitution is a grandchild of this shell, and `wait` only knows
+  # about its own children. The first version of this did exactly that and
+  # would have failed the moment a lane finished.
+  if [ "$LANE_MODE" = "serial" ]; then
+    echo "  ▶ frontend (lint, build, coverage, mcp)"
+    run_lane frontend "$FRONTEND_LOG" "$FRONTEND_LANE" \
+      || { report_lane_failure frontend "$FRONTEND_LOG"; exit 1; }
+    echo "  ✅ frontend OK"
+
+    if [ "$RUST_CHANGED" = true ]; then
+      echo "  ▶ rust (clippy, fmt, coverage ≥85%)"
+      run_lane rust "$RUST_LOG" "$RUST_LANE" \
+        || { report_lane_failure rust "$RUST_LOG"; exit 1; }
+      echo "  ✅ rust OK"
+    else
+      echo "  ⏭️  rust — skipped (no src-tauri/ changes)"
+    fi
+
+    if [ -n "$SMOKE_FILES" ]; then
+      echo "  ▶ playwright (core smoke)"
+      run_lane playwright "$PLAYWRIGHT_LOG" "$PLAYWRIGHT_LANE" \
+        || { report_lane_failure playwright "$PLAYWRIGHT_LOG"; exit 1; }
+      echo "  ✅ playwright OK"
+    else
+      echo "  ⏭️  playwright — skipped (no tests/**/*.spec.ts)"
+    fi
+  else
+    echo "  ▶ frontend (lint, build, coverage, mcp)"
+    run_lane frontend "$FRONTEND_LOG" "$FRONTEND_LANE" &
+    FRONTEND_PID=$!
+
+    if [ "$RUST_CHANGED" = true ]; then
+      echo "  ▶ rust (clippy, fmt, coverage ≥85%)"
+      run_lane rust "$RUST_LOG" "$RUST_LANE" &
+      RUST_PID=$!
+    else
+      echo "  ⏭️  rust — skipped (no src-tauri/ changes)"
+    fi
+
+    if [ -n "$SMOKE_FILES" ]; then
+      echo "  ▶ playwright (core smoke)"
+      run_lane playwright "$PLAYWRIGHT_LOG" "$PLAYWRIGHT_LANE" &
+      PLAYWRIGHT_PID=$!
+    else
+      echo "  ⏭️  playwright — skipped (no tests/**/*.spec.ts)"
+    fi
+
+    # Every lane is waited on before deciding, so one failure does not hide
+    # another and no lane is left running after the hook returns.
+    if [ -n "$FRONTEND_PID" ] && ! wait "$FRONTEND_PID"; then
+      report_lane_failure frontend "$FRONTEND_LOG"
+      LANE_FAILED="yes"
+    fi
+    if [ -n "$RUST_PID" ] && ! wait "$RUST_PID"; then
+      report_lane_failure rust "$RUST_LOG"
+      LANE_FAILED="yes"
+    fi
+    if [ -n "$PLAYWRIGHT_PID" ] && ! wait "$PLAYWRIGHT_PID"; then
+      report_lane_failure playwright "$PLAYWRIGHT_LOG"
+      LANE_FAILED="yes"
+    fi
+
+    if [ -n "$LANE_FAILED" ]; then
       exit 1
     fi
-    echo "  ✅ Core smoke tests OK"
-  else
-    echo "⏭️  [5/6] Playwright core smoke tests — skipped (no tests/**/*.spec.ts)"
+    echo "  ✅ All lanes OK"
   fi
 fi
 
