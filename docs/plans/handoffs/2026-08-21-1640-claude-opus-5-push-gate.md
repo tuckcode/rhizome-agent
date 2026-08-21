@@ -4,16 +4,18 @@ model: Claude Opus 5
 also: []
 description: >-
   Confetti end to end (ADR-0164), Chat home's rail and sessions column, #28,
-  and the push gate cut from ~4m30s to ~2m16s by unpinning three gates that
-  each ran one-at-a-time.
-commits: 5cfff20..0039fa5
+  the push gate cut from ~4m30s to ~2m06s by unpinning three gates that each
+  ran one-at-a-time, and HANDOFF.md split into per-session files because the
+  newest one had drifted to third place in a 2156-line stack.
+commits: 5cfff20..e525331
 ---
 
 # 2026-08-21 — confetti, chrome, and the push gate
 
-**State:** `main` pushed through `724311f`, tree clean, all gates green. Prime
-**0.7.4**, daemon running detached. **A push now takes ~2m16s, down from
-~4m30s this morning** — measured, see "The gate" below.
+**State:** `main` pushed through `e525331`, tree clean, all gates green. Prime
+**0.7.4**; the daemon dies with whatever terminal starts it, so start it
+detached. **A push now takes ~2m06s, down from ~4m30s this morning** —
+measured, see "The gate" below.
 
 ### Shipped
 
@@ -35,6 +37,14 @@ commits: 5cfff20..0039fa5
   CROSS-MODEL-HANDOFF.md all say to run. C35.
 - The last two visual-audit items: Goal has one home, and nothing sits level
   with the traffic lights.
+- **This file exists.** `HANDOFF.md` had reached 2156 lines of stacked session
+  sections, and because each session inserted next to whichever heading it was
+  reading, the newest handoff had drifted to third place — "read the latest
+  handoff" pointed at yesterday's audit. It is 496 lines now: current state and
+  an index. Sessions are one file each here, newest by filename, with `model`
+  as a frontmatter field rather than a parenthetical someone might forget.
+  `pnpm handoff:check` enforces the shape, because three sessions in a row
+  wrote the ordering rule down in prose and the file kept growing anyway.
 
 ### The gate: three findings with one shape
 
