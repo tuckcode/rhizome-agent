@@ -12,6 +12,9 @@ export const APP_STORAGE_KEYS = {
   sortPreferences: 'rhizome-sort-preferences',
   sidebarCollapsed: 'rhizome:sidebar-collapsed',
   layoutPanels: 'rhizome:layout-panels',
+  // Chat home's sessions column. New in this generation, so it has no
+  // `tolaria` twin and is deliberately absent from LEGACY_APP_STORAGE_KEYS.
+  chatSessionsOpen: 'rhizome:chat-sessions-open',
   welcomeDismissed: 'rhizome_welcome_dismissed',
 } as const
 

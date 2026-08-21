@@ -1,4 +1,10 @@
 import { useCallback, useEffect, useState, useRef, type CSSProperties, type MutableRefObject, type ReactNode, type RefObject } from 'react'
+import { APP_STORAGE_KEYS } from '../constants/appStorage'
+import {
+  chatSessionsOpenDefault,
+  readChatSessionsOpen,
+  storedChatSessionsOpen,
+} from '../lib/chatSessionsColumn'
 import { callHost } from '../lib/callHost'
 import {
   AiPanelComposer,
@@ -290,7 +296,30 @@ export function AiPanelView({
     handleSend(text, references)
   }, [handleSend, isActive, onSendPrompt])
 
-  const [sessionsOpen, setSessionsOpen] = useState(false)
+  // Open unless this machine says otherwise. The column is the only thing on
+  // Chat home that says other sessions exist, so a closed default left the
+  // landing window an empty transcript and a composer (visual audit,
+  // 2026-08-20). Read lazily so the first paint already has the right column.
+  const [sessionsOpen, setSessionsOpen] = useState(() => {
+    try {
+      return readChatSessionsOpen(localStorage.getItem(APP_STORAGE_KEYS.chatSessionsOpen))
+    } catch {
+      return chatSessionsOpenDefault
+    }
+  })
+
+  const toggleSessions = useCallback(() => {
+    setSessionsOpen((open) => {
+      const next = !open
+      try {
+        localStorage.setItem(APP_STORAGE_KEYS.chatSessionsOpen, storedChatSessionsOpen(next))
+      } catch {
+        // A machine with no usable storage still gets the toggle, just not
+        // the memory of it.
+      }
+      return next
+    })
+  }, [])
   const [activeSessionPath, setActiveSessionPath] = useState<string | null>(null)
   const [switchError, setSwitchError] = useState<string | null>(null)
 
@@ -446,7 +475,7 @@ export function AiPanelView({
             variant="ghost"
             size="icon-xs"
             className="h-6 w-6 p-0 [&_svg:not([class*=size-])]:size-4"
-            onClick={() => setSessionsOpen((open) => !open)}
+            onClick={toggleSessions}
             aria-pressed={sessionsOpen}
             aria-label={translate(locale, sessionsOpen ? 'ai.sessions.close' : 'ai.sessions.open')}
             title={translate(locale, sessionsOpen ? 'ai.sessions.close' : 'ai.sessions.open')}

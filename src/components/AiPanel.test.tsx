@@ -9,6 +9,7 @@ import type { VaultEntry } from '../types'
 import { queueAiPrompt } from '../utils/aiPromptBridge'
 import type { NoteReference } from '../utils/ai-context'
 import { bindVaultConfigStore, getVaultConfig, resetVaultConfigStore } from '../utils/vaultConfigStore'
+import { APP_STORAGE_KEYS } from '../constants/appStorage'
 
 const { trackEventMock } = vi.hoisted(() => ({
   trackEventMock: vi.fn(),
@@ -525,5 +526,84 @@ describe('AiPanel', () => {
 
     expect(onUnsupportedAiPaste).toHaveBeenCalledWith(UNSUPPORTED_INLINE_PASTE_MESSAGE)
     expect(screen.getByTestId('agent-input').textContent).not.toContain('paste.png')
+  })
+})
+
+/**
+ * The column already rendered to the left of the transcript — it just started
+ * closed, so the window people land on had no sign that other sessions
+ * existed (visual audit, 2026-08-20). Asserting the control's pressed state
+ * rather than the request behind it: the bug was what the screen showed.
+ */
+describe('Chat home opens with its sessions column', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  /** The smallest controller `AiPanelView` will render — mirrors the one
+   *  `QueuedPromptTargetHarness` builds, without the queued-prompt wiring. */
+  function primeController(): AiPanelController {
+    return {
+      agent: {
+        messages: [],
+        status: 'idle',
+        sendMessage: () => Promise.resolve(),
+        stopMessage: vi.fn(),
+        regenerateMessage: () => Promise.resolve(),
+        clearConversation: vi.fn(),
+        addLocalMarker: vi.fn(),
+      },
+      input: '',
+      setInput: vi.fn(),
+      linkedEntries: [],
+      hasContext: false,
+      isActive: false,
+      permissionMode: 'safe',
+      handleSend: vi.fn(),
+      handleStop: vi.fn(),
+      handleNavigateWikilink: vi.fn(),
+      handlePermissionModeChange: vi.fn(),
+      handleNewChat: vi.fn(),
+    }
+  }
+
+  function renderPrimePanel() {
+    return render(
+      <AiPanelView
+        controller={primeController()}
+        onClose={vi.fn()}
+        showHeader={false}
+        targetId="agent:prime"
+      />,
+    )
+  }
+
+  it('shows the column on a machine with no stored preference', () => {
+    renderPrimePanel()
+    expect(screen.getByRole('button', { name: 'Close sessions' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+
+  it('remembers a person who closed it', () => {
+    renderPrimePanel()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close sessions' }))
+
+    expect(screen.getByRole('button', { name: 'Open sessions' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    expect(localStorage.getItem(APP_STORAGE_KEYS.chatSessionsOpen)).toBe('0')
+  })
+
+  it('starts closed when that is what the machine remembers', () => {
+    localStorage.setItem(APP_STORAGE_KEYS.chatSessionsOpen, '0')
+    renderPrimePanel()
+    expect(screen.getByRole('button', { name: 'Open sessions' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
   })
 })
