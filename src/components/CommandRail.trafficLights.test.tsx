@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 
 vi.mock('../lib/productAnalytics', () => ({ trackRailDestinationClicked: vi.fn() }))
@@ -8,8 +8,10 @@ vi.mock('./ui/action-tooltip', () => ({
 }))
 
 import { CommandRail } from './CommandRail'
+import { APP_STORAGE_KEYS } from '../constants/appStorage'
 
 const RAIL_WIDTH = 46
+const RAIL_EXPANDED_WIDTH = 168
 /** macOS draws the three window buttons ~54px wide from the configured x. */
 const TRAFFIC_LIGHT_SPAN = 54
 
@@ -39,6 +41,10 @@ function configuredTrafficLightX(): number {
 }
 
 describe('CommandRail vs macOS traffic lights', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
   // The window uses titleBarStyle "Overlay", so the system buttons float over
   // the webview. They were configured at x=18 and overlapped this 46px rail —
   // first vertically (worked around by pushing the rail's content down), then
@@ -54,12 +60,34 @@ describe('CommandRail vs macOS traffic lights', () => {
     expect(configuredTrafficLightX() + TRAFFIC_LIGHT_SPAN).toBeLessThan(136)
   })
 
-  it('no longer offsets the rail downward, since nothing overlaps it', () => {
+  it('does not offset a collapsed rail, since the lights sit beside it', () => {
+    localStorage.setItem(APP_STORAGE_KEYS.commandRailExpanded, '0')
+
     const rail = renderRail()
 
     // Symmetric padding via `py-2`; an asymmetric top inset would leave a
     // visible empty band at the rail's top for no reason.
     expect(rail.className).toContain('py-2')
     expect(rail.style.paddingTop).toBe('')
+  })
+
+  /**
+   * Expanding the rail (2026-08-20, to label the destinations) put it back
+   * under the lights: 168px of rail against lights that start at x=58. The
+   * horizontal escape the config bought only holds while the rail is narrow,
+   * so the wide state makes room vertically instead — which is what every
+   * macOS sidebar does with the lights sitting in its top band.
+   */
+  it('offsets an expanded rail, which now reaches under the lights', () => {
+    localStorage.setItem(APP_STORAGE_KEYS.commandRailExpanded, '1')
+
+    const rail = renderRail()
+
+    expect(Number.parseInt(rail.style.width, 10)).toBe(RAIL_EXPANDED_WIDTH)
+    expect(configuredTrafficLightX()).toBeLessThan(RAIL_EXPANDED_WIDTH)
+
+    const inset = Number.parseInt(rail.style.paddingTop, 10)
+    // Clear of the lights themselves: they are drawn ~16px tall from y=24.
+    expect(inset).toBeGreaterThanOrEqual(40)
   })
 })

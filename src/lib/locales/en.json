@@ -871,6 +871,8 @@
   "rail.changes": "Changes",
   "rail.agent": "Agent activity",
   "rail.settings": "Settings",
+  "rail.expand": "Expand rail",
+  "rail.collapse": "Collapse rail",
   "status.theme.light": "Switch to light mode",
   "status.theme.dark": "Switch to dark mode",
   "status.settings.open": "Open settings",
