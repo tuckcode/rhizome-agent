@@ -38,6 +38,14 @@ for FILE in $STAGED_FILES; do
   esac
 done
 
+# Runs before the docs-only early exit below, because a handoff edit *is* a
+# docs-only change — checking it after would mean never checking it.
+STAGED_HANDOFF=$(echo "$STAGED_FILES" | grep -E '^docs/(HANDOFF\.md|plans/handoffs/)' || true)
+if [ -n "$STAGED_HANDOFF" ]; then
+  echo "  → handoff shape..."
+  pnpm handoff:check
+fi
+
 if [ "$APP_CHANGED" = false ]; then
   echo "  → app checks skipped (docs/workflow/hooks only)"
   echo "✅ Pre-commit passed"

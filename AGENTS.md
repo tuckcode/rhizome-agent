@@ -21,7 +21,15 @@
 > repo's docs*.
 
 - **If you are not Claude (e.g. Nous Portal, Hermes Agent, or any non-Anthropic model), start with `docs/CROSS-MODEL-HANDOFF.md`** — a short, verified list of traps a prior session already hit in this repo (knip false positives, a release-pipeline contradiction, native-vs-browser QA gaps, naming residues that look fixable but aren't). It exists specifically so the same mistakes aren't repeated by a different model.
-- Read `docs/HANDOFF.md` — the current-state doc. **Its newest session handoff is the first `## Session handoff` section in the file**, and that is the one to read and the place to add yours. The sections below it are dated but not in date order, because sessions have inserted next to whichever heading they were reading; the file says so at the top. (This line used to describe the file as "updated in place each session (not dated)" — it has been twenty-plus dated sections for a long time, and "see the latest handoff" only works if the newest one is on top.) Read it directly; the wiki's search-first rule does not apply to repo docs.
+- Read `docs/HANDOFF.md` — current state and an index, ~500 lines, meant to be read in full. It holds no session records: those are one file each in `docs/plans/handoffs/`, newest by filename.
+
+  ```bash
+  ls docs/plans/handoffs | grep -v archive | tail -1   # the latest handoff
+  ```
+
+  Open that one, and any older one whose `description:` frontmatter sounds relevant — that field exists so you can skip the rest. **Write your own session as a new file there** (`YYYY-MM-DD-HHMM-<model>-<topic>.md`, frontmatter with `session`, `model`, `description`), and update `HANDOFF.md` in place rather than pasting into it. `pnpm handoff:check` enforces the shape and runs in pre-commit.
+
+  Restructured 2026-08-21: the file had reached 2156 lines of stacked sessions, and because each session inserted next to whichever heading it was reading, the newest handoff had drifted to third place — "read the latest handoff" pointed at the wrong one. Read it directly; the wiki's search-first rule does not apply to repo docs.
 - Check `docs/plans/` for the most recent `*-session-status.md` (sort by date in the filename) — dated detail log behind the handoff summary: what's done, what's blocked, and where to pick up
 - Check `docs/adr/` for relevant architecture decisions before structural choices
 - Check `docs/ARCHITECTURE.md` and `docs/ABSTRACTIONS.md` for relevant structural information
