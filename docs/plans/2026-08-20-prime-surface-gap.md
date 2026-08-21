@@ -112,9 +112,30 @@ concluding a command is missing:
 `get_model_catalog`, `get_session_tree` and `get_session_header` all return the
 *second* message to an unattached client. So the recorded finding that the
 model catalog is "advertised but not routable" was half wrong: the name is
-`get_model_catalog` (not `model_catalog`), and it is very likely reachable
-after attach. **Not yet probed attached** — doing so needs a throwaway session,
-since attaching to a live one disturbs whoever holds it.
+`get_model_catalog` (not `model_catalog`), and it is reachable after attach.
+
+**Probed attached, 2026-08-20**, from a throwaway `client-owned` session that
+was killed afterwards:
+
+| Command | Models | Providers |
+|---|---|---|
+| `get_available_models` (what Rhizome calls) | **185** | 4 — `prime-inference` 104, `opencode` 61, `anthropic` 13, `xai` 7 |
+| `get_model_catalog` | **1252** | 20+ — `openrouter` 289, `vercel-ai-gateway` 220, `amazon-bedrock` 119, `huggingface` 67, `cloudflare-ai-gateway` 57, `azure-openai-responses` 41, `openai` 41, `github-copilot` 33, `mistral` 31, `fireworks` 23, … |
+
+**The picker is not capped by a bug — the two commands answer different
+questions.** `get_available_models` returns what this machine can actually run
+*now*: providers with credentials. `get_model_catalog` returns everything Prime
+knows how to talk to, credentialled or not, and also carries
+`configuredProviders`. Our picker calling the narrower one is correct, and the
+2026-08-19 note that the list is "capped by the installed Prime version" was
+right about the mechanism (the catalog is baked into the bundle) and wrong to
+treat 183 as a ceiling worth working around.
+
+**The opportunity is the other 1067.** A BYO-model product can show what
+connecting a provider would unlock — "OpenRouter: 289 models, not connected" —
+instead of silently listing only what is already wired. That needs
+`get_model_catalog` plus `configuredProviders`, both now known to work, and it
+is a far better use of this command than trying to widen the picker.
 
 ### 1a. `observe` exists — one layer down, and family-scoped
 
