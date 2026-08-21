@@ -59,13 +59,48 @@ export interface PrimeRosterSession {
   taskState?: 'needs_input' | 'completed'
 }
 
+/**
+ * Every status this module can report, in the order `activityFor` tests
+ * them. Exported as a tuple so the locale file and the view can be checked
+ * against one list rather than three copies of the same eight strings.
+ */
+export const ROSTER_ACTIVITY_KEYS = [
+  'compacting',
+  'runningCommand',
+  'runningTools',
+  'replying',
+  'working',
+  'waitingOnSubagents',
+  'waitingOnHeartbeat',
+  'waitingForYou',
+] as const
+
+export type RosterActivityKey = (typeof ROSTER_ACTIVITY_KEYS)[number]
+
+/** The locale key carrying the copy for one status. */
+export function rosterActivityMessageKey(key: RosterActivityKey): string {
+  return `menuBarCompanion.activity.${key}`
+}
+
+/**
+ * What a session is doing, in a form the view can render in any locale.
+ *
+ * Two kinds because there are genuinely two sources. A `summary` is the
+ * daemon's own sentence about the work — prose we did not write and cannot
+ * translate, passed through as-is. A `status` is our own classification of the
+ * flags, which is copy we own and must not hard-code in English (C34).
+ */
+export type RosterActivity =
+  | { kind: 'summary'; text: string }
+  | { kind: 'status'; key: RosterActivityKey }
+
 /** A single row in the menu-bar roster. */
 export interface RunningSessionRow {
   /** The daemon handle to open — `activeSessionId`. */
   id: string
   title: string
-  /** One line naming what the session is doing right now. */
-  activityLabel: string
+  /** What the session is doing right now — see `RosterActivity`. */
+  activity: RosterActivity
   /** True when the agent itself is turning, as opposed to merely pinned. */
   working: boolean
   /** Live descendants hosted under this session, children and deeper. */
@@ -207,22 +242,24 @@ function rootHandleFor(
   return sessionHandle(current)
 }
 
-function activityLabelFor(session: PrimeRosterSession): string {
+function activityFor(session: PrimeRosterSession): RosterActivity {
   const summary = collapseWhitespace(session.summary ?? '')
-  if (summary) return truncate(summary, 60)
+  if (summary) return { kind: 'summary', text: truncate(summary, 60) }
 
-  if (session.isCompacting) return 'Compacting'
-  if (session.isBashRunning) return 'Running a command'
-  if (session.isRunningTools) return 'Running tools'
-  if (session.isStreaming) return 'Replying'
-  if (session.activity === 'working') return 'Working'
-  if (session.hasRunningRlmChildren) return 'Waiting on subagents'
-  if (session.hasActiveHeartbeat) return 'Waiting on a heartbeat'
+  const status = (key: RosterActivityKey): RosterActivity => ({ kind: 'status', key })
+
+  if (session.isCompacting) return status('compacting')
+  if (session.isBashRunning) return status('runningCommand')
+  if (session.isRunningTools) return status('runningTools')
+  if (session.isStreaming) return status('replying')
+  if (session.activity === 'working') return status('working')
+  if (session.hasRunningRlmChildren) return status('waitingOnSubagents')
+  if (session.hasActiveHeartbeat) return status('waitingOnHeartbeat')
   // Last, and only once nothing more specific applies: a session held open
   // with no turn running is waiting on the user, not working. Without this it
   // fell through to "Working" — the one thing it is definitely not doing.
-  if (session.taskState === 'needs_input') return 'Waiting for you'
-  return 'Working'
+  if (session.taskState === 'needs_input') return status('waitingForYou')
+  return status('working')
 }
 
 /** Agent-is-turning, as opposed to pinned by a heartbeat or a busy child. */
@@ -317,7 +354,7 @@ export function toRunningSessionRows(
       return {
         id: handle,
         title: rosterSessionTitle(session, { maxLength: options.titleLength }),
-        activityLabel: activityLabelFor(session),
+        activity: activityFor(session),
         working: isWorking(session),
         subagentCount: subagentCounts.get(handle) ?? 0,
         sessionFile: session.sessionFile,

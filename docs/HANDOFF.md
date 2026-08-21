@@ -1699,17 +1699,25 @@ Note what this implies about the record: sessions in this window that report "al
 
 ## Open threads
 
-- **C34-OPEN: the menu-bar roster's activity labels are not localized.** Every
-  string `activityLabelFor` returns (`src/lib/primeRunningSessions.ts`) is an
-  English literal in the module — "Compacting", "Running a command", "Running
-  tools", "Replying", "Working", "Waiting on subagents", "Waiting on a
-  heartbeat", and now "Waiting for you". None are in `src/lib/locales/en.json`,
-  so `pnpm l10n:translate` has never seen them and the popover stays English in
-  every locale. Pre-existing — the labels shipped this way with #13 on
-  2026-08-19 — and logged here rather than fixed in passing because moving all
-  eight into the locale file is its own change with its own translation run.
-  Whoever does it should check the rest of `MenuBarCompanionApp.tsx` at the same
-  time.
+- **C34-OPEN (half done): the menu-bar roster's activity labels.** The eight
+  statuses are no longer English literals in `primeRunningSessions.ts` — the
+  module now returns a `RosterActivity` (`{kind:'summary'}` for the daemon's own
+  prose, `{kind:'status', key}` for copy we own), the keys live in
+  `menuBarCompanion.activity.*` in `en.json`, and `MenuBarCompanionApp` renders
+  them through `t()`. **Two things remain:**
+
+  1. **`pnpm l10n:translate` has never run for them.** It needs
+     `LARA_ACCESS_KEY_ID` / `LARA_ACCESS_KEY_SECRET`, which are not set on this
+     machine, so all 19 non-English locales are missing these 8 keys. That is
+     C18's existing gap (272 missing per locale before this change, 280 after)
+     — the change did not create the gap but did widen it by 8.
+  2. **The companion window ignores the user's locale entirely.**
+     `MenuBarCompanionApp.tsx:22` is `createTranslator(DEFAULT_APP_LOCALE)`,
+     where `DEFAULT_APP_LOCALE = 'en'`. Every other component in the tree takes
+     a `locale` prop. So even a fully translated locale file renders English in
+     that window. It is a separate Tauri window without the settings context,
+     which is presumably why — but until it is fixed, localizing anything in the
+     companion is preparation, not a user-visible change.
 
 - ~~C4-OPEN: tolaria MCP server path mismatch across live configs~~ **RESOLVED `2fa620a5`**
 - ~~C6-OPEN: inbox automation default~~ **RESOLVED 2026-07-31.** Default ON for new vaults, plus a one-time per-vault migration for existing ones. See "Investigation done" item 1 above.
