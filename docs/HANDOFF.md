@@ -2,6 +2,14 @@
 
 Living doc. Update in place each session. This file is "what's true right now," not a history log. Detailed per-session records go in `docs/plans/*-session-status.md`.
 
+**The newest session handoff is the first `## Session handoff` section below,
+directly under the standing-rule block.** Put yours there — not next to the
+one whose date looks adjacent to yours. The sections below it are *not* in
+date order and never have been: several sessions inserted next to whichever
+heading they happened to be reading, so on 2026-08-21 the newest entry sat
+third and two older ones sat above it. If someone is told "see the latest
+handoff," this is the only rule that makes that instruction work.
+
 ## ⛔ Standing rule correction — pushing (2026-08-15)
 
 **Push when the pre-push gates pass. You do not need to ask.** That is what
@@ -24,80 +32,6 @@ agent is committing to the tree.
 
 Still true, and not what this rule was about: **never `--no-verify`**, and a
 push is not a release — releases are tagged builds with signed installers.
-
----
-
-## Session handoff — 2026-08-20d (visual frontend audit)
-
-**State:** `main` was `98bff09` at session start (`origin/main`). Prime
-**0.7.4**. Daemon was restarted off `orphan-file` before the walk. Tree
-should only gain the audit doc + this header.
-
-**Shipped this session:** the punch list, not code.
-`docs/plans/2026-08-20-frontend-ui-audit.md`.
-
-Walked `pnpm tauri dev` with cua-driver (Cursor IDE cannot see the window).
-Atticus's glance was right: no sessions column on Chat home, Goal jumps to
-the far right on a live session, traffic lights share a vertical band with
-the Chat rail icon, and the 46px rail is icon-only with no expand.
-
-**Next session: one visible chrome fix**, not candidate 4. Ranked in the
-audit: (1) expandable rail or labels, (2) sessions list as the default left
-column (#27), (3) traffic-light y, (4) Goal not `justify-between` against
-the meter. #28 (Untitled) and #26 (no `prime-agent update` button) confirmed.
-grok-4.6 shows in the live strip; jsonl `xai/grok-4.6`.
-
-Menu-bar roster was not visually re-checked (companion window off-screen).
-Do not build on `observe`. Do not start candidate 4 until the column exists
-or is explicitly deferred.
-
-**Then:** candidate 4, attached `get_model_catalog` probe, C34, #26–#29.
-
----
-
-## Session handoff — 2026-08-20c (frontend UI audit is next)
-
-**State:** `main` in sync with `origin/main` at `34b840e`. Tree clean (ignore
-`.cursor/`). All six commits from 2026-08-20b **were pushed** — the header
-below still says they were not; that is stale. Gates: 5482 frontend tests,
-88.05% lines; 1534 Rust tests, 85.29% lines; 26 Playwright smoke. Prime
-**0.7.4**.
-
-**Daemon when this was written:** `orphan-file` — restart before anything
-that talks to Prime:
-
-```bash
-prime-agent shutdown --force
-prime-agent --mode daemon >/dev/null 2>&1 &
-sleep 2 && prime-agent status
-```
-
-**Shipped today (already on origin):** candidate 3 (`e276738`), Prime surface
-gap analysis + probe corrections (`ad27041` `870aedf` `da02b96`), roster
-title + waiting-label fix (`34b840e`). Outside the repo:
-`~/.prime/agent/extensions/xai-oauth.ts` now lists `grok-4.6` at 500k/500k.
-
-**Next session: visual frontend audit**, not candidate 4. **Done 2026-08-20d**
-— see the header above and `docs/plans/2026-08-20-frontend-ui-audit.md`.
-
-Atticus's goal is eyes on the running app so we know what is broken,
-half-done, or missing — especially the Prime / chat surface. Playbook:
-`docs/plans/2026-08-20-frontend-ui-audit-pickup.md`. Launch `pnpm tauri dev`
-with the screen unlocked, walk AI panel → roster → history → vault sanity →
-agent settings, score each screen, write
-`docs/plans/YYYY-MM-DD-frontend-ui-audit.md`. Do not fix-as-you-go unless
-the screen is lying in one line.
-
-Cursor IDE chat cannot see the Rhizome window. SuperGrok Heavy / Cursor Ultra
-does not change that. Use computer-use. Grok Bot is a separate app with its
-own cloud computer; it is not the audit tool.
-
-**Do not start from `observe`.** Probed: `Unknown daemon command`. The
-replacement for live-row status is already on the `list` payload; `34b840e`
-fixed the two actual defects. Read the gap doc before inventing transport.
-
-**Then** (after the punch list exists): candidate 4, attached
-`get_model_catalog` probe, C34, #26–#29.
 
 ---
 
@@ -183,6 +117,80 @@ cheap loop; no repo doc mentioned it before today.
   that it may never use. Filtering the display was the safe half; creating it
   lazily is the half that stops the litter.
 - Architecture candidates 2 and 5; #26 (no in-app `prime-agent update`).
+
+---
+
+## Session handoff — 2026-08-20d (visual frontend audit)
+
+**State:** `main` was `98bff09` at session start (`origin/main`). Prime
+**0.7.4**. Daemon was restarted off `orphan-file` before the walk. Tree
+should only gain the audit doc + this header.
+
+**Shipped this session:** the punch list, not code.
+`docs/plans/2026-08-20-frontend-ui-audit.md`.
+
+Walked `pnpm tauri dev` with cua-driver (Cursor IDE cannot see the window).
+Atticus's glance was right: no sessions column on Chat home, Goal jumps to
+the far right on a live session, traffic lights share a vertical band with
+the Chat rail icon, and the 46px rail is icon-only with no expand.
+
+**Next session: one visible chrome fix**, not candidate 4. Ranked in the
+audit: (1) expandable rail or labels, (2) sessions list as the default left
+column (#27), (3) traffic-light y, (4) Goal not `justify-between` against
+the meter. #28 (Untitled) and #26 (no `prime-agent update` button) confirmed.
+grok-4.6 shows in the live strip; jsonl `xai/grok-4.6`.
+
+Menu-bar roster was not visually re-checked (companion window off-screen).
+Do not build on `observe`. Do not start candidate 4 until the column exists
+or is explicitly deferred.
+
+**Then:** candidate 4, attached `get_model_catalog` probe, C34, #26–#29.
+
+---
+
+## Session handoff — 2026-08-20c (frontend UI audit is next)
+
+**State:** `main` in sync with `origin/main` at `34b840e`. Tree clean (ignore
+`.cursor/`). All six commits from 2026-08-20b **were pushed** — the header
+below still says they were not; that is stale. Gates: 5482 frontend tests,
+88.05% lines; 1534 Rust tests, 85.29% lines; 26 Playwright smoke. Prime
+**0.7.4**.
+
+**Daemon when this was written:** `orphan-file` — restart before anything
+that talks to Prime:
+
+```bash
+prime-agent shutdown --force
+prime-agent --mode daemon >/dev/null 2>&1 &
+sleep 2 && prime-agent status
+```
+
+**Shipped today (already on origin):** candidate 3 (`e276738`), Prime surface
+gap analysis + probe corrections (`ad27041` `870aedf` `da02b96`), roster
+title + waiting-label fix (`34b840e`). Outside the repo:
+`~/.prime/agent/extensions/xai-oauth.ts` now lists `grok-4.6` at 500k/500k.
+
+**Next session: visual frontend audit**, not candidate 4. **Done 2026-08-20d**
+— see the header above and `docs/plans/2026-08-20-frontend-ui-audit.md`.
+
+Atticus's goal is eyes on the running app so we know what is broken,
+half-done, or missing — especially the Prime / chat surface. Playbook:
+`docs/plans/2026-08-20-frontend-ui-audit-pickup.md`. Launch `pnpm tauri dev`
+with the screen unlocked, walk AI panel → roster → history → vault sanity →
+agent settings, score each screen, write
+`docs/plans/YYYY-MM-DD-frontend-ui-audit.md`. Do not fix-as-you-go unless
+the screen is lying in one line.
+
+Cursor IDE chat cannot see the Rhizome window. SuperGrok Heavy / Cursor Ultra
+does not change that. Use computer-use. Grok Bot is a separate app with its
+own cloud computer; it is not the audit tool.
+
+**Do not start from `observe`.** Probed: `Unknown daemon command`. The
+replacement for live-row status is already on the `list` payload; `34b840e`
+fixed the two actual defects. Read the gap doc before inventing transport.
+
+**Then** (after the punch list exists): candidate 4, attached
+`get_model_catalog` probe, C34, #26–#29.
 
 ---
 
