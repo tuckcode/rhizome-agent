@@ -220,7 +220,13 @@ if ! run_sidecar_automatic_checks; then
   LANE_LOG_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rhizome-prepush.XXXXXX")"
   trap 'rm -rf "$LANE_LOG_DIR"' EXIT
 
-  FRONTEND_LANE="pnpm lint && pnpm build && FRONTEND_COVERAGE_CONCURRENCY=\"${FRONTEND_COVERAGE_CONCURRENCY:-1}\" node scripts/run-vitest-coverage-shards.mjs --silent && pnpm test:mcp"
+  # Coverage was pinned to one shard at a time, which was most of this lane:
+  # measured 2026-08-21, concurrency 1 took 124s and 2 took 85s. The runner
+  # defaults concurrency to the shard count, so the pin is simply removed
+  # rather than replaced with another number. Four shards measured no better
+  # than two — a fixed cost (vitest startup, instrumentation, merging)
+  # dominates from there.
+  FRONTEND_LANE="pnpm lint && pnpm build && node scripts/run-vitest-coverage-shards.mjs --silent && pnpm test:mcp"
 
   # Unset GIT_DIR so git tests create isolated repos without inheriting hook
   # context. `--no-clean` keeps the incremental build; LAPUTA_FULL_COVERAGE=1

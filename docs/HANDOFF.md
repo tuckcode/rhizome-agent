@@ -1787,6 +1787,16 @@ Note what this implies about the record: sessions in this window that report "al
   behaviour. This machine has 15 cores; the lanes barely overlap in what they
   use.
 
+  **The frontend lane is the critical path, and coverage is most of it.**
+  Timed with the lanes running together: frontend **168s**, Rust 70s,
+  Playwright 34s — so the push costs whatever the frontend lane costs. Inside
+  it: lint 17s, build 18s, mcp <1s, and **coverage 124s**, because the hook
+  pinned `FRONTEND_COVERAGE_CONCURRENCY=1`. Unpinned (the runner defaults to
+  the shard count, 2) the same coverage takes **85s**. Four shards measured no
+  better than two, so a fixed cost — vitest startup, instrumentation, merging
+  — dominates below that. Cutting further means not running all 5482 tests on
+  every push, which is a different decision than a knob.
+
   **The smoke lane was never about test count.** `playwright.smoke.config.ts`
   had `workers: 1`, so 26 tests ran strictly one at a time — ~110s on a
   15-core machine. At `workers: 4` the same 26 tests take **~34s**, verified
