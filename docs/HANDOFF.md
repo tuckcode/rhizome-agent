@@ -133,17 +133,34 @@ including `openrouter` 289 and `vercel-ai-gateway` 220, plus
 one. The opportunity is showing what connecting a provider would unlock — a
 BYO-model surface, not a wider list.
 
-### Next, and why not what I did
+### Chat home has a left column now (#27, first half)
 
-The visual audit (`docs/plans/2026-08-20-frontend-ui-audit.md`) ranks a
-**left column for Chat home** first — expandable rail with labels, or the
-sessions list open by default, or both. I deliberately did not touch it
-unattended: choosing between those is a product call, and I could not judge the
-result without eyes on the window. Everything I did instead was verifiable by
-unit test or by probing the daemon.
+`sessionsOpen` defaults to open and the choice persists per machine
+(`rhizome:chat-sessions-open`). Atticus chose sessions-open over an expandable
+icon rail when asked.
 
-Also untouched for the same reason: traffic-light `y` (audit item 3) and the
-Goal button's two homes (item 4). Both are visual judgements.
+**Verified in a browser, not just in tests.** `pnpm dev` serves the whole app
+against `mock-tauri`, so Chat home can be driven without the native window —
+this is a much cheaper verification loop than `pnpm tauri dev` + cua-driver and
+nothing in this repo's docs mentioned it. Confirmed on screen: no stored
+preference lands with the SESSIONS column beside the transcript; closing it
+writes `0`, survives a full reload, and Chat home honours it; clearing the key
+returns to open.
+
+Still true from the audit and visible in those screenshots: the rail is
+icon-only (item 1), and the Goal button sits far right of the composer row
+against the context meter (item 4).
+
+### Next, and why not most of it
+
+Untouched: traffic-light `y` (audit item 3) and the Goal button's two homes
+(item 4). Both are visual judgements about a native window — the traffic lights
+do not exist in the browser preview at all, so the cheap loop above cannot
+settle either one.
+
+The rail (audit item 1) is still icon-only. With the sessions column now
+carrying the left side of Chat home, labelling the rail is a smaller and less
+urgent change than it was when it was the only chrome there.
 
 ---
 
