@@ -1762,6 +1762,18 @@ Note what this implies about the record: sessions in this window that report "al
 
 ## Open threads
 
+- **C37-OPEN: the Chunk sidecars are unavailable, so every push pays for it.**
+  Every pre-push run this session printed `⚠️ Chunk sidecar unavailable;
+  falling back to local automatic checks` and then ran all six gates serially
+  on the laptop — **~4.5 minutes per push**, roughly 2 min of it Playwright
+  smoke and 1.5 min `cargo llvm-cov`. `AGENTS.md` designs this to run on three
+  parallel sidecar lanes (frontend, Rust, Playwright), which is why the local
+  fallback feels so much slower than the docs imply. Nobody has looked at *why*
+  the sidecar is unavailable — that is the first question, before trimming any
+  gate. If it cannot be revived, the next-best levers are moving coverage to CI
+  and shrinking the 26-test smoke lane back to the "core pre-push workflow
+  only" rule `AGENTS.md` already states.
+
 - **C36-RESOLVED (2026-08-21): a celebration's `message` now has somewhere to
   go.** `CelebrationToast` shows the agent's line for 4.5s with an optional
   "From <name>", dismissable early. It appears only when the celebration
