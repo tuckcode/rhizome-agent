@@ -59,6 +59,7 @@ import { areAutomaticUpdateChecksEnabled } from '../lib/automaticUpdateChecks'
 import { trackAllNotesVisibilityChanged } from '../lib/productAnalytics'
 import { AiProviderSettings } from './AiProviderSettings'
 import { AiAgentIcon } from './AiAgentIcon'
+import { readCelebrationsEnabled } from '../lib/celebration'
 import { GitSettingsSection } from './GitSettingsSection'
 import { PrivacySettingsSection } from './PrivacySettingsSection'
 import { SettingsBodyNav } from './SettingsBodyNav'
@@ -131,6 +132,7 @@ interface SettingsDraft {
   autoAdvanceInboxAfterOrganize: boolean
   aiFeaturesEnabled: boolean
   keepSessionsRunningOnQuit: boolean
+  celebrationsEnabled: boolean
   defaultAiAgent: AiAgentId
   defaultAiTarget: string
   aiModelProviders: AiModelProvider[]
@@ -171,7 +173,9 @@ interface SettingsBodyProps {
   aiFeaturesEnabled: boolean
   setAiFeaturesEnabled: (value: boolean) => void
   keepSessionsRunningOnQuit: boolean
+  celebrationsEnabled: boolean
   setKeepSessionsRunningOnQuit: (value: boolean) => void
+  setCelebrationsEnabled: (value: boolean) => void
   aiAgentsStatus: AiAgentsStatus
   defaultAiAgent: AiAgentId
   setDefaultAiAgent: (value: AiAgentId) => void
@@ -253,6 +257,8 @@ function createSettingsDraft(
     // Off unless the user has said otherwise: quitting stops the agent, the
     // way Claude Code and Hermes behave.
     keepSessionsRunningOnQuit: settings.keep_sessions_running_on_quit === true,
+    // Absent means never chosen, which is on: the effect is opt-out.
+    celebrationsEnabled: readCelebrationsEnabled(settings.celebrations_enabled),
     defaultAiAgent: resolveDefaultAiAgent(settings.default_ai_agent),
     defaultAiTarget: resolveAiTarget(settings).id,
     aiModelProviders: normalizeAiModelProviders(settings.ai_model_providers),
@@ -331,6 +337,7 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     initial_h1_auto_rename_enabled: draft.initialH1AutoRename,
     ai_features_enabled: draft.aiFeaturesEnabled,
     keep_sessions_running_on_quit: draft.keepSessionsRunningOnQuit,
+    celebrations_enabled: draft.celebrationsEnabled,
     default_ai_agent: draft.defaultAiAgent,
     default_ai_target: draft.defaultAiTarget,
     ai_model_providers: draft.aiModelProviders.length > 0 ? draft.aiModelProviders : null,
@@ -659,6 +666,8 @@ function SettingsBodyFromDraft({
       setKeepSessionsRunningOnQuit={(value) =>
         updateDraft('keepSessionsRunningOnQuit', value)
       }
+      celebrationsEnabled={draft.celebrationsEnabled}
+      setCelebrationsEnabled={(value) => updateDraft('celebrationsEnabled', value)}
       aiAgentsStatus={aiAgentsStatus}
       defaultAiAgent={draft.defaultAiAgent}
       setDefaultAiAgent={(value) => updateDraft('defaultAiAgent', value)}
@@ -866,6 +875,8 @@ function SettingsAgentWorkflowSections({
   setAiFeaturesEnabled,
   keepSessionsRunningOnQuit,
   setKeepSessionsRunningOnQuit,
+  celebrationsEnabled,
+  setCelebrationsEnabled,
   aiAgentsStatus,
   defaultAiAgent,
   setDefaultAiAgent,
@@ -892,6 +903,8 @@ function SettingsAgentWorkflowSections({
           aiFeaturesEnabled={aiFeaturesEnabled}
           setAiFeaturesEnabled={setAiFeaturesEnabled}
           keepSessionsRunningOnQuit={keepSessionsRunningOnQuit}
+          celebrationsEnabled={celebrationsEnabled}
+          setCelebrationsEnabled={setCelebrationsEnabled}
           setKeepSessionsRunningOnQuit={setKeepSessionsRunningOnQuit}
           aiAgentsStatus={aiAgentsStatus}
           defaultAiAgent={defaultAiAgent}
@@ -1220,6 +1233,8 @@ function AiAgentSettingsSection({
   setAiFeaturesEnabled,
   keepSessionsRunningOnQuit,
   setKeepSessionsRunningOnQuit,
+  celebrationsEnabled,
+  setCelebrationsEnabled,
   aiAgentsStatus,
   defaultAiAgent,
   setDefaultAiAgent,
@@ -1235,6 +1250,8 @@ function AiAgentSettingsSection({
   | 'setAiFeaturesEnabled'
   | 'keepSessionsRunningOnQuit'
   | 'setKeepSessionsRunningOnQuit'
+  | 'celebrationsEnabled'
+  | 'setCelebrationsEnabled'
   | 'aiAgentsStatus'
   | 'defaultAiAgent'
   | 'setDefaultAiAgent'
@@ -1279,6 +1296,13 @@ function AiAgentSettingsSection({
           checked={keepSessionsRunningOnQuit}
           onChange={setKeepSessionsRunningOnQuit}
           testId="settings-keep-sessions-running-on-quit"
+        />
+        <SettingsSwitchRow
+          label={t('settings.celebrations.enable')}
+          description={t('settings.celebrations.enableDescription')}
+          checked={celebrationsEnabled}
+          onChange={setCelebrationsEnabled}
+          testId="settings-celebrations-enabled"
         />
       </SettingsGroup>
 

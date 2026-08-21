@@ -1,0 +1,64 @@
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ConfettiCannon } from './ConfettiCannon'
+import { CelebrationContext } from './celebrationContext'
+import {
+  decideCelebration,
+  initialCelebrationGateState,
+  type CelebrationGateState,
+  type CelebrationReason,
+} from '../lib/celebration'
+import { prefersReducedMotion } from '../lib/reducedMotion'
+import { trackCelebration } from '../lib/productAnalytics'
+
+/**
+ * Owns the one cannon and the one gate.
+ *
+ * Every source asks `celebrate(reason)` and gets a boolean back; none of them
+ * knows whether a burst happened for their reason, someone else's, or not at
+ * all. That is the point — the decision lives in one place, so a new trigger
+ * cannot accidentally bypass the cooldown or the setting by rendering its own
+ * canvas.
+ */
+
+export interface CelebrationProviderProps {
+  children: ReactNode
+  /** The user's setting. Absent while settings are still loading. */
+  enabled?: boolean
+}
+
+export function CelebrationProvider({ children, enabled = true }: CelebrationProviderProps) {
+  const [fireKey, setFireKey] = useState(0)
+  // A ref, not state: the gate is read and written inside one call and must
+  // not wait for a render to take effect, or two sources firing in the same
+  // tick would both see an empty gate and both get through.
+  const gateRef = useRef<CelebrationGateState>(initialCelebrationGateState)
+
+  const celebrate = useCallback(
+    (reason: CelebrationReason) => {
+      const decision = decideCelebration({
+        state: gateRef.current,
+        reason,
+        now: Date.now(),
+        enabled,
+        reducedMotion: prefersReducedMotion(),
+      })
+      gateRef.current = decision.state
+
+      trackCelebration({ reason, shown: decision.celebrate, refusal: decision.refusal })
+      if (!decision.celebrate) return false
+
+      setFireKey((key) => key + 1)
+      return true
+    },
+    [enabled],
+  )
+
+  const value = useMemo(() => ({ celebrate, enabled }), [celebrate, enabled])
+
+  return (
+    <CelebrationContext.Provider value={value}>
+      {children}
+      <ConfettiCannon fireKey={fireKey} enabled={enabled} />
+    </CelebrationContext.Provider>
+  )
+}

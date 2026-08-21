@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { readConfettiColors } from '../lib/confettiColors'
+import { surfaceSize } from '../lib/confettiSurface'
 import { prefersReducedMotion } from '../lib/reducedMotion'
 import {
   createConfettiRenderer,
@@ -21,17 +22,6 @@ import {
  * re-rendering for any other reason cannot fire a second burst.
  */
 
-function surfaceSize(canvas: HTMLCanvasElement, view: Window): ConfettiSurfaceSize {
-  const rect = canvas.getBoundingClientRect()
-  return {
-    width: Math.max(1, rect.width),
-    height: Math.max(1, rect.height),
-    // Capped: a 3x backing store for decorative paper costs real memory and
-    // buys nothing anyone can see.
-    devicePixelRatio: Math.min(view.devicePixelRatio || 1, 2),
-  }
-}
-
 interface ConfettiHost {
   burst(colors: string[]): void
   resize(size: ConfettiSurfaceSize): void
@@ -46,7 +36,22 @@ interface ConfettiHost {
  * tests — a celebration that throws on an unsupported engine would take the
  * window down with it.
  */
+/**
+ * Hosts already built, keyed by the canvas they own.
+ *
+ * Handing a canvas to a worker is one-way and permanent for that element: it
+ * cannot be transferred twice, and `getContext` throws on it forever after.
+ * React StrictMode mounts effects twice against the *same* node in
+ * development, so without this the second pass re-entered `createHost`, failed
+ * to transfer, fell through to `getContext`, and threw — a blank window with a
+ * stack trace. Weak so a discarded canvas takes its host with it.
+ */
+const hostsByCanvas = new WeakMap<HTMLCanvasElement, ConfettiHost>()
+
 function createHost(canvas: HTMLCanvasElement, view: Window): ConfettiHost | null {
+  const existing = hostsByCanvas.get(canvas)
+  if (existing) return existing
+
   if (typeof canvas.transferControlToOffscreen === 'function' && typeof Worker === 'function') {
     try {
       const worker = new Worker(new URL('./confetti.worker.ts', import.meta.url), {
@@ -56,21 +61,31 @@ function createHost(canvas: HTMLCanvasElement, view: Window): ConfettiHost | nul
       worker.postMessage({ type: 'initialize', canvas: offscreen, size: surfaceSize(canvas, view) }, [
         offscreen,
       ])
-      return {
+      const host: ConfettiHost = {
         burst: (colors) => worker.postMessage({ type: 'burst', colors }),
         resize: (size) => worker.postMessage({ type: 'resize', size }),
         dispose: () => {
           worker.postMessage({ type: 'dispose' })
           worker.terminate()
+          hostsByCanvas.delete(canvas)
         },
       }
+      hostsByCanvas.set(canvas, host)
+      return host
     } catch {
       // Fall through: a canvas whose control transfer failed can still be
       // drawn on directly.
     }
   }
 
-  const context = canvas.getContext('2d')
+  // Guarded: on a canvas whose control was already transferred this does not
+  // return null, it throws.
+  let context: CanvasRenderingContext2D | null = null
+  try {
+    context = canvas.getContext('2d')
+  } catch {
+    return null
+  }
   if (!context) return null
   const renderer: ConfettiRenderer = createConfettiRenderer(context as unknown as ConfettiContext, {
     requestFrame: (callback) => view.requestAnimationFrame(callback),
@@ -78,7 +93,7 @@ function createHost(canvas: HTMLCanvasElement, view: Window): ConfettiHost | nul
       view.cancelAnimationFrame(handle)
     },
   })
-  return {
+  const host: ConfettiHost = {
     burst: (colors) => {
       renderer.burst(colors)
     },
@@ -87,8 +102,11 @@ function createHost(canvas: HTMLCanvasElement, view: Window): ConfettiHost | nul
     },
     dispose: () => {
       renderer.dispose()
+      hostsByCanvas.delete(canvas)
     },
   }
+  hostsByCanvas.set(canvas, host)
+  return host
 }
 
 export interface ConfettiCannonProps {
@@ -130,8 +148,10 @@ export function ConfettiCannon({ fireKey, enabled = true }: ConfettiCannonProps)
     return () => {
       observer?.disconnect()
       view.removeEventListener('resize', notifySize)
-      host.dispose()
-      hostRef.current = null
+      // Deliberately not disposed here. This cleanup also runs on StrictMode's
+      // development remount, where the same canvas comes straight back — and a
+      // transferred canvas cannot be given a second host. The worker dies with
+      // the window; a WeakMap entry dies with the element.
     }
   }, [enabled])
 
@@ -146,7 +166,12 @@ export function ConfettiCannon({ fireKey, enabled = true }: ConfettiCannonProps)
       ref={canvasRef}
       data-testid="confetti-cannon"
       aria-hidden
-      className="pointer-events-none fixed inset-0 z-[9999] h-full w-full"
+      className="pointer-events-none fixed inset-0 z-[9999]"
+      // Sized explicitly because a canvas is a replaced element: `inset-0`
+      // alone does not stretch it the way it stretches a div — with `width:
+      // auto` it keeps its intrinsic size, which for a canvas handed to a
+      // worker is whatever backing store that worker last set.
+      style={{ width: '100vw', height: '100vh' }}
     />
   )
 }

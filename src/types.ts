@@ -137,6 +137,12 @@ export interface Settings {
    * fire. Governs the *session*, not Prime's shared background service.
    */
   keep_sessions_running_on_quit?: boolean | null
+  /**
+   * Confetti when something worth marking finishes. Absent means never
+   * chosen, which reads as on. A system reduced-motion preference suppresses
+   * celebrations whatever this says.
+   */
+  celebrations_enabled?: boolean | null
   theme_mode?: ThemeMode | null
   color_theme?: string | null
   accent_color?: AccentColor | null
