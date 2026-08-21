@@ -77,8 +77,17 @@ export const ROSTER_ACTIVITY_KEYS = [
 
 export type RosterActivityKey = (typeof ROSTER_ACTIVITY_KEYS)[number]
 
-/** The locale key carrying the copy for one status. */
-export function rosterActivityMessageKey(key: RosterActivityKey): string {
+/**
+ * The locale key carrying the copy for one status.
+ *
+ * The return type is the template literal rather than `string` so it satisfies
+ * the translator's union of known message keys. Typed as `string` this
+ * compiles under `tsc --noEmit` and fails under `tsc -b`, which is what the
+ * pre-push build caught.
+ */
+export function rosterActivityMessageKey(
+  key: RosterActivityKey,
+): `menuBarCompanion.activity.${RosterActivityKey}` {
   return `menuBarCompanion.activity.${key}`
 }
 
