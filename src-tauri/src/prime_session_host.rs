@@ -2724,6 +2724,55 @@ mod tests {
         let _ = shutdown_host();
     }
 
+    /// The path a user actually takes: launch, then type. The session has to
+    /// come into existence inside the prompt, in the order the daemon
+    /// requires, and the turn has to stream as it always did — including the
+    /// `Init` that tells the frontend which session it is now in, which on
+    /// this path can only be known after the prompt has been sent.
+    #[cfg(unix)]
+    #[test]
+    fn the_first_prompt_on_a_lazy_host_creates_the_session_and_still_streams() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| {
+            (command["type"].as_str() == Some("prompt")).then(|| {
+                vec![
+                    ok(id, "prompt", serde_json::Value::Null),
+                    session_event(serde_json::json!({ "type": "agent_start" })),
+                    session_event(text_delta("hello")),
+                    session_event(serde_json::json!({ "type": "agent_end", "messages": [] })),
+                ]
+            })
+        });
+        daemon.install();
+        connect_host_lazy(vault.path()).unwrap();
+
+        let mut events = Vec::new();
+        let session =
+            run_prompt_stream(prompt_request(vault.path(), false), |e| events.push(e)).unwrap();
+
+        assert_eq!(session, "sess-a");
+        assert_eq!(
+            daemon.commands(),
+            vec!["list", "create", "attach", "get_state", "prompt", "get_state"],
+            "the session is created inside the prompt, attached before it, and \
+             re-read after"
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "hello")),
+            "events={events:?}"
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, AiAgentStreamEvent::Init { session_id } if session_id == "sess-a")),
+            "the frontend has to learn the session it landed in: {events:?}"
+        );
+        let _ = shutdown_host();
+    }
+
     /// Deferring the session must not cost the user the model chip. Chat home
     /// draws it before a word is typed, and "Model unknown" on every launch
     /// would be a worse answer than the true one: what Prime is configured to
