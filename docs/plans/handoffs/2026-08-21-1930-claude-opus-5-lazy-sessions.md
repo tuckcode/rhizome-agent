@@ -217,6 +217,43 @@ the Localization section and the checklist line now say the opposite, and C18
 is retitled **DECIDED**. Copy still goes in `en.json` — that is structure, not
 translation.
 
+### #27, half of which was already done
+
+The issue was researched 2026-08-19 and describes an overlay that no longer
+exists — the sessions column stopped being one earlier the same day. Four
+criteria were already met before this session touched it, including the one
+in the title, and that answered its second open question by itself: there is
+one view now, not two.
+
+**Built:** a row says whether its session is still running. The list lit a dot
+for the *attached* session and nothing else, so a goal continuing in a
+background session looked identical to a finished one. Three states — filled
+with a ring is turning, filled is held by the daemon but idle, outlined is a
+log on disk.
+
+Two calls worth keeping:
+
+- **Not `isRosterSessionRunning`.** That predicate means "is doing work" —
+  heartbeat, turning, live children — and an idle resident session fails it
+  while still being reattachable and still able to fire a goal. The third
+  state exists for that gap. `runningSessionFilesByPath` also counts subagents
+  and caps nothing, unlike `toRunningSessionRows`, which is shaped for a
+  five-row popover: a sidebar marking only the first five sessions alive would
+  be wrong invisibly.
+- **The status is in the accessible name**, not only the dot. The dot is
+  `aria-hidden` because it is decoration, so "distinguishable" was otherwise
+  only true for people who can see colour.
+
+**Decided by Atticus, 2026-08-22: the two sidebars dock independently.** Two
+preferences, neither of which exists yet. That choice creates the edge case a
+single preference would not have had — both docked to the same side — and it
+has to mean something deliberate. Recorded on #27.
+
+**The browser caught its third bug of the session.** No mock handler for
+`list_prime_running_sessions`, so every row would have read as saved. Invisible
+to the tests, which mock that module wholesale. All three of tonight's
+browser-only findings had that same shape.
+
 ### Open
 
 - **#28 is closed.** Its checklist held three items this session did not

@@ -51,7 +51,7 @@ file.
 
 ## State
 
-`main` pushed through `92d70b3`, tree clean, all gates green. Prime **0.7.4**;
+`main` pushed through `6a8b792`, tree clean, all gates green. Prime **0.7.4**;
 the daemon dies with whatever terminal starts it, so start it detached:
 
 ```bash
