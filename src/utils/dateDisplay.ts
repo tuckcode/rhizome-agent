@@ -67,6 +67,51 @@ export function formatTimestampForDateDisplay(
   return formatDateForDisplay(new Date(timestampSeconds * 1000), format)
 }
 
+/** Local clock time, `14:08`. Matches the session list's meta line. */
+export function formatTimeForDisplay(date: Date): string {
+  return `${twoDigit(date.getHours())}:${twoDigit(date.getMinutes())}`
+}
+
+/** Same calendar day on the viewer's own clock. */
+export function isSameDisplayDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate()
+  )
+}
+
+/**
+ * What the "modified" half of a note row should say.
+ *
+ * A note row shows when it was saved and when it was created. Whenever both
+ * fall on the same day — which is most of a note's life, and all of a freshly
+ * imported vault — that spent the row printing one date twice:
+ *
+ *     August 22, 2026                    Created August 22, 2026
+ *
+ * The second half already says the date, so the first half says the clock time
+ * instead. Nothing is lost and the row starts carrying information it did not
+ * before.
+ *
+ * Local time throughout, which is what `getHours` and `getDate` read — a
+ * timestamp is only meaningful to a reader in their own zone.
+ */
+export function formatSavedLabel(
+  savedSeconds: number | null | undefined,
+  createdSeconds: number | null | undefined,
+  format: DateDisplayFormat = DEFAULT_DATE_DISPLAY_FORMAT,
+): string {
+  if (!savedSeconds) return ''
+  const saved = new Date(savedSeconds * 1000)
+  if (!createdSeconds) return formatDateForDisplay(saved, format)
+
+  const created = new Date(createdSeconds * 1000)
+  return isSameDisplayDay(saved, created)
+    ? formatTimeForDisplay(saved)
+    : formatDateForDisplay(saved, format)
+}
+
 export function parseDateDisplayParts(value: string): DateParts | null {
   return parseDashDateParts(value) ?? parseSlashDateParts(value)
 }
