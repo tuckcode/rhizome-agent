@@ -222,8 +222,8 @@ translation.
 - **#28 is closed.** Its checklist held three items this session did not
   touch — the identical-label fallback still at `PrimeSessionList.tsx:185`,
   no origin on a row, and no answer for 500 sessions — so they moved to
-  **#30** rather than disappearing with the close. **All three are done now**,
-  so #30 is ready to close. The 43 existing husks are
+  **#30** rather than disappearing with the close. **#30 is closed too** — all
+  three landed this session. The 43 existing husks are
   still on disk; nothing reads them (`list_sessions` drops them), and
   deleting them is a user decision, not a migration to write unasked.
 - **C33's 150 excluded files.** A third of the errors are in five:
