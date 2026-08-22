@@ -183,6 +183,7 @@ fn summarize_lines<I: Iterator<Item = String>>(lines: I) -> PrimeSessionSummary 
     let mut summary = PrimeSessionSummary::default();
     let mut have_header = false;
     let mut agent_opening: Option<String> = None;
+    let mut session_name: Option<String> = None;
 
     for line in lines.take(SUMMARY_SCAN_LINE_LIMIT) {
         let Ok(event) = serde_json::from_str::<serde_json::Value>(&line) else {
@@ -195,6 +196,16 @@ fn summarize_lines<I: Iterator<Item = String>>(lines: I) -> PrimeSessionSummary 
                 summary.cwd = event["cwd"].as_str().map(str::to_string);
                 summary.git_branch = event["git"]["branch"].as_str().map(str::to_string);
                 have_header = true;
+            }
+            // A name someone deliberately set — `prime-agent rename`, the
+            // daemon's `set_session_name`, or Rhizome at creation. Prime
+            // appends one of these per rename and the last wins, so this
+            // overwrites rather than taking the first.
+            "session_info" => {
+                let name = normalize_whitespace(event["name"].as_str().unwrap_or_default());
+                if !name.is_empty() {
+                    session_name = Some(truncate_title(&name));
+                }
             }
             "message" if summary.title.is_none() => {
                 summary.has_conversation = true;
@@ -228,9 +239,18 @@ fn summarize_lines<I: Iterator<Item = String>>(lines: I) -> PrimeSessionSummary 
             "message" => summary.has_conversation = true,
             _ => {}
         }
-        if have_header && summary.title.is_some() {
+        // Not `summary.title.is_some()`: a `session_info` entry can appear
+        // after the first user message, so stopping the moment a title exists
+        // would miss a rename. Scanning on costs nothing — the 400-line cap
+        // still bounds it.
+        if have_header && summary.title.is_some() && session_name.is_some() {
             break;
         }
+    }
+    // A deliberate name beats a derived one. Someone who renamed a session
+    // chose that label over whatever its first message happened to say.
+    if let Some(name) = session_name {
+        summary.title = Some(name);
     }
     if summary.title.is_none() {
         summary.title = agent_opening;
@@ -695,6 +715,74 @@ mod tests {
 
         assert_eq!(listed.len(), 1);
         assert!(!listed[0].archived);
+    }
+
+    /// Prime writes a `session_info` entry whenever a session is named —
+    /// `prime-agent rename`, the daemon's `set_session_name`, or Rhizome at
+    /// creation. Probed against installed 0.7.4: `appendSessionInfo` writes
+    /// `{"type":"session_info","name":…}` into the log, which is why the disk
+    /// reader can see a name at all.
+    #[test]
+    fn a_named_session_is_listed_under_its_name() {
+        let log = [
+            r#"{"type":"session","id":"s1","timestamp":"2026-08-22T00:00:00Z","cwd":"/vault"}"#,
+            r#"{"type":"session_info","name":"Release notes for 0.8"}"#,
+        ];
+
+        let summary = summarize_lines(log.iter().map(|line| line.to_string()));
+
+        assert_eq!(summary.title.as_deref(), Some("Release notes for 0.8"));
+    }
+
+    /// A name is a choice; a title from the first message is a derivation.
+    /// Someone who renamed a session picked that label over what the
+    /// conversation happened to open with, so it wins.
+    #[test]
+    fn a_deliberate_name_beats_the_title_derived_from_the_first_message() {
+        let log = [
+            r#"{"type":"session","id":"s1","timestamp":"2026-08-22T00:00:00Z","cwd":"/vault"}"#,
+            r#"{"type":"message","message":{"role":"user","content":[{"type":"text","text":"how do I link two notes?"}]}}"#,
+            r#"{"type":"session_info","name":"Wikilink research"}"#,
+        ];
+
+        let summary = summarize_lines(log.iter().map(|line| line.to_string()));
+
+        assert_eq!(summary.title.as_deref(), Some("Wikilink research"));
+        assert!(
+            summary.has_conversation,
+            "naming it does not un-say the message"
+        );
+    }
+
+    /// Prime appends one entry per rename rather than rewriting the first, so
+    /// the last one is the current name.
+    #[test]
+    fn the_most_recent_rename_is_the_name_that_shows() {
+        let log = [
+            r#"{"type":"session","id":"s1","timestamp":"2026-08-22T00:00:00Z","cwd":"/vault"}"#,
+            r#"{"type":"session_info","name":"First idea"}"#,
+            r#"{"type":"session_info","name":"What it actually became"}"#,
+        ];
+
+        let summary = summarize_lines(log.iter().map(|line| line.to_string()));
+
+        assert_eq!(summary.title.as_deref(), Some("What it actually became"));
+    }
+
+    /// An empty or whitespace-only name is not a name. The daemon rejects one,
+    /// but a log is not ours to trust — and blanking a good title because a
+    /// stray entry said nothing would be worse than ignoring it.
+    #[test]
+    fn a_blank_name_does_not_erase_a_real_title() {
+        let log = [
+            r#"{"type":"session","id":"s1","timestamp":"2026-08-22T00:00:00Z","cwd":"/vault"}"#,
+            r#"{"type":"message","message":{"role":"user","content":[{"type":"text","text":"keep me"}]}}"#,
+            r#"{"type":"session_info","name":"   "}"#,
+        ];
+
+        let summary = summarize_lines(log.iter().map(|line| line.to_string()));
+
+        assert_eq!(summary.title.as_deref(), Some("keep me"));
     }
 
     #[test]
