@@ -227,6 +227,36 @@ an explicit user/host action the agent must not infer.
 ### 6. Smaller, cheap
 - `set_session_name` — never called. Fixes "all Untitled" (#28) and gives #27
   exact origins. `prime-agent rename` is the CLI equivalent.
+
+  **Probed 2026-08-22 against installed 0.7.4** — real and routable, not just
+  documented. It is in the daemon's command list and has a live `case` handler
+  in `dist/modes/daemon/daemon-mode.js`: takes `activeSessionId` + `name`,
+  trims, rejects empty, calls `setStateSessionName`. `rename_saved_session` and
+  `delete_saved_session` are in the same list.
+
+  **This supersedes how #28 and #30 were solved on 2026-08-21.** Both were
+  fixed by deriving labels *after the fact* — filtering husks, disambiguating
+  identical titles with an id suffix, and showing a session's `cwd` because the
+  log carries no client field. All of that stands and is still needed for the
+  ~50 sessions already on disk. But for sessions Rhizome creates from now on,
+  naming one at creation is a better fix at the source:
+
+  - A named session is never "Untitled", so there is nothing to disambiguate.
+  - A Rhizome-set name **is** an origin signal. #30 was closed saying "which
+    client wrote it is not derivable", which is true of *reading* an existing
+    log and false of *writing* a new one. Rhizome can create the fact it could
+    not derive.
+
+  Worth doing before more label-derivation logic gets built on the old
+  premise.
+
+  **It also corrects ADR-0165's closing line**, which says deleting a session
+  log is "Prime's to offer, not Rhizome's". `delete_saved_session` is routable,
+  so Rhizome *could* offer it. The decision not to still stands — archiving is
+  reversible and deletion over a store shared with Prime's CLI is not something
+  to add casually — but the honest reason is that we choose not to, not that we
+  cannot. Not raised to a superseding ADR because the decision is unchanged;
+  only its justification was imprecise.
 - `export_html` — a real command; no UI.
 - `set_steering_mode` / `set_follow_up_mode` — queue behaviour, no UI.
 - `set_auto_retry` / `abort_retry` — no UI.

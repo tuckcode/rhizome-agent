@@ -285,6 +285,34 @@ repo, and hyphenated English like "a**sk**-to-Tasks". Do not let that number
 drive urgency. Real, worth doing, deadline is an *event* (the vault going
 public or gaining a collaborator), not a date.
 
+### A correction, from reading the roadmap doc instead of writing a new one
+
+Asked whether any plan or design docs were needed. The answer was no —
+`docs/plans/2026-08-20-prime-surface-gap.md` already covers the Prime gaps and
+is two days old. Reading it instead of writing something new turned up that its
+§6 item invalidates part of what shipped tonight.
+
+**`set_session_name` is real and routable.** Probed against installed 0.7.4:
+in the daemon's command list with a live `case` handler taking
+`activeSessionId` + `name`. `rename_saved_session` and `delete_saved_session`
+are there too. Rhizome calls none of them.
+
+That means **#30 was closed on a claim that is half wrong.** "Which client
+wrote a session is not derivable" is true of *reading* an existing log and
+false of *writing* a new one — Rhizome can create the fact it could not derive.
+Naming a session at creation would have made #28's disambiguation and #30's
+place label unnecessary for every future session. Both still stand for the ~50
+already on disk, and for sessions other clients write. Now **#31**.
+
+It also corrects **ADR-0165**'s closing line, which says deleting a session log
+is "Prime's to offer, not Rhizome's". `delete_saved_session` is routable, so
+the honest statement is that we *choose* not to. The decision is unchanged, so
+no superseding ADR — recorded in the gap doc, where the capability list lives.
+
+The lesson is the one this session kept relearning: **check the record before
+adding to it.** Three times tonight the answer was already written down —
+C18's localization decision, #27's shipped half, and this.
+
 ### Open
 
 - **#28 is closed.** Its checklist held three items this session did not
