@@ -2,6 +2,7 @@ import { Plus } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import type { CSSProperties } from 'react'
 import { cn } from '@/lib/utils'
+import { useDragRegion } from '../hooks/useDragRegion'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import type { PrimeConnectionProblem } from '../hooks/usePrimeHostStatus'
 import { subheadTrafficLightInset } from '../utils/trafficLights'
@@ -96,6 +97,10 @@ export function PrimeSessionSubhead({
 }: PrimeSessionSubheadProps) {
   const t = createTranslator(locale)
   const trafficLightInset = subheadTrafficLightInset() as CSSProperties
+  // On Chat this strip is the topmost band, so it *is* the title bar. Without
+  // a drag region the window cannot be moved at all from here — Notes has one
+  // on the breadcrumb bar, Chat had none.
+  const { onMouseDown: onDragRegionMouseDown } = useDragRegion<HTMLDivElement>()
   const shortId = shortPrimeSessionId(sessionId)
   const vault = tildeVaultPath(vaultPath)
   // Recomputed on render rather than on a timer of its own. Host status polls
@@ -119,6 +124,8 @@ export function PrimeSessionSubhead({
       )}
       style={trafficLightInset}
       data-testid="prime-session-subhead"
+      data-tauri-drag-region
+      onMouseDown={onDragRegionMouseDown}
     >
       <span className="inline-flex shrink-0 items-center gap-1.5">
         <span
