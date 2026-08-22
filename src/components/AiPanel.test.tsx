@@ -139,7 +139,7 @@ function QueuedPromptTargetHarness({ onTargetChange }: { onTargetChange: (target
 
 /** The smallest controller `AiPanelView` will render — mirrors the one
  *  `QueuedPromptTargetHarness` builds, without the queued-prompt wiring. */
-function primeController(): AiPanelController {
+function primeController(overrides: Partial<AiPanelController> = {}): AiPanelController {
   return {
     agent: {
       messages: [],
@@ -161,6 +161,7 @@ function primeController(): AiPanelController {
     handleNavigateWikilink: vi.fn(),
     handlePermissionModeChange: vi.fn(),
     handleNewChat: vi.fn(),
+    ...overrides,
   }
 }
 
@@ -633,5 +634,40 @@ describe('the Goal button has one home', () => {
     // Two slots, always: whatever the meter decides to render, and the button.
     expect(row?.querySelector('[data-testid="prime-context-meter-slot"]')).toBeInTheDocument()
     expect(row?.className).not.toContain('justify-between')
+  })
+})
+
+/**
+ * #41. Prime's daemon has taken `steer` and `follow_up` all along, both
+ * exposed as Tauri commands and tested in Rust, and `AiPanelComposer` has
+ * rendered a Steer button for a typed-into composer during a turn — with
+ * seven passing tests. Nothing ever passed `onSteer`, so `canSteer` was
+ * always false, the composer locked, and the only control was Stop.
+ *
+ * Asserting the wiring rather than the handler: the whole defect was one
+ * absent prop, and a component test of the composer cannot see it.
+ */
+describe('talking to a turn that is already running', () => {
+  function renderActivePrime(input: string) {
+    return render(
+      <AiPanelView
+        controller={primeController({ isActive: true, input })}
+        onClose={vi.fn()}
+        showHeader={false}
+        targetId="agent:prime"
+      />,
+    )
+  }
+
+  it('offers Steer once something is typed during a turn', () => {
+    renderActivePrime('focus on error handling')
+
+    expect(screen.getByRole('button', { name: 'Steer response' })).toBeInTheDocument()
+  })
+
+  it('still offers Stop when the composer is empty', () => {
+    renderActivePrime('')
+
+    expect(screen.getByRole('button', { name: 'Stop response' })).toBeInTheDocument()
   })
 })

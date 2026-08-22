@@ -6,6 +6,7 @@ import {
   storedChatSessionsOpen,
 } from '../lib/chatSessionsColumn'
 import { callHost } from '../lib/callHost'
+import { sendToRunningTurn } from '../lib/primeTurnMessaging'
 import {
   AiPanelComposer,
   AiPanelHeader,
@@ -298,11 +299,41 @@ export function AiPanelView({
     onClose,
     enabled: interactive,
   })
-  const handleComposerSend = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
-    if (!text.trim() || isActive) return
+  const sendAsNewTurn = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
     onSendPrompt?.(text)
     handleSend(text, references)
-  }, [handleSend, isActive, onSendPrompt])
+  }, [handleSend, onSendPrompt])
+
+  const handleComposerSend = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
+    if (!text.trim()) return
+    if (isActive) {
+      // Sending during a turn queues a follow-up rather than being dropped.
+      // Enter is "send another message", which must not disturb the work in
+      // flight — redirecting it is Steer, a separate and deliberate control.
+      if (!isPrimeTarget) return
+      void sendToRunningTurn('followUp', text).then((queued) => {
+        // `false` means the turn ended between the keystroke and the call.
+        // Send it as a new turn rather than losing it.
+        if (queued) setInput('')
+        else sendAsNewTurn(text, references)
+      })
+      return
+    }
+    sendAsNewTurn(text, references)
+  }, [isActive, isPrimeTarget, sendAsNewTurn, setInput])
+
+  /**
+   * Redirect the running turn. Only wired for Prime — this is a daemon verb,
+   * and the composer locks itself when no handler is supplied, which is what
+   * every non-Prime target should keep doing.
+   */
+  const handleSteer = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
+    if (!text.trim()) return
+    void sendToRunningTurn('steer', text).then((steered) => {
+      if (steered) setInput('')
+      else sendAsNewTurn(text, references)
+    })
+  }, [sendAsNewTurn, setInput])
 
   // Open unless this machine says otherwise. The column is the only thing on
   // Chat home that says other sessions exist, so a closed default left the
@@ -582,6 +613,7 @@ export function AiPanelView({
         controls={composerControls}
         onChange={setInput}
         onSend={handleComposerSend}
+        onSteer={isPrimeTarget ? handleSteer : undefined}
         onStop={handleStop}
         onUnsupportedAiPaste={onUnsupportedAiPaste}
         foot={isPrimeTarget ? (
