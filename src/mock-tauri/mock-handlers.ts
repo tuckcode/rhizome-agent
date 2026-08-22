@@ -681,7 +681,36 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       },
     ])
   },
-  read_prime_session_transcript: () => [],
+  // A real transcript, not `[]`. Returning nothing meant selecting a session
+  // in `pnpm dev` looked broken — the conversation stayed on its empty state —
+  // so a genuine bug in that path (the column collapsing on select) was
+  // indistinguishable from the mock having nothing to give, and went unnoticed.
+  read_prime_session_transcript: (args: { path?: string }) => {
+    const which = (args?.path ?? '').includes('01a0208e') ? 'release notes' : 'the vault watcher'
+    return [
+      {
+        kind: 'message',
+        id: 'm1',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: `Tell me about ${which}.` }],
+          text: `Tell me about ${which}.`,
+          timestamp: Date.now() - 9 * 60_000,
+        },
+      },
+      {
+        kind: 'message',
+        id: 'm2',
+        parentId: 'm1',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: `Here is what I found about ${which}.` }],
+          text: `Here is what I found about ${which}. It debounces on a 250ms timer so a burst of filesystem events becomes one reload, which is why saving a note does not redraw the list four times.`,
+          timestamp: Date.now() - 8 * 60_000,
+        },
+      },
+    ]
+  },
   switch_prime_session: () => 'mock-session',
   manage_prime_heartbeat: () => null,
   cancel_prime_scheduled_work: () => null,
