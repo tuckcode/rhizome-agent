@@ -63,7 +63,7 @@ critical path at ~120s, coverage 85s of it).
 
 ## Recent sessions
 
-- [2026-08-21 (evening) · Claude Opus 5](plans/handoffs/2026-08-21-1930-claude-opus-5-lazy-sessions.md) — #28's root cause: a vault attach creates no Prime session, verified against a live daemon; and C33, test files typechecked behind a named exclusion list
+- [2026-08-21 (evening) · Claude Opus 5](plans/handoffs/2026-08-21-1930-claude-opus-5-lazy-sessions.md) — #28's root cause: a vault attach creates no Prime session, verified against a live daemon; #28 closed and its untouched items moved to #30; and C33, test files typechecked behind a named exclusion list
 - [2026-08-21 · Claude Opus 5](plans/handoffs/2026-08-21-1640-claude-opus-5-push-gate.md) — confetti end to end (ADR-0164), Chat home's rail and sessions column, #28, and the push gate cut from ~4m30s to ~2m16s
 - Everything before that: [handoff archive](plans/handoffs/archive-through-2026-08-20.md) — not in date order, search by date or issue number
 
