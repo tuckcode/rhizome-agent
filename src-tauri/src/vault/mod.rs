@@ -7,6 +7,7 @@ mod folders;
 mod frontmatter;
 mod getting_started;
 pub mod graph;
+pub mod graph_queries;
 mod ignored;
 mod image;
 mod migration;

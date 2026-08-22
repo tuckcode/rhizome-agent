@@ -296,6 +296,69 @@ const TOOLS = [
     },
   },
   {
+    name: 'rhizome_graph_health',
+    description: "The vault's shape as numbers: how many notes exist, how many connect to nothing, how many links point at notes that were never written, and which notes are the hubs. Ask this before advising on vault structure.",
+    annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        vaultPath: { type: 'string', description: 'Optional target vault root. Uses active vault if omitted.' },
+      },
+    },
+  },
+  {
+    name: 'rhizome_graph_orphans',
+    description: 'List notes with no links in and no links out. A worklist of notes that exist but are unreachable by following links from anywhere.',
+    annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Maximum notes to return (default 200). The reply always reports the true total.' },
+        vaultPath: { type: 'string', description: 'Optional target vault root. Uses active vault if omitted.' },
+      },
+    },
+  },
+  {
+    name: 'rhizome_graph_dead_links',
+    description: 'List wikilink targets that have no note behind them, grouped by target and ordered by how many notes want each one. Each is a note somebody meant to write.',
+    annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Maximum uncreated notes to return (default 200). The reply always reports the true total.' },
+        vaultPath: { type: 'string', description: 'Optional target vault root. Uses active vault if omitted.' },
+      },
+    },
+  },
+  {
+    name: 'rhizome_graph_neighbors',
+    description: 'The subgraph around one note: everything within N hops, following links in either direction. Use to answer "what is this note connected to" without loading the whole graph.',
+    annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        note: { type: 'string', description: 'Note to centre on. A vault path, a title, or a filename stem all resolve.' },
+        depth: { type: 'number', description: 'Hops to walk, 1-5 (default 1).' },
+        vaultPath: { type: 'string', description: 'Optional target vault root. Uses active vault if omitted.' },
+      },
+      required: ['note'],
+    },
+  },
+  {
+    name: 'rhizome_graph_path',
+    description: 'How two notes connect, if they do — the shortest chain of links between them, in either direction.',
+    annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        from: { type: 'string', description: 'Starting note: path, title, or filename stem.' },
+        to: { type: 'string', description: 'Destination note: path, title, or filename stem.' },
+        vaultPath: { type: 'string', description: 'Optional target vault root. Uses active vault if omitted.' },
+      },
+      required: ['from', 'to'],
+    },
+  },
+  {
     name: 'rhizome_repo_research',
     description: 'Research a GitHub repository or local codebase and generate one or more wiki pages in the Rhizome vault. Uses the specified research mode (architecture, hidden-lessons, reusable-patterns, first-hour, agent-handoff, integration-plan). Specify pageCount for multi-page output.',
     annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
@@ -507,6 +570,78 @@ async function handleRhizomeGraphSummary(args) {
   return { content: [{ type: 'text', text: output || 'Graph summary generated.' }] }
 }
 
+/**
+ * Scoped graph queries all go through one `rhizome-tool graph-query` call.
+ * There is no Python equivalent: `rhizome-graph` builds a different graph
+ * that collapses slugs and drops uncreated targets entirely, so falling
+ * back to it would answer these questions with different numbers than the
+ * app's own graph view shows.
+ */
+async function runGraphQuery(vaultPath, kindArgs) {
+  if (!RHIZOME_TOOL_PATH) {
+    throw new Error(
+      'Graph queries need the Rhizome sidecar. Set RHIZOME_TOOL_PATH to the rhizome-tool binary.',
+    )
+  }
+  return runRhizoCli(RHIZOME_TOOL_PATH, ['graph-query', vaultPath, ...kindArgs], 30000)
+}
+
+function graphLimitArgs(args) {
+  return Number.isFinite(args.limit) && args.limit > 0 ? ['--limit', String(args.limit)] : []
+}
+
+async function handleRhizomeGraphHealth(args) {
+  const vaultPath = resolveVaultPath(args, toolService)
+  const output = await runGraphQuery(vaultPath, ['health'])
+  appendRhizomeEvent(vaultPath, { type: 'graph-health' })
+  // Lead with the sentence that changes behaviour; the JSON below it is
+  // what the agent composes with.
+  let headline = ''
+  try {
+    const h = JSON.parse(output)
+    const pct = h.notes > 0 ? Math.round((h.orphans / h.notes) * 100) : 0
+    headline = `${h.notes} notes, ${h.links} links. ${h.orphans} (${pct}%) connect to nothing, `
+      + `and ${h.deadLinks} links point at ${h.uncreated} notes that were never written.\n\n`
+  } catch {
+    // Fall through to raw output — a parse failure is not worth an error.
+  }
+  return { content: [{ type: 'text', text: `${headline}${output}` }] }
+}
+
+async function handleRhizomeGraphOrphans(args) {
+  const vaultPath = resolveVaultPath(args, toolService)
+  const output = await runGraphQuery(vaultPath, ['orphans', ...graphLimitArgs(args)])
+  appendRhizomeEvent(vaultPath, { type: 'graph-orphans' })
+  return { content: [{ type: 'text', text: output }] }
+}
+
+async function handleRhizomeGraphDeadLinks(args) {
+  const vaultPath = resolveVaultPath(args, toolService)
+  const output = await runGraphQuery(vaultPath, ['dead-links', ...graphLimitArgs(args)])
+  appendRhizomeEvent(vaultPath, { type: 'graph-dead-links' })
+  return { content: [{ type: 'text', text: output }] }
+}
+
+async function handleRhizomeGraphNeighbors(args) {
+  const vaultPath = resolveVaultPath(args, toolService)
+  const note = typeof args.note === 'string' ? args.note.trim() : ''
+  if (!note) throw new Error('note is required')
+  const depth = Number.isFinite(args.depth) && args.depth > 0 ? ['--depth', String(args.depth)] : []
+  const output = await runGraphQuery(vaultPath, ['neighbors', note, ...depth])
+  appendRhizomeEvent(vaultPath, { type: 'graph-neighbors' })
+  return { content: [{ type: 'text', text: output }] }
+}
+
+async function handleRhizomeGraphPath(args) {
+  const vaultPath = resolveVaultPath(args, toolService)
+  const from = typeof args.from === 'string' ? args.from.trim() : ''
+  const to = typeof args.to === 'string' ? args.to.trim() : ''
+  if (!from || !to) throw new Error('from and to are both required')
+  const output = await runGraphQuery(vaultPath, ['path', from, to])
+  appendRhizomeEvent(vaultPath, { type: 'graph-path' })
+  return { content: [{ type: 'text', text: output }] }
+}
+
 async function handleRhizomeRepoResearch(args) {
   const vaultPath = resolveVaultPath(args, toolService)
   const repo = typeof args.repo === 'string' ? args.repo.trim() : ''
@@ -676,6 +811,11 @@ const TOOL_HANDLERS = new Map([
   ['rhizome_search', handleRhizomeSearch],
   ['rhizome_lint', handleRhizomeLint],
   ['rhizome_graph_summary', handleRhizomeGraphSummary],
+  ['rhizome_graph_health', handleRhizomeGraphHealth],
+  ['rhizome_graph_orphans', handleRhizomeGraphOrphans],
+  ['rhizome_graph_dead_links', handleRhizomeGraphDeadLinks],
+  ['rhizome_graph_neighbors', handleRhizomeGraphNeighbors],
+  ['rhizome_graph_path', handleRhizomeGraphPath],
   ['rhizome_repo_research', handleRhizomeRepoResearch],
   ['rhizome_generate_wiki', handleRhizomeGenerateWiki],
   ['rhizome_grok_import', handleRhizomeGrokImport],

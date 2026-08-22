@@ -8,7 +8,7 @@
 //! server routes it there directly.
 
 use rhizome_lib::inbox_action::CaptureRequest;
-use rhizome_lib::rhizome_api::{self, GrokImportMode};
+use rhizome_lib::rhizome_api::{self, GraphQuery, GrokImportMode};
 use std::path::PathBuf;
 
 /// Trigger recorded when a caller does not name itself. Everything reaching
@@ -46,6 +46,11 @@ enum Command {
     },
     Graph {
         vault_path: PathBuf,
+    },
+    /// Scoped graph questions for an agent — see `GraphQuery`.
+    GraphQuery {
+        vault_path: PathBuf,
+        query: GraphQuery,
     },
     /// File a page with no agent call — the browser extension's "Save URL".
     SaveCapture {
@@ -198,6 +203,44 @@ fn parse_args(argv: &[String]) -> Result<Command, String> {
                 vault_path: PathBuf::from(&rest[0]),
             })
         }
+        "graph-query" => {
+            let limit = take_flag(&mut rest, "--limit")
+                .map(|v| {
+                    v.parse::<usize>()
+                        .map_err(|_| "--limit must be a number".to_string())
+                })
+                .transpose()?
+                .unwrap_or(rhizome_api::GRAPH_QUERY_LIMIT);
+            let depth = take_flag(&mut rest, "--depth")
+                .map(|v| {
+                    v.parse::<usize>()
+                        .map_err(|_| "--depth must be a number".to_string())
+                })
+                .transpose()?
+                .unwrap_or(1);
+            const USAGE: &str = "usage: graph-query <vault_path> \
+                 <health | orphans | dead-links | neighbors <note> | path <from> <to>> \
+                 [--limit N] [--depth N]";
+            if rest.len() < 2 {
+                return Err(USAGE.to_string());
+            }
+            let vault_path = PathBuf::from(&rest[0]);
+            let query = match (rest[1].as_str(), rest.len()) {
+                ("health", 2) => GraphQuery::Health,
+                ("orphans", 2) => GraphQuery::Orphans { limit },
+                ("dead-links", 2) => GraphQuery::DeadLinks { limit },
+                ("neighbors", 3) => GraphQuery::Neighbors {
+                    note: rest[2].clone(),
+                    depth,
+                },
+                ("path", 4) => GraphQuery::Path {
+                    from: rest[2].clone(),
+                    to: rest[3].clone(),
+                },
+                _ => return Err(USAGE.to_string()),
+            };
+            Ok(Command::GraphQuery { vault_path, query })
+        }
         "save-capture" => {
             let title = take_flag(&mut rest, "--title").unwrap_or_default();
             let context = take_flag(&mut rest, "--context").unwrap_or_default();
@@ -287,6 +330,7 @@ fn run(command: Command) -> Result<String, String> {
             rhizome_api::grok_import(&vault_path, mode, &mut stderr_line)
         }
         Command::Graph { vault_path } => rhizome_api::build_wiki_graph(&vault_path),
+        Command::GraphQuery { vault_path, query } => rhizome_api::graph_query(&vault_path, &query),
         Command::SaveCapture {
             vault_path,
             capture,
@@ -545,6 +589,80 @@ mod tests {
     fn graph_rejects_extra_args() {
         let err = parse_args(&args(&["graph", "/vault", "extra"])).unwrap_err();
         assert!(err.contains("usage"));
+    }
+
+    #[test]
+    fn parses_graph_query_health() {
+        let cmd = parse_args(&args(&["graph-query", "/vault", "health"])).unwrap();
+        assert_eq!(
+            cmd,
+            Command::GraphQuery {
+                vault_path: PathBuf::from("/vault"),
+                query: GraphQuery::Health,
+            }
+        );
+    }
+
+    #[test]
+    fn parses_graph_query_orphans_with_limit() {
+        let cmd = parse_args(&args(&["graph-query", "/vault", "orphans", "--limit", "5"])).unwrap();
+        assert_eq!(
+            cmd,
+            Command::GraphQuery {
+                vault_path: PathBuf::from("/vault"),
+                query: GraphQuery::Orphans { limit: 5 },
+            }
+        );
+    }
+
+    #[test]
+    fn parses_graph_query_neighbors_with_depth() {
+        let cmd = parse_args(&args(&[
+            "graph-query",
+            "/vault",
+            "neighbors",
+            "Alpha",
+            "--depth",
+            "2",
+        ]))
+        .unwrap();
+        assert_eq!(
+            cmd,
+            Command::GraphQuery {
+                vault_path: PathBuf::from("/vault"),
+                query: GraphQuery::Neighbors {
+                    note: "Alpha".to_string(),
+                    depth: 2,
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn parses_graph_query_path_between_two_notes() {
+        let cmd = parse_args(&args(&["graph-query", "/vault", "path", "Alpha", "Beta"])).unwrap();
+        assert_eq!(
+            cmd,
+            Command::GraphQuery {
+                vault_path: PathBuf::from("/vault"),
+                query: GraphQuery::Path {
+                    from: "Alpha".to_string(),
+                    to: "Beta".to_string(),
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn graph_query_rejects_an_unknown_kind() {
+        let err = parse_args(&args(&["graph-query", "/vault", "wat"])).unwrap_err();
+        assert!(err.contains("usage"), "got: {err}");
+    }
+
+    #[test]
+    fn graph_query_rejects_neighbors_without_a_note() {
+        let err = parse_args(&args(&["graph-query", "/vault", "neighbors"])).unwrap_err();
+        assert!(err.contains("usage"), "got: {err}");
     }
 
     #[test]

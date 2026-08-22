@@ -65,6 +65,11 @@ pub fn call_rhizome_tool(
             let vault = args.get("vaultPath").ok_or("Missing vaultPath")?;
             run_cli(&["rhizome-graph", "summary", vault])
         }
+        name if name.starts_with("rhizome_graph_") && name != "rhizome_graph_summary" => {
+            let vault = args.get("vaultPath").ok_or("Missing vaultPath")?;
+            let query = crate::rhizome_api::graph_query_from_tool(name, &args)?;
+            crate::rhizome_api::graph_query(Path::new(vault), &query)
+        }
         "rhizome_wiki_graph" => {
             let vault = args.get("vaultPath").ok_or("Missing vaultPath")?;
             crate::rhizome_api::build_wiki_graph(Path::new(vault))

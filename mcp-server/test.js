@@ -550,6 +550,48 @@ describe('stdio process lifecycle', () => {
     }
   })
 
+  it('advertises the scoped graph query tools with their required arguments', async () => {
+    const { client, stderr } = await connectMcpClient()
+
+    try {
+      const { tools } = await client.listTools()
+      const toolsByName = new Map(tools.map(tool => [tool.name, tool]))
+      const expected = {
+        rhizome_graph_health: [],
+        rhizome_graph_orphans: [],
+        rhizome_graph_dead_links: [],
+        rhizome_graph_neighbors: ['note'],
+        rhizome_graph_path: ['from', 'to'],
+      }
+
+      for (const [name, required] of Object.entries(expected)) {
+        const tool = toolsByName.get(name)
+        assert.ok(tool, `Missing MCP tool: ${name}`)
+        assert.equal(tool.annotations?.readOnlyHint, true, `${name} should be read-only`)
+        assert.deepEqual(tool.inputSchema?.required ?? [], required, `${name} required args`)
+      }
+    } finally {
+      await closeMcpClient(client, stderr)
+    }
+  })
+
+  it('says what is missing when a graph query runs without the sidecar', async () => {
+    const { client, stderr } = await connectMcpClient()
+
+    try {
+      const result = await client.callTool({
+        name: 'rhizome_graph_health',
+        arguments: {},
+      })
+      const text = result.content?.[0]?.text ?? ''
+      // No RHIZOME_TOOL_PATH in the test env: the failure must name the
+      // binary to set, not surface as an opaque spawn error.
+      assert.match(text, /RHIZOME_TOOL_PATH/)
+    } finally {
+      await closeMcpClient(client, stderr)
+    }
+  })
+
   it('creates a note through the MCP create_note tool', async () => {
     const { client, stderr } = await connectMcpClient()
     const relativePath = 'note/mcp-tool-created.md'

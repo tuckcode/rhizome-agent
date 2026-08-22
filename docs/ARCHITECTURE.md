@@ -1007,6 +1007,52 @@ graph — `src-tauri/src/vault/graph.rs`:
   mitigations (verified: `3d-force-graph` lands in its own ~1.36MB chunk,
   separate from `index-*.js`).
 
+### Scoped graph queries for agents (#39)
+
+`build_graph` answers "draw me everything", which is the wrong shape for an
+agent: at 192 nodes the full DTO is already a knot, and a force-directed
+picture is not something a model can compose with.
+`src-tauri/src/vault/graph_queries.rs` adds the questions an agent actually
+asks, as pure transforms over the same `GraphDto`:
+
+- **`health`** — notes, uncreated targets, links, orphans, dead links, and
+  the hubs. Ranked on links between notes that *exist*: counting ghosts
+  would crown a note that links to five pages nobody wrote.
+- **`orphans(limit)`** — notes with no links in or out. Reports `total` and
+  `truncated` alongside the capped list; never a silent cap.
+- **`dead_links(limit)`** — grouped by the note that was never written and
+  ordered by how many notes want it, because the unit of work is *write the
+  missing note*, not *visit each link*.
+- **`neighbors(note, depth)`** — the subgraph within `depth` hops, walking
+  edges in both directions, plus the edges among those nodes so a caller can
+  draw exactly that subgraph. Depth is clamped to `MAX_DEPTH` (5).
+- **`shortest_path(from, to)`** — BFS, endpoints included, `connected: false`
+  rather than an error when there is no route.
+
+`resolve_note` accepts a vault path, a path without `.md`, a title, or a
+filename stem — an agent says "Alpha" and "notes/alpha.md" meaning the same
+note, and failing on the wrong one reads as a broken tool. Exact id wins
+first so a title cannot steal another note's exact hit.
+
+Exposed the same three ways as the rest: `rhizome_api::graph_query`
+(AppHandle-free, takes a `GraphQuery` enum), the `rhizome_graph_*` arm in
+`rhizome_commands::call_rhizome_tool` (argument parsing lives in
+`rhizome_api::graph_query_from_tool` so it is testable without an
+`AppHandle`), and a `graph-query <vault_path> <kind>` subcommand on the
+`rhizome-tool` sidecar. MCP surfaces five tools —
+`rhizome_graph_health`, `_orphans`, `_dead_links`, `_neighbors`, `_path`.
+
+**These have no Python fallback on purpose.** The older
+`rhizome_graph_summary` shells out to the external `rhizome-graph` CLI,
+which builds a *different* graph: measured 2026-08-22 on the Rhizome Vault
+it reports 144 pages / 84 edges where the in-repo builder reports 155 notes
+/ 174 edges, its `export` collapses distinct slugs (losing 20 edges), and it
+drops uncreated targets entirely, so dead links cannot be derived from it at
+all. Answering these questions through it would give an agent different
+numbers than the graph view shows the user. `runGraphQuery` in the MCP
+server therefore fails with a message naming `RHIZOME_TOOL_PATH` rather
+than falling back. See C40.
+
 ## Vault Cache System
 
 The vault cache (`src-tauri/src/vault/cache.rs`) accelerates vault scanning using git-based incremental updates.

@@ -190,6 +190,45 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 ## Open threads
 
+- **C41-RESOLVED (2026-08-22): `pnpm test:mcp` never ran `mcp-server/test.js`.**
+  The script globbed `mcp-server/*.test.js`, which matches
+  `tool-service.test.js` and `vault-events.test.js` but not `test.js` — so the
+  stdio-lifecycle, vault, `vault-path`, `agent-instructions` and `ws-bridge`
+  suites, **49 tests**, ran on no gate. This is the mirror image of the July
+  finding that `tool-service.test.js` was ungated because vitest's `include`
+  did not reach `mcp-server/`: both times the fix was to the glob, and both
+  times everything was green while it was unreachable. The script now names
+  `test.js` explicitly (`node --test mcp-server/test.js mcp-server/*.test.js`);
+  `pnpm test:mcp` went from 16 tests to 67. Do **not** widen it to
+  `mcp-server/*.js` — that imports `index.js`, which starts the server and
+  hangs forever.
+
+- **C40-OPEN: `rhizome_graph_summary` answers with a different graph than the
+  app's own.** It shells out to the external `rhizome-graph` CLI. Measured
+  2026-08-22 on `~/Documents/Rhizome Vault`, side by side with
+  `vault::graph::build_graph`:
+
+  | | `rhizome-graph` | in-repo `build_graph` |
+  |---|---|---|
+  | pages / notes | 144 | 155 |
+  | edges | 84 (`summary`) / 64 (`export`) | 174 |
+  | uncreated targets | dropped entirely | 37 |
+  | dead links | underivable | 51 |
+
+  Three separate defects: `summary` and `export` disagree with **each other**
+  by 20 edges because the export collapses distinct slugs (`entities/rhizome`
+  and any other `rhizome` become one node); uncreated wikilink targets are not
+  emitted at all, so orphan and dead-link questions cannot be answered from it;
+  and `communities` returns 112 groups for 144 pages, which is 107 singletons
+  wearing a cluster label. The new `rhizome_graph_*` tools (#39) are built on
+  the in-repo graph and deliberately have **no fallback** to the CLI — an agent
+  quoting 144 notes at a user looking at 155 in the graph view is worse than a
+  tool that says it needs `RHIZOME_TOOL_PATH`. What remains open is
+  `rhizome_graph_summary` itself, which is still wired to the CLI in both
+  `mcp-server/index.js` and `rhizome_commands.rs`. Retiring it in favour of
+  `rhizome_graph_health` is the obvious move; it was left alone here because
+  removing a tool agents may already be calling is its own change.
+
 - **C39-OPEN: the live-daemon tests are not isolated, so running them litters
   the real session store.** Found 2026-08-22 by running the six `#[ignore]`d
   live tests for the first time. `RHIZOME_PRIME_DAEMON_SOCKET` isolates the

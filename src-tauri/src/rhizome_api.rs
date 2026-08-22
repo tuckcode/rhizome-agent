@@ -294,6 +294,97 @@ pub fn build_wiki_graph(vault_path: &Path) -> Result<String, String> {
     serde_json::to_string(&graph).map_err(|e| format!("Failed to serialize graph: {e}"))
 }
 
+/// A scoped question about the wiki graph. One enum rather than five
+/// entry points so the sidecar, the Tauri command layer, and MCP all
+/// spell the same query the same way.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GraphQuery {
+    /// Counts that describe the vault's shape: notes, orphans, dead links.
+    Health,
+    /// Notes with no links in or out — a worklist, not a statistic.
+    Orphans { limit: usize },
+    /// Links pointing at notes that were never written, grouped by target.
+    DeadLinks { limit: usize },
+    /// The subgraph around one note, `depth` hops in either direction.
+    Neighbors { note: String, depth: usize },
+    /// How two notes connect, if they do.
+    Path { from: String, to: String },
+}
+
+/// Default cap for list-shaped queries. Generous enough that a normal
+/// vault is never truncated; the reports carry `total` and `truncated`
+/// so a caller always knows when it was.
+pub const GRAPH_QUERY_LIMIT: usize = 200;
+
+/// Build a `GraphQuery` from the tool name and string args the Tauri
+/// command layer receives. Kept here rather than in `rhizome_commands`
+/// so it is testable without a Tauri `AppHandle`.
+pub fn graph_query_from_tool(
+    name: &str,
+    args: &std::collections::HashMap<String, String>,
+) -> Result<GraphQuery, String> {
+    let number = |key: &str, fallback: usize| -> Result<usize, String> {
+        match args.get(key) {
+            Some(raw) => raw
+                .parse::<usize>()
+                .map_err(|_| format!("{key} must be a number")),
+            None => Ok(fallback),
+        }
+    };
+    let text = |key: &str| -> Result<String, String> {
+        args.get(key)
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty())
+            .ok_or_else(|| format!("Missing {key}"))
+    };
+
+    match name {
+        "rhizome_graph_health" => Ok(GraphQuery::Health),
+        "rhizome_graph_orphans" => Ok(GraphQuery::Orphans {
+            limit: number("limit", GRAPH_QUERY_LIMIT)?,
+        }),
+        "rhizome_graph_dead_links" => Ok(GraphQuery::DeadLinks {
+            limit: number("limit", GRAPH_QUERY_LIMIT)?,
+        }),
+        "rhizome_graph_neighbors" => Ok(GraphQuery::Neighbors {
+            note: text("note")?,
+            depth: number("depth", 1)?,
+        }),
+        "rhizome_graph_path" => Ok(GraphQuery::Path {
+            from: text("from")?,
+            to: text("to")?,
+        }),
+        other => Err(format!("Unknown graph query tool: {other}")),
+    }
+}
+
+/// Answer a graph query as JSON. AppHandle-free — shared by the GUI
+/// command layer, the `rhizome-tool` sidecar, and MCP.
+pub fn graph_query(vault_path: &Path, query: &GraphQuery) -> Result<String, String> {
+    use crate::vault::graph_queries as gq;
+
+    let entries = crate::vault::scan_vault_cached(vault_path)?;
+    let graph = crate::vault::graph::build_graph(vault_path, &entries);
+
+    let json = match query {
+        GraphQuery::Health => serde_json::to_string(&gq::health(&graph)),
+        GraphQuery::Orphans { limit } => serde_json::to_string(&gq::orphans(&graph, *limit)),
+        GraphQuery::DeadLinks { limit } => serde_json::to_string(&gq::dead_links(&graph, *limit)),
+        GraphQuery::Neighbors { note, depth } => {
+            let found = gq::neighbors(&graph, note, *depth)
+                .ok_or_else(|| format!("No note in this vault matches \"{note}\""))?;
+            serde_json::to_string(&found)
+        }
+        GraphQuery::Path { from, to } => {
+            let found = gq::shortest_path(&graph, from, to)
+                .ok_or_else(|| format!("No note in this vault matches \"{from}\" or \"{to}\""))?;
+            serde_json::to_string(&found)
+        }
+    };
+
+    json.map_err(|e| format!("Failed to serialize graph query: {e}"))
+}
+
 /// Repo research via agent layer (AppHandle-free). See `distill` for the
 /// `agent` override contract.
 #[allow(clippy::too_many_arguments)]
@@ -516,6 +607,90 @@ mod tests {
     }
 
     /// End-to-end over a real on-disk vault: scan → graph → JSON.
+    #[test]
+    fn graph_query_from_tool_maps_each_tool_name_to_its_query() {
+        let args = std::collections::HashMap::new();
+
+        assert_eq!(
+            graph_query_from_tool("rhizome_graph_health", &args).unwrap(),
+            GraphQuery::Health
+        );
+        assert_eq!(
+            graph_query_from_tool("rhizome_graph_orphans", &args).unwrap(),
+            GraphQuery::Orphans {
+                limit: GRAPH_QUERY_LIMIT
+            }
+        );
+        assert_eq!(
+            graph_query_from_tool("rhizome_graph_dead_links", &args).unwrap(),
+            GraphQuery::DeadLinks {
+                limit: GRAPH_QUERY_LIMIT
+            }
+        );
+    }
+
+    #[test]
+    fn graph_query_from_tool_reads_limit_depth_and_note_arguments() {
+        let args = std::collections::HashMap::from([
+            ("note".to_string(), "Alpha".to_string()),
+            ("depth".to_string(), "3".to_string()),
+        ]);
+        assert_eq!(
+            graph_query_from_tool("rhizome_graph_neighbors", &args).unwrap(),
+            GraphQuery::Neighbors {
+                note: "Alpha".to_string(),
+                depth: 3
+            }
+        );
+
+        let args = std::collections::HashMap::from([("limit".to_string(), "7".to_string())]);
+        assert_eq!(
+            graph_query_from_tool("rhizome_graph_orphans", &args).unwrap(),
+            GraphQuery::Orphans { limit: 7 }
+        );
+    }
+
+    #[test]
+    fn graph_query_from_tool_rejects_missing_and_unknown_arguments() {
+        let empty = std::collections::HashMap::new();
+
+        assert!(graph_query_from_tool("rhizome_graph_neighbors", &empty).is_err());
+        assert!(graph_query_from_tool("rhizome_graph_path", &empty).is_err());
+        assert!(graph_query_from_tool("rhizome_graph_nope", &empty).is_err());
+    }
+
+    #[test]
+    fn graph_query_answers_health_for_a_real_vault_directory() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(dir.path().join("a.md"), "# A\n\nSee [[Ghost Note]].\n").unwrap();
+        std::fs::write(dir.path().join("b.md"), "# B\n\nNothing here.\n").unwrap();
+
+        let json = graph_query(dir.path(), &GraphQuery::Health).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed["notes"], 2);
+        assert_eq!(parsed["uncreated"], 1);
+        assert_eq!(parsed["deadLinks"], 1);
+        assert_eq!(parsed["orphans"], 1);
+    }
+
+    #[test]
+    fn graph_query_errors_when_a_note_does_not_resolve() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(dir.path().join("a.md"), "# A\n").unwrap();
+
+        let err = graph_query(
+            dir.path(),
+            &GraphQuery::Neighbors {
+                note: "No Such Note".to_string(),
+                depth: 1,
+            },
+        )
+        .unwrap_err();
+
+        assert!(err.contains("No Such Note"), "got: {err}");
+    }
+
     #[test]
     fn build_wiki_graph_returns_parseable_json_with_ghosts() {
         let dir = TempDir::new().unwrap();
