@@ -98,6 +98,13 @@ interface AiPanelViewProps {
   showHeader?: boolean
   showLeftBorder?: boolean
   surface?: 'default' | 'sidebar'
+  /**
+   * Vault the panel is showing. Only the session list uses it, to keep rows
+   * that ran in *this* vault from all repeating its name — see
+   * `primeSessionPlace`. Optional: a caller with no vault in hand gets a list
+   * where every row names its place, which is the safe direction.
+   */
+  vaultPath?: string | null
   composerControls?: ReactNode
   notePane?: ReactNode
   onForkMessage?: (messageId: string) => void
@@ -205,6 +212,7 @@ export function AiPanelView({
   onSendPrompt,
   onMessageHistoryScrollStateChange,
   targetId,
+  vaultPath = null,
 }: AiPanelViewProps) {
   const view = resolveAiPanelViewModel({
     defaultAiAgent: providedDefaultAiAgent,
@@ -502,6 +510,7 @@ export function AiPanelView({
               onNewChat={handleNewChat}
               activeSessionPath={activeSessionPath}
               working={isActive}
+              vaultPath={vaultPath}
             />
           </div>
         )}
@@ -659,6 +668,7 @@ export function AiPanel({
       defaultAiAgentReadiness={defaultAiAgentReadiness}
       defaultAiAgentReady={providedDefaultAiAgentReady}
       locale={locale}
+      vaultPath={vaultPath}
       activeEntry={activeEntry}
       entries={entries}
       targetId={defaultAiTarget?.id}

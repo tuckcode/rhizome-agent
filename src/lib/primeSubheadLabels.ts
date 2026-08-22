@@ -54,7 +54,7 @@ export function tildeVaultPath(
  * would put a Tauri call behind a status strip. `/Users/x` and `/home/x` are
  * the two shapes that matter on the platforms this ships to.
  */
-function inferHomeDir(path: string): string | null {
+export function inferHomeDir(path: string): string | null {
   const match = /^(\/(?:Users|home)\/[^/]+)/.exec(path)
   return match ? match[1] : null
 }

@@ -65,6 +65,7 @@ type AiPanelSectionProps = Pick<
   | 'onOpenNote'
   | 'onToggleAIChat'
   | 'onUnsupportedAiPaste'
+  | 'vaultPath'
 > & {
   controller: AiPanelController
 }
@@ -82,6 +83,7 @@ function AiPanelSection({
   onOpenNote,
   onToggleAIChat,
   onUnsupportedAiPaste,
+  vaultPath,
 }: AiPanelSectionProps) {
   return (
     <div
@@ -98,6 +100,7 @@ function AiPanelSection({
         defaultAiAgentReadiness={defaultAiAgentReadiness}
         defaultAiAgentReady={defaultAiAgentReady}
         locale={locale}
+        vaultPath={vaultPath}
         activeEntry={inspectorEntry}
         entries={entries}
       />
@@ -269,6 +272,7 @@ export function EditorRightPanel({
       onOpenNote={onOpenNote}
       onToggleAIChat={onToggleAIChat}
       onUnsupportedAiPaste={onUnsupportedAiPaste}
+      vaultPath={vaultPath}
     />
   }
 

@@ -659,6 +659,7 @@ function ConversationSession({
           defaultAiTarget={target}
           entries={context.entries}
           activeEntry={context.activeEntry}
+          vaultPath={vaultPath}
           composerControls={composerControls}
           interactive={active}
           locale={locale}
