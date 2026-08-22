@@ -272,6 +272,14 @@ Rust client on the daemon socket (ADR-0163), so the SDK is not a drop-in — but
 the RLM/subagent model (`rlm.md`, `rlm-runtime.md`) is unread, and children
 sessions are a product surface we have never looked at.
 
+## Quantified 2026-08-22
+
+`2026-08-22-prime-harness-coverage.md` counts what this doc describes:
+**27 of 105 daemon commands, 25%**. It clusters the 68 unused into product
+surfaces rather than a list, and argues the sequencing — Windows hang first,
+then a live-daemon test lane, then RLM. Read that one for the numbers and this
+one for the reasoning behind each gap.
+
 ## What this does not change
 
 Probe-first still applies, and this session is the proof: the docs sent me to
