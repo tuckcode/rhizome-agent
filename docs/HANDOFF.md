@@ -190,6 +190,25 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 ## Open threads
 
+- **C42-OPEN: Rhizome Agent has never been launched on Windows, and the docs
+  said otherwise.** Atticus, 2026-08-22: *"i forgot it doesnt work on windows
+  right this sec / never launched atleast."* That is a different and larger
+  claim than #32, which scopes the Windows gap to the Prime daemon transport:
+  if the app has never started there, the daemon is not the first thing
+  blocking it, and #32's named-pipe work (`1922a27`, `326930b`) sits behind an
+  unknown rather than being the last mile.
+
+  `docs/WINDOWS-DEV.md` opened by asserting Rhizome Agent is "a first-class
+  Windows app" whose "notes, editor, search, git, wiki, and MCP all work on
+  Windows." **None of that had been observed by anyone.** It was written from
+  what the code targets. Corrected in place — the doc now leads with the real
+  status. This is the failure mode AGENTS.md already names: self-reported
+  claims in this repo have a track record of not surviving verification, and a
+  setup doc reads as a report even when it was only ever a plan.
+
+  First action for whoever has a Windows machine: `pnpm tauri dev` and record
+  what actually happens, before touching the daemon at all.
+
 - **C41-RESOLVED (2026-08-22): `pnpm test:mcp` never ran `mcp-server/test.js`.**
   The script globbed `mcp-server/*.test.js`, which matches
   `tool-service.test.js` and `vault-events.test.js` but not `test.js` — so the
