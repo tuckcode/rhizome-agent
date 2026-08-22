@@ -1007,6 +1007,38 @@ graph — `src-tauri/src/vault/graph.rs`:
   mitigations (verified: `3d-force-graph` lands in its own ~1.36MB chunk,
   separate from `index-*.js`).
 
+### Custom research formats (#37)
+
+A built-in research format is, to the pipeline, exactly one imperative
+sentence: `rhizome_repo_research::mode_instruction` maps an id to it and
+falls back to `architecture` for anything unrecognised. There is no enum and
+no validation gate — which is why a *custom* format needed no new concept,
+only storage: `{ id, title, instruction }`.
+
+`src-tauri/src/rhizome_research_formats.rs` keeps them per vault in
+`.rhizome/research-formats.json`, alongside events and the repo cache rather
+than in app settings, so they travel with the vault, sync through git, and
+are readable by agents. `resolve_instruction` is **custom-first**: a saved
+format deliberately shadows a built-in with the same id, so the stock
+"Architecture Map" wording can be replaced without inventing a new name.
+`build_synthesis_prompt` takes the instruction rather than the mode id; the
+`mode` string still flows through the pipeline untouched and the lookup
+happens once at the call site.
+
+Failure modes are chosen so research never breaks on this file: a missing or
+corrupt formats file loads as an empty list rather than erroring, saving an
+existing id replaces instead of appending, and deleting an absent id is a
+no-op.
+
+Tauri commands `list_research_formats`, `save_research_format` (returns the
+whole list so callers never re-fetch) and `delete_research_format`. The UI is
+`RhizomeFormatModal.tsx`, which renders customs in their own category
+alongside `RESEARCH_MODES` via `lib/researchFormats.tsx`'s
+`customToResearchMode` — the instruction doubles as the description, since it
+is literally what the agent is told. `mock-tauri` ships one seeded format on
+purpose: a mock returning `[]` makes the section look unbuilt rather than
+empty, which has hidden three real defects in this repo already.
+
 ### Scoped graph queries for agents (#39)
 
 `build_graph` answers "draw me everything", which is the wrong shape for an

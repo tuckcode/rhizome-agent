@@ -90,6 +90,18 @@ export function trackPrimeThinkingLevelChanged(level: string): void {
 }
 
 /**
+ * A user-authored research format was saved (#37).
+ *
+ * Only the resulting count. The title and the instruction are user content —
+ * an instruction can name a private repo, a client, or a colleague — and the
+ * question this event exists to answer is whether anyone writes custom
+ * formats at all, which a count answers on its own.
+ */
+export function trackResearchFormatSaved(totalFormats: number): void {
+  trackEvent('research_format_saved', { totalFormats })
+}
+
+/**
  * A scheduled prompt was paused, resumed, or cancelled from the band (#14).
  *
  * Both fields are fixed enums from Prime's own vocabulary — no prompt text,

@@ -153,6 +153,14 @@ let mockSettings: Settings = {
 
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
 const mockArchivedSessions = new Set<string>()
+
+let mockResearchFormats: Array<{ id: string, title: string, instruction: string }> = [
+  {
+    id: 'q3-planning-lens',
+    title: 'Q3 Planning Lens',
+    instruction: 'Read the repository as a planning document: what shipped, what slipped, and what the next quarter has to absorb.',
+  },
+]
 const DEFAULT_MOCK_VAULT = {
   label: 'demo-vault-v2',
   path: DEFAULT_MOCK_VAULT_PATH,
@@ -716,6 +724,21 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   cancel_prime_scheduled_work: () => null,
   get_prime_thinking_levels: () => ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
   set_prime_thinking_level: () => null,
+  // Real data, not `[]`: a mock that returns nothing makes the custom-format
+  // section look unbuilt rather than empty (the mock has hidden three real
+  // defects that way already).
+  list_research_formats: () => mockResearchFormats,
+  save_research_format: (args: { title: string, instruction: string, id?: string }) => {
+    const id = (args.id?.trim() || args.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')).replace(/^-|-$/g, '')
+    const next = mockResearchFormats.filter(f => f.id !== id)
+    next.push({ id, title: args.title.trim(), instruction: args.instruction.trim() })
+    mockResearchFormats = next
+    return mockResearchFormats
+  },
+  delete_research_format: (args: { id: string }) => {
+    mockResearchFormats = mockResearchFormats.filter(f => f.id !== args.id)
+    return mockResearchFormats
+  },
   get_available_prime_models: () => [
     { id: 'grok-4.5', name: 'Grok 4.5', provider: 'xai', contextWindow: 256000, reasoning: true },
     { id: 'claude-fable-5', name: 'Claude Fable 5', provider: 'anthropic', reasoning: true },
