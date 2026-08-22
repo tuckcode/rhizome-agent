@@ -94,10 +94,10 @@ When adding or changing a meaningful user-facing feature, include the event name
 — TypeScript picks it up from the project include — so knip reports it as an
 unused file. `src/types/rhizomeTestBridge.ts` is exactly this: five source
 files fail to typecheck without it, and it is listed in `knip.json`'s
-`ignore` for that reason. **Always run `pnpm typecheck` after deleting
-anything knip flagged**, and check for `declare global` before believing a
-file is dead. Ambient-declaration files are knip's most dangerous false
-positive.
+`ignore` for that reason, as is `src/types/mockTauriBridge.ts`. **Always run
+`pnpm typecheck` after deleting anything knip flagged**, and check for
+`declare global` before believing a file is dead. Ambient-declaration files
+are knip's most dangerous false positive.
 
 No CodeScene gate — dropped 2026-07-09 (no free tier at any layer: cloud, `cs` CLI, or local CodeHealth MCP all require a paid account; user won't pay). Boy Scout Rule still applies by judgment: never add `// eslint-disable`, `#[allow(...)]`, or `as any`; leave touched files cleaner than you found them. If hotspot/bus-factor analysis becomes a real need later, evaluate `code-maat` (free, git-history hotspot mining) + SonarQube Community (free, per-file quality rating) as a from-scratch replacement — not a drop-in, needs new plumbing and its own baseline.
 
@@ -128,6 +128,17 @@ gate compiles zero files. `tsc -b` catches the same error immediately. This had
 been noticed three separate times in `HANDOFF.md` and written down as a
 gotcha each time while the documented command stayed wrong; the script exists
 so the right command is the easy one.
+
+**`pnpm typecheck` covers test files too, minus a named backlog.** Test files
+are excluded from `tsconfig.app.json` and were checked by nothing until
+2026-08-21; `tsconfig.test.json` is a third project that includes them, and
+the root `tsconfig.json` references it so `tsc -b` picks it up. It is a
+ratchet, not a wall: 386 of 533 test files were already clean, so they are
+gated now, and the 150 that were not are listed by name in that file's
+`exclude`. A new test file is checked from the moment it is written.
+`pnpm typecheck:tests:backlog` prints what is still exempt, worst file first
+— clearing one means deleting its line from `exclude`. That command is
+advisory, not a gate, for the same reason `pnpm deadcode` is. C33.
 
 `pnpm test:mcp` exists because vitest's `include` is
 `src/**/*.{test,spec}.{ts,tsx}`, so nothing under `mcp-server/` was ever run

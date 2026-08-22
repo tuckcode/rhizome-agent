@@ -163,15 +163,6 @@ import {
 } from './utils/appOrchestration'
 import './App.css'
 
-// Type declarations for mock content storage and test overrides
-declare global {
-  interface Window {
-    __mockContent?: Record<string, string>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock handler map for Playwright test overrides
-    __mockHandlers?: Record<string, (args: any) => any>
-  }
-}
-
 const DEFAULT_SELECTION: SidebarSelection = INBOX_SELECTION
 
 /** Wraps useEditorSave to also keep outgoingLinks in sync on save and on content change. */
