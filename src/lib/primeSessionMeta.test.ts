@@ -4,6 +4,7 @@ import {
   primeSessionMetaLabel,
   primeSessionPlace,
   primeSessionRowTitles,
+  primeSessionStatus,
   sortPrimeSessions,
   type PrimeSessionSummary,
 } from './primeSessionMeta'
@@ -283,5 +284,37 @@ describe('primeSessionMetaLabel with a place', () => {
 
   it('is unchanged when no vault or home is supplied at all', () => {
     expect(primeSessionMetaLabel(session({ mtimeMs: at(14, 8) }), NOW)).toBe('Today · 14:08')
+  })
+})
+
+describe('primeSessionStatus', () => {
+  const at = (path: string) => session({ path })
+
+  it('is saved when the daemon has never heard of the log', () => {
+    expect(primeSessionStatus(at('/sessions/a.jsonl'), new Map())).toBe('saved')
+  })
+
+  /**
+   * The state that did not exist before: alive, but not turning. A session
+   * outlives the window (ADR-0163), so "I left this running" is a different
+   * answer from "this is finished", and the list used to give both the same
+   * dot.
+   */
+  it('is running when the daemon has it but nothing is turning', () => {
+    const running = new Map([['/sessions/a.jsonl', false]])
+
+    expect(primeSessionStatus(at('/sessions/a.jsonl'), running)).toBe('running')
+  })
+
+  it('is working when the daemon says that session is mid-turn', () => {
+    const running = new Map([['/sessions/a.jsonl', true]])
+
+    expect(primeSessionStatus(at('/sessions/a.jsonl'), running)).toBe('working')
+  })
+
+  it('does not light up a neighbour that merely sorts next to a running one', () => {
+    const running = new Map([['/sessions/a.jsonl', true]])
+
+    expect(primeSessionStatus(at('/sessions/b.jsonl'), running)).toBe('saved')
   })
 })

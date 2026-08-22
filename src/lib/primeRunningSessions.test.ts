@@ -4,6 +4,7 @@ import {
   isRosterSessionRunning,
   rosterActivityMessageKey,
   rosterSessionTitle,
+  runningSessionFilesByPath,
   runningSessionOverflow,
   toRunningSessionRows,
   type PrimeRosterSession,
@@ -375,5 +376,108 @@ describe('activity statuses are named, not written', () => {
       { activeSessionId: 'a', activity: 'working', summary: 'Rebuilding the index' },
     ])
     expect(rows[0]?.activity).toEqual({ kind: 'summary', text: 'Rebuilding the index' })
+  })
+})
+
+describe('runningSessionFilesByPath', () => {
+  it('keys running sessions by their log path, flagging the ones mid-turn', () => {
+    const running = runningSessionFilesByPath([
+      session({ id: 'a', sessionFile: '/sessions/a.jsonl', activity: 'idle' }),
+      session({ id: 'b', sessionFile: '/sessions/b.jsonl', activity: 'working' }),
+    ])
+
+    expect(running.get('/sessions/a.jsonl')).toBe(false)
+    expect(running.get('/sessions/b.jsonl')).toBe(true)
+  })
+
+  /**
+   * The sidebar shows every session, not a capped popover. If this reused
+   * `toRunningSessionRows` the sixth running session would silently read as
+   * dead — wrong in a way the user cannot see.
+   */
+  it('caps nothing, unlike the popover roster', () => {
+    const many = Array.from({ length: 9 }, (_, index) =>
+      session({ id: `s${index}`, sessionFile: `/sessions/${index}.jsonl` }),
+    )
+
+    expect(runningSessionFilesByPath(many).size).toBe(9)
+  })
+
+  /**
+   * A subagent that is turning is a live session. If its log is in the list,
+   * showing it as dead would be a lie.
+   */
+  it('counts subagents, which the popover roster deliberately hides', () => {
+    const running = runningSessionFilesByPath([
+      session({
+        id: 'child',
+        sessionFile: '/sessions/child.jsonl',
+        runtimeKind: 'subagent',
+        rlmDepth: 1,
+        activity: 'working',
+      }),
+    ])
+
+    expect(running.get('/sessions/child.jsonl')).toBe(true)
+  })
+
+  /**
+   * The daemon does not always report a `sessionFile`. Deriving one from the
+   * id would be a guess, and a wrong guess lights up somebody else's row.
+   */
+  it('skips a session the daemon gave no log path for', () => {
+    const running = runningSessionFilesByPath([
+      session({ id: 'a', sessionFile: undefined }),
+      session({ id: 'b', sessionFile: '   ' }),
+    ])
+
+    expect(running.size).toBe(0)
+  })
+
+  it('reports nothing rather than throwing when the roster is absent', () => {
+    expect(runningSessionFilesByPath(null).size).toBe(0)
+    expect(runningSessionFilesByPath(undefined).size).toBe(0)
+  })
+
+  /**
+   * "Alive" here is wider than the menu bar's "is it doing work". A resident
+   * session sitting idle can be reattached and can still fire a goal, so
+   * calling it dead would be wrong — but it is not working either, and the
+   * dot has a state for exactly that now.
+   */
+  it('counts an idle resident session as alive, not as finished', () => {
+    const running = runningSessionFilesByPath([
+      session({
+        id: 'idle',
+        sessionFile: '/sessions/idle.jsonl',
+        activity: 'idle',
+        isSessionActive: false,
+        hasActiveHeartbeat: false,
+      }),
+    ])
+
+    expect(running.get('/sessions/idle.jsonl')).toBe(false)
+    expect(isRosterSessionRunning({ activeSessionId: 'idle', activity: 'idle' })).toBe(
+      false,
+    )
+  })
+
+  /** No handle means the daemon is not holding it; a log path alone is not enough. */
+  it('skips a roster entry with no session handle', () => {
+    const running = runningSessionFilesByPath([
+      { sessionFile: '/sessions/orphan.jsonl' } as PrimeRosterSession,
+    ])
+
+    expect(running.size).toBe(0)
+  })
+
+  /** Two roster entries can share a log; "something here is turning" wins. */
+  it('keeps a path working when any entry on it is working', () => {
+    const running = runningSessionFilesByPath([
+      session({ id: 'a', sessionFile: '/sessions/a.jsonl', activity: 'idle' }),
+      session({ id: 'b', sessionFile: '/sessions/a.jsonl', activity: 'working' }),
+    ])
+
+    expect(running.get('/sessions/a.jsonl')).toBe(true)
   })
 })

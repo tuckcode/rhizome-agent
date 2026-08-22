@@ -351,6 +351,46 @@ export function toRunningSessionRows(
   return disambiguateTitles(rows, (row) => row.id.slice(0, 6))
 }
 
+/**
+ * Which session logs the daemon says are alive, and which of those are
+ * mid-turn — keyed by log path, to cross-reference the *disk* list.
+ *
+ * The two data sources answer different questions and have bitten before:
+ * `list_prime_session_summaries` reads logs off disk and cannot know what is
+ * running, while the roster knows what is running and is not a history. The
+ * join between them is the log path — `sessionFile` here, `path` there.
+ *
+ * Uncapped and un-filtered, unlike `toRunningSessionRows`: that one is shaped
+ * for a five-row popover, and a sidebar marking only the first five sessions
+ * as alive would be wrong in a way the user could not see. Subagents count as
+ * running too — a subagent that is turning is a live session, and if its log
+ * is in the list it should not read as dead.
+ *
+ * A session the daemon reports without a `sessionFile` is skipped rather than
+ * guessed at: the daemon does not always write one, and inventing a path from
+ * an id is how the wrong row lights up.
+ */
+export function runningSessionFilesByPath(
+  roster: readonly PrimeRosterSession[] | null | undefined,
+): Map<string, boolean> {
+  const running = new Map<string, boolean>()
+  for (const session of validSessions(roster)) {
+    // Deliberately *not* `isRosterSessionRunning`: that answers "is this doing
+    // work" — heartbeat, turning, live children — which is the narrower
+    // question the menu bar asks. Here the question is "is the daemon still
+    // holding this session", because a resident session sitting idle can be
+    // reattached and can still fire a goal, and telling the user it is dead
+    // would be wrong. Being in the roster with a handle is that answer.
+    if (!session.activeSessionId) continue
+    const file = session.sessionFile?.trim()
+    if (!file) continue
+    // A path already marked working stays working: two roster entries can
+    // share a log, and "something here is turning" is the honest summary.
+    running.set(file, (running.get(file) ?? false) || isWorking(session))
+  }
+  return running
+}
+
 /** How many running sessions the cap hid, for a "+N more" affordance. */
 export function runningSessionOverflow(
   roster: readonly PrimeRosterSession[] | null | undefined,

@@ -8,7 +8,9 @@ import {
   primeSessionAge,
   primeSessionMetaLabel,
   primeSessionRowTitles,
+  primeSessionStatus,
   sortPrimeSessions,
+  type PrimeSessionStatus,
   type PrimeSessionSummary,
 } from '../lib/primeSessionMeta'
 import {
@@ -16,6 +18,7 @@ import {
   trackPrimeSessionListOpened,
   trackPrimeSessionOpened,
 } from '../lib/productAnalytics'
+import { usePrimeRunningSessionFiles } from '../hooks/usePrimeRunningSessionFiles'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { invoke } from '@tauri-apps/api/core'
 
@@ -31,7 +34,11 @@ interface PrimeSessionListProps {
   onNewChat?: () => void
   /** Path the live host is on, so that row can read as current. */
   activeSessionPath?: string | null
-  /** True while the live session is mid-turn — drives the working dot. */
+  /**
+   * True while the *attached* session is mid-turn. The other rows get their
+   * state from the daemon's roster rather than from this — see
+   * `usePrimeRunningSessionFiles`.
+   */
   working?: boolean
   /**
    * The vault this list was opened from. Rows that ran somewhere else say so;
@@ -103,14 +110,14 @@ function SessionRowButton({
   title,
   meta,
   active,
-  working,
+  status,
   onSelect,
 }: {
   label: string
   title: string
   meta: string | null
   active: boolean
-  working: boolean
+  status: PrimeSessionStatus
   onSelect: () => void
 }) {
   return (
@@ -128,9 +135,14 @@ function SessionRowButton({
         aria-hidden="true"
         className={cn(
           'mt-[5px] size-1.5 rounded-full border',
-          working
-            ? 'border-[var(--accent-green)] bg-[var(--accent-green)] ring-2 ring-[var(--accent-green)]/25'
-            : 'border-muted-foreground/50 bg-transparent',
+          // Three states, not two. Filled with a ring: turning right now.
+          // Filled, no ring: the daemon still holds it, sitting idle — a
+          // session outlives the window (ADR-0163), so that is a real and
+          // different answer from the third: outlined, just a log on disk.
+          status === 'working' &&
+            'border-[var(--accent-green)] bg-[var(--accent-green)] ring-2 ring-[var(--accent-green)]/25',
+          status === 'running' && 'border-[var(--accent-green)] bg-[var(--accent-green)]',
+          status === 'saved' && 'border-muted-foreground/50 bg-transparent',
         )}
       />
       <span className="min-w-0">
@@ -159,7 +171,7 @@ function LiveSessionRow({
   title,
   meta,
   active,
-  working,
+  status,
   onSelect,
   archiveLabel,
   onArchive,
@@ -168,7 +180,7 @@ function LiveSessionRow({
   title: string
   meta: string | null
   active: boolean
-  working: boolean
+  status: PrimeSessionStatus
   onSelect: () => void
   archiveLabel: string
   onArchive: () => void
@@ -180,7 +192,7 @@ function LiveSessionRow({
         title={title}
         meta={meta}
         active={active}
-        working={working}
+        status={status}
         onSelect={onSelect}
       />
       <SessionRowAction label={archiveLabel} icon={<Archive size={13} />} onClick={onArchive} />
@@ -213,9 +225,10 @@ function ArchivedSessionRow({
         title={title}
         meta={meta}
         active={active}
-        // An archived session is not the one being watched: it was filed out
-        // of the way. Nothing to indicate.
-        working={false}
+        // Filed out of the way, so it does not claim attention with a live
+        // dot even if the daemon still holds it — the archive is where you
+        // put the things you are not watching.
+        status="saved"
         onSelect={onSelect}
       />
       <SessionRowAction
@@ -249,6 +262,24 @@ export default function PrimeSessionList({
   const [loadedAt, setLoadedAt] = useState(() => Date.now())
   const [error, setError] = useState<string | null>(null)
   const [archiveOpen, setArchiveOpen] = useState(false)
+  // Which of these logs the daemon still holds. Polled only while this column
+  // is mounted, which is while it is open.
+  const running = usePrimeRunningSessionFiles(true)
+
+  /**
+   * The row's accessible name, carrying its state.
+   *
+   * The dot is `aria-hidden` — it has to be, it is decoration — so without
+   * this "running vs saved is distinguishable" is only true for people who
+   * can see colour. A screen reader heard four identical "Open session X"
+   * buttons whatever was happening in them.
+   */
+  const rowLabel = (title: string, status: PrimeSessionStatus): string => {
+    const name = t('ai.sessions.selectAria', { title })
+    if (status === 'working') return `${name} — ${t('ai.sessions.statusWorking')}`
+    if (status === 'running') return `${name} — ${t('ai.sessions.statusRunning')}`
+    return name
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -367,15 +398,19 @@ export default function PrimeSessionList({
           {live.map((session) => {
             const title = titleFor.get(session.id) ?? untitled
             const active = Boolean(activeSessionPath) && session.path === activeSessionPath
-            const isWorking = active && working
+            // The attached session's own turn is known here first — the
+            // roster poll is 4s behind — so it wins for that one row.
+            const status: PrimeSessionStatus =
+              active && working ? 'working' : primeSessionStatus(session, running)
+            const isWorking = status === 'working'
             return (
               <LiveSessionRow
                 key={session.id}
                 title={title}
                 meta={primeSessionMetaLabel(session, at, { working: isWorking, vaultPath })}
-                label={t('ai.sessions.selectAria', { title })}
+                label={rowLabel(title, status)}
                 active={active}
-                working={isWorking}
+                status={status}
                 onSelect={() => select(session)}
                 archiveLabel={t('ai.sessions.archive', { title })}
                 onArchive={() => setArchived(session, true)}
