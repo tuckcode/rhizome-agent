@@ -106,12 +106,35 @@ project happened to include `App.tsx`. Tests getting their own project broke
 that and `mock-tauri/index.ts` stopped seeing globals it sets. Third ambient
 file in `knip.json`'s `ignore` now.
 
+### #30's first item: no two rows render the same label
+
+`PrimeSessionList.tsx` still had the exact fallback #28 named. Fixed by
+sharing `disambiguateTitles` out of `primeRunningSessions.ts` — but **not**
+its suffix. That was `id.slice(0, 6)`, which is right for a daemon handle and
+wrong for a saved session id, because those are uuidv7 and the leading
+characters are a clock:
+
+| suffix over the 93 real logs | distinct values |
+|---|---|
+| first 6 characters | **23** (one prefix covered 23 sessions) |
+| last 6 characters | 93 |
+
+Copying it verbatim would have shipped "Untitled session · 01a004" twice —
+the bug, restated. The suffix is a parameter now, each list picks the part of
+its own ids that varies, and a test pins that a non-distinguishing suffix is
+not silently papered over.
+
+Worth generalising: **a helper that fixes a duplicate-label bug can carry the
+bug into its next caller**, because the thing that made it work was the shape
+of the ids at the first call site, not the function.
+
 ### Open
 
 - **#28 is closed.** Its checklist held three items this session did not
   touch — the identical-label fallback still at `PrimeSessionList.tsx:185`,
   no origin on a row, and no answer for 500 sessions — so they moved to
-  **#30** rather than disappearing with the close. The 43 existing husks are
+  **#30** rather than disappearing with the close. The label one is done
+  (above); origin and scale are not. The 43 existing husks are
   still on disk; nothing reads them (`list_sessions` drops them), and
   deleting them is a user decision, not a migration to write unasked.
 - **C33's 150 excluded files.** A third of the errors are in five:
