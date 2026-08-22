@@ -480,9 +480,7 @@ fn parse_status_socket_path(stdout: &str) -> Option<PathBuf> {
 }
 
 fn is_daemon_transport_path(path: &str) -> bool {
-    path.ends_with(".sock")
-        || path.starts_with(r"\\.\pipe\")
-        || path.starts_with(r"\\?\pipe\")
+    path.ends_with(".sock") || path.starts_with(r"\\.\pipe\") || path.starts_with(r"\\?\pipe\")
 }
 
 #[cfg(unix)]
@@ -511,10 +509,7 @@ fn connect_stream(path: &Path) -> Result<DaemonStream, String> {
     // Wait until an instance is listening. If the daemon is down, `open` below
     // still fails — this just avoids racing a pipe that is starting up.
     unsafe {
-        windows_sys::Win32::System::Pipes::WaitNamedPipeW(
-            wide.as_ptr(),
-            PIPE_CONNECT_TIMEOUT_MS,
-        );
+        windows_sys::Win32::System::Pipes::WaitNamedPipeW(wide.as_ptr(), PIPE_CONNECT_TIMEOUT_MS);
     }
 
     OpenOptions::new()
@@ -538,8 +533,10 @@ fn set_stream_roster_timeouts(stream: &mut DaemonStream) {
     #[cfg(windows)]
     {
         let _ = stream;
-        // `read_roster_over` enforces `ROSTER_TIMEOUT` via its deadline loop.
-        // Named pipes opened as `File` have no socket-style read timeout.
+        // A named pipe opened as a `File` has no socket-style read timeout, so
+        // there is nothing to set here. The bound that actually holds is the
+        // `recv_timeout` in `list_running_sessions` — `read_roster_over`'s
+        // deadline is checked *between* reads and cannot interrupt one.
     }
 }
 
@@ -1737,16 +1734,51 @@ const ROSTER_TIMEOUT: Duration = Duration::from_secs(3);
 /// "the service is down" render the same quiet way in the popover, and the
 /// popover must not show an error banner for a service the user never started.
 pub fn list_running_sessions() -> Result<Vec<serde_json::Value>, String> {
-    let Ok(socket_path) = daemon_socket_path() else {
+    // Only one roster read at a time. This bounds the cost of the failure
+    // below: a daemon that accepts a connection and then never speaks leaves
+    // its reader parked, and without this guard the 4s poll would park a new
+    // thread every few seconds forever.
+    if ROSTER_IN_FLIGHT.swap(true, Ordering::SeqCst) {
         return Ok(Vec::new());
-    };
-    let Ok(mut stream) = connect_stream(&socket_path) else {
-        return Ok(Vec::new());
-    };
-    set_stream_roster_timeouts(&mut stream);
+    }
 
-    read_roster_over(stream)
+    let (tx, rx) = mpsc::channel();
+    let spawned = thread::Builder::new()
+        .name("prime-roster".into())
+        .spawn(move || {
+            let roster = (|| {
+                let socket_path = daemon_socket_path().ok()?;
+                let mut stream = connect_stream(&socket_path).ok()?;
+                set_stream_roster_timeouts(&mut stream);
+                read_roster_over(stream).ok()
+            })()
+            .unwrap_or_default();
+            let _ = tx.send(roster);
+            ROSTER_IN_FLIGHT.store(false, Ordering::SeqCst);
+        });
+
+    if spawned.is_err() {
+        ROSTER_IN_FLIGHT.store(false, Ordering::SeqCst);
+        return Ok(Vec::new());
+    }
+
+    // The timeout lives here, on the *wait*, rather than on the read — which
+    // is the only place it can be enforced on every platform. `read_roster_over`
+    // checks a deadline between reads, but a blocking read that never returns
+    // is never interrupted by it: on Unix `set_read_timeout` bounded the read
+    // itself, and a Windows named pipe opened as a `File` has no equivalent.
+    // Waiting on a channel is bounded regardless of what the read is doing.
+    match rx.recv_timeout(ROSTER_TIMEOUT) {
+        Ok(roster) => Ok(roster),
+        // Timed out or the thread died: nothing is running, as far as anyone
+        // can tell right now. The parked thread ends on its own when the
+        // daemon finally answers or drops the connection.
+        Err(_) => Ok(Vec::new()),
+    }
 }
+
+/// Guards against parking a reader thread per poll. See `list_running_sessions`.
+static ROSTER_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
 /// The protocol half of `list_running_sessions`, split out so the exchange can
 /// be tested against the fake daemon without binding the real socket path.
@@ -4267,7 +4299,8 @@ mod tests {
 
     #[test]
     fn status_output_yields_a_windows_named_pipe_path() {
-        let stdout = "socket                                   pid    version  status   sessions  uptime\n\
+        let stdout =
+            "socket                                   pid    version  status   sessions  uptime\n\
                       \\\\.\\pipe\\prime-agent-daemon *  1234  0.7.4    current  0\n\
                       \n* default background service\n";
 
@@ -6022,5 +6055,60 @@ mod tests {
         let (result, commands) = roster_against_fake_daemon(|_| Vec::new(), false);
         assert_eq!(result.expect("roster"), Vec::<serde_json::Value>::new());
         assert!(commands.is_empty(), "must not ask before being greeted");
+    }
+
+    /// One roster read at a time.
+    ///
+    /// This guard is what bounds the cost of a daemon that accepts a
+    /// connection and then never speaks. `read_roster_over`'s deadline is
+    /// checked *between* reads and cannot interrupt one, so on Windows — where
+    /// a named pipe opened as a `File` has no read timeout — that reader parks.
+    /// The `recv_timeout` in `list_running_sessions` bounds the *wait*, but the
+    /// parked thread stays until the daemon answers or hangs up. Without this
+    /// flag the 4s poll in `usePrimeRunningSessionFiles` would park a fresh one
+    /// every few seconds, forever.
+    ///
+    /// The hang itself cannot be reproduced here: on Unix `set_read_timeout`
+    /// bounds the read, so macOS and Linux were never affected. This tests the
+    /// half that is platform-independent.
+    #[test]
+    fn only_one_roster_read_runs_at_a_time() {
+        let _guard = host_guard();
+        // Stand in for a read already parked on a silent daemon.
+        ROSTER_IN_FLIGHT.store(true, Ordering::SeqCst);
+
+        let result = list_running_sessions();
+
+        assert_eq!(
+            result.expect("a second poll answers rather than queueing"),
+            Vec::<serde_json::Value>::new(),
+            "a poll that arrives while one is parked reports nothing running"
+        );
+        assert!(
+            ROSTER_IN_FLIGHT.load(Ordering::SeqCst),
+            "the parked read still owns the flag; the second poll must not clear it"
+        );
+
+        ROSTER_IN_FLIGHT.store(false, Ordering::SeqCst);
+    }
+
+    /// And it is released again, or the roster would answer "nothing running"
+    /// forever after the first successful poll.
+    #[test]
+    fn a_finished_roster_read_releases_the_flag() {
+        let _guard = host_guard();
+        ROSTER_IN_FLIGHT.store(false, Ordering::SeqCst);
+
+        // No daemon on this path, so the thread fails fast and still clears.
+        let _ = list_running_sessions();
+
+        let released = (0..50).any(|_| {
+            if !ROSTER_IN_FLIGHT.load(Ordering::SeqCst) {
+                return true;
+            }
+            thread::sleep(Duration::from_millis(20));
+            false
+        });
+        assert!(released, "the flag must not latch on");
     }
 }
