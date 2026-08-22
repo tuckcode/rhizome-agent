@@ -19,9 +19,29 @@ describe('AiMessage', () => {
   })
 
   it('renders user message', () => {
-    const { container } = render(<AiMessage userMessage="Hello AI" actions={[]} />)
+    render(<AiMessage userMessage="Hello AI" actions={[]} />)
     expect(screen.getByText('Hello AI')).toBeTruthy()
-    expect(container.querySelector('[style*="background: var(--state-hover)"]')).toBeTruthy()
+  })
+
+  /**
+   * A turn boundary has to be findable while scrolling past screens of answer.
+   * The bubble used to be tinted with `--state-hover`, a hover affordance that
+   * is deliberately almost invisible — so scrolling back to "where did I ask
+   * this?" meant reading rather than scanning.
+   *
+   * Asserted on the right-edge rule specifically: the bubble is right-aligned,
+   * so that edge sits at a fixed x and forms a rhythm down the margin. The
+   * background tint alone is not what makes it scannable.
+   */
+  it('marks the user turn with an accent the eye can find while scrolling', () => {
+    render(<AiMessage userMessage="Hello AI" actions={[]} />)
+
+    // Read off the style attribute rather than `toHaveStyle`: jsdom does not
+    // parse a shorthand whose value contains `var()`, so the assertion would
+    // pass vacuously.
+    const style = screen.getByText('Hello AI').getAttribute('style') ?? ''
+    expect(style).toContain('border-right: 2px solid var(--accent-blue)')
+    expect(style).toContain('background: var(--accent-blue-bg)')
   })
 
   it('keeps long user messages inside the chat column', () => {
