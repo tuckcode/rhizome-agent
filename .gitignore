@@ -18,6 +18,11 @@ _site/
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+# Same shape as .vscode above: per-machine state (hook counters, timestamps)
+# is ignored, but a shared .cursor/rules/ can still be committed if the repo
+# ever wants one.
+.cursor/*
+!.cursor/rules/
 .idea
 .DS_Store
 *.suo
