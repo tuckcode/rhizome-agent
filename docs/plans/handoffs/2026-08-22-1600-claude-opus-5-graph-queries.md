@@ -106,9 +106,44 @@ client-of-harnesses and own-the-loop, and it is the one that makes
 licensing load-bearing. deepseek-harness is recorded as **unevaluated** —
 noted on his recommendation, not verified.
 
+### #37 — the dead button is wired
+
+Built after the above, in two commits (`5d7587c` storage, `1b469fc` UI).
+
+**The blocker was smaller than the issue thought.** `mode_instruction` is a
+plain `&str -> &'static str` match with `architecture` as the fallback for
+unknown ids — no enum, no validation gate. That one sentence *is* what
+separates "Architecture Map" from "Hidden Lessons"; everything else on a
+`ResearchMode` is presentation. So a custom format needed no new concept,
+only storage: `{ id, title, instruction }`.
+
+Stored per vault in `.rhizome/research-formats.json` (Atticus's choice was
+not taken — he said "keep going", and per-vault was the standing
+recommendation: formats travel with the vault, sync through git, and are
+readable by agents). `resolve_instruction` is **custom-first**, so a saved
+format deliberately shadows a built-in of the same id.
+
+Failure modes chosen so research never breaks on this file: missing or
+corrupt loads empty, saving an existing id replaces, deleting an absent id
+is a no-op.
+
+The old button was wrong in three ways beyond having no `onClick`: raw
+`<button>` where AGENTS.md requires shadcn `Button`, hardcoded copy instead
+of `en.json`, and always enabled even with no vault to save into.
+
+**QA honestly:** the composer's click-through is covered by 6 vitest tests
+against the real component. In the live app I confirmed the modal renders,
+the `research-format-add` control is present, enabled, and reads
+"+ Save as custom", and the Custom category appears from the seeded mock —
+but **not** the full click-through, because the browser pane kept dropping
+the dialog between calls. Worth redoing on the native app.
+
 ### Open
 
-- **#37** "Save as custom" — he said build it; not started.
+- **#37 follow-ups:** delete-a-format has a Tauri command
+  (`delete_research_format`) and Rust tests but **no UI** — nothing calls it
+  yet. Editing an existing format likewise: saving the same title
+  overwrites, but there is no edit affordance.
 - **#40** awaiting his decision; #39's composition and UI halves.
 - C40 (`rhizome_graph_summary` still on the CLI), C39, C37, C33.
 - `~/CLAUDE.md` step 1 names `agents/claude/vault-context.md`, which does
