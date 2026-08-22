@@ -69,15 +69,25 @@ Red → Green → Refactor → Commit. One cycle per commit. For bugs: write fai
 
 **Test quality (Kent Beck's Desiderata):** Isolated · Deterministic · Fast · Behavioral · Structure-insensitive · Specific · Predictive. Fix flaky tests first. Prefer E2E over unit tests for user flows.
 
-### Localization (mandatory for UI copy)
+### Localization — English only for v0
 
-All user-facing UI labels/copy must live in `src/lib/locales/en.json` and be translated into every target listed in `lara.yaml`. When adding or changing interface copy:
+All user-facing UI labels/copy must live in `src/lib/locales/en.json`. That part
+is mandatory and is not about translation: copy in `en.json` is how the rest of
+the code reads a label, and a string hardcoded in a component is a bug whatever
+the language policy is.
 
-```bash
-pnpm l10n:translate
-```
+**Translating it is out of scope for v0.** Atticus, 2026-08-16: *"If I go public
+and there's demand for multiple languages, then I'll consider it. Until then I'm
+not worried."* Restated 2026-08-21. `CONTEXT.md` defines v0 as the trusted
+circle — nineteen locales is a strangers-first concern.
 
-Use `pnpm l10n:translate:force` only when intentionally regenerating existing translations. Commit `src/lib/locales/*.json`, `lara.yaml`/`lara.lock` changes if produced, and verify placeholders/product names stayed intact.
+So: **do not run `pnpm l10n:translate`** (it needs `LARA_ACCESS_KEY_ID` /
+`SECRET`, which are set on no machine here anyway), and **do not report
+`pnpm l10n:validate` failing.** It fails by design. It has been re-raised as a
+finding by at least four separate sessions after the decision was made, which is
+attention spent on a settled question. C18.
+
+When localization does come into scope, the facts are in C18 in `HANDOFF.md`.
 
 ### Product analytics (mandatory for meaningful features)
 
@@ -195,7 +205,7 @@ Before pushing, verify the release gates and add a **completion comment** to the
 - Tests/coverage: commands run and final coverage result.
 - Coverage commands passed (`pnpm test:coverage` and `cargo llvm-cov ... --fail-under-lines 85`) or the change is docs-only.
 - Codacy: MCP/CLI scan summary; confirm no new Critical/High findings.
-- Localization: any user-facing copy lives in `src/lib/locales/en.json`, `pnpm l10n:translate` was run, and `pnpm l10n:validate` passes. If no copy changed, say “Localization: no UI copy changes”.
+- Localization: any user-facing copy lives in `src/lib/locales/en.json`. If no copy changed, say “Localization: no UI copy changes”. **Translations are out of scope for v0 (C18) — name the `en.json` keys you added and stop.** Do not run `pnpm l10n:translate`, and do not report `pnpm l10n:validate` failing: it fails by design until localization is in scope, and re-raising it spends the owner's attention on a decision already made twice.
 - PostHog: meaningful new user actions/events are instrumented with safe metadata; noisy/minor changes explicitly say “PostHog: no event needed because …”.
 - Refactoring: any cleanup done on touched files, or "none needed".
 - ADRs: any new/updated ADRs, or "none".
