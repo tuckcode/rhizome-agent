@@ -1941,6 +1941,49 @@ impl PrimeHost {
         Ok(host)
     }
 
+    /// Give the session Rhizome just created a name.
+    ///
+    /// Prime records this as a `session_info` entry in the log, so it survives
+    /// on disk and the history list reads it back — that is the whole point.
+    /// It is also the origin marker the log otherwise lacks: the `session`
+    /// header carries no field saying which client wrote it, so a session that
+    /// Rhizome names is one Rhizome can recognise later. #31.
+    ///
+    /// **Never fatal.** Two constraints make failure ordinary rather than
+    /// exceptional: the daemon rejects a name already held by another *live*
+    /// session at the same depth, so opening the same vault in a second window
+    /// legitimately collides; and an older daemon may not route the command at
+    /// all. A session with no name works perfectly well — it falls back to the
+    /// title derived from its first message, exactly as before — so refusing
+    /// to open a session because it could not be labelled would trade a real
+    /// capability for a cosmetic one.
+    ///
+    /// The id tail is what makes the name unique. It is the *end* of the id,
+    /// not the start: session ids are uuidv7 and their leading characters are
+    /// a timestamp — measured over 93 real logs, the first six characters gave
+    /// 23 distinct values and one prefix covered 23 sessions.
+    fn name_session(&mut self, cwd: &Path) {
+        let vault = cwd
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| "vault".to_string());
+        let id = self
+            .session_id
+            .clone()
+            .unwrap_or_else(|| self.active_session_id.clone());
+        let tail: String = id.chars().rev().take(6).collect();
+        let suffix: String = tail.chars().rev().collect();
+        let name = format!("Rhizome · {vault} · {suffix}");
+
+        if let Err(error) = self.call(serde_json::json!({
+            "type": "set_session_name",
+            "name": name.clone(),
+        })) {
+            log::debug!("Could not name the Prime session ({name}): {error}");
+        }
+    }
+
     /// Join `active_session_id` and read its state.
     ///
     /// Shared by the two ways a host acquires a session — rejoining one left
@@ -2018,7 +2061,9 @@ impl PrimeHost {
         }
         let cwd = self.cwd.clone();
         self.create_session(&cwd)?;
-        self.attach_and_read_state()
+        self.attach_and_read_state()?;
+        self.name_session(&cwd);
+        Ok(())
     }
 
     /// Find a session already running here that this client can rejoin.
@@ -2716,7 +2761,7 @@ mod tests {
         assert_eq!(session_id, "sess-a");
         assert_eq!(
             daemon.commands(),
-            vec!["list", "create", "attach", "get_state"]
+            vec!["list", "create", "attach", "get_state", "set_session_name"]
         );
         let _ = shutdown_host();
     }
@@ -2756,6 +2801,7 @@ mod tests {
                 "create",
                 "attach",
                 "get_state",
+                "set_session_name",
                 "prompt",
                 "get_state"
             ],
@@ -2857,6 +2903,7 @@ mod tests {
                 "create",
                 "attach",
                 "get_state",
+                "set_session_name",
                 "get_available_models"
             ]
         );
