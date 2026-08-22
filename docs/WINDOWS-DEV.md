@@ -1,8 +1,20 @@
 # Windows development — Rhizome Agent + Prime
 
-Rhizome Agent is a **first-class Windows app** (Tauri + WebView2). Notes,
-editor, search, git, wiki, and MCP all work on Windows. Prime chat/sessions
-need the **`prime-agent` daemon** running on the same machine.
+> **⚠️ Status, corrected 2026-08-22: the app has never been launched on
+> Windows.** Not "the daemon does not connect yet" — nobody has observed
+> Rhizome Agent start on a Windows machine at all. Everything below is the
+> intended setup path, not a verified one, and the first person to run it
+> should expect to be debugging the boot, not the features.
+>
+> This file previously opened by calling Rhizome Agent "a first-class
+> Windows app" whose notes, editor, search, git, wiki and MCP "all work on
+> Windows". No one had checked any of that. It was written from what the
+> code is *meant* to do. See C42.
+
+Rhizome Agent **targets** Windows (Tauri + WebView2). Prime chat/sessions
+need the **`prime-agent` daemon** running on the same machine; the named-pipe
+client for it landed in `1922a27`/`326930b` and is likewise unverified on a
+real Windows box.
 
 ## One-time prerequisites
 
