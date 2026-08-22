@@ -27,6 +27,13 @@ export interface PrimeSessionSummary {
    * mirrored here so the shape matches what Rust serialises.
    */
   hasConversation?: boolean
+  /**
+   * Filed out of the main list by the user. Rhizome's own state, kept in its
+   * settings — nothing under `~/.prime/agent/sessions` is moved or deleted,
+   * because that directory is Prime's and is shared with its CLI and every
+   * other client. Archiving is a view, and it is reversible.
+   */
+  archived?: boolean
 }
 
 /** Coarse age, for analytics only — never rendered. */

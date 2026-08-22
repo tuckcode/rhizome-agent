@@ -721,11 +721,51 @@ mod tests {
 // --- Prime session list ---
 
 /// Every Prime session on disk, newest first, summarised for a list.
+///
+/// Archived sessions are flagged, not withheld — the list renders them under
+/// a disclosure, so it needs them present. A settings read that fails leaves
+/// everything unarchived rather than failing the list: not knowing what was
+/// filed is a reason to show more, never to show nothing.
 #[cfg(desktop)]
 #[tauri::command]
 pub fn list_prime_session_summaries(
 ) -> Result<Vec<crate::prime_sessions::PrimeSessionSummary>, String> {
-    crate::prime_sessions::list_sessions()
+    let summaries = crate::prime_sessions::list_sessions()?;
+    let archived = crate::settings::get_settings()
+        .ok()
+        .and_then(|settings| settings.archived_prime_sessions)
+        .unwrap_or_default();
+    Ok(crate::prime_sessions::mark_archived(summaries, &archived))
+}
+
+/// File a session out of the main list, or put it back.
+///
+/// Rhizome's own state. Nothing under `~/.prime/agent/sessions` is touched:
+/// that directory is Prime's, shared with its CLI and every other client on
+/// the machine, and archiving must not change what they see. Reversible by
+/// construction — the id simply leaves the list again.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn set_prime_session_archived(session_id: String, archived: bool) -> Result<(), String> {
+    let session_id = session_id.trim().to_string();
+    if session_id.is_empty() {
+        return Err("A session needs an id to archive".into());
+    }
+    let mut settings = crate::settings::get_settings()?;
+    let mut ids = settings.archived_prime_sessions.take().unwrap_or_default();
+
+    if archived {
+        // Idempotent: archiving twice is one entry, not two. The frontend can
+        // fire this from a stale list without corrupting the set.
+        if !ids.iter().any(|id| id == &session_id) {
+            ids.push(session_id);
+        }
+    } else {
+        ids.retain(|id| id != &session_id);
+    }
+
+    settings.archived_prime_sessions = Some(ids);
+    crate::settings::save_settings(settings)
 }
 
 /// Replay one session's conversation from its log.
