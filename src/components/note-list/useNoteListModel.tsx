@@ -625,6 +625,9 @@ function buildNoteListLayoutModel(params: {
     setSearch: params.content.setSearch,
     handleSearchKeyDown: params.content.handleSearchKeyDown,
     handleListKeyDown: params.interaction.handleListKeyDown,
+    // Surfaced flat so the layout can point `aria-activedescendant` at the
+    // highlighted row without reaching into the keyboard model.
+    highlightedPath: params.interaction.noteListKeyboard.highlightedPath,
     noteListPanelRef: params.interaction.noteListKeyboard.panelRef,
     handleNoteListPanelBlurCapture: params.interaction.noteListKeyboard.handlePanelBlurCapture,
     handleNoteListPanelFocusCapture: params.interaction.noteListKeyboard.handlePanelFocusCapture,

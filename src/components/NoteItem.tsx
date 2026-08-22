@@ -1,4 +1,5 @@
 import type { ComponentType, CSSProperties, MouseEvent as ReactMouseEvent, MouseEventHandler, ReactNode, SVGAttributes } from 'react'
+import { noteOptionId } from '../lib/noteOptionId'
 import type { VaultEntry, NoteStatus } from '../types'
 import { cn } from '@/lib/utils'
 import {
@@ -501,6 +502,10 @@ function NoteItemRow({
   return (
     <div
       role="option"
+      // The list points `aria-activedescendant` here when the arrow keys land
+      // on this row. Without an id there is nothing to point at, and keyboard
+      // navigation moves in silence for anyone using a screen reader.
+      id={noteOptionId(entryPath)}
       aria-selected={isSelected || isMultiSelected}
       className={surfaceProps.className}
       style={surfaceProps.style}

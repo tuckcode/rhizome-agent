@@ -53,6 +53,38 @@ describe('NoteList keyboard activation', () => {
     vi.restoreAllMocks()
   })
 
+  /**
+   * The list holds focus and its rows are not focusable, so
+   * `aria-activedescendant` is the only thing that tells a screen reader the
+   * highlight moved. Without it, arrowing through a whole vault is silent:
+   * the rows had `role="option"` and `aria-selected`, but no `id` for the
+   * listbox to point at, so the pattern was 80% built and announced nothing.
+   */
+  it('tells assistive tech which row the arrow keys are on', async () => {
+    render(<NoteListKeyboardHarness onOpen={vi.fn()} />)
+
+    fireEvent.click(screen.getByText('Facebook Ads Strategy'))
+    const container = screen.getByTestId('note-list-container')
+
+    await waitFor(() => {
+      const highlighted = container.querySelector('[data-highlighted="true"]')
+      const active = container.getAttribute('aria-activedescendant')
+      expect(active).toBeTruthy()
+      // The id must resolve to the highlighted row — a dangling reference
+      // announces nothing, which is the state this fixes.
+      expect(highlighted?.id).toBe(active)
+    })
+
+    const before = container.getAttribute('aria-activedescendant')
+    fireEvent.keyDown(container, { key: 'ArrowDown' })
+
+    await waitFor(() => {
+      const after = container.getAttribute('aria-activedescendant')
+      expect(after).not.toBe(before)
+      expect(container.querySelector('[data-highlighted="true"]')?.id).toBe(after)
+    })
+  })
+
   it('focuses the list on click and continues arrow navigation from the clicked note', async () => {
     const onOpen = vi.fn()
     render(<NoteListKeyboardHarness onOpen={onOpen} />)

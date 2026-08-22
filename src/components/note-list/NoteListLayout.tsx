@@ -1,4 +1,5 @@
 import { BulkActionBar } from '../BulkActionBar'
+import { noteOptionId } from '../../lib/noteOptionId'
 import { FilterPills } from './FilterPills'
 import { NoteListHeader } from './NoteListHeader'
 import { EntityView, ListView } from './NoteListViews'
@@ -177,8 +178,10 @@ function NoteListBody({
   filterCounts,
   onNoteListFilterChange,
   loading,
+  highlightedPath,
 }: Pick<
   NoteListLayoutProps,
+  | 'highlightedPath'
   | 'handleListKeyDown'
   | 'noteListContainerRef'
   | 'handleNoteListBlur'
@@ -213,6 +216,11 @@ function NoteListBody({
       role="listbox"
       aria-label="Notes"
       tabIndex={0}
+      // Which row the arrow keys are on. The listbox holds focus and the rows
+      // are not focusable themselves, so this is the only thing that tells a
+      // screen reader the highlight moved — without it, arrowing through a
+      // vault is silent.
+      aria-activedescendant={highlightedPath ? noteOptionId(highlightedPath) : undefined}
       onBlur={handleNoteListBlur}
       onKeyDown={handleListKeyDown}
       onFocus={handleNoteListFocus}
