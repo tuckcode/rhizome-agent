@@ -43,6 +43,7 @@ mod prime_discovery;
 mod prime_events;
 pub mod prime_session_host;
 pub mod prime_sessions;
+mod prime_settings;
 pub mod prime_tool_unwrap;
 pub mod prime_update;
 mod prime_vault_skill;
