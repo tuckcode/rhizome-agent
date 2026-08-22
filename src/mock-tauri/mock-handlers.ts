@@ -596,7 +596,48 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   abort_prime_session_turn: () => false,
   stream_prime_session: () => 'mock-session',
   list_prime_sessions: () => [],
-  list_prime_session_summaries: () => [],
+  // Four rows rather than none, because an empty list makes the sessions
+  // column invisible in `pnpm dev` — and that browser loop is where the
+  // rendering of this list actually gets looked at. Chosen to exercise what
+  // has gone wrong here before: two with no title at all (#28's stacked
+  // "Untitled session" rows, which must now disambiguate), one from the open
+  // vault and one from somewhere else (#30's place label, which must appear
+  // on the second and not the first).
+  list_prime_session_summaries: () => {
+    const minutes = (n: number) => Date.now() - n * 60_000
+    return [
+      {
+        id: '01a0252e-b9d5-71e9-83de-2bce32f65c06',
+        path: '/mock/sessions/01a0252e-b9d5-71e9-83de-2bce32f65c06.jsonl',
+        title: 'Where does the vault watcher debounce?',
+        cwd: DEFAULT_MOCK_VAULT_PATH,
+        mtimeMs: minutes(4),
+        hasConversation: true,
+      },
+      {
+        id: '01a0252e-b6b9-749a-ad79-4c8c33e521f9',
+        path: '/mock/sessions/01a0252e-b6b9-749a-ad79-4c8c33e521f9.jsonl',
+        cwd: '/Users/mock/code/projects/rhizome-agent',
+        mtimeMs: minutes(90),
+        hasConversation: true,
+      },
+      {
+        id: '01a0252e-c4d1-7fa2-9b10-77c1de904ab3',
+        path: '/mock/sessions/01a0252e-c4d1-7fa2-9b10-77c1de904ab3.jsonl',
+        cwd: '/private/tmp',
+        mtimeMs: minutes(60 * 26),
+        hasConversation: true,
+      },
+      {
+        id: '01a0208e-3494-73a9-a6a2-2b890838d7a5',
+        path: '/mock/sessions/01a0208e-3494-73a9-a6a2-2b890838d7a5.jsonl',
+        title: 'Draft the release notes',
+        cwd: DEFAULT_MOCK_VAULT_PATH,
+        mtimeMs: minutes(60 * 24 * 5),
+        hasConversation: true,
+      },
+    ]
+  },
   read_prime_session_transcript: () => [],
   switch_prime_session: () => 'mock-session',
   manage_prime_heartbeat: () => null,

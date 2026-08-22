@@ -11,6 +11,7 @@
  */
 
 import { disambiguateTitles } from './disambiguateTitles'
+import { inferHomeDir } from './primeSubheadLabels'
 
 export interface PrimeSessionSummary {
   id: string
@@ -66,34 +67,86 @@ function clockTime(timestamp: number): string {
 }
 
 /**
+ * Where a session ran, short enough for a 228px column — or `null` when
+ * saying so would be noise.
+ *
+ * The list shows every log in `~/.prime/agent/sessions` whoever wrote it, and
+ * #28 called the result unexplained clutter. It is: measured on 93 real logs,
+ * 16 distinct working directories, and **28 of the 93 ran in a temp
+ * directory** — test runs rather than anyone's work.
+ *
+ * Naming the *client* is not on offer. The `session` header line carries
+ * `cwd`, `timestamp`, `git` and sometimes `parentSession`, and no client field
+ * at all across all 93 logs. Where a session ran is the answer the data
+ * actually supports, so it is the one given.
+ *
+ * Returns `null` for the vault that is currently open, because labelling every
+ * row "Rhizome Vault" inside the Rhizome Vault spends the common case to serve
+ * the rare one. A row earns its place by being from somewhere *else*.
+ *
+ * Home collapses to `~`: the basename of `/Users/dtc` is a username, which
+ * names nothing. Inferred from the path shape rather than read from the
+ * environment, the way `tildeVaultPath` already does it — the renderer has no
+ * `$HOME` and this is a cosmetic label, not worth a Tauri call.
+ */
+export function primeSessionPlace(
+  session: PrimeSessionSummary,
+  vaultPath: string | null | undefined,
+): string | null {
+  const cwd = session.cwd?.trim()
+  if (!cwd) return null
+
+  const withoutTrailingSlash = (path: string) => path.replace(/\/+$/, '') || '/'
+  const here = withoutTrailingSlash(cwd)
+  const vault = vaultPath?.trim()
+  if (vault && here === withoutTrailingSlash(vault)) return null
+
+  if (here === inferHomeDir(here)) return '~'
+  return here.slice(here.lastIndexOf('/') + 1) || here
+}
+
+/**
  * The meta line under a session title.
  *
- * Per Frame F: `Today · 14:08`, `Yesterday`, `Mon`, else a short date. A
- * session mid-turn reads `Working · tools` instead — what it is doing now
- * matters more than when it last changed.
+ * Per Frame F: `Today · 14:08`, `Yesterday`, `Mon`, else a short date, with
+ * where it ran appended when that is somewhere other than the open vault —
+ * `Today · 14:08 · rhizome-agent`. Time leads because it is the sort key, so
+ * the leftmost thing on every row lines up; the place truncates first when the
+ * column runs out, which is the right thing to lose.
+ *
+ * A session mid-turn reads `Working · tools` and nothing else — what it is
+ * doing now matters more than when or where, and it is the session already on
+ * screen.
  */
 export function primeSessionMetaLabel(
   session: PrimeSessionSummary,
   now: number,
-  options: { working?: boolean } = {},
+  options: { working?: boolean; vaultPath?: string | null } = {},
 ): string | null {
   if (options.working) return 'Working · tools'
 
+  const place = primeSessionPlace(session, options.vaultPath)
   const timestamp = session.mtimeMs
-  if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) return null
+  // No timestamp used to mean no meta line at all. Where it ran is still worth
+  // saying: a row with a place beats a row with nothing under its title.
+  if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) return place
 
-  switch (primeSessionAge(session, now)) {
-    case 'today':
-      return `Today · ${clockTime(timestamp)}`
-    case 'yesterday':
-      return 'Yesterday'
-    case 'week':
-      return WEEKDAYS[new Date(timestamp).getDay()]
-    default: {
-      const date = new Date(timestamp)
-      return `${MONTHS[date.getMonth()]} ${date.getDate()}`
+  const when = (() => {
+    switch (primeSessionAge(session, now)) {
+      case 'today':
+        return `Today · ${clockTime(timestamp)}`
+      case 'yesterday':
+        return 'Yesterday'
+      case 'week':
+        return WEEKDAYS[new Date(timestamp).getDay()]
+      default: {
+        const date = new Date(timestamp)
+        return `${MONTHS[date.getMonth()]} ${date.getDate()}`
+      }
     }
-  }
+  })()
+
+  return place ? `${when} · ${place}` : when
 }
 
 /**

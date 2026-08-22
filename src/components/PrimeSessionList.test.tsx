@@ -88,6 +88,43 @@ describe('PrimeSessionList', () => {
     expect(screen.getByText('Untitled session · cccccc')).toBeInTheDocument()
   })
 
+  /**
+   * #30's second item. The list reads every log in `~/.prime/agent/sessions`
+   * whoever wrote it — 28 of the author's 93 ran in a temp directory, from
+   * test runs — and nothing on a row said so.
+   *
+   * Rows from the open vault stay quiet: repeating its name on every row is
+   * noise on the common case.
+   */
+  it('says where a session ran when that is not the vault in front of you', async () => {
+    const vault = '/Users/dtc/Documents/Rhizome Vault'
+    invoked.result = [
+      summary({ id: 'a', path: '/sessions/a.jsonl', title: 'Here', cwd: vault }),
+      summary({ id: 'b', path: '/sessions/b.jsonl', title: 'Elsewhere', cwd: '/private/tmp' }),
+    ]
+
+    render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} vaultPath={vault} />)
+
+    expect(await screen.findByText('Elsewhere')).toBeInTheDocument()
+    expect(screen.getByText('Today · 14:00 · tmp')).toBeInTheDocument()
+    expect(screen.getByText('Today · 14:00')).toBeInTheDocument()
+  })
+
+  it('names every place when it has no vault to compare against', async () => {
+    invoked.result = [
+      summary({
+        id: 'a',
+        path: '/sessions/a.jsonl',
+        title: 'Somewhere',
+        cwd: '/Users/dtc/code/projects/rhizome-agent',
+      }),
+    ]
+
+    render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+
+    expect(await screen.findByText('Today · 14:00 · rhizome-agent')).toBeInTheDocument()
+  })
+
   it('survives a host that answers with no list at all', async () => {
     invoked.result = null as unknown as unknown[]
 

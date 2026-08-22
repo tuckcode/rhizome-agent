@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   primeSessionAge,
   primeSessionMetaLabel,
+  primeSessionPlace,
   primeSessionRowTitles,
   sortPrimeSessions,
   type PrimeSessionSummary,
@@ -170,5 +171,117 @@ describe('primeSessionRowTitles', () => {
 
   it('returns a title per session, in order, for an empty list too', () => {
     expect(primeSessionRowTitles([], UNTITLED)).toEqual([])
+  })
+})
+
+describe('primeSessionPlace', () => {
+  const VAULT = '/Users/dtc/Documents/Rhizome Vault'
+  const HOME = '/Users/dtc'
+
+  /**
+   * The list shows every log in `~/.prime/agent/sessions` regardless of which
+   * client wrote it, and #28 called the result unexplained clutter. Measured
+   * on 93 real logs: 16 distinct working directories, and 28 of the 93 ran in
+   * a temp directory — test runs, not the user's work.
+   *
+   * Naming *which app* wrote a session is not possible: the `session` header
+   * line carries `cwd`, `timestamp`, `git` and sometimes `parentSession`, and
+   * no client field at all. Where it ran is the honest answer.
+   */
+  it('names the directory a session ran in', () => {
+    expect(primeSessionPlace(session({ cwd: '/Users/dtc/code/projects/rhizome-agent' }), VAULT))
+      .toBe('rhizome-agent')
+    expect(primeSessionPlace(session({ cwd: '/private/tmp' }), VAULT)).toBe('tmp')
+  })
+
+  /**
+   * Saying "Rhizome Vault" on every row of a list you opened from inside the
+   * Rhizome Vault is noise on the common case to serve the rare one. The row
+   * earns its place label by being from somewhere *else*.
+   */
+  it('says nothing when the session ran in the vault that is open', () => {
+    expect(primeSessionPlace(session({ cwd: VAULT }), VAULT)).toBeNull()
+    expect(primeSessionPlace(session({ cwd: `${VAULT}/` }), VAULT)).toBeNull()
+  })
+
+  it('writes the home directory as ~ rather than a username', () => {
+    expect(primeSessionPlace(session({ cwd: HOME }), VAULT)).toBe('~')
+  })
+
+  it('has nothing to say about a session with no recorded directory', () => {
+    expect(primeSessionPlace(session(), VAULT)).toBeNull()
+    expect(primeSessionPlace(session({ cwd: '   ' }), VAULT)).toBeNull()
+  })
+
+  /**
+   * With no vault open — the list can render before one is chosen — every
+   * session is from somewhere else, so every one says where.
+   */
+  it('names every place when there is no vault to compare against', () => {
+    expect(primeSessionPlace(session({ cwd: VAULT }), null)).toBe('Rhizome Vault')
+  })
+
+  it('falls back to the whole path when there is no basename to take', () => {
+    expect(primeSessionPlace(session({ cwd: '/' }), VAULT)).toBe('/')
+  })
+})
+
+describe('primeSessionMetaLabel with a place', () => {
+  const VAULT = '/Users/dtc/Documents/Rhizome Vault'
+  const at = (h: number, m: number) => new Date(2026, 7, 13, h, m).getTime()
+
+  it('appends the place after the time, so the sort key stays leftmost', () => {
+    const label = primeSessionMetaLabel(
+      session({ mtimeMs: at(14, 8), cwd: '/Users/dtc/code/projects/rhizome-agent' }),
+      NOW,
+      { vaultPath: VAULT },
+    )
+
+    expect(label).toBe('Today · 14:08 · rhizome-agent')
+  })
+
+  it('leaves the label exactly as it was for a session from the open vault', () => {
+    const label = primeSessionMetaLabel(session({ mtimeMs: at(14, 8), cwd: VAULT }), NOW, {
+      vaultPath: VAULT,
+    })
+
+    expect(label).toBe('Today · 14:08')
+  })
+
+  it('carries the place on older rows too', () => {
+    expect(
+      primeSessionMetaLabel(session({ mtimeMs: NOW - DAY - HOUR, cwd: '/private/tmp' }), NOW, {
+        vaultPath: VAULT,
+      }),
+    ).toBe('Yesterday · tmp')
+  })
+
+  /**
+   * What it is doing now matters more than where it did it — the working row
+   * is the one the user is watching, and it is the session that is open.
+   */
+  it('says nothing about place while a session is working', () => {
+    expect(
+      primeSessionMetaLabel(session({ mtimeMs: at(14, 8), cwd: '/private/tmp' }), NOW, {
+        working: true,
+        vaultPath: VAULT,
+      }),
+    ).toBe('Working · tools')
+  })
+
+  /**
+   * A session with no timestamp had no meta line at all. Where it ran is still
+   * worth saying — an unplaceable row with a place beats an empty one.
+   */
+  it('shows the place alone when there is no timestamp', () => {
+    expect(
+      primeSessionMetaLabel(session({ cwd: '/private/tmp' }), NOW, {
+        vaultPath: VAULT,
+      }),
+    ).toBe('tmp')
+  })
+
+  it('is unchanged when no vault or home is supplied at all', () => {
+    expect(primeSessionMetaLabel(session({ mtimeMs: at(14, 8) }), NOW)).toBe('Today · 14:08')
   })
 })

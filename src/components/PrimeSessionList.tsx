@@ -29,6 +29,12 @@ interface PrimeSessionListProps {
   activeSessionPath?: string | null
   /** True while the live session is mid-turn — drives the working dot. */
   working?: boolean
+  /**
+   * The vault this list was opened from. Rows that ran somewhere else say so;
+   * rows from here stay quiet, because naming the open vault on every row is
+   * noise. Absent means no comparison, so every row names its place.
+   */
+  vaultPath?: string | null
   /** Overridable so tests do not depend on the wall clock. */
   now?: number
 }
@@ -100,6 +106,7 @@ export default function PrimeSessionList({
   onNewChat,
   activeSessionPath = null,
   working = false,
+  vaultPath = null,
   now,
 }: PrimeSessionListProps) {
   const t = createTranslator(locale)
@@ -195,7 +202,7 @@ export default function PrimeSessionList({
               <SessionRow
                 key={session.id}
                 title={title}
-                meta={primeSessionMetaLabel(session, at, { working: isWorking })}
+                meta={primeSessionMetaLabel(session, at, { working: isWorking, vaultPath })}
                 label={t('ai.sessions.selectAria', { title })}
                 active={active}
                 working={isWorking}
