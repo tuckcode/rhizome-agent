@@ -45,6 +45,46 @@ ensure_cargo_tooling() {
   fi
 }
 
+ensure_llvm_coverage_tooling() {
+  # `cargo llvm-cov` needs llvm-cov and llvm-profdata. rustup's
+  # llvm-tools-preview supplies them on its own, which is the Windows and
+  # Linux path and needs nothing here. macOS installs LLVM through Homebrew,
+  # where cargo cannot find them unless the two variables point at it.
+  #
+  # AGENTS.md documented exporting these by hand before every push. That is a
+  # ritual a hook can perform for itself, and forgetting it costs a full
+  # re-run of every other gate — which is exactly what happened on
+  # 2026-08-22.
+  if [ -n "$LLVM_COV" ] && [ -n "$LLVM_PROFDATA" ]; then
+    return 0
+  fi
+  if ! command -v brew >/dev/null 2>&1; then
+    return 0
+  fi
+
+  BREW_LLVM="$(brew --prefix llvm 2>/dev/null)"
+  if [ -x "$BREW_LLVM/bin/llvm-cov" ] && [ -x "$BREW_LLVM/bin/llvm-profdata" ]; then
+    export LLVM_COV="${LLVM_COV:-$BREW_LLVM/bin/llvm-cov}"
+    export LLVM_PROFDATA="${LLVM_PROFDATA:-$BREW_LLVM/bin/llvm-profdata}"
+  fi
+}
+
+ensure_playwright_browser() {
+  # A missing browser binary does not fail loudly — every spec dies in about a
+  # millisecond inside browserType.launch, so the lane reports twenty-six
+  # failures that look like the change under test broke everything. Checking
+  # first turns that into one line.
+  #
+  # Playwright pins a browser build per version, so a version bump orphans the
+  # cached binary. That happened on 2026-08-22 between two pushes an hour
+  # apart, with no change to any test.
+  if npx --no-install playwright install --dry-run chromium >/dev/null 2>&1; then
+    if ! npx --no-install playwright install chromium >/dev/null 2>&1; then
+      echo "  ⚠️  playwright browser install failed — run: npx playwright install chromium"
+    fi
+  fi
+}
+
 ensure_node_tooling() {
   if command -v node >/dev/null 2>&1 && command -v pnpm >/dev/null 2>&1; then
     return 0
@@ -241,6 +281,8 @@ report_lane_failure() {
 
 if ! run_sidecar_automatic_checks; then
   ensure_cargo_tooling
+  ensure_llvm_coverage_tooling
+  ensure_playwright_browser
 
   LANE_LOG_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rhizome-prepush.XXXXXX")"
   trap 'rm -rf "$LANE_LOG_DIR"' EXIT
