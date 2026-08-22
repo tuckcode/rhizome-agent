@@ -109,13 +109,13 @@ static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 /// The socket type per platform.
 ///
 /// Prime listens on a unix socket everywhere except Windows, where it uses a
-/// named pipe this client does not speak yet. Aliasing the type keeps the
-/// `cfg` to the one function that actually connects, rather than smearing it
-/// across every method that touches a stream.
+/// named pipe. Aliasing the type keeps the `cfg` to the one function that
+/// actually connects, rather than smearing it across every method that touches
+/// a stream.
 #[cfg(unix)]
 type DaemonStream = std::os::unix::net::UnixStream;
-#[cfg(not(unix))]
-type DaemonStream = std::net::TcpStream;
+#[cfg(windows)]
+type DaemonStream = std::fs::File;
 
 // ── Public types ────────────────────────────────────────────────────────────
 
@@ -384,7 +384,7 @@ fn daemon_socket_path() -> Result<PathBuf, String> {
     }
 
     if let Some(path) = default_daemon_socket_path() {
-        if path.exists() {
+        if default_daemon_path_is_present(&path) {
             return Ok(path);
         }
     }
@@ -410,12 +410,31 @@ fn unreachable_problem(detail: &str) -> PrimeConnectionProblem {
 }
 
 /// `<tmpdir>/prime-agent-<uid>/daemon.sock`, or `None` when the uid is unknown.
+#[cfg(unix)]
 fn default_daemon_socket_path() -> Option<PathBuf> {
     Some(
         std::env::temp_dir()
             .join(format!("prime-agent-{}", current_uid()?))
             .join("daemon.sock"),
     )
+}
+
+/// Prime's default background-service pipe on Windows.
+#[cfg(windows)]
+fn default_daemon_socket_path() -> Option<PathBuf> {
+    Some(PathBuf::from(r"\\.\pipe\prime-agent-daemon"))
+}
+
+#[cfg(unix)]
+fn default_daemon_path_is_present(path: &Path) -> bool {
+    path.exists()
+}
+
+/// A named pipe has no meaningful `exists()` check — only a connect attempt
+/// can tell whether the daemon is listening.
+#[cfg(windows)]
+fn default_daemon_path_is_present(_path: &Path) -> bool {
+    true
 }
 
 /// This process's uid, read off the home directory rather than via libc.
@@ -454,13 +473,16 @@ fn reported_daemon_socket_path() -> Option<PathBuf> {
 /// The table marks the default background service with a trailing `*`, which is
 /// part of the display and not of the path.
 fn parse_status_socket_path(stdout: &str) -> Option<PathBuf> {
-    stdout
-        .lines()
-        .map(str::trim)
-        .filter(|line| line.starts_with('/'))
-        .find_map(|line| line.split_whitespace().next())
-        .filter(|path| path.ends_with(".sock"))
-        .map(PathBuf::from)
+    stdout.lines().map(str::trim).find_map(|line| {
+        let path = line.split_whitespace().next()?;
+        is_daemon_transport_path(path).then(|| PathBuf::from(path))
+    })
+}
+
+fn is_daemon_transport_path(path: &str) -> bool {
+    path.ends_with(".sock")
+        || path.starts_with(r"\\.\pipe\")
+        || path.starts_with(r"\\?\pipe\")
 }
 
 #[cfg(unix)]
@@ -473,9 +495,52 @@ fn connect_stream(path: &Path) -> Result<DaemonStream, String> {
     })
 }
 
-#[cfg(not(unix))]
-fn connect_stream(_path: &Path) -> Result<DaemonStream, String> {
-    Err("Rhizome cannot reach Prime's background service on this platform yet".into())
+#[cfg(windows)]
+fn connect_stream(path: &Path) -> Result<DaemonStream, String> {
+    use std::fs::OpenOptions;
+    use std::os::windows::ffi::OsStrExt;
+
+    const PIPE_CONNECT_TIMEOUT_MS: u32 = 3_000;
+
+    let wide: Vec<u16> = path
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+
+    // Wait until an instance is listening. If the daemon is down, `open` below
+    // still fails — this just avoids racing a pipe that is starting up.
+    unsafe {
+        windows_sys::Win32::System::Pipes::WaitNamedPipeW(
+            wide.as_ptr(),
+            PIPE_CONNECT_TIMEOUT_MS,
+        );
+    }
+
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)
+        .map_err(|error| {
+            format!(
+                "Could not reach Prime's background service at {}: {error}",
+                path.display()
+            )
+        })
+}
+
+fn set_stream_roster_timeouts(stream: &mut DaemonStream) {
+    #[cfg(unix)]
+    {
+        let _ = stream.set_read_timeout(Some(ROSTER_TIMEOUT));
+        let _ = stream.set_write_timeout(Some(ROSTER_TIMEOUT));
+    }
+    #[cfg(windows)]
+    {
+        let _ = stream;
+        // `read_roster_over` enforces `ROSTER_TIMEOUT` via its deadline loop.
+        // Named pipes opened as `File` have no socket-style read timeout.
+    }
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────
@@ -1675,11 +1740,10 @@ pub fn list_running_sessions() -> Result<Vec<serde_json::Value>, String> {
     let Ok(socket_path) = daemon_socket_path() else {
         return Ok(Vec::new());
     };
-    let Ok(stream) = DaemonStream::connect(&socket_path) else {
+    let Ok(mut stream) = connect_stream(&socket_path) else {
         return Ok(Vec::new());
     };
-    let _ = stream.set_read_timeout(Some(ROSTER_TIMEOUT));
-    let _ = stream.set_write_timeout(Some(ROSTER_TIMEOUT));
+    set_stream_roster_timeouts(&mut stream);
 
     read_roster_over(stream)
 }
@@ -4199,6 +4263,36 @@ mod tests {
     fn status_output_without_a_socket_yields_nothing() {
         assert_eq!(parse_status_socket_path("no daemon running\n"), None);
         assert_eq!(parse_status_socket_path(""), None);
+    }
+
+    #[test]
+    fn status_output_yields_a_windows_named_pipe_path() {
+        let stdout = "socket                                   pid    version  status   sessions  uptime\n\
+                      \\\\.\\pipe\\prime-agent-daemon *  1234  0.7.4    current  0\n\
+                      \n* default background service\n";
+
+        assert_eq!(
+            parse_status_socket_path(stdout),
+            Some(PathBuf::from(r"\\.\pipe\prime-agent-daemon"))
+        );
+    }
+
+    #[test]
+    fn is_daemon_transport_path_accepts_unix_sockets_and_windows_pipes() {
+        assert!(is_daemon_transport_path(
+            "/var/folders/_9/hp/T/prime-agent-501/daemon.sock"
+        ));
+        assert!(is_daemon_transport_path(r"\\.\pipe\prime-agent-daemon"));
+        assert!(!is_daemon_transport_path("socket"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_default_socket_path_matches_primes_own_layout() {
+        assert_eq!(
+            default_daemon_socket_path().expect("a pipe path on windows"),
+            PathBuf::from(r"\\.\pipe\prime-agent-daemon")
+        );
     }
 
     #[cfg(unix)]
