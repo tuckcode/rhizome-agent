@@ -254,6 +254,37 @@ has to mean something deliberate. Recorded on #27.
 to the tests, which mock that module wholesale. All three of tonight's
 browser-only findings had that same shape.
 
+### C32 closed: Prime exists in the architecture docs now
+
+Both `ARCHITECTURE.md` and `ABSTRACTIONS.md` contained **zero** mentions of
+Prime — grepped, not assumed — while `prime_session_host.rs` alone is ~5,600
+lines. Written at the end of the session that had just re-derived all of it,
+deliberately: a future session would have had to derive it again *before* it
+could write it down, which is what the 2026-08-19 session also did.
+
+The lead is the thing that matters most: Prime is a **daemon client, not a
+subprocess**, which makes the `cli_agent_runtime.rs` model documented directly
+above it on the same page actively misleading.
+
+### #29 investigated, not fixed
+
+Verified the whole chain and left the findings on the issue rather than in a
+chat log. Two of them change the plan:
+
+- **"A wiring decision, not new detection code" is wrong.** `redactToken`
+  unconditionally redacts absolute paths, and the only public entry point also
+  collapses whitespace. Wired in as-is it would turn a note into one line with
+  every path replaced. Needs a tokens-only, formatting-preserving entry point.
+- **`sk-` is a weak prefix.** SpinKit CSS classes (`sk-circle`) collide.
+  Acceptable for telemetry where over-redaction is free; not over user content.
+
+**Nothing has leaked.** Scanned with the detector's exact token-start
+semantics: 0 in 156 notes, 0 elsewhere in the vault, 0 across 11 commits. A
+naive regex reports 1086 — all noise from a plugin bundle, a cached third-party
+repo, and hyphenated English like "a**sk**-to-Tasks". Do not let that number
+drive urgency. Real, worth doing, deadline is an *event* (the vault going
+public or gaining a collaborator), not a date.
+
 ### Open
 
 - **#28 is closed.** Its checklist held three items this session did not
