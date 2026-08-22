@@ -64,6 +64,7 @@ critical path at ~120s, coverage 85s of it).
 
 ## Recent sessions
 
+- [2026-08-22 · Claude Opus 5](plans/handoffs/2026-08-22-1100-claude-opus-5-ux-sweep.md) — Windows pipe landed by Cursor then its roster hang fixed; the ignored live-daemon tests run for the first time; C32 closed; a UX sweep found a silent screen-reader bug, a dead button and a session-select regression; #31–#39 opened
 - [2026-08-21 (evening) · Claude Opus 5](plans/handoffs/2026-08-21-1930-claude-opus-5-lazy-sessions.md) — #28's root cause: a vault attach creates no Prime session, verified against a live daemon; #28 closed, #30 opened and then finished (row labels, where a session ran, archiving); C33, test files typechecked behind a named exclusion list; and localization restated as decided
 - [2026-08-21 · Claude Opus 5](plans/handoffs/2026-08-21-1640-claude-opus-5-push-gate.md) — confetti end to end (ADR-0164), Chat home's rail and sessions column, #28, and the push gate cut from ~4m30s to ~2m16s
 - Everything before that: [handoff archive](plans/handoffs/archive-through-2026-08-20.md) — not in date order, search by date or issue number
