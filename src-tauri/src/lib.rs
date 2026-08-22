@@ -54,6 +54,7 @@ pub mod rhizome_grok_import;
 pub mod rhizome_import;
 pub mod rhizome_jobs;
 pub mod rhizome_repo_research;
+pub mod rhizome_research_formats;
 pub mod rhizome_search;
 pub mod rhizome_vault_seed;
 pub mod rhizome_write_location;
@@ -686,6 +687,9 @@ macro_rules! app_invoke_handler {
             inbox_watcher::start_inbox_watcher,
             inbox_watcher::stop_inbox_watcher,
             rhizome_commands::call_rhizome_tool,
+            rhizome_commands::list_research_formats,
+            rhizome_commands::save_research_format,
+            rhizome_commands::delete_research_format,
             rhizome_jobs::start_rhizome_job,
             rhizome_jobs::cancel_rhizome_job,
             menu_bar_companion::toggle_menu_bar_companion,

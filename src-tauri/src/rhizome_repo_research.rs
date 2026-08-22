@@ -235,7 +235,7 @@ OPEN QUESTIONS:\n\
 /// Prompt for the final synthesis call: turn accumulated findings into one
 /// contract-conformant wiki page in the strict `TITLE:`/`CONTEXT:`/`---`/
 /// body shape `parse_agent_response` understands.
-pub fn build_synthesis_prompt(repo_name: &str, mode: &str, findings: &str) -> String {
+pub fn build_synthesis_prompt(repo_name: &str, instruction: &str, findings: &str) -> String {
     format!(
         "Using the research findings below about the repository \"{repo_name}\", \
 write a single wiki page.\n\
@@ -247,7 +247,6 @@ CONTEXT: <one sentence situating this page for retrieval>\n\
 ---\n\
 <body in markdown: the wiki page, self-contained>\n\n\
 Research findings:\n{findings}",
-        instruction = mode_instruction(mode),
     )
 }
 
@@ -423,7 +422,11 @@ pub fn run_repo_research_via_agent(
     on_line("Synthesizing wiki page...");
     let synthesis = run_agent_round(
         &repo_dir,
-        build_synthesis_prompt(&repo_name, mode, &findings),
+        build_synthesis_prompt(
+            &repo_name,
+            &crate::rhizome_research_formats::resolve_instruction(vault_path, mode),
+            &findings,
+        ),
         agent,
         on_line,
     )?;
@@ -611,7 +614,7 @@ mod tests {
 
     #[test]
     fn synthesis_prompt_includes_mode_instruction_and_shape() {
-        let p = build_synthesis_prompt("owner/repo", "eli5", "- finding one");
+        let p = build_synthesis_prompt("owner/repo", mode_instruction("eli5"), "- finding one");
         assert!(p.contains("\"owner/repo\""));
         assert!(p.contains(mode_instruction("eli5")));
         assert!(p.contains("TITLE:"));
