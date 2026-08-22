@@ -7,6 +7,7 @@ import { createTranslator, type AppLocale } from '../lib/i18n'
 import {
   primeSessionAge,
   primeSessionMetaLabel,
+  primeSessionRowTitles,
   sortPrimeSessions,
   type PrimeSessionSummary,
 } from '../lib/primeSessionMeta'
@@ -139,6 +140,11 @@ export default function PrimeSessionList({
   const ordered = useMemo(() => sortPrimeSessions(sessions ?? []), [sessions])
   const at = now ?? loadedAt
   const untitled = t('ai.sessions.untitled')
+  // Computed across the whole list rather than per row: whether a title needs
+  // disambiguating is a property of its neighbours, not of the session. Left
+  // to the React Compiler rather than a `useMemo` — `untitled` comes from
+  // `t()`, a fresh value every render, so a hand-written memo cannot hold.
+  const titles = primeSessionRowTitles(ordered, untitled)
 
   const select = useCallback(
     (session: PrimeSessionSummary) => {
@@ -181,8 +187,8 @@ export default function PrimeSessionList({
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-0.5 p-1.5">
-          {ordered.map((session) => {
-            const title = session.title?.trim() || untitled
+          {ordered.map((session, index) => {
+            const title = titles[index] ?? untitled
             const active = Boolean(activeSessionPath) && session.path === activeSessionPath
             const isWorking = active && working
             return (

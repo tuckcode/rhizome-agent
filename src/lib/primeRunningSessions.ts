@@ -123,6 +123,8 @@ export interface RunningSessionRow {
 }
 
 /** Default cap on rendered rows. The popover is 360px wide, not a window. */
+import { disambiguateTitles } from './disambiguateTitles'
+
 const DEFAULT_LIMIT = 5
 const DEFAULT_TITLE_LENGTH = 44
 
@@ -303,32 +305,6 @@ function countDescendantsByRoot(sessions: PrimeRosterSession[]): Map<string, num
 }
 
 /**
- * Make every rendered title distinct.
- *
- * Observed live the first time this shipped: four running sessions, none with
- * a `firstMessage` (a session with no messages yet has none), two of them
- * rooted at `/Users/dtc`. Both rows rendered as "dtc" — identical, and giving
- * the user no way to tell which session was which or that they were even two
- * different sessions. A row you cannot tell apart from its neighbour is not a
- * row you can click.
- *
- * Only collisions get a suffix; a title that is already unique is left alone,
- * because appending an id to everything would make the common case noisier to
- * fix the rare one.
- */
-function disambiguateTitles(rows: RunningSessionRow[]): RunningSessionRow[] {
-  const counts = new Map<string, number>()
-  for (const row of rows) counts.set(row.title, (counts.get(row.title) ?? 0) + 1)
-  if (![...counts.values()].some((count) => count > 1)) return rows
-
-  return rows.map((row) => (
-    (counts.get(row.title) ?? 0) > 1
-      ? { ...row, title: `${row.title} · ${row.id.slice(0, 6)}` }
-      : row
-  ))
-}
-
-/**
  * Running top-level sessions, newest and busiest first, capped for the popover.
  *
  * Returns `[]` when nothing is running so the caller can render nothing at all
@@ -369,7 +345,10 @@ export function toRunningSessionRows(
         sessionFile: session.sessionFile,
       }
     })
-  return disambiguateTitles(rows)
+  // A daemon handle is random throughout, so its leading characters
+  // distinguish it. That is not true of every id — see the note in
+  // `disambiguateTitles` about uuidv7 session ids, whose prefix is a clock.
+  return disambiguateTitles(rows, (row) => row.id.slice(0, 6))
 }
 
 /** How many running sessions the cap hid, for a "+N more" affordance. */

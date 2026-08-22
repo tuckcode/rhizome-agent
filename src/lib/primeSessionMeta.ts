@@ -10,6 +10,8 @@
  * group headings above sections.
  */
 
+import { disambiguateTitles } from './disambiguateTitles'
+
 export interface PrimeSessionSummary {
   id: string
   path: string
@@ -92,6 +94,34 @@ export function primeSessionMetaLabel(
       return `${MONTHS[date.getMonth()]} ${date.getDate()}`
     }
   }
+}
+
+/**
+ * The label for each row, in the order given, with no two the same.
+ *
+ * A session with messages but no *user* message has no title — Prime derives
+ * one from the first user turn and there is nothing authoritative to prefer
+ * over that — so it falls back to the localized "Untitled". Two of those used
+ * to render as two identical rows, which is #28's title and the part #30
+ * carried: a row you cannot tell from its neighbour is not a row you can
+ * click.
+ *
+ * Suffixed with the **end** of the id, not the start. Session ids are uuidv7,
+ * whose leading characters are a timestamp: measured on 93 real logs in
+ * `~/.prime/agent/sessions`, the first six characters gave 23 distinct values
+ * and a single prefix covered 23 sessions. The random tail gave 93. The
+ * running-session list suffixes with the start because a daemon handle is
+ * random throughout — same helper, different id shape.
+ */
+export function primeSessionRowTitles(
+  sessions: readonly PrimeSessionSummary[],
+  untitled: string,
+): string[] {
+  const rows = sessions.map((session) => ({
+    id: session.id,
+    title: session.title?.trim() || untitled,
+  }))
+  return disambiguateTitles(rows, (row) => row.id.slice(-6)).map((row) => row.title)
 }
 
 /** Newest first. Sessions with no timestamp sink to the bottom. */
