@@ -169,6 +169,14 @@ pub struct Settings {
     /// A system-level reduced-motion preference suppresses it regardless of
     /// this, and that check lives in the UI, where the media query is.
     pub celebrations_enabled: Option<bool>,
+    /// Prime sessions the user has filed out of the main history list.
+    ///
+    /// Session ids, not paths — the id is Prime's own and survives a file
+    /// moving. Kept here rather than as a change to the log on disk because
+    /// `~/.prime/agent/sessions` belongs to Prime and is shared with its CLI
+    /// and any other client: archiving is Rhizome's view of the list, and must
+    /// not alter what anyone else sees. See `docs/adr/0165-archiving-prime-sessions.md`.
+    pub archived_prime_sessions: Option<Vec<String>>,
     /// Shared secret a browser extension presents to the MCP tool bridge.
     /// Generated once per install by [`ensure_bridge_token`] and never shown
     /// to anyone but the user. See `docs/adr/0159-bridge-token-auth.md`.
@@ -310,6 +318,9 @@ pub fn normalize_ui_language(value: Option<&str>) -> Option<String> {
 
 fn normalize_settings(settings: Settings) -> Settings {
     Settings {
+        // Passed through untouched: an id is Prime's own uuid, and there is no
+        // normalising to do to a set of them.
+        archived_prime_sessions: settings.archived_prime_sessions,
         keep_sessions_running_on_quit: settings.keep_sessions_running_on_quit,
         celebrations_enabled: settings.celebrations_enabled,
         auto_pull_interval_minutes: settings.auto_pull_interval_minutes,
@@ -643,6 +654,7 @@ mod tests {
     #[test]
     fn test_settings_json_roundtrip() {
         let settings = Settings {
+            archived_prime_sessions: Some(vec!["01a0252e-filed".to_string()]),
             keep_sessions_running_on_quit: Some(true),
             celebrations_enabled: Some(false),
             auto_pull_interval_minutes: Some(10),

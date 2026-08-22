@@ -152,6 +152,7 @@ let mockSettings: Settings = {
 }
 
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
+const mockArchivedSessions = new Set<string>()
 const DEFAULT_MOCK_VAULT = {
   label: 'demo-vault-v2',
   path: DEFAULT_MOCK_VAULT_PATH,
@@ -596,6 +597,17 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   abort_prime_session_turn: () => false,
   stream_prime_session: () => 'mock-session',
   list_prime_sessions: () => [],
+  // Archived ids live here rather than in the fixture list so the dev loop
+  // round-trips: file a row, and the next read still has it filed. In memory
+  // only — a reload starts clean, which is what a mock host should do.
+  set_prime_session_archived: (args: { sessionId?: string; archived?: boolean }) => {
+    const id = args?.sessionId
+    if (!id) return null
+    if (args?.archived) mockArchivedSessions.add(id)
+    else mockArchivedSessions.delete(id)
+    return null
+  },
+
   // Four rows rather than none, because an empty list makes the sessions
   // column invisible in `pnpm dev` — and that browser loop is where the
   // rendering of this list actually gets looked at. Chosen to exercise what
@@ -605,7 +617,11 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   // on the second and not the first).
   list_prime_session_summaries: () => {
     const minutes = (n: number) => Date.now() - n * 60_000
-    return [
+    // One place decides what is filed, so every row agrees and the fixtures
+    // below stay readable.
+    const filed = <T extends { id: string }>(rows: T[]) =>
+      rows.map((row) => ({ ...row, archived: mockArchivedSessions.has(row.id) }))
+    return filed([
       {
         id: '01a0252e-b9d5-71e9-83de-2bce32f65c06',
         path: '/mock/sessions/01a0252e-b9d5-71e9-83de-2bce32f65c06.jsonl',
@@ -636,7 +652,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
         mtimeMs: minutes(60 * 24 * 5),
         hasConversation: true,
       },
-    ]
+    ])
   },
   read_prime_session_transcript: () => [],
   switch_prime_session: () => 'mock-session',

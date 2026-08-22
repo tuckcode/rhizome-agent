@@ -14,10 +14,15 @@ vi.mock('../mock-tauri', () => ({
   },
 }))
 
-const tracked = vi.hoisted(() => ({ opened: [] as number[], selected: [] as string[] }))
+const tracked = vi.hoisted(() => ({
+  opened: [] as number[],
+  selected: [] as string[],
+  archived: [] as boolean[],
+}))
 vi.mock('../lib/productAnalytics', () => ({
   trackPrimeSessionListOpened: (count: number) => tracked.opened.push(count),
   trackPrimeSessionOpened: (age: string) => tracked.selected.push(age),
+  trackPrimeSessionArchived: (archived: boolean) => tracked.archived.push(archived),
 }))
 
 const NOW = new Date(2026, 7, 13, 15, 0, 0).getTime()
@@ -34,6 +39,7 @@ beforeEach(() => {
   invoked.fail = ''
   tracked.opened = []
   tracked.selected = []
+  tracked.archived = []
 })
 
 describe('PrimeSessionList', () => {
@@ -125,6 +131,89 @@ describe('PrimeSessionList', () => {
     expect(await screen.findByText('Today · 14:00 · rhizome-agent')).toBeInTheDocument()
   })
 
+  describe('archiving', () => {
+    /**
+     * Archiving is Rhizome's own view: `~/.prime/agent/sessions` belongs to
+     * Prime and is shared with its CLI, so a filed session is flagged in
+     * settings and never moved or deleted on disk. The row leaves the main
+     * list and the archive disclosure appears.
+     */
+    it('files a session out of the list and tells the host', async () => {
+      invoked.result = [
+        summary({ id: 'a', path: '/sessions/a.jsonl', title: 'Keep me' }),
+        summary({ id: 'b', path: '/sessions/b.jsonl', title: 'File me' }),
+      ]
+
+      render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Archive File me' }))
+
+      await waitFor(() => expect(screen.queryByText('File me')).not.toBeInTheDocument())
+      expect(screen.getByText('Keep me')).toBeInTheDocument()
+      expect(invoked.calls).toContain('set_prime_session_archived')
+    })
+
+    it('shows what is archived behind a disclosure, closed to start', async () => {
+      invoked.result = [
+        summary({ id: 'a', path: '/sessions/a.jsonl', title: 'Live one' }),
+        summary({ id: 'b', path: '/sessions/b.jsonl', title: 'Filed one', archived: true }),
+      ]
+
+      render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+
+      expect(await screen.findByText('Live one')).toBeInTheDocument()
+      expect(screen.queryByText('Filed one')).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: /Archived/ }))
+
+      expect(screen.getByText('Filed one')).toBeInTheDocument()
+    })
+
+    it('has no archive section at all when nothing is filed', async () => {
+      invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: 'Only one' })]
+
+      render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+
+      await screen.findByText('Only one')
+      expect(screen.queryByRole('button', { name: /Archived/ })).not.toBeInTheDocument()
+    })
+
+    it('puts a session back', async () => {
+      invoked.result = [
+        summary({ id: 'b', path: '/sessions/b.jsonl', title: 'Filed one', archived: true }),
+      ]
+
+      render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+
+      fireEvent.click(await screen.findByRole('button', { name: /Archived/ }))
+      fireEvent.click(screen.getByRole('button', { name: 'Restore Filed one' }))
+
+      await waitFor(() =>
+        expect(screen.queryByRole('button', { name: /Archived/ })).not.toBeInTheDocument(),
+      )
+      expect(screen.getByText('Filed one')).toBeInTheDocument()
+    })
+
+    /**
+     * The row moves before the host answers, so a refusal has to move it back
+     * — otherwise the list quietly disagrees with what is stored, and the
+     * next reload appears to lose the user's action.
+     */
+    it('puts the row back when the host refuses', async () => {
+      invoked.result = [summary({ id: 'b', path: '/sessions/b.jsonl', title: 'File me' })]
+
+      render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+      await screen.findByText('File me')
+      invoked.fail = 'settings are read-only'
+
+      fireEvent.click(screen.getByRole('button', { name: 'Archive File me' }))
+
+      expect(await screen.findByRole('alert')).toBeInTheDocument()
+      expect(screen.getByText('File me')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Archived/ })).not.toBeInTheDocument()
+    })
+  })
+
   it('survives a host that answers with no list at all', async () => {
     invoked.result = null as unknown as unknown[]
 
@@ -161,7 +250,7 @@ describe('PrimeSessionList', () => {
     const onSelectSession = vi.fn()
 
     render(<PrimeSessionList now={NOW} onSelectSession={onSelectSession} />)
-    fireEvent.click(await screen.findByRole('button', { name: /pick me/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open session pick me' }))
 
     expect(onSelectSession).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }))
     expect(invoked.calls).not.toContain('switch_prime_session')
@@ -186,9 +275,11 @@ describe('PrimeSessionList', () => {
 
     render(<PrimeSessionList now={NOW} activeSessionPath="/sessions/a.jsonl" />)
 
-    const active = await screen.findByRole('button', { name: /active one/ })
+    const active = await screen.findByRole('button', { name: 'Open session active one' })
     expect(active).toHaveAttribute('aria-current', 'true')
-    expect(screen.getByRole('button', { name: /other one/ })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('button', { name: 'Open session other one' })).not.toHaveAttribute(
+      'aria-current',
+    )
   })
 
   /** What a session is doing now matters more than when it last changed. */
@@ -218,7 +309,7 @@ describe('PrimeSessionList', () => {
     invoked.result = [summary({ id: 'a', title: 'pick me', mtimeMs: NOW - 3 * DAY })]
 
     render(<PrimeSessionList now={NOW} />)
-    fireEvent.click(await screen.findByRole('button', { name: /pick me/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open session pick me' }))
 
     await waitFor(() => expect(tracked.opened).toEqual([1]))
     expect(tracked.selected).toEqual(['week'])

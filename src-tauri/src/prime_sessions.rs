@@ -66,6 +66,16 @@ pub struct PrimeSessionSummary {
     /// `list_sessions` drops the drafts — see #28.
     #[serde(default)]
     pub has_conversation: bool,
+    /// Whether the user has archived this session out of the main list.
+    ///
+    /// Rhizome's own state, kept in its settings — **never** a change to the
+    /// log on disk. `~/.prime/agent/sessions` belongs to Prime and is shared
+    /// with the `prime-agent` CLI and any other client on the machine; moving
+    /// or deleting a file there would silently change what *they* see. Same
+    /// principle as ADR-0163: the daemon is not ours to stop, and its files
+    /// are not ours to move. Archiving is a view, and it is reversible.
+    #[serde(default)]
+    pub archived: bool,
 }
 
 /// The log a session id writes to.
@@ -261,6 +271,31 @@ fn worth_listing(summaries: Vec<PrimeSessionSummary>) -> Vec<PrimeSessionSummary
     summaries
         .into_iter()
         .filter(|summary| summary.has_conversation)
+        .collect()
+}
+
+/// Mark the sessions the user has archived.
+///
+/// Pure, and split from the command layer for the same reason `worth_listing`
+/// is split from `list_sessions`: the decision is worth testing and the
+/// settings read is not. Archived sessions stay *in* the list rather than
+/// being dropped from it — the UI shows them under a disclosure, so it needs
+/// them present and flagged, not missing.
+pub fn mark_archived(
+    summaries: Vec<PrimeSessionSummary>,
+    archived_ids: &[String],
+) -> Vec<PrimeSessionSummary> {
+    if archived_ids.is_empty() {
+        return summaries;
+    }
+    let archived: std::collections::HashSet<&str> =
+        archived_ids.iter().map(String::as_str).collect();
+    summaries
+        .into_iter()
+        .map(|mut summary| {
+            summary.archived = archived.contains(summary.id.as_str());
+            summary
+        })
         .collect()
 }
 
@@ -613,6 +648,53 @@ mod tests {
             summary.started_at.as_deref(),
             Some("2026-08-09T11:21:12.442Z")
         );
+    }
+
+    fn summary(id: &str) -> PrimeSessionSummary {
+        PrimeSessionSummary {
+            id: id.into(),
+            has_conversation: true,
+            ..Default::default()
+        }
+    }
+
+    /// Archiving is a *view*, so an archived session stays in the payload and
+    /// carries a flag. Dropping it here would leave the UI unable to show the
+    /// archive at all, and would make "restore" impossible without a second
+    /// round trip.
+    #[test]
+    fn archived_sessions_are_flagged_rather_than_removed() {
+        let listed = mark_archived(
+            vec![summary("kept"), summary("filed"), summary("also-kept")],
+            &["filed".to_string()],
+        );
+
+        assert_eq!(
+            listed.len(),
+            3,
+            "archiving hides a row, it does not delete one"
+        );
+        assert!(!listed[0].archived);
+        assert!(listed[1].archived, "the one the user filed");
+        assert!(!listed[2].archived);
+    }
+
+    #[test]
+    fn nothing_archived_leaves_every_session_alone() {
+        let listed = mark_archived(vec![summary("a"), summary("b")], &[]);
+
+        assert!(listed.iter().all(|session| !session.archived));
+    }
+
+    /// An id in settings with no log behind it is the normal end state of
+    /// archiving something and later deleting it in Prime. It must not throw
+    /// away the rest of the list.
+    #[test]
+    fn an_archived_id_with_no_session_left_is_ignored() {
+        let listed = mark_archived(vec![summary("still-here")], &["long-gone".to_string()]);
+
+        assert_eq!(listed.len(), 1);
+        assert!(!listed[0].archived);
     }
 
     #[test]

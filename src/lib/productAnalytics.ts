@@ -314,6 +314,17 @@ export function trackPrimeSessionOpened(age: PrimeSessionAge): void {
   trackEvent('prime_session_opened', { age })
 }
 
+/**
+ * A session was filed out of the list, or put back.
+ *
+ * Whether people curate this list at all is the question #30 left open: if
+ * they do, the list stays short on its own and never needs virtualizing. No
+ * id, no title, no path — only which way the switch went.
+ */
+export function trackPrimeSessionArchived(archived: boolean): void {
+  trackEvent('prime_session_archived', { archived: archived ? 'yes' : 'no' })
+}
+
 /** Coarse buckets — an exact count of someone's sessions is not our business. */
 function sessionCountBucket(count: number): '0' | '1-5' | '6-20' | '21-50' | '50+' {
   if (count <= 0) return '0'
