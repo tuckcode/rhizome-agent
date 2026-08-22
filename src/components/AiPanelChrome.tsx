@@ -521,6 +521,13 @@ export const AiPanelContextBar = memo(function AiPanelContextBar({
   )
 })
 
+/**
+ * How close to the bottom still counts as "reading the live output".
+ * Generous enough to survive sub-pixel rounding and a partly-drawn last line,
+ * tight enough that one deliberate scroll up releases the stream.
+ */
+const FOLLOW_THRESHOLD_PX = 48
+
 export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
   agentLabel,
   agentReadiness,
@@ -538,16 +545,30 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
 }: AiPanelMessageHistoryProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
+  // Following the stream is a mode, not an event: true while the reader is
+  // parked at the bottom, false the moment they scroll up to read. Starts
+  // true so a freshly opened conversation lands at the newest turn.
+  const followingRef = useRef(true)
+  const messageCountRef = useRef(messages.length)
 
   const updateScrollState = useCallback(() => {
     const element = containerRef.current
+    if (element) {
+      const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight
+      followingRef.current = distanceFromBottom <= FOLLOW_THRESHOLD_PX
+    }
     onScrollStateChange?.((element?.scrollTop ?? 0) > 1)
   }, [onScrollStateChange])
 
   useEffect(() => {
     void isActive
-    void messages
-    endRef.current?.scrollIntoView({ behavior: 'smooth' })
+    // A longer response is output arriving on its own; a longer list is the
+    // reader sending. Only the second one earns yanking them to the bottom.
+    const sent = messages.length > messageCountRef.current
+    messageCountRef.current = messages.length
+    if (sent) followingRef.current = true
+
+    if (followingRef.current) endRef.current?.scrollIntoView({ behavior: 'smooth' })
     if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(updateScrollState)
     else updateScrollState()
   }, [messages, isActive, updateScrollState])
