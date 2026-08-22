@@ -128,13 +128,48 @@ Worth generalising: **a helper that fixes a duplicate-label bug can carry the
 bug into its next caller**, because the thing that made it work was the shape
 of the ids at the first call site, not the function.
 
+### #30's second item: a row says where it ran
+
+The issue asked for sessions from other clients to be "labelled as such or
+filtered". **That is not possible.** Across all 93 logs the `session` header
+line carries exactly `type`, `version`, `id`, `timestamp`, `cwd`, `rlmDepth`,
+sometimes `git` (57/93) and sometimes `parentSession` (2/93). No client field.
+The issue's wording assumed a field that does not exist.
+
+What the data does support is *where*, and it turns out to be most of the
+answer:
+
+| cwd | sessions |
+|---|---|
+| `~/Documents/Rhizome Vault` | 31 |
+| `/private/tmp` | 19 |
+| `~/code/projects/rhizome-agent` | 11 |
+| a grok worktree | 10 |
+| `~` | 6 |
+| `demo-vault-v2` | 5 |
+| nine `/var/folders/…/T/…` temp dirs | 9 |
+
+**28 of 93 ran in a temp directory** — test runs, including this repo's own
+live-daemon tests. That is the clutter, and it is now labelled.
+
+A row from elsewhere reads `Today · 20:43 · rhizome-agent`; a row from the
+vault you have open says nothing extra, because repeating its name on every
+row spends the common case on the rare one. Time stays leftmost — it is the
+sort key, and the place is what should truncate first in a 228px column.
+
+**`pnpm dev` could not show this list at all.** `list_prime_session_summaries`
+returned `[]` in `mock-tauri`, so the sessions column was invisible in the one
+loop where its rendering is cheap to look at. Four fixtures now, chosen to
+exercise both defects this column has had. Confirmed on screen rather than
+only in assertions.
+
 ### Open
 
 - **#28 is closed.** Its checklist held three items this session did not
   touch — the identical-label fallback still at `PrimeSessionList.tsx:185`,
   no origin on a row, and no answer for 500 sessions — so they moved to
-  **#30** rather than disappearing with the close. The label one is done
-  (above); origin and scale are not. The 43 existing husks are
+  **#30** rather than disappearing with the close. Two are done (above);
+  what happens at 500 sessions is not, and is the only one left. The 43 existing husks are
   still on disk; nothing reads them (`list_sessions` drops them), and
   deleting them is a user decision, not a migration to write unasked.
 - **C33's 150 excluded files.** A third of the errors are in five:
