@@ -38,11 +38,21 @@
 
 - origin = `https://github.com/tuckcode/rhizome-agent.git` (**PRIVATE**). Commit locally, push to origin main when pre-push gates pass.
   **⛔ Never add `knispo/rhizome` as a remote in this repo.** That is Rhizome Desktop — a different product with a different bundle id and its own history. See the STOP block at the top of this file and `docs/IDENTITY.md`. (This line said `knispo/rhizome` until 2026-08-09; it was inherited verbatim from the Desktop rules during the fork and directly contradicted both.)
-- **Before pushing, ensure these env vars are set** (required for `cargo llvm-cov`, which the pre-push Rust gate invokes at step 4/6):
+- **The pre-push hook now sets `LLVM_COV` / `LLVM_PROFDATA` itself** on macOS
+  (`ensure_llvm_coverage_tooling`), so exporting them by hand is no longer
+  required. It only fills them in when they are unset, so an explicit export
+  still wins.
+
+  This used to be a manual ritual before every push:
   ```
   export LLVM_COV="$(brew --prefix llvm)/bin/llvm-cov"
   export LLVM_PROFDATA="$(brew --prefix llvm)/bin/llvm-profdata"
   ```
+  Forgetting it failed the Rust lane *after* every other gate had passed,
+  costing a full re-run — which is what prompted moving it into the hook on
+  2026-08-22. Agents in particular could not win here: shell state does not
+  persist between tool calls, so the export had to be repeated in the same
+  command as every single push.
   See `docs/CROSS-MODEL-HANDOFF.md` §13 for the full sequence and `cargo llvm-cov` flags.
 
   **On Windows** those two exports are wrong — there is no `brew`. Install the
