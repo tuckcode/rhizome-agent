@@ -10,7 +10,7 @@ import {
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
 import { resolveIcon } from '../utils/iconRegistry'
 import { getDisplayDate } from '../utils/noteListHelpers'
-import { formatTimestampForDateDisplay } from '../utils/dateDisplay'
+import { formatSavedLabel, formatTimestampForDateDisplay } from '../utils/dateDisplay'
 import { filePreviewKind, type FilePreviewKind } from '../utils/filePreview'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { PropertyChips } from './note-item/PropertyChips'
@@ -337,7 +337,10 @@ function NoteDateRow({
   allEntries: VaultEntry[]
 }) {
   const dateDisplayFormat = useDateDisplayFormat()
-  const modifiedLabel = formatTimestampForDateDisplay(getDisplayDate(entry), dateDisplayFormat)
+  // The clock time when saved and created land on the same day — the right
+  // half of this row already prints that date, so printing it twice spent the
+  // row saying nothing. See `formatSavedLabel`.
+  const modifiedLabel = formatSavedLabel(getDisplayDate(entry), entry.createdAt, dateDisplayFormat)
   const createdLabel = entry.createdAt ? `Created ${formatTimestampForDateDisplay(entry.createdAt, dateDisplayFormat)}` : null
   const linkCount = entry.outgoingLinks.length
 
