@@ -64,12 +64,27 @@ ensure_node_tooling() {
   fi
 }
 
+# A `prototype/*` branch is throwaway code kept as a primary source: the
+# measurement or spike that settled a decision, parked out of main so the
+# number can be re-run later instead of re-derived. It never merges, so the
+# main-only rule does not need to cover it — and the full gate suite does not
+# either, since prototype code is written without tests or error handling by
+# design. See `docs/adr/` and the `prototype` skill.
+IS_PROTOTYPE_BRANCH=false
+
 require_main_push() {
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-  if [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "HEAD" ]; then
-    echo "❌ Pushes must happen from main or a detached HEAD that is pushed directly to main. Current branch: $CURRENT_BRANCH"
-    exit 1
-  fi
+  case "$CURRENT_BRANCH" in
+    prototype/*)
+      IS_PROTOTYPE_BRANCH=true
+      ;;
+    main | HEAD)
+      ;;
+    *)
+      echo "❌ Pushes must happen from main, a detached HEAD pushed directly to main, or a prototype/* branch. Current branch: $CURRENT_BRANCH"
+      exit 1
+      ;;
+  esac
 
   while IFS=' ' read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
     [ -z "$LOCAL_REF" ] && continue
@@ -81,8 +96,10 @@ require_main_push() {
         ;;
       refs/tags/*:refs/tags/*)
         ;;
+      refs/heads/prototype/*:refs/heads/prototype/*)
+        ;;
       *)
-        echo "❌ Pushes must be main -> main only."
+        echo "❌ Pushes must be main -> main, a tag, or prototype/* -> the same prototype/*."
         echo "   Attempted: ${LOCAL_REF:-<none>} -> ${REMOTE_REF:-<none>}"
         exit 1
         ;;
@@ -98,6 +115,14 @@ else
   PUSH_INPUT=$(cat)
 fi
 require_main_push
+
+if [ "$IS_PROTOTYPE_BRANCH" = true ]; then
+  echo ""
+  echo "🧪 prototype branch — gates skipped by design."
+  echo "   Throwaway code parked as a primary source; it never merges to main."
+  exit 0
+fi
+
 ensure_node_tooling
 
 START_TIME=$(date +%s)
