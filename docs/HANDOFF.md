@@ -472,17 +472,40 @@ push is not a release — releases are tagged builds with signed installers.
   -b`), now what `AGENTS.md`, `CONTRIBUTING.md` and `CROSS-MODEL-HANDOFF.md`
   all tell you to run.
 
-- **C33-OPEN: test files are excluded from the typecheck.** Found 2026-08-19
-  while landing #9; **restated 2026-08-20**, because the original diagnosis was
-  half the story. `tsconfig.app.json` sets `"exclude": ["src/**/*.test.ts",
-  "src/**/*.test.tsx", "src/**/*.spec.ts", "src/**/*.spec.tsx"]`, so test files
-  are invisible even to a working typecheck — demonstrated by a prop deleted
-  from `ChatComposerDeckProps` while `ChatComposerDeck.test.tsx` kept passing
-  it, with nothing reporting the mismatch. The reason nobody caught it sooner
-  was C35: the command being run typechecked **no** files, so "tests are not
-  checked" was indistinguishable from "nothing is checked". With `pnpm
-  typecheck` now real, this is the remaining gap: including tests will surface
-  a backlog, so it wants its own change rather than a drive-by.
+- **C33-PARTLY-RESOLVED (2026-08-21): test files are typechecked now, minus a
+  named backlog.** Found 2026-08-19 while landing #9; **restated 2026-08-20**,
+  because the original diagnosis was half the story. `tsconfig.app.json` sets
+  `"exclude": ["src/**/*.test.ts", …]`, so test files were invisible even to a
+  working typecheck — demonstrated by a prop deleted from
+  `ChatComposerDeckProps` while `ChatComposerDeck.test.tsx` kept passing it,
+  with nothing reporting the mismatch. The reason nobody caught it sooner was
+  C35: the command being run typechecked **no** files, so "tests are not
+  checked" was indistinguishable from "nothing is checked".
+
+  The backlog turned out not to be a wall. Measured 2026-08-21: **386 of 533
+  test files were already clean**, and of the 1458 errors a first run showed,
+  698 came from `node_modules` — two regression tests import BlockNote's raw
+  `.ts` source by relative path, and `skipLibCheck` skips `.d.ts`, not `.ts`.
+  The real repo-side backlog is **668 errors across 143 files**, a third of it
+  in five files.
+
+  So `tsconfig.test.json` is a ratchet: the 386 clean files are gated by
+  `pnpm typecheck` today (proven by appending a type error to a test file and
+  watching `tsc -b` catch it), and the 150 dirty ones are listed by name in its
+  `exclude`. A new test file is checked from the moment it is written.
+  `pnpm typecheck:tests:backlog` prints what is left, worst file first;
+  clearing one means deleting its line from `exclude`. It is deliberately not
+  a gate, for the same reason `pnpm deadcode` is not.
+
+  Two things fell out of this that are worth knowing. `ChatComposerDeck.test.tsx`
+  — the file the original report was about — is in the clean set, so that
+  specific hole is closed. And `src/types/mockTauriBridge.ts` is new: the
+  `__mockContent` / `__mockHandlers` window augmentations lived inside
+  `App.tsx`, which worked only while every project happened to include
+  `App.tsx`. Giving tests their own project broke that, and `mock-tauri/index.ts`
+  stopped being able to see globals it sets. Global augmentations belong in
+  `src/types/` with the others — and, like `rhizomeTestBridge.ts`, in
+  `knip.json`'s `ignore`, because nothing imports them by design.
 - **C31-OPEN: `pnpm test` produced one unhandled error that would not reproduce.** Seen 2026-08-19 while landing #13: a full run reported `Tests 5433 passed` alongside `Errors 1` and exited non-zero. Three further full runs on the same tree exited 0 with no error line, and the error text was never captured — it did not appear in the tail, and greps for `Unhandled`/`rejection` came back empty on the clean runs. **Not attributed to that session's change and not shown to predate it either**; nobody has run this down. It matters because the push gate runs `pnpm test`: a 1-in-4 unhandled error is a push that fails for no visible reason, and the natural reaction — re-run and move on — is exactly how it stays unfixed. Next time it appears, capture the whole run to a file before doing anything else (`pnpm test > /tmp/t.txt 2>&1`), because the message is only in the block vitest prints between the file list and the summary.
 
 - **C32-OPEN: `ARCHITECTURE.md` and `ABSTRACTIONS.md` contain no mention of Prime at all.** Confirmed 2026-08-19 by grepping both files for `Prime` — zero hits in either, while `src-tauri/src/prime_session_host.rs` alone is ~4,600 lines and the daemon client, session host, goal, fork, compact, heartbeat and roster surfaces all live outside the docs. AGENTS.md requires updating these two after "any Tauri command, new component/hook, data model change, or new integration", so every harness session has been in technical violation of that rule and every one of them has let it pass. The practical cost: a new session has no structural map of the harness and re-derives it from source each time — this session spent a meaningful chunk of its budget rediscovering that `prime_session_host.rs` is a full daemon client and that `prime_sessions.rs` is a *disk* reader that cannot answer "what is running". Do not fix this as a side quest inside a feature commit; it is its own piece of work.

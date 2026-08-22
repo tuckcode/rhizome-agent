@@ -16,6 +16,7 @@
   "ignore": [
     "src-tauri/gen/**",
     "src/mock-tauri.ts",
+    "src/types/mockTauriBridge.ts",
     "src/types/rhizomeTestBridge.ts"
   ],
   "ignoreDependencies": [

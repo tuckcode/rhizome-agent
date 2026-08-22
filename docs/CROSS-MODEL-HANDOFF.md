@@ -20,7 +20,9 @@ Ambient `declare global { interface Window { ... } }` files are imported by
 not an import. knip reports them as "unused files." `src/types/rhizomeTestBridge.ts`
 is exactly this: five source files (`main.tsx`, `App.tsx`, `useMenuEvents.ts`,
 `useDeepLinks.ts`, `SingleEditorView.tsx`) fail to typecheck without it, and
-a smoke spec drives the runtime bridge it types.
+a smoke spec drives the runtime bridge it types. `src/types/mockTauriBridge.ts`
+(added 2026-08-21) is the same thing for `__mockContent` / `__mockHandlers`;
+both are in `knip.json`'s `ignore`.
 
 **Rule: always run `pnpm typecheck` after deleting anything knip flagged.**
 (`npx tsc --noEmit` is a no-op here — root `tsconfig.json` is `"files": []`
