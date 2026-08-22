@@ -313,6 +313,37 @@ The lesson is the one this session kept relearning: **check the record before
 adding to it.** Three times tonight the answer was already written down —
 C18's localization decision, #27's shipped half, and this.
 
+### #31, and the Windows gap it surfaced
+
+**#31 shipped** (`44ba9d6`): Rhizome names the sessions it creates, and the
+summarizer reads `session_info` entries so a name set anywhere — including
+`prime-agent rename` from the CLI — shows in the list. Naming failure is
+deliberately non-fatal: probing showed names must be unique among *live*
+sessions at the same depth, so two windows on one vault legitimately collide.
+
+Scoped down honestly in the process. Only sessions with messages are listed,
+and those already had content-derived titles, so auto-naming rescues few
+"Untitled" rows. The real wins are origin — which #30 said was underivable —
+and renameability. The user-facing rename is still unbuilt and is the piece
+with the clearest value left.
+
+**Then: can we work on this from Windows?** No — and it is worth knowing why.
+`connect_stream` returns an error stub off Unix, so the whole Prime harness is
+dead there. But **Prime's daemon already listens on Windows**
+(`\\.\pipe\prime-agent-daemon`), the seam in our code already exists as a
+single `DaemonStream` type alias with a comment anticipating exactly this, and
+a Windows named-pipe client is an ordinary file handle — `std::fs::File`
+supplies the `try_clone`/`Read`/`Write` every consumer uses. The only
+socket-specific call in the file is the roster timeout pair.
+
+Small change; the cost is that it cannot be verified from macOS. **#32**, with
+line references pinned to `44ba9d6`. prime-agent is MIT, so no licensing
+obstacle.
+
+Everything else in the repo — notes, editor, search, git, wiki, MCP — works on
+Windows today, and `pnpm dev` against `mock-tauri` drives the session list
+including all three dot states and archiving without a daemon at all.
+
 ### Open
 
 - **#28 is closed.** Its checklist held three items this session did not
