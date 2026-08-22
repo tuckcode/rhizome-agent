@@ -44,6 +44,22 @@
   export LLVM_PROFDATA="$(brew --prefix llvm)/bin/llvm-profdata"
   ```
   See `docs/CROSS-MODEL-HANDOFF.md` §13 for the full sequence and `cargo llvm-cov` flags.
+
+  **On Windows** those two exports are wrong — there is no `brew`. Install the
+  toolchain through rustup instead, once per machine:
+  ```
+  rustup component add llvm-tools-preview
+  ```
+  `cargo llvm-cov` finds them itself after that, and no environment variables
+  are needed. The hook has no platform branch, so this is the first thing a
+  Windows push trips on.
+
+  **Also on Windows: the Prime harness does not run at all.** `connect_stream`
+  returns an error stub off Unix, because Prime's daemon speaks a named pipe
+  (`\\.\pipe\prime-agent-daemon`) and this client only speaks Unix sockets.
+  Chat, sessions, goals and the session list are all dead there — that is #32
+  / C38, not a broken checkout. Everything else works, and `pnpm dev` against
+  `mock-tauri` drives the session list without a daemon at all.
 - Commit at natural checkpoints — one TDD cycle (below) for code, otherwise every 20–30 min: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
 - **Every agent must sign its commits with a `Co-Authored-By` trailer** naming the model that actually wrote the change:
   ```
