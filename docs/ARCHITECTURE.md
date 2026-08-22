@@ -348,6 +348,89 @@ sequenceDiagram
 
 When the agent writes or edits vault files, `aiAgentFileOperations.ts` detects this from normalized tool inputs and calls `onFileCreated` or `onFileModified` callbacks to trigger vault reload. Unrecognized write-like operations fall back to a full vault refresh.
 
+### Prime Agent — a daemon client, not a subprocess
+
+**Prime is the exception to everything above.** Every other agent on this page
+is spawned as a child process per turn and dies when the turn ends. Prime is
+not: Rhizome connects to a **long-lived daemon over a Unix socket** and attaches
+to a session that outlives both the turn and the window. That is ADR-0163, and
+it is the single most important thing to know before reading any of the Prime
+code — the subprocess mental model from `cli_agent_runtime.rs` does not apply
+and will mislead you.
+
+Concretely: closing the window is a **detach**, not a kill. A session keeps
+running, and a goal or heartbeat can fire while Rhizome is closed.
+
+#### The two modules, and why confusing them is the classic mistake
+
+| | `prime_session_host.rs` (~5,600 lines) | `prime_sessions.rs` |
+|---|---|---|
+| What it is | The daemon **client** | A **disk reader** |
+| Talks to | The daemon over a socket | `~/.prime/agent/sessions/*.jsonl` |
+| Answers | "what is running right now" | "what conversations exist" |
+| Cannot answer | history | **what is running** |
+
+`prime_sessions.rs` reads log files. It has no idea which of them the daemon is
+still holding — a finished session and one mid-turn look identical on disk. The
+live answer comes from the daemon's roster (`list_prime_running_sessions`), and
+the only join between the two is the **log path**: `sessionFile` on a roster
+entry, `path` on a summary. `runningSessionFilesByPath` in
+`src/lib/primeRunningSessions.ts` is that bridge.
+
+This distinction has caused real defects more than once. Assume nothing; check
+which source you are holding.
+
+#### Session lifecycle
+
+`PrimeHost::connect` opens the socket, waits for the daemon's `daemon_hello`
+(which is also the protocol-version check), then either **rejoins** a session
+already running in this vault or stops at *connected with no session*.
+
+**It does not create one.** Creating a session writes a log file immediately, and
+Rhizome connects on every vault attach — including the transient default vault a
+window opens with — so eager creation littered the user's history with empty
+sessions (#28). A session is created by `ensure_session`, on the first command
+that genuinely needs one, in the order the daemon requires:
+
+```
+list → create → attach → get_state → <the command that asked>
+```
+
+`send_command` — the session-scoped sender — is the choke point that triggers it.
+Three reads deliberately opt out, because they run on timers whether or not
+anyone is talking to the agent and would otherwise be what creates the session:
+`agent_activity` (app-level poll), `get_session_stats` (15s), and `get_commands`
+(on mount). Each answers "nothing", which is true of a host with no session.
+
+#### Where the pieces live
+
+- **`prime_session_host.rs`** — socket transport, handshake, attach, session
+  lifecycle, prompt streaming, model/thinking level, goals, fork, compact,
+  heartbeats, quit disposition
+- **`prime_sessions.rs`** — summarising logs off disk for the history list; caps
+  each read at 400 lines (`SUMMARY_SCAN_LINE_LIMIT`) and stops early, which is
+  why listing 2,000 sessions costs ~50ms rather than reading gigabytes
+- **`prime_settings.rs`** — Prime's own configured defaults, read for the model
+  chip when there is no session yet
+- **`prime_agent_activity.rs`** — goal, heartbeats and schedules for the activity band
+- **`prime_events.rs`**, **`prime_tool_unwrap.rs`** — normalising the daemon's
+  event stream into the shared `AiAgentStreamEvent` shape
+- **`prime_discovery.rs`**, **`prime_update.rs`**, **`prime_vault_skill.rs`** —
+  locating the binary, updating it, and seeding the Rhizome vault skill
+- Frontend: `usePrimeHostStatus` (status poll), `usePrimeAgentActivity` (app-level,
+  goal/heartbeats), `usePrimeRunningSessionFiles` (roster → which logs are alive),
+  `PrimeSessionList` (the history sidebar), `primeSessionMeta.ts` (row labels)
+
+#### What Rhizome does not own
+
+`~/.prime/agent/` is Prime's, and it is shared with the `prime-agent` CLI and any
+other client on the machine. Rhizome reads from it and never rewrites it to suit
+its own view — archiving a session records an id in Rhizome's `settings.json`
+rather than moving a log (ADR-0165), and quitting detaches rather than stopping
+the daemon (ADR-0163). The session log format carries no field identifying which
+client wrote it, so "which app made this session" is not a question the data can
+answer.
+
 ### Context Building
 
 The agent panel (`ai-context.ts`) builds a structured JSON snapshot from the active note and linked entries:
