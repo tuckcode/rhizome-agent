@@ -173,6 +173,47 @@ describe('primeSessionRowTitles', () => {
   it('returns a title per session, in order, for an empty list too', () => {
     expect(primeSessionRowTitles([], UNTITLED)).toEqual([])
   })
+
+  /**
+   * #33. The first version suffixed any repeated *title*, which put hex on
+   * rows a user could already tell apart:
+   *
+   *     Untitled session · e521f9        Untitled session · 904ab3
+   *     Today · 07:29 · rhizome-agent    Yesterday · tmp
+   *
+   * The meta lines differ completely. Suffixing there solved a collision the
+   * second line had already resolved, on the line the eye reads first.
+   */
+  it('leaves an untitled title alone when the rest of the row already differs', () => {
+    const titles = primeSessionRowTitles(
+      [session({ id: 'aaaaaa111111' }), session({ id: 'bbbbbb222222' })],
+      UNTITLED,
+      ['Today · 07:29 · rhizome-agent', 'Yesterday · tmp'],
+    )
+
+    expect(titles).toEqual(['Untitled', 'Untitled'])
+  })
+
+  /** And still suffixes when the whole row would genuinely repeat. */
+  it('suffixes when the meta matches too, because then the rows are identical', () => {
+    const titles = primeSessionRowTitles(
+      [session({ id: 'aaaaaa111111' }), session({ id: 'bbbbbb222222' })],
+      UNTITLED,
+      ['Today · 07:29', 'Today · 07:29'],
+    )
+
+    expect(titles).toEqual(['Untitled · 111111', 'Untitled · 222222'])
+  })
+
+  it('treats a missing meta as no meta rather than as a distinguishing one', () => {
+    const titles = primeSessionRowTitles(
+      [session({ id: 'aaaaaa111111' }), session({ id: 'bbbbbb222222' })],
+      UNTITLED,
+      [null, null],
+    )
+
+    expect(titles).toEqual(['Untitled · 111111', 'Untitled · 222222'])
+  })
 })
 
 describe('primeSessionPlace', () => {

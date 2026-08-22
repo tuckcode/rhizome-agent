@@ -319,7 +319,38 @@ export default function PrimeSessionList({
   //
   // Across *both* sections, not each on its own: a session keeps the label it
   // had when it is filed, so archiving a row does not rename its neighbour.
-  const titles = primeSessionRowTitles(ordered, untitled)
+  //
+  // Meta is computed first and fed in, because whether a title needs a suffix
+  // depends on what the *rest of the row* already says (#33).
+  const statusFor = new Map(
+    ordered.map((session) => {
+      const isActive = Boolean(activeSessionPath) && session.path === activeSessionPath
+      // The attached session's own turn is known here first — the roster poll
+      // is 4s behind — so it wins for that one row. An archived row never
+      // claims a live dot: the archive is where you put what you are not
+      // watching.
+      const status: PrimeSessionStatus = session.archived
+        ? 'saved'
+        : isActive && working
+          ? 'working'
+          : primeSessionStatus(session, running)
+      return [session.id, status] as const
+    }),
+  )
+  const metaFor = new Map(
+    ordered.map((session) => [
+      session.id,
+      primeSessionMetaLabel(session, at, {
+        working: statusFor.get(session.id) === 'working',
+        vaultPath,
+      }),
+    ]),
+  )
+  const titles = primeSessionRowTitles(
+    ordered,
+    untitled,
+    ordered.map((session) => metaFor.get(session.id) ?? null),
+  )
   const titleFor = new Map(ordered.map((session, index) => [session.id, titles[index] ?? untitled]))
   const live = ordered.filter((session) => !session.archived)
   const archived = ordered.filter((session) => session.archived)
@@ -398,16 +429,12 @@ export default function PrimeSessionList({
           {live.map((session) => {
             const title = titleFor.get(session.id) ?? untitled
             const active = Boolean(activeSessionPath) && session.path === activeSessionPath
-            // The attached session's own turn is known here first — the
-            // roster poll is 4s behind — so it wins for that one row.
-            const status: PrimeSessionStatus =
-              active && working ? 'working' : primeSessionStatus(session, running)
-            const isWorking = status === 'working'
+            const status = statusFor.get(session.id) ?? 'saved'
             return (
               <LiveSessionRow
                 key={session.id}
                 title={title}
-                meta={primeSessionMetaLabel(session, at, { working: isWorking, vaultPath })}
+                meta={metaFor.get(session.id) ?? null}
                 label={rowLabel(title, status)}
                 active={active}
                 status={status}
@@ -447,7 +474,7 @@ export default function PrimeSessionList({
                       <ArchivedSessionRow
                         key={session.id}
                         title={title}
-                        meta={primeSessionMetaLabel(session, at, { vaultPath })}
+                        meta={metaFor.get(session.id) ?? null}
                         label={t('ai.sessions.selectAria', { title })}
                         active={active}
                         onSelect={() => select(session)}

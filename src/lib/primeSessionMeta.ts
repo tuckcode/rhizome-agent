@@ -176,12 +176,27 @@ export function primeSessionMetaLabel(
 export function primeSessionRowTitles(
   sessions: readonly PrimeSessionSummary[],
   untitled: string,
+  metas: readonly (string | null)[] = [],
 ): string[] {
-  const rows = sessions.map((session) => ({
+  // Collision is a property of the whole row, not the title.
+  //
+  // The first version of this suffixed any repeated *title*, which put hex on
+  // rows a user could already tell apart:
+  //
+  //     Untitled session · e521f9        Untitled session · 904ab3
+  //     Today · 07:29 · rhizome-agent    Yesterday · tmp
+  //
+  // Those meta lines differ completely; the suffix solved a collision the
+  // second line had already resolved, on the line the eye reads first. A
+  // suffix is only worth its noise when the rendered row would genuinely
+  // repeat — same title *and* same meta. #33.
+  const rows = sessions.map((session, index) => ({
     id: session.id,
     title: session.title?.trim() || untitled,
+    meta: metas[index] ?? '',
   }))
-  return disambiguateTitles(rows, (row) => row.id.slice(-6)).map((row) => row.title)
+  return disambiguateTitles(rows, (row) => row.id.slice(-6), (row) => `${row.title}\u0000${row.meta}`)
+    .map((row) => row.title)
 }
 
 /**
