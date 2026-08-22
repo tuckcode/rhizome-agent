@@ -7,6 +7,7 @@ import {
 } from '../lib/chatSessionsColumn'
 import { callHost } from '../lib/callHost'
 import { sendToRunningTurn } from '../lib/primeTurnMessaging'
+import { trackPrimeTurnMessage } from '../lib/productAnalytics'
 import {
   AiPanelComposer,
   AiPanelHeader,
@@ -299,7 +300,16 @@ export function AiPanelView({
     onClose,
     enabled: interactive,
   })
+  // Queued follow-ups are local to the turn: Prime owns the queue, but it
+  // reports no view of it, so the panel remembers what it handed over and
+  // forgets once the turn that would drain it has ended.
+  const [queuedFollowUps, setQueuedFollowUps] = useState<string[]>([])
+
   const sendAsNewTurn = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
+    // A new turn starts with an empty queue. Cleared here rather than in an
+    // effect on `isActive`: setting state from an effect cascades renders, and
+    // the queue only ever needs to be empty at the moment a turn begins.
+    setQueuedFollowUps([])
     onSendPrompt?.(text)
     handleSend(text, references)
   }, [handleSend, onSendPrompt])
@@ -314,8 +324,13 @@ export function AiPanelView({
       void sendToRunningTurn('followUp', text).then((queued) => {
         // `false` means the turn ended between the keystroke and the call.
         // Send it as a new turn rather than losing it.
-        if (queued) setInput('')
-        else sendAsNewTurn(text, references)
+        if (queued) {
+          setQueuedFollowUps((current) => [...current, text.trim()])
+          trackPrimeTurnMessage('followUp')
+          setInput('')
+        } else {
+          sendAsNewTurn(text, references)
+        }
       })
       return
     }
@@ -330,8 +345,12 @@ export function AiPanelView({
   const handleSteer = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
     if (!text.trim()) return
     void sendToRunningTurn('steer', text).then((steered) => {
-      if (steered) setInput('')
-      else sendAsNewTurn(text, references)
+      if (steered) {
+        trackPrimeTurnMessage('steer')
+        setInput('')
+      } else {
+        sendAsNewTurn(text, references)
+      }
     })
   }, [sendAsNewTurn, setInput])
 
@@ -614,6 +633,7 @@ export function AiPanelView({
         onChange={setInput}
         onSend={handleComposerSend}
         onSteer={isPrimeTarget ? handleSteer : undefined}
+        queuedFollowUps={isPrimeTarget && isActive ? queuedFollowUps : undefined}
         onStop={handleStop}
         onUnsupportedAiPaste={onUnsupportedAiPaste}
         foot={isPrimeTarget ? (

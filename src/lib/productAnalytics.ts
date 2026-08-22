@@ -102,6 +102,18 @@ export function trackResearchFormatSaved(totalFormats: number): void {
 }
 
 /**
+ * A message was sent to a turn that was already running (#41).
+ *
+ * The kind only — never the message, which is user content. Atticus, asked
+ * whether people steer or queue, answered "i do both", so the split is the
+ * whole question this event exists to measure: a surface that serves one and
+ * tolerates the other would be the wrong design.
+ */
+export function trackPrimeTurnMessage(kind: 'steer' | 'followUp'): void {
+  trackEvent('prime_turn_message', { kind })
+}
+
+/**
  * A scheduled prompt was paused, resumed, or cancelled from the band (#14).
  *
  * Both fields are fixed enums from Prime's own vocabulary — no prompt text,
