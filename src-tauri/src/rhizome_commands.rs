@@ -26,6 +26,46 @@ fn invalidate_search_on_success(
     service.invalidate(Path::new(vault_path));
 }
 
+/// List the vault's user-authored research formats.
+#[tauri::command]
+pub fn list_research_formats(
+    vault_path: String,
+) -> Vec<crate::rhizome_research_formats::CustomFormat> {
+    crate::rhizome_research_formats::load(Path::new(&vault_path))
+}
+
+/// Save (or replace) one research format and return the full list back, so
+/// the caller never has to re-fetch to stay in sync.
+#[tauri::command]
+pub fn save_research_format(
+    vault_path: String,
+    title: String,
+    instruction: String,
+    id: Option<String>,
+) -> Result<Vec<crate::rhizome_research_formats::CustomFormat>, String> {
+    let id = id
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| crate::rhizome_research_formats::slug_for(&title));
+    crate::rhizome_research_formats::save(
+        Path::new(&vault_path),
+        &crate::rhizome_research_formats::CustomFormat {
+            id,
+            title: title.trim().to_string(),
+            instruction: instruction.trim().to_string(),
+        },
+    )
+}
+
+/// Delete one research format by id, returning the remaining list.
+#[tauri::command]
+pub fn delete_research_format(
+    vault_path: String,
+    id: String,
+) -> Result<Vec<crate::rhizome_research_formats::CustomFormat>, String> {
+    crate::rhizome_research_formats::delete(Path::new(&vault_path), &id)
+}
+
 /// Execute a Rhizome CLI tool and return its stdout.
 #[tauri::command]
 pub fn call_rhizome_tool(
