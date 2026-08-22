@@ -30,6 +30,7 @@ pub mod menu;
 mod menu_bar_capture;
 mod menu_bar_companion;
 pub mod mycelium;
+mod navigation_guard;
 pub mod opencode_cli;
 mod opencode_config;
 mod opencode_discovery;
@@ -758,6 +759,12 @@ pub fn run() {
 
     #[cfg(desktop)]
     let builder = with_desktop_entry_plugins(builder);
+
+    // #43 — a window-level navigation guard. Stops any webview (the main
+    // window is config-declared, so we use the plugin hook, not the
+    // WebviewWindowBuilder method) from navigating away from the app
+    // origin; off-origin links go to the system browser instead.
+    let builder = builder.plugin(navigation_guard::init());
 
     #[cfg(desktop)]
     let builder = builder
