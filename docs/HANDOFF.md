@@ -531,6 +531,7 @@ push is not a release — releases are tagged builds with signed installers.
 - **C32-WAS-OPEN: `ARCHITECTURE.md` and `ABSTRACTIONS.md` contain no mention of Prime at all.** Confirmed 2026-08-19 by grepping both files for `Prime` — zero hits in either, while `src-tauri/src/prime_session_host.rs` alone is ~4,600 lines and the daemon client, session host, goal, fork, compact, heartbeat and roster surfaces all live outside the docs. AGENTS.md requires updating these two after "any Tauri command, new component/hook, data model change, or new integration", so every harness session has been in technical violation of that rule and every one of them has let it pass. The practical cost: a new session has no structural map of the harness and re-derives it from source each time — this session spent a meaningful chunk of its budget rediscovering that `prime_session_host.rs` is a full daemon client and that `prime_sessions.rs` is a *disk* reader that cannot answer "what is running". Do not fix this as a side quest inside a feature commit; it is its own piece of work.
 ## Links out
 
+- Prime harness coverage, quantified → `docs/plans/2026-08-22-prime-harness-coverage.md` (25% of the daemon surface; what is missing, and in what order)
 - Full history + session details → `docs/plans/` (see classification in `docs/plans/handoff-classification.md`)
 - Context retooling plan → `docs/plans/2026-07-25-context-retooling-plan.md`
 - Duplication analysis → `docs/plans/duplication-analysis.md`
