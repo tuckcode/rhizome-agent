@@ -526,10 +526,7 @@ pub fn get_status() -> PrimeHostStatus {
             // binary — it owns a socket — but this field has always meant
             // "where Prime lives" to the UI, and that is still the CLI path.
             binary_path,
-            model_provider: host
-                .model_provider
-                .clone()
-                .or(defaults.default_provider),
+            model_provider: host.model_provider.clone().or(defaults.default_provider),
             model_id: host.model_id.clone().or(defaults.default_model),
             model_name: host.model_name.clone(),
             thinking_level: host
@@ -2754,7 +2751,14 @@ mod tests {
         assert_eq!(session, "sess-a");
         assert_eq!(
             daemon.commands(),
-            vec!["list", "create", "attach", "get_state", "prompt", "get_state"],
+            vec![
+                "list",
+                "create",
+                "attach",
+                "get_state",
+                "prompt",
+                "get_state"
+            ],
             "the session is created inside the prompt, attached before it, and \
              re-read after"
         );
@@ -2765,9 +2769,9 @@ mod tests {
             "events={events:?}"
         );
         assert!(
-            events
-                .iter()
-                .any(|e| matches!(e, AiAgentStreamEvent::Init { session_id } if session_id == "sess-a")),
+            events.iter().any(
+                |e| matches!(e, AiAgentStreamEvent::Init { session_id } if session_id == "sess-a")
+            ),
             "the frontend has to learn the session it landed in: {events:?}"
         );
         let _ = shutdown_host();
@@ -2789,7 +2793,10 @@ mod tests {
         let status = get_status();
 
         assert!(status.running, "connected, just not in a session yet");
-        assert!(status.session_id.is_none(), "and there is no session to name");
+        assert!(
+            status.session_id.is_none(),
+            "and there is no session to name"
+        );
         // Whatever this machine's Prime is set to. The assertion that matters
         // is that the two agree — hardcoding a model here would encode a
         // default the product deliberately does not have.
@@ -2845,7 +2852,13 @@ mod tests {
 
         assert_eq!(
             daemon.commands(),
-            vec!["list", "create", "attach", "get_state", "get_available_models"]
+            vec![
+                "list",
+                "create",
+                "attach",
+                "get_state",
+                "get_available_models"
+            ]
         );
         let _ = shutdown_host();
     }
@@ -2887,7 +2900,11 @@ mod tests {
         let stats = get_session_stats().expect("stats read as unknown");
         let commands = get_commands().expect("commands read as empty");
 
-        assert_eq!(activity, Default::default(), "nothing to report, not a goal");
+        assert_eq!(
+            activity,
+            Default::default(),
+            "nothing to report, not a goal"
+        );
         assert!(stats.session_id.is_none(), "no session, no stats");
         assert!(commands.is_empty(), "no session, no session commands");
         assert_eq!(
