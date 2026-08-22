@@ -366,7 +366,8 @@ export function AiPanelView({
       })
       agent.replaceMessages(primeTranscriptToConversation(transcript))
       setActiveSessionPath(branch.path)
-      setSessionsOpen(false)
+      // Same as selecting: the column stays. A fork adds a session to the very
+      // list being hidden, so closing it hides the thing that just happened.
     } catch (e) {
       setSwitchError(e instanceof Error ? e.message : String(e))
     }
@@ -443,7 +444,11 @@ export function AiPanelView({
       })
       agent.replaceMessages(primeTranscriptToConversation(transcript))
       setActiveSessionPath(session.path)
-      setSessionsOpen(false)
+      // The column deliberately stays open. Closing it made sense when this
+      // list was an overlay covering the conversation — dismissing it was how
+      // you got back to the chat. It is a persistent sidebar now, and closing
+      // it on select throws away the standing context you opened it for, then
+      // makes you reopen it to pick a second session.
     } catch (e) {
       setSwitchError(e instanceof Error ? e.message : String(e))
     }
