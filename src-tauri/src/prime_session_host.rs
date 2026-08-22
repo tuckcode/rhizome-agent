@@ -504,6 +504,17 @@ pub fn get_status() -> PrimeHostStatus {
         }
     }
 
+    // A host with no session yet has no model to report from `get_state`, and
+    // Chat home draws the model chip before a word is typed. Prime's own
+    // configured defaults are what the session it eventually creates will
+    // start as, so they are the honest answer rather than "unknown". Read only
+    // when there is nothing better: once a session exists it is the authority,
+    // because the user may have switched model inside it.
+    let defaults = match guard.as_ref() {
+        Some(host) if !host.has_session() => crate::prime_settings::read_defaults(),
+        _ => crate::prime_settings::PrimeDefaults::default(),
+    };
+
     match guard.as_ref() {
         Some(host) => PrimeHostStatus {
             installed: availability.installed,
@@ -515,10 +526,16 @@ pub fn get_status() -> PrimeHostStatus {
             // binary — it owns a socket — but this field has always meant
             // "where Prime lives" to the UI, and that is still the CLI path.
             binary_path,
-            model_provider: host.model_provider.clone(),
-            model_id: host.model_id.clone(),
+            model_provider: host
+                .model_provider
+                .clone()
+                .or(defaults.default_provider),
+            model_id: host.model_id.clone().or(defaults.default_model),
             model_name: host.model_name.clone(),
-            thinking_level: host.thinking_level.clone(),
+            thinking_level: host
+                .thinking_level
+                .clone()
+                .or(defaults.default_thinking_level),
             reattached: host.reattached,
             started_at: host.started_at.clone(),
             // The daemon reports `sessionFile` on only some state payloads,
@@ -569,6 +586,13 @@ pub fn shutdown_host() -> Result<bool, String> {
 
 pub fn new_session() -> Result<String, String> {
     with_host_mut(|host| {
+        // A host that never got a session does not need a second one: the
+        // session it is about to create *is* the new chat. Asking the daemon
+        // for another would leave the first empty — the litter of #28.
+        if !host.has_session() {
+            host.ensure_session()?;
+            return Ok(host.session_id.clone().unwrap_or_default());
+        }
         host.call(serde_json::json!({ "type": "new_session" }))?;
         // Refresh session id from get_state.
         host.refresh_session_id()?;
@@ -579,6 +603,12 @@ pub fn new_session() -> Result<String, String> {
 /// Token / cost / context usage for the live session.
 pub fn get_session_stats() -> Result<PrimeSessionStats, String> {
     with_host_mut(|host| {
+        // Polled every 15s while the panel is open. Every field is already
+        // optional for "Prime has not said yet", and no session is the same
+        // answer — so this reports unknown rather than creating one.
+        if !host.has_session() {
+            return Ok(PrimeSessionStats::default());
+        }
         let data = host.call(serde_json::json!({ "type": "get_session_stats" }))?;
         Ok(PrimeSessionStats::from_state_data(&data))
     })
@@ -700,6 +730,12 @@ fn commands_from_response(data: &serde_json::Value) -> Vec<PrimeReportedCommand>
 /// Skills and extension commands the live session can invoke via `/`.
 pub fn get_commands() -> Result<Vec<PrimeReportedCommand>, String> {
     with_host_mut(|host| {
+        // The composer menu fetches this on mount and again whenever the
+        // session id changes — so opening the panel must not create a
+        // session, and the refetch after one exists fills the menu in.
+        if !host.has_session() {
+            return Ok(Vec::new());
+        }
         let data = host.call(serde_json::json!({ "type": "get_commands" }))?;
         Ok(commands_from_response(&data))
     })
@@ -849,6 +885,13 @@ pub fn cancel_scheduled_work(job_id: &str) -> Result<(), String> {
 pub fn agent_activity() -> Result<crate::prime_agent_activity::PrimeAgentActivity, String> {
     use crate::prime_agent_activity as activity;
     with_host_mut(|host| {
+        // Mounted at app level and ticking on a timer, so this is the poll
+        // most likely to create a session nobody asked for. An agent with no
+        // session has no goal, no heartbeats and nothing scheduled — which is
+        // exactly the empty payload the band already renders as nothing.
+        if !host.has_session() {
+            return Ok(activity::PrimeAgentActivity::default());
+        }
         // Not `get_state`: probed live against 0.7.2, the daemon's `get_state`
         // never carries a `goal` key at all (its summarizer just does not set
         // one). `get_connection_state` does — it wraps the same
@@ -1391,7 +1434,7 @@ fn ensure_host_for_cwd(cwd: PathBuf) -> Result<String, String> {
                 let _ = crate::prime_vault_skill::seed_vault_skill(&cwd);
                 return Ok(host.session_id.clone().unwrap_or_default());
             }
-            // Disconnected or wrong cwd → detach and open a new session.
+            // Disconnected or wrong cwd → detach and reconnect there.
             let _ = host.shutdown();
             *guard = None;
         }
@@ -1780,13 +1823,18 @@ fn next_id() -> String {
 }
 
 impl PrimeHost {
-    /// Open a connection, create a session in `cwd`, and attach to it.
+    /// Open a connection in `cwd` and rejoin work already running there.
     ///
-    /// Creating rather than adopting an existing session preserves today's
-    /// behaviour exactly: `ensure_host` has always produced a session scoped to
-    /// the vault it was handed. Reattaching to work left running is #7's job,
-    /// and needs a UI to choose *which* session — a choice this function has no
-    /// standing to make on the user's behalf.
+    /// Deliberately does *not* create a session when there is nothing to
+    /// rejoin. Rhizome connects on every vault attach — including the
+    /// transient default vault a window opens with — and the daemon writes a
+    /// session log the moment it is asked to `create`, so connecting eagerly
+    /// is what filled the user's history with empty sessions (#28). A session
+    /// arrives from `ensure_session`, when something actually needs one.
+    ///
+    /// Reattaching to work left running is #7's job. Choosing *which* session
+    /// to rejoin when several qualify is `pick_resumable_session`; this
+    /// function has no standing to make a wider choice on the user's behalf.
     fn connect(cwd: PathBuf) -> Result<Self, String> {
         std::fs::create_dir_all(&cwd).map_err(|error| {
             format!(
@@ -1872,46 +1920,67 @@ impl PrimeHost {
                 log::info!("Reattaching to Prime session {found}");
                 host.active_session_id = found;
                 host.reattached = true;
+                host.attach_and_read_state()?;
             }
-            Ok(None) => host.create_session(&cwd)?,
-            Err(error) => {
-                // Enumeration is an optimisation, not a precondition. Failing
-                // to list is no reason to refuse to open — start fresh.
-                log::debug!("Could not enumerate Prime sessions, creating one: {error}");
-                host.create_session(&cwd)?;
-            }
-        }
-
-        let attached = host.send_bare_command(serde_json::json!({
-            "type": "attach",
-            "activeSessionId": host.active_session_id,
-            "capabilities": DAEMON_CLIENT_CAPABILITIES,
-        }))?;
-        if attached["success"].as_bool() != Some(true) {
-            let _ = host.shutdown();
-            return Err(response_error(&attached, "attach"));
-        }
-
-        // Warm-up: get_state confirms the session answers and yields sessionId.
-        match host.send_command(serde_json::json!({ "type": "get_state" })) {
-            Ok(response) if response["success"].as_bool() == Some(true) => {
-                if let Some(data) = response.get("data") {
-                    host.apply_state_data(data);
-                }
-                // Reached it: whatever was wrong before no longer is.
+            // Nothing to rejoin: connected, with no session. Creating one here
+            // is what littered `~/.prime/agent/sessions` with empty logs (#28)
+            // — the daemon writes the file on `create`, and Rhizome connects
+            // on every vault attach whether or not anyone means to chat.
+            // `ensure_session` makes one when something actually needs it.
+            Ok(None) => {
+                // The connection itself is proven: the daemon greeted us and
+                // answered `list`. Whatever was wrong before no longer is.
                 record_problem(None);
             }
-            Ok(response) => {
-                let _ = host.shutdown();
-                return Err(response_error(&response, "get_state"));
-            }
             Err(error) => {
-                let _ = host.shutdown();
-                return Err(error);
+                // Enumeration is an optimisation, not a precondition. Failing
+                // to list is no reason to refuse to open — the session this
+                // host will create on demand is a fresh one either way.
+                log::debug!("Could not enumerate Prime sessions: {error}");
+                record_problem(None);
             }
         }
 
         Ok(host)
+    }
+
+    /// Join `active_session_id` and read its state.
+    ///
+    /// Shared by the two ways a host acquires a session — rejoining one left
+    /// running, and creating one on demand — because the daemon rejects any
+    /// session command sent before `attach`, and `get_state` is what turns
+    /// the daemon's handle into the session id, model and start time the UI
+    /// shows.
+    fn attach_and_read_state(&mut self) -> Result<(), String> {
+        let attached = self.send_bare_command(serde_json::json!({
+            "type": "attach",
+            "activeSessionId": self.active_session_id,
+            "capabilities": DAEMON_CLIENT_CAPABILITIES,
+        }))?;
+        if attached["success"].as_bool() != Some(true) {
+            let _ = self.shutdown();
+            return Err(response_error(&attached, "attach"));
+        }
+
+        // Warm-up: get_state confirms the session answers and yields sessionId.
+        match self.send_command(serde_json::json!({ "type": "get_state" })) {
+            Ok(response) if response["success"].as_bool() == Some(true) => {
+                if let Some(data) = response.get("data") {
+                    self.apply_state_data(data);
+                }
+                // Reached it: whatever was wrong before no longer is.
+                record_problem(None);
+                Ok(())
+            }
+            Ok(response) => {
+                let _ = self.shutdown();
+                Err(response_error(&response, "get_state"))
+            }
+            Err(error) => {
+                let _ = self.shutdown();
+                Err(error)
+            }
+        }
     }
 
     /// Create a fresh session rooted at `cwd`, and adopt it.
@@ -1938,6 +2007,21 @@ impl PrimeHost {
         };
         self.active_session_id = active_session_id.to_string();
         Ok(())
+    }
+
+    /// Create the deferred session and attach to it, if there is not one.
+    ///
+    /// Idempotent by design: `create_session` sets `active_session_id` before
+    /// this returns, so the `get_state` warm-up below — which goes out through
+    /// the session-scoped sender, and so back through here — sees a session
+    /// and stops rather than recursing.
+    fn ensure_session(&mut self) -> Result<(), String> {
+        if !self.active_session_id.is_empty() {
+            return Ok(());
+        }
+        let cwd = self.cwd.clone();
+        self.create_session(&cwd)?;
+        self.attach_and_read_state()
     }
 
     /// Find a session already running here that this client can rejoin.
@@ -2021,6 +2105,12 @@ impl PrimeHost {
         self.connected.load(Ordering::Relaxed)
     }
 
+    /// Has this host got a session yet? False between connecting and the
+    /// first thing that needs one.
+    fn has_session(&self) -> bool {
+        !self.active_session_id.is_empty()
+    }
+
     /// Detach and drop the connection.
     ///
     /// Deliberately not a kill. The daemon is not ours to stop — that is the
@@ -2092,10 +2182,18 @@ impl PrimeHost {
             .unwrap_or(serde_json::Value::Null))
     }
 
+    /// Send a session-scoped command, creating the session if there is not
+    /// one yet.
+    ///
+    /// This is the choke point that makes creation lazy: asking for a session
+    /// is what buys one. Reads that run on a timer must not come through here
+    /// — see `agent_activity`, `get_session_stats` and `get_commands`, which
+    /// answer "nothing" instead.
     fn send_command(
         &mut self,
         mut command: serde_json::Value,
     ) -> Result<serde_json::Value, String> {
+        self.ensure_session()?;
         let object = command
             .as_object_mut()
             .ok_or_else(|| "Prime daemon command must be a JSON object".to_string())?;
@@ -2567,8 +2665,22 @@ mod tests {
         })
     }
 
+    /// Connect and materialize the session, the way a user reaching for the
+    /// agent does. Most tests here exercise a live session, so this keeps them
+    /// reading as they did before sessions became lazy.
     #[cfg(unix)]
     fn connect_host(vault: &Path) -> Result<String, String> {
+        ensure_host(&vault.to_string_lossy())?;
+        with_host_mut(|host| {
+            host.ensure_session()?;
+            Ok(host.session_id.clone().unwrap_or_default())
+        })
+    }
+
+    /// Connect and stop there — no session. This is what attaching a vault
+    /// does now, and the only helper that should be used to assert it.
+    #[cfg(unix)]
+    fn connect_host_lazy(vault: &Path) -> Result<String, String> {
         ensure_host(&vault.to_string_lossy())
     }
 
@@ -2608,6 +2720,161 @@ mod tests {
         assert_eq!(
             daemon.commands(),
             vec!["list", "create", "attach", "get_state"]
+        );
+        let _ = shutdown_host();
+    }
+
+    /// Deferring the session must not cost the user the model chip. Chat home
+    /// draws it before a word is typed, and "Model unknown" on every launch
+    /// would be a worse answer than the true one: what Prime is configured to
+    /// start a session with.
+    #[cfg(unix)]
+    #[test]
+    fn a_session_less_host_reports_the_model_prime_would_start_with() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+        connect_host_lazy(vault.path()).unwrap();
+
+        let status = get_status();
+
+        assert!(status.running, "connected, just not in a session yet");
+        assert!(status.session_id.is_none(), "and there is no session to name");
+        // Whatever this machine's Prime is set to. The assertion that matters
+        // is that the two agree — hardcoding a model here would encode a
+        // default the product deliberately does not have.
+        let defaults = crate::prime_settings::read_defaults();
+        assert_eq!(status.model_id, defaults.default_model);
+        assert_eq!(status.model_provider, defaults.default_provider);
+        assert_eq!(status.thinking_level, defaults.default_thinking_level);
+
+        let _ = shutdown_host();
+    }
+
+    /// #28's root cause. Attaching a vault must not create a session.
+    ///
+    /// Rhizome connects on every vault attach — including the transient
+    /// default vault the window opens with before the real one loads — and
+    /// the daemon writes a session log the moment it is asked to `create`.
+    /// Every launch therefore left husks on disk: 43 of 93 logs in the
+    /// author's `~/.prime/agent/sessions` held no message at all. Filtering
+    /// them out of the list was the display half; this is the half that stops
+    /// making them.
+    #[cfg(unix)]
+    #[test]
+    fn attaching_a_vault_creates_no_session() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+
+        let session_id = connect_host_lazy(vault.path()).unwrap();
+
+        assert_eq!(session_id, "", "no session yet means no session id");
+        assert_eq!(
+            daemon.commands(),
+            vec!["list"],
+            "connecting looks for work to rejoin and stops there"
+        );
+        let _ = shutdown_host();
+    }
+
+    /// The deferred half, on demand. A command that needs a session pays for
+    /// one — in the same order the eager path used, because the daemon
+    /// rejects a session command sent before `attach`.
+    #[cfg(unix)]
+    #[test]
+    fn the_first_command_that_needs_a_session_creates_one() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+        connect_host_lazy(vault.path()).unwrap();
+
+        get_available_models().expect("models list");
+
+        assert_eq!(
+            daemon.commands(),
+            vec!["list", "create", "attach", "get_state", "get_available_models"]
+        );
+        let _ = shutdown_host();
+    }
+
+    /// Once a session exists, later commands reuse it rather than creating
+    /// another. Deferring must not turn into creating one per command.
+    #[cfg(unix)]
+    #[test]
+    fn a_session_is_created_once_and_then_reused() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+        connect_host_lazy(vault.path()).unwrap();
+
+        get_available_models().expect("models list");
+        get_available_models().expect("models list again");
+
+        let creates = daemon.commands().iter().filter(|c| *c == "create").count();
+        assert_eq!(creates, 1, "one session, not one per command");
+        let _ = shutdown_host();
+    }
+
+    /// The polls that run whether or not anyone is talking to the agent must
+    /// not be what creates the session. `usePrimeAgentActivity` is mounted at
+    /// app level and ticks on a timer; the stats poll and the command menu
+    /// both fetch on mount. If any of them materialized a session, deferring
+    /// creation would buy nothing.
+    #[cfg(unix)]
+    #[test]
+    fn background_reads_do_not_create_a_session() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+        connect_host_lazy(vault.path()).unwrap();
+
+        let activity = agent_activity().expect("activity reads as empty");
+        let stats = get_session_stats().expect("stats read as unknown");
+        let commands = get_commands().expect("commands read as empty");
+
+        assert_eq!(activity, Default::default(), "nothing to report, not a goal");
+        assert!(stats.session_id.is_none(), "no session, no stats");
+        assert!(commands.is_empty(), "no session, no session commands");
+        assert_eq!(
+            daemon.commands(),
+            vec!["list"],
+            "a background poll must not spend a session: {:?}",
+            daemon.commands()
+        );
+        let _ = shutdown_host();
+    }
+
+    /// "New chat" on a host that never got one is the session, not a second
+    /// one. Materializing and then asking the daemon for a fresh session
+    /// would create two logs and leave the first empty — the exact litter
+    /// this change exists to stop.
+    #[cfg(unix)]
+    #[test]
+    fn a_new_chat_on_a_fresh_host_creates_one_session_not_two() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+        connect_host_lazy(vault.path()).unwrap();
+
+        let session_id = new_session().expect("a session to chat in");
+
+        assert_eq!(session_id, "sess-a");
+        let commands = daemon.commands();
+        assert_eq!(
+            commands.iter().filter(|c| *c == "create").count(),
+            1,
+            "{commands:?}"
+        );
+        assert!(
+            !commands.iter().any(|c| c == "new_session"),
+            "the session just created is already new: {commands:?}"
         );
         let _ = shutdown_host();
     }
@@ -2848,11 +3115,13 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    /// With nothing to rejoin, opening still creates — #6's behaviour has to
-    /// survive #7, or a first run would land nowhere.
+    /// With nothing to rejoin, the session a first run gets is a created one,
+    /// not an adopted one — #6's behaviour has to survive #7, or a first run
+    /// would land nowhere. It arrives on demand now rather than at connect
+    /// (see `attaching_a_vault_creates_no_session`), but it still arrives.
     #[cfg(unix)]
     #[test]
-    fn opening_with_nothing_running_still_creates_a_session() {
+    fn a_first_run_creates_rather_than_rejoins() {
         let _guard = host_guard();
         let vault = tempfile::tempdir().unwrap();
         let daemon = FakeDaemon::start(|command, id| {
