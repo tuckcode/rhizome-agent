@@ -189,6 +189,29 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 ## Open threads
 
+- **C39-OPEN: the live-daemon tests are not isolated, so running them litters
+  the real session store.** Found 2026-08-22 by running the six `#[ignore]`d
+  live tests for the first time. `RHIZOME_PRIME_DAEMON_SOCKET` isolates the
+  *socket*, and an isolated daemon can run with a scratch `--session-dir`, but
+  tests that reconnect fall back to the default daemon — one run left **six
+  husk sessions** in `~/.prime/agent/sessions` with `tempfile::tempdir()`
+  cwds. That is the exact litter #28 removed, so the lane is deliberately not
+  scripted until this is fixed.
+
+  **Starting an isolated daemon is itself non-obvious**, so record it here.
+  Prime's supervisor `lstat`s the socket path *before* binding
+  (`getDaemonSocketIdentity`), so it cannot cold-start on a path that has never
+  existed — a real unix socket must be pre-created there. And the path must be
+  short: `AF_UNIX` caps near 104 chars, which the scratchpad path exceeds.
+  ```bash
+  D=/tmp/rzlive/tmp/prime-agent-$(id -u); mkdir -p "$D" /tmp/rzlive/sessions
+  python3 -c "import socket;s=socket.socket(socket.AF_UNIX);s.bind('$D/daemon.sock');s.close()"
+  TMPDIR=/tmp/rzlive/tmp prime-agent --mode daemon --session-dir /tmp/rzlive/sessions &
+  RHIZOME_PRIME_DAEMON_SOCKET=$D/daemon.sock cargo test --lib prime_session_host -- --ignored --test-threads=1
+  ```
+  5 of 6 pass. `scheduled_work_against_the_live_daemon` needs pre-existing
+  scheduled work, which is its own documented precondition.
+
 - **C38-RESOLVED (2026-08-22, code landed `1922a27`, Windows verification pending):**
   Prime harness connects on Windows via `\\.\pipe\prime-agent-daemon`
   (`connect_stream` in `prime_session_host.rs` — `File` + `WaitNamedPipeW`).
