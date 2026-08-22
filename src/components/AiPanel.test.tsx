@@ -665,6 +665,12 @@ describe('talking to a turn that is already running', () => {
     expect(screen.getByRole('button', { name: 'Steer response' })).toBeInTheDocument()
   })
 
+  it('shows nothing queued before anything is queued', () => {
+    renderActivePrime('')
+
+    expect(screen.queryByTestId('composer-queued-follow-ups')).toBeNull()
+  })
+
   it('still offers Stop when the composer is empty', () => {
     renderActivePrime('')
 

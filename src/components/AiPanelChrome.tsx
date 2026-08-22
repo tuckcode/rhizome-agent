@@ -76,6 +76,8 @@ interface AiPanelComposerProps {
   /** Redirect a running turn instead of aborting it. When absent the composer
    *  stays disabled while streaming, which is the pre-steering behaviour. */
   onSteer?: (text: string, references: NoteReference[]) => void
+  /** Messages waiting to run after the current turn, oldest first (#41). */
+  queuedFollowUps?: string[]
   onUnsupportedAiPaste?: (message: string) => void
   /** Frame A foot row. Rendered under the box so it can see controller state. */
   foot?: ReactNode
@@ -618,6 +620,7 @@ export function AiPanelComposer({
   onSend,
   onStop,
   onSteer,
+  queuedFollowUps,
   onUnsupportedAiPaste,
   foot,
   commandEntries,
@@ -668,6 +671,26 @@ export function AiPanelComposer({
         <div className="mb-1.5 min-w-0">
           {controls}
         </div>
+      ) : null}
+      {queuedFollowUps && queuedFollowUps.length > 0 ? (
+        // A queued message that shows no sign of existing until the turn ends
+        // is its own bad experience. One line each, oldest first, so the order
+        // they will run in is the order they are read in.
+        <ul
+          className="mb-1.5 flex min-w-0 flex-col gap-0.5"
+          data-testid="composer-queued-follow-ups"
+          aria-label={t('ai.panel.queuedLabel')}
+        >
+          {queuedFollowUps.map((message, index) => (
+            <li
+              key={`${index}-${message}`}
+              className="flex min-w-0 items-center gap-1.5 font-mono text-[10.5px] text-muted-foreground"
+            >
+              <span aria-hidden="true" className="shrink-0 opacity-60">{index + 1}</span>
+              <span className="truncate">{message}</span>
+            </li>
+          ))}
+        </ul>
       ) : null}
       <div className={cn(
         'flex items-end gap-2',
