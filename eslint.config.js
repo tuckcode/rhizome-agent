@@ -29,6 +29,12 @@ export default defineConfig([
     // would otherwise lint whatever generated/build artifacts happen to
     // exist in a sibling worktree at the time.
     '.claude/worktrees/',
+    // Same hazard, different location: worktrees also land at
+    // `rhizome-agent/<branch-name>/` — a full second checkout nested inside
+    // this one. `.gitignore` keeps it out of commits but eslint walks it
+    // anyway, and it broke a push on generated `src-tauri/gen/apple/assets/`
+    // files that are not this tree's source at all.
+    'rhizome-agent/',
   ]),
   {
     files: ['**/*.{ts,tsx}'],
