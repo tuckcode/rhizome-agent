@@ -5575,7 +5575,15 @@ mod tests {
         let socket = daemon_socket_path().expect("a reachable daemon");
         println!("socket: {}", socket.display());
 
-        let session_id = ensure_host(&vault.path().to_string_lossy()).expect("connect + attach");
+        // `ensure_host` connects; it no longer creates a session (#28), so the
+        // id is empty until something needs one. Materialize it the way a real
+        // first command does.
+        ensure_host(&vault.path().to_string_lossy()).expect("connect + attach");
+        let session_id = with_host_mut(|host| {
+            host.ensure_session()?;
+            Ok(host.session_id.clone().unwrap_or_default())
+        })
+        .expect("a session to prompt in");
         println!("session: {session_id}");
         assert!(!session_id.is_empty(), "a live session must report an id");
 
@@ -5760,7 +5768,15 @@ mod tests {
 
         // ── Default: our session is stopped ──────────────────────────────
         ensure_host(&vault.path().to_string_lossy()).expect("connect");
-        let stopped_id = with_host_mut(|host| Ok(host.active_session_id.clone())).unwrap();
+        // A session has to exist before quitting can have a disposition about
+        // it — connecting alone no longer creates one (#28), and
+        // `settle_session_on_quit` correctly reports `NotConnected` for a host
+        // holding nothing.
+        let stopped_id = with_host_mut(|host| {
+            host.ensure_session()?;
+            Ok(host.active_session_id.clone())
+        })
+        .unwrap();
         assert_eq!(
             settle_session_on_quit(false).unwrap(),
             QuitDisposition::StopSession
@@ -5789,7 +5805,16 @@ mod tests {
         );
 
         // ── Opted in: the session is left running ────────────────────────
-        let kept_id = with_host_mut(|host| Ok(host.active_session_id.clone())).unwrap();
+        // The first quit killed the session it was holding, so this half needs
+        // its own — reading `active_session_id` off the spent host reports the
+        // dead one, and `settle_session_on_quit` then answers `NotConnected`
+        // about a session that is indeed not there.
+        ensure_host(&vault.path().to_string_lossy()).expect("reconnect for the keep case");
+        let kept_id = with_host_mut(|host| {
+            host.ensure_session()?;
+            Ok(host.active_session_id.clone())
+        })
+        .unwrap();
         assert_eq!(
             settle_session_on_quit(true).unwrap(),
             QuitDisposition::KeepSessionRunning
