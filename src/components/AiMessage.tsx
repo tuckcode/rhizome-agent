@@ -85,11 +85,24 @@ function UserBubble({ content, references, onOpenNote }: {
 }) {
   return (
     <div className="flex justify-end" style={{ marginBottom: 8 }}>
+      {/*
+        Tinted with the accent rather than `--state-hover`, and carrying a
+        2px accent rule down its right edge.
+
+        The rule is the part that matters. An answer runs for screens, so
+        scrolling back to "where did I ask this?" means hunting for a boundary
+        in a wall of prose — and `--state-hover` is a hover affordance,
+        deliberately almost invisible, so it never caught the eye. The bubble
+        is right-aligned, which puts its right edge at a fixed x: a rule there
+        forms a rhythm down the margin that reads while scrolling fast, when
+        text does not.
+      */}
       <div
         className="min-w-0 max-w-[85%] overflow-hidden"
         style={{
-          background: 'var(--state-hover)',
+          background: 'var(--accent-blue-bg)',
           color: 'var(--foreground)',
+          borderRight: '2px solid var(--accent-blue)',
           borderRadius: '12px 12px 2px 12px',
           maxWidth: '85%',
           padding: '8px 12px',
