@@ -108,8 +108,11 @@ file in `knip.json`'s `ignore` now.
 
 ### Open
 
-- **#28's display half and its root cause are both done**, but the 43 existing
-  husks are still on disk. Nothing reads them (`list_sessions` drops them);
+- **#28 is closed.** Its checklist held three items this session did not
+  touch — the identical-label fallback still at `PrimeSessionList.tsx:185`,
+  no origin on a row, and no answer for 500 sessions — so they moved to
+  **#30** rather than disappearing with the close. The 43 existing husks are
+  still on disk; nothing reads them (`list_sessions` drops them), and
   deleting them is a user decision, not a migration to write unasked.
 - **C33's 150 excluded files.** A third of the errors are in five:
   `useAppKeyboard.test.ts` (72), `useCommandRegistry.test.ts` (64),
