@@ -992,6 +992,50 @@ Tolaria delegates remote auth to the user's system git setup:
 - Existing `git_pull` / `git_push` commands keep surfacing raw git errors, and clone commands fail fast when git wants interactive terminal input
 - No provider-specific token or username is stored in app settings
 
+## Prime Session
+
+The core abstraction of the Prime harness, and the one most likely to be
+modelled wrongly. Full detail in `ARCHITECTURE.md` → *Prime Agent*.
+
+**A Prime session is not a subprocess.** It lives in a daemon that Rhizome
+connects to over a Unix socket, and it outlives both the turn and the window
+(ADR-0163). Closing Rhizome detaches; the session keeps running and a goal or
+heartbeat can still fire.
+
+### Two sources, two questions
+
+- **`PrimeSessionSummary`** (`prime_sessions.rs`, mirrored in
+  `src/lib/primeSessionMeta.ts`) — one saved conversation, summarised from its
+  log **on disk**: `id`, `path`, `title`, `cwd`, `startedAt`, `gitBranch`,
+  `mtimeMs`, `hasConversation`, `archived`. It answers *what conversations
+  exist*. It **cannot** answer what is running.
+- **`PrimeRosterSession`** (`src/lib/primeRunningSessions.ts`) — one session the
+  daemon is holding **right now**: `activeSessionId`, `activity`, `sessionFile`,
+  `runtimeKind`, `rlmDepth`. It answers *what is running*. It is not a history.
+
+The join between them is the **log path** — `sessionFile` on the roster, `path`
+on the summary. Treating either as the other is a mistake this repo has made
+more than once.
+
+### Derived state
+
+- **`PrimeSessionStatus`** — `'working' | 'running' | 'saved'`. Three states,
+  because "I left this running" and "this is finished" are different answers and
+  only the daemon can tell them apart.
+- **`title`** — derived from the first *user* message; a session with only
+  assistant turns has none, which is why row labels need disambiguating.
+- **`archived`** — Rhizome's own view, an id in `settings.json`. Not a change to
+  the log: `~/.prime/agent/sessions` is Prime's and shared with its CLI
+  (ADR-0165).
+
+### Identifiers
+
+Session ids are **uuidv7**: the leading characters are a timestamp, so two
+sessions created milliseconds apart share them. Measured over 93 real logs, the
+first six characters gave 23 distinct values and one prefix covered 23 sessions.
+When you need a short distinguishing suffix, take the **end** of the id. A
+daemon handle is different — random throughout, so its prefix is fine.
+
 ## Settings
 
 App-level settings persisted at `$XDG_CONFIG_HOME/com.tolaria.app/settings.json`, defaulting to `$HOME/.config/com.tolaria.app/settings.json` on Unix platforms (reads legacy `com.laputa.app` and the previous platform config directory on upgrade):
