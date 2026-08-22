@@ -77,16 +77,62 @@ describe('MarkdownContent', () => {
     expect(mockOpenExternalUrl).toHaveBeenCalledWith('https://example.com/docs')
   })
 
-  it('leaves relative markdown links as normal anchors', () => {
+  it('keeps a relative markdown link inert instead of navigating the app away', () => {
     render(<MarkdownContent content="[Vault note](notes/project.md)" />)
     const link = screen.getByRole('link', { name: 'Vault note' }) as HTMLAnchorElement
+    // No test-side preventDefault: the component itself must stop this, or a
+    // click replaces the whole app with a page that has no way back.
     const event = new MouseEvent('click', { bubbles: true, cancelable: true })
-    link.addEventListener('click', (clickEvent) => clickEvent.preventDefault())
 
     link.dispatchEvent(event)
 
+    expect(event.defaultPrevented).toBe(true)
     expect(link.getAttribute('href')).toBe('notes/project.md')
     expect(mockOpenExternalUrl).not.toHaveBeenCalled()
+  })
+
+  it('opens a scheme-less www link in the system browser', () => {
+    render(<MarkdownContent content="[Clip](www.youtube.com/watch?v=abc)" />)
+    const link = screen.getByRole('link', { name: 'Clip' }) as HTMLAnchorElement
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+
+    link.dispatchEvent(event)
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(mockOpenExternalUrl).toHaveBeenCalledWith('www.youtube.com/watch?v=abc')
+  })
+
+  it('renders an unknown scheme as plain text, never as a link', () => {
+    render(<MarkdownContent content="[Odd](weird-scheme://somewhere)" />)
+
+    // react-markdown's url transform drops protocols it does not know, so
+    // this shape never reaches the click handler at all.
+    expect(screen.queryByRole('link', { name: 'Odd' })).toBeNull()
+    expect(screen.getByText('Odd')).toBeInTheDocument()
+  })
+
+  it('keeps a protocol-relative link inert', () => {
+    render(<MarkdownContent content="[Odd](//example.com/page)" />)
+    const link = screen.getByRole('link', { name: 'Odd' }) as HTMLAnchorElement
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+
+    link.dispatchEvent(event)
+
+    // Survives the url transform and would navigate the webview on click.
+    expect(event.defaultPrevented).toBe(true)
+    expect(mockOpenExternalUrl).not.toHaveBeenCalled()
+  })
+
+  it('still lets a mailto link reach the system mail client', () => {
+    render(<MarkdownContent content="Contact luca@example.com" />)
+    const link = screen.getByRole('link', { name: 'luca@example.com' }) as HTMLAnchorElement
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+
+    link.dispatchEvent(event)
+
+    // mailto: is handed to the OS by the webview and cannot strand the app,
+    // so it stays a plain anchor rather than being made inert.
+    expect(event.defaultPrevented).toBe(false)
   })
 
   it('renders GFM email autolinks when modern regex features are available', () => {
