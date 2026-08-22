@@ -51,8 +51,9 @@ file.
 
 ## State
 
-`main` pushed through `44ba9d6`, tree clean, all gates green. Prime **0.7.4**;
-the daemon dies with whatever terminal starts it, so start it detached:
+`main` pushed through `1922a27`, tree clean. Prime **0.7.4** on Windows speaks
+`\\.\pipe\prime-agent-daemon` — see `docs/WINDOWS-DEV.md`. On macOS/Linux the
+daemon dies with whatever terminal starts it, so start it detached:
 
 ```bash
 (prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
@@ -188,18 +189,11 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 ## Open threads
 
-- **C38-OPEN: the Prime harness does not run on Windows.** `connect_stream`
-  returns an error stub off Unix (`prime_session_host.rs:477`), so every Prime
-  feature fails at connect time there — chat, sessions, goals, the session
-  list, everything built 2026-08-21/22. **This is entirely our gap, not
-  upstream's**: probed against installed 0.7.4, Prime's daemon listens on
-  `\\.\pipe\prime-agent-daemon` and its worker supervisor builds pipe paths
-  too. The seam already exists — `DaemonStream` is one type alias and every
-  consumer uses only `try_clone`/`Read`/`Write`, which `std::fs::File`
-  provides, and a Windows named-pipe client is a file handle. The only
-  socket-specific API in the file is `set_read_timeout`/`set_write_timeout` in
-  `read_roster_over`. Small change, but it cannot be verified from macOS.
-  Tracked as **#32**, with line references against `44ba9d6`.
+- **C38-RESOLVED (2026-08-22, code landed `1922a27`, Windows verification pending):**
+  Prime harness connects on Windows via `\\.\pipe\prime-agent-daemon`
+  (`connect_stream` in `prime_session_host.rs` — `File` + `WaitNamedPipeW`).
+  **#32** closed in code; end-to-end proof still needs a Windows machine with
+  `prime-agent --mode daemon` running. Setup: `docs/WINDOWS-DEV.md`.
 
 - **C37-PARTLY-RESOLVED (2026-08-21): pushes were slow for two reasons; the
   local one is fixed.** Every pre-push printed `⚠️ Chunk sidecar unavailable`
