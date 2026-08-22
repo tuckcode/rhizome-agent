@@ -675,9 +675,20 @@
 
 /* --- AI panel working border animation --- */
 
+/*
+ * Pulses the working indicator strip only.
+ *
+ * This animated `opacity` until 2026-08-22, and the rule lands on the
+ * <aside> that wraps the whole AI panel — opacity applies to the entire
+ * subtree, so the transcript, tool cards and composer all breathed from
+ * full to 60% every two seconds for as long as a turn ran. Fading the
+ * border colour itself gets the intended pulse and touches nothing else.
+ *
+ * Keep this animating border-left-color and nothing inheritable.
+ */
 @keyframes ai-border-pulse {
-  0%, 100% { border-color: var(--accent-blue); opacity: 1; }
-  50% { border-color: var(--accent-blue-hover); opacity: 0.6; }
+  0%, 100% { border-left-color: var(--accent-blue); }
+  50% { border-left-color: color-mix(in srgb, var(--accent-blue) 35%, transparent); }
 }
 
 /* --- Typing indicator dots --- */
