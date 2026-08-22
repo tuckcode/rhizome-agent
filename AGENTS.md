@@ -54,12 +54,12 @@
   are needed. The hook has no platform branch, so this is the first thing a
   Windows push trips on.
 
-  **Also on Windows: the Prime harness does not run at all.** `connect_stream`
-  returns an error stub off Unix, because Prime's daemon speaks a named pipe
-  (`\\.\pipe\prime-agent-daemon`) and this client only speaks Unix sockets.
-  Chat, sessions, goals and the session list are all dead there — that is #32
-  / C38, not a broken checkout. Everything else works, and `pnpm dev` against
-  `mock-tauri` drives the session list without a daemon at all.
+  **On Windows, Prime speaks a named pipe** (`\\.\pipe\prime-agent-daemon`), not a
+  Unix socket. `prime_session_host.rs` connects there via `std::fs::File` +
+  `WaitNamedPipeW`. Chat/sessions/goals still need a live `prime-agent` daemon
+  on that machine to verify end-to-end — this Linux CI box cannot exercise that
+  path. Everything else works, and `pnpm dev` against `mock-tauri` drives the
+  session list without a daemon at all.
 - Commit at natural checkpoints — one TDD cycle (below) for code, otherwise every 20–30 min: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
 - **Every agent must sign its commits with a `Co-Authored-By` trailer** naming the model that actually wrote the change:
   ```
