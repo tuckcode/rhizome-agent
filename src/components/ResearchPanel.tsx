@@ -526,6 +526,8 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
         onClose={() => setFormatModalOpen(false)}
         onSelect={handleModeSelect}
         currentMode={selectedMode}
+        vaultPath={defaultDestinationVaultPath}
+        locale={locale}
       />
 
       <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>

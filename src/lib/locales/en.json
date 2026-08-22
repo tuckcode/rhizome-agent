@@ -1254,5 +1254,16 @@
   "ai.goal.setSuccess": "Goal active: {objective}",
   "ai.goal.clearSuccess": "Goal cleared.",
   "ai.goal.setFailed": "Prime did not confirm the goal was set: {error}",
-  "ai.goal.clearFailed": "Prime did not confirm the goal was cleared: {error}"
+  "ai.goal.clearFailed": "Prime did not confirm the goal was cleared: {error}",
+  "research.format.customCategory": "Custom",
+  "research.format.add": "+ Save as custom",
+  "research.format.save": "Save format",
+  "research.format.cancel": "Cancel",
+  "research.format.titleLabel": "Format name",
+  "research.format.titlePlaceholder": "Name this format",
+  "research.format.instructionLabel": "Instruction",
+  "research.format.instructionPlaceholder": "Write a single sentence telling the agent what to produce",
+  "research.format.instructionHint": "One imperative sentence. This is exactly what the agent is told, so it is also the format's description.",
+  "research.format.saveIncomplete": "A format needs a name and an instruction.",
+  "research.format.saveFailed": "Could not save this format."
 }

@@ -1,9 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Dialog,
   DialogContent,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { callHostOr } from '../lib/callHost'
+import { createTranslator, type AppLocale } from '../lib/i18n'
+import { trackResearchFormatSaved } from '../lib/productAnalytics'
+import { customToResearchMode, type CustomFormat } from '../lib/researchFormats'
 import { MagnifyingGlass, BugBeetle, Brain, RocketLaunch, Code, PuzzlePiece, Question, FileMagnifyingGlass, ArrowsDownUp } from '@phosphor-icons/react'
 
 export interface ResearchMode {
@@ -177,17 +183,85 @@ interface RhizomeFormatModalProps {
   onClose: () => void
   onSelect: (mode: ResearchMode) => void
   currentMode?: string
+  /** Vault whose `.rhizome/research-formats.json` holds the custom formats. */
+  vaultPath?: string
+  locale?: AppLocale
 }
 
 function getCategoryModes(modes: ResearchMode[], category: string): ResearchMode[] {
   return modes.filter(m => m.category === category)
 }
 
-export function RhizomeFormatModal({ open, onClose, onSelect, currentMode }: RhizomeFormatModalProps) {
+export function RhizomeFormatModal({
+  open,
+  onClose,
+  onSelect,
+  currentMode,
+  vaultPath = '',
+  locale = 'en',
+}: RhizomeFormatModalProps) {
+  const t = createTranslator(locale)
   const [selectedId, setSelectedId] = useState<string>(currentMode || 'architecture')
-  const selected = RESEARCH_MODES.find(m => m.id === selectedId) ?? RESEARCH_MODES[0]
+  const [customFormats, setCustomFormats] = useState<CustomFormat[]>([])
+  const [composing, setComposing] = useState(false)
+  const [draftTitle, setDraftTitle] = useState('')
+  const [draftInstruction, setDraftInstruction] = useState('')
+  const [saveError, setSaveError] = useState<string | null>(null)
 
-  const categories = [...new Set(RESEARCH_MODES.map(m => m.category))]
+  // Reloaded per open rather than once: another window (or the agent) can
+  // write the file while this modal is closed.
+  useEffect(() => {
+    if (!open || !vaultPath) return
+    let cancelled = false
+    void callHostOr<CustomFormat[]>('list_research_formats', [], { vaultPath }).then(formats => {
+      if (!cancelled) setCustomFormats(Array.isArray(formats) ? formats : [])
+    })
+    return () => { cancelled = true }
+  }, [open, vaultPath])
+
+  const customLabel = t('research.format.customCategory')
+  const allModes = [
+    ...RESEARCH_MODES,
+    ...customFormats.map(f => customToResearchMode(f, customLabel)),
+  ]
+  const selected = allModes.find(m => m.id === selectedId) ?? RESEARCH_MODES[0]
+
+  const categories = [...new Set(allModes.map(m => m.category))]
+
+  const resetDraft = () => {
+    setComposing(false)
+    setDraftTitle('')
+    setDraftInstruction('')
+    setSaveError(null)
+  }
+
+  const handleSave = async () => {
+    const title = draftTitle.trim()
+    const instruction = draftInstruction.trim()
+    if (!title || !instruction) {
+      setSaveError(t('research.format.saveIncomplete'))
+      return
+    }
+    try {
+      const formats = await callHostOr<CustomFormat[] | null>(
+        'save_research_format',
+        null,
+        { vaultPath, title, instruction },
+      )
+      if (!formats) {
+        setSaveError(t('research.format.saveFailed'))
+        return
+      }
+      setCustomFormats(formats)
+      // Count only. The instruction is user content and never leaves here.
+      trackResearchFormatSaved(formats.length)
+      const saved = formats.find(f => f.title === title)
+      if (saved) setSelectedId(saved.id)
+      resetDraft()
+    } catch {
+      setSaveError(t('research.format.saveFailed'))
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={(open) => { if (!open) onClose() }}>
@@ -215,7 +289,7 @@ export function RhizomeFormatModal({ open, onClose, onSelect, currentMode }: Rhi
 
             <div className="space-y-4">
               {categories.map(cat => {
-                const modes = getCategoryModes(RESEARCH_MODES, cat)
+                const modes = getCategoryModes(allModes, cat)
                 if (modes.length === 0) return null
                 return (
                   <div key={cat}>
@@ -266,9 +340,56 @@ export function RhizomeFormatModal({ open, onClose, onSelect, currentMode }: Rhi
             </div>
 
             <div className="mt-5">
-              <button className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-muted-foreground border border-dashed border-border hover:border-border transition-colors">
-                + Save as custom
-              </button>
+              {composing ? (
+                <div
+                  data-testid="research-format-composer"
+                  className="rounded-lg border border-border p-3 space-y-2"
+                >
+                  <Input
+                    data-testid="research-format-title"
+                    value={draftTitle}
+                    onChange={e => setDraftTitle(e.target.value)}
+                    placeholder={t('research.format.titlePlaceholder')}
+                    aria-label={t('research.format.titleLabel')}
+                  />
+                  <Textarea
+                    data-testid="research-format-instruction"
+                    value={draftInstruction}
+                    onChange={e => setDraftInstruction(e.target.value)}
+                    placeholder={t('research.format.instructionPlaceholder')}
+                    aria-label={t('research.format.instructionLabel')}
+                    rows={3}
+                  />
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    {t('research.format.instructionHint')}
+                  </p>
+                  {saveError && (
+                    <p role="alert" className="text-[11px] text-destructive">{saveError}</p>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      data-testid="research-format-save"
+                      onClick={() => { void handleSave() }}
+                    >
+                      {t('research.format.save')}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={resetDraft}>
+                      {t('research.format.cancel')}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  data-testid="research-format-add"
+                  disabled={!vaultPath}
+                  className="w-full justify-start border-dashed text-muted-foreground"
+                  onClick={() => setComposing(true)}
+                >
+                  {t('research.format.add')}
+                </Button>
+              )}
             </div>
           </div>
 
