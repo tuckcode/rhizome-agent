@@ -20,6 +20,28 @@ function isExplicitWebUrl(href?: string): href is string {
   return lowerHref.startsWith('http://') || lowerHref.startsWith('https://')
 }
 
+/**
+ * Schemes the webview hands straight to the OS. These cannot strand the app,
+ * so they stay plain anchors — making them inert would break mail and phone
+ * links for no safety gain.
+ */
+const OS_HANDLED_SCHEMES = ['mailto:', 'tel:', 'sms:']
+
+function isOsHandledScheme(href: string): boolean {
+  const lowerHref = href.trim().toLowerCase()
+  return OS_HANDLED_SCHEMES.some((scheme) => lowerHref.startsWith(scheme))
+}
+
+/**
+ * `www.example.com` with no scheme. Deliberately narrower than "anything with
+ * a dot": a relative note link like `notes/project.md` also parses as a bare
+ * domain (`.md` is a real TLD), and silently opening a browser for someone's
+ * note would be worse than leaving the link inert.
+ */
+function isSchemelessWebUrl(href: string): boolean {
+  return href.trim().toLowerCase().startsWith('www.')
+}
+
 function openExplicitWebUrl(event: MouseEvent<HTMLAnchorElement>, href: string) {
   event.preventDefault()
   void openExternalUrl(href).catch((error) => {
@@ -61,10 +83,17 @@ export const MarkdownContent = memo(function MarkdownContent({ content, onWikili
             </a>
           )
         }
-        if (isExplicitWebUrl(href)) {
+        if (href && (isExplicitWebUrl(href) || isSchemelessWebUrl(href))) {
           return <a href={href} onClick={(event) => openExplicitWebUrl(event, href)}>{children}</a>
         }
-        return <a href={href}>{children}</a>
+        if (href && isOsHandledScheme(href)) {
+          return <a href={href}>{children}</a>
+        }
+        // Everything else is inert. The app renders in a webview with no
+        // browser chrome, so any navigation away from it is a one-way trip:
+        // no back button, no address bar, nothing to click but quit. An
+        // unopenable link is a far smaller failure than a stranded app.
+        return <a href={href} onClick={(event) => event.preventDefault()}>{children}</a>
       },
     }
   }, [onWikilinkClick])
