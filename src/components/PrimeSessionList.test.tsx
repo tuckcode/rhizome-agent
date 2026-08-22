@@ -45,6 +45,49 @@ describe('PrimeSessionList', () => {
    * Found when Chat home started opening this list by default: every `App`
    * test suddenly mounted it and three unhandled rejections appeared.
    */
+  /**
+   * #28's title, and the half #30 carried: two sessions with no title rendered
+   * as two rows both reading "Untitled", stacked and impossible to tell apart.
+   * A session with messages but no *user* message has no title, so this
+   * survives the filter that drops empty ones.
+   *
+   * Asserted at the component rather than only on `primeSessionRowTitles`
+   * because the defect was always about what reaches the screen — the unit
+   * that computed the label was never wrong, it was simply not called.
+   */
+  it('never shows two rows a user cannot tell apart', async () => {
+    invoked.result = [
+      summary({ id: '01a0252e-b9d5-71e9-83de-2bce32f65c06', path: '/sessions/a.jsonl' }),
+      summary({ id: '01a0252e-b6b9-749a-ad79-4c8c33e521f9', path: '/sessions/b.jsonl' }),
+    ]
+
+    render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /Open session/ })).toHaveLength(2))
+    const labels = screen
+      .getAllByRole('button', { name: /Open session/ })
+      .map((button) => button.getAttribute('aria-label'))
+    expect(new Set(labels).size).toBe(2)
+    // The suffix is the end of the id, not the start: these two are uuidv7 and
+    // share their first eight characters, which are a timestamp.
+    expect(screen.getByText('Untitled session · f65c06')).toBeInTheDocument()
+    expect(screen.getByText('Untitled session · e521f9')).toBeInTheDocument()
+  })
+
+  it('leaves a titled session alone while its untitled neighbours are suffixed', async () => {
+    invoked.result = [
+      summary({ id: 'aaaaaa', path: '/sessions/a.jsonl', title: 'Release notes' }),
+      summary({ id: 'bbbbbb', path: '/sessions/b.jsonl' }),
+      summary({ id: 'cccccc', path: '/sessions/c.jsonl' }),
+    ]
+
+    render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+
+    expect(await screen.findByText('Release notes')).toBeInTheDocument()
+    expect(screen.getByText('Untitled session · bbbbbb')).toBeInTheDocument()
+    expect(screen.getByText('Untitled session · cccccc')).toBeInTheDocument()
+  })
+
   it('survives a host that answers with no list at all', async () => {
     invoked.result = null as unknown as unknown[]
 

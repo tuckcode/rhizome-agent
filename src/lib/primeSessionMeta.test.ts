@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   primeSessionAge,
   primeSessionMetaLabel,
+  primeSessionRowTitles,
   sortPrimeSessions,
   type PrimeSessionSummary,
 } from './primeSessionMeta'
@@ -89,5 +90,85 @@ describe('sortPrimeSessions', () => {
     sortPrimeSessions(input)
 
     expect(input.map((s) => s.id)).toEqual(['a', 'b'])
+  })
+})
+
+describe('primeSessionRowTitles', () => {
+  const UNTITLED = 'Untitled'
+
+  it('uses the session title when it has one', () => {
+    const titles = primeSessionRowTitles(
+      [session({ id: 'a', title: 'Inbox triage' }), session({ id: 'b', title: 'Release notes' })],
+      UNTITLED,
+    )
+
+    expect(titles).toEqual(['Inbox triage', 'Release notes'])
+  })
+
+  it('falls back for a session with no title, and for a blank one', () => {
+    const titles = primeSessionRowTitles(
+      [session({ id: 'a' }), session({ id: 'b', title: '   ' })],
+      UNTITLED,
+    )
+
+    expect(titles).toEqual(['Untitled · a', 'Untitled · b'])
+  })
+
+  it('trims a title rather than rendering its whitespace', () => {
+    expect(primeSessionRowTitles([session({ title: '  Inbox triage  ' })], UNTITLED))
+      .toEqual(['Inbox triage'])
+  })
+
+  /**
+   * The defect #28 named and #30 carried: two untitled rows stacked on top of
+   * each other, impossible to tell apart. A session with messages but no
+   * *user* message has no title, so this survives the empty-session filter.
+   */
+  it('never renders two identical rows', () => {
+    const titles = primeSessionRowTitles(
+      [
+        session({ id: '01a0252e-b9d5-71e9-83de-2bce32f65c06' }),
+        session({ id: '01a0252e-b6b9-749a-ad79-4c8c33e521f9' }),
+      ],
+      UNTITLED,
+    )
+
+    expect(new Set(titles).size).toBe(2)
+  })
+
+  /**
+   * Session ids are uuidv7: the leading characters are a timestamp, so two
+   * sessions created milliseconds apart share them. Measured on 93 real logs,
+   * the first six characters gave 23 distinct values. Suffixing with the
+   * prefix would have rendered "Untitled · 01a025" twice — the bug, restated.
+   */
+  it('disambiguates on the part of a uuidv7 that varies, not the clock prefix', () => {
+    const titles = primeSessionRowTitles(
+      [
+        session({ id: '01a0252e-b9d5-71e9-83de-2bce32f65c06' }),
+        session({ id: '01a0252e-b6b9-749a-ad79-4c8c33e521f9' }),
+      ],
+      UNTITLED,
+    )
+
+    expect(titles).toEqual(['Untitled · f65c06', 'Untitled · e521f9'])
+  })
+
+  it('leaves a unique title unsuffixed even when a neighbour collides', () => {
+    const titles = primeSessionRowTitles(
+      [
+        session({ id: 'aaaaaa', title: 'Release notes' }),
+        session({ id: 'bbbbbb' }),
+        session({ id: 'cccccc' }),
+      ],
+      UNTITLED,
+    )
+
+    expect(titles[0]).toBe('Release notes')
+    expect(titles[1]).not.toBe(titles[2])
+  })
+
+  it('returns a title per session, in order, for an empty list too', () => {
+    expect(primeSessionRowTitles([], UNTITLED)).toEqual([])
   })
 })
