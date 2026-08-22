@@ -600,6 +600,33 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   // Archived ids live here rather than in the fixture list so the dev loop
   // round-trips: file a row, and the next read still has it filed. In memory
   // only — a reload starts clean, which is what a mock host should do.
+  // Two of the four fixture sessions are alive — one turning, one idle —
+  // so the three states of the row dot are all visible in `pnpm dev`. Without
+  // this the hook catches "no mock handler" and every row reads as saved,
+  // which is indistinguishable from the feature not working.
+  list_prime_running_sessions: () => [
+    {
+      id: 'live-1',
+      activeSessionId: 'live-1',
+      sessionFile: '/mock/sessions/01a0252e-b9d5-71e9-83de-2bce32f65c06.jsonl',
+      activity: 'working',
+      isSessionActive: true,
+      lifecycle: 'live',
+      runtimeKind: 'top-level',
+      rlmDepth: 0,
+    },
+    {
+      id: 'live-2',
+      activeSessionId: 'live-2',
+      sessionFile: '/mock/sessions/01a0252e-b6b9-749a-ad79-4c8c33e521f9.jsonl',
+      activity: 'idle',
+      isSessionActive: false,
+      lifecycle: 'live',
+      runtimeKind: 'top-level',
+      rlmDepth: 0,
+    },
+  ],
+
   set_prime_session_archived: (args: { sessionId?: string; archived?: boolean }) => {
     const id = args?.sessionId
     if (!id) return null

@@ -3,12 +3,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PrimeSessionList from './PrimeSessionList'
 import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
 
-const invoked = vi.hoisted(() => ({ calls: [] as string[], result: [] as unknown[], fail: '' }))
+const invoked = vi.hoisted(() => ({
+  calls: [] as string[],
+  result: [] as unknown[],
+  roster: [] as unknown[],
+  rosterFails: false,
+  fail: '',
+}))
 
 vi.mock('../mock-tauri', () => ({
   isTauri: () => false,
   mockInvoke: (cmd: string) => {
     invoked.calls.push(cmd)
+    if (cmd === 'list_prime_running_sessions') {
+      return invoked.rosterFails
+        ? Promise.reject(new Error('daemon unreachable'))
+        : Promise.resolve(invoked.roster)
+    }
     if (invoked.fail) return Promise.reject(new Error(invoked.fail))
     return Promise.resolve(invoked.result)
   },
@@ -36,6 +47,8 @@ function summary(overrides: Partial<PrimeSessionSummary> = {}): PrimeSessionSumm
 beforeEach(() => {
   invoked.calls = []
   invoked.result = []
+  invoked.roster = []
+  invoked.rosterFails = false
   invoked.fail = ''
   tracked.opened = []
   tracked.selected = []
@@ -129,6 +142,51 @@ describe('PrimeSessionList', () => {
     render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
 
     expect(await screen.findByText('Today · 14:00 · rhizome-agent')).toBeInTheDocument()
+  })
+
+  describe('running vs saved', () => {
+    /**
+     * Sessions outlive the window (ADR-0163) and several run at once (#13),
+     * so "I left this running" and "this is finished" are different answers
+     * and the list used to give both the same dot — it only ever lit the
+     * session this window was attached to.
+     *
+     * Asserted on the accessible name rather than the dot's classes: the dot
+     * is `aria-hidden`, so a class assertion would prove the pixel changed
+     * while a screen reader still heard four identical rows.
+     */
+    it('says which sessions the daemon still holds, and which are turning', async () => {
+      invoked.result = [
+        summary({ id: 'a', path: '/sessions/a.jsonl', title: 'Turning' }),
+        summary({ id: 'b', path: '/sessions/b.jsonl', title: 'Idle but alive' }),
+        summary({ id: 'c', path: '/sessions/c.jsonl', title: 'Just a log' }),
+      ]
+      invoked.roster = [
+        { id: 'r1', activeSessionId: 'r1', sessionFile: '/sessions/a.jsonl', activity: 'working' },
+        { id: 'r2', activeSessionId: 'r2', sessionFile: '/sessions/b.jsonl', activity: 'idle' },
+      ]
+
+      render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+
+      expect(
+        await screen.findByRole('button', { name: 'Open session Turning — working now' }),
+      ).toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: 'Open session Idle but alive — still running' }),
+      ).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Open session Just a log' })).toBeInTheDocument()
+    })
+
+    /** The daemon being unreachable is ordinary; it must not read as "all dead" loudly. */
+    it('falls back to saved when the roster cannot be read', async () => {
+      invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: 'Unknown' })]
+      invoked.rosterFails = true
+
+      render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+
+      expect(await screen.findByRole('button', { name: 'Open session Unknown' })).toBeInTheDocument()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
   })
 
   describe('archiving', () => {

@@ -184,6 +184,30 @@ export function primeSessionRowTitles(
   return disambiguateTitles(rows, (row) => row.id.slice(-6)).map((row) => row.title)
 }
 
+/**
+ * What a row's status dot means: is this session alive, and is it turning?
+ *
+ * Three states, because two were not enough. Sessions outlive the window
+ * (ADR-0163) and several run at once (#13), so "saved" and "running but idle"
+ * are genuinely different things to a user deciding what to open — and until
+ * now the list showed a dot for the *attached* session only, which meant a
+ * goal continuing in a background session looked exactly like a dead one.
+ *
+ * `running` is keyed by log path because that is the only join between the
+ * two data sources: the list is read off disk and cannot know what is
+ * running, and the roster knows what is running and is not a history.
+ */
+export type PrimeSessionStatus = 'working' | 'running' | 'saved'
+
+export function primeSessionStatus(
+  session: PrimeSessionSummary,
+  running: ReadonlyMap<string, boolean>,
+): PrimeSessionStatus {
+  const workingHere = running.get(session.path)
+  if (workingHere === undefined) return 'saved'
+  return workingHere ? 'working' : 'running'
+}
+
 /** Newest first. Sessions with no timestamp sink to the bottom. */
 export function sortPrimeSessions(sessions: PrimeSessionSummary[]): PrimeSessionSummary[] {
   return [...sessions].sort((a, b) => (b.mtimeMs ?? -Infinity) - (a.mtimeMs ?? -Infinity))
