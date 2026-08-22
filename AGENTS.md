@@ -117,7 +117,14 @@ Use Codacy as a security and static-analysis gate before a task is considered re
 pnpm lint && pnpm typecheck && pnpm test && pnpm test:coverage  # frontend ≥70%
 pnpm test:mcp   # mcp-server/*.test.js — node:test, NOT picked up by vitest
 cargo test && cargo llvm-cov --manifest-path src-tauri/Cargo.toml --no-clean --fail-under-lines 85
+cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings
+cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check
 ```
+
+The last two ran on every push all along and were simply missing from this
+list — a push that fails on `cargo fmt --check` after every other gate passed
+costs a full re-run of the suite. Run them before pushing, not after. Added
+2026-08-21 after exactly that happened.
 
 **`pnpm typecheck` is `tsc -b`, and `npx tsc --noEmit` is a no-op.** Measured
 2026-08-20: appending `export const X: number = "nope"` to a source file and
