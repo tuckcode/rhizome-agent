@@ -2,9 +2,17 @@ import { useCallback, useEffect, useRef } from 'react'
 
 interface ResizeHandleProps {
   onResize: (delta: number) => void
+  /**
+   * Which edge of the panel the handle straddles. A `leading` handle sits on
+   * the panel's right edge, so dragging right widens it. A `trailing` handle
+   * sits on the left edge of a right-docked panel, where the same drag has to
+   * mean the opposite — otherwise the sidebar shrinks as you pull it wider.
+   */
+  edge?: 'leading' | 'trailing'
 }
 
-export function ResizeHandle({ onResize }: ResizeHandleProps) {
+export function ResizeHandle({ onResize, edge = 'leading' }: ResizeHandleProps) {
+  const direction = edge === 'trailing' ? -1 : 1
   const handleRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
   const lastX = useRef(0)
@@ -26,7 +34,7 @@ export function ResizeHandle({ onResize }: ResizeHandleProps) {
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging.current) return
-      pendingDelta.current += e.clientX - lastX.current
+      pendingDelta.current += (e.clientX - lastX.current) * direction
       lastX.current = e.clientX
 
       if (!rafId.current) {
@@ -64,7 +72,7 @@ export function ResizeHandle({ onResize }: ResizeHandleProps) {
       document.removeEventListener('mouseup', handleMouseUp)
       if (rafId.current) cancelAnimationFrame(rafId.current)
     }
-  }, [onResize])
+  }, [onResize, direction])
 
   useEffect(() => {
     const handle = handleRef.current
@@ -76,7 +84,7 @@ export function ResizeHandle({ onResize }: ResizeHandleProps) {
   return (
     <div
       ref={handleRef}
-      className="relative z-30 -ml-1 w-1 shrink-0 self-stretch cursor-col-resize bg-transparent transition-colors hover:bg-[var(--border)]"
+      className={`relative z-30 ${edge === 'trailing' ? '-mr-1' : '-ml-1'} w-1 shrink-0 self-stretch cursor-col-resize bg-transparent transition-colors hover:bg-[var(--border)]`}
     />
   )
 }
