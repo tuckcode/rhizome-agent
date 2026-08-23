@@ -1,6 +1,6 @@
 # Shell — Final Direction (converged spec)
 
-**Status:** decided design spec, ready to build. Supersedes the three-variant framing of the 2026-07-18 shell exploration (`rhizome-shell-exploration.html`, scratchpad artifact). This document picks one destination and sequences it. **Scope:** shell layout, status bar, graph-canvas chrome, settings surface, and their integration points. Zero code in this doc.
+**Status:** decided design spec, ready to build — **except §2.1 and §2.3, superseded 2026-08-22 by `docs/adr/0166-chat-centered-shell.md`.** The region map below is a note-taking app's map, inherited from Rhizome Desktop at the fork; this product puts Chat in the center with one panel on each side. Everything else in this document still stands. Supersedes the three-variant framing of the 2026-07-18 shell exploration (`rhizome-shell-exploration.html`, scratchpad artifact). This document picks one destination and sequences it. **Scope:** shell layout, status bar, graph-canvas chrome, settings surface, and their integration points. Zero code in this doc.
 
 ---
 
@@ -21,6 +21,10 @@ The exploration's "ember" skin is dead — ledger/mycelium shipped as the two fi
 All colors are the **real shipped tokens from `src/index.css`** — never raw hex. The shell must look correct under all 15 themes plus the accent picker, so nothing below hardcodes ledger/mycelium values.
 
 ### 2.1 Region map (final state, all phases landed)
+
+> **Superseded — see ADR-0166.** Chat is the center canvas and each side holds
+> at most one panel. The map below is kept because §§2.2, 2.4–2.7 reference its
+> region names.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -47,6 +51,12 @@ Behind `shell_command_rail` (flag already reserved by wave 5.3 planning; infra e
 - **Keyboard:** rail destinations get `Cmd+1..4` accelerators (menu-registered per the `app.set_menu()` gotcha in AGENTS.md — full menu rebuild, not a patch).
 
 ### 2.3 Sidebar (250px default, 250–400 resizable — unchanged bounds)
+
+> **Superseded — see ADR-0166.** The sidebar docks *right* whenever the command
+> rail is on: the rail holds the left edge and the macOS traffic lights with it,
+> so the "rail does not take over brand duty" clause below no longer describes
+> the shipped shell. The bounds, the 250px floor, and the node-dot/section-head
+> dressing are unchanged.
 
 The 250px floor stays exactly as shipped (`7bae29db` raised it for the wordmark lockup; `useLayoutPanels.ts` `COLUMN_MIN_WIDTHS.sidebar` and `.app__sidebar` in `App.css` stay in sync). The lockup stays in the sidebar header — the rail does **not** take over brand duty.
 
