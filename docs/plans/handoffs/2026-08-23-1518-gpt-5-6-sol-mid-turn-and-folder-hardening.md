@@ -176,11 +176,16 @@ security batch.
 - ADRs: added ADR-0167, superseding ADR-0163's session-lifecycle policy while
   retaining its daemon-client transport decision. No lifecycle code implemented
   in this batch.
-- Native QA: **attempted but blocked.** The existing `pnpm tauri dev` process was
-  left untouched. The required Orca computer-use runtime failed to open with
-  `runtime_open_timeout` ("Timed out waiting for an Orca desktop window"). Per
-  its guide, no alternate desktop driver was substituted. The tauri 2.11.1 bump
-  carries wry, tao, muda, and tray-icon, so tray reopen, menu actions, window
-  restore, and #43's navigation guard still require native observation before a
-  release.
+- Native QA: **partially passed in Cursor with CuaDriver.** The Tauri 2.11.1
+  stack built and launched as a real `RhizomeAgent` process; its 1383×900 main
+  window and native app/File/Edit/View/Go/Note/Vault/Window menu tree were
+  present. Pressing the native close button changed the exact main window from
+  on-screen to hidden while leaving the process alive, confirming close→hide.
+  CuaDriver could observe the app's menu and status item but refused AX dispatch
+  because those elements could not be proven to belong to the main CGWindow;
+  Cursor also blocked the pixel tray click. A manual menu-mark click did not
+  produce conclusive driver evidence after focus returned. Therefore tray
+  restore, a dispatched native menu action, and #43's off-origin navigation
+  guard remain unverified before release. The QA process and driver were stopped
+  and the temporary capture was deleted.
 - Demo vault dirt: clean (`git status --short -- demo-vault demo-vault-v2`).

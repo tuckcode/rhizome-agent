@@ -251,9 +251,12 @@ push is not a release — releases are tagged builds with signed installers.
 
     The bump carries the webview stack with it: wry 0.54→0.55, tao 0.34→0.35,
     muda 0.17→0.19, tray-icon 0.21→0.23. **1631 Rust tests, clippy, and fmt
-    pass; tray/menu/window behaviour has not had native QA.** Do that before
-    trusting a release build — and re-check the #43 guard specifically, since it
-    hooks a plugin API in the layer that just moved.
+    pass.** Cursor/CuaDriver native QA built and launched the app and verified
+    the real main window's close→hide behavior. Tray restore, a dispatched
+    native menu action, and #43's off-origin navigation guard remain unverified:
+    CuaDriver observed the menu/status elements but its exact-window provenance
+    guard refused dispatch, and Cursor blocked the pixel tray click. Do those
+    three checks before trusting a release build.
   - `dompurify` 3.4.2 → **3.4.13** and `mermaid` 11.14.0 → **11.17.0** patch
     the XSS/CSS-injection advisories on `SafeMarkup.tsx`, the one raw-markup path
     the review cited as the reason no XSS could reach IPC. The two arguments
