@@ -24,11 +24,13 @@ still lives in `docs/ARCHITECTURE.md` / `docs/ABSTRACTIONS.md` (Desktop inherita
 
 | Term | Meaning |
 |------|---------|
-| **Prime / Prime Agent** | The **only** agent runtime in Agent product UI. Long-lived session engine, skills, extensions, providers/models, compaction, continual harness. **Built on Pi** — session JSONL under `~/.prime/agent/sessions/` is Pi-shaped (Mindwalk already labels it `harness: pi`). |
+| **Prime / Prime Agent** | The **only** agent runtime in Agent product UI. Session engine, skills, extensions, providers/models, compaction, continual harness. **Built on Pi** — session JSONL under `~/.prime/agent/sessions/` is Pi-shaped (Mindwalk already labels it `harness: pi`). Prime can persist work, but persistence is a capability, not the default permission model. |
 | **Harness** | Prime’s tooling and infrastructure embedded in the chat desktop shell (Hermes-Desktop-class ambition over time; v0 = core loop + skills/status). |
-| **Prime daemon** | Prime’s own background service. Runs independently of any client and outlives them; hosts workers. Rhizome connects to it, does not own it (ADR-0163). |
-| **Session host** | Rhizome’s Rust client of the [[Prime daemon]] (`prime_session_host`). A *connection*, not a parent — closing Rhizome detaches it and leaves sessions running. Superseded the RPC-child owner it was until 2026-08-15. |
+| **Prime daemon** | Prime’s own background service. Runs independently of any client and can outlive them; hosts workers. Rhizome connects to it and never owns or stops it. A running daemon means Prime is available, not that an agent is working (ADR-0163, ADR-0167). |
+| **Session host** | Rhizome’s Rust client of the [[Prime daemon]] (`prime_session_host`). A connection, not the daemon's parent. Sessions are foreground-owned by default; only an explicit background grant lets work outlive Rhizome (ADR-0167). Superseded the RPC-child owner it was until 2026-08-15. |
 | **Session** | The user-facing unit of work: one conversation with Prime, listed, named, switched and resumed. **The only word the UI uses** for a running thing. Follows Hermes Agent, which meets the same product-name collision and resolves it the same way. |
+| **Foreground session** | The default session posture: work is owned by the visible Rhizome client and stops after that client disconnects. Its transcript remains resumable. |
+| **Background grant** | Explicit, visible, revocable permission for a specific turn, goal, heartbeat, or schedule to continue without the Rhizome window. Never inferred from closing the UI and never granted globally to every session. |
 | **Worker** | The daemon-side process holding one or more sessions. **Internal to the transport layer** — never surfaced in UI or product copy. |
 | **Subagent** | A session Prime spawned from another session (Prime’s RLM recursion). Subordinate by name, so it does not compete with [[Session]]. |
 | **Agent** | The runtime that does the work: **Prime**. Reversed 2026-08-16 — this previously meant the Rhizome product, which put the shell where the figure belongs. Rhizome is referred to by name, never as “the agent”. Still never a *running* thing — that is a [[Session]]. |

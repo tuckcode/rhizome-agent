@@ -51,7 +51,10 @@ file.
 
 ## State
 
-`main` pushed through `bb520e3`, tree clean. Prime **0.7.4** on Windows speaks
+`origin/main` is pushed through `aed471b`; local `main` is four commits ahead
+with C43/C44, folder-boundary hardening, the dependency-security sweep (C45),
+and the foreground-owned session decision (C47 / ADR-0167). Final dependency
+scan has 0 Critical/High; frontend and Rust coverage pass. Prime **0.7.4** on Windows speaks
 `\\.\pipe\prime-agent-daemon` — see `docs/WINDOWS-DEV.md`. On macOS/Linux the
 daemon dies with whatever terminal starts it, so start it detached:
 
@@ -64,6 +67,7 @@ critical path at ~120s, coverage 85s of it).
 
 ## Recent sessions
 
+- [2026-08-23 · GPT-5.6 Sol](plans/handoffs/2026-08-23-1518-gpt-5-6-sol-mid-turn-and-folder-hardening.md) — C43/C44 and destructive folder paths fixed; Codacy activated and all High dependency findings patched; Switchyard evaluated behind Prime; foreground-owned sessions decided in ADR-0167
 - [2026-08-22 (evening) · Grok 4.6](plans/handoffs/2026-08-22-2108-grok-4-6-window-navigation-guard.md) — #43 window-level navigation guard built on the Tauri 2.10 plugin `on_navigation` hook (config-declared main window, so no window rebuild); off-origin links route to the system browser, webview never leaves; 7 Rust unit tests on the centralized policy; Rust gates green at 85.57%
 - [2026-08-22 · GPT-5.6 Luna](plans/handoffs/2026-08-22-2137-gpt-5.6-luna-recent-changes-review.md) — review of today's chat/native-chrome/pre-push changes; C43/C44 record two mid-turn message-loss paths, and the browser helper's repeated install check
 - [2026-08-22 · Claude Opus 5](plans/handoffs/2026-08-22-1100-claude-opus-5-ux-sweep.md) — Windows pipe landed by Cursor then its roster hang fixed; the ignored live-daemon tests run for the first time; C32 closed; a UX sweep found a silent screen-reader bug, a dead button and a session-select regression; #31–#39 opened
@@ -192,20 +196,115 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 ## Open threads
 
-- **C44-OPEN: Prime follow-up admission is not propagated through Rust.**
-  `prime_session_host::queue_message` returns `true` whenever the RPC call
-  succeeds, but Prime's `follow_up` response includes `data.queued`. The
-  frontend therefore cannot tell an accepted queue from a rejected race and
-  may show a queued message that Prime did not retain. Review:
-  `docs/plans/handoffs/2026-08-22-2137-gpt-5.6-luna-recent-changes-review.md`.
+- **C47-DECIDED (2026-08-23, implementation pending): Prime sessions are
+  foreground-owned by default; background work is an explicit grant.** Atticus
+  does not want closing Rhizome to imply indefinite agent autonomy. Prime's
+  daemon remains shared infrastructure and may stay available, but availability
+  is not activity.
 
-- **C43-OPEN: mid-turn Steer/follow-up fallback can silently drop messages.**
-  `AiPanel.tsx` falls back to `sendAsNewTurn` when queueing returns false, but
-  that callback captures `handleSend` from an active render and
-  `useAiPanelController.handleSend` refuses sends while `isActive` is true.
-  Transport errors are also collapsed into the same false result. Fix the
-  state/error distinction and add a race regression test. Review:
-  `docs/plans/handoffs/2026-08-22-2137-gpt-5.6-luna-recent-changes-review.md`.
+  Prime 0.7.4 already supports the required lifecycle:
+  `DaemonSessionLifecycle = "resident" | "client_owned"`. A client-owned worker
+  is stopped 30 seconds after its owning protocol client disconnects, while
+  `promote_owned_session` makes explicitly approved work resident. Rhizome
+  currently omits the `client_owned_sessions` capability and creates every
+  session as resident, so orderly Quit is safe only because the exit handler
+  sends `kill`; crash/force-quit can still leave work alive.
+
+  Decided UX: new sessions client-owned; idle close detaches; active close asks
+  with **Stop and close** as default and **Keep working** as explicit promotion;
+  schedules/heartbeats may survive because creating one is already an explicit
+  grant and they remain visible/cancellable. Remove or migrate the global
+  `keep_sessions_running_on_quit` preference. ADR-0167 supersedes ADR-0163's
+  unconditional session-survival policy while retaining its daemon-client
+  transport decision. The implementation is the next separate lifecycle slice;
+  the full evidence and transition notes are in the latest handoff.
+
+- **C45-RESOLVED (2026-08-23): the Codacy gate was runnable all along,
+  and its first run refuted a security review.** `codacy-cli` analyses locally
+  with no account and no payment; only the MCP server needs a paid token for a
+  private repo, and that server just shells out to the same CLI. AGENTS.md had
+  told every session the paid tier blocked the whole gate, so it was skipped for
+  months. Setup and the trimmed tool set are documented in AGENTS.md's Codacy
+  section.
+
+  First run: **95 advisories** across `pnpm-lock.yaml` (63), `mcp-server/package-lock.json`
+  (23), and `src-tauri/Cargo.lock` (9). No criticals. Two mattered because they
+  contradicted the 2026-08-22 review's reasoning, and both are **fixed in this
+  working tree**:
+  - `tauri` 2.10.2 → **2.11.1** (CVE-2026-42184, origin confusion). `is_local_url()`
+    compared only the first domain label, so `http://asset.attacker.com/` was
+    classified as a local origin and could invoke IPC. The review had ruled the
+    unguarded folder commands unreachable *because* "Tauri IPC is only callable
+    from the app's own webview" — and that premise, as a property of Tauri, was
+    false on Windows and Android for every version from 2.0 up.
+
+    **This app was not exploitable, but not for the reason the review gave.**
+    Three independent things had to hold, and the framework guarantee was the
+    one that didn't: #43's navigation guard sends any off-origin top-level
+    navigation to the system browser (`navigation_decision`, 2026-08-22), the
+    production CSP declares no `frame-src` so subframes inherit
+    `default-src 'self'` and cannot load an attacker host, and C42 means the app
+    has never launched on Windows at all. The lesson is about the review, not the
+    patch: a reachability argument resting on one framework guarantee is one CVE
+    away from wrong, and the two controls that actually held were never cited.
+
+    The bump carries the webview stack with it: wry 0.54→0.55, tao 0.34→0.35,
+    muda 0.17→0.19, tray-icon 0.21→0.23. **1631 Rust tests, clippy, and fmt
+    pass; tray/menu/window behaviour has not had native QA.** Do that before
+    trusting a release build — and re-check the #43 guard specifically, since it
+    hooks a plugin API in the layer that just moved.
+  - `dompurify` 3.4.2 → **3.4.13** and `mermaid` 11.14.0 → **11.17.0** patch
+    the XSS/CSS-injection advisories on `SafeMarkup.tsx`, the one raw-markup path
+    the review cited as the reason no XSS could reach IPC. The two arguments
+    propped each other up.
+
+  The remaining High findings were patchable transitive pins, including versions
+  deliberately held in `pnpm-workspace.yaml` and `mcp-server/package.json`.
+  Updated `@hono/node-server`, `fast-uri`, `hono`, `ip-address`, `js-yaml`,
+  `linkify-it`, `nanoid`, `postcss`, `protobufjs`, `vite`, `quinn-proto`,
+  `openssl`, and `tar`; also patched the reachable markdown-it quadratic parser
+  path and serde_with's empty-map panic.
+
+  Final Trivy scan: **0 Critical, 0 High; 9 lockfile occurrences remain** (two
+  Medium advisories, four unique Low advisories, duplicated by versions/locks).
+  The Mediums are reviewed:
+  - `@opentelemetry/core` <2.8's unbounded W3C baggage-header parsing is under
+    PostHog's browser telemetry SDK. Rhizome sends telemetry outbound and never
+    parses attacker-controlled inbound HTTP baggage headers; overriding the core
+    alone would also split it from the coordinated OpenTelemetry 2.2/2.6 stack.
+  - `glib` 0.18's iterator unsoundness is Linux-only under Tauri's GTK 0.18
+    stack. Rhizome does not call the affected iterator API; 0.20 is an ecosystem
+    major that current Tauri/wry do not use.
+
+  Remaining Low findings are `body-parser` invalid-limit DoS (Rhizome supplies
+  fixed limits), dev-only `esbuild`, and transitive `lru`/old `rand` unsoundness
+  paths not called by repo code. The gate is now usable as a no-new-High ratchet;
+  do not require zero findings until those upstream stacks move.
+
+- **C46-OPEN (2026-08-23): `AiPanel.tsx` measures CCN 50 across 447 lines.**
+  Codacy's `lizard` is the first tool in this repo to say so — it was the only
+  warning across the files this session touched (`src-tauri/src/vault/folders.rs`
+  sits at avg CCN 2.5). Lizard aggregates a TSX module's top level into one
+  `*global*` entry, so the number reads high by construction, but the direction
+  is real: the C43 fix added a ref, a layout effect, and two send callbacks to a
+  component that was already the largest in the panel. The natural seam is the
+  mid-turn send policy — accepted / not-running / failed, plus the idle fallback
+  — which is decision logic with no JSX and could move to a hook or module
+  beside `primeTurnMessaging.ts`. Not attempted here: it would have meant
+  refactoring the component in the same change as the race fix.
+
+- **C44-RESOLVED (2026-08-23): Prime follow-up admission now
+  propagates through Rust.** `queue_message` returns `data.queued` for
+  `follow_up`, while a successful `steer` keeps its prior success semantics.
+  Fake-daemon command-boundary tests cover accepted and declined follow-ups plus
+  steer.
+
+- **C43-RESOLVED (2026-08-23): mid-turn fallback no longer drops
+  messages through stale state.** The frontend distinguishes accepted,
+  no-longer-running, and transport-failure results. Fallback reads the latest
+  controller state and starts a new turn only when it is idle; a transport
+  failure keeps the draft. The regression starts active, resolves the follow-up
+  after rerendering idle, and proves the latest send callback receives it.
 
 - **C42-OPEN: Rhizome Agent has never been launched on Windows, and the docs
   said otherwise.** Atticus, 2026-08-22: *"i forgot it doesnt work on windows
