@@ -1,5 +1,7 @@
 # Abstractions
 
+> This document describes Rhizome Agent — see `docs/IDENTITY.md`. "Tolaria" is the pre-fork product name and appears below unchanged; it is not evidence this is Rhizome Desktop.
+
 Key abstractions and domain models in Tolaria.
 
 ## Design Philosophy

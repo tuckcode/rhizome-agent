@@ -1,4 +1,6 @@
-# Grok-Wiki UI Patterns — Rhizome Desktop Reference
+# Grok-Wiki UI Patterns — Rhizome Agent Reference
+
+> Written pre-fork when this repo was still Rhizome Desktop; the Research panel it references is Rhizome Agent's.
 
 Observed from the running Grok-Wiki macOS app on 2026-06-30.
 

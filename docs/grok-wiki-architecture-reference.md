@@ -1,6 +1,6 @@
 # Grok-Wiki Architecture Extraction — Rhizome Implementation Reference
 
-Extracted from the running Grok-Wiki server bundle (`rlm-wiki.js`) on macOS. Independently described, not copied code. Use as reference for implementing Rhizome Desktop's research features.
+Extracted from the running Grok-Wiki server bundle (`rlm-wiki.js`) on macOS. Independently described, not copied code. Use as reference for implementing Rhizome Agent's Research panel and grok-import (`ResearchPanel.tsx`, `src-tauri/src/rhizome_grok_import.rs`) — written pre-fork when this repo was still Rhizome Desktop, but the features it describes now live here, not there.
 
 ## 1. Wiki Generation Pipeline (Two-Phase)
 
