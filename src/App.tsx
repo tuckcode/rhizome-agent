@@ -484,6 +484,13 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   // Wave 5.3 command rail (docs/design/shell-final-direction.md §2.2). Flag
   // off → this block is inert and the shell renders byte-identical.
   const commandRailEnabled = useFeatureFlag('shell_command_rail')
+  /*
+    The note tree only docks right when the command rail is there to hold the
+    left edge — the rail is what reserves room for the macOS traffic lights.
+    With the classic shell (`ff_shell_command_rail=false`) nothing else would,
+    so the tree stays where it was.
+  */
+  const sidebarDock: 'left' | 'right' = commandRailEnabled ? 'right' : 'left' 
   const railActiveDestination = useMemo((): CommandRailDestination => {
     if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'chat') return 'chat'
     if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'graph') return 'graph'
@@ -1763,6 +1770,16 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const noteListModifiedFiles = isChangesSelection ? selectedChangesModifiedFiles : undefined
   const noteListModifiedFilesError = isChangesSelection ? gitSurfaces.changesModifiedFilesError : null
 
+  const sidebarPanel = sidebarVisible && !isChatDestination ? (
+    <>
+      {sidebarDock === 'right' && <ResizeHandle onResize={layout.handleSidebarResize} edge="trailing" />}
+      <div className={`app__sidebar app__sidebar--${sidebarDock}`} style={{ width: layout.sidebarWidth }}>
+      <Sidebar entries={visibleEntries} isWikiVault={isWikiVault} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onUpdateViewDefinition={handleSidebarUpdateViewDefinition} onReorderViews={canReorderSavedViews ? viewOrdering.onReorderViews : undefined} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} allNotesFileVisibility={allNotesFileVisibility} pluralizeTypeLabels={settings.sidebar_type_pluralization_enabled ?? true} dock={sidebarDock} onCollapse={handleCollapseSidebar} onGoBack={handleGoBack} onGoForward={handleGoForward} canGoBack={canGoBack} canGoForward={canGoForward} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} workspaceOrder={vaultWorkspaceOrder} />
+      </div>
+      {sidebarDock === 'left' && <ResizeHandle onResize={layout.handleSidebarResize} />}
+    </>
+  ) : null
+
   return (
     <AppPreferencesProvider dateDisplayFormat={dateDisplayFormat}>
       <CelebrationProvider
@@ -1785,14 +1802,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               onOpenSettings={handleOpenSettings}
             />
           )}
-          {sidebarVisible && !isChatDestination && (
-            <>
-              <div className="app__sidebar" style={{ width: layout.sidebarWidth }}>
-                <Sidebar entries={visibleEntries} isWikiVault={isWikiVault} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onUpdateViewDefinition={handleSidebarUpdateViewDefinition} onReorderViews={canReorderSavedViews ? viewOrdering.onReorderViews : undefined} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} allNotesFileVisibility={allNotesFileVisibility} pluralizeTypeLabels={settings.sidebar_type_pluralization_enabled ?? true} onCollapse={handleCollapseSidebar} onGoBack={handleGoBack} onGoForward={handleGoForward} canGoBack={canGoBack} canGoForward={canGoForward} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} workspaceOrder={vaultWorkspaceOrder} />
-              </div>
-              <ResizeHandle onResize={layout.handleSidebarResize} />
-            </>
-          )}
+          {sidebarDock === 'left' && sidebarPanel}
           {noteListVisible && !isChatDestination && !(effectiveSelection.kind === 'filter' && (effectiveSelection.filter === 'graph' || effectiveSelection.filter === 'mycelium')) && (
             <>
               <div className={`app__note-list${aiActivity.highlightElement === 'notelist' ? ' ai-highlight' : ''}`} style={{ width: layout.noteListWidth }}>
@@ -1924,6 +1934,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
             />
             )}
           </div>
+          {sidebarDock === 'right' && sidebarPanel}
         </div>
         <UpdateBanner status={updateStatus} actions={updateActions} locale={appLocale} />
         <RenameDetectedBanner renames={detectedRenames} onUpdate={handleUpdateWikilinks} onDismiss={handleDismissRenames} />

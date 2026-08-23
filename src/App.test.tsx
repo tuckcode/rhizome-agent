@@ -1354,6 +1354,23 @@ describe('App', () => {
     })
   })
 
+  it('docks the sidebar to the right of the editor', async () => {
+    // The note tree is a convenience panel, not the app's spine — the rail
+    // owns the left edge (and the macOS traffic lights with it), so the tree
+    // sits on the trailing side where it can be ignored or collapsed away.
+    render(<App />)
+    await waitFor(() => {
+      expect(screen.getByText('All Notes')).toBeInTheDocument()
+    })
+
+    const shell = document.querySelector('.app') as HTMLElement
+    const editor = shell.querySelector('.app__editor') as HTMLElement
+    const sidebar = shell.querySelector('.app__sidebar') as HTMLElement
+    expect(editor).toBeInTheDocument()
+    expect(sidebar).toBeInTheDocument()
+    expect(editor.compareDocumentPosition(sidebar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('Cmd+1 hides sidebar and note list (editor-only mode)', async () => {
     render(<App />)
     await waitFor(() => {

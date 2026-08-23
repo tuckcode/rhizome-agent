@@ -382,6 +382,7 @@ function SidebarTitleBarAction({
 
 export function SidebarTitleBar({
   locale = 'en',
+  dock = 'left',
   onCollapse,
   onGoBack,
   onGoForward,
@@ -389,6 +390,12 @@ export function SidebarTitleBar({
   canGoForward = false,
 }: {
   locale?: AppLocale
+  /**
+   * Which edge the sidebar is docked to. Only the left dock has to clear the
+   * macOS traffic lights; on the right that gutter belongs to the command rail
+   * and reserving it here would just push the controls toward the middle.
+   */
+  dock?: 'left' | 'right'
   onCollapse?: () => void
   onGoBack?: () => void
   onGoForward?: () => void
@@ -404,12 +411,12 @@ export function SidebarTitleBar({
     <div
       ref={dragRegionRef}
       className="shrink-0 flex items-center border-b border-border"
-      style={{ height: 52, padding: '0 8px', paddingLeft: 90, cursor: 'default', justifyContent: 'flex-start' }}
+      style={{ height: 52, padding: '0 8px', paddingLeft: dock === 'right' ? 8 : 90, cursor: 'default', justifyContent: 'flex-start' }}
     >
       <div className="flex items-center gap-3" style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}>
         {onCollapse && (
           <SidebarTitleBarAction label={collapseLabel} shortcut={SIDEBAR_COLLAPSE_SHORTCUT} onClick={onCollapse}>
-            <SidebarSimple size={16} weight="regular" />
+            <SidebarSimple size={16} weight="regular" mirrored={dock === 'right'} />
           </SidebarTitleBarAction>
         )}
         {onGoBack && (
