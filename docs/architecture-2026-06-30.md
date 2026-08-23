@@ -1,4 +1,6 @@
-# Rhizome: Complete Architecture & Implementation Plan
+# Rhizome: Complete Architecture & Implementation Plan (historical)
+
+> **Note:** A synthesis snapshot from the day this repo's shell architecture was designed, before the Desktop/Agent fork. Kept as background. **Current architecture is `docs/ARCHITECTURE.md`; current shell direction is `docs/adr/0166-chat-centered-shell.md`.** Do not treat this as live guidance.
 
 **Author:** Hermes (acting as 20-year senior architect)
 **Date:** 2026-06-30
