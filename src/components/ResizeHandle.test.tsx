@@ -103,4 +103,24 @@ describe('ResizeHandle', () => {
     expect(document.body.style.cursor).toBe('')
     expect(document.body.style.userSelect).toBe('')
   })
+  it('inverts the delta when the handle sits on a panel\'s trailing edge', () => {
+    // A right-docked panel grows when the pointer moves LEFT. Without the
+    // inversion the sidebar-on-the-right shrinks as you drag it wider.
+    const onResize = vi.fn()
+    const { container } = render(<ResizeHandle onResize={onResize} edge="trailing" />)
+    const handle = container.firstChild as HTMLElement
+
+    fireEvent.mouseDown(handle, { clientX: 100 })
+    fireEvent.mouseMove(document, { clientX: 120 })
+    if (rafCallback) rafCallback(0)
+
+    expect(onResize).toHaveBeenCalledWith(-20)
+  })
+
+  it('hangs off the panel\'s left edge when trailing', () => {
+    const { container } = render(<ResizeHandle onResize={vi.fn()} edge="trailing" />)
+    const handle = container.firstChild as HTMLElement
+    expect(handle.className).toContain('-mr-1')
+    expect(handle.className).not.toContain('-ml-1')
+  })
 })
