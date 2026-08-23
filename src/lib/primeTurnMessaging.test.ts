@@ -41,21 +41,21 @@ describe('sendToRunningTurn', () => {
   })
 
   it('never sends a blank message', async () => {
-    expect(await sendToRunningTurn('steer', '   ')).toBe(false)
+    expect(await sendToRunningTurn('steer', '   ')).toBe('not-running')
     expect(invoked.calls).toEqual([])
   })
 
-  it('reports false when no turn was running, rather than claiming success', async () => {
+  it('reports when no turn was running, rather than claiming success', async () => {
     invoked.accepted = false
 
     // `queue_message` answers false when nothing is streaming. The caller
     // needs that distinction to fall back to a normal send.
-    expect(await sendToRunningTurn('followUp', 'anything')).toBe(false)
+    expect(await sendToRunningTurn('followUp', 'anything')).toBe('not-running')
   })
 
-  it('reports false instead of throwing when the host call fails', async () => {
+  it('distinguishes a host failure from Prime declining the message', async () => {
     invoked.throws = true
 
-    expect(await sendToRunningTurn('steer', 'anything')).toBe(false)
+    expect(await sendToRunningTurn('steer', 'anything')).toBe('failed')
   })
 })

@@ -11,12 +11,17 @@ import type { NoteReference } from '../utils/ai-context'
 import { bindVaultConfigStore, getVaultConfig, resetVaultConfigStore } from '../utils/vaultConfigStore'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 
-const { trackEventMock } = vi.hoisted(() => ({
+const { sendToRunningTurnMock, trackEventMock } = vi.hoisted(() => ({
+  sendToRunningTurnMock: vi.fn(),
   trackEventMock: vi.fn(),
 }))
 
 vi.mock('../lib/telemetry', () => ({
   trackEvent: trackEventMock,
+}))
+
+vi.mock('../lib/primeTurnMessaging', () => ({
+  sendToRunningTurn: sendToRunningTurnMock,
 }))
 
 // Mock the hooks and utils to isolate component tests
@@ -174,6 +179,8 @@ describe('AiPanel', () => {
     mockClearConversation.mockReset()
     mockAddLocalMarker.mockReset()
     mockUseCliAiAgent.mockReset()
+    sendToRunningTurnMock.mockReset()
+    sendToRunningTurnMock.mockResolvedValue('accepted')
     trackEventMock.mockClear()
     resetVaultConfigStore()
     bindVaultConfigStore({
@@ -675,5 +682,94 @@ describe('talking to a turn that is already running', () => {
     renderActivePrime('')
 
     expect(screen.getByRole('button', { name: 'Stop response' })).toBeInTheDocument()
+  })
+
+  it('sends a declined follow-up as a new turn after the running turn ends', async () => {
+    let resolveFollowUp: (result: 'not-running') => void = () => {}
+    sendToRunningTurnMock.mockReturnValue(new Promise((resolve) => {
+      resolveFollowUp = resolve
+    }))
+    const staleActiveSend = vi.fn()
+    const latestIdleSend = vi.fn()
+    const renderPanel = (controller: AiPanelController) => (
+      <AiPanelView
+        controller={controller}
+        onClose={vi.fn()}
+        showHeader={false}
+        targetId="agent:prime"
+      />
+    )
+    const { rerender } = render(renderPanel(primeController({
+      isActive: true,
+      input: 'then summarise',
+      handleSend: staleActiveSend,
+    })))
+
+    fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Enter' })
+    rerender(renderPanel(primeController({
+      isActive: false,
+      input: 'then summarise',
+      handleSend: latestIdleSend,
+    })))
+    await act(async () => resolveFollowUp('not-running'))
+
+    expect(latestIdleSend).toHaveBeenCalledWith('then summarise', [])
+    expect(staleActiveSend).not.toHaveBeenCalled()
+  })
+
+  it('keeps the draft when the follow-up transport fails', async () => {
+    sendToRunningTurnMock.mockResolvedValue('failed')
+    const handleSend = vi.fn()
+    const setInput = vi.fn()
+    render(
+      <AiPanelView
+        controller={primeController({
+          isActive: true,
+          input: 'do not lose this',
+          handleSend,
+          setInput,
+        })}
+        onClose={vi.fn()}
+        showHeader={false}
+        targetId="agent:prime"
+      />,
+    )
+
+    fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Enter' })
+    await act(async () => {})
+
+    expect(handleSend).not.toHaveBeenCalled()
+    expect(setInput).not.toHaveBeenCalled()
+    expect(screen.getByTestId('agent-input')).toHaveTextContent('do not lose this')
+  })
+
+  // Prime can report "no turn running" while the panel still shows one, because
+  // the UI learns a turn ended from a later event. The fallback deliberately
+  // does not start a turn from that stale-active state, so the guarantee is the
+  // draft: the text stays in the composer and Enter works again once idle.
+  it('keeps a declined message in the composer when the panel still looks active', async () => {
+    sendToRunningTurnMock.mockResolvedValue('not-running')
+    const handleSend = vi.fn()
+    const setInput = vi.fn()
+    render(
+      <AiPanelView
+        controller={primeController({
+          isActive: true,
+          input: 'still worth keeping',
+          handleSend,
+          setInput,
+        })}
+        onClose={vi.fn()}
+        showHeader={false}
+        targetId="agent:prime"
+      />,
+    )
+
+    fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Enter' })
+    await act(async () => {})
+
+    expect(handleSend).not.toHaveBeenCalled()
+    expect(setInput).not.toHaveBeenCalled()
+    expect(screen.getByTestId('agent-input')).toHaveTextContent('still worth keeping')
   })
 })
