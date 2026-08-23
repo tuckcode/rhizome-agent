@@ -139,9 +139,41 @@ No CodeScene gate — dropped 2026-07-09 (no free tier at any layer: cloud, `cs`
 
 Use Codacy as a security and static-analysis gate before a task is considered releasable.
 
-- Prefer the Codacy MCP inside Codex to inspect repository/file issues for every touched code file.
-- If MCP is unavailable, use the local CLI wrapper, e.g. `.codacy/cli.sh analyze <path> --format sarif`; choose the relevant tool when useful (`eslint`, `opengrep`, `trivy`, `lizard`).
-- **Not actually set up yet.** `.codacy/` (gitignored, per-machine) has never been created and no Codacy MCP has been available in any session so far. This isn't a config accident — Codacy required payment for a private repo, and **this repo is private** (`git remote -v` → `tuckcode/rhizome-agent`), so the paid-tier blocker still applies here. (The Desktop rules this was imported from said the repo "went public," which was true of `knispo/rhizome` and is *not* true of this one — corrected 2026-08-09.) Until someone confirms free-tier eligibility, **say so explicitly in the completion comment** ("Codacy: not run — no MCP tool, no `.codacy/` directory in this session") rather than silently skipping the gate.
+- **Run the local CLI. It needs no Codacy account and no payment** (corrected
+  2026-08-23 — see below):
+  ```bash
+  codacy-cli analyze --tool trivy                 # vulnerable deps, whole repo
+  codacy-cli analyze --tool opengrep <path>        # security patterns
+  codacy-cli analyze --tool lizard <path>          # complexity
+  codacy-cli analyze --tool trivy --format sarif -o trivy.sarif
+  ```
+  Per machine, once: `brew install codacy/codacy-cli-v2/codacy-cli-v2` then
+  `codacy-cli init` (local mode) and `codacy-cli install`. `.codacy/` is
+  gitignored, so every machine and every fresh clone repeats those three
+  commands; `.codacy.yaml` at the repo root (tracked) holds the shared
+  exclude list.
+- **`codacy-cli init` defaults to every language it can find** — Dart, Go,
+  Java, and Python runtimes for a TypeScript-and-Rust repo. Trim
+  `.codacy/codacy.yaml` to `lizard`, `opengrep`, `trivy` (runtime:
+  `python`). Codacy's `eslint` is deliberately excluded: it pins eslint 8,
+  ignores plugin rules, and this repo's own `pnpm lint` (eslint 9, flat
+  config, typescript-eslint) is strictly stronger. Rust is not covered by
+  any Codacy tool — `cargo clippy` is that lane.
+- **The MCP server is the part that costs money, and it is optional.**
+  `@codacy/codacy-mcp` refuses to start without `CODACY_ACCOUNT_TOKEN`, and
+  an account covering a **private** repo (`tuckcode/rhizome-agent`) is paid.
+  Its `codacy_cli_analyze` tool just shells out to the same CLI, so the gate
+  loses nothing by running the CLI directly. What the token would add is the
+  hosted dashboard and trend history — not analysis capability.
+- **This gate reported itself unrunnable for months, and that was wrong.** The
+  rule used to say the paid-tier blocker applied to the whole gate and told
+  agents to write "Codacy: not run" in the completion comment, so every
+  session dutifully skipped it. The CLI's own README says it runs "for local
+  code analysis without a Codacy account." The first real run (2026-08-23)
+  found 95 advisories across the three lockfiles, two of which directly
+  contradicted a prior security review's reasoning — C45. A gate nobody can
+  run is indistinguishable from a gate that finds nothing, which is exactly
+  how it read until someone checked the claim instead of repeating it.
 - **Always fix Critical and High severity findings introduced by your change** before considering the change releasable.
 - Review Medium findings. Fix them when they are real defects or security-sensitive; otherwise explain why they are acceptable in the completion comment.
 - Never silence a Codacy rule just to pass the scan. Prefer small code changes that remove the finding.
@@ -321,9 +353,13 @@ Single-context layout — root `CONTEXT.md` + `docs/adr/`. See `docs/agents/doma
 
 - Prefers code reviews to be short and actionable.
 - When discussing GitHub issues or work items, pair the number with a brief plain-language description instead of using the number alone.
+- Shares strategy docs as decision context for joint calls, not as implementation to-dos.
+- Wants background agent execution to be explicit: active window close should default to stopping work, while explicitly scheduled work may continue if it stays visible and revocable.
 
 ## Learned Workspace Facts
 
-- Prime mid-turn messaging has two tracked correctness risks: the fallback can drop messages through a stale active-state closure, and the Rust queue command does not propagate Prime's `data.queued` admission result; see C43/C44 in `docs/HANDOFF.md`.
+- Prime mid-turn messaging is tri-state: accepted, no longer running, or transport failure. Follow-ups propagate Prime's `data.queued`; fallback starts a new turn only from the latest idle UI state. C43/C44 record why.
 - On macOS, restoring a hidden main window requires unhiding the application first (`app.show()`), then unminimize, show, and focus. `lib.rs::focus_main_window` is the shared path; menu-bar and tray reopen must delegate to it.
+- Rhizome is the desk and durable memory; Prime is the engine. Chat first, vault on purpose. Memory is gated; execution is not.
+- Prime supports `client_owned` sessions that stop after a disconnected-client grace period and can be promoted to `resident`; Rhizome currently creates sessions as `resident`, the key seam for foreground-only defaults.
 
