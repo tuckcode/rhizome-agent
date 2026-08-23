@@ -211,11 +211,10 @@ mod desktop {
     }
 
     pub fn focus_main_window(app: &AppHandle) {
-        if let Some(window) = app.get_webview_window("main") {
-            let _ = window.unminimize();
-            let _ = window.show();
-            let _ = window.set_focus();
-        }
+        // Use the same restore path as dock clicks and second-instance opens.
+        // On macOS, showing the window is not enough after the last window was
+        // hidden: the application itself must be unhidden first.
+        crate::focus_main_window(app);
         if let Some(companion) = app.get_webview_window(WINDOW_LABEL) {
             let _ = companion.hide();
         }

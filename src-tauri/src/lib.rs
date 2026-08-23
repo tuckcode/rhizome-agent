@@ -335,7 +335,7 @@ pub(crate) fn should_reopen_main_window(has_visible_windows: bool) -> bool {
 }
 
 #[cfg(desktop)]
-fn focus_main_window(app_handle: &tauri::AppHandle) {
+pub(crate) fn focus_main_window(app_handle: &tauri::AppHandle) {
     use tauri::Manager;
 
     // Unhide the *application* first. Once C22's fix hides the last window,
