@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { getAppCommandMenuSections } from '../hooks/appCommandCatalog'
@@ -139,19 +140,50 @@ function AppMenuButton({ locale, sections }: { locale: AppLocale; sections: Read
 }
 
 function HorizontalMenuBar({ sections }: { sections: ReadonlyArray<MenuSection> }) {
+  /*
+   * One open-menu label for the whole bar, not one open flag per dropdown.
+   * A menu bar is a single control: at most one menu is open, and once one
+   * is, the pointer steers which. Independent dropdown roots cannot express
+   * either half of that — they would each need their own click, and two
+   * could be open at once.
+   */
+  const [openLabel, setOpenLabel] = useState<string | null>(null)
+
   return (
     <div
       className="hidden h-full min-[760px]:flex"
       data-testid="desktop-horizontal-menu"
     >
       {sections.map((section) => (
-        <DropdownMenu key={section.label} modal={false}>
+        <DropdownMenu
+          key={section.label}
+          modal={false}
+          open={openLabel === section.label}
+          /*
+           * Clicking Edit while File is open fires both Edit's "open" and
+           * File's dismiss. Order is not guaranteed, so a close only clears
+           * the bar when *this* section is still the open one — otherwise
+           * File's late dismiss would stomp the menu Edit just opened.
+           */
+          onOpenChange={(open) =>
+            setOpenLabel((current) => {
+              if (open) return section.label
+              return current === section.label ? null : current
+            })
+          }
+        >
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="h-full rounded-none px-3 text-[13px] font-normal text-foreground/75 hover:bg-foreground/10 hover:text-foreground"
+              /*
+               * Hover only *steers* an open menu bar, it does not open one —
+               * brushing past File on the way to the window controls must not
+               * pop a menu nobody asked for.
+               */
+              onPointerEnter={() => setOpenLabel((current) => (current === null ? current : section.label))}
+              className="h-full rounded-none px-3 text-[13px] font-normal text-foreground/75 hover:bg-foreground/10 hover:text-foreground data-[state=open]:bg-foreground/10 data-[state=open]:text-foreground"
               data-no-drag
             >
               {section.label}

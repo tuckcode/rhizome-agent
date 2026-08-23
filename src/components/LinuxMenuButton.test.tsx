@@ -99,4 +99,28 @@ describe('LinuxMenuButton', () => {
     expect(toggleMaximize).toHaveBeenCalledOnce()
     expect(close).toHaveBeenCalledOnce()
   })
+  it('switches menus on hover once one is already open', async () => {
+    // Native menu bars track the pointer horizontally: with File open,
+    // sliding onto Edit swaps to Edit without a second click. Independent
+    // dropdown roots cannot do this — each only opens on its own click.
+    render(<LinuxMenuButton />)
+
+    await openHorizontalMenu('File')
+    expect(screen.getByRole('button', { name: 'File' })).toHaveAttribute('data-state', 'open')
+
+    fireEvent.pointerEnter(screen.getByRole('button', { name: 'Edit' }))
+
+    expect(screen.getByRole('button', { name: 'Edit' })).toHaveAttribute('data-state', 'open')
+    expect(screen.getByRole('button', { name: 'File' })).toHaveAttribute('data-state', 'closed')
+  }, MENU_TEST_TIMEOUT_MS)
+
+  it('leaves closed menus alone when the pointer passes over them', async () => {
+    // Hover only steers an already-open menu bar. With nothing open,
+    // brushing past File must not pop a menu the user never asked for.
+    render(<LinuxMenuButton />)
+
+    fireEvent.pointerEnter(screen.getByRole('button', { name: 'File' }))
+
+    expect(screen.getByRole('button', { name: 'File' })).toHaveAttribute('data-state', 'closed')
+  }, MENU_TEST_TIMEOUT_MS)
 })
