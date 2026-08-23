@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useRef, type CSSProperties, type MutableRefObject, type ReactNode, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useState, useRef, type CSSProperties, type MutableRefObject, type ReactNode, type RefObject } from 'react'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import {
   chatSessionsOpenDefault,
@@ -45,8 +45,6 @@ import { trackPrimeCommandRun } from '../lib/productAnalytics'
 import { trackEvent } from '../lib/telemetry'
 import { PrimeGoalDialog } from './PrimeGoalDialog'
 import type { PrimeAgentActivity } from './AgentActivityBand'
-
-export type { AiAgentMessage } from '../hooks/useCliAiAgent'
 
 interface AiPanelProps {
   onClose: () => void
@@ -304,15 +302,28 @@ export function AiPanelView({
   // reports no view of it, so the panel remembers what it handed over and
   // forgets once the turn that would drain it has ended.
   const [queuedFollowUps, setQueuedFollowUps] = useState<string[]>([])
+  const latestTurnState = useRef({ handleSend, isActive, onSendPrompt })
+  useLayoutEffect(() => {
+    latestTurnState.current = { handleSend, isActive, onSendPrompt }
+  }, [handleSend, isActive, onSendPrompt])
 
   const sendAsNewTurn = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
     // A new turn starts with an empty queue. Cleared here rather than in an
     // effect on `isActive`: setting state from an effect cascades renders, and
     // the queue only ever needs to be empty at the moment a turn begins.
     setQueuedFollowUps([])
-    onSendPrompt?.(text)
-    handleSend(text, references)
-  }, [handleSend, onSendPrompt])
+    const latest = latestTurnState.current
+    latest.onSendPrompt?.(text)
+    latest.handleSend(text, references)
+  }, [])
+
+  const sendAsNewTurnIfIdle = useCallback((
+    text: string,
+    references: Parameters<typeof handleSend>[1],
+  ) => {
+    if (latestTurnState.current.isActive) return
+    sendAsNewTurn(text, references)
+  }, [sendAsNewTurn])
 
   const handleComposerSend = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
     if (!text.trim()) return
@@ -321,21 +332,21 @@ export function AiPanelView({
       // Enter is "send another message", which must not disturb the work in
       // flight — redirecting it is Steer, a separate and deliberate control.
       if (!isPrimeTarget) return
-      void sendToRunningTurn('followUp', text).then((queued) => {
-        // `false` means the turn ended between the keystroke and the call.
+      void sendToRunningTurn('followUp', text).then((result) => {
+        // `not-running` means the turn ended between the keystroke and the call.
         // Send it as a new turn rather than losing it.
-        if (queued) {
+        if (result === 'accepted') {
           setQueuedFollowUps((current) => [...current, text.trim()])
           trackPrimeTurnMessage('followUp')
           setInput('')
-        } else {
-          sendAsNewTurn(text, references)
+        } else if (result === 'not-running') {
+          sendAsNewTurnIfIdle(text, references)
         }
       })
       return
     }
     sendAsNewTurn(text, references)
-  }, [isActive, isPrimeTarget, sendAsNewTurn, setInput])
+  }, [isActive, isPrimeTarget, sendAsNewTurn, sendAsNewTurnIfIdle, setInput])
 
   /**
    * Redirect the running turn. Only wired for Prime — this is a daemon verb,
@@ -344,15 +355,15 @@ export function AiPanelView({
    */
   const handleSteer = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
     if (!text.trim()) return
-    void sendToRunningTurn('steer', text).then((steered) => {
-      if (steered) {
+    void sendToRunningTurn('steer', text).then((result) => {
+      if (result === 'accepted') {
         trackPrimeTurnMessage('steer')
         setInput('')
-      } else {
-        sendAsNewTurn(text, references)
+      } else if (result === 'not-running') {
+        sendAsNewTurnIfIdle(text, references)
       }
     })
-  }, [sendAsNewTurn, setInput])
+  }, [sendAsNewTurnIfIdle, setInput])
 
   // Open unless this machine says otherwise. The column is the only thing on
   // Chat home that says other sessions exist, so a closed default left the

@@ -1279,7 +1279,10 @@ fn queue_message(kind: &str, message: &str) -> Result<bool, String> {
         if !host.is_streaming {
             return Ok(false);
         }
-        host.call(build_queue_command(kind, trimmed))?;
+        let data = host.call(build_queue_command(kind, trimmed))?;
+        if kind == "follow_up" {
+            return Ok(data["queued"].as_bool().unwrap_or(false));
+        }
         Ok(true)
     })
 }
@@ -4460,6 +4463,60 @@ mod tests {
             build_queue_command("follow_up", "then summarise"),
             serde_json::json!({"type": "follow_up", "message": "then summarise"})
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn follow_up_returns_the_daemons_queue_admission_result() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| {
+            (command["type"].as_str() == Some("follow_up"))
+                .then(|| vec![ok(id, "follow_up", serde_json::json!({ "queued": false }))])
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+        with_host_mut(|host| {
+            host.is_streaming = true;
+            Ok(())
+        })
+        .unwrap();
+
+        assert!(!follow_up("then summarise").unwrap());
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn admitted_follow_ups_and_successful_steers_return_true() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("follow_up") => Some(vec![ok(
+                id,
+                "follow_up",
+                serde_json::json!({ "queued": true }),
+            )]),
+            Some("steer") => Some(vec![ok(
+                id,
+                "steer",
+                serde_json::json!({ "queued": false }),
+            )]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+        with_host_mut(|host| {
+            host.is_streaming = true;
+            Ok(())
+        })
+        .unwrap();
+
+        assert!(follow_up("then summarise").unwrap());
+        assert!(steer("focus on error handling").unwrap());
+
+        let _ = shutdown_host();
     }
 
     /// Prime's queue state arrives as one event carrying both lists. The UI
