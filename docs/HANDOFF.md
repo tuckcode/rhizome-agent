@@ -51,10 +51,11 @@ file.
 
 ## State
 
-`origin/main` is pushed through `aed471b`; local `main` is four commits ahead
-with C43/C44, folder-boundary hardening, the dependency-security sweep (C45),
-and the foreground-owned session decision (C47 / ADR-0167). Final dependency
-scan has 0 Critical/High; frontend and Rust coverage pass. Prime **0.7.4** on Windows speaks
+`origin/main` is pushed through `aed471b`; local `main` contains the earlier
+menu-bar fix (`760f63c`) plus this session's messaging, folder-boundary,
+dependency-security (C45), and lifecycle-decision (C47 / ADR-0167) commits.
+Final dependency scan has 0 Critical/High; frontend and Rust coverage pass.
+Prime **0.7.4** on Windows speaks
 `\\.\pipe\prime-agent-daemon` — see `docs/WINDOWS-DEV.md`. On macOS/Linux the
 daemon dies with whatever terminal starts it, so start it detached:
 

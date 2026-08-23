@@ -8,7 +8,7 @@ description: >-
   (tauri CVE-2026-42184), so tauri, dompurify, and mermaid are patched. C45.
   Also evaluated NVIDIA NeMo Switchyard as an experimental router behind Prime
   and decided Prime sessions should be foreground-owned by default (ADR-0167).
-commits: a2895bf, 2d12ca5, 7813c0c, plus the documentation commit containing this handoff
+commits: a2895bf, 2d12ca5, 7813c0c, 2aee980 (plus a follow-up metadata correction)
 ---
 
 # Mid-turn messaging and folder hardening — 2026-08-23
