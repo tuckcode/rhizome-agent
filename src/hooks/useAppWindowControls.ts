@@ -45,6 +45,7 @@ interface AppWindowControls {
   rawToggleRef: MutableRefObject<() => void>
   sidebarVisible: boolean
   tableOfContentsToggleRef: MutableRefObject<() => void>
+  viewMode: ViewMode
   zoom: ReturnType<typeof useZoom>
 }
 
@@ -101,7 +102,7 @@ export function useAppWindowControls({
     tableOfContentsToggleRef,
   } = useAppWindowActionRefs()
 
-  const { setViewMode, sidebarVisible, noteListVisible } = useViewMode(
+  const { viewMode, setViewMode, sidebarVisible, noteListVisible } = useViewMode(
     windowMode ? 'editor-only' : undefined,
   )
   const zoom = useZoom()
@@ -150,6 +151,7 @@ export function useAppWindowControls({
     rawToggleRef,
     sidebarVisible,
     tableOfContentsToggleRef,
+    viewMode,
     zoom,
   }
 }
