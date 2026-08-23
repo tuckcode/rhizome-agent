@@ -317,3 +317,13 @@ Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `
 
 Single-context layout — root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
 
+## Learned User Preferences
+
+- Prefers code reviews to be short and actionable.
+- When discussing GitHub issues or work items, pair the number with a brief plain-language description instead of using the number alone.
+
+## Learned Workspace Facts
+
+- Prime mid-turn messaging has two tracked correctness risks: the fallback can drop messages through a stale active-state closure, and the Rust queue command does not propagate Prime's `data.queued` admission result; see C43/C44 in `docs/HANDOFF.md`.
+- On macOS, restoring a hidden main window requires unhiding the application first (`app.show()`), then unminimize, show, and focus. `lib.rs::focus_main_window` is the shared path; menu-bar and tray reopen must delegate to it.
+

@@ -51,7 +51,7 @@ file.
 
 ## State
 
-`main` pushed through `97ddb6e`, tree clean. Prime **0.7.4** on Windows speaks
+`main` pushed through `bb520e3`, tree clean. Prime **0.7.4** on Windows speaks
 `\\.\pipe\prime-agent-daemon` — see `docs/WINDOWS-DEV.md`. On macOS/Linux the
 daemon dies with whatever terminal starts it, so start it detached:
 
@@ -65,6 +65,7 @@ critical path at ~120s, coverage 85s of it).
 ## Recent sessions
 
 - [2026-08-22 (evening) · Grok 4.6](plans/handoffs/2026-08-22-2108-grok-4-6-window-navigation-guard.md) — #43 window-level navigation guard built on the Tauri 2.10 plugin `on_navigation` hook (config-declared main window, so no window rebuild); off-origin links route to the system browser, webview never leaves; 7 Rust unit tests on the centralized policy; Rust gates green at 85.57%
+- [2026-08-22 · GPT-5.6 Luna](plans/handoffs/2026-08-22-2137-gpt-5.6-luna-recent-changes-review.md) — review of today's chat/native-chrome/pre-push changes; C43/C44 record two mid-turn message-loss paths, and the browser helper's repeated install check
 - [2026-08-22 · Claude Opus 5](plans/handoffs/2026-08-22-1100-claude-opus-5-ux-sweep.md) — Windows pipe landed by Cursor then its roster hang fixed; the ignored live-daemon tests run for the first time; C32 closed; a UX sweep found a silent screen-reader bug, a dead button and a session-select regression; #31–#39 opened
 - [2026-08-21 (evening) · Claude Opus 5](plans/handoffs/2026-08-21-1930-claude-opus-5-lazy-sessions.md) — #28's root cause: a vault attach creates no Prime session, verified against a live daemon; #28 closed, #30 opened and then finished (row labels, where a session ran, archiving); C33, test files typechecked behind a named exclusion list; and localization restated as decided
 - [2026-08-21 · Claude Opus 5](plans/handoffs/2026-08-21-1640-claude-opus-5-push-gate.md) — confetti end to end (ADR-0164), Chat home's rail and sessions column, #28, and the push gate cut from ~4m30s to ~2m16s
@@ -190,6 +191,21 @@ push is not a release — releases are tagged builds with signed installers.
 4. `docs/plans/2026-07-10-rhizome-desktop-alpha-roadmap.md`
 5. `AGENTS.md` at repo root
 ## Open threads
+
+- **C44-OPEN: Prime follow-up admission is not propagated through Rust.**
+  `prime_session_host::queue_message` returns `true` whenever the RPC call
+  succeeds, but Prime's `follow_up` response includes `data.queued`. The
+  frontend therefore cannot tell an accepted queue from a rejected race and
+  may show a queued message that Prime did not retain. Review:
+  `docs/plans/handoffs/2026-08-22-2137-gpt-5.6-luna-recent-changes-review.md`.
+
+- **C43-OPEN: mid-turn Steer/follow-up fallback can silently drop messages.**
+  `AiPanel.tsx` falls back to `sendAsNewTurn` when queueing returns false, but
+  that callback captures `handleSend` from an active render and
+  `useAiPanelController.handleSend` refuses sends while `isActive` is true.
+  Transport errors are also collapsed into the same false result. Fix the
+  state/error distinction and add a race regression test. Review:
+  `docs/plans/handoffs/2026-08-22-2137-gpt-5.6-luna-recent-changes-review.md`.
 
 - **C42-OPEN: Rhizome Agent has never been launched on Windows, and the docs
   said otherwise.** Atticus, 2026-08-22: *"i forgot it doesnt work on windows
