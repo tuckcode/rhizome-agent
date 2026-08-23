@@ -6,7 +6,7 @@ mod rename_cmds;
 mod scan_cmds;
 mod view_cmds;
 
-pub(super) use boundary::VaultBoundary;
+pub(super) use boundary::{with_registered_boundary, VaultBoundary};
 pub use file_cmds::*;
 pub use frontmatter_cmds::*;
 pub use lifecycle_cmds::*;

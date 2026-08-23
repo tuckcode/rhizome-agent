@@ -1,6 +1,6 @@
 use crate::vault::{self, FolderRenameResult};
 
-use super::expand_tilde;
+use super::vault::with_registered_boundary;
 
 #[tauri::command]
 pub fn rename_vault_folder(
@@ -8,18 +8,18 @@ pub fn rename_vault_folder(
     folder_path: String,
     new_name: String,
 ) -> Result<FolderRenameResult, String> {
-    let vault_path = expand_tilde(&vault_path);
-    vault::rename_folder(
-        std::path::Path::new(vault_path.as_ref()),
-        &folder_path,
-        &new_name,
-    )
+    with_registered_boundary(&vault_path, |boundary| {
+        boundary.validate_writable_path(&folder_path)?;
+        vault::rename_folder(boundary.requested_root(), &folder_path, &new_name)
+    })
 }
 
 #[tauri::command]
 pub fn delete_vault_folder(vault_path: String, folder_path: String) -> Result<String, String> {
-    let vault_path = expand_tilde(&vault_path);
-    vault::delete_folder(std::path::Path::new(vault_path.as_ref()), &folder_path)
+    with_registered_boundary(&vault_path, |boundary| {
+        boundary.validate_writable_path(&folder_path)?;
+        vault::delete_folder(boundary.requested_root(), &folder_path)
+    })
 }
 
 #[cfg(test)]
@@ -27,24 +27,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn folder_commands_route_through_vault_path_boundary() {
+    fn folder_commands_reject_an_unregistered_vault_root() {
         let dir = tempfile::TempDir::new().unwrap();
         let vault_path = dir.path().to_string_lossy().to_string();
         let folder = dir.path().join("Inbox");
         std::fs::create_dir(&folder).unwrap();
         std::fs::write(folder.join("note.md"), "# Note\n").unwrap();
 
-        let renamed = rename_vault_folder(
+        let rename_error = rename_vault_folder(
             vault_path.clone(),
             "Inbox".to_string(),
             "Organized".to_string(),
         )
-        .unwrap();
-        assert!(renamed.new_path.ends_with("Organized"));
-        assert!(dir.path().join("Organized/note.md").exists());
+        .expect_err("an arbitrary root must not be accepted as a vault");
+        assert_eq!(rename_error, "Vault path must be registered");
+        assert!(dir.path().join("Inbox/note.md").exists());
 
-        let deleted = delete_vault_folder(vault_path, "Organized".to_string()).unwrap();
-        assert_eq!(deleted, "Organized");
-        assert!(!dir.path().join("Organized").exists());
+        let delete_error = delete_vault_folder(vault_path, "Inbox".to_string())
+            .expect_err("an arbitrary root must not be accepted as a vault");
+        assert_eq!(delete_error, "Vault path must be registered");
+        assert!(dir.path().join("Inbox/note.md").exists());
     }
 }

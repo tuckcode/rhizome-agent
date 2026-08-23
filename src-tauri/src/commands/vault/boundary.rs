@@ -8,6 +8,7 @@ pub(crate) const ACTIVE_VAULT_PATH_ERROR: &str = "Path must stay inside the acti
 const ACTIVE_VAULT_MISMATCH_ERROR: &str = "Vault path must match the active vault";
 const ACTIVE_VAULT_UNAVAILABLE_ERROR: &str = "Active vault is not available";
 const NO_ACTIVE_VAULT_ERROR: &str = "No active vault selected";
+const UNREGISTERED_VAULT_ERROR: &str = "Vault path must be registered";
 pub(crate) const INVALID_VIEW_FILENAME_ERROR: &str = "Invalid view filename";
 
 #[derive(Clone, Debug)]
@@ -309,6 +310,21 @@ pub(crate) fn with_boundary<T>(
     action: impl FnOnce(&VaultBoundary) -> Result<T, String>,
 ) -> Result<T, String> {
     let boundary = VaultBoundary::from_request(requested_vault_path)?;
+    action(&boundary)
+}
+
+pub(crate) fn with_registered_boundary<T>(
+    requested_vault_path: &str,
+    action: impl FnOnce(&VaultBoundary) -> Result<T, String>,
+) -> Result<T, String> {
+    let requested = build_vault_root_paths(requested_vault_path)?;
+    if !is_registered_vault_root(&requested)? {
+        return Err(UNREGISTERED_VAULT_ERROR.to_string());
+    }
+    let boundary = VaultBoundary {
+        requested_root: requested.requested,
+        canonical_root: requested.canonical,
+    };
     action(&boundary)
 }
 
