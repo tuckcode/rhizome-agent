@@ -74,6 +74,8 @@ interface SidebarProps {
   allNotesFileVisibility?: AllNotesFileVisibility
   pluralizeTypeLabels?: boolean
   locale?: AppLocale
+  /** Which edge the sidebar is docked to. See SidebarTitleBar's `dock`. */
+  dock?: 'left' | 'right'
   onCollapse?: () => void
   onGoBack?: () => void
   onGoForward?: () => void
@@ -693,6 +695,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
     <aside className="flex h-full flex-col overflow-hidden border-r border-[var(--sidebar-border)] bg-sidebar text-sidebar-foreground">
       <SidebarTitleBar
         locale={locale}
+        dock={props.dock}
         onCollapse={props.onCollapse}
         onGoBack={props.onGoBack}
         onGoForward={props.onGoForward}

@@ -55,4 +55,24 @@ describe('SidebarTitleBar', () => {
     expect(lockup.textContent).toBe('rhizome')
     expect(lockup.querySelector('[data-testid="brand-mark"]')).toBeInTheDocument()
   })
+  it('drops the traffic-light gutter when docked right', () => {
+    // The 90px left inset exists only to clear the macOS traffic lights. On
+    // the trailing edge they are the command rail's problem, and the inset is
+    // just dead space pushing the controls into the middle of the bar.
+    const { container } = renderTitleBar({ onCollapse: vi.fn(), dock: 'right' })
+    const bar = container.firstChild as HTMLElement
+    expect(bar.style.paddingLeft).toBe('8px')
+  })
+
+  it('keeps the traffic-light gutter when docked left', () => {
+    const { container } = renderTitleBar({ onCollapse: vi.fn(), dock: 'left' })
+    const bar = container.firstChild as HTMLElement
+    expect(bar.style.paddingLeft).toBe('90px')
+  })
+
+  it('mirrors the collapse glyph so it points at the edge it closes toward', () => {
+    renderTitleBar({ onCollapse: vi.fn(), dock: 'right' })
+    const svg = screen.getByRole('button', { name: 'Collapse sidebar' }).querySelector('svg')
+    expect(svg).toHaveAttribute('transform', 'scale(-1, 1)')
+  })
 })
