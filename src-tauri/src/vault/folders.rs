@@ -36,7 +36,19 @@ fn ensure_relative_folder_path(folder_path: &str) -> Result<PathBuf, String> {
         return Err("Folder path cannot escape the vault root".to_string());
     }
 
-    Ok(relative.to_path_buf())
+    // `.` and `./` carry no `..`, so the guard above lets them through while
+    // they still resolve to the vault root. `remove_dir_all` empties a
+    // directory before removing it, so the root's contents were being deleted
+    // even where the final rmdir failed.
+    let normalized: PathBuf = relative
+        .components()
+        .filter(|component| !matches!(component, Component::CurDir))
+        .collect();
+    if normalized.as_os_str().is_empty() {
+        return Err("Folder path cannot target the vault root".to_string());
+    }
+
+    Ok(normalized)
 }
 
 fn display_relative_path(path: &Path) -> String {
@@ -189,5 +201,29 @@ mod tests {
         let error = delete_folder(dir.path(), "projects").unwrap_err();
 
         assert_eq!(error, "Folder does not exist: projects");
+    }
+
+    /// `.` resolved to the vault root itself, so a recursive delete would have
+    /// taken the whole vault. The traversal guard only looked for `..`.
+    #[test]
+    fn folder_operations_refuse_to_target_the_vault_root() {
+        let dir = TempDir::new().unwrap();
+        make_folder(&dir, "projects");
+
+        for folder_path in [".", "./", "./."] {
+            let delete_error = delete_folder(dir.path(), folder_path).unwrap_err();
+            assert_eq!(
+                delete_error, "Folder path cannot target the vault root",
+                "delete accepted {folder_path}"
+            );
+
+            let rename_error = rename_folder(dir.path(), folder_path, "renamed").unwrap_err();
+            assert_eq!(
+                rename_error, "Folder path cannot target the vault root",
+                "rename accepted {folder_path}"
+            );
+        }
+
+        assert!(dir.path().join("projects").is_dir());
     }
 }
