@@ -26,6 +26,7 @@ Not v0: second full wiki/PKM product; multi-CLI agent matrix as product; silent 
 |-----------|-----|
 | **Hermes Agent Desktop** | Bar for “harness feels native inside a chat desktop” (install depth, status, tooling presence). Internal craft bar — not the external brand story. |
 | **Prime Agent** | Only runtime; RPC host already landed; skills/providers/continual harness are Prime’s. |
+| **Selective harness doctrine** | What to take from Hermes / DeepSeek / others: contracts and artifacts, never organs. `docs/design/harness-doctrine.md`, ADR-0168. |
 | **Rhizome vault method** | Durable memory SoT; MCP + open-note + promote. |
 
 ## 5. Product principles (locked)
@@ -37,7 +38,7 @@ Not v0: second full wiki/PKM product; multi-CLI agent matrix as product; silent 
 5. **Default toolkit** (vault skill first); no Safe/Power product mode for circle v0 — extend via more Prime skills. *(Was Safe/Power; reframed 2026-08-09.)*  
 6. **Chat-first UX** with enough note UI to open/edit from tools (not full Desktop chrome).  
 7. **Circle v0 may BYO `prime-agent`.** Bundled runtime is a later phase exit criterion.  
-8. **v0 harness depth = core loop + skills/extensions + working status.** Broader Hermes-like parity is post-v0 (“D eventually”).
+8. **v0 harness depth = core loop + skills/extensions + working status.** Broader Hermes-like *feel* is post-v0 and user-pulled. It is not command-count parity with Prime, and it is not a license to graft other runtimes. See `docs/design/harness-doctrine.md` (ADR-0168).
 
 ## 6. v0 exit checklist (trusted circle)
 
@@ -122,7 +123,7 @@ Eng:
 
 ### Phase 5 — Later (post-v0)
 
-- Broader harness-desktop parity (plan mode UX, autonomous, heartbeats/cron surfaces, etc.) as product pulls  
+- User-pulled Prime surfaces (queue, subagent tree, schedules, refine, model/auth catalog) as Rhizome UX over Prime — not command-count parity, not a second runtime (ADR-0168)  
 - Hard-delete unused Desktop DNA (dead agent adapters, unreachable panels)  
 - Optional: multi-vault sessions, full session library UI, deeper continual-harness↔vault bridges  
 

@@ -362,8 +362,12 @@ it is the single most important thing to know before reading any of the Prime
 code — the subprocess mental model from `cli_agent_runtime.rs` does not apply
 and will mislead you.
 
-Concretely: closing the window is a **detach**, not a kill. A session keeps
-running, and a goal or heartbeat can fire while Rhizome is closed.
+Concretely, **the current code** still creates resident sessions, so closing
+the window is a detach and a session can keep running. **That is no longer
+the decided policy.** ADR-0167 makes new work foreground-owned; background
+execution is an explicit grant. ADR-0168 is the broader take/leave rule:
+Rhizome renders Prime, it does not become a second runtime. See
+`docs/design/harness-doctrine.md`.
 
 #### The two modules, and why confusing them is the classic mistake
 

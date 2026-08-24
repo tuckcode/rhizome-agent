@@ -1,6 +1,7 @@
 # Rhizome as a memory-native agent harness
 
-Design vision (draft). Not an implementation plan until ratified.
+Design vision (draft). Product shape only. The ratified take/leave rule is
+[`harness-doctrine.md`](./harness-doctrine.md) (ADR-0168).
 
 ## The idea in one line
 
@@ -73,7 +74,8 @@ Markdown vault on disk  ← single source of truth
 2. **Prime runs** — hard agent loops, subagents, long jobs live in [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent).  
 3. **Rhizome presents** — desktop UI, research/memory ops, session chrome.  
 4. **Refine → notes** — harness “memory” should materialize into the vault over time, not stay forever only under `~/.prime`.  
-5. **Hermes** = “this should feel as capable as a serious agent product,” not “fork Hermes.”
+5. **Hermes** = “this should feel as capable as a serious agent product,” not “fork Hermes.”  
+6. **Selective borrowing** — absorb contracts and artifacts from other harnesses; never transplant their control loops (ADR-0168).
 
 ## What this is *not*
 

@@ -51,10 +51,10 @@ file.
 
 ## State
 
-`origin/main` is pushed through `aed471b`; local `main` contains the earlier
-menu-bar fix (`760f63c`) plus this session's messaging, folder-boundary,
-dependency-security (C45), and lifecycle-decision (C47 / ADR-0167) commits.
-Final dependency scan has 0 Critical/High; frontend and Rust coverage pass.
+`origin/main` is pushed through `aed471b`; local `main` is ahead with the
+messaging, folder-boundary, dependency-security (C45), lifecycle (C47 /
+ADR-0167), and selective-harness-doctrine (ADR-0168) work. Final dependency
+scan has 0 Critical/High; frontend and Rust coverage pass.
 Prime **0.7.4** on Windows speaks
 `\\.\pipe\prime-agent-daemon` — see `docs/WINDOWS-DEV.md`. On macOS/Linux the
 daemon dies with whatever terminal starts it, so start it detached:
@@ -68,6 +68,7 @@ critical path at ~120s, coverage 85s of it).
 
 ## Recent sessions
 
+- [2026-08-23 (evening) · GPT-5.6 Sol](plans/handoffs/2026-08-23-1920-gpt-5-6-sol-harness-doctrine.md) — selective harness doctrine ratified (ADR-0168): borrow contracts/artifacts, never second runtimes; Prime/Hermes/DeepSeek source reviews + five-frame scoring
 - [2026-08-23 · GPT-5.6 Sol](plans/handoffs/2026-08-23-1518-gpt-5-6-sol-mid-turn-and-folder-hardening.md) — C43/C44 and destructive folder paths fixed; Codacy activated and all High dependency findings patched; Switchyard evaluated behind Prime; foreground-owned sessions decided in ADR-0167
 - [2026-08-22 (evening) · Grok 4.6](plans/handoffs/2026-08-22-2108-grok-4-6-window-navigation-guard.md) — #43 window-level navigation guard built on the Tauri 2.10 plugin `on_navigation` hook (config-declared main window, so no window rebuild); off-origin links route to the system browser, webview never leaves; 7 Rust unit tests on the centralized policy; Rust gates green at 85.57%
 - [2026-08-22 · GPT-5.6 Luna](plans/handoffs/2026-08-22-2137-gpt-5.6-luna-recent-changes-review.md) — review of today's chat/native-chrome/pre-push changes; C43/C44 record two mid-turn message-loss paths, and the browser helper's repeated install check
@@ -195,7 +196,25 @@ push is not a release — releases are tagged builds with signed installers.
 3. `docs/ARCHITECTURE.md`
 4. `docs/plans/2026-07-10-rhizome-desktop-alpha-roadmap.md`
 5. `AGENTS.md` at repo root
+
 ## Open threads
+
+- **C50-DECIDED (2026-08-24): selective harness doctrine.** Rhizome absorbs
+  contracts and artifacts from other harnesses, never their control loops or
+  memory stores. Prime remains the only execution core. Coverage is by user
+  job, not Prime command count. Ledger: `docs/design/harness-doctrine.md`,
+  ADR-0168. Source reviews and divergence scoring are in `docs/plans/2026-08-24-*`.
+  OpenHuman was named in the frames but has no first-party review yet.
+
+- **C49-OPEN (2026-08-23): Mycelium click produces a white overlay.** Native
+  and browser reproduction: the process stays alive; this is a renderer/UI
+  fault, not a hard crash. Not diagnosed.
+
+- **C48-OPEN (2026-08-23): model picker shows two models while Prime reports
+  hundreds.** A live 0.8.0 daemon advertised 501 available models; the Rhizome
+  picker showed two. This is a fidelity bug under ADR-0168 (render Prime's
+  catalog), not evidence that Prime lost models. Also note `@tauri-apps/api`
+  is still 2.10.1 against Rust `tauri` 2.11.1 from the C45 bump.
 
 - **C47-DECIDED (2026-08-23, implementation pending): Prime sessions are
   foreground-owned by default; background work is an explicit grant.** Atticus
