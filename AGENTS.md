@@ -351,9 +351,9 @@ Single-context layout — root `CONTEXT.md` + `docs/adr/`. See `docs/agents/doma
 
 ## Learned User Preferences
 
-- Prefers code reviews to be short and actionable.
+- Prefers short, direct answers over walls of text; code reviews should stay short and actionable.
 - When discussing GitHub issues or work items, pair the number with a brief plain-language description instead of using the number alone.
-- Shares strategy docs as decision context for joint calls, not as implementation to-dos.
+- Shares strategy docs and harness take/leave recommendations as decision context for joint calls, not as final implementation decisions.
 - Wants background agent execution to be explicit: active window close should default to stopping work, while explicitly scheduled work may continue if it stays visible and revocable.
 
 ## Learned Workspace Facts
