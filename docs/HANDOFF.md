@@ -75,6 +75,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-08-24 · Claude Opus 5](plans/handoffs/2026-08-24-2122-claude-opus-5-shell-dock-and-next-index.md) — note tree docked right and ADR-0166 for the chat-centred shell (three questions left open); a tree/list exclusivity attempt reverted after it broke Cmd+N and inbox auto-advance; stale Tolaria/Desktop naming fixed in six live docs; the Linux/Windows menu bar tracks the pointer; scheduled security review found nothing above the bar; `docs/NEXT.md` added
 - [2026-08-24 · Grok 4.6](plans/handoffs/2026-08-24-1350-grok-4-6-c47-client-owned.md) — C47: client_owned create, promote/complete, idle detach, active-close dialog, quit without the global keep-running toggle
 - [2026-08-23 (wrap) · Grok 4.6](plans/handoffs/2026-08-23-2316-grok-4-6-session-wrap.md) — day closed; doctrine already on origin; local leftover is title clearance, Tauri JS align, C48/C49 corrections, Book → Skill; C47 still next
 - [2026-08-23 (late) · Grok 4.6](plans/handoffs/2026-08-23-2248-grok-4-6-book-to-skill.md) — Research Generate gained a Book → Skill format (`book-to-skill`); instruction produces a SKILL.md-shaped wiki page, does not vendor virgiliojr94/book-to-skill
