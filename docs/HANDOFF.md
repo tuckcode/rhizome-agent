@@ -66,6 +66,13 @@ daemon dies with whatever terminal starts it, so start it detached:
 A push runs the gates in ~2m16s (three parallel lanes; the frontend lane is the
 critical path at ~120s, coverage 85s of it).
 
+## What to pick up next
+
+`docs/NEXT.md` — unclaimed work in one place: open issues by theme, the
+decisions that block some of them, the open C-numbers, and where the design
+docs need filling. Read it when a handoff task is finished and the next one is
+yours to choose.
+
 ## Recent sessions
 
 - [2026-08-24 · Grok 4.6](plans/handoffs/2026-08-24-1350-grok-4-6-c47-client-owned.md) — C47: client_owned create, promote/complete, idle detach, active-close dialog, quit without the global keep-running toggle
