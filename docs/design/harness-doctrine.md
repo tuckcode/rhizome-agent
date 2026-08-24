@@ -18,6 +18,9 @@ The earlier vision draft, [`rhizome-prime-harness-vision.md`](./rhizome-prime-ha
 still states the product shape. This file is the decision about what to take
 from other harnesses and what to leave behind.
 
+Composition working notes (option 2, unratified — discuss/decide):
+[`harness-composition.md`](./harness-composition.md).
+
 ## One sentence
 
 **Rhizome absorbs metabolites, not organs.** Prime remains the only execution

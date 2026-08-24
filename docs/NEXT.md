@@ -19,21 +19,49 @@ gh issue list --state open --limit 60 && grep -c "C[0-9]*-OPEN" docs/HANDOFF.md
 
 ## 1. Decide before building
 
-Three of these gate work that is otherwise ready. A session that picks up a
+Four of these gate work that is otherwise ready. A session that picks up a
 blocked issue without settling its decision first will guess, and the guess
 will be re-litigated later.
 
+### Harness composition — decide this first; it dictates how we build
+
+Full writeup (working notes, not an ADR):
+[`docs/design/harness-composition.md`](design/harness-composition.md).
+Filter: ADR-0168 / [`harness-doctrine.md`](design/harness-doctrine.md).
+
+**Discuss / decide before grafting.** Working intent from 2026-08-24:
+
+- **Option 2:** Rhizome is the product harness; Prime stays the only engine
+  and keeps receiving Prime updates through a thin versioned adapter.
+  Foreign pieces live in Rhizome (UX, vault, policy) or as Prime
+  skills / MCP / extensions — never forked into Prime, never a second loop.
+- **DeepSeek plugins:** take the *idea* (add behavior / hook a turn / block
+  a tool without forking the loop). Do not port Cordis or load `dsh`
+  plugins. Prime extensions already have those hooks.
+- **Proposed first slice if ratified:** native extension UI (`extension_ui`
+  — select / confirm / input). Rhizome auto-cancels those today.
+- **Corrections:** Hermes Agent is its own runtime, not built on OpenCode.
+  OpenCode stays reject-as-backend (weekend NotebookLM still assigned it
+  context/routing — that disagreement is part of the decide list).
+
+Still open: ratify option 2; ratify the first slice; name remaining
+incompatibilities (especially one write authority for memory). #5 cannot
+finish until this is yes enough to build against. Closing #40 against the
+filter is not “composition done.”
+
+Layers, per-harness verdicts, and the Prime-update split live in the
+composition doc — do not restate them here.
+
 | Decision | Blocks | Where it stands |
 |---|---|---|
+| **Harness composition: option 2 + first slice** | #5, #40, and any graft of a foreign harness idea | Filter ratified (ADR-0168). Working notes in `harness-composition.md`. Still discuss/decide: ratify option 2, ratify native extension UI as first slice, name remaining incompatibilities. |
 | **What ⌘1/⌘2/⌘3 and "Full Layout" mean once Chat is the centre** | #27, and any further shell work | ADR-0166 lists it as open. `viewMode`'s three states are wired through `viewCommands.ts`, the command palette, `PulseView`, and `useMainWindowSizeConstraints` — the ladder has no meaning when a fourth surface (Chat) is permanent |
 | **Does Wiki Graph replace the canvas or feed a side panel** | #39, #11, #22 | ADR-0166 open question. It is a full-canvas destination today, same as Chat was |
 | **Right panel exclusivity (Inbox / Notes / Changes, never two)** | #27, #34 | Attempted 2026-08-22, reverted in `64b2e89`: making `all` resolve to tree-only broke Cmd+N, inbox auto-advance and note selection, because real flows assume the note list is visible on load. Needs a control the user opts into, not a changed default |
 
-**#40 ("is Rhizome a harness, or a client of harnesses?") looks answered.**
-ADR-0168 ratified *"Rhizome absorbs metabolites, not organs"* — take contracts
-and artifacts, reject second runtimes. That is the answer #40 asked for. The
-issue is still `needs-info` and still open. Someone should either close it
-citing ADR-0168, or say what it still asks that the ADR does not settle.
+**#40** can close against ADR-0168 (Rhizome is a client of Prime, not a second
+harness). Do not treat that close as "the harness question is done."
+Ratify `harness-composition.md` before grafting.
 
 Two ideas are in play for the Chat-centre question and neither is decided —
 split the centre horizontally (editor on top, Chat as a collapsible bottom
@@ -93,8 +121,8 @@ from the 2026-08-22 handoff.
 **Specs**
 | | |
 |---|---|
-| #5 | Spec: the Prime harness surface — parent of #40 |
-| #40 | Harness or client — see §1 |
+| #5 | Spec: the Prime harness surface — parent of #40; **B** on §1 / `harness-composition.md` |
+| #40 | Harness or client — filter answered (ADR-0168); composition still discuss/decide |
 
 #29 is the only open issue with a security consequence: chat content is written
 to the vault and pushed to a remote. Worth pulling forward past its position
@@ -162,14 +190,20 @@ Worth doing, in order:
    The rest still stands. Do not treat the whole document as dead.
 
 Not needed: a new theme doc (`rhizome-default-themes.md` is thorough and
-current), and nothing for the harness question (ADR-0168 just settled it).
+current). The harness *filter* is settled (ADR-0168). Composition working
+notes now live in [`harness-composition.md`](design/harness-composition.md);
+they are not ratified. Do not treat the doctrine or that file as a license
+to start grafting.
 
 ---
 
 ## 5. If you want a suggested order
 
-1. **Close #40 against ADR-0168** — minutes, removes an open question that is
-   already answered.
+1. **Harness composition (§1)** — discuss/decide
+   [`harness-composition.md`](design/harness-composition.md) (option 2,
+   DeepSeek *idea* on Prime extensions, first slice = native extension UI).
+   Until ratified, do not graft. Closing **#40** against the filter is a
+   side-errand, not a substitute.
 2. **#29, credential redaction** — only open issue with a security consequence.
 3. **The composer cluster (#38, #9, #35, #21)** — unblocked, one surface, and
    §4.4's spec pays for itself immediately.

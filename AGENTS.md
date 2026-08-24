@@ -353,7 +353,7 @@ Single-context layout — root `CONTEXT.md` + `docs/adr/`. See `docs/agents/doma
 
 - Prefers short, direct answers over walls of text; code reviews should stay short and actionable.
 - When discussing GitHub issues or work items, pair the number with a brief plain-language description instead of using the number alone.
-- Shares strategy docs and harness take/leave recommendations as decision context for joint calls, not as final implementation decisions.
+- Shares strategy docs and harness take/leave recommendations as decision context for joint calls, not as a shipped bill of materials. Intended product shape is option 2 (Rhizome harness, Prime engine); the take/adapt/reject/defer matrix with named incompatibilities is still unwritten.
 - Wants background agent execution to be explicit: active window close should default to stopping work, while explicitly scheduled work may continue if it stays visible and revocable.
 
 ## Learned Workspace Facts
@@ -361,6 +361,7 @@ Single-context layout — root `CONTEXT.md` + `docs/adr/`. See `docs/agents/doma
 - Prime mid-turn messaging is tri-state: accepted, no longer running, or transport failure. Follow-ups propagate Prime's `data.queued`; fallback starts a new turn only from the latest idle UI state. C43/C44 record why.
 - On macOS, restoring a hidden main window requires unhiding the application first (`app.show()`), then unminimize, show, and focus. `lib.rs::focus_main_window` is the shared path; menu-bar and tray reopen must delegate to it.
 - Rhizome is the desk and durable memory; Prime is the engine. Chat first, vault on purpose. Memory is gated; execution is not.
-- Selective harness doctrine: absorb contracts and artifacts from Hermes/DeepSeek/others, never their runtimes or memory stores. Coverage is by user job, not Prime command count. Ledger: `docs/design/harness-doctrine.md` (ADR-0168).
-- Prime supports `client_owned` sessions that stop after a disconnected-client grace period and can be promoted to `resident`; Rhizome currently creates sessions as `resident`, the key seam for foreground-only defaults.
+- Selective harness doctrine (option 2): Rhizome is the product harness; Prime remains the only execution core and keeps receiving Prime updates through a thin versioned adapter. Absorb contracts and artifacts from Hermes/DeepSeek/others, never their runtimes or memory stores. Foreign pieces live in Rhizome (UX, vault, policy) or as Prime skills/MCP/extensions — never forked or patched into Prime. Coverage is by user job, not Prime command count. Ledger: `docs/design/harness-doctrine.md` (ADR-0168). Composition working notes: `docs/design/harness-composition.md` (unratified; `docs/NEXT.md` §1). Prime has no security sandbox; do not invent one in the desktop. Kern (getkern/kern) is Linux/WSL2 only.
+- DeepSeek's Cordis plugin system is rejected as a kernel port; take extensibility on Prime's existing seams instead. Hermes Agent is its own runtime (not built on OpenCode); OpenCode is a delegated skill in Hermes.
+- Prime supports `client_owned` sessions that stop after a disconnected-client grace period and can be promoted to `resident`; Rhizome creates new sessions as `client_owned` (ADR-0167 / C47). Idle close detaches; active close defaults to stop, with Keep working as an explicit promote. Quit follows ownership.
 
