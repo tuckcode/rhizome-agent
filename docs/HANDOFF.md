@@ -52,8 +52,8 @@ file.
 ## State
 
 `origin/main` is pushed through `e02e3c4`. Local `main` is ahead with
-`f37b805` (traffic-light clearance + Tauri JS 2.11.1) and the uncommitted
-Book → Skill slice. C47 (client-owned sessions) is still the next
+`f37b805` (traffic-light clearance + Tauri JS 2.11.1) and `0ce85ce`
+(Book → Skill). C47 (client-owned sessions) is still the next
 implementation. C48/C49 are closed as QA-environment misreads.
 Prime **0.7.4** on Windows speaks
 `\\.\pipe\prime-agent-daemon` — see `docs/WINDOWS-DEV.md`. On macOS/Linux the
