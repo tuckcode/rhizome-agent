@@ -202,6 +202,7 @@ pub fn mode_instruction(mode: &str) -> &'static str {
         "debugging-atlas" => "Write a practical debugging guide: common failure modes, symptoms, which logs and probes to check first, root-cause paths, and recovery flows.",
         "integration-plan" => "Write a concrete integration plan: the integration surface (APIs, hooks, events, CLI), data contracts, auth and error handling, and a step-by-step plan naming exact files.",
         "agent-handoff" => "Write everything an AI agent needs to work effectively in this repo: environment setup, test commands, CI gates, conventions, generated files, and do-not-touch areas.",
+        "book-to-skill" => "Turn the source into an Agent Skill: a SKILL.md-shaped page with a short name, one-line description, when to apply it, then chapters, a glossary, reusable patterns, and a one-page cheatsheet. Extract durable operating knowledge — do not transcribe the book.",
         _ => "Produce a comprehensive developer reference: entry points, data flow, key abstractions, and a component/tech-stack map.",
     }
 }
@@ -623,7 +624,7 @@ mod tests {
     }
 
     #[test]
-    fn mode_instruction_covers_all_ten_modes_distinctly() {
+    fn mode_instruction_covers_all_eleven_modes_distinctly() {
         let modes = [
             "architecture",
             "first-hour",
@@ -635,6 +636,7 @@ mod tests {
             "debugging-atlas",
             "integration-plan",
             "agent-handoff",
+            "book-to-skill",
         ];
         let instructions: std::collections::HashSet<_> =
             modes.iter().map(|m| mode_instruction(m)).collect();
@@ -644,6 +646,16 @@ mod tests {
             mode_instruction("nonsense"),
             mode_instruction("architecture")
         );
+    }
+
+    #[test]
+    fn book_to_skill_asks_for_a_skill_shaped_page_not_a_transcript() {
+        let instruction = mode_instruction("book-to-skill");
+        assert!(instruction.contains("Agent Skill"));
+        assert!(instruction.contains("chapters"));
+        assert!(instruction.contains("glossary"));
+        assert!(instruction.contains("cheatsheet"));
+        assert!(instruction.contains("do not transcribe"));
     }
 
     #[test]

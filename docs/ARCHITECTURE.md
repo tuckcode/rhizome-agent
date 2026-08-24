@@ -1021,7 +1021,12 @@ A built-in research format is, to the pipeline, exactly one imperative
 sentence: `rhizome_repo_research::mode_instruction` maps an id to it and
 falls back to `architecture` for anything unrecognised. There is no enum and
 no validation gate — which is why a *custom* format needed no new concept,
-only storage: `{ id, title, instruction }`.
+only storage: `{ id, title, instruction }`. Built-ins live in
+`RhizomeFormatModal.tsx`'s `RESEARCH_MODES` plus the matching
+`mode_instruction` arm; `book-to-skill` is the eleventh, and it asks for a
+SKILL.md-shaped wiki page (chapters, glossary, patterns, cheatsheet) rather
+than vendoring [book-to-skill](https://github.com/virgiliojr94/book-to-skill)
+as a second extractor.
 
 `src-tauri/src/rhizome_research_formats.rs` keeps them per vault in
 `.rhizome/research-formats.json`, alongside events and the repo cache rather

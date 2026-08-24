@@ -51,6 +51,15 @@ beforeEach(() => {
   tracked.counts = []
 })
 
+describe('RhizomeFormatModal built-in formats', () => {
+  it('offers Book → Skill as a built-in research format', async () => {
+    renderModal()
+
+    expect(await screen.findByText('Book → Skill')).toBeInTheDocument()
+    expect(screen.getByText('Agent skill')).toBeInTheDocument()
+  })
+})
+
 describe('RhizomeFormatModal custom formats', () => {
   it('renders saved formats alongside the built-in ones', async () => {
     invoked.formats = [{ id: 'q3', title: 'Q3 Lens', instruction: 'Read it as a plan.' }]

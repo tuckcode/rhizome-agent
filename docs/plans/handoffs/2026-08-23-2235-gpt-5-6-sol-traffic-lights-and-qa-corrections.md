@@ -6,7 +6,7 @@ description: >-
   with Rust 2.11.1, and closed C48/C49 after proving both were QA-environment
   misreads rather than product defects.   Frontend, coverage, build, MCP,
   Playwright, and Codacy gates pass.
-commits: pending local wrap-up
+commits: f37b805
 ---
 
 # Traffic lights and QA corrections — 2026-08-23
