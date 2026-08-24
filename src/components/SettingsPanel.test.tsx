@@ -195,40 +195,12 @@ describe('SettingsPanel', () => {
     expectSettingsSaved({ ai_features_enabled: true })
   })
 
-  /**
-   * Default off: quitting stops the agent, the way Claude Code and Hermes
-   * behave. A user who wants a heartbeat to keep firing after quit has to say
-   * so — running work the user cannot see is not something to opt them into.
-   */
-  it('keeps sessions running after quit only when the user asks', () => {
+  it('does not offer a global keep-sessions-running-on-quit toggle', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
-    const toggle = () =>
-      within(screen.getByTestId('settings-keep-sessions-running-on-quit')).getByRole('switch')
-    expect(toggle()).toHaveAttribute('aria-checked', 'false')
-
-    fireEvent.click(toggle())
-    saveSettingsPanel()
-
-    expectSettingsSaved({ keep_sessions_running_on_quit: true })
-  })
-
-  /** A stored preference must survive reopening the panel. */
-  it('shows the stored preference when sessions are set to keep running', () => {
-    render(
-      <SettingsPanel
-        open={true}
-        settings={{ ...emptySettings, keep_sessions_running_on_quit: true }}
-        onSave={onSave}
-        onClose={onClose}
-      />
-    )
-
-    expect(
-      within(screen.getByTestId('settings-keep-sessions-running-on-quit')).getByRole('switch'),
-    ).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByTestId('settings-keep-sessions-running-on-quit')).toBeNull()
   })
 
   it('updates the draft language when stored settings finish loading', () => {

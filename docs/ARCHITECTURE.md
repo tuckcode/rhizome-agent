@@ -362,11 +362,12 @@ it is the single most important thing to know before reading any of the Prime
 code — the subprocess mental model from `cli_agent_runtime.rs` does not apply
 and will mislead you.
 
-Concretely, **the current code** still creates resident sessions, so closing
-the window is a detach and a session can keep running. **That is no longer
-the decided policy.** ADR-0167 makes new work foreground-owned; background
-execution is an explicit grant. ADR-0168 is the broader take/leave rule:
-Rhizome renders Prime, it does not become a second runtime. See
+New sessions are `client_owned` (ADR-0167). Idle close detaches; the owned
+worker expires after Prime's reconnect grace. Active close asks, with
+**Stop and close** as the default and **Keep working** as an explicit
+`promote_owned_session`. The daemon may stay available; that is not the same
+as an agent still working. ADR-0168 is the broader take/leave rule: Rhizome
+renders Prime, it does not become a second runtime. See
 `docs/design/harness-doctrine.md`.
 
 #### The two modules, and why confusing them is the classic mistake

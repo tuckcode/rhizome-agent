@@ -39,10 +39,17 @@ const DAEMON_PROTOCOL_VERSION: u64 = 7;
 
 /// What this client can handle. `slim_attach` keeps the attach reply small by
 /// omitting the duplicated top-level `state`/`messages` — the snapshot carries
-/// both. We deliberately do **not** claim `extension_ui`: Rhizome has no UI for
-/// an extension's prompts, and not claiming it means the daemon never routes
-/// one here to hang the turn.
-const DAEMON_CLIENT_CAPABILITIES: [&str; 3] = ["attach_snapshot", "event_sequence", "slim_attach"];
+/// both. `client_owned_sessions` is required before Prime will honor
+/// `lifecycle: "client_owned"` on create (ADR-0167). We deliberately do **not**
+/// claim `extension_ui`: Rhizome has no UI for an extension's prompts, and not
+/// claiming it means the daemon never routes one here to hang the turn.
+const DAEMON_CLIENT_CAPABILITIES: [&str; 4] = [
+    "attach_snapshot",
+    "event_sequence",
+    "slim_attach",
+    "client_owned_sessions",
+];
+const CLIENT_OWNED_SESSIONS_CAPABILITY: &str = "client_owned_sessions";
 
 /// The oldest `prime-agent` Rhizome can talk to.
 ///
@@ -363,6 +370,20 @@ struct PrimeHost {
     socket_path: PathBuf,
     cwd: PathBuf,
     is_streaming: bool,
+    /// Capabilities the daemon advertised in `daemon_hello`. Used to refuse
+    /// `client_owned` create/promote/complete before sending a command an
+    /// older service cannot honor (ADR-0167).
+    server_capabilities: Vec<String>,
+    /// Whether this attached session is foreground-owned, explicitly resident,
+    /// or unknown (reattached work from before we recorded the grant).
+    session_ownership: SessionOwnership,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SessionOwnership {
+    ClientOwned,
+    Resident,
+    Unknown,
 }
 
 // ── Socket discovery ────────────────────────────────────────────────────────
@@ -1260,6 +1281,44 @@ pub fn set_auto_compaction(enabled: bool) -> Result<(), String> {
     })
 }
 
+/// Promote the attached client-owned session to resident work.
+///
+/// This is the explicit background grant in ADR-0167. One-way: Prime does not
+/// offer a demote. Refuses before sending if the greeting did not advertise
+/// `client_owned_sessions`.
+pub fn promote_owned_session() -> Result<(), String> {
+    with_host_mut(|host| {
+        host.require_client_owned_sessions("keep this session working in the background")?;
+        host.call(serde_json::json!({ "type": "promote_owned_session" }))?;
+        host.session_ownership = SessionOwnership::Resident;
+        Ok(())
+    })
+}
+
+/// Stop the attached client-owned session's worker.
+///
+/// The default close/quit action. The durable transcript stays on disk.
+/// Refuses before sending if the greeting did not advertise
+/// `client_owned_sessions`.
+pub fn complete_owned_session() -> Result<(), String> {
+    with_host_mut(|host| {
+        host.require_client_owned_sessions("stop this foreground-owned session")?;
+        host.call(serde_json::json!({ "type": "complete_owned_session" }))?;
+        Ok(())
+    })
+}
+
+fn client_owned_unavailable(operation: &str) -> String {
+    format!(
+        "Prime cannot {operation} because this daemon does not support \
+         client-owned sessions. Update Prime and try again."
+    )
+}
+
+fn is_not_owned_error(error: &str) -> bool {
+    error.to_ascii_lowercase().contains("not owned")
+}
+
 fn build_queue_command(kind: &str, message: &str) -> serde_json::Value {
     serde_json::json!({ "type": kind, "message": message })
 }
@@ -1693,23 +1752,44 @@ pub enum QuitDisposition {
     /// Default: closing the harness stops the agent, as Claude Code and Hermes
     /// do. Nothing is left running that the user cannot see.
     StopSession,
-    /// The user asked for sessions to outlive the app, so this one is left
-    /// running and detached.
+    /// The session was detached. Owned workers expire after Prime's reconnect
+    /// grace; explicitly resident work keeps running.
     KeepSessionRunning,
     /// Not connected, so there is nothing to decide.
     NotConnected,
 }
 
-/// Decide what quitting should do with our session.
+/// How Rhizome should settle its attached Prime session.
 ///
-/// Pure so the rule is testable without a socket, and so the whole policy is
-/// one line the reader can check against the setting's own description.
-fn quit_disposition(keep_running: bool) -> QuitDisposition {
-    if keep_running {
-        QuitDisposition::KeepSessionRunning
-    } else {
-        QuitDisposition::StopSession
+/// ADR-0167: idle close detaches, stop completes owned work, keep-working
+/// promotes then detaches. There is no global "survive quit" toggle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionCloseIntent {
+    Detach,
+    Stop,
+    KeepWorking,
+}
+
+fn disposition_for(intent: SessionCloseIntent) -> QuitDisposition {
+    match intent {
+        SessionCloseIntent::Stop => QuitDisposition::StopSession,
+        SessionCloseIntent::Detach | SessionCloseIntent::KeepWorking => {
+            QuitDisposition::KeepSessionRunning
+        }
     }
+}
+
+/// Whether the attached session is mid-turn. Used by window-close to decide
+/// between a quiet detach and the Stop / Keep working confirmation.
+pub fn is_streaming() -> bool {
+    let slot = host_slot();
+    let Ok(guard) = slot.host.lock() else {
+        return false;
+    };
+    guard
+        .as_ref()
+        .is_some_and(|host| host.is_alive() && host.is_streaming)
 }
 
 /// How long a roster query will wait before giving up on the daemon.
@@ -1853,11 +1933,11 @@ fn roster_sessions(response: &serde_json::Value) -> Vec<serde_json::Value> {
         .unwrap_or_default()
 }
 
-/// Settle Rhizome's session on quit, per the user's preference.
+/// Settle Rhizome's attached session, then drop the connection.
 ///
-/// Returns what it decided so the caller can log it and, later, surface a
-/// session left running where the user can see it.
-pub fn settle_session_on_quit(keep_running: bool) -> Result<QuitDisposition, String> {
+/// Never sends `prime-agent shutdown`. Detach is what leaves promoted work
+/// running; complete (with kill as last resort) is what stops owned work.
+pub fn settle_session(intent: SessionCloseIntent) -> Result<QuitDisposition, String> {
     let slot = host_slot();
     let mut guard = slot.host.lock().map_err(poison)?;
     let Some(host) = guard.as_mut() else {
@@ -1867,18 +1947,31 @@ pub fn settle_session_on_quit(keep_running: bool) -> Result<QuitDisposition, Str
         return Ok(QuitDisposition::NotConnected);
     }
 
-    let disposition = quit_disposition(keep_running);
-    if disposition == QuitDisposition::StopSession {
-        // `kill` ends this session only. `shutdown` would stop every agent on
-        // the machine including other clients' — never the right tool for
-        // "the user closed my window".
-        let _ = host.send_command(serde_json::json!({ "type": "kill" }));
+    match intent {
+        SessionCloseIntent::Stop => host.stop_owned_session(),
+        SessionCloseIntent::KeepWorking => host.promote_then_detach_grant(),
+        SessionCloseIntent::Detach => {}
     }
-    // Either way the connection goes: detaching is what leaves a kept session
-    // running rather than tied to a process that is exiting.
     let _ = host.shutdown();
     *guard = None;
-    Ok(disposition)
+    Ok(disposition_for(intent))
+}
+
+/// Full quit: stop foreground-owned work; leave explicitly resident work.
+pub fn settle_session_on_quit() -> Result<QuitDisposition, String> {
+    let ownership = {
+        let slot = host_slot();
+        let guard = slot.host.lock().map_err(poison)?;
+        guard
+            .as_ref()
+            .map(|host| host.session_ownership)
+            .unwrap_or(SessionOwnership::Unknown)
+    };
+    let intent = match ownership {
+        SessionOwnership::Resident => SessionCloseIntent::Detach,
+        SessionOwnership::ClientOwned | SessionOwnership::Unknown => SessionCloseIntent::Stop,
+    };
+    settle_session(intent)
 }
 
 /// Explain a refused session switch.
@@ -2002,6 +2095,8 @@ impl PrimeHost {
             socket_path,
             cwd: cwd.clone(),
             is_streaming: false,
+            server_capabilities: Vec::new(),
+            session_ownership: SessionOwnership::Unknown,
         };
 
         // The daemon greets first. Reading it is the handshake — it carries the
@@ -2129,12 +2224,13 @@ impl PrimeHost {
     /// own directory, which is how the vault tools would quietly start
     /// operating on the wrong tree.
     fn create_session(&mut self, cwd: &Path) -> Result<(), String> {
+        self.require_client_owned_sessions("create a foreground-owned session")?;
         let created = self.send_bare_command(serde_json::json!({
             "type": "create",
             "config": { "cwd": cwd.to_string_lossy() },
-            // Explicit rather than defaulted: outliving this client is the
-            // property ADR-0163 exists for, so it should not rest on a default.
-            "lifecycle": "resident",
+            // Explicit rather than defaulted: foreground-owned is the ADR-0167
+            // default. Resident is an explicit later promotion, not create.
+            "lifecycle": "client_owned",
         }))?;
         if created["success"].as_bool() != Some(true) {
             let _ = self.shutdown();
@@ -2145,6 +2241,7 @@ impl PrimeHost {
             return Err("Prime's daemon created a session without an id".into());
         };
         self.active_session_id = active_session_id.to_string();
+        self.session_ownership = SessionOwnership::ClientOwned;
         Ok(())
     }
 
@@ -2209,6 +2306,7 @@ impl PrimeHost {
                                 required_version: MINIMUM_PRIME_VERSION.to_string(),
                             }));
                         }
+                        self.record_hello_capabilities(&json);
                         log::info!(
                             "Connected to Prime daemon {} (protocol {protocol}) at {}",
                             json["appVersion"].as_str().unwrap_or("unknown"),
@@ -2244,6 +2342,64 @@ impl PrimeHost {
 
     fn is_alive(&self) -> bool {
         self.connected.load(Ordering::Relaxed)
+    }
+
+    fn record_hello_capabilities(&mut self, hello: &serde_json::Value) {
+        self.server_capabilities = hello["serverCapabilities"]
+            .as_array()
+            .map(|capabilities| {
+                capabilities
+                    .iter()
+                    .filter_map(|capability| capability.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+    }
+
+    fn require_client_owned_sessions(&self, operation: &str) -> Result<(), String> {
+        if self
+            .server_capabilities
+            .iter()
+            .any(|capability| capability == CLIENT_OWNED_SESSIONS_CAPABILITY)
+        {
+            return Ok(());
+        }
+        Err(client_owned_unavailable(operation))
+    }
+
+    /// Stop this client's owned worker. A resident session is left running
+    /// (complete refuses "not owned"); any other complete failure falls back
+    /// to `kill` of *this* session only.
+    fn stop_owned_session(&mut self) {
+        if self
+            .require_client_owned_sessions("stop this foreground-owned session")
+            .is_err()
+        {
+            let _ = self.send_command(serde_json::json!({ "type": "kill" }));
+            return;
+        }
+        match self.call(serde_json::json!({ "type": "complete_owned_session" })) {
+            Ok(_) => {}
+            Err(error) if is_not_owned_error(&error) => {}
+            Err(_) => {
+                let _ = self.send_command(serde_json::json!({ "type": "kill" }));
+            }
+        }
+    }
+
+    fn promote_then_detach_grant(&mut self) {
+        if self
+            .require_client_owned_sessions("keep this session working in the background")
+            .is_err()
+        {
+            return;
+        }
+        if self
+            .call(serde_json::json!({ "type": "promote_owned_session" }))
+            .is_ok()
+        {
+            self.session_ownership = SessionOwnership::Resident;
+        }
     }
 
     /// Has this host got a session yet? False between connecting and the
@@ -2752,7 +2908,12 @@ mod tests {
             "schemaId": "protocol-7-schema-13-816309b1cd50",
             "appVersion": "0.7.1",
             "clientId": "fake-client",
-            "serverCapabilities": ["attach_snapshot", "event_sequence", "slim_attach"],
+            "serverCapabilities": [
+                "attach_snapshot",
+                "event_sequence",
+                "slim_attach",
+                "client_owned_sessions",
+            ],
         })
     }
 
@@ -3111,9 +3272,145 @@ mod tests {
             Some(vault.path().to_string_lossy().as_ref()),
             "cwd must ride inside config: {create}"
         );
-        // Outliving this client is the property ADR-0163 exists for; it should
-        // be asked for rather than inherited from a default.
-        assert_eq!(create["lifecycle"].as_str(), Some("resident"));
+        // ADR-0167: a new session is owned by this client. Resident is an
+        // explicit promotion, not the create default.
+        assert_eq!(create["lifecycle"].as_str(), Some("client_owned"));
+        let attach = daemon.command("attach").expect("attach follows create");
+        let capabilities = attach["capabilities"]
+            .as_array()
+            .expect("attach advertises client capabilities");
+        assert!(
+            capabilities
+                .iter()
+                .any(|capability| capability.as_str() == Some("client_owned_sessions")),
+            "client_owned create is rejected unless attach claims the capability: {attach}"
+        );
+        let _ = shutdown_host();
+    }
+
+    /// Promotion is the explicit grant that turns a foreground-owned session
+    /// into resident work. The command must name the attached session.
+    #[cfg(unix)]
+    #[test]
+    fn promote_owned_session_sends_the_attached_session() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        promote_owned_session()
+            .expect("promote must succeed when the daemon advertises the capability");
+
+        let promote = daemon
+            .command("promote_owned_session")
+            .expect("promote was sent");
+        assert_eq!(
+            promote["activeSessionId"].as_str(),
+            Some(FAKE_ACTIVE_SESSION_ID)
+        );
+        let _ = shutdown_host();
+    }
+
+    /// Completing owned work is the default close/quit stop. Same handle as
+    /// promote, different lifetime.
+    #[cfg(unix)]
+    #[test]
+    fn complete_owned_session_sends_the_attached_session() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        complete_owned_session()
+            .expect("complete must succeed when the daemon advertises the capability");
+
+        let complete = daemon
+            .command("complete_owned_session")
+            .expect("complete was sent");
+        assert_eq!(
+            complete["activeSessionId"].as_str(),
+            Some(FAKE_ACTIVE_SESSION_ID)
+        );
+        let _ = shutdown_host();
+    }
+
+    /// A daemon that cannot own sessions must fail before the command goes
+    /// out. Sending it anyway would produce a raw protocol error.
+    #[cfg(unix)]
+    #[test]
+    fn promote_refuses_when_the_daemon_lacks_client_owned_sessions() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let cwd = vault.path().to_string_lossy().to_string();
+        let daemon = FakeDaemon::start_with_hello(
+            {
+                let cwd = cwd.clone();
+                move |command, id| {
+                    (command["type"].as_str() == Some("list")).then(|| {
+                        vec![ok(
+                            id,
+                            "list",
+                            listed(serde_json::json!([session_row(
+                                "left-running",
+                                &cwd,
+                                "2026-08-15T14:30:00.000Z",
+                                0
+                            )])),
+                        )]
+                    })
+                }
+            },
+            serde_json::json!({
+                "type": "daemon_hello",
+                "protocol": { "name": DAEMON_PROTOCOL_NAME, "version": DAEMON_PROTOCOL_VERSION },
+                "appVersion": "0.7.1",
+                "clientId": "fake-client",
+                "serverCapabilities": ["attach_snapshot", "event_sequence", "slim_attach"],
+            }),
+        );
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let error = promote_owned_session().expect_err("must not promote without the capability");
+        assert!(error.contains("client-owned"), "{error}");
+        assert!(
+            !daemon
+                .commands()
+                .contains(&"promote_owned_session".to_string()),
+            "capability-aware: do not send a command the daemon cannot honor"
+        );
+        let _ = shutdown_host();
+    }
+
+    /// Creating as `client_owned` is rejected the same way: do not send a
+    /// lifecycle the greeting said this daemon cannot honor.
+    #[cfg(unix)]
+    #[test]
+    fn create_refuses_client_owned_when_the_daemon_lacks_the_capability() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start_with_hello(
+            |_, _| None,
+            serde_json::json!({
+                "type": "daemon_hello",
+                "protocol": { "name": DAEMON_PROTOCOL_NAME, "version": DAEMON_PROTOCOL_VERSION },
+                "appVersion": "0.7.1",
+                "clientId": "fake-client",
+                "serverCapabilities": ["attach_snapshot", "event_sequence", "slim_attach"],
+            }),
+        );
+        daemon.install();
+
+        let error = connect_host(vault.path())
+            .expect_err("create must not send client_owned to an incapable daemon");
+        assert!(error.contains("client-owned"), "{error}");
+        assert!(
+            !daemon.commands().contains(&"create".to_string()),
+            "capability-aware: do not send create: {commands:?}",
+            commands = daemon.commands()
+        );
         let _ = shutdown_host();
     }
 
@@ -3464,7 +3761,12 @@ mod tests {
                 "protocol": { "name": DAEMON_PROTOCOL_NAME, "version": 9 },
                 "appVersion": "0.9.0",
                 "clientId": "fake-client",
-                "serverCapabilities": [],
+                "serverCapabilities": [
+                    "attach_snapshot",
+                    "event_sequence",
+                    "slim_attach",
+                    "client_owned_sessions",
+                ],
             }),
         );
         daemon.install();
@@ -3575,15 +3877,24 @@ mod tests {
     /// Hermes do. Nothing keeps running that the user cannot see.
     #[test]
     fn quitting_stops_the_session_by_default() {
-        assert_eq!(quit_disposition(false), QuitDisposition::StopSession);
+        assert_eq!(
+            disposition_for(SessionCloseIntent::Stop),
+            QuitDisposition::StopSession
+        );
     }
 
-    /// Opting in is the whole reason ADR-0163 connects to a daemon rather than
-    /// owning a child: a heartbeat that only fires while a window happens to
-    /// be open is not a heartbeat.
+    /// Keep working and idle detach both leave the worker; they differ in
+    /// whether it was promoted first.
     #[test]
-    fn opting_in_keeps_the_session_running() {
-        assert_eq!(quit_disposition(true), QuitDisposition::KeepSessionRunning);
+    fn detach_and_keep_working_leave_the_session() {
+        assert_eq!(
+            disposition_for(SessionCloseIntent::Detach),
+            QuitDisposition::KeepSessionRunning
+        );
+        assert_eq!(
+            disposition_for(SessionCloseIntent::KeepWorking),
+            QuitDisposition::KeepSessionRunning
+        );
     }
 
     /// Quitting without a connection has nothing to decide and must not error
@@ -3595,22 +3906,26 @@ mod tests {
         let _ = shutdown_host();
 
         assert_eq!(
-            settle_session_on_quit(false).unwrap(),
+            settle_session(SessionCloseIntent::Stop).unwrap(),
             QuitDisposition::NotConnected
         );
         assert_eq!(
-            settle_session_on_quit(true).unwrap(),
+            settle_session(SessionCloseIntent::Detach).unwrap(),
+            QuitDisposition::NotConnected
+        );
+        assert_eq!(
+            settle_session_on_quit().unwrap(),
             QuitDisposition::NotConnected
         );
     }
 
-    /// End to end at the transport: the default ends our session, and ends
-    /// **only** ours. `shutdown` would stop every agent on the machine
-    /// including other clients' — never the right tool for "the user closed my
-    /// window", and the reason this is `kill` instead.
+    /// End to end at the transport: the default completes our owned session,
+    /// and ends **only** ours. `shutdown` would stop every agent on the
+    /// machine including other clients' — never the right tool for "the user
+    /// closed my window".
     #[cfg(unix)]
     #[test]
-    fn quitting_kills_our_session_and_never_the_whole_service() {
+    fn quitting_completes_our_owned_session_and_never_the_whole_service() {
         let _guard = host_guard();
         let vault = tempfile::tempdir().unwrap();
         let daemon = FakeDaemon::start(|_, _| None);
@@ -3618,15 +3933,15 @@ mod tests {
         connect_host(vault.path()).unwrap();
 
         assert_eq!(
-            settle_session_on_quit(false).unwrap(),
+            settle_session_on_quit().unwrap(),
             QuitDisposition::StopSession
         );
 
-        let kill = daemon
-            .wait_for_command("kill", Duration::from_secs(5))
-            .expect("our session is stopped");
+        let complete = daemon
+            .wait_for_command("complete_owned_session", Duration::from_secs(5))
+            .expect("our owned session is stopped");
         assert_eq!(
-            kill["activeSessionId"].as_str(),
+            complete["activeSessionId"].as_str(),
             Some(FAKE_ACTIVE_SESSION_ID),
             "it must name our own session"
         );
@@ -3635,13 +3950,18 @@ mod tests {
             "the shared service is never stopped: {:?}",
             daemon.commands()
         );
+        assert!(
+            !daemon.commands().contains(&"kill".to_string()),
+            "owned stop uses complete, not kill: {:?}",
+            daemon.commands()
+        );
     }
 
-    /// With the toggle on, the session is left running and merely detached —
-    /// which is what lets a heartbeat still fire after the app is gone.
+    /// Idle close detaches. The owned worker expires after Prime's grace;
+    /// we do not complete or kill it here.
     #[cfg(unix)]
     #[test]
-    fn opting_in_detaches_without_killing_anything() {
+    fn idle_close_detaches_without_completing_or_killing() {
         let _guard = host_guard();
         let vault = tempfile::tempdir().unwrap();
         let daemon = FakeDaemon::start(|_, _| None);
@@ -3649,7 +3969,7 @@ mod tests {
         connect_host(vault.path()).unwrap();
 
         assert_eq!(
-            settle_session_on_quit(true).unwrap(),
+            settle_session(SessionCloseIntent::Detach).unwrap(),
             QuitDisposition::KeepSessionRunning
         );
 
@@ -3657,14 +3977,71 @@ mod tests {
             daemon
                 .wait_for_command("detach", Duration::from_secs(5))
                 .is_some(),
-            "a kept session is released, not held by a dying process"
+            "idle close releases the client"
         );
         let commands = daemon.commands();
         assert!(
-            !commands.contains(&"kill".to_string()),
-            "a kept session must survive: {commands:?}"
+            !commands.contains(&"complete_owned_session".to_string()),
+            "{commands:?}"
         );
+        assert!(!commands.contains(&"kill".to_string()), "{commands:?}");
         assert!(!commands.contains(&"shutdown".to_string()));
+    }
+
+    /// Keep working is the explicit grant: promote, then detach.
+    #[cfg(unix)]
+    #[test]
+    fn keep_working_promotes_then_detaches() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        assert_eq!(
+            settle_session(SessionCloseIntent::KeepWorking).unwrap(),
+            QuitDisposition::KeepSessionRunning
+        );
+
+        let promote = daemon
+            .command("promote_owned_session")
+            .expect("keep working promotes");
+        assert_eq!(
+            promote["activeSessionId"].as_str(),
+            Some(FAKE_ACTIVE_SESSION_ID)
+        );
+        assert!(daemon
+            .wait_for_command("detach", Duration::from_secs(5))
+            .is_some());
+        assert!(!daemon
+            .commands()
+            .contains(&"complete_owned_session".to_string()));
+        assert!(!daemon.commands().contains(&"kill".to_string()));
+        assert!(!daemon.commands().contains(&"shutdown".to_string()));
+    }
+
+    /// After an explicit promote, full quit must not complete the worker.
+    #[cfg(unix)]
+    #[test]
+    fn quit_after_promote_detaches_resident_work() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+        promote_owned_session().unwrap();
+
+        assert_eq!(
+            settle_session_on_quit().unwrap(),
+            QuitDisposition::KeepSessionRunning
+        );
+        let commands = daemon.commands();
+        assert!(commands.contains(&"promote_owned_session".to_string()));
+        assert!(
+            !commands.contains(&"complete_owned_session".to_string()),
+            "{commands:?}"
+        );
+        assert!(!commands.contains(&"kill".to_string()), "{commands:?}");
     }
 
     // ── Turns ───────────────────────────────────────────────────────────────
@@ -5835,7 +6212,7 @@ mod tests {
         })
         .unwrap();
         assert_eq!(
-            settle_session_on_quit(false).unwrap(),
+            settle_session_on_quit().unwrap(),
             QuitDisposition::StopSession
         );
         println!("default quit stopped session {stopped_id}");
@@ -5872,8 +6249,9 @@ mod tests {
             Ok(host.active_session_id.clone())
         })
         .unwrap();
+        promote_owned_session().expect("keep working is an explicit promote");
         assert_eq!(
-            settle_session_on_quit(true).unwrap(),
+            settle_session(SessionCloseIntent::KeepWorking).unwrap(),
             QuitDisposition::KeepSessionRunning
         );
         std::thread::sleep(Duration::from_secs(1));

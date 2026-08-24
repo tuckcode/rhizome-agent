@@ -91,9 +91,15 @@ export function usePrimeHostStatus(enabled = true, vaultPath?: string): PrimeHos
 
     void start()
     const id = window.setInterval(refresh, 4000)
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || !vaultPath) return
+      void start()
+    }
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
       cancelled = true
       window.clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [enabled, vaultPath])
 

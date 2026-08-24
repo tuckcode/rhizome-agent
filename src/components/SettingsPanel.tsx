@@ -131,7 +131,6 @@ interface SettingsDraft {
   autoGitInactiveThresholdSeconds: number
   autoAdvanceInboxAfterOrganize: boolean
   aiFeaturesEnabled: boolean
-  keepSessionsRunningOnQuit: boolean
   celebrationsEnabled: boolean
   defaultAiAgent: AiAgentId
   defaultAiTarget: string
@@ -172,9 +171,7 @@ interface SettingsBodyProps {
   setAutoAdvanceInboxAfterOrganize: (value: boolean) => void
   aiFeaturesEnabled: boolean
   setAiFeaturesEnabled: (value: boolean) => void
-  keepSessionsRunningOnQuit: boolean
   celebrationsEnabled: boolean
-  setKeepSessionsRunningOnQuit: (value: boolean) => void
   setCelebrationsEnabled: (value: boolean) => void
   aiAgentsStatus: AiAgentsStatus
   defaultAiAgent: AiAgentId
@@ -254,9 +251,6 @@ function createSettingsDraft(
     ),
     autoAdvanceInboxAfterOrganize: settings.auto_advance_inbox_after_organize ?? false,
     aiFeaturesEnabled: areAiFeaturesEnabled(settings),
-    // Off unless the user has said otherwise: quitting stops the agent, the
-    // way Claude Code and Hermes behave.
-    keepSessionsRunningOnQuit: settings.keep_sessions_running_on_quit === true,
     // Absent means never chosen, which is on: the effect is opt-out.
     celebrationsEnabled: readCelebrationsEnabled(settings.celebrations_enabled),
     defaultAiAgent: resolveDefaultAiAgent(settings.default_ai_agent),
@@ -336,7 +330,6 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     sidebar_type_pluralization_enabled: draft.sidebarTypePluralizationEnabled,
     initial_h1_auto_rename_enabled: draft.initialH1AutoRename,
     ai_features_enabled: draft.aiFeaturesEnabled,
-    keep_sessions_running_on_quit: draft.keepSessionsRunningOnQuit,
     celebrations_enabled: draft.celebrationsEnabled,
     default_ai_agent: draft.defaultAiAgent,
     default_ai_target: draft.defaultAiTarget,
@@ -662,10 +655,6 @@ function SettingsBodyFromDraft({
       setAutoAdvanceInboxAfterOrganize={(value) => updateDraft('autoAdvanceInboxAfterOrganize', value)}
       aiFeaturesEnabled={draft.aiFeaturesEnabled}
       setAiFeaturesEnabled={(value) => updateDraft('aiFeaturesEnabled', value)}
-      keepSessionsRunningOnQuit={draft.keepSessionsRunningOnQuit}
-      setKeepSessionsRunningOnQuit={(value) =>
-        updateDraft('keepSessionsRunningOnQuit', value)
-      }
       celebrationsEnabled={draft.celebrationsEnabled}
       setCelebrationsEnabled={(value) => updateDraft('celebrationsEnabled', value)}
       aiAgentsStatus={aiAgentsStatus}
@@ -873,8 +862,6 @@ function SettingsAgentWorkflowSections({
   setAutoAdvanceInboxAfterOrganize,
   aiFeaturesEnabled,
   setAiFeaturesEnabled,
-  keepSessionsRunningOnQuit,
-  setKeepSessionsRunningOnQuit,
   celebrationsEnabled,
   setCelebrationsEnabled,
   aiAgentsStatus,
@@ -902,10 +889,8 @@ function SettingsAgentWorkflowSections({
           t={t}
           aiFeaturesEnabled={aiFeaturesEnabled}
           setAiFeaturesEnabled={setAiFeaturesEnabled}
-          keepSessionsRunningOnQuit={keepSessionsRunningOnQuit}
           celebrationsEnabled={celebrationsEnabled}
           setCelebrationsEnabled={setCelebrationsEnabled}
-          setKeepSessionsRunningOnQuit={setKeepSessionsRunningOnQuit}
           aiAgentsStatus={aiAgentsStatus}
           defaultAiAgent={defaultAiAgent}
           setDefaultAiAgent={setDefaultAiAgent}
@@ -1231,8 +1216,6 @@ function AiAgentSettingsSection({
   t,
   aiFeaturesEnabled,
   setAiFeaturesEnabled,
-  keepSessionsRunningOnQuit,
-  setKeepSessionsRunningOnQuit,
   celebrationsEnabled,
   setCelebrationsEnabled,
   aiAgentsStatus,
@@ -1248,8 +1231,6 @@ function AiAgentSettingsSection({
   | 't'
   | 'aiFeaturesEnabled'
   | 'setAiFeaturesEnabled'
-  | 'keepSessionsRunningOnQuit'
-  | 'setKeepSessionsRunningOnQuit'
   | 'celebrationsEnabled'
   | 'setCelebrationsEnabled'
   | 'aiAgentsStatus'
@@ -1289,13 +1270,6 @@ function AiAgentSettingsSection({
           checked={sessionAutoDistillEnabled}
           onChange={(value) => updateVaultConfigField('session_auto_distill_enabled', value)}
           testId="settings-session-auto-distill-enabled"
-        />
-        <SettingsSwitchRow
-          label={t('settings.aiAgents.keepSessionsRunning')}
-          description={t('settings.aiAgents.keepSessionsRunningDescription')}
-          checked={keepSessionsRunningOnQuit}
-          onChange={setKeepSessionsRunningOnQuit}
-          testId="settings-keep-sessions-running-on-quit"
         />
         <SettingsSwitchRow
           label={t('settings.celebrations.enable')}

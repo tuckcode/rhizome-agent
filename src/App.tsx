@@ -88,6 +88,8 @@ import {
 } from './hooks/useNeighborhoodSelection'
 import { ConflictResolverModal } from './components/ConflictResolverModal'
 import { ConfirmDeleteDialog } from './components/ConfirmDeleteDialog'
+import { PrimeActiveCloseDialog } from './components/PrimeActiveCloseDialog'
+import { usePrimeActiveClose } from './hooks/usePrimeActiveClose'
 import { DeleteProgressNotice } from './components/DeleteProgressNotice'
 import { UpdateBanner } from './components/UpdateBanner'
 import { VersionUpdateIndicator } from './components/VersionUpdateIndicator'
@@ -216,6 +218,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const networkStatus = useNetworkStatus()
   const { settings, loaded: settingsLoaded, saveSettings } = useSettings()
   const aiFeaturesEnabled = areAiFeaturesEnabled(settings)
+  const primeActiveClose = usePrimeActiveClose()
 
   // onSwitch closure captures `notes` declared below — safe because it's only
   // called on user interaction, never during render (refs inside the hook
@@ -2017,6 +2020,13 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           onClose={conflictFlow.handleCloseConflictResolver}
         />
         <SettingsPanel open={dialogs.showSettings} initialSectionId={settingsInitialSectionId} settings={settings} aiAgentsStatus={aiAgentsStatus} locale={appLocale} systemLocale={systemLocale} vaults={vaultSwitcher.allVaults} defaultWorkspacePath={vaultSwitcher.defaultWorkspacePath} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} isGitVault={gitRepoState !== 'missing'} onSave={saveSettings} onCopyMcpConfig={mcpSetupDialog.copyManualConfig} explicitOrganizationEnabled={explicitOrganizationEnabled} onSaveExplicitOrganization={handleSaveExplicitOrganization} inboxAutomationEnabled={isInboxAutomationEnabled(vaultConfig.inbox_automation_enabled)} onSaveInboxAutomation={(enabled) => updateConfig('inbox_automation_enabled', enabled)} onAdoptPortentTypes={() => { void handleAdoptPortentTypes() }} onClose={dialogs.closeSettings} />
+        <PrimeActiveCloseDialog
+          open={primeActiveClose.open}
+          locale={appLocale}
+          onStopAndClose={primeActiveClose.stopAndClose}
+          onKeepWorking={primeActiveClose.keepWorking}
+          onCancel={primeActiveClose.cancel}
+        />
         <FeedbackDialog open={showFeedback} onClose={closeFeedback} locale={appLocale} />
         <McpSetupDialog open={mcpSetupDialog.open} status={mcpSetupDialog.status} busyAction={mcpSetupDialog.busyAction} manualConfigSnippet={mcpSetupDialog.manualConfigSnippet} opencodeManualConfigSnippet={mcpSetupDialog.opencodeManualConfigSnippet} manualConfigLoading={mcpSetupDialog.manualConfigLoading} manualConfigError={mcpSetupDialog.manualConfigError} locale={appLocale} onClose={mcpSetupDialog.closeDialog} onConnect={mcpSetupDialog.connect} onCopyManualConfig={mcpSetupDialog.copyManualConfig} onCopyOpenCodeManualConfig={mcpSetupDialog.copyOpenCodeManualConfig} onDisconnect={mcpSetupDialog.disconnect} onLoadManualConfig={mcpSetupDialog.loadManualConfig} />
         <CloneVaultModal key={dialogs.showCloneVault ? 'clone-open' : 'clone-closed'} open={dialogs.showCloneVault} onClose={dialogs.closeCloneVault} onVaultCloned={vaultSwitcher.handleVaultCloned} />

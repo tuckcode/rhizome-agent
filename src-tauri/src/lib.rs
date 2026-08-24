@@ -605,6 +605,9 @@ macro_rules! app_invoke_handler {
             commands::set_prime_thinking_level,
             commands::get_prime_thinking_levels,
             commands::fork_prime_session,
+            commands::promote_owned_prime_session,
+            commands::complete_owned_prime_session,
+            commands::settle_prime_session,
             commands::get_prime_agent_activity,
             commands::manage_prime_heartbeat,
             commands::cancel_prime_scheduled_work,
@@ -725,20 +728,10 @@ fn handle_run_event(app_handle: &tauri::AppHandle, event: &tauri::RunEvent) {
     }
 
     if let tauri::RunEvent::Exit = event {
-        // Quitting is the one moment Rhizome decides anything about a
-        // session's lifetime — closing the window only detaches (ADR-0163).
-        // Default is to stop the agent, the way Claude Code and Hermes do;
-        // the setting exists for work that should outlive the app, such as a
-        // heartbeat that would otherwise only fire while a window is open.
-        //
-        // Scoped to *our* session. Prime's background service is shared
-        // infrastructure that starts itself and hosts other clients' work, so
-        // it is never Rhizome's to stop. See #12.
-        let keep_running = crate::settings::get_settings()
-            .ok()
-            .and_then(|settings| settings.keep_sessions_running_on_quit)
-            .unwrap_or(false);
-        match crate::prime_session_host::settle_session_on_quit(keep_running) {
+        // Quitting settles this client's session (ADR-0167): foreground-owned
+        // work stops; explicitly promoted work stays resident. Prime's daemon
+        // is shared infrastructure and is never Rhizome's to stop. See #12.
+        match crate::prime_session_host::settle_session_on_quit() {
             Ok(disposition) => log::info!("Prime session on quit: {disposition:?}"),
             // Never block the exit on this.
             Err(error) => log::debug!("Could not settle the Prime session on quit: {error}"),
@@ -783,8 +776,23 @@ pub fn run() {
             // fixes. `WindowEvent` is core to Tauri on every target.
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window_hides_instead_of_closing(window.label()) {
-                    log::info!("main window close requested — hiding, not closing (C22)");
+                    use tauri::Emitter;
                     api.prevent_close();
+                    if crate::prime_session_host::is_streaming() {
+                        log::info!(
+                            "main window close requested while Prime is working — asking (ADR-0167)"
+                        );
+                        if let Err(err) = window.emit("prime-active-close-requested", ()) {
+                            log::warn!("could not ask about the active close: {err}");
+                        }
+                        return;
+                    }
+                    log::info!(
+                        "main window close requested — detaching and hiding (C22, ADR-0167)"
+                    );
+                    let _ = crate::prime_session_host::settle_session(
+                        crate::prime_session_host::SessionCloseIntent::Detach,
+                    );
                     if let Err(err) = window.hide() {
                         log::warn!("main window hide failed, it will close: {err}");
                     }
