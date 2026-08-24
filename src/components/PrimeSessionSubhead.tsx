@@ -115,11 +115,9 @@ export function PrimeSessionSubhead({
       className={cn(
         'flex min-h-[30px] shrink-0 items-center gap-2.5 border-b border-border pr-3',
         'font-mono text-[10.5px] tracking-[0.03em] text-muted-foreground',
-        // macOS puts the traffic lights at x=58 (tauri.conf.json) and this strip
-        // is the topmost band on ChatHome, so nothing else absorbs them. The
-        // design system's own `.subhead` carries the same clearance as
-        // `padding-left: 60px`; it is measured from the window edge, so the
-        // 46px rail to our left comes off it.
+        // macOS paints overlay traffic lights at x=58 (tauri.conf.json).
+        // This strip is ChatHome's title bar, so the inset has to clear
+        // them; the 46px rail is already to our left and comes off it.
         'pl-[var(--subhead-traffic-light-inset,0.75rem)]',
       )}
       style={trafficLightInset}

@@ -10,6 +10,8 @@ const TRAFFIC_LIGHT_LEFT_PX = 58
 
 /** Three 12px lights with 8px gaps, plus breathing room before content. */
 const TRAFFIC_LIGHT_RUN_PX = 70
+/** Extra gap after the last light. 70px ends flush with the status text. */
+const TRAFFIC_LIGHT_CLEARANCE_PX = 16
 
 /** The command rail the chat surface sits to the right of. */
 const COMMAND_RAIL_WIDTH_PX = 46
@@ -24,6 +26,10 @@ const COMMAND_RAIL_WIDTH_PX = 46
  */
 export function subheadTrafficLightInset(): Record<string, string> {
   if (!isTauri() || !isMac()) return {}
-  const inset = TRAFFIC_LIGHT_LEFT_PX + TRAFFIC_LIGHT_RUN_PX - COMMAND_RAIL_WIDTH_PX
+  const inset =
+    TRAFFIC_LIGHT_LEFT_PX +
+    TRAFFIC_LIGHT_RUN_PX +
+    TRAFFIC_LIGHT_CLEARANCE_PX -
+    COMMAND_RAIL_WIDTH_PX
   return { '--subhead-traffic-light-inset': `${inset}px` }
 }
