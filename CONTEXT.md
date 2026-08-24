@@ -26,6 +26,7 @@ still lives in `docs/ARCHITECTURE.md` / `docs/ABSTRACTIONS.md` (Desktop inherita
 |------|---------|
 | **Prime / Prime Agent** | The **only** agent runtime in Agent product UI. Session engine, skills, extensions, providers/models, compaction, continual harness. **Built on Pi** — session JSONL under `~/.prime/agent/sessions/` is Pi-shaped (Mindwalk already labels it `harness: pi`). Prime can persist work, but persistence is a capability, not the default permission model. |
 | **Harness** | Prime’s tooling and infrastructure embedded in the chat desktop shell (Hermes-Desktop-class ambition over time; v0 = core loop + skills/status). |
+| **Selective doctrine** | Borrow **contracts and artifacts**, never second runtimes or memory authorities. Coverage is by user job, not daemon command count. Ledger: `docs/design/harness-doctrine.md` (ADR-0168). |
 | **Prime daemon** | Prime’s own background service. Runs independently of any client and can outlive them; hosts workers. Rhizome connects to it and never owns or stops it. A running daemon means Prime is available, not that an agent is working (ADR-0163, ADR-0167). |
 | **Session host** | Rhizome’s Rust client of the [[Prime daemon]] (`prime_session_host`). A connection, not the daemon's parent. Sessions are foreground-owned by default; only an explicit background grant lets work outlive Rhizome (ADR-0167). Superseded the RPC-child owner it was until 2026-08-15. |
 | **Session** | The user-facing unit of work: one conversation with Prime, listed, named, switched and resumed. **The only word the UI uses** for a running thing. Follows Hermes Agent, which meets the same product-name collision and resolves it the same way. |
@@ -75,5 +76,6 @@ still lives in `docs/ARCHITECTURE.md` / `docs/ABSTRACTIONS.md` (Desktop inherita
 - Identity: `docs/IDENTITY.md`
 - Spike (session host): `docs/plans/2026-08-09-prime-harness-chat-spike.md`
 - v0 brief + roadmap: `docs/plans/2026-08-09-rhizome-agent-v0-brief-and-roadmap.md`
+- Harness doctrine: `docs/design/harness-doctrine.md` (ADR-0168)
 - Issue tracker / triage: `docs/agents/`
 - ADRs: `docs/adr/` (read when touching that area; many are Desktop-era)

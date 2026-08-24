@@ -361,5 +361,6 @@ Single-context layout — root `CONTEXT.md` + `docs/adr/`. See `docs/agents/doma
 - Prime mid-turn messaging is tri-state: accepted, no longer running, or transport failure. Follow-ups propagate Prime's `data.queued`; fallback starts a new turn only from the latest idle UI state. C43/C44 record why.
 - On macOS, restoring a hidden main window requires unhiding the application first (`app.show()`), then unminimize, show, and focus. `lib.rs::focus_main_window` is the shared path; menu-bar and tray reopen must delegate to it.
 - Rhizome is the desk and durable memory; Prime is the engine. Chat first, vault on purpose. Memory is gated; execution is not.
+- Selective harness doctrine: absorb contracts and artifacts from Hermes/DeepSeek/others, never their runtimes or memory stores. Coverage is by user job, not Prime command count. Ledger: `docs/design/harness-doctrine.md` (ADR-0168).
 - Prime supports `client_owned` sessions that stop after a disconnected-client grace period and can be promoted to `resident`; Rhizome currently creates sessions as `resident`, the key seam for foreground-only defaults.
 

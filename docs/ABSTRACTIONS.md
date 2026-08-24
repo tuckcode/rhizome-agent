@@ -1000,9 +1000,11 @@ The core abstraction of the Prime harness, and the one most likely to be
 modelled wrongly. Full detail in `ARCHITECTURE.md` → *Prime Agent*.
 
 **A Prime session is not a subprocess.** It lives in a daemon that Rhizome
-connects to over a Unix socket, and it outlives both the turn and the window
-(ADR-0163). Closing Rhizome detaches; the session keeps running and a goal or
-heartbeat can still fire.
+connects to over a Unix socket (ADR-0163). The daemon may outlive the window;
+the *session* does not, unless the user granted background residency
+(ADR-0167). Current code still creates resident sessions — that is the C47
+implementation gap, not the policy. The take/leave rule for other harnesses
+is ADR-0168 / `docs/design/harness-doctrine.md`.
 
 ### Two sources, two questions
 
