@@ -51,10 +51,9 @@ file.
 
 ## State
 
-`origin/main` is pushed through `e02e3c4`. Local `main` is ahead with
-`f37b805` (traffic-light clearance + Tauri JS 2.11.1) and `0ce85ce`
-(Book → Skill). C47 (client-owned sessions) is implemented locally and
-not yet pushed. C48/C49 are closed as QA-environment misreads.
+`origin/main` is pushed through `e02e3c4`. Local `main` is ahead through
+the harness-composition docs commit (includes C47 as `d737085`, Book →
+Skill, NEXT.md, ADR-0166). C48/C49 are closed as QA-environment misreads.
 Prime **0.7.4** on Windows speaks
 `\\.\pipe\prime-agent-daemon` — see `docs/WINDOWS-DEV.md`. On macOS/Linux the
 daemon dies with whatever terminal starts it, so start it detached:
@@ -75,6 +74,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-08-24 (evening) · Grok 4.6](plans/handoffs/2026-08-24-1740-grok-4-6-harness-composition.md) — option-2 composition notes (`docs/design/harness-composition.md`); NEXT.md §1 is discuss/decide; DeepSeek plugin *idea* on Prime extensions; sandbox is Prime’s (Kern is Linux-only)
 - [2026-08-24 · Claude Opus 5](plans/handoffs/2026-08-24-2122-claude-opus-5-shell-dock-and-next-index.md) — note tree docked right and ADR-0166 for the chat-centred shell (three questions left open); a tree/list exclusivity attempt reverted after it broke Cmd+N and inbox auto-advance; stale Tolaria/Desktop naming fixed in six live docs; the Linux/Windows menu bar tracks the pointer; scheduled security review found nothing above the bar; `docs/NEXT.md` added
 - [2026-08-24 · Grok 4.6](plans/handoffs/2026-08-24-1350-grok-4-6-c47-client-owned.md) — C47: client_owned create, promote/complete, idle detach, active-close dialog, quit without the global keep-running toggle
 - [2026-08-23 (wrap) · Grok 4.6](plans/handoffs/2026-08-23-2316-grok-4-6-session-wrap.md) — day closed; doctrine already on origin; local leftover is title clearance, Tauri JS align, C48/C49 corrections, Book → Skill; C47 still next
@@ -217,6 +217,8 @@ push is not a release — releases are tagged builds with signed installers.
   job, not Prime command count. Ledger: `docs/design/harness-doctrine.md`,
   ADR-0168. Source reviews and divergence scoring are in `docs/plans/2026-08-24-*`.
   OpenHuman was named in the frames but has no first-party review yet.
+  Composition (option 2) is written but unratified:
+  `docs/design/harness-composition.md`, pickup in `docs/NEXT.md` §1.
 
 - **C49-RESOLVED (2026-08-23): Mycelium did not white-screen.** The original
   native audit clicked the wrong rail coordinate: its before/after screenshots
