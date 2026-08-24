@@ -51,10 +51,10 @@ file.
 
 ## State
 
-`origin/main` is pushed through `aed471b`; local `main` is ahead with the
-messaging, folder-boundary, dependency-security (C45), lifecycle (C47 /
-ADR-0167), and selective-harness-doctrine (ADR-0168) work. Final dependency
-scan has 0 Critical/High; frontend and Rust coverage pass.
+`origin/main` is pushed through `e02e3c4`. Local `main` is ahead with
+`f37b805` (traffic-light clearance + Tauri JS 2.11.1) and the uncommitted
+Book → Skill slice. C47 (client-owned sessions) is still the next
+implementation. C48/C49 are closed as QA-environment misreads.
 Prime **0.7.4** on Windows speaks
 `\\.\pipe\prime-agent-daemon` — see `docs/WINDOWS-DEV.md`. On macOS/Linux the
 daemon dies with whatever terminal starts it, so start it detached:
@@ -68,6 +68,9 @@ critical path at ~120s, coverage 85s of it).
 
 ## Recent sessions
 
+- [2026-08-23 (wrap) · Grok 4.6](plans/handoffs/2026-08-23-2316-grok-4-6-session-wrap.md) — day closed; doctrine already on origin; local leftover is title clearance, Tauri JS align, C48/C49 corrections, Book → Skill; C47 still next
+- [2026-08-23 (late) · Grok 4.6](plans/handoffs/2026-08-23-2248-grok-4-6-book-to-skill.md) — Research Generate gained a Book → Skill format (`book-to-skill`); instruction produces a SKILL.md-shaped wiki page, does not vendor virgiliojr94/book-to-skill
+- [2026-08-23 (late) · GPT-5.6 Sol](plans/handoffs/2026-08-23-2235-gpt-5-6-sol-traffic-lights-and-qa-corrections.md) — traffic-light clearance native-verified; Tauri JS/Rust versions aligned; false two-model and Mycelium white-screen findings corrected
 - [2026-08-23 (evening) · GPT-5.6 Sol](plans/handoffs/2026-08-23-1920-gpt-5-6-sol-harness-doctrine.md) — selective harness doctrine ratified (ADR-0168): borrow contracts/artifacts, never second runtimes; Prime/Hermes/DeepSeek source reviews + five-frame scoring
 - [2026-08-23 · GPT-5.6 Sol](plans/handoffs/2026-08-23-1518-gpt-5-6-sol-mid-turn-and-folder-hardening.md) — C43/C44 and destructive folder paths fixed; Codacy activated and all High dependency findings patched; Switchyard evaluated behind Prime; foreground-owned sessions decided in ADR-0167
 - [2026-08-22 (evening) · Grok 4.6](plans/handoffs/2026-08-22-2108-grok-4-6-window-navigation-guard.md) — #43 window-level navigation guard built on the Tauri 2.10 plugin `on_navigation` hook (config-declared main window, so no window rebuild); off-origin links route to the system browser, webview never leaves; 7 Rust unit tests on the centralized policy; Rust gates green at 85.57%
@@ -206,15 +209,26 @@ push is not a release — releases are tagged builds with signed installers.
   ADR-0168. Source reviews and divergence scoring are in `docs/plans/2026-08-24-*`.
   OpenHuman was named in the frames but has no first-party review yet.
 
-- **C49-OPEN (2026-08-23): Mycelium click produces a white overlay.** Native
-  and browser reproduction: the process stays alive; this is a renderer/UI
-  fault, not a hard crash. Not diagnosed.
+- **C49-RESOLVED (2026-08-23): Mycelium did not white-screen.** The original
+  native audit clicked the wrong rail coordinate: its before/after screenshots
+  are identical and Mycelium never became active. A precise browser click on
+  the accessible `Mycelium` control showed the white-looking Suspense fallback
+  immediately, then the full `MyceliumView` 1.5 seconds later. The view, empty
+  session state, Refresh, Close, and disabled Open in Mindwalk control all
+  rendered normally. This was a bad QA inference from an unverified pixel click
+  plus an immediate screenshot, not a renderer fault.
 
-- **C48-OPEN (2026-08-23): model picker shows two models while Prime reports
-  hundreds.** A live 0.8.0 daemon advertised 501 available models; the Rhizome
-  picker showed two. This is a fidelity bug under ADR-0168 (render Prime's
-  catalog), not evidence that Prime lost models. Also note `@tauri-apps/api`
-  is still 2.10.1 against Rust `tauri` 2.11.1 from the C45 bump.
+- **C48-RESOLVED (2026-08-23): the two-model picker was the browser mock, not
+  the native Prime catalog.** The screenshot showed exactly the two fixtures in
+  `src/mock-tauri/mock-handlers.ts` (`Claude Fable 5`, `Grok 4.5`), including
+  their provider grouping. The native command does not use that fixture:
+  `get_available_prime_models` delegates to Prime's live
+  `get_available_models`, which the same session probed at **501 models** across
+  six configured providers. No model access was lost and no picker cache bug
+  was demonstrated; the QA environment was misidentified. The adjacent Tauri
+  package warning is fixed in the current working tree:
+  `@tauri-apps/api` now matches Rust `tauri` at 2.11.1 and `pnpm tauri dev`
+  launches without the mismatch.
 
 - **C47-DECIDED (2026-08-23, implementation pending): Prime sessions are
   foreground-owned by default; background work is an explicit grant.** Atticus

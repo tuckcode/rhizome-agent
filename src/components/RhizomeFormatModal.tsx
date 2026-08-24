@@ -10,7 +10,7 @@ import { callHostOr } from '../lib/callHost'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { trackResearchFormatSaved } from '../lib/productAnalytics'
 import { customToResearchMode, type CustomFormat } from '../lib/researchFormats'
-import { MagnifyingGlass, BugBeetle, Brain, RocketLaunch, Code, PuzzlePiece, Question, FileMagnifyingGlass, ArrowsDownUp } from '@phosphor-icons/react'
+import { MagnifyingGlass, BugBeetle, Brain, RocketLaunch, Code, PuzzlePiece, Question, FileMagnifyingGlass, ArrowsDownUp, BookOpen } from '@phosphor-icons/react'
 
 export interface ResearchMode {
   id: string
@@ -174,6 +174,21 @@ const RESEARCH_MODES: ResearchMode[] = [
       title: 'Agent Context',
       description: 'What the agent needs to know: env vars, API keys, test commands, and files it should never modify.',
       pills: ['Environment setup', 'Test commands', 'Generated files', 'CI gates'],
+    },
+  },
+  {
+    id: 'book-to-skill',
+    title: 'Book → Skill',
+    description: 'Turn a technical book, docs folder, or repo into an agent skill: when to use it, chapters, glossary, patterns, and a cheatsheet.',
+    category: 'skills',
+    categoryLabel: 'Skills',
+    tag: 'Agent skill',
+    icon: <BookOpen weight="bold" className="w-5 h-5" />,
+    produces: ['When to use', 'Chapters', 'Glossary', 'Patterns', 'Cheatsheet'],
+    samplePeek: {
+      title: 'Skill from a Book',
+      description: 'A SKILL.md-shaped page: name, when to apply it, chapters to pull on demand, glossary, patterns, and a one-page cheatsheet.',
+      pills: ['When to apply', 'Chapter map', 'Glossary', 'Cheatsheet'],
     },
   },
 ]

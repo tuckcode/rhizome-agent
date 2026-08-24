@@ -360,13 +360,13 @@ const TOOLS = [
   },
   {
     name: 'rhizome_repo_research',
-    description: 'Research a GitHub repository or local codebase and generate one or more wiki pages in the Rhizome vault. Uses the specified research mode (architecture, hidden-lessons, reusable-patterns, first-hour, agent-handoff, integration-plan). Specify pageCount for multi-page output.',
+    description: 'Research a GitHub repository or local codebase and generate one or more wiki pages in the Rhizome vault. Uses the specified research mode (architecture, hidden-lessons, reusable-patterns, first-hour, agent-handoff, integration-plan, book-to-skill). Specify pageCount for multi-page output.',
     annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
     inputSchema: {
       type: 'object',
       properties: {
         repo: { type: 'string', description: 'GitHub URL (github.com/owner/repo) or local path to the repository' },
-        mode: { type: 'string', description: 'Research mode (default: architecture)', enum: ['architecture', 'hidden-lessons', 'reusable-patterns', 'first-hour', 'agent-handoff', 'integration-plan', 'feature-scout', 'mental-model'] },
+        mode: { type: 'string', description: 'Research mode (default: architecture)', enum: ['architecture', 'hidden-lessons', 'reusable-patterns', 'first-hour', 'agent-handoff', 'integration-plan', 'feature-scout', 'mental-model', 'eli5', 'debugging-atlas', 'book-to-skill'] },
         depth: { type: 'string', description: 'Research depth: fast (3-5 pages), regular (8-18 pages), deep (25+ pages) (default: fast)', enum: ['fast', 'regular', 'deep'] },
         vaultPath: { type: 'string', description: 'Optional target vault root. Uses active vault if omitted.' },
       },
@@ -381,7 +381,7 @@ const TOOLS = [
       type: 'object',
       properties: {
         repo: { type: 'string', description: 'GitHub URL (github.com/owner/repo) or local path to the repository' },
-        mode: { type: 'string', description: 'Research mode (default: architecture)', enum: ['architecture', 'hidden-lessons', 'reusable-patterns', 'first-hour', 'agent-handoff', 'integration-plan', 'feature-scout', 'mental-model'] },
+        mode: { type: 'string', description: 'Research mode (default: architecture)', enum: ['architecture', 'hidden-lessons', 'reusable-patterns', 'first-hour', 'agent-handoff', 'integration-plan', 'feature-scout', 'mental-model', 'eli5', 'debugging-atlas', 'book-to-skill'] },
         depth: { type: 'string', description: 'Depth: fast (3-5 pages), regular (8-18), deep (25+) (default: fast)', enum: ['fast', 'regular', 'deep'] },
         pageCount: { type: 'number', description: 'Exact number of pages (overrides depth auto-count)' },
         vaultPath: { type: 'string', description: 'Optional target vault root' },
