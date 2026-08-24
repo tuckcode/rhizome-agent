@@ -819,6 +819,29 @@ pub fn fork_prime_session(
     crate::prime_session_host::fork(&entry_id)
 }
 
+/// Promote the attached client-owned session to resident background work.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn promote_owned_prime_session() -> Result<(), String> {
+    crate::prime_session_host::promote_owned_session()
+}
+
+/// Stop the attached client-owned session's worker. Transcript stays on disk.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn complete_owned_prime_session() -> Result<(), String> {
+    crate::prime_session_host::complete_owned_session()
+}
+
+/// Settle the attached Prime session, then drop the Rhizome connection.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn settle_prime_session(
+    intent: crate::prime_session_host::SessionCloseIntent,
+) -> Result<crate::prime_session_host::QuitDisposition, String> {
+    crate::prime_session_host::settle_session(intent)
+}
+
 /// Every model the live Prime host can switch to.
 #[cfg(desktop)]
 #[tauri::command]

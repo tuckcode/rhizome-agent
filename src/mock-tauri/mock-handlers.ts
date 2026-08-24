@@ -759,6 +759,9 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   ],
   set_prime_model: () => null,
   fork_prime_session: () => ({ sessionId: 'mock-fork', branchedFrom: 'branch point' }),
+  promote_owned_prime_session: () => undefined,
+  complete_owned_prime_session: () => undefined,
+  settle_prime_session: () => ({ outcome: 'keep_session_running' }),
   compact_prime_session: () => 12000,
   export_prime_session: ({ sessionPath }: { sessionPath: string }) =>
     `~/Downloads/prime-session-${sessionPath.split('/').pop()?.replace(/\.jsonl$/, '') ?? 'session'}.html`,

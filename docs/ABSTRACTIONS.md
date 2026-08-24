@@ -1002,9 +1002,9 @@ modelled wrongly. Full detail in `ARCHITECTURE.md` → *Prime Agent*.
 **A Prime session is not a subprocess.** It lives in a daemon that Rhizome
 connects to over a Unix socket (ADR-0163). The daemon may outlive the window;
 the *session* does not, unless the user granted background residency
-(ADR-0167). Current code still creates resident sessions — that is the C47
-implementation gap, not the policy. The take/leave rule for other harnesses
-is ADR-0168 / `docs/design/harness-doctrine.md`.
+(ADR-0167). New sessions are client-owned; `promote_owned_session` is the
+explicit grant. The take/leave rule for other harnesses is ADR-0168 /
+`docs/design/harness-doctrine.md`.
 
 ### Two sources, two questions
 

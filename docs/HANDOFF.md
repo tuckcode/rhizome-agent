@@ -53,8 +53,8 @@ file.
 
 `origin/main` is pushed through `e02e3c4`. Local `main` is ahead with
 `f37b805` (traffic-light clearance + Tauri JS 2.11.1) and `0ce85ce`
-(Book → Skill). C47 (client-owned sessions) is still the next
-implementation. C48/C49 are closed as QA-environment misreads.
+(Book → Skill). C47 (client-owned sessions) is implemented locally and
+not yet pushed. C48/C49 are closed as QA-environment misreads.
 Prime **0.7.4** on Windows speaks
 `\\.\pipe\prime-agent-daemon` — see `docs/WINDOWS-DEV.md`. On macOS/Linux the
 daemon dies with whatever terminal starts it, so start it detached:
@@ -68,6 +68,7 @@ critical path at ~120s, coverage 85s of it).
 
 ## Recent sessions
 
+- [2026-08-24 · Grok 4.6](plans/handoffs/2026-08-24-1350-grok-4-6-c47-client-owned.md) — C47: client_owned create, promote/complete, idle detach, active-close dialog, quit without the global keep-running toggle
 - [2026-08-23 (wrap) · Grok 4.6](plans/handoffs/2026-08-23-2316-grok-4-6-session-wrap.md) — day closed; doctrine already on origin; local leftover is title clearance, Tauri JS align, C48/C49 corrections, Book → Skill; C47 still next
 - [2026-08-23 (late) · Grok 4.6](plans/handoffs/2026-08-23-2248-grok-4-6-book-to-skill.md) — Research Generate gained a Book → Skill format (`book-to-skill`); instruction produces a SKILL.md-shaped wiki page, does not vendor virgiliojr94/book-to-skill
 - [2026-08-23 (late) · GPT-5.6 Sol](plans/handoffs/2026-08-23-2235-gpt-5-6-sol-traffic-lights-and-qa-corrections.md) — traffic-light clearance native-verified; Tauri JS/Rust versions aligned; false two-model and Mycelium white-screen findings corrected
@@ -230,28 +231,17 @@ push is not a release — releases are tagged builds with signed installers.
   `@tauri-apps/api` now matches Rust `tauri` at 2.11.1 and `pnpm tauri dev`
   launches without the mismatch.
 
-- **C47-DECIDED (2026-08-23, implementation pending): Prime sessions are
-  foreground-owned by default; background work is an explicit grant.** Atticus
-  does not want closing Rhizome to imply indefinite agent autonomy. Prime's
-  daemon remains shared infrastructure and may stay available, but availability
-  is not activity.
-
-  Prime 0.7.4 already supports the required lifecycle:
-  `DaemonSessionLifecycle = "resident" | "client_owned"`. A client-owned worker
-  is stopped 30 seconds after its owning protocol client disconnects, while
-  `promote_owned_session` makes explicitly approved work resident. Rhizome
-  currently omits the `client_owned_sessions` capability and creates every
-  session as resident, so orderly Quit is safe only because the exit handler
-  sends `kill`; crash/force-quit can still leave work alive.
-
-  Decided UX: new sessions client-owned; idle close detaches; active close asks
-  with **Stop and close** as default and **Keep working** as explicit promotion;
-  schedules/heartbeats may survive because creating one is already an explicit
-  grant and they remain visible/cancellable. Remove or migrate the global
-  `keep_sessions_running_on_quit` preference. ADR-0167 supersedes ADR-0163's
-  unconditional session-survival policy while retaining its daemon-client
-  transport decision. The implementation is the next separate lifecycle slice;
-  the full evidence and transition notes are in the latest handoff.
+- **C47-IMPLEMENTED (2026-08-24): Prime sessions are foreground-owned by
+  default; background work is an explicit grant.** New sessions advertise
+  `client_owned_sessions` and create with `lifecycle: "client_owned"`. Idle
+  window close detaches (owned worker expires after Prime's grace). Active
+  close asks, with **Stop and close** (`complete_owned_session`) as default and
+  **Keep working** (`promote_owned_session` then detach). Full quit stops
+  owned work and leaves explicitly promoted work resident. The global
+  `keep_sessions_running_on_quit` toggle is gone; the settings field still
+  parses so old files load. Daemon shutdown is still never sent. Remaining:
+  native QA of the close dialog, and UI that distinguishes attached vs
+  resident work.
 
 - **C45-RESOLVED (2026-08-23): the Codacy gate was runnable all along,
   and its first run refuted a security review.** `codacy-cli` analyses locally
