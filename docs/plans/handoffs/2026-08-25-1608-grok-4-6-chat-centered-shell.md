@@ -5,6 +5,7 @@ description: >-
   Chat-centered shell: sessions left, Chat the permanent center, inbox and
   notes on the right, all collapsible. ADR-0166 open questions on ⌘1/⌘2/⌘3
   and right-panel exclusivity settled.
+commits: dbd737e
 ---
 
 # Chat-centered shell
