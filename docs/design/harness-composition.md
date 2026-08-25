@@ -1,5 +1,8 @@
 # Harness composition — option 2
 
+**Origin:** Grok 4.6 · 2026-08-24 · `2b5daba`. Working notes from a Cursor
+session, not the Claude Code `NEXT.md` draft.
+
 **Status:** working notes, 2026-08-24. **Not an ADR.** Discuss and decide
 before grafting. The ratified *filter* is still
 [ADR-0168](../adr/0168-selective-harness-doctrine.md) /

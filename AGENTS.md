@@ -45,6 +45,7 @@
 - Check `docs/plans/` for the most recent `*-session-status.md` (sort by date in the filename) — dated detail log behind the handoff summary: what's done, what's blocked, and where to pick up
 - Check `docs/adr/` for relevant architecture decisions before structural choices
 - Check `docs/ARCHITECTURE.md` and `docs/ABSTRACTIONS.md` for relevant structural information
+- Living docs here are multi-agent palimpsests. A heading is not one session's voice. Read the **Origin:** line on the file or section before treating it as "what Claude decided" or "the original plan." "Claude" is also ambiguous in this repo — Claude Code on a subscription, Cursor Claude, and a pasted claude.ai briefing are different sessions. Name the surface, not just the brand. Convention: **ADRs & docs** below.
 
 ### Commits & pushes
 
@@ -286,6 +287,16 @@ ADRs live in `docs/adr/`. Create in the same commit as the code. Never edit exis
 
 After any Tauri command, new component/hook, data model change, or new integration: update `docs/ARCHITECTURE.md`, `docs/ABSTRACTIONS.md`, and/or `docs/GETTING-STARTED.md` in the same commit.
 
+**Origin tags on living docs.** This repo is several models and at least two harnesses (Claude Code subscription, Cursor). The chat that wrote a paragraph is not in `rg`. When you add a section to `HANDOFF.md`, `NEXT.md`, or a design note other agents will treat as current, put one visible line under the heading:
+
+```
+**Origin:** <model> · <date> · <commit or session id>
+```
+
+Do not overwrite someone else's Origin line. Do not attribute a later insert to the file's original author.
+
+**Why:** `docs/NEXT.md` was created by Claude Code (`c0cced2f` / `b8dc8fb`), then Grok inserted harness composition as "decide this first" (`2b5daba`). A later session treated that block as Claude's original plan and looked for RLM / plugin tasks that were never a `NEXT.md` row in either version. Git blame would have said; the file did not.
+
 ---
 
 ## 2. Product Rules
@@ -367,13 +378,18 @@ Single-context layout — root `CONTEXT.md` + `docs/adr/`. See `docs/agents/doma
 - When discussing GitHub issues or work items, pair the number with a brief plain-language description instead of using the number alone.
 - Shares strategy docs and harness take/leave recommendations as decision context for joint calls, not as a shipped bill of materials. Intended product shape is option 2 (Rhizome harness, Prime engine); the take/adapt/reject/defer matrix with named incompatibilities is still unwritten.
 - Wants background agent execution to be explicit: active window close should default to stopping work, while explicitly scheduled work may continue if it stays visible and revocable.
+- Prefers not to copy-paste session summaries between agents; those belong in `docs/HANDOFF.md` / `docs/NEXT.md`. After a handoff task, pick next work from `docs/NEXT.md`.
+- Expects living docs to say which model/session wrote a section. This project is multi-agent; grep is not the whole story.
 
 ## Learned Workspace Facts
 
 - Prime mid-turn messaging is tri-state: accepted, no longer running, or transport failure. Follow-ups propagate Prime's `data.queued`; fallback starts a new turn only from the latest idle UI state. C43/C44 record why.
 - On macOS, restoring a hidden main window requires unhiding the application first (`app.show()`), then unminimize, show, and focus. `lib.rs::focus_main_window` is the shared path; menu-bar and tray reopen must delegate to it.
-- Rhizome is the desk and durable memory; Prime is the engine. Chat first, vault on purpose. Memory is gated; execution is not.
+- Rhizome is the desk and durable memory; Prime is the engine. Chat first, vault on purpose. The note tree docks on the right; ADR-0166's chat-as-center canvas is the decided direction and is not fully shipped. Memory is gated; execution is not.
 - Selective harness doctrine (option 2): Rhizome is the product harness; Prime remains the only execution core and keeps receiving Prime updates through a thin versioned adapter. Absorb contracts and artifacts from Hermes/DeepSeek/others, never their runtimes or memory stores. Foreign pieces live in Rhizome (UX, vault, policy) or as Prime skills/MCP/extensions — never forked or patched into Prime. Coverage is by user job, not Prime command count. Ledger: `docs/design/harness-doctrine.md` (ADR-0168). Composition working notes: `docs/design/harness-composition.md` (unratified; `docs/NEXT.md` §1). Prime has no security sandbox; do not invent one in the desktop. Kern (getkern/kern) is Linux/WSL2 only.
 - DeepSeek's Cordis plugin system is rejected as a kernel port; take extensibility on Prime's existing seams instead. Hermes Agent is its own runtime (not built on OpenCode); OpenCode is a delegated skill in Hermes.
 - Prime supports `client_owned` sessions that stop after a disconnected-client grace period and can be promoted to `resident`; Rhizome creates new sessions as `client_owned` (ADR-0167 / C47). Idle close detaches; active close defaults to stop, with Keep working as an explicit promote. Quit follows ownership.
+- The `docs/grok-wiki-*` files are not live product guidance; Grok wiki is out of scope.
+- Do not make the right-panel note tree and note list exclusive — that broke Cmd+N, inbox auto-advance, and note selection and was reverted.
+- Living index docs are palimpsests. `docs/NEXT.md` was Claude Code `b8dc8fb`, then Grok `2b5daba` inserted harness composition; RLM was never a row. Read **Origin:** lines; `rg` cannot attribute a section.
 
