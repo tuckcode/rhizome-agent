@@ -21,12 +21,12 @@ describe('graph view mounts the AI workspace surface', () => {
   const source = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
 
   function graphBranch(): string {
-    const start = source.indexOf("effectiveSelection.filter === 'graph' ? (")
+    const start = source.indexOf('isGraphDestination ? (')
     expect(start, 'graph branch not found in App.tsx').toBeGreaterThan(-1)
     // End at the ternary's alternative arm. Deliberately not `indexOf('<Editor')`
     // — the branch's own explanatory comment mentions <Editor> and would
     // truncate the slice before the assertion ever sees the real markup.
-    const end = source.indexOf(') : (', start)
+    const end = source.indexOf(') : isMyceliumDestination ? (', start)
     expect(end, 'graph branch has no alternative arm').toBeGreaterThan(start)
     return source.slice(start, end)
   }

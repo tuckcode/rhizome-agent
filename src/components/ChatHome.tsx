@@ -35,12 +35,9 @@ interface ChatHomeProps {
 }
 
 /**
- * Frame A — chat as the whole window.
- *
- * The conversation is the primary surface here rather than a panel beside an
- * editor: a telemetry subhead across the top, then the transcript and composer
- * filling everything under it. Open-note is a secondary pane (Frame B), not
- * an editor takeover — the vault is still a rail click away.
+ * Chat as the center canvas (ADR-0166). Sessions stay a left column inside
+ * this surface; inbox and notes dock on the right of it in the shell.
+ * Open-note is a secondary pane, not an editor takeover.
  */
 export default function ChatHome({
   locale,
@@ -66,7 +63,7 @@ export default function ChatHome({
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" data-testid="chat-home">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="chat-home">
       {isPrimeTarget ? (
         <PrimeSessionSubhead
           locale={locale}

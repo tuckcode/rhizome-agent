@@ -53,8 +53,9 @@ file.
 
 `origin/main` was last confirmed at `87e12c3`. Local main may be ahead
 with origin-tags, RLM family, the adapter snapshot, queue visibility,
-#17/#14/#18, #29 vault credential redaction, and the composer strip
-(#38/#9/#35/#21). Confirm with `git log origin/main..HEAD`.
+#17/#14/#18, #29 vault credential redaction, the composer strip
+(#38/#9/#35/#21), and the chat-centered shell (ADR-0166). Confirm with
+`git log origin/main..HEAD`.
 
 This machine's installed Prime is **0.8.0** (102 public daemon commands —
 `docs/prime-adapter-surface.json`). GitHub latest is also `v0.8.0`.
@@ -80,6 +81,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1608-grok-4-6-chat-centered-shell.md) — chat-centered shell: sessions left, Chat center, inbox/notes right, all collapsible. ⌘1/⌘2/⌘3 settled; Graph/Mycelium still take the canvas.
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1445-grok-4-6-composer-strip.md) — composer strip: live pills, model moved off the subhead, one-click thinking toggle. #21 was already in the slash menu.
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1430-grok-4-6-vault-credentials.md) — #29: tokens-only redaction before distill; Save to vault refuses. Detector was telemetry-only.
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1345-grok-4-6-branches-schedules-markers.md) — #17 `get_session_tree`/`navigate_tree` in Chat; #14 create via `heartbeat_set`/`cron_add`; #18 compact/fork/model markers. Issues not closed (no live-Prime demo).

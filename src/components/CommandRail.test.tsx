@@ -18,6 +18,7 @@ function renderRail(overrides: Partial<React.ComponentProps<typeof CommandRail>>
   const props: React.ComponentProps<typeof CommandRail> = {
     locale: 'en',
     activeDestination: 'notes',
+    onSelectChat: vi.fn(),
     onSelectNotes: vi.fn(),
     onSelectGraph: vi.fn(),
     onSelectMycelium: vi.fn(),

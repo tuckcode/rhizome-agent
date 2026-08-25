@@ -290,9 +290,15 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   )
   const aiWorkspaceWindowContext = useMemo(() => aiWorkspaceWindowContextForPath(resolvedPath), [resolvedPath])
   const [settingsInitialSectionId, setSettingsInitialSectionId] = useState<string | null>(null)
+  // Wave 5.3 command rail. Default on; classic shell is `ff_shell_command_rail=false`.
+  const commandRailEnabled = useFeatureFlag('shell_command_rail')
+  const chatCentered = commandRailEnabled && !noteWindowParams
   const openChatHome = useCallback(() => {
+    // Rail-on Chat is furniture, not a destination. Classic shell still
+    // replaces the notes window with ChatHome.
+    if (commandRailEnabled) return
     handleSetSelection({ kind: 'filter', filter: 'chat' })
-  }, [handleSetSelection])
+  }, [commandRailEnabled, handleSetSelection])
   const {
     effectiveShowAIChat,
     handleOpenAiSettings,
@@ -486,31 +492,30 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     dialogs.openSettings()
   }, [dialogs])
 
-  // Wave 5.3 command rail (docs/design/shell-final-direction.md §2.2). Flag
-  // off → this block is inert and the shell renders byte-identical.
-  const commandRailEnabled = useFeatureFlag('shell_command_rail')
   /*
     The note tree only docks right when the command rail is there to hold the
     left edge — the rail is what reserves room for the macOS traffic lights.
     With the classic shell (`ff_shell_command_rail=false`) nothing else would,
     so the tree stays where it was.
   */
-  const sidebarDock: 'left' | 'right' = commandRailEnabled ? 'right' : 'left' 
-  const railActiveDestination = useMemo((): CommandRailDestination => {
-    if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'chat') return 'chat'
-    if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'graph') return 'graph'
-    if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'mycelium') return 'mycelium'
-    if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'changes') return 'changes'
-    if (showResearch) return 'research'
-    return 'notes'
-  }, [effectiveSelection, showResearch])
-  // Frame A: chat owns the whole window. No note list, no editor, no sidebar —
-  // "conversation owns the room" is the design system's rule for this surface.
+  const sidebarDock: 'left' | 'right' = commandRailEnabled ? 'right' : 'left'
+  const isGraphDestination =
+    effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'graph'
+  const isMyceliumDestination =
+    effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'mycelium'
+  // Classic shell only: Chat is still a destination that replaces the vault.
   const isChatDestination =
-    effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'chat'
+    !chatCentered &&
+    effectiveSelection.kind === 'filter' &&
+    effectiveSelection.filter === 'chat'
   const handleRailSelectChat = useCallback(() => {
-    handleSetSelection({ kind: 'filter', filter: 'chat' })
-  }, [handleSetSelection])
+    if (isGraphDestination || isMyceliumDestination) {
+      handleSetSelection({
+        kind: 'filter',
+        filter: explicitOrganizationEnabled ? 'inbox' : 'all',
+      })
+    }
+  }, [explicitOrganizationEnabled, handleSetSelection, isGraphDestination, isMyceliumDestination])
   const handleRailSelectNotes = useCallback(() => {
     handleSetSelection({ kind: 'filter', filter: explicitOrganizationEnabled ? 'inbox' : 'all' })
   }, [handleSetSelection, explicitOrganizationEnabled])
@@ -1246,11 +1251,29 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     rawToggleRef,
     sidebarVisible,
     tableOfContentsToggleRef,
+    viewMode,
     zoom,
   } = useAppWindowControls({
     layout,
     windowMode: Boolean(noteWindowParams) || aiWorkspaceWindow,
   })
+  const railActiveDestination = useMemo((): CommandRailDestination => {
+    if (isGraphDestination) return 'graph'
+    if (isMyceliumDestination) return 'mycelium'
+    if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'changes') return 'changes'
+    if (showResearch) return 'research'
+    if (chatCentered && viewMode === 'editor-only') return 'chat'
+    if (isChatDestination) return 'chat'
+    return 'notes'
+  }, [
+    chatCentered,
+    effectiveSelection,
+    isChatDestination,
+    isGraphDestination,
+    isMyceliumDestination,
+    showResearch,
+    viewMode,
+  ])
 
 
 
@@ -1784,20 +1807,18 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const noteListModifiedFilesError = isChangesSelection ? gitSurfaces.changesModifiedFilesError : null
 
   /*
-   * Tried making 'all' resolve to tree-only when docked right (the tree and
-   * note list otherwise stack in one slot with nothing to say which is "on
-   * top" — see the annotated screenshot behind #4). Reverted: the note list
-   * isn't just decoration alongside the tree, real flows depend on it being
-   * visible on load — Cmd+N note creation, inbox auto-advance, and note
-   * selection all broke in the app test suite the moment 'all' stopped
-   * showing both by default. Both panels visible together is unchanged,
-   * dock-independent, for now; a real fix needs an explicit control the user
-   * opts into rather than a changed default. See docs/HANDOFF.md.
-   */
-  const showSidebarTree = sidebarVisible
-  const showNoteListPanel = noteListVisible
+    Chat-centered shell (ADR-0166, settled 2026-08-25): sessions sit in
+    ChatHome on the left of the conversation; inbox (note list) and notes
+    (tree) sit on the right; both vault panels stay independently
+    collapsible via ⌘1/⌘2/⌘3. They are not exclusive — Cmd+N, inbox
+    auto-advance, and note selection need the list visible. Graph and
+    Mycelium still take the canvas; Chat does not hide the vault.
+  */
+  const showSidebarTree = sidebarVisible && !isChatDestination
+  const hideNoteListForCanvas = isGraphDestination || isMyceliumDestination
+  const showNoteListPanel = noteListVisible && !isChatDestination && !hideNoteListForCanvas
 
-  const sidebarPanel = showSidebarTree && !isChatDestination ? (
+  const sidebarPanel = showSidebarTree ? (
     <>
       {sidebarDock === 'right' && <ResizeHandle onResize={layout.handleSidebarResize} edge="trailing" />}
       <div className={`app__sidebar app__sidebar--${sidebarDock}`} style={{ width: layout.sidebarWidth }}>
@@ -1807,8 +1828,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     </>
   ) : null
 
-  const noteListPanel = showNoteListPanel && !isChatDestination && !(effectiveSelection.kind === 'filter' && (effectiveSelection.filter === 'graph' || effectiveSelection.filter === 'mycelium')) ? (
+  const noteListPanel = showNoteListPanel ? (
     <>
+      {chatCentered && <ResizeHandle onResize={layout.handleNoteListResize} edge="trailing" />}
       <div className={`app__note-list${aiActivity.highlightElement === 'notelist' ? ' ai-highlight' : ''}`} style={{ width: layout.noteListWidth }}>
         {effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse' ? (
           <PulseView vaultPath={gitSurfaces.historyRepositoryPath} onOpenNote={handlePulseOpenNote} refreshKey={gitHistoryRefreshKey} sidebarCollapsed={!showSidebarTree} onExpandSidebar={() => handleSetViewMode('all')} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.historyRepositoryPath} onRepositoryChange={gitSurfaces.setHistoryRepositoryPath} locale={appLocale} />
@@ -1816,9 +1838,33 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           <NoteList entries={visibleEntries} selection={effectiveSelection} selectedNote={activeTab?.entry ?? null} loading={isVaultContentLoading} noteListFilter={noteListFilter} onNoteListFilterChange={setNoteListFilter} inboxPeriod={inboxPeriod} modifiedFiles={noteListModifiedFiles} modifiedFilesError={noteListModifiedFilesError} gitRepositories={gitRepositories} selectedGitRepositoryPath={gitSurfaces.changesRepositoryPath} onGitRepositoryChange={gitSurfaces.setChangesRepositoryPath} getNoteStatus={vault.getNoteStatus} sidebarCollapsed={!showSidebarTree} onSelectNote={notes.handleSelectNote} onReplaceActiveTab={handleReplaceActiveTabWithQueuedDiff} onEnterNeighborhood={handleEnterNeighborhood} onCreateNote={notes.handleCreateNoteImmediate} onBulkOrganize={explicitOrganizationEnabled ? bulkActions.handleBulkOrganize : undefined} onBulkArchive={bulkActions.handleBulkArchive} onBulkDeletePermanently={deleteActions.handleBulkDeletePermanently} onUpdateTypeSort={notes.handleUpdateFrontmatter} onUpdateViewDefinition={handleUpdateViewDefinition} updateEntry={vault.updateEntry} onOpenInNewWindow={handleOpenEntryInNewWindow} onRenameFilename={appSave.handleFilenameRename} onExportPdf={handleExportNotePdfFromList} onToggleFavorite={entryActions.handleToggleFavorite} onToggleOrganized={explicitOrganizationEnabled ? entryActions.handleToggleOrganized : undefined} onRevealFile={fileActions.revealFile} onCopyFilePath={fileActions.copyFilePath} canCopyGitUrl={noteGitUrls.canCopyEntryGitUrl} onCopyGitUrl={noteGitUrls.copyEntryGitUrl} onDiscardFile={handleDiscardFile} onOpenDeletedNote={handleOpenDeletedNote} allNotesNoteListProperties={vaultConfig.allNotes?.noteListProperties ?? null} onUpdateAllNotesNoteListProperties={handleUpdateAllNotesNoteListProperties} inboxNoteListProperties={vaultConfig.inbox?.noteListProperties ?? null} onUpdateInboxNoteListProperties={handleUpdateInboxNoteListProperties} views={vault.views} visibleNotesRef={visibleNotesRef} allNotesFileVisibility={allNotesFileVisibility} multiSelectionCommandRef={multiSelectionCommandRef} locale={appLocale} />
         )}
       </div>
-      <ResizeHandle onResize={layout.handleNoteListResize} />
+      {!chatCentered && <ResizeHandle onResize={layout.handleNoteListResize} />}
     </>
   ) : null
+
+  const chatHomeSurface = (
+    <Suspense fallback={<div className="flex h-full flex-1 items-center justify-center text-sm text-muted-foreground" data-testid="chat-home-suspense">{translate(appLocale, 'rail.chat')}</div>}>
+      <ChatHome
+        locale={appLocale}
+        defaultAiAgent={aiAgentPreferences.defaultAiAgent}
+        defaultAiTarget={aiAgentPreferences.defaultAiTarget}
+        defaultAiAgentReadiness={aiAgentPreferences.defaultAiAgentReadiness}
+        defaultAiAgentReady={aiAgentPreferences.defaultAiAgentReady}
+        onExit={() => handleSetViewMode(chatCentered ? 'all' : 'editor-list')}
+        vaultPath={activeEditorVaultPath}
+        vaultPaths={writableVaultPaths}
+        vaults={vaultSwitcher.allVaults.map((vault) => ({ label: vault.label, path: vault.path }))}
+        onSwitchVault={vaultSwitcher.switchVault}
+        entries={visibleEntries}
+        onOpenNote={notes.handleNavigateWikilink}
+        onPromoteToVault={handlePromoteChatToVault}
+        onFileCreated={vaultBridge.handleAgentFileCreated}
+        onFileModified={vaultBridge.handleAgentFileModified}
+        onVaultChanged={vaultBridge.handleAgentVaultChanged}
+        onUnsupportedAiPaste={setToastMessage}
+      />
+    </Suspense>
+  )
 
   return (
     <AppPreferencesProvider dateDisplayFormat={dateDisplayFormat}>
@@ -1833,19 +1879,28 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
             <CommandRail
               locale={appLocale}
               activeDestination={railActiveDestination}
-              onSelectChat={handleRailSelectChat}
-              onSelectNotes={handleRailSelectNotes}
+              onSelectChat={() => {
+                handleRailSelectChat()
+                if (chatCentered) handleSetViewMode('editor-only')
+              }}
+              onSelectNotes={() => {
+                handleRailSelectNotes()
+                if (chatCentered) handleSetViewMode('all')
+              }}
               onSelectGraph={handleRailSelectGraph}
               onSelectMycelium={handleRailSelectMycelium}
               onOpenResearch={() => setShowResearch(true)}
-              onSelectChanges={handleRailSelectChanges}
+              onSelectChanges={() => {
+                handleRailSelectChanges()
+                if (chatCentered && viewMode === 'editor-only') handleSetViewMode('editor-list')
+              }}
               onOpenSettings={handleOpenSettings}
             />
           )}
           {sidebarDock === 'left' && sidebarPanel}
-          {noteListPanel}
+          {!chatCentered && noteListPanel}
           <div className={`app__editor${aiActivity.highlightElement === 'editor' || aiActivity.highlightElement === 'tab' ? ' ai-highlight' : ''}`}>
-            {effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'graph' ? (
+            {isGraphDestination ? (
               // The AI workspace normally renders inside <Editor>, but the graph
               // replaces <Editor> entirely — so without mounting it here too,
               // clicking the AI bubble in graph view hid the bubble (it unmounts
@@ -1856,35 +1911,98 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                 </Suspense>
                 {effectiveShowAIChat && aiWorkspaceSurface}
               </div>
-            ) : isChatDestination ? (
-              <Suspense fallback={<div className="flex h-full flex-1 items-center justify-center text-sm text-muted-foreground" data-testid="chat-home-suspense">{translate(appLocale, 'rail.chat')}</div>}>
-              <ChatHome
-                locale={appLocale}
-                defaultAiAgent={aiAgentPreferences.defaultAiAgent}
-                defaultAiTarget={aiAgentPreferences.defaultAiTarget}
-                defaultAiAgentReadiness={aiAgentPreferences.defaultAiAgentReadiness}
-                defaultAiAgentReady={aiAgentPreferences.defaultAiAgentReady}
-                onExit={handleRailSelectNotes}
-                vaultPath={activeEditorVaultPath}
-                vaultPaths={writableVaultPaths}
-                vaults={vaultSwitcher.allVaults.map((vault) => ({ label: vault.label, path: vault.path }))}
-                onSwitchVault={vaultSwitcher.switchVault}
-                entries={visibleEntries}
-                onOpenNote={notes.handleNavigateWikilink}
-                onPromoteToVault={handlePromoteChatToVault}
-                onFileCreated={vaultBridge.handleAgentFileCreated}
-                onFileModified={vaultBridge.handleAgentFileModified}
-                onVaultChanged={vaultBridge.handleAgentVaultChanged}
-                onUnsupportedAiPaste={setToastMessage}
-              />
-              </Suspense>
-            ) : effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'mycelium' ? (
+            ) : isMyceliumDestination ? (
               <div className="relative flex flex-1 min-h-0">
                 <Suspense fallback={<div className="flex h-full flex-1 items-center justify-center text-sm text-muted-foreground" data-testid="mycelium-suspense">{translate(appLocale, 'mycelium.title')}</div>}>
                   <MyceliumView locale={appLocale} onExit={handleRailSelectNotes} />
                 </Suspense>
                 {effectiveShowAIChat && aiWorkspaceSurface}
               </div>
+            ) : chatCentered ? (
+              <div className="app__chat-center" data-testid="chat-center">
+                {chatHomeSurface}
+                {activeTab ? (
+                  <div className="app__note-editor">
+                    <Editor
+                      tabs={notes.tabs}
+                      activeTabPath={notes.activeTabPath}
+                      isVaultLoading={isVaultContentLoading}
+                      entries={visibleEntries}
+                      onNavigateWikilink={notes.handleNavigateWikilink}
+                      onLoadDiff={loadDiffForPath}
+                      onLoadDiffAtCommit={loadDiffAtCommitForPath}
+                      pendingCommitDiffRequest={pendingDiffRequest}
+                      onPendingCommitDiffHandled={handlePendingDiffHandled}
+                      getNoteStatus={vault.getNoteStatus}
+                      onCreateNote={notes.handleCreateNoteImmediate}
+                      inspectorCollapsed={layout.inspectorCollapsed}
+                      onToggleInspector={handleToggleInspector}
+                      inspectorWidth={layout.inspectorWidth}
+                      defaultAiAgent={aiAgentPreferences.defaultAiAgent}
+                      defaultAiTarget={aiAgentPreferences.defaultAiTarget}
+                      defaultAiAgentReadiness={aiAgentPreferences.defaultAiAgentReadiness}
+                      defaultAiAgentReady={aiAgentPreferences.defaultAiAgentReady}
+                      onUnsupportedAiPaste={setToastMessage}
+                      onInspectorResize={layout.handleInspectorResize}
+                      inspectorEntry={activeTab?.entry ?? null}
+                      inspectorContent={activeTab?.content ?? null}
+                      gitHistory={gitHistory}
+                      onUpdateFrontmatter={notes.handleUpdateFrontmatter}
+                      onDeleteProperty={notes.handleDeleteProperty}
+                      onAddProperty={notes.handleAddProperty}
+                      onCreateMissingType={handleCreateMissingType}
+                      onCreateAndOpenNote={notes.handleCreateNoteForRelationship}
+                      onChangeWorkspace={activeDeletedFile ? undefined : handleChangeWorkspace}
+                      onInitializeProperties={handleInitializeProperties}
+                      showAIChat={false}
+                      vaultPath={activeEditorVaultPath}
+                      vaultPaths={writableVaultPaths}
+                      noteList={aiNoteList}
+                      noteListFilter={aiNoteListFilter}
+                      onToggleFavorite={activeDeletedFile ? undefined : entryActions.handleToggleFavorite}
+                      onToggleOrganized={activeDeletedFile || !explicitOrganizationEnabled ? undefined : toggleOrganizedCommand}
+                      onEnterNeighborhood={activeDeletedFile ? undefined : handleEnterNeighborhood}
+                      onRevealFile={fileActions.revealFile}
+                      onReloadVault={handleManualVaultReload}
+                      onCopyFilePath={fileActions.copyFilePath}
+                      onCopyDeepLink={activeDeletedFile ? undefined : deepLinks.copyEntryDeepLink}
+                      onCopyGitUrl={activeDeletedFile || !activeTabEntry || !noteGitUrls.canCopyEntryGitUrl(activeTabEntry) ? undefined : noteGitUrls.copyEntryGitUrl}
+                      onOpenExternalFile={fileActions.openExternalFile}
+                      onDeleteNote={activeDeletedFile ? undefined : deleteActions.handleDeleteNote}
+                      onArchiveNote={activeDeletedFile ? undefined : entryActions.handleArchiveNote}
+                      onUnarchiveNote={activeDeletedFile ? undefined : entryActions.handleUnarchiveNote}
+                      onContentChange={handleTrackedContentChange}
+                      onSave={handleTrackedSave}
+                      onRenameFilename={activeDeletedFile ? undefined : appSave.handleFilenameRename}
+                      noteWidth={activeNoteWidth}
+                      onToggleNoteWidth={handleToggleNoteWidth}
+                      rawToggleRef={rawToggleRef}
+                      tableOfContentsToggleRef={tableOfContentsToggleRef}
+                      pdfExportRef={pdfExportRef}
+                      findInNoteRef={findInNoteRef}
+                      diffToggleRef={diffToggleRef}
+                      canGoBack={canGoBack}
+                      canGoForward={canGoForward}
+                      onGoBack={handleGoBack}
+                      onGoForward={handleGoForward}
+                      leftPanelsCollapsed={!sidebarVisible && !noteListVisible}
+                      onFileCreated={vaultBridge.handleAgentFileCreated}
+                      onFileModified={vaultBridge.handleAgentFileModified}
+                      onVaultChanged={vaultBridge.handleAgentVaultChanged}
+                      workspaces={inspectorWorkspaces}
+                      isConflicted={conflictFlow.isConflicted}
+                      onKeepMine={conflictFlow.handleKeepMine}
+                      onKeepTheirs={conflictFlow.handleKeepTheirs}
+                      flushPendingEditorContentRef={flushPendingEditorContentRef}
+                      flushPendingRawContentRef={flushPendingRawContentRef}
+                      onToast={setToastMessage}
+                      locale={appLocale}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : isChatDestination ? (
+              chatHomeSurface
             ) : (
             <Editor
               tabs={notes.tabs}
@@ -1965,6 +2083,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
             />
             )}
           </div>
+          {chatCentered && noteListPanel}
           {sidebarDock === 'right' && sidebarPanel}
         </div>
         <UpdateBanner status={updateStatus} actions={updateActions} locale={appLocale} />

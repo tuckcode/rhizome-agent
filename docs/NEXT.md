@@ -67,19 +67,18 @@ composition doc — do not restate them here.
 | Decision | Blocks | Where it stands |
 |---|---|---|
 | **Harness composition: option 2 + first slice** | #5, #40, and any graft of a foreign harness idea | Filter ratified (ADR-0168). Working notes in `harness-composition.md`. Still discuss/decide: ratify option 2, ratify native extension UI as first slice, name remaining incompatibilities. |
-| **What ⌘1/⌘2/⌘3 and "Full Layout" mean once Chat is the centre** | #27, and any further shell work | ADR-0166 lists it as open. `viewMode`'s three states are wired through `viewCommands.ts`, the command palette, `PulseView`, and `useMainWindowSizeConstraints` — the ladder has no meaning when a fourth surface (Chat) is permanent |
-| **Does Wiki Graph replace the canvas or feed a side panel** | #39, #11, #22 | ADR-0166 open question. It is a full-canvas destination today, same as Chat was |
-| **Right panel exclusivity (Inbox / Notes / Changes, never two)** | #27, #34 | Attempted 2026-08-22, reverted in `64b2e89`: making `all` resolve to tree-only broke Cmd+N, inbox auto-advance and note selection, because real flows assume the note list is visible on load. Needs a control the user opts into, not a changed default |
+| **What ⌘1/⌘2/⌘3 and "Full Layout" mean once Chat is the centre** | — | **Settled 2026-08-25.** ⌘1 Chat only, ⌘2 Chat + Inbox, ⌘3 Chat + Notes. Stored `viewMode` values unchanged. |
+| **Does Wiki Graph replace the canvas or feed a side panel** | #39, #11, #22 | Still open. Graph/Mycelium still take the canvas; the chat-centered ship did not convert them. |
+| **Right panel exclusivity (Inbox / Notes / Changes, never two)** | — | **Settled 2026-08-25: no.** Inbox (list) and notes (tree) may both be open on the right. Changes is a list filter. The 2026-08-22 exclusivity attempt stays reverted. |
 
 **#40** can close against ADR-0168 (Rhizome is a client of Prime, not a second
 harness). Do not treat that close as "the harness question is done."
 Ratify `harness-composition.md` before grafting.
 
-Two ideas are in play for the Chat-centre question and neither is decided —
-split the centre horizontally (editor on top, Chat as a collapsible bottom
-strip), or one shared side panel where clicking a note turns the list into the
-editor. Captured with the rest of the shell review in the design artifact linked
-from the 2026-08-22 handoff.
+Two ideas were in play for the Chat-centre question; **neither is the
+shipped map.** The product is sessions left, Chat center, inbox and notes
+on the right, all collapsible — not a bottom Chat strip, and not a shared
+side panel that turns the list into the editor. Captured in ADR-0166.
 
 ---
 
@@ -90,9 +89,9 @@ from the 2026-08-22 handoff.
 **Shell and layout**
 | | |
 |---|---|
-| #27 | Session list as a dockable sidebar, not a toggled overlay — **B** |
-| #34 | No way to search or filter the session list — **B** (shares the panel) |
-| #22 | Mycelium: Rhizome's visual language, and two entry points — **B** |
+| #27 | Session list as a dockable sidebar, not a toggled overlay — left column of Chat (always on in the chat-centered shell); GitHub still open pending live check |
+| #34 | No way to search or filter the session list — unblocked; the panel is the Chat sessions column |
+| #22 | Mycelium: Rhizome's visual language, and two entry points — **B** (graph/mycelium still take the canvas) |
 | #11 | Mycelium runs inside Rhizome instead of launching another app — **B** |
 | #39 | Make the knowledge graph an agent tool, not a place you visit — **B** |
 
@@ -226,8 +225,9 @@ unprompted Prime verbs.
    DeepSeek *idea* on Prime extensions, first slice = native extension UI).
    Until ratified, do not graft. Closing **#40** against the filter is a
    side-errand, not a substitute.
-2. **Settle §1's shell decisions**, then #27 / #34 / #39 / #11 / #22 unblock
-   together.
+2. **Chat-centered shell shipped** (ADR-0166, 2026-08-25). Remaining canvas
+   question is Wiki Graph / Mycelium (#39 / #11 / #22). #34 is session search
+   on the Chat sessions column.
 3. **Memory loop (#24, #25)** — the product thesis, thinnest design coverage.
 4. **C28 and C31** whenever the push gate flakes on you — the natural reaction
    (re-run and move on) is exactly how they stay unfixed.
