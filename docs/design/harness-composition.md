@@ -88,6 +88,13 @@ a Hermes or DeepSeek contract we already built. Then we choose — use Prime’s
 version or keep ours — we do not get a silent merge conflict. Name that
 choice in the matrix before the slice ships.
 
+**Keep the adapter honest.** `docs/prime-adapter-surface.json` is the last
+mechanical read of Prime's daemon command set vs what we send. Refresh with
+`pnpm prime:surface` / `pnpm prime:surface:github`. Do not clone upstream
+into this tree.
+
+**Origin:** Grok 4.6 · 2026-08-25 — the snapshot / `pnpm prime:surface` check.
+
 ---
 
 ## Layers (a harness is more than tools)

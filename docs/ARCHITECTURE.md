@@ -425,7 +425,9 @@ anyone is talking to the agent and would otherwise be what creates the session:
 - **`prime_events.rs`**, **`prime_tool_unwrap.rs`** — normalising the daemon's
   event stream into the shared `AiAgentStreamEvent` shape
 - **`prime_discovery.rs`**, **`prime_update.rs`**, **`prime_vault_skill.rs`** —
-  locating the binary, updating it, and seeding the Rhizome vault skill
+  locating the binary, updating it, and seeding the Rhizome vault skill.
+  Adapter command-set snapshot: `docs/prime-adapter-surface.json`
+  (`pnpm prime:surface`).
 - Frontend: `usePrimeHostStatus` (status poll), `usePrimeAgentActivity` (app-level,
   goal/heartbeats), `usePrimeRunningSessionFiles` (roster → which logs are alive),
   `RlmFamilyBand` (live RLM children from that roster; Stop → `cancel_rlm_child`),
