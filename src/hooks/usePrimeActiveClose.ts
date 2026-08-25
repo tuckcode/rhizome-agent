@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { listen } from '@tauri-apps/api/event'
+import { isTauri } from '../mock-tauri'
 import { callHost } from '../lib/callHost'
 
 export const PRIME_ACTIVE_CLOSE_EVENT = 'prime-active-close-requested'
@@ -19,17 +19,22 @@ export function usePrimeActiveClose() {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
+    if (!isTauri()) return
+
     let cancelled = false
     let unlisten: (() => void) | undefined
-    void listen(PRIME_ACTIVE_CLOSE_EVENT, () => {
-      setOpen(true)
-    }).then((fn) => {
-      if (cancelled) {
-        fn()
-        return
-      }
-      unlisten = fn
-    })
+    void import('@tauri-apps/api/event')
+      .then(({ listen }) => listen(PRIME_ACTIVE_CLOSE_EVENT, () => {
+        setOpen(true)
+      }))
+      .then((fn) => {
+        if (cancelled) {
+          fn()
+          return
+        }
+        unlisten = fn
+      })
+      .catch(() => undefined)
     return () => {
       cancelled = true
       unlisten?.()
