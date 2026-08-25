@@ -5,8 +5,9 @@ import { PRIME_ACTIVE_CLOSE_EVENT, usePrimeActiveClose } from './usePrimeActiveC
 const listenMock = vi.fn()
 const unlistenMock = vi.fn()
 const hideMock = vi.fn()
-const invoked = vi.hoisted(() => ({
-  calls: [] as Array<{ cmd: string; args?: Record<string, unknown> }>,
+const { invoked, tauri } = vi.hoisted(() => ({
+  invoked: { calls: [] as Array<{ cmd: string; args?: Record<string, unknown> }> },
+  tauri: { on: true },
 }))
 
 vi.mock('@tauri-apps/api/event', () => ({
@@ -18,8 +19,11 @@ vi.mock('@tauri-apps/api/window', () => ({
 }))
 
 vi.mock('../mock-tauri', () => ({
-  isTauri: () => false,
-  mockInvoke: (cmd: string, args?: Record<string, unknown>) => {
+  isTauri: () => tauri.on,
+}))
+
+vi.mock('../lib/callHost', () => ({
+  callHost: (cmd: string, args?: Record<string, unknown>) => {
     invoked.calls.push({ cmd, args })
     return Promise.resolve({ outcome: 'stop_session' })
   },
@@ -38,7 +42,15 @@ describe('usePrimeActiveClose', () => {
     hideMock.mockReset()
     hideMock.mockResolvedValue(undefined)
     invoked.calls = []
+    tauri.on = true
     listenMock.mockResolvedValue(unlistenMock)
+  })
+
+  it('does not touch Tauri listen in the browser', async () => {
+    tauri.on = false
+    renderHook(() => usePrimeActiveClose())
+    await Promise.resolve()
+    expect(listenMock).not.toHaveBeenCalled()
   })
 
   it('opens when Rust asks about an active close', async () => {
@@ -66,7 +78,7 @@ describe('usePrimeActiveClose', () => {
     expect(invoked.calls).toEqual([
       { cmd: 'settle_prime_session', args: { intent: 'stop' } },
     ])
-    expect(hideMock).toHaveBeenCalled()
+    await waitFor(() => expect(hideMock).toHaveBeenCalled())
     expect(result.current.open).toBe(false)
   })
 
@@ -84,7 +96,7 @@ describe('usePrimeActiveClose', () => {
     expect(invoked.calls).toEqual([
       { cmd: 'settle_prime_session', args: { intent: 'keep_working' } },
     ])
-    expect(hideMock).toHaveBeenCalled()
+    await waitFor(() => expect(hideMock).toHaveBeenCalled())
   })
 
   it('cancel leaves the window open and does not settle', async () => {
