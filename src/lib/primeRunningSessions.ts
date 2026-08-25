@@ -40,6 +40,12 @@ export interface PrimeRosterSession {
   runtimeKind?: 'top-level' | 'subagent'
   rlmDepth?: number
   parentActiveSessionId?: string
+  /**
+   * Prime's RLM node id. `cancel_rlm_child` wants this, not the daemon
+   * handle. Present on subagent roster rows (probed in daemon-session-list:
+   * `id` is already `rlmChildId ?? activeSessionId`).
+   */
+  rlmChildId?: string
   sessionFile?: string
   summary?: string
   firstMessage?: string
@@ -144,6 +150,48 @@ function truncate(value: string, maxLength: number): string {
 
 function sessionHandle(session: PrimeRosterSession): string | undefined {
   return session.activeSessionId ?? session.id
+}
+
+/**
+ * Id `cancel_rlm_child` accepts. The daemon handle is a different field —
+ * sending it makes Prime look up a child that is not there.
+ */
+function rlmCancelId(session: PrimeRosterSession): string | undefined {
+  const childId = collapseWhitespace(session.rlmChildId ?? '')
+  if (childId) return childId
+  // Prime's list already puts rlmChildId in `id` for subagents.
+  if (isSubagent(session)) {
+    const listed = collapseWhitespace(session.id ?? '')
+    if (listed) return listed
+  }
+  return sessionHandle(session)
+}
+
+function fileStemEquals(path: string, id: string): boolean {
+  const slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+  const file = slash >= 0 ? path.slice(slash + 1) : path
+  const stem = file.endsWith('.jsonl') ? file.slice(0, -6) : file
+  return stem === id
+}
+
+/**
+ * Chat's host status reports Prime's durable `sessionId`, not the daemon
+ * handle the roster parents on. Resolve either (or a log-path stem) to the
+ * handle `rootHandleFor` walks to.
+ */
+function resolveLiveRootHandle(
+  sessions: readonly PrimeRosterSession[],
+  liveId: string,
+): string {
+  for (const session of sessions) {
+    if (isSubagent(session)) continue
+    const handle = sessionHandle(session)
+    if (!handle) continue
+    if (handle === liveId) return handle
+    if (session.sessionId === liveId) return handle
+    if (session.sessionFile && fileStemEquals(session.sessionFile, liveId)) return handle
+  }
+  return liveId
 }
 
 /**
@@ -285,6 +333,58 @@ function validSessions(
   return roster.filter(
     (session): session is PrimeRosterSession => !!session && typeof session === 'object',
   )
+}
+
+/** One RLM child (or grandchild) of the live chat session. */
+export interface RlmFamilyMember {
+  /** Id sent to `cancel_rlm_child`. */
+  id: string
+  title: string
+  activity: RosterActivity
+  working: boolean
+  /** 1 = direct child. Deeper numbers are grandchildren. */
+  depth: number
+}
+
+/**
+ * The live session's RLM family, from the roster we already poll.
+ *
+ * `liveId` may be the daemon handle *or* the durable `sessionId` Chat's host
+ * status reports. Menu-bar rows hide these and only count them. Chat needs
+ * the members themselves so a parent can see and stop its children.
+ */
+export function familyForRoot(
+  roster: readonly PrimeRosterSession[] | null | undefined,
+  rootHandle: string | null | undefined,
+): RlmFamilyMember[] {
+  if (!rootHandle) return []
+  const sessions = validSessions(roster)
+  if (sessions.length === 0) return []
+
+  const liveHandle = resolveLiveRootHandle(sessions, rootHandle)
+
+  const byHandle = new Map<string, PrimeRosterSession>()
+  for (const session of sessions) {
+    const handle = sessionHandle(session)
+    if (handle) byHandle.set(handle, session)
+  }
+
+  const members: RlmFamilyMember[] = []
+  for (const session of sessions) {
+    if (!isSubagent(session)) continue
+    if (rootHandleFor(session, byHandle) !== liveHandle) continue
+    const id = rlmCancelId(session)
+    if (!id) continue
+    members.push({
+      id,
+      title: rosterSessionTitle(session),
+      activity: activityFor(session),
+      working: isWorking(session),
+      depth: session.rlmDepth && session.rlmDepth > 0 ? session.rlmDepth : 1,
+    })
+  }
+
+  return members.sort((left, right) => left.depth - right.depth || left.title.localeCompare(right.title))
 }
 
 function countDescendantsByRoot(sessions: PrimeRosterSession[]): Map<string, number> {

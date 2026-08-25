@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { AiPanel } from './AiPanel'
 import { PrimeSessionSubhead } from './PrimeSessionSubhead'
 import { AgentActivityBand } from './AgentActivityBand'
+import { RlmFamilyBand } from './RlmFamilyBand'
 import { ChatComposerDeck } from './ChatComposerDeck'
 import { ChatNotePane } from './ChatNotePane'
 import { vaultLabelFromPath } from '../lib/primeSubheadLabels'
@@ -76,6 +77,11 @@ export default function ChatHome({
         />
       ) : null}
       <AgentActivityBand locale={locale} enabled={isPrimeTarget} />
+      <RlmFamilyBand
+        locale={locale}
+        enabled={isPrimeTarget}
+        liveSessionId={primeHost?.sessionId ?? null}
+      />
       <div className="flex min-h-0 flex-1">
         <AiPanel
           locale={locale}

@@ -438,6 +438,13 @@ pub fn follow_up_prime_session(message: String) -> Result<bool, String> {
     crate::prime_session_host::follow_up(&message)
 }
 
+/// Stop one RLM child of the attached Prime session.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn cancel_prime_rlm_child(child_id: String) -> Result<bool, String> {
+    crate::prime_session_host::cancel_rlm_child(&child_id)
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 pub fn get_prime_session_stats() -> Result<crate::prime_session_host::PrimeSessionStats, String> {

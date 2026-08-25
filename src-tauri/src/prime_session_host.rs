@@ -1281,6 +1281,26 @@ pub fn set_auto_compaction(enabled: bool) -> Result<(), String> {
     })
 }
 
+/// Stop one RLM child of the attached session.
+///
+/// Prime owns the child. This is a request, not a local kill. Empty ids are
+/// refused before they hit the daemon so a miswired Stop cannot cancel
+/// "whatever is current". `childId` is Prime's `rlmChildId`, not the child's
+/// daemon handle — `host.call` injects the *parent's* `activeSessionId`.
+pub fn cancel_rlm_child(child_id: &str) -> Result<bool, String> {
+    let trimmed = child_id.trim();
+    if trimmed.is_empty() {
+        return Err("Cannot cancel an RLM child without an id".into());
+    }
+    with_host_mut(|host| {
+        let data = host.call(serde_json::json!({
+            "type": "cancel_rlm_child",
+            "childId": trimmed,
+        }))?;
+        Ok(data["cancelled"].as_bool().unwrap_or(false))
+    })
+}
+
 /// Promote the attached client-owned session to resident work.
 ///
 /// This is the explicit background grant in ADR-0167. One-way: Prime does not
@@ -5531,6 +5551,41 @@ mod tests {
         connect_host(vault.path()).unwrap();
 
         assert_eq!(compact(None).unwrap(), Some(41_000));
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancel_rlm_child_refuses_an_empty_id_before_talking_to_the_daemon() {
+        let _guard = host_guard();
+        let error = cancel_rlm_child("  ").unwrap_err();
+        assert!(
+            error.contains("without an id"),
+            "empty stop must not hit Prime: {error}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancel_rlm_child_asks_prime_with_the_child_id() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("cancel_rlm_child") => {
+                assert_eq!(command["childId"], "kid-1");
+                Some(vec![ok(
+                    id,
+                    "cancel_rlm_child",
+                    serde_json::json!({ "cancelled": true }),
+                )])
+            }
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        assert!(cancel_rlm_child("kid-1").unwrap());
 
         let _ = shutdown_host();
     }

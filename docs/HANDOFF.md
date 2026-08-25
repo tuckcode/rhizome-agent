@@ -51,10 +51,11 @@ file.
 
 ## State
 
-`origin/main` is pushed through `20e1b6c` (stranded-work check). Includes
-C47 as `d737085`, the listen-outside-Tauri guard (`b064272`), Book →
-Skill, NEXT.md, ADR-0166, and the harness-composition notes. C48/C49
-are closed as QA-environment misreads.
+`origin/main` was last confirmed at `87e12c3`. Local main may be ahead
+with origin-tags (`ea105fa`) and the RLM family slice (Chat roster +
+`cancel_rlm_child`). Confirm with `git log origin/main..HEAD` before
+assuming either is pushed.
+
 Prime **0.7.4** on Windows speaks
 `\\.\pipe\prime-agent-daemon` — see `docs/WINDOWS-DEV.md`. On macOS/Linux the
 daemon dies with whatever terminal starts it, so start it detached:
@@ -75,6 +76,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-08-24 (late) · Grok 4.6](plans/handoffs/2026-08-24-2335-grok-4-6-rlm-family-band.md) — RLM family in Chat from the `list` roster; Stop → `cancel_rlm_child`. Not #17. Not a plugin kernel
 - [2026-08-24 (late) · Grok 4.6](plans/handoffs/2026-08-24-2308-grok-4-6-origin-tags.md) — Origin tags on living docs; NEXT.md is a palimpsest (Claude Code then Grok); RLM was never a row
 - [2026-08-24 (late) · Grok 4.6](plans/handoffs/2026-08-24-2225-grok-4-6-stranded-work-check.md) — session-start stranded-work check in AGENTS.md; C47 listen-outside-Tauri guard (`b064272`) so the local stack can push
 - [2026-08-24 (evening) · Grok 4.6](plans/handoffs/2026-08-24-1740-grok-4-6-harness-composition.md) — option-2 composition notes (`docs/design/harness-composition.md`); NEXT.md §1 is discuss/decide; DeepSeek plugin *idea* on Prime extensions; sandbox is Prime’s (Kern is Linux-only)

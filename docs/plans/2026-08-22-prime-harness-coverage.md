@@ -12,8 +12,8 @@ surface is every `case "<name>":` in
 
 ## The number
 
-**27 of 105 daemon commands — 25%.** Excluding the 10 `worker_*` internals a
-client never sends: 27 of 95, 28%.
+**28 of 105 daemon commands — 27%.** Excluding the 10 `worker_*` internals a
+client never sends: 28 of 95, 29%.
 
 What we speak today:
 
@@ -23,27 +23,30 @@ extension_ui_response  follow_up  fork  get_available_models  get_commands
 get_connection_state  get_messages  get_session_stats  get_state
 heartbeat_manage  kill  list  new_session  prompt  set_auto_compaction
 set_model  set_session_name  set_thinking_level  steer  switch_session
+cancel_rlm_child
 ```
 
 That set is a complete, working *conversation* client: connect, attach,
 prompt, stream, switch model and reasoning level, fork, compact, watch a goal.
-Nothing in it is half-built.
+`cancel_rlm_child` is the first RLM write. Chat now lists the live session's
+roster children (`RlmFamilyBand`); it still does not speak `get_session_tree`
+(fork history, #17) or `set_rlm_max_depth`.
 
 ## The number needs two corrections, in opposite directions
 
-**It overstates the gap.** Eight of the 68 unused commands are daemon
+**It overstates the gap.** Eight of the 67 unused commands are daemon
 infrastructure a desktop client should never call — `restart`, `reload`,
 `shutdown`, `set_transport`, `prepare_update_restart`, `retry_worker`,
 `restore_actions`, `ack_result`. ADR-0163 is explicit that the daemon is not
 ours to stop; not calling these is the decision working, not a gap.
 
 **It understates the gap**, and this is the part that matters. What is missing
-is not 68 scattered commands. It is a small number of *coherent product
+is not 67 scattered commands. It is a small number of *coherent product
 surfaces*, each entirely absent:
 
 | Missing surface | Cmds | What its absence means |
 |---|---:|---|
-| **RLM / subagents** | 6 | `get_session_tree`, `get_context_tree`, `cancel_rlm_child`, `set_rlm_max_depth`… **Never looked at.** Multi-agent is arguably Prime's differentiator and Rhizome has none of it |
+| **RLM / subagents** | 5 left | Chat shows live children from the **`list` roster** and Stop → `cancel_rlm_child`. Still missing `get_session_tree` / `get_context_tree` / `set_rlm_max_depth`. `get_session_tree` is fork history (#17), not the RLM family |
 | **Queue & steering** | 12 | We can `steer` and `follow_up` blind. We cannot *see* the queue, edit a queued message, clear it, or set steering/follow-up mode |
 | **Session tree / forking** | 6 | We `fork`, but cannot show the branch point first (`get_user_messages_for_forking`) or navigate the tree |
 | **Saved sessions** | 6 | `rename_saved_session`, `export_html`, `import_jsonl`. Also `list_saved_sessions` — see the open question below |
@@ -64,7 +67,7 @@ nothing (#28), event normalisation into the shared `AiAgentStreamEvent` shape,
 goal/heartbeat watching, and — as of 2026-08-22 — an architecture doc that
 describes all of it (C32). None of that is scaffolding to be redone.
 
-Worth saying plainly: the hard part is done. The remaining 68 are additions to
+Worth saying plainly: the hard part is done. The remaining 67 are additions to
 a working client, not a rewrite of one.
 
 ## Three things block "smooth", regardless of coverage
@@ -74,7 +77,7 @@ a working client, not a rewrite of one.
    ordering and useless for shape. On 2026-08-21 three separate defects were
    invisible to a fully green suite and obvious in a browser within seconds —
    all three because the tests mock the transport wholesale. Every one of the
-   68 inherits that blind spot. **This is the highest-leverage infrastructure
+   67 inherits that blind spot. **This is the highest-leverage infrastructure
    work available**, because it changes the cost of all future commands rather
    than adding one.
 
