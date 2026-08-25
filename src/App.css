@@ -105,6 +105,13 @@
   min-width: 0;
 }
 
+.app__note-editor--idle {
+  display: none;
+  flex: 0 0 0;
+  min-width: 0;
+  border: none;
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
