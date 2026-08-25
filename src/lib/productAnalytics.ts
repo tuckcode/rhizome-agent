@@ -68,25 +68,27 @@ export function trackFilePreviewFailed(previewKind: FilePreviewKind): void {
 }
 
 /**
- * A running-session row was opened from the menu-bar roster (#13).
- *
- * The point of the roster is discovery — whether anyone actually uses the menu
- * bar to get back to work, or only ever opens it to capture. No session id,
- * title, path, or summary: those carry note and prompt content.
- *
- * `working` and the subagent count are numbers, not booleans — `trackEvent`
- * takes `Record<string, string | number>` and a raw boolean gets through
- * `npx tsc --noEmit` only to fail the stricter pre-push build (see e518b0c).
- */
-/**
- * The reasoning level was changed from the strip control (#9).
+ * The reasoning level was changed from the composer (#9 / #35).
  *
  * The level id is a fixed, non-identifying enum from Prime's own list, so it
- * is safe to record as-is; it tells us whether anyone actually moves off the
- * default, which is the whole question behind putting the control on the strip.
+ * is safe to record as-is. `source` says whether it came from the model menu
+ * or the one-click toggle — whether anyone uses the toggle is the question.
  */
-export function trackPrimeThinkingLevelChanged(level: string): void {
-  trackEvent('prime_thinking_level_changed', { level })
+export function trackPrimeThinkingLevelChanged(
+  level: string,
+  source: 'menu' | 'toggle' = 'menu',
+): void {
+  trackEvent('prime_thinking_level_changed', { level, source })
+}
+
+/**
+ * A composer control strip pill was opened (#38). Which pill, never the
+ * vault path, skill name, or model id — those are user content.
+ */
+export function trackComposerPillOpened(
+  pill: 'agent' | 'model' | 'vault' | 'skills',
+): void {
+  trackEvent('composer_pill_opened', { pill })
 }
 
 /**
@@ -161,6 +163,17 @@ export function trackPrimeScheduledWorkCreated(source: 'heartbeat' | 'cron'): vo
   trackEvent('prime_scheduled_work_created', { source })
 }
 
+/**
+ * A running-session row was opened from the menu-bar roster (#13).
+ *
+ * The point of the roster is discovery — whether anyone actually uses the menu
+ * bar to get back to work, or only ever opens it to capture. No session id,
+ * title, path, or summary: those carry note and prompt content.
+ *
+ * `working` and the subagent count are numbers, not booleans — `trackEvent`
+ * takes `Record<string, string | number>` and a raw boolean gets through
+ * `npx tsc --noEmit` only to fail the stricter pre-push build (see e518b0c).
+ */
 export function trackMenuBarSessionOpened(options: {
   working: boolean
   subagentCount: number

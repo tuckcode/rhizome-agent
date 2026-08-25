@@ -3,20 +3,19 @@ import { describe, expect, it, vi } from 'vitest'
 import { PrimeSessionSubhead } from './PrimeSessionSubhead'
 
 describe('PrimeSessionSubhead', () => {
-  it('reports the session, model and vault it is talking to', () => {
+  it('reports the session and vault it is talking to', () => {
     render(
       <PrimeSessionSubhead
         live
         sessionId="019fe641-61fa-73e9-82ef-91fc90097aab"
-        model="xai / grok-4.5"
         vaultPath="/Users/dtc/Documents/Laputa"
       />,
     )
 
     expect(screen.getByText('Prime session live')).toBeInTheDocument()
     expect(screen.getByText('7aab')).toBeInTheDocument()
-    expect(screen.getByText('xai / grok-4.5')).toBeInTheDocument()
     expect(screen.getByText('~/Documents/Laputa')).toBeInTheDocument()
+    expect(screen.queryByTestId('prime-model-thinking-control')).not.toBeInTheDocument()
   })
 
   /** A full home path spends most of its width on the part every path shares. */
@@ -40,7 +39,6 @@ describe('PrimeSessionSubhead', () => {
     render(<PrimeSessionSubhead live vaultPath="/Users/dtc/vault" />)
 
     expect(screen.queryByText(/sess_/)).not.toBeInTheDocument()
-    expect(screen.queryByText('model')).not.toBeInTheDocument()
     expect(screen.getByText('vault')).toBeInTheDocument()
   })
 
@@ -135,38 +133,5 @@ describe('PrimeSessionSubhead', () => {
 
     expect(screen.getByText('Prime session live')).toBeInTheDocument()
     expect(screen.queryByText(/npm i -g/)).not.toBeInTheDocument()
-  })
-
-  it('shows model and thinking level as one control (#9)', () => {
-    render(
-      <PrimeSessionSubhead live model="Grok 4.5" thinkingLevel="high" vaultPath="/v" />,
-    )
-
-    const control = screen.getByTestId('prime-model-thinking-control')
-    expect(control).toHaveTextContent('Grok 4.5 · High')
-  })
-
-  it('shows the model alone until a level is reported', () => {
-    render(<PrimeSessionSubhead live model="Grok 4.5" vaultPath="/v" />)
-
-    const control = screen.getByTestId('prime-model-thinking-control')
-    expect(control).toHaveTextContent('Grok 4.5')
-    // Not a dangling separator — that reads as a rendering bug, not as
-    // "no level yet".
-    expect(control.textContent).not.toContain('·')
-  })
-
-  it('renders the control as a button so the level can be changed from here', () => {
-    // #9: the strip is where you read the model AND where you change it.
-    // A static span would satisfy the first half and silently fail the second.
-    render(<PrimeSessionSubhead live model="Grok 4.5" thinkingLevel="off" vaultPath="/v" />)
-
-    expect(screen.getByTestId('prime-model-thinking-control').tagName).toBe('BUTTON')
-  })
-
-  it('shows off as a setting rather than as absence', () => {
-    render(<PrimeSessionSubhead live model="Grok 4.5" thinkingLevel="off" vaultPath="/v" />)
-
-    expect(screen.getByTestId('prime-model-thinking-control')).toHaveTextContent('Grok 4.5 · Off')
   })
 })

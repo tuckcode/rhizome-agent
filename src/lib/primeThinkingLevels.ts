@@ -51,3 +51,43 @@ export function modelThinkingLabel(
   if (!modelLabel) return null
   return levelLabel ? `${modelLabel} · ${levelLabel}` : modelLabel
 }
+
+/**
+ * Endpoints for the composer one-click thinking toggle (#35).
+ *
+ * The host still owns the list. These ids are only how we pick a quiet
+ * default and a loud default *from that list* so a click has somewhere to go
+ * without opening a menu. Unknown current levels count as quiet.
+ */
+const QUIET_LEVEL_IDS = ['off', 'minimal', 'low'] as const
+const LOUD_LEVEL_IDS = ['high', 'xhigh', 'max'] as const
+
+function firstPresentLevel(
+  levels: readonly string[],
+  candidates: readonly string[],
+): string | null {
+  const byId = new Map(levels.map((level) => [level.trim().toLowerCase(), level.trim()]))
+  for (const id of candidates) {
+    const hit = byId.get(id)
+    if (hit) return hit
+  }
+  return null
+}
+
+export function nextThinkingToggleLevel(
+  current: string | null | undefined,
+  levels: readonly string[],
+): string | null {
+  const usable = levels.map((level) => level.trim()).filter(Boolean)
+  if (usable.length === 0) return null
+  const quiet = firstPresentLevel(usable, QUIET_LEVEL_IDS) ?? usable[0]
+  const loud = firstPresentLevel(usable, LOUD_LEVEL_IDS) ?? usable[usable.length - 1]
+  const now = (current ?? '').trim().toLowerCase()
+  if (LOUD_LEVEL_IDS.some((id) => id === now)) return quiet
+  return loud
+}
+
+export function thinkingLevelIsLoud(current: string | null | undefined): boolean {
+  const now = (current ?? '').trim().toLowerCase()
+  return LOUD_LEVEL_IDS.some((id) => id === now)
+}

@@ -14,8 +14,6 @@ function renderSubhead() {
       locale="en"
       live
       sessionId="sess_1036"
-      model="Grok 4.6"
-      thinkingLevel="medium"
       vaultPath="/Users/dtc/Documents/Rhizome Vault"
     />,
   )

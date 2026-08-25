@@ -21,6 +21,8 @@ interface ChatHomeProps {
   defaultAiAgentReady: boolean
   vaultPath: string
   vaultPaths: string[]
+  vaults?: { label: string; path: string }[]
+  onSwitchVault?: (path: string) => void
   entries: VaultEntry[]
   onOpenNote?: (path: string) => void
   onPromoteToVault?: (text: string) => void
@@ -48,6 +50,8 @@ export default function ChatHome({
   defaultAiAgentReady,
   vaultPath,
   vaultPaths,
+  vaults,
+  onSwitchVault,
   entries,
   onPromoteToVault,
   onFileCreated,
@@ -68,8 +72,6 @@ export default function ChatHome({
           locale={locale}
           live={Boolean(primeHost?.running)}
           sessionId={primeHost?.sessionId ?? null}
-          model={primeModelLabel(primeHost)}
-          thinkingLevel={primeHost?.thinkingLevel ?? null}
           vaultPath={vaultPath}
           startedAt={primeHost?.startedAt ?? null}
           problem={primeHost?.problem ?? null}
@@ -124,8 +126,16 @@ export default function ChatHome({
               <ChatComposerDeck
                 locale={locale}
                 vaultLabel={vaultLabelFromPath(vaultPath)}
+                vaultPath={vaultPath}
+                vaults={vaults ?? vaultPaths.map((path) => ({
+                  label: vaultLabelFromPath(path) ?? path,
+                  path,
+                }))}
+                onSwitchVault={onSwitchVault}
                 contextLabel={openNote ? openNote.label.split('/').filter(Boolean).at(-1) ?? openNote.label : null}
                 skillsLabel="rhizome-vault"
+                model={primeModelLabel(primeHost)}
+                thinkingLevel={primeHost?.thinkingLevel ?? null}
               />
             ) : undefined
           }

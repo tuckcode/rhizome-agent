@@ -99,10 +99,10 @@ from the 2026-08-22 handoff.
 **Composer and controls** — the densest ready-to-build cluster, no blockers
 | | |
 |---|---|
-| #38 | Composer pills look like controls but are inert |
-| #9 | Model and thinking level as one control on the strip |
-| #35 | Verbose modifier reachable from the composer |
-| #21 | Argument hints for commands that take arguments |
+| #38 | Composer pills look like controls but are inert — **implemented locally** |
+| #9 | Model and thinking level as one control on the strip — **relocated to composer with #38** |
+| #35 | Verbose modifier reachable from the composer — **implemented locally** (one-click thinking toggle) |
+| #21 | Argument hints for commands that take arguments — **already in the slash menu** |
 
 **Transcript and sessions**
 | | |
@@ -197,10 +197,10 @@ Worth doing, in order:
    theme. `automatic-memory-consolidation.md` covers consolidation, not
    promotion or retrieval-provenance. This is the one genuinely missing
    document, not a cross-reference.
-4. **Spec the composer control strip.** #38, #9, #35 and #21 all reshape the
-   same strip and will be built by different sessions. Four independent
-   redesigns of one component is the predictable outcome. One short spec, not a
-   full design doc.
+4. **Spec the composer control strip.** #38, #9, #35 and #21 reshaped the
+   same strip. Built as one surface 2026-08-25 rather than four redesigns.
+   The contract lives on `ChatComposerDeck`. GitHub issues still open
+   (no live Prime demo; C18).
 5. `shell-final-direction.md` §2.1 and §2.3 are marked superseded by ADR-0166.
    The rest still stands. Do not treat the whole document as dead.
 
@@ -217,18 +217,18 @@ to start grafting.
 Claude's original (`b8dc8fb`) started at **close #40**, then #29, then the
 composer cluster. Item 1 below is Grok's later insertion (`2b5daba`).
 
-**Origin:** Grok 4.6 · 2026-08-25 — #29 vault credential redaction landed.
-Next free choice is the composer cluster, not more unprompted Prime verbs.
+**Origin:** Grok 4.6 · 2026-08-25 — composer cluster landed on one strip.
+Next free choice is shell decisions or memory-loop (#24/#25), not more
+unprompted Prime verbs.
 
 1. **Harness composition (§1)** — discuss/decide
    [`harness-composition.md`](design/harness-composition.md) (option 2,
    DeepSeek *idea* on Prime extensions, first slice = native extension UI).
    Until ratified, do not graft. Closing **#40** against the filter is a
    side-errand, not a substitute.
-2. **The composer cluster (#38, #9, #35, #21)** — unblocked, one surface, and
-   §4.4's spec pays for itself immediately.
-3. **Settle §1's shell decisions**, then #27 / #34 / #39 / #11 / #22 unblock
+2. **Settle §1's shell decisions**, then #27 / #34 / #39 / #11 / #22 unblock
    together.
+3. **Memory loop (#24, #25)** — the product thesis, thinnest design coverage.
 4. **C28 and C31** whenever the push gate flakes on you — the natural reaction
    (re-run and move on) is exactly how they stay unfixed.
 
