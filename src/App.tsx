@@ -1867,6 +1867,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                 onExit={handleRailSelectNotes}
                 vaultPath={activeEditorVaultPath}
                 vaultPaths={writableVaultPaths}
+                vaults={vaultSwitcher.allVaults.map((vault) => ({ label: vault.label, path: vault.path }))}
+                onSwitchVault={vaultSwitcher.switchVault}
                 entries={visibleEntries}
                 onOpenNote={notes.handleNavigateWikilink}
                 onPromoteToVault={handlePromoteChatToVault}

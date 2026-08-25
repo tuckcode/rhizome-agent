@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { modelThinkingLabel, thinkingLevelLabel } from './primeThinkingLevels'
+import { modelThinkingLabel, nextThinkingToggleLevel, thinkingLevelLabel } from './primeThinkingLevels'
 
 describe('thinkingLevelLabel', () => {
   it('renders each level Prime documents', () => {
@@ -51,5 +51,31 @@ describe('modelThinkingLabel', () => {
   it('renders nothing at all without a model', () => {
     expect(modelThinkingLabel(null, 'high')).toBeNull()
     expect(modelThinkingLabel('  ', 'high')).toBeNull()
+  })
+})
+
+describe('nextThinkingToggleLevel', () => {
+  const levels = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
+
+  it('turns a quiet or middle setting up to high', () => {
+    expect(nextThinkingToggleLevel('off', levels)).toBe('high')
+    expect(nextThinkingToggleLevel('low', levels)).toBe('high')
+    expect(nextThinkingToggleLevel('medium', levels)).toBe('high')
+    expect(nextThinkingToggleLevel(null, levels)).toBe('high')
+  })
+
+  it('turns a loud setting back to off', () => {
+    expect(nextThinkingToggleLevel('high', levels)).toBe('off')
+    expect(nextThinkingToggleLevel('xhigh', levels)).toBe('off')
+    expect(nextThinkingToggleLevel('max', levels)).toBe('off')
+  })
+
+  it('picks endpoints that actually exist on the host list', () => {
+    expect(nextThinkingToggleLevel('medium', ['low', 'medium', 'xhigh'])).toBe('xhigh')
+    expect(nextThinkingToggleLevel('xhigh', ['low', 'medium', 'xhigh'])).toBe('low')
+  })
+
+  it('has nowhere to go when the host sent no levels', () => {
+    expect(nextThinkingToggleLevel('high', [])).toBeNull()
   })
 })

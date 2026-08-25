@@ -6,7 +6,6 @@ import { useDragRegion } from '../hooks/useDragRegion'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import type { PrimeConnectionProblem } from '../hooks/usePrimeHostStatus'
 import { subheadTrafficLightInset } from '../utils/trafficLights'
-import { PrimeModelPicker } from './PrimeModelPicker'
 import {
   primeSessionUptime,
   shortPrimeSessionId,
@@ -18,9 +17,6 @@ interface PrimeSessionSubheadProps {
   /** Host is up and holding a session. */
   live: boolean
   sessionId?: string | null
-  model?: string | null
-  /** Reasoning level, rendered as one control with the model (#9). */
-  thinkingLevel?: string | null
   /** Vault the picker attaches to when it has to spawn a host. */
   vaultPath?: string | null
   /**
@@ -77,19 +73,16 @@ function Separator() {
 }
 
 /**
- * Frame A's telemetry strip: what session you are in, on what model, against
- * what vault.
+ * Frame A's telemetry strip: what session you are in, against what vault.
  *
- * Mono and muted on purpose — this is instrumentation, not content. It answers
- * "what am I actually talking to" at a glance, which in a chat-first window is
- * the question the missing chrome used to answer.
+ * Mono and muted on purpose — this is instrumentation, not content. Model,
+ * thinking level, and vault switching live on the composer (#38), where the
+ * hands already are. Duplicating them here is how the two would disagree.
  */
 export function PrimeSessionSubhead({
   locale = 'en',
   live,
   sessionId,
-  model,
-  thinkingLevel,
   vaultPath,
   startedAt,
   problem,
@@ -153,22 +146,6 @@ export function PrimeSessionSubhead({
           <span className="shrink-0">
             sess_<strong className="font-medium text-foreground">{shortId}</strong>
           </span>
-        </>
-      ) : null}
-
-      {model ? (
-        <>
-          <Separator />
-          {/* One control, one place to read it and to change it (#9). The
-              composer deck no longer carries a second model picker. */}
-          <PrimeModelPicker
-            locale={locale}
-            label={model}
-            thinkingLevel={thinkingLevel}
-            side="bottom"
-            variant="strip"
-            vaultPath={vaultPath ?? undefined}
-          />
         </>
       ) : null}
 
