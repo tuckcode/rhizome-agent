@@ -51,9 +51,11 @@ file.
 
 ## State
 
-`origin/main` is pushed through `e02e3c4`. Local `main` is ahead through
-the harness-composition docs commit (includes C47 as `d737085`, Book →
-Skill, NEXT.md, ADR-0166). C48/C49 are closed as QA-environment misreads.
+Local `main` is ahead of origin (`e02e3c4`) through the C47
+listen-outside-Tauri guard (`b064272`) and the stranded-work
+session-start check. Includes C47 as `d737085`, Book → Skill, NEXT.md,
+ADR-0166, and the harness-composition notes. This session's job is to
+push that stack. C48/C49 are closed as QA-environment misreads.
 Prime **0.7.4** on Windows speaks
 `\\.\pipe\prime-agent-daemon` — see `docs/WINDOWS-DEV.md`. On macOS/Linux the
 daemon dies with whatever terminal starts it, so start it detached:
@@ -74,6 +76,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-08-24 (late) · Grok 4.6](plans/handoffs/2026-08-24-2225-grok-4-6-stranded-work-check.md) — session-start stranded-work check in AGENTS.md; C47 listen-outside-Tauri guard (`b064272`) so the local stack can push
 - [2026-08-24 (evening) · Grok 4.6](plans/handoffs/2026-08-24-1740-grok-4-6-harness-composition.md) — option-2 composition notes (`docs/design/harness-composition.md`); NEXT.md §1 is discuss/decide; DeepSeek plugin *idea* on Prime extensions; sandbox is Prime’s (Kern is Linux-only)
 - [2026-08-24 · Claude Opus 5](plans/handoffs/2026-08-24-2122-claude-opus-5-shell-dock-and-next-index.md) — note tree docked right and ADR-0166 for the chat-centred shell (three questions left open); a tree/list exclusivity attempt reverted after it broke Cmd+N and inbox auto-advance; stale Tolaria/Desktop naming fixed in six live docs; the Linux/Windows menu bar tracks the pointer; scheduled security review found nothing above the bar; `docs/NEXT.md` added
 - [2026-08-24 · Grok 4.6](plans/handoffs/2026-08-24-1350-grok-4-6-c47-client-owned.md) — C47: client_owned create, promote/complete, idle detach, active-close dialog, quit without the global keep-running toggle
