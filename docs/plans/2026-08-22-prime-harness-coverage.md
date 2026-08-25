@@ -4,6 +4,11 @@ The quantified companion to `2026-08-20-prime-surface-gap.md`. That doc read
 Prime's shipped documentation and listed the capability gaps qualitatively.
 This one counts.
 
+**Living count:** [`docs/prime-adapter-surface.json`](../prime-adapter-surface.json)
+(regenerate with `pnpm prime:surface --update`). This prose was written against
+installed **0.7.4**; the machine now has **0.8.0** (102 public daemon commands,
+30 spoken). Prefer the snapshot over the numbers below.
+
 **Method, so it can be re-run rather than re-argued.** The daemon's routable
 surface is every `case "<name>":` in
 `~/.local/lib/node_modules/prime-agent/dist/modes/daemon/daemon-mode.js`

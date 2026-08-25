@@ -33,6 +33,15 @@
   Uncommitted files are not "someone else's mess" — they are the last session's unfinished commit. Unpushed commits are not "already done" — another clone will not see them. If either is present, finish that first (commit, push, or surface it in your handoff) before starting new work. Demo-vault dirt is the exception already covered below; everything else counts.
 
   **Why:** this has now bitten three times in about a day. GPT-5.6 Luna's handoff sat uncommitted across a session boundary and was recovered only because a later session happened to run `git status` before wrapping up. The option-2 harness-composition slice plus Grok's C47 work then sat local-only while origin was still at the doctrine commit. The third was the C47 follow-up that skipped Tauri `listen` outside the native app — it was sitting uncommitted in the working tree, and without it `git push` failed the frontend coverage lane and a Playwright smoke on `transformCallback`. This file already warns agents about *creating* unpushed work and checks `git status` only for demo-vault dirt. Nothing told a fresh agent to look for work stranded by a previous session.
+- **Prime adapter work: check the snapshot, do not ingest Prime.** `docs/prime-adapter-surface.json` is the last mechanical read of `DAEMON_COMMAND_TYPES` vs the `"type"` strings we send. Before changing the host:
+
+  ```bash
+  pnpm prime:surface            # installed package vs snapshot
+  pnpm prime:surface:github     # GitHub latest release tag vs snapshot
+  ```
+
+  If it drifts, `--update` after you have understood the diff. Do **not** clone `PrimeIntellect-ai/prime-agent`, and do **not** dump `~/.local/lib/node_modules/prime-agent` into context — the snapshot is the list. User-facing "a newer Prime is out" is already `check_prime_update` / `usePrimeUpdate`; this is the adapter check.
+
 - Read `docs/HANDOFF.md` — current state and an index, ~500 lines, meant to be read in full. It holds no session records: those are one file each in `docs/plans/handoffs/`, newest by filename.
 
   ```bash

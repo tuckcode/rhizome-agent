@@ -16,6 +16,8 @@
     "docs:preview": "vitepress preview site --host 127.0.0.1",
     "lint": "eslint . --max-warnings=0",
     "handoff:check": "node scripts/check-handoff-shape.mjs",
+    "prime:surface": "node scripts/check-prime-surface.mjs",
+    "prime:surface:github": "node scripts/check-prime-surface.mjs --github",
     "deadcode": "knip",
     "l10n:translate": "lara-cli translate",
     "l10n:translate:force": "lara-cli translate --force",
