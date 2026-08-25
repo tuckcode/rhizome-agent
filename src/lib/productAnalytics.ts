@@ -113,6 +113,11 @@ export function trackPrimeTurnMessage(kind: 'steer' | 'followUp'): void {
   trackEvent('prime_turn_message', { kind })
 }
 
+/** Cleared Prime's steer/follow-up queue from Chat. No message text. */
+export function trackPrimeQueueCleared(): void {
+  trackEvent('prime_queue_cleared')
+}
+
 /**
  * A scheduled prompt was paused, resumed, or cancelled from the band (#14).
  *

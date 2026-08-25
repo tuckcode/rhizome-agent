@@ -613,6 +613,8 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   // this the hook catches "no mock handler" and every row reads as saved,
   // which is indistinguishable from the feature not working.
   cancel_prime_rlm_child: () => true,
+  get_prime_session_queue: () => ({ steering: [], followUp: [] }),
+  clear_prime_session_queue: () => ({ steering: [], followUp: [] }),
   list_prime_running_sessions: () => [
     {
       id: 'live-1',

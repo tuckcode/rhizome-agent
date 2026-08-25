@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { AiPanelComposer } from './AiPanelChrome'
+import type { PrimeQueue } from '../lib/primeQueue'
 
-function renderComposer(queuedFollowUps?: string[]) {
+function renderComposer(queue?: PrimeQueue, onClearQueue?: () => void) {
   return render(
     <AiPanelComposer
       entries={[]}
@@ -15,21 +16,25 @@ function renderComposer(queuedFollowUps?: string[]) {
       onSend={vi.fn()}
       onSteer={vi.fn()}
       onStop={vi.fn()}
-      queuedFollowUps={queuedFollowUps}
+      queue={queue}
+      onClearQueue={onClearQueue}
     />,
   )
 }
 
 describe('queued follow-ups in the composer', () => {
-  it('lists queued messages in the order they will run', () => {
-    renderComposer(['check the tests', 'then summarise'])
+  it('lists steering then follow-ups in the order they will run', () => {
+    renderComposer({
+      steering: ['focus on error handling'],
+      followUp: ['then summarise'],
+    })
 
     const items = screen.getAllByRole('listitem').map((item) => item.textContent)
-    expect(items).toEqual(['1check the tests', '2then summarise'])
+    expect(items).toEqual(['Steer · focus on error handling', 'After · then summarise'])
   })
 
   it('renders nothing when the queue is empty', () => {
-    renderComposer([])
+    renderComposer({ steering: [], followUp: [] })
 
     expect(screen.queryByTestId('composer-queued-follow-ups')).toBeNull()
   })
@@ -38,5 +43,13 @@ describe('queued follow-ups in the composer', () => {
     renderComposer(undefined)
 
     expect(screen.queryByTestId('composer-queued-follow-ups')).toBeNull()
+  })
+
+  it('asks Prime to clear the queue', () => {
+    const onClearQueue = vi.fn()
+    renderComposer({ steering: [], followUp: ['then summarise'] }, onClearQueue)
+
+    fireEvent.click(screen.getByTestId('composer-queue-clear'))
+    expect(onClearQueue).toHaveBeenCalledOnce()
   })
 })

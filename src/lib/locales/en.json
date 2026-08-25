@@ -1270,5 +1270,8 @@
   "research.format.instructionHint": "One imperative sentence. This is exactly what the agent is told, so it is also the format's description.",
   "research.format.saveIncomplete": "A format needs a name and an instruction.",
   "research.format.saveFailed": "Could not save this format.",
-  "ai.panel.queuedLabel": "Messages queued to run after this turn"
+  "ai.panel.queuedLabel": "Waiting in this session",
+  "ai.panel.queuedSteer": "Steer",
+  "ai.panel.queuedFollowUp": "After",
+  "ai.panel.queuedClear": "Clear"
 }
