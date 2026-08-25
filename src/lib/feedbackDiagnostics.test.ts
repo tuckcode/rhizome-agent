@@ -14,7 +14,7 @@ describe('feedbackDiagnostics', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const stopCapture = startFeedbackDiagnosticsCapture()
-    const sampleToken = ['ghp', 'super-secret-token'].join('_')
+    const sampleToken = ['ghp', 'A'.repeat(36)].join('_')
 
     console.error(`Load failed for /Users/luca/Laputa/private.md with token ${sampleToken}`)
     console.warn('Retrying from C:\\Users\\luca\\Notes\\vault.md')

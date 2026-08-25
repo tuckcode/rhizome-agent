@@ -1,5 +1,5 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
-import type { AgentStatus, AiAgentMessage } from './aiAgentConversation'
+import { appendLocalMarker, type AgentStatus, type AiAgentMessage } from './aiAgentConversation'
 import { detectFileOperation, type AgentFileCallbacks } from './aiAgentFileOperations'
 import {
   markReasoningDone,
@@ -11,8 +11,9 @@ import { getAiAgentDefinition, type AiAgentId } from './aiAgents'
 import {
   trackAiAgentResponseCompleted,
   trackAiAgentResponseFailed,
+  trackVaultCredentialsHandled,
 } from './productAnalytics'
-import type { AppLocale } from './i18n'
+import { translate, type AppLocale } from './i18n'
 import { localizedStreamErrorMessage } from './localizedStreamError'
 import {
   isSessionAutoDistillEnabled,
@@ -81,7 +82,7 @@ export interface StreamMutationContext {
   vaultPath: string
   /** User text for this turn — used by session auto-distill. */
   userMessage?: string
-  /** When true/undefined, queue a post-turn distill. Explicit false skips. */
+  /** Explicit true opts in. Unset/false skips (product default OFF). */
   sessionAutoDistillEnabled?: boolean
   setMessages: Dispatch<SetStateAction<AiAgentMessage[]>>
   setStatus: Dispatch<SetStateAction<AgentStatus>>
@@ -252,6 +253,16 @@ export function createStreamCallbacks(context: StreamMutationContext) {
           userMessage,
           assistantResponse: finalResponse,
           toolNames,
+        }).then((result) => {
+          if (!result.queued || result.redactedCount <= 0) return
+          trackVaultCredentialsHandled('auto_distill', 'redact', result.redactedCount)
+          appendLocalMarker(
+            setMessages,
+            translate(locale, 'ai.marker.credentialsRedactedDistill', {
+              count: result.redactedCount,
+              plural: result.redactedCount === 1 ? '' : 's',
+            }),
+          )
         }).catch(() => {
           // best-effort — never block the chat UI on distill failures
         })

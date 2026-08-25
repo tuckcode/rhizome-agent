@@ -185,6 +185,44 @@ describe('MenuBarCompanionApp', () => {
     )
   })
 
+  it('redacts credentials in clipboard text before distill', async () => {
+    const pat = ['ghp', 'A'.repeat(36)].join('_')
+    mockBackend({ activeVault: '/vault' })
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === 'load_vault_list') {
+        return Promise.resolve({
+          vaults: [{ label: 'My Vault', path: '/vault' }],
+          active_vault: '/vault',
+        })
+      }
+      if (cmd === 'call_rhizome_tool') return Promise.resolve(JSON.stringify([]))
+      if (cmd === 'read_text_from_clipboard') return Promise.resolve(`Durable idea ${pat}`)
+      if (cmd === 'start_rhizome_job') return Promise.resolve(null)
+      return Promise.resolve(undefined)
+    })
+    render(<MenuBarCompanionApp />)
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith('load_vault_list'))
+
+    fireEvent.click(screen.getByTestId('menu-bar-companion-distill'))
+
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith(
+        'start_rhizome_job',
+        expect.objectContaining({
+          name: 'rhizome_distill',
+          args: expect.objectContaining({
+            text: expect.stringContaining('[redacted-token]'),
+            vaultPath: '/vault',
+            trigger: 'menu_bar',
+          }),
+        }),
+      ),
+    )
+    const distillCall = invokeMock.mock.calls.find(([cmd]) => cmd === 'start_rhizome_job')
+    const text = (distillCall?.[1] as { args?: { text?: string } } | undefined)?.args?.text
+    expect(text).not.toContain(pat)
+  })
+
   it('renders activity rows when the vault has events', async () => {
     mockBackend({
       events: [{ type: 'distill', title: 'Event Sourcing', timestamp: '2026-07-19T10:00:00Z' }],

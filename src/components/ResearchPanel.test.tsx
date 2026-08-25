@@ -336,6 +336,33 @@ describe('ResearchPanel', () => {
     })
   })
 
+  it('redacts credentials before sending distill text to the model', async () => {
+    const pat = ['ghp', 'A'.repeat(36)].join('_')
+    render(
+      <ResearchPanel open={true} onClose={onClose} vaultPath="/vault" onOpenNote={onOpenNote} />
+    )
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /distill/i }), { button: 0, ctrlKey: false })
+    fireEvent.change(screen.getByPlaceholderText(/paste research output/i), {
+      target: { value: `notes and ${pat}` },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^distill/i }))
+
+    await waitFor(() => {
+      expect(mockInvokeFn).toHaveBeenCalledWith('start_rhizome_job', expect.objectContaining({
+        name: 'rhizome_distill',
+        args: expect.objectContaining({
+          text: expect.stringContaining('[redacted-token]'),
+        }),
+      }))
+    })
+    const distillCall = mockInvokeFn.mock.calls.find(
+      ([, payload]) => (payload as { name?: string })?.name === 'rhizome_distill',
+    )
+    const text = (distillCall?.[1] as { args?: { text?: string } } | undefined)?.args?.text
+    expect(text).not.toContain(pat)
+  })
+
   it('shows the destination vault name on the write-action buttons', async () => {
     render(
       <ResearchPanel

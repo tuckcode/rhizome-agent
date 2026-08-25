@@ -18,6 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { trackEvent } from '../lib/telemetry'
+import { trackVaultCredentialsHandled } from '../lib/productAnalytics'
+import { redactCredentialTokens } from '../lib/sensitiveTextRedaction'
 import type { VaultOption } from './status-bar/types'
 import { AI_AGENT_DEFINITIONS, createAiAgentAvailability, type AiAgentsStatus } from '../lib/aiAgents'
 import { configuredModelTargets, normalizeAiModelProviders, preflightAiTarget, resolveAiTarget, type AiModelTarget } from '../lib/aiTargets'
@@ -391,8 +393,16 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
 
     const jobId = crypto.randomUUID()
     setCurrentJobId(jobId)
+    const credentials = redactCredentialTokens(distillInput)
+    if (credentials.count > 0) {
+      trackVaultCredentialsHandled('research_distill', 'redact', credentials.count)
+      addEvent(t('research.event.credentialsRedacted', {
+        count: credentials.count,
+        plural: credentials.count === 1 ? '' : 's',
+      }))
+    }
     const args: Record<string, string> = {
-      text: distillInput,
+      text: credentials.text,
       project: projectInput || '',
       vaultPath: destinationVaultPath,
       ...resolvedTargetArg,

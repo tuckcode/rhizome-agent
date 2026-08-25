@@ -7,7 +7,8 @@ import { useMenuBarCompanionVault } from '../hooks/useMenuBarCompanionVault'
 import { useMenuBarRunningSessions } from '../hooks/useMenuBarRunningSessions'
 import { rosterActivityMessageKey, type RunningSessionRow } from '../lib/primeRunningSessions'
 import { buildCaptureNote } from '../utils/menuBarCapture'
-import { trackMenuBarSessionOpened } from '../lib/productAnalytics'
+import { trackMenuBarSessionOpened, trackVaultCredentialsHandled } from '../lib/productAnalytics'
+import { redactCredentialTokens } from '../lib/sensitiveTextRedaction'
 
 /**
  * Menu-bar companion popover. Capture writes a real note to the active
@@ -23,7 +24,7 @@ export function MenuBarCompanionApp() {
   const [capture, setCapture] = useState('')
   const [pickingType, setPickingType] = useState(false)
   const [selectedType, setSelectedType] = useState<string | null>(null)
-  const [savedFlash, setSavedFlash] = useState(false)
+  const [hintFlash, setHintFlash] = useState<string | null>(null)
   const { activeVaultPath, vaultLabel, activity, refresh } = useMenuBarCompanionVault()
   const running = useMenuBarRunningSessions()
   const { setPolling } = running
@@ -72,6 +73,11 @@ export function MenuBarCompanionApp() {
     void Promise.resolve(open).catch(() => {})
   }, [])
 
+  const flashHint = useCallback((message: string) => {
+    setHintFlash(message)
+    window.setTimeout(() => setHintFlash(null), 1500)
+  }, [])
+
   const saveCapture = useCallback(() => {
     const note = buildCaptureNote(capture, selectedType, new Date().toISOString())
     if (!note || !activeVaultPath || !isTauri()) return
@@ -97,12 +103,11 @@ export function MenuBarCompanionApp() {
         setCapture('')
         setSelectedType(null)
         setPickingType(false)
-        setSavedFlash(true)
-        window.setTimeout(() => setSavedFlash(false), 1500)
+        flashHint(t('menuBarCompanion.captureSaved'))
         refresh()
       })
       .catch(() => {})
-  }, [capture, selectedType, activeVaultPath, refresh])
+  }, [capture, selectedType, activeVaultPath, flashHint, refresh, t])
 
   const distillClipboard = useCallback(() => {
     if (!activeVaultPath || !isTauri()) return
@@ -110,25 +115,35 @@ export function MenuBarCompanionApp() {
       .then((text) => {
         const trimmed = (text ?? '').trim()
         if (!trimmed) return
+        const credentials = redactCredentialTokens(trimmed)
+        if (credentials.count > 0) {
+          trackVaultCredentialsHandled('menu_bar_distill', 'redact', credentials.count)
+        }
         const jobId = crypto.randomUUID()
         return invoke('start_rhizome_job', {
           jobId,
           name: 'rhizome_distill',
           args: {
-            text: trimmed,
+            text: credentials.text,
             vaultPath: activeVaultPath,
             project: '',
             trigger: 'menu_bar',
           },
         }).then(() => {
-          setSavedFlash(true)
-          window.setTimeout(() => setSavedFlash(false), 1500)
+          flashHint(
+            credentials.count > 0
+              ? t('menuBarCompanion.credentialsRedacted', {
+                count: credentials.count,
+                plural: credentials.count === 1 ? '' : 's',
+              })
+              : t('menuBarCompanion.distillQueued'),
+          )
           // Activity will refresh when the job finishes; poll once shortly after.
           window.setTimeout(() => refresh(), 2500)
         })
       })
       .catch(() => {})
-  }, [activeVaultPath, refresh])
+  }, [activeVaultPath, flashHint, refresh, t])
 
   const onCaptureKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
@@ -184,7 +199,7 @@ export function MenuBarCompanionApp() {
           />
           <div className="mt-1.5 flex items-center justify-between font-mono text-[10.5px] tracking-wide text-[var(--text-muted,var(--muted-foreground))]">
             <span data-testid="menu-bar-companion-hint">
-              {savedFlash ? t('menuBarCompanion.captureSaved') : t('menuBarCompanion.captureHint')}
+              {hintFlash ?? t('menuBarCompanion.captureHint')}
             </span>
             <span data-testid="menu-bar-companion-char-count">{capture.length}</span>
           </div>

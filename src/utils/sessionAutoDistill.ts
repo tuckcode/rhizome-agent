@@ -5,6 +5,8 @@
  * the fork deliberately flipped it, see the note on the enable check below.)
  */
 
+import { redactCredentialTokens } from '../lib/sensitiveTextRedaction'
+
 const MIN_ASSISTANT_CHARS = 80
 
 export function isSessionAutoDistillEnabled(
@@ -79,15 +81,27 @@ export interface QueueSessionAutoDistillArgs {
   }) => Promise<unknown>
 }
 
+export interface QueueSessionAutoDistillResult {
+  queued: boolean
+  redactedCount: number
+}
+
 /**
- * Fire-and-forget distill of the completed turn. Returns true if a job was queued.
+ * Fire-and-forget distill of the completed turn. Credentials are stripped
+ * before the provider sees the payload (#29).
  */
 export async function queueSessionAutoDistill(
   args: QueueSessionAutoDistillArgs,
-): Promise<boolean> {
-  if (args.toolNames && turnAlreadyCalledDistill(args.toolNames)) return false
-  const text = buildSessionAutoDistillText(args.userMessage, args.assistantResponse)
-  if (!text || !args.vaultPath) return false
+): Promise<QueueSessionAutoDistillResult> {
+  if (args.toolNames && turnAlreadyCalledDistill(args.toolNames)) {
+    return { queued: false, redactedCount: 0 }
+  }
+
+  const user = redactCredentialTokens(args.userMessage)
+  const assistant = redactCredentialTokens(args.assistantResponse)
+  const redactedCount = user.count + assistant.count
+  const text = buildSessionAutoDistillText(user.text, assistant.text)
+  if (!text || !args.vaultPath) return { queued: false, redactedCount }
 
   const jobId =
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -107,10 +121,10 @@ export async function queueSessionAutoDistill(
 
   if (args.startJob) {
     await args.startJob(payload)
-    return true
+    return { queued: true, redactedCount }
   }
 
   const { invoke } = await import('@tauri-apps/api/core')
   await invoke('start_rhizome_job', payload)
-  return true
+  return { queued: true, redactedCount }
 }
