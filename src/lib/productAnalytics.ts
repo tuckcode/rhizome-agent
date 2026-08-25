@@ -126,6 +126,11 @@ export function trackPrimeScheduledWorkAction(
   trackEvent('prime_scheduled_work_action', { action, source })
 }
 
+/** Stopped one live RLM child from Chat. No child id — that is Prime's. */
+export function trackPrimeRlmChildStopped(): void {
+  trackEvent('prime_rlm_child_stopped')
+}
+
 export function trackMenuBarSessionOpened(options: {
   working: boolean
   subagentCount: number

@@ -32,6 +32,11 @@ will be re-litigated later.
 **Origin:** Grok 4.6 · 2026-08-24 · `2b5daba` — not in Claude's original.
 RLM is not a row in this file in either version.
 
+**Origin:** Grok 4.6 · 2026-08-24 — user-pulled Prime slice (not this file's
+order): live RLM family in Chat from the `list` roster + `cancel_rlm_child`.
+That is not #17 (`get_session_tree` is fork history) and not the composition
+first slice (native `extension_ui`). Do not start a plugin kernel.
+
 Full writeup (working notes, not an ADR):
 [`docs/design/harness-composition.md`](design/harness-composition.md).
 Filter: ADR-0168 / [`harness-doctrine.md`](design/harness-doctrine.md).
@@ -208,6 +213,12 @@ to start grafting.
 
 Claude's original (`b8dc8fb`) started at **close #40**, then #29, then the
 composer cluster. Item 1 below is Grok's later insertion (`2b5daba`).
+
+**Origin:** Grok 4.6 · 2026-08-24 — user-pulled, in progress / landing: RLM
+family in Chat (roster + `cancel_rlm_child`). Next Prime surfaces after that:
+queue visibility, then #17 fork tree (not RLM), then #14 create schedules.
+Do not take this as replacing item 2 (#29) for a session that is choosing
+freely — it is what this session was told to keep building.
 
 1. **Harness composition (§1)** — discuss/decide
    [`harness-composition.md`](design/harness-composition.md) (option 2,

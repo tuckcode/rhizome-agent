@@ -428,6 +428,7 @@ anyone is talking to the agent and would otherwise be what creates the session:
   locating the binary, updating it, and seeding the Rhizome vault skill
 - Frontend: `usePrimeHostStatus` (status poll), `usePrimeAgentActivity` (app-level,
   goal/heartbeats), `usePrimeRunningSessionFiles` (roster → which logs are alive),
+  `RlmFamilyBand` (live RLM children from that roster; Stop → `cancel_rlm_child`),
   `PrimeSessionList` (the history sidebar), `primeSessionMeta.ts` (row labels)
 
 #### What Rhizome does not own

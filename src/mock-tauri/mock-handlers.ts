@@ -612,6 +612,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   // so the three states of the row dot are all visible in `pnpm dev`. Without
   // this the hook catches "no mock handler" and every row reads as saved,
   // which is indistinguishable from the feature not working.
+  cancel_prime_rlm_child: () => true,
   list_prime_running_sessions: () => [
     {
       id: 'live-1',
@@ -622,6 +623,20 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       lifecycle: 'live',
       runtimeKind: 'top-level',
       rlmDepth: 0,
+      hasRunningRlmChildren: true,
+    },
+    {
+      id: 'live-1-kid',
+      activeSessionId: 'live-1-kid',
+      parentActiveSessionId: 'live-1',
+      sessionFile: '/mock/sessions/01a0252e-b9d5-71e9-83de-2bce32f65c07.jsonl',
+      activity: 'working',
+      isSessionActive: true,
+      lifecycle: 'live',
+      runtimeKind: 'subagent',
+      rlmDepth: 1,
+      rlmChildId: 'live-1-kid',
+      firstMessage: 'Review auth',
     },
     {
       id: 'live-2',

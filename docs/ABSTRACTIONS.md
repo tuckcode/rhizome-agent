@@ -1040,6 +1040,13 @@ first six characters gave 23 distinct values and one prefix covered 23 sessions.
 When you need a short distinguishing suffix, take the **end** of the id. A
 daemon handle is different — random throughout, so its prefix is fine.
 
+RLM children are a third identity: Prime's `rlmChildId`. They appear on the
+daemon **`list` roster** (`runtimeKind: 'subagent'`, `parentActiveSessionId`),
+not on `get_session_tree` — that tree is fork/branch history (#17). Chat's
+`RlmFamilyBand` reads the roster and Stop sends `cancel_rlm_child` with
+`rlmChildId`. Host status's `sessionId` is the durable uuidv7; join it to the
+roster by `sessionId` / log stem, then walk `parentActiveSessionId`.
+
 ## Settings
 
 App-level settings persisted at `$XDG_CONFIG_HOME/com.tolaria.app/settings.json`, defaulting to `$HOME/.config/com.tolaria.app/settings.json` on Unix platforms (reads legacy `com.laputa.app` and the previous platform config directory on upgrade):

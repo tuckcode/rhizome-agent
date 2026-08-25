@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ROSTER_ACTIVITY_KEYS,
+  familyForRoot,
   isRosterSessionRunning,
   rosterActivityMessageKey,
   rosterSessionTitle,
@@ -103,6 +104,109 @@ describe('rosterSessionTitle', () => {
   it('falls back to the short id when there is neither message nor cwd', () => {
     expect(rosterSessionTitle(session({ firstMessage: undefined, cwd: undefined, id: 'aaa1' })))
       .toBe('aaa1')
+  })
+})
+
+describe('familyForRoot', () => {
+  it('is empty when the live session has no children', () => {
+    expect(familyForRoot([session()], 'aaa1')).toEqual([])
+  })
+
+  it('lists the live session\'s descendants and not another root\'s', () => {
+    const members = familyForRoot(
+      [
+        session({ id: 'root', activeSessionId: 'root' }),
+        session({
+          id: 'kid',
+          activeSessionId: 'kid',
+          runtimeKind: 'subagent',
+          rlmDepth: 1,
+          parentActiveSessionId: 'root',
+          firstMessage: 'Review auth',
+          activity: 'working',
+          isSessionActive: true,
+        }),
+        session({
+          id: 'other-kid',
+          activeSessionId: 'other-kid',
+          runtimeKind: 'subagent',
+          rlmDepth: 1,
+          parentActiveSessionId: 'elsewhere',
+          firstMessage: 'Not ours',
+        }),
+      ],
+      'root',
+    )
+
+    expect(members.map((member) => member.id)).toEqual(['kid'])
+    expect(members[0]?.title).toBe('Review auth')
+    expect(members[0]?.working).toBe(true)
+  })
+
+  it('includes grandchildren under the same root', () => {
+    const members = familyForRoot(
+      [
+        session({ id: 'root', activeSessionId: 'root' }),
+        session({
+          id: 'kid',
+          activeSessionId: 'kid',
+          runtimeKind: 'subagent',
+          rlmDepth: 1,
+          parentActiveSessionId: 'root',
+        }),
+        session({
+          id: 'grandkid',
+          activeSessionId: 'grandkid',
+          runtimeKind: 'subagent',
+          rlmDepth: 2,
+          parentActiveSessionId: 'kid',
+        }),
+      ],
+      'root',
+    )
+
+    expect(members.map((member) => member.id)).toEqual(['kid', 'grandkid'])
+    expect(members.find((member) => member.id === 'grandkid')?.depth).toBe(2)
+  })
+
+  it('is empty without a live session handle', () => {
+    expect(
+      familyForRoot(
+        [
+          session({
+            id: 'kid',
+            activeSessionId: 'kid',
+            runtimeKind: 'subagent',
+            parentActiveSessionId: 'root',
+          }),
+        ],
+        null,
+      ),
+    ).toEqual([])
+  })
+
+  it('matches Chat\'s durable sessionId, not only the daemon handle', () => {
+    const members = familyForRoot(
+      [
+        session({
+          id: 'handle-root',
+          activeSessionId: 'handle-root',
+          sessionId: '019fe641-61fa-73e9-82ef-91fc90097aab',
+        }),
+        session({
+          id: 'child-node-9',
+          activeSessionId: 'handle-kid',
+          rlmChildId: 'child-node-9',
+          runtimeKind: 'subagent',
+          rlmDepth: 1,
+          parentActiveSessionId: 'handle-root',
+          firstMessage: 'Review auth',
+        }),
+      ],
+      '019fe641-61fa-73e9-82ef-91fc90097aab',
+    )
+
+    expect(members.map((member) => member.id)).toEqual(['child-node-9'])
   })
 })
 

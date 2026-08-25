@@ -1233,6 +1233,8 @@
   "ai.activity.scheduled.resume": "Resume",
   "ai.activity.scheduled.cancel": "Cancel",
   "ai.activity.thinking": "thinking {level}",
+  "ai.activity.rlmFamily": "{count} subagent(s)",
+  "ai.activity.rlmStop": "Stop",
   "ai.goal.trigger": "Goal",
   "ai.goal.triggerActive": "Goal: {objective}",
   "ai.goal.dialogTitleSet": "Set a goal",
