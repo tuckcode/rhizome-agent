@@ -51,11 +51,10 @@ file.
 
 ## State
 
-Local `main` is ahead of origin (`e02e3c4`) through the C47
-listen-outside-Tauri guard (`b064272`) and the stranded-work
-session-start check. Includes C47 as `d737085`, Book → Skill, NEXT.md,
-ADR-0166, and the harness-composition notes. This session's job is to
-push that stack. C48/C49 are closed as QA-environment misreads.
+`origin/main` is pushed through `20e1b6c` (stranded-work check). Includes
+C47 as `d737085`, the listen-outside-Tauri guard (`b064272`), Book →
+Skill, NEXT.md, ADR-0166, and the harness-composition notes. C48/C49
+are closed as QA-environment misreads.
 Prime **0.7.4** on Windows speaks
 `\\.\pipe\prime-agent-daemon` — see `docs/WINDOWS-DEV.md`. On macOS/Linux the
 daemon dies with whatever terminal starts it, so start it detached:
