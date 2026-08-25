@@ -1152,7 +1152,9 @@ mod tests {
         ]));
         assert_eq!(items.len(), 2);
         match &items[1] {
-            PrimeTranscriptItem::BranchSummary { from_id, summary, .. } => {
+            PrimeTranscriptItem::BranchSummary {
+                from_id, summary, ..
+            } => {
                 assert_eq!(from_id.as_deref(), Some("u1"));
                 assert_eq!(summary.as_deref(), Some("tried the rust rewrite"));
             }

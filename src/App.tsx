@@ -1921,8 +1921,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
             ) : chatCentered ? (
               <div className="app__chat-center" data-testid="chat-center">
                 {chatHomeSurface}
-                {activeTab ? (
-                  <div className="app__note-editor">
+                <div className={activeTab ? 'app__note-editor' : 'app__note-editor app__note-editor--idle'}>
                     <Editor
                       tabs={notes.tabs}
                       activeTabPath={notes.activeTabPath}
@@ -1999,7 +1998,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                       locale={appLocale}
                     />
                   </div>
-                ) : null}
               </div>
             ) : isChatDestination ? (
               chatHomeSurface

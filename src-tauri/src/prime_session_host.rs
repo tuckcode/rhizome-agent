@@ -1139,9 +1139,7 @@ pub fn create_scheduled_work(
             });
             if let Some(mode) = delivery_mode.map(str::trim).filter(|mode| !mode.is_empty()) {
                 if !matches!(mode, "steer" | "follow_up") {
-                    return Err(
-                        "Heartbeat delivery must be steer or follow_up".into(),
-                    );
+                    return Err("Heartbeat delivery must be steer or follow_up".into());
                 }
                 payload["deliveryMode"] = serde_json::Value::String(mode.to_string());
             }
