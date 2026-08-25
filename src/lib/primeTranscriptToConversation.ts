@@ -25,8 +25,9 @@ export type PrimeTranscriptItem =
       /** Tool calls, already unwrapped from their shell wrapper in Rust. */
       tools?: PrimeTranscriptTool[]
     }
-  | { kind: 'compaction'; id?: string; timestamp?: string; summary?: string; tokensBefore?: number }
-  | { kind: 'modelChange'; id?: string; timestamp?: string; provider?: string; modelId?: string }
+  | { kind: 'compaction'; id?: string; parentId?: string; timestamp?: string; summary?: string; tokensBefore?: number }
+  | { kind: 'modelChange'; id?: string; parentId?: string; timestamp?: string; provider?: string; modelId?: string }
+  | { kind: 'branchSummary'; id?: string; parentId?: string; fromId?: string; summary?: string }
 
 export interface PrimeTranscriptTool {
   id?: string
@@ -91,6 +92,44 @@ function emptyTurn(userMessage: string, id: string): AiAgentMessage {
  * legitimately opens mid-conversation, and silently discarding those messages
  * would make a resumed session look like it started later than it did.
  */
+/**
+ * The current branch of a forked log, walking parentId from the live leaf.
+ *
+ * The on-disk jsonl keeps every sibling. A transcript that replayed the whole
+ * file would mix the turn we abandoned with the one we are on. Missing leaf
+ * or unknown id returns the original list so a stale pointer cannot blank
+ * the panel.
+ */
+export function transcriptAlongBranch(
+  items: PrimeTranscriptItem[],
+  leafId: string | null | undefined,
+): PrimeTranscriptItem[] {
+  const leaf = leafId?.trim()
+  if (!leaf) return items
+  const byId = new Map<string, PrimeTranscriptItem>()
+  for (const item of items) {
+    if (item.id) byId.set(item.id, item)
+  }
+  if (!byId.has(leaf)) return items
+  const keep = new Set<string>()
+  let current: string | undefined = leaf
+  while (current && !keep.has(current)) {
+    keep.add(current)
+    current = byId.get(current)?.parentId
+  }
+  return items.filter((item) => item.id !== undefined && keep.has(item.id))
+}
+
+function markerPreview(text: string | undefined, max = 140): string | undefined {
+  const line = (text ?? '')
+    .split('\n')
+    .map((part) => part.replace(/^#+\s*/, '').trim())
+    .find(Boolean)
+  if (!line) return undefined
+  if (line.length <= max) return line
+  return `${line.slice(0, max - 1)}…`
+}
+
 export function primeTranscriptToConversation(items: PrimeTranscriptItem[]): AiAgentMessage[] {
   const turns: AiAgentMessage[] = []
   let index = 0
@@ -105,12 +144,16 @@ export function primeTranscriptToConversation(items: PrimeTranscriptItem[]): AiA
 
   for (const item of items) {
     if (item.kind === 'compaction') {
-      // The summary is the only surviving record of the turns it replaced, so
-      // it is shown, not reduced to a divider.
+      // The summary is the only surviving record of the turns it replaced.
+      // It rides on the marker, not as a fake assistant message — #18.
+      const preview = markerPreview(item.summary)
+      const tokens =
+        typeof item.tokensBefore === 'number' ? ` · ${item.tokensBefore} tokens before` : ''
       turns.push({
         ...emptyTurn('', `replay-compaction-${index++}`),
-        localMarker: 'compaction',
-        response: item.summary,
+        localMarker: preview
+          ? `Compacted this conversation${tokens}\n${preview}`
+          : `Compacted this conversation${tokens}`,
       })
       continue
     }
@@ -119,7 +162,18 @@ export function primeTranscriptToConversation(items: PrimeTranscriptItem[]): AiA
       const model = [item.provider, item.modelId].filter(Boolean).join(' / ')
       turns.push({
         ...emptyTurn('', `replay-model-${index++}`),
-        localMarker: model ? `model · ${model}` : 'model changed',
+        localMarker: model ? `Model changed · ${model}` : 'Model changed',
+      })
+      continue
+    }
+
+    if (item.kind === 'branchSummary') {
+      const preview = markerPreview(item.summary)
+      turns.push({
+        ...emptyTurn('', `replay-fork-${index++}`),
+        localMarker: preview
+          ? `Branched from this conversation\n${preview}`
+          : 'Branched from this conversation',
       })
       continue
     }

@@ -18,6 +18,14 @@ describe('AiMessage', () => {
     writeClipboardText.mockResolvedValue(undefined)
   })
 
+  it('renders a local marker as a system event, not a chat turn', () => {
+    render(<AiMessage userMessage="" actions={[]} localMarker={'Compacted this conversation\nGoal'} />)
+    const marker = screen.getByTestId('ai-local-marker')
+    expect(marker).toHaveTextContent('Compacted this conversation')
+    expect(marker).toHaveTextContent('Goal')
+    expect(screen.queryByTestId('ai-message')).not.toBeInTheDocument()
+  })
+
   it('renders user message', () => {
     render(<AiMessage userMessage="Hello AI" actions={[]} />)
     expect(screen.getByText('Hello AI')).toBeTruthy()

@@ -15,6 +15,9 @@ surface is every `case "<name>":` in
 (installed 0.7.4). Ours is every `"type": "<name>"` we send from
 `src-tauri/src/**/*.rs`. Both are mechanical greps; neither trusts a doc.
 
+Living spoken count is in the snapshot (**36 / 102** on 0.8.0 after #17/#14).
+The numbered list below is historical.
+
 ## The number
 
 **28 of 105 daemon commands — 27%.** Excluding the 10 `worker_*` internals a
@@ -34,8 +37,8 @@ cancel_rlm_child
 That set is a complete, working *conversation* client: connect, attach,
 prompt, stream, switch model and reasoning level, fork, compact, watch a goal.
 `cancel_rlm_child` is the first RLM write. Chat now lists the live session's
-roster children (`RlmFamilyBand`); it still does not speak `get_session_tree`
-(fork history, #17) or `set_rlm_max_depth`.
+roster children (`RlmFamilyBand`) and the current conversation's fork tree
+(`get_session_tree` / `navigate_tree`, #17). Still unspoken: `set_rlm_max_depth`.
 
 ## The number needs two corrections, in opposite directions
 
@@ -51,7 +54,7 @@ surfaces*, each entirely absent:
 
 | Missing surface | Cmds | What its absence means |
 |---|---:|---|
-| **RLM / subagents** | 5 left | Chat shows live children from the **`list` roster** and Stop → `cancel_rlm_child`. Still missing `get_session_tree` / `get_context_tree` / `set_rlm_max_depth`. `get_session_tree` is fork history (#17), not the RLM family |
+| **RLM / subagents** | 4 left | Chat shows live children from the **`list` roster** and Stop → `cancel_rlm_child`. Fork history is `get_session_tree` (#17), now spoken. Still missing `get_context_tree` / `set_rlm_max_depth`. |
 | **Queue & steering** | 10 left | Chat reads Prime's **`get_queue`** (steer + follow-up previews) and Clear → `clear_queue`. Still missing mutate, resume, and set steering/follow-up mode |
 | **Session tree / forking** | 6 | We `fork`, but cannot show the branch point first (`get_user_messages_for_forking`) or navigate the tree |
 | **Saved sessions** | 6 | `rename_saved_session`, `export_html`, `import_jsonl`. Also `list_saved_sessions` — see the open question below |

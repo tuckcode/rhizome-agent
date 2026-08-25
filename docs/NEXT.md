@@ -214,11 +214,9 @@ to start grafting.
 Claude's original (`b8dc8fb`) started at **close #40**, then #29, then the
 composer cluster. Item 1 below is Grok's later insertion (`2b5daba`).
 
-**Origin:** Grok 4.6 · 2026-08-24 — user-pulled, in progress / landing: RLM
-family in Chat (roster + `cancel_rlm_child`). Next Prime surfaces after that:
-queue visibility, then #17 fork tree (not RLM), then #14 create schedules.
-Do not take this as replacing item 2 (#29) for a session that is choosing
-freely — it is what this session was told to keep building.
+**Origin:** Grok 4.6 · 2026-08-25 — user-pulled Prime surfaces landed this
+session: #17 fork tree, #14 create schedules, then #18 markers. Next free
+choice is the composer cluster or #29, not more unprompted Prime verbs.
 
 1. **Harness composition (§1)** — discuss/decide
    [`harness-composition.md`](design/harness-composition.md) (option 2,
