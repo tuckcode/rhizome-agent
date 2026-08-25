@@ -136,6 +136,16 @@ export function trackPrimeRlmChildStopped(): void {
   trackEvent('prime_rlm_child_stopped')
 }
 
+/** Continued from a fork inside the current conversation (#17). No entry text. */
+export function trackPrimeSessionTreeNavigated(): void {
+  trackEvent('prime_session_tree_navigated')
+}
+
+/** Created a heartbeat or cron job from Chat. No prompt text. */
+export function trackPrimeScheduledWorkCreated(source: 'heartbeat' | 'cron'): void {
+  trackEvent('prime_scheduled_work_created', { source })
+}
+
 export function trackMenuBarSessionOpened(options: {
   working: boolean
   subagentCount: number

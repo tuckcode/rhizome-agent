@@ -389,6 +389,17 @@ pub enum PrimeTranscriptItem {
         #[serde(skip_serializing_if = "Option::is_none")]
         model_id: Option<String>,
     },
+    #[serde(rename_all = "camelCase")]
+    BranchSummary {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        parent_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        from_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        summary: Option<String>,
+    },
 }
 
 /// One tool call on a replayed message, named as the user should see it.
@@ -468,6 +479,12 @@ fn transcript_from_lines<I: Iterator<Item = String>>(lines: I) -> Vec<PrimeTrans
                 timestamp: event["timestamp"].as_str().map(str::to_string),
                 provider: event["provider"].as_str().map(str::to_string),
                 model_id: event["modelId"].as_str().map(str::to_string),
+            }),
+            "branch_summary" => items.push(PrimeTranscriptItem::BranchSummary {
+                id: event["id"].as_str().map(str::to_string),
+                parent_id: event["parentId"].as_str().map(str::to_string),
+                from_id: event["fromId"].as_str().map(str::to_string),
+                summary: event["summary"].as_str().map(str::to_string),
             }),
             _ => {}
         }
@@ -1124,6 +1141,22 @@ mod tests {
                 assert_eq!(model_id.as_deref(), Some("grok-4.5"));
             }
             other => panic!("expected a model change, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn branch_summary_is_an_item_in_place_not_dropped() {
+        let items = transcript_from_lines(lines(&[
+            r#"{"type":"message","message":{"role":"user","content":[{"type":"text","text":"start"}]}}"#,
+            r#"{"type":"branch_summary","id":"br1","fromId":"u1","summary":"tried the rust rewrite"}"#,
+        ]));
+        assert_eq!(items.len(), 2);
+        match &items[1] {
+            PrimeTranscriptItem::BranchSummary { from_id, summary, .. } => {
+                assert_eq!(from_id.as_deref(), Some("u1"));
+                assert_eq!(summary.as_deref(), Some("tried the rust rewrite"));
+            }
+            other => panic!("expected a branch summary, got {other:?}"),
         }
     }
 

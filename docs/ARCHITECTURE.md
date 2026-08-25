@@ -409,8 +409,8 @@ list → create → attach → get_state → <the command that asked>
 Four reads deliberately opt out, because they run on timers whether or not
 anyone is talking to the agent and would otherwise be what creates the session:
 `agent_activity` (app-level poll), `get_session_stats` (15s), `get_commands`
-(on mount), and `get_queue` (composer). Each answers "nothing", which is true
-of a host with no session.
+(on mount), `get_queue` (composer), and `get_session_tree` (branch band).
+Each answers "nothing", which is true of a host with no session.
 
 #### Where the pieces live
 
@@ -433,6 +433,9 @@ of a host with no session.
   goal/heartbeats), `usePrimeRunningSessionFiles` (roster → which logs are alive),
   `RlmFamilyBand` (live RLM children from that roster; Stop → `cancel_rlm_child`),
   `usePrimeQueue` (composer queue from `get_queue`; Clear → `clear_queue`),
+  `usePrimeSessionTree` / `SessionBranchBand` (`get_session_tree` / `navigate_tree`,
+  #17 — this conversation, not the sessions drawer),
+  `PrimeScheduleDialog` (`heartbeat_set` / `cron_add`, #14 create),
   `PrimeSessionList` (the history sidebar), `primeSessionMeta.ts` (row labels)
 
 #### What Rhizome does not own

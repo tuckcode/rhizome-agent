@@ -1047,9 +1047,17 @@ not on `get_session_tree` — that tree is fork/branch history (#17). Chat's
 `rlmChildId`. Host status's `sessionId` is the durable uuidv7; join it to the
 roster by `sessionId` / log stem, then walk `parentActiveSessionId`.
 
+`SessionBranchBand` is the #17 surface: Prime `get_session_tree` / `navigate_tree`
+inside this conversation. The sessions drawer still switches *between* logs.
+A linear conversation has no sibling groups, so the band stays quiet.
+
 The composer queue is Prime's **`get_queue`** (steering + follow-up previews),
 not a list of messages Chat remembered sending. Clear is `clear_queue`.
 Mutate and steering-mode remain unspoken.
+
+Schedules: see/pause/cancel already lived on the activity band (#14). Create is
+`heartbeat_set` / `cron_add` from `PrimeScheduleDialog` next to Goal — not on
+the idle strip, which must stay quiet when nothing is scheduled.
 
 ## Settings
 

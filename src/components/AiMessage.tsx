@@ -39,13 +39,21 @@ export interface AiMessageProps {
 }
 
 function LocalMarker({ text }: { text: string }) {
+  const [title, ...rest] = text.split('\n')
+  const detail = rest.join('\n').trim()
   return (
     <div
-      className="mx-auto text-center text-muted-foreground"
-      style={{ fontSize: 11, margin: '8px 0 16px', maxWidth: '85%' }}
+      className="mx-auto flex w-full max-w-[85%] flex-col items-center gap-1 text-center font-mono text-[10.5px] tracking-[0.02em] text-muted-foreground"
+      style={{ margin: '12px 0 16px' }}
       data-testid="ai-local-marker"
+      role="note"
     >
-      {text}
+      <span className="flex w-full items-center gap-2">
+        <span className="h-px min-w-4 flex-1 bg-border" aria-hidden="true" />
+        <span className="shrink-0">{title}</span>
+        <span className="h-px min-w-4 flex-1 bg-border" aria-hidden="true" />
+      </span>
+      {detail ? <span className="max-w-full truncate">{detail}</span> : null}
     </div>
   )
 }

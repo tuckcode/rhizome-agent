@@ -52,8 +52,9 @@ file.
 ## State
 
 `origin/main` was last confirmed at `87e12c3`. Local main may be ahead
-with origin-tags, RLM family, the Prime adapter snapshot, and the
-`get_queue` composer slice. Confirm with `git log origin/main..HEAD`.
+with origin-tags, RLM family, the adapter snapshot, queue visibility,
+#17 branch navigation, #14 schedule create, and #18 transcript markers.
+Confirm with `git log origin/main..HEAD`.
 
 This machine's installed Prime is **0.8.0** (102 public daemon commands —
 `docs/prime-adapter-surface.json`). GitHub latest is also `v0.8.0`.
@@ -79,6 +80,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1345-grok-4-6-branches-schedules-markers.md) — #17 `get_session_tree`/`navigate_tree` in Chat; #14 create via `heartbeat_set`/`cron_add`; #18 compact/fork/model markers. Issues not closed (no live-Prime demo).
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1255-grok-4-6-prime-queue.md) — Chat shows Prime `get_queue`; Clear → `clear_queue`. Not a local follow-up list
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1148-grok-4-6-prime-surface-check.md) — mechanical Prime adapter snapshot (`docs/prime-adapter-surface.json`); `pnpm prime:surface` / `--github`. Do not clone upstream.
 - [2026-08-24 (late) · Grok 4.6](plans/handoffs/2026-08-24-2308-grok-4-6-origin-tags.md) — Origin tags on living docs; NEXT.md is a palimpsest (Claude Code then Grok); RLM was never a row

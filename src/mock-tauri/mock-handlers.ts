@@ -615,6 +615,8 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   cancel_prime_rlm_child: () => true,
   get_prime_session_queue: () => ({ steering: [], followUp: [] }),
   clear_prime_session_queue: () => ({ steering: [], followUp: [] }),
+  get_prime_session_tree: () => ({ nodes: [] }),
+  navigate_prime_session_tree: () => ({ nodes: [] }),
   list_prime_running_sessions: () => [
     {
       id: 'live-1',
@@ -739,6 +741,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   switch_prime_session: () => 'mock-session',
   manage_prime_heartbeat: () => null,
   cancel_prime_scheduled_work: () => null,
+  create_prime_scheduled_work: () => null,
   get_prime_thinking_levels: () => ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
   set_prime_thinking_level: () => null,
   // Real data, not `[]`: a mock that returns nothing makes the custom-format

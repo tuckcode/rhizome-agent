@@ -256,6 +256,114 @@ impl PrimeQueue {
     }
 }
 
+/// Fork/branch history of the attached session (`get_session_tree`).
+///
+/// Flat nodes only — the tree is rebuilt on the frontend. Entries are reduced
+/// to an id, parent, kind and a short title so a full `AgentMessage` never
+/// crosses IPC just to name a branch.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrimeSessionTree {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub leaf_id: Option<String>,
+    pub nodes: Vec<PrimeSessionTreeNode>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrimeSessionTreeNode {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
+    pub kind: String,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+}
+
+impl PrimeSessionTree {
+    fn from_data(data: &serde_json::Value) -> Self {
+        let leaf_id = data["leafId"]
+            .as_str()
+            .map(str::trim)
+            .filter(|id| !id.is_empty())
+            .map(str::to_string);
+        let nodes = data["flatNodes"]
+            .as_array()
+            .map(|items| items.iter().filter_map(tree_node_from_flat).collect())
+            .unwrap_or_default();
+        Self { leaf_id, nodes }
+    }
+}
+
+const TREE_TITLE_MAX: usize = 80;
+
+fn tree_node_from_flat(value: &serde_json::Value) -> Option<PrimeSessionTreeNode> {
+    let entry = value.get("entry")?;
+    let id = entry["id"]
+        .as_str()
+        .map(str::trim)
+        .filter(|id| !id.is_empty())?
+        .to_string();
+    let parent_id = entry["parentId"]
+        .as_str()
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .map(str::to_string);
+    let label = value["label"]
+        .as_str()
+        .map(str::trim)
+        .filter(|label| !label.is_empty())
+        .map(str::to_string);
+    let (kind, title) = tree_title_from_entry(entry, label.as_deref());
+    Some(PrimeSessionTreeNode {
+        id,
+        parent_id,
+        kind,
+        title,
+        label,
+    })
+}
+
+fn tree_title_from_entry(entry: &serde_json::Value, label: Option<&str>) -> (String, String) {
+    let kind = match entry["type"].as_str() {
+        Some("message") => match entry["message"]["role"].as_str() {
+            Some("user") => "user",
+            Some("assistant") => "assistant",
+            _ => "other",
+        },
+        Some(other) => other,
+        None => "other",
+    };
+    if let Some(label) = label {
+        return (kind.to_string(), preview_text(label, TREE_TITLE_MAX));
+    }
+    let title = if entry["type"].as_str() == Some("message") {
+        PrimeMessage::from_value(&entry["message"]).text
+    } else {
+        String::new()
+    };
+    let title = preview_text(title.trim(), TREE_TITLE_MAX);
+    (
+        kind.to_string(),
+        if title.is_empty() {
+            kind.replace('_', " ")
+        } else {
+            title
+        },
+    )
+}
+
+fn preview_text(text: &str, max: usize) -> String {
+    let trimmed: String = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if trimmed.chars().count() <= max {
+        return trimmed;
+    }
+    let mut out: String = trimmed.chars().take(max.saturating_sub(1)).collect();
+    out.push('…');
+    out
+}
+
 fn string_previews(value: &serde_json::Value) -> Vec<String> {
     value
         .as_array()
@@ -1002,6 +1110,63 @@ pub fn cancel_scheduled_work(job_id: &str) -> Result<(), String> {
     })
 }
 
+/// Start a heartbeat or a cron schedule on the attached session.
+///
+/// `kind` is Prime's `source`: `heartbeat` → `heartbeat_set` (pauseable),
+/// `cron` → `cron_add` (cancel only). Must not create a session (#28): a
+/// schedule belongs to a conversation that already exists. Heartbeats require
+/// a persisted session file on Prime's side too.
+pub fn create_scheduled_work(
+    kind: &str,
+    schedule: &str,
+    prompt: &str,
+    delivery_mode: Option<&str>,
+) -> Result<(), String> {
+    let schedule = schedule.trim();
+    let prompt = prompt.trim();
+    if schedule.is_empty() {
+        return Err("A cadence is required".into());
+    }
+    if prompt.is_empty() {
+        return Err("A prompt is required".into());
+    }
+    let command = match kind.trim() {
+        "heartbeat" => {
+            let mut payload = serde_json::json!({
+                "type": "heartbeat_set",
+                "schedule": schedule,
+                "prompt": prompt,
+            });
+            if let Some(mode) = delivery_mode.map(str::trim).filter(|mode| !mode.is_empty()) {
+                if !matches!(mode, "steer" | "follow_up") {
+                    return Err(
+                        "Heartbeat delivery must be steer or follow_up".into(),
+                    );
+                }
+                payload["deliveryMode"] = serde_json::Value::String(mode.to_string());
+            }
+            payload
+        }
+        "cron" => serde_json::json!({
+            "type": "cron_add",
+            "schedule": schedule,
+            "prompt": prompt,
+        }),
+        other => {
+            return Err(format!(
+                "Unknown schedule kind {other:?}. Expected heartbeat or cron",
+            ));
+        }
+    };
+    with_host_mut(|host| {
+        if !host.has_session() {
+            return Err("Start a conversation before scheduling a prompt".into());
+        }
+        host.call(command)?;
+        Ok(())
+    })
+}
+
 /// What the harness is doing besides answering: goal, heartbeats, schedules.
 ///
 /// One host lock for three round-trips. A sub-request that fails degrades that
@@ -1444,6 +1609,51 @@ pub fn clear_queue() -> Result<PrimeQueue, String> {
         }
         let data = host.call(serde_json::json!({ "type": "clear_queue" }))?;
         Ok(PrimeQueue::from_data(&data))
+    })
+}
+
+/// Fork/branch history of the attached session.
+///
+/// Polled while Chat is open. Must not create a session (#28): no session
+/// means no branches, which is true.
+pub fn get_session_tree() -> Result<PrimeSessionTree, String> {
+    with_host_mut(|host| {
+        if !host.has_session() {
+            return Ok(PrimeSessionTree::default());
+        }
+        let data = host.call(serde_json::json!({ "type": "get_session_tree" }))?;
+        Ok(PrimeSessionTree::from_data(&data))
+    })
+}
+
+/// Move the live leaf to an earlier branch of this conversation.
+///
+/// Same session, not a new one — that is `fork`. Refuses mid-turn for the
+/// same reason `fork` and `switch_session` do. Empty ids are refused before
+/// they hit the daemon so a miswired click cannot navigate "whatever is
+/// current". Returns the tree Prime reports afterwards so the band can mark
+/// the new leaf without a second poll.
+pub fn navigate_tree(target_id: &str) -> Result<PrimeSessionTree, String> {
+    let trimmed = target_id.trim();
+    if trimmed.is_empty() {
+        return Err("Cannot navigate without a branch id".into());
+    }
+    with_host_mut(|host| {
+        if !host.has_session() {
+            return Err("No conversation to navigate".into());
+        }
+        if host.is_streaming {
+            return Err("Cannot switch branches while a turn is running".into());
+        }
+        let result = host.call(serde_json::json!({
+            "type": "navigate_tree",
+            "targetId": trimmed,
+        }))?;
+        if result["cancelled"].as_bool() == Some(true) {
+            return Err("Branch switch was cancelled".into());
+        }
+        let data = host.call(serde_json::json!({ "type": "get_session_tree" }))?;
+        Ok(PrimeSessionTree::from_data(&data))
     })
 }
 
@@ -2575,8 +2785,8 @@ impl PrimeHost {
     ///
     /// This is the choke point that makes creation lazy: asking for a session
     /// is what buys one. Reads that run on a timer must not come through here
-    /// — see `agent_activity`, `get_session_stats`, `get_commands` and
-    /// `get_queue`, which answer "nothing" instead.
+    /// — see `agent_activity`, `get_session_stats`, `get_commands`,
+    /// `get_queue` and `get_session_tree`, which answer "nothing" instead.
     fn send_command(
         &mut self,
         mut command: serde_json::Value,
@@ -3298,6 +3508,7 @@ mod tests {
         let stats = get_session_stats().expect("stats read as unknown");
         let commands = get_commands().expect("commands read as empty");
         let queue = get_queue().expect("queue read as empty");
+        let tree = get_session_tree().expect("tree read as empty");
 
         assert_eq!(
             activity,
@@ -3307,6 +3518,7 @@ mod tests {
         assert!(stats.session_id.is_none(), "no session, no stats");
         assert!(commands.is_empty(), "no session, no session commands");
         assert_eq!(queue, PrimeQueue::default(), "no session, no queue");
+        assert_eq!(tree, PrimeSessionTree::default(), "no session, no branches");
         assert_eq!(
             daemon.commands(),
             vec!["list"],
@@ -5046,6 +5258,110 @@ mod tests {
         let _ = shutdown_host();
     }
 
+    #[test]
+    fn session_tree_reads_user_text_and_uses_label_when_prime_named_the_branch() {
+        let tree = PrimeSessionTree::from_data(&serde_json::json!({
+            "leafId": "u2",
+            "flatNodes": [
+                {
+                    "entry": {
+                        "type": "message",
+                        "id": "u1",
+                        "parentId": null,
+                        "message": {
+                            "role": "user",
+                            "content": [{ "type": "text", "text": "how should we store this" }]
+                        }
+                    }
+                },
+                {
+                    "entry": {
+                        "type": "message",
+                        "id": "u2",
+                        "parentId": "u1",
+                        "message": {
+                            "role": "user",
+                            "content": [{ "type": "text", "text": "the unlabeled prompt" }]
+                        }
+                    },
+                    "label": "rust rewrite"
+                }
+            ]
+        }));
+        assert_eq!(tree.leaf_id.as_deref(), Some("u2"));
+        assert_eq!(tree.nodes[0].kind, "user");
+        assert_eq!(tree.nodes[0].title, "how should we store this");
+        assert_eq!(tree.nodes[1].title, "rust rewrite");
+        assert_eq!(tree.nodes[1].label.as_deref(), Some("rust rewrite"));
+    }
+
+    #[test]
+    fn navigate_tree_refuses_without_a_branch_id() {
+        assert!(navigate_tree("").is_err());
+        assert!(navigate_tree("   ").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn get_session_tree_asks_prime_and_navigate_moves_the_leaf() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("get_session_tree") => Some(vec![ok(
+                id,
+                "get_session_tree",
+                serde_json::json!({
+                    "leafId": "rust",
+                    "flatNodes": [
+                        {
+                            "entry": {
+                                "type": "message",
+                                "id": "ts",
+                                "parentId": "a1",
+                                "message": {
+                                    "role": "user",
+                                    "content": [{ "type": "text", "text": "stay on typescript" }]
+                                }
+                            }
+                        },
+                        {
+                            "entry": {
+                                "type": "message",
+                                "id": "rust",
+                                "parentId": "a1",
+                                "message": {
+                                    "role": "user",
+                                    "content": [{ "type": "text", "text": "try rust rewrite" }]
+                                }
+                            }
+                        }
+                    ]
+                }),
+            )]),
+            Some("navigate_tree") => {
+                assert_eq!(command["targetId"], "ts");
+                Some(vec![ok(
+                    id,
+                    "navigate_tree",
+                    serde_json::json!({ "cancelled": false }),
+                )])
+            }
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let tree = get_session_tree().unwrap();
+        assert_eq!(tree.leaf_id.as_deref(), Some("rust"));
+        assert_eq!(tree.nodes.len(), 2);
+
+        let after = navigate_tree("ts").unwrap();
+        assert_eq!(after.nodes[0].id, "ts");
+        assert!(daemon.command("navigate_tree").is_some());
+
+        let _ = shutdown_host();
+    }
+
     /// Prime's queue state arrives as one event carrying both lists. The UI
     /// needs the count to show "2 queued" without tracking sends itself.
     #[test]
@@ -5519,6 +5835,10 @@ mod tests {
         assert!(manage_heartbeat("job-1", "delete").is_err());
         assert!(manage_heartbeat("", "pause").is_err(), "an id is required");
         assert!(cancel_scheduled_work("   ").is_err());
+        assert!(create_scheduled_work("heartbeat", "", "check in", None).is_err());
+        assert!(create_scheduled_work("cron", "0 9 * * 1-5", "  ", None).is_err());
+        assert!(create_scheduled_work("goal", "every 5m", "check in", None).is_err());
+        assert!(create_scheduled_work("heartbeat", "every 5m", "check in", Some("queue")).is_err());
     }
 
     #[cfg(unix)]
@@ -5577,6 +5897,70 @@ mod tests {
         cancel_scheduled_work("heartbeat-job").unwrap();
         cancel_scheduled_work("cron-job").unwrap();
         assert_eq!(*seen.lock().unwrap(), vec!["heartbeat-job", "cron-job"]);
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn creating_a_heartbeat_asks_prime_and_does_not_invent_a_session() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("heartbeat_set") => {
+                assert_eq!(command["schedule"], "every 30 minutes");
+                assert_eq!(command["prompt"], "check open work");
+                assert_eq!(command["deliveryMode"], "steer");
+                Some(vec![ok(
+                    id,
+                    "heartbeat_set",
+                    serde_json::json!({ "heartbeat": { "id": "hb-1" } }),
+                )])
+            }
+            Some("cron_add") => {
+                assert_eq!(command["schedule"], "0 9 * * 1-5");
+                assert_eq!(command["prompt"], "weekday review");
+                assert!(command.get("deliveryMode").is_none());
+                Some(vec![ok(
+                    id,
+                    "cron_add",
+                    serde_json::json!({ "job": { "id": "cron-1" } }),
+                )])
+            }
+            _ => None,
+        });
+        daemon.install();
+        connect_host_lazy(vault.path()).unwrap();
+
+        let error = create_scheduled_work(
+            "heartbeat",
+            "every 30 minutes",
+            "check open work",
+            Some("steer"),
+        )
+        .unwrap_err();
+        assert!(
+            error.contains("Start a conversation"),
+            "no session, no schedule: {error}"
+        );
+        assert_eq!(
+            daemon.commands(),
+            vec!["list"],
+            "creating a schedule must not spend a session: {:?}",
+            daemon.commands()
+        );
+
+        connect_host(vault.path()).unwrap();
+        create_scheduled_work(
+            "heartbeat",
+            "every 30 minutes",
+            "check open work",
+            Some("steer"),
+        )
+        .unwrap();
+        create_scheduled_work("cron", "0 9 * * 1-5", "weekday review", None).unwrap();
+        assert!(daemon.command("heartbeat_set").is_some());
+        assert!(daemon.command("cron_add").is_some());
 
         let _ = shutdown_host();
     }

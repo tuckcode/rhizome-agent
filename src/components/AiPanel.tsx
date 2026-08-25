@@ -7,18 +7,25 @@ import {
 } from '../lib/chatSessionsColumn'
 import { callHost } from '../lib/callHost'
 import { sendToRunningTurn } from '../lib/primeTurnMessaging'
-import { trackPrimeTurnMessage } from '../lib/productAnalytics'
+import { trackPrimeTurnMessage, trackPrimeSessionTreeNavigated } from '../lib/productAnalytics'
 import { usePrimeQueue } from '../hooks/usePrimeQueue'
+import { usePrimeSessionTree } from '../hooks/usePrimeSessionTree'
+import { SessionBranchBand } from './SessionBranchBand'
+import {
+  primeTranscriptToConversation,
+  transcriptAlongBranch,
+  type PrimeTranscriptItem,
+} from '../lib/primeTranscriptToConversation'
+import type { PrimeSessionTree } from '../lib/primeSessionTree'
 import {
   AiPanelComposer,
   AiPanelHeader,
   AiPanelMessageHistory,
 } from './AiPanelChrome'
-import { ClockCounterClockwise, Target } from '@phosphor-icons/react'
+import { ClockCounterClockwise, CalendarDots, Target } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { translate } from '../lib/i18n'
 import PrimeSessionList from './PrimeSessionList'
-import { primeTranscriptToConversation, type PrimeTranscriptItem } from '../lib/primeTranscriptToConversation'
 import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
 import { useMenuBarSessionOpen } from '../hooks/useMenuBarSessionOpen'
 import {
@@ -42,10 +49,12 @@ import { ChatComposerFoot } from './ChatComposerFoot'
 import { lastToolName } from '../utils/lastToolName'
 import { usePrimeCommandMenu } from '../hooks/usePrimeCommandMenu'
 import { type CommandMenuAction } from '../lib/primeCommandMenu'
-import { trackPrimeCommandRun } from '../lib/productAnalytics'
+import { trackPrimeCommandRun, trackPrimeScheduledWorkCreated } from '../lib/productAnalytics'
 import { trackEvent } from '../lib/telemetry'
 import { PrimeGoalDialog } from './PrimeGoalDialog'
+import { PrimeScheduleDialog, type ScheduledWorkKind, type HeartbeatDelivery } from './PrimeScheduleDialog'
 import type { PrimeAgentActivity } from './AgentActivityBand'
+import { usePrimeActivity } from './primeActivityContext'
 
 interface AiPanelProps {
   onClose: () => void
@@ -243,6 +252,12 @@ export function AiPanelView({
   // usage reflects the exchange that just happened.
   const primeStats = usePrimeSessionStats(isPrimeTarget, agent.status)
   const { queue, refresh: refreshQueue, clear: clearQueue } = usePrimeQueue(isPrimeTarget, isActive)
+  const { tree: sessionTree, refresh: refreshSessionTree } = usePrimeSessionTree(
+    isPrimeTarget,
+    primeHost.sessionPath ?? isActive,
+  )
+  const [branchBusyId, setBranchBusyId] = useState<string | null>(null)
+  const [branchError, setBranchError] = useState<string | null>(null)
 
   // Goal dialog (#20): opened on demand, not polled — the goal strip
   // (`AgentActivityBand`, wired in `ChatHome`) already polls for display.
@@ -274,6 +289,27 @@ export function AiPanelView({
     trackEvent('prime_goal_cleared')
   }, [])
 
+  const { refresh: refreshActivity } = usePrimeActivity()
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false)
+  const handleCreateSchedule = useCallback(
+    async (
+      kind: ScheduledWorkKind,
+      schedule: string,
+      prompt: string,
+      deliveryMode: HeartbeatDelivery,
+    ) => {
+      await callHost('create_prime_scheduled_work', {
+        kind,
+        schedule,
+        prompt,
+        deliveryMode: kind === 'heartbeat' ? deliveryMode : undefined,
+      })
+      trackPrimeScheduledWorkCreated(kind)
+      await refreshActivity()
+    },
+    [refreshActivity],
+  )
+
   // Reopening lands back in work the daemon kept running, so the panel has to
   // show that conversation rather than an empty one over a live session (#7).
   usePrimeSessionRehydrate({
@@ -282,6 +318,27 @@ export function AiPanelView({
     sessionPath: primeHost.sessionPath,
     onTranscript: agent.replaceMessages,
   })
+
+  const lastModelId = useRef<string | null | undefined>(undefined)
+  const lastModelSession = useRef(primeHost.sessionPath)
+  useEffect(() => {
+    if (!isPrimeTarget) return
+    if (primeHost.sessionPath !== lastModelSession.current) {
+      lastModelSession.current = primeHost.sessionPath
+      lastModelId.current = primeHost.modelId ?? null
+      return
+    }
+    const next = primeHost.modelId ?? null
+    if (lastModelId.current === undefined) {
+      lastModelId.current = next
+      return
+    }
+    if (next && next !== lastModelId.current) {
+      const label = primeModelLabel(primeHost) ?? next
+      agent.addLocalMarker(translate(locale, 'ai.command.modelChanged', { model: label }))
+    }
+    lastModelId.current = next
+  }, [agent, isPrimeTarget, locale, primeHost])
 
   useAiPanelPromptQueue({
     agent,
@@ -410,7 +467,7 @@ export function AiPanelView({
 
     setSwitchError(null)
     try {
-      const forked = await callHost<{ sessionId: string }>('fork_prime_session', { entryId })
+      const forked = await callHost<{ sessionId: string; branchedFrom?: string }>('fork_prime_session', { entryId })
       const summaries = await callHost<PrimeSessionSummary[]>('list_prime_session_summaries')
       const branch = summaries.find((session) => session.id === forked.sessionId)
       if (!branch) {
@@ -424,13 +481,49 @@ export function AiPanelView({
         path: branch.path,
       })
       agent.replaceMessages(primeTranscriptToConversation(transcript))
+      agent.addLocalMarker(
+        forked.branchedFrom?.trim()
+          ? translate(locale, 'ai.command.forkedFrom', { from: forked.branchedFrom.trim() })
+          : translate(locale, 'ai.command.forked'),
+      )
       setActiveSessionPath(branch.path)
+      refreshSessionTree()
       // Same as selecting: the column stays. A fork adds a session to the very
       // list being hidden, so closing it hides the thing that just happened.
     } catch (e) {
       setSwitchError(e instanceof Error ? e.message : String(e))
     }
-  }, [agent])
+  }, [agent, locale, refreshSessionTree])
+
+  /**
+   * Stay in this conversation and continue from an earlier fork (#17).
+   *
+   * Not a session switch: the log file is the same, the leaf moves. The
+   * on-disk jsonl still has every sibling, so the transcript is filtered to
+   * the ancestry of the new leaf rather than replaying the abandoned turn.
+   */
+  const handleNavigateBranch = useCallback(async (targetId: string) => {
+    setBranchError(null)
+    setBranchBusyId(targetId)
+    try {
+      const next = await callHost<PrimeSessionTree>('navigate_prime_session_tree', { targetId })
+      const path = activeSessionPath ?? primeHost.sessionPath
+      if (path) {
+        const transcript = await callHost<PrimeTranscriptItem[]>('read_prime_session_transcript', {
+          path,
+        })
+        agent.replaceMessages(
+          primeTranscriptToConversation(transcriptAlongBranch(transcript, next.leafId)),
+        )
+      }
+      trackPrimeSessionTreeNavigated()
+      refreshSessionTree()
+    } catch (e) {
+      setBranchError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBranchBusyId(null)
+    }
+  }, [activeSessionPath, agent, primeHost.sessionPath, refreshSessionTree])
 
   const commandEntries = usePrimeCommandMenu(isPrimeTarget, primeHost.sessionId)
   const latestPrimeEntryId = [...agent.messages].reverse().find((message) => message.primeEntryId)?.primeEntryId
@@ -503,6 +596,7 @@ export function AiPanelView({
       })
       agent.replaceMessages(primeTranscriptToConversation(transcript))
       setActiveSessionPath(session.path)
+      refreshSessionTree()
       // The column deliberately stays open. Closing it made sense when this
       // list was an overlay covering the conversation — dismissing it was how
       // you got back to the chat. It is a persistent sidebar now, and closing
@@ -511,7 +605,7 @@ export function AiPanelView({
     } catch (e) {
       setSwitchError(e instanceof Error ? e.message : String(e))
     }
-  }, [agent])
+  }, [agent, refreshSessionTree])
 
   // A roster row clicked in the menu bar lands here (#13). Reuses the same
   // switch path as the in-app session list so there is one way to change
@@ -578,7 +672,17 @@ export function AiPanelView({
             />
           </div>
         )}
-      <div className="flex min-h-0 min-w-[55%] flex-1">
+      <div className="flex min-h-0 min-w-[55%] flex-1 flex-col">
+      {isPrimeTarget ? (
+        <SessionBranchBand
+          locale={locale}
+          tree={sessionTree}
+          onSelect={(targetId) => void handleNavigateBranch(targetId)}
+          busyId={branchBusyId}
+          error={branchError}
+        />
+      ) : null}
+      <div className="min-h-0 flex-1">
       <AiPanelMessageHistory
         agentLabel={view.agentLabel}
         agentReadiness={view.defaultAiAgentReadiness}
@@ -594,6 +698,7 @@ export function AiPanelView({
         onScrollStateChange={onMessageHistoryScrollStateChange}
         hasContext={hasContext}
       />
+      </div>
       </div>
       {notePane}
       </div>
@@ -618,6 +723,15 @@ export function AiPanelView({
             <Target size={12} weight="regular" aria-hidden="true" />
             {translate(locale, 'ai.goal.trigger')}
           </Button>
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => setScheduleDialogOpen(true)}
+            data-testid="prime-schedule-trigger"
+          >
+            <CalendarDots size={12} weight="regular" aria-hidden="true" />
+            {translate(locale, 'ai.schedule.trigger')}
+          </Button>
         </div>
       )}
       {isPrimeTarget && (
@@ -628,6 +742,14 @@ export function AiPanelView({
           currentGoal={goalDialogGoal}
           onSetGoal={handleSetGoal}
           onClearGoal={handleClearGoal}
+        />
+      )}
+      {isPrimeTarget && (
+        <PrimeScheduleDialog
+          open={scheduleDialogOpen}
+          onOpenChange={setScheduleDialogOpen}
+          locale={locale}
+          onCreate={handleCreateSchedule}
         />
       )}
       <AiPanelComposer

@@ -412,6 +412,23 @@ pub fn cancel_prime_scheduled_work(job_id: String) -> Result<(), String> {
     crate::prime_session_host::cancel_scheduled_work(&job_id)
 }
 
+/// Create a heartbeat or cron schedule on the attached session (#14).
+#[cfg(desktop)]
+#[tauri::command]
+pub fn create_prime_scheduled_work(
+    kind: String,
+    schedule: String,
+    prompt: String,
+    delivery_mode: Option<String>,
+) -> Result<(), String> {
+    crate::prime_session_host::create_scheduled_work(
+        &kind,
+        &schedule,
+        &prompt,
+        delivery_mode.as_deref(),
+    )
+}
+
 /// Every Prime session the daemon is hosting, for the menu-bar roster (#13).
 ///
 /// Standalone one-shot query — deliberately not routed through the attached
@@ -450,6 +467,22 @@ pub fn get_prime_session_queue() -> Result<crate::prime_session_host::PrimeQueue
 #[tauri::command]
 pub fn clear_prime_session_queue() -> Result<crate::prime_session_host::PrimeQueue, String> {
     crate::prime_session_host::clear_queue()
+}
+
+/// Fork/branch history of the attached conversation (#17).
+#[cfg(desktop)]
+#[tauri::command]
+pub fn get_prime_session_tree() -> Result<crate::prime_session_host::PrimeSessionTree, String> {
+    crate::prime_session_host::get_session_tree()
+}
+
+/// Continue from an earlier branch of this conversation.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn navigate_prime_session_tree(
+    target_id: String,
+) -> Result<crate::prime_session_host::PrimeSessionTree, String> {
+    crate::prime_session_host::navigate_tree(&target_id)
 }
 
 /// Stop one RLM child of the attached Prime session.

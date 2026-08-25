@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   primeTranscriptToConversation,
+  transcriptAlongBranch,
   type PrimeTranscriptItem,
 } from './primeTranscriptToConversation'
 
@@ -91,8 +92,10 @@ describe('primeTranscriptToConversation', () => {
       userMessage('carry on'),
     ])
 
-    expect(turns[0].localMarker).toBe('compaction')
-    expect(turns[0].response).toContain('Ship the session list')
+    expect(turns[0].localMarker).toBe(
+      'Compacted this conversation · 120000 tokens before\nGoal',
+    )
+    expect(turns[0].response).toBeUndefined()
     expect(turns[1].userMessage).toBe('carry on')
   })
 
@@ -101,7 +104,7 @@ describe('primeTranscriptToConversation', () => {
       { kind: 'modelChange', id: 'm1', provider: 'xai', modelId: 'grok-4.5' },
     ])
 
-    expect(turns[0].localMarker).toBe('model · xai / grok-4.5')
+    expect(turns[0].localMarker).toBe('Model changed · xai / grok-4.5')
   })
 
   /**
@@ -159,7 +162,28 @@ describe('primeTranscriptToConversation', () => {
     expect(turns[0].primeEntryId).toBeUndefined()
   })
 
+  it('renders a fork as a branch marker, not a turn', () => {
+    const turns = primeTranscriptToConversation([
+      { kind: 'branchSummary', id: 'br1', fromId: 'u1', summary: 'tried the rust rewrite' },
+    ])
+    expect(turns[0].localMarker).toBe('Branched from this conversation\ntried the rust rewrite')
+  })
+
   it('returns nothing for an empty transcript', () => {
     expect(primeTranscriptToConversation([])).toEqual([])
+  })
+
+  it('keeps only the ancestry of the live leaf when the log has a fork', () => {
+    const kept = transcriptAlongBranch(
+      [
+        { kind: 'message', id: 'u1', message: { role: 'user', content: [], text: 'start' } },
+        { kind: 'message', id: 'a1', parentId: 'u1', message: { role: 'assistant', content: [], text: 'ok' } },
+        { kind: 'message', id: 'ts', parentId: 'a1', message: { role: 'user', content: [], text: 'typescript' } },
+        { kind: 'message', id: 'rust', parentId: 'a1', message: { role: 'user', content: [], text: 'rust' } },
+      ],
+      'rust',
+    )
+
+    expect(kept.map((item) => item.id)).toEqual(['u1', 'a1', 'rust'])
   })
 })
