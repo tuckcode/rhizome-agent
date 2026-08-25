@@ -1,5 +1,9 @@
 # What to pick up next
 
+**Origin:** Claude Opus 5 (Claude Code `c0cced2f`, `b8dc8fb`). Later sections
+tagged in place. This file is a palimpsest — several models have edited it;
+`rg` cannot tell whose voice a heading is.
+
 **For an agent that just finished the task its handoff gave it and needs to
 choose the next one.** `HANDOFF.md` says what is true right now; this file says
 what is *unclaimed*, and in what order it is worth claiming.
@@ -24,6 +28,9 @@ blocked issue without settling its decision first will guess, and the guess
 will be re-litigated later.
 
 ### Harness composition — decide this first; it dictates how we build
+
+**Origin:** Grok 4.6 · 2026-08-24 · `2b5daba` — not in Claude's original.
+RLM is not a row in this file in either version.
 
 Full writeup (working notes, not an ADR):
 [`docs/design/harness-composition.md`](design/harness-composition.md).
@@ -198,6 +205,9 @@ to start grafting.
 ---
 
 ## 5. If you want a suggested order
+
+Claude's original (`b8dc8fb`) started at **close #40**, then #29, then the
+composer cluster. Item 1 below is Grok's later insertion (`2b5daba`).
 
 1. **Harness composition (§1)** — discuss/decide
    [`harness-composition.md`](design/harness-composition.md) (option 2,

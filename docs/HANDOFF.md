@@ -75,6 +75,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-08-24 (late) · Grok 4.6](plans/handoffs/2026-08-24-2308-grok-4-6-origin-tags.md) — Origin tags on living docs; NEXT.md is a palimpsest (Claude Code then Grok); RLM was never a row
 - [2026-08-24 (late) · Grok 4.6](plans/handoffs/2026-08-24-2225-grok-4-6-stranded-work-check.md) — session-start stranded-work check in AGENTS.md; C47 listen-outside-Tauri guard (`b064272`) so the local stack can push
 - [2026-08-24 (evening) · Grok 4.6](plans/handoffs/2026-08-24-1740-grok-4-6-harness-composition.md) — option-2 composition notes (`docs/design/harness-composition.md`); NEXT.md §1 is discuss/decide; DeepSeek plugin *idea* on Prime extensions; sandbox is Prime’s (Kern is Linux-only)
 - [2026-08-24 · Claude Opus 5](plans/handoffs/2026-08-24-2122-claude-opus-5-shell-dock-and-next-index.md) — note tree docked right and ADR-0166 for the chat-centred shell (three questions left open); a tree/list exclusivity attempt reverted after it broke Cmd+N and inbox auto-advance; stale Tolaria/Desktop naming fixed in six live docs; the Linux/Windows menu bar tracks the pointer; scheduled security review found nothing above the bar; `docs/NEXT.md` added
