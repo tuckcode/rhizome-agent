@@ -733,17 +733,17 @@
         {
           "kind": "command",
           "command": "viewEditorOnly",
-          "label": "Editor Only"
+          "label": "Chat only"
         },
         {
           "kind": "command",
           "command": "viewEditorList",
-          "label": "Editor + Notes"
+          "label": "Chat + Inbox"
         },
         {
           "kind": "command",
           "command": "viewAll",
-          "label": "All Panels"
+          "label": "Chat + Notes"
         },
         {
           "kind": "separator"

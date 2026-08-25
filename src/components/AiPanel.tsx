@@ -659,9 +659,7 @@ export function AiPanelView({
         {sessionsOpen && (
           // Design system: sessions are a 228px column beside the transcript,
           // never a view that replaces it. Conversation owns the room.
-          // 900px matches the design system's own breakpoint for `.ra-sessions`;
-          // below it the transcript takes the whole panel.
-          <div className="hidden w-[228px] shrink-0 border-r border-border min-[900px]:flex">
+          <div className="flex w-[228px] shrink-0 border-r border-border">
             <PrimeSessionList
               locale={locale}
               onSelectSession={(session) => void handleSelectSession(session)}

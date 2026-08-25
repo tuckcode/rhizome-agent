@@ -67,8 +67,10 @@ function useCloseDisabledAiWorkspace(aiFeaturesEnabled: boolean, closeAIChat: ()
 }
 
 /**
- * Agent product: open Frame A (ChatHome) once per browser/app session
- * so launch is conversation-first. User can still leave via the rail.
+ * Agent product: Chat is the center canvas (ADR-0166). Launch no longer
+ * switches to a Chat *destination*; the shell already mounts ChatHome.
+ * Classic shell (`ff_shell_command_rail=false`) still uses this to replace
+ * the notes window once per browser/app session.
  */
 function useAgentDefaultOpenChat(
   aiFeaturesEnabled: boolean,

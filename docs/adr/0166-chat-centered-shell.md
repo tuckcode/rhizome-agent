@@ -42,24 +42,27 @@ drives.**
 ┌──────────────────────────────────────────────────────────────┐
 │ titlebar (macOS overlay / LinuxTitlebar — unchanged)         │
 ├────┬────────────┬──────────────────────────┬────────────────┤
-│rail│ left panel │          CHAT            │  right panel   │
-│    │  Research  │                          │     Inbox      │
-│    │  Mycelium  │      (the canvas)        │     Notes      │
-│    │  Graph     │                          │    Changes     │
+│rail│  sessions  │          CHAT            │  inbox (list)  │
+│    │            │                          │  notes (tree)  │
+│    │            │      (the canvas)        │    Changes     │
 ├────┴────────────┴──────────────────────────┴────────────────┤
 │ status bar                                                   │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 - **Chat never closes and never moves.** It is not a destination competing with
-  the others; it is what the others are arranged around.
-- **Each side holds at most one panel.** Opening a right-hand destination closes
-  whichever right-hand panel was open. Never two at once on the same side.
-- **The rail groups by side, not by type.** Its buttons stopped being one
-  undifferentiated list the moment some of them replaced the canvas and others
-  fed a panel. Grouping makes that visible before the click.
-- **Panels are optional.** A user who never opens either gets Chat full-width,
-  which is the intended default posture, not a degraded one.
+  the others; it is what the others are arranged around. Sessions live as a
+  collapsible column on its left. Inbox (note list) and notes (tree) dock on
+  the right and collapse independently (⌘1 Chat only, ⌘2 Chat + Inbox, ⌘3 Chat
+  + Notes).
+- **Both right-hand vault panels may be open together.** Exclusive Inbox *or*
+  Notes *or* Changes was tried and reverted: Cmd+N, inbox auto-advance, and
+  note selection need the list visible. Changes is a filter on that list, not
+  a third exclusive occupant.
+- **Graph and Mycelium still take the canvas.** That remains the open question
+  for #39 / #11 / #22; this ADR does not turn them into side panels.
+- **Panels are optional.** Rail Chat / ⌘1 collapses the vault so Chat is
+  full-width, which is a focused posture, not a degraded one.
 
 This supersedes `docs/design/shell-final-direction.md` §2.1 (region map) and
 §2.3 (sidebar position and brand duty). The rest of that document — status-bar
@@ -96,16 +99,19 @@ is unaffected and still stands.
   inverts and the negative margin flips. `useLayoutPanels` already negated the
   delta in the hook for the inspector and graph-preview docks — two idioms for
   one problem now exist, and the hook-level negation should migrate to the prop.
-* `ViewMode`'s nested ladder (`editor-only` → `editor-list` → `all`) no longer
-  describes the shell: it assumes the tree and note list stack on one side and
-  that having the tree implies having the list. It becomes a per-side panel
-  selector.
-* `isChatDestination` disappears. Chat is not a destination, so the branches that
-  hide every panel when it is active have nothing left to test.
+* `ViewMode`'s ladder is now Chat-centric, not editor-centric: `editor-only`
+  is Chat only (⌘1), `editor-list` is Chat + Inbox (⌘2), `all` is Chat +
+  Notes tree and list (⌘3). The stored values are unchanged so existing vault
+  configs keep working.
+* `isChatDestination` remains only for the classic shell
+  (`ff_shell_command_rail=false`). With the rail on, Chat is furniture: the
+  branches that used to hide every panel when Chat was the destination no
+  longer run.
 * The 250px sidebar floor and `.app__sidebar` min-width stay in sync as before,
   but the reason changes: it is the wordmark lockup alone, no longer the lockup
   plus a traffic-light gutter.
-* Rail destinations' `Cmd+1..4` accelerators need rethinking — they enumerate a
-  flat list that is now two groups with different semantics.
+* Rail Chat focuses the conversation (collapses the vault). Rail Notes opens
+  both right-hand vault panels. Changes is a filter on the list, not a canvas
+  replacement. Graph and Mycelium still take the canvas.
 
 [[shell-final-direction]]

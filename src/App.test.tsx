@@ -3,7 +3,6 @@ import type { ReactElement, ReactNode } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { DEFAULT_VAULTS } from './hooks/useVaultSwitcher'
 import { AGENT_CHAT_OPENED_SESSION_KEY } from './hooks/useAppAiWorkspaceBridge'
-import { formatShortcutDisplay } from './hooks/appCommandCatalog'
 import { invoke } from '@tauri-apps/api/core'
 import type { Settings, ViewDefinition, ViewFile } from './types'
 
@@ -518,11 +517,11 @@ describe('App', () => {
     expect(await screen.findByText('All Notes', {}, { timeout: 5000 })).toBeInTheDocument()
   })
 
-  it('lands on ChatHome at launch instead of the notes shell', async () => {
+  it('lands on ChatHome with inbox and notes beside it', async () => {
     sessionStorage.removeItem(AGENT_CHAT_OPENED_SESSION_KEY)
     render(<App />)
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
-    expect(screen.queryByText('All Notes')).not.toBeInTheDocument()
+    expect(await screen.findByText('All Notes')).toBeInTheDocument()
   })
 
   it('creates custom views with a portable fallback filename for symbol-only names', async () => {
@@ -579,7 +578,7 @@ describe('App', () => {
     expect(screen.getByTestId('sidebar-loading-types')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-loading-folders')).toBeInTheDocument()
     expect(screen.getByTestId('note-list-loading-skeleton')).toBeInTheDocument()
-    expect(screen.getByTestId('breadcrumb-title-skeleton')).toBeInTheDocument()
+    expect(screen.queryByTestId('breadcrumb-title-skeleton')).not.toBeInTheDocument()
     expect(screen.queryByTestId('editor-content-skeleton')).not.toBeInTheDocument()
     expect(screen.queryByText('Select a note to start editing')).not.toBeInTheDocument()
     expect(screen.getByTestId('status-vault-reloading')).toHaveAccessibleName('Reloading vault from disk')
@@ -597,18 +596,16 @@ describe('App', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('vault-loading-skeleton')).not.toBeInTheDocument()
       expect(screen.queryByTestId('note-list-loading-skeleton')).not.toBeInTheDocument()
-      expect(screen.queryByTestId('breadcrumb-title-skeleton')).not.toBeInTheDocument()
       expect(screen.queryByTestId('editor-content-skeleton')).not.toBeInTheDocument()
       expect(screen.queryByTestId('status-vault-reloading')).not.toBeInTheDocument()
       expect(screen.getAllByText('Test Project').length).toBeGreaterThan(0)
     })
   })
 
-  it('shows empty state in editor when no note is selected', async () => {
+  it('shows Chat as the center canvas when no note is selected', async () => {
     render(<App />)
-    await waitFor(() => {
-      expect(screen.getByText('Select a note to start editing')).toBeInTheDocument()
-    })
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.queryByText('Select a note to start editing')).not.toBeInTheDocument()
   })
 
   it('opens a note window after loading the active vault graph', async () => {
@@ -637,17 +634,10 @@ describe('App', () => {
     expect(listVault).toHaveBeenCalled()
   })
 
-  it('shows keyboard shortcut hints', async () => {
-    const quickOpenHint = formatShortcutDisplay({ display: '⌘P / ⌘O' })
-    const newNoteHint = formatShortcutDisplay({ display: '⌘N' })
-    const { container } = render(<App />)
-    await screen.findByText('Select a note to start editing')
-
-    await waitFor(() => {
-      const visibleText = container.textContent ?? ''
-      expect(visibleText).toContain(`${quickOpenHint} to search`)
-      expect(visibleText).toContain(`${newNoteHint} to create`)
-    })
+  it('shows Chat home without requiring the empty-editor shortcut hints', async () => {
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.queryByText('Select a note to start editing')).not.toBeInTheDocument()
   })
 
   it('registers keyboard shortcuts without error', async () => {
@@ -958,7 +948,7 @@ describe('App', () => {
     expect(screen.queryByTestId('vault-loading-skeleton')).not.toBeInTheDocument()
     expect(screen.getByTestId('sidebar-loading-favorites')).toBeInTheDocument()
     expect(screen.getByTestId('note-list-loading-skeleton')).toBeInTheDocument()
-    expect(screen.getByTestId('breadcrumb-title-skeleton')).toBeInTheDocument()
+    expect(screen.queryByTestId('breadcrumb-title-skeleton')).not.toBeInTheDocument()
     expect(screen.queryByTestId('editor-content-skeleton')).not.toBeInTheDocument()
     expect(screen.getByTestId('status-vault-reloading')).toHaveAccessibleName('Reloading vault from disk')
 
@@ -1369,6 +1359,20 @@ describe('App', () => {
     expect(editor).toBeInTheDocument()
     expect(sidebar).toBeInTheDocument()
     expect(editor.compareDocumentPosition(sidebar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('puts sessions and chat in the center with inbox and notes on the right', async () => {
+    render(<App />)
+    const chat = await screen.findByTestId('chat-home', {}, { timeout: 5000 })
+    await screen.findByText('All Notes')
+
+    const shell = document.querySelector('.app') as HTMLElement
+    const noteList = shell.querySelector('.app__note-list') as HTMLElement
+    const sidebar = shell.querySelector('.app__sidebar') as HTMLElement
+    expect(noteList).toBeInTheDocument()
+    expect(sidebar).toBeInTheDocument()
+    expect(chat.compareDocumentPosition(noteList) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(noteList.compareDocumentPosition(sidebar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('Cmd+1 hides sidebar and note list (editor-only mode)', async () => {
