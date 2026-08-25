@@ -52,13 +52,12 @@ file.
 ## State
 
 `origin/main` was last confirmed at `87e12c3`. Local main may be ahead
-with origin-tags (`ea105fa`), the RLM family slice, and the Prime adapter
-surface snapshot. Confirm with `git log origin/main..HEAD`.
+with origin-tags, RLM family, the Prime adapter snapshot, and the
+`get_queue` composer slice. Confirm with `git log origin/main..HEAD`.
 
-This machine's installed Prime is **0.8.0** (102 public daemon commands,
-30 spoken — `docs/prime-adapter-surface.json`). GitHub latest is also
-`v0.8.0`. `pnpm prime:surface` / `pnpm prime:surface:github` is the
-cheap re-check; do not ingest the Prime package.
+This machine's installed Prime is **0.8.0** (102 public daemon commands —
+`docs/prime-adapter-surface.json`). GitHub latest is also `v0.8.0`.
+`pnpm prime:surface` / `pnpm prime:surface:github` is the cheap re-check.
 
 Prime **0.7.4+** on Windows speaks
 `\\.\pipe\prime-agent-daemon` — see `docs/WINDOWS-DEV.md`. On macOS/Linux the
@@ -80,6 +79,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1255-grok-4-6-prime-queue.md) — Chat shows Prime `get_queue`; Clear → `clear_queue`. Not a local follow-up list
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1148-grok-4-6-prime-surface-check.md) — mechanical Prime adapter snapshot (`docs/prime-adapter-surface.json`); `pnpm prime:surface` / `--github`. Do not clone upstream.
 - [2026-08-24 (late) · Grok 4.6](plans/handoffs/2026-08-24-2308-grok-4-6-origin-tags.md) — Origin tags on living docs; NEXT.md is a palimpsest (Claude Code then Grok); RLM was never a row
 - [2026-08-24 (late) · Grok 4.6](plans/handoffs/2026-08-24-2225-grok-4-6-stranded-work-check.md) — session-start stranded-work check in AGENTS.md; C47 listen-outside-Tauri guard (`b064272`) so the local stack can push

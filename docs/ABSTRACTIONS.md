@@ -1047,6 +1047,10 @@ not on `get_session_tree` — that tree is fork/branch history (#17). Chat's
 `rlmChildId`. Host status's `sessionId` is the durable uuidv7; join it to the
 roster by `sessionId` / log stem, then walk `parentActiveSessionId`.
 
+The composer queue is Prime's **`get_queue`** (steering + follow-up previews),
+not a list of messages Chat remembered sending. Clear is `clear_queue`.
+Mutate and steering-mode remain unspoken.
+
 ## Settings
 
 App-level settings persisted at `$XDG_CONFIG_HOME/com.tolaria.app/settings.json`, defaulting to `$HOME/.config/com.tolaria.app/settings.json` on Unix platforms (reads legacy `com.laputa.app` and the previous platform config directory on upgrade):

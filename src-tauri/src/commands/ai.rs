@@ -438,6 +438,20 @@ pub fn follow_up_prime_session(message: String) -> Result<bool, String> {
     crate::prime_session_host::follow_up(&message)
 }
 
+/// Steering and follow-up previews for the attached session.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn get_prime_session_queue() -> Result<crate::prime_session_host::PrimeQueue, String> {
+    crate::prime_session_host::get_queue()
+}
+
+/// Drop every queued steer and follow-up.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn clear_prime_session_queue() -> Result<crate::prime_session_host::PrimeQueue, String> {
+    crate::prime_session_host::clear_queue()
+}
+
 /// Stop one RLM child of the attached Prime session.
 #[cfg(desktop)]
 #[tauri::command]

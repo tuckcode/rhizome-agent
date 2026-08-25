@@ -16,6 +16,7 @@ import type { AiAgentReadiness } from '../lib/aiAgents'
 import type { NoteReference } from '../utils/ai-context'
 import type { VaultEntry } from '../types'
 import type { CommandMenuAction, CommandMenuEntry } from '../lib/primeCommandMenu'
+import { primeQueueIsEmpty, primeQueueItems, type PrimeQueue } from '../lib/primeQueue'
 import { cn } from '@/lib/utils'
 
 interface AiPanelHeaderProps {
@@ -76,8 +77,9 @@ interface AiPanelComposerProps {
   /** Redirect a running turn instead of aborting it. When absent the composer
    *  stays disabled while streaming, which is the pre-steering behaviour. */
   onSteer?: (text: string, references: NoteReference[]) => void
-  /** Messages waiting to run after the current turn, oldest first (#41). */
-  queuedFollowUps?: string[]
+  /** Prime's steer/follow-up queue. Absent when this surface does not queue. */
+  queue?: PrimeQueue
+  onClearQueue?: () => void
   onUnsupportedAiPaste?: (message: string) => void
   /** Frame A foot row. Rendered under the box so it can see controller state. */
   foot?: ReactNode
@@ -620,7 +622,8 @@ export function AiPanelComposer({
   onSend,
   onStop,
   onSteer,
-  queuedFollowUps,
+  queue,
+  onClearQueue,
   onUnsupportedAiPaste,
   foot,
   commandEntries,
@@ -672,25 +675,47 @@ export function AiPanelComposer({
           {controls}
         </div>
       ) : null}
-      {queuedFollowUps && queuedFollowUps.length > 0 ? (
-        // A queued message that shows no sign of existing until the turn ends
-        // is its own bad experience. One line each, oldest first, so the order
-        // they will run in is the order they are read in.
-        <ul
+      {queue && !primeQueueIsEmpty(queue) ? (
+        <div
           className="mb-1.5 flex min-w-0 flex-col gap-0.5"
           data-testid="composer-queued-follow-ups"
-          aria-label={t('ai.panel.queuedLabel')}
         >
-          {queuedFollowUps.map((message, index) => (
-            <li
-              key={`${index}-${message}`}
-              className="flex min-w-0 items-center gap-1.5 font-mono text-[10.5px] text-muted-foreground"
-            >
-              <span aria-hidden="true" className="shrink-0 opacity-60">{index + 1}</span>
-              <span className="truncate">{message}</span>
-            </li>
-          ))}
-        </ul>
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <span className="min-w-0 flex-1 font-mono text-[10.5px] tracking-[0.02em]">
+              {t('ai.panel.queuedLabel')}
+            </span>
+            {onClearQueue ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                data-testid="composer-queue-clear"
+                onClick={onClearQueue}
+              >
+                <X size={10} aria-hidden="true" />
+                {t('ai.panel.queuedClear')}
+              </Button>
+            ) : null}
+          </div>
+          <ul
+            className="flex min-w-0 flex-col gap-0.5"
+            aria-label={t('ai.panel.queuedLabel')}
+          >
+            {primeQueueItems(queue).map((item) => (
+              <li
+                key={`${item.lane}-${item.index}-${item.text}`}
+                className="flex min-w-0 items-center gap-1.5 font-mono text-[10.5px] text-muted-foreground"
+                data-testid={item.lane === 'steer' ? 'composer-queued-steer' : 'composer-queued-follow-up'}
+              >
+                <span className="truncate">
+                  {item.lane === 'steer' ? t('ai.panel.queuedSteer') : t('ai.panel.queuedFollowUp')}
+                  {' · '}
+                  {item.text}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
       <div className={cn(
         'flex items-end gap-2',

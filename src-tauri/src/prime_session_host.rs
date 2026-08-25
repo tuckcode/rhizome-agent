@@ -229,6 +229,51 @@ impl PrimeSessionStats {
     }
 }
 
+/// Prime's steering / follow-up queue, as `get_queue` reports it.
+///
+/// Previews, not the full prompt body. `followUp` is the daemon spelling
+/// (`get_queue` / `clear_queue`); `session_action_update` uses `followUps`.
+/// `from_data` accepts both so a payload either way still lists the same
+/// messages.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrimeQueue {
+    pub steering: Vec<String>,
+    pub follow_up: Vec<String>,
+}
+
+impl PrimeQueue {
+    fn from_data(data: &serde_json::Value) -> Self {
+        let follow_up = if data.get("followUp").map(serde_json::Value::is_array) == Some(true) {
+            string_previews(&data["followUp"])
+        } else {
+            string_previews(&data["followUps"])
+        };
+        Self {
+            steering: string_previews(&data["steering"]),
+            follow_up,
+        }
+    }
+}
+
+fn string_previews(value: &serde_json::Value) -> Vec<String> {
+    value
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| {
+                    let text = item.as_str()?.trim();
+                    if text.is_empty() {
+                        return None;
+                    }
+                    Some(text.to_string())
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 /// One message from Prime's conversation history.
 ///
 /// `content` is passed through as raw JSON rather than modelled here. Prime
@@ -1376,6 +1421,32 @@ pub fn follow_up(message: &str) -> Result<bool, String> {
     queue_message("follow_up", message)
 }
 
+/// The attached session's steering and follow-up previews.
+///
+/// Polled while Chat is open. Must not create a session (#28): no session
+/// means an empty queue, which is true.
+pub fn get_queue() -> Result<PrimeQueue, String> {
+    with_host_mut(|host| {
+        if !host.has_session() {
+            return Ok(PrimeQueue::default());
+        }
+        let data = host.call(serde_json::json!({ "type": "get_queue" }))?;
+        Ok(PrimeQueue::from_data(&data))
+    })
+}
+
+/// Drop every queued steer and follow-up. Returns the queue Prime reports
+/// afterwards (usually empty).
+pub fn clear_queue() -> Result<PrimeQueue, String> {
+    with_host_mut(|host| {
+        if !host.has_session() {
+            return Ok(PrimeQueue::default());
+        }
+        let data = host.call(serde_json::json!({ "type": "clear_queue" }))?;
+        Ok(PrimeQueue::from_data(&data))
+    })
+}
+
 pub fn abort_turn() -> Result<bool, String> {
     let slot = host_slot();
     let mut guard = slot.host.lock().map_err(poison)?;
@@ -2504,8 +2575,8 @@ impl PrimeHost {
     ///
     /// This is the choke point that makes creation lazy: asking for a session
     /// is what buys one. Reads that run on a timer must not come through here
-    /// — see `agent_activity`, `get_session_stats` and `get_commands`, which
-    /// answer "nothing" instead.
+    /// — see `agent_activity`, `get_session_stats`, `get_commands` and
+    /// `get_queue`, which answer "nothing" instead.
     fn send_command(
         &mut self,
         mut command: serde_json::Value,
@@ -3211,9 +3282,9 @@ mod tests {
 
     /// The polls that run whether or not anyone is talking to the agent must
     /// not be what creates the session. `usePrimeAgentActivity` is mounted at
-    /// app level and ticks on a timer; the stats poll and the command menu
-    /// both fetch on mount. If any of them materialized a session, deferring
-    /// creation would buy nothing.
+    /// app level and ticks on a timer; the stats poll, the command menu, and
+    /// the composer queue all fetch on mount. If any of them materialized a
+    /// session, deferring creation would buy nothing.
     #[cfg(unix)]
     #[test]
     fn background_reads_do_not_create_a_session() {
@@ -3226,6 +3297,7 @@ mod tests {
         let activity = agent_activity().expect("activity reads as empty");
         let stats = get_session_stats().expect("stats read as unknown");
         let commands = get_commands().expect("commands read as empty");
+        let queue = get_queue().expect("queue read as empty");
 
         assert_eq!(
             activity,
@@ -3234,6 +3306,7 @@ mod tests {
         );
         assert!(stats.session_id.is_none(), "no session, no stats");
         assert!(commands.is_empty(), "no session, no session commands");
+        assert_eq!(queue, PrimeQueue::default(), "no session, no queue");
         assert_eq!(
             daemon.commands(),
             vec!["list"],
@@ -4912,6 +4985,63 @@ mod tests {
 
         assert!(follow_up("then summarise").unwrap());
         assert!(steer("focus on error handling").unwrap());
+
+        let _ = shutdown_host();
+    }
+
+    #[test]
+    fn get_queue_reads_follow_up_or_follow_ups() {
+        let from_daemon = PrimeQueue::from_data(&serde_json::json!({
+            "steering": ["focus on error handling"],
+            "followUp": ["then summarise", "  "],
+        }));
+        assert_eq!(
+            from_daemon,
+            PrimeQueue {
+                steering: vec!["focus on error handling".into()],
+                follow_up: vec!["then summarise".into()],
+            }
+        );
+
+        let from_event = PrimeQueue::from_data(&serde_json::json!({
+            "steering": [],
+            "followUps": ["after that, ship it"],
+        }));
+        assert_eq!(from_event.follow_up, vec!["after that, ship it"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn get_queue_asks_prime_and_clear_drops_both_lanes() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("get_queue") => Some(vec![ok(
+                id,
+                "get_queue",
+                serde_json::json!({
+                    "steering": ["focus on error handling"],
+                    "followUp": ["then summarise"],
+                }),
+            )]),
+            Some("clear_queue") => Some(vec![ok(
+                id,
+                "clear_queue",
+                serde_json::json!({ "steering": [], "followUp": [] }),
+            )]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        assert_eq!(
+            get_queue().unwrap(),
+            PrimeQueue {
+                steering: vec!["focus on error handling".into()],
+                follow_up: vec!["then summarise".into()],
+            }
+        );
+        assert_eq!(clear_queue().unwrap(), PrimeQueue::default());
 
         let _ = shutdown_host();
     }

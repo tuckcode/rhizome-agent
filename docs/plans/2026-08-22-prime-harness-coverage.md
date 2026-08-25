@@ -52,7 +52,7 @@ surfaces*, each entirely absent:
 | Missing surface | Cmds | What its absence means |
 |---|---:|---|
 | **RLM / subagents** | 5 left | Chat shows live children from the **`list` roster** and Stop → `cancel_rlm_child`. Still missing `get_session_tree` / `get_context_tree` / `set_rlm_max_depth`. `get_session_tree` is fork history (#17), not the RLM family |
-| **Queue & steering** | 12 | We can `steer` and `follow_up` blind. We cannot *see* the queue, edit a queued message, clear it, or set steering/follow-up mode |
+| **Queue & steering** | 10 left | Chat reads Prime's **`get_queue`** (steer + follow-up previews) and Clear → `clear_queue`. Still missing mutate, resume, and set steering/follow-up mode |
 | **Session tree / forking** | 6 | We `fork`, but cannot show the branch point first (`get_user_messages_for_forking`) or navigate the tree |
 | **Saved sessions** | 6 | `rename_saved_session`, `export_html`, `import_jsonl`. Also `list_saved_sessions` — see the open question below |
 | **Agent messaging** | 5 | Agent-to-agent `send_message` and its pause/resume controls |

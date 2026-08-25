@@ -615,6 +615,8 @@ macro_rules! app_invoke_handler {
             commands::clear_prime_goal,
             commands::steer_prime_session,
             commands::follow_up_prime_session,
+            commands::get_prime_session_queue,
+            commands::clear_prime_session_queue,
             commands::cancel_prime_rlm_child,
             commands::compact_prime_session,
             commands::set_prime_auto_compaction,

@@ -8,6 +8,7 @@ import {
 import { callHost } from '../lib/callHost'
 import { sendToRunningTurn } from '../lib/primeTurnMessaging'
 import { trackPrimeTurnMessage } from '../lib/productAnalytics'
+import { usePrimeQueue } from '../hooks/usePrimeQueue'
 import {
   AiPanelComposer,
   AiPanelHeader,
@@ -241,6 +242,7 @@ export function AiPanelView({
   // Refresh when a turn finishes rather than only on the interval, so context
   // usage reflects the exchange that just happened.
   const primeStats = usePrimeSessionStats(isPrimeTarget, agent.status)
+  const { queue, refresh: refreshQueue, clear: clearQueue } = usePrimeQueue(isPrimeTarget, isActive)
 
   // Goal dialog (#20): opened on demand, not polled — the goal strip
   // (`AgentActivityBand`, wired in `ChatHome`) already polls for display.
@@ -298,24 +300,19 @@ export function AiPanelView({
     onClose,
     enabled: interactive,
   })
-  // Queued follow-ups are local to the turn: Prime owns the queue, but it
-  // reports no view of it, so the panel remembers what it handed over and
-  // forgets once the turn that would drain it has ended.
-  const [queuedFollowUps, setQueuedFollowUps] = useState<string[]>([])
+  // Prime owns the queue. Chat used to remember follow-ups locally because
+  // we had no read; `get_queue` is that read.
   const latestTurnState = useRef({ handleSend, isActive, onSendPrompt })
   useLayoutEffect(() => {
     latestTurnState.current = { handleSend, isActive, onSendPrompt }
   }, [handleSend, isActive, onSendPrompt])
 
   const sendAsNewTurn = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
-    // A new turn starts with an empty queue. Cleared here rather than in an
-    // effect on `isActive`: setting state from an effect cascades renders, and
-    // the queue only ever needs to be empty at the moment a turn begins.
-    setQueuedFollowUps([])
     const latest = latestTurnState.current
     latest.onSendPrompt?.(text)
     latest.handleSend(text, references)
-  }, [])
+    refreshQueue()
+  }, [refreshQueue])
 
   const sendAsNewTurnIfIdle = useCallback((
     text: string,
@@ -336,9 +333,9 @@ export function AiPanelView({
         // `not-running` means the turn ended between the keystroke and the call.
         // Send it as a new turn rather than losing it.
         if (result === 'accepted') {
-          setQueuedFollowUps((current) => [...current, text.trim()])
           trackPrimeTurnMessage('followUp')
           setInput('')
+          refreshQueue()
         } else if (result === 'not-running') {
           sendAsNewTurnIfIdle(text, references)
         }
@@ -346,7 +343,7 @@ export function AiPanelView({
       return
     }
     sendAsNewTurn(text, references)
-  }, [isActive, isPrimeTarget, sendAsNewTurn, sendAsNewTurnIfIdle, setInput])
+  }, [isActive, isPrimeTarget, refreshQueue, sendAsNewTurn, sendAsNewTurnIfIdle, setInput])
 
   /**
    * Redirect the running turn. Only wired for Prime — this is a daemon verb,
@@ -359,11 +356,12 @@ export function AiPanelView({
       if (result === 'accepted') {
         trackPrimeTurnMessage('steer')
         setInput('')
+        refreshQueue()
       } else if (result === 'not-running') {
         sendAsNewTurnIfIdle(text, references)
       }
     })
-  }, [sendAsNewTurnIfIdle, setInput])
+  }, [refreshQueue, sendAsNewTurnIfIdle, setInput])
 
   // Open unless this machine says otherwise. The column is the only thing on
   // Chat home that says other sessions exist, so a closed default left the
@@ -644,7 +642,8 @@ export function AiPanelView({
         onChange={setInput}
         onSend={handleComposerSend}
         onSteer={isPrimeTarget ? handleSteer : undefined}
-        queuedFollowUps={isPrimeTarget && isActive ? queuedFollowUps : undefined}
+        queue={isPrimeTarget ? queue : undefined}
+        onClearQueue={isPrimeTarget ? () => void clearQueue() : undefined}
         onStop={handleStop}
         onUnsupportedAiPaste={onUnsupportedAiPaste}
         foot={isPrimeTarget ? (
