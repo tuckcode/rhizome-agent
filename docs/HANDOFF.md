@@ -53,8 +53,8 @@ file.
 
 `origin/main` was last confirmed at `87e12c3`. Local main may be ahead
 with origin-tags, RLM family, the adapter snapshot, queue visibility,
-#17 branch navigation, #14 schedule create, and #18 transcript markers.
-Confirm with `git log origin/main..HEAD`.
+#17/#14/#18, and #29 vault credential redaction. Confirm with
+`git log origin/main..HEAD`.
 
 This machine's installed Prime is **0.8.0** (102 public daemon commands —
 `docs/prime-adapter-surface.json`). GitHub latest is also `v0.8.0`.
@@ -80,6 +80,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1430-grok-4-6-vault-credentials.md) — #29: tokens-only redaction before distill; Save to vault refuses. Detector was telemetry-only.
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1345-grok-4-6-branches-schedules-markers.md) — #17 `get_session_tree`/`navigate_tree` in Chat; #14 create via `heartbeat_set`/`cron_add`; #18 compact/fork/model markers. Issues not closed (no live-Prime demo).
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1255-grok-4-6-prime-queue.md) — Chat shows Prime `get_queue`; Clear → `clear_queue`. Not a local follow-up list
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1148-grok-4-6-prime-surface-check.md) — mechanical Prime adapter snapshot (`docs/prime-adapter-surface.json`); `pnpm prime:surface` / `--github`. Do not clone upstream.
@@ -536,7 +537,12 @@ push is not a release — releases are tagged builds with signed installers.
 
   **Rule: a secret in a config file will eventually reach a transcript; a secret in a keychain will not.** Point MCP servers at a wrapper that reads the credential at launch (e.g. `security find-generic-password -w -s <name>`) so the config holds a reference rather than the value. Plaintext `env` blocks are the *documented* MCP pattern, which is exactly why this needs saying — following the standard setup is what created the exposure.
 
-  Note also that `src/lib/sensitiveTextRedaction.ts` already recognises `ghp_`/`gho_`/`github_pat_`/`sk-`/`xox*`, but is wired only into telemetry and feedback diagnostics — what leaves the machine. Nothing redacts what is written to conversation logs.
+  Note also that `src/lib/sensitiveTextRedaction.ts` recognises those prefixes.
+  Telemetry still uses the diagnostic entry point (paths + whitespace collapse).
+  **#29** added `redactCredentialTokens` for vault-bound chat: auto-distill /
+  research / menu-bar distill redact-and-continue; explicit Save to vault
+  refuses. Prime's `~/.prime/agent/sessions/*.jsonl` is still Prime's to write
+  and is local-only.
 
   Closed on two independent axes, both verified:
 

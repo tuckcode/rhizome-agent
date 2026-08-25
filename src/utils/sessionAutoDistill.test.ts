@@ -60,7 +60,7 @@ describe('sessionAutoDistill', () => {
       assistantResponse: assistant,
       startJob,
     })
-    expect(queued).toBe(true)
+    expect(queued).toEqual({ queued: true, redactedCount: 0 })
     expect(startJob).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'rhizome_distill',
@@ -82,7 +82,25 @@ describe('sessionAutoDistill', () => {
       toolNames: ['rhizome_distill'],
       startJob,
     })
-    expect(queued).toBe(false)
+    expect(queued).toEqual({ queued: false, redactedCount: 0 })
     expect(startJob).not.toHaveBeenCalled()
+  })
+
+  it('strips credential tokens before the distill job sees the turn', async () => {
+    const startJob = vi.fn().mockResolvedValue(null)
+    const pat = ['ghp', 'A'.repeat(36)].join('_')
+    const assistant = 'We decided the release matrix drops Intel Mac forever. '.repeat(3)
+    const queued = await queueSessionAutoDistill({
+      vaultPath: '/vault',
+      userMessage: `the token is ${pat}`,
+      assistantResponse: assistant,
+      startJob,
+    })
+    expect(queued).toEqual({ queued: true, redactedCount: 1 })
+    const payload = startJob.mock.calls[0]?.[0] as {
+      args: { text: string }
+    }
+    expect(payload.args.text).toContain('[redacted-token]')
+    expect(payload.args.text).not.toContain(pat)
   })
 })

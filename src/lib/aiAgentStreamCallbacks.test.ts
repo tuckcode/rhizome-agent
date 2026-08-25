@@ -3,9 +3,10 @@ import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentStatus, AiAgentMessage } from './aiAgentConversation'
 
-const { detectFileOperationMock, trackEventMock } = vi.hoisted(() => ({
+const { detectFileOperationMock, trackEventMock, queueSessionAutoDistillMock } = vi.hoisted(() => ({
   detectFileOperationMock: vi.fn(),
   trackEventMock: vi.fn(),
+  queueSessionAutoDistillMock: vi.fn(),
 }))
 
 vi.mock('./aiAgentFileOperations', async (importOriginal) => ({
@@ -16,6 +17,14 @@ vi.mock('./aiAgentFileOperations', async (importOriginal) => ({
 vi.mock('./telemetry', () => ({
   trackEvent: trackEventMock,
 }))
+
+vi.mock('../utils/sessionAutoDistill', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/sessionAutoDistill')>()
+  return {
+    ...actual,
+    queueSessionAutoDistill: queueSessionAutoDistillMock,
+  }
+})
 
 import { createStreamCallbacks } from './aiAgentStreamCallbacks'
 import { translate } from './i18n'
@@ -46,6 +55,8 @@ describe('aiAgentStreamCallbacks', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     trackEventMock.mockClear()
+    queueSessionAutoDistillMock.mockReset()
+    queueSessionAutoDistillMock.mockResolvedValue({ queued: false, redactedCount: 0 })
   })
 
   it('handles the happy-path lifecycle and refreshes the vault at the end', () => {
@@ -446,5 +457,52 @@ describe('aiAgentStreamCallbacks', () => {
     })
     expect(fileCallbacks.onVaultChanged).not.toHaveBeenCalled()
     expect(detectFileOperationMock).not.toHaveBeenCalled()
+  })
+
+  it('marks the transcript when auto-distill strips credentials', async () => {
+    queueSessionAutoDistillMock.mockResolvedValue({ queued: true, redactedCount: 2 })
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'Question',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const status = createStatusStore()
+    const responseAccRef = { current: '' }
+
+    const callbacks = createStreamCallbacks({
+      agent: 'claude_code',
+      locale: 'en',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      userMessage: 'Question',
+      sessionAutoDistillEnabled: true,
+      setMessages: messages.setMessages,
+      setStatus: status.setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef,
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: {} },
+    })
+
+    callbacks.onText('A'.repeat(80))
+    callbacks.onDone()
+    await queueSessionAutoDistillMock.mock.results[0]?.value
+
+    expect(queueSessionAutoDistillMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vaultPath: '/vault',
+        userMessage: 'Question',
+      }),
+    )
+    expect(trackEventMock).toHaveBeenCalledWith('vault_credentials_handled', {
+      source: 'auto_distill',
+      action: 'redact',
+      count: 2,
+    })
+    const marker = messages.getMessages().find((message) => message.localMarker)
+    expect(marker?.localMarker).toBe('Removed 2 credentials before saving this turn to the wiki')
   })
 })

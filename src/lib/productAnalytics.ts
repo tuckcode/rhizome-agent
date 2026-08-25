@@ -102,6 +102,21 @@ export function trackResearchFormatSaved(totalFormats: number): void {
 }
 
 /**
+ * A credential-shaped token was stopped before leaving the machine (#29).
+ *
+ * Count and enums only — never the token, never the surrounding note. `source`
+ * is which write path noticed it; `action` is whether we stripped it and
+ * continued (unattended distill) or refused (the user is present).
+ */
+export function trackVaultCredentialsHandled(
+  source: 'auto_distill' | 'promote' | 'research_distill' | 'menu_bar_distill',
+  action: 'redact' | 'refuse',
+  count: number,
+): void {
+  trackEvent('vault_credentials_handled', { source, action, count })
+}
+
+/**
  * A message was sent to a turn that was already running (#41).
  *
  * The kind only — never the message, which is user content. Atticus, asked

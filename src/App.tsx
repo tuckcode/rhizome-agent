@@ -109,6 +109,8 @@ import { openNoteListPropertiesPicker } from './components/note-list/noteListPro
 import type { NoteListMultiSelectionCommands } from './components/note-list/multiSelectionCommands'
 import { focusNoteIconPropertyEditor } from './components/noteIconPropertyEvents'
 import { trackEvent } from './lib/telemetry'
+import { trackVaultCredentialsHandled } from './lib/productAnalytics'
+import { redactCredentialTokens } from './lib/sensitiveTextRedaction'
 import { areAutomaticUpdateChecksEnabled } from './lib/automaticUpdateChecks'
 import { areAiFeaturesEnabled } from './lib/aiFeatures'
 import { aiTargetReady, type AiTarget } from './lib/aiTargets'
@@ -1690,6 +1692,12 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     const vaultPath = activeEditorVaultPath
     if (!vaultPath) {
       setToastMessage(translate(appLocale, 'ai.message.saveToVaultNoVault'))
+      return
+    }
+    const credentials = redactCredentialTokens(body)
+    if (credentials.count > 0) {
+      trackVaultCredentialsHandled('promote', 'refuse', credentials.count)
+      setToastMessage(translate(appLocale, 'ai.message.saveToVaultCredentials'))
       return
     }
     try {

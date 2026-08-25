@@ -128,7 +128,7 @@ from the 2026-08-22 handoff.
 | #14 | Schedules and heartbeats: see, pause, cancel |
 | #13 | Menu bar dropdown shows what is running — see also C34 |
 | #36 | Timezone setting |
-| #29 | Redact credentials before chat content is written to the vault |
+| #29 | Redact credentials before chat content is written to the vault — **implemented locally** (not closed on GitHub yet) |
 
 **Specs**
 | | |
@@ -136,9 +136,12 @@ from the 2026-08-22 handoff.
 | #5 | Spec: the Prime harness surface — parent of #40; **B** on §1 / `harness-composition.md` |
 | #40 | Harness or client — filter answered (ADR-0168); composition still discuss/decide |
 
-#29 is the only open issue with a security consequence: chat content is written
-to the vault and pushed to a remote. Worth pulling forward past its position
-here.
+#29 was the only open issue with a security consequence. Local work: tokens-only
+`redactCredentialTokens`, distill redact-and-continue, Save-to-vault refuse.
+Prime session jsonl is out of scope. Close the GitHub issue after a live check
+if you want the tracker to match the tree.
+
+**Origin:** Grok 4.6 · 2026-08-25 — #29 implementation.
 
 ---
 
@@ -214,21 +217,19 @@ to start grafting.
 Claude's original (`b8dc8fb`) started at **close #40**, then #29, then the
 composer cluster. Item 1 below is Grok's later insertion (`2b5daba`).
 
-**Origin:** Grok 4.6 · 2026-08-25 — user-pulled Prime surfaces landed this
-session: #17 fork tree, #14 create schedules, then #18 markers. Next free
-choice is the composer cluster or #29, not more unprompted Prime verbs.
+**Origin:** Grok 4.6 · 2026-08-25 — #29 vault credential redaction landed.
+Next free choice is the composer cluster, not more unprompted Prime verbs.
 
 1. **Harness composition (§1)** — discuss/decide
    [`harness-composition.md`](design/harness-composition.md) (option 2,
    DeepSeek *idea* on Prime extensions, first slice = native extension UI).
    Until ratified, do not graft. Closing **#40** against the filter is a
    side-errand, not a substitute.
-2. **#29, credential redaction** — only open issue with a security consequence.
-3. **The composer cluster (#38, #9, #35, #21)** — unblocked, one surface, and
+2. **The composer cluster (#38, #9, #35, #21)** — unblocked, one surface, and
    §4.4's spec pays for itself immediately.
-4. **Settle §1's shell decisions**, then #27 / #34 / #39 / #11 / #22 unblock
+3. **Settle §1's shell decisions**, then #27 / #34 / #39 / #11 / #22 unblock
    together.
-5. **C28 and C31** whenever the push gate flakes on you — the natural reaction
+4. **C28 and C31** whenever the push gate flakes on you — the natural reaction
    (re-run and move on) is exactly how they stay unfixed.
 
 Do not treat this order as authoritative over a handoff that names your task.

@@ -8,6 +8,8 @@ import { persistNewNote } from '../hooks/useNoteCreation'
 import { isTauri } from '../mock-tauri'
 import { areAiFeaturesEnabled } from '../lib/aiFeatures'
 import { translate } from '../lib/i18n'
+import { trackVaultCredentialsHandled } from '../lib/productAnalytics'
+import { redactCredentialTokens } from '../lib/sensitiveTextRedaction'
 import { buildPromoteNoteFromChat } from '../utils/promoteChatToVault'
 import {
   aiWorkspaceWindowSharedContextSnapshot,
@@ -282,6 +284,12 @@ export function AiWorkspaceWindowApp() {
     if (!body) return
     if (!vaultPath) {
       setToastMessage(translate(preferences.appLocale, 'ai.message.saveToVaultNoVault'))
+      return
+    }
+    const credentials = redactCredentialTokens(body)
+    if (credentials.count > 0) {
+      trackVaultCredentialsHandled('promote', 'refuse', credentials.count)
+      setToastMessage(translate(preferences.appLocale, 'ai.message.saveToVaultCredentials'))
       return
     }
     try {
