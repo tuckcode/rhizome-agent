@@ -61,6 +61,18 @@ describe('primeTranscriptToConversation', () => {
     expect(turns[0].response).toBe('Found a decision note.')
   })
 
+  it('uses the recovered command as the replayed card label', () => {
+    const turns = primeTranscriptToConversation([
+      userMessage('search'),
+      assistant([], '', [{ id: 't1', tool: 'bash', detail: 'rg foo wiki/' }]),
+    ])
+
+    expect(turns[0].actions[0]).toMatchObject({
+      tool: 'bash',
+      label: 'rg foo wiki/',
+    })
+  })
+
   /** Replayed history is finished. A pending card would spin forever. */
   it('marks every replayed action done, never pending', () => {
     const turns = primeTranscriptToConversation([

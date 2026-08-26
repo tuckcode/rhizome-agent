@@ -7,6 +7,7 @@ import { translate, type AppLocale } from '../lib/i18n'
 import type { NoteReference } from '../utils/ai-context'
 import { writeClipboardText } from '../utils/clipboardText'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
+import { groupConsecutiveToolActions } from '../lib/groupConsecutiveToolActions'
 
 export interface AiAction {
   tool: string
@@ -178,7 +179,7 @@ function ActionCardsList({ actions, onOpenNote, expandedIds, onToggleExpand }: {
 }) {
   return (
     <div className="flex flex-col gap-1" style={{ marginBottom: 8 }}>
-      {actions.map((action) => (
+      {groupConsecutiveToolActions(actions).map((action) => (
         <AiActionCard
           key={action.toolId}
           tool={action.tool}

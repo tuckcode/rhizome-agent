@@ -22,6 +22,14 @@ describe('notePathFromToolInput', () => {
   })
 })
 
+describe('updateToolAction bash preview', () => {
+  it('labels a bash wrapper with the recovered command', () => {
+    const next = updateToolAction(base, 'bash', 't1', '{"command":"rg foo wiki/"}')
+    expect(next.actions[0].label).toBe('rg foo wiki/')
+    expect(next.actions[0].tool).toBe('bash')
+  })
+})
+
 describe('updateToolAction path', () => {
   it('attaches path and labels create_note', () => {
     const next = updateToolAction(base, 'create_note', 't1', '{"path":"inbox/a.md"}')

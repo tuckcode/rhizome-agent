@@ -23,8 +23,24 @@ export function markReasoningDone(
   ))
 }
 
-function formatToolLabel(toolName: string): string {
-  if (toolName === 'Bash') {
+function previewFromToolInput(input?: string): string | undefined {
+  if (!input?.trim()) return undefined
+  try {
+    const parsed = JSON.parse(input) as Record<string, unknown>
+    for (const key of ['command', 'preview']) {
+      const value = parsed[key]
+      if (typeof value === 'string' && value.trim()) return value.trim()
+    }
+  } catch {
+    return undefined
+  }
+  return undefined
+}
+
+function formatToolLabel(toolName: string, input?: string): string {
+  const preview = previewFromToolInput(input)
+  if (preview) return preview
+  if (toolName === 'Bash' || toolName === 'bash') {
     return 'Ran shell command'
   }
   if (toolName === 'Write') return 'Wrote file'
@@ -96,7 +112,7 @@ export function updateToolAction(
               ...action,
               input: input ?? action.input,
               path: path ?? action.path,
-              label: action.label || formatToolLabel(toolName),
+              label: action.label || formatToolLabel(toolName, input ?? action.input),
             }
           : action
       )),
@@ -110,7 +126,9 @@ export function updateToolAction(
       {
         tool: toolName,
         toolId,
-        label: path ? `${formatToolLabel(toolName)} · ${path}` : formatToolLabel(toolName),
+        label: path
+          ? `${formatToolLabel(toolName, input)} · ${path}`
+          : formatToolLabel(toolName, input),
         path,
         status: 'pending' as const,
         input,

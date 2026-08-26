@@ -33,6 +33,7 @@ export interface PrimeTranscriptTool {
   id?: string
   tool: string
   path?: string
+  detail?: string
 }
 
 export interface PrimeMessage {
@@ -66,7 +67,7 @@ function actionsFrom(tools: PrimeTranscriptTool[] | undefined, seed: number): Ai
   return (tools ?? []).map((tool, index) => ({
     tool: tool.tool,
     toolId: tool.id ?? `replay-${seed}-${index}`,
-    label: tool.path ? `${tool.tool} ${tool.path}` : tool.tool,
+    label: tool.detail ?? (tool.path ? `${tool.tool} ${tool.path}` : tool.tool),
     ...(tool.path ? { path: tool.path } : {}),
     status: 'done' as const,
   }))

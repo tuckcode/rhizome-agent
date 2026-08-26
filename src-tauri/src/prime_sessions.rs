@@ -411,6 +411,8 @@ pub struct PrimeTranscriptTool {
     pub tool: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
 }
 
 /// Pull tool calls out of a message's content blocks.
@@ -437,6 +439,7 @@ fn tools_from_message(content: &serde_json::Value) -> Vec<PrimeTranscriptTool> {
                 id: block["id"].as_str().map(str::to_string),
                 tool: unwrapped.tool,
                 path: unwrapped.path,
+                detail: unwrapped.detail,
             }
         })
         .collect()

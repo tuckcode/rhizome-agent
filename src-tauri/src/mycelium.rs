@@ -223,7 +223,7 @@ fn rewrite_value(value: &mut serde_json::Value) -> usize {
     count
 }
 
-fn extract_bash_from_ipython(code: &str) -> Option<String> {
+pub(crate) fn extract_bash_from_ipython(code: &str) -> Option<String> {
     let trimmed = code.trim_start_matches('\u{feff}');
     let mut lines = trimmed.lines();
     let first = lines.next()?.trim();
