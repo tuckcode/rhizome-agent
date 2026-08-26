@@ -29,6 +29,7 @@ type BreadcrumbActions = Pick<
   | 'onToggleTableOfContents'
   | 'inspectorCollapsed'
   | 'onToggleInspector'
+  | 'onCloseNote'
   | 'showDiffToggle'
   | 'onToggleFavorite'
   | 'onToggleOrganized'
@@ -189,6 +190,7 @@ function ActiveTabBreadcrumb({
       onToggleTableOfContents={actions.onToggleTableOfContents}
       inspectorCollapsed={actions.inspectorCollapsed}
       onToggleInspector={actions.onToggleInspector}
+      onCloseNote={actions.onCloseNote}
       onToggleFavorite={bindPath(actions.onToggleFavorite, path)}
       onToggleOrganized={bindPath(actions.onToggleOrganized, path)}
       onEnterNeighborhood={actions.onEnterNeighborhood}
@@ -236,6 +238,7 @@ function EditorLoadingBreadcrumb({
       onToggleTableOfContents={actions.onToggleTableOfContents}
       inspectorCollapsed={actions.inspectorCollapsed}
       onToggleInspector={actions.onToggleInspector}
+      onCloseNote={actions.onCloseNote}
       noteWidth={actions.noteWidth}
       onToggleNoteWidth={actions.onToggleNoteWidth}
       locale={locale}
@@ -257,6 +260,7 @@ function buildBreadcrumbActions(model: EditorContentModel): BreadcrumbActions {
     onToggleTableOfContents: model.onToggleTableOfContents,
     inspectorCollapsed: model.inspectorCollapsed,
     onToggleInspector: model.onToggleInspector,
+    onCloseNote: model.onCloseNote,
     showDiffToggle: model.showDiffToggle,
     onToggleFavorite: model.onToggleFavorite,
     onToggleOrganized: model.onToggleOrganized,

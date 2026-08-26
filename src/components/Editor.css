@@ -30,8 +30,8 @@
   transition: border-color 0.2s ease;
 }
 
-body.mac-chrome .app:not(:has(.app__sidebar)):not(:has(.app__note-list)) .breadcrumb-bar {
-  --breadcrumb-bar-left-padding: 90px;
+body.mac-chrome .app:not(:has([data-testid='command-rail'])):not(:has(.app__sidebar)):not(:has(.app__note-list)) .breadcrumb-bar {
+  --breadcrumb-bar-left-padding: 144px;
 }
 
 .breadcrumb-bar[data-title-hidden] {
@@ -43,15 +43,15 @@ body.mac-chrome .app:not(:has(.app__sidebar)):not(:has(.app__note-list)) .breadc
 }
 
 .breadcrumb-bar__actions [data-slot='button'] {
-  width: auto;
-  height: auto;
-  min-width: 0;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
   padding: 0;
-  border-radius: 0;
+  border-radius: var(--radius);
 }
 
 .breadcrumb-bar__actions [data-slot='button']:hover {
-  background: transparent;
+  background: var(--surface-hover);
 }
 
 .breadcrumb-bar__overflow-menu {

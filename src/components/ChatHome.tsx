@@ -30,13 +30,14 @@ interface ChatHomeProps {
   onFileModified?: (path: string) => void
   onVaultChanged?: () => void
   onUnsupportedAiPaste?: (message: string) => void
+  sessionsAutoCollapsed?: boolean
   /** Where "close" goes when chat owns the window — back to the vault. */
   onExit: () => void
 }
 
 /**
  * Chat as the center canvas (ADR-0166). Sessions stay a left column inside
- * this surface; inbox and notes dock on the right of it in the shell.
+ * this surface; Inbox opens one Notes panel with navigation above its list.
  * Open-note is a secondary pane, not an editor takeover.
  */
 export default function ChatHome({
@@ -55,6 +56,7 @@ export default function ChatHome({
   onFileModified,
   onVaultChanged,
   onUnsupportedAiPaste,
+  sessionsAutoCollapsed = false,
   onExit,
 }: ChatHomeProps) {
   const isPrimeTarget = defaultAiTarget?.kind !== 'api_model' && defaultAiAgent === 'prime'
@@ -101,6 +103,7 @@ export default function ChatHome({
           onVaultChanged={onVaultChanged}
           onUnsupportedAiPaste={onUnsupportedAiPaste}
           showHeader={false}
+          sessionsAutoCollapsed={sessionsAutoCollapsed}
           forkTargetsPrimeEntry
           newChatRef={newChatRef}
           notePane={

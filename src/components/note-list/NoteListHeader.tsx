@@ -11,10 +11,13 @@ import { SortDropdown } from '../SortDropdown'
 import { ListPropertiesPopover, type ListPropertiesPopoverProps } from './ListPropertiesPopover'
 import { GitRepositorySelect } from '../GitRepositorySelect'
 import type { GitRepositoryOption } from '../../utils/gitRepositories'
-import { isMac, MACOS_TRAFFIC_LIGHT_SAFE_PADDING } from '../../utils/platform'
+import {
+  hasNativeMacosTrafficLights,
+  MACOS_TRAFFIC_LIGHT_SAFE_PADDING,
+} from '../../utils/trafficLights'
 
-const NOTE_LIST_ACTION_BUTTON_CLASSNAME = '!h-auto !w-auto !min-w-0 !rounded-none !p-0 !text-muted-foreground hover:!bg-transparent hover:!text-foreground focus-visible:!bg-transparent data-[state=open]:!bg-transparent data-[state=open]:!text-foreground [&_svg]:!size-4'
-const NOTE_LIST_EXPAND_BUTTON_CLASSNAME = '!h-6 !w-6 !min-w-0 !rounded !p-0 !text-muted-foreground hover:!bg-accent hover:!text-foreground focus-visible:!bg-accent [&_svg]:!size-4'
+const NOTE_LIST_ACTION_BUTTON_CLASSNAME = '!h-[32px] !w-[32px] !min-w-[32px] !rounded !p-0 !text-muted-foreground hover:!bg-accent hover:!text-foreground focus-visible:!bg-accent data-[state=open]:!bg-accent data-[state=open]:!text-foreground [&_svg]:!size-4'
+const NOTE_LIST_EXPAND_BUTTON_CLASSNAME = '!h-[32px] !w-[32px] !min-w-[32px] !rounded !p-0 !text-muted-foreground hover:!bg-accent hover:!text-foreground focus-visible:!bg-accent [&_svg]:!size-4'
 const PROPERTY_TRIGGER_TITLE_KEYS: Record<string, TranslationKey> = {
   'Customize columns': 'noteList.properties.customizeColumns',
   'Customize All Notes columns': 'noteList.properties.customizeAllColumns',
@@ -301,7 +304,7 @@ export function NoteListHeader({
   onGitRepositoryChange,
 }: NoteListHeaderProps) {
   const { dragRegionRef } = useDragRegion<HTMLDivElement>()
-  const collapsedSidebarPadding = sidebarCollapsed && isMac()
+  const collapsedSidebarPadding = sidebarCollapsed && hasNativeMacosTrafficLights()
     ? MACOS_TRAFFIC_LIGHT_SAFE_PADDING
     : undefined
 

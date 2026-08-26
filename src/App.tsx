@@ -3,6 +3,10 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Sidebar } from './components/Sidebar'
 import { CommandRail, type CommandRailDestination } from './components/CommandRail'
 import { NoteList } from './components/NoteList'
+import {
+  VaultPanel,
+  VaultPanelRestoreButton,
+} from './components/VaultPanel'
 import { Editor } from './components/Editor'
 import { ResizeHandle } from './components/ResizeHandle'
 import { CreateTypeDialog } from './components/CreateTypeDialog'
@@ -79,6 +83,7 @@ import { useVaultBridge } from './hooks/useVaultBridge'
 import { useSavedViewOrdering } from './hooks/useSavedViewOrdering'
 import { useAppViewActions } from './hooks/useAppViewActions'
 import { useAppWindowControls } from './hooks/useAppWindowControls'
+import { useShellCompactLayout } from './hooks/useShellCompactLayout'
 import { useAiWorkspacePublishedContext } from './hooks/useAiWorkspacePublishedContext'
 import {
   useNeighborhoodEntry,
@@ -516,7 +521,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       })
     }
   }, [explicitOrganizationEnabled, handleSetSelection, isGraphDestination, isMyceliumDestination])
-  const handleRailSelectNotes = useCallback(() => {
+  const handleRailSelectInbox = useCallback(() => {
     handleSetSelection({ kind: 'filter', filter: explicitOrganizationEnabled ? 'inbox' : 'all' })
   }, [handleSetSelection, explicitOrganizationEnabled])
   const handleRailSelectGraph = useCallback(() => {
@@ -1183,6 +1188,15 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     return entry ? vaultPathForEntry(entry, resolvedPath) : resolvedPath
   }, [resolvedPath, vault.entries])
 
+  const handleCloseNote = useCallback(() => {
+    const path = notes.activeTabPathRef.current
+    if (path) {
+      flushPendingEditorContentRef.current?.(path)
+      flushPendingRawContentRef.current?.(path)
+    }
+    notes.closeAllTabs()
+  }, [notes])
+
   const deleteActions = useDeleteActions({
     onDeselectNote: (path: string) => { if (notes.activeTabPath === path) notes.closeAllTabs() },
     removeEntry: vault.removeEntry,
@@ -1255,6 +1269,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     zoom,
   } = useAppWindowControls({
     layout,
+    unifiedVaultPanel: chatCentered,
     windowMode: Boolean(noteWindowParams) || aiWorkspaceWindow,
   })
   const railActiveDestination = useMemo((): CommandRailDestination => {
@@ -1264,7 +1279,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     if (showResearch) return 'research'
     if (chatCentered && viewMode === 'editor-only') return 'chat'
     if (isChatDestination) return 'chat'
-    return 'notes'
+    return 'inbox'
   }, [
     chatCentered,
     effectiveSelection,
@@ -1515,6 +1530,16 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   })
   const activeTabEntry = activeTab?.entry ?? null
   const activeTabPath = activeTabEntry?.path
+  const {
+    shellRef,
+    collapseSessions: compactSessions,
+    collapseVaultPanel: compactVaultPanel,
+  } = useShellCompactLayout(
+    chatCentered,
+    Boolean(activeTab),
+    !layout.inspectorCollapsed,
+  )
+  const [compactVaultPanelOpen, setCompactVaultPanelOpen] = useState(false)
   const handleSelectNoteForPdfExport = notes.handleSelectNote
   const handleExportNotePdfFromList = useCallback((entry: VaultEntry) => {
     if (!isMarkdownEntry(entry)) return
@@ -1807,22 +1832,49 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const noteListModifiedFilesError = isChangesSelection ? gitSurfaces.changesModifiedFilesError : null
 
   /*
-    Chat-centered shell (ADR-0166, settled 2026-08-25): sessions sit in
-    ChatHome on the left of the conversation; inbox (note list) and notes
-    (tree) sit on the right; both vault panels stay independently
-    collapsible via ⌘1/⌘2/⌘3. They are not exclusive — Cmd+N, inbox
-    auto-advance, and note selection need the list visible. Graph and
-    Mycelium still take the canvas; Chat does not hide the vault.
+    Chat-centered shell: navigation and the selected note list share one
+    right-side panel. The existing view-mode values remain the persisted
+    contract:
+      editor-only -> panel hidden
+      editor-list -> panel open, Browse collapsed
+      all         -> panel open, Browse expanded
+    The classic shell keeps its historical adjacent-column interpretation.
   */
-  const showSidebarTree = sidebarVisible && !isChatDestination
+  const vaultBrowseOpen = viewMode === 'all'
+  const showSidebarTree = !chatCentered && sidebarVisible && !isChatDestination
   const hideNoteListForCanvas = isGraphDestination || isMyceliumDestination
-  const showNoteListPanel = noteListVisible && !isChatDestination && !hideNoteListForCanvas
+  const showNoteListPanel = !chatCentered && noteListVisible && !isChatDestination && !hideNoteListForCanvas
+  const showVaultPanel =
+    chatCentered &&
+    viewMode !== 'editor-only' &&
+    !hideNoteListForCanvas &&
+    (!compactVaultPanel || compactVaultPanelOpen)
+  const showVaultPanelRestore =
+    chatCentered &&
+    viewMode !== 'editor-only' &&
+    !hideNoteListForCanvas &&
+    compactVaultPanel &&
+    !compactVaultPanelOpen
+
+  const handleVaultTreeSelect = (nextSelection: SidebarSelection) => {
+    handleSetSelection(nextSelection)
+  }
+
+  const sidebarSurface = (unified: boolean) => (
+    <Sidebar entries={visibleEntries} isWikiVault={isWikiVault} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={unified ? handleVaultTreeSelect : handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onUpdateViewDefinition={handleSidebarUpdateViewDefinition} onReorderViews={canReorderSavedViews ? viewOrdering.onReorderViews : undefined} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} allNotesFileVisibility={allNotesFileVisibility} pluralizeTypeLabels={settings.sidebar_type_pluralization_enabled ?? true} dock={sidebarDock} showTitleBar={!unified} onCollapse={unified ? undefined : handleCollapseSidebar} onGoBack={handleGoBack} onGoForward={handleGoForward} canGoBack={canGoBack} canGoForward={canGoForward} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} workspaceOrder={vaultWorkspaceOrder} />
+  )
+
+  const noteListSurface = effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse' ? (
+    <PulseView vaultPath={gitSurfaces.historyRepositoryPath} onOpenNote={handlePulseOpenNote} refreshKey={gitHistoryRefreshKey} sidebarCollapsed={!showSidebarTree && !chatCentered} onExpandSidebar={() => handleSetViewMode('all')} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.historyRepositoryPath} onRepositoryChange={gitSurfaces.setHistoryRepositoryPath} locale={appLocale} />
+  ) : (
+    <NoteList entries={visibleEntries} selection={effectiveSelection} selectedNote={activeTab?.entry ?? null} loading={isVaultContentLoading} noteListFilter={noteListFilter} onNoteListFilterChange={setNoteListFilter} inboxPeriod={inboxPeriod} modifiedFiles={noteListModifiedFiles} modifiedFilesError={noteListModifiedFilesError} gitRepositories={gitRepositories} selectedGitRepositoryPath={gitSurfaces.changesRepositoryPath} onGitRepositoryChange={gitSurfaces.setChangesRepositoryPath} getNoteStatus={vault.getNoteStatus} sidebarCollapsed={!showSidebarTree && !chatCentered} onSelectNote={(entry) => { notes.handleSelectNote(entry); if (compactVaultPanel) setCompactVaultPanelOpen(false) }} onReplaceActiveTab={(entry) => { handleReplaceActiveTabWithQueuedDiff(entry); if (compactVaultPanel) setCompactVaultPanelOpen(false) }} onEnterNeighborhood={handleEnterNeighborhood} onCreateNote={notes.handleCreateNoteImmediate} onBulkOrganize={explicitOrganizationEnabled ? bulkActions.handleBulkOrganize : undefined} onBulkArchive={bulkActions.handleBulkArchive} onBulkDeletePermanently={deleteActions.handleBulkDeletePermanently} onUpdateTypeSort={notes.handleUpdateFrontmatter} onUpdateViewDefinition={handleUpdateViewDefinition} updateEntry={vault.updateEntry} onOpenInNewWindow={handleOpenEntryInNewWindow} onRenameFilename={appSave.handleFilenameRename} onExportPdf={handleExportNotePdfFromList} onToggleFavorite={entryActions.handleToggleFavorite} onToggleOrganized={explicitOrganizationEnabled ? entryActions.handleToggleOrganized : undefined} onRevealFile={fileActions.revealFile} onCopyFilePath={fileActions.copyFilePath} canCopyGitUrl={noteGitUrls.canCopyEntryGitUrl} onCopyGitUrl={noteGitUrls.copyEntryGitUrl} onDiscardFile={handleDiscardFile} onOpenDeletedNote={handleOpenDeletedNote} allNotesNoteListProperties={vaultConfig.allNotes?.noteListProperties ?? null} onUpdateAllNotesNoteListProperties={handleUpdateAllNotesNoteListProperties} inboxNoteListProperties={vaultConfig.inbox?.noteListProperties ?? null} onUpdateInboxNoteListProperties={handleUpdateInboxNoteListProperties} views={vault.views} visibleNotesRef={visibleNotesRef} allNotesFileVisibility={allNotesFileVisibility} multiSelectionCommandRef={multiSelectionCommandRef} locale={appLocale} />
+  )
 
   const sidebarPanel = showSidebarTree ? (
     <>
       {sidebarDock === 'right' && <ResizeHandle onResize={layout.handleSidebarResize} edge="trailing" />}
       <div className={`app__sidebar app__sidebar--${sidebarDock}`} style={{ width: layout.sidebarWidth }}>
-      <Sidebar entries={visibleEntries} isWikiVault={isWikiVault} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onUpdateViewDefinition={handleSidebarUpdateViewDefinition} onReorderViews={canReorderSavedViews ? viewOrdering.onReorderViews : undefined} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} allNotesFileVisibility={allNotesFileVisibility} pluralizeTypeLabels={settings.sidebar_type_pluralization_enabled ?? true} dock={sidebarDock} onCollapse={handleCollapseSidebar} onGoBack={handleGoBack} onGoForward={handleGoForward} canGoBack={canGoBack} canGoForward={canGoForward} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} workspaceOrder={vaultWorkspaceOrder} />
+        {sidebarSurface(false)}
       </div>
       {sidebarDock === 'left' && <ResizeHandle onResize={layout.handleSidebarResize} />}
     </>
@@ -1832,13 +1884,33 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     <>
       {chatCentered && <ResizeHandle onResize={layout.handleNoteListResize} edge="trailing" />}
       <div className={`app__note-list${aiActivity.highlightElement === 'notelist' ? ' ai-highlight' : ''}`} style={{ width: layout.noteListWidth }}>
-        {effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse' ? (
-          <PulseView vaultPath={gitSurfaces.historyRepositoryPath} onOpenNote={handlePulseOpenNote} refreshKey={gitHistoryRefreshKey} sidebarCollapsed={!showSidebarTree} onExpandSidebar={() => handleSetViewMode('all')} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.historyRepositoryPath} onRepositoryChange={gitSurfaces.setHistoryRepositoryPath} locale={appLocale} />
-        ) : (
-          <NoteList entries={visibleEntries} selection={effectiveSelection} selectedNote={activeTab?.entry ?? null} loading={isVaultContentLoading} noteListFilter={noteListFilter} onNoteListFilterChange={setNoteListFilter} inboxPeriod={inboxPeriod} modifiedFiles={noteListModifiedFiles} modifiedFilesError={noteListModifiedFilesError} gitRepositories={gitRepositories} selectedGitRepositoryPath={gitSurfaces.changesRepositoryPath} onGitRepositoryChange={gitSurfaces.setChangesRepositoryPath} getNoteStatus={vault.getNoteStatus} sidebarCollapsed={!showSidebarTree} onSelectNote={notes.handleSelectNote} onReplaceActiveTab={handleReplaceActiveTabWithQueuedDiff} onEnterNeighborhood={handleEnterNeighborhood} onCreateNote={notes.handleCreateNoteImmediate} onBulkOrganize={explicitOrganizationEnabled ? bulkActions.handleBulkOrganize : undefined} onBulkArchive={bulkActions.handleBulkArchive} onBulkDeletePermanently={deleteActions.handleBulkDeletePermanently} onUpdateTypeSort={notes.handleUpdateFrontmatter} onUpdateViewDefinition={handleUpdateViewDefinition} updateEntry={vault.updateEntry} onOpenInNewWindow={handleOpenEntryInNewWindow} onRenameFilename={appSave.handleFilenameRename} onExportPdf={handleExportNotePdfFromList} onToggleFavorite={entryActions.handleToggleFavorite} onToggleOrganized={explicitOrganizationEnabled ? entryActions.handleToggleOrganized : undefined} onRevealFile={fileActions.revealFile} onCopyFilePath={fileActions.copyFilePath} canCopyGitUrl={noteGitUrls.canCopyEntryGitUrl} onCopyGitUrl={noteGitUrls.copyEntryGitUrl} onDiscardFile={handleDiscardFile} onOpenDeletedNote={handleOpenDeletedNote} allNotesNoteListProperties={vaultConfig.allNotes?.noteListProperties ?? null} onUpdateAllNotesNoteListProperties={handleUpdateAllNotesNoteListProperties} inboxNoteListProperties={vaultConfig.inbox?.noteListProperties ?? null} onUpdateInboxNoteListProperties={handleUpdateInboxNoteListProperties} views={vault.views} visibleNotesRef={visibleNotesRef} allNotesFileVisibility={allNotesFileVisibility} multiSelectionCommandRef={multiSelectionCommandRef} locale={appLocale} />
-        )}
+        {noteListSurface}
       </div>
       {!chatCentered && <ResizeHandle onResize={layout.handleNoteListResize} />}
+    </>
+  ) : null
+
+  const vaultPanel = showVaultPanel ? (
+    <>
+      {!compactVaultPanel && (
+        <ResizeHandle onResize={layout.handleNoteListResize} edge="trailing" />
+      )}
+      <div
+        className={`app__vault-panel${compactVaultPanel ? ' app__vault-panel--overlay' : ''}${aiActivity.highlightElement === 'notelist' ? ' ai-highlight' : ''}`}
+        style={{ width: layout.noteListWidth }}
+      >
+        <VaultPanel
+          browseOpen={vaultBrowseOpen}
+          locale={appLocale}
+          navigation={sidebarSurface(true)}
+          noteList={noteListSurface}
+          onBrowseToggle={() => handleSetViewMode(vaultBrowseOpen ? 'editor-list' : 'all')}
+          onCollapse={() => {
+            setCompactVaultPanelOpen(false)
+            handleSetViewMode('editor-only')
+          }}
+        />
+      </div>
     </>
   ) : null
 
@@ -1862,6 +1934,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         onFileModified={vaultBridge.handleAgentFileModified}
         onVaultChanged={vaultBridge.handleAgentVaultChanged}
         onUnsupportedAiPaste={setToastMessage}
+        sessionsAutoCollapsed={compactSessions}
       />
     </Suspense>
   )
@@ -1874,18 +1947,32 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       >
       <PrimeActivityProvider enabled={aiFeaturesEnabled}>
       <div className="app-shell">
-        <div className="app">
+        <div
+          ref={shellRef}
+          className="app"
+          data-compact-sessions={compactSessions ? 'true' : 'false'}
+          data-compact-vault={compactVaultPanel ? 'true' : 'false'}
+        >
           {commandRailEnabled && (
             <CommandRail
               locale={appLocale}
               activeDestination={railActiveDestination}
+              inboxCount={inboxCount}
               onSelectChat={() => {
                 handleRailSelectChat()
                 if (chatCentered) handleSetViewMode('editor-only')
               }}
-              onSelectNotes={() => {
-                handleRailSelectNotes()
-                if (chatCentered) handleSetViewMode('all')
+              onSelectInbox={() => {
+                handleRailSelectInbox()
+                if (chatCentered) {
+                  if (viewMode === 'editor-only') {
+                    handleSetViewMode('all')
+                    if (compactVaultPanel) setCompactVaultPanelOpen(true)
+                  } else {
+                    setCompactVaultPanelOpen(false)
+                    handleSetViewMode('editor-only')
+                  }
+                }
               }}
               onSelectGraph={handleRailSelectGraph}
               onSelectMycelium={handleRailSelectMycelium}
@@ -1893,6 +1980,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               onSelectChanges={() => {
                 handleRailSelectChanges()
                 if (chatCentered && viewMode === 'editor-only') handleSetViewMode('editor-list')
+                if (compactVaultPanel) setCompactVaultPanelOpen(true)
               }}
               onOpenSettings={handleOpenSettings}
             />
@@ -1914,7 +2002,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
             ) : isMyceliumDestination ? (
               <div className="relative flex flex-1 min-h-0">
                 <Suspense fallback={<div className="flex h-full flex-1 items-center justify-center text-sm text-muted-foreground" data-testid="mycelium-suspense">{translate(appLocale, 'mycelium.title')}</div>}>
-                  <MyceliumView locale={appLocale} onExit={handleRailSelectNotes} />
+                  <MyceliumView locale={appLocale} onExit={handleRailSelectInbox} />
                 </Suspense>
                 {effectiveShowAIChat && aiWorkspaceSurface}
               </div>
@@ -1936,6 +2024,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                       onCreateNote={notes.handleCreateNoteImmediate}
                       inspectorCollapsed={layout.inspectorCollapsed}
                       onToggleInspector={handleToggleInspector}
+                      onCloseNote={handleCloseNote}
                       inspectorWidth={layout.inspectorWidth}
                       defaultAiAgent={aiAgentPreferences.defaultAiAgent}
                       defaultAiTarget={aiAgentPreferences.defaultAiTarget}
@@ -2016,6 +2105,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               onCreateNote={notes.handleCreateNoteImmediate}
               inspectorCollapsed={layout.inspectorCollapsed}
               onToggleInspector={handleToggleInspector}
+              onCloseNote={handleCloseNote}
               inspectorWidth={layout.inspectorWidth}
               defaultAiAgent={aiAgentPreferences.defaultAiAgent}
               defaultAiTarget={aiAgentPreferences.defaultAiTarget}
@@ -2081,8 +2171,14 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
             />
             )}
           </div>
-          {chatCentered && noteListPanel}
-          {sidebarDock === 'right' && sidebarPanel}
+          {showVaultPanelRestore && (
+            <VaultPanelRestoreButton
+              locale={appLocale}
+              onClick={() => setCompactVaultPanelOpen(true)}
+            />
+          )}
+          {vaultPanel}
+          {!chatCentered && sidebarDock === 'right' && sidebarPanel}
         </div>
         <UpdateBanner status={updateStatus} actions={updateActions} locale={appLocale} />
         <RenameDetectedBanner renames={detectedRenames} onUpdate={handleUpdateWikilinks} onDismiss={handleDismissRenames} />

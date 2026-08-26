@@ -6,7 +6,10 @@ import { isMac } from './platform'
  * (`trafficLightPosition`). The window uses an overlay title bar, so they are
  * painted *over* whatever renders at the top of the window.
  */
-const TRAFFIC_LIGHT_LEFT_PX = 58
+export const MACOS_TRAFFIC_LIGHT_POSITION = {
+  x: 58,
+  y: 16,
+} as const
 
 /** Three 12px lights with 8px gaps, plus breathing room before content. */
 const TRAFFIC_LIGHT_RUN_PX = 70
@@ -15,6 +18,18 @@ const TRAFFIC_LIGHT_CLEARANCE_PX = 16
 
 /** The command rail the chat surface sits to the right of. */
 const COMMAND_RAIL_WIDTH_PX = 46
+
+export const MACOS_TRAFFIC_LIGHT_SAFE_PADDING =
+  MACOS_TRAFFIC_LIGHT_POSITION.x +
+  TRAFFIC_LIGHT_RUN_PX +
+  TRAFFIC_LIGHT_CLEARANCE_PX
+
+export const COMMAND_RAIL_TRAFFIC_LIGHT_INSET =
+  MACOS_TRAFFIC_LIGHT_POSITION.y + 43
+
+export function hasNativeMacosTrafficLights(): boolean {
+  return isTauri() && isMac()
+}
 
 /**
  * Left inset for the first band under the title bar, so the traffic lights do
@@ -25,11 +40,9 @@ const COMMAND_RAIL_WIDTH_PX = 46
  * component keeps its padding in one class and simply gets a bigger value here.
  */
 export function subheadTrafficLightInset(): Record<string, string> {
-  if (!isTauri() || !isMac()) return {}
+  if (!hasNativeMacosTrafficLights()) return {}
   const inset =
-    TRAFFIC_LIGHT_LEFT_PX +
-    TRAFFIC_LIGHT_RUN_PX +
-    TRAFFIC_LIGHT_CLEARANCE_PX -
+    MACOS_TRAFFIC_LIGHT_SAFE_PADDING -
     COMMAND_RAIL_WIDTH_PX
   return { '--subhead-traffic-light-inset': `${inset}px` }
 }

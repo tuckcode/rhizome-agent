@@ -157,8 +157,8 @@ function StatusBarAction({
         variant="ghost"
         size="xs"
         className={cn(
-          'h-auto gap-1 rounded-sm px-1 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground',
-          compact && 'h-6 gap-0.5 px-0.5',
+          'min-h-[32px] gap-1 rounded-sm px-1.5 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground',
+          compact && 'min-h-[32px] gap-0.5 px-1',
           disabled && 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-muted-foreground',
           className,
         )}

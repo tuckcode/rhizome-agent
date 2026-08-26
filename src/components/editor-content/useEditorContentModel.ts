@@ -36,6 +36,7 @@ export interface EditorContentProps {
   onToggleTableOfContents?: () => void
   inspectorCollapsed: boolean
   onToggleInspector: () => void
+  onCloseNote?: () => void
   onNavigateWikilink: (target: string) => void
   onEditorChange?: () => void
   onToggleFavorite?: (path: string) => void

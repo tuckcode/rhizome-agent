@@ -11,19 +11,11 @@ import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 test.describe('Command Palette smoke tests', () => {
   test.beforeEach(async ({ page }) => {
-    // Launch defaults to ChatHome once per browser session
-    // (`useAppAiWorkspaceBridge`'s `useAgentDefaultOpenChat`), racing the
-    // notes-shell mount against the vault-ready check that triggers it.
-    // Playwright gives every test a fresh context/session, so without this
-    // pin the race is live on every single run: fast machines usually win it
-    // (sidebar paints, gets asserted visible, and only then the app swaps to
-    // ChatHome underneath the already-passed assertion), but under load the
-    // vault-ready effect can fire before the notes shell ever paints, and
-    // `sidebar-top-nav` never appears within the 10s budget. Pinning the
-    // session flag before `goto` removes the race instead of racing it.
+    // The Notes panel now starts closed. The Inbox rail item is the stable
+    // shell-ready marker; these command tests do not need the panel open.
     await pinNotesShellLaunch(page)
     await page.goto('/', { waitUntil: 'domcontentloaded' })
-    await expect(page.locator('[data-testid="sidebar-top-nav"]')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByTestId('command-rail-inbox')).toBeVisible({ timeout: 10_000 })
   })
 
   test('Cmd+K opens the command palette @smoke', async ({ page }) => {
@@ -62,11 +54,10 @@ test.describe('Command Palette smoke tests', () => {
 
 test.describe('Keyboard shortcuts smoke tests', () => {
   test.beforeEach(async ({ page }) => {
-    // See the comment in the 'Command Palette smoke tests' beforeEach above:
-    // this pins the notes shell so it isn't swapped for ChatHome mid-race.
+    // See the shell-ready marker comment in the block above.
     await pinNotesShellLaunch(page)
     await page.goto('/', { waitUntil: 'domcontentloaded' })
-    await expect(page.locator('[data-testid="sidebar-top-nav"]')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByTestId('command-rail-inbox')).toBeVisible({ timeout: 10_000 })
   })
 
   test('Cmd+P opens quick open palette @smoke', async ({ page }) => {

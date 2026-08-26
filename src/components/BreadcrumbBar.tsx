@@ -34,6 +34,7 @@ import {
   ArrowsInLineHorizontal,
   ArrowsOutLineHorizontal,
   DotsThree,
+  X,
 } from '@phosphor-icons/react'
 import { slugify } from '../hooks/useNoteCreation'
 import { useDragRegion } from '../hooks/useDragRegion'
@@ -55,6 +56,7 @@ interface BreadcrumbBarProps {
   onToggleTableOfContents?: () => void
   inspectorCollapsed?: boolean
   onToggleInspector?: () => void
+  onCloseNote?: () => void
   onToggleFavorite?: () => void
   onToggleOrganized?: () => void
   onRevealFile?: (path: string) => void
@@ -148,7 +150,10 @@ function IconActionButton({
         type="button"
         variant="ghost"
         size="icon-xs"
-        className={cn('text-muted-foreground [&_svg:not([class*=size-])]:size-4', className)}
+        className={cn(
+          '!h-[32px] !w-[32px] !min-w-[32px] !rounded !p-0 text-muted-foreground [&_svg:not([class*=size-])]:size-4',
+          className,
+        )}
         style={style}
         onClick={onClick}
         aria-label={copy.label}
@@ -408,6 +413,24 @@ function InspectorAction({
       tooltipAlign="end"
     >
       <SidebarSimple size={16} weight="regular" className={BREADCRUMB_ICON_CLASS} />
+    </IconActionButton>
+  )
+}
+
+function CloseNoteAction({
+  locale = 'en',
+  onCloseNote,
+}: Pick<BreadcrumbBarProps, 'locale' | 'onCloseNote'>) {
+  if (!onCloseNote) return null
+  return (
+    <IconActionButton
+      copy={{ label: translate(locale, 'editor.toolbar.closeNote') }}
+      onClick={onCloseNote}
+      className="hover:text-foreground"
+      testId="breadcrumb-close-note"
+      tooltipAlign="end"
+    >
+      <X size={16} className={BREADCRUMB_ICON_CLASS} />
     </IconActionButton>
   )
 }
@@ -833,6 +856,7 @@ function BreadcrumbActions({
   onToggleTableOfContents,
   inspectorCollapsed,
   onToggleInspector,
+  onCloseNote,
   onToggleFavorite,
   onToggleOrganized,
   onRevealFile,
@@ -911,6 +935,7 @@ function BreadcrumbActions({
         locale={locale}
       />
       <InspectorAction inspectorCollapsed={inspectorCollapsed} locale={locale} onToggleInspector={onToggleInspector} />
+      <CloseNoteAction locale={locale} onCloseNote={onCloseNote} />
     </div>
   )
 }
@@ -977,7 +1002,7 @@ function BreadcrumbOverflowMenu({
             type="button"
             variant="ghost"
             size="icon-xs"
-            className="breadcrumb-bar__overflow-menu text-muted-foreground hover:text-foreground"
+            className="breadcrumb-bar__overflow-menu !h-[32px] !w-[32px] !min-w-[32px] !rounded !p-0 text-muted-foreground hover:text-foreground"
             aria-label={translate(locale, 'editor.toolbar.moreActions')}
             data-testid="breadcrumb-overflow-menu-trigger"
           >
@@ -1127,7 +1152,6 @@ export const BreadcrumbBar = memo(function BreadcrumbBar({
     <TooltipProvider>
       <div
         ref={breadcrumbDragRegionRef}
-        data-tauri-drag-region
         data-title-hidden=""
         className="breadcrumb-bar flex shrink-0 items-center border-b border-transparent"
         style={{
@@ -1148,7 +1172,6 @@ export const BreadcrumbBar = memo(function BreadcrumbBar({
         </div>
         <div
           aria-hidden="true"
-          data-tauri-drag-region
           className="breadcrumb-bar__drag-spacer w-6 shrink-0"
         />
         <BreadcrumbActions

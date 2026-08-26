@@ -42,9 +42,10 @@ drives.**
 ┌──────────────────────────────────────────────────────────────┐
 │ titlebar (macOS overlay / LinuxTitlebar — unchanged)         │
 ├────┬────────────┬──────────────────────────┬────────────────┤
-│rail│  sessions  │          CHAT            │  inbox (list)  │
-│    │            │                          │  notes (tree)  │
-│    │            │      (the canvas)        │    Changes     │
+│rail│  sessions  │          CHAT            │ Notes panel    │
+│Inbox            │                          │ nav: Inbox,    │
+│    │            │      (the canvas)        │ Archive, types │
+│    │            │                          │ selected list  │
 ├────┴────────────┴──────────────────────────┴────────────────┤
 │ status bar                                                   │
 └──────────────────────────────────────────────────────────────┘
@@ -52,13 +53,14 @@ drives.**
 
 - **Chat never closes and never moves.** It is not a destination competing with
   the others; it is what the others are arranged around. Sessions live as a
-  collapsible column on its left. Inbox (note list) and notes (tree) dock on
-  the right and collapse independently (⌘1 Chat only, ⌘2 Chat + Inbox, ⌘3 Chat
-  + Notes).
-- **Both right-hand vault panels may be open together.** Exclusive Inbox *or*
-  Notes *or* Changes was tried and reverted: Cmd+N, inbox auto-advance, and
-  note selection need the list visible. Changes is a filter on that list, not
-  a third exclusive occupant.
+  collapsible column on its left.
+- **The vault is one optional Notes panel.** It starts closed. The rail labels
+  its toggle **Inbox**; opening it shows compact navigation (Inbox, All Notes,
+  Archive, views, types/projects, and folders) above the selected note list.
+  Browse can collapse without hiding the list.
+- **There is no Inbox/Notes tab switch or second right-hand column.** Cmd+N,
+  inbox auto-advance, and note selection keep using the one list. Changes is a
+  filter on that list, not a separate occupant.
 - **Graph and Mycelium still take the canvas.** That remains the open question
   for #39 / #11 / #22; this ADR does not turn them into side panels.
 - **Panels are optional.** Rail Chat / ⌘1 collapses the vault so Chat is
@@ -90,19 +92,17 @@ is unaffected and still stands.
 
 ## Consequences
 
-* The sidebar docks right and is gated on the command rail: with the classic
-  shell (`ff_shell_command_rail=false`) nothing reserves the traffic-light
-  gutter, so it stays left. `Sidebar`/`SidebarTitleBar` take a `dock` prop; the
-  right dock drops the 90px traffic-light inset, mirrors the collapse glyph, and
-  moves its divider to the leading edge.
+* The navigation tree is embedded above the list in the right Notes panel and
+  omits its standalone title bar. The classic shell still renders the
+  standalone sidebar on the left.
 * `ResizeHandle` takes `edge="trailing"` for right-docked panels: the drag delta
   inverts and the negative margin flips. `useLayoutPanels` already negated the
   delta in the hook for the inspector and graph-preview docks — two idioms for
   one problem now exist, and the hook-level negation should migrate to the prop.
 * `ViewMode`'s ladder is now Chat-centric, not editor-centric: `editor-only`
-  is Chat only (⌘1), `editor-list` is Chat + Inbox (⌘2), `all` is Chat +
-  Notes tree and list (⌘3). The stored values are unchanged so existing vault
-  configs keep working.
+  is Chat only (⌘1), `editor-list` opens Notes with Browse collapsed (⌘2), and
+  `all` opens Notes with Browse expanded (⌘3). The stored values are unchanged
+  so existing vault configs keep working; the no-preference default is closed.
 * `isChatDestination` remains only for the classic shell
   (`ff_shell_command_rail=false`). With the rail on, Chat is furniture: the
   branches that used to hide every panel when Chat was the destination no
@@ -110,8 +110,8 @@ is unaffected and still stands.
 * The 250px sidebar floor and `.app__sidebar` min-width stay in sync as before,
   but the reason changes: it is the wordmark lockup alone, no longer the lockup
   plus a traffic-light gutter.
-* Rail Chat focuses the conversation (collapses the vault). Rail Notes opens
-  both right-hand vault panels. Changes is a filter on the list, not a canvas
-  replacement. Graph and Mycelium still take the canvas.
+* Rail Chat focuses the conversation. Rail Inbox toggles the one Notes panel.
+  Changes opens that panel on its list filter, not as a canvas replacement.
+  Graph and Mycelium still take the canvas.
 
 [[shell-final-direction]]

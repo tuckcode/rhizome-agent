@@ -26,7 +26,7 @@ function seedBodyTemplateTypeEntry(vaultPath: string, typeName: string, template
 }
 
 async function openTestVault(page: Page): Promise<void> {
-  await openFixtureVault(page, tempVaultDir)
+  await openFixtureVault(page, tempVaultDir, { initialPanel: 'notes' })
 }
 
 async function selectSection(page: Page, label: string): Promise<void> {

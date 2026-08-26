@@ -28,6 +28,7 @@ interface FixtureVaultOptions {
   isGitRepo?: boolean
   expectedReadyTitle?: string
   folders?: FolderNode[]
+  initialPanel?: 'inbox' | 'notes'
 }
 
 interface CopyDirArgs {
@@ -531,22 +532,32 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folde
   })
 }
 
-async function waitForFixtureVaultReady({ page, expectedTitle }: FixturePageArgs & { expectedTitle: string }): Promise<void> {
+async function waitForFixtureVaultReady({
+  page,
+  initialPanel,
+}: FixturePageArgs & { initialPanel: 'inbox' | 'notes' }): Promise<void> {
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => Boolean(window.__mockHandlers?.list_vault))
-  await page.locator('[data-testid="note-list-container"]').waitFor({ timeout: FIXTURE_VAULT_READY_TIMEOUT })
-
-  // Product default is Inbox when explicit organization is enabled (undefined
-  // counts as on). Fixture notes are typed/organized, so Inbox is empty.
-  // Switch to All Notes before asserting the seed title is visible.
-  const expected = page.getByText(expectedTitle, { exact: true }).first()
-  if (!(await expected.isVisible().catch(() => false))) {
-    await page.getByRole('button', { name: 'All Notes' }).click()
+  if (!(await page.getByTestId('vault-panel').isVisible().catch(() => false))) {
+    await page.getByTestId('command-rail-inbox').click()
   }
+  const noteList = page.locator('[data-testid="note-list-container"]')
+  await noteList.waitFor({ timeout: FIXTURE_VAULT_READY_TIMEOUT })
 
-  await expect(expected).toBeVisible({
+  // Product default is Inbox when explicit organization is enabled. Fixture
+  // tests use the full seed set, so normalize to All Notes. Do not wait on one
+  // title: the virtualized list may legitimately keep that row off-DOM.
+  await page.getByTestId('sidebar-top-nav').getByText('All Notes', { exact: true }).click()
+  await expect(noteList.getByRole('option').first()).toBeVisible({
     timeout: FIXTURE_VAULT_READY_TIMEOUT,
   })
+
+  if (initialPanel === 'inbox') {
+    await page.getByTestId('vault-panel-browse-toggle').click()
+    await expect(page.getByTestId('vault-panel-navigation')).toHaveCount(0)
+  } else {
+    await expect(page.getByTestId('vault-panel-navigation')).toBeVisible()
+  }
 }
 
 export async function openFixtureVault(
@@ -562,7 +573,7 @@ export async function openFixtureVault(
   })
   await waitForFixtureVaultReady({
     page,
-    expectedTitle: options.expectedReadyTitle ?? 'Alpha Project',
+    initialPanel: options.initialPanel ?? 'inbox',
   })
 }
 

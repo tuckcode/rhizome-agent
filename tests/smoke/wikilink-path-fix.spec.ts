@@ -96,17 +96,18 @@ async function dispatchModifiedLinkActivation(link: ReturnType<Page['locator']>)
 
 test.describe('Wikilink insertion and navigation', () => {
   test.beforeEach(async ({ page }) => {
-    // This block navigates without openFixtureVault, so it does not inherit
-    // that helper's notes-shell pin. Without it, launch opens ChatHome and
-    // `.app__note-list` never renders.
+    // This block navigates without openFixtureVault, so use the unified Notes
+    // tab to choose the source type before opening the note from Inbox.
     await pinNotesShellLaunch(page)
     await page.route('**/api/vault/ping', route => route.fulfill({ status: 503 }))
     await page.goto('/')
     await page.waitForTimeout(500)
 
-    const noteItem = page.locator('.app__note-list .cursor-pointer').filter({ hasText: SOURCE_NOTE_TITLE }).first()
+    await page.getByTestId('command-rail-inbox').click()
+    await page.locator('aside').getByText('Responsibilities', { exact: true }).first().click()
+    const noteItem = page.getByTestId('note-list-container').getByText(SOURCE_NOTE_TITLE, { exact: true }).first()
     await noteItem.click()
-    await page.waitForTimeout(1000)
+    await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 10_000 })
   })
 
   test('[[ autocomplete inserts wikilink that is not broken', async ({ page }) => {

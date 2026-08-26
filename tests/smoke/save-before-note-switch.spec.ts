@@ -42,6 +42,15 @@ function collectReactUpdateLoopErrors(page: Page): string[] {
 
 async function openNote(page: Page, title: string) {
   const noteList = page.locator('[data-testid="note-list-container"]')
+  if (!(await noteList.isVisible().catch(() => false))) {
+    const restore = page.getByTestId('vault-panel-restore')
+    if (await restore.isVisible().catch(() => false)) {
+      await restore.click()
+    } else {
+      await page.getByTestId('command-rail-inbox').click()
+    }
+    await expect(noteList).toBeVisible()
+  }
   await noteList.getByText(title, { exact: true }).click()
 }
 

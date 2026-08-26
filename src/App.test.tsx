@@ -284,6 +284,20 @@ function getHeaderForNoteList(noteListContainer: HTMLElement) {
   return within(noteListContainer.parentElement as HTMLElement).getByRole('heading', { level: 3 })
 }
 
+async function selectInboxInVaultPanel() {
+  if (!screen.queryByTestId('vault-panel')) {
+    fireEvent.click(await screen.findByTestId('command-rail-inbox'))
+  }
+  if (!screen.queryByTestId('vault-panel-navigation')) {
+    fireEvent.click(await screen.findByTestId('vault-panel-browse-toggle'))
+  }
+  const trigger = within(await screen.findByTestId('sidebar-top-nav')).getByText('Inbox', { exact: true })
+  await act(async () => {
+    fireEvent.click(trigger)
+    await Promise.resolve()
+  })
+}
+
 async function clickNoteListItem(noteListContainer: HTMLElement, title: string, options?: MouseEventInit) {
   await waitFor(() => {
     expect(within(noteListContainer).getByText(title)).toBeInTheDocument()
@@ -504,6 +518,7 @@ describe('App', () => {
     vi.mocked(isTauri).mockReturnValue(false)
     vi.mocked(useUpdater).mockReturnValue(createMockUpdaterResult())
     localStorage.clear()
+    localStorage.setItem('rhizome-view-mode', 'all')
     sessionStorage.clear()
     // App tests assert the notes shell. Launch now opens ChatHome once per
     // session — mark it done so these stay on the four-panel layout.
@@ -517,7 +532,7 @@ describe('App', () => {
     expect(await screen.findByText('All Notes', {}, { timeout: 5000 })).toBeInTheDocument()
   })
 
-  it('lands on ChatHome with inbox and notes beside it', async () => {
+  it('lands on ChatHome with the combined Notes panel available', async () => {
     sessionStorage.removeItem(AGENT_CHAT_OPENED_SESSION_KEY)
     render(<App />)
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
@@ -555,11 +570,12 @@ describe('App', () => {
 
   it('loads and displays vault entries in sidebar', async () => {
     render(<App />)
-    await waitFor(() => {
-      // Entries appear in both Sidebar and NoteList
-      expect(screen.getAllByText('Test Project').length).toBeGreaterThan(0)
-      expect(screen.getAllByText('Software Development').length).toBeGreaterThan(0)
-    }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
+    expect(await screen.findByText('All Notes', {}, { timeout: SLOW_APP_READY_TIMEOUT_MS })).toBeInTheDocument()
+    expect(screen.getByTestId('vault-panel-navigation')).toContainElement(screen.getByTestId('sidebar-top-nav'))
+
+    await selectInboxInVaultPanel()
+    expect(await screen.findByText('Test Project')).toBeInTheDocument()
+    expect(await screen.findByText('Software Development')).toBeInTheDocument()
   })
 
   it('keeps the app shell usable while the vault note scan is pending', async () => {
@@ -577,6 +593,7 @@ describe('App', () => {
     expect(screen.getByTestId('sidebar-loading-views')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-loading-types')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-loading-folders')).toBeInTheDocument()
+    await selectInboxInVaultPanel()
     expect(screen.getByTestId('note-list-loading-skeleton')).toBeInTheDocument()
     expect(screen.getByTestId('breadcrumb-title-skeleton')).toBeInTheDocument()
     expect(screen.queryByTestId('editor-content-skeleton')).not.toBeInTheDocument()
@@ -606,6 +623,15 @@ describe('App', () => {
     render(<App />)
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByText('Select a note to start editing')).not.toBeInTheDocument()
+  })
+
+  it('starts with the vault panel closed when no view preference is stored', async () => {
+    localStorage.removeItem('rhizome-view-mode')
+    render(<App />)
+
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.getByTestId('command-rail-inbox')).toHaveTextContent('Inbox')
+    expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
   })
 
   it('opens a note window after loading the active vault graph', async () => {
@@ -662,6 +688,7 @@ describe('App', () => {
     try {
       render(<App />)
       await screen.findByText('All Notes')
+      await selectInboxInVaultPanel()
 
       fireEvent.keyDown(window, { key: 'n', code: 'KeyN', metaKey: true })
 
@@ -947,6 +974,7 @@ describe('App', () => {
 
     expect(screen.queryByTestId('vault-loading-skeleton')).not.toBeInTheDocument()
     expect(screen.getByTestId('sidebar-loading-favorites')).toBeInTheDocument()
+    await selectInboxInVaultPanel()
     expect(screen.getByTestId('note-list-loading-skeleton')).toBeInTheDocument()
     expect(screen.getByTestId('breadcrumb-title-skeleton')).toBeInTheDocument()
     expect(screen.queryByTestId('editor-content-skeleton')).not.toBeInTheDocument()
@@ -1116,6 +1144,7 @@ describe('App', () => {
 
     render(<App />)
 
+    await selectInboxInVaultPanel()
     const noteListContainer = await screen.findByTestId('note-list-container', {}, { timeout: 5000 })
     const getHeader = () => getHeaderForNoteList(noteListContainer)
 
@@ -1214,6 +1243,7 @@ describe('App', () => {
 
     render(<App />)
 
+    await selectInboxInVaultPanel()
     const noteListContainer = await screen.findByTestId('note-list-container')
     await waitFor(() => {
       expect(getHeaderForNoteList(noteListContainer)).toHaveTextContent('Inbox')
@@ -1247,6 +1277,7 @@ describe('App', () => {
 
     render(<App />)
 
+    await selectInboxInVaultPanel()
     const noteListContainer = await screen.findByTestId('note-list-container')
     await waitFor(() => {
       expect(getHeaderForNoteList(noteListContainer)).toHaveTextContent('Inbox')
@@ -1344,10 +1375,7 @@ describe('App', () => {
     })
   })
 
-  it('docks the sidebar to the right of the editor', async () => {
-    // The note tree is a convenience panel, not the app's spine — the rail
-    // owns the left edge (and the macOS traffic lights with it), so the tree
-    // sits on the trailing side where it can be ignored or collapsed away.
+  it('docks the unified vault panel to the right of the editor', async () => {
     render(<App />)
     await waitFor(() => {
       expect(screen.getByText('All Notes')).toBeInTheDocument()
@@ -1355,45 +1383,40 @@ describe('App', () => {
 
     const shell = document.querySelector('.app') as HTMLElement
     const editor = shell.querySelector('.app__editor') as HTMLElement
-    const sidebar = shell.querySelector('.app__sidebar') as HTMLElement
+    const vaultPanel = shell.querySelector('.app__vault-panel') as HTMLElement
     expect(editor).toBeInTheDocument()
-    expect(sidebar).toBeInTheDocument()
-    expect(editor.compareDocumentPosition(sidebar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(vaultPanel).toBeInTheDocument()
+    expect(editor.compareDocumentPosition(vaultPanel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('puts sessions and chat in the center with inbox and notes on the right', async () => {
+  it('puts compact navigation above the selected note list in one right panel', async () => {
     render(<App />)
     const chat = await screen.findByTestId('chat-home', {}, { timeout: 5000 })
     await screen.findByText('All Notes')
 
     const shell = document.querySelector('.app') as HTMLElement
-    const noteList = shell.querySelector('.app__note-list') as HTMLElement
-    const sidebar = shell.querySelector('.app__sidebar') as HTMLElement
-    expect(noteList).toBeInTheDocument()
-    expect(sidebar).toBeInTheDocument()
-    expect(chat.compareDocumentPosition(noteList) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(noteList.compareDocumentPosition(sidebar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const vaultPanel = shell.querySelector('.app__vault-panel') as HTMLElement
+    expect(vaultPanel).toBeInTheDocument()
+    expect(chat.compareDocumentPosition(vaultPanel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByTestId('vault-panel-navigation')).toContainElement(screen.getByTestId('sidebar-top-nav'))
+    expect(screen.getByTestId('vault-panel-note-list')).toContainElement(screen.getByTestId('note-list-container'))
   })
 
-  it('Cmd+1 hides sidebar and note list (editor-only mode)', async () => {
+  it('Cmd+1 hides the unified vault panel', async () => {
     render(<App />)
     await waitFor(() => {
       expect(screen.getByText('All Notes')).toBeInTheDocument()
     })
 
-    // All panels visible by default
-    expect(document.querySelector('.app__sidebar')).toBeInTheDocument()
-    expect(document.querySelector('.app__note-list')).toBeInTheDocument()
+    expect(document.querySelector('.app__vault-panel')).toBeInTheDocument()
 
-    // Cmd+1 → editor-only
     fireEvent.keyDown(window, { key: '1', metaKey: true })
     await waitFor(() => {
-      expect(document.querySelector('.app__sidebar')).not.toBeInTheDocument()
-      expect(document.querySelector('.app__note-list')).not.toBeInTheDocument()
+      expect(document.querySelector('.app__vault-panel')).not.toBeInTheDocument()
     })
   })
 
-  it('Cmd+2 shows editor + note list (sidebar hidden)', async () => {
+  it('Cmd+2 keeps the vault panel open with Browse collapsed', async () => {
     render(<App />)
     await waitFor(() => {
       expect(screen.getByText('All Notes')).toBeInTheDocument()
@@ -1401,28 +1424,28 @@ describe('App', () => {
 
     fireEvent.keyDown(window, { key: '2', metaKey: true })
     await waitFor(() => {
-      expect(document.querySelector('.app__sidebar')).not.toBeInTheDocument()
-      expect(document.querySelector('.app__note-list')).toBeInTheDocument()
+      expect(document.querySelector('.app__vault-panel')).toBeInTheDocument()
+      expect(screen.queryByTestId('vault-panel-navigation')).not.toBeInTheDocument()
+      expect(screen.getByTestId('note-list-container')).toBeInTheDocument()
     })
   })
 
-  it('Cmd+3 restores all panels after Cmd+1', async () => {
+  it('Cmd+3 opens the vault panel with Browse above the note list after Cmd+1', async () => {
     render(<App />)
     await waitFor(() => {
       expect(screen.getByText('All Notes')).toBeInTheDocument()
     })
 
-    // Switch to editor-only first
     fireEvent.keyDown(window, { key: '1', metaKey: true })
     await waitFor(() => {
-      expect(document.querySelector('.app__sidebar')).not.toBeInTheDocument()
+      expect(document.querySelector('.app__vault-panel')).not.toBeInTheDocument()
     })
 
-    // Cmd+3 → all panels
     fireEvent.keyDown(window, { key: '3', metaKey: true })
     await waitFor(() => {
-      expect(document.querySelector('.app__sidebar')).toBeInTheDocument()
-      expect(document.querySelector('.app__note-list')).toBeInTheDocument()
+      expect(document.querySelector('.app__vault-panel')).toBeInTheDocument()
+      expect(screen.getByTestId('vault-panel-navigation')).toContainElement(screen.getByTestId('sidebar-top-nav'))
+      expect(screen.getByTestId('note-list-container')).toBeInTheDocument()
     })
   })
 
@@ -1439,7 +1462,7 @@ describe('App', () => {
     fireEvent.keyDown(window, { key: '1', metaKey: true })
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith('update_current_window_min_size', {
-        minWidth: 480,
+        minWidth: 760,
         minHeight: 400,
         growToFit: true,
       })
@@ -1450,7 +1473,7 @@ describe('App', () => {
     fireEvent.keyDown(window, { key: '3', metaKey: true })
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith('update_current_window_min_size', {
-        minWidth: 1030,
+        minWidth: 760,
         minHeight: 400,
         growToFit: true,
       })

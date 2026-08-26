@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { ArrowSquareOut, ClipboardText, FileDashed, FilePdf, FolderOpen, ImageSquare, Link, SpeakerHigh, Video, WarningCircle } from '@phosphor-icons/react'
+import { ArrowSquareOut, ClipboardText, FileDashed, FilePdf, FolderOpen, ImageSquare, Link, SpeakerHigh, Video, WarningCircle, X } from '@phosphor-icons/react'
 import type { VaultEntry } from '../types'
 import { translate, type AppLocale } from '../lib/i18n'
 import { trackFilePreviewAction, trackFilePreviewFailed, trackFilePreviewOpened } from '../lib/productAnalytics'
@@ -8,6 +8,7 @@ import { filePreviewKind, previewFileTypeLabel, type FilePreviewKind } from '../
 import { useExternalMediaPreview } from '../utils/mediaPreviewRuntime'
 import { focusNoteListContainer } from '../utils/neighborhoodHistory'
 import { openLocalFile } from '../utils/url'
+import { useDragRegion } from '../hooks/useDragRegion'
 import { Button } from './ui/button'
 
 interface FilePreviewProps {
@@ -17,6 +18,7 @@ interface FilePreviewProps {
   onCopyDeepLink?: (entry: VaultEntry) => void
   onOpenExternalFile?: (path: string) => void
   onRevealFile?: (path: string) => void
+  onCloseNote?: () => void
 }
 
 interface FilePreviewFallbackProps {
@@ -162,6 +164,7 @@ function FilePreviewHeader({
   onRevealFile,
   onCopyFilePath,
   onCopyDeepLink,
+  onCloseNote,
 }: {
   entry: VaultEntry
   previewKind: FilePreviewKind | null
@@ -172,11 +175,15 @@ function FilePreviewHeader({
   onRevealFile?: () => void
   onCopyFilePath?: () => void
   onCopyDeepLink?: () => void
+  onCloseNote?: () => void
 }) {
+  const { dragRegionRef } = useDragRegion<HTMLDivElement>()
+
   return (
     <div
+      ref={dragRegionRef}
       className="flex h-[52px] shrink-0 items-center justify-between border-b border-border px-4"
-      data-tauri-drag-region
+      data-testid="file-preview-header"
     >
       <div className="flex min-w-0 items-center gap-2">
         <FilePreviewHeaderIcon previewKind={previewKind} />
@@ -185,7 +192,7 @@ function FilePreviewHeader({
           <p className="m-0 text-[11px] text-muted-foreground">{fileTypeLabel}</p>
         </div>
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1" data-no-drag>
         {onRevealFile && (
           <Button type="button" variant="ghost" size="sm" onClick={onRevealFile} disabled={!canUseFileActions}>
             <FolderOpen size={15} />
@@ -208,6 +215,20 @@ function FilePreviewHeader({
           <ArrowSquareOut size={15} />
           Open
         </Button>
+        {onCloseNote && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="h-8 w-8 shrink-0"
+            onClick={onCloseNote}
+            aria-label={translate(locale, 'editor.toolbar.closeNote')}
+            title={translate(locale, 'editor.toolbar.closeNote')}
+            data-testid="file-preview-close-note"
+          >
+            <X size={16} />
+          </Button>
+        )}
       </div>
     </div>
   )
@@ -471,6 +492,7 @@ export function FilePreview({
   onCopyDeepLink,
   onOpenExternalFile,
   onRevealFile,
+  onCloseNote,
 }: FilePreviewProps) {
   const previewRef = useRef<HTMLElement | null>(null)
   const { canUseFileActions, previewKind, previewPath } = filePreviewState(entry)
@@ -528,6 +550,7 @@ export function FilePreview({
         onRevealFile={onRevealFile ? actions.handleRevealFile : undefined}
         onCopyFilePath={onCopyFilePath ? actions.handleCopyFilePath : undefined}
         onCopyDeepLink={onCopyDeepLink ? actions.handleCopyDeepLink : undefined}
+        onCloseNote={onCloseNote}
       />
       <div className="min-h-0 flex-1 overflow-auto bg-background">
         <FilePreviewBody

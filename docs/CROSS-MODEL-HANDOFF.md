@@ -513,3 +513,24 @@ full suite rather than the files the agent touched:
 
 **Agent prompts must demand the full `pnpm test` suite plus `cargo fmt --check`,
 explicitly.** Focused tests are a development loop, not a ship gate.
+
+## 19. Titlebar double-click + native drag on the same mousedown races maximize
+
+Observed 2026-08-25 on the chat-centered shell: double-clicking the overlay
+titlebar went fullscreen, then instantly snapped back to half-height.
+
+Two causes stacked. First, `data-tauri-drag-region` and `useDragRegion`
+(`src/hooks/useDragRegion.ts` → `perform_current_window_titlebar_double_click`)
+were both live on the same strip, so one gesture toggled maximize twice.
+Second, even after the native attribute was removed, the first mousedown of
+the double-click called `startDragging()`. The second click maximized; the
+still-active drag then restored the previous frame.
+
+**Rule:** one owner per titlebar surface — `useDragRegion` only. Start a
+window drag only after the pointer moves. Keep a short lock so the native
+titlebar command cannot fire twice in one gesture. Browser Playwright
+cannot see this; it needs a rebuilt `.app` / `pnpm tauri dev`.
+
+Related: the breadcrumb control that looks like a sidebar collapse opens
+Properties (`editor.toolbar.openProperties`). Closing the note is the
+trailing **X** (`editor.toolbar.closeNote`).

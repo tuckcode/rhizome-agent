@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CaretLeft, CaretRight, ChatCircle, CirclesThree, GearSix, GitBranch, ListBullets, MagnifyingGlass, ShareNetwork } from '@phosphor-icons/react'
+import { CaretLeft, CaretRight, ChatCircle, CirclesThree, GearSix, GitBranch, MagnifyingGlass, ShareNetwork, Tray } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { ActionTooltip } from './ui/action-tooltip'
 import { Button } from './ui/button'
@@ -7,15 +7,19 @@ import { createTranslator, type AppLocale } from '../lib/i18n'
 import { trackRailDestinationClicked } from '../lib/productAnalytics'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import { readStoredBooleanPreference, writeStoredBooleanPreference } from '../lib/uiPreference'
-import { isMac } from '../utils/platform'
+import {
+  COMMAND_RAIL_TRAFFIC_LIGHT_INSET,
+  hasNativeMacosTrafficLights,
+} from '../utils/trafficLights'
 
-export type CommandRailDestination = 'chat' | 'notes' | 'graph' | 'mycelium' | 'research' | 'changes'
+export type CommandRailDestination = 'chat' | 'inbox' | 'graph' | 'mycelium' | 'research' | 'changes'
 
 interface CommandRailProps {
   locale: AppLocale
   activeDestination: CommandRailDestination
+  inboxCount?: number
   onSelectChat: () => void
-  onSelectNotes: () => void
+  onSelectInbox: () => void
   onSelectGraph: () => void
   onSelectMycelium: () => void
   onOpenResearch: () => void
@@ -30,7 +34,7 @@ const RAIL_EXPANDED_WIDTH = 168
 /**
  * Room for the macOS traffic lights, in both rail states.
  *
- * `tauri.conf.json` puts them at x=58, y=24. Expanded, the 168px rail runs
+ * `tauri.conf.json` puts them at x=58, y=16. Expanded, the 168px rail runs
  * underneath them. Collapsed, the 46px rail clears them horizontally — but the
  * lights then sit level with the first destination, close enough to read as
  * part of it. The visual audit's words: "the lights themselves still look
@@ -40,10 +44,9 @@ const RAIL_EXPANDED_WIDTH = 168
  * them the way it does in every macOS sidebar. Off-Mac there are no lights to
  * make room for, and the space would just be a dent in the top of the rail.
  */
-const RAIL_TRAFFIC_LIGHT_INSET = 52
-
 function RailButton({
   active,
+  badge,
   expanded,
   icon: IconComponent,
   label,
@@ -51,6 +54,7 @@ function RailButton({
   testId,
 }: {
   active: boolean
+  badge?: number
   expanded: boolean
   icon: Icon
   label: string
@@ -68,8 +72,8 @@ function RailButton({
       data-testid={testId}
       className={
         expanded
-          ? 'flex w-full items-center justify-start gap-2 rounded-[var(--radius)] px-2'
-          : 'rounded-[var(--radius)] p-0'
+          ? 'relative flex w-full items-center justify-start gap-2 rounded-[var(--radius)] px-2'
+          : 'relative rounded-[var(--radius)] p-0'
       }
       style={{
         width: expanded ? '100%' : RAIL_BUTTON_SIZE,
@@ -80,6 +84,16 @@ function RailButton({
     >
       <IconComponent size={RAIL_ICON_SIZE} weight={active ? 'fill' : 'regular'} />
       {expanded ? <span className="truncate text-[13px] leading-none">{label}</span> : null}
+      {badge && badge > 0 ? (
+        <span
+          className={expanded
+            ? 'ml-auto min-w-[18px] rounded-full bg-muted px-1.5 text-center text-[10px] leading-[18px]'
+            : 'absolute right-0 top-0 min-w-[14px] rounded-full bg-muted px-1 text-center text-[9px] leading-[14px]'}
+          aria-label={`${badge}`}
+        >
+          {badge > 99 ? '99+' : badge}
+        </span>
+      ) : null}
     </Button>
   )
 
@@ -102,8 +116,9 @@ function RailButton({
 export function CommandRail({
   locale,
   activeDestination,
+  inboxCount = 0,
   onSelectChat,
-  onSelectNotes,
+  onSelectInbox,
   onSelectGraph,
   onSelectMycelium,
   onOpenResearch,
@@ -123,7 +138,7 @@ export function CommandRail({
   }
   // Read once per render rather than memoised: the platform does not change,
   // and a stale memo here would be a dent in the wrong place.
-  const trafficLightRoom = isMac()
+  const trafficLightRoom = hasNativeMacosTrafficLights()
   const handleSelect = (destination: CommandRailDestination, action: () => void) => {
     trackRailDestinationClicked(destination)
     action()
@@ -136,7 +151,7 @@ export function CommandRail({
       data-expanded={expanded ? 'true' : 'false'}
       style={{
         width: expanded ? RAIL_EXPANDED_WIDTH : RAIL_COLLAPSED_WIDTH,
-        paddingTop: trafficLightRoom ? RAIL_TRAFFIC_LIGHT_INSET : undefined,
+        paddingTop: trafficLightRoom ? COMMAND_RAIL_TRAFFIC_LIGHT_INSET : undefined,
         background: 'var(--surface-sidebar)',
         borderRight: '1px solid var(--border-subtle)',
       }}
@@ -150,12 +165,13 @@ export function CommandRail({
         testId="command-rail-chat"
       />
       <RailButton
-        active={activeDestination === 'notes'}
+        active={activeDestination === 'inbox'}
+        badge={inboxCount}
         expanded={expanded}
-        icon={ListBullets}
-        label={t('rail.notes')}
-        onClick={() => handleSelect('notes', onSelectNotes)}
-        testId="command-rail-notes"
+        icon={Tray}
+        label={t('rail.inbox')}
+        onClick={() => handleSelect('inbox', onSelectInbox)}
+        testId="command-rail-inbox"
       />
       <RailButton
         active={activeDestination === 'graph'}

@@ -22,6 +22,7 @@ type WindowConstraintUpdater = (
 
 interface UseAppWindowControlsParams {
   layout: ReturnType<typeof useLayoutPanels>
+  unifiedVaultPanel?: boolean
   windowMode: boolean
 }
 
@@ -61,6 +62,7 @@ function useAppWindowActionRefs(): AppWindowActionRefs {
 
 function useMainWindowConstraintUpdater(
   layout: ReturnType<typeof useLayoutPanels>,
+  unifiedVaultPanel: boolean,
   windowMode: boolean,
 ): WindowConstraintUpdater {
   return useCallback((
@@ -77,6 +79,7 @@ function useMainWindowConstraintUpdater(
       sidebarWidth: layout.sidebarWidth,
       noteListWidth: layout.noteListWidth,
       inspectorWidth: layout.inspectorWidth,
+      unifiedVaultPanel,
     })
 
     void applyMainWindowSizeConstraints(minWidth, { growToFit: !isWindows() })
@@ -86,12 +89,14 @@ function useMainWindowConstraintUpdater(
     layout.inspectorWidth,
     layout.noteListWidth,
     layout.sidebarWidth,
+    unifiedVaultPanel,
     windowMode,
   ])
 }
 
 export function useAppWindowControls({
   layout,
+  unifiedVaultPanel = false,
   windowMode,
 }: UseAppWindowControlsParams): AppWindowControls {
   const {
@@ -107,7 +112,7 @@ export function useAppWindowControls({
   )
   const zoom = useZoom()
   const buildNumber = useBuildNumber()
-  const updateMainWindowConstraints = useMainWindowConstraintUpdater(layout, windowMode)
+  const updateMainWindowConstraints = useMainWindowConstraintUpdater(layout, unifiedVaultPanel, windowMode)
 
   const handleSetViewMode = useCallback((mode: ViewMode) => {
     setViewMode(mode)
@@ -137,6 +142,7 @@ export function useAppWindowControls({
     sidebarWidth: layout.sidebarWidth,
     noteListWidth: layout.noteListWidth,
     inspectorWidth: layout.inspectorWidth,
+    unifiedVaultPanel,
   })
 
   return {

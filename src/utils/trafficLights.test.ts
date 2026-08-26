@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isTauri } from '../mock-tauri'
-import { subheadTrafficLightInset } from './trafficLights'
+import {
+  COMMAND_RAIL_TRAFFIC_LIGHT_INSET,
+  MACOS_TRAFFIC_LIGHT_POSITION,
+  subheadTrafficLightInset,
+} from './trafficLights'
 
 vi.mock('../mock-tauri', () => ({
   isTauri: vi.fn(() => false),
@@ -22,7 +26,23 @@ function configuredTrafficLightX(): number {
   return position.x
 }
 
+function configuredTrafficLightPosition(): { x: number; y: number } {
+  const conf = JSON.parse(
+    readFileSync(`${process.cwd()}/src-tauri/tauri.conf.json`, 'utf8'),
+  ) as { app: { windows: Array<{ trafficLightPosition?: { x: number; y: number } }> } }
+  const position = conf.app.windows[0]?.trafficLightPosition
+  if (!position) throw new Error('main window has no trafficLightPosition')
+  return position
+}
+
 describe('subheadTrafficLightInset', () => {
+  it('keeps renderer geometry synchronized with the native config', () => {
+    expect(MACOS_TRAFFIC_LIGHT_POSITION).toEqual(configuredTrafficLightPosition())
+    expect(COMMAND_RAIL_TRAFFIC_LIGHT_INSET).toBeGreaterThan(
+      MACOS_TRAFFIC_LIGHT_POSITION.y + 16,
+    )
+  })
+
   const originalUserAgent = navigator.userAgent
 
   beforeEach(() => {

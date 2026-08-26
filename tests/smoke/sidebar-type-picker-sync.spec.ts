@@ -62,7 +62,7 @@ test.describe('Sidebar type picker stays in sync with live vault types', () => {
   })
 
   test('creating a missing Journal type updates the sidebar visibility picker immediately', async ({ page }) => {
-    await openFixtureVault(page, tempVaultDir)
+    await openFixtureVault(page, tempVaultDir, { initialPanel: 'notes' })
 
     await expect(page.locator('nav').getByText('Journals', { exact: true })).toHaveCount(0)
 
