@@ -971,7 +971,9 @@ pub fn run_mindwalk_open(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn start_mindwalk_sidecar(path: Option<String>) -> Result<crate::mycelium::MindwalkSidecarStatus, String> {
+pub fn start_mindwalk_sidecar(
+    path: Option<String>,
+) -> Result<crate::mycelium::MindwalkSidecarStatus, String> {
     crate::mycelium::start_mindwalk_sidecar(path.as_deref())
 }
 

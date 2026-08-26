@@ -16,7 +16,7 @@ function userMessage(text: string, id = 'u1'): PrimeTranscriptItem {
 function assistant(
   content: unknown[],
   text = '',
-  tools?: Array<{ id?: string; tool: string; path?: string }>,
+  tools?: Array<{ id?: string; tool: string; path?: string; detail?: string }>,
 ): PrimeTranscriptItem {
   return { kind: 'message', id: 'a1', message: { role: 'assistant', content, text }, tools }
 }
