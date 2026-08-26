@@ -227,3 +227,23 @@ export function primeSessionStatus(
 export function sortPrimeSessions(sessions: PrimeSessionSummary[]): PrimeSessionSummary[] {
   return [...sessions].sort((a, b) => (b.mtimeMs ?? -Infinity) - (a.mtimeMs ?? -Infinity))
 }
+
+/**
+ * Whether a session row belongs in a typed filter (#34).
+ *
+ * Title, place, and branch are already on the row. Conversation content is
+ * not — that would mean reading logs, and this list exists so opening it
+ * never does that. `displayTitle` is the label on screen, including any
+ * untitled suffix, so a search for what the user can see still hits.
+ */
+export function primeSessionMatchesQuery(
+  session: PrimeSessionSummary,
+  query: string,
+  displayTitle?: string | null,
+): boolean {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return true
+
+  const fields = [displayTitle, session.title, session.cwd, session.gitBranch]
+  return fields.some((field) => field?.toLowerCase().includes(needle))
+}
