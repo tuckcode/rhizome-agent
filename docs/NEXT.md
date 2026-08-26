@@ -89,8 +89,8 @@ becomes the editor. Captured in ADR-0166.
 **Shell and layout**
 | | |
 |---|---|
-| #27 | Session list as a dockable sidebar, not a toggled overlay — left column of Chat (always on in the chat-centered shell); GitHub still open pending live check |
-| #34 | No way to search or filter the session list — **implemented locally** (title / place / branch; native QA 2026-08-26) |
+| #27 | Session list as a dockable sidebar — **closed 2026-08-26** (left column of Chat) |
+| #34 | Session list filter — **closed 2026-08-26** (title / place / branch) |
 | #22 | Mycelium: Rhizome's visual language, and two entry points — **B** (graph/mycelium still take the canvas) |
 | #11 | Mycelium runs inside Rhizome instead of launching another app — **B** |
 | #39 | Make the knowledge graph an agent tool, not a place you visit — **B** |
@@ -108,7 +108,7 @@ becomes the editor. Captured in ADR-0166.
 |---|---|
 | #17 | Branch navigation within a conversation |
 | #18 | Transcript markers for actions that change what Prime remembers |
-| #31 | Name Prime sessions at creation — **implemented locally** (create-time name + rename from the list) |
+| #31 | Name Prime sessions at creation — **closed 2026-08-26** (create-time name + rename from the list) |
 | #23 | Sessions are searchable knowledge, not opaque logs |
 | #42 | Tool cards say "ipython" five times |
 
@@ -127,7 +127,7 @@ becomes the editor. Captured in ADR-0166.
 | #14 | Schedules and heartbeats: see, pause, cancel |
 | #13 | Menu bar dropdown shows what is running — see also C34 |
 | #36 | Timezone setting |
-| #29 | Redact credentials before chat content is written to the vault — **implemented locally** (not closed on GitHub yet) |
+| #29 | Redact credentials before chat content is written to the vault — **closed 2026-08-26** (`a8f83de`) |
 
 **Specs**
 | | |
@@ -135,10 +135,9 @@ becomes the editor. Captured in ADR-0166.
 | #5 | Spec: the Prime harness surface — parent of #40; **B** on §1 / `harness-composition.md` |
 | #40 | Harness or client — filter answered (ADR-0168); composition still discuss/decide |
 
-#29 was the only open issue with a security consequence. Local work: tokens-only
-`redactCredentialTokens`, distill redact-and-continue, Save-to-vault refuse.
-Prime session jsonl is out of scope. Close the GitHub issue after a live check
-if you want the tracker to match the tree.
+#29 was the only open issue with a security consequence. Closed 2026-08-26
+(`a8f83de`): tokens-only `redactCredentialTokens`, distill redact-and-continue,
+Save-to-vault refuse. Prime session jsonl stays out of scope.
 
 **Origin:** Grok 4.6 · 2026-08-25 — #29 implementation.
 
@@ -226,8 +225,8 @@ unprompted Prime verbs.
    Until ratified, do not graft. Closing **#40** against the filter is a
    side-errand, not a substitute.
 2. **Chat-centered shell shipped** (ADR-0166, 2026-08-25). Remaining canvas
-   question is Wiki Graph / Mycelium (#39 / #11 / #22). #34 session search
-   is in the tree (not closed on GitHub).
+   question is Wiki Graph / Mycelium (#39 / #11 / #22). #27 / #34 / #31
+   closed on GitHub 2026-08-26.
 3. **Memory loop (#24, #25)** — the product thesis, thinnest design coverage.
 4. **C28 and C31** whenever the push gate flakes on you — the natural reaction
    (re-run and move on) is exactly how they stay unfixed.
