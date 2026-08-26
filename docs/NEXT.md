@@ -108,7 +108,7 @@ becomes the editor. Captured in ADR-0166.
 |---|---|
 | #17 | Branch navigation within a conversation |
 | #18 | Transcript markers for actions that change what Prime remembers |
-| #31 | Name Prime sessions at creation |
+| #31 | Name Prime sessions at creation — **implemented locally** (create-time name + rename from the list) |
 | #23 | Sessions are searchable knowledge, not opaque logs |
 | #42 | Tool cards say "ipython" five times |
 

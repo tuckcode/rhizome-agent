@@ -153,6 +153,7 @@ let mockSettings: Settings = {
 
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
 const mockArchivedSessions = new Set<string>()
+const mockSessionNames = new Map<string, string>()
 
 let mockResearchFormats: Array<{ id: string, title: string, instruction: string }> = [
   {
@@ -662,6 +663,15 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     return null
   },
 
+  rename_prime_session: (args: { path?: string; name?: string }) => {
+    const name = args?.name?.trim()
+    if (!name) throw new Error('Session name cannot be empty')
+    const path = args?.path
+    if (!path) throw new Error('A session needs a path to rename')
+    mockSessionNames.set(path, name)
+    return null
+  },
+
   // Four rows rather than none, because an empty list makes the sessions
   // column invisible in `pnpm dev` — and that browser loop is where the
   // rendering of this list actually gets looked at. Chosen to exercise what
@@ -673,8 +683,12 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     const minutes = (n: number) => Date.now() - n * 60_000
     // One place decides what is filed, so every row agrees and the fixtures
     // below stay readable.
-    const filed = <T extends { id: string }>(rows: T[]) =>
-      rows.map((row) => ({ ...row, archived: mockArchivedSessions.has(row.id) }))
+    const filed = <T extends { id: string; path: string; title?: string }>(rows: T[]) =>
+      rows.map((row) => ({
+        ...row,
+        archived: mockArchivedSessions.has(row.id),
+        title: mockSessionNames.get(row.path) ?? row.title,
+      }))
     return filed([
       {
         id: '01a0252e-b9d5-71e9-83de-2bce32f65c06',

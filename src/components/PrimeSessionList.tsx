@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Archive, ArrowCounterClockwise, CaretRight, Plus } from '@phosphor-icons/react'
+import { Archive, ArrowCounterClockwise, CaretRight, PencilSimple, Plus } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -20,6 +20,7 @@ import {
   trackPrimeSessionListFiltered,
   trackPrimeSessionListOpened,
   trackPrimeSessionOpened,
+  trackPrimeSessionRenamed,
 } from '../lib/productAnalytics'
 import { usePrimeRunningSessionFiles } from '../hooks/usePrimeRunningSessionFiles'
 import { isTauri, mockInvoke } from '../mock-tauri'
@@ -75,12 +76,25 @@ function SessionRowFrame({ active, children }: { active: boolean; children: Reac
 }
 
 /**
- * The trailing icon action on a row — archive, or restore.
+ * Trailing icon actions on a row — rename, archive, restore.
  *
- * Hidden until the row is hovered or the button itself is focused, so a list
- * at rest is titles and nothing else. `focus-visible` is not optional here:
+ * Hidden until the row is hovered or something inside is focused, so a list
+ * at rest is titles and nothing else. `focus-within` is not optional here:
  * an action that only appears on hover is an action a keyboard cannot reach.
  */
+function SessionRowActions({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className={cn(
+        'absolute right-1 top-1/2 flex -translate-y-1/2 items-center opacity-0 transition-opacity',
+        'group-hover:opacity-100 focus-within:opacity-100',
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
 function SessionRowAction({
   label,
   icon,
@@ -98,13 +112,58 @@ function SessionRowAction({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className={cn(
-        'absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2 p-0 opacity-0 transition-opacity',
-        'group-hover:opacity-100 focus-visible:opacity-100',
-      )}
+      className="h-6 w-6 p-0"
     >
       {icon}
     </Button>
+  )
+}
+
+function SessionNameInput({
+  initialValue,
+  onCommit,
+  onCancel,
+  locale,
+}: {
+  initialValue: string
+  onCommit: (name: string) => void
+  onCancel: () => void
+  locale: AppLocale
+}) {
+  const t = createTranslator(locale)
+  const [value, setValue] = useState(initialValue)
+  const done = useRef(false)
+  const finish = (action: () => void) => {
+    if (done.current) return
+    done.current = true
+    action()
+  }
+
+  return (
+    <div className="grid w-full grid-cols-[6px_1fr] items-start gap-2 rounded-sm px-2 py-[9px] pr-2">
+      <span aria-hidden="true" className="mt-[5px] size-1.5 rounded-full border border-muted-foreground/50 bg-transparent" />
+      <Input
+        autoFocus
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        onFocus={(event) => event.currentTarget.select()}
+        onBlur={(event) => finish(() => onCommit(event.currentTarget.value))}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            finish(() => onCommit(event.currentTarget.value))
+          }
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            finish(onCancel)
+          }
+        }}
+        placeholder={t('ai.sessions.renamePlaceholder')}
+        aria-label={t('ai.sessions.renameAria')}
+        data-testid="prime-session-rename"
+        className="h-7 px-2 text-[12.5px] shadow-none md:text-[12.5px]"
+      />
+    </div>
   )
 }
 
@@ -131,7 +190,7 @@ function SessionRowButton({
       aria-current={active ? 'true' : undefined}
       className={cn(
         'grid w-full grid-cols-[6px_1fr] items-start gap-2 rounded-sm',
-        'px-2 py-[9px] pr-8 text-left',
+        'px-2 py-[9px] pr-14 text-left',
       )}
     >
       <span
@@ -176,6 +235,8 @@ function LiveSessionRow({
   active,
   status,
   onSelect,
+  renameLabel,
+  onRename,
   archiveLabel,
   onArchive,
 }: {
@@ -185,6 +246,8 @@ function LiveSessionRow({
   active: boolean
   status: PrimeSessionStatus
   onSelect: () => void
+  renameLabel: string
+  onRename: () => void
   archiveLabel: string
   onArchive: () => void
 }) {
@@ -198,7 +261,10 @@ function LiveSessionRow({
         status={status}
         onSelect={onSelect}
       />
-      <SessionRowAction label={archiveLabel} icon={<Archive size={13} />} onClick={onArchive} />
+      <SessionRowActions>
+        <SessionRowAction label={renameLabel} icon={<PencilSimple size={13} />} onClick={onRename} />
+        <SessionRowAction label={archiveLabel} icon={<Archive size={13} />} onClick={onArchive} />
+      </SessionRowActions>
     </SessionRowFrame>
   )
 }
@@ -210,6 +276,8 @@ function ArchivedSessionRow({
   meta,
   active,
   onSelect,
+  renameLabel,
+  onRename,
   restoreLabel,
   onRestore,
 }: {
@@ -218,6 +286,8 @@ function ArchivedSessionRow({
   meta: string | null
   active: boolean
   onSelect: () => void
+  renameLabel: string
+  onRename: () => void
   restoreLabel: string
   onRestore: () => void
 }) {
@@ -234,11 +304,14 @@ function ArchivedSessionRow({
         status="saved"
         onSelect={onSelect}
       />
-      <SessionRowAction
-        label={restoreLabel}
-        icon={<ArrowCounterClockwise size={13} />}
-        onClick={onRestore}
-      />
+      <SessionRowActions>
+        <SessionRowAction label={renameLabel} icon={<PencilSimple size={13} />} onClick={onRename} />
+        <SessionRowAction
+          label={restoreLabel}
+          icon={<ArrowCounterClockwise size={13} />}
+          onClick={onRestore}
+        />
+      </SessionRowActions>
     </SessionRowFrame>
   )
 }
@@ -263,9 +336,10 @@ export default function PrimeSessionList({
   // Captured when the data is read, not at render: the label should describe
   // the moment the list was true, and reading a clock in a memo is impure.
   const [loadedAt, setLoadedAt] = useState(() => Date.now())
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ kind: 'list' | 'action'; message: string } | null>(null)
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [renamingId, setRenamingId] = useState<string | null>(null)
   const filterTracked = useRef(false)
   // Which of these logs the daemon still holds. Polled only while this column
   // is mounted, which is while it is open.
@@ -304,7 +378,7 @@ export default function PrimeSessionList({
         failure = e instanceof Error ? e.message : String(e)
       }
       if (cancelled) return
-      setError(failure)
+      setError(failure ? { kind: 'list', message: failure } : null)
       setLoadedAt(Date.now())
       setSessions(listed)
       trackPrimeSessionListOpened(listed.length)
@@ -406,11 +480,64 @@ export default function PrimeSessionList({
               entry.id === session.id ? { ...entry, archived: !next } : entry,
             ),
           )
-          setError(e instanceof Error ? e.message : String(e))
+          setError({
+            kind: 'action',
+            message: e instanceof Error ? e.message : String(e),
+          })
         },
       )
     },
     [],
+  )
+
+  const startRename = useCallback((session: PrimeSessionSummary) => {
+    setRenamingId(session.id)
+  }, [])
+
+  const cancelRename = useCallback(() => {
+    setRenamingId(null)
+  }, [])
+
+  /**
+   * Name a session from the list.
+   *
+   * The title moves first and the host is told after, same as archiving:
+   * a rename is a label, and waiting on the daemon to redraw would make
+   * typing feel like it missed. A refusal puts the previous title back.
+   * An empty draft is not a name — the daemon rejects one — so it cancels
+   * rather than sending.
+   */
+  const commitRename = useCallback(
+    (session: PrimeSessionSummary, draft: string) => {
+      const name = draft.trim()
+      const previous = session.title?.trim() ?? ''
+      setRenamingId(null)
+      if (!name || name === previous) return
+
+      setSessions((current) =>
+        (current ?? []).map((entry) => (entry.id === session.id ? { ...entry, title: name } : entry)),
+      )
+      trackPrimeSessionRenamed()
+      void (async () => {
+        try {
+          if (vaultPath) {
+            await call('ensure_prime_session_host', { vaultPath })
+          }
+          await call('rename_prime_session', { path: session.path, name })
+        } catch (e: unknown) {
+          setSessions((current) =>
+            (current ?? []).map((entry) =>
+              entry.id === session.id ? { ...entry, title: session.title } : entry,
+            ),
+          )
+          setError({
+            kind: 'action',
+            message: e instanceof Error ? e.message : String(e),
+          })
+        }
+      })()
+    },
+    [vaultPath],
   )
 
   return (
@@ -436,7 +563,9 @@ export default function PrimeSessionList({
 
       {error ? (
         <p className="px-2.5 py-3 text-xs text-destructive" role="alert">
-          {t('ai.sessions.error', { message: error })}
+          {error.kind === 'list'
+            ? t('ai.sessions.error', { message: error.message })
+            : t('ai.sessions.actionError', { message: error.message })}
         </p>
       ) : null}
 
@@ -467,6 +596,18 @@ export default function PrimeSessionList({
             const title = titleFor.get(session.id) ?? untitled
             const active = Boolean(activeSessionPath) && session.path === activeSessionPath
             const status = statusFor.get(session.id) ?? 'saved'
+            if (renamingId === session.id) {
+              return (
+                <SessionRowFrame key={session.id} active={active}>
+                  <SessionNameInput
+                    initialValue={session.title?.trim() ?? ''}
+                    onCommit={(name) => commitRename(session, name)}
+                    onCancel={cancelRename}
+                    locale={locale}
+                  />
+                </SessionRowFrame>
+              )
+            }
             return (
               <LiveSessionRow
                 key={session.id}
@@ -476,6 +617,8 @@ export default function PrimeSessionList({
                 active={active}
                 status={status}
                 onSelect={() => select(session)}
+                renameLabel={t('ai.sessions.rename', { title })}
+                onRename={() => startRename(session)}
                 archiveLabel={t('ai.sessions.archive', { title })}
                 onArchive={() => setArchived(session, true)}
               />
@@ -507,6 +650,18 @@ export default function PrimeSessionList({
                     const title = titleFor.get(session.id) ?? untitled
                     const active =
                       Boolean(activeSessionPath) && session.path === activeSessionPath
+                    if (renamingId === session.id) {
+                      return (
+                        <SessionRowFrame key={session.id} active={active}>
+                          <SessionNameInput
+                            initialValue={session.title?.trim() ?? ''}
+                            onCommit={(name) => commitRename(session, name)}
+                            onCancel={cancelRename}
+                            locale={locale}
+                          />
+                        </SessionRowFrame>
+                      )
+                    }
                     return (
                       <ArchivedSessionRow
                         key={session.id}
@@ -515,6 +670,8 @@ export default function PrimeSessionList({
                         label={t('ai.sessions.selectAria', { title })}
                         active={active}
                         onSelect={() => select(session)}
+                        renameLabel={t('ai.sessions.rename', { title })}
+                        onRename={() => startRename(session)}
                         restoreLabel={t('ai.sessions.restore', { title })}
                         onRestore={() => setArchived(session, false)}
                       />

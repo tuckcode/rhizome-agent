@@ -171,6 +171,22 @@ describe('primeSessionRowTitles', () => {
     expect(titles[1]).not.toBe(titles[2])
   })
 
+  /**
+   * #31. A session Rhizome named at creation — or the user renamed from the
+   * list — already has a label. The id tail must not be stamped on again.
+   */
+  it('leaves a named session alone', () => {
+    const titles = primeSessionRowTitles(
+      [
+        session({ id: 'aaaaaa111111', title: 'Rhizome · Notes · f65c06' }),
+        session({ id: 'bbbbbb222222' }),
+      ],
+      UNTITLED,
+    )
+
+    expect(titles).toEqual(['Rhizome · Notes · f65c06', 'Untitled'])
+  })
+
   it('returns a title per session, in order, for an empty list too', () => {
     expect(primeSessionRowTitles([], UNTITLED)).toEqual([])
   })
