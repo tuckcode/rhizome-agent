@@ -397,6 +397,18 @@ export function trackPrimeSessionArchived(archived: boolean): void {
   trackEvent('prime_session_archived', { archived: archived ? 'yes' : 'no' })
 }
 
+/**
+ * Someone typed in the session list filter (#34).
+ *
+ * Whether people reach for search answers whether curation is enough.
+ * `match_count` is a size bucket, never the query — the query is theirs.
+ */
+export function trackPrimeSessionListFiltered(matchCount: number): void {
+  trackEvent('prime_session_list_filtered', {
+    match_count: sessionCountBucket(matchCount),
+  })
+}
+
 /** Coarse buckets — an exact count of someone's sessions is not our business. */
 function sessionCountBucket(count: number): '0' | '1-5' | '6-20' | '21-50' | '50+' {
   if (count <= 0) return '0'

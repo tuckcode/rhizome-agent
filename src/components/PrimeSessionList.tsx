@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Archive, ArrowCounterClockwise, CaretRight, Plus } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import {
   primeSessionAge,
+  primeSessionMatchesQuery,
   primeSessionMetaLabel,
   primeSessionRowTitles,
   primeSessionStatus,
@@ -15,6 +17,7 @@ import {
 } from '../lib/primeSessionMeta'
 import {
   trackPrimeSessionArchived,
+  trackPrimeSessionListFiltered,
   trackPrimeSessionListOpened,
   trackPrimeSessionOpened,
 } from '../lib/productAnalytics'
@@ -262,6 +265,8 @@ export default function PrimeSessionList({
   const [loadedAt, setLoadedAt] = useState(() => Date.now())
   const [error, setError] = useState<string | null>(null)
   const [archiveOpen, setArchiveOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const filterTracked = useRef(false)
   // Which of these logs the daemon still holds. Polled only while this column
   // is mounted, which is while it is open.
   const running = usePrimeRunningSessionFiles(true)
@@ -354,6 +359,21 @@ export default function PrimeSessionList({
   const titleFor = new Map(ordered.map((session, index) => [session.id, titles[index] ?? untitled]))
   const live = ordered.filter((session) => !session.archived)
   const archived = ordered.filter((session) => session.archived)
+  const searching = query.trim().length > 0
+  const visibleLive = live.filter((session) =>
+    primeSessionMatchesQuery(session, query, titleFor.get(session.id)),
+  )
+  const visibleArchived = archived.filter((session) =>
+    primeSessionMatchesQuery(session, query, titleFor.get(session.id)),
+  )
+  const noMatches = searching && visibleLive.length === 0 && visibleArchived.length === 0
+  const showArchived = archiveOpen || (searching && visibleArchived.length > 0)
+
+  useEffect(() => {
+    if (!searching || filterTracked.current) return
+    filterTracked.current = true
+    trackPrimeSessionListFiltered(visibleLive.length + visibleArchived.length)
+  }, [searching, visibleArchived.length, visibleLive.length])
 
   const select = useCallback(
     (session: PrimeSessionSummary) => {
@@ -420,13 +440,30 @@ export default function PrimeSessionList({
         </p>
       ) : null}
 
+      {sessions !== null && ordered.length > 0 ? (
+        <div className="px-2 pb-1.5 pt-1.5">
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('ai.sessions.searchPlaceholder')}
+            aria-label={t('ai.sessions.search')}
+            data-testid="prime-session-search"
+            className="h-7 px-2 text-[12px] shadow-none md:text-[12px]"
+          />
+        </div>
+      ) : null}
+
       {sessions !== null && !error && ordered.length === 0 ? (
         <p className="px-2.5 py-3 text-xs text-muted-foreground">{t('ai.sessions.empty')}</p>
       ) : null}
 
+      {noMatches ? (
+        <p className="px-2.5 py-3 text-xs text-muted-foreground">{t('ai.sessions.noMatches')}</p>
+      ) : null}
+
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-0.5 p-1.5">
-          {live.map((session) => {
+          {visibleLive.map((session) => {
             const title = titleFor.get(session.id) ?? untitled
             const active = Boolean(activeSessionPath) && session.path === activeSessionPath
             const status = statusFor.get(session.id) ?? 'saved'
@@ -445,13 +482,13 @@ export default function PrimeSessionList({
             )
           })}
 
-          {archived.length > 0 ? (
+          {visibleArchived.length > 0 ? (
             <>
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => setArchiveOpen((open) => !open)}
-                aria-expanded={archiveOpen}
+                aria-expanded={showArchived}
                 className={cn(
                   'mt-1 h-7 justify-start gap-1 px-2 font-mono text-[10px] uppercase',
                   'tracking-[0.1em] text-muted-foreground',
@@ -460,13 +497,13 @@ export default function PrimeSessionList({
                 <CaretRight
                   size={10}
                   aria-hidden="true"
-                  className={cn('transition-transform', archiveOpen && 'rotate-90')}
+                  className={cn('transition-transform', showArchived && 'rotate-90')}
                 />
-                {t('ai.sessions.archivedSection')} ({archived.length})
+                {t('ai.sessions.archivedSection')} ({visibleArchived.length})
               </Button>
 
-              {archiveOpen
-                ? archived.map((session) => {
+              {showArchived
+                ? visibleArchived.map((session) => {
                     const title = titleFor.get(session.id) ?? untitled
                     const active =
                       Boolean(activeSessionPath) && session.path === activeSessionPath

@@ -29,11 +29,13 @@ const tracked = vi.hoisted(() => ({
   opened: [] as number[],
   selected: [] as string[],
   archived: [] as boolean[],
+  filtered: [] as number[],
 }))
 vi.mock('../lib/productAnalytics', () => ({
   trackPrimeSessionListOpened: (count: number) => tracked.opened.push(count),
   trackPrimeSessionOpened: (age: string) => tracked.selected.push(age),
   trackPrimeSessionArchived: (archived: boolean) => tracked.archived.push(archived),
+  trackPrimeSessionListFiltered: (count: number) => tracked.filtered.push(count),
 }))
 
 const NOW = new Date(2026, 7, 13, 15, 0, 0).getTime()
@@ -53,6 +55,7 @@ beforeEach(() => {
   tracked.opened = []
   tracked.selected = []
   tracked.archived = []
+  tracked.filtered = []
 })
 
 describe('PrimeSessionList', () => {
@@ -371,6 +374,51 @@ describe('PrimeSessionList', () => {
 
     await waitFor(() => expect(tracked.opened).toEqual([1]))
     expect(tracked.selected).toEqual(['week'])
+  })
+
+  it('filters the list by title and says when nothing matches', async () => {
+    invoked.result = [
+      summary({ id: 'a', title: 'Vault watcher' }),
+      summary({ id: 'b', title: 'Release notes' }),
+    ]
+
+    render(<PrimeSessionList now={NOW} />)
+    const search = await screen.findByRole('textbox', { name: 'Filter sessions' })
+    fireEvent.change(search, { target: { value: 'vault' } })
+
+    expect(screen.getByRole('button', { name: 'Open session Vault watcher' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Open session Release notes' })).not.toBeInTheDocument()
+    expect(tracked.filtered).toEqual([1])
+
+    fireEvent.change(search, { target: { value: 'nope' } })
+    expect(screen.getByText('No sessions match.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Open session/ })).not.toBeInTheDocument()
+  })
+
+  it('searches archived rows instead of silently hiding them', async () => {
+    invoked.result = [
+      summary({ id: 'a', title: 'Live vault work' }),
+      summary({ id: 'b', title: 'Old vault watcher', archived: true }),
+    ]
+
+    render(<PrimeSessionList now={NOW} />)
+    await screen.findByText('Live vault work')
+    expect(screen.queryByText('Old vault watcher')).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Filter sessions' }), {
+      target: { value: 'watcher' },
+    })
+
+    expect(await screen.findByText('Old vault watcher')).toBeInTheDocument()
+    expect(screen.queryByText('Live vault work')).not.toBeInTheDocument()
+  })
+
+  it('keeps the empty-store copy distinct from a failed search', async () => {
+    render(<PrimeSessionList now={NOW} />)
+
+    expect(await screen.findByText(/No Prime sessions yet/)).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Filter sessions' })).not.toBeInTheDocument()
+    expect(screen.queryByText('No sessions match.')).not.toBeInTheDocument()
   })
 
   it('offers a new chat only when the caller can start one', async () => {

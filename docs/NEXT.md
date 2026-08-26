@@ -90,7 +90,7 @@ becomes the editor. Captured in ADR-0166.
 | | |
 |---|---|
 | #27 | Session list as a dockable sidebar, not a toggled overlay — left column of Chat (always on in the chat-centered shell); GitHub still open pending live check |
-| #34 | No way to search or filter the session list — unblocked; the panel is the Chat sessions column |
+| #34 | No way to search or filter the session list — **implemented locally** (title / place / branch; native QA 2026-08-26) |
 | #22 | Mycelium: Rhizome's visual language, and two entry points — **B** (graph/mycelium still take the canvas) |
 | #11 | Mycelium runs inside Rhizome instead of launching another app — **B** |
 | #39 | Make the knowledge graph an agent tool, not a place you visit — **B** |
@@ -226,8 +226,8 @@ unprompted Prime verbs.
    Until ratified, do not graft. Closing **#40** against the filter is a
    side-errand, not a substitute.
 2. **Chat-centered shell shipped** (ADR-0166, 2026-08-25). Remaining canvas
-   question is Wiki Graph / Mycelium (#39 / #11 / #22). #34 is session search
-   on the Chat sessions column.
+   question is Wiki Graph / Mycelium (#39 / #11 / #22). #34 session search
+   is in the tree (not closed on GitHub).
 3. **Memory loop (#24, #25)** — the product thesis, thinnest design coverage.
 4. **C28 and C31** whenever the push gate flakes on you — the natural reaction
    (re-run and move on) is exactly how they stay unfixed.

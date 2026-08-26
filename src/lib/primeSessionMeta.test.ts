@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   primeSessionAge,
+  primeSessionMatchesQuery,
   primeSessionMetaLabel,
   primeSessionPlace,
   primeSessionRowTitles,
@@ -357,5 +358,29 @@ describe('primeSessionStatus', () => {
     const running = new Map([['/sessions/a.jsonl', true]])
 
     expect(primeSessionStatus(at('/sessions/b.jsonl'), running)).toBe('saved')
+  })
+})
+
+describe('primeSessionMatchesQuery', () => {
+  it('keeps every row when the query is blank', () => {
+    expect(primeSessionMatchesQuery(session({ title: 'Vault watcher' }), '   ')).toBe(true)
+  })
+
+  it('matches the title the user can see, not only the stored name', () => {
+    const untitled = session({ title: null })
+    expect(primeSessionMatchesQuery(untitled, 'f65c06', 'Untitled session · f65c06')).toBe(true)
+    expect(primeSessionMatchesQuery(untitled, 'vault', 'Untitled session · f65c06')).toBe(false)
+  })
+
+  it('matches place and branch so a search for where it ran still hits', () => {
+    const row = session({
+      title: 'Watch the inbox',
+      cwd: '/Users/dtc/code/projects/rhizome-agent',
+      gitBranch: 'shell-harden',
+    })
+
+    expect(primeSessionMatchesQuery(row, 'rhizome-agent')).toBe(true)
+    expect(primeSessionMatchesQuery(row, 'shell-harden')).toBe(true)
+    expect(primeSessionMatchesQuery(row, 'desktop')).toBe(false)
   })
 })
