@@ -110,7 +110,7 @@ becomes the editor. Captured in ADR-0166.
 | #18 | Transcript markers for actions that change what Prime remembers |
 | #31 | Name Prime sessions at creation — **closed 2026-08-26** (create-time name + rename from the list) |
 | #23 | Sessions are searchable knowledge, not opaque logs |
-| #42 | Tool cards say "ipython" five times — **implemented locally** (`%%bash` → command; consecutive names grouped; GitHub still open) |
+| #42 | Tool cards say "ipython" five times — **closed 2026-08-26** (expandable Tool use group; `%%bash` → command) |
 
 **Memory loop** — the product thesis; least covered by design docs
 | | |
