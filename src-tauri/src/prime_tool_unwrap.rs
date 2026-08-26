@@ -40,6 +40,9 @@ pub struct UnwrappedTool {
     /// Note the call acts on, when the arguments name one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    /// First meaningful command or Python line, when the wrapper hid it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
     /// True when this was recovered from a wrapper rather than reported directly.
     pub unwrapped: bool,
 }
@@ -56,6 +59,7 @@ pub fn unwrap_tool(name: &str, arguments: &serde_json::Value) -> UnwrappedTool {
             return UnwrappedTool {
                 tool: reported.to_string(),
                 path: Some(direct),
+                detail: None,
                 unwrapped: false,
             };
         }
@@ -65,6 +69,7 @@ pub fn unwrap_tool(name: &str, arguments: &serde_json::Value) -> UnwrappedTool {
         return UnwrappedTool {
             tool: reported.to_string(),
             path: None,
+            detail: None,
             unwrapped: false,
         };
     }
@@ -73,22 +78,36 @@ pub fn unwrap_tool(name: &str, arguments: &serde_json::Value) -> UnwrappedTool {
         return UnwrappedTool {
             tool: reported.to_string(),
             path: None,
+            detail: None,
             unwrapped: false,
         };
     };
 
-    match parse_cli_invocation(&code) {
-        Some((tool, path)) => UnwrappedTool {
+    if let Some((tool, path)) = parse_cli_invocation(&code) {
+        return UnwrappedTool {
             tool,
             path,
+            detail: None,
             unwrapped: true,
-        },
-        // A wrapper doing something else entirely — say so rather than guess.
-        None => UnwrappedTool {
-            tool: reported.to_string(),
+        };
+    }
+
+    // Same %%bash cell Mindwalk already rewrites. Vault CLI is handled above;
+    // this is research/shell that used to stay a bare "ipython".
+    if let Some(bash) = crate::mycelium::extract_bash_from_ipython(&code) {
+        return UnwrappedTool {
+            tool: "bash".to_string(),
             path: None,
-            unwrapped: false,
-        },
+            detail: compact_preview(&bash),
+            unwrapped: true,
+        };
+    }
+
+    UnwrappedTool {
+        tool: reported.to_string(),
+        path: None,
+        detail: first_meaningful_python_line(&code),
+        unwrapped: false,
     }
 }
 
@@ -166,6 +185,36 @@ fn path_from_json_argument(argument: &str) -> Option<String> {
         }
     }
     None
+}
+
+const PREVIEW_MAX: usize = 80;
+
+fn compact_preview(text: &str) -> Option<String> {
+    let line = text
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty() && !line.starts_with('#'))?;
+    let collapsed = line.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.is_empty() {
+        return None;
+    }
+    if collapsed.chars().count() > PREVIEW_MAX {
+        let truncated: String = collapsed.chars().take(PREVIEW_MAX).collect();
+        Some(format!("{truncated}…"))
+    } else {
+        Some(collapsed)
+    }
+}
+
+fn first_meaningful_python_line(code: &str) -> Option<String> {
+    let line = code.lines().map(str::trim).find(|line| {
+        !line.is_empty()
+            && !line.starts_with('#')
+            && !line.starts_with("%%")
+            && !line.starts_with("import ")
+            && !line.starts_with("from ")
+    })?;
+    compact_preview(line)
 }
 
 fn path_for_key(argument: &str, key: &str) -> Option<String> {
@@ -311,6 +360,33 @@ mod tests {
             unwrap_tool("ipython", &serde_json::Value::Null).tool,
             "ipython"
         );
+    }
+
+    #[test]
+    fn a_bash_cell_reports_the_command_not_ipython() {
+        let unwrapped = unwrap_tool(
+            "ipython",
+            &serde_json::json!({ "code": "%%bash\nrg foo wiki/\n" }),
+        );
+
+        assert_eq!(unwrapped.tool, "bash");
+        assert_eq!(unwrapped.detail.as_deref(), Some("rg foo wiki/"));
+        assert!(unwrapped.unwrapped);
+        assert_eq!(unwrapped.path, None);
+    }
+
+    #[test]
+    fn a_plain_python_cell_keeps_ipython_and_shows_the_first_line() {
+        let unwrapped = unwrap_tool(
+            "ipython",
+            &serde_json::json!({
+                "code": "import os\nprint(sum(range(10)))\n"
+            }),
+        );
+
+        assert_eq!(unwrapped.tool, "ipython");
+        assert_eq!(unwrapped.detail.as_deref(), Some("print(sum(range(10)))"));
+        assert!(!unwrapped.unwrapped);
     }
 
     #[test]

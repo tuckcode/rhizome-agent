@@ -31,6 +31,8 @@ type IconRenderer = (size: number) => ReactNode
 const TOOL_ICON_MAP: Record<string, IconRenderer> = {
   // Native Claude Code tools
   Bash: (s) => <Terminal size={s} />,
+  bash: (s) => <Terminal size={s} />,
+  ipython: (s) => <Terminal size={s} />,
   Write: (s) => <PencilSimple size={s} />,
   Edit: (s) => <NotePencil size={s} />,
   Read: (s) => <File size={s} />,

@@ -146,6 +146,24 @@ describe('AiMessage', () => {
     expect(screen.getAllByTestId('ai-action-card')).toHaveLength(2)
   })
 
+  it('groups five identical tool names into one counted row', () => {
+    render(
+      <AiMessage
+        userMessage="research"
+        actions={Array.from({ length: 5 }, (_, index) => ({
+          tool: 'ipython',
+          toolId: `t${index}`,
+          label: 'ipython',
+          status: 'done' as const,
+        }))}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('tool-use-count').textContent).toBe('5')
+    expect(screen.getAllByTestId('ai-action-card')).toHaveLength(1)
+    expect(screen.getByText('ipython ×5')).toBeTruthy()
+  })
+
   it('passes onOpenNote to action cards', () => {
     const onOpenNote = vi.fn()
     render(

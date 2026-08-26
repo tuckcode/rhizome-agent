@@ -155,9 +155,14 @@ where
     let unwrapped = crate::prime_tool_unwrap::unwrap_tool(&tool_name(json), &args);
 
     emit(AiAgentStreamEvent::ToolStart {
-        tool_name: unwrapped.tool,
+        tool_name: unwrapped.tool.clone(),
         tool_id: tool_id(json),
-        input: tool_input_with_path(&args, unwrapped.path.as_deref()),
+        input: tool_input_with_recovery(
+            &args,
+            unwrapped.path.as_deref(),
+            unwrapped.detail.as_deref(),
+            &unwrapped.tool,
+        ),
     });
 }
 
@@ -167,20 +172,48 @@ where
 /// object carrying `path` (`notePathFromToolInput`). Putting the unwrapped path
 /// there means the affordance works for shelled-out calls without the UI
 /// needing to know wrappers exist.
-fn tool_input_with_path(args: &serde_json::Value, path: Option<&str>) -> Option<String> {
-    let Some(path) = path else {
+fn tool_input_with_recovery(
+    args: &serde_json::Value,
+    path: Option<&str>,
+    detail: Option<&str>,
+    tool: &str,
+) -> Option<String> {
+    if path.is_none() && detail.is_none() {
         return (!args.is_null()).then(|| args.to_string());
-    };
+    }
 
     let mut merged = args.clone();
     match merged.as_object_mut() {
         Some(object) => {
-            object.insert("path".into(), serde_json::Value::String(path.to_string()));
+            if let Some(path) = path {
+                object.insert("path".into(), serde_json::Value::String(path.to_string()));
+            }
+            if let Some(detail) = detail {
+                let key = if tool.eq_ignore_ascii_case("bash") {
+                    "command"
+                } else {
+                    "preview"
+                };
+                object.insert(key.into(), serde_json::Value::String(detail.to_string()));
+            }
             Some(merged.to_string())
         }
-        // Arguments that are not an object (a bare command string) still have
-        // to yield a path, so wrap them rather than dropping either one.
-        None => Some(serde_json::json!({ "path": path, "raw": args }).to_string()),
+        None => {
+            let mut wrapped = serde_json::Map::new();
+            if let Some(path) = path {
+                wrapped.insert("path".into(), serde_json::Value::String(path.to_string()));
+            }
+            if let Some(detail) = detail {
+                let key = if tool.eq_ignore_ascii_case("bash") {
+                    "command"
+                } else {
+                    "preview"
+                };
+                wrapped.insert(key.into(), serde_json::Value::String(detail.to_string()));
+            }
+            wrapped.insert("raw".into(), args.clone());
+            Some(serde_json::Value::Object(wrapped).to_string())
+        }
     }
 }
 
@@ -345,6 +378,28 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_bash_cell_reaches_the_ui_as_the_command() {
+        let events = collect(serde_json::json!({
+            "type": "tool_execution_start",
+            "toolName": "ipython",
+            "toolCallId": "call-bash",
+            "args": {"code": "%%bash\nrg foo wiki/\n"},
+        }));
+
+        match &events[0] {
+            AiAgentStreamEvent::ToolStart {
+                tool_name, input, ..
+            } => {
+                assert_eq!(tool_name, "bash");
+                let parsed: serde_json::Value =
+                    serde_json::from_str(input.as_deref().unwrap()).expect("input is json");
+                assert_eq!(parsed["command"], "rg foo wiki/");
+            }
+            other => panic!("expected a tool start, got {other:?}"),
+        }
+    }
+
     /// A wrapper doing something unrelated keeps its own name and offers no
     /// Open — a card pointing at a note it never touched is worse than none.
     #[test]
@@ -364,6 +419,7 @@ mod tests {
                 let parsed: serde_json::Value =
                     serde_json::from_str(input.as_deref().unwrap()).expect("input is json");
                 assert!(parsed.get("path").is_none());
+                assert_eq!(parsed["preview"], "print(1 + 1)");
             }
             other => panic!("expected a tool start, got {other:?}"),
         }
