@@ -5,6 +5,7 @@ import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
 
 const invoked = vi.hoisted(() => ({
   calls: [] as string[],
+  args: [] as Array<Record<string, unknown> | undefined>,
   result: [] as unknown[],
   roster: [] as unknown[],
   rosterFails: false,
@@ -13,8 +14,9 @@ const invoked = vi.hoisted(() => ({
 
 vi.mock('../mock-tauri', () => ({
   isTauri: () => false,
-  mockInvoke: (cmd: string) => {
+  mockInvoke: (cmd: string, args?: Record<string, unknown>) => {
     invoked.calls.push(cmd)
+    invoked.args.push(args)
     if (cmd === 'list_prime_running_sessions') {
       return invoked.rosterFails
         ? Promise.reject(new Error('daemon unreachable'))
@@ -30,12 +32,16 @@ const tracked = vi.hoisted(() => ({
   selected: [] as string[],
   archived: [] as boolean[],
   filtered: [] as number[],
+  renamed: 0,
 }))
 vi.mock('../lib/productAnalytics', () => ({
   trackPrimeSessionListOpened: (count: number) => tracked.opened.push(count),
   trackPrimeSessionOpened: (age: string) => tracked.selected.push(age),
   trackPrimeSessionArchived: (archived: boolean) => tracked.archived.push(archived),
   trackPrimeSessionListFiltered: (count: number) => tracked.filtered.push(count),
+  trackPrimeSessionRenamed: () => {
+    tracked.renamed += 1
+  },
 }))
 
 const NOW = new Date(2026, 7, 13, 15, 0, 0).getTime()
@@ -48,6 +54,7 @@ function summary(overrides: Partial<PrimeSessionSummary> = {}): PrimeSessionSumm
 
 beforeEach(() => {
   invoked.calls = []
+  invoked.args = []
   invoked.result = []
   invoked.roster = []
   invoked.rosterFails = false
@@ -56,6 +63,7 @@ beforeEach(() => {
   tracked.selected = []
   tracked.archived = []
   tracked.filtered = []
+  tracked.renamed = 0
 })
 
 describe('PrimeSessionList', () => {
@@ -272,6 +280,74 @@ describe('PrimeSessionList', () => {
       expect(await screen.findByRole('alert')).toBeInTheDocument()
       expect(screen.getByText('File me')).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: /Archived/ })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('renaming', () => {
+    /**
+     * #31. The list is where a name is given, not a place that waits for the
+     * first message to invent one. The title moves first; the host is told
+     * the log path and the new name — `rename_saved_session`, not the
+     * live-session `set_session_name`.
+     */
+    it('renames a session from the list and tells the host', async () => {
+      invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: 'File me' })]
+
+      render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+      fireEvent.click(await screen.findByRole('button', { name: 'Rename File me' }))
+
+      const input = screen.getByTestId('prime-session-rename')
+      fireEvent.change(input, { target: { value: 'Inbox triage' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      expect(await screen.findByText('Inbox triage')).toBeInTheDocument()
+      expect(invoked.calls).toContain('rename_prime_session')
+      expect(invoked.args).toContainEqual({ path: '/sessions/a.jsonl', name: 'Inbox triage' })
+      expect(tracked.renamed).toBe(1)
+    })
+
+    it('does not send a blank name, and unnamed sessions still fall back', async () => {
+      invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: null })]
+
+      render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+      expect(await screen.findByText('Untitled session')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Rename Untitled session' }))
+      fireEvent.change(screen.getByTestId('prime-session-rename'), { target: { value: '   ' } })
+      fireEvent.keyDown(screen.getByTestId('prime-session-rename'), { key: 'Enter' })
+
+      expect(await screen.findByText('Untitled session')).toBeInTheDocument()
+      expect(invoked.calls).not.toContain('rename_prime_session')
+      expect(tracked.renamed).toBe(0)
+    })
+
+    it('puts the previous title back when the host refuses', async () => {
+      invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: 'Keep me' })]
+
+      render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+      fireEvent.click(await screen.findByRole('button', { name: 'Rename Keep me' }))
+      invoked.fail = 'daemon refused'
+      fireEvent.change(screen.getByTestId('prime-session-rename'), {
+        target: { value: 'New name' },
+      })
+      fireEvent.keyDown(screen.getByTestId('prime-session-rename'), { key: 'Enter' })
+
+      expect(await screen.findByRole('alert')).toBeInTheDocument()
+      expect(screen.getByText('Keep me')).toBeInTheDocument()
+    })
+
+    it('cancels without talking to the host', async () => {
+      invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: 'Keep me' })]
+
+      render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+      fireEvent.click(await screen.findByRole('button', { name: 'Rename Keep me' }))
+      fireEvent.change(screen.getByTestId('prime-session-rename'), {
+        target: { value: 'Changed my mind' },
+      })
+      fireEvent.keyDown(screen.getByTestId('prime-session-rename'), { key: 'Escape' })
+
+      expect(await screen.findByText('Keep me')).toBeInTheDocument()
+      expect(invoked.calls).not.toContain('rename_prime_session')
     })
   })
 

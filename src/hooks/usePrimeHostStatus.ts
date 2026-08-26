@@ -68,32 +68,46 @@ export function usePrimeHostStatus(enabled = true, vaultPath?: string): PrimeHos
     if (!enabled) return
 
     let cancelled = false
-    const refresh = () => {
-      void callHost<PrimeHostStatus>('get_prime_session_host_status')
-        .then((next) => {
-          if (!cancelled) setStatus(next)
-        })
-        .catch(() => {
-          if (!cancelled) setStatus(EMPTY)
-        })
-    }
 
-    const start = async () => {
-      if (vaultPath) {
-        try {
-          await callHost('ensure_prime_session_host', { vaultPath })
-        } catch {
-          // Status poll still runs — chip shows not-running instead of hanging.
-        }
+    const connect = async () => {
+      if (!vaultPath) return
+      try {
+        await callHost('ensure_prime_session_host', { vaultPath })
+      } catch {
+        // Status poll still runs — chip shows not-running instead of hanging.
       }
-      if (!cancelled) refresh()
     }
 
-    void start()
-    const id = window.setInterval(refresh, 4000)
+    const refresh = async () => {
+      try {
+        let next = await callHost<PrimeHostStatus>('get_prime_session_host_status')
+        // A test build often loses the first connect: the window is up before
+        // Prime's service is listening. Polling status alone then freezes the
+        // chip on "Model" for the rest of the session. If we are down and we
+        // have a vault, try again — a refused socket is cheap.
+        if (!next.running && vaultPath) {
+          await connect()
+          next = await callHost<PrimeHostStatus>('get_prime_session_host_status')
+        }
+        if (!cancelled) setStatus(next)
+      } catch {
+        if (!cancelled) setStatus(EMPTY)
+      }
+    }
+
+    void (async () => {
+      await connect()
+      if (!cancelled) await refresh()
+    })()
+    const id = window.setInterval(() => {
+      void refresh()
+    }, 4000)
     const onVisible = () => {
       if (document.visibilityState !== 'visible' || !vaultPath) return
-      void start()
+      void (async () => {
+        await connect()
+        if (!cancelled) await refresh()
+      })()
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => {

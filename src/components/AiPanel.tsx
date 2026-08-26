@@ -250,7 +250,7 @@ export function AiPanelView({
     handleNewChat,
   } = controller
   const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime'
-  const primeHost = usePrimeHostStatus(isPrimeTarget)
+  const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath ?? undefined)
   const modelLabel = isPrimeTarget ? primeModelLabel(primeHost) : null
   // Refresh when a turn finishes rather than only on the interval, so context
   // usage reflects the exchange that just happened.
@@ -596,6 +596,9 @@ export function AiPanelView({
 
     setSwitchError(null)
     try {
+      if (vaultPath) {
+        await callHost('ensure_prime_session_host', { vaultPath })
+      }
       await callHost<string>('switch_prime_session', { path: session.path })
       const transcript = await callHost<PrimeTranscriptItem[]>('read_prime_session_transcript', {
         path: session.path,
@@ -611,7 +614,7 @@ export function AiPanelView({
     } catch (e) {
       setSwitchError(e instanceof Error ? e.message : String(e))
     }
-  }, [agent, refreshSessionTree])
+  }, [agent, refreshSessionTree, vaultPath])
 
   // A roster row clicked in the menu bar lands here (#13). Reuses the same
   // switch path as the in-app session list so there is one way to change

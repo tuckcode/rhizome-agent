@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -29,6 +30,8 @@ use std::time::{Duration, Instant};
 
 const DAEMON_RESPONSE_TIMEOUT: Duration = Duration::from_secs(30);
 const DAEMON_HELLO_TIMEOUT: Duration = Duration::from_secs(10);
+/// Prime's own CLI waits 30s for `ensureDaemonRunning` (installed 0.8.0).
+const DAEMON_STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 const TURN_IDLE_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 
 /// Protocol Rhizome speaks. Verified against `prime-agent` 0.7.1, whose
@@ -545,9 +548,10 @@ enum SessionOwnership {
 ///
 /// Prime computes this as `<tmpdir>/prime-agent-<uid>/daemon.sock`
 /// (`defaultDaemonSocketPath`, read from the installed 0.7.1 build). Checked in
-/// order: the env override, then that default, then whatever `prime-agent
-/// status` reports — the last covers a daemon deliberately started elsewhere,
-/// and costs a subprocess only when the default is absent.
+/// order: the env override, then that default — even if the socket file is
+/// missing, because that is where we spawn a cold supervisor — then whatever
+/// `prime-agent status` reports. Status covers a daemon deliberately started
+/// elsewhere, and costs a subprocess only when the default path is unknown.
 fn daemon_socket_path() -> Result<PathBuf, String> {
     if let Some(path) = std::env::var_os(DAEMON_SOCKET_ENV) {
         let path = PathBuf::from(path);
@@ -558,15 +562,114 @@ fn daemon_socket_path() -> Result<PathBuf, String> {
     }
 
     if let Some(path) = default_daemon_socket_path() {
-        if default_daemon_path_is_present(&path) {
-            return Ok(path);
-        }
+        return Ok(path);
     }
 
     reported_daemon_socket_path().ok_or_else(|| {
         "Prime's background service is not reachable. Check it with `prime-agent status`."
             .to_string()
     })
+}
+
+/// Whether the socket path came from `RHIZOME_PRIME_DAEMON_SOCKET`.
+///
+/// Tests and explicit overrides point at a listener we must not replace.
+/// Spawning a real supervisor onto a FakeDaemon path (or an absent test
+/// socket) would be a side effect the suite cannot clean up.
+fn daemon_socket_is_overridden() -> bool {
+    std::env::var_os(DAEMON_SOCKET_ENV).is_some()
+}
+
+/// Arguments Prime's CLI uses to start a supervisor.
+///
+/// Probed on installed 0.8.0 `ensureDaemonRunning`:
+/// `node entrypoint --mode daemon --daemon-socket <path>`. The public
+/// `prime-agent` binary *is* that entrypoint.
+fn daemon_launch_args(socket_path: &Path) -> Vec<String> {
+    vec![
+        "--mode".into(),
+        "daemon".into(),
+        "--daemon-socket".into(),
+        socket_path.to_string_lossy().into_owned(),
+    ]
+}
+
+/// If nothing is listening, start Prime's supervisor the way the CLI does.
+///
+/// Rhizome used to only connect. That works while a `prime-agent` TUI (or a
+/// leftover worker) has already kicked the supervisor. A test build, a
+/// machine that has not opened the CLI today, or a supervisor that exited
+/// with no workers left all look like "Prime is not reachable" — and the
+/// model picker, session switch, and first prompt all fail the same way.
+/// The CLI's own clients call `ensureInteractiveDaemonRunning` on the way
+/// in. We do the same, then attach. Never fatal to try: a refused spawn
+/// still surfaces as `ServiceUnreachable`.
+fn ensure_daemon_listening(socket_path: &Path) -> Result<(), String> {
+    if connect_stream(socket_path).is_ok() {
+        return Ok(());
+    }
+    if daemon_socket_is_overridden() {
+        return Err(format!(
+            "Could not reach Prime's background service at {}",
+            socket_path.display()
+        ));
+    }
+    spawn_prime_daemon(socket_path)?;
+    wait_for_daemon(socket_path)
+}
+
+fn spawn_prime_daemon(socket_path: &Path) -> Result<(), String> {
+    if let Some(dir) = socket_path.parent() {
+        std::fs::create_dir_all(dir).map_err(|error| {
+            format!("Could not create the Prime daemon socket directory: {error}")
+        })?;
+    }
+    let binary = crate::prime_discovery::find_binary()?;
+    let target = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(&binary)?;
+    let mut command = crate::hidden_command(&target.program);
+    crate::cli_agent_runtime::configure_agent_command_environment(&mut command, &binary);
+    if let Some(first_arg) = target.first_arg {
+        command.arg(first_arg);
+    }
+    command.args(daemon_launch_args(socket_path));
+    command.stdin(Stdio::null());
+    command.stdout(Stdio::null());
+    command.stderr(Stdio::null());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const DETACHED_PROCESS: u32 = 0x00000008;
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+        command.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+    }
+    let mut child = command
+        .spawn()
+        .map_err(|error| format!("Failed to start Prime's background service: {error}"))?;
+    // `Child` waits on drop. A supervisor that stays up would hang
+    // `ensure_host` for the rest of the process. Reap it in the background.
+    thread::spawn(move || {
+        let _ = child.wait();
+    });
+    Ok(())
+}
+
+fn wait_for_daemon(socket_path: &Path) -> Result<(), String> {
+    let deadline = Instant::now() + DAEMON_STARTUP_TIMEOUT;
+    while Instant::now() < deadline {
+        if connect_stream(socket_path).is_ok() {
+            return Ok(());
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    Err(format!(
+        "Timed out waiting for Prime's background service at {}",
+        socket_path.display()
+    ))
 }
 
 /// Classify a failure to reach the service.
@@ -597,18 +700,6 @@ fn default_daemon_socket_path() -> Option<PathBuf> {
 #[cfg(windows)]
 fn default_daemon_socket_path() -> Option<PathBuf> {
     Some(PathBuf::from(r"\\.\pipe\prime-agent-daemon"))
-}
-
-#[cfg(unix)]
-fn default_daemon_path_is_present(path: &Path) -> bool {
-    path.exists()
-}
-
-/// A named pipe has no meaningful `exists()` check — only a connect attempt
-/// can tell whether the daemon is listening.
-#[cfg(windows)]
-fn default_daemon_path_is_present(_path: &Path) -> bool {
-    true
 }
 
 /// This process's uid, read off the home directory rather than via libc.
@@ -781,22 +872,29 @@ pub fn get_status() -> PrimeHostStatus {
             // Connected: whatever went wrong before is history.
             problem: None,
         },
-        None => PrimeHostStatus {
-            installed: availability.installed,
-            version: availability.version,
-            running: false,
-            session_id: None,
-            is_streaming: false,
-            binary_path,
-            model_provider: None,
-            model_id: None,
-            model_name: None,
-            thinking_level: None,
-            reattached: false,
-            started_at: None,
-            session_path: None,
-            problem: current_problem(),
-        },
+        None => {
+            // Same reason the session-less connected host reads defaults: the
+            // composer chip is drawn before a connection exists, and "Model"
+            // on every launch is a worse answer than what the next session
+            // will actually start as.
+            let defaults = crate::prime_settings::read_defaults();
+            PrimeHostStatus {
+                installed: availability.installed,
+                version: availability.version,
+                running: false,
+                session_id: None,
+                is_streaming: false,
+                binary_path,
+                model_provider: defaults.default_provider,
+                model_id: defaults.default_model,
+                model_name: None,
+                thinking_level: defaults.default_thinking_level,
+                reattached: false,
+                started_at: None,
+                session_path: None,
+                problem: current_problem(),
+            }
+        }
     }
 }
 
@@ -1466,6 +1564,79 @@ pub fn switch_session(session_path: &str) -> Result<String, String> {
     })
 }
 
+/// Rename a session on disk, or the live one if that log is still attached.
+///
+/// Prime's `set_session_name` only addresses the attached session. The list
+/// is history — most rows are not the one this window is in — so this speaks
+/// `rename_saved_session`, which takes the log path and writes `session_info`
+/// there. Probed on installed 0.8.0: `{ sessionPath, name }`; `activeSessionId`
+/// is optional and only used to prove the caller is attached, so we omit it.
+/// The daemon trims and rejects an empty name; we do the same before talking
+/// to it, so a blank field never becomes a round trip.
+///
+/// Sent bare on purpose. The session-scoped sender would `ensure_session`
+/// first, and renaming a past conversation must not be what creates a new
+/// one. #31.
+pub fn rename_saved_session(session_path: &str, name: &str) -> Result<(), String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("Session name cannot be empty".into());
+    }
+    ensure_renameable_session_path(session_path)?;
+    with_host_mut(|host| {
+        let response = host.send_bare_command(serde_json::json!({
+            "type": "rename_saved_session",
+            "sessionPath": session_path,
+            "name": name,
+        }))?;
+        if response["success"].as_bool() != Some(true) {
+            return Err(response_error(&response, "rename_saved_session"));
+        }
+        Ok(())
+    })
+}
+
+/// What Rhizome writes when it creates a session.
+///
+/// Identifies this client and the vault the session is working in. The id
+/// tail is uniqueness for the daemon, which rejects a name already held by
+/// another live session at the same depth — not a timestamp; the row already
+/// shows one. `primeSessionRowTitles` then leaves a unique name alone.
+fn rhizome_created_session_name(cwd: &Path, session_id: &str) -> String {
+    let vault = cwd
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| "vault".to_string());
+    let tail: String = session_id.chars().rev().take(6).collect();
+    let suffix: String = tail.chars().rev().collect();
+    format!("Rhizome · {vault} · {suffix}")
+}
+
+/// A rename talks to the daemon about a path the user picked from the list.
+/// Refuse anything that is not a session log before that round trip — the
+/// daemon will also reject it, but a bad path should fail here, not after
+/// a hop. Containment is only checkable when the file exists; a test path
+/// that is shaped like a log is allowed through so the command itself can
+/// be asserted without writing into `~/.prime/agent/sessions`.
+fn ensure_renameable_session_path(session_path: &str) -> Result<(), String> {
+    if session_path.contains("..") {
+        return Err("Not a Prime session log".into());
+    }
+    let path = Path::new(session_path);
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+    if name.is_empty() || !name.ends_with(".jsonl") || name.contains(".mindwalk-bridge.") {
+        return Err("Not a Prime session log".into());
+    }
+    if path.exists() {
+        crate::prime_sessions::ensure_inside_sessions_dir(path)?;
+    }
+    Ok(())
+}
+
 /// Compact the conversation now. Returns tokens held before compaction when
 /// Prime reports it, so the caller can show what the run actually reclaimed.
 pub fn compact(custom_instructions: Option<String>) -> Result<Option<u64>, String> {
@@ -2014,12 +2185,10 @@ fn describe_problem(problem: &PrimeConnectionProblem) -> String {
             "Prime is not installed. Install it with `npm i -g prime-agent`.".to_string()
         }
         PrimeConnectionProblem::ServiceUnreachable { .. } => {
-            // Not "start it with `prime-agent daemon`": that command does not
-            // exist, and per Prime's own daemon.md the supervisor is internal
-            // infrastructure that starts itself and is restarted by a worker if
-            // it dies. `status` is a real, read-only command that shows whether
-            // it is there.
-            "Prime's background service is not reachable. Check it with `prime-agent status`."
+            // We start the supervisor ourselves on connect (the same
+            // `--mode daemon --daemon-socket` kick the CLI uses). This copy
+            // is the fallback when that spawn still cannot listen.
+            "Prime's background service could not be started. Check it with `prime-agent status`."
                 .to_string()
         }
         PrimeConnectionProblem::ServiceTooOld {
@@ -2353,6 +2522,12 @@ impl PrimeHost {
             record_problem(Some(problem));
             message
         })?;
+        if let Err(detail) = ensure_daemon_listening(&socket_path) {
+            let problem = unreachable_problem(&detail);
+            let message = describe_problem(&problem);
+            record_problem(Some(problem));
+            return Err(message);
+        }
         let stream = connect_stream(&socket_path).map_err(|detail| {
             let problem = unreachable_problem(&detail);
             let message = describe_problem(&problem);
@@ -2456,18 +2631,11 @@ impl PrimeHost {
     /// a timestamp — measured over 93 real logs, the first six characters gave
     /// 23 distinct values and one prefix covered 23 sessions.
     fn name_session(&mut self, cwd: &Path) {
-        let vault = cwd
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-            .filter(|name| !name.is_empty())
-            .unwrap_or_else(|| "vault".to_string());
         let id = self
             .session_id
             .clone()
             .unwrap_or_else(|| self.active_session_id.clone());
-        let tail: String = id.chars().rev().take(6).collect();
-        let suffix: String = tail.chars().rev().collect();
-        let name = format!("Rhizome · {vault} · {suffix}");
+        let name = rhizome_created_session_name(cwd, &id);
 
         if let Err(error) = self.call(serde_json::json!({
             "type": "set_session_name",
@@ -3000,6 +3168,43 @@ mod tests {
         TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner())
     }
 
+    /// #31. The name has to identify Rhizome *and* be useful. Vault folder
+    /// plus the id tail — the tail is uniqueness for the daemon, taken from
+    /// the end because uuidv7's leading characters are a clock.
+    #[test]
+    fn created_session_names_identify_rhizome_and_the_vault() {
+        assert_eq!(
+            rhizome_created_session_name(
+                Path::new("/Users/dtc/Documents/Notes"),
+                "01a0252e-b9d5-71e9-83de-2bce32f65c06",
+            ),
+            "Rhizome · Notes · f65c06"
+        );
+    }
+
+    #[test]
+    fn created_session_names_fall_back_when_the_folder_has_no_name() {
+        assert_eq!(
+            rhizome_created_session_name(Path::new("/"), "abc123xyz"),
+            "Rhizome · vault · 123xyz"
+        );
+    }
+
+    /// Probed on installed 0.8.0 `ensureDaemonRunning`. The public binary is
+    /// the CLI entrypoint; these are the flags it passes to itself.
+    #[test]
+    fn daemon_launch_args_match_what_prime_spawns() {
+        assert_eq!(
+            daemon_launch_args(Path::new("/tmp/prime-agent-501/daemon.sock")),
+            vec![
+                "--mode",
+                "daemon",
+                "--daemon-socket",
+                "/tmp/prime-agent-501/daemon.sock",
+            ]
+        );
+    }
+
     // ── Fake daemon ─────────────────────────────────────────────────────────
     //
     // The one seam this work adds. It is a real unix socket speaking the real
@@ -3486,6 +3691,94 @@ mod tests {
         let creates = daemon.commands().iter().filter(|c| *c == "create").count();
         assert_eq!(creates, 1, "one session, not one per command");
         let _ = shutdown_host();
+    }
+
+    /// #31. A name at create time is what the list later reads back. The
+    /// payload is the contract: Rhizome, the vault, the id tail. The type
+    /// sequence already asserted `set_session_name` is sent; this is the
+    /// half that says *what*.
+    #[cfg(unix)]
+    #[test]
+    fn a_new_session_is_named_for_rhizome_and_the_vault() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+
+        connect_host(vault.path()).unwrap();
+
+        let command = daemon
+            .command("set_session_name")
+            .expect("the new session must be named");
+        let folder = vault.path().file_name().unwrap().to_string_lossy();
+        let expected = format!("Rhizome · {folder} · sess-a");
+        assert_eq!(command["name"].as_str(), Some(expected.as_str()));
+        let _ = shutdown_host();
+    }
+
+    /// Renaming a past conversation must not be what materializes a session.
+    /// `send_command` would `ensure_session` first; this path is bare.
+    #[cfg(unix)]
+    #[test]
+    fn renaming_a_saved_session_does_not_create_one() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+        connect_host_lazy(vault.path()).unwrap();
+
+        rename_saved_session("/sessions/abc.jsonl", "Inbox triage").unwrap();
+
+        assert_eq!(
+            daemon.commands(),
+            vec!["list", "rename_saved_session"],
+            "a rename is not a reason to create"
+        );
+        let command = daemon.command("rename_saved_session").unwrap();
+        assert_eq!(command["sessionPath"], "/sessions/abc.jsonl");
+        assert_eq!(command["name"], "Inbox triage");
+        assert!(
+            command.get("activeSessionId").is_none(),
+            "activeSessionId is optional and we must not invent one: {command}"
+        );
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn renaming_rejects_an_empty_name_without_talking_to_the_daemon() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+        connect_host_lazy(vault.path()).unwrap();
+
+        let error = rename_saved_session("/sessions/abc.jsonl", "   ").unwrap_err();
+        assert!(
+            error.contains("empty"),
+            "blank names fail here, not after a hop: {error}"
+        );
+        assert!(
+            daemon.command("rename_saved_session").is_none(),
+            "the daemon must not see a blank rename"
+        );
+        let _ = shutdown_host();
+    }
+
+    #[test]
+    fn renaming_rejects_a_path_that_is_not_a_session_log() {
+        assert_eq!(
+            rename_saved_session("/etc/passwd", "Inbox").unwrap_err(),
+            "Not a Prime session log"
+        );
+        assert_eq!(
+            rename_saved_session("/sessions/foo.mindwalk-bridge.jsonl", "Inbox").unwrap_err(),
+            "Not a Prime session log"
+        );
+        assert_eq!(
+            rename_saved_session("/sessions/../other.jsonl", "Inbox").unwrap_err(),
+            "Not a Prime session log"
+        );
     }
 
     /// The polls that run whether or not anyone is talking to the agent must
@@ -4169,9 +4462,11 @@ mod tests {
     #[test]
     fn the_version_floor_is_a_version_a_user_could_install() {
         assert!(MINIMUM_PRIME_VERSION.split('.').count() >= 2);
-        assert!(MINIMUM_PRIME_VERSION
-            .chars()
-            .all(|c| c.is_ascii_digit() || c == '.'));
+        assert!(
+            MINIMUM_PRIME_VERSION
+                .chars()
+                .all(|c| c.is_ascii_digit() || c == '.')
+        );
     }
 
     // ── Quit semantics (#12) ────────────────────────────────────────────────
@@ -4313,12 +4608,16 @@ mod tests {
             promote["activeSessionId"].as_str(),
             Some(FAKE_ACTIVE_SESSION_ID)
         );
-        assert!(daemon
-            .wait_for_command("detach", Duration::from_secs(5))
-            .is_some());
-        assert!(!daemon
-            .commands()
-            .contains(&"complete_owned_session".to_string()));
+        assert!(
+            daemon
+                .wait_for_command("detach", Duration::from_secs(5))
+                .is_some()
+        );
+        assert!(
+            !daemon
+                .commands()
+                .contains(&"complete_owned_session".to_string())
+        );
         assert!(!daemon.commands().contains(&"kill".to_string()));
         assert!(!daemon.commands().contains(&"shutdown".to_string()));
     }
@@ -4982,8 +5281,7 @@ mod tests {
 
     #[test]
     fn status_output_yields_a_windows_named_pipe_path() {
-        let stdout =
-            "socket                                   pid    version  status   sessions  uptime\n\
+        let stdout = "socket                                   pid    version  status   sessions  uptime\n\
                       \\\\.\\pipe\\prime-agent-daemon *  1234  0.7.4    current  0\n\
                       \n* default background service\n";
 

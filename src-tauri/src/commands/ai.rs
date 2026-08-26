@@ -131,8 +131,8 @@ pub async fn get_ai_agents_status() -> AiAgentsStatus {
 #[tauri::command]
 pub fn get_agent_docs_path(app_handle: tauri::AppHandle) -> Result<String, String> {
     use std::path::PathBuf;
-    use tauri::path::BaseDirectory;
     use tauri::Manager;
+    use tauri::path::BaseDirectory;
 
     let mut candidates = Vec::new();
 
@@ -782,8 +782,8 @@ mod tests {
 /// filed is a reason to show more, never to show nothing.
 #[cfg(desktop)]
 #[tauri::command]
-pub fn list_prime_session_summaries(
-) -> Result<Vec<crate::prime_sessions::PrimeSessionSummary>, String> {
+pub fn list_prime_session_summaries()
+-> Result<Vec<crate::prime_sessions::PrimeSessionSummary>, String> {
     let summaries = crate::prime_sessions::list_sessions()?;
     let archived = crate::settings::get_settings()
         .ok()
@@ -820,6 +820,17 @@ pub fn set_prime_session_archived(session_id: String, archived: bool) -> Result<
 
     settings.archived_prime_sessions = Some(ids);
     crate::settings::save_settings(settings)
+}
+
+/// Rename a Prime session from the list.
+///
+/// Speaks `rename_saved_session` so a historical log can be named without
+/// attaching to it. Archiving stays a Rhizome-only flag; this writes Prime's
+/// own `session_info` so the CLI and every other client see the same title.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn rename_prime_session(path: String, name: String) -> Result<(), String> {
+    crate::prime_session_host::rename_saved_session(&path, &name)
 }
 
 /// Replay one session's conversation from its log.

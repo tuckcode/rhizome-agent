@@ -409,6 +409,16 @@ export function trackPrimeSessionListFiltered(matchCount: number): void {
   })
 }
 
+/**
+ * A session was given a name from the list (#31).
+ *
+ * Whether people rename at all answers whether the create-time label is
+ * enough. No title, no path — the name is theirs.
+ */
+export function trackPrimeSessionRenamed(): void {
+  trackEvent('prime_session_renamed')
+}
+
 /** Coarse buckets — an exact count of someone's sessions is not our business. */
 function sessionCountBucket(count: number): '0' | '1-5' | '6-20' | '21-50' | '50+' {
   if (count <= 0) return '0'
