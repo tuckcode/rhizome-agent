@@ -53,6 +53,8 @@ interface AskResult {
 interface ResearchPanelProps {
   open: boolean
   onClose: () => void
+  /** Dialog is the legacy overlay. Pane is the rail canvas. */
+  variant?: 'dialog' | 'pane'
   vaultPath: string
   /** Persisted "Rhizome Vault" setting — where research output should land, independent of vaultPath. */
   agentMemoryVaultPath?: string | null
@@ -129,7 +131,7 @@ function parseAskResults(raw: string): AskResult[] {
   }
 }
 
-export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, vaults = [], onSetDefaultDestination, onOpenNote, locale = 'en', settings = EMPTY_SETTINGS, aiAgentsStatus = ALL_AGENTS_INSTALLED_STATUS }: ResearchPanelProps) {
+export function ResearchPanel({ open, onClose, variant = 'dialog', vaultPath, agentMemoryVaultPath, vaults = [], onSetDefaultDestination, onOpenNote, locale = 'en', settings = EMPTY_SETTINGS, aiAgentsStatus = ALL_AGENTS_INSTALLED_STATUS }: ResearchPanelProps) {
   const t = useMemo(() => createTranslator(locale), [locale])
   // Generate/Import/Distill all currently run through the same resolved
   // target — preflight it once so a missing/unauthenticated CLI blocks
@@ -529,27 +531,27 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
     })
     .sort((a, b) => librarySort === 'name' ? a.title.localeCompare(b.title) : b.dateEpoch - a.dateEpoch)
 
-  return (
+  const researchBody = (
     <>
-      <RhizomeFormatModal
-        open={formatModalOpen}
-        onClose={() => setFormatModalOpen(false)}
-        onSelect={handleModeSelect}
-        currentMode={selectedMode}
-        vaultPath={defaultDestinationVaultPath}
-        locale={locale}
-      />
-
-      <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-        <DialogContent
-          className="flex flex-col p-0 gap-0 bg-popover border-border rounded-xl overflow-hidden"
-          style={{ width: '95vw', maxWidth: 1100, height: '85vh', maxHeight: 700 }}
-        >
-          <DialogHeader className="px-5 pt-4 pb-2 border-b border-border">
-            <DialogTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
-              <Sparkle weight="bold" className="w-5 h-5 text-muted-foreground" />
-              {t('research.title')}
-            </DialogTitle>
+          <div className="px-5 pt-4 pb-2 border-b border-border">
+            <div className="flex items-start justify-between gap-2">
+            {variant === 'pane' ? (
+              <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Sparkle weight="bold" className="w-5 h-5 text-muted-foreground" />
+                {t('research.title')}
+              </h2>
+            ) : (
+              <DialogTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Sparkle weight="bold" className="w-5 h-5 text-muted-foreground" />
+                {t('research.title')}
+              </DialogTitle>
+            )}
+            {variant === 'pane' ? (
+              <Button type="button" variant="ghost" size="sm" onClick={onClose} data-testid="research-exit">
+                {t('research.exit')}
+              </Button>
+            ) : null}
+            </div>
             {destinationVaultPath ? (
               <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                 <span>📁</span>
@@ -590,7 +592,7 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
             ) : (
               <p className="text-xs text-[#ff9f0a] mt-1">⚠ {t('research.noVaultWarning')}</p>
             )}
-          </DialogHeader>
+          </div>
 
           {preflightBlocked && (
             <div
@@ -1068,8 +1070,37 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
               </TabsContent>
             </div>
           </Tabs>
-        </DialogContent>
-      </Dialog>
+    </>
+  )
+
+  return (
+    <>
+      <RhizomeFormatModal
+        open={formatModalOpen}
+        onClose={() => setFormatModalOpen(false)}
+        onSelect={handleModeSelect}
+        currentMode={selectedMode}
+        vaultPath={defaultDestinationVaultPath}
+        locale={locale}
+      />
+
+      {variant === 'pane' ? (
+        <div
+          className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-background"
+          data-testid="research-canvas"
+        >
+          {researchBody}
+        </div>
+      ) : (
+        <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
+          <DialogContent
+            className="flex flex-col p-0 gap-0 bg-popover border-border rounded-xl overflow-hidden"
+            style={{ width: '95vw', maxWidth: 1100, height: '85vh', maxHeight: 700 }}
+          >
+            {researchBody}
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Dialog open={pendingConfirmAction !== null} onOpenChange={(o) => { if (!o) setPendingConfirmAction(null) }}>
         <DialogContent className="bg-popover border-border">

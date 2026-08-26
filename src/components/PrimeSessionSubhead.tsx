@@ -1,4 +1,4 @@
-import { Plus } from '@phosphor-icons/react'
+import { CirclesThree, Plus } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import type { CSSProperties } from 'react'
 import { cn } from '@/lib/utils'
@@ -36,6 +36,8 @@ interface PrimeSessionSubheadProps {
   problem?: PrimeConnectionProblem | null
   /** Frame A hides AiPanelHeader — New chat lives here instead. */
   onNewChat?: () => void
+  /** Open this session's footprint in Mycelium (#22). */
+  onOpenFootprint?: () => void
 }
 
 /**
@@ -87,6 +89,7 @@ export function PrimeSessionSubhead({
   startedAt,
   problem,
   onNewChat,
+  onOpenFootprint,
 }: PrimeSessionSubheadProps) {
   const t = createTranslator(locale)
   const trafficLightInset = subheadTrafficLightInset() as CSSProperties
@@ -169,18 +172,37 @@ export function PrimeSessionSubhead({
         </>
       ) : null}
 
-      {onNewChat ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          className="ml-auto h-[32px] w-[32px] shrink-0 p-0 [&_svg:not([class*=size-])]:size-3.5"
-          onClick={onNewChat}
-          aria-label={t('ai.sessions.newChat')}
-          title={t('ai.sessions.newChat')}
-        >
-          <Plus size={14} />
-        </Button>
+      {onOpenFootprint || onNewChat ? (
+        <div className="ml-auto flex shrink-0 items-center gap-0.5">
+          {onOpenFootprint ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="h-[32px] w-[32px] p-0 [&_svg:not([class*=size-])]:size-3.5"
+              onClick={onOpenFootprint}
+              onMouseDown={(event) => event.stopPropagation()}
+              aria-label={t('mycelium.openThisRun')}
+              title={t('mycelium.openThisRun')}
+              data-testid="prime-session-footprint"
+            >
+              <CirclesThree size={14} />
+            </Button>
+          ) : null}
+          {onNewChat ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="h-[32px] w-[32px] p-0 [&_svg:not([class*=size-])]:size-3.5"
+              onClick={onNewChat}
+              aria-label={t('ai.sessions.newChat')}
+              title={t('ai.sessions.newChat')}
+            >
+              <Plus size={14} />
+            </Button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   )

@@ -49,6 +49,15 @@ describe('PrimeSessionSubhead', () => {
     fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
     expect(onNewChat).toHaveBeenCalledTimes(1)
   })
+
+  it('opens this session footprint from the in-session button', () => {
+    const onOpenFootprint = vi.fn()
+    render(<PrimeSessionSubhead live onOpenFootprint={onOpenFootprint} />)
+
+    fireEvent.click(screen.getByTestId('prime-session-footprint'))
+    expect(onOpenFootprint).toHaveBeenCalledTimes(1)
+    expect(screen.getByLabelText('This run')).toBeInTheDocument()
+  })
   /**
    * A session outlives the window now (ADR-0163), so how long it has been
    * running is no longer implied by how long the app has been open — and it is

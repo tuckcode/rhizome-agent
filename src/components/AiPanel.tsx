@@ -42,6 +42,7 @@ import { useAiPanelController, type AiPanelController } from './useAiPanelContro
 import { useAiPanelPromptQueue } from './useAiPanelPromptQueue'
 import { useAiPanelFocus } from './useAiPanelFocus'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
+import { promoteSessionFromHost } from '../utils/promoteChatToVault'
 import { usePrimeSessionRehydrate } from '../hooks/usePrimeSessionRehydrate'
 import { usePrimeSessionStats } from '../hooks/usePrimeSessionStats'
 import { PrimeContextMeter } from './PrimeContextMeter'
@@ -59,7 +60,7 @@ import { usePrimeActivity } from './primeActivityContext'
 interface AiPanelProps {
   onClose: () => void
   onOpenNote?: (path: string) => void
-  onPromoteToVault?: (text: string) => void
+  onPromoteToVault?: (text: string, session?: string) => void
   onUnsupportedAiPaste?: (message: string) => void
   defaultAiAgent?: AiAgentId
   defaultAiTarget?: AiTarget
@@ -97,7 +98,7 @@ interface AiPanelViewProps {
   controller: AiPanelController
   onClose: () => void
   onOpenNote?: (path: string) => void
-  onPromoteToVault?: (text: string) => void
+  onPromoteToVault?: (text: string, session?: string) => void
   onUnsupportedAiPaste?: (message: string) => void
   defaultAiAgent?: AiAgentId
   defaultAiTarget?: AiTarget
@@ -703,7 +704,11 @@ export function AiPanelView({
         onOpenNote={onOpenNote}
         onNavigateWikilink={handleNavigateWikilink}
         onRegenerateMessage={agent.regenerateMessage}
-        onPromoteToVault={onPromoteToVault}
+        onPromoteToVault={
+          onPromoteToVault
+            ? (text) => onPromoteToVault(text, promoteSessionFromHost(primeHost.sessionId, primeHost.sessionPath))
+            : undefined
+        }
         onScrollStateChange={onMessageHistoryScrollStateChange}
         hasContext={hasContext}
       />

@@ -122,6 +122,16 @@ describe('ResearchPanel', () => {
     })
   })
 
+  it('renders as a rail canvas without the dialog overlay', () => {
+    render(
+      <ResearchPanel variant="pane" open={true} onClose={onClose} vaultPath="/vault" onOpenNote={onOpenNote} />,
+    )
+    expect(screen.getByTestId('research-canvas')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('research-exit'))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
   it('opens the note at its vault-relative path and closes the panel when a library item is clicked', async () => {
     render(
       <ResearchPanel open={true} onClose={onClose} vaultPath="/vault" onOpenNote={onOpenNote} />

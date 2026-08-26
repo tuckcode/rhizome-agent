@@ -204,12 +204,15 @@ Vision draft: [`rhizome-prime-harness-vision.md`](./rhizome-prime-harness-vision
 
 NVIDIA NeMo Switchyard is an experimental model router, not a harness.
 Trial path only: `Rhizome → Prime → Switchyard → providers`. Rhizome does
-not grow a router.
+not grow a router. Combined write-up with TokenJuice:
+[`token-routing-and-compression.md`](./token-routing-and-compression.md).
 
 ### OpenHuman — DEFER a source review
 
-Named in divergence frames. No first-party review in this repo yet.
-Metabolite-only until someone writes one.
+Named in divergence frames. One feature has been read: TinyHumans TokenJuice
+(tool-output compression router). That is **not** Switchyard and **not** a
+full OpenHuman review. Metabolite-only; do not compact independently.
+See [`token-routing-and-compression.md`](./token-routing-and-compression.md).
 
 ### Claude Code
 

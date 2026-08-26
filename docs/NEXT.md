@@ -68,8 +68,9 @@ composition doc — do not restate them here.
 |---|---|---|
 | **Harness composition: option 2 + first slice** | #5, #40, and any graft of a foreign harness idea | Filter ratified (ADR-0168). Working notes in `harness-composition.md`. Still discuss/decide: ratify option 2, ratify native extension UI as first slice, name remaining incompatibilities. |
 | **What ⌘1/⌘2/⌘3 and "Full Layout" mean once Chat is the centre** | — | **Settled 2026-08-25.** ⌘1 Chat only, ⌘2 opens the Notes panel with Browse collapsed, ⌘3 opens it with Browse expanded. Stored `viewMode` values unchanged. |
-| **Does Wiki Graph replace the canvas or feed a side panel** | #39, #11, #22 | Still open. Graph/Mycelium still take the canvas; the chat-centered ship did not convert them. |
+| **Does Wiki Graph replace the canvas or feed a side panel** | #39 | **Settled for Research / Mycelium 2026-08-26 (local, live check leftover):** they replace Chat as the center canvas, like Graph. #39 (graph as an agent tool vs a place) is still open. |
 | **Right panel composition** | — | **Settled 2026-08-25.** One Notes panel: compact navigation above the selected list. Rail Inbox toggles it; Changes is a list filter. No Inbox/Notes tabs or second right column. |
+| **TokenJuice + Switchyard** | later stacked system; not a Rhizome organ | **Wanted 2026-08-26, not started.** Discuss/plan only. TokenJuice-shaped tool-output shrink first (Prime owns what the model sees). Switchyard-shaped model hop second (sidecar behind Prime; halfway house is `set_scoped_models`). Write-up: [`token-routing-and-compression.md`](design/token-routing-and-compression.md). Do not vendor either in this tree. |
 
 **#40** can close against ADR-0168 (Rhizome is a client of Prime, not a second
 harness). Do not treat that close as "the harness question is done."
@@ -91,8 +92,8 @@ becomes the editor. Captured in ADR-0166.
 |---|---|
 | #27 | Session list as a dockable sidebar — **closed 2026-08-26** (left column of Chat) |
 | #34 | Session list filter — **closed 2026-08-26** (title / place / branch) |
-| #22 | Mycelium: Rhizome's visual language, and two entry points — **B** (graph/mycelium still take the canvas) |
-| #11 | Mycelium runs inside Rhizome instead of launching another app — **B** |
+| #22 | Mycelium: Rhizome chrome + rail overview vs This run — **implemented locally** (engine still Mindwalk; M4 restyle not started) |
+| #11 | Mycelium runs as an in-app sidecar embed — **implemented locally** |
 | #39 | Make the knowledge graph an agent tool, not a place you visit — **B** |
 
 **Composer and controls** — the densest ready-to-build cluster, no blockers
@@ -115,7 +116,7 @@ becomes the editor. Captured in ADR-0166.
 **Memory loop** — the product thesis; least covered by design docs
 | | |
 |---|---|
-| #24 | Promote produces a note worth keeping, not a transcript dump |
+| #24 | Promote produces a note worth keeping, not a transcript dump — **implemented locally** (live check leftover) |
 | #25 | Retrieval shows its work — `needs-triage`, oldest untriaged |
 | #37 | "Save as custom" in the research format modal has never done anything |
 
@@ -224,11 +225,15 @@ unprompted Prime verbs.
    DeepSeek *idea* on Prime extensions, first slice = native extension UI).
    Until ratified, do not graft. Closing **#40** against the filter is a
    side-errand, not a substitute.
-2. **Chat-centered shell shipped** (ADR-0166, 2026-08-25). Remaining canvas
-   question is Wiki Graph / Mycelium (#39 / #11 / #22). #27 / #34 / #31
+2. **Chat-centered shell shipped** (ADR-0166, 2026-08-25). Research and
+   Mycelium take the canvas locally (#11 / #22); live check leftover.
+   Remaining canvas question is Wiki Graph as a *tool* (#39). #27 / #34 / #31
    closed on GitHub 2026-08-26.
 3. **Memory loop (#24, #25)** — the product thesis, thinnest design coverage.
-4. **C28 and C31** whenever the push gate flakes on you — the natural reaction
+4. **TokenJuice + Switchyard (§1)** — discuss/plan when you want the stacked
+   later system. Not this week's build.
+   [`token-routing-and-compression.md`](design/token-routing-and-compression.md).
+5. **C28 and C31** whenever the push gate flakes on you — the natural reaction
    (re-run and move on) is exactly how they stay unfixed.
 
 Do not treat this order as authoritative over a handoff that names your task.

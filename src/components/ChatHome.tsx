@@ -33,6 +33,8 @@ interface ChatHomeProps {
   sessionsAutoCollapsed?: boolean
   /** Where "close" goes when chat owns the window — back to the vault. */
   onExit: () => void
+  /** Open Mycelium on this Prime session only (#22). */
+  onOpenSessionFootprint?: (sessionPath: string) => void
 }
 
 /**
@@ -58,6 +60,7 @@ export default function ChatHome({
   onUnsupportedAiPaste,
   sessionsAutoCollapsed = false,
   onExit,
+  onOpenSessionFootprint,
 }: ChatHomeProps) {
   const isPrimeTarget = defaultAiTarget?.kind !== 'api_model' && defaultAiAgent === 'prime'
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
@@ -75,6 +78,11 @@ export default function ChatHome({
           startedAt={primeHost?.startedAt ?? null}
           problem={primeHost?.problem ?? null}
           onNewChat={() => newChatRef.current?.()}
+          onOpenFootprint={
+            onOpenSessionFootprint && primeHost?.sessionPath
+              ? () => onOpenSessionFootprint(primeHost.sessionPath as string)
+              : undefined
+          }
         />
       ) : null}
       <AgentActivityBand locale={locale} enabled={isPrimeTarget} />

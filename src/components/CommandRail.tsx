@@ -22,7 +22,7 @@ interface CommandRailProps {
   onSelectInbox: () => void
   onSelectGraph: () => void
   onSelectMycelium: () => void
-  onOpenResearch: () => void
+  onSelectResearch: () => void
   onSelectChanges: () => void
   onOpenSettings: () => void
 }
@@ -110,7 +110,7 @@ function RailButton({
  * Wave 5.3 icon command rail — behind `shell_command_rail`. See
  * docs/design/shell-final-direction.md §2.2. Fixed 46px, not resizable;
  * destinations reuse the exact handlers the legacy status-bar buttons
- * already call (same Graph toggle history semantics, same Research dialog,
+ * already call (same Graph toggle history semantics, same Research canvas,
  * same Changes filter) so behavior is identical, only the entry point moves.
  */
 export function CommandRail({
@@ -121,7 +121,7 @@ export function CommandRail({
   onSelectInbox,
   onSelectGraph,
   onSelectMycelium,
-  onOpenResearch,
+  onSelectResearch,
   onSelectChanges,
   onOpenSettings,
 }: CommandRailProps) {
@@ -194,7 +194,7 @@ export function CommandRail({
         expanded={expanded}
         icon={MagnifyingGlass}
         label={t('rail.research')}
-        onClick={() => handleSelect('research', onOpenResearch)}
+        onClick={() => handleSelect('research', onSelectResearch)}
         testId="command-rail-research"
       />
       <RailButton

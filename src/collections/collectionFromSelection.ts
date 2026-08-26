@@ -14,6 +14,7 @@ const BUILTIN_LABELS: Record<SidebarFilter, string> = {
   pulse: 'Pulse',
   graph: 'Wiki Graph',
   mycelium: 'Mycelium',
+  research: 'Research',
   chat: 'Chat',
   inbox: 'Inbox',
   favorites: 'Favorites',
