@@ -101,18 +101,18 @@ function ConflictFileRow({
       tabIndex={0}
       onFocus={onFocus}
       className={cn(
-        'flex items-center justify-between gap-2 rounded-md border px-3 py-2 transition-colors',
+        'flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 transition-colors',
         focused ? 'border-ring bg-accent/50' : 'border-border bg-background',
         resolved && 'opacity-70',
       )}
       data-testid={`conflict-file-${state.file}`}
     >
-      <td className="flex min-w-0 flex-1 items-center gap-2">
+      <td className="flex min-w-[140px] flex-1 items-center gap-2">
         <FileText size={14} className="shrink-0 text-muted-foreground" />
         <span className="text-sm truncate" title={state.file}>{fileName(state.file)}</span>
         <ResolutionLabel resolution={state.resolution} />
       </td>
-      <td className="flex shrink-0 items-center gap-1">
+      <td className="ml-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-1">
         {state.resolving ? (
           <Loader2 size={14} className="animate-spin text-muted-foreground" />
         ) : (
@@ -120,7 +120,7 @@ function ConflictFileRow({
             <Button
               variant="outline"
               size="sm"
-              className="text-xs h-7 px-2"
+              className="min-h-[32px] px-2 text-xs"
               onClick={() => onResolve('ours')}
               disabled={state.resolving}
               title="Keep my local version (K)"
@@ -131,7 +131,7 @@ function ConflictFileRow({
             <Button
               variant="outline"
               size="sm"
-              className="text-xs h-7 px-2"
+              className="min-h-[32px] px-2 text-xs"
               onClick={() => onResolve('theirs')}
               disabled={state.resolving}
               title="Keep remote version (T)"
@@ -143,7 +143,7 @@ function ConflictFileRow({
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-xs h-7 px-2"
+                className="min-h-[32px] px-2 text-xs"
                 onClick={onOpenInEditor}
                 title="Open file in editor (O)"
                 data-testid={`resolve-open-${state.file}`}
@@ -330,11 +330,11 @@ function ConflictDialogFooter({
   onCommit: () => void
 }) {
   return (
-    <DialogFooter className="flex-row items-center justify-between sm:justify-between">
-      <span className="text-[11px] text-muted-foreground">
+    <DialogFooter className="flex-row flex-wrap items-center justify-between gap-3 sm:justify-between">
+      <span className="min-w-0 text-[11px] text-muted-foreground">
         K = keep mine · T = keep theirs · O = open · Enter = commit
       </span>
-      <div className="flex gap-2">
+      <div className="ml-auto flex shrink-0 gap-2">
         <Button variant="outline" onClick={onClose}>Cancel</Button>
         <Button
           onClick={onCommit}
@@ -401,7 +401,7 @@ function ConflictResolverDialogContent({
   return (
     <DialogContent
       showCloseButton={false}
-      className="sm:max-w-[520px]"
+      className="max-h-[calc(100vh-24px)] w-[calc(100vw-24px)] overflow-y-auto sm:max-w-[620px]"
       onKeyDown={handleKeyDown}
     >
       <ConflictDialogHeader fileCount={fileStates.length} />

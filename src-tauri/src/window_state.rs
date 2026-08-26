@@ -74,7 +74,7 @@ pub(crate) fn handle_run_event(app_handle: &AppHandle, event: &RunEvent) {
             event: WindowEvent::Destroyed,
             ..
         } if label == MAIN_WINDOW_LABEL => save_cached_main_window_frame(app_handle),
-        RunEvent::Exit => save_cached_main_window_frame(app_handle),
+        RunEvent::Exit => save_main_window_frame(app_handle),
         _ => {}
     }
 }
@@ -118,7 +118,8 @@ fn cache_current_normal_frame(app_handle: &AppHandle) {
 }
 
 fn save_main_window_frame(app_handle: &AppHandle) {
-    let frame = current_normal_main_window_frame(app_handle).or_else(|| cached_frame(app_handle));
+    let frame =
+        current_restorable_main_window_frame(app_handle).or_else(|| cached_frame(app_handle));
     write_main_window_frame_if_available(frame);
 }
 
@@ -140,6 +141,20 @@ fn current_normal_main_window_frame(app_handle: &AppHandle) -> Option<WindowFram
         return None;
     }
     read_window_frame(&window).filter(is_valid_saved_frame)
+}
+
+fn current_restorable_main_window_frame(app_handle: &AppHandle) -> Option<WindowFrame> {
+    let window = app_handle.get_webview_window(MAIN_WINDOW_LABEL)?;
+    let is_fullscreen = window.is_fullscreen().unwrap_or(false);
+    let is_minimized = window.is_minimized().unwrap_or(false);
+    if !should_save_live_window_frame(is_fullscreen, is_minimized) {
+        return None;
+    }
+    read_window_frame(&window).filter(is_valid_saved_frame)
+}
+
+fn should_save_live_window_frame(is_fullscreen: bool, is_minimized: bool) -> bool {
+    !is_fullscreen && !is_minimized
 }
 
 fn is_normal_window(window: &WebviewWindow) -> bool {
@@ -526,6 +541,14 @@ mod tests {
     fn rejects_corrupted_tiny_saved_frames() {
         assert!(!is_valid_saved_frame(&frame(100, 100, 1, 900)));
         assert!(!is_valid_saved_frame(&frame(100, 100, 1400, 1)));
+    }
+
+    #[test]
+    fn saves_filled_windows_but_not_fullscreen_or_minimized_frames() {
+        assert!(should_save_live_window_frame(false, false));
+        assert!(!should_save_live_window_frame(true, false));
+        assert!(!should_save_live_window_frame(false, true));
+        assert!(!should_save_live_window_frame(true, true));
     }
 
     #[test]

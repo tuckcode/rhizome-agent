@@ -183,16 +183,16 @@ describe('BreadcrumbBar — drag region', () => {
     expect(dragRegionMouseDown).toHaveBeenCalledOnce()
   })
 
-  it('has data-tauri-drag-region on the container', () => {
+  it('does not combine the custom drag handler with a native drag marker', () => {
     const { container } = render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
     const bar = container.firstElementChild as HTMLElement
-    expect(bar.dataset.tauriDragRegion).toBeDefined()
+    expect(bar.dataset.tauriDragRegion).toBeUndefined()
   })
 
-  it('marks the center spacer as a drag region', () => {
+  it('lets the center spacer bubble to the custom drag handler', () => {
     const { container } = render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
     const spacer = container.querySelector('.breadcrumb-bar__drag-spacer')
-    expect(spacer).toHaveAttribute('data-tauri-drag-region')
+    expect(spacer).not.toHaveAttribute('data-tauri-drag-region')
     expect(spacer).toHaveAttribute('aria-hidden', 'true')
   })
 })
@@ -877,5 +877,22 @@ describe('BreadcrumbBar — table of contents toggle', () => {
     } finally {
       restoreMeasurement()
     }
+  })
+})
+
+describe('BreadcrumbBar — close note', () => {
+  it('does not render a close control without a handler', () => {
+    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
+
+    expect(screen.queryByRole('button', { name: 'Close note' })).not.toBeInTheDocument()
+  })
+
+  it('closes the open note from the header', () => {
+    const onCloseNote = vi.fn()
+    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} onCloseNote={onCloseNote} />)
+
+    fireEvent.click(screen.getByTestId('breadcrumb-close-note'))
+
+    expect(onCloseNote).toHaveBeenCalledOnce()
   })
 })

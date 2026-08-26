@@ -16,11 +16,11 @@ describe('useViewMode', () => {
     )
   })
 
-  it('defaults to "all" when no stored value', () => {
+  it('defaults to a closed vault panel when no value is stored', () => {
     const { result } = renderHook(() => useViewMode())
-    expect(result.current.viewMode).toBe('all')
-    expect(result.current.sidebarVisible).toBe(true)
-    expect(result.current.noteListVisible).toBe(true)
+    expect(result.current.viewMode).toBe('editor-only')
+    expect(result.current.sidebarVisible).toBe(false)
+    expect(result.current.noteListVisible).toBe(false)
   })
 
   it('loads persisted view mode from vault config', () => {
@@ -73,6 +73,6 @@ describe('useViewMode', () => {
       vi.fn(),
     )
     const { result } = renderHook(() => useViewMode())
-    expect(result.current.viewMode).toBe('all')
+    expect(result.current.viewMode).toBe('editor-only')
   })
 })

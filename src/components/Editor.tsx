@@ -78,6 +78,7 @@ interface EditorProps {
   onCreateNote?: () => void
   inspectorCollapsed: boolean
   onToggleInspector: () => void
+  onCloseNote?: () => void
   inspectorWidth: number
   defaultAiAgent?: AiAgentId
   defaultAiTarget?: AiTarget
@@ -194,7 +195,6 @@ function EditorEmptyState({ locale = 'en' }: { locale?: AppLocale }) {
     <div className="flex flex-1 flex-col overflow-hidden">
       <div
         aria-hidden="true"
-        data-tauri-drag-region
         data-testid="editor-empty-state-drag-region"
         className="shrink-0"
         onMouseDown={onMouseDown}
@@ -413,6 +413,7 @@ function EditorLayout({
   onToggleTableOfContents,
   inspectorCollapsed,
   onToggleInspector,
+  onCloseNote,
   onNavigateWikilink,
   handleEditorChange,
   onToggleFavorite,
@@ -491,6 +492,7 @@ function EditorLayout({
   onToggleTableOfContents?: () => void
   inspectorCollapsed: boolean
   onToggleInspector: () => void
+  onCloseNote?: () => void
   onNavigateWikilink: (target: string) => void
   handleEditorChange: () => void
   onToggleFavorite?: (path: string) => void
@@ -562,6 +564,7 @@ function EditorLayout({
                   onCopyDeepLink={onCopyDeepLink}
                   onOpenExternalFile={onOpenExternalFile}
                   onRevealFile={onRevealFile}
+                  onCloseNote={onCloseNote}
                 />
               )
             : <EditorContent
@@ -588,6 +591,7 @@ function EditorLayout({
               onToggleTableOfContents={onToggleTableOfContents}
               inspectorCollapsed={inspectorCollapsed}
               onToggleInspector={onToggleInspector}
+              onCloseNote={onCloseNote}
               onNavigateWikilink={onNavigateWikilink}
               onEditorChange={handleEditorChange}
               onToggleFavorite={onToggleFavorite}

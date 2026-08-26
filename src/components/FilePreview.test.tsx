@@ -11,6 +11,11 @@ const { convertFileSrcMock, externalMediaPreviewMock, trackEventMock } = vi.hois
 
 vi.mock('@tauri-apps/api/core', () => ({
   convertFileSrc: convertFileSrcMock,
+  invoke: vi.fn(),
+}))
+
+vi.mock('@tauri-apps/api/window', () => ({
+  getCurrentWindow: () => ({ startDragging: vi.fn() }),
 }))
 
 vi.mock('../lib/telemetry', () => ({
@@ -274,5 +279,15 @@ describe('FilePreview', () => {
       expect.any(String),
       expect.objectContaining({ path: expect.any(String) }),
     )
+  })
+
+  it('closes the preview from the header', () => {
+    const onCloseNote = vi.fn()
+    render(<FilePreview entry={imageEntry} onCloseNote={onCloseNote} />)
+
+    expect(screen.getByTestId('file-preview-header')).not.toHaveAttribute('data-tauri-drag-region')
+    fireEvent.click(screen.getByRole('button', { name: 'Close note' }))
+
+    expect(onCloseNote).toHaveBeenCalledOnce()
   })
 })

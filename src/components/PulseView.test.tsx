@@ -365,7 +365,7 @@ describe('PulseView', () => {
     expect(onExpandSidebar).toHaveBeenCalledTimes(1)
   })
 
-  it('offsets the collapsed-sidebar expand button past macOS traffic lights', async () => {
+  it('does not reserve traffic-light space in a macOS browser preview', async () => {
     mockInvokeFn.mockResolvedValue([])
 
     await withUserAgent(MAC_USER_AGENT, async () => {
@@ -377,7 +377,7 @@ describe('PulseView', () => {
         />,
       )
 
-      expect(await screen.findByTestId('pulse-header')).toHaveStyle({ paddingLeft: '90px' })
+      expect(await screen.findByTestId('pulse-header')).toHaveStyle({ paddingLeft: '16px' })
     })
   })
 

@@ -65,6 +65,21 @@ describe('ConflictResolverModal', () => {
     expect(props.onOpenInEditor).toHaveBeenCalledWith('notes/project.md')
   })
 
+  it('keeps conflict actions full-height and allows their row to wrap', () => {
+    renderModal({
+      fileStates: [{
+        file: 'a/very/long/workspace/path/that/must/not/push/actions/outside-the-dialog.md',
+        resolution: null,
+        resolving: false,
+      }],
+    })
+
+    expect(screen.getByText('outside-the-dialog.md').closest('tr')).toHaveClass('flex-wrap')
+    expect(screen.getByRole('button', { name: 'Keep mine' })).toHaveClass('min-h-[32px]')
+    expect(screen.getByRole('button', { name: 'Keep theirs' })).toHaveClass('min-h-[32px]')
+    expect(screen.getByRole('button', { name: 'Open in editor' })).toHaveClass('min-h-[32px]')
+  })
+
   it('hides Open in editor for binary files', () => {
     renderModal({
       fileStates: [{ file: 'images/photo.png', resolution: null, resolving: false }],

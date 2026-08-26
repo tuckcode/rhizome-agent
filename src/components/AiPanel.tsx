@@ -86,6 +86,8 @@ interface AiPanelProps {
   composerControls?: ReactNode
   /** Frame B note split — sits beside the transcript so the composer spans both. */
   notePane?: ReactNode
+  /** Temporarily hide Sessions when the containing shell cannot fit it. */
+  sessionsAutoCollapsed?: boolean
   onForkMessage?: (entryId: string) => void
   /** Fork branches the Prime session rather than copying the conversation. */
   forkTargetsPrimeEntry?: boolean
@@ -117,6 +119,7 @@ interface AiPanelViewProps {
   vaultPath?: string | null
   composerControls?: ReactNode
   notePane?: ReactNode
+  sessionsAutoCollapsed?: boolean
   onForkMessage?: (messageId: string) => void
   forkTargetsPrimeEntry?: boolean
   onQueuedPromptTarget?: (targetId: string) => void
@@ -216,6 +219,7 @@ export function AiPanelView({
   surface = 'default',
   composerControls,
   notePane,
+  sessionsAutoCollapsed = false,
   onForkMessage,
   forkTargetsPrimeEntry,
   onQueuedPromptTarget,
@@ -433,6 +437,7 @@ export function AiPanelView({
   })
 
   const toggleSessions = useCallback(() => {
+    if (sessionsAutoCollapsed) return
     setSessionsOpen((open) => {
       const next = !open
       try {
@@ -443,7 +448,8 @@ export function AiPanelView({
       }
       return next
     })
-  }, [])
+  }, [sessionsAutoCollapsed])
+  const sessionsVisible = sessionsOpen && !sessionsAutoCollapsed
   const [activeSessionPath, setActiveSessionPath] = useState<string | null>(null)
   const [switchError, setSwitchError] = useState<string | null>(null)
 
@@ -640,11 +646,13 @@ export function AiPanelView({
             type="button"
             variant="ghost"
             size="icon-xs"
-            className="h-6 w-6 p-0 [&_svg:not([class*=size-])]:size-4"
+            className="h-[32px] w-[32px] p-0 [&_svg:not([class*=size-])]:size-4"
             onClick={toggleSessions}
-            aria-pressed={sessionsOpen}
-            aria-label={translate(locale, sessionsOpen ? 'ai.sessions.close' : 'ai.sessions.open')}
-            title={translate(locale, sessionsOpen ? 'ai.sessions.close' : 'ai.sessions.open')}
+            disabled={sessionsAutoCollapsed}
+            aria-pressed={sessionsVisible}
+            aria-label={translate(locale, sessionsVisible ? 'ai.sessions.close' : 'ai.sessions.open')}
+            title={translate(locale, sessionsVisible ? 'ai.sessions.close' : 'ai.sessions.open')}
+            data-auto-collapsed={sessionsAutoCollapsed ? 'true' : 'false'}
           >
             <ClockCounterClockwise size={16} />
           </Button>
@@ -656,7 +664,7 @@ export function AiPanelView({
         </p>
       ) : null}
       <div className="flex min-h-0 flex-1">
-        {sessionsOpen && (
+        {sessionsVisible && (
           // Design system: sessions are a 228px column beside the transcript,
           // never a view that replaces it. Conversation owns the room.
           <div className="flex w-[228px] shrink-0 border-r border-border">
@@ -810,6 +818,7 @@ export function AiPanel({
   noteListFilter,
   newChatRef,
   notePane,
+  sessionsAutoCollapsed,
 }: AiPanelProps) {
   const defaultAiAgentReadiness = providedDefaultAiAgentReadiness
     ?? readinessFromReadyFlag(providedDefaultAiAgentReady)
@@ -846,6 +855,7 @@ export function AiPanel({
       onForkMessage={providedOnForkMessage}
       forkTargetsPrimeEntry={forkTargetsPrimeEntry}
       notePane={notePane}
+      sessionsAutoCollapsed={sessionsAutoCollapsed}
       onClose={onClose}
       onOpenNote={onOpenNote}
       onPromoteToVault={onPromoteToVault}

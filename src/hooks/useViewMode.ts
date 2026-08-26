@@ -14,7 +14,7 @@ function loadViewMode(): ViewMode {
   // Fallback to localStorage during initial load (before vault config is ready)
   const ls = getAppStorageItem('viewMode')
   if (isViewMode(ls)) return ls
-  return 'all'
+  return 'editor-only'
 }
 
 export function useViewMode(initialOverride?: ViewMode) {

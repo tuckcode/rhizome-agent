@@ -64,6 +64,26 @@ describe('getMainWindowMinWidth', () => {
       },
       expectedWidth: 1500,
     },
+    {
+      name: 'keeps the adaptive unified vault panel out of the native minimum',
+      visibility: {
+        sidebarVisible: true,
+        noteListVisible: true,
+        inspectorCollapsed: true,
+        unifiedVaultPanel: true,
+      },
+      expectedWidth: 760,
+    },
+    {
+      name: 'still reserves inspector room in the unified shell',
+      visibility: {
+        sidebarVisible: true,
+        noteListVisible: true,
+        inspectorCollapsed: false,
+        unifiedVaultPanel: true,
+      },
+      expectedWidth: 1000,
+    },
   ] as const
 
   it.each(minWidthCases)('$name', ({ visibility, expectedWidth }) => {

@@ -17,9 +17,9 @@ vi.mock('./ui/action-tooltip', () => ({
 function renderRail(overrides: Partial<React.ComponentProps<typeof CommandRail>> = {}) {
   const props: React.ComponentProps<typeof CommandRail> = {
     locale: 'en',
-    activeDestination: 'notes',
+    activeDestination: 'inbox',
     onSelectChat: vi.fn(),
-    onSelectNotes: vi.fn(),
+    onSelectInbox: vi.fn(),
     onSelectGraph: vi.fn(),
     onSelectMycelium: vi.fn(),
     onOpenResearch: vi.fn(),
@@ -39,7 +39,7 @@ describe('CommandRail', () => {
   it('renders the four destinations and the settings gear', () => {
     renderRail()
     expect(screen.getByTestId('command-rail')).toBeInTheDocument()
-    expect(screen.getByTestId('command-rail-notes')).toBeInTheDocument()
+    expect(screen.getByTestId('command-rail-inbox')).toHaveTextContent('Inbox')
     expect(screen.getByTestId('command-rail-graph')).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-research')).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-changes')).toBeInTheDocument()
@@ -61,15 +61,15 @@ describe('CommandRail', () => {
     expect(props.onSelectChanges).toHaveBeenCalledOnce()
     expect(trackRailDestinationClicked).toHaveBeenCalledWith('changes')
 
-    fireEvent.click(screen.getByTestId('command-rail-notes'))
-    expect(props.onSelectNotes).toHaveBeenCalledOnce()
-    expect(trackRailDestinationClicked).toHaveBeenCalledWith('notes')
+    fireEvent.click(screen.getByTestId('command-rail-inbox'))
+    expect(props.onSelectInbox).toHaveBeenCalledOnce()
+    expect(trackRailDestinationClicked).toHaveBeenCalledWith('inbox')
   })
 
   it('marks the active destination with aria-pressed', () => {
     renderRail({ activeDestination: 'graph' })
     expect(screen.getByTestId('command-rail-graph')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('command-rail-notes')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('command-rail-inbox')).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('opens settings from the gear without tracking a destination', () => {
@@ -98,7 +98,7 @@ describe('the rail says what its destinations are', () => {
   it('shows every label as text, not only on hover', () => {
     renderRail()
 
-    for (const label of ['Chat', 'Notes', 'Wiki Graph', 'Mycelium', 'Research', 'Changes', 'Settings']) {
+    for (const label of ['Chat', 'Inbox', 'Wiki Graph', 'Mycelium', 'Research', 'Changes', 'Settings']) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }
   })

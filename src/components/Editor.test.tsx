@@ -323,7 +323,7 @@ describe('Editor', () => {
     const { container } = renderEditor()
     const dragRegion = container.querySelector('[data-testid="editor-empty-state-drag-region"]')
 
-    expect(dragRegion).toHaveAttribute('data-tauri-drag-region')
+    expect(dragRegion).not.toHaveAttribute('data-tauri-drag-region')
     expect(dragRegion).toHaveAttribute('aria-hidden', 'true')
   })
 
@@ -573,6 +573,19 @@ describe('Editor', () => {
       ctrlKey: false,
     })
     expect(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Delete this note' })).toBeInTheDocument()
+  })
+
+  it('closes the open note from the breadcrumb', () => {
+    const onCloseNote = vi.fn()
+    renderEditor({
+      tabs: [mockTab],
+      activeTabPath: mockEntry.path,
+      onCloseNote,
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close note' }))
+
+    expect(onCloseNote).toHaveBeenCalledOnce()
   })
 
   it('keeps editor chrome visible while active note content is loading', () => {

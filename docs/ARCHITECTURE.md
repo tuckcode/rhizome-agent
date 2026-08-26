@@ -214,17 +214,19 @@ flowchart TD
     style EXT fill:#f3e5f5,stroke:#9c27b0,color:#000
 ```
 
-## Four-Panel Layout
+## Chat-Centered Layout
 
 The **network-shell** product map (ADR-0166, shipped 2026-08-25) is:
 
 ```
-rail | sessions | CHAT | inbox (note list) | notes (tree)
+rail (Inbox toggle) | sessions | CHAT | Notes panel (navigation over list)
 ```
 
 Chat is the center canvas. Sessions are a collapsible column on its left.
-Inbox and notes dock on the right and collapse independently (⌘1 / ⌘2 / ⌘3).
-Selecting a note opens the editor beside Chat rather than replacing it.
+The right Notes panel starts closed; compact Inbox/All Notes/Archive/type/folder
+navigation sits above its selected note list. Browse and the whole panel
+collapse independently (⌘1 / ⌘2 / ⌘3). Selecting a note opens the editor
+beside Chat rather than replacing it.
 Graph and Mycelium still replace the canvas. The diagram below is the
 inherited Desktop notes-app map (classic shell / note windows / editor
 internals); do not treat it as the Agent main-window layout.

@@ -67,18 +67,18 @@ composition doc — do not restate them here.
 | Decision | Blocks | Where it stands |
 |---|---|---|
 | **Harness composition: option 2 + first slice** | #5, #40, and any graft of a foreign harness idea | Filter ratified (ADR-0168). Working notes in `harness-composition.md`. Still discuss/decide: ratify option 2, ratify native extension UI as first slice, name remaining incompatibilities. |
-| **What ⌘1/⌘2/⌘3 and "Full Layout" mean once Chat is the centre** | — | **Settled 2026-08-25.** ⌘1 Chat only, ⌘2 Chat + Inbox, ⌘3 Chat + Notes. Stored `viewMode` values unchanged. |
+| **What ⌘1/⌘2/⌘3 and "Full Layout" mean once Chat is the centre** | — | **Settled 2026-08-25.** ⌘1 Chat only, ⌘2 opens the Notes panel with Browse collapsed, ⌘3 opens it with Browse expanded. Stored `viewMode` values unchanged. |
 | **Does Wiki Graph replace the canvas or feed a side panel** | #39, #11, #22 | Still open. Graph/Mycelium still take the canvas; the chat-centered ship did not convert them. |
-| **Right panel exclusivity (Inbox / Notes / Changes, never two)** | — | **Settled 2026-08-25: no.** Inbox (list) and notes (tree) may both be open on the right. Changes is a list filter. The 2026-08-22 exclusivity attempt stays reverted. |
+| **Right panel composition** | — | **Settled 2026-08-25.** One Notes panel: compact navigation above the selected list. Rail Inbox toggles it; Changes is a list filter. No Inbox/Notes tabs or second right column. |
 
 **#40** can close against ADR-0168 (Rhizome is a client of Prime, not a second
 harness). Do not treat that close as "the harness question is done."
 Ratify `harness-composition.md` before grafting.
 
-Two ideas were in play for the Chat-centre question; **neither is the
-shipped map.** The product is sessions left, Chat center, inbox and notes
-on the right, all collapsible — not a bottom Chat strip, and not a shared
-side panel that turns the list into the editor. Captured in ADR-0166.
+The shipped map is sessions left, Chat center, and one optional Notes panel
+on the right. Rail Inbox opens that panel; its compact navigation sits above
+the selected note list. It is not a bottom Chat strip and the list never
+becomes the editor. Captured in ADR-0166.
 
 ---
 

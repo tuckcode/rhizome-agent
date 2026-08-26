@@ -76,6 +76,7 @@ interface SidebarProps {
   locale?: AppLocale
   /** Which edge the sidebar is docked to. See SidebarTitleBar's `dock`. */
   dock?: 'left' | 'right'
+  showTitleBar?: boolean
   onCollapse?: () => void
   onGoBack?: () => void
   onGoForward?: () => void
@@ -693,15 +694,17 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
 
   return (
     <aside className="flex h-full flex-col overflow-hidden border-r border-[var(--sidebar-border)] bg-sidebar text-sidebar-foreground">
-      <SidebarTitleBar
-        locale={locale}
-        dock={props.dock}
-        onCollapse={props.onCollapse}
-        onGoBack={props.onGoBack}
-        onGoForward={props.onGoForward}
-        canGoBack={props.canGoBack}
-        canGoForward={props.canGoForward}
-      />
+      {props.showTitleBar !== false ? (
+        <SidebarTitleBar
+          locale={locale}
+          dock={props.dock}
+          onCollapse={props.onCollapse}
+          onGoBack={props.onGoBack}
+          onGoForward={props.onGoForward}
+          canGoBack={props.canGoBack}
+          canGoForward={props.canGoForward}
+        />
+      ) : null}
       <SidebarRuntimeNavigation props={props} runtime={runtime} />
       <SidebarInteractionOverlays locale={locale} runtime={runtime} />
     </aside>

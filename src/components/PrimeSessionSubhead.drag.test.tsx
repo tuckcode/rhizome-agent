@@ -20,12 +20,10 @@ function renderSubhead() {
 }
 
 describe('PrimeSessionSubhead window dragging', () => {
-  it('is a drag region, because on Chat it is the topmost band', () => {
+  it('avoids a second native drag marker beside the custom handler', () => {
     renderSubhead()
 
-    // Chat has no breadcrumb bar above it. Without this the window cannot be
-    // moved from the Chat surface at all.
-    expect(screen.getByTestId('prime-session-subhead')).toHaveAttribute('data-tauri-drag-region')
+    expect(screen.getByTestId('prime-session-subhead')).not.toHaveAttribute('data-tauri-drag-region')
   })
 
   it('starts a window drag on mousedown', () => {

@@ -64,10 +64,10 @@ describe('SidebarTitleBar', () => {
     expect(bar.style.paddingLeft).toBe('8px')
   })
 
-  it('keeps the traffic-light gutter when docked left', () => {
+  it('does not reserve a traffic-light gutter in a browser preview', () => {
     const { container } = renderTitleBar({ onCollapse: vi.fn(), dock: 'left' })
     const bar = container.firstChild as HTMLElement
-    expect(bar.style.paddingLeft).toBe('90px')
+    expect(bar.style.paddingLeft).toBe('8px')
   })
 
   it('mirrors the collapse glyph so it points at the edge it closes toward', () => {

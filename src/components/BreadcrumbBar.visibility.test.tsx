@@ -58,21 +58,22 @@ describe('BreadcrumbBar filename visibility', () => {
     expect(screen.getByText('test')).toBeVisible()
   })
 
-  it('keeps breadcrumb action buttons on the zero-padding footprint', () => {
+  it('gives breadcrumb action buttons a full 32px hit target', () => {
     const editorCss = readFileSync(`${process.cwd()}/src/components/Editor.css`, 'utf8')
 
     expect(editorCss).toContain(".breadcrumb-bar__actions [data-slot='button']")
-    expect(editorCss).toContain('width: auto;')
-    expect(editorCss).toContain('height: auto;')
+    expect(editorCss).toContain('width: 32px;')
+    expect(editorCss).toContain('height: 32px;')
+    expect(editorCss).toContain('min-width: 32px;')
     expect(editorCss).toContain('padding: 0;')
-    expect(editorCss).toContain('border-radius: 0;')
+    expect(editorCss).toContain('border-radius: var(--radius);')
   })
 
   it('offsets the editor-only breadcrumb title past the macOS traffic lights', () => {
     const editorCss = readFileSync(`${process.cwd()}/src/components/Editor.css`, 'utf8')
 
-    expect(editorCss).toContain('body.mac-chrome .app:not(:has(.app__sidebar)):not(:has(.app__note-list)) .breadcrumb-bar')
-    expect(editorCss).toContain('--breadcrumb-bar-left-padding: 90px;')
+    expect(editorCss).toContain("body.mac-chrome .app:not(:has([data-testid='command-rail']))")
+    expect(editorCss).toContain('--breadcrumb-bar-left-padding: 144px;')
   })
 
   it('keeps a permanent overflow menu while moving lower-priority actions from measured overflow state', () => {

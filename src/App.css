@@ -10,6 +10,7 @@
 
 .app {
   display: flex;
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -56,6 +57,135 @@
   border-left: 1px solid var(--sidebar-border);
 }
 
+.app__vault-panel {
+  flex: 0 0 auto;
+  min-width: 260px;
+  max-width: min(500px, 42vw);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 20;
+  background: var(--surface-sidebar);
+  border-left: 1px solid var(--sidebar-border);
+}
+
+.app__vault-panel--overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(360px, calc(100% - 48px)) !important;
+  max-width: calc(100% - 48px);
+  z-index: 50;
+  box-shadow: -10px 0 28px color-mix(in srgb, black 18%, transparent);
+}
+
+.vault-panel {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface-sidebar);
+}
+
+.vault-panel__header {
+  height: 44px;
+  padding: 0 8px 0 10px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+
+.vault-panel__title {
+  margin: 0;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vault-panel__browse-toggle {
+  min-width: 0;
+  min-height: 32px;
+  gap: 4px;
+  padding: 0 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.vault-panel__collapse {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.vault-panel__restore {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  z-index: 40;
+  width: 32px;
+  height: 40px;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 1px solid var(--sidebar-border);
+  border-right: 0;
+  border-radius: var(--radius) 0 0 var(--radius);
+  background: var(--surface-sidebar);
+  box-shadow: -4px 0 12px color-mix(in srgb, black 10%, transparent);
+}
+
+.vault-panel__content {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.vault-panel__navigation {
+  min-width: 0;
+  min-height: 120px;
+  max-height: 42%;
+  flex: 0 1 42%;
+  display: flex;
+  overflow: hidden;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+
+.vault-panel__navigation > aside {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  border: 0;
+}
+
+.vault-panel__note-list {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.vault-panel__note-list > * {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  border: 0;
+}
+
 /* With the tree docked right, the note list ends against that panel's own
    left border — it must not stack a second hairline on the same seam. */
 .app:has(.app__sidebar--right) .app__note-list > * {
@@ -77,6 +207,10 @@
   flex: 1;
 }
 
+.app:has([data-testid='chat-center']) .app__editor {
+  min-width: 0;
+}
+
 .app__chat-center {
   display: flex;
   flex-direction: row;
@@ -86,13 +220,13 @@
 }
 
 .app__chat-center > [data-testid="chat-home"] {
-  flex: 1 1 60%;
-  min-width: 0;
+  flex: 1 1 50%;
+  min-width: 320px;
 }
 
 .app__note-editor {
-  flex: 1 1 40%;
-  min-width: 280px;
+  flex: 1 1 50%;
+  min-width: 320px;
   min-height: 0;
   overflow: hidden;
   display: flex;
@@ -110,6 +244,18 @@
   flex: 0 0 0;
   min-width: 0;
   border: none;
+}
+
+@container editor (max-width: 760px) {
+  .prime-subhead__uptime {
+    display: none;
+  }
+}
+
+@container editor (max-width: 620px) {
+  .prime-subhead__session {
+    display: none;
+  }
 }
 
 @keyframes spin {

@@ -31,12 +31,16 @@ import { getContextMenuPositionStyle } from '../contextMenuPosition'
 import { countByFilter } from '../../utils/noteListHelpers'
 import { viewIdentityKey, viewSelectionForView } from '../../utils/viewIdentity'
 import { translate, type AppLocale } from '../../lib/i18n'
+import {
+  hasNativeMacosTrafficLights,
+  MACOS_TRAFFIC_LIGHT_SAFE_PADDING,
+} from '../../utils/trafficLights'
 
 export { SidebarTopNav } from './SidebarTopNav'
 export { FavoritesSection } from './FavoritesSection'
 
 const SIDEBAR_TITLE_BAR_ACTION_CLASSNAME =
-  '!h-auto !w-auto !min-w-0 !rounded-none !p-0 text-muted-foreground hover:!bg-transparent hover:text-foreground [&_svg]:!size-4'
+  '!h-[32px] !w-[32px] !min-w-[32px] !rounded !p-0 text-muted-foreground hover:!bg-accent hover:text-foreground [&_svg]:!size-4'
 
 const SIDEBAR_COLLAPSE_SHORTCUT = getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewEditorList)
 const HISTORY_BACK_SHORTCUT = getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewGoBack)
@@ -406,12 +410,15 @@ export function SidebarTitleBar({
   const collapseLabel = translate(locale, 'sidebar.action.collapse')
   const backLabel = translate(locale, 'command.navigation.goBack')
   const forwardLabel = translate(locale, 'command.navigation.goForward')
+  const leftPadding = dock === 'left' && hasNativeMacosTrafficLights()
+    ? MACOS_TRAFFIC_LIGHT_SAFE_PADDING
+    : 8
 
   return (
     <div
       ref={dragRegionRef}
       className="shrink-0 flex items-center border-b border-border"
-      style={{ height: 52, padding: '0 8px', paddingLeft: dock === 'right' ? 8 : 90, cursor: 'default', justifyContent: 'flex-start' }}
+      style={{ height: 52, padding: '0 8px', paddingLeft: leftPadding, cursor: 'default', justifyContent: 'flex-start' }}
     >
       <div className="flex items-center gap-3" style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}>
         {onCollapse && (

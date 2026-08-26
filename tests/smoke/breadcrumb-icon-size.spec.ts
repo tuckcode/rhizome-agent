@@ -4,8 +4,13 @@ import { createFixtureVaultCopy, openFixtureVault, removeFixtureVaultCopy } from
 let tempVaultDir: string
 
 async function expectIconSize(buttonName: string, page: Page) {
-  const icon = page.getByRole('button', { name: buttonName }).locator('svg')
+  const button = page.locator('.breadcrumb-bar').getByRole('button', { name: buttonName })
+  const icon = button.locator('svg')
+  await expect(button).toBeVisible({ timeout: 5_000 })
   await expect(icon).toBeVisible({ timeout: 5_000 })
+  const buttonBox = await button.boundingBox()
+  expect(buttonBox?.width).toBeGreaterThanOrEqual(32)
+  expect(buttonBox?.height).toBeGreaterThanOrEqual(32)
   const box = await icon.boundingBox()
   expect(box?.width).toBeGreaterThanOrEqual(15)
   expect(box?.width).toBeLessThanOrEqual(17)
@@ -33,15 +38,17 @@ test.describe('Breadcrumb action icon size regression', () => {
     removeFixtureVaultCopy(tempVaultDir)
   })
 
-  test('breadcrumb action icons render at the pre-regression 16px size', async ({ page }) => {
+  test('breadcrumb actions keep 32px hitboxes around 16px icons @smoke', async ({ page }) => {
     await openFixtureVault(page, tempVaultDir)
     await selectAlphaProject(page)
 
     await expect(page.locator('.breadcrumb-bar')).toBeVisible({ timeout: 5_000 })
 
-    await expectIconSize('Search within this note', page)
+    await expectIconSize('Add to favorites', page)
+    await expectIconSize('Set note as organized', page)
+    await expectIconSize('Reload vault', page)
     await expectIconSize('Open the raw editor', page)
-    await expectIconSize('Open the AI panel', page)
-    await expectIconSize('Archive this note', page)
+    await expectIconSize('More note actions', page)
+    await expectIconSize('Open the properties panel', page)
   })
 })

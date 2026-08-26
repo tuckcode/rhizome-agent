@@ -115,10 +115,9 @@ export function PrimeSessionSubhead({
       )}
       style={trafficLightInset}
       data-testid="prime-session-subhead"
-      data-tauri-drag-region
       onMouseDown={onDragRegionMouseDown}
     >
-      <span className="inline-flex shrink-0 items-center gap-1.5">
+      <span className="inline-flex min-w-0 items-center gap-1.5">
         <span
           aria-hidden="true"
           className={cn(
@@ -130,11 +129,13 @@ export function PrimeSessionSubhead({
         />
         <span
           className={cn(
+            'truncate',
             live && 'text-[var(--accent-green)]',
             // A problem is not the same as idle: idle is a resting state, this
             // is something the user has to act on.
             !live && problemMessage && 'text-[var(--accent-amber,inherit)] text-foreground',
           )}
+          title={live ? t('ai.subhead.live') : (problemMessage ?? t('ai.subhead.idle'))}
         >
           {live ? t('ai.subhead.live') : (problemMessage ?? t('ai.subhead.idle'))}
         </span>
@@ -143,7 +144,7 @@ export function PrimeSessionSubhead({
       {shortId ? (
         <>
           <Separator />
-          <span className="shrink-0">
+          <span className="prime-subhead__session shrink-0">
             sess_<strong className="font-medium text-foreground">{shortId}</strong>
           </span>
         </>
@@ -161,7 +162,7 @@ export function PrimeSessionSubhead({
       {uptime ? (
         <>
           <Separator />
-          <span className="shrink-0">
+          <span className="prime-subhead__uptime shrink-0">
             {t('ai.subhead.uptime')}{' '}
             <strong className="font-medium text-foreground">{uptime}</strong>
           </span>
@@ -173,7 +174,7 @@ export function PrimeSessionSubhead({
           type="button"
           variant="ghost"
           size="icon-xs"
-          className="ml-auto h-6 w-6 shrink-0 p-0 [&_svg:not([class*=size-])]:size-3.5"
+          className="ml-auto h-[32px] w-[32px] shrink-0 p-0 [&_svg:not([class*=size-])]:size-3.5"
           onClick={onNewChat}
           aria-label={t('ai.sessions.newChat')}
           title={t('ai.sessions.newChat')}

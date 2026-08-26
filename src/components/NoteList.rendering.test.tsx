@@ -541,7 +541,7 @@ describe('NoteList rendering', () => {
     expect(screen.getByTitle('Create new note')).toBeInTheDocument()
   })
 
-  it('uses breadcrumbs-like button styling for note-list header actions', () => {
+  it('uses full 32px hit targets for note-list header actions', () => {
     renderBookNoteList({
       entryOverrides: { properties: { Priority: 'High' } },
       selection: { kind: 'filter', filter: 'inbox' },
@@ -557,13 +557,13 @@ describe('NoteList rendering', () => {
     for (const button of buttons) {
       expect(button).toHaveAttribute('data-variant', 'ghost')
       expect(button).toHaveClass(
-        '!h-auto',
-        '!w-auto',
-        '!min-w-0',
-        '!rounded-none',
+        '!h-[32px]',
+        '!w-[32px]',
+        '!min-w-[32px]',
+        '!rounded',
         '!p-0',
         '!text-muted-foreground',
-        'hover:!bg-transparent',
+        'hover:!bg-accent',
         'hover:!text-foreground',
       )
       expect(button).not.toHaveAttribute('tabindex', '-1')
@@ -1108,11 +1108,11 @@ describe('NoteList type sections', () => {
 })
 
 describe('NoteList traffic-light padding', () => {
-  it('adds left padding for macOS traffic lights when the sidebar is collapsed', () => {
+  it('does not add phantom traffic-light padding in a macOS browser preview', () => {
     withUserAgent(MAC_USER_AGENT, () => {
       const { container } = renderNoteList({ sidebarCollapsed: true })
       const header = container.querySelector('.h-\\[52px\\]') as HTMLElement
-      expect(header.style.paddingLeft).toBe('90px')
+      expect(header.style.paddingLeft).toBe('')
     })
   })
 
