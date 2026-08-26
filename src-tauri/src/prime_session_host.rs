@@ -4462,11 +4462,9 @@ mod tests {
     #[test]
     fn the_version_floor_is_a_version_a_user_could_install() {
         assert!(MINIMUM_PRIME_VERSION.split('.').count() >= 2);
-        assert!(
-            MINIMUM_PRIME_VERSION
-                .chars()
-                .all(|c| c.is_ascii_digit() || c == '.')
-        );
+        assert!(MINIMUM_PRIME_VERSION
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '.'));
     }
 
     // ── Quit semantics (#12) ────────────────────────────────────────────────
@@ -4608,16 +4606,12 @@ mod tests {
             promote["activeSessionId"].as_str(),
             Some(FAKE_ACTIVE_SESSION_ID)
         );
-        assert!(
-            daemon
-                .wait_for_command("detach", Duration::from_secs(5))
-                .is_some()
-        );
-        assert!(
-            !daemon
-                .commands()
-                .contains(&"complete_owned_session".to_string())
-        );
+        assert!(daemon
+            .wait_for_command("detach", Duration::from_secs(5))
+            .is_some());
+        assert!(!daemon
+            .commands()
+            .contains(&"complete_owned_session".to_string()));
         assert!(!daemon.commands().contains(&"kill".to_string()));
         assert!(!daemon.commands().contains(&"shutdown".to_string()));
     }
@@ -5281,7 +5275,8 @@ mod tests {
 
     #[test]
     fn status_output_yields_a_windows_named_pipe_path() {
-        let stdout = "socket                                   pid    version  status   sessions  uptime\n\
+        let stdout =
+            "socket                                   pid    version  status   sessions  uptime\n\
                       \\\\.\\pipe\\prime-agent-daemon *  1234  0.7.4    current  0\n\
                       \n* default background service\n";
 
