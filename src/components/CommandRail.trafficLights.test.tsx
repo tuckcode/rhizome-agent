@@ -26,7 +26,7 @@ function renderRail() {
       onSelectInbox={vi.fn()}
       onSelectGraph={vi.fn()}
       onSelectMycelium={vi.fn()}
-      onOpenResearch={vi.fn()}
+      onSelectResearch={vi.fn()}
       onSelectChanges={vi.fn()}
       onOpenSettings={vi.fn()}
     />

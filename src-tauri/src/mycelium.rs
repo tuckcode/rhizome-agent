@@ -1,9 +1,14 @@
-//! Mycelium helpers: list Prime sessions, detect Mindwalk, open bridged sessions.
+//! Mycelium helpers: list Prime sessions and run Mindwalk as a local sidecar.
 
 use serde::Serialize;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::time::SystemTime;
+use std::process::{Child, Command, Stdio};
+use std::sync::Mutex;
+use std::time::{Duration, SystemTime};
+
+const MYCELIUM_SIDECAR_PORT: u16 = 18765;
+static SIDECAR: Mutex<Option<Child>> = Mutex::new(None);
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -45,6 +50,160 @@ pub fn list_prime_sessions() -> Result<Vec<PrimeSessionEntry>, String> {
             path: path.to_string_lossy().into_owned(),
         })
         .collect())
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MindwalkSidecarStatus {
+    pub url: String,
+    pub mode: String,
+}
+
+/// Pull the first loopback URL out of Mindwalk's startup banner.
+pub fn extract_mindwalk_url(text: &str) -> Option<String> {
+    for raw in text.split_whitespace() {
+        let trimmed = raw.trim_matches(|c: char| c == '(' || c == ')' || c == '"' || c == '\'');
+        if let Some(rest) = trimmed
+            .strip_prefix("http://127.0.0.1:")
+            .or_else(|| trimmed.strip_prefix("http://localhost:"))
+        {
+            let port: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+            if !port.is_empty() {
+                return Some(format!("http://127.0.0.1:{port}"));
+            }
+        }
+    }
+    None
+}
+
+fn mindwalk_candidates() -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    if let Some(home) = dirs::home_dir() {
+        out.push(home.join(".local").join("bin").join("mindwalk"));
+        out.push(home.join("go").join("bin").join("mindwalk"));
+    }
+    out.push(PathBuf::from("/opt/homebrew/bin/mindwalk"));
+    out.push(PathBuf::from("/usr/local/bin/mindwalk"));
+    if let Ok(path) = std::env::var("PATH") {
+        let sep = if cfg!(windows) { ';' } else { ':' };
+        for dir in path.split(sep) {
+            let name = if cfg!(windows) {
+                "mindwalk.exe"
+            } else {
+                "mindwalk"
+            };
+            out.push(Path::new(dir).join(name));
+        }
+    }
+    out
+}
+
+fn resolve_mindwalk_binary() -> Option<PathBuf> {
+    mindwalk_candidates()
+        .into_iter()
+        .find(|path| path.is_file())
+}
+
+fn prime_sessions_dir() -> Result<PathBuf, String> {
+    let home = dirs::home_dir().ok_or_else(|| "no home".to_string())?;
+    Ok(home.join(".prime").join("agent").join("sessions"))
+}
+
+fn stop_sidecar_locked(slot: &mut Option<Child>) {
+    if let Some(mut child) = slot.take() {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+}
+
+pub fn stop_mindwalk_sidecar() -> Result<(), String> {
+    let mut slot = SIDECAR
+        .lock()
+        .map_err(|_| "mycelium sidecar lock poisoned".to_string())?;
+    stop_sidecar_locked(&mut slot);
+    Ok(())
+}
+
+fn watch_pipe_for_url<R: std::io::Read + Send + 'static>(
+    pipe: Option<R>,
+    tx: std::sync::mpsc::Sender<String>,
+) {
+    if let Some(pipe) = pipe {
+        std::thread::spawn(move || {
+            let reader = BufReader::new(pipe);
+            let mut collected = String::new();
+            for line in reader.lines().map_while(Result::ok) {
+                collected.push_str(&line);
+                collected.push('\n');
+                if let Some(url) = extract_mindwalk_url(&collected) {
+                    let _ = tx.send(url);
+                    return;
+                }
+            }
+        });
+    }
+}
+
+fn wait_for_sidecar_url(child: &mut Child, fallback: &str) -> Result<String, String> {
+    let (tx, rx) = std::sync::mpsc::channel::<String>();
+    watch_pipe_for_url(child.stderr.take(), tx.clone());
+    watch_pipe_for_url(child.stdout.take(), tx);
+    match rx.recv_timeout(Duration::from_secs(8)) {
+        Ok(url) => Ok(url),
+        Err(_) => {
+            if child.try_wait().ok().flatten().is_some() {
+                Err("Mycelium sidecar failed to start.".into())
+            } else {
+                Ok(fallback.to_string())
+            }
+        }
+    }
+}
+
+pub fn start_mindwalk_sidecar(session_path: Option<&str>) -> Result<MindwalkSidecarStatus, String> {
+    let binary = resolve_mindwalk_binary().ok_or_else(|| {
+        "Mycelium sidecar could not start. Install Mindwalk, then retry.".to_string()
+    })?;
+    let sessions = prime_sessions_dir()?;
+    let mut slot = SIDECAR
+        .lock()
+        .map_err(|_| "mycelium sidecar lock poisoned".to_string())?;
+    stop_sidecar_locked(&mut slot);
+
+    let fallback = format!("http://127.0.0.1:{MYCELIUM_SIDECAR_PORT}");
+    let mut command = Command::new(&binary);
+    let mode = if let Some(path) = session_path {
+        let bridged = write_bridged_session(path)?;
+        command.arg("open").arg("--no-open").arg(&bridged);
+        "session"
+    } else {
+        command
+            .arg("serve")
+            .arg("--no-open")
+            .arg("--port")
+            .arg(MYCELIUM_SIDECAR_PORT.to_string())
+            .arg("--pi-dir")
+            .arg(&sessions);
+        "overview"
+    };
+    let mut child = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Mycelium sidecar could not start: {e}"))?;
+    let url = match wait_for_sidecar_url(&mut child, &fallback) {
+        Ok(url) => url,
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(error);
+        }
+    };
+    *slot = Some(child);
+    Ok(MindwalkSidecarStatus {
+        url,
+        mode: mode.to_string(),
+    })
 }
 
 pub fn which_binary(name: &str) -> WhichBinaryResult {
@@ -122,13 +281,24 @@ mod tests {
         // Should not panic; may be empty on CI
         let _ = list_prime_sessions();
     }
+
+    #[test]
+    fn extracts_loopback_url_from_banner() {
+        assert_eq!(
+            extract_mindwalk_url("Serving UI at http://127.0.0.1:18765\n"),
+            Some("http://127.0.0.1:18765".into())
+        );
+        assert_eq!(
+            extract_mindwalk_url("open (http://localhost:56843)"),
+            Some("http://127.0.0.1:56843".into())
+        );
+        assert_eq!(extract_mindwalk_url("no url here"), None);
+    }
 }
 
-/// Read a Prime session, rewrite ipython %%bash → bash-shaped toolCalls, write bridge file, open Mindwalk.
-pub fn bridge_and_open_prime_session(path: &str) -> Result<String, String> {
+fn write_bridged_session(path: &str) -> Result<PathBuf, String> {
     let path_buf = PathBuf::from(path);
-    let home = dirs::home_dir().ok_or_else(|| "no home".to_string())?;
-    let sessions = home.join(".prime").join("agent").join("sessions");
+    let sessions = prime_sessions_dir()?;
     let canonical = path_buf
         .canonicalize()
         .map_err(|e| format!("canonicalize: {e}"))?;
@@ -136,7 +306,7 @@ pub fn bridge_and_open_prime_session(path: &str) -> Result<String, String> {
         return Err("Refusing to open a session outside ~/.prime/agent/sessions".into());
     }
     let raw = std::fs::read_to_string(&canonical).map_err(|e| format!("read session: {e}"))?;
-    let (bridged, rewritten) = bridge_prime_session_jsonl(&raw);
+    let (bridged, _rewritten) = bridge_prime_session_jsonl(&raw);
     let out_name = format!(
         "{}.mindwalk-bridge.jsonl",
         canonical
@@ -146,7 +316,17 @@ pub fn bridge_and_open_prime_session(path: &str) -> Result<String, String> {
     );
     let out_path = sessions.join(out_name);
     std::fs::write(&out_path, bridged).map_err(|e| format!("write bridge: {e}"))?;
-    let _ = rewritten;
+    Ok(out_path)
+}
+
+/// Read a Prime session, rewrite ipython %%bash → bash-shaped toolCalls, write bridge file.
+pub fn bridge_prime_session(path: &str) -> Result<String, String> {
+    Ok(write_bridged_session(path)?.to_string_lossy().into_owned())
+}
+
+/// Legacy browser launch — kept for existing command bindings, unused by Mycelium UI.
+pub fn bridge_and_open_prime_session(path: &str) -> Result<String, String> {
+    let out_path = write_bridged_session(path)?;
     run_mindwalk_open(out_path.to_str().unwrap_or_default())?;
     Ok(out_path.to_string_lossy().into_owned())
 }

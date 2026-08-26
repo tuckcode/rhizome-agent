@@ -22,7 +22,7 @@ function renderRail(overrides: Partial<React.ComponentProps<typeof CommandRail>>
     onSelectInbox: vi.fn(),
     onSelectGraph: vi.fn(),
     onSelectMycelium: vi.fn(),
-    onOpenResearch: vi.fn(),
+    onSelectResearch: vi.fn(),
     onSelectChanges: vi.fn(),
     onOpenSettings: vi.fn(),
     ...overrides,
@@ -54,7 +54,7 @@ describe('CommandRail', () => {
     expect(trackRailDestinationClicked).toHaveBeenCalledWith('graph')
 
     fireEvent.click(screen.getByTestId('command-rail-research'))
-    expect(props.onOpenResearch).toHaveBeenCalledOnce()
+    expect(props.onSelectResearch).toHaveBeenCalledOnce()
     expect(trackRailDestinationClicked).toHaveBeenCalledWith('research')
 
     fireEvent.click(screen.getByTestId('command-rail-changes'))

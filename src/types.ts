@@ -274,7 +274,7 @@ export interface PulseCommit {
   deleted: number
 }
 
-export type SidebarFilter = 'all' | 'archived' | 'changes' | 'pulse' | 'graph' | 'mycelium' | 'chat' | 'inbox' | 'favorites'
+export type SidebarFilter = 'all' | 'archived' | 'changes' | 'pulse' | 'graph' | 'mycelium' | 'research' | 'chat' | 'inbox' | 'favorites'
 
 export type InboxPeriod = 'week' | 'month' | 'quarter' | 'all'
 

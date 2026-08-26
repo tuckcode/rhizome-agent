@@ -971,6 +971,21 @@ pub fn run_mindwalk_open(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub fn start_mindwalk_sidecar(path: Option<String>) -> Result<crate::mycelium::MindwalkSidecarStatus, String> {
+    crate::mycelium::start_mindwalk_sidecar(path.as_deref())
+}
+
+#[tauri::command]
+pub fn stop_mindwalk_sidecar() -> Result<(), String> {
+    crate::mycelium::stop_mindwalk_sidecar()
+}
+
+#[tauri::command]
+pub fn bridge_prime_session(path: String) -> Result<String, String> {
+    crate::mycelium::bridge_prime_session(&path)
+}
+
+#[tauri::command]
 pub fn bridge_and_open_prime_session(path: String) -> Result<String, String> {
     crate::mycelium::bridge_and_open_prime_session(&path)
 }

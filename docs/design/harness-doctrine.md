@@ -12,6 +12,7 @@ Source reviews:
 - [Hermes source review](../plans/2026-08-24-hermes-harness-source-review.md)
 - [DeepSeek Harness source review](../plans/2026-08-24-deepseek-harness-source-review.md)
 - Switchyard evaluation (wiki note `projects/rhizome-agent/switchyard-model-routing`)
+- [Token routing and compression](./token-routing-and-compression.md) — Switchyard + TinyHumans TokenJuice, 2026-08-26
 - [Divergence scoring](../plans/2026-08-24-harness-doctrine-divergence.md)
 
 The earlier vision draft, [`rhizome-prime-harness-vision.md`](./rhizome-prime-harness-vision.md),
@@ -127,9 +128,12 @@ does not grow a router of its own.
 ### OpenHuman — DEFER a source review
 
 OpenHuman appeared in the divergence frames as a possible stance, not as a
-reviewed stack. There is no first-party source review in this repo yet. Until
-one exists, treat it like any other external harness: metabolite-only, no organ
-transplant.
+reviewed stack. One feature has been read: TinyHumans TokenJuice (content-kind
+tool-output compression). That is recorded in
+[`token-routing-and-compression.md`](./token-routing-and-compression.md). It is
+not a full OpenHuman source review. Until one exists, treat the rest of
+OpenHuman like any other external harness: metabolite-only, no organ
+transplant. Do not compact Prime tool results in Rhizome.
 
 ### OpenCode and other CLIs — REJECT as product backends
 
@@ -193,8 +197,9 @@ UI.
 | Bundled Prime / Node | Lifecycle, capability negotiation, and extension UI are stable. |
 | Native extension UI (`select` / `confirm` / `input` / `editor`) | After ADR-0167; required before claiming extension support. |
 | Queue editing, RLM tree, schedule UI, refine history | User pull, in that order, each as Prime mechanics + Rhizome UX. |
-| Switchyard production routing | Behind-Prime experiment with a half-life. |
-| OpenHuman source review | Someone reads first-party sources. |
+| Switchyard production routing | Behind-Prime experiment with a half-life. See [`token-routing-and-compression.md`](./token-routing-and-compression.md). |
+| TokenJuice-shaped tool compaction | Behind Prime (skill / daemon). Rhizome may render breadcrumbs; it must not compact independently. |
+| OpenHuman source review | TokenJuice path read 2026-08-26. Full stack still unread. |
 | Agent-team roster / mailbox / task DAG | Prime exposes a stable equivalent. |
 | Worktree orchestration | Prime isolation + Rhizome review/merge UX are understood. |
 | Voice, HUD, bot gateways, hosted fleets | Demonstrated Rhizome demand. |

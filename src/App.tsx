@@ -1,4 +1,4 @@
-import { persistNewNote } from './hooks/useNoteCreation'
+import { noteExistsOnDisk, persistNewNote } from './hooks/useNoteCreation'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { CommandRail, type CommandRailDestination } from './components/CommandRail'
@@ -24,7 +24,7 @@ const GraphView = lazy(() => import('./components/graph/GraphView'))
 const MyceliumView = lazy(() => import('./components/MyceliumView'))
 const ChatHome = lazy(() => import('./components/ChatHome'))
 import { AppAiWorkspaceSurface } from './components/AppAiWorkspaceSurface'
-import { buildPromoteNoteFromChat } from './utils/promoteChatToVault'
+import { writePromoteNoteFromChat } from './utils/promoteChatToVault'
 import { AiWorkspaceWindowApp } from './components/AiWorkspaceWindowApp'
 import { SettingsPanel } from './components/SettingsPanel'
 import { CloneVaultModal } from './components/CloneVaultModal'
@@ -216,7 +216,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const dialogs = useDialogs()
   const { closeAIChat, openAIChat, showAIChat } = dialogs
   const [showFeedback, setShowFeedback] = useState(false)
-  const [showResearch, setShowResearch] = useState(false)
+  const [myceliumFocusPath, setMyceliumFocusPath] = useState<string | null>(null)
   const openFeedback = useCallback(() => setShowFeedback(true), [])
   const closeFeedback = useCallback(() => setShowFeedback(false), [])
   const openDocs = useCallback(() => {
@@ -508,19 +508,30 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'graph'
   const isMyceliumDestination =
     effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'mycelium'
+  const isResearchDestination =
+    effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'research'
   // Classic shell only: Chat is still a destination that replaces the vault.
   const isChatDestination =
     !chatCentered &&
     effectiveSelection.kind === 'filter' &&
     effectiveSelection.filter === 'chat'
   const handleRailSelectChat = useCallback(() => {
-    if (isGraphDestination || isMyceliumDestination) {
+    if (isGraphDestination || isMyceliumDestination || isResearchDestination) {
       handleSetSelection({
         kind: 'filter',
         filter: explicitOrganizationEnabled ? 'inbox' : 'all',
       })
     }
-  }, [explicitOrganizationEnabled, handleSetSelection, isGraphDestination, isMyceliumDestination])
+  }, [
+    explicitOrganizationEnabled,
+    handleSetSelection,
+    isGraphDestination,
+    isMyceliumDestination,
+    isResearchDestination,
+  ])
+  const handleRailSelectResearch = useCallback(() => {
+    handleSetSelection({ kind: 'filter', filter: 'research' })
+  }, [handleSetSelection])
   const handleRailSelectInbox = useCallback(() => {
     handleSetSelection({ kind: 'filter', filter: explicitOrganizationEnabled ? 'inbox' : 'all' })
   }, [handleSetSelection, explicitOrganizationEnabled])
@@ -528,6 +539,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     handleSetSelection(toggleGraphSelection(effectiveSelection, vaultConfig.inbox?.explicitOrganization))
   }, [handleSetSelection, effectiveSelection, vaultConfig.inbox?.explicitOrganization])
   const handleRailSelectMycelium = useCallback(() => {
+    setMyceliumFocusPath(null)
+    handleSetSelection({ kind: 'filter', filter: 'mycelium' })
+  }, [handleSetSelection])
+  const handleOpenSessionFootprint = useCallback((path: string) => {
+    setMyceliumFocusPath(path)
     handleSetSelection({ kind: 'filter', filter: 'mycelium' })
   }, [handleSetSelection])
   const handleRailSelectChanges = useCallback(() => {
@@ -1272,11 +1288,15 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     unifiedVaultPanel: chatCentered,
     windowMode: Boolean(noteWindowParams) || aiWorkspaceWindow,
   })
+  const handleChatViewMode = useCallback((mode: typeof viewMode) => {
+    if (mode === 'editor-only') handleRailSelectChat()
+    handleSetViewMode(mode)
+  }, [handleRailSelectChat, handleSetViewMode])
   const railActiveDestination = useMemo((): CommandRailDestination => {
     if (isGraphDestination) return 'graph'
     if (isMyceliumDestination) return 'mycelium'
+    if (isResearchDestination) return 'research'
     if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'changes') return 'changes'
-    if (showResearch) return 'research'
     if (chatCentered && viewMode === 'editor-only') return 'chat'
     if (isChatDestination) return 'chat'
     return 'inbox'
@@ -1286,7 +1306,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     isChatDestination,
     isGraphDestination,
     isMyceliumDestination,
-    showResearch,
+    isResearchDestination,
     viewMode,
   ])
 
@@ -1637,7 +1657,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     redoLabel: notes.redoLabel,
     onOpenSettings: handleOpenSettings,
     onOpenFeedback: openFeedback,
-    onOpenResearch: () => setShowResearch(true),
+    onOpenResearch: handleRailSelectResearch,
     onDeleteNote: deleteActions.handleDeleteNote,
     onArchiveNote: entryActions.handleArchiveNote, onUnarchiveNote: entryActions.handleUnarchiveNote,
     onCommitPush: handleCommitPush,
@@ -1648,7 +1668,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     onPull: handlePullSelectedRepository,
     onPullRepository: handlePullRepository,
     onResolveConflicts: conflictFlow.handleOpenConflictResolver,
-    onSetViewMode: handleSetViewMode,
+    onSetViewMode: handleChatViewMode,
     onToggleInspector: handleToggleInspector,
     onToggleDiff: toggleDiffCommand,
     onToggleRawEditor: toggleRawEditorCommand,
@@ -1734,7 +1754,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const handleAiWorkspaceConversationsChange = useCallback((conversations: AiWorkspaceConversationSetting[]) => {
     void saveSettings({ ...settings, ai_workspace_conversations: conversations })
   }, [saveSettings, settings])
-  const handlePromoteChatToVault = useCallback(async (text: string) => {
+  const handlePromoteChatToVault = useCallback(async (text: string, session?: string) => {
     const body = text.trim()
     if (!body) return
     const vaultPath = activeEditorVaultPath
@@ -1749,10 +1769,17 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       return
     }
     try {
-      const note = buildPromoteNoteFromChat(body)
-      await persistNewNote({ path: note.path, content: note.content, vaultPath })
-      vaultBridge.handleAgentFileCreated(note.path)
-      setToastMessage(translate(appLocale, 'ai.message.saveToVaultDone', { title: note.title }))
+      const result = await writePromoteNoteFromChat(body, new Date(), {
+        session,
+        pathExists: (path) => noteExistsOnDisk({ path, vaultPath }),
+        persist: (note) => persistNewNote({ path: note.path, content: note.content, vaultPath }),
+      })
+      if (result.status === 'duplicate') {
+        setToastMessage(translate(appLocale, 'ai.message.saveToVaultDuplicate', { title: result.note.title }))
+        return
+      }
+      vaultBridge.handleAgentFileCreated(result.note.path)
+      setToastMessage(translate(appLocale, 'ai.message.saveToVaultDone', { title: result.note.title }))
     } catch (error) {
       setToastMessage(translate(appLocale, 'ai.message.saveToVaultFailed', {
         error: error instanceof Error ? error.message : String(error),
@@ -1842,7 +1869,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   */
   const vaultBrowseOpen = viewMode === 'all'
   const showSidebarTree = !chatCentered && sidebarVisible && !isChatDestination
-  const hideNoteListForCanvas = isGraphDestination || isMyceliumDestination
+  const hideNoteListForCanvas = isGraphDestination || isMyceliumDestination || isResearchDestination
   const showNoteListPanel = !chatCentered && noteListVisible && !isChatDestination && !hideNoteListForCanvas
   const showVaultPanel =
     chatCentered &&
@@ -1935,6 +1962,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         onVaultChanged={vaultBridge.handleAgentVaultChanged}
         onUnsupportedAiPaste={setToastMessage}
         sessionsAutoCollapsed={compactSessions}
+        onOpenSessionFootprint={handleOpenSessionFootprint}
       />
     </Suspense>
   )
@@ -1976,7 +2004,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               }}
               onSelectGraph={handleRailSelectGraph}
               onSelectMycelium={handleRailSelectMycelium}
-              onOpenResearch={() => setShowResearch(true)}
+              onSelectResearch={handleRailSelectResearch}
               onSelectChanges={() => {
                 handleRailSelectChanges()
                 if (chatCentered && viewMode === 'editor-only') handleSetViewMode('editor-list')
@@ -2002,9 +2030,25 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
             ) : isMyceliumDestination ? (
               <div className="relative flex flex-1 min-h-0">
                 <Suspense fallback={<div className="flex h-full flex-1 items-center justify-center text-sm text-muted-foreground" data-testid="mycelium-suspense">{translate(appLocale, 'mycelium.title')}</div>}>
-                  <MyceliumView locale={appLocale} onExit={handleRailSelectInbox} />
+                  <MyceliumView locale={appLocale} onExit={handleRailSelectChat} focusSessionPath={myceliumFocusPath} />
                 </Suspense>
                 {effectiveShowAIChat && aiWorkspaceSurface}
+              </div>
+            ) : isResearchDestination ? (
+              <div className="relative flex min-h-0 flex-1" data-testid="research-destination">
+                <ResearchPanel
+                  variant="pane"
+                  open
+                  onClose={handleRailSelectChat}
+                  vaultPath={resolvedPath}
+                  agentMemoryVaultPath={settings.agent_memory_vault_path}
+                  vaults={vaultSwitcher.allVaults}
+                  onSetDefaultDestination={(path) => { void saveSettings({ ...settings, agent_memory_vault_path: path }) }}
+                  onOpenNote={vaultBridge.openNoteByPath}
+                  locale={appLocale}
+                  settings={settings}
+                  aiAgentsStatus={aiAgentsStatus}
+                />
               </div>
             ) : chatCentered ? (
               <div className="app__chat-center" data-testid="chat-center">
@@ -2182,7 +2226,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         </div>
         <UpdateBanner status={updateStatus} actions={updateActions} locale={appLocale} />
         <RenameDetectedBanner renames={detectedRenames} onUpdate={handleUpdateWikilinks} onDismiss={handleDismissRenames} />
-        <StatusBar noteCount={visibleEntries.length} modifiedCount={gitModifiedCount} vaultPath={resolvedPath} defaultWorkspacePath={defaultWorkspacePath} vaults={vaultSwitcher.allVaults} multiWorkspaceEnabled={multiWorkspaceEnabled} onSwitchVault={vaultSwitcher.switchVault} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onOpenSettings={handleOpenSettings} onOpenVaultSettings={handleOpenVaultSettings} onOpenFeedback={openFeedback} onOpenDocs={openDocs} onOpenResearch={() => setShowResearch(true)} onOpenLocalFolder={vaultSwitcher.handleOpenLocalFolder} onCreateEmptyVault={vaultSwitcher.handleCreateEmptyVault} onCloneVault={dialogs.openCloneVault} onCloneGettingStarted={cloneGettingStartedVault} onClickPending={() => handleSetSelection({ kind: 'filter', filter: 'changes' })} onClickPulse={() => handleSetSelection({ kind: 'filter', filter: 'pulse' })} onClickGraph={() => handleSetSelection(toggleGraphSelection(effectiveSelection, vaultConfig.inbox?.explicitOrganization))} onCommitPush={handleCommitPush} commitActionPending={commitFlow.isOpeningCommitDialog} gitFeaturesEnabled={gitFeaturesEnabled} onInitializeGit={openGitSetupDialog} isOffline={networkStatus.isOffline} isGitVault={isGitVault} isVaultReloading={vault.isReloading || isVaultContentLoading} syncStatus={autoSync.syncStatus} lastSyncTime={autoSync.lastSyncTime} conflictCount={autoSync.conflictFiles.length} remoteStatus={autoSync.remoteStatus} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.syncRepositoryPath} onRepositoryChange={gitSurfaces.setSyncRepositoryPath} onTriggerSync={handlePullSelectedRepository} onPullAndPush={handlePullAndPushSelectedRepository} onOpenConflictResolver={conflictFlow.handleOpenConflictResolver} zoomLevel={zoom.zoomLevel} themeMode={documentThemeMode} onZoomReset={zoom.zoomReset} onToggleThemeMode={settingsLoaded ? handleToggleThemeMode : undefined} buildNumber={buildNumber} onCheckForUpdates={handleCheckForUpdates} versionUpdateIndicator={versionUpdateIndicator} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} aiFeaturesEnabled={aiFeaturesEnabled} mcpStatus={mcpSetupDialog.status} onInstallMcp={mcpSetupDialog.openDialog} commandRailActive={commandRailEnabled} locale={appLocale} />
+        <StatusBar noteCount={visibleEntries.length} modifiedCount={gitModifiedCount} vaultPath={resolvedPath} defaultWorkspacePath={defaultWorkspacePath} vaults={vaultSwitcher.allVaults} multiWorkspaceEnabled={multiWorkspaceEnabled} onSwitchVault={vaultSwitcher.switchVault} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onOpenSettings={handleOpenSettings} onOpenVaultSettings={handleOpenVaultSettings} onOpenFeedback={openFeedback} onOpenDocs={openDocs} onOpenResearch={handleRailSelectResearch} onOpenLocalFolder={vaultSwitcher.handleOpenLocalFolder} onCreateEmptyVault={vaultSwitcher.handleCreateEmptyVault} onCloneVault={dialogs.openCloneVault} onCloneGettingStarted={cloneGettingStartedVault} onClickPending={() => handleSetSelection({ kind: 'filter', filter: 'changes' })} onClickPulse={() => handleSetSelection({ kind: 'filter', filter: 'pulse' })} onClickGraph={() => handleSetSelection(toggleGraphSelection(effectiveSelection, vaultConfig.inbox?.explicitOrganization))} onCommitPush={handleCommitPush} commitActionPending={commitFlow.isOpeningCommitDialog} gitFeaturesEnabled={gitFeaturesEnabled} onInitializeGit={openGitSetupDialog} isOffline={networkStatus.isOffline} isGitVault={isGitVault} isVaultReloading={vault.isReloading || isVaultContentLoading} syncStatus={autoSync.syncStatus} lastSyncTime={autoSync.lastSyncTime} conflictCount={autoSync.conflictFiles.length} remoteStatus={autoSync.remoteStatus} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.syncRepositoryPath} onRepositoryChange={gitSurfaces.setSyncRepositoryPath} onTriggerSync={handlePullSelectedRepository} onPullAndPush={handlePullAndPushSelectedRepository} onOpenConflictResolver={conflictFlow.handleOpenConflictResolver} zoomLevel={zoom.zoomLevel} themeMode={documentThemeMode} onZoomReset={zoom.zoomReset} onToggleThemeMode={settingsLoaded ? handleToggleThemeMode : undefined} buildNumber={buildNumber} onCheckForUpdates={handleCheckForUpdates} versionUpdateIndicator={versionUpdateIndicator} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} aiFeaturesEnabled={aiFeaturesEnabled} mcpStatus={mcpSetupDialog.status} onInstallMcp={mcpSetupDialog.openDialog} commandRailActive={commandRailEnabled} locale={appLocale} />
         <GitSetupDialog open={gitFeaturesEnabled && shouldShowGitSetupDialog} onInitGit={handleInitGitRepo} onDismiss={dismissGitSetupDialog} onNeverForVault={neverForVaultGitSetupDialog} />
         <DeleteProgressNotice count={deleteActions.pendingDeleteCount} />
         <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
@@ -2273,18 +2317,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
             onCancel={folderActions.cancelDeleteFolder}
           />
         )}
-        <ResearchPanel
-          open={showResearch}
-          onClose={() => setShowResearch(false)}
-          vaultPath={resolvedPath}
-          agentMemoryVaultPath={settings.agent_memory_vault_path}
-          vaults={vaultSwitcher.allVaults}
-          onSetDefaultDestination={(path) => { void saveSettings({ ...settings, agent_memory_vault_path: path }) }}
-          onOpenNote={vaultBridge.openNoteByPath}
-          locale={appLocale}
-          settings={settings}
-          aiAgentsStatus={aiAgentsStatus}
-        />
       </div>
     </PrimeActivityProvider>
     </CelebrationProvider>

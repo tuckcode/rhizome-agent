@@ -466,7 +466,8 @@ export function persistNewNote(request: PersistNewNoteRequest): Promise<void> {
   return invoke<void>('create_note_content', args).then(() => {})
 }
 
-async function typeTargetExistsOnDisk({ path, vaultPath }: Pick<PersistNewNoteRequest, 'path' | 'vaultPath'>): Promise<boolean> {
+/** True when a vault-relative path already has a file on disk. */
+export async function noteExistsOnDisk({ path, vaultPath }: Pick<PersistNewNoteRequest, 'path' | 'vaultPath'>): Promise<boolean> {
   if (!isTauri()) return false
 
   try {
@@ -476,6 +477,10 @@ async function typeTargetExistsOnDisk({ path, vaultPath }: Pick<PersistNewNoteRe
   } catch {
     return false
   }
+}
+
+async function typeTargetExistsOnDisk(request: Pick<PersistNewNoteRequest, 'path' | 'vaultPath'>): Promise<boolean> {
+  return noteExistsOnDisk(request)
 }
 
 async function findTypeTargetCollision(resolved: ResolvedEntry): Promise<string | null> {

@@ -81,6 +81,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-08-26 (afternoon) · Grok 4.6](plans/handoffs/2026-08-26-1718-grok-4-6-research-mycelium-canvas.md) — Research as canvas; Mycelium #11/#22 in-app sidecar + Rhizome chrome; #24 promote in the same dirty tree. Live check leftover. Not committed.
 - [2026-08-26 · Grok 4.6](plans/handoffs/2026-08-26-1155-grok-4-6-housekeeping.md) — pushed Notes panel / #34 / #31; closed GitHub #27 #29 #31 #34; icon WIP on stash
 - [2026-08-25 (night) · Grok 4.6](plans/handoffs/2026-08-25-2348-grok-4-6-shell-harden.md) — unified Notes panel + close-note X + titlebar drag fix. Native QA 2026-08-26: double-click holds, X closes the note.
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1608-grok-4-6-chat-centered-shell.md) — first chat-centered ship (two right columns). Superseded in the working tree by the 23:48 unify.
@@ -233,7 +234,8 @@ push is not a release — releases are tagged builds with signed installers.
   memory stores. Prime remains the only execution core. Coverage is by user
   job, not Prime command count. Ledger: `docs/design/harness-doctrine.md`,
   ADR-0168. Source reviews and divergence scoring are in `docs/plans/2026-08-24-*`.
-  OpenHuman was named in the frames but has no first-party review yet.
+  OpenHuman: TokenJuice compression path read 2026-08-26
+  (`docs/design/token-routing-and-compression.md`); full stack still unread.
   Composition (option 2) is written but unratified:
   `docs/design/harness-composition.md`, pickup in `docs/NEXT.md` §1.
 
