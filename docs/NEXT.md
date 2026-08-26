@@ -157,7 +157,7 @@ backlog, not a replacement for it.
 - **Correctness:** C40 (`rhizome_graph_summary` answers about a different
   graph), C34 (menu-bar roster activity labels, half done)
 - **Health and cleanup:** C46 (`AiPanel.tsx` CCN 50 / 447 lines — grew during
-  the C43 fix), C24 (three dead exports in `primeSessionToMindwalk.ts`), C21 /
+  the C43 fix), C21 /
   C30 (branding residues), C11 (Getting Started clones an unrelated upstream
   repo — blocked on GitHub access)
 - **Product decisions pending:** C9 (optional first-run Welcome), C10 (spotlight

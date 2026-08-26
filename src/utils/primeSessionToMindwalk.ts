@@ -6,17 +6,6 @@
  * tool records Mindwalk already understands.
  */
 
-export const PRIME_SESSIONS_DIR_DEFAULT = '~/.prime/agent/sessions'
-
-export interface BridgedSessionResult {
-  /** Absolute path written (temp or alongside). */
-  outputPath: string
-  /** How many tool events were rewritten. */
-  rewrittenTools: number
-  /** Total lines copied. */
-  lineCount: number
-}
-
 function extractBashFromIpythonCode(code: string): string | null {
   const trimmed = code.replace(/^\uFEFF/, '')
   const lines = trimmed.split(/\r?\n/)
@@ -108,11 +97,4 @@ export function bridgePrimeSessionJsonl(raw: string): { bridged: string; rewritt
     }
   }
   return { bridged: out.join('\n') + (raw.endsWith('\n') ? '' : ''), rewrittenTools, lineCount: lines.filter((l) => l.trim()).length }
-}
-
-export function listPrimeSessionCandidates(sessionDirListing: string[]): string[] {
-  return sessionDirListing
-    .filter((name) => name.endsWith('.jsonl'))
-    .sort()
-    .reverse()
 }
