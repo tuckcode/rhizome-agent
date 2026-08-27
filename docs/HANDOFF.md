@@ -51,13 +51,20 @@ file.
 
 ## State
 
-`origin/main` is **`80fa720`**. Confirm with `git log origin/main..HEAD`
+`origin/main` is **`8cfe2a0`**. Confirm with `git log origin/main..HEAD`
 — it should be empty. Multi-day briefing since Claude last owned a
 session: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md).
 
-GitHub #27 #29 #31 #34 #42 closed 2026-08-26. #11 #22 #24 are on
-`main` and stay open until a live check. Inverted Dock icon is
+GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11 and #22 are
+live-verified 2026-08-26 night and clear to close.** **#24 is
+live-verified too but must stay open — C51.** Inverted Dock icon is
 `stash@{0}` (`wip: inverted dock icon`), not in the tree.
+
+Mycelium now renders with a Rhizome skin (`6377b04`): a loopback proxy
+fronts the Mindwalk sidecar and injects one stylesheet, so the engine
+stays upstream's and its updates keep arriving. M4 (a native client on
+Mindwalk's `/api/sessions/{key}/snapshot`) is still unstarted and is
+unblocked, not replaced, by this.
 
 This machine's installed Prime is **0.8.0** (102 public daemon commands —
 `docs/prime-adapter-surface.json`). GitHub latest is also `v0.8.0`.
@@ -83,6 +90,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-08-26 (night) · Claude Opus 5](plans/handoffs/2026-08-26-2245-claude-opus-5-livecheck-and-mycelium-skin.md) — live-checked Research / Mycelium / Promote against a live Prime daemon; found C51; skinned the Mindwalk engine as Rhizome without forking (`6377b04`); corrected the CodeScene free-tier claim
 - [2026-08-26 (night) · Grok 4.6](YOU-SHOULD-KNOW.md) — multi-day “you should know” briefing since Claude last owned a session (2026-08-24)
 - [2026-08-26 (afternoon) · Grok 4.6](plans/handoffs/2026-08-26-1718-grok-4-6-research-mycelium-canvas.md) — Research as canvas; Mycelium #11/#22 in-app sidecar + Rhizome chrome; #24 promote. Pushed as `5d2d34a` / `80fa720`. Live check leftover.
 - [2026-08-26 · Grok 4.6](plans/handoffs/2026-08-26-1155-grok-4-6-housekeeping.md) — pushed Notes panel / #34 / #31; closed GitHub #27 #29 #31 #34; icon WIP on stash
