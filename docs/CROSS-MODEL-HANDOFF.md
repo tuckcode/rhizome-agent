@@ -30,6 +30,44 @@ plus references, which `--noEmit` does not follow. Measured 2026-08-20.)
 It's already in `knip.json`'s `ignore` list — if knip flags a NEW ambient
 file, check for `declare global` before believing it's dead.
 
+## Native QA on macOS: permissions, and which binary you can drive
+
+Two traps cost a session on 2026-08-27. Both are environment, not code.
+
+**1. The dev binary cannot be driven or screenshotted reliably.**
+`target/debug/RhizomeAgent` has **no bundle identifier** (`osascript ... get
+bundle identifier` returns `missing value`). Consequences:
+- computer-use screenshot filtering blanks its window — the app looks like it
+  never launched. It did.
+- It can never hold a TCC grant, so protected-folder behaviour (a vault in
+  `~/Documents`, C53) is **untestable** from `pnpm tauri dev`.
+
+Build a bundle for anything permission-related:
+`pnpm tauri build --bundles app` (skip plain `tauri build` — the DMG step
+fails on this machine and the `.app` is all you need).
+
+**2. Do not use `osascript` for native QA — use the cua-driver tools.**
+Observed 2026-08-27: `osascript` drove the View menu and read window geometry
+early in a session, then began denying **every** cross-app target (System
+Events *and* Finder) with `-1743 Not authorized to send Apple events`, while
+both toggles stayed ON in System Settings. Toggling them off and back on did
+not restore it. Pure AppleScript (`osascript -e '1+1'`) still worked, so the
+interpreter was fine — only cross-app events were refused.
+
+**CuaDriver was unaffected throughout** and could still enumerate windows,
+read AX trees, and click. The grants are per-process: the shell host's Apple
+Events were denied while CuaDriver's were not.
+
+So the fix is not a permission hunt. `osascript` is a redundant path —
+`invoke_menu`, `list_windows` and `get_window_state` cover menus, geometry and
+elements. Reach for cua-driver first and do not spend a session toggling TCC
+rows, as one did. Two plausible-sounding explanations (per-process caching,
+then code-signature invalidation after an app update) were both proposed and
+both failed to predict the behaviour; the actual trigger is still unknown.
+
+CuaDriver needs its own grants (Automation → System Events, and Accessibility
+for typing); they are separate rows from the host's.
+
 ## 2. The MCP `:9711` bridge IS live — RESOLVED 2026-07-25, an earlier version of this doc got it wrong
 
 **Verified working.** An earlier revision of this file claimed
