@@ -30,6 +30,49 @@ where
     }
 }
 
+/// The provider's own reason for a turn that produced no assistant text.
+///
+/// Prime records `stopReason: "error"` and a human-readable `errorMessage` on
+/// the assistant message — a 429 rate limit, a 402 for an account that never
+/// bought credits, a 404 for a retired model. Rhizome used to discard both and
+/// let the UI substitute "… finished without returning a reply", which is
+/// indistinguishable from a model that legitimately had nothing to say.
+///
+/// That one sentence hid three unrelated failures for days (C51, C53, and
+/// silent provider refusals), so the reason is surfaced verbatim rather than
+/// rewritten: the provider's own words name the account, model or limit at
+/// fault, and we cannot say it better.
+///
+/// Returns `None` when the turn produced text, or when nothing errored — a
+/// genuinely empty turn keeps the placeholder.
+pub(crate) fn provider_error_from_agent_end(json: &serde_json::Value) -> Option<String> {
+    let messages = json["messages"].as_array()?;
+    messages.iter().rev().find_map(|entry| {
+        // Prime sends the message bare in some shapes and wrapped in others.
+        let message = if entry["message"].is_object() {
+            &entry["message"]
+        } else {
+            entry
+        };
+        if message["role"].as_str()? != "assistant" {
+            return None;
+        }
+        if message["stopReason"].as_str()? != "error" {
+            return None;
+        }
+        // A late failure after partial output is not an empty turn; the user
+        // already has the text, so do not replace it with an error.
+        if message["content"]
+            .as_array()
+            .is_some_and(|content| !content.is_empty())
+        {
+            return None;
+        }
+        let reason = message["errorMessage"].as_str()?.trim();
+        (!reason.is_empty()).then(|| reason.to_string())
+    })
+}
+
 pub(crate) fn session_id_from_state(data: &serde_json::Value) -> Option<&str> {
     data["sessionId"]
         .as_str()
@@ -460,6 +503,95 @@ mod tests {
             "success": true
         }))
         .is_empty());
+    }
+
+    // C51/C53 both hid behind the same sentence for days. Prime records the
+    // real reason; these lock in that we read it.
+    #[test]
+    fn reads_the_provider_error_off_an_empty_errored_turn() {
+        let end = serde_json::json!({
+            "type": "agent_end",
+            "messages": [{
+                "role": "assistant",
+                "content": [],
+                "stopReason": "error",
+                "provider": "opencode",
+                "errorMessage": "429 Error from provider (Console): Rate limit exceeded. Please try again later."
+            }]
+        });
+        assert_eq!(
+            provider_error_from_agent_end(&end).as_deref(),
+            Some("429 Error from provider (Console): Rate limit exceeded. Please try again later.")
+        );
+    }
+
+    #[test]
+    fn unwraps_a_nested_message_envelope() {
+        let end = serde_json::json!({
+            "type": "agent_end",
+            "messages": [{ "message": {
+                "role": "assistant",
+                "content": [],
+                "stopReason": "error",
+                "errorMessage": "402 Insufficient credits."
+            }}]
+        });
+        assert_eq!(
+            provider_error_from_agent_end(&end).as_deref(),
+            Some("402 Insufficient credits.")
+        );
+    }
+
+    #[test]
+    fn a_genuinely_empty_turn_is_not_a_provider_error() {
+        // No stopReason: the model simply said nothing. Must stay the
+        // placeholder, not be dressed up as a provider failure.
+        let end = serde_json::json!({
+            "type": "agent_end",
+            "messages": [{ "role": "assistant", "content": [] }]
+        });
+        assert!(provider_error_from_agent_end(&end).is_none());
+    }
+
+    #[test]
+    fn a_turn_that_produced_text_is_not_a_provider_error() {
+        let end = serde_json::json!({
+            "type": "agent_end",
+            "messages": [{
+                "role": "assistant",
+                "content": [{ "type": "text", "text": "hi" }],
+                "stopReason": "error",
+                "errorMessage": "late failure after partial output"
+            }]
+        });
+        assert!(provider_error_from_agent_end(&end).is_none());
+    }
+
+    #[test]
+    fn prefers_the_last_errored_assistant_message() {
+        let end = serde_json::json!({
+            "type": "agent_end",
+            "messages": [
+                { "role": "assistant", "content": [], "stopReason": "error", "errorMessage": "first" },
+                { "role": "user", "content": [] },
+                { "role": "assistant", "content": [], "stopReason": "error", "errorMessage": "second" }
+            ]
+        });
+        assert_eq!(
+            provider_error_from_agent_end(&end).as_deref(),
+            Some("second")
+        );
+    }
+
+    #[test]
+    fn blank_error_text_is_not_surfaced() {
+        let end = serde_json::json!({
+            "type": "agent_end",
+            "messages": [{
+                "role": "assistant", "content": [], "stopReason": "error", "errorMessage": "   "
+            }]
+        });
+        assert!(provider_error_from_agent_end(&end).is_none());
     }
 
     #[test]
