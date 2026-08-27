@@ -44,8 +44,21 @@ export interface StreamAiAgentRequest {
 
 const CONVERSATION_HISTORY_OPEN_MARKER = ['<', 'conversation_history', '>'].join('')
 
+/**
+ * Ask the mock agent for a turn that produces no assistant text.
+ *
+ * The empty-turn path — stream ends with nothing, `finalResponseText`
+ * substitutes a placeholder, and the transcript shows "… finished without
+ * returning a reply" — was unreachable in mock mode, so nothing could test
+ * what the UI does with it. That is how C51 shipped: promote treated the
+ * placeholder as the reply and wrote it to the vault. This seam makes the
+ * path drivable from Playwright.
+ */
+export const MOCK_EMPTY_REPLY_PROMPT = '__mock_empty_reply__'
+
 function mockAgentResponse(agent: AiAgentId, message: string): string {
   const agentLabel = getAiAgentDefinition(agent).label
+  if (message.trim() === MOCK_EMPTY_REPLY_PROMPT) return ''
   if (message.indexOf(CONVERSATION_HISTORY_OPEN_MARKER) >= 0) {
     const allUserLines = message.match(/\[user\]: .+/g) ?? []
     const turnCount = allUserLines.length

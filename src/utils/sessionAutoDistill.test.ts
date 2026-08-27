@@ -25,6 +25,20 @@ describe('sessionAutoDistill', () => {
     ).toBeNull()
   })
 
+  // finalResponseText has two empty-turn strings: the generic
+  // "<agent> finished without returning a reply" and an OpenCode-specific
+  // one. Both are placeholders, so both must be refused — matching only the
+  // generic one left OpenCode's variant promotable (found while adding the
+  // C51 test seam).
+  it('skips the OpenCode empty-turn placeholder', () => {
+    const openCodeEmpty = [
+      'OpenCode returned no assistant text.',
+      'Check the selected provider/model context limit or retry the request.',
+      'For large active notes, Rhizome sends a compact note snapshot and OpenCode can read the full file with get_note(path).',
+    ].join(' ')
+    expect(buildSessionAutoDistillText('hi', openCodeEmpty)).toBeNull()
+  })
+
   it('skips OAuth and RPC host failure text so they never become wiki concepts', () => {
     const oauth =
       'Failed to authenticate: OAuth session expired and could not be refreshed'

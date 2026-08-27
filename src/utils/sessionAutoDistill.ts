@@ -22,7 +22,11 @@ export function isTransientAgentFailureText(text: string): boolean {
   const t = text.trim()
   if (!t) return true
   if (/^Error:/iu.test(t)) return true
+  // Both empty-turn placeholders from `finalResponseText`. The generic one
+  // covers every agent but OpenCode, which has its own wording — matching only
+  // the generic string left OpenCode's variant promotable into the vault.
   if (/finished without returning a reply/iu.test(t)) return true
+  if (/returned no assistant text/iu.test(t)) return true
   // Provider / OAuth / RPC host failures (must not become wiki "concepts")
   if (/OAuth session expired/iu.test(t)) return true
   if (/Failed to authenticate/iu.test(t)) return true

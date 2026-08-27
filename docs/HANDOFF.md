@@ -268,6 +268,17 @@ push is not a release — releases are tagged builds with signed installers.
   the same shape as the #29 credential refuse; the rest of its AC passed.
   Test note was deleted; vault `raw/inbox` verified empty.
 
+- **C52-OPEN (2026-08-27): the AI chat Playwright specs are stale against the
+  chat-centered shell.** `tests/smoke/ai-chat-history.spec.ts` fails all four
+  tests: its `beforeEach` clicks `.app__note-list .cursor-pointer` and then
+  sends `Cmd+Shift+L`, both of which predate ADR-0166. Chat is now the default
+  center canvas, so `agent-input` / `agent-send` are present at `/` with no
+  note selection and no shortcut — see
+  `tests/smoke/promote-refuses-empty-turn.spec.ts` for the working setup.
+  Not caught by the push gate because these specs are in the regression lane,
+  not `@smoke`. Related to C25 (stale regression specs); this is a second,
+  larger instance. Found while adding the C51 regression.
+
 - **C50-DECIDED (2026-08-24): selective harness doctrine.** Rhizome absorbs
   contracts and artifacts from other harnesses, never their control loops or
   memory stores. Prime remains the only execution core. Coverage is by user
