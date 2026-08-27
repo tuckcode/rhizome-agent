@@ -75,13 +75,54 @@ describe('promoteChatToVault', () => {
     expect(invented).toHaveLength(original.length)
   })
 
+  // C51: a turn that produced nothing still renders a placeholder in Chat, and
+  // Promote used to write that placeholder to the vault as if it were the
+  // reply. Found natively 2026-08-26 when the model returned an empty turn.
+  it('refuses to promote a turn that produced no assistant content', async () => {
+    const persist = vi.fn()
+    const result = await writePromoteNoteFromChat(
+      'Prime Agent finished without returning a reply.',
+      at,
+      { pathExists: async () => false, persist },
+    )
+    expect(result.status).toBe('refused')
+    expect(persist).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['empty text', '   '],
+    ['an error payload', 'Error: invalid args `request` for command'],
+    ['an auth failure', 'OAuth session expired. Please sign in again.'],
+  ])('refuses to promote %s', async (_label, text) => {
+    const persist = vi.fn()
+    const result = await writePromoteNoteFromChat(text, at, {
+      pathExists: async () => false,
+      persist,
+    })
+    expect(result.status).toBe('refused')
+    expect(persist).not.toHaveBeenCalled()
+  })
+
+  it('still promotes a real reply that merely mentions an error', async () => {
+    const persist = vi.fn()
+    const result = await writePromoteNoteFromChat(
+      'The retry loop swallows the error and returns early, which is the bug.',
+      at,
+      { pathExists: async () => false, persist },
+    )
+    expect(result.status).toBe('saved')
+    expect(persist).toHaveBeenCalledTimes(1)
+  })
+
   it('refuses a second write to the same path', async () => {
     const persist = vi.fn()
     const first = await writePromoteNoteFromChat('Hello world. Extra.', at, {
       pathExists: async () => false,
       persist,
     })
-    expect(first.status).toBe('saved')
+    // Narrow with an assertion rather than expect(): expect() does not narrow
+    // the union, and `refused` carries no note.
+    if (first.status !== 'saved') throw new Error(`expected saved, got ${first.status}`)
     expect(first.note.path).toBe('raw/inbox/20260809-hello-world.md')
     expect(persist).toHaveBeenCalledTimes(1)
 
@@ -89,7 +130,7 @@ describe('promoteChatToVault', () => {
       pathExists: async (path) => path === first.note.path,
       persist,
     })
-    expect(second.status).toBe('duplicate')
+    if (second.status !== 'duplicate') throw new Error(`expected duplicate, got ${second.status}`)
     expect(second.note.path).toBe(first.note.path)
     expect(persist).toHaveBeenCalledTimes(1)
   })

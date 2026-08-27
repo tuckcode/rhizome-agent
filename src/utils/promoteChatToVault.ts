@@ -1,4 +1,5 @@
 import { slugifyNoteStem } from './noteSlug'
+import { isTransientAgentFailureText } from './sessionAutoDistill'
 
 const MAX_TITLE_LEN = 72
 const MAX_SLUG_LEN = 48
@@ -13,6 +14,7 @@ export interface PromoteNoteFromChat {
 export type PromoteWriteResult =
   | { status: 'saved'; note: PromoteNoteFromChat }
   | { status: 'duplicate'; note: PromoteNoteFromChat }
+  | { status: 'refused' }
 
 /** Prefer the live session id; fall back to the session log path. */
 export function promoteSessionFromHost(
@@ -140,7 +142,19 @@ export function buildPromoteNoteFromChat(
 }
 
 /**
- * Write the promoted note, or refuse when that relative path already exists.
+ * Write the promoted note, or refuse it.
+ *
+ * Two refusals. **Duplicate**: that relative path already exists, so promote
+ * will not overwrite. **Refused**: the turn carries no assistant knowledge —
+ * it is empty, or it is a transport/auth failure, or it is the placeholder
+ * Chat renders when a turn produced nothing at all.
+ *
+ * That last case is C51: an empty turn still renders "… finished without
+ * returning a reply" in the transcript, and promote happily wrote *that
+ * sentence* to the vault as if it were the answer. The same predicate already
+ * guards auto-distill, so both durable-write paths now refuse the same inputs
+ * — a placeholder is not knowledge on either road into the vault.
+ *
  * Callers inject existence + persist so this stays unit-testable.
  */
 export async function writePromoteNoteFromChat(
@@ -152,6 +166,9 @@ export async function writePromoteNoteFromChat(
     persist: (note: PromoteNoteFromChat) => Promise<void>
   },
 ): Promise<PromoteWriteResult> {
+  if (isTransientAgentFailureText(text)) {
+    return { status: 'refused' }
+  }
   const note = buildPromoteNoteFromChat(text, at, { session: options.session })
   if (await options.pathExists(note.path)) {
     return { status: 'duplicate', note }

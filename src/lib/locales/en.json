@@ -1158,6 +1158,7 @@
   "ai.message.saveToVaultNoVault": "Attach a vault to save chat into notes",
   "ai.message.saveToVaultCredentials": "This contains a credential. Remove it, then save — vault notes are committed and can be pushed.",
   "ai.message.saveToVaultDuplicate": "Already in the vault as “{title}”. Promote will not overwrite it.",
+  "ai.message.saveToVaultNoContent": "Nothing to promote — this turn did not produce a reply.",
   "ai.panel.mode.harness": "Harness",
   "ai.panel.skills.default": "Skills · default toolkit (install more in Prime)",
   "ai.panel.skills.withVault": "Skills · {skills}",

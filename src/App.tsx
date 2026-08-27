@@ -1774,6 +1774,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         pathExists: (path) => noteExistsOnDisk({ path, vaultPath }),
         persist: (note) => persistNewNote({ path: note.path, content: note.content, vaultPath }),
       })
+      if (result.status === 'refused') {
+        setToastMessage(translate(appLocale, 'ai.message.saveToVaultNoContent'))
+        return
+      }
       if (result.status === 'duplicate') {
         setToastMessage(translate(appLocale, 'ai.message.saveToVaultDuplicate', { title: result.note.title }))
         return

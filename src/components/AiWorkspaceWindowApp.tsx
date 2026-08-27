@@ -298,6 +298,10 @@ export function AiWorkspaceWindowApp() {
         pathExists: (path) => noteExistsOnDisk({ path, vaultPath }),
         persist: (note) => persistNewNote({ path: note.path, content: note.content, vaultPath }),
       })
+      if (result.status === 'refused') {
+        setToastMessage(translate(preferences.appLocale, 'ai.message.saveToVaultNoContent'))
+        return
+      }
       if (result.status === 'duplicate') {
         setToastMessage(translate(preferences.appLocale, 'ai.message.saveToVaultDuplicate', { title: result.note.title }))
         return
