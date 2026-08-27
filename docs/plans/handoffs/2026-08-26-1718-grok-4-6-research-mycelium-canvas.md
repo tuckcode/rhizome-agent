@@ -4,13 +4,15 @@ model: Grok 4.6 (Cursor)
 description: >-
   Research as a rail canvas; Mycelium #11/#22 in-app sidecar embed with
   Rhizome chrome. #24 promote is in the same dirty tree. Live check leftover.
-commits: uncommitted
+commits: 5d2d34a, 80fa720
 ---
 
 # Research canvas + Mycelium in-app — stop here 2026-08-26 afternoon
 
-Working tree is dirty on purpose. Do not assume `origin/main` has any of
-this. Do not close #11 / #22 / #24 on GitHub until the user live-checks.
+**Later the same day:** this slice was committed and pushed (`5d2d34a`,
+gate fix `80fa720`). The “dirty tree” line below is historical.
+
+Do not close #11 / #22 / #24 on GitHub until the user live-checks.
 Do not start TokenJuice/Switchyard or harness composition. Do not run
 `pnpm l10n:translate` (C18).
 

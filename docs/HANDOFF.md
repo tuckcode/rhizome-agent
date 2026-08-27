@@ -51,10 +51,12 @@ file.
 
 ## State
 
-`origin/main` should be at the housekeeping commit that closes this
-session (Notes panel `39fc511`, #34 `061a141`, #31 `a85f517`). Confirm
-with `git log origin/main..HEAD` — it should be empty after the push.
-GitHub #27 #29 #31 #34 closed 2026-08-26. Inverted Dock icon is
+`origin/main` is **`80fa720`**. Confirm with `git log origin/main..HEAD`
+— it should be empty. Multi-day briefing since Claude last owned a
+session: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md).
+
+GitHub #27 #29 #31 #34 #42 closed 2026-08-26. #11 #22 #24 are on
+`main` and stay open until a live check. Inverted Dock icon is
 `stash@{0}` (`wip: inverted dock icon`), not in the tree.
 
 This machine's installed Prime is **0.8.0** (102 public daemon commands —
@@ -81,7 +83,8 @@ yours to choose.
 
 ## Recent sessions
 
-- [2026-08-26 (afternoon) · Grok 4.6](plans/handoffs/2026-08-26-1718-grok-4-6-research-mycelium-canvas.md) — Research as canvas; Mycelium #11/#22 in-app sidecar + Rhizome chrome; #24 promote in the same dirty tree. Live check leftover. Not committed.
+- [2026-08-26 (night) · Grok 4.6](YOU-SHOULD-KNOW.md) — multi-day “you should know” briefing since Claude last owned a session (2026-08-24)
+- [2026-08-26 (afternoon) · Grok 4.6](plans/handoffs/2026-08-26-1718-grok-4-6-research-mycelium-canvas.md) — Research as canvas; Mycelium #11/#22 in-app sidecar + Rhizome chrome; #24 promote. Pushed as `5d2d34a` / `80fa720`. Live check leftover.
 - [2026-08-26 · Grok 4.6](plans/handoffs/2026-08-26-1155-grok-4-6-housekeeping.md) — pushed Notes panel / #34 / #31; closed GitHub #27 #29 #31 #34; icon WIP on stash
 - [2026-08-25 (night) · Grok 4.6](plans/handoffs/2026-08-25-2348-grok-4-6-shell-harden.md) — unified Notes panel + close-note X + titlebar drag fix. Native QA 2026-08-26: double-click holds, X closes the note.
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1608-grok-4-6-chat-centered-shell.md) — first chat-centered ship (two right columns). Superseded in the working tree by the 23:48 unify.
