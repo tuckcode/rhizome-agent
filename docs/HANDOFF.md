@@ -232,6 +232,25 @@ push is not a release — releases are tagged builds with signed installers.
 
 ## Open threads
 
+- **C51-OPEN (2026-08-26): Promote accepts the empty-turn placeholder as
+  content.** Native live check, Claude Opus 5. When a Prime turn returns no
+  assistant text, Chat renders the string `Prime Agent finished without
+  returning a reply.` — and `Save to vault` promotes *that string* as if it
+  were the reply. Reproduced on `stealth/ox-alpha`, which returned an empty
+  turn: the promote wrote
+  `raw/inbox/20260826-prime-agent-finished-without-returning-a-reply.md`
+  with `title: "Prime Agent finished without returning a reply."`, a `# `
+  heading of the same, and that sentence as the body. Everything else in #24
+  behaved: correct `raw/inbox/{YYYYMMDD}-{slug}.md` path, full frontmatter
+  (`title`, `is_a: Note`, `created`, `source: prime-chat-promote`, `session`
+  matching the subhead's `sess_2749`), title from the first sentence rather
+  than a timestamp, no invented wikilinks, and the same-path refuse held on a
+  second press (no duplicate file; it opened the existing note). Fix is a
+  guard on the promote path — refuse when the turn has no assistant content,
+  the same shape as the #29 credential refuse. **#24 must not be closed until
+  this is fixed**; the rest of its AC passed. Test note was deleted; vault
+  `raw/inbox` verified empty.
+
 - **C50-DECIDED (2026-08-24): selective harness doctrine.** Rhizome absorbs
   contracts and artifacts from other harnesses, never their control loops or
   memory stores. Prime remains the only execution core. Coverage is by user
