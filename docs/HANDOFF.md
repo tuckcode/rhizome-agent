@@ -268,6 +268,43 @@ push is not a release — releases are tagged builds with signed installers.
   the same shape as the #29 credential refuse; the rest of its AC passed.
   Test note was deleted; vault `raw/inbox` verified empty.
 
+- **C53-OPEN (2026-08-27): a vault in `~/Documents` silently breaks every chat
+  turn on macOS.** Diagnosed from Prime's own daemon log, Claude Opus 5.
+
+  Chain: `ensure_prime_session_host(vault_path)` →
+  `ensure_host_for_cwd(cwd = vault_path)` → `create_session` sends
+  `{"config": {"cwd": <vault path>}}`. Prime spawns a session worker with that
+  cwd. macOS gates `~/Documents`, `~/Desktop` and `~/Downloads` behind TCC, so
+  the worker dies at launch:
+  `Error: EPERM: operation not permitted, uv_cwd` at `process.cwd()`. The
+  supervisor then waits 30s for a worker socket that never appears
+  (`Timed out connecting to daemon session worker`, `connect ENOENT …/worker`)
+  and Chat shows a generic red timeout banner.
+
+  **It reads exactly like a model/provider failure and is not one** — the
+  worker dies before any model is contacted. A turn that dies this way also
+  renders the empty-turn placeholder, which means **last night's C51
+  discovery was almost certainly triggered by this, not by a flaky
+  `stealth/ox-alpha`.** Correct the record when citing C51.
+
+  **Root cause, now fixed:** `src-tauri/Info.plist` declared only
+  `NSLocalNetworkUsageDescription`. With no `NSDocumentsFolderUsageDescription`
+  (or Desktop/Downloads), macOS never prompts, so the app could not obtain
+  access even when properly bundled — this is **not** a dev-only problem.
+  Keys added and guarded by `src/utils/macOsFolderAccessConfig.test.ts`.
+
+  **Still open:** (a) confirm a bundled build now prompts and that chat
+  completes with the Documents vault; (b) decide whether the session cwd
+  should be the vault at all — `pick_resumable_session` keys sessions on cwd
+  and Prime runs shell commands there, so changing it is ADR territory;
+  (c) surface a real error instead of a 30s generic timeout when a worker
+  fails to start. An existing grant may also need
+  `tccutil reset SystemPolicyDocumentsFolder ai.rhizome.agent` to re-prompt.
+
+  Note for QA: the dev binary `target/debug/RhizomeAgent` has **no bundle
+  identifier**, so it can never hold a TCC grant regardless of these keys.
+  Protected-folder behaviour can only be tested from a bundled `.app`.
+
 - **C52-OPEN (2026-08-27): the AI chat Playwright specs are stale against the
   chat-centered shell.** `tests/smoke/ai-chat-history.spec.ts` fails all four
   tests: its `beforeEach` clicks `.app__note-list .cursor-pointer` and then

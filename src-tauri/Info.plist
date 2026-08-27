@@ -4,5 +4,25 @@
 <dict>
   <key>NSLocalNetworkUsageDescription</key>
   <string>Rhizome connects to local model servers you configure for AI chat.</string>
+  <!--
+    macOS gates Documents, Desktop and Downloads behind TCC, and only prompts
+    for one if the matching usage string is declared here. Without these keys
+    there is no prompt and no way to grant access from inside the app.
+
+    These are load-bearing, not boilerplate: Rhizome passes the vault path to
+    Prime as the session working directory, so a vault in a protected folder
+    makes the Prime session worker die at launch on process.cwd() (EPERM,
+    uv_cwd). The supervisor then waits 30s for a worker that never connects and
+    chat fails with a generic timeout that reads like a model problem. C53.
+
+    A vault in ~/Documents is the common case, so Documents is the one that
+    matters most; Desktop and Downloads are declared for the same reason.
+  -->
+  <key>NSDocumentsFolderUsageDescription</key>
+  <string>Rhizome needs access to your Documents folder to open a vault stored there.</string>
+  <key>NSDesktopFolderUsageDescription</key>
+  <string>Rhizome needs access to your Desktop folder to open a vault stored there.</string>
+  <key>NSDownloadsFolderUsageDescription</key>
+  <string>Rhizome needs access to your Downloads folder to open a vault stored there.</string>
 </dict>
 </plist>
