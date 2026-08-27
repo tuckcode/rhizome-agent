@@ -1940,6 +1940,7 @@ where
 
     // Stream events until agent_end (or timeout / host death).
     let mut saw_text = false;
+    let mut provider_error: Option<String> = None;
     let outcome = stream_until_agent_end(|json| {
         if json["type"].as_str() == Some("message_update")
             && json["assistantMessageEvent"]["type"].as_str() == Some("text_delta")
@@ -1948,6 +1949,9 @@ where
                 .is_some_and(|d| !d.is_empty())
         {
             saw_text = true;
+        }
+        if json["type"].as_str() == Some("agent_end") {
+            provider_error = crate::prime_events::provider_error_from_agent_end(json);
         }
         crate::prime_events::dispatch_event(json, &mut emit);
     });
@@ -1961,8 +1965,16 @@ where
 
     match outcome {
         Ok(()) => {
+            // A turn with no text is not automatically a failure — a model may
+            // legitimately say nothing. But when Prime recorded a provider
+            // error on that empty turn, say so: "… finished without returning
+            // a reply" hid 429 rate limits, a 402 on an account that never
+            // bought credits, and a 404 for a retired model, all of which read
+            // to the user as a broken app.
             if !saw_text {
-                // Still a successful empty turn is fine; don't force an error.
+                if let Some(reason) = provider_error.take() {
+                    emit(AiAgentStreamEvent::Error { message: reason });
+                }
             }
         }
         Err(error) => {
