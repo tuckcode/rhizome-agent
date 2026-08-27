@@ -66,6 +66,21 @@ fn looks_like_vault(path: &Path) -> bool {
     if !path.is_dir() {
         return false;
     }
+    // The home directory is never a vault, whatever markers it happens to
+    // hold. Chat without a vault is supported, and `normalize_cwd("")` hands
+    // Prime $HOME as its working directory — reasonable for Prime, but
+    // `$HOME/.prime/agent/settings.json` *is* Prime's own global config, so
+    // seeding there rewrites another tool's global state and scopes the vault
+    // MCP server to the user's whole home directory. The marker heuristic
+    // below cannot catch this: a stray `CLAUDE.md` or a `.rhizome` directory
+    // in $HOME is enough to satisfy it. #46.
+    if dirs::home_dir().is_some_and(|home| {
+        let home = home.canonicalize().unwrap_or(home);
+        let path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        home == path
+    }) {
+        return false;
+    }
     if path.join(".obsidian").is_dir()
         || path.join("AGENTS.md").is_file()
         || path.join("wiki").is_dir()
@@ -281,6 +296,34 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("note.md"), "# hi\n").unwrap();
         assert!(looks_like_vault(dir.path()));
+    }
+
+    // #46. Chat without a vault is a supported flow, and `normalize_cwd("")`
+    // hands Prime the home directory as its working directory. That is fine
+    // for Prime — but $HOME is not a vault, and `$HOME/.prime/agent/
+    // settings.json` *is* Prime's own global config. Seeding there rewrites
+    // another tool's global state and scopes the vault MCP server to the
+    // user's entire home directory. $HOME therefore is never a vault, however
+    // many markers it happens to contain (this machine's has `.rhizome` and
+    // five top-level .md files, so every heuristic below says yes).
+    #[test]
+    fn the_home_directory_is_never_a_vault() {
+        let Some(home) = dirs::home_dir() else {
+            return;
+        };
+        assert!(
+            !looks_like_vault(&home),
+            "$HOME must never be treated as a vault: seeding it would rewrite \
+             Prime's global settings.json and scope vault tools to all of $HOME"
+        );
+    }
+
+    #[test]
+    fn seeding_the_home_directory_is_refused() {
+        let Some(home) = dirs::home_dir() else {
+            return;
+        };
+        assert!(seed_vault_skill(&home).is_err());
     }
 
     #[test]
