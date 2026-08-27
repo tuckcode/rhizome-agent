@@ -4,6 +4,11 @@
 tagged in place. This file is a palimpsest — several models have edited it;
 `rg` cannot tell whose voice a heading is.
 
+**Coming in cold after 2026-08-24:** read
+[`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) before claiming a row. It is
+the multi-day briefing (what shipped, what GitHub still calls open, what
+not to re-litigate). This file stays the unclaimed-work index.
+
 **For an agent that just finished the task its handoff gave it and needs to
 choose the next one.** `HANDOFF.md` says what is true right now; this file says
 what is *unclaimed*, and in what order it is worth claiming.
