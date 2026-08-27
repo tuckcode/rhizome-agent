@@ -55,9 +55,9 @@ file.
 — it should be empty. Multi-day briefing since Claude last owned a
 session: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md).
 
-GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11 and #22 are
-live-verified 2026-08-26 night and clear to close.** **#24 is
-live-verified too but must stay open — C51.** Inverted Dock icon is
+GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22 and #24 are
+live-verified and clear to close** — C51 blocked #24 and is fixed
+(`373ee1f`). Inverted Dock icon is
 `stash@{0}` (`wip: inverted dock icon`), not in the tree.
 
 Mycelium now renders with a Rhizome skin (`6377b04`): a loopback proxy
@@ -240,8 +240,18 @@ push is not a release — releases are tagged builds with signed installers.
 
 ## Open threads
 
-- **C51-OPEN (2026-08-26): Promote accepts the empty-turn placeholder as
-  content.** Native live check, Claude Opus 5. When a Prime turn returns no
+- **C51-RESOLVED (2026-08-26, fixed `373ee1f`): Promote accepted the
+  empty-turn placeholder as content.** Fixed by guarding
+  `writePromoteNoteFromChat` with `isTransientAgentFailureText` — the
+  predicate auto-distill already used — rather than a new regex for the
+  placeholder alone. That widened the fix: error payloads, OAuth failures and
+  RPC host failures were equally promotable and equally not knowledge, so both
+  durable write paths into the vault now refuse the same inputs.
+  `PromoteWriteResult` gained a `refused` variant and a toast
+  (`ai.message.saveToVaultNoContent`) so the refusal is visible.
+  **#24 is unblocked and clear to close.** Original finding follows.
+
+  Native live check, Claude Opus 5. When a Prime turn returns no
   assistant text, Chat renders the string `Prime Agent finished without
   returning a reply.` — and `Save to vault` promotes *that string* as if it
   were the reply. Reproduced on `stealth/ox-alpha`, which returned an empty
@@ -255,9 +265,8 @@ push is not a release — releases are tagged builds with signed installers.
   than a timestamp, no invented wikilinks, and the same-path refuse held on a
   second press (no duplicate file; it opened the existing note). Fix is a
   guard on the promote path — refuse when the turn has no assistant content,
-  the same shape as the #29 credential refuse. **#24 must not be closed until
-  this is fixed**; the rest of its AC passed. Test note was deleted; vault
-  `raw/inbox` verified empty.
+  the same shape as the #29 credential refuse; the rest of its AC passed.
+  Test note was deleted; vault `raw/inbox` verified empty.
 
 - **C50-DECIDED (2026-08-24): selective harness doctrine.** Rhizome absorbs
   contracts and artifacts from other harnesses, never their control loops or
