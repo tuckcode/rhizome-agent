@@ -160,7 +160,10 @@ fn wait_for_sidecar_url(child: &mut Child, fallback: &str) -> Result<String, Str
     }
 }
 
-pub fn start_mindwalk_sidecar(session_path: Option<&str>) -> Result<MindwalkSidecarStatus, String> {
+pub fn start_mindwalk_sidecar(
+    session_path: Option<&str>,
+    theme: Option<&str>,
+) -> Result<MindwalkSidecarStatus, String> {
     let binary = resolve_mindwalk_binary().ok_or_else(|| {
         "Mycelium sidecar could not start. Install Mindwalk, then retry.".to_string()
     })?;
@@ -200,6 +203,17 @@ pub fn start_mindwalk_sidecar(session_path: Option<&str>) -> Result<MindwalkSide
         }
     };
     *slot = Some(child);
+    // Hand the view the skinned URL, not the sidecar's. The proxy passes every
+    // byte through untouched except the HTML document, so engine upgrades keep
+    // arriving for free — see `mycelium_skin`. A proxy that fails to bind is
+    // cosmetic, not fatal: fall back to the raw engine rather than a dead view.
+    let url = match crate::mycelium_skin::start_skin_proxy(&url, theme.unwrap_or("dark")) {
+        Ok(skinned) => skinned,
+        Err(error) => {
+            log::warn!("mycelium skin proxy unavailable, serving unskinned: {error}");
+            url
+        }
+    };
     Ok(MindwalkSidecarStatus {
         url,
         mode: mode.to_string(),

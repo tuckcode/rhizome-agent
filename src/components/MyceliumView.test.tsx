@@ -52,4 +52,17 @@ describe('MyceliumView', () => {
       expect(screen.getByTestId('mycelium-session-scope')).toBeInTheDocument()
     })
   })
+
+  // The host skins the embedded engine per theme, so the sidecar has to be
+  // told which one. Without this the iframe renders Mindwalk's own palette.
+  it('passes the document theme to the sidecar', async () => {
+    document.documentElement.setAttribute('data-theme', 'light')
+    sidecarStarts.length = 0
+    render(<MyceliumView />)
+    await waitFor(() => {
+      expect(sidecarStarts).toHaveLength(1)
+    })
+    expect(sidecarStarts[0]?.theme).toBe('light')
+    document.documentElement.removeAttribute('data-theme')
+  })
 })
