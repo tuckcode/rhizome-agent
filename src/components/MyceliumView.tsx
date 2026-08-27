@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { invoke } from '@tauri-apps/api/core'
+import { useDocumentThemeMode } from '../hooks/useDocumentThemeMode'
 
 interface MyceliumViewProps {
   locale?: AppLocale
@@ -34,6 +35,7 @@ export default function MyceliumView({
   focusSessionPath = null,
 }: MyceliumViewProps) {
   const t = createTranslator(locale)
+  const themeMode = useDocumentThemeMode()
   const sessionOnly = Boolean(focusSessionPath)
   const [sessions, setSessions] = useState<SessionPick[]>([])
   const [selected, setSelected] = useState<SessionPick | null>(null)
@@ -62,7 +64,12 @@ export default function MyceliumView({
     setBusy(true)
     setError(null)
     try {
-      const status = await call<SidecarStatus>('start_mindwalk_sidecar', path ? { path } : {})
+      // The host fronts Mindwalk with a skin proxy; the theme rides along so
+      // the embedded engine matches the app instead of flashing its own.
+      const status = await call<SidecarStatus>('start_mindwalk_sidecar', {
+        ...(path ? { path } : {}),
+        theme: themeMode,
+      })
       setSidecar(status)
       setSidecarPath(path ?? null)
     } catch (e) {
@@ -71,7 +78,7 @@ export default function MyceliumView({
     } finally {
       setBusy(false)
     }
-  }, [])
+  }, [themeMode])
 
   useEffect(() => {
     void refreshSessions()

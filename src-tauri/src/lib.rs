@@ -30,6 +30,7 @@ pub mod menu;
 mod menu_bar_capture;
 mod menu_bar_companion;
 pub mod mycelium;
+pub mod mycelium_skin;
 mod navigation_guard;
 pub mod opencode_cli;
 mod opencode_config;
