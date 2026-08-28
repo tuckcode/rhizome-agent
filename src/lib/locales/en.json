@@ -1328,5 +1328,10 @@
   "ai.panel.queuedLabel": "Waiting in this session",
   "ai.panel.queuedSteer": "Steer",
   "ai.panel.queuedFollowUp": "After",
-  "ai.panel.queuedClear": "Clear"
+  "ai.panel.queuedClear": "Clear",
+  "settings.providers.title": "Model providers",
+  "settings.providers.description": "Providers Prime is signed in to. Rhizome reads this; connect or disconnect from Prime.",
+  "settings.providers.loading": "Checking connections…",
+  "settings.providers.none": "No connected providers found.",
+  "settings.providers.expired": "Expired"
 }

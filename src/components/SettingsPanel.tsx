@@ -58,6 +58,7 @@ import { areAiFeaturesEnabled } from '../lib/aiFeatures'
 import { areAutomaticUpdateChecksEnabled } from '../lib/automaticUpdateChecks'
 import { trackAllNotesVisibilityChanged } from '../lib/productAnalytics'
 import { AiProviderSettings } from './AiProviderSettings'
+import { PrimeProviderStatusSection } from './PrimeProviderStatusSection'
 import { AiAgentIcon } from './AiAgentIcon'
 import { readCelebrationsEnabled } from '../lib/celebration'
 import { GitSettingsSection } from './GitSettingsSection'
@@ -1339,6 +1340,7 @@ function AiTargetManagementTabs({
       </TabsList>
       <TabsContent value="agents" className="space-y-3">
         <AiAgentsInstalledSection t={t} aiAgentsStatus={aiAgentsStatus} />
+        <PrimeProviderStatusSection t={t} />
         {onCopyMcpConfig ? <CopyMcpConfigButton t={t} onCopyMcpConfig={onCopyMcpConfig} /> : null}
         <BridgeTokenRow t={t} />
       </TabsContent>
