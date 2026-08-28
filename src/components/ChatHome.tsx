@@ -4,6 +4,7 @@ import { PrimeSessionSubhead } from './PrimeSessionSubhead'
 import { AgentActivityBand } from './AgentActivityBand'
 import { RlmFamilyBand } from './RlmFamilyBand'
 import { ChatComposerDeck } from './ChatComposerDeck'
+import { ChatPreflightBanner } from './ChatPreflightBanner'
 import { ChatNotePane } from './ChatNotePane'
 import { vaultLabelFromPath } from '../lib/primeSubheadLabels'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
@@ -131,6 +132,14 @@ export default function ChatHome({
           }
           composerControls={
             isPrimeTarget ? (
+              <>
+              {/* Above the pills, not below: a reason the turn will fail is
+                  worth more than the controls it sits over. */}
+              <ChatPreflightBanner
+                locale={locale}
+                vaultPath={vaultPath}
+                provider={primeHost?.modelProvider ?? null}
+              />
               <ChatComposerDeck
                 locale={locale}
                 vaultLabel={vaultLabelFromPath(vaultPath)}
@@ -145,6 +154,7 @@ export default function ChatHome({
                 model={primeModelLabel(primeHost)}
                 thinkingLevel={primeHost?.thinkingLevel ?? null}
               />
+              </>
             ) : undefined
           }
           onClose={onExit}
