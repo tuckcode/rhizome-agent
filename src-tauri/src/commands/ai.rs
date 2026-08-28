@@ -970,6 +970,16 @@ pub fn run_mindwalk_open(path: String) -> Result<String, String> {
     crate::mycelium::run_mindwalk_open(&path)
 }
 
+/// Providers the engine holds credentials for.
+///
+/// Powers the picker's split between models this account can use and models it
+/// cannot: Prime publishes its full catalog regardless of auth state, so a
+/// fifth of the list can belong to a provider the user never signed into.
+#[tauri::command]
+pub fn get_connected_providers() -> Vec<String> {
+    crate::preflight::connected_providers()
+}
+
 /// Everything the app can determine about whether a turn will work, without
 /// spending one. Cheap enough to call on vault switch and model change.
 #[tauri::command]

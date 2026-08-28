@@ -42,3 +42,53 @@ export function groupModelsByProvider(models: PrimeModel[]): PrimeModelGroup[] {
       models: [...group].sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id)),
     }))
 }
+
+/**
+ * Split the catalog into what this account can actually use, and what it
+ * cannot.
+ *
+ * Prime publishes its whole catalog regardless of auth state. Measured on one
+ * machine: **501 models, of which 105 belong to `prime-inference` — a provider
+ * the user had never signed into.** A fifth of the list was unusable and
+ * indistinguishable from the rest, which is most of why the picker reads as a
+ * wall (#45).
+ *
+ * Unconnected models are separated rather than hidden. Hiding them would make
+ * "why can't I find X?" unanswerable, and connecting a provider is a thing the
+ * user might reasonably want to discover.
+ *
+ * `connected` empty means we could not determine credentials — not that
+ * nothing is connected. Everything is then treated as available, matching the
+ * backend's refusal to guess (`preflight::check_provider_connected`): a picker
+ * that wrongly greys out a working model is worse than one that greys out
+ * nothing.
+ */
+export function partitionModelsByConnection(
+  models: PrimeModel[],
+  connected: string[],
+): { available: PrimeModel[]; unavailable: PrimeModel[] } {
+  if (connected.length === 0) return { available: models, unavailable: [] }
+  const known = new Set(connected.map((provider) => provider.trim()).filter(Boolean))
+  const available: PrimeModel[] = []
+  const unavailable: PrimeModel[] = []
+  for (const model of models) {
+    ;(known.has(model.provider?.trim()) ? available : unavailable).push(model)
+  }
+  return { available, unavailable }
+}
+
+/**
+ * Narrow the list by a free-text query over provider, name and id.
+ *
+ * A blank query returns everything rather than nothing — the filter is a way
+ * through a long list, not a gate in front of it.
+ */
+export function filterModels(models: PrimeModel[], query: string): PrimeModel[] {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return models
+  return models.filter((model) =>
+    [model.provider, model.name, model.id]
+      .filter(Boolean)
+      .some((field) => field.toLowerCase().includes(needle)),
+  )
+}

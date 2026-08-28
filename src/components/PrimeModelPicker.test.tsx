@@ -7,6 +7,7 @@ const invoked = vi.hoisted(() => ({
   models: [] as unknown[],
   levels: ['off', 'low', 'high'] as string[],
   fail: '',
+  connected: [] as string[],
 }))
 
 vi.mock('../mock-tauri', () => ({
@@ -16,6 +17,7 @@ vi.mock('../mock-tauri', () => ({
     if (cmd === 'set_prime_model' && invoked.fail) return Promise.reject(new Error(invoked.fail))
     if (cmd === 'get_available_prime_models') return Promise.resolve(invoked.models)
     if (cmd === 'get_prime_thinking_levels') return Promise.resolve(invoked.levels)
+    if (cmd === 'get_connected_providers') return Promise.resolve(invoked.connected)
     return Promise.resolve(null)
   },
 }))
@@ -38,6 +40,7 @@ function cmds() {
 beforeEach(() => {
   invoked.calls = []
   invoked.models = MODELS
+  invoked.connected = []
   invoked.fail = ''
   tracked.providers = []
 })
@@ -134,5 +137,51 @@ describe('PrimeModelPicker', () => {
       new PointerEvent('pointerdown', { bubbles: true, ctrlKey: false, button: 0 }),
     )
     await waitFor(() => expect(cmds()).toContain('get_prime_thinking_levels'))
+  })
+})
+
+describe('PrimeModelPicker — filtering and connection state (#45)', () => {
+  async function openPicker() {
+    render(<PrimeModelPicker vaultPath="/v" />)
+    // Radix opens on pointerdown, not click.
+    fireEvent.pointerDown(
+      screen.getByTestId('prime-model-chip'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+    await waitFor(() => expect(screen.getByTestId('prime-model-filter')).toBeInTheDocument())
+  }
+
+  it('narrows the list as you type', async () => {
+    await openPicker()
+    expect(screen.getByText('Grok 4.5')).toBeInTheDocument()
+    expect(screen.getByText('Claude Fable 5')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByTestId('prime-model-filter'), { target: { value: 'grok' } })
+    await waitFor(() => expect(screen.queryByText('Claude Fable 5')).not.toBeInTheDocument())
+    expect(screen.getByText('Grok 4.5')).toBeInTheDocument()
+  })
+
+  it('separates models whose provider has no credentials', async () => {
+    invoked.connected = ['xai']
+    await openPicker()
+    await waitFor(() => {
+      expect(screen.getByTestId('prime-models-unavailable')).toBeInTheDocument()
+    })
+    // Usable model listed; unusable one is behind the toggle, not gone.
+    expect(screen.getByText('Grok 4.5')).toBeInTheDocument()
+    expect(screen.queryByText('Claude Fable 5')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('prime-models-unavailable-toggle'))
+    await waitFor(() => expect(screen.getByText('Claude Fable 5')).toBeInTheDocument())
+  })
+
+  // Credential detection is best-effort; an unknown answer must not grey out
+  // a model that works.
+  it('shows everything when credentials cannot be determined', async () => {
+    invoked.connected = []
+    await openPicker()
+    expect(screen.getByText('Grok 4.5')).toBeInTheDocument()
+    expect(screen.getByText('Claude Fable 5')).toBeInTheDocument()
+    expect(screen.queryByTestId('prime-models-unavailable')).not.toBeInTheDocument()
   })
 })
