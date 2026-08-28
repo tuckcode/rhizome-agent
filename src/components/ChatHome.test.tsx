@@ -180,3 +180,91 @@ describe('ChatHome — the agent sees the note you have open', () => {
     expect(vi.mocked(loadChatNoteContent)).toHaveBeenCalledTimes(1)
   })
 })
+
+/**
+ * The other direction: right-click a note in the vault and hand it to the
+ * agent. App switches to Chat and passes the note in; ChatHome opens it, and
+ * the context wiring above does the rest.
+ */
+describe('ChatHome — a note handed in from the vault', () => {
+  const entry = {
+    path: '/Users/dtc/Documents/Laputa/wiki/decisions/memory-loop.md',
+    filename: 'memory-loop.md',
+    title: 'Memory loop',
+    isA: 'Note',
+    aliases: [],
+    belongsTo: [],
+    relatedTo: [],
+    relationships: {},
+    outgoingLinks: [],
+    properties: {},
+    archived: false,
+    modifiedAt: 1700000000,
+    createdAt: 1700000000,
+    fileSize: 10,
+    snippet: '',
+    wordCount: 0,
+    hasH1: false,
+    listPropertiesDisplay: [],
+  } as never
+
+  function renderWith(requestedNote: { path: string; label: string; requestId: number } | null) {
+    return render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath="/Users/dtc/Documents/Laputa"
+        vaultPaths={['/Users/dtc/Documents/Laputa']}
+        entries={[entry]}
+        requestedNote={requestedNote}
+        onExit={vi.fn()}
+      />,
+    )
+  }
+
+  it('opens the handed-in note and gives it to the agent', async () => {
+    renderWith({
+      path: '/Users/dtc/Documents/Laputa/wiki/decisions/memory-loop.md',
+      label: 'Memory loop',
+      requestId: 1,
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('agent-note-body')).toHaveTextContent('Promote is explicit')
+    })
+    expect(screen.getByTestId('agent-active-note')).toHaveTextContent('memory-loop.md')
+  })
+
+  /**
+   * Asking about the same note twice has to reopen it. Keying on the path
+   * alone would make the second ask a no-op once the user had closed the pane.
+   */
+  it('reopens the same note when it is asked for again', async () => {
+    const note = {
+      path: '/Users/dtc/Documents/Laputa/wiki/decisions/memory-loop.md',
+      label: 'Memory loop',
+    }
+    const { rerender } = renderWith({ ...note, requestId: 1 })
+    await waitFor(() => expect(screen.getByTestId('chat-note-pane')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close note' }))
+    expect(screen.queryByTestId('chat-note-pane')).not.toBeInTheDocument()
+
+    rerender(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath="/Users/dtc/Documents/Laputa"
+        vaultPaths={['/Users/dtc/Documents/Laputa']}
+        entries={[entry]}
+        requestedNote={{ ...note, requestId: 2 }}
+        onExit={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('chat-note-pane')).toBeInTheDocument()
+  })
+})

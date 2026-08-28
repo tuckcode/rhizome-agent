@@ -212,6 +212,13 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const visibleNotesRef = useRef<VaultEntry[]>([])
   const multiSelectionCommandRef = useRef<NoteListMultiSelectionCommands | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  // "Ask the agent about this note" — the vault pointing at the conversation.
+  // `requestId` rather than a bare path so asking twice about the same note
+  // reopens it after the user has closed the pane.
+  const [chatNoteRequest, setChatNoteRequest] = useState<
+    { path: string; label: string; requestId: number } | null
+  >(null)
+  const chatNoteRequestId = useRef(1)
   const [gitHistoryRefreshKey, setGitHistoryRefreshKey] = useState(0)
   const dialogs = useDialogs()
   const { closeAIChat, openAIChat, showAIChat } = dialogs
@@ -529,6 +536,21 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     isMyceliumDestination,
     isResearchDestination,
   ])
+  /**
+   * Right-click a note → hand it to the agent.
+   *
+   * Switches to Chat and opens the note beside it, which is what makes the
+   * agent able to see it — `ChatHome` feeds its open note into the agent's
+   * context. So this is one action, not two: go to chat, and bring the note.
+   */
+  const handleAskAgentAboutNote = useCallback((entry: VaultEntry) => {
+    handleRailSelectChat()
+    setChatNoteRequest({
+      path: entry.path,
+      label: entry.title || entry.filename || entry.path,
+      requestId: chatNoteRequestId.current++,
+    })
+  }, [handleRailSelectChat])
   const handleRailSelectResearch = useCallback(() => {
     handleSetSelection({ kind: 'filter', filter: 'research' })
   }, [handleSetSelection])
@@ -1898,7 +1920,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const noteListSurface = effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse' ? (
     <PulseView vaultPath={gitSurfaces.historyRepositoryPath} onOpenNote={handlePulseOpenNote} refreshKey={gitHistoryRefreshKey} sidebarCollapsed={!showSidebarTree && !chatCentered} onExpandSidebar={() => handleSetViewMode('all')} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.historyRepositoryPath} onRepositoryChange={gitSurfaces.setHistoryRepositoryPath} locale={appLocale} />
   ) : (
-    <NoteList entries={visibleEntries} selection={effectiveSelection} selectedNote={activeTab?.entry ?? null} loading={isVaultContentLoading} noteListFilter={noteListFilter} onNoteListFilterChange={setNoteListFilter} inboxPeriod={inboxPeriod} modifiedFiles={noteListModifiedFiles} modifiedFilesError={noteListModifiedFilesError} gitRepositories={gitRepositories} selectedGitRepositoryPath={gitSurfaces.changesRepositoryPath} onGitRepositoryChange={gitSurfaces.setChangesRepositoryPath} getNoteStatus={vault.getNoteStatus} sidebarCollapsed={!showSidebarTree && !chatCentered} onSelectNote={(entry) => { notes.handleSelectNote(entry); if (compactVaultPanel) setCompactVaultPanelOpen(false) }} onReplaceActiveTab={(entry) => { handleReplaceActiveTabWithQueuedDiff(entry); if (compactVaultPanel) setCompactVaultPanelOpen(false) }} onEnterNeighborhood={handleEnterNeighborhood} onCreateNote={notes.handleCreateNoteImmediate} onBulkOrganize={explicitOrganizationEnabled ? bulkActions.handleBulkOrganize : undefined} onBulkArchive={bulkActions.handleBulkArchive} onBulkDeletePermanently={deleteActions.handleBulkDeletePermanently} onUpdateTypeSort={notes.handleUpdateFrontmatter} onUpdateViewDefinition={handleUpdateViewDefinition} updateEntry={vault.updateEntry} onOpenInNewWindow={handleOpenEntryInNewWindow} onRenameFilename={appSave.handleFilenameRename} onExportPdf={handleExportNotePdfFromList} onToggleFavorite={entryActions.handleToggleFavorite} onToggleOrganized={explicitOrganizationEnabled ? entryActions.handleToggleOrganized : undefined} onRevealFile={fileActions.revealFile} onCopyFilePath={fileActions.copyFilePath} canCopyGitUrl={noteGitUrls.canCopyEntryGitUrl} onCopyGitUrl={noteGitUrls.copyEntryGitUrl} onDiscardFile={handleDiscardFile} onOpenDeletedNote={handleOpenDeletedNote} allNotesNoteListProperties={vaultConfig.allNotes?.noteListProperties ?? null} onUpdateAllNotesNoteListProperties={handleUpdateAllNotesNoteListProperties} inboxNoteListProperties={vaultConfig.inbox?.noteListProperties ?? null} onUpdateInboxNoteListProperties={handleUpdateInboxNoteListProperties} views={vault.views} visibleNotesRef={visibleNotesRef} allNotesFileVisibility={allNotesFileVisibility} multiSelectionCommandRef={multiSelectionCommandRef} locale={appLocale} />
+    <NoteList entries={visibleEntries} selection={effectiveSelection} selectedNote={activeTab?.entry ?? null} loading={isVaultContentLoading} noteListFilter={noteListFilter} onNoteListFilterChange={setNoteListFilter} inboxPeriod={inboxPeriod} modifiedFiles={noteListModifiedFiles} modifiedFilesError={noteListModifiedFilesError} gitRepositories={gitRepositories} selectedGitRepositoryPath={gitSurfaces.changesRepositoryPath} onGitRepositoryChange={gitSurfaces.setChangesRepositoryPath} getNoteStatus={vault.getNoteStatus} sidebarCollapsed={!showSidebarTree && !chatCentered} onSelectNote={(entry) => { notes.handleSelectNote(entry); if (compactVaultPanel) setCompactVaultPanelOpen(false) }} onReplaceActiveTab={(entry) => { handleReplaceActiveTabWithQueuedDiff(entry); if (compactVaultPanel) setCompactVaultPanelOpen(false) }} onEnterNeighborhood={handleEnterNeighborhood} onCreateNote={notes.handleCreateNoteImmediate} onBulkOrganize={explicitOrganizationEnabled ? bulkActions.handleBulkOrganize : undefined} onBulkArchive={bulkActions.handleBulkArchive} onBulkDeletePermanently={deleteActions.handleBulkDeletePermanently} onUpdateTypeSort={notes.handleUpdateFrontmatter} onUpdateViewDefinition={handleUpdateViewDefinition} updateEntry={vault.updateEntry} onOpenInNewWindow={handleOpenEntryInNewWindow} onRenameFilename={appSave.handleFilenameRename} onExportPdf={handleExportNotePdfFromList} onToggleFavorite={entryActions.handleToggleFavorite} onToggleOrganized={explicitOrganizationEnabled ? entryActions.handleToggleOrganized : undefined} onAskAgent={handleAskAgentAboutNote} onRevealFile={fileActions.revealFile} onCopyFilePath={fileActions.copyFilePath} canCopyGitUrl={noteGitUrls.canCopyEntryGitUrl} onCopyGitUrl={noteGitUrls.copyEntryGitUrl} onDiscardFile={handleDiscardFile} onOpenDeletedNote={handleOpenDeletedNote} allNotesNoteListProperties={vaultConfig.allNotes?.noteListProperties ?? null} onUpdateAllNotesNoteListProperties={handleUpdateAllNotesNoteListProperties} inboxNoteListProperties={vaultConfig.inbox?.noteListProperties ?? null} onUpdateInboxNoteListProperties={handleUpdateInboxNoteListProperties} views={vault.views} visibleNotesRef={visibleNotesRef} allNotesFileVisibility={allNotesFileVisibility} multiSelectionCommandRef={multiSelectionCommandRef} locale={appLocale} />
   )
 
   const sidebarPanel = showSidebarTree ? (
@@ -1967,6 +1989,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         onUnsupportedAiPaste={setToastMessage}
         sessionsAutoCollapsed={compactSessions}
         onOpenSessionFootprint={handleOpenSessionFootprint}
+        requestedNote={chatNoteRequest}
       />
     </Suspense>
   )
