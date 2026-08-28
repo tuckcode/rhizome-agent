@@ -1038,6 +1038,13 @@ pub struct PrimeModel {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_window: Option<u64>,
     pub reasoning: bool,
+    /// Input modalities Prime reports for this model, e.g. `["text","image"]`.
+    ///
+    /// `None` means Prime did not say — which is not the same as "text only",
+    /// and callers must not read it that way. The picker and the composer both
+    /// follow the house rule here: never guess a failure.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input: Option<Vec<String>>,
 }
 
 /// One entry from Prime `get_commands`, as the daemon actually reports it.
@@ -1147,6 +1154,12 @@ fn models_from_response(data: &serde_json::Value) -> Vec<PrimeModel> {
                         provider: provider.to_string(),
                         context_window: model["contextWindow"].as_u64(),
                         reasoning: model["reasoning"].as_bool().unwrap_or(false),
+                        input: model["input"].as_array().map(|modalities| {
+                            modalities
+                                .iter()
+                                .filter_map(|value| value.as_str().map(str::to_string))
+                                .collect()
+                        }),
                     })
                 })
                 .collect()
@@ -5516,6 +5529,32 @@ mod tests {
             data: data.into(),
             mime_type: "image/png".into(),
         }
+    }
+
+    /// Prime reports which modalities a model takes. Rhizome dropped the
+    /// field, so the composer had no way to tell a vision model from a
+    /// text-only one — and images could only ever be offered blindly.
+    #[test]
+    fn a_models_input_modalities_survive_the_parse() {
+        let models = models_from_response(&serde_json::json!({
+            "models": [
+                {"id": "claude-opus-5", "provider": "anthropic", "input": ["text", "image"]},
+                {"id": "text-only", "provider": "opencode", "input": ["text"]},
+                {"id": "unsaid", "provider": "opencode"},
+            ]
+        }));
+
+        assert_eq!(
+            models[0].input.as_deref(),
+            Some(["text".to_string(), "image".to_string()].as_slice())
+        );
+        assert_eq!(
+            models[1].input.as_deref(),
+            Some(["text".to_string()].as_slice())
+        );
+        // Not "text only" — Prime simply did not say, and a caller that reads
+        // silence as a refusal would grey out working models.
+        assert_eq!(models[2].input, None);
     }
 
     /// A text-only turn has to stay byte-identical to what Rhizome sent

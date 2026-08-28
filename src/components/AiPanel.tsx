@@ -7,6 +7,7 @@ import {
   storedChatSessionsOpen,
 } from '../lib/chatSessionsColumn'
 import { callHost } from '../lib/callHost'
+import { findModel, modelAcceptsImages, type PrimeModel } from '../lib/primeModels'
 import {
   MAX_IMAGES_PER_MESSAGE,
   readImageAttachment,
@@ -385,6 +386,40 @@ export function AiPanelView({
   }, [handleSend, isActive, onSendPrompt])
 
   /**
+   * Warn once per paste when the running model cannot see the image.
+   *
+   * The catalog is fetched lazily and cached: it is a daemon round trip, and
+   * the answer only matters the first time someone attaches an image. A failed
+   * lookup says nothing at all rather than warning on a model that works.
+   */
+  const modelCatalogRef = useRef<PrimeModel[] | null>(null)
+  const latestHostModel = useRef({
+    provider: primeHost.modelProvider ?? null,
+    modelId: primeHost.modelId ?? null,
+  })
+  latestHostModel.current = {
+    provider: primeHost.modelProvider ?? null,
+    modelId: primeHost.modelId ?? null,
+  }
+  const warnIfModelIsTextOnly = useCallback(async () => {
+    const host = latestHostModel.current
+    if (!host.provider || !host.modelId) return
+    if (!modelCatalogRef.current) {
+      try {
+        const listed = await callHost<PrimeModel[]>('get_available_prime_models')
+        modelCatalogRef.current = Array.isArray(listed) ? listed : []
+      } catch {
+        return
+      }
+    }
+    const model = findModel(modelCatalogRef.current, host.provider, host.modelId)
+    if (modelAcceptsImages(model) !== false) return
+    onUnsupportedAiPaste?.(translate(locale, 'ai.composer.attachmentTextOnlyModel', {
+      model: model?.name ?? host.modelId,
+    }))
+  }, [locale, onUnsupportedAiPaste])
+
+  /**
    * Images staged for the next message.
    *
    * Owned here rather than in the composer because the composer is stateless
@@ -408,6 +443,10 @@ export function AiPanelView({
         }))
       }
       if (accepted.length === 0) return
+      // Say something only when Prime has actually told us the model is
+      // text-only. Unknown modalities stay silent — the same refusal to guess
+      // that `partitionModelsByConnection` makes about credentials.
+      void warnIfModelIsTextOnly()
       setAttachments((current) => {
         const next = [...current, ...accepted]
         if (next.length > MAX_IMAGES_PER_MESSAGE) {
@@ -419,7 +458,7 @@ export function AiPanelView({
       })
       trackComposerImagesAttached(accepted.length)
     })()
-  }, [locale, onUnsupportedAiPaste])
+  }, [locale, onUnsupportedAiPaste, warnIfModelIsTextOnly])
   const removeAttachment = useCallback((id: string) => {
     setAttachments((current) => current.filter((attachment) => attachment.id !== id))
   }, [])

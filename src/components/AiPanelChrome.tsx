@@ -143,6 +143,7 @@ function ComposerInput({
   onSend,
   onUnsupportedAiPaste,
   onImagePaste,
+  unsupportedPasteMessage,
   placeholder,
   commandEntries,
   commandDisabled,
@@ -159,6 +160,7 @@ function ComposerInput({
   onSend: (text: string, references: NoteReference[]) => void
   onUnsupportedAiPaste?: (message: string) => void
   onImagePaste?: (files: File[]) => void
+  unsupportedPasteMessage: string
   placeholder: string
   commandEntries?: CommandMenuEntry[]
   commandDisabled?: Record<string, string>
@@ -174,6 +176,7 @@ function ComposerInput({
       onSend={onSend}
       onUnsupportedPaste={onUnsupportedAiPaste}
       onImagePaste={onImagePaste}
+      unsupportedPasteMessage={unsupportedPasteMessage}
       disabled={disabled}
       placeholder={placeholder}
       placeholderClassName={hasControls ? 'px-2 py-1.5 text-[13px] leading-5' : undefined}
@@ -780,6 +783,7 @@ export function AiPanelComposer({
             onSend={onSend}
             onUnsupportedAiPaste={onUnsupportedAiPaste}
             onImagePaste={onAttachImages}
+            unsupportedPasteMessage={t('ai.composer.pasteTextOnly')}
             placeholder={placeholder}
             commandEntries={commandEntries}
             commandDisabled={commandDisabled}

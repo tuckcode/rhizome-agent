@@ -10,6 +10,11 @@ export interface PrimeModel {
   provider: string
   contextWindow?: number | null
   reasoning?: boolean
+  /**
+   * Input modalities Prime reports, e.g. `['text', 'image']`. Absent when
+   * Prime did not say — which is not the same as text-only.
+   */
+  input?: string[] | null
 }
 
 export interface PrimeModelGroup {
@@ -161,4 +166,34 @@ export function activeModelKey(models: PrimeModel[], label?: string | null): str
   if (!needle) return null
   const match = models.find((model) => model.name?.trim() === needle || model.id?.trim() === needle)
   return match ? modelKey(match) : null
+}
+
+/**
+ * Whether a model takes images, as far as we can tell.
+ *
+ * Three states, not two, and the third is the point: `null` means Prime did
+ * not report modalities for this model, and silence is not a refusal. The
+ * composer treats `null` the way `partitionModelsByConnection` treats unknown
+ * credentials — offer the thing and say nothing, because a warning that cries
+ * wolf on a working setup gets scrolled past, and is then worth less than
+ * nothing.
+ */
+export function modelAcceptsImages(model: PrimeModel | null | undefined): boolean | null {
+  const input = model?.input
+  if (!input || input.length === 0) return null
+  return input.some((modality) => modality.trim().toLowerCase() === 'image')
+}
+
+/** The model a live host says it is running, out of a fetched catalog. */
+export function findModel(
+  models: PrimeModel[],
+  provider: string | null | undefined,
+  id: string | null | undefined,
+): PrimeModel | null {
+  const wantedProvider = provider?.trim()
+  const wantedId = id?.trim()
+  if (!wantedProvider || !wantedId) return null
+  return (
+    models.find((model) => model.provider === wantedProvider && model.id === wantedId) ?? null
+  )
 }

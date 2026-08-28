@@ -3,6 +3,8 @@ import {
   filterModels,
   groupModelsByProvider,
   activeModelKey,
+  findModel,
+  modelAcceptsImages,
   modelKey,
   partitionModelsByAllowList,
   partitionModelsByConnection,
@@ -199,5 +201,43 @@ describe('activeModelKey', () => {
     expect(activeModelKey(models, null)).toBeNull()
     expect(activeModelKey(models, '  ')).toBeNull()
     expect(activeModelKey(models, 'Something Else')).toBeNull()
+  })
+})
+
+describe('modelAcceptsImages', () => {
+  it('is true for a vision model', () => {
+    expect(modelAcceptsImages(model({ input: ['text', 'image'] }))).toBe(true)
+  })
+
+  it('is false when Prime says text only', () => {
+    expect(modelAcceptsImages(model({ input: ['text'] }))).toBe(false)
+  })
+
+  /**
+   * The state that matters. Silence is not a refusal — reading it as one
+   * would warn on models that work, and a warning that cries wolf is worth
+   * less than no warning at all.
+   */
+  it('is null when Prime did not say, so nothing is guessed', () => {
+    expect(modelAcceptsImages(model({ input: undefined }))).toBeNull()
+    expect(modelAcceptsImages(model({ input: [] }))).toBeNull()
+    expect(modelAcceptsImages(null)).toBeNull()
+  })
+})
+
+describe('findModel', () => {
+  const models = [
+    model({ id: 'grok-4.5', provider: 'xai' }),
+    model({ id: 'hy3-free', provider: 'opencode' }),
+  ]
+
+  it('matches on the pair, because an id alone is ambiguous across providers', () => {
+    expect(findModel(models, 'opencode', 'hy3-free')?.id).toBe('hy3-free')
+    expect(findModel(models, 'xai', 'hy3-free')).toBeNull()
+  })
+
+  it('is null when the host has not reported a model yet', () => {
+    expect(findModel(models, null, 'grok-4.5')).toBeNull()
+    expect(findModel(models, 'xai', undefined)).toBeNull()
   })
 })
