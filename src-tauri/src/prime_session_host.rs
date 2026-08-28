@@ -224,6 +224,13 @@ pub struct PrimeHostStatus {
     /// Display name from Prime get_state model, when known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_name: Option<String>,
+    /// Whether the running model accepts image input.
+    ///
+    /// Three states, and the third is load-bearing: `None` means Prime did
+    /// not report modalities, which is not the same as "text only". Callers
+    /// must stay silent on `None` rather than warn.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_accepts_images: Option<bool>,
     /// Reasoning level the session is running at, when the daemon reports one.
     /// Read from the same state payload as the model so the strip's one
     /// control has one source (#9), rather than polling two commands that can
@@ -580,6 +587,9 @@ struct PrimeHost {
     model_provider: Option<String>,
     model_id: Option<String>,
     model_name: Option<String>,
+    /// Whether the running model takes images, from `get_state`'s Model
+    /// `input` array. `None` means Prime did not say — never "text only".
+    model_accepts_images: Option<bool>,
     thinking_level: Option<String>,
     socket_path: PathBuf,
     cwd: PathBuf,
@@ -902,6 +912,7 @@ pub fn get_status() -> PrimeHostStatus {
 
     match guard.as_ref() {
         Some(host) => PrimeHostStatus {
+            model_accepts_images: host.model_accepts_images,
             installed: availability.installed,
             version: availability.version,
             running: true,
@@ -937,6 +948,8 @@ pub fn get_status() -> PrimeHostStatus {
             // will actually start as.
             let defaults = crate::prime_settings::read_defaults();
             PrimeHostStatus {
+                // No session, so nothing is running and nothing is claimed.
+                model_accepts_images: None,
                 installed: availability.installed,
                 version: availability.version,
                 running: false,
@@ -1135,6 +1148,24 @@ pub fn get_commands() -> Result<Vec<PrimeReportedCommand>, String> {
         let data = host.call(serde_json::json!({ "type": "get_commands" }))?;
         Ok(commands_from_response(&data))
     })
+}
+
+/// Whether a Prime `Model` reports image input.
+///
+/// `None` when the model carries no `input` array at all. Reading that as
+/// "text only" would warn on models that work, which is worse than not
+/// warning: the same refusal to guess that `check_provider_connected` makes
+/// about credentials.
+fn model_accepts_images(model: &serde_json::Value) -> Option<bool> {
+    let modalities = model["input"].as_array()?;
+    if modalities.is_empty() {
+        return None;
+    }
+    Some(modalities.iter().any(|value| {
+        value
+            .as_str()
+            .is_some_and(|modality| modality.trim().eq_ignore_ascii_case("image"))
+    }))
 }
 
 fn models_from_response(data: &serde_json::Value) -> Vec<PrimeModel> {
@@ -2650,6 +2681,7 @@ impl PrimeHost {
         )?;
 
         let mut host = Self {
+            model_accepts_images: None,
             stream,
             pending,
             event_tx,
@@ -3148,6 +3180,7 @@ impl PrimeHost {
             .as_str()
             .or_else(|| model["id"].as_str())
             .map(str::to_string);
+        self.model_accepts_images = model_accepts_images(model);
     }
 }
 
@@ -5529,6 +5562,33 @@ mod tests {
             data: data.into(),
             mime_type: "image/png".into(),
         }
+    }
+
+    /// `get_state` returns the whole Model, `input` included — so whether the
+    /// running model takes images is already on the status payload, with no
+    /// second round trip and nothing to match by id. The first cut fetched the
+    /// catalog and looked the model up, and the warning never fired in the
+    /// app; this removes the lookup rather than debugging it.
+    #[test]
+    fn the_running_models_image_support_is_read_straight_off_get_state() {
+        let vision = serde_json::json!({"id": "claude-fable-5", "input": ["text", "image"]});
+        let text_only = serde_json::json!({"id": "hy3-free", "input": ["text"]});
+        assert_eq!(model_accepts_images(&vision), Some(true));
+        assert_eq!(model_accepts_images(&text_only), Some(false));
+    }
+
+    /// Silence is not a refusal. A model with no `input` array must not be
+    /// reported as text-only, or the composer warns on models that work.
+    #[test]
+    fn a_model_that_reports_no_modalities_is_unknown_not_text_only() {
+        assert_eq!(
+            model_accepts_images(&serde_json::json!({"id": "unsaid"})),
+            None
+        );
+        assert_eq!(
+            model_accepts_images(&serde_json::json!({"id": "empty", "input": []})),
+            None
+        );
     }
 
     /// Prime reports which modalities a model takes. Rhizome dropped the
