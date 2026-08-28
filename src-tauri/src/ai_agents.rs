@@ -249,6 +249,9 @@ where
     };
     let prime_request = crate::prime_session_host::PrimePromptRequest {
         message: request.message,
+        // This path is the agent-panel bridge, which has no attachment
+        // surface — images arrive only through the chat composer.
+        images: Vec::new(),
         system_prompt: request.system_prompt,
         vault_path,
         event_name: request.event_name,

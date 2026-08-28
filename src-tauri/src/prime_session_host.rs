@@ -129,10 +129,68 @@ type DaemonStream = std::fs::File;
 
 // ── Public types ────────────────────────────────────────────────────────────
 
+/// One image on a `prompt`, `steer` or `follow_up`, exactly as Prime's
+/// `docs/rpc.md` specifies `ImageContent`.
+///
+/// `data` is base64 with no `data:` prefix — that prefix is a browser
+/// artifact, and the frontend strips it before this struct ever sees it.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrimeImageContent {
+    #[serde(rename = "type", default = "image_content_type")]
+    pub kind: String,
+    pub data: String,
+    pub mime_type: String,
+}
+
+fn image_content_type() -> String {
+    "image".to_string()
+}
+
+/// Images Rhizome will actually put on the wire.
+///
+/// The last gate before a unix socket that speaks newline-delimited JSON, so
+/// the caps are enforced here too and not only in the composer: a blank
+/// payload or a fifth image is dropped rather than turned into one enormous
+/// line the whole session waits behind. `MAX_PROMPT_IMAGES` mirrors
+/// `MAX_IMAGES_PER_MESSAGE` in `src/lib/composerAttachments.ts`.
+pub const MAX_PROMPT_IMAGES: usize = 4;
+
+fn normalized_images(images: &[PrimeImageContent]) -> Vec<serde_json::Value> {
+    images
+        .iter()
+        .filter(|image| !image.data.trim().is_empty() && !image.mime_type.trim().is_empty())
+        .take(MAX_PROMPT_IMAGES)
+        .map(|image| {
+            serde_json::json!({
+                "type": "image",
+                "data": image.data.trim(),
+                "mimeType": image.mime_type.trim(),
+            })
+        })
+        .collect()
+}
+
+/// The `images` entry for a command, or `None` when there is nothing to send.
+///
+/// `None` rather than an empty array on purpose: a text-only turn has to stay
+/// byte-identical to what Rhizome sent before images existed, so adding this
+/// feature cannot change ordinary chat.
+fn prompt_images_field(images: &[PrimeImageContent]) -> Option<serde_json::Value> {
+    let normalized = normalized_images(images);
+    (!normalized.is_empty()).then_some(serde_json::Value::Array(normalized))
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrimePromptRequest {
     pub message: String,
+    /// Images attached to this turn, as Prime's `ImageContent`.
+    ///
+    /// Empty for every text-only turn, and the command then carries no
+    /// `images` key at all — see [`prompt_images_field`].
+    #[serde(default)]
+    pub images: Vec<PrimeImageContent>,
     pub system_prompt: Option<String>,
     pub vault_path: String,
     #[serde(default)]
@@ -1718,8 +1776,16 @@ fn is_not_owned_error(error: &str) -> bool {
     error.to_ascii_lowercase().contains("not owned")
 }
 
-fn build_queue_command(kind: &str, message: &str) -> serde_json::Value {
-    serde_json::json!({ "type": kind, "message": message })
+fn build_queue_command(
+    kind: &str,
+    message: &str,
+    images: &[PrimeImageContent],
+) -> serde_json::Value {
+    let mut command = serde_json::json!({ "type": kind, "message": message });
+    if let Some(images) = prompt_images_field(images) {
+        command["images"] = images;
+    }
+    command
 }
 
 /// Queue a steering message for the running turn, or a follow-up for after it.
@@ -1728,16 +1794,18 @@ fn build_queue_command(kind: &str, message: &str) -> serde_json::Value {
 /// `steer` does with no active run, so we do not find out the hard way — the
 /// caller is expected to send a normal prompt instead, which is what a user
 /// pressing enter on an idle session means anyway.
-fn queue_message(kind: &str, message: &str) -> Result<bool, String> {
+fn queue_message(kind: &str, message: &str, images: &[PrimeImageContent]) -> Result<bool, String> {
     let trimmed = message.trim();
-    if trimmed.is_empty() {
+    // An image with no words is still a message — "what is this?" is the
+    // whole point of pasting a screenshot.
+    if trimmed.is_empty() && prompt_images_field(images).is_none() {
         return Err("Cannot queue an empty message".into());
     }
     with_host_mut(|host| {
         if !host.is_streaming {
             return Ok(false);
         }
-        let data = host.call(build_queue_command(kind, trimmed))?;
+        let data = host.call(build_queue_command(kind, trimmed, images))?;
         if kind == "follow_up" {
             return Ok(data["queued"].as_bool().unwrap_or(false));
         }
@@ -1746,13 +1814,13 @@ fn queue_message(kind: &str, message: &str) -> Result<bool, String> {
 }
 
 /// Redirect the turn that is currently running, without discarding its work.
-pub fn steer(message: &str) -> Result<bool, String> {
-    queue_message("steer", message)
+pub fn steer(message: &str, images: &[PrimeImageContent]) -> Result<bool, String> {
+    queue_message("steer", message, images)
 }
 
 /// Queue a message to run after the current turn finishes.
-pub fn follow_up(message: &str) -> Result<bool, String> {
-    queue_message("follow_up", message)
+pub fn follow_up(message: &str, images: &[PrimeImageContent]) -> Result<bool, String> {
+    queue_message("follow_up", message, images)
 }
 
 /// The attached session's steering and follow-up previews.
@@ -1891,6 +1959,7 @@ where
 
     let message =
         crate::cli_agent_runtime::build_prompt(&request.message, request.system_prompt.as_deref());
+    let images_field = prompt_images_field(&request.images);
 
     // Emit Init from current session if we have one and didn't already.
     let session_before = with_host_mut(|host| Ok(host.session_id.clone())).unwrap_or(None);
@@ -1907,10 +1976,14 @@ where
 
     let prompt_response = match with_host_mut(|host| {
         host.is_streaming = true;
-        host.send_command(serde_json::json!({
+        let mut command = serde_json::json!({
             "type": "prompt",
             "message": message,
-        }))
+        });
+        if let Some(images) = images_field.clone() {
+            command["images"] = images;
+        }
+        host.send_command(command)
     }) {
         Ok(response) => response,
         Err(error) => {
@@ -3505,6 +3578,7 @@ mod tests {
     #[cfg(unix)]
     fn prompt_request(vault: &Path, new_session: bool) -> PrimePromptRequest {
         PrimePromptRequest {
+            images: Vec::new(),
             message: "hi".into(),
             system_prompt: None,
             vault_path: vault.to_string_lossy().into_owned(),
@@ -5436,16 +5510,62 @@ mod tests {
 
     // ── Pure helpers ────────────────────────────────────────────────────────
 
+    fn image(data: &str) -> PrimeImageContent {
+        PrimeImageContent {
+            kind: "image".into(),
+            data: data.into(),
+            mime_type: "image/png".into(),
+        }
+    }
+
+    /// A text-only turn has to stay byte-identical to what Rhizome sent
+    /// before images existed. `None`, not `[]` — an empty array would change
+    /// every ordinary chat message on the wire to ship one new feature.
+    #[test]
+    fn a_turn_with_no_images_carries_no_images_key_at_all() {
+        assert_eq!(prompt_images_field(&[]), None);
+        assert_eq!(
+            build_queue_command("steer", "carry on", &[]),
+            serde_json::json!({"type": "steer", "message": "carry on"})
+        );
+    }
+
+    #[test]
+    fn images_go_out_in_primes_image_content_shape() {
+        assert_eq!(
+            build_queue_command("follow_up", "and this", &[image("QUJD")]),
+            serde_json::json!({
+                "type": "follow_up",
+                "message": "and this",
+                "images": [{"type": "image", "data": "QUJD", "mimeType": "image/png"}],
+            })
+        );
+    }
+
+    /// The last gate before a socket that speaks newline-delimited JSON. A
+    /// blank payload is not an image, and a fifth one is a stall the whole
+    /// session waits behind.
+    #[test]
+    fn blank_payloads_are_dropped_and_the_count_is_capped() {
+        let mut blank = image("   ");
+        blank.mime_type = "image/png".into();
+        assert_eq!(prompt_images_field(&[blank]), None);
+
+        let many = vec![image("QQ=="); MAX_PROMPT_IMAGES + 3];
+        let field = prompt_images_field(&many).expect("images");
+        assert_eq!(field.as_array().unwrap().len(), MAX_PROMPT_IMAGES);
+    }
+
     /// Steering is the whole point of this slice: redirect a running turn
     /// without throwing its work away. `abort` was the only interrupt before.
     #[test]
     fn steer_and_follow_up_send_the_message_prime_expects() {
         assert_eq!(
-            build_queue_command("steer", "focus on error handling"),
+            build_queue_command("steer", "focus on error handling", &[]),
             serde_json::json!({"type": "steer", "message": "focus on error handling"})
         );
         assert_eq!(
-            build_queue_command("follow_up", "then summarise"),
+            build_queue_command("follow_up", "then summarise", &[]),
             serde_json::json!({"type": "follow_up", "message": "then summarise"})
         );
     }
@@ -5467,7 +5587,7 @@ mod tests {
         })
         .unwrap();
 
-        assert!(!follow_up("then summarise").unwrap());
+        assert!(!follow_up("then summarise", &[]).unwrap());
 
         let _ = shutdown_host();
     }
@@ -5498,8 +5618,8 @@ mod tests {
         })
         .unwrap();
 
-        assert!(follow_up("then summarise").unwrap());
-        assert!(steer("focus on error handling").unwrap());
+        assert!(follow_up("then summarise", &[]).unwrap());
+        assert!(steer("focus on error handling", &[]).unwrap());
 
         let _ = shutdown_host();
     }
@@ -6896,6 +7016,7 @@ mod tests {
         let mut events = Vec::new();
         run_prompt_stream(
             PrimePromptRequest {
+                images: Vec::new(),
                 message: "Reply with exactly the word: pong".into(),
                 system_prompt: None,
                 vault_path: vault.path().to_string_lossy().into_owned(),
