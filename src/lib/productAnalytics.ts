@@ -463,3 +463,15 @@ export function trackCelebration({
     refusal: refusal ?? 'none',
   })
 }
+
+/**
+ * The chat model menu's curated allow-list changed (#45).
+ *
+ * Counts only. The question this answers is whether people curate at all and
+ * how far down they cut — 501 models is the complaint the feature exists for,
+ * so "curated to 6 of 501" is the signal. Which models they picked is a
+ * per-user preference, and shipping 501 ids per event would bury it anyway.
+ */
+export function trackPrimeModelAllowListChanged(selected: number, available: number): void {
+  trackEvent('prime_model_allow_list_changed', { selected, available })
+}
