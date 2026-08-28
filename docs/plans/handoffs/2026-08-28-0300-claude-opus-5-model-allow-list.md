@@ -14,7 +14,7 @@ commits: daf3127..74c77dc
 Continues
 [2026-08-28-0010-claude-opus-5-model-settings-triage.md](2026-08-28-0010-claude-opus-5-model-settings-triage.md).
 
-## Nous Portal: compatible today, one input short of proven
+## Nous Portal works — confirmed live
 
 The previous handoff was right to correct "blocked upstream", and the flow it
 pointed at holds up. Verified without a key:
@@ -31,10 +31,21 @@ sends `bearer_auth`, `openai_chat_payload` sends `{model, messages,
 stream:false}`. Nous accepts that shape, and its 401 is exactly the provider
 error `ea21050` now surfaces verbatim.
 
-**Untested: a valid key returning 200 through the app.** Reading the key from
-the macOS keychain is blocked by policy and should be. Settings to enter:
-kind **Custom provider**, base URL `https://inference-api.nousresearch.com/v1`,
-model e.g. `tencent/hy3:free`, key storage **Env** → `NOUS_API_KEY`.
+**Then confirmed with a real key** (`NOUS_API_KEY`, Env storage):
+`nousresearch/hermes-4-405b` returned **HTTP 200** and the content `OK`.
+
+So **#45's custom-provider work is not needed to use Nous for chat.** Settings
+to enter: kind **Custom provider**, base URL
+`https://inference-api.nousresearch.com/v1`, model
+`nousresearch/hermes-4-405b`, key storage **Env** → `NOUS_API_KEY`.
+
+Rhizome's own env probe was replayed verbatim and finds the variable.
+`zsh -lc` does *not* read `.zshrc`, which is why a naive presence check says
+"not set"; `rc_source_command` (`shell_env.rs:160`) sources it explicitly
+before probing. That path is correct — no defect there.
+
+The remaining gap is `api_model` targets bypassing Prime (`ChatHome.tsx:66`),
+which is by design and unchanged.
 
 ### Three findings that change #45's shape
 
@@ -47,7 +58,13 @@ model e.g. `tencent/hy3:free`, key storage **Env** → `NOUS_API_KEY`.
    filter is a naming heuristic **for Prime targets**; for `api_model` targets
    it can read the real number. The previous handoff's claim needs that
    qualifier.
-3. **No "fetch models" button, and no Nous preset.** `/v1/models` is public and
+3. **`pricing.prompt == 0` does not mean callable.** `tencent/hy3:free`
+   returns **400 — "missing tags"** with a valid key, while the paid
+   `hermes-4-405b` returns 200. The free ids carry a `synthesizedFreeVariant`
+   marker the paid entries lack, so they are synthesized routes needing
+   something extra. A free-only filter that trusts the price field would offer
+   models that 400. Third strike against a naive one.
+4. **No "fetch models" button, and no Nous preset.** `/v1/models` is public and
    unauthenticated — the app could populate a picker instead of making you type
    ids. `aiModelProviderCatalog.json` has 7 kinds, none of them Nous.
 
@@ -92,8 +109,10 @@ believing it.** Tracked as C54.
 
 ## Pick up here
 
-- Give the key and close the Nous live check. One command:
-  `echo 'export NOUS_API_KEY=...' >> ~/.zshrc && source ~/.zshrc`
+- **Nous live check is closed** — 200 + `OK`. Not yet done through the app's
+  own Settings → API providers UI; the request shape is identical, so this is
+  a UI confirmation, not a risk.
+- **Rotate the key used for that test.** It was pasted into a chat transcript.
 - **#45 step 2** — the free-only quick-filter, now with finding 2 above: real
   prices for `api_model` targets, naming heuristic for Prime ones. Label it as
   a heuristic where it is one.
