@@ -147,6 +147,49 @@ window rendered blank until the prompt was accepted. Expect that on **every**
 rebuild while the vault lives in a protected folder — it is the same fact as
 C53's `tccutil reset` note, from the other direction.
 
+## Three corrections from reading the installed Prime's own docs
+
+Triggered by "only text is supported in the AI composer" — the composer refuses
+pasted images. Chasing that turned up two claims in this repo that are wrong.
+Source throughout is `~/.local/lib/node_modules/prime-agent/docs/` for the
+**installed 0.8.0**, plus the live daemon where noted. Not a clone; bounded
+reads of the package already on disk.
+
+**1. Prime accepts images. We refuse them client-side.**
+`docs/rpc.md` §Prompting: `prompt`, `steer` and `follow_up` all take an
+optional `images` array of
+`{"type":"image","data":"<base64>","mimeType":"image/png"}`. Rhizome sends
+`{"type":"prompt","message":…}` only (`prime_session_host.rs:1911`), and
+`InlineWikilinkInput` blocks the paste outright —
+`UNSUPPORTED_INLINE_PASTE_MESSAGE`, a **hardcoded English string** that should
+be in `en.json` regardless of this feature. Nothing upstream blocks image
+support; the whole gap is ours.
+
+**2. Prime's Model object carries `input` and `cost`. We drop both.**
+`docs/rpc.md` §Model: `"input": ["text","image"]` and
+`"cost": {input, output, cacheRead, cacheWrite}`. `PrimeModel`
+(`prime_session_host.rs:976`) maps only id/name/provider/contextWindow/reasoning.
+`prime-agent model list` shows an **images** column, so per-model image support
+is confirmed live. **`cost` is doc-only so far** — `get_available_models` is
+session-scoped, and a daemon-level probe over protocol 7 answers
+`Supervisor cannot route daemon command`, so confirming it needs an attached
+session. Verify before building on it.
+
+If it holds, **#45 step 2 stops being a naming heuristic**: a free-only filter
+can read a real number instead of guessing at `-free` / `:free`. This session
+already found that guessing fails in both directions — Nous's zero-priced
+`tencent/hy3:free` returns 400, and the same id 404s inside Prime.
+
+**3. Prime has a custom-provider mechanism, and it is the doctrine seam.**
+`docs/custom-provider.md`: extensions call `pi.registerProvider()` to override a
+provider's `baseUrl` or register a new one with its own models, API key and
+OAuth — with two worked examples under `examples/extensions/`. The earlier
+claim that connecting a provider "needs an ADR, not a button" was based on
+`settings.json` having no such field, which is true of `settings.json` and false
+of Prime. ADR-0168 already names extensions as where foreign pieces belong, so
+**Nous Portal inside a Prime session is unblocked** and wants a Prime extension,
+not a fork. Correct the record before quoting #45's blocked/works table.
+
 ## Pick up here
 
 - **Nous live check is closed** — 200 + `OK`. Not yet done through the app's
