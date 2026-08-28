@@ -92,6 +92,13 @@ pub fn check_provider_connected(provider: &str, connected: &[String]) -> CheckRe
             "Pick a model from the composer before sending a message.",
         );
     }
+    // An empty set means we could not read the engine's credentials, not that
+    // nothing is connected. Staying silent is the only safe reading: a false
+    // "not connected" on a working setup trains the user to ignore the banner,
+    // which costs more than the check ever earns.
+    if connected.is_empty() {
+        return CheckResult::Ok;
+    }
     if connected.iter().any(|name| name == provider) {
         return CheckResult::Ok;
     }
@@ -127,6 +134,35 @@ impl Preflight {
             .filter(|check| !check.is_ok())
             .collect()
     }
+}
+
+/// Provider names the engine holds credentials for.
+///
+/// Read-only, and a deliberate fallback: Prime's daemon exposes no auth or
+/// login command (verified against all 102 commands in
+/// `docs/prime-adapter-surface.json` — only `get_available_models`,
+/// `get_model_catalog`, `set_model`, `set_scoped_models` and `cycle_model`
+/// touch this area), so the credential file is the only source. Rhizome
+/// **reads** it and never writes it; writing into Prime's own state is what
+/// #46 was about.
+///
+/// Returns an empty set on any failure, which `check_provider_connected`
+/// treats as "unknown" and stays quiet about. Replace this with a daemon call
+/// the moment Prime grows one.
+pub fn connected_providers() -> Vec<String> {
+    let Some(path) = dirs::home_dir().map(|home| home.join(".prime/agent/auth.json")) else {
+        return Vec::new();
+    };
+    let Ok(raw) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&raw) else {
+        return Vec::new();
+    };
+    parsed
+        .as_object()
+        .map(|entries| entries.keys().cloned().collect())
+        .unwrap_or_default()
 }
 
 pub fn run(vault_path: &Path, provider: &str, connected: &[String]) -> Preflight {
@@ -199,6 +235,15 @@ mod tests {
         };
         assert!(reason.contains("nous-portal"), "reason names the provider");
         assert!(remedy.contains("nous-portal"));
+    }
+
+    // The banner is only worth having if it is trusted. Reporting "not
+    // connected" because we failed to read credentials would be a false alarm
+    // on a working setup, and one of those teaches the user to ignore it.
+    #[test]
+    fn an_unknown_credential_set_stays_silent_rather_than_crying_wolf() {
+        assert_eq!(check_provider_connected("opencode", &[]), CheckResult::Ok);
+        assert_eq!(check_provider_connected("anything", &[]), CheckResult::Ok);
     }
 
     #[test]

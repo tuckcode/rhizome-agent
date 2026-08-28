@@ -970,6 +970,24 @@ pub fn run_mindwalk_open(path: String) -> Result<String, String> {
     crate::mycelium::run_mindwalk_open(&path)
 }
 
+/// Everything the app can determine about whether a turn will work, without
+/// spending one. Cheap enough to call on vault switch and model change.
+#[tauri::command]
+pub fn preflight_chat(
+    vault_path: Option<String>,
+    provider: Option<String>,
+) -> crate::preflight::Preflight {
+    let vault_path = vault_path
+        .map(|path| expand_tilde(&path).into_owned())
+        .unwrap_or_default();
+    let connected = crate::preflight::connected_providers();
+    crate::preflight::run(
+        std::path::Path::new(&vault_path),
+        provider.as_deref().unwrap_or_default(),
+        &connected,
+    )
+}
+
 #[tauri::command]
 pub fn start_mindwalk_sidecar(
     path: Option<String>,

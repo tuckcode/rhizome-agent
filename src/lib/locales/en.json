@@ -1159,6 +1159,7 @@
   "ai.message.saveToVaultCredentials": "This contains a credential. Remove it, then save — vault notes are committed and can be pushed.",
   "ai.message.saveToVaultDuplicate": "Already in the vault as “{title}”. Promote will not overwrite it.",
   "ai.message.saveToVaultNoContent": "Nothing to promote — this turn did not produce a reply.",
+  "ai.preflight.title": "This chat may not work yet",
   "ai.panel.mode.harness": "Harness",
   "ai.panel.skills.default": "Skills · default toolkit (install more in Prime)",
   "ai.panel.skills.withVault": "Skills · {skills}",
