@@ -11,7 +11,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { createTranslator, type AppLocale } from '../lib/i18n'
-import { groupModelsByProvider, type PrimeModel } from '../lib/primeModels'
+import {
+  filterModels,
+  groupModelsByProvider,
+  partitionModelsByConnection,
+  type PrimeModel,
+} from '../lib/primeModels'
 import { modelThinkingLabel, thinkingLevelLabel } from '../lib/primeThinkingLevels'
 import { trackPrimeModelChanged, trackPrimeThinkingLevelChanged } from '../lib/productAnalytics'
 
@@ -57,6 +62,9 @@ export function PrimeModelPicker({
   const [open, setOpen] = useState(false)
   const [models, setModels] = useState<PrimeModel[] | null>(null)
   const [levels, setLevels] = useState<string[]>([])
+  const [connected, setConnected] = useState<string[]>([])
+  const [query, setQuery] = useState('')
+  const [showUnavailable, setShowUnavailable] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -70,6 +78,15 @@ export function PrimeModelPicker({
           await callHost('ensure_prime_session_host', { vaultPath })
         }
         listed = await callHost<PrimeModel[]>('get_available_prime_models')
+        // Which providers this account can actually reach. Best-effort: an
+        // empty answer means "unknown", and the partition then shows
+        // everything rather than greying out a model that works.
+        try {
+          const providers = await callHost<string[]>('get_connected_providers')
+          if (!cancelled) setConnected(Array.isArray(providers) ? providers : [])
+        } catch {
+          if (!cancelled) setConnected([])
+        }
         // The level list comes from the host too (#9: nothing hardcoded).
         // Its own failure must not blank the model list, which is the larger
         // half of this menu.
@@ -123,7 +140,10 @@ export function PrimeModelPicker({
     [vaultPath],
   )
 
-  const groups = groupModelsByProvider(models ?? [])
+  const matching = filterModels(models ?? [], query)
+  const { available, unavailable } = partitionModelsByConnection(matching, connected)
+  const groups = groupModelsByProvider(available)
+  const unavailableGroups = groupModelsByProvider(unavailable)
   const strip = variant === 'strip'
   const triggerLabel = strip
     ? (modelThinkingLabel(label, thinkingLevel) ?? t('ai.composer.modelUnknown'))
@@ -156,6 +176,26 @@ export function PrimeModelPicker({
         {error ? (
           <div className="px-2 py-1.5 text-xs text-destructive" role="alert">
             {error}
+          </div>
+        ) : null}
+        {models !== null && !error ? (
+          <div className="px-1.5 pb-1 pt-0.5">
+            <input
+              type="text"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              // The menu treats typing as type-ahead navigation and would
+              // swallow the query, so keystrokes stop here.
+              onKeyDown={(event) => event.stopPropagation()}
+              placeholder={t('ai.composer.modelsFilter')}
+              className={cn(
+                'w-full rounded-sm border border-border bg-background px-1.5 py-1',
+                'font-mono text-[11px] text-foreground placeholder:text-muted-foreground',
+                'focus:border-border-strong focus:outline-none',
+              )}
+              data-testid="prime-model-filter"
+              aria-label={t('ai.composer.modelsFilter')}
+            />
           </div>
         ) : null}
         {models === null && !error ? (
@@ -204,6 +244,48 @@ export function PrimeModelPicker({
             ))}
           </div>
         ))}
+        {/* Models whose provider has no credentials. Separated rather than
+            hidden — "why can't I find X?" should stay answerable — and still
+            selectable, because credential detection is best-effort and being
+            wrong must not lock a user out of a model that works. */}
+        {unavailable.length > 0 ? (
+          <div data-testid="prime-models-unavailable">
+            <DropdownMenuSeparator />
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault()
+                setShowUnavailable((shown) => !shown)
+              }}
+              onKeyDown={(event) => event.stopPropagation()}
+              className={cn(
+                'w-full px-2 py-1.5 text-left font-mono text-[10px] uppercase',
+                'tracking-[0.1em] text-muted-foreground hover:text-foreground',
+              )}
+              data-testid="prime-models-unavailable-toggle"
+            >
+              {t('ai.composer.modelsNotConnected', { count: String(unavailable.length) })}
+            </button>
+            {showUnavailable
+              ? unavailableGroups.map((group) => (
+                  <div key={`unavailable-${group.provider}`}>
+                    <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+                      {group.provider}
+                    </DropdownMenuLabel>
+                    {group.models.map((model) => (
+                      <DropdownMenuItem
+                        key={`unavailable-${model.provider}/${model.id}`}
+                        onSelect={() => void select(model)}
+                        className="text-[12.5px] opacity-60"
+                      >
+                        <span className="truncate">{model.name}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </div>
+                ))
+              : null}
+          </div>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   )
