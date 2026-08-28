@@ -822,6 +822,41 @@ pub fn set_prime_session_archived(session_id: String, archived: bool) -> Result<
     crate::settings::save_settings(settings)
 }
 
+// --- Chat model allow-list (#45) ---
+
+/// The models the chat picker shows, as `"provider/id"` keys.
+///
+/// Empty means no curation — show the whole catalog — not "show nothing". A
+/// settings read that fails returns empty for the same reason
+/// `list_prime_session_summaries` treats one that way: not knowing what the
+/// user curated is a reason to show more, never to show nothing.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn get_prime_model_allow_list() -> Vec<String> {
+    crate::settings::get_settings()
+        .ok()
+        .and_then(|settings| settings.prime_model_allow_list)
+        .unwrap_or_default()
+}
+
+/// Replace the picker's allow-list.
+///
+/// A whole-list write rather than per-model toggles: the editor is a set of
+/// checkboxes over the catalog, so the list it holds *is* the new value, and a
+/// toggle API would make two sources of truth out of one screen. Passing an
+/// empty list is how the user turns curation off again.
+///
+/// Rhizome's own state. Nothing under `~/.prime/agent` is written, so Prime's
+/// CLI and every other client keep seeing the full catalog.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn set_prime_model_allow_list(models: Vec<String>) -> Result<(), String> {
+    let mut settings = crate::settings::get_settings()?;
+    settings.prime_model_allow_list =
+        crate::settings::normalize_prime_model_allow_list(Some(models));
+    crate::settings::save_settings(settings)
+}
+
 /// Rename a Prime session from the list.
 ///
 /// Speaks `rename_saved_session` so a historical log can be named without

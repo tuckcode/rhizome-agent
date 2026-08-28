@@ -177,6 +177,18 @@ pub struct Settings {
     /// and any other client: archiving is Rhizome's view of the list, and must
     /// not alter what anyone else sees. See `docs/adr/0165-archiving-prime-sessions.md`.
     pub archived_prime_sessions: Option<Vec<String>>,
+    /// The models the chat picker shows, as `"provider/id"` keys.
+    ///
+    /// `None` — the default — means no curation: show the whole catalog. A
+    /// non-empty list means the user has chosen a shortlist, and everything
+    /// else moves behind a disclosure rather than disappearing, the same way
+    /// unconnected providers do. An empty list normalizes back to `None`,
+    /// because a list that hides every model is a trap, not a preference.
+    ///
+    /// Rhizome's own view, like [`Self::archived_prime_sessions`]: nothing
+    /// under `~/.prime/agent` is touched, so Prime's CLI and every other
+    /// client still see the full catalog.
+    pub prime_model_allow_list: Option<Vec<String>>,
     /// Shared secret a browser extension presents to the MCP tool bridge.
     /// Generated once per install by [`ensure_bridge_token`] and never shown
     /// to anyone but the user. See `docs/adr/0159-bridge-token-auth.md`.
@@ -207,6 +219,23 @@ fn normalize_optional_string(value: Option<String>) -> Option<String> {
     value
         .map(|candidate| candidate.trim().to_string())
         .filter(|candidate| !candidate.is_empty())
+}
+
+/// Trim, drop blanks, and de-duplicate the picker's allow-list.
+///
+/// Order is the caller's — the settings editor writes catalog order — so this
+/// preserves first-seen position rather than sorting. An empty result becomes
+/// `None`: "curated down to nothing" and "not curated" must not be two states,
+/// or a stray save would empty the chat model menu with no way back to it
+/// from the menu itself.
+pub fn normalize_prime_model_allow_list(value: Option<Vec<String>>) -> Option<Vec<String>> {
+    let mut seen = std::collections::BTreeSet::new();
+    let keys = value?
+        .into_iter()
+        .map(|key| key.trim().to_string())
+        .filter(|key| !key.is_empty() && seen.insert(key.clone()))
+        .collect::<Vec<_>>();
+    (!keys.is_empty()).then_some(keys)
 }
 
 fn normalize_optional_positive_u32(value: Option<u32>) -> Option<u32> {
@@ -321,6 +350,7 @@ fn normalize_settings(settings: Settings) -> Settings {
         // Passed through untouched: an id is Prime's own uuid, and there is no
         // normalising to do to a set of them.
         archived_prime_sessions: settings.archived_prime_sessions,
+        prime_model_allow_list: normalize_prime_model_allow_list(settings.prime_model_allow_list),
         keep_sessions_running_on_quit: settings.keep_sessions_running_on_quit,
         celebrations_enabled: settings.celebrations_enabled,
         auto_pull_interval_minutes: settings.auto_pull_interval_minutes,
@@ -647,6 +677,58 @@ mod tests {
     }
 
     #[test]
+    fn an_empty_allow_list_means_no_curation_rather_than_an_empty_menu() {
+        // The dangerous state: a user unticks the last model, or a bad write
+        // lands `[]`. If that persisted as a real filter the chat picker would
+        // be empty and offer no way to undo itself.
+        assert_eq!(normalize_prime_model_allow_list(Some(Vec::new())), None);
+        assert_eq!(
+            normalize_prime_model_allow_list(Some(vec!["   ".into(), "".into()])),
+            None
+        );
+        assert_eq!(normalize_prime_model_allow_list(None), None);
+    }
+
+    #[test]
+    fn allow_list_keys_are_trimmed_deduped_and_left_in_catalog_order() {
+        assert_eq!(
+            normalize_prime_model_allow_list(Some(vec![
+                " xai/grok-4.5 ".into(),
+                "anthropic/claude-opus-5".into(),
+                "xai/grok-4.5".into(),
+            ])),
+            Some(vec![
+                "xai/grok-4.5".to_string(),
+                "anthropic/claude-opus-5".to_string(),
+            ])
+        );
+    }
+
+    #[test]
+    fn saving_settings_normalizes_the_allow_list_on_the_way_to_disk() {
+        let reloaded = save_and_reload(Settings {
+            prime_model_allow_list: Some(vec!["  xai/grok-4.5  ".into(), " ".into()]),
+            ..Default::default()
+        });
+        assert_eq!(
+            reloaded.prime_model_allow_list,
+            Some(vec!["xai/grok-4.5".to_string()])
+        );
+    }
+
+    #[test]
+    fn allow_list_crosses_the_ipc_boundary_under_the_name_the_frontend_reads() {
+        // `useSettings` and the picker both read `prime_model_allow_list` off
+        // `get_settings`; nothing else pins that spelling.
+        let json = serde_json::to_value(Settings {
+            prime_model_allow_list: Some(vec!["xai/grok-4.5".to_string()]),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(json["prime_model_allow_list"][0], "xai/grok-4.5");
+    }
+
+    #[test]
     fn test_default_settings_all_none() {
         assert_empty_settings(&Settings::default());
     }
@@ -655,6 +737,7 @@ mod tests {
     fn test_settings_json_roundtrip() {
         let settings = Settings {
             archived_prime_sessions: Some(vec!["01a0252e-filed".to_string()]),
+            prime_model_allow_list: Some(vec!["opencode/hy3-free".to_string()]),
             keep_sessions_running_on_quit: Some(true),
             celebrations_enabled: Some(false),
             auto_pull_interval_minutes: Some(10),
