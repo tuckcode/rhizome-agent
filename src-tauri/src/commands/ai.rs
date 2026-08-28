@@ -833,10 +833,7 @@ pub fn set_prime_session_archived(session_id: String, archived: bool) -> Result<
 #[cfg(desktop)]
 #[tauri::command]
 pub fn get_prime_model_allow_list() -> Vec<String> {
-    crate::settings::get_settings()
-        .ok()
-        .and_then(|settings| settings.prime_model_allow_list)
-        .unwrap_or_default()
+    crate::settings::prime_model_allow_list()
 }
 
 /// Replace the picker's allow-list.
@@ -851,10 +848,7 @@ pub fn get_prime_model_allow_list() -> Vec<String> {
 #[cfg(desktop)]
 #[tauri::command]
 pub fn set_prime_model_allow_list(models: Vec<String>) -> Result<(), String> {
-    let mut settings = crate::settings::get_settings()?;
-    settings.prime_model_allow_list =
-        crate::settings::normalize_prime_model_allow_list(Some(models));
-    crate::settings::save_settings(settings)
+    crate::settings::set_prime_model_allow_list(models)
 }
 
 /// Rename a Prime session from the list.
