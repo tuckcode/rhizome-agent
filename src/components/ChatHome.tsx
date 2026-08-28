@@ -7,6 +7,8 @@ import { ChatComposerDeck } from './ChatComposerDeck'
 import { ChatPreflightBanner } from './ChatPreflightBanner'
 import { ChatNotePane } from './ChatNotePane'
 import { useChatNoteContent } from '../hooks/useChatNoteContent'
+import { usePanelWidth } from '../hooks/usePanelWidth'
+import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import { vaultLabelFromPath } from '../lib/primeSubheadLabels'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 import { resolveChatOpenNote } from '../utils/resolveChatOpenNote'
@@ -91,6 +93,9 @@ export default function ChatHome({
     setOpenNote({ path: requestedNote.path, label: requestedNote.label })
   }
   const openNoteContent = useChatNoteContent(openNote?.path, vaultPath)
+  // Bounds, not decoration: below ~260px the note is unreadable, and past
+  // ~880px the conversation it sits beside stops being the point.
+  const notePaneWidth = usePanelWidth(APP_STORAGE_KEYS.chatNotePaneWidth, 448, 260, 880)
   const openNoteEntry = openNote
     ? entries.find((entry) => entry.path === openNote.path) ?? null
     : null
@@ -149,6 +154,8 @@ export default function ChatHome({
               <ChatNotePane
                 locale={locale}
                 label={openNote.label}
+                width={notePaneWidth.width}
+                onResize={notePaneWidth.resizeBy}
                 body={openNoteContent.body}
                 error={openNoteContent.error}
                 loading={openNoteContent.loading}
