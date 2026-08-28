@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent, type RefObject } fr
 import {
   Archive,
   ArrowSquareOut,
+  ChatTeardropText,
   CheckCircle,
   ClipboardText,
   FilePdf,
@@ -39,6 +40,7 @@ interface NoteListContextMenuNodeProps {
   ctxMenu: NoteListContextMenuState | null
   ctxMenuRef: RefObject<HTMLDivElement | null>
   locale: AppLocale
+  onAskAgent?: (entry: VaultEntry) => void
   onEnterNeighborhood?: (entry: VaultEntry) => void
   onOpenInNewWindow?: (entry: VaultEntry) => void
   onRequestRename?: (entry: VaultEntry) => void
@@ -58,6 +60,7 @@ type BuildContextMenuItemsParams = Pick<
   NoteListContextMenuNodeProps,
   | 'locale'
   | 'onEnterNeighborhood'
+  | 'onAskAgent'
   | 'onOpenInNewWindow'
   | 'onRequestRename'
   | 'onArchivePaths'
@@ -70,6 +73,28 @@ type BuildContextMenuItemsParams = Pick<
   | 'canCopyGitUrl'
   | 'onCopyGitUrl'
 >
+
+/**
+ * Hand this note to the agent.
+ *
+ * The other half of "the agent can see the note you have open": that one
+ * starts from the conversation, this one starts from the vault. Passes the
+ * whole entry rather than a path, because the caller needs the title to open
+ * it and the path to load it.
+ */
+function askAgentItem(
+  entry: VaultEntry,
+  locale: AppLocale,
+  onAskAgent: ((entry: VaultEntry) => void) | undefined,
+  selectAction: SelectContextAction,
+) {
+  if (!onAskAgent) return []
+  return [{
+    icon: ChatTeardropText,
+    label: translate(locale, 'command.note.askAgent'),
+    onSelect: () => selectAction('ask_agent', () => onAskAgent(entry)),
+  }]
+}
 
 function openWindowItem(
   entry: VaultEntry,
@@ -240,6 +265,8 @@ function buildContextMenuItems(
   selectAction: SelectContextAction,
 ): NoteListContextMenuItem[] {
   return [
+    // First: it is the reason someone right-clicks a note while chat is open.
+    ...askAgentItem(entry, props.locale, props.onAskAgent, selectAction),
     ...openWindowItem(entry, props.locale, props.onOpenInNewWindow, selectAction),
     ...favoriteItem(entry, props.locale, props.onToggleFavorite, selectAction),
     ...organizedItem(entry, props.locale, props.onToggleOrganized, selectAction),
@@ -275,6 +302,7 @@ export function NoteListContextMenuNode(props: NoteListContextMenuNodeProps) {
     ctxMenu,
     ctxMenuRef,
     locale,
+    onAskAgent,
     onEnterNeighborhood,
     onOpenInNewWindow,
     onRequestRename,
@@ -300,6 +328,7 @@ export function NoteListContextMenuNode(props: NoteListContextMenuNodeProps) {
   }
   const items = buildContextMenuItems({
     locale,
+    onAskAgent,
     onEnterNeighborhood,
     onOpenInNewWindow,
     onRequestRename,

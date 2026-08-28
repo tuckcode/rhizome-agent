@@ -27,6 +27,7 @@ interface NoteListContextMenuParams {
   onExportPdf?: (entry: VaultEntry) => void
   onToggleFavorite?: (path: string) => void
   onToggleOrganized?: (path: string) => void
+  onAskAgent?: (entry: VaultEntry) => void
   onRevealFile?: (path: string) => void
   onCopyFilePath?: (path: string) => void
   canCopyGitUrl?: (entry: VaultEntry) => boolean
@@ -43,6 +44,7 @@ function hasNoteListContextActions({
   onExportPdf,
   onToggleFavorite,
   onToggleOrganized,
+  onAskAgent,
   onRevealFile,
   onCopyFilePath,
   canCopyGitUrl,
@@ -57,6 +59,7 @@ function hasNoteListContextActions({
     onDeletePaths,
     onToggleFavorite,
     onToggleOrganized && isMarkdownEntry(entry),
+    onAskAgent,
     onRevealFile,
     onCopyFilePath,
     onCopyGitUrl && canCopyGitUrl?.(entry),
@@ -73,6 +76,7 @@ export function useNoteListContextMenu({
   onExportPdf,
   onToggleFavorite,
   onToggleOrganized,
+  onAskAgent,
   onRevealFile,
   onCopyFilePath,
   canCopyGitUrl,
@@ -119,6 +123,7 @@ export function useNoteListContextMenu({
       onExportPdf,
       onToggleFavorite,
       onToggleOrganized,
+      onAskAgent,
       onRevealFile,
       onCopyFilePath,
       canCopyGitUrl,
@@ -138,6 +143,7 @@ export function useNoteListContextMenu({
     onRenameFilename,
     onOpenInNewWindow,
     onCopyGitUrl,
+    onAskAgent,
     onRevealFile,
     onToggleFavorite,
     onToggleOrganized,
@@ -149,6 +155,7 @@ export function useNoteListContextMenu({
         ctxMenu={ctxMenu}
         ctxMenuRef={ctxMenuRef}
         locale={locale}
+        onAskAgent={onAskAgent}
         onEnterNeighborhood={onEnterNeighborhood}
         onOpenInNewWindow={onOpenInNewWindow}
         onRequestRename={onRenameFilename ? requestRename : undefined}

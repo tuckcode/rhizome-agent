@@ -211,3 +211,29 @@ describe('NoteList context menu', () => {
     })
   })
 })
+
+/**
+ * Right-click a note and hand it to the agent.
+ *
+ * The vault and the conversation sat side by side with no way to point one at
+ * the other. Chat now sees the note you have open; this is the other
+ * direction — start from the note.
+ */
+describe('NoteList context menu — ask the agent', () => {
+  it('offers the action and passes the whole entry, not just a path', () => {
+    const onAskAgent = vi.fn()
+    renderNoteList({ onAskAgent })
+
+    fireEvent.contextMenu(screen.getByText('Build Laputa App'))
+    fireEvent.click(screen.getByText('Ask the agent about this note'))
+
+    expect(onAskAgent).toHaveBeenCalledWith(mockEntries[0])
+  })
+
+  /** No handler, no menu item — the same rule every other action here follows. */
+  it('hides the action when no handler is supplied', () => {
+    renderNoteList({})
+    fireEvent.contextMenu(screen.getByText('Build Laputa App'))
+    expect(screen.queryByText('Ask the agent about this note')).not.toBeInTheDocument()
+  })
+})

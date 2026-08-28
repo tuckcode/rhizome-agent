@@ -37,6 +37,12 @@ interface ChatHomeProps {
   onExit: () => void
   /** Open Mycelium on this Prime session only (#22). */
   onOpenSessionFootprint?: (sessionPath: string) => void
+  /**
+   * A note handed to Chat from outside — the vault's "Ask the agent about this
+   * note". Carries an id so asking about the *same* note twice still reopens
+   * it after the user has closed the pane.
+   */
+  requestedNote?: { path: string; label: string; requestId: number } | null
 }
 
 /**
@@ -63,6 +69,7 @@ export default function ChatHome({
   sessionsAutoCollapsed = false,
   onExit,
   onOpenSessionFootprint,
+  requestedNote,
 }: ChatHomeProps) {
   const isPrimeTarget = defaultAiTarget?.kind !== 'api_model' && defaultAiAgent === 'prime'
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
@@ -71,6 +78,18 @@ export default function ChatHome({
   // One read of the open note, shared by the pane and the agent. Chat used to
   // pass nothing to `AiPanel`, so a note open on screen was invisible to the
   // model — "summarise this" had no "this".
+  // An incoming request wins over whatever is open. Keyed on `requestId`, not
+  // the path, so asking about the same note twice reopens it rather than
+  // silently doing nothing.
+  //
+  // Adjusted during render rather than in an effect: this is state derived
+  // from a prop, and React's own guidance is to set it here. An effect would
+  // render once with the stale note before correcting itself.
+  const [lastRequestId, setLastRequestId] = useState<number | null>(null)
+  if (requestedNote && requestedNote.requestId !== lastRequestId) {
+    setLastRequestId(requestedNote.requestId)
+    setOpenNote({ path: requestedNote.path, label: requestedNote.label })
+  }
   const openNoteContent = useChatNoteContent(openNote?.path, vaultPath)
   const openNoteEntry = openNote
     ? entries.find((entry) => entry.path === openNote.path) ?? null

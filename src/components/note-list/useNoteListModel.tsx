@@ -344,6 +344,7 @@ interface UseNoteListInteractionStateParams {
   onExportPdf?: (entry: VaultEntry) => void
   onToggleFavorite?: (path: string) => void
   onToggleOrganized?: (path: string) => void
+  onAskAgent?: (entry: VaultEntry) => void
   onRevealFile?: (path: string) => void
   onCopyFilePath?: (path: string) => void
   canCopyGitUrl?: (entry: VaultEntry) => boolean
@@ -376,6 +377,7 @@ function useNoteListInteractionState({
   onExportPdf,
   onToggleFavorite,
   onToggleOrganized,
+  onAskAgent,
   onRevealFile,
   onCopyFilePath,
   canCopyGitUrl,
@@ -398,6 +400,7 @@ function useNoteListInteractionState({
     onDeletePaths: onBulkDeletePermanently,
     onToggleFavorite,
     onToggleOrganized,
+    onAskAgent,
     onRevealFile,
     onCopyFilePath,
     canCopyGitUrl,
@@ -563,6 +566,7 @@ export interface NoteListProps {
   onExportPdf?: (entry: VaultEntry) => void
   onToggleFavorite?: (path: string) => void
   onToggleOrganized?: (path: string) => void
+  onAskAgent?: (entry: VaultEntry) => void
   onRevealFile?: (path: string) => void
   onCopyFilePath?: (path: string) => void
   canCopyGitUrl?: (entry: VaultEntry) => boolean
@@ -698,6 +702,7 @@ export function useNoteListModel({
   onExportPdf,
   onToggleFavorite,
   onToggleOrganized,
+  onAskAgent,
   onRevealFile,
   onCopyFilePath,
   canCopyGitUrl,
@@ -760,6 +765,7 @@ export function useNoteListModel({
     onExportPdf,
     onToggleFavorite,
     onToggleOrganized,
+    onAskAgent,
     onRevealFile,
     onCopyFilePath,
     canCopyGitUrl,

@@ -163,6 +163,7 @@
   "command.note.copyDeepLink": "Copy deep link to current item",
   "command.note.exportPdf": "Export note as PDF",
   "command.note.openNewWindow": "Open in New Window",
+  "command.note.askAgent": "Ask the agent about this note",
   "command.git.initialize": "Initialize Git for Current Vault",
   "command.git.commitPush": "Commit & Push",
   "command.git.addRemote": "Add Remote to Current Vault",
