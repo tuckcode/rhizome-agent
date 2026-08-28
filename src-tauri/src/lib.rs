@@ -598,6 +598,8 @@ macro_rules! app_invoke_handler {
             commands::get_prime_session_messages,
             commands::list_prime_session_summaries,
             commands::set_prime_session_archived,
+            commands::get_prime_model_allow_list,
+            commands::set_prime_model_allow_list,
             commands::rename_prime_session,
             commands::read_prime_session_transcript,
             commands::switch_prime_session,
