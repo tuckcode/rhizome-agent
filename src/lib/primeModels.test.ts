@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { filterModels, partitionModelsByConnection, groupModelsByProvider, type PrimeModel } from './primeModels'
+import {
+  filterModels,
+  groupModelsByProvider,
+  modelKey,
+  partitionModelsByAllowList,
+  partitionModelsByConnection,
+  type PrimeModel,
+} from './primeModels'
 
 function model(overrides: Partial<PrimeModel> = {}): PrimeModel {
   return { id: 'm1', name: 'Model One', provider: 'xai', ...overrides }
@@ -97,5 +104,74 @@ describe('groupModelsByProvider', () => {
     it('returns nothing when nothing matches', () => {
       expect(filterModels(catalog, 'nous-portal')).toHaveLength(0)
     })
+  })
+})
+
+describe('modelKey', () => {
+  it('is the pair set_prime_model needs, so a key round-trips to a switch', () => {
+    expect(modelKey(model({ provider: 'xai', id: 'grok-4.5' }))).toBe('xai/grok-4.5')
+  })
+
+  /** Prime's ids already contain slashes (`google/gemma-4-31b-it:free`). */
+  it('survives ids that themselves contain a slash', () => {
+    const key = modelKey(model({ provider: 'openrouter', id: 'google/gemma-4-31b-it:free' }))
+    expect(key).toBe('openrouter/google/gemma-4-31b-it:free')
+  })
+})
+
+describe('partitionModelsByAllowList', () => {
+  const models = [
+    model({ id: 'grok-4.5', provider: 'xai' }),
+    model({ id: 'claude-opus-5', provider: 'anthropic' }),
+    model({ id: 'hy3-free', provider: 'opencode' }),
+  ]
+
+  /**
+   * The state that must not become a wall of nothing. An empty list is
+   * "never curated", which the Rust side also enforces by normalizing `[]`
+   * back to absent.
+   */
+  it('treats an empty allow-list as no curation and shows everything', () => {
+    const { shown, hidden } = partitionModelsByAllowList(models, [])
+    expect(shown).toHaveLength(3)
+    expect(hidden).toHaveLength(0)
+  })
+
+  it('shows only the listed models and keeps the rest as hidden', () => {
+    const { shown, hidden } = partitionModelsByAllowList(models, ['xai/grok-4.5'])
+    expect(shown.map((m) => m.id)).toEqual(['grok-4.5'])
+    expect(hidden.map((m) => m.id)).toEqual(['claude-opus-5', 'hy3-free'])
+  })
+
+  /**
+   * The list survives a model leaving Prime's catalog, and stale keys must
+   * not resurrect anything or blank the menu.
+   */
+  it('ignores allow-list entries that name no live model', () => {
+    const { shown, hidden } = partitionModelsByAllowList(models, ['xai/gone', 'opencode/hy3-free'])
+    expect(shown.map((m) => m.id)).toEqual(['hy3-free'])
+    expect(hidden).toHaveLength(2)
+  })
+
+  /**
+   * Curating every model away is indistinguishable from a bad write, and the
+   * picker is the only place the mistake is visible — so it refuses.
+   */
+  it('shows everything rather than nothing when the list matches no live model', () => {
+    const { shown, hidden } = partitionModelsByAllowList(models, ['xai/gone', 'dead/also-gone'])
+    expect(shown).toHaveLength(3)
+    expect(hidden).toHaveLength(0)
+  })
+
+  it('trims and ignores blank keys the way the backend does', () => {
+    const { shown } = partitionModelsByAllowList(models, ['  xai/grok-4.5 ', '   '])
+    expect(shown.map((m) => m.id)).toEqual(['grok-4.5'])
+  })
+
+  /** Keeps the current model reachable even if the user never listed it. */
+  it('keeps the active model shown so the menu always contains what is running', () => {
+    const { shown, hidden } = partitionModelsByAllowList(models, ['xai/grok-4.5'], 'anthropic/claude-opus-5')
+    expect(shown.map((m) => m.id)).toEqual(['grok-4.5', 'claude-opus-5'])
+    expect(hidden.map((m) => m.id)).toEqual(['hy3-free'])
   })
 })
