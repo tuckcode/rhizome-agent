@@ -12,8 +12,10 @@ import {
 import { cn } from '@/lib/utils'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import {
+  activeModelKey,
   filterModels,
   groupModelsByProvider,
+  partitionModelsByAllowList,
   partitionModelsByConnection,
   type PrimeModel,
 } from '../lib/primeModels'
@@ -63,8 +65,10 @@ export function PrimeModelPicker({
   const [models, setModels] = useState<PrimeModel[] | null>(null)
   const [levels, setLevels] = useState<string[]>([])
   const [connected, setConnected] = useState<string[]>([])
+  const [allowList, setAllowList] = useState<string[]>([])
   const [query, setQuery] = useState('')
   const [showUnavailable, setShowUnavailable] = useState(false)
+  const [showHidden, setShowHidden] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -86,6 +90,15 @@ export function PrimeModelPicker({
           if (!cancelled) setConnected(Array.isArray(providers) ? providers : [])
         } catch {
           if (!cancelled) setConnected([])
+        }
+        // The curated shortlist (#45). Rhizome's own setting, so a failure
+        // here is a failure to read our own file — and the answer to that is
+        // the uncurated catalog, never a narrower menu than the user chose.
+        try {
+          const listedAllowList = await callHost<string[]>('get_prime_model_allow_list')
+          if (!cancelled) setAllowList(Array.isArray(listedAllowList) ? listedAllowList : [])
+        } catch {
+          if (!cancelled) setAllowList([])
         }
         // The level list comes from the host too (#9: nothing hardcoded).
         // Its own failure must not blank the model list, which is the larger
@@ -140,10 +153,29 @@ export function PrimeModelPicker({
     [vaultPath],
   )
 
-  const matching = filterModels(models ?? [], query)
-  const { available, unavailable } = partitionModelsByConnection(matching, connected)
+  const listed = models ?? []
+  // Curation is applied to the whole catalog, before the query. Both of
+  // `partitionModelsByAllowList`'s refusals are about the saved list going
+  // stale against Prime's catalog, and judging that on a filtered subset would
+  // read every narrow query as a stale list and silently drop the curation.
+  // The query then narrows each bucket, so typing still reaches a hidden
+  // model in one click.
+  const { shown, hidden } = partitionModelsByAllowList(
+    listed,
+    allowList,
+    activeModelKey(listed, label),
+  )
+  // Credentials second: the allow-list is the user's explicit choice, so a
+  // model they filed away is counted there rather than again under
+  // "not connected".
+  const matchingHidden = filterModels(hidden, query)
+  const { available, unavailable } = partitionModelsByConnection(
+    filterModels(shown, query),
+    connected,
+  )
   const groups = groupModelsByProvider(available)
   const unavailableGroups = groupModelsByProvider(unavailable)
+  const hiddenGroups = groupModelsByProvider(matchingHidden)
   const strip = variant === 'strip'
   const triggerLabel = strip
     ? (modelThinkingLabel(label, thinkingLevel) ?? t('ai.composer.modelUnknown'))
@@ -203,7 +235,7 @@ export function PrimeModelPicker({
             {t('ai.composer.modelsLoading')}
           </div>
         ) : null}
-        {models !== null && !error && groups.length === 0 ? (
+        {models !== null && !error && groups.length === 0 && matchingHidden.length === 0 ? (
           <div className="px-2 py-1.5 text-xs text-muted-foreground">
             {t('ai.composer.modelsEmpty')}
           </div>
@@ -275,6 +307,47 @@ export function PrimeModelPicker({
                     {group.models.map((model) => (
                       <DropdownMenuItem
                         key={`unavailable-${model.provider}/${model.id}`}
+                        onSelect={() => void select(model)}
+                        className="text-[12.5px] opacity-60"
+                      >
+                        <span className="truncate">{model.name}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </div>
+                ))
+              : null}
+          </div>
+        ) : null}
+        {/* Models the user curated out of this menu (#45). Same shape as the
+            block above and for the same reason: a shortlist is a default view,
+            not a deletion, and the filter box still reaches through it. */}
+        {matchingHidden.length > 0 ? (
+          <div data-testid="prime-models-hidden">
+            <DropdownMenuSeparator />
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault()
+                setShowHidden((shown) => !shown)
+              }}
+              onKeyDown={(event) => event.stopPropagation()}
+              className={cn(
+                'w-full px-2 py-1.5 text-left font-mono text-[10px] uppercase',
+                'tracking-[0.1em] text-muted-foreground hover:text-foreground',
+              )}
+              data-testid="prime-models-hidden-toggle"
+            >
+              {t('ai.composer.modelsHidden', { count: String(matchingHidden.length) })}
+            </button>
+            {showHidden
+              ? hiddenGroups.map((group) => (
+                  <div key={`hidden-${group.provider}`}>
+                    <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+                      {group.provider}
+                    </DropdownMenuLabel>
+                    {group.models.map((model) => (
+                      <DropdownMenuItem
+                        key={`hidden-${model.provider}/${model.id}`}
                         onSelect={() => void select(model)}
                         className="text-[12.5px] opacity-60"
                       >

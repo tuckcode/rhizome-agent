@@ -8,6 +8,7 @@ const invoked = vi.hoisted(() => ({
   levels: ['off', 'low', 'high'] as string[],
   fail: '',
   connected: [] as string[],
+  allowList: [] as string[],
 }))
 
 vi.mock('../mock-tauri', () => ({
@@ -18,6 +19,7 @@ vi.mock('../mock-tauri', () => ({
     if (cmd === 'get_available_prime_models') return Promise.resolve(invoked.models)
     if (cmd === 'get_prime_thinking_levels') return Promise.resolve(invoked.levels)
     if (cmd === 'get_connected_providers') return Promise.resolve(invoked.connected)
+    if (cmd === 'get_prime_model_allow_list') return Promise.resolve(invoked.allowList)
     return Promise.resolve(null)
   },
 }))
@@ -41,6 +43,7 @@ beforeEach(() => {
   invoked.calls = []
   invoked.models = MODELS
   invoked.connected = []
+  invoked.allowList = []
   invoked.fail = ''
   tracked.providers = []
 })
@@ -183,5 +186,78 @@ describe('PrimeModelPicker — filtering and connection state (#45)', () => {
     expect(screen.getByText('Grok 4.5')).toBeInTheDocument()
     expect(screen.getByText('Claude Fable 5')).toBeInTheDocument()
     expect(screen.queryByTestId('prime-models-unavailable')).not.toBeInTheDocument()
+  })
+})
+
+describe('PrimeModelPicker — curated allow-list (#45)', () => {
+  async function openPicker(label?: string) {
+    render(<PrimeModelPicker vaultPath="/v" label={label} />)
+    fireEvent.pointerDown(
+      screen.getByTestId('prime-model-chip'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+    await waitFor(() => expect(screen.getByTestId('prime-model-filter')).toBeInTheDocument())
+  }
+
+  it('shows only the curated models, with the rest behind a disclosure', async () => {
+    invoked.allowList = ['xai/grok-4.5']
+    await openPicker()
+
+    await waitFor(() => expect(screen.getByTestId('prime-models-hidden')).toBeInTheDocument())
+    expect(screen.getByText('Grok 4.5')).toBeInTheDocument()
+    expect(screen.queryByText('Claude Fable 5')).not.toBeInTheDocument()
+
+    // Separated, not gone — "why can't I find X?" stays answerable.
+    fireEvent.click(screen.getByTestId('prime-models-hidden-toggle'))
+    await waitFor(() => expect(screen.getByText('Claude Fable 5')).toBeInTheDocument())
+  })
+
+  it('still switches to a model reached through the disclosure', async () => {
+    invoked.allowList = ['xai/grok-4.5']
+    await openPicker()
+    fireEvent.click(await screen.findByTestId('prime-models-hidden-toggle'))
+    fireEvent.click(await screen.findByText('Claude Fable 5'))
+
+    await waitFor(() => expect(cmds()).toContain('set_prime_model'))
+    expect(tracked.providers).toContain('anthropic')
+  })
+
+  it('shows the whole catalog when nothing has been curated', async () => {
+    invoked.allowList = []
+    await openPicker()
+    expect(screen.getByText('Grok 4.5')).toBeInTheDocument()
+    expect(screen.getByText('Claude Fable 5')).toBeInTheDocument()
+    expect(screen.queryByTestId('prime-models-hidden')).not.toBeInTheDocument()
+  })
+
+  /** The list is Rhizome's, and losing it must not narrow the menu. */
+  it('shows the whole catalog when the allow-list cannot be read', async () => {
+    invoked.allowList = []
+    await openPicker()
+    expect(screen.getByText('Claude Fable 5')).toBeInTheDocument()
+  })
+
+  /** The chip's label names a model; the menu must contain it. */
+  it('keeps the running model listed even when it was never curated', async () => {
+    invoked.models = [...MODELS, { id: 'hy3-free', name: 'HY3 Free', provider: 'opencode' }]
+    invoked.allowList = ['xai/grok-4.5']
+    await openPicker('Claude Fable 5')
+
+    await waitFor(() => expect(screen.getByTestId('prime-models-hidden')).toBeInTheDocument())
+    // Twice: once on the chip, once as a menu entry alongside the curated
+    // model — and not behind the disclosure.
+    expect(screen.getAllByText('Claude Fable 5')).toHaveLength(2)
+    expect(screen.getByTestId('prime-models-hidden')).not.toHaveTextContent('Claude Fable 5')
+    expect(screen.queryByText('HY3 Free')).not.toBeInTheDocument()
+  })
+
+  it('reaches a hidden model through the filter box in one step', async () => {
+    invoked.allowList = ['xai/grok-4.5']
+    await openPicker()
+    fireEvent.change(screen.getByTestId('prime-model-filter'), { target: { value: 'fable' } })
+
+    await waitFor(() => expect(screen.getByTestId('prime-models-hidden')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('prime-models-hidden-toggle'))
+    await waitFor(() => expect(screen.getByText('Claude Fable 5')).toBeInTheDocument())
   })
 })

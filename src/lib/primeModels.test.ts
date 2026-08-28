@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   filterModels,
   groupModelsByProvider,
+  activeModelKey,
   modelKey,
   partitionModelsByAllowList,
   partitionModelsByConnection,
@@ -173,5 +174,30 @@ describe('partitionModelsByAllowList', () => {
     const { shown, hidden } = partitionModelsByAllowList(models, ['xai/grok-4.5'], 'anthropic/claude-opus-5')
     expect(shown.map((m) => m.id)).toEqual(['grok-4.5', 'claude-opus-5'])
     expect(hidden.map((m) => m.id)).toEqual(['hy3-free'])
+  })
+})
+
+describe('activeModelKey', () => {
+  const models = [
+    model({ id: 'grok-4.5', name: 'Grok 4.5', provider: 'xai' }),
+    model({ id: 'hy3-free', name: '', provider: 'opencode' }),
+  ]
+
+  /**
+   * `usePrimeHostStatus` reduces the running model to `modelName || modelId`
+   * before the chip ever sees it, so the label is matched against both.
+   */
+  it('resolves the chip label back to a key by name', () => {
+    expect(activeModelKey(models, 'Grok 4.5')).toBe('xai/grok-4.5')
+  })
+
+  it('resolves it by id when the host reported no display name', () => {
+    expect(activeModelKey(models, 'hy3-free')).toBe('opencode/hy3-free')
+  })
+
+  it('is null when nothing is running or the label names no live model', () => {
+    expect(activeModelKey(models, null)).toBeNull()
+    expect(activeModelKey(models, '  ')).toBeNull()
+    expect(activeModelKey(models, 'Something Else')).toBeNull()
   })
 })

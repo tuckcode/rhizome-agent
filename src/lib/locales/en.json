@@ -1227,6 +1227,7 @@
   "ai.composer.modelsEmpty": "No models available",
   "ai.composer.modelsFilter": "Filter models…",
   "ai.composer.modelsNotConnected": "Not connected · {count}",
+  "ai.composer.modelsHidden": "Hidden by your list · {count}",
   "ai.composer.agent": "Agent",
   "ai.composer.current": "current",
   "ai.composer.skills": "Skills",
