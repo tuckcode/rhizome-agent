@@ -451,15 +451,44 @@ Each answers "nothing", which is true of a host with no session.
   `usePrimeSessionTree` / `SessionBranchBand` (`get_session_tree` / `navigate_tree`,
   #17 — this conversation, not the sessions drawer),
   `PrimeScheduleDialog` (`heartbeat_set` / `cron_add`, #14 create),
-  `PrimeSessionList` (the history sidebar), `primeSessionMeta.ts` (row labels)
+  `PrimeSessionList` (the history sidebar), `primeSessionMeta.ts` (row labels),
+  `PrimeModelPicker` + `primeModels.ts` (the chat model menu — see below)
+
+#### The chat model menu (#45)
+
+Prime publishes its whole catalog regardless of auth state — **501 models** on
+one measured machine, a fifth of them from a provider that account had never
+signed into — and exposes no price field. Three passes narrow it, in this
+order, and the order is load-bearing:
+
+1. **Curation** — `partitionModelsByAllowList` against the user's shortlist in
+   `settings.prime_model_allow_list` (`"provider/id"` keys, edited in
+   Settings → AI agents by `PrimeModelAllowListSection`). Applied to the whole
+   catalog *before* the query, because the partition's stale-list refusal would
+   otherwise read every narrow search as a stale list and drop the curation.
+2. **The search box** — `filterModels`, applied to each bucket separately, so
+   typing reaches a curated-out model in one click.
+3. **Credentials** — `partitionModelsByConnection` against
+   `get_connected_providers`.
+
+Each pass **separates rather than hides**: curated-out and unconnected models
+render under their own disclosure and stay selectable. Two states are refused
+outright, both being the same failure — an empty menu with no way out of
+itself: an empty allow-list means *never curated* (normalized to `None` in
+Rust), and a list matching no live model shows everything. `activeModelKey`
+keeps whatever is running listed, since the picker only ever receives a label.
+
+The allow-list is Rhizome's view of Prime's catalog, in the same sense as
+archiving below: Prime's CLI and every other client still see all 501.
 
 #### What Rhizome does not own
 
 `~/.prime/agent/` is Prime's, and it is shared with the `prime-agent` CLI and any
 other client on the machine. Rhizome reads from it and never rewrites it to suit
 its own view — archiving a session records an id in Rhizome's `settings.json`
-rather than moving a log (ADR-0165), and quitting detaches rather than stopping
-the daemon (ADR-0163). The session log format carries no field identifying which
+rather than moving a log (ADR-0165), curating the model menu records keys in
+the same file rather than touching Prime's catalog (#45), and quitting detaches
+rather than stopping the daemon (ADR-0163). The session log format carries no field identifying which
 client wrote it, so "which app made this session" is not a question the data can
 answer.
 
