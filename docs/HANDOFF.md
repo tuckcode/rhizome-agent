@@ -51,7 +51,7 @@ file.
 
 ## State
 
-`origin/main` is **`8cfe2a0`**. Confirm with `git log origin/main..HEAD`
+`origin/main` is **`bb00152`**. Confirm with `git log origin/main..HEAD`
 — it should be empty. Multi-day briefing since Claude last owned a
 session: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md).
 
@@ -90,6 +90,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-08-27 · Claude Opus 5](plans/handoffs/2026-08-27-2223-claude-opus-5-failure-legibility.md) — made failures legible: fixed C51, C53 and silent provider refusals (all three wore the same sentence), completed the #47 pre-public gate, cut the model picker's unusable fifth
 - [2026-08-26 (night) · Claude Opus 5](plans/handoffs/2026-08-26-2245-claude-opus-5-livecheck-and-mycelium-skin.md) — live-checked Research / Mycelium / Promote against a live Prime daemon; found C51; skinned the Mindwalk engine as Rhizome without forking (`6377b04`); corrected the CodeScene free-tier claim
 - [2026-08-26 (night) · Grok 4.6](YOU-SHOULD-KNOW.md) — multi-day “you should know” briefing since Claude last owned a session (2026-08-24)
 - [2026-08-26 (afternoon) · Grok 4.6](plans/handoffs/2026-08-26-1718-grok-4-6-research-mycelium-canvas.md) — Research as canvas; Mycelium #11/#22 in-app sidecar + Rhizome chrome; #24 promote. Pushed as `5d2d34a` / `80fa720`. Live check leftover.
@@ -268,7 +269,7 @@ push is not a release — releases are tagged builds with signed installers.
   the same shape as the #29 credential refuse; the rest of its AC passed.
   Test note was deleted; vault `raw/inbox` verified empty.
 
-- **C53-OPEN (2026-08-27): a vault in `~/Documents` silently breaks every chat
+- **C53-RESOLVED (2026-08-27, fixed `be23da8`): a vault in `~/Documents` silently breaks every chat
   turn on macOS.** Diagnosed from Prime's own daemon log, Claude Opus 5.
 
   Chain: `ensure_prime_session_host(vault_path)` →
