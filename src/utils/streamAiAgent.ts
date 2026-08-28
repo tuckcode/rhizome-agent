@@ -1,3 +1,4 @@
+import type { PrimeImageContent } from '../lib/composerAttachments'
 import { isTauri } from '../mock-tauri'
 import { getAiAgentDefinition, type AiAgentId } from '../lib/aiAgents'
 import {
@@ -38,6 +39,8 @@ export interface StreamAiAgentRequest {
   vaultPath: string
   vaultPaths?: string[]
   permissionMode?: AiAgentPermissionMode
+  /** Prime only. Absent or empty for a text-only turn. */
+  images?: PrimeImageContent[]
   callbacks: AgentStreamCallbacks
   signal?: AbortSignal
 }
@@ -187,6 +190,9 @@ async function streamNativeAiAgent(request: StreamAiAgentRequest): Promise<void>
         // PrimePromptRequest uses serde rename_all = "camelCase"
         request: {
           message: request.message,
+          // `PrimePromptRequest.images` — omitted entirely for a text-only
+          // turn so the command on the wire is unchanged.
+          images: request.images ?? [],
           systemPrompt: request.systemPrompt || null,
           vaultPath: request.vaultPath || '',
           eventName,

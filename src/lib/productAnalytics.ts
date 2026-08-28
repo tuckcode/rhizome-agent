@@ -475,3 +475,15 @@ export function trackCelebration({
 export function trackPrimeModelAllowListChanged(selected: number, available: number): void {
   trackEvent('prime_model_allow_list_changed', { selected, available })
 }
+
+/**
+ * Images were attached to a chat message.
+ *
+ * The count only — never the image, its name, or its bytes. The question is
+ * whether anyone attaches images at all once they can, and how many at a time;
+ * the picture itself is user content and the most sensitive thing in the
+ * composer.
+ */
+export function trackComposerImagesAttached(count: number): void {
+  trackEvent('composer_images_attached', { count })
+}

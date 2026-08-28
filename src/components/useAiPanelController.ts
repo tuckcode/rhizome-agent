@@ -1,3 +1,4 @@
+import type { PrimeImageContent } from '../lib/composerAttachments'
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 import type { AiAgentId, AiAgentReadiness } from '../lib/aiAgents'
 import type { AiTarget } from '../lib/aiTargets'
@@ -50,7 +51,7 @@ export interface AiPanelController {
   hasContext: boolean
   isActive: boolean
   permissionMode: AiAgentPermissionMode
-  handleSend: (text: string, references: NoteReference[]) => void
+  handleSend: (text: string, references: NoteReference[], images?: PrimeImageContent[]) => void
   handleStop: () => void
   handleNavigateWikilink: (target: string) => void
   handlePermissionModeChange: (mode: AiAgentPermissionMode) => void
@@ -188,9 +189,15 @@ export function useAiPanelController({
   const { agent, permissionMode } = usePanelAgent({ vaultPath, vaultPaths, contextPrompt, defaultAiAgent, defaultAiTarget, defaultAiAgentReady, defaultAiAgentReadiness, locale, onFileCreated, onFileModified, onVaultChanged, sessionId })
   const isActive = agent.status === 'thinking' || agent.status === 'tool-executing'
 
-  const handleSend = useCallback((text: string, references: NoteReference[]) => {
-    if (!text.trim() || isActive) return
-    agent.sendMessage(text, references)
+  const handleSend = useCallback((
+    text: string,
+    references: NoteReference[],
+    images?: PrimeImageContent[],
+  ) => {
+    // An attachment alone is a message; text is no longer the only payload.
+    const hasPayload = Boolean(text.trim()) || (images?.length ?? 0) > 0
+    if (!hasPayload || isActive) return
+    agent.sendMessage(text, references, images)
     setInput('')
   }, [agent, isActive])
 

@@ -7,6 +7,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react'
+import { imageFilesFromTransfer } from '../lib/composerAttachments'
 import type { VaultEntry } from '../types'
 import type { NoteReference } from '../utils/ai-context'
 import { buildTypeEntryMap } from '../utils/typeColors'
@@ -61,6 +62,12 @@ interface InlineWikilinkInputProps {
   onChange: (value: string) => void
   onSubmit?: (text: string, references: NoteReference[]) => void
   onUnsupportedPaste?: (message: string) => void
+  /**
+   * Images pasted or dropped into the composer. Without a handler they are
+   * refused exactly as before — this input is also the note editor's inline
+   * field, which has no use for an attachment.
+   */
+  onImagePaste?: (files: File[]) => void
   submitOnEmpty?: boolean
   disabled?: boolean
   placeholder?: string
@@ -212,6 +219,7 @@ export function InlineWikilinkInput({
   onChange,
   onSubmit,
   onUnsupportedPaste,
+  onImagePaste,
   submitOnEmpty = false,
   disabled = false,
   placeholder,
@@ -340,6 +348,21 @@ export function InlineWikilinkInput({
     () => onUnsupportedPaste?.(UNSUPPORTED_INLINE_PASTE_MESSAGE),
     [onUnsupportedPaste],
   )
+  /**
+   * Take the images out of a paste or drop, if anyone is listening for them.
+   * Returns whether it handled the payload, so the caller keeps its existing
+   * refusal for everything else — a PDF is still not a message.
+   */
+  const takeImages = useCallback(
+    (transfer: DataTransfer | null) => {
+      if (!onImagePaste) return false
+      const images = imageFilesFromTransfer(transfer)
+      if (images.length === 0) return false
+      onImagePaste(images)
+      return true
+    },
+    [onImagePaste],
+  )
   const recoverUnsupportedMutation = () => {
     pendingCompositionInputRef.current = false
     pendingPasteRef.current = null
@@ -438,8 +461,9 @@ export function InlineWikilinkInput({
     }
 
     nativeEvent.preventDefault()
+    if (takeImages(dataTransfer)) return
     notifyUnsupportedPaste()
-  }, [disabled, insertTransferText, notifyUnsupportedPaste])
+  }, [disabled, insertTransferText, notifyUnsupportedPaste, takeImages])
   useLayoutEffect(() => {
     void renderVersion
     const editor = editorRef.current
@@ -457,6 +481,7 @@ export function InlineWikilinkInput({
     event.preventDefault()
 
     if (!droppedPathText) {
+      if (takeImages(event.dataTransfer)) return
       notifyUnsupportedPaste()
       return
     }
@@ -468,6 +493,7 @@ export function InlineWikilinkInput({
 
     if (hasUnsupportedClipboardPayload(event.clipboardData)) {
       event.preventDefault()
+      if (takeImages(event.clipboardData)) return
       notifyUnsupportedPaste()
       return
     }

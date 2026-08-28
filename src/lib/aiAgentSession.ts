@@ -1,3 +1,4 @@
+import type { PrimeImageContent } from './composerAttachments'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 import {
   appendLocalResponse,
@@ -51,6 +52,8 @@ interface SelectedTargetStreamRequest {
   context: AgentExecutionContext
   formattedMessage: string
   systemPrompt: string
+  /** Only Prime takes these; `api_model` targets are text-only for now. */
+  images?: PrimeImageContent[]
   callbacks: ReturnType<typeof createStreamCallbacks>
   signal?: AbortSignal
 }
@@ -59,6 +62,7 @@ function normalizePrompt(prompt: PendingUserPrompt): PendingUserPrompt {
   return {
     text: prompt.text.trim(),
     references: prompt.references && prompt.references.length > 0 ? prompt.references : undefined,
+    images: prompt.images && prompt.images.length > 0 ? prompt.images : undefined,
   }
 }
 
@@ -67,7 +71,10 @@ function completedMessageCount(messages: AiAgentMessage[]): number {
 }
 
 function shouldIgnorePrompt(status: AgentStatus, prompt: PendingUserPrompt): boolean {
-  return !prompt.text || status === 'thinking' || status === 'tool-executing'
+  // An image with no words is a message. "What is this?" is the whole reason
+  // someone pastes a screenshot, so text alone no longer gates the send.
+  const hasPayload = Boolean(prompt.text) || (prompt.images?.length ?? 0) > 0
+  return !hasPayload || status === 'thinking' || status === 'tool-executing'
 }
 
 function blockMissingVault(runtime: AiAgentSessionRuntime, context: AgentExecutionContext, prompt: PendingUserPrompt): void {
@@ -88,6 +95,7 @@ async function streamWithSelectedTarget({
   context,
   formattedMessage,
   systemPrompt,
+  images,
   callbacks,
   signal,
 }: SelectedTargetStreamRequest): Promise<void> {
@@ -108,6 +116,7 @@ async function streamWithSelectedTarget({
     agent: context.agent,
     message: formattedMessage,
     systemPrompt,
+    images,
     vaultPath: context.vaultPath,
     vaultPaths: context.vaultPaths,
     permissionMode: context.permissionMode,
@@ -192,6 +201,7 @@ export async function sendAgentMessage({
     context,
     formattedMessage,
     systemPrompt,
+    images: promptForAgent.images,
     callbacks,
     signal: controller.signal,
   })

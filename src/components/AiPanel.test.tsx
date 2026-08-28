@@ -537,7 +537,13 @@ describe('AiPanel', () => {
     })
   })
 
-  it('surfaces an unsupported image paste notice without locking the composer', () => {
+  /**
+   * Was: a pasted image raised the unsupported-paste notice. Prime accepts
+   * images (`docs/rpc.md`), so a screenshot is now attached instead — the
+   * refusal was ours. The paste must still stay out of the *text*, which is
+   * what the second assertion always guarded.
+   */
+  it('attaches a pasted image instead of refusing it', async () => {
     const onUnsupportedAiPaste = vi.fn()
     const entry = makeEntry({ title: 'My Note' })
 
@@ -559,8 +565,37 @@ describe('AiPanel', () => {
       },
     })
 
-    expect(onUnsupportedAiPaste).toHaveBeenCalledWith(UNSUPPORTED_INLINE_PASTE_MESSAGE)
+    expect(await screen.findByTestId('composer-attachments')).toBeInTheDocument()
+    expect(screen.getByText('paste.png')).toBeInTheDocument()
+    expect(onUnsupportedAiPaste).not.toHaveBeenCalledWith(UNSUPPORTED_INLINE_PASTE_MESSAGE)
     expect(screen.getByTestId('agent-input').textContent).not.toContain('paste.png')
+  })
+
+  /** Everything that is not an image is still refused, unchanged. */
+  it('still refuses a pasted file that is not an image', () => {
+    const onUnsupportedAiPaste = vi.fn()
+    const entry = makeEntry({ title: 'My Note' })
+
+    render(
+      <AiPanel
+        onClose={vi.fn()}
+        vaultPath="/tmp/vault"
+        activeEntry={entry}
+        entries={[entry]}
+        onUnsupportedAiPaste={onUnsupportedAiPaste}
+      />,
+    )
+
+    fireEvent.paste(screen.getByTestId('agent-input'), {
+      clipboardData: {
+        getData: vi.fn(() => ''),
+        files: [new File(['pdf'], 'paper.pdf', { type: 'application/pdf' })],
+        items: [{ kind: 'file', type: 'application/pdf' }],
+      },
+    })
+
+    expect(onUnsupportedAiPaste).toHaveBeenCalledWith(UNSUPPORTED_INLINE_PASTE_MESSAGE)
+    expect(screen.queryByTestId('composer-attachments')).not.toBeInTheDocument()
   })
 })
 
@@ -713,7 +748,7 @@ describe('talking to a turn that is already running', () => {
     })))
     await act(async () => resolveFollowUp('not-running'))
 
-    expect(latestIdleSend).toHaveBeenCalledWith('then summarise', [])
+    expect(latestIdleSend).toHaveBeenCalledWith('then summarise', [], undefined)
     expect(staleActiveSend).not.toHaveBeenCalled()
   })
 
