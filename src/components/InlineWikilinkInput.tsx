@@ -68,6 +68,8 @@ interface InlineWikilinkInputProps {
    * field, which has no use for an attachment.
    */
   onImagePaste?: (files: File[]) => void
+  /** Localized copy for a refused paste. Falls back to the constant. */
+  unsupportedPasteMessage?: string
   submitOnEmpty?: boolean
   disabled?: boolean
   placeholder?: string
@@ -136,7 +138,15 @@ function isNativeCompositionBeforeInput(
     || nativeEvent.inputType === 'insertCompositionText'
 }
 
-export const UNSUPPORTED_INLINE_PASTE_MESSAGE = 'Only text paste is supported in the AI composer right now.'
+/**
+ * The fallback text for a refused paste.
+ *
+ * Callers pass the localized string in; this constant only covers a caller
+ * that supplies nothing. It said "only text paste is supported" until images
+ * were added — the copy was describing Rhizome's own refusal, not a limit of
+ * the engine, and it outlived the limit by three days.
+ */
+export const UNSUPPORTED_INLINE_PASTE_MESSAGE = 'Only text and images can be pasted into the composer.'
 
 function hasUnsupportedClipboardPayload(clipboardData: DataTransfer) {
   if (clipboardData.files.length > 0) return true
@@ -220,6 +230,7 @@ export function InlineWikilinkInput({
   onSubmit,
   onUnsupportedPaste,
   onImagePaste,
+  unsupportedPasteMessage,
   submitOnEmpty = false,
   disabled = false,
   placeholder,
@@ -345,8 +356,8 @@ export function InlineWikilinkInput({
     onPathDrop: insertNativePathDrop,
   })
   const notifyUnsupportedPaste = useCallback(
-    () => onUnsupportedPaste?.(UNSUPPORTED_INLINE_PASTE_MESSAGE),
-    [onUnsupportedPaste],
+    () => onUnsupportedPaste?.(unsupportedPasteMessage ?? UNSUPPORTED_INLINE_PASTE_MESSAGE),
+    [onUnsupportedPaste, unsupportedPasteMessage],
   )
   /**
    * Take the images out of a paste or drop, if anyone is listening for them.

@@ -1235,6 +1235,8 @@
   "ai.composer.attachmentUnsupported": "only PNG, JPEG, GIF and WebP images can be attached",
   "ai.composer.attachmentUnreadable": "the file could not be read",
   "ai.composer.attachmentTooMany": "Only the first {count} images were attached.",
+  "ai.composer.attachmentTextOnlyModel": "{model} does not accept images. Switch models before sending, or the image is ignored.",
+  "ai.composer.pasteTextOnly": "Only text and images can be pasted into the composer.",
   "ai.composer.agent": "Agent",
   "ai.composer.current": "current",
   "ai.composer.skills": "Skills",

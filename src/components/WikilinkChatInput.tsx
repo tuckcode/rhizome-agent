@@ -11,6 +11,7 @@ interface WikilinkChatInputProps {
   onSend: (text: string, references: NoteReference[]) => void
   onUnsupportedPaste?: (message: string) => void
   onImagePaste?: (files: File[]) => void
+  unsupportedPasteMessage?: string
   disabled?: boolean
   placeholder?: string
   placeholderClassName?: string
@@ -31,6 +32,7 @@ export function WikilinkChatInput({
   onSend,
   onUnsupportedPaste,
   onImagePaste,
+  unsupportedPasteMessage,
   disabled,
   placeholder,
   placeholderClassName,
@@ -51,6 +53,7 @@ export function WikilinkChatInput({
       onSubmit={onSend}
       onUnsupportedPaste={onUnsupportedPaste}
       onImagePaste={onImagePaste}
+      unsupportedPasteMessage={unsupportedPasteMessage}
       disabled={disabled}
       placeholder={placeholder}
       placeholderClassName={placeholderClassName}
