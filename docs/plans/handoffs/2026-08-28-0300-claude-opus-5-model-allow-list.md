@@ -93,102 +93,61 @@ catalog is a daemon round-trip and stays cached; the allow-list is a local read
 edited on another surface, so it re-reads on every open. Tests pin both halves.
 Nothing in the unit suite would have caught this — it needed `pnpm dev`.
 
-## ⚠️ `cargo llvm-cov --no-clean` gave a false coverage failure
+## ⚠️ The documented Rust coverage command fails on a healthy tree
 
-`--no-clean` (the command in `AGENTS.md`'s check suite) reported **83.87%
-lines, exit 1**. A clean run of the same tree reports **84.88%, exit 0**. The
-stale run's output listed profile data from **two rustc versions** (1.97.1 and
-1.98.0) — `--no-clean` had merged artifacts from before a toolchain bump.
+`AGENTS.md`'s check suite said
 
-Confirmed by running a worktree at `087880d`, the commit before this session:
-**84.88%, exit 0** — identical to HEAD. This session moved Rust coverage by
-0.00%, and the pre-push hook's own Rust lane passed.
+```
+cargo llvm-cov --manifest-path src-tauri/Cargo.toml --no-clean --fail-under-lines 85
+```
 
-**If the Rust coverage gate fails, re-run it without `--no-clean` before
-believing it.** Tracked as C54.
+while `.husky/pre-push` runs it with
+`--ignore-filename-regex "lib\.rs|main\.rs|menu\.rs"`. Excluding those three
+files of largely untestable wiring is worth about **0.8pp**:
 
-## The chat transcript had no scroll box (fixed, `6c4d91d`)
+| command | lines | exit |
+|---|---|---|
+| as documented, `--no-clean` | 83.87% | 1 |
+| as documented, clean | 84.88% | 1 |
+| **as the hook runs it** | **85.68%** | **0** |
 
-A long Prime session painted straight over the composer, the context meter and
-the sessions column. Reported as "ui bugged"; verified fixed in the running app
-on the same session (`sess_28ec`).
+The documented command fails on a tree the gate passes. `AGENTS.md` is fixed;
+C54 carries the detail.
 
-`AiPanelChrome`'s scroller is `flex-1 overflow-y-auto`, but `b9983ad`
-(2026-08-25) wrapped it in a **block** div — `flex-1` is inert outside a flex
-container, so it sized to its own content and `overflow-y-auto` had nothing to
-overflow. Before that commit it was a direct flex child and worked.
+**I got this wrong first, and the way I got it wrong is the lesson.** I read
+an exit code out of a shell pipeline — `cargo llvm-cov … | tail -3` reports
+`tail`'s status, which is always 0 — and concluded from a "passing" baseline
+that `--no-clean` was inflating a false failure. `--no-clean` does skew the
+number after a toolchain bump (that run's table listed profile data from two
+rustc versions), but it was never the cause. Redirect to a file and read `$?`.
 
-Measured, 3 000px of transcript in an 899px viewport:
+## Image attachments shipped (`ee73666`..`c9081df`)
 
-| | clientHeight | scrollHeight | scrolls | bottom |
-|---|---|---|---|---|
-| before | 3136 | 3136 | no | 3206 |
-| after | 660 | 3136 | yes | 730 |
+Pasting or dropping a screenshot into the composer attaches it and sends it to
+Prime. Four commits: the conversion lib, the Rust send path, the composer, and
+the model gating. Non-image files are still refused, unchanged.
 
-**Two hypotheses died on contact with the app, and both were the obvious one.**
-A window resize did not clear it, so it was not a repaint artifact. The AX tree
-showed session rows at y=-335 and y=1472, which reads as an unclipped list —
-it is not; the Radix viewport clips correctly and those are scrolled-out rows
-reporting true coordinates. What actually pinned it: **15 page-ups over the
-transcript changed nothing.** A transcript that cannot scroll has no scroll box.
+Two gates had to learn that **an attachment is a message**: `shouldIgnorePrompt`
+and the composer's send button both tested text alone. "What is this?" with a
+pasted screenshot and no words is the ordinary case.
 
-**jsdom computes no box sizes**, so all 5 829 unit tests passed for the three
-days this bug existed and would again. `tests/smoke/chat-transcript-scrolls.spec.ts`
-is a Playwright layout test, verified in both directions — it fails on the
-unfixed tree. Untagged, so it runs in the regression lane.
+`toPrimeImages` / `prompt_images_field` return **nothing**, not an empty array,
+when there is no attachment — a text-only turn stays byte-identical to what
+Rhizome sent before this existed, and tests pin it on both sides.
 
-### Rebuilding re-triggers the Documents prompt
+`modelAcceptsImages` is tri-state and the third state is the point: `null`
+means Prime did not report modalities, and silence is not a refusal. Only a
+model Prime explicitly calls text-only produces a warning. Same rule as
+`partitionModelsByConnection` and `check_provider_connected`.
 
-The running app was a release bundle from the previous evening; `pnpm tauri dev`
-was not running, so nothing hot-reloaded and Cmd+R did nothing. After
-`pnpm tauri build` the new bundle's ad-hoc signature is a different app to
-macOS, so the C53 TCC grant for `~/Documents/Rhizome Vault` was gone and the
-window rendered blank until the prompt was accepted. Expect that on **every**
-rebuild while the vault lives in a protected folder — it is the same fact as
-C53's `tccutil reset` note, from the other direction.
+Caps are 5 MB and 4 images, enforced in the composer **and** in Rust — the
+daemon speaks newline-delimited JSON over a socket, so an oversized paste is
+one enormous line the session waits behind.
 
-## Three corrections from reading the installed Prime's own docs
-
-Triggered by "only text is supported in the AI composer" — the composer refuses
-pasted images. Chasing that turned up two claims in this repo that are wrong.
-Source throughout is `~/.local/lib/node_modules/prime-agent/docs/` for the
-**installed 0.8.0**, plus the live daemon where noted. Not a clone; bounded
-reads of the package already on disk.
-
-**1. Prime accepts images. We refuse them client-side.**
-`docs/rpc.md` §Prompting: `prompt`, `steer` and `follow_up` all take an
-optional `images` array of
-`{"type":"image","data":"<base64>","mimeType":"image/png"}`. Rhizome sends
-`{"type":"prompt","message":…}` only (`prime_session_host.rs:1911`), and
-`InlineWikilinkInput` blocks the paste outright —
-`UNSUPPORTED_INLINE_PASTE_MESSAGE`, a **hardcoded English string** that should
-be in `en.json` regardless of this feature. Nothing upstream blocks image
-support; the whole gap is ours.
-
-**2. Prime's Model object carries `input` and `cost`. We drop both.**
-`docs/rpc.md` §Model: `"input": ["text","image"]` and
-`"cost": {input, output, cacheRead, cacheWrite}`. `PrimeModel`
-(`prime_session_host.rs:976`) maps only id/name/provider/contextWindow/reasoning.
-`prime-agent model list` shows an **images** column, so per-model image support
-is confirmed live. **`cost` is doc-only so far** — `get_available_models` is
-session-scoped, and a daemon-level probe over protocol 7 answers
-`Supervisor cannot route daemon command`, so confirming it needs an attached
-session. Verify before building on it.
-
-If it holds, **#45 step 2 stops being a naming heuristic**: a free-only filter
-can read a real number instead of guessing at `-free` / `:free`. This session
-already found that guessing fails in both directions — Nous's zero-priced
-`tencent/hy3:free` returns 400, and the same id 404s inside Prime.
-
-**3. Prime has a custom-provider mechanism, and it is the doctrine seam.**
-`docs/custom-provider.md`: extensions call `pi.registerProvider()` to override a
-provider's `baseUrl` or register a new one with its own models, API key and
-OAuth — with two worked examples under `examples/extensions/`. The earlier
-claim that connecting a provider "needs an ADR, not a button" was based on
-`settings.json` having no such field, which is true of `settings.json` and false
-of Prime. ADR-0168 already names extensions as where foreign pieces belong, so
-**Nous Portal inside a Prime session is unblocked** and wants a Prime extension,
-not a fork. Correct the record before quoting #45's blocked/works table.
+**Not live-checked in the app yet.** The unit and component tests cover the
+wiring; nobody has pasted a screenshot into a running Prime session and seen a
+model answer about it. That is the next thing to do, and it needs a rebuild
+(and another Documents prompt — see above).
 
 ## Pick up here
 

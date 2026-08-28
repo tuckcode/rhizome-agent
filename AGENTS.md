@@ -204,7 +204,7 @@ Use Codacy as a security and static-analysis gate before a task is considered re
 ```bash
 pnpm lint && pnpm typecheck && pnpm test && pnpm test:coverage  # frontend ≥70%
 pnpm test:mcp   # mcp-server/*.test.js — node:test, NOT picked up by vitest
-cargo test && cargo llvm-cov --manifest-path src-tauri/Cargo.toml --no-clean --fail-under-lines 85
+cargo test && cargo llvm-cov --manifest-path src-tauri/Cargo.toml --no-clean --ignore-filename-regex "lib\.rs|main\.rs|menu\.rs" --fail-under-lines 85
 cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings
 cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check
 ```
