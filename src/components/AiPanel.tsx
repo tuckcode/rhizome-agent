@@ -7,7 +7,6 @@ import {
   storedChatSessionsOpen,
 } from '../lib/chatSessionsColumn'
 import { callHost } from '../lib/callHost'
-import { findModel, modelAcceptsImages, type PrimeModel } from '../lib/primeModels'
 import {
   MAX_IMAGES_PER_MESSAGE,
   readImageAttachment,
@@ -386,38 +385,22 @@ export function AiPanelView({
   }, [handleSend, isActive, onSendPrompt])
 
   /**
-   * Warn once per paste when the running model cannot see the image.
+   * Warn when the running model cannot see the image.
    *
-   * The catalog is fetched lazily and cached: it is a daemon round trip, and
-   * the answer only matters the first time someone attaches an image. A failed
-   * lookup says nothing at all rather than warning on a model that works.
+   * Read straight off the host status: `get_state` returns the whole Model,
+   * `input` included, so there is no catalog to fetch and no id to match.
+   * The first cut did fetch the catalog and look the model up — and the
+   * warning never fired in the app. Deleting the lookup was the fix.
+   *
+   * `null`/`undefined` means Prime did not report modalities, and silence is
+   * not a refusal: only an explicit `false` warns.
    */
-  const modelCatalogRef = useRef<PrimeModel[] | null>(null)
-  const latestHostModel = useRef({
-    provider: primeHost.modelProvider ?? null,
-    modelId: primeHost.modelId ?? null,
-  })
-  latestHostModel.current = {
-    provider: primeHost.modelProvider ?? null,
-    modelId: primeHost.modelId ?? null,
-  }
-  const warnIfModelIsTextOnly = useCallback(async () => {
-    const host = latestHostModel.current
-    if (!host.provider || !host.modelId) return
-    if (!modelCatalogRef.current) {
-      try {
-        const listed = await callHost<PrimeModel[]>('get_available_prime_models')
-        modelCatalogRef.current = Array.isArray(listed) ? listed : []
-      } catch {
-        return
-      }
-    }
-    const model = findModel(modelCatalogRef.current, host.provider, host.modelId)
-    if (modelAcceptsImages(model) !== false) return
+  const warnIfModelIsTextOnly = useCallback(() => {
+    if (primeHost.modelAcceptsImages !== false) return
     onUnsupportedAiPaste?.(translate(locale, 'ai.composer.attachmentTextOnlyModel', {
-      model: model?.name ?? host.modelId,
+      model: primeHost.modelName ?? primeHost.modelId ?? '',
     }))
-  }, [locale, onUnsupportedAiPaste])
+  }, [locale, onUnsupportedAiPaste, primeHost.modelAcceptsImages, primeHost.modelId, primeHost.modelName])
 
   /**
    * Images staged for the next message.
@@ -446,7 +429,7 @@ export function AiPanelView({
       // Say something only when Prime has actually told us the model is
       // text-only. Unknown modalities stay silent — the same refusal to guess
       // that `partitionModelsByConnection` makes about credentials.
-      void warnIfModelIsTextOnly()
+      warnIfModelIsTextOnly()
       setAttachments((current) => {
         const next = [...current, ...accepted]
         if (next.length > MAX_IMAGES_PER_MESSAGE) {

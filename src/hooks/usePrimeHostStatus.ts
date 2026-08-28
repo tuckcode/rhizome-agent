@@ -22,6 +22,11 @@ export interface PrimeHostStatus {
   binaryPath: string | null
   modelProvider?: string | null
   modelId?: string | null
+  /**
+   * Whether the running model takes images, from `get_state`'s Model.
+   * `undefined`/`null` means Prime did not say — not "text only".
+   */
+  modelAcceptsImages?: boolean | null
   modelName?: string | null
   /**
    * Reasoning level the session is running at, when Prime reports one.
@@ -48,6 +53,7 @@ const EMPTY: PrimeHostStatus = {
   binaryPath: null,
   modelProvider: null,
   modelId: null,
+  modelAcceptsImages: null,
   modelName: null,
   thinkingLevel: null,
   reattached: false,
