@@ -444,15 +444,21 @@ pub fn list_prime_running_sessions() -> Result<Vec<serde_json::Value>, String> {
 /// the caller should send a normal prompt instead.
 #[cfg(desktop)]
 #[tauri::command]
-pub fn steer_prime_session(message: String) -> Result<bool, String> {
-    crate::prime_session_host::steer(&message)
+pub fn steer_prime_session(
+    message: String,
+    images: Option<Vec<crate::prime_session_host::PrimeImageContent>>,
+) -> Result<bool, String> {
+    crate::prime_session_host::steer(&message, &images.unwrap_or_default())
 }
 
 /// Queue a message for after the current turn. Returns false when idle.
 #[cfg(desktop)]
 #[tauri::command]
-pub fn follow_up_prime_session(message: String) -> Result<bool, String> {
-    crate::prime_session_host::follow_up(&message)
+pub fn follow_up_prime_session(
+    message: String,
+    images: Option<Vec<crate::prime_session_host::PrimeImageContent>>,
+) -> Result<bool, String> {
+    crate::prime_session_host::follow_up(&message, &images.unwrap_or_default())
 }
 
 /// Steering and follow-up previews for the attached session.
