@@ -970,6 +970,16 @@ pub fn run_mindwalk_open(path: String) -> Result<String, String> {
     crate::mycelium::run_mindwalk_open(&path)
 }
 
+/// Read-only connection status for each provider the engine knows about.
+///
+/// Answers "am I actually connected, and how?" — the question that had no
+/// surface at all, so a provider that was never connected looked identical to
+/// one that was working. Metadata only; no key or token is read.
+#[tauri::command]
+pub fn get_prime_provider_status() -> Vec<crate::preflight::ProviderStatus> {
+    crate::preflight::provider_statuses()
+}
+
 /// Providers the engine holds credentials for.
 ///
 /// Powers the picker's split between models this account can use and models it

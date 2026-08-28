@@ -136,6 +136,68 @@ impl Preflight {
     }
 }
 
+/// How a provider is connected, and whether that connection is still good.
+///
+/// Metadata only. The access token, refresh token and API key are never read
+/// out of the credential file and have no field here — this type exists to
+/// answer "am I connected?", which needs none of them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderStatus {
+    pub name: String,
+    /// `oauth`, `api_key`, or whatever else the engine records.
+    pub auth_kind: String,
+    /// Unix milliseconds, OAuth only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<i64>,
+    /// True only when an expiry is known and has passed. An API key has no
+    /// expiry and is never reported as expired.
+    pub expired: bool,
+}
+
+/// Parse provider status out of the engine's credential JSON.
+///
+/// Split from the file read so the shape can be tested without a home
+/// directory: the interesting logic is expiry, and that deserves a test more
+/// than the `read_to_string` does.
+pub fn provider_status_from_auth(auth: &serde_json::Value, now_ms: i64) -> Vec<ProviderStatus> {
+    let Some(entries) = auth.as_object() else {
+        return Vec::new();
+    };
+    let mut statuses: Vec<ProviderStatus> = entries
+        .iter()
+        .map(|(name, entry)| {
+            let expires_at = entry["expires"].as_i64();
+            ProviderStatus {
+                name: name.clone(),
+                auth_kind: entry["type"].as_str().unwrap_or("unknown").to_string(),
+                expires_at,
+                expired: expires_at.is_some_and(|expiry| expiry <= now_ms),
+            }
+        })
+        .collect();
+    statuses.sort_by(|a, b| a.name.cmp(&b.name));
+    statuses
+}
+
+/// Provider status for the settings surface, read from the engine's store.
+pub fn provider_statuses() -> Vec<ProviderStatus> {
+    let Some(path) = dirs::home_dir().map(|home| home.join(".prime/agent/auth.json")) else {
+        return Vec::new();
+    };
+    let Ok(raw) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&raw) else {
+        return Vec::new();
+    };
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_millis() as i64)
+        .unwrap_or(0);
+    provider_status_from_auth(&parsed, now_ms)
+}
+
 /// Provider names the engine holds credentials for.
 ///
 /// Read-only, and a deliberate fallback: Prime's daemon exposes no auth or
@@ -285,6 +347,67 @@ mod tests {
             reason.contains("/nope/not/here"),
             "an unreadable vault makes the provider question moot, so it leads"
         );
+    }
+
+    fn auth_fixture() -> serde_json::Value {
+        serde_json::json!({
+            "opencode":  { "type": "api_key", "key": "sk-secret" },
+            "anthropic": { "type": "oauth", "access": "tok", "refresh": "r", "expires": 2_000 },
+            "xai":       { "type": "oauth", "access": "tok", "refresh": "r", "expires": 500 },
+        })
+    }
+
+    #[test]
+    fn reports_how_each_provider_is_connected() {
+        let statuses = provider_status_from_auth(&auth_fixture(), 1_000);
+        let kinds: Vec<_> = statuses
+            .iter()
+            .map(|s| (s.name.as_str(), s.auth_kind.as_str()))
+            .collect();
+        assert_eq!(
+            kinds,
+            vec![
+                ("anthropic", "oauth"),
+                ("opencode", "api_key"),
+                ("xai", "oauth"),
+            ],
+            "sorted by name so the settings list is stable between reads"
+        );
+    }
+
+    #[test]
+    fn an_expired_oauth_token_is_flagged() {
+        let statuses = provider_status_from_auth(&auth_fixture(), 1_000);
+        let xai = statuses.iter().find(|s| s.name == "xai").unwrap();
+        let anthropic = statuses.iter().find(|s| s.name == "anthropic").unwrap();
+        assert!(xai.expired, "expiry 500 is in the past at now=1000");
+        assert!(!anthropic.expired, "expiry 2000 is still in the future");
+    }
+
+    #[test]
+    fn an_api_key_never_expires() {
+        let statuses = provider_status_from_auth(&auth_fixture(), i64::MAX);
+        let opencode = statuses.iter().find(|s| s.name == "opencode").unwrap();
+        assert!(!opencode.expired);
+        assert_eq!(opencode.expires_at, None);
+    }
+
+    // The settings surface answers "am I connected?", which needs no secret.
+    // Serializing one would leak it to the webview and into any log that
+    // captured the payload.
+    #[test]
+    fn no_secret_material_is_ever_serialized() {
+        let statuses = provider_status_from_auth(&auth_fixture(), 1_000);
+        let json = serde_json::to_string(&statuses).unwrap();
+        for secret in ["sk-secret", "\"key\"", "access", "refresh", "tok"] {
+            assert!(!json.contains(secret), "leaked {secret} into {json}");
+        }
+    }
+
+    #[test]
+    fn malformed_credential_data_yields_no_providers() {
+        assert!(provider_status_from_auth(&serde_json::json!([]), 0).is_empty());
+        assert!(provider_status_from_auth(&serde_json::json!("nope"), 0).is_empty());
     }
 
     #[test]
