@@ -92,3 +92,57 @@ export function filterModels(models: PrimeModel[], query: string): PrimeModel[] 
       .some((field) => field.toLowerCase().includes(needle)),
   )
 }
+
+/**
+ * The key an allow-list entry stores: exactly the pair `set_prime_model`
+ * needs, so a stored key can be turned back into a switch.
+ *
+ * Prime's ids already contain slashes (`google/gemma-4-31b-it:free`), so this
+ * is a join, never something to split back apart — read the model, not the key.
+ */
+export function modelKey(model: Pick<PrimeModel, 'provider' | 'id'>): string {
+  return `${model.provider}/${model.id}`
+}
+
+/**
+ * Split the catalog by the user's curated allow-list (#45).
+ *
+ * The motivating case is a user who wants their menu to be OpenRouter's free
+ * models and nothing else. Prime publishes 501 models and no price field, so a
+ * hand-picked list is the only mechanism that is actually reliable — a
+ * "free only" filter can be nothing better than a guess at naming conventions.
+ *
+ * Hidden models are separated, not dropped, the way
+ * {@link partitionModelsByConnection} separates unconnected ones: they render
+ * under a disclosure so "why can't I find X?" stays answerable, and the filter
+ * box still reaches them.
+ *
+ * Two refusals, both guarding the same failure — a menu with nothing in it:
+ *
+ * - An empty list means *never curated*, not "curated down to zero". The Rust
+ *   side normalizes `[]` back to absent for the same reason.
+ * - A list that matches no live model shows everything. Prime's catalog
+ *   changes underneath a saved list, and a picker that empties itself because
+ *   every key went stale gives the user no way back from inside the picker.
+ *
+ * `activeKey` keeps whatever is running now visible even when it was never
+ * listed, so the menu always contains the model the label is showing.
+ */
+export function partitionModelsByAllowList(
+  models: PrimeModel[],
+  allowList: string[],
+  activeKey?: string | null,
+): { shown: PrimeModel[]; hidden: PrimeModel[] } {
+  const allowed = new Set(allowList.map((key) => key.trim()).filter(Boolean))
+  if (allowed.size === 0) return { shown: models, hidden: [] }
+
+  const active = activeKey?.trim()
+  const isShown = (model: PrimeModel) => {
+    const key = modelKey(model)
+    return allowed.has(key) || (!!active && key === active)
+  }
+
+  const shown = models.filter(isShown)
+  if (shown.length === 0) return { shown: models, hidden: [] }
+  return { shown, hidden: models.filter((model) => !isShown(model)) }
+}
