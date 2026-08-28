@@ -144,10 +144,21 @@ Caps are 5 MB and 4 images, enforced in the composer **and** in Rust — the
 daemon speaks newline-delimited JSON over a socket, so an oversized paste is
 one enormous line the session waits behind.
 
-**Not live-checked in the app yet.** The unit and component tests cover the
-wiring; nobody has pasted a screenshot into a running Prime session and seen a
-model answer about it. That is the next thing to do, and it needs a rebuild
-(and another Documents prompt — see above).
+**Live-checked end to end, 2026-08-28 05:30.** Rebuilt, relaunched, and pasted
+a generated 240x120 PNG — an orange rectangle on navy `#121830` — into a live
+Prime session on `muse-spark-1.2-contributor-free` (`images: yes`). Asked for
+the colours and the shape. The model answered:
+
+> I see an orange square on a dark navy blue background.
+
+Nothing in the prompt named either colour, so that answer is only reachable
+from the image. Confirmed along with it: the chip appears on paste
+(`image.png ×`), the send button activates with **no text typed**, the chip
+clears on send, and the context meter moved 0 → 19.0k.
+
+The text-only warning path was not exercised — the model in the session
+accepts images. Still unverified in the app: a model Prime reports as
+text-only, and drag-and-drop (only paste was driven).
 
 ## Pick up here
 
