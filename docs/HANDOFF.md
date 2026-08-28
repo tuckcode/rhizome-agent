@@ -55,8 +55,7 @@ file.
 — it should be empty. Multi-day briefing since Claude last owned a
 session: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md).
 
-GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22 and #24 are
-live-verified and clear to close** — C51 blocked #24 and is fixed
+GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22 and #24 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Inverted Dock icon is
 `stash@{0}` (`wip: inverted dock icon`), not in the tree.
 
@@ -90,6 +89,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-08-28 · Claude Opus 5](plans/handoffs/2026-08-28-0010-claude-opus-5-model-settings-triage.md) — closed #24; specced model settings (#45); corrected a wrong “blocked upstream” call — Rhizome already supports OpenAI-compatible endpoints; filed #48 OmniRoute; Mycelium duplicate entry point still undecided
 - [2026-08-27 · Claude Opus 5](plans/handoffs/2026-08-27-2223-claude-opus-5-failure-legibility.md) — made failures legible: fixed C51, C53 and silent provider refusals (all three wore the same sentence), completed the #47 pre-public gate, cut the model picker's unusable fifth
 - [2026-08-26 (night) · Claude Opus 5](plans/handoffs/2026-08-26-2245-claude-opus-5-livecheck-and-mycelium-skin.md) — live-checked Research / Mycelium / Promote against a live Prime daemon; found C51; skinned the Mindwalk engine as Rhizome without forking (`6377b04`); corrected the CodeScene free-tier claim
 - [2026-08-26 (night) · Grok 4.6](YOU-SHOULD-KNOW.md) — multi-day “you should know” briefing since Claude last owned a session (2026-08-24)
