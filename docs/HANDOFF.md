@@ -51,7 +51,7 @@ file.
 
 ## State
 
-`origin/main` is **`c9081df`**. Confirm with `git log origin/main..HEAD`
+`origin/main` is **`1e20804`**. Confirm with `git log origin/main..HEAD`
 — it should be empty. Multi-day briefing since Claude last owned a
 session: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md).
 
@@ -89,6 +89,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-08-28 (afternoon) · Claude Opus 5](plans/handoffs/2026-08-28-1500-claude-opus-5-note-context.md) — Chat can see the note you have open (it passed nothing before), and any note can be handed to the agent by right-clicking it; both live-verified, the agent naming the note's contents with tools forbidden
 - [2026-08-28 (early) · Claude Opus 5](plans/handoffs/2026-08-28-0300-claude-opus-5-model-allow-list.md) — Nous Portal **confirmed working** through the existing OpenAI-compatible path (200 + `OK` on `hermes-4-405b`), so #45's custom-provider work is not needed for chat; #45 step 1 shipped — persisted chat-model allow-list, editor in Settings → AI agents; fixed the chat transcript having no scroll box (`6c4d91d`, regression from `b9983ad`); C54: the documented Rust coverage command is missing the gate's `--ignore-filename-regex` and fails on a healthy tree
 - [2026-08-28 · Claude Opus 5](plans/handoffs/2026-08-28-0010-claude-opus-5-model-settings-triage.md) — closed #24; specced model settings (#45); corrected a wrong “blocked upstream” call — Rhizome already supports OpenAI-compatible endpoints; filed #48 OmniRoute; Mycelium duplicate entry point still undecided
 - [2026-08-27 · Claude Opus 5](plans/handoffs/2026-08-27-2223-claude-opus-5-failure-legibility.md) — made failures legible: fixed C51, C53 and silent provider refusals (all three wore the same sentence), completed the #47 pre-public gate, cut the model picker's unusable fifth
