@@ -461,6 +461,37 @@ fn save_settings_at(path: &PathBuf, settings: Settings) -> Result<(), String> {
     fs::write(path, json).map_err(|e| format!("Failed to write settings: {}", e))
 }
 
+/// The picker's allow-list, from a settings file that may not exist yet.
+///
+/// An unreadable file answers "no curation" rather than propagating an error:
+/// not knowing what the user curated is a reason to show the whole catalog,
+/// never a reason to show nothing. Same refusal the frontend makes.
+fn prime_model_allow_list_at(path: &PathBuf) -> Vec<String> {
+    get_settings_at(path)
+        .ok()
+        .and_then(|settings| settings.prime_model_allow_list)
+        .unwrap_or_default()
+}
+
+/// Replace the picker's allow-list, leaving every other setting alone.
+fn set_prime_model_allow_list_at(path: &PathBuf, models: Vec<String>) -> Result<(), String> {
+    let mut settings = get_settings_at(path)?;
+    settings.prime_model_allow_list = normalize_prime_model_allow_list(Some(models));
+    save_settings_at(path, settings)
+}
+
+/// See [`prime_model_allow_list_at`].
+pub fn prime_model_allow_list() -> Vec<String> {
+    settings_path()
+        .map(|path| prime_model_allow_list_at(&path))
+        .unwrap_or_default()
+}
+
+/// See [`set_prime_model_allow_list_at`].
+pub fn set_prime_model_allow_list(models: Vec<String>) -> Result<(), String> {
+    set_prime_model_allow_list_at(&settings_path()?, models)
+}
+
 pub fn get_settings() -> Result<Settings, String> {
     get_settings_at(&settings_path()?)
 }
@@ -726,6 +757,51 @@ mod tests {
         })
         .unwrap();
         assert_eq!(json["prime_model_allow_list"][0], "xai/grok-4.5");
+    }
+
+    #[test]
+    fn an_absent_settings_file_reads_as_an_uncurated_model_menu() {
+        let dir = tempfile::TempDir::new().unwrap();
+        assert!(prime_model_allow_list_at(&dir.path().join("settings.json")).is_empty());
+    }
+
+    #[test]
+    fn setting_the_allow_list_normalizes_and_leaves_other_settings_alone() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        save_settings_at(
+            &path,
+            Settings {
+                accent_color: Some("purple".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        set_prime_model_allow_list_at(&path, vec![" xai/grok-4.5 ".into(), "  ".into()]).unwrap();
+
+        assert_eq!(
+            prime_model_allow_list_at(&path),
+            vec!["xai/grok-4.5".to_string()]
+        );
+        assert_eq!(
+            get_settings_at(&path).unwrap().accent_color.as_deref(),
+            Some("purple")
+        );
+    }
+
+    #[test]
+    fn clearing_the_allow_list_restores_the_whole_catalog() {
+        // "Show all" writes an empty list, which must land as *no curation*
+        // rather than a filter that matches nothing.
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        set_prime_model_allow_list_at(&path, vec!["xai/grok-4.5".into()]).unwrap();
+
+        set_prime_model_allow_list_at(&path, Vec::new()).unwrap();
+
+        assert!(prime_model_allow_list_at(&path).is_empty());
+        assert_eq!(get_settings_at(&path).unwrap().prime_model_allow_list, None);
     }
 
     #[test]
