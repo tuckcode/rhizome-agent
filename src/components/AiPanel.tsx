@@ -692,7 +692,11 @@ export function AiPanelView({
           error={branchError}
         />
       ) : null}
-      <div className="min-h-0 flex-1">
+      {/* `flex flex-col`, not a bare block. The transcript's own scroller is
+          `flex-1`, which is inert in a block parent — it then sized to its
+          content, `overflow-y-auto` had nothing to overflow, and a long
+          session painted straight over the composer instead of scrolling. */}
+      <div className="flex min-h-0 flex-1 flex-col">
       <AiPanelMessageHistory
         agentLabel={view.agentLabel}
         agentReadiness={view.defaultAiAgentReadiness}

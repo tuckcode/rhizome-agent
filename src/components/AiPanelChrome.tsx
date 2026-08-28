@@ -578,7 +578,10 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
   }, [messages, isActive, updateScrollState])
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto" style={{ padding: 12 }} onScroll={updateScrollState}>
+    // `min-h-0` is load-bearing: a flex item defaults to `min-height: auto`,
+    // so without it this refuses to shrink below its content and scrolls
+    // nothing however tall the transcript gets.
+    <div ref={containerRef} className="min-h-0 flex-1 overflow-y-auto" style={{ padding: 12 }} onScroll={updateScrollState}>
       {messages.length === 0 && !isActive && (
         <AiPanelEmptyState
           agentLabel={agentLabel}
