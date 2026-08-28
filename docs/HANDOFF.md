@@ -51,7 +51,7 @@ file.
 
 ## State
 
-`origin/main` is **`bb00152`**. Confirm with `git log origin/main..HEAD`
+`origin/main` is **`74c77dc`**. Confirm with `git log origin/main..HEAD`
 — it should be empty. Multi-day briefing since Claude last owned a
 session: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md).
 
@@ -89,6 +89,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-08-28 (early) · Claude Opus 5](plans/handoffs/2026-08-28-0300-claude-opus-5-model-allow-list.md) — Nous Portal verified compatible through the existing OpenAI-compatible path (only a live key untested); #45 step 1 shipped — persisted chat-model allow-list, editor in Settings → AI agents; C54: `cargo llvm-cov --no-clean` gives a false coverage failure after a toolchain bump
 - [2026-08-28 · Claude Opus 5](plans/handoffs/2026-08-28-0010-claude-opus-5-model-settings-triage.md) — closed #24; specced model settings (#45); corrected a wrong “blocked upstream” call — Rhizome already supports OpenAI-compatible endpoints; filed #48 OmniRoute; Mycelium duplicate entry point still undecided
 - [2026-08-27 · Claude Opus 5](plans/handoffs/2026-08-27-2223-claude-opus-5-failure-legibility.md) — made failures legible: fixed C51, C53 and silent provider refusals (all three wore the same sentence), completed the #47 pre-public gate, cut the model picker's unusable fifth
 - [2026-08-26 (night) · Claude Opus 5](plans/handoffs/2026-08-26-2245-claude-opus-5-livecheck-and-mycelium-skin.md) — live-checked Research / Mycelium / Promote against a live Prime daemon; found C51; skinned the Mindwalk engine as Rhizome without forking (`6377b04`); corrected the CodeScene free-tier claim
@@ -241,58 +242,42 @@ push is not a release — releases are tagged builds with signed installers.
 
 ## Open threads
 
-- **C51-RESOLVED (2026-08-26, fixed `373ee1f`): Promote accepted the
-  empty-turn placeholder as content.** Fixed by guarding
-  `writePromoteNoteFromChat` with `isTransientAgentFailureText` — the
-  predicate auto-distill already used — rather than a new regex for the
-  placeholder alone. That widened the fix: error payloads, OAuth failures and
-  RPC host failures were equally promotable and equally not knowledge, so both
-  durable write paths into the vault now refuse the same inputs.
-  `PromoteWriteResult` gained a `refused` variant and a toast
-  (`ai.message.saveToVaultNoContent`) so the refusal is visible.
-  **#24 is unblocked and clear to close.** Original finding follows.
+- **C54-OPEN (2026-08-28): `cargo llvm-cov --no-clean` reports a false
+  coverage failure after a Rust toolchain bump.** The command in the check
+  suite above reported **83.87% lines, exit 1**; the same tree without
+  `--no-clean` reports **84.88%, exit 0**. The stale run's per-file table
+  listed profile data from **two rustc versions** (1.97.1 and 1.98.0), so
+  `--no-clean` had merged artifacts from before the bump.
 
-  Native live check, Claude Opus 5. When a Prime turn returns no
-  assistant text, Chat renders the string `Prime Agent finished without
-  returning a reply.` — and `Save to vault` promotes *that string* as if it
-  were the reply. Reproduced on `stealth/ox-alpha`, which returned an empty
-  turn: the promote wrote
-  `raw/inbox/20260826-prime-agent-finished-without-returning-a-reply.md`
-  with `title: "Prime Agent finished without returning a reply."`, a `# `
-  heading of the same, and that sentence as the body. Everything else in #24
-  behaved: correct `raw/inbox/{YYYYMMDD}-{slug}.md` path, full frontmatter
-  (`title`, `is_a: Note`, `created`, `source: prime-chat-promote`, `session`
-  matching the subhead's `sess_2749`), title from the first sentence rather
-  than a timestamp, no invented wikilinks, and the same-path refuse held on a
-  second press (no duplicate file; it opened the existing note). Fix is a
-  guard on the promote path — refuse when the turn has no assistant content,
-  the same shape as the #29 credential refuse; the rest of its AC passed.
-  Test note was deleted; vault `raw/inbox` verified empty.
+  Confirmed against a worktree at `087880d`: **84.88%, exit 0** — identical to
+  HEAD, so it is not a regression from any recent change. The pre-push hook's
+  own Rust lane passes.
 
-- **C53-RESOLVED (2026-08-27, fixed `be23da8`): a vault in `~/Documents` silently breaks every chat
-  turn on macOS.** Diagnosed from Prime's own daemon log, Claude Opus 5.
+  **Do not chase a Rust coverage failure until you have re-run it clean.** Open
+  question is whether the documented command should drop `--no-clean` (correct
+  but slower) or clear `target/llvm-cov-target` when the toolchain changes.
 
-  Chain: `ensure_prime_session_host(vault_path)` →
-  `ensure_host_for_cwd(cwd = vault_path)` → `create_session` sends
-  `{"config": {"cwd": <vault path>}}`. Prime spawns a session worker with that
-  cwd. macOS gates `~/Documents`, `~/Desktop` and `~/Downloads` behind TCC, so
-  the worker dies at launch:
-  `Error: EPERM: operation not permitted, uv_cwd` at `process.cwd()`. The
-  supervisor then waits 30s for a worker socket that never appears
-  (`Timed out connecting to daemon session worker`, `connect ENOENT …/worker`)
-  and Chat shows a generic red timeout banner.
+- **C51-RESOLVED (2026-08-26, fixed `373ee1f` / `2360cb5` / `9e50a8d`): Promote
+  accepted the empty-turn placeholder as content.** `writePromoteNoteFromChat`
+  is now guarded by `isTransientAgentFailureText`, the predicate auto-distill
+  already used — which widened the fix to error payloads, OAuth failures and
+  RPC host failures, all equally promotable and equally not knowledge.
+  `PromoteWriteResult` gained a `refused` variant and a toast. **#24 closed.**
+  Full finding and its native live check:
+  [2026-08-26-2245](plans/handoffs/2026-08-26-2245-claude-opus-5-livecheck-and-mycelium-skin.md).
+  **Correct the record when citing it:** the empty turn was almost certainly
+  C53's dying worker, not a flaky `stealth/ox-alpha`.
 
-  **It reads exactly like a model/provider failure and is not one** — the
-  worker dies before any model is contacted. A turn that dies this way also
-  renders the empty-turn placeholder, which means **last night's C51
-  discovery was almost certainly triggered by this, not by a flaky
-  `stealth/ox-alpha`.** Correct the record when citing C51.
-
-  **Root cause, now fixed:** `src-tauri/Info.plist` declared only
-  `NSLocalNetworkUsageDescription`. With no `NSDocumentsFolderUsageDescription`
-  (or Desktop/Downloads), macOS never prompts, so the app could not obtain
-  access even when properly bundled — this is **not** a dev-only problem.
-  Keys added and guarded by `src/utils/macOsFolderAccessConfig.test.ts`.
+- **C53-RESOLVED (2026-08-27, fixed `be23da8`): a vault in `~/Documents`
+  silently breaks every chat turn on macOS.** `Info.plist` declared only
+  `NSLocalNetworkUsageDescription`, so macOS never prompted for the protected
+  folder and the app could not obtain access even when properly bundled. Prime's
+  session worker then died at launch on `process.cwd()`
+  (`EPERM: operation not permitted, uv_cwd`) and the supervisor timed out after
+  30s. **It reads exactly like a model/provider failure and is not one** — the
+  worker dies before any model is contacted. Keys added, guarded by
+  `src/utils/macOsFolderAccessConfig.test.ts`. Chain and daemon-log evidence:
+  [2026-08-27-2223](plans/handoffs/2026-08-27-2223-claude-opus-5-failure-legibility.md).
 
   **Still open:** (a) confirm a bundled build now prompts and that chat
   completes with the Documents vault; (b) decide whether the session cwd
