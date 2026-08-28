@@ -107,6 +107,46 @@ Confirmed by running a worktree at `087880d`, the commit before this session:
 **If the Rust coverage gate fails, re-run it without `--no-clean` before
 believing it.** Tracked as C54.
 
+## The chat transcript had no scroll box (fixed, `6c4d91d`)
+
+A long Prime session painted straight over the composer, the context meter and
+the sessions column. Reported as "ui bugged"; verified fixed in the running app
+on the same session (`sess_28ec`).
+
+`AiPanelChrome`'s scroller is `flex-1 overflow-y-auto`, but `b9983ad`
+(2026-08-25) wrapped it in a **block** div — `flex-1` is inert outside a flex
+container, so it sized to its own content and `overflow-y-auto` had nothing to
+overflow. Before that commit it was a direct flex child and worked.
+
+Measured, 3 000px of transcript in an 899px viewport:
+
+| | clientHeight | scrollHeight | scrolls | bottom |
+|---|---|---|---|---|
+| before | 3136 | 3136 | no | 3206 |
+| after | 660 | 3136 | yes | 730 |
+
+**Two hypotheses died on contact with the app, and both were the obvious one.**
+A window resize did not clear it, so it was not a repaint artifact. The AX tree
+showed session rows at y=-335 and y=1472, which reads as an unclipped list —
+it is not; the Radix viewport clips correctly and those are scrolled-out rows
+reporting true coordinates. What actually pinned it: **15 page-ups over the
+transcript changed nothing.** A transcript that cannot scroll has no scroll box.
+
+**jsdom computes no box sizes**, so all 5 829 unit tests passed for the three
+days this bug existed and would again. `tests/smoke/chat-transcript-scrolls.spec.ts`
+is a Playwright layout test, verified in both directions — it fails on the
+unfixed tree. Untagged, so it runs in the regression lane.
+
+### Rebuilding re-triggers the Documents prompt
+
+The running app was a release bundle from the previous evening; `pnpm tauri dev`
+was not running, so nothing hot-reloaded and Cmd+R did nothing. After
+`pnpm tauri build` the new bundle's ad-hoc signature is a different app to
+macOS, so the C53 TCC grant for `~/Documents/Rhizome Vault` was gone and the
+window rendered blank until the prompt was accepted. Expect that on **every**
+rebuild while the vault lives in a protected folder — it is the same fact as
+C53's `tccutil reset` note, from the other direction.
+
 ## Pick up here
 
 - **Nous live check is closed** — 200 + `OK`. Not yet done through the app's
