@@ -51,7 +51,7 @@ file.
 
 ## State
 
-`origin/main` is **`6c4d91d`**. Confirm with `git log origin/main..HEAD`
+`origin/main` is **`c9081df`**. Confirm with `git log origin/main..HEAD`
 — it should be empty. Multi-day briefing since Claude last owned a
 session: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md).
 
@@ -89,7 +89,7 @@ yours to choose.
 
 ## Recent sessions
 
-- [2026-08-28 (early) · Claude Opus 5](plans/handoffs/2026-08-28-0300-claude-opus-5-model-allow-list.md) — Nous Portal **confirmed working** through the existing OpenAI-compatible path (200 + `OK` on `hermes-4-405b`), so #45's custom-provider work is not needed for chat; #45 step 1 shipped — persisted chat-model allow-list, editor in Settings → AI agents; fixed the chat transcript having no scroll box (`6c4d91d`, regression from `b9983ad`); C54: `cargo llvm-cov --no-clean` gives a false coverage failure after a toolchain bump
+- [2026-08-28 (early) · Claude Opus 5](plans/handoffs/2026-08-28-0300-claude-opus-5-model-allow-list.md) — Nous Portal **confirmed working** through the existing OpenAI-compatible path (200 + `OK` on `hermes-4-405b`), so #45's custom-provider work is not needed for chat; #45 step 1 shipped — persisted chat-model allow-list, editor in Settings → AI agents; fixed the chat transcript having no scroll box (`6c4d91d`, regression from `b9983ad`); C54: the documented Rust coverage command is missing the gate's `--ignore-filename-regex` and fails on a healthy tree
 - [2026-08-28 · Claude Opus 5](plans/handoffs/2026-08-28-0010-claude-opus-5-model-settings-triage.md) — closed #24; specced model settings (#45); corrected a wrong “blocked upstream” call — Rhizome already supports OpenAI-compatible endpoints; filed #48 OmniRoute; Mycelium duplicate entry point still undecided
 - [2026-08-27 · Claude Opus 5](plans/handoffs/2026-08-27-2223-claude-opus-5-failure-legibility.md) — made failures legible: fixed C51, C53 and silent provider refusals (all three wore the same sentence), completed the #47 pre-public gate, cut the model picker's unusable fifth
 - [2026-08-26 (night) · Claude Opus 5](plans/handoffs/2026-08-26-2245-claude-opus-5-livecheck-and-mycelium-skin.md) — live-checked Research / Mycelium / Promote against a live Prime daemon; found C51; skinned the Mindwalk engine as Rhizome without forking (`6377b04`); corrected the CodeScene free-tier claim
@@ -242,20 +242,39 @@ push is not a release — releases are tagged builds with signed installers.
 
 ## Open threads
 
-- **C54-OPEN (2026-08-28): `cargo llvm-cov --no-clean` reports a false
-  coverage failure after a Rust toolchain bump.** The command in the check
-  suite above reported **83.87% lines, exit 1**; the same tree without
-  `--no-clean` reports **84.88%, exit 0**. The stale run's per-file table
-  listed profile data from **two rustc versions** (1.97.1 and 1.98.0), so
-  `--no-clean` had merged artifacts from before the bump.
+- **C54-RESOLVED (2026-08-28): the Rust coverage command in the check suite is
+  missing a flag the gate uses, and fails on a healthy tree.** `AGENTS.md`
+  documents
 
-  Confirmed against a worktree at `087880d`: **84.88%, exit 0** — identical to
-  HEAD, so it is not a regression from any recent change. The pre-push hook's
-  own Rust lane passes.
+  ```
+  cargo llvm-cov --manifest-path src-tauri/Cargo.toml --no-clean --fail-under-lines 85
+  ```
 
-  **Do not chase a Rust coverage failure until you have re-run it clean.** Open
-  question is whether the documented command should drop `--no-clean` (correct
-  but slower) or clear `target/llvm-cov-target` when the toolchain changes.
+  but `.husky/pre-push` runs it with
+  `--ignore-filename-regex "lib\.rs|main\.rs|menu\.rs"`. Those three files are
+  large and largely untestable wiring, and excluding them is worth **~0.8pp**:
+
+  | command | lines | exit |
+  |---|---|---|
+  | as documented, `--no-clean` | 83.87% | 1 |
+  | as documented, clean | 84.88% | 1 |
+  | **as the hook runs it** | **85.68%** | **0** |
+
+  So the documented command fails on a tree the real gate passes. Confirmed
+  against a worktree at `087880d`, before this session: identical numbers, so
+  it is not a regression from any recent change.
+
+  `--no-clean` separately skews the figure after a toolchain bump — the 83.87%
+  run's per-file table listed profile data from **two rustc versions** (1.97.1
+  and 1.98.0). Real, but not what caused the failure.
+
+  **First diagnosed here as a `--no-clean` artifact. That was wrong**, and the
+  mistake was reading an exit code out of a shell pipeline — `cargo llvm-cov …
+  | tail -3` reports `tail`'s status, which is always 0, so a "passing"
+  baseline run had never actually passed. Redirect to a file and read `$?`.
+
+  **Fix: `AGENTS.md`'s check suite now carries the flag.** Do not chase a Rust
+  coverage failure until the command you ran matches the hook's.
 
 - **C51-RESOLVED (2026-08-26, fixed `373ee1f` / `2360cb5` / `9e50a8d`): Promote
   accepted the empty-turn placeholder as content.** `writePromoteNoteFromChat`
