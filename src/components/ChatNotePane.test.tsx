@@ -38,3 +38,32 @@ describe('ChatNotePane', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument()
   })
 })
+
+describe('ChatNotePane — resizing', () => {
+  it('has no handle when Chat does not offer one', () => {
+    render(<ChatNotePane label="a.md" onClose={vi.fn()} />)
+    expect(screen.queryByTestId('chat-note-pane-resize')).not.toBeInTheDocument()
+  })
+
+  /**
+   * Dragging the divider left widens the note. The pane reports the raw
+   * delta and `usePanelWidth` owns the sign and the bounds, so the two can be
+   * reasoned about separately.
+   */
+  it('reports the drag distance from its left edge', () => {
+    const onResize = vi.fn()
+    render(<ChatNotePane label="a.md" width={448} onResize={onResize} onClose={vi.fn()} />)
+
+    const handle = screen.getByTestId('chat-note-pane-resize')
+    fireEvent.mouseDown(handle, { clientX: 600, clientY: 300 })
+    fireEvent.mouseMove(window, { clientX: 560, clientY: 300 })
+    fireEvent.mouseUp(window)
+
+    expect(onResize).toHaveBeenCalledWith(-40)
+  })
+
+  it('renders at the width it is given', () => {
+    render(<ChatNotePane label="a.md" width={512} onResize={vi.fn()} onClose={vi.fn()} />)
+    expect(screen.getByTestId('chat-note-pane')).toHaveStyle({ width: '512px' })
+  })
+})
