@@ -6,6 +6,7 @@ import { RlmFamilyBand } from './RlmFamilyBand'
 import { ChatComposerDeck } from './ChatComposerDeck'
 import { ChatPreflightBanner } from './ChatPreflightBanner'
 import { ChatNotePane } from './ChatNotePane'
+import { useChatNoteContent } from '../hooks/useChatNoteContent'
 import { vaultLabelFromPath } from '../lib/primeSubheadLabels'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 import { resolveChatOpenNote } from '../utils/resolveChatOpenNote'
@@ -67,6 +68,13 @@ export default function ChatHome({
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
+  // One read of the open note, shared by the pane and the agent. Chat used to
+  // pass nothing to `AiPanel`, so a note open on screen was invisible to the
+  // model — "summarise this" had no "this".
+  const openNoteContent = useChatNoteContent(openNote?.path, vaultPath)
+  const openNoteEntry = openNote
+    ? entries.find((entry) => entry.path === openNote.path) ?? null
+    : null
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="chat-home">
@@ -102,6 +110,8 @@ export default function ChatHome({
           vaultPath={vaultPath}
           vaultPaths={vaultPaths}
           entries={entries}
+          activeEntry={openNoteEntry}
+          activeNoteContent={openNoteContent.body}
           onOpenNote={(target) => {
             const resolved = resolveChatOpenNote(target, vaultPath, entries)
             if (resolved) setOpenNote(resolved)
@@ -120,8 +130,9 @@ export default function ChatHome({
               <ChatNotePane
                 locale={locale}
                 label={openNote.label}
-                path={openNote.path}
-                vaultPath={vaultPath}
+                body={openNoteContent.body}
+                error={openNoteContent.error}
+                loading={openNoteContent.loading}
                 onClose={() => setOpenNote(null)}
                 onOpenNote={(target) => {
                   const resolved = resolveChatOpenNote(target, vaultPath, entries)

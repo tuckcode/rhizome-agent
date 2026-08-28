@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react'
 import { X } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { createTranslator, type AppLocale } from '../lib/i18n'
-import { loadChatNoteContent } from '../utils/loadChatNoteContent'
 import { MarkdownContent } from './MarkdownContent'
 
 interface ChatNotePaneProps {
   locale?: AppLocale
   label: string
-  path?: string
-  vaultPath?: string
+  /** Body, loaded by `useChatNoteContent` in Chat so the agent sees it too. */
+  body?: string | null
+  error?: boolean
+  loading?: boolean
   onClose: () => void
   onOpenNote?: (target: string) => void
 }
@@ -22,38 +22,13 @@ interface ChatNotePaneProps {
 export function ChatNotePane({
   locale = 'en',
   label,
-  path,
-  vaultPath,
+  body = null,
+  error = false,
+  loading = false,
   onClose,
   onOpenNote,
 }: ChatNotePaneProps) {
   const t = createTranslator(locale)
-  const [loaded, setLoaded] = useState<{ path: string; body: string } | null>(null)
-  const [failedPath, setFailedPath] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!path || !vaultPath) return
-    const requested = path
-    let cancelled = false
-    void loadChatNoteContent(requested, vaultPath)
-      .then((content) => {
-        if (cancelled) return
-        setLoaded({ path: requested, body: content })
-        setFailedPath(null)
-      })
-      .catch(() => {
-        if (cancelled) return
-        setFailedPath(requested)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [path, vaultPath])
-
-  const body = path && loaded?.path === path ? loaded.body : null
-  const error = Boolean(path && failedPath === path)
-  const loading = Boolean(path && vaultPath && !body && !error)
-
   return (
     <aside
       data-testid="chat-note-pane"

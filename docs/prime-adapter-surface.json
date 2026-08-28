@@ -1,6 +1,6 @@
 {
   "repo": "PrimeIntellect-ai/prime-agent",
-  "auditedAt": "2026-08-25",
+  "auditedAt": "2026-08-28",
   "installedVersion": "0.8.0",
   "githubLatestTag": "v0.8.0",
   "protocolVersion": 7,
@@ -139,6 +139,7 @@
     "new_session",
     "promote_owned_session",
     "prompt",
+    "rename_saved_session",
     "set_auto_compaction",
     "set_model",
     "set_session_name",
