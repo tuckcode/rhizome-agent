@@ -261,3 +261,44 @@ describe('PrimeModelPicker — curated allow-list (#45)', () => {
     await waitFor(() => expect(screen.getByText('Claude Fable 5')).toBeInTheDocument())
   })
 })
+
+describe('PrimeModelPicker — allow-list freshness (#45)', () => {
+  function open() {
+    fireEvent.pointerDown(
+      screen.getByTestId('prime-model-chip'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+  }
+
+  /**
+   * The list is edited in Settings, which is a different surface from this
+   * menu. Caching it the way the catalog is cached leaves the menu showing a
+   * shortlist the user has already changed — found by opening the app, not by
+   * a test.
+   */
+  it('re-reads the allow-list every time it opens', async () => {
+    render(<PrimeModelPicker vaultPath="/v" />)
+    open()
+    await waitFor(() => expect(cmds()).toContain('get_prime_model_allow_list'))
+    expect(screen.queryByTestId('prime-models-hidden')).not.toBeInTheDocument()
+
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    invoked.allowList = ['xai/grok-4.5']
+    open()
+
+    await waitFor(() => expect(screen.getByTestId('prime-models-hidden')).toBeInTheDocument())
+  })
+
+  /** The catalog is a daemon round-trip, so it stays cached. */
+  it('does not re-fetch the model catalog on a second open', async () => {
+    render(<PrimeModelPicker vaultPath="/v" />)
+    open()
+    await waitFor(() => expect(cmds()).toContain('get_available_prime_models'))
+
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    open()
+    await waitFor(() => expect(cmds()).toContain('get_prime_model_allow_list'))
+
+    expect(cmds().filter((cmd) => cmd === 'get_available_prime_models')).toHaveLength(1)
+  })
+})

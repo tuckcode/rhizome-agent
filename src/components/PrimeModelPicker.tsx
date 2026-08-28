@@ -91,15 +91,6 @@ export function PrimeModelPicker({
         } catch {
           if (!cancelled) setConnected([])
         }
-        // The curated shortlist (#45). Rhizome's own setting, so a failure
-        // here is a failure to read our own file — and the answer to that is
-        // the uncurated catalog, never a narrower menu than the user chose.
-        try {
-          const listedAllowList = await callHost<string[]>('get_prime_model_allow_list')
-          if (!cancelled) setAllowList(Array.isArray(listedAllowList) ? listedAllowList : [])
-        } catch {
-          if (!cancelled) setAllowList([])
-        }
         // The level list comes from the host too (#9: nothing hardcoded).
         // Its own failure must not blank the model list, which is the larger
         // half of this menu.
@@ -120,6 +111,30 @@ export function PrimeModelPicker({
       cancelled = true
     }
   }, [open, models, vaultPath])
+
+  // Re-read on every open, unlike the catalog above, which is cached because
+  // it is a daemon round-trip. The allow-list is a local settings read and it
+  // is edited on a different surface — Settings — so caching it leaves this
+  // menu showing a shortlist the user has already changed. Found by opening
+  // the app, not by a test.
+  //
+  // A failure is a failure to read Rhizome's own file, and the answer to that
+  // is the uncurated catalog: never a narrower menu than the user asked for.
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const listed = await callHost<string[]>('get_prime_model_allow_list')
+        if (!cancelled) setAllowList(Array.isArray(listed) ? listed : [])
+      } catch {
+        if (!cancelled) setAllowList([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open])
 
   // No success callback: `usePrimeHostStatus` polls the host, so the chip's
   // label follows the switch on its own within one interval.
