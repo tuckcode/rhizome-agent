@@ -1,3 +1,4 @@
+import type { PrimeImageContent } from '../lib/composerAttachments'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 import type { AiAgentId } from '../lib/aiAgents'
 import type { AiAgentPermissionMode } from '../lib/aiAgentPermissionMode'
@@ -147,16 +148,24 @@ export function useCliAiAgent(
     }
   }
 
-  async function sendPrompt(text: string, references?: NoteReference[]): Promise<void> {
+  async function sendPrompt(
+    text: string,
+    references?: NoteReference[],
+    images?: PrimeImageContent[],
+  ): Promise<void> {
     await sendAgentMessage({
       runtime,
       context: await buildAgentContext(),
-      prompt: { text, references },
+      prompt: { text, references, images },
     })
   }
 
-  async function sendMessage(text: string, references?: NoteReference[]): Promise<void> {
-    await sendPrompt(text, references)
+  async function sendMessage(
+    text: string,
+    references?: NoteReference[],
+    images?: PrimeImageContent[],
+  ): Promise<void> {
+    await sendPrompt(text, references, images)
   }
 
   async function regenerateMessage(messageId: string): Promise<void> {

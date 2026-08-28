@@ -1,3 +1,4 @@
+import type { PrimeImageContent } from './composerAttachments'
 import type { Dispatch, SetStateAction } from 'react'
 import type { AiAction } from '../components/AiMessage'
 import { buildAgentSystemPrompt } from '../utils/ai-agent'
@@ -55,6 +56,11 @@ export interface AgentExecutionContext {
 export interface PendingUserPrompt {
   text: string
   references?: NoteReference[]
+  /**
+   * Images attached to this turn, already in Prime's `ImageContent` shape.
+   * Absent for every text-only message.
+   */
+  images?: PrimeImageContent[]
 }
 
 function toChatHistory(messages: AiAgentMessage[]): ChatMessage[] {

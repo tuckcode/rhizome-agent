@@ -1,13 +1,21 @@
 import { useCallback, useEffect, useLayoutEffect, useState, useRef, type CSSProperties, type MutableRefObject, type ReactNode, type RefObject } from 'react'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
+
 import {
   chatSessionsOpenDefault,
   readChatSessionsOpen,
   storedChatSessionsOpen,
 } from '../lib/chatSessionsColumn'
 import { callHost } from '../lib/callHost'
+import {
+  MAX_IMAGES_PER_MESSAGE,
+  readImageAttachment,
+  toPrimeImages,
+  type AttachmentRejection,
+  type ComposerAttachment,
+} from '../lib/composerAttachments'
 import { sendToRunningTurn } from '../lib/primeTurnMessaging'
-import { trackPrimeTurnMessage, trackPrimeSessionTreeNavigated } from '../lib/productAnalytics'
+import { trackComposerImagesAttached, trackPrimeTurnMessage, trackPrimeSessionTreeNavigated } from '../lib/productAnalytics'
 import { usePrimeQueue } from '../hooks/usePrimeQueue'
 import { usePrimeSessionTree } from '../hooks/usePrimeSessionTree'
 import { SessionBranchBand } from './SessionBranchBand'
@@ -202,6 +210,13 @@ function AiPanelFrame({
   )
 }
 
+/** Why an attachment was refused, in words the user can act on. */
+const ATTACHMENT_REJECTION_KEYS: Record<AttachmentRejection, Parameters<typeof translate>[1]> = {
+  too_large: 'ai.composer.attachmentTooLarge',
+  unsupported_type: 'ai.composer.attachmentUnsupported',
+  unreadable: 'ai.composer.attachmentUnreadable',
+}
+
 export function AiPanelView({
   controller,
   onClose,
@@ -369,12 +384,53 @@ export function AiPanelView({
     latestTurnState.current = { handleSend, isActive, onSendPrompt }
   }, [handleSend, isActive, onSendPrompt])
 
+  /**
+   * Images staged for the next message.
+   *
+   * Owned here rather than in the composer because the composer is stateless
+   * about the message it is building — the same reason `input` lives up here.
+   * Cleared on every accepted send, so an attachment never rides along with a
+   * later, unrelated turn.
+   */
+  const [attachments, setAttachments] = useState<ComposerAttachment[]>([])
+  const attachImages = useCallback((files: File[]) => {
+    void (async () => {
+      const results = await Promise.all(files.map(readImageAttachment))
+      const accepted = results.flatMap((result) => (result.ok ? [result.attachment] : []))
+      // Every rejection is said out loud. A silently dropped attachment is the
+      // exact failure this repo keeps rediscovering: an unusable state that
+      // looks like a working one.
+      for (const result of results) {
+        if (result.ok) continue
+        onUnsupportedAiPaste?.(translate(locale, 'ai.composer.attachmentRejected', {
+          name: result.name,
+          reason: translate(locale, ATTACHMENT_REJECTION_KEYS[result.reason]),
+        }))
+      }
+      if (accepted.length === 0) return
+      setAttachments((current) => {
+        const next = [...current, ...accepted]
+        if (next.length > MAX_IMAGES_PER_MESSAGE) {
+          onUnsupportedAiPaste?.(translate(locale, 'ai.composer.attachmentTooMany', {
+            count: String(MAX_IMAGES_PER_MESSAGE),
+          }))
+        }
+        return next.slice(0, MAX_IMAGES_PER_MESSAGE)
+      })
+      trackComposerImagesAttached(accepted.length)
+    })()
+  }, [locale, onUnsupportedAiPaste])
+  const removeAttachment = useCallback((id: string) => {
+    setAttachments((current) => current.filter((attachment) => attachment.id !== id))
+  }, [])
+
   const sendAsNewTurn = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
     const latest = latestTurnState.current
     latest.onSendPrompt?.(text)
-    latest.handleSend(text, references)
+    latest.handleSend(text, references, toPrimeImages(attachments) ?? undefined)
+    setAttachments([])
     refreshQueue()
-  }, [refreshQueue])
+  }, [attachments, refreshQueue])
 
   const sendAsNewTurnIfIdle = useCallback((
     text: string,
@@ -385,7 +441,7 @@ export function AiPanelView({
   }, [sendAsNewTurn])
 
   const handleComposerSend = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
-    if (!text.trim()) return
+    if (!text.trim() && attachments.length === 0) return
     if (isActive) {
       // Sending during a turn queues a follow-up rather than being dropped.
       // Enter is "send another message", which must not disturb the work in
@@ -405,7 +461,7 @@ export function AiPanelView({
       return
     }
     sendAsNewTurn(text, references)
-  }, [isActive, isPrimeTarget, refreshQueue, sendAsNewTurn, sendAsNewTurnIfIdle, setInput])
+  }, [attachments.length, isActive, isPrimeTarget, refreshQueue, sendAsNewTurn, sendAsNewTurnIfIdle, setInput])
 
   /**
    * Redirect the running turn. Only wired for Prime — this is a daemon verb,
@@ -413,7 +469,7 @@ export function AiPanelView({
    * every non-Prime target should keep doing.
    */
   const handleSteer = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
-    if (!text.trim()) return
+    if (!text.trim() && attachments.length === 0) return
     void sendToRunningTurn('steer', text).then((result) => {
       if (result === 'accepted') {
         trackPrimeTurnMessage('steer')
@@ -423,7 +479,7 @@ export function AiPanelView({
         sendAsNewTurnIfIdle(text, references)
       }
     })
-  }, [refreshQueue, sendAsNewTurnIfIdle, setInput])
+  }, [attachments.length, refreshQueue, sendAsNewTurnIfIdle, setInput])
 
   // Open unless this machine says otherwise. The column is the only thing on
   // Chat home that says other sessions exist, so a closed default left the
@@ -786,6 +842,9 @@ export function AiPanelView({
         onClearQueue={isPrimeTarget ? () => void clearQueue() : undefined}
         onStop={handleStop}
         onUnsupportedAiPaste={onUnsupportedAiPaste}
+        attachments={attachments}
+        onAttachImages={attachImages}
+        onRemoveAttachment={removeAttachment}
         foot={isPrimeTarget ? (
           <ChatComposerFoot
             locale={locale}

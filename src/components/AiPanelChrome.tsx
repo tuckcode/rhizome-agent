@@ -1,9 +1,10 @@
 import { memo, useCallback, useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
-import { Sparkle, X, PaperPlaneRight, Plus, Link, Stop } from '@phosphor-icons/react'
+import { Sparkle, X, PaperPlaneRight, Plus, Link, Stop, ImageSquare } from '@phosphor-icons/react'
 import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import type { ComposerAttachment } from '../lib/composerAttachments'
 import { WikilinkChatInput } from './WikilinkChatInput'
 import { extractInlineWikilinkReferences } from './inlineWikilinkText'
 import {
@@ -63,6 +64,10 @@ interface AiPanelMessageHistoryProps {
 }
 
 interface AiPanelComposerProps {
+  /** Images staged for this message. Owned by the panel, not the composer. */
+  attachments?: ComposerAttachment[]
+  onAttachImages?: (files: File[]) => void
+  onRemoveAttachment?: (id: string) => void
   entries: VaultEntry[]
   agentLabel: string
   agentReadiness: AiAgentReadiness
@@ -137,6 +142,7 @@ function ComposerInput({
   onChange,
   onSend,
   onUnsupportedAiPaste,
+  onImagePaste,
   placeholder,
   commandEntries,
   commandDisabled,
@@ -152,6 +158,7 @@ function ComposerInput({
   onChange: (value: string) => void
   onSend: (text: string, references: NoteReference[]) => void
   onUnsupportedAiPaste?: (message: string) => void
+  onImagePaste?: (files: File[]) => void
   placeholder: string
   commandEntries?: CommandMenuEntry[]
   commandDisabled?: Record<string, string>
@@ -166,6 +173,7 @@ function ComposerInput({
       onChange={onChange}
       onSend={onSend}
       onUnsupportedPaste={onUnsupportedAiPaste}
+      onImagePaste={onImagePaste}
       disabled={disabled}
       placeholder={placeholder}
       placeholderClassName={hasControls ? 'px-2 py-1.5 text-[13px] leading-5' : undefined}
@@ -628,6 +636,9 @@ export function AiPanelComposer({
   queue,
   onClearQueue,
   onUnsupportedAiPaste,
+  attachments = [],
+  onAttachImages,
+  onRemoveAttachment,
   foot,
   commandEntries,
   commandDisabled,
@@ -641,13 +652,16 @@ export function AiPanelComposer({
   const canSteer = isActive && typeof onSteer === 'function'
   const composerDisabled = (isActive && !canSteer) || agentReadiness !== 'ready'
   const hasInput = input.trim().length > 0
-  const canSend = !composerDisabled && hasInput
+  // An attachment is a message. Pasting a screenshot and asking nothing is
+  // the ordinary case for "what is this?", so it must be sendable alone.
+  const hasPayload = hasInput || attachments.length > 0
+  const canSend = !composerDisabled && hasPayload
   const placeholder = getComposerPlaceholder(agentLabel, agentReadiness, t)
   const hasControls = controls !== undefined && controls !== null
   // While a turn runs: typed text steers it, empty input stops it. The button
   // says which, so the affordance is never ambiguous.
   const sendButton = isActive
-    ? (canSteer && hasInput
+    ? (canSteer && hasPayload
         ? (
             <ComposerSendButton
               canSend
@@ -720,6 +734,37 @@ export function AiPanelComposer({
           </ul>
         </div>
       ) : null}
+      {attachments.length > 0 ? (
+        <ul
+          className="mb-1.5 flex min-w-0 flex-wrap gap-1.5"
+          data-testid="composer-attachments"
+          aria-label={t('ai.composer.attachments')}
+        >
+          {attachments.map((attachment) => (
+            <li
+              key={attachment.id}
+              className={cn(
+                'flex min-w-0 items-center gap-1.5 rounded-md border border-border',
+                'bg-muted px-2 py-1 text-[11px] text-foreground',
+              )}
+            >
+              <ImageSquare size={12} weight="regular" aria-hidden="true" className="shrink-0 text-muted-foreground" />
+              <span className="max-w-[160px] truncate">{attachment.name}</span>
+              {onRemoveAttachment ? (
+                <button
+                  type="button"
+                  onClick={() => onRemoveAttachment(attachment.id)}
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                  data-testid={`composer-attachment-remove-${attachment.id}`}
+                  aria-label={t('ai.composer.attachmentRemove', { name: attachment.name })}
+                >
+                  <X size={10} aria-hidden="true" />
+                </button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <div className={cn(
         'flex items-end gap-2',
         hasControls && 'rounded-xl border border-border bg-background px-2 py-1.5 shadow-xs',
@@ -734,6 +779,7 @@ export function AiPanelComposer({
             onChange={onChange}
             onSend={onSend}
             onUnsupportedAiPaste={onUnsupportedAiPaste}
+            onImagePaste={onAttachImages}
             placeholder={placeholder}
             commandEntries={commandEntries}
             commandDisabled={commandDisabled}
