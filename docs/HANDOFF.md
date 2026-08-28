@@ -242,39 +242,43 @@ push is not a release — releases are tagged builds with signed installers.
 
 ## Open threads
 
-- **C54-RESOLVED (2026-08-28): the Rust coverage command in the check suite is
-  missing a flag the gate uses, and fails on a healthy tree.** `AGENTS.md`
-  documents
+- **C55-OPEN (2026-08-28): the text-only-model warning does not fire in the
+  app.** Image attachments work end to end (a vision model described a pasted
+  PNG), but pasting into a model Prime reports as text-only produces no
+  warning. Reproduced four times across two builds, on `opencode/hy3-free`
+  (`input: ["text"]`), with a live session attached and the pill showing the
+  display name `Hy3 Free`.
 
-  ```
-  cargo llvm-cov --manifest-path src-tauri/Cargo.toml --no-clean --fail-under-lines 85
-  ```
+  **Ruled out with evidence, not reasoning:**
+  - Not toast timing — repeated with immediate capture, and the `<Toast>` is
+    rendered in the main shell (`App.tsx:2236`).
+  - Not missing data — `prime-agent --mode rpc` returns `input` on every model
+    (`hy3-free` → `["text"]`, `claude-fable-5` → `["text","image"]`), and
+    `get_state` returns the **whole** Model object, `input` included.
+  - Not a stale build — the running binary contains the `modelAcceptsImages`
+    field name and was launched from it.
+  - **Not the composer.** `AiPanel.textOnlyModel.test.tsx` gives the panel a
+    status with `modelAcceptsImages: false` and the warning fires. That half
+    is correct.
 
-  but `.husky/pre-push` runs it with
-  `--ignore-filename-regex "lib\.rs|main\.rs|menu\.rs"`. Those three files are
-  large and largely untestable wiring, and excluding them is worth **~0.8pp**:
+  So the gap is between `apply_state` and the status the frontend receives.
+  **Next thing to check:** whether `model_accepts_images` is refreshed on the
+  status poll after `set_model`, or only at attach — `set_model` calls
+  `refresh_session_id`, not a state refresh, yet `model_name` does update, so
+  the two should not diverge. Instrument the status payload before theorising
+  again; that is what settled every other question in this session.
 
-  | command | lines | exit |
-  |---|---|---|
-  | as documented, `--no-clean` | 83.87% | 1 |
-  | as documented, clean | 84.88% | 1 |
-  | **as the hook runs it** | **85.68%** | **0** |
+  First cut fetched the model catalog and matched by provider+id; that was
+  replaced (`7258a4d`) with reading `input` straight off `get_state`. The
+  replacement is simpler and still does not fire.
 
-  So the documented command fails on a tree the real gate passes. Confirmed
-  against a worktree at `087880d`, before this session: identical numbers, so
-  it is not a regression from any recent change.
-
-  `--no-clean` separately skews the figure after a toolchain bump — the 83.87%
-  run's per-file table listed profile data from **two rustc versions** (1.97.1
-  and 1.98.0). Real, but not what caused the failure.
-
-  **First diagnosed here as a `--no-clean` artifact. That was wrong**, and the
-  mistake was reading an exit code out of a shell pipeline — `cargo llvm-cov …
-  | tail -3` reports `tail`'s status, which is always 0, so a "passing"
-  baseline run had never actually passed. Redirect to a file and read `$?`.
-
-  **Fix: `AGENTS.md`'s check suite now carries the flag.** Do not chase a Rust
-  coverage failure until the command you ran matches the hook's.
+- **C54-RESOLVED (2026-08-28): the documented Rust coverage command was
+  missing the gate's `--ignore-filename-regex "lib\.rs|main\.rs|menu\.rs"`**,
+  so it reported 84.88% and exit 1 on a tree the hook passes at 85.68%.
+  `AGENTS.md`'s check suite now carries the flag. Confirmed against a worktree
+  at `087880d`, so it was never a regression. Full numbers and the
+  shell-pipeline mistake that produced the first, wrong diagnosis:
+  [2026-08-28-0300](plans/handoffs/2026-08-28-0300-claude-opus-5-model-allow-list.md).
 
 - **C51-RESOLVED (2026-08-26, fixed `373ee1f` / `2360cb5` / `9e50a8d`): Promote
   accepted the empty-turn placeholder as content.** `writePromoteNoteFromChat`
