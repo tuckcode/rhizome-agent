@@ -156,9 +156,14 @@ from the image. Confirmed along with it: the chip appears on paste
 (`image.png ×`), the send button activates with **no text typed**, the chip
 clears on send, and the context meter moved 0 → 19.0k.
 
-The text-only warning path was not exercised — the model in the session
-accepts images. Still unverified in the app: a model Prime reports as
-text-only, and drag-and-drop (only paste was driven).
+**The text-only warning does not work — C55.** Exercised on
+`opencode/hy3-free` across two builds and four pastes: the image attaches, no
+warning. The composer half is proven correct by
+`AiPanel.textOnlyModel.test.tsx`; the data is proven present via
+`prime-agent --mode rpc`. The gap is what the live status carries. Do not
+re-derive the ruled-out causes — they are listed in C55.
+
+Drag-and-drop is also still unverified; only paste was driven.
 
 ## Pick up here
 
