@@ -146,3 +146,19 @@ export function partitionModelsByAllowList(
   if (shown.length === 0) return { shown: models, hidden: [] }
   return { shown, hidden: models.filter((model) => !isShown(model)) }
 }
+
+/**
+ * Resolve the chip's label back to a model key.
+ *
+ * The picker is handed a label, not a pair: `usePrimeHostStatus` reduces the
+ * running model to `modelName || modelId` before the chip sees it. Matching on
+ * both is enough to keep the running model out of the hidden bucket, and
+ * failing to match is harmless — the label still renders, and the menu is one
+ * disclosure away from the model.
+ */
+export function activeModelKey(models: PrimeModel[], label?: string | null): string | null {
+  const needle = label?.trim()
+  if (!needle) return null
+  const match = models.find((model) => model.name?.trim() === needle || model.id?.trim() === needle)
+  return match ? modelKey(match) : null
+}

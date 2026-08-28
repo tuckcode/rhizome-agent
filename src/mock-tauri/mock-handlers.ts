@@ -153,6 +153,8 @@ let mockSettings: Settings = {
 
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
 const mockArchivedSessions = new Set<string>()
+let mockPrimeModelAllowList: string[] = ['xai/grok-4.5']
+
 const mockSessionNames = new Map<string, string>()
 
 let mockResearchFormats: Array<{ id: string, title: string, instruction: string }> = [
@@ -792,6 +794,14 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     },
   ],
   set_prime_model: () => null,
+  // Curated by default so `pnpm dev` renders the shortlist *and* the
+  // "hidden by your list" disclosure — the uncurated case is the one that
+  // looks identical to having no feature at all.
+  get_prime_model_allow_list: () => [...mockPrimeModelAllowList],
+  set_prime_model_allow_list: (args: { models?: string[] }) => {
+    mockPrimeModelAllowList = (args?.models ?? []).map((key) => key.trim()).filter(Boolean)
+    return null
+  },
   fork_prime_session: () => ({ sessionId: 'mock-fork', branchedFrom: 'branch point' }),
   promote_owned_prime_session: () => undefined,
   complete_owned_prime_session: () => undefined,
