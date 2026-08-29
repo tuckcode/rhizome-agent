@@ -1,0 +1,10 @@
+{
+  "_why": "Findings that exist today and are design questions, not defects the sweep should block on. A lane that is red from day one is a lane nobody reads — the same failure as a gate nobody runs. Delete a line when you fix it; the sweep then guards against it coming back.",
+  "_reviewed": "2026-08-28",
+  "_shared": [
+    "duplicate-control: New chat",
+    "duplicate-control: Rename Untitled session",
+    "duplicate-control: Archive Untitled session"
+  ],
+  "_sharedWhy": "The sessions column is chrome on every screen, so its findings appear everywhere. 'New chat' is genuinely two controls with one label. The other two are two sessions that are both called 'Untitled session', so their row buttons end up with identical accessible names — the #30 family, a naming problem rather than a layout one."
+}
