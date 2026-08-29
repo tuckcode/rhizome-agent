@@ -9,9 +9,7 @@ import {
 export const AGENT_CHAT_OPENED_SESSION_KEY = 'rhizome:agent-chat-opened-session'
 
 interface UseAppAiWorkspaceBridgeOptions {
-  aiFeaturesEnabled: boolean
   aiWorkspaceWindow: boolean
-  closeAIChat: () => void
   openAIChat: () => void
   /** Frame A — conversation owns the window. Launch goes here, not the side panel. */
   openChatHome: () => void
@@ -30,24 +28,22 @@ interface AppAiWorkspaceBridge {
   handleOpenDockedAiWorkspace: () => void
 }
 
-function useOpenAiChatEvent(aiFeaturesEnabled: boolean, openAiWorkspace: (source: 'event') => void) {
+function useOpenAiChatEvent(openAiWorkspace: (source: 'event') => void) {
   useEffect(() => {
     const handleOpenAiChat = () => {
-      if (!aiFeaturesEnabled) return
       openAiWorkspace('event')
     }
 
     window.addEventListener(OPEN_AI_CHAT_EVENT, handleOpenAiChat)
     return () => window.removeEventListener(OPEN_AI_CHAT_EVENT, handleOpenAiChat)
-  }, [aiFeaturesEnabled, openAiWorkspace])
+  }, [openAiWorkspace])
 }
 
-function useDockRequestEvent(aiFeaturesEnabled: boolean, aiWorkspaceWindow: boolean, openAIChat: () => void) {
+function useDockRequestEvent(aiWorkspaceWindow: boolean, openAIChat: () => void) {
   useEffect(() => {
     if (aiWorkspaceWindow) return
 
     const handleDockRequest = () => {
-      if (!aiFeaturesEnabled) return
       openAIChat()
       trackEvent('ai_workspace_docked', { source: 'window' })
     }
@@ -57,13 +53,7 @@ function useDockRequestEvent(aiFeaturesEnabled: boolean, aiWorkspaceWindow: bool
     return () => {
       window.removeEventListener(AI_WORKSPACE_DOCK_REQUESTED_EVENT, handleDockRequest)
     }
-  }, [aiFeaturesEnabled, aiWorkspaceWindow, openAIChat])
-}
-
-function useCloseDisabledAiWorkspace(aiFeaturesEnabled: boolean, closeAIChat: () => void, showAIChat: boolean) {
-  useEffect(() => {
-    if (!aiFeaturesEnabled && showAIChat) closeAIChat()
-  }, [aiFeaturesEnabled, closeAIChat, showAIChat])
+  }, [aiWorkspaceWindow, openAIChat])
 }
 
 /**
@@ -73,7 +63,6 @@ function useCloseDisabledAiWorkspace(aiFeaturesEnabled: boolean, closeAIChat: ()
  * the notes window once per browser/app session.
  */
 function useAgentDefaultOpenChat(
-  aiFeaturesEnabled: boolean,
   aiWorkspaceWindow: boolean,
   showAIChat: boolean,
   openChatHome: () => void,
@@ -84,7 +73,7 @@ function useAgentDefaultOpenChat(
   useEffect(() => {
     if (didTry.current) return
     if (!vaultReady) return
-    if (!aiFeaturesEnabled || aiWorkspaceWindow || showAIChat || suppressDefaultOpen) return
+    if (aiWorkspaceWindow || showAIChat || suppressDefaultOpen) return
     try {
       if (sessionStorage.getItem(AGENT_CHAT_OPENED_SESSION_KEY) === '1') {
         didTry.current = true
@@ -97,13 +86,11 @@ function useAgentDefaultOpenChat(
     didTry.current = true
     openChatHome()
     trackEvent('ai_workspace_open', { source: 'agent_default_chat_home' })
-  }, [aiFeaturesEnabled, aiWorkspaceWindow, openChatHome, showAIChat, suppressDefaultOpen, vaultReady])
+  }, [aiWorkspaceWindow, openChatHome, showAIChat, suppressDefaultOpen, vaultReady])
 }
 
 export function useAppAiWorkspaceBridge({
-  aiFeaturesEnabled,
   aiWorkspaceWindow,
-  closeAIChat,
   openAIChat,
   openChatHome,
   openSettings,
@@ -112,10 +99,8 @@ export function useAppAiWorkspaceBridge({
   suppressDefaultOpen = false,
   vaultReady = false,
 }: UseAppAiWorkspaceBridgeOptions): AppAiWorkspaceBridge {
-  useCloseDisabledAiWorkspace(aiFeaturesEnabled, closeAIChat, showAIChat)
-  useDockRequestEvent(aiFeaturesEnabled, aiWorkspaceWindow, openAIChat)
+  useDockRequestEvent(aiWorkspaceWindow, openAIChat)
   useAgentDefaultOpenChat(
-    aiFeaturesEnabled,
     aiWorkspaceWindow,
     showAIChat,
     openChatHome,
@@ -136,14 +121,14 @@ export function useAppAiWorkspaceBridge({
     [openAIChat],
   )
 
-  useOpenAiChatEvent(aiFeaturesEnabled, openAiWorkspace)
+  useOpenAiChatEvent(openAiWorkspace)
 
   const handleOpenDockedAiWorkspace = useCallback(() => {
     openAiWorkspace('status_bar')
   }, [openAiWorkspace])
 
   return {
-    effectiveShowAIChat: aiFeaturesEnabled && showAIChat,
+    effectiveShowAIChat: showAIChat,
     handleOpenAiSettings,
     handleOpenDockedAiWorkspace,
   }

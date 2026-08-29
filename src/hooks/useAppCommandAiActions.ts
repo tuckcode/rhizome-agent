@@ -15,7 +15,6 @@ interface AppCommandAiPreferences {
 }
 
 interface AppCommandAiActions {
-  aiFeaturesEnabled: boolean
   onToggleAIChat?: () => void
   onOpenAiAgents?: () => void
   aiAgentsStatus?: AiAgentsStatus
@@ -28,30 +27,23 @@ interface AppCommandAiActions {
 }
 
 export function useAppCommandAiActions(
-  aiFeaturesEnabled: boolean,
   dialogs: AppCommandDialogs,
   aiAgentsStatus: AiAgentsStatus,
   vaultAiGuidanceStatus: VaultAiGuidanceStatus,
   restoreVaultAiGuidanceCommand: (() => void) | undefined,
   aiAgentPreferences: AppCommandAiPreferences,
 ): AppCommandAiActions {
-  return useMemo(() => {
-    if (!aiFeaturesEnabled) return { aiFeaturesEnabled: false }
-
-    return {
-      aiFeaturesEnabled: true,
-      onToggleAIChat: dialogs.toggleAIChat,
-      onOpenAiAgents: dialogs.openSettings,
-      aiAgentsStatus,
-      vaultAiGuidanceStatus,
-      onRestoreVaultAiGuidance: restoreVaultAiGuidanceCommand,
-      selectedAiAgent: aiAgentPreferences.defaultAiAgent,
-      onSetDefaultAiAgent: aiAgentPreferences.setDefaultAiAgent,
-      onCycleDefaultAiAgent: aiAgentPreferences.cycleDefaultAiAgent,
-      selectedAiAgentLabel: aiAgentPreferences.defaultAiAgentLabel,
-    }
-  }, [
-    aiFeaturesEnabled,
+  return useMemo(() => ({
+    onToggleAIChat: dialogs.toggleAIChat,
+    onOpenAiAgents: dialogs.openSettings,
+    aiAgentsStatus,
+    vaultAiGuidanceStatus,
+    onRestoreVaultAiGuidance: restoreVaultAiGuidanceCommand,
+    selectedAiAgent: aiAgentPreferences.defaultAiAgent,
+    onSetDefaultAiAgent: aiAgentPreferences.setDefaultAiAgent,
+    onCycleDefaultAiAgent: aiAgentPreferences.cycleDefaultAiAgent,
+    selectedAiAgentLabel: aiAgentPreferences.defaultAiAgentLabel,
+  }), [
     dialogs.toggleAIChat,
     dialogs.openSettings,
     aiAgentsStatus,

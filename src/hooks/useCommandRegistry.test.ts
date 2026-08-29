@@ -379,27 +379,6 @@ describe('useCommandRegistry', () => {
     })
   })
 
-  it('removes AI commands when AI features are disabled', () => {
-    const config = makeConfig({
-      aiFeaturesEnabled: false,
-      onToggleAIChat: vi.fn(),
-      onOpenAiAgents: vi.fn(),
-      aiAgentsStatus: {
-        claude_code: { status: 'installed', version: '1.0.0' },
-        codex: { status: 'missing', version: null },
-        opencode: { status: 'missing', version: null },
-        pi: { status: 'missing', version: null },
-        antigravity: { status: 'missing', version: null },
-      },
-      selectedAiAgent: 'claude_code',
-    })
-    const { result } = renderHook(() => useCommandRegistry(config))
-
-    expect(findCommand(result.current, 'toggle-ai-panel')).toBeUndefined()
-    expect(findCommand(result.current, 'new-ai-chat')).toBeUndefined()
-    expect(findCommand(result.current, 'open-ai-agents')).toBeUndefined()
-  })
-
   it('exposes active file actions when a note is selected', () => {
     const onRevealActiveFile = vi.fn()
     const onCopyActiveFilePath = vi.fn()
