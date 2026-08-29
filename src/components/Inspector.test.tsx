@@ -9,30 +9,43 @@ function render(ui: ReactElement) {
   return rtlRender(ui, { wrapper: TooltipProvider })
 }
 
-const mockEntry: VaultEntry = {
-  path: '/vault/project/test.md',
-  filename: 'test.md',
-  title: 'Test Project',
-  isA: 'Project',
-  aliases: [],
-  belongsTo: ['[[responsibility/grow-newsletter]]'],
-  relatedTo: ['[[topic/software-development]]'],
-  status: 'Active',
-  owner: 'Luca Rossi',
-  cadence: null,
-  archived: false,
-  modifiedAt: 1707900000,
-  createdAt: null,
-  fileSize: 1024,
-  snippet: '',
-  wordCount: 0,
-  relationships: {},
-  icon: null,
-  color: null,
+function makeEntry(overrides: Partial<VaultEntry> = {}): VaultEntry {
+  return {
+    path: '/vault/project/test.md',
+    filename: 'test.md',
+    title: 'Test Project',
+    isA: 'Project',
+    aliases: [],
+    belongsTo: ['[[responsibility/grow-newsletter]]'],
+    relatedTo: ['[[topic/software-development]]'],
+    status: 'Active',
+    archived: false,
+    modifiedAt: 1707900000,
+    createdAt: null,
+    fileSize: 1024,
+    snippet: '',
+    wordCount: 0,
+    relationships: {},
+    icon: null,
+    color: null,
     order: null,
-  template: null, sort: null,
-  outgoingLinks: [],
+    sidebarLabel: null,
+    template: null,
+    sort: null,
+    view: null,
+    visible: null,
+    organized: false,
+    favorite: false,
+    favoriteIndex: null,
+    listPropertiesDisplay: [],
+    outgoingLinks: [],
+    properties: { Owner: 'Luca Rossi', Cadence: null },
+    hasH1: false,
+    ...overrides,
+  }
 }
+
+const mockEntry: VaultEntry = makeEntry()
 
 const mockContent = `---
 title: Test Project
@@ -52,30 +65,16 @@ Related to:
 This is a test note with some words to count.
 `
 
-const referrerEntry: VaultEntry = {
+const referrerEntry: VaultEntry = makeEntry({
   path: '/vault/note/referrer.md',
   filename: 'referrer.md',
   title: 'Referrer Note',
   isA: 'Note',
-  aliases: [],
-  belongsTo: [],
-  relatedTo: [],
   status: null,
-  owner: null,
-  cadence: null,
-  archived: false,
   modifiedAt: 1707900000,
-  createdAt: null,
   fileSize: 200,
-  snippet: '',
-  wordCount: 0,
-  relationships: {},
-  icon: null,
-  color: null,
-  order: null,
-  template: null, sort: null,
   outgoingLinks: ['Test Project'],
-}
+})
 
 const now = Math.floor(Date.now() / 1000)
 const mockGitHistory: GitCommit[] = [
@@ -400,105 +399,48 @@ This is a test note with some words to count.
   })
 
   describe('Referenced By (bidirectional relationships)', () => {
-    const targetEntry: VaultEntry = {
+    const targetEntry: VaultEntry = makeEntry({
       path: '/Users/luca/Laputa/responsibility/grow-newsletter.md',
       filename: 'grow-newsletter.md',
       title: 'Grow Newsletter',
       isA: 'Responsibility',
-      aliases: [],
-      belongsTo: [],
-      relatedTo: [],
       status: 'Active',
-      owner: null,
-      cadence: null,
-      archived: false,
-      modifiedAt: 1707900000,
-      createdAt: null,
       fileSize: 500,
-      snippet: '',
-      wordCount: 0,
       relationships: { 'Type': ['[[responsibility]]'] },
-      icon: null,
-      color: null,
-      order: null,
-      template: null, sort: null,
-      outgoingLinks: [],
-    }
+    })
 
-    const essayEntry: VaultEntry = {
+    const essayEntry: VaultEntry = makeEntry({
       path: '/Users/luca/Laputa/essay/on-writing.md',
       filename: 'on-writing.md',
       title: 'On Writing Well',
       isA: 'Essay',
-      aliases: [],
       belongsTo: ['[[responsibility/grow-newsletter]]'],
-      relatedTo: [],
       status: null,
-      owner: null,
-      cadence: null,
-      archived: false,
-      modifiedAt: 1707900000,
-      createdAt: null,
       fileSize: 300,
-      snippet: '',
-      wordCount: 0,
       relationships: { 'Belongs to': ['[[responsibility/grow-newsletter]]'], 'Type': ['[[essay]]'] },
-      icon: null,
-      color: null,
-      order: null,
-      template: null, sort: null,
-      outgoingLinks: [],
-    }
+    })
 
-    const procedureEntry: VaultEntry = {
+    const procedureEntry: VaultEntry = makeEntry({
       path: '/Users/luca/Laputa/procedure/write-essays.md',
       filename: 'write-essays.md',
       title: 'Write Weekly Essays',
       isA: 'Procedure',
-      aliases: [],
       belongsTo: ['[[responsibility/grow-newsletter]]'],
-      relatedTo: [],
       status: null,
-      owner: null,
-      cadence: null,
-      archived: false,
-      modifiedAt: 1707900000,
-      createdAt: null,
       fileSize: 400,
-      snippet: '',
-      wordCount: 0,
       relationships: { 'Belongs to': ['[[responsibility/grow-newsletter]]'], 'Type': ['[[procedure]]'] },
-      icon: null,
-      color: null,
-      order: null,
-      template: null, sort: null,
-      outgoingLinks: [],
-    }
+    })
 
-    const experimentEntry: VaultEntry = {
+    const experimentEntry: VaultEntry = makeEntry({
       path: '/Users/luca/Laputa/experiment/seo.md',
       filename: 'seo.md',
       title: 'SEO Experiment',
       isA: 'Experiment',
-      aliases: [],
-      belongsTo: [],
       relatedTo: ['[[responsibility/grow-newsletter]]'],
       status: null,
-      owner: null,
-      cadence: null,
-      archived: false,
-      modifiedAt: 1707900000,
-      createdAt: null,
       fileSize: 200,
-      snippet: '',
-      wordCount: 0,
       relationships: { 'Related to': ['[[responsibility/grow-newsletter]]'], 'Type': ['[[experiment]]'] },
-      icon: null,
-      color: null,
-      order: null,
-      template: null, sort: null,
-      outgoingLinks: [],
-    }
+    })
 
     const targetContent = `---
 title: Grow Newsletter
@@ -608,31 +550,18 @@ Status: Active
     })
 
     it('excludes entries from backlinks when already shown in referenced-by', async () => {
-      const noteA: VaultEntry = {
+      const noteA: VaultEntry = makeEntry({
         path: '/Users/luca/Laputa/essay/on-writing.md',
         filename: 'on-writing.md',
         title: 'On Writing Well',
         isA: 'Essay',
-        aliases: [],
         belongsTo: ['[[responsibility/grow-newsletter]]'],
-        relatedTo: [],
         status: null,
-        owner: null,
-        cadence: null,
-        archived: false,
-        modifiedAt: 1707900000,
-        createdAt: null,
         fileSize: 300,
-        snippet: '',
-        wordCount: 0,
         relationships: { 'Belongs to': ['[[responsibility/grow-newsletter]]'], 'Type': ['[[essay]]'] },
-        icon: null,
-        color: null,
-        order: null,
-        template: null, sort: null,
         // Body text also links to grow-newsletter
         outgoingLinks: ['responsibility/grow-newsletter'],
-      }
+      })
       render(
         <Inspector
           {...defaultProps}

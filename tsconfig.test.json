@@ -34,7 +34,6 @@
     "src/components/Editor.raw-mode-sync.test.ts",
     "src/components/Editor.test.tsx",
     "src/components/EditorRightPanel.test.tsx",
-    "src/components/Inspector.test.tsx",
     "src/components/InspectorPanels.test.tsx",
     "src/components/MarkdownContent.webkit.test.tsx",
     "src/components/NoteAutocomplete.test.tsx",
