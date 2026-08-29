@@ -111,7 +111,7 @@ function TypeSelectorValue({
   )
 }
 
-function TypeRowLabel() {
+function TypeRowLabel({ locale }: { locale: AppLocale }) {
   return (
     <span className={PROPERTY_PANEL_LABEL_CLASS_NAME}>
       <span
@@ -120,7 +120,7 @@ function TypeRowLabel() {
       >
         <StackSimple size={14} className="shrink-0" data-testid="type-row-icon" />
       </span>
-      <span className="min-w-0 truncate">Type</span>
+      <span className="min-w-0 truncate">{translate(locale, 'inspector.properties.type')}</span>
     </span>
   )
 }
@@ -216,7 +216,7 @@ function ReadOnlyType({
       className="grid min-h-7 min-w-0 grid-cols-2 items-center gap-2 px-1.5"
       style={PROPERTY_PANEL_ROW_STYLE}
     >
-      <TypeRowLabel />
+      <TypeRowLabel locale={locale} />
       <TypeRowValue missingTypeName={missingTypeName} locale={locale} onCreateMissingType={onCreateMissingType}>
         {onNavigate ? (
           <button type="button"
@@ -396,7 +396,7 @@ function EditableTypeSelector({
       style={PROPERTY_PANEL_ROW_STYLE}
       data-testid="type-selector"
     >
-      <TypeRowLabel />
+      <TypeRowLabel locale={locale} />
       <TypeRowValue missingTypeName={missingTypeName} locale={locale} onCreateMissingType={onCreateMissingType}>
         <Popover open={open} onOpenChange={handleOpenChange}>
           <PopoverTrigger asChild>

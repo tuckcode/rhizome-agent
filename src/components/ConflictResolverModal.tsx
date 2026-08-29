@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 're
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { ConflictFileState } from '../hooks/useConflictResolver'
+import { translate, type AppLocale } from '../lib/i18n'
 import { cn } from '@/lib/utils'
 
 type ConflictResolutionStrategy = 'ours' | 'theirs'
@@ -50,6 +51,7 @@ interface ConflictResolverModalProps {
   allResolved: boolean
   committing: boolean
   error: string | null
+  locale?: AppLocale
   onResolveFile: (file: string, strategy: 'ours' | 'theirs') => void
   onOpenInEditor: (file: string) => void
   onCommit: () => void
@@ -77,12 +79,14 @@ function ResolutionLabel({ resolution }: { resolution: ConflictFileState['resolu
 function ConflictFileRow({
   state,
   focused,
+  locale,
   onResolve,
   onOpenInEditor,
   onFocus,
 }: {
   state: ConflictFileState
   focused: boolean
+  locale: AppLocale
   onResolve: (strategy: 'ours' | 'theirs') => void
   onOpenInEditor: () => void
   onFocus: () => void
@@ -126,7 +130,7 @@ function ConflictFileRow({
               title="Keep my local version (K)"
               data-testid={`resolve-ours-${state.file}`}
             >
-              Keep mine
+              {translate(locale, 'conflict.keepMine')}
             </Button>
             <Button
               variant="outline"
@@ -261,15 +265,19 @@ function handleCommitShortcut({
   return true
 }
 
-function ConflictDialogHeader({ fileCount }: { fileCount: number }) {
+function ConflictDialogHeader({ fileCount, locale }: { fileCount: number; locale: AppLocale }) {
   return (
     <DialogHeader>
       <div className="flex items-center gap-2">
         <AlertTriangle size={18} className="text-[var(--accent-orange)]" />
-        <DialogTitle>Resolve Merge Conflicts</DialogTitle>
+        <DialogTitle>{translate(locale, 'conflict.title')}</DialogTitle>
       </div>
       <DialogDescription>
-        {fileCount} file{fileCount !== 1 ? 's have' : ' has'} merge conflicts. Choose how to resolve each file.
+        {translate(locale, 'conflict.description', {
+          count: fileCount,
+          plural: fileCount === 1 ? '' : 's',
+          hasHave: fileCount === 1 ? 'has' : 'have',
+        })}
       </DialogDescription>
     </DialogHeader>
   )
@@ -278,12 +286,14 @@ function ConflictDialogHeader({ fileCount }: { fileCount: number }) {
 function ConflictFileList({
   fileStates,
   focusIdx,
+  locale,
   onFocusRow,
   onOpenInEditor,
   onResolveFile,
 }: {
   fileStates: ConflictFileState[]
   focusIdx: number
+  locale: AppLocale
   onFocusRow: (index: number) => void
   onOpenInEditor: (file: string) => void
   onResolveFile: (file: string, strategy: ConflictResolutionStrategy) => void
@@ -299,6 +309,7 @@ function ConflictFileList({
             key={state.file}
             state={state}
             focused={index === focusIdx}
+            locale={locale}
             onResolve={(strategy) => onResolveFile(state.file, strategy)}
             onOpenInEditor={() => onOpenInEditor(state.file)}
             onFocus={() => onFocusRow(index)}
@@ -321,11 +332,13 @@ function CommitButtonContent({ committing }: { committing: boolean }) {
 function ConflictDialogFooter({
   allResolved,
   committing,
+  locale,
   onClose,
   onCommit,
 }: {
   allResolved: boolean
   committing: boolean
+  locale: AppLocale
   onClose: () => void
   onCommit: () => void
 }) {
@@ -335,7 +348,7 @@ function ConflictDialogFooter({
         K = keep mine · T = keep theirs · O = open · Enter = commit
       </span>
       <div className="ml-auto flex shrink-0 gap-2">
-        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button variant="outline" onClick={onClose}>{translate(locale, 'common.cancel')}</Button>
         <Button
           onClick={onCommit}
           disabled={!allResolved || committing}
@@ -371,6 +384,7 @@ function ConflictResolverDialogContent({
   allResolved,
   committing,
   error,
+  locale = 'en',
   onResolveFile,
   onOpenInEditor,
   onCommit,
@@ -404,11 +418,12 @@ function ConflictResolverDialogContent({
       className="max-h-[calc(100vh-24px)] w-[calc(100vw-24px)] overflow-y-auto sm:max-w-[620px]"
       onKeyDown={handleKeyDown}
     >
-      <ConflictDialogHeader fileCount={fileStates.length} />
+      <ConflictDialogHeader fileCount={fileStates.length} locale={locale} />
 
       <ConflictFileList
         fileStates={fileStates}
         focusIdx={focusIdx}
+        locale={locale}
         onFocusRow={syncFocusIdx}
         onOpenInEditor={onOpenInEditor}
         onResolveFile={onResolveFile}
@@ -421,6 +436,7 @@ function ConflictResolverDialogContent({
       <ConflictDialogFooter
         allResolved={allResolved}
         committing={committing}
+        locale={locale}
         onClose={onClose}
         onCommit={onCommit}
       />
