@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useState, useRef, type CSSProperties, type MutableRefObject, type ReactNode, type RefObject } from 'react'
+import { useCallback, useEffect, useState, useRef, type CSSProperties, type MutableRefObject, type ReactNode, type RefObject } from 'react'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 
 import {
@@ -9,10 +9,9 @@ import {
 import { callHost } from '../lib/callHost'
 import { usePanelWidth } from '../hooks/usePanelWidth'
 import { startResizeDrag } from '../utils/startResizeDrag'
-import { toPrimeImages } from '../lib/composerAttachments'
-import { sendToRunningTurn } from '../lib/primeTurnMessaging'
-import { trackPrimeTurnMessage, trackPrimeSessionTreeNavigated } from '../lib/productAnalytics'
+import { trackPrimeSessionTreeNavigated } from '../lib/productAnalytics'
 import { useAiPanelAttachments } from './useAiPanelAttachments'
+import { useAiPanelSendPolicy } from './useAiPanelSendPolicy'
 import { usePrimeQueue } from '../hooks/usePrimeQueue'
 import { usePrimeSessionTree } from '../hooks/usePrimeSessionTree'
 import { SessionBranchBand } from './SessionBranchBand'
@@ -379,13 +378,6 @@ export function AiPanelView({
     onClose,
     enabled: interactive,
   })
-  // Prime owns the queue. Chat used to remember follow-ups locally because
-  // we had no read; `get_queue` is that read.
-  const latestTurnState = useRef({ handleSend, isActive, onSendPrompt })
-  useLayoutEffect(() => {
-    latestTurnState.current = { handleSend, isActive, onSendPrompt }
-  }, [handleSend, isActive, onSendPrompt])
-
   // 180–420: narrower and a session title is a truncation, wider and the
   // transcript starts losing the room the design gives it.
   const sessionsWidth = usePanelWidth(APP_STORAGE_KEYS.chatSessionsWidth, 228, 180, 420)
@@ -397,62 +389,18 @@ export function AiPanelView({
     modelId: primeHost.modelId,
   })
 
-  const sendAsNewTurn = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
-    const latest = latestTurnState.current
-    latest.onSendPrompt?.(text)
-    latest.handleSend(text, references, toPrimeImages(attachments) ?? undefined)
-    clearAttachments()
-    refreshQueue()
-  }, [attachments, clearAttachments, refreshQueue])
-
-  const sendAsNewTurnIfIdle = useCallback((
-    text: string,
-    references: Parameters<typeof handleSend>[1],
-  ) => {
-    if (latestTurnState.current.isActive) return
-    sendAsNewTurn(text, references)
-  }, [sendAsNewTurn])
-
-  const handleComposerSend = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
-    if (!text.trim() && attachments.length === 0) return
-    if (isActive) {
-      // Sending during a turn queues a follow-up rather than being dropped.
-      // Enter is "send another message", which must not disturb the work in
-      // flight — redirecting it is Steer, a separate and deliberate control.
-      if (!isPrimeTarget) return
-      void sendToRunningTurn('followUp', text).then((result) => {
-        // `not-running` means the turn ended between the keystroke and the call.
-        // Send it as a new turn rather than losing it.
-        if (result === 'accepted') {
-          trackPrimeTurnMessage('followUp')
-          setInput('')
-          refreshQueue()
-        } else if (result === 'not-running') {
-          sendAsNewTurnIfIdle(text, references)
-        }
-      })
-      return
-    }
-    sendAsNewTurn(text, references)
-  }, [attachments.length, isActive, isPrimeTarget, refreshQueue, sendAsNewTurn, sendAsNewTurnIfIdle, setInput])
-
-  /**
-   * Redirect the running turn. Only wired for Prime — this is a daemon verb,
-   * and the composer locks itself when no handler is supplied, which is what
-   * every non-Prime target should keep doing.
-   */
-  const handleSteer = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
-    if (!text.trim() && attachments.length === 0) return
-    void sendToRunningTurn('steer', text).then((result) => {
-      if (result === 'accepted') {
-        trackPrimeTurnMessage('steer')
-        setInput('')
-        refreshQueue()
-      } else if (result === 'not-running') {
-        sendAsNewTurnIfIdle(text, references)
-      }
-    })
-  }, [attachments.length, refreshQueue, sendAsNewTurnIfIdle, setInput])
+  // Prime owns the queue. Chat used to remember follow-ups locally because
+  // we had no read; `get_queue` is that read.
+  const { handleComposerSend, handleSteer } = useAiPanelSendPolicy({
+    handleSend,
+    isActive,
+    isPrimeTarget,
+    onSendPrompt,
+    attachments,
+    clearAttachments,
+    refreshQueue,
+    setInput,
+  })
 
   // Open unless this machine says otherwise. The column is the only thing on
   // Chat home that says other sessions exist, so a closed default left the
