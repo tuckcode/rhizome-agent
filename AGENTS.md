@@ -42,6 +42,12 @@
 
   If it drifts, `--update` after you have understood the diff. Do **not** clone `PrimeIntellect-ai/prime-agent`, and do **not** dump `~/.local/lib/node_modules/prime-agent` into context — the snapshot is the list. User-facing "a newer Prime is out" is already `check_prime_update` / `usePrimeUpdate`; this is the adapter check.
 
+  **The snapshot answers "does this command exist". It never answers "what does this command do".** It is a list of names, and a name is not a meaning. When you need the behaviour, read Prime's own docs — they are installed at `~/.local/lib/node_modules/prime-agent/docs/` (`usage.md`, `models.md`, `rpc.md`, `rlm.md`, `daemon.md`, and ~30 more). Reading one file is not dumping the package; it is the difference between knowing and guessing.
+
+  **Why this is in the rule and not left to judgement.** On 2026-08-29 an agent needed to know what `set_scoped_models` does. The snapshot gave the name; this rule read as "do not look further"; so the meaning was taken from a *repo design note* that called it "a routing halfway house". Prime's own `usage.md` says `/scoped-models` means **"Enable/disable models for Ctrl+P cycling"** — a filter on the model picker, not routing at all. That single wrong assumption was then used to argue against adopting an external router, in a decision document, in front of the owner. One `grep` would have caught it.
+
+  The general failure is worth naming: **a document written by a previous agent in this repo is not a primary source.** `HANDOFF.md`, `NEXT.md`, the design notes and the ADRs are all agent-authored, confident in tone, and cited by later agents as if they were verified. Three separate errors on 2026-08-29 had exactly this shape. When a claim about *external* behaviour matters — Prime's, macOS's, a library's — go to that thing's own documentation or run it, and cite what you actually read.
+
 - Read `docs/HANDOFF.md` — current state and an index, ~500 lines, meant to be read in full. It holds no session records: those are one file each in `docs/plans/handoffs/`, newest by filename.
 
   ```bash
