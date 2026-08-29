@@ -277,8 +277,6 @@ fn run_startup_tasks_for_vault(vault_path: &Path) {
         "Migrated is_a to type on startup",
         vault::migrate_is_a_to_type(vp_str),
     );
-    // Migrate legacy config/agents.md -> root AGENTS.md (one-time, idempotent)
-    vault::migrate_agents_md(vp_str);
     // Seed AGENTS.md and starter type definitions at vault root if missing
     vault::seed_config_files(vp_str);
 }

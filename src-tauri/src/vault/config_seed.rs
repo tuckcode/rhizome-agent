@@ -224,12 +224,6 @@ struct GuidancePaths {
     gemini: PathBuf,
 }
 
-#[derive(Debug, Default)]
-struct LegacyAgentsMigrationOutcome {
-    copied_to_root: bool,
-    removed_legacy: bool,
-}
-
 /// Write a file if it doesn't exist or is empty (corrupt). Returns true if written.
 fn write_if_missing(path: &Path, content: &str) -> Result<bool, String> {
     let needs_write = !path.exists() || fs::metadata(path).map_or(true, |m| m.len() == 0);
@@ -417,48 +411,6 @@ fn sync_all_ai_guidance_files(vault_path: &Path) -> Result<bool, String> {
     Ok(wrote_required || wrote_gemini)
 }
 
-fn migrate_legacy_agents_file(
-    root_agents: &Path,
-    config_agents: &Path,
-) -> Result<LegacyAgentsMigrationOutcome, String> {
-    let mut outcome = LegacyAgentsMigrationOutcome::default();
-    if !config_agents.exists() {
-        return Ok(outcome);
-    }
-
-    let config_content = read_file_or_empty(config_agents);
-    if !config_content.is_empty() && root_agents_can_be_replaced(root_agents) {
-        fs::write(root_agents, &config_content)
-            .map_err(|e| format!("Failed to write AGENTS.md: {e}"))?;
-        outcome.copied_to_root = true;
-    }
-
-    fs::remove_file(config_agents)
-        .map_err(|e| format!("Failed to remove config/agents.md: {e}"))?;
-    outcome.removed_legacy = true;
-
-    Ok(outcome)
-}
-
-fn cleanup_empty_config_dir(vault: &Path) -> Result<bool, String> {
-    let config_dir = vault.join("config");
-    if !config_dir.is_dir() {
-        return Ok(false);
-    }
-
-    let is_empty = fs::read_dir(&config_dir)
-        .map_err(|e| format!("Failed to inspect {}: {e}", config_dir.display()))?
-        .next()
-        .is_none();
-    if !is_empty {
-        return Ok(false);
-    }
-
-    fs::remove_dir(&config_dir)
-        .map_err(|e| format!("Failed to remove {}: {e}", config_dir.display()))?;
-    Ok(true)
-}
-
 pub(super) fn sync_default_agents_file(vault_path: &Path) -> Result<bool, String> {
     let paths = guidance_paths(vault_path);
     sync_managed_file(&paths.agents, AGENTS_MD, root_agents_can_be_replaced)
@@ -500,45 +452,11 @@ fn ensure_root_type_definitions(vault_path: &Path) {
     ensure_root_type_definition(vault_path, "note.md", NOTE_TYPE_DEFINITION);
 }
 
-/// Migrate legacy `config/agents.md` → root `AGENTS.md` for existing vaults.
-///
-/// - If `config/agents.md` has real content and root `AGENTS.md` is missing/empty/stub:
-///   move content to root, remove legacy file.
-/// - If root `AGENTS.md` doesn't exist: write defaults.
-/// - Cleans up empty `config/` directory after migration.
-///
-/// Always idempotent and silent.
-pub fn migrate_agents_md(vault_path: impl AsRef<str>) {
-    let vault = Path::new(vault_path.as_ref());
-    let root_agents = vault.join("AGENTS.md");
-    let config_agents = vault.join("config").join("agents.md");
-
-    if let Ok(outcome) = migrate_legacy_agents_file(&root_agents, &config_agents) {
-        if outcome.copied_to_root {
-            log::info!("Migrated config/agents.md content to root AGENTS.md");
-        }
-        if outcome.removed_legacy {
-            log::info!("Removed legacy config/agents.md");
-        }
-    }
-
-    if cleanup_empty_config_dir(vault).unwrap_or(false) {
-        log::info!("Removed empty config/ directory");
-    }
-
-    let _ = sync_required_ai_guidance_files(vault);
-}
-
 /// Repair config files: ensure `AGENTS.md` at vault root and root type definitions.
 /// Migrates legacy `config/agents.md` to root if present.
 /// Called by the "Repair Vault" command. Returns a status message.
 pub fn repair_config_files(vault_path: impl AsRef<str>) -> Result<String, String> {
     let vault = Path::new(vault_path.as_ref());
-    let root_agents = vault.join("AGENTS.md");
-    let config_agents = vault.join("config").join("agents.md");
-
-    migrate_legacy_agents_file(&root_agents, &config_agents)?;
-    let _ = cleanup_empty_config_dir(vault)?;
     sync_required_ai_guidance_files(vault)?;
 
     write_if_missing(&vault.join("type.md"), TYPE_TYPE_DEFINITION)?;
@@ -618,10 +536,6 @@ mod tests {
 
     fn run_seed(vault: &Path) {
         seed_config_files(vault.to_str().unwrap());
-    }
-
-    fn run_migrate(vault: &Path) {
-        migrate_agents_md(vault.to_str().unwrap());
     }
 
     fn run_repair(vault: &Path) {
@@ -814,65 +728,6 @@ mod tests {
     }
 
     #[test]
-    fn test_migrate_agents_md_moves_config_to_root() {
-        assert_legacy_agents_move_to_root(
-            run_migrate,
-            "# My vault agent instructions\nCustom content\n",
-            "My vault agent instructions",
-            true,
-        );
-    }
-
-    #[test]
-    fn test_migrate_agents_md_preserves_existing_root() {
-        let (_dir, vault) = create_vault();
-        write_root_agents(&vault, "# My root agent config\nDo not overwrite\n");
-        write_legacy_agents(&vault, "Legacy content");
-
-        migrate_agents_md(vault.to_str().unwrap());
-
-        let config_dir = vault.join("config");
-        let content = read_root_agents(&vault);
-        assert!(content.contains("My root agent config"));
-        assert!(!config_dir.join("agents.md").exists());
-    }
-
-    #[test]
-    fn test_migrate_agents_md_replaces_stub_with_config_content() {
-        assert_stub_agents_are_replaced(
-            run_migrate,
-            "# Real Agent Config\nImportant instructions\n",
-            "Real Agent Config",
-        );
-    }
-
-    #[test]
-    fn test_migrate_agents_md_idempotent_when_no_legacy() {
-        let (_dir, vault) = create_vault();
-
-        migrate_agents_md(vault.to_str().unwrap());
-
-        assert!(vault.join("AGENTS.md").exists());
-        let root = read_root_agents(&vault);
-        assert!(root.contains("Rhizome Vault"));
-        assert_eq!(read_root_claude(&vault), CLAUDE_MD_SHIM);
-    }
-
-    #[test]
-    fn test_migrate_agents_md_keeps_nonempty_config_dir() {
-        let (_dir, vault) = create_vault();
-        let config_dir = config_dir(&vault);
-        fs::write(config_dir.join("agents.md"), "Agent content").unwrap();
-        fs::write(config_dir.join("other.md"), "Other file").unwrap();
-
-        migrate_agents_md(vault.to_str().unwrap());
-
-        assert!(config_dir.exists());
-        assert!(config_dir.join("other.md").exists());
-        assert!(!config_dir.join("agents.md").exists());
-    }
-
-    #[test]
     fn test_repair_config_files_creates_all() {
         let (_dir, vault) = create_vault();
 
@@ -893,21 +748,25 @@ mod tests {
     }
 
     #[test]
-    fn test_repair_config_files_migrates_legacy_config() {
-        assert_legacy_agents_move_to_root(
-            run_repair,
-            "# My vault agent instructions\nCustom content\n",
-            "My vault agent instructions",
-            true,
-        );
-    }
+    /// Repair no longer moves `config/agents.md` to the root — that migration
+    /// was deleted with the rest of the single-user compatibility code (#57),
+    /// after checking that no vault on this machine still has one. Repair
+    /// seeds and syncs; it does not rescue a layout nobody runs.
+    fn test_repair_config_files_leaves_a_legacy_file_where_it_is() {
+        let vault = tempfile::TempDir::new().unwrap();
+        let config_dir = vault.path().join("config");
+        fs::create_dir_all(&config_dir).unwrap();
+        fs::write(config_dir.join("agents.md"), "# Old\nContent\n").unwrap();
 
-    #[test]
-    fn test_repair_config_files_replaces_stub_with_legacy() {
-        assert_stub_agents_are_replaced(
-            run_repair,
-            "# Real Instructions\nImportant stuff\n",
-            "Real Instructions",
+        run_repair(vault.path());
+
+        assert!(
+            config_dir.join("agents.md").exists(),
+            "repair must not move or delete a legacy file it no longer understands"
+        );
+        assert!(
+            vault.path().join("AGENTS.md").exists(),
+            "repair still seeds the guidance file it is responsible for"
         );
     }
 
