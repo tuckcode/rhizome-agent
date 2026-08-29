@@ -587,6 +587,15 @@ export default function PrimeSessionList({
         </div>
       ) : null}
 
+      {/* `sessions === null` is "not read yet", and it used to render nothing
+          at all — a blank column with no heading, no message and no spinner.
+          A read that is slow, or one that never resolves, is then
+          indistinguishable from a person having no sessions, and from the
+          panel being broken. Say which. */}
+      {sessions === null && !error ? (
+        <p className="px-2.5 py-3 text-xs text-muted-foreground">{t('ai.sessions.loading')}</p>
+      ) : null}
+
       {sessions !== null && !error && ordered.length === 0 ? (
         <p className="px-2.5 py-3 text-xs text-muted-foreground">{t('ai.sessions.empty')}</p>
       ) : null}

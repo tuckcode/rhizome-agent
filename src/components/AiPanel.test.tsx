@@ -413,7 +413,10 @@ describe('AiPanel', () => {
     )
 
     expect(screen.getByText('Checking availability')).toBeTruthy()
-    expect(screen.getByTestId('agent-input')).toHaveAttribute('aria-placeholder', 'Checking AI agent availability...')
+    // Short on purpose: the centre of the panel already says "Checking AI agent
+    // availability" in full, and the composer repeating it put the same sentence
+    // on screen twice.
+    expect(screen.getByTestId('agent-input')).toHaveAttribute('aria-placeholder', 'Checking\u2026')
     expect(screen.getByTestId('agent-send')).toBeDisabled()
   })
 
