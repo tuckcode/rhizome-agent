@@ -7523,6 +7523,68 @@ mod tests {
         let _ = shutdown_host();
     }
 
+    /// #49 against the real daemon. A fake daemon proves we send
+    /// `set_session_name`; only the installed daemon proves it accepts the
+    /// rename mid-session and writes it into the log the sessions list reads.
+    ///
+    /// ```sh
+    /// cargo test --lib prime_session_host::tests::live_session_naming -- --ignored --nocapture
+    /// ```
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "requires a running prime-agent daemon (see `prime-agent status`)"]
+    fn live_session_naming() {
+        let _guard = host_guard();
+        std::env::remove_var(DAEMON_SOCKET_ENV);
+        let vault = tempfile::tempdir().unwrap();
+
+        ensure_host(&vault.path().to_string_lossy()).expect("connect + attach");
+        let session_id = with_host_mut(|host| {
+            host.ensure_session()?;
+            Ok(host.session_id.clone().unwrap_or_default())
+        })
+        .expect("a session to name");
+        println!("session: {session_id}");
+
+        // The placeholder is what a fresh session starts with.
+        assert!(
+            with_host_mut(|host| Ok(host.name_is_placeholder)).unwrap(),
+            "a session Rhizome created carries our placeholder"
+        );
+
+        let asked = "Explain what a wikilink is in one sentence";
+        run_prompt_stream(
+            PrimePromptRequest {
+                images: Vec::new(),
+                message: asked.into(),
+                system_prompt: None,
+                vault_path: vault.path().to_string_lossy().into_owned(),
+                event_name: None,
+                provider: None,
+                model_id: None,
+                new_session: false,
+            },
+            |_| {},
+        )
+        .expect("a live turn");
+
+        assert!(
+            !with_host_mut(|host| Ok(host.name_is_placeholder)).unwrap(),
+            "the first exchange consumes the placeholder"
+        );
+
+        // The name is only real if the daemon wrote it where the list reads.
+        let log = dirs::home_dir()
+            .unwrap()
+            .join(".prime/agent/sessions")
+            .join(format!("{session_id}.jsonl"));
+        let summary = crate::prime_sessions::summarize_file(&log).expect("the session log");
+        println!("title: {:?}", summary.title);
+        assert_eq!(summary.title.as_deref(), Some(asked));
+
+        let _ = shutdown_host();
+    }
+
     /// Live counterpart to the goal fake-daemon tests (#20): set, replace and
     /// clear a goal against a real `prime-agent daemon`, proving the
     /// `/goal [--budget N] <objective>` text this module sends is actually
