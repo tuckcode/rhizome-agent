@@ -167,7 +167,9 @@ export interface Settings {
 }
 
 export interface AiWorkspaceConversationSetting {
-  archived?: boolean | null
+  archived?: boolean
+  /** Ran in a temp directory — test/probe residue, grouped out of the main list. */
+  scratch?: boolean | null
   id: string
   target_id?: string | null
   title: string
