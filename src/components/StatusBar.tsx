@@ -103,7 +103,6 @@ interface StatusBarProps {
   onRemoveVault?: (path: string) => void
   onReorderVaults?: (orderedPaths: string[]) => void
   onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
-  aiFeaturesEnabled?: boolean
   mcpStatus?: McpStatus
   onInstallMcp?: () => void
   commandRailActive?: boolean
@@ -154,7 +153,6 @@ function StatusBarPrimaryFromFooter({
   onRemoveVault,
   onReorderVaults,
   onUpdateWorkspaceIdentity,
-  aiFeaturesEnabled = true,
   mcpStatus,
   onInstallMcp,
   commandRailActive,
@@ -202,7 +200,7 @@ function StatusBarPrimaryFromFooter({
       onRemoveVault={onRemoveVault}
       onReorderVaults={onReorderVaults}
       onUpdateWorkspaceIdentity={onUpdateWorkspaceIdentity}
-      mcpStatus={aiFeaturesEnabled ? mcpStatus : undefined}
+      mcpStatus={mcpStatus}
       onInstallMcp={onInstallMcp}
       commandRailActive={commandRailActive}
       locale={locale}
