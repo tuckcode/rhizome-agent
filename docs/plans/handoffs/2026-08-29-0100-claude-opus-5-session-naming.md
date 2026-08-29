@@ -5,7 +5,7 @@ description: >-
   Sessions now name themselves from their first exchange and store that name
   in Prime, so every client reads the same one. A user rename still wins.
   The list also stops printing Rhizome's own placeholder as if it were a name.
-commits: 8087091, f57d85e
+commits: 8087091, f57d85e, 1980221, f43f7a6
 ---
 
 # Sessions name themselves — 2026-08-29
@@ -57,6 +57,16 @@ anything the session is about, and stands only when there is nothing to derive
 from (still better than "Untitled session" — it at least names the vault).
 This also means **old sessions read better immediately**, without any backfill.
 
+## Also fixed: Mycelium listed uuids
+
+`list_prime_sessions` named each row by its filename — Prime's uuid — so the
+Sessions column beside the citymap was a wall of
+`01a04c21-91d5-76aa-8b75-….jsonl`. It now uses the same title the sessions
+list shows (`f43f7a6`). A log too damaged to summarise keeps its filename.
+
+The middle column in that view is Mindwalk's own list, reading the logs
+itself; it is unaffected by our naming and shows what Prime stored.
+
 ## Where the code is
 
 - `src-tauri/src/prime_session_host.rs` — `session_title_from_exchange`,
@@ -85,6 +95,29 @@ worth it so other clients see the same names, or whether derived titles are
 enough. Left undecided deliberately: a backfill writes to every log in
 `~/.prime/agent/sessions` and is not obviously wanted.
 
+## Mycelium's Evaluation panel — not our bug
+
+Reported mid-session with a screenshot: Mycelium's **Evaluation** panel fails
+with `claude failed: exit status 1` over a raw JSON dump.
+
+Reproduced outside the app in three commands. `claude -p "hi"
+--output-format json` returns the identical payload, and its `result` field —
+which the panel truncates before showing — says:
+
+> Failed to authenticate: OAuth session expired and could not be refreshed
+
+So the `claude` CLI's own login has expired on this machine. Nothing in
+Rhizome or Mindwalk is broken. **Fix: run `claude login`.**
+`~/.mindwalk/judge/` is empty, so no evaluation has ever completed here.
+
+Two things worth doing anyway, neither started:
+
+- The panel prints the whole JSON blob and cuts it mid-field. The one useful
+  sentence is in `result`; everything shown is noise. This is Mindwalk's
+  surface, not ours — worth an upstream issue rather than a patch.
+- An expired CLI login is a fixable state with a one-line action. Rhizome
+  already does this for Prime (`PrimeConnectionProblem`); Mycelium does not.
+
 ## Not done
 
 - **C55** — the text-only-model warning still does not fire in the app.
@@ -92,3 +125,7 @@ enough. Left undecided deliberately: a backfill writes to every log in
 - **#44** — the Notes panel and the Mycelium list are still not resizable; the
   Notes panel needs a decision about how a drag interacts with
   `useShellCompactLayout`.
+- **Mycelium still opens as a modal over the app**, with its own window
+  chrome and a second "Mycelium" heading under the first. Doctrine says it
+  should replace Chat as the centre canvas (ADR-0166). Visible in the same
+  screenshot: the title collides with the macOS traffic lights.
