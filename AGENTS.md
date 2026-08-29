@@ -77,6 +77,16 @@
   command as every single push.
   See `docs/CROSS-MODEL-HANDOFF.md` §13 for the full sequence and `cargo llvm-cov` flags.
 
+  **Corrected 2026-08-28:** the hook checked `brew --prefix llvm`, which
+  answers with a path whether or not the formula is installed. On a machine
+  where Homebrew's llvm had been removed the check passed and the push then
+  failed inside cargo with `could not execute process … No such file or
+  directory` — an error naming llvm-profdata and not the reason. The hook now
+  verifies the binaries exist and falls back to Xcode Command Line Tools
+  (`/Library/Developer/CommandLineTools/usr/bin`), which every macOS machine
+  that can build this project already has. Rust here is Homebrew's rather than
+  rustup's, so `llvm-tools-preview` is not available as a fallback on macOS.
+
   **On Windows** those two exports are wrong — there is no `brew`. Install the
   toolchain through rustup instead, once per machine:
   ```

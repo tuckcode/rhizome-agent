@@ -58,14 +58,29 @@ ensure_llvm_coverage_tooling() {
   if [ -n "$LLVM_COV" ] && [ -n "$LLVM_PROFDATA" ]; then
     return 0
   fi
-  if ! command -v brew >/dev/null 2>&1; then
-    return 0
+  if command -v brew >/dev/null 2>&1; then
+    BREW_LLVM="$(brew --prefix llvm 2>/dev/null)"
+    if [ -x "$BREW_LLVM/bin/llvm-cov" ] && [ -x "$BREW_LLVM/bin/llvm-profdata" ]; then
+      export LLVM_COV="$BREW_LLVM/bin/llvm-cov"
+      export LLVM_PROFDATA="$BREW_LLVM/bin/llvm-profdata"
+      return 0
+    fi
   fi
 
-  BREW_LLVM="$(brew --prefix llvm 2>/dev/null)"
-  if [ -x "$BREW_LLVM/bin/llvm-cov" ] && [ -x "$BREW_LLVM/bin/llvm-profdata" ]; then
-    export LLVM_COV="${LLVM_COV:-$BREW_LLVM/bin/llvm-cov}"
-    export LLVM_PROFDATA="${LLVM_PROFDATA:-$BREW_LLVM/bin/llvm-profdata}"
+  # Homebrew's llvm is not guaranteed. `brew --prefix llvm` answers with a
+  # path whether or not the formula is installed, so the old check passed the
+  # prefix test and then failed inside cargo with "could not execute process
+  # … No such file or directory" — an error that names llvm-profdata and not
+  # the reason. Observed 2026-08-28 on a machine where the formula had gone
+  # while `/opt/homebrew/opt/llvm` remained.
+  #
+  # Xcode Command Line Tools ship both, and every macOS machine that can
+  # compile this project already has them. Rust here is Homebrew's rather than
+  # rustup's, so `llvm-tools-preview` is not an option to fall back to.
+  XCODE_LLVM="/Library/Developer/CommandLineTools/usr/bin"
+  if [ -x "$XCODE_LLVM/llvm-cov" ] && [ -x "$XCODE_LLVM/llvm-profdata" ]; then
+    export LLVM_COV="$XCODE_LLVM/llvm-cov"
+    export LLVM_PROFDATA="$XCODE_LLVM/llvm-profdata"
   fi
 }
 
