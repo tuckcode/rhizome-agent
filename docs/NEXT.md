@@ -17,11 +17,12 @@ It indexes, it does not restate. Every row points at the issue, ADR, or C-number
 that owns the detail. If you find yourself copying a paragraph out of one of
 those into here, link it instead — the same rule `HANDOFF.md` runs on.
 
-Snapshot: **2026-08-24**, 27 open issues, 16 open C-numbers. Re-derive both
+Snapshot: **2026-08-29**, 25 open issues, 18 open C-numbers. Re-derive both
 before trusting the counts:
 
 ```bash
-gh issue list --state open --limit 60 && grep -c "C[0-9]*-OPEN" docs/HANDOFF.md
+gh issue list --state open --limit 60 | wc -l
+rg 'C[0-9]+-OPEN' docs/HANDOFF.md | rg -v '~~' | rg -o 'C[0-9]+-OPEN' | sort -u | wc -l
 ```
 
 ---
@@ -98,8 +99,8 @@ becomes the editor. Captured in ADR-0166.
 |---|---|
 | #27 | Session list as a dockable sidebar — **closed 2026-08-26** (left column of Chat) |
 | #34 | Session list filter — **closed 2026-08-26** (title / place / branch) |
-| #22 | Mycelium: Rhizome chrome + rail overview vs This run — **implemented locally** (engine still Mindwalk; M4 restyle not started) |
-| #11 | Mycelium runs as an in-app sidecar embed — **implemented locally** |
+| #22 | Mycelium: Rhizome chrome + rail overview vs This run — **closed 2026-08-27** (engine still Mindwalk; M4 restyle not started) |
+| #11 | Mycelium runs as an in-app sidecar embed — **closed 2026-08-27** |
 | #39 | Make the knowledge graph an agent tool, not a place you visit — **B** |
 
 **Composer and controls** — the densest ready-to-build cluster, no blockers
@@ -122,7 +123,7 @@ becomes the editor. Captured in ADR-0166.
 **Memory loop** — the product thesis; least covered by design docs
 | | |
 |---|---|
-| #24 | Promote produces a note worth keeping, not a transcript dump — **implemented locally** (live check leftover) |
+| #24 | Promote produces a note worth keeping, not a transcript dump — **closed 2026-08-28** |
 | #25 | Retrieval shows its work — `needs-triage`, oldest untriaged |
 | #37 | "Save as custom" in the research format modal has never done anything — **closed 2026-08-29** (UI `1b469fc`; storage `5d7587c`) |
 
@@ -157,7 +158,7 @@ Save-to-vault refuse. Prime session jsonl stays out of scope.
 
 ## 3. Open threads (C-numbers)
 
-16 open. Full text in `HANDOFF.md` § Open threads — this is the shape of the
+18 open. Full text in `HANDOFF.md` § Open threads — this is the shape of the
 backlog, not a replacement for it.
 
 - **Blocks other work:** C23 (`get_messages` returns no assistant messages —
@@ -165,7 +166,10 @@ backlog, not a replacement for it.
   launched — #32 sits on top of it)
 - **Test and gate reliability:** C28 (three `@smoke` specs fail under CPU load),
   C31 (unreproducible `pnpm test` unhandled error), C39 (live-daemon tests not
-  isolated), C25 (two stale regression specs)
+  isolated), C25 (two stale regression specs), C52 (AI chat Playwright specs
+  stale), C56 (two live-daemon tests fail against a healthy daemon)
+- **Correctness / warnings:** C55 (text-only-model warning does not fire in
+  native app)
 - **Correctness:** C40 (`rhizome_graph_summary` answers about a different
   graph), C34 (menu-bar roster activity labels, half done)
 - **Health and cleanup:** C46 (`AiPanel.tsx` CCN 50 / 447 lines — grew during
@@ -237,10 +241,11 @@ unprompted Prime verbs.
    Until ratified, do not graft. Closing **#40** against the filter is a
    side-errand, not a substitute.
 2. **Chat-centered shell shipped** (ADR-0166, 2026-08-25). Research and
-   Mycelium take the canvas locally (#11 / #22); live check leftover.
-   Remaining canvas question is Wiki Graph as a *tool* (#39). #27 / #34 / #31
-   closed on GitHub 2026-08-26.
-3. **Memory loop (#24, #25)** — the product thesis, thinnest design coverage.
+   Mycelium on canvas (#11 / #22 closed 2026-08-27). Remaining canvas question
+   is Wiki Graph as a *tool* (#39). #27 / #34 / #31 closed on GitHub
+   2026-08-26.
+3. **Memory loop (#25)** — #24 closed 2026-08-28; retrieval provenance is the
+   product thesis gap with thinnest design coverage.
 4. **TokenJuice + Switchyard (§1)** — discuss/plan when you want the stacked
    later system. Not this week's build.
    [`token-routing-and-compression.md`](design/token-routing-and-compression.md).
