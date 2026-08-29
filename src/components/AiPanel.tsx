@@ -56,12 +56,11 @@ import { ChatComposerFoot } from './ChatComposerFoot'
 import { lastToolName } from '../utils/lastToolName'
 import { usePrimeCommandMenu } from '../hooks/usePrimeCommandMenu'
 import { type CommandMenuAction } from '../lib/primeCommandMenu'
-import { trackPrimeCommandRun, trackPrimeScheduledWorkCreated } from '../lib/productAnalytics'
-import { trackEvent } from '../lib/telemetry'
+import { trackPrimeCommandRun } from '../lib/productAnalytics'
 import { PrimeGoalDialog } from './PrimeGoalDialog'
-import { PrimeScheduleDialog, type ScheduledWorkKind, type HeartbeatDelivery } from './PrimeScheduleDialog'
-import type { PrimeAgentActivity } from './AgentActivityBand'
-import { usePrimeActivity } from './primeActivityContext'
+import { PrimeScheduleDialog } from './PrimeScheduleDialog'
+import { useAiPanelGoalDialog } from './useAiPanelGoalDialog'
+import { useAiPanelScheduleDialog } from './useAiPanelScheduleDialog'
 
 interface AiPanelProps {
   onClose: () => void
@@ -281,56 +280,8 @@ export function AiPanelView({
   const [branchBusyId, setBranchBusyId] = useState<string | null>(null)
   const [branchError, setBranchError] = useState<string | null>(null)
 
-  // Goal dialog (#20): opened on demand, not polled — the goal strip
-  // (`AgentActivityBand`, wired in `ChatHome`) already polls for display.
-  // This only needs a fresh read at the moment the dialog opens, so the
-  // "current goal" shown there can never be stale.
-  const [goalDialogOpen, setGoalDialogOpen] = useState(false)
-  const [goalDialogGoal, setGoalDialogGoal] = useState<PrimeAgentActivity['goal'] | null>(null)
-  const handleOpenGoalDialog = useCallback(() => {
-
-    setGoalDialogOpen(true)
-    void callHost<PrimeAgentActivity>('get_prime_agent_activity')
-      .then((activity) => setGoalDialogGoal(activity?.goal ?? null))
-      .catch(() => setGoalDialogGoal(null))
-  }, [])
-  const handleSetGoal = useCallback(async (objective: string, tokenBudget: number | null) => {
-
-    const goal = await callHost<{ objective?: string }>('set_prime_goal', {
-      objective,
-      tokenBudget: tokenBudget ?? undefined,
-    })
-    // ProductAnalyticsProperties is Record<string, string | number> — a raw
-    // boolean does not typecheck under the build's stricter pass.
-    trackEvent('prime_goal_set', { has_budget: tokenBudget !== null ? 'yes' : 'no' })
-    return goal
-  }, [])
-  const handleClearGoal = useCallback(async () => {
-
-    await callHost<void>('clear_prime_goal')
-    trackEvent('prime_goal_cleared')
-  }, [])
-
-  const { refresh: refreshActivity } = usePrimeActivity()
-  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false)
-  const handleCreateSchedule = useCallback(
-    async (
-      kind: ScheduledWorkKind,
-      schedule: string,
-      prompt: string,
-      deliveryMode: HeartbeatDelivery,
-    ) => {
-      await callHost('create_prime_scheduled_work', {
-        kind,
-        schedule,
-        prompt,
-        deliveryMode: kind === 'heartbeat' ? deliveryMode : undefined,
-      })
-      trackPrimeScheduledWorkCreated(kind)
-      await refreshActivity()
-    },
-    [refreshActivity],
-  )
+  const goalDialog = useAiPanelGoalDialog()
+  const scheduleDialog = useAiPanelScheduleDialog()
 
   // Reopening lands back in work the daemon kept running, so the panel has to
   // show that conversation rather than an empty one over a live session (#7).
@@ -715,7 +666,7 @@ export function AiPanelView({
           <Button
             variant="ghost"
             size="xs"
-            onClick={handleOpenGoalDialog}
+            onClick={goalDialog.openDialog}
             data-testid="prime-goal-trigger"
           >
             <Target size={12} weight="regular" aria-hidden="true" />
@@ -724,7 +675,7 @@ export function AiPanelView({
           <Button
             variant="ghost"
             size="xs"
-            onClick={() => setScheduleDialogOpen(true)}
+            onClick={() => scheduleDialog.onOpenChange(true)}
             data-testid="prime-schedule-trigger"
           >
             <CalendarDots size={12} weight="regular" aria-hidden="true" />
@@ -734,20 +685,20 @@ export function AiPanelView({
       )}
       {isPrimeTarget && (
         <PrimeGoalDialog
-          open={goalDialogOpen}
-          onOpenChange={setGoalDialogOpen}
+          open={goalDialog.open}
+          onOpenChange={goalDialog.onOpenChange}
           locale={locale}
-          currentGoal={goalDialogGoal}
-          onSetGoal={handleSetGoal}
-          onClearGoal={handleClearGoal}
+          currentGoal={goalDialog.currentGoal}
+          onSetGoal={goalDialog.onSetGoal}
+          onClearGoal={goalDialog.onClearGoal}
         />
       )}
       {isPrimeTarget && (
         <PrimeScheduleDialog
-          open={scheduleDialogOpen}
-          onOpenChange={setScheduleDialogOpen}
+          open={scheduleDialog.open}
+          onOpenChange={scheduleDialog.onOpenChange}
           locale={locale}
-          onCreate={handleCreateSchedule}
+          onCreate={scheduleDialog.onCreate}
         />
       )}
       <AiPanelComposer
