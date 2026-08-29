@@ -7,7 +7,6 @@ const invoked = vi.hoisted(() => ({
   calls: [] as Array<{ cmd: string, args?: Record<string, unknown> }>,
   formats: [] as Array<{ id: string, title: string, instruction: string }>,
   saveFails: false,
-  deleteFails: false,
 }))
 
 vi.mock('../mock-tauri', () => ({
@@ -22,12 +21,6 @@ vi.mock('../mock-tauri', () => ({
         ...invoked.formats,
         { id: title.toLowerCase().replace(/\s+/g, '-'), title, instruction: String(args?.instruction ?? '') },
       ]
-      return Promise.resolve(invoked.formats)
-    }
-    if (cmd === 'delete_research_format') {
-      if (invoked.deleteFails) return Promise.reject(new Error('nope'))
-      const id = String(args?.id ?? '')
-      invoked.formats = invoked.formats.filter(f => f.id !== id)
       return Promise.resolve(invoked.formats)
     }
     return Promise.resolve(null)
@@ -55,7 +48,6 @@ beforeEach(() => {
   invoked.calls = []
   invoked.formats = []
   invoked.saveFails = false
-  invoked.deleteFails = false
   tracked.counts = []
 })
 
@@ -133,42 +125,6 @@ describe('RhizomeFormatModal custom formats', () => {
     renderModal({ vaultPath: '' })
 
     expect(screen.getByTestId('research-format-add')).toBeDisabled()
-  })
-
-  it('does not offer delete for built-in formats', async () => {
-    renderModal()
-
-    await screen.findByTestId('research-format-add')
-    expect(screen.queryByTestId('research-format-delete')).toBeNull()
-  })
-
-  it('deletes a custom format after confirmation', async () => {
-    invoked.formats = [{ id: 'q3', title: 'Q3 Lens', instruction: 'Read it as a plan.' }]
-
-    renderModal({ currentMode: 'q3' })
-
-    await waitFor(() => expect(screen.getByTestId('research-format-delete')).toBeInTheDocument())
-    fireEvent.click(screen.getByTestId('research-format-delete'))
-    fireEvent.click(screen.getByTestId('confirm-delete-btn'))
-
-    await waitFor(() => {
-      expect(invoked.calls.some(c => c.cmd === 'delete_research_format' && c.args?.id === 'q3')).toBe(true)
-    })
-    expect(screen.queryByText('Q3 Lens')).toBeNull()
-    expect(screen.getAllByText('Architecture Map').length).toBeGreaterThan(0)
-  })
-
-  it('surfaces a delete failure instead of removing the format silently', async () => {
-    invoked.deleteFails = true
-    invoked.formats = [{ id: 'q3', title: 'Q3 Lens', instruction: 'Read it as a plan.' }]
-
-    renderModal({ currentMode: 'q3' })
-
-    fireEvent.click(await screen.findByTestId('research-format-delete'))
-    fireEvent.click(screen.getByTestId('confirm-delete-btn'))
-
-    expect(await screen.findByRole('alert')).toBeInTheDocument()
-    expect(screen.getAllByText('Q3 Lens').length).toBeGreaterThan(0)
   })
 })
 

@@ -1376,9 +1376,5 @@
   "settings.modelAllowList.summary": "{selected} of {available} listed first in the chat menu.",
   "settings.modelAllowList.showAll": "Show all",
   "settings.modelAllowList.noMatches": "No models match that search.",
-  "settings.modelAllowList.more": "Showing {shown} of {matched} matches — narrow the search.",
-  "research.format.delete": "Delete format",
-  "research.format.deleteConfirmTitle": "Delete custom format?",
-  "research.format.deleteConfirmMessage": "This removes \"{title}\" from this vault. Built-in formats are not affected.",
-  "research.format.deleteFailed": "Could not delete this format."
+  "settings.modelAllowList.more": "Showing {shown} of {matched} matches — narrow the search."
 }

@@ -368,7 +368,6 @@ export function SearchPanel({
           ref={inputRef}
           query={query}
           loading={loading}
-          locale={locale}
           onChange={setQuery}
         />
         <SearchContent
@@ -382,7 +381,6 @@ export function SearchPanel({
           showWorkspace={showWorkspace}
           dateDisplayFormat={dateDisplayFormat}
           listRef={listRef}
-          locale={locale}
           onSelect={handleSelect}
           onHover={handleResultHover}
         />
@@ -394,12 +392,11 @@ export function SearchPanel({
 interface SearchInputProps {
   query: string
   loading: boolean
-  locale: AppLocale
   onChange: (value: string) => void
 }
 
 const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
-  function SearchInput({ query, loading, locale, onChange }, ref) {
+  function SearchInput({ query, loading, onChange }, ref) {
     return (
       <div className="flex items-center gap-3 border-b border-border px-4 py-3">
         <svg aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -410,7 +407,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           ref={ref}
           className="flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-muted-foreground"
           type="text"
-          placeholder={translate(locale, 'search.placeholder')}
+          placeholder="Search in all notes..."
           value={query}
           onChange={e => onChange(e.target.value)}
         />
@@ -442,7 +439,6 @@ interface SearchContentProps {
   showWorkspace: boolean
   dateDisplayFormat: DateDisplayFormat
   listRef: React.RefObject<HTMLDivElement | null>
-  locale: AppLocale
   onSelect: (result: SearchResult) => void
   onHover: (index: number, event: React.MouseEvent<HTMLDivElement>) => void
 }
@@ -559,63 +555,51 @@ function SearchResultSubtitle({ subtitle }: { subtitle: string | null }) {
   return subtitle ? <p className="mt-0.5 pl-[22px] text-[11px] text-muted-foreground">{subtitle}</p> : null
 }
 
-function SearchIdleMessage({ locale }: { locale: AppLocale }) {
+function SearchIdleMessage() {
   return (
     <div className="px-4 py-8 text-center">
-      <p className="text-[13px] text-muted-foreground">{translate(locale, 'search.idleHint')}</p>
-      <p className="mt-1 text-[11px] text-muted-foreground/60">{translate(locale, 'search.keyboardHint')}</p>
+      <p className="text-[13px] text-muted-foreground">Search across all note contents</p>
+      <p className="mt-1 text-[11px] text-muted-foreground/60">Enter to open · Esc to close</p>
     </div>
   )
 }
 
-function SearchLoadingMessage({ locale }: { locale: AppLocale }) {
-  return (
-    <div className="px-4 py-8 text-center text-[13px] text-muted-foreground">
-      {translate(locale, 'search.loading')}
-    </div>
-  )
+function SearchLoadingMessage() {
+  return <div className="px-4 py-8 text-center text-[13px] text-muted-foreground">Searching...</div>
 }
 
-function SearchNoResultsMessage({ locale }: { locale: AppLocale }) {
+function SearchNoResultsMessage() {
   return (
     <div className="px-4 py-8 text-center">
-      <p className="text-[13px] text-muted-foreground">{translate(locale, 'search.noResults')}</p>
+      <p className="text-[13px] text-muted-foreground">No results found</p>
     </div>
   )
 }
 
-function SearchResultsHeader({ count, elapsedMs, locale }: { count: number; elapsedMs: number | null; locale: AppLocale }) {
-  const summary = translate(locale, 'search.resultCount', {
-    count,
-    plural: count === 1 ? '' : 's',
-  })
-  const timing = elapsedMs !== null
-    ? translate(locale, 'search.resultElapsed', { elapsedMs })
-    : ''
-
+function SearchResultsHeader({ count, elapsedMs }: { count: number; elapsedMs: number | null }) {
   return (
     <div className="border-b border-border/50 px-4 py-1.5">
       <span className="text-[11px] text-muted-foreground">
-        {summary}{timing}
+        {count} result{count !== 1 ? 's' : ''}{elapsedMs !== null ? ` · ${elapsedMs}ms` : ''}
       </span>
     </div>
   )
 }
 
 function SearchContent({
-  query, results, selectedIndex, loading, elapsedMs, entryLookup, typeEntryMap, showWorkspace, dateDisplayFormat, listRef, locale, onSelect, onHover,
+  query, results, selectedIndex, loading, elapsedMs, entryLookup, typeEntryMap, showWorkspace, dateDisplayFormat, listRef, onSelect, onHover,
 }: SearchContentProps) {
   const hasQuery = query.trim().length > 0
   const hasResults = results.length > 0
   return (
     <div className="flex-1 overflow-y-auto">
-      {!hasQuery && <SearchIdleMessage locale={locale} />}
-      {hasQuery && !hasResults && loading && <SearchLoadingMessage locale={locale} />}
-      {hasQuery && !hasResults && !loading && <SearchNoResultsMessage locale={locale} />}
+      {!hasQuery && <SearchIdleMessage />}
+      {hasQuery && !hasResults && loading && <SearchLoadingMessage />}
+      {hasQuery && !hasResults && !loading && <SearchNoResultsMessage />}
       {hasResults && (
         <>
-          <SearchResultsHeader count={results.length} elapsedMs={elapsedMs} locale={locale} />
-          <div ref={listRef} role="listbox" aria-label={translate(locale, 'search.resultsAria')}>
+          <SearchResultsHeader count={results.length} elapsedMs={elapsedMs} />
+          <div ref={listRef} role="listbox" aria-label="Search results">
             {results.map((result, i) => (
               <SearchResultRow
                 key={result.path}
