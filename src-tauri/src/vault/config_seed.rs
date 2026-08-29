@@ -585,36 +585,6 @@ mod tests {
         assert!(!content.contains("Store note type in the `type:` frontmatter field."));
     }
 
-    fn assert_legacy_agents_move_to_root(
-        run: VaultOperation,
-        legacy_agents: &str,
-        expected_root_text: &str,
-        expect_config_dir_removed: bool,
-    ) {
-        let (_dir, vault) = run_with_agents(run, None, Some(legacy_agents));
-
-        let config_dir = vault.join("config");
-        let root_content = read_root_agents(&vault);
-        assert!(root_content.contains(expected_root_text));
-        assert!(!config_dir.join("agents.md").exists());
-        assert_eq!(config_dir.exists(), !expect_config_dir_removed);
-    }
-
-    fn assert_stub_agents_are_replaced(
-        run: VaultOperation,
-        legacy_agents: &str,
-        expected_root_text: &str,
-    ) {
-        let (_dir, vault) = run_with_agents(
-            run,
-            Some("# Agent Instructions\nSee config/agents.md for vault instructions.\n"),
-            Some(legacy_agents),
-        );
-
-        let content = read_root_agents(&vault);
-        assert!(content.contains(expected_root_text));
-    }
-
     fn assert_required_agents_file_seeded(vault: &Path) {
         assert!(vault.join("AGENTS.md").exists());
         assert!(read_root_agents(vault).contains("Rhizome Vault"));
