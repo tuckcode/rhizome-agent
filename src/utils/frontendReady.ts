@@ -3,7 +3,7 @@ export const STARTUP_RELOAD_ATTEMPT_STORAGE_NAME = 'tolaria:startup-reload-attem
 
 declare global {
   interface Window {
-    __tolariaFrontendReady?: boolean
+    __rhizomeFrontendReady?: boolean
   }
 }
 
@@ -53,7 +53,7 @@ export function markFrontendReady(options: FrontendReadyOptions = {}): void {
   const win = options.win ?? window
   const storage = options.storage ?? getSessionStorage(win)
 
-  win.__tolariaFrontendReady = true
+  win.__rhizomeFrontendReady = true
   removeSessionItem(storage, STARTUP_RELOAD_ATTEMPT_STORAGE_NAME)
   win.dispatchEvent(new Event(FRONTEND_READY_EVENT_NAME))
 }
@@ -64,7 +64,7 @@ export function reloadFrontendOnceIfStartupFailed(
   const win = options.win ?? window
   const storage = options.storage ?? getSessionStorage(win)
 
-  if (win.__tolariaFrontendReady === true) return false
+  if (win.__rhizomeFrontendReady === true) return false
   if (readSessionItem(storage, STARTUP_RELOAD_ATTEMPT_STORAGE_NAME) === '1') return false
   if (!writeSessionItem(storage, STARTUP_RELOAD_ATTEMPT_STORAGE_NAME, '1')) return false
 

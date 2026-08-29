@@ -189,7 +189,7 @@
 
         window.addEventListener(readyEventName, clearReloadAttempt, { once: true });
         window.setTimeout(function () {
-          if (window.__tolariaFrontendReady === true) return;
+          if (window.__rhizomeFrontendReady === true) return;
           if (hasReloadAttempted()) return;
           if (!markReloadAttempted()) return;
 

@@ -125,7 +125,7 @@ describe('main entrypoint', () => {
     vi.clearAllMocks()
     document.body.innerHTML = '<div id="root"></div>'
     document.body.className = ''
-    window.__tolariaFrontendReady = false
+    window.__rhizomeFrontendReady = false
     sessionStorage.clear()
   })
 
@@ -143,7 +143,7 @@ describe('main entrypoint', () => {
     )
 
     const error = new Error('Maximum update depth exceeded')
-    window.__tolariaFrontendReady = true
+    window.__rhizomeFrontendReady = true
     rootOptions().onCaughtError?.(error, { componentStack: '\n    in App' })
 
     expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack: '\n    in App' })
@@ -153,7 +153,7 @@ describe('main entrypoint', () => {
     await importEntrypoint()
 
     const error = new Error('recoverable render error')
-    window.__tolariaFrontendReady = true
+    window.__rhizomeFrontendReady = true
     rootOptions().onRecoverableError?.(error, {})
 
     expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack: '' })
@@ -171,7 +171,7 @@ describe('main entrypoint', () => {
     await importEntrypoint()
 
     const error = new Error('ResizeObserver loop completed with undelivered notifications.')
-    window.__tolariaFrontendReady = true
+    window.__rhizomeFrontendReady = true
 
     rootOptions().onRecoverableError?.(error, {})
     rootOptions().onCaughtError?.(error, { componentStack: '\n    in App' })
@@ -185,7 +185,7 @@ describe('main entrypoint', () => {
 
     const error = new Error("Block doesn't have id")
     const componentStack = '\n    in MermaidBlock\n    in BlockNoteRenderRecoveryBoundary'
-    window.__tolariaFrontendReady = true
+    window.__rhizomeFrontendReady = true
 
     rootOptions().onCaughtError?.(error, { componentStack })
     expect(mocks.sentryHandler).not.toHaveBeenCalled()
@@ -198,7 +198,7 @@ describe('main entrypoint', () => {
     await importEntrypoint()
 
     const error = new Error('Block type does not match')
-    window.__tolariaFrontendReady = true
+    window.__rhizomeFrontendReady = true
 
     rootOptions().onCaughtError?.(error, {})
     expect(mocks.sentryHandler).not.toHaveBeenCalled()
@@ -213,7 +213,7 @@ describe('main entrypoint', () => {
 
     const error = new Error('The object can not be found here.')
     error.name = 'NotFoundError'
-    window.__tolariaFrontendReady = true
+    window.__rhizomeFrontendReady = true
 
     rootOptions().onCaughtError?.(error, {
       componentStack: '\n    in BlockNoteView\n    in BlockNoteRenderRecoveryBoundary',
@@ -229,7 +229,7 @@ describe('main entrypoint', () => {
     const { markRecoveredActionTooltipError } = await import('./components/ui/actionTooltipRecovery')
     const error = new Error('tooltip content render failed')
     const componentStack = '\n    in TooltipContent\n    in ActionTooltipBoundary'
-    window.__tolariaFrontendReady = true
+    window.__rhizomeFrontendReady = true
     markRecoveredActionTooltipError(error)
 
     rootOptions().onCaughtError?.(error, { componentStack })

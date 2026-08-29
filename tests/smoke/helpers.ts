@@ -15,7 +15,7 @@ const COMMAND_MODIFIER: KeyboardModifier = process.platform === 'darwin' ? 'Meta
  * Waiting on this flag is a real readiness signal, not a timing guess.
  */
 export async function waitForKeyboardShortcutsReady(page: Page): Promise<void> {
-  await page.waitForFunction(() => window.__tolariaFrontendReady === true, undefined, {
+  await page.waitForFunction(() => window.__rhizomeFrontendReady === true, undefined, {
     timeout: 10_000,
   })
 }
