@@ -46,6 +46,14 @@
 
   **Why this is in the rule and not left to judgement.** On 2026-08-29 an agent needed to know what `set_scoped_models` does. The snapshot gave the name; this rule read as "do not look further"; so the meaning was taken from a *repo design note* that called it "a routing halfway house". Prime's own `usage.md` says `/scoped-models` means **"Enable/disable models for Ctrl+P cycling"** — a filter on the model picker, not routing at all. That single wrong assumption was then used to argue against adopting an external router, in a decision document, in front of the owner. One `grep` would have caught it.
 
+  **And Prime's docs are not the last word either.** A 2026-08-16 session found
+  Prime's *documented* behaviour diverging from its *actual* behaviour four
+  separate times in one day, and probing the live daemon caught it every time.
+  So the order of trust is: **live daemon > Prime's docs > this repo's notes.**
+  Read `usage.md` before believing a repo note; probe the daemon before
+  shipping anything that depends on the answer. `pnpm test:live-prime` and a
+  one-off `prime-agent` call are both cheap.
+
   The general failure is worth naming: **a document written by a previous agent in this repo is not a primary source.** `HANDOFF.md`, `NEXT.md`, the design notes and the ADRs are all agent-authored, confident in tone, and cited by later agents as if they were verified. Three separate errors on 2026-08-29 had exactly this shape. When a claim about *external* behaviour matters — Prime's, macOS's, a library's — go to that thing's own documentation or run it, and cite what you actually read.
 
 - Read `docs/HANDOFF.md` — current state and an index, ~500 lines, meant to be read in full. It holds no session records: those are one file each in `docs/plans/handoffs/`, newest by filename.
