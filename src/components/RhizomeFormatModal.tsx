@@ -9,8 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { callHostOr } from '../lib/callHost'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { trackResearchFormatSaved } from '../lib/productAnalytics'
-import { customToResearchMode, CUSTOM_CATEGORY, type CustomFormat } from '../lib/researchFormats'
-import { ConfirmDeleteDialog } from './ConfirmDeleteDialog'
+import { customToResearchMode, type CustomFormat } from '../lib/researchFormats'
 import { MagnifyingGlass, BugBeetle, Brain, RocketLaunch, Code, PuzzlePiece, Question, FileMagnifyingGlass, ArrowsDownUp, BookOpen } from '@phosphor-icons/react'
 
 export interface ResearchMode {
@@ -223,8 +222,6 @@ export function RhizomeFormatModal({
   const [draftTitle, setDraftTitle] = useState('')
   const [draftInstruction, setDraftInstruction] = useState('')
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Reloaded per open rather than once: another window (or the agent) can
   // write the file while this modal is closed.
@@ -243,7 +240,6 @@ export function RhizomeFormatModal({
     ...customFormats.map(f => customToResearchMode(f, customLabel)),
   ]
   const selected = allModes.find(m => m.id === selectedId) ?? RESEARCH_MODES[0]
-  const isCustomSelected = selected.category === CUSTOM_CATEGORY
 
   const categories = [...new Set(allModes.map(m => m.category))]
 
@@ -282,33 +278,7 @@ export function RhizomeFormatModal({
     }
   }
 
-  const handleDelete = async () => {
-    if (!isCustomSelected) return
-    setDeleteError(null)
-    try {
-      const formats = await callHostOr<CustomFormat[] | null>(
-        'delete_research_format',
-        null,
-        { vaultPath, id: selected.id },
-      )
-      if (!formats) {
-        setDeleteError(t('research.format.deleteFailed'))
-        setDeleteConfirmOpen(false)
-        return
-      }
-      setCustomFormats(formats)
-      setDeleteConfirmOpen(false)
-      if (!formats.some(f => f.id === selectedId)) {
-        setSelectedId(RESEARCH_MODES[0].id)
-      }
-    } catch {
-      setDeleteError(t('research.format.deleteFailed'))
-      setDeleteConfirmOpen(false)
-    }
-  }
-
   return (
-    <>
     <Dialog open={open} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent
         className="p-0 gap-0 bg-popover border-border rounded-xl overflow-hidden"
@@ -470,48 +440,17 @@ export function RhizomeFormatModal({
               </div>
             </div>
 
-            <div className="mt-auto flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                {deleteError && (
-                  <p role="alert" className="text-[11px] text-destructive">{deleteError}</p>
-                )}
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {isCustomSelected && (
-                  <Button
-                    variant="outline"
-                    data-testid="research-format-delete"
-                    className="text-destructive border-destructive/30 hover:bg-destructive/10"
-                    onClick={() => {
-                      setDeleteError(null)
-                      setDeleteConfirmOpen(true)
-                    }}
-                  >
-                    {t('research.format.delete')}
-                  </Button>
-                )}
-                <Button
-                  onClick={() => { onSelect(selected); onClose() }}
-                  className="bg-primary text-primary-foreground hover:bg-muted px-5"
-                >
-                  Use {selected.title}
-                </Button>
-              </div>
+            <div className="mt-auto flex justify-end">
+              <Button
+                onClick={() => { onSelect(selected); onClose() }}
+                className="bg-primary text-primary-foreground hover:bg-muted px-5"
+              >
+                Use {selected.title}
+              </Button>
             </div>
           </div>
         </div>
       </DialogContent>
     </Dialog>
-    {deleteConfirmOpen && (
-      <ConfirmDeleteDialog
-        open={deleteConfirmOpen}
-        title={t('research.format.deleteConfirmTitle')}
-        message={t('research.format.deleteConfirmMessage', { title: selected.title })}
-        confirmLabel={t('research.format.delete')}
-        onCancel={() => setDeleteConfirmOpen(false)}
-        onConfirm={() => { void handleDelete() }}
-      />
-    )}
-    </>
   )
 }
