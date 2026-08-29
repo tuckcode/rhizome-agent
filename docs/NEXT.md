@@ -101,7 +101,7 @@ becomes the editor. Captured in ADR-0166.
 | #34 | Session list filter — **closed 2026-08-26** (title / place / branch) |
 | #22 | Mycelium: Rhizome chrome + rail overview vs This run — **closed 2026-08-27** (`5d2d34a`, skin `6377b04`; engine still Mindwalk; M4 restyle not started) |
 | #11 | Mycelium runs as an in-app sidecar embed — **closed 2026-08-27** (`5d2d34a`) |
-| #44 | Panels resizable by dragging — **closed 2026-08-29** (`a26eb40`, `fe97f99`) |
+| #44 | Panels resizable by dragging — **closed 2026-08-29** (Chat sessions `a26eb40`, chat note pane `fe97f99`; Notes + Mycelium list resizable) |
 | #39 | Make the knowledge graph an agent tool, not a place you visit — **B** |
 
 **Composer and controls** — shipped as one strip 2026-08-25; closed on GitHub 2026-08-29
@@ -159,7 +159,7 @@ Save-to-vault refuse. Prime session jsonl stays out of scope.
 
 ## 3. Open threads (C-numbers)
 
-17 open. Full text in `HANDOFF.md` § Open threads — this is the shape of the
+16 open. Full text in `HANDOFF.md` § Open threads — this is the shape of the
 backlog, not a replacement for it.
 
 - **Blocks other work:** C23 (`get_messages` returns no assistant messages —
@@ -172,8 +172,11 @@ backlog, not a replacement for it.
 - ~~**Correctness / warnings:** C55 (text-only-model warning does not fire in
   native app)~~ **RESOLVED 2026-08-29** (`c423445`) — catalog fallback when
   daemon `get_state` omits `input`; see HANDOFF C55-RESOLVED
+- ~~**Correctness:** C34 (menu-bar roster activity labels)~~ **RESOLVED
+  2026-08-29** (`1509f9f` copy refactor, `be85f80` locale wiring) — see HANDOFF
+  C34-RESOLVED
 - **Correctness:** C40 (`rhizome_graph_summary` answers about a different
-  graph), C34 (menu-bar roster activity labels, half done)
+  graph)
 - **Health and cleanup:** C46 (`AiPanel.tsx` CCN 50 / 447 lines — grew during
   the C43 fix), C21 /
   C30 (branding residues), C11 (Getting Started clones an unrelated upstream
