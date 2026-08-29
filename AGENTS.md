@@ -245,6 +245,16 @@ gated now, and the 150 that were not are listed by name in that file's
 — clearing one means deleting its line from `exclude`. That command is
 advisory, not a gate, for the same reason `pnpm deadcode` is. C33.
 
+**`pnpm test:live-prime` runs the six `#[ignore]`d Rust tests that need a real
+Prime daemon.** Not in the push gate on purpose — it depends on a background
+service on your machine, and a gate that fails for reasons unrelated to the
+diff is a gate people learn to ignore. Run it when you touch the adapter. No
+daemon is a clean skip, not a failure.
+
+Three of its five current failures state their own missing setup (a started
+session, a scheduled job, `RHIZOME_TEST_DAEMON_SOCKET`) and are not defects.
+Two are real and tracked as C56 — read the message before assuming rot.
+
 `pnpm test:mcp` exists because vitest's `include` is
 `src/**/*.{test,spec}.{ts,tsx}`, so nothing under `mcp-server/` was ever run
 — `tool-service.test.js` sat passing and ungated until 2026-07-31. **Never
