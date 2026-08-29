@@ -12,9 +12,7 @@ function renderBridge(
   const openChatHome = vi.fn()
   renderHook(() =>
     useAppAiWorkspaceBridge({
-      aiFeaturesEnabled: true,
       aiWorkspaceWindow: false,
-      closeAIChat: vi.fn(),
       openAIChat,
       openChatHome,
       openSettings: vi.fn(),
@@ -42,12 +40,6 @@ describe('useAppAiWorkspaceBridge default open', () => {
   it('does not reopen ChatHome later in the same session', () => {
     sessionStorage.setItem(AGENT_CHAT_OPENED_SESSION_KEY, '1')
     const { openChatHome } = renderBridge()
-
-    expect(openChatHome).not.toHaveBeenCalled()
-  })
-
-  it('does not open ChatHome when AI features are off', () => {
-    const { openChatHome } = renderBridge({ aiFeaturesEnabled: false })
 
     expect(openChatHome).not.toHaveBeenCalled()
   })

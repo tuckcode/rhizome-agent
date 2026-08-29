@@ -18,7 +18,6 @@ const DEFAULT_NOTE_WIDTH_COMMAND_LABELS: Record<NoteWidthMode, string> = {
 const noop = () => {}
 
 interface ViewCommandsConfig {
-  aiFeaturesEnabled?: boolean
   hasActiveNote: boolean
   activeNoteModified: boolean
   onSetViewMode: (mode: ViewMode) => void
@@ -111,11 +110,8 @@ function buildToggleTableOfContentsCommand(
 }
 
 function buildAiViewCommands(
-  aiFeaturesEnabled: boolean,
   onToggleAIChat?: () => void,
 ): CommandAction[] {
-  if (!aiFeaturesEnabled) return []
-
   return [
     { id: 'toggle-ai-panel', label: 'Toggle AI Panel', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewToggleAiChat), keywords: ['ai', 'agent', 'chat', 'assistant', 'contextual'], enabled: true, execute: () => onToggleAIChat?.() },
     { id: 'new-ai-chat', label: 'New AI chat', group: 'View', keywords: ['ai', 'agent', 'chat', 'assistant', 'new', 'fresh', 'conversation', 'reset'], enabled: true, execute: requestNewAiChat },
@@ -124,7 +120,6 @@ function buildAiViewCommands(
 
 export function buildViewCommands(config: ViewCommandsConfig): CommandAction[] {
   const {
-    aiFeaturesEnabled = true,
     hasActiveNote, activeNoteModified,
     onSetViewMode, onToggleInspector, onToggleDiff, onToggleRawEditor,
     noteWidth = DEFAULT_NOTE_WIDTH_MODE, defaultNoteWidth = DEFAULT_NOTE_WIDTH_MODE,
@@ -135,7 +130,7 @@ export function buildViewCommands(config: ViewCommandsConfig): CommandAction[] {
     canMoveSelectedViewUp, canMoveSelectedViewDown,
   } = config
 
-  const aiCommands = buildAiViewCommands(aiFeaturesEnabled, onToggleAIChat)
+  const aiCommands = buildAiViewCommands(onToggleAIChat)
 
   return [
     { id: 'view-editor', label: 'Chat only', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewEditorOnly), keywords: ['layout', 'focus', 'chat'], enabled: true, execute: () => onSetViewMode('editor-only') },

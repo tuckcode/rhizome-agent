@@ -88,7 +88,6 @@ interface AppCommandsConfig {
   gitRepositories?: GitRepositoryOption[]
   onInitializeGit?: () => void
   onCreateType?: () => void
-  aiFeaturesEnabled?: boolean
   onToggleAIChat?: () => void
   onToggleTableOfContents?: () => void
   onCheckForUpdates?: () => void
@@ -239,7 +238,6 @@ type CommandRegistryVaultActions = Pick<
 >
 type CommandRegistryAiActions = Pick<
   CommandRegistryConfig,
-  | 'aiFeaturesEnabled'
   | 'mcpStatus'
   | 'onInstallMcp'
   | 'aiAgentsStatus'
@@ -270,14 +268,6 @@ type CommandRegistryNoteActions = Pick<
   | 'onExportNoteAsPdf'
 >
 
-function aiFeaturesAreEnabled(config: Pick<AppCommandsConfig, 'aiFeaturesEnabled'>): boolean {
-  return config.aiFeaturesEnabled !== false
-}
-
-function enabledAiChatToggle(config: Pick<AppCommandsConfig, 'aiFeaturesEnabled' | 'onToggleAIChat'>): (() => void) | undefined {
-  return aiFeaturesAreEnabled(config) ? config.onToggleAIChat : undefined
-}
-
 function createKeyboardActions(
   config: AppCommandsConfig,
 ): Omit<Parameters<typeof useAppKeyboard>[0], 'onArchiveNote'> {
@@ -304,7 +294,7 @@ function createKeyboardActions(
     onZoomReset: config.onZoomReset,
     onGoBack: config.onGoBack,
     onGoForward: config.onGoForward,
-    onToggleAIChat: enabledAiChatToggle(config),
+    onToggleAIChat: config.onToggleAIChat,
     onToggleTableOfContents: config.onToggleTableOfContents,
     onToggleRawEditor: config.onToggleRawEditor,
     onToggleInspector: config.onToggleInspector,
@@ -385,7 +375,7 @@ function createMenuEventActionHandlers(
     onSearch: config.onSearch,
     onToggleRawEditor: config.onToggleRawEditor,
     onToggleDiff: config.onToggleDiff,
-    onToggleAIChat: enabledAiChatToggle(config),
+    onToggleAIChat: config.onToggleAIChat,
     onToggleTableOfContents: config.onToggleTableOfContents,
     onExportNoteAsPdf: config.onExportNoteAsPdf,
     onToggleOrganized: config.onToggleOrganized,
@@ -519,7 +509,7 @@ function createCommandRegistryCoreConfig(
     defaultNoteWidth: config.defaultNoteWidth,
     onSetNoteWidth: config.onSetNoteWidth,
     onSetDefaultNoteWidth: config.onSetDefaultNoteWidth,
-    onToggleAIChat: enabledAiChatToggle(config),
+    onToggleAIChat: config.onToggleAIChat,
     onToggleTableOfContents: config.onToggleTableOfContents,
     onKeyboardShortcuts: config.onKeyboardShortcuts,
   }
@@ -563,7 +553,6 @@ function createCommandRegistryVaultConfig(
 export function createCommandRegistryAiConfig(
   config: Pick<
     AppCommandsConfig,
-    | 'aiFeaturesEnabled'
     | 'mcpStatus'
     | 'onInstallMcp'
     | 'aiAgentsStatus'
@@ -577,17 +566,9 @@ export function createCommandRegistryAiConfig(
     | 'onReopenAiOnboarding'
   >,
 ): CommandRegistryAiActions {
-  const aiFeaturesEnabled = aiFeaturesAreEnabled(config)
-  const sharedConfig = {
-    aiFeaturesEnabled,
+  return {
     mcpStatus: config.mcpStatus,
     onInstallMcp: config.onInstallMcp,
-  }
-
-  if (!aiFeaturesEnabled) return sharedConfig
-
-  return {
-    ...sharedConfig,
     aiAgentsStatus: config.aiAgentsStatus,
     vaultAiGuidanceStatus: config.vaultAiGuidanceStatus,
     onOpenAiAgents: config.onOpenAiAgents,
