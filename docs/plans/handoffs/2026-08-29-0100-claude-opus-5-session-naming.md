@@ -118,6 +118,35 @@ Two things worth doing anyway, neither started:
 - An expired CLI login is a fixable state with a one-line action. Rhizome
   already does this for Prime (`PrimeConnectionProblem`); Mycelium does not.
 
+## Review of the output rules in `~/.claude/CLAUDE.md`
+
+Asked for at the end of the session. That file is personal and lives outside
+this repo, so it is recorded here rather than changed — nothing has been
+applied yet.
+
+Five findings, most important first:
+
+1. **Rules 1 and 11 contradict each other.** Rule 1 requires the first line to
+   be a command or path; rule 11 requires it to be a plain sentence a
+   non-engineer understands. Those are different sentences, and each turn
+   picks one arbitrarily. Rule 11 should win; rule 1 becomes "the first line
+   answers or acts — never context or preamble."
+2. **Nothing requires checking before claiming.** The costliest failures are
+   confident wrong statements — four wrong causes asserted in one session, and
+   two more this session before looking. `AGENTS.md` carries this rule for
+   this repo only, so it protects one project out of all of them. Add to the
+   global file: *never state a cause you have not checked.*
+3. **Rule 5 (restate state every turn) only fits multi-turn work.** On a
+   single question it produces filler, and it is quietly skipped. Scope it.
+4. **Rule 3 (always end with a next action) forces a fake one.** When work is
+   genuinely finished the honest ending is no ending. Allow it to be omitted.
+5. **Rule 7 (make wins visible) is already covered** by rules 1 and 3.
+   Removing it shortens the list without losing anything.
+
+Smaller: rule 14 permits a closing question that rule 10's "no closers" bans,
+and the file mixes three unrelated topics (`/graphify`, session naming, output
+shape) under mismatched heading levels.
+
 ## Not done
 
 - **C55** — the text-only-model warning still does not fire in the app.
