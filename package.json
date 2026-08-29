@@ -28,6 +28,7 @@
     "tauri": "tauri",
     "test": "vitest run",
     "test:mcp": "node --test mcp-server/test.js mcp-server/*.test.js",
+    "test:live-prime": "node scripts/run-live-prime-tests.mjs",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "playwright:smoke": "playwright test --config playwright.smoke.config.ts tests/smoke/autosave-low-end-typing.spec.ts tests/smoke/breadcrumb-icon-size.spec.ts tests/smoke/create-note-backing-file.spec.ts tests/smoke/delete-note-nonblocking.spec.ts tests/smoke/example.spec.ts tests/smoke/fix-crash-create-note.spec.ts tests/smoke/quick-open-create-note.spec.ts tests/smoke/save-before-note-switch.spec.ts tests/smoke/h1-untitled-auto-rename.spec.ts tests/smoke/keyboard-command-routing.spec.ts tests/smoke/missing-string-metadata-open-note.spec.ts tests/smoke/multibyte-search-snippet.spec.ts tests/smoke/pull-refresh-open-note.spec.ts tests/smoke/unified-shell-layout.spec.ts tests/smoke/wikilink-path-fix.spec.ts",
@@ -122,5 +123,5 @@
     "vitest": "^4.0.18",
     "ws": "^8.19.0"
   },
-  "description": "Rhizome Agent — desktop chat shell on the Prime Agent harness (not Rhizome Desktop)."
+  "description": "Rhizome Agent \u2014 desktop chat shell on the Prime Agent harness (not Rhizome Desktop)."
 }
