@@ -9,15 +9,10 @@ import {
 import { callHost } from '../lib/callHost'
 import { usePanelWidth } from '../hooks/usePanelWidth'
 import { startResizeDrag } from '../utils/startResizeDrag'
-import {
-  MAX_IMAGES_PER_MESSAGE,
-  readImageAttachment,
-  toPrimeImages,
-  type AttachmentRejection,
-  type ComposerAttachment,
-} from '../lib/composerAttachments'
+import { toPrimeImages } from '../lib/composerAttachments'
 import { sendToRunningTurn } from '../lib/primeTurnMessaging'
-import { trackComposerImagesAttached, trackPrimeTurnMessage, trackPrimeSessionTreeNavigated } from '../lib/productAnalytics'
+import { trackPrimeTurnMessage, trackPrimeSessionTreeNavigated } from '../lib/productAnalytics'
+import { useAiPanelAttachments } from './useAiPanelAttachments'
 import { usePrimeQueue } from '../hooks/usePrimeQueue'
 import { usePrimeSessionTree } from '../hooks/usePrimeSessionTree'
 import { SessionBranchBand } from './SessionBranchBand'
@@ -224,13 +219,6 @@ function AiPanelFrame({
   )
 }
 
-/** Why an attachment was refused, in words the user can act on. */
-const ATTACHMENT_REJECTION_KEYS: Record<AttachmentRejection, Parameters<typeof translate>[1]> = {
-  too_large: 'ai.composer.attachmentTooLarge',
-  unsupported_type: 'ai.composer.attachmentUnsupported',
-  unreadable: 'ai.composer.attachmentUnreadable',
-}
-
 export function AiPanelView({
   controller,
   onClose,
@@ -398,78 +386,24 @@ export function AiPanelView({
     latestTurnState.current = { handleSend, isActive, onSendPrompt }
   }, [handleSend, isActive, onSendPrompt])
 
-  /**
-   * Warn when the running model cannot see the image.
-   *
-   * Read straight off the host status: `get_state` returns the whole Model,
-   * `input` included, so there is no catalog to fetch and no id to match.
-   * The first cut did fetch the catalog and look the model up — and the
-   * warning never fired in the app. Deleting the lookup was the fix.
-   *
-   * `null`/`undefined` means Prime did not report modalities, and silence is
-   * not a refusal: only an explicit `false` warns.
-   */
-  const warnIfModelIsTextOnly = useCallback(() => {
-    if (primeHost.modelAcceptsImages !== false) return
-    onUnsupportedAiPaste?.(translate(locale, 'ai.composer.attachmentTextOnlyModel', {
-      model: primeHost.modelName ?? primeHost.modelId ?? '',
-    }))
-  }, [locale, onUnsupportedAiPaste, primeHost.modelAcceptsImages, primeHost.modelId, primeHost.modelName])
-
-  /**
-   * Images staged for the next message.
-   *
-   * Owned here rather than in the composer because the composer is stateless
-   * about the message it is building — the same reason `input` lives up here.
-   * Cleared on every accepted send, so an attachment never rides along with a
-   * later, unrelated turn.
-   */
   // 180–420: narrower and a session title is a truncation, wider and the
   // transcript starts losing the room the design gives it.
   const sessionsWidth = usePanelWidth(APP_STORAGE_KEYS.chatSessionsWidth, 228, 180, 420)
-  const [attachments, setAttachments] = useState<ComposerAttachment[]>([])
-  const attachImages = useCallback((files: File[]) => {
-    void (async () => {
-      const results = await Promise.all(files.map(readImageAttachment))
-      const accepted = results.flatMap((result) => (result.ok ? [result.attachment] : []))
-      // Every rejection is said out loud. A silently dropped attachment is the
-      // exact failure this repo keeps rediscovering: an unusable state that
-      // looks like a working one.
-      for (const result of results) {
-        if (result.ok) continue
-        onUnsupportedAiPaste?.(translate(locale, 'ai.composer.attachmentRejected', {
-          name: result.name,
-          reason: translate(locale, ATTACHMENT_REJECTION_KEYS[result.reason]),
-        }))
-      }
-      if (accepted.length === 0) return
-      // Say something only when Prime has actually told us the model is
-      // text-only. Unknown modalities stay silent — the same refusal to guess
-      // that `partitionModelsByConnection` makes about credentials.
-      warnIfModelIsTextOnly()
-      setAttachments((current) => {
-        const next = [...current, ...accepted]
-        if (next.length > MAX_IMAGES_PER_MESSAGE) {
-          onUnsupportedAiPaste?.(translate(locale, 'ai.composer.attachmentTooMany', {
-            count: String(MAX_IMAGES_PER_MESSAGE),
-          }))
-        }
-        return next.slice(0, MAX_IMAGES_PER_MESSAGE)
-      })
-      trackComposerImagesAttached(accepted.length)
-    })()
-  }, [locale, onUnsupportedAiPaste, warnIfModelIsTextOnly])
-  const removeAttachment = useCallback((id: string) => {
-    setAttachments((current) => current.filter((attachment) => attachment.id !== id))
-  }, [])
+  const { attachments, attachImages, removeAttachment, clearAttachments } = useAiPanelAttachments({
+    locale,
+    onUnsupportedAiPaste,
+    modelAcceptsImages: primeHost.modelAcceptsImages,
+    modelName: primeHost.modelName,
+    modelId: primeHost.modelId,
+  })
 
   const sendAsNewTurn = useCallback((text: string, references: Parameters<typeof handleSend>[1]) => {
     const latest = latestTurnState.current
     latest.onSendPrompt?.(text)
     latest.handleSend(text, references, toPrimeImages(attachments) ?? undefined)
-    setAttachments([])
+    clearAttachments()
     refreshQueue()
-  }, [attachments, refreshQueue])
+  }, [attachments, clearAttachments, refreshQueue])
 
   const sendAsNewTurnIfIdle = useCallback((
     text: string,
