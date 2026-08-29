@@ -123,7 +123,7 @@ becomes the editor. Captured in ADR-0166.
 |---|---|
 | #24 | Promote produces a note worth keeping, not a transcript dump — **implemented locally** (live check leftover) |
 | #25 | Retrieval shows its work — `needs-triage`, oldest untriaged |
-| #37 | "Save as custom" in the research format modal has never done anything |
+| #37 | "Save as custom" in the research format modal has never done anything — **closed 2026-08-29** (UI `1b469fc`; storage `5d7587c`) |
 
 **Platform and lifecycle**
 | | |
@@ -196,7 +196,7 @@ Worth doing, in order:
    the whole class.
 2. **Close the ADR-0166 open questions** into a decision (§1). Three unresolved
    questions in the newest structural ADR are blocking five issues.
-3. **Write the memory-loop design doc.** #24, #25 and #37 are the product thesis
+3. **Write the memory-loop design doc.** #24 and #25 are the product thesis
    — chat → work → promote → recall — and have the thinnest coverage of any
    theme. `automatic-memory-consolidation.md` covers consolidation, not
    promotion or retrieval-provenance. This is the one genuinely missing
