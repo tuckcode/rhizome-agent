@@ -2279,7 +2279,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           }}
           locale={appLocale}
         />
-        <SearchPanel open={dialogs.showSearch} vaultPath={resolvedPath} entries={visibleEntries} onSelectNote={notes.handleSelectNote} onClose={dialogs.closeSearch} />
+        <SearchPanel open={dialogs.showSearch} vaultPath={resolvedPath} entries={visibleEntries} onSelectNote={notes.handleSelectNote} onClose={dialogs.closeSearch} locale={appLocale} />
         <CreateTypeDialog open={dialogs.showCreateTypeDialog} onClose={dialogs.closeCreateType} onCreate={handleCreateType} />
         <NoteRetargetingDialogs
           dialogState={noteRetargetingUi.dialogState}
@@ -2310,6 +2310,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           allResolved={conflictResolver.allResolved}
           committing={conflictResolver.committing}
           error={conflictResolver.error}
+          locale={appLocale}
           onResolveFile={conflictResolver.resolveFile}
           onOpenInEditor={conflictResolver.openInEditor}
           onCommit={conflictResolver.commitResolution}
