@@ -11,6 +11,7 @@ import {
 import { APP_COMMAND_EVENT_NAME, APP_COMMAND_IDS } from '../hooks/appCommandDispatcher'
 import { translate } from '../lib/i18n'
 import { trackEvent } from '../lib/telemetry'
+import { _editorLocaleRef } from './editorSchema'
 import { SafeSvgDiv } from './SafeMarkup'
 
 type MermaidApi = typeof import('mermaid')['default']
@@ -44,7 +45,6 @@ const MERMAID_RENDER_HOST_STYLE = [
   'min-height:1px',
   'overflow:hidden',
 ].join(';')
-const OPEN_RAW_EDITOR_LABEL = translate('en', 'editor.toolbar.rawOpen')
 
 function renderIdFromReactId(reactId: string): string {
   const safeId = reactId.replace(/[^a-zA-Z0-9_-]/g, '')
@@ -159,15 +159,16 @@ function openRawEditorForMermaidSource(event: SyntheticEvent): void {
 }
 
 function MermaidRawEditorButton() {
+  const openRawEditorLabel = translate(_editorLocaleRef.current, 'editor.toolbar.rawOpen')
   return (
     <Button
-      aria-label={OPEN_RAW_EDITOR_LABEL}
+      aria-label={openRawEditorLabel}
       className="mermaid-diagram__edit-button"
       contentEditable={false}
       onClick={openRawEditorForMermaidSource}
       onMouseDown={stopMermaidViewportEvent}
       size="icon-sm"
-      title={OPEN_RAW_EDITOR_LABEL}
+      title={openRawEditorLabel}
       type="button"
       variant="outline"
     >
@@ -236,7 +237,7 @@ export function MermaidDiagram({ diagram, source }: MermaidDiagramProps) {
     return (
       <figure className="mermaid-diagram mermaid-diagram--error" data-testid="mermaid-diagram-error">
         <MermaidRawEditorButton />
-        <figcaption>Mermaid diagram unavailable</figcaption>
+        <figcaption>{translate(_editorLocaleRef.current, 'editor.mermaid.unavailable')}</figcaption>
         <MermaidSourceFallback source={source} />
       </figure>
     )
