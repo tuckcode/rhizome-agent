@@ -91,17 +91,23 @@ function inertControls(root: ParentNode): UiAuditFinding[] {
     // pressable; a 22px pill is. Without this the rule fires on every card in
     // the app and the report becomes noise nobody reads.
     const controlSized = height <= 40 && width <= 360
+    const label = text(node)
+    // A count badge is bordered, rounded and small, and is not pretending to
+    // be pressable — nobody tries to click "3". A control that looks like a
+    // control says something: a verb, a name, a value with a word in it.
+    const isBadge = /^\d+\+?$/u.test(label)
     const looksPressable =
       controlSized &&
+      !isBadge &&
       Number.parseFloat(style.borderTopWidth) > 0 &&
       cornerRadius(style) >= 8 &&
-      node.textContent!.trim().length > 0 &&
+      label.length > 0 &&
       node.childElementCount <= 3
     if (!looksPressable) return []
     return [
       {
         rule: 'inert-control' as const,
-        label: text(node),
+        label,
         detail: 'Bordered and rounded like the app\'s pills, but not a control.',
         testId: node.dataset.testid,
       },
@@ -182,6 +188,12 @@ function overlappingControls(controls: HTMLElement[]): UiAuditFinding[] {
       // transcript.
       const smaller = Math.min(boxA.width * boxA.height, boxB.width * boxB.height)
       if (overlap >= smaller - 1) continue
+      // Content scrolling under a sticky toolbar is not a collision, and it
+      // is the single biggest source of false positives here: a list row
+      // passing beneath a search bar reads to geometry exactly like two
+      // controls drawn on top of each other. If the two live in different
+      // scroll containers, one is passing behind the other by design.
+      if (nearestScroller(a) !== nearestScroller(b)) continue
       findings.push({
         rule: 'overlapping-controls',
         label: `${accessibleName(a) || text(a)} / ${accessibleName(b) || text(b)}`,
@@ -204,6 +216,23 @@ function cornerRadius(style: CSSStyleDeclaration): number {
   const longhand = Number.parseFloat(style.borderTopLeftRadius)
   if (Number.isFinite(longhand)) return longhand
   return Number.parseFloat(style.borderRadius) || 0
+}
+
+/**
+ * The closest ancestor that scrolls, or `null` for the page itself.
+ *
+ * Two controls in the same scroller move together, so an overlap between them
+ * is a real layout collision. Two in different scrollers pass over each other
+ * as a matter of course.
+ */
+function nearestScroller(node: HTMLElement): HTMLElement | null {
+  let current: HTMLElement | null = node.parentElement
+  while (current) {
+    const overflow = getComputedStyle(current).overflowY
+    if (overflow === 'auto' || overflow === 'scroll') return current
+    current = current.parentElement
+  }
+  return null
 }
 
 function intersectionArea(a: DOMRect, b: DOMRect): number {

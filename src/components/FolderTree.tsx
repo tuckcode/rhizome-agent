@@ -312,7 +312,7 @@ function CreateFolderButton({
       type="button"
       variant="ghost"
       size="icon-xs"
-      className="h-auto w-auto min-w-0 rounded-none p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+      className="rounded-none text-muted-foreground hover:bg-transparent hover:text-foreground"
       data-testid="create-folder-btn"
       title={translate(locale, 'sidebar.action.createFolder')}
       aria-label={translate(locale, 'sidebar.action.createFolder')}

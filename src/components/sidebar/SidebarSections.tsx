@@ -122,7 +122,7 @@ export function ViewsSection({
             type="button"
             variant="ghost"
             size="icon-xs"
-            className="h-auto w-auto min-w-0 rounded-none p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+            className="rounded-none text-muted-foreground hover:bg-transparent hover:text-foreground"
             aria-label={translate(locale, 'sidebar.action.createView')}
             title={translate(locale, 'sidebar.action.createView')}
             onClick={(event) => { event.stopPropagation(); onCreateView() }}
@@ -297,7 +297,7 @@ export function TypesSection({
               size="icon-xs"
               title={translate(locale, 'sidebar.action.customizeSections')}
               aria-label={translate(locale, 'sidebar.action.customizeSections')}
-              className="h-auto w-auto min-w-0 rounded-none p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+              className="rounded-none text-muted-foreground hover:bg-transparent hover:text-foreground"
               onClick={(event) => { event.stopPropagation(); setShowCustomize((value) => !value) }}
             >
               <SlidersHorizontal size={12} className="text-muted-foreground hover:text-foreground" />
@@ -307,7 +307,7 @@ export function TypesSection({
                 type="button"
                 variant="ghost"
                 size="icon-xs"
-                className="h-auto w-auto min-w-0 rounded-none p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+                className="rounded-none text-muted-foreground hover:bg-transparent hover:text-foreground"
                 data-testid="create-type-btn"
                 title={translate(locale, 'sidebar.action.createType')}
                 aria-label={translate(locale, 'sidebar.action.createType')}

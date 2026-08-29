@@ -44,6 +44,15 @@ describe('auditUi', () => {
     expect(auditUi(host).filter((f) => f.rule === 'inert-control')).toHaveLength(0)
   })
 
+  /** A count badge is bordered, rounded and small, and nobody tries to click
+   *  "3". Flagging every badge in the app is noise. */
+  it('leaves a count badge alone', () => {
+    const host = mount('<span style="border: 1px solid; border-radius: 999px">98</span>')
+    sized(host.firstElementChild!, { w: 22, h: 18 })
+
+    expect(auditUi(host).filter((f) => f.rule === 'inert-control')).toHaveLength(0)
+  })
+
   it('leaves a real control alone, however pill-shaped', () => {
     const host = mount('<button style="border: 1px solid; border-radius: 999px">Rhizome Vault</button>')
     sized(host.firstElementChild!, { w: 120, h: 22 })
@@ -125,6 +134,22 @@ describe('auditUi', () => {
     const [row, action] = host.querySelectorAll('button')
     sized(row, { x: 0, y: 0, w: 200, h: 54 })
     sized(action, { x: 160, y: 16, w: 21, h: 21 })
+
+    expect(auditUi(host).filter((f) => f.rule === 'overlapping-controls')).toHaveLength(0)
+  })
+
+  /** A list row passing under a sticky toolbar looks, to geometry, exactly
+   *  like a collision. Different scroll containers means one is passing
+   *  behind the other by design. */
+  it('does not flag content scrolling under a sticky toolbar', () => {
+    const host = mount(`
+      <div><button aria-label="Search notes">Search</button></div>
+      <div id="scroller" style="overflow-y: auto"><button aria-label="Open Essays">Essays</button></div>
+    `)
+    const toolbar = host.querySelector('[aria-label="Search notes"]')!
+    const row = host.querySelector('[aria-label="Open Essays"]')!
+    sized(toolbar, { x: 0, y: 0, w: 200, h: 30 })
+    sized(row, { x: 0, y: 10, w: 200, h: 30 })
 
     expect(auditUi(host).filter((f) => f.rule === 'overlapping-controls')).toHaveLength(0)
   })
