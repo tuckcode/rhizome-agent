@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, fireEvent } from '@testing-library/react'
+import { render, fireEvent, screen } from '@testing-library/react'
 import { ResizeHandle } from './ResizeHandle'
 
 describe('ResizeHandle', () => {
@@ -120,7 +120,33 @@ describe('ResizeHandle', () => {
   it('hangs off the panel\'s left edge when trailing', () => {
     const { container } = render(<ResizeHandle onResize={vi.fn()} edge="trailing" />)
     const handle = container.firstChild as HTMLElement
-    expect(handle.className).toContain('-mr-1')
-    expect(handle.className).not.toContain('-ml-1')
+    expect(handle.className).toContain('-mr-2')
+    expect(handle.className).not.toContain('-ml-2')
   })
+
+
+  it('is wide enough to grab — 8px took three attempts', () => {
+    const { container } = render(<ResizeHandle onResize={vi.fn()} />)
+    const handle = container.firstChild as HTMLElement
+    expect(handle.className).toContain('w-4')
+    expect(handle.className).not.toContain('w-1')
+  })
+
+  it('can sit on a panel edge instead of between columns', () => {
+    const { container } = render(
+      <ResizeHandle onResize={vi.fn()} edge="trailing" placement="absolute" />,
+    )
+    const handle = container.firstChild as HTMLElement
+    expect(handle.className).toContain('absolute')
+    expect(handle.className).toContain('-left-[10px]')
+    expect(handle.className).not.toContain('relative')
+  })
+
+  it('exposes a named separator when given a label', () => {
+    render(<ResizeHandle onResize={vi.fn()} label="Resize notes panel" testId="vault-panel-resize" />)
+    const handle = screen.getByTestId('vault-panel-resize')
+    expect(handle).toHaveAttribute('role', 'separator')
+    expect(handle).toHaveAttribute('aria-label', 'Resize notes panel')
+  })
+
 })

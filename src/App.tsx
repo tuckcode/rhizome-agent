@@ -1944,27 +1944,29 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   ) : null
 
   const vaultPanel = showVaultPanel ? (
-    <>
-      {!compactVaultPanel && (
-        <ResizeHandle onResize={layout.handleNoteListResize} edge="trailing" />
-      )}
-      <div
-        className={`app__vault-panel${compactVaultPanel ? ' app__vault-panel--overlay' : ''}${aiActivity.highlightElement === 'notelist' ? ' ai-highlight' : ''}`}
-        style={{ width: layout.noteListWidth }}
-      >
-        <VaultPanel
-          browseOpen={vaultBrowseOpen}
-          locale={appLocale}
-          navigation={sidebarSurface(true)}
-          noteList={noteListSurface}
-          onBrowseToggle={() => handleSetViewMode(vaultBrowseOpen ? 'editor-list' : 'all')}
-          onCollapse={() => {
-            setCompactVaultPanelOpen(false)
-            handleSetViewMode('editor-only')
-          }}
-        />
-      </div>
-    </>
+    <div
+      className={`app__vault-panel${compactVaultPanel ? ' app__vault-panel--overlay' : ''}${aiActivity.highlightElement === 'notelist' ? ' ai-highlight' : ''}`}
+      style={{ width: layout.noteListWidth }}
+    >
+      <ResizeHandle
+        onResize={layout.handleNoteListResize}
+        edge="trailing"
+        placement="absolute"
+        label={translate(appLocale, 'notes.panel.resize')}
+        testId="vault-panel-resize"
+      />
+      <VaultPanel
+        browseOpen={vaultBrowseOpen}
+        locale={appLocale}
+        navigation={sidebarSurface(true)}
+        noteList={noteListSurface}
+        onBrowseToggle={() => handleSetViewMode(vaultBrowseOpen ? 'editor-list' : 'all')}
+        onCollapse={() => {
+          setCompactVaultPanelOpen(false)
+          handleSetViewMode('editor-only')
+        }}
+      />
+    </div>
   ) : null
 
   const chatHomeSurface = (
