@@ -470,7 +470,7 @@ pnpm test:coverage
 cargo test
 
 # Rust coverage (must pass ≥85% line coverage)
-cargo llvm-cov --manifest-path src-tauri/Cargo.toml --no-clean --fail-under-lines 85
+cargo llvm-cov --manifest-path src-tauri/Cargo.toml --no-clean --ignore-filename-regex "lib\.rs|main\.rs|menu\.rs" --fail-under-lines 85
 
 # Playwright core smoke lane (requires dev server)
 BASE_URL="http://localhost:5173" pnpm playwright:smoke

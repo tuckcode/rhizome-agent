@@ -402,7 +402,7 @@ clean.** Before concluding you regressed coverage:
 cargo llvm-cov clean --workspace --manifest-path src-tauri/Cargo.toml
 LLVM_COV="$(brew --prefix llvm)/bin/llvm-cov" \
 LLVM_PROFDATA="$(brew --prefix llvm)/bin/llvm-profdata" \
-  cargo llvm-cov --manifest-path src-tauri/Cargo.toml --fail-under-lines 85
+  cargo llvm-cov --manifest-path src-tauri/Cargo.toml --ignore-filename-regex "lib\.rs|main\.rs|menu\.rs" --fail-under-lines 85
 ```
 
 A `--no-clean` *pass* is trustworthy; only failures need the clean re-run.

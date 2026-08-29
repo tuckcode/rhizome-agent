@@ -306,12 +306,15 @@ push is not a release — releases are tagged builds with signed installers.
   replaced (`7258a4d`) with reading `input` straight off `get_state`. The
   replacement is simpler and still does not fire.
 
-- **C54-RESOLVED (2026-08-28): the documented Rust coverage command was
+- **C54-RESOLVED (2026-08-29): the documented Rust coverage command was
   missing the gate's `--ignore-filename-regex "lib\.rs|main\.rs|menu\.rs"`**,
   so it reported 84.88% and exit 1 on a tree the hook passes at 85.68%.
-  `AGENTS.md`'s check suite now carries the flag. Confirmed against a worktree
-  at `087880d`, so it was never a regression. Full numbers and the
-  shell-pipeline mistake that produced the first, wrong diagnosis:
+  Without the flag, `lib.rs`/`main.rs`/`menu.rs` boilerplate drag the total
+  below 85% even when product code passes. `AGENTS.md`, `GETTING-STARTED.md`,
+  and `CROSS-MODEL-HANDOFF.md` §13 now match `.husky/pre-push` and
+  `.chunk/run-rust-gate.sh`. Confirmed against a worktree at `087880d`, so it
+  was never a regression. Full numbers and the shell-pipeline mistake that
+  produced the first, wrong diagnosis:
   [2026-08-28-0300](plans/handoffs/2026-08-28-0300-claude-opus-5-model-allow-list.md).
 
 - **C51-RESOLVED (2026-08-26, `373ee1f` / `2360cb5` / `9e50a8d`): Promote
@@ -727,11 +730,10 @@ push is not a release — releases are tagged builds with signed installers.
   without a running daemon, which is why the existing `live_*` tests are
   `#[ignore]`. Padding those would be chasing the number, not the coverage.
 
-  **Also correct §13's snippet while here:** it gives
-  `cargo llvm-cov clean --workspace`, which fails in this repo with
-  `could not find Cargo.toml` — there is no root manifest. It needs
-  `--manifest-path src-tauri/Cargo.toml`, same as every other cargo invocation
-  in these docs.
+  **Also correct §13's snippet while here:** the clean line lacked
+  `--manifest-path src-tauri/Cargo.toml` (fixed 2026-08-16); the coverage
+  line lacked `--ignore-filename-regex "lib\.rs|main\.rs|menu\.rs"` (fixed
+  2026-08-29, C54). Both are required to match the pre-push gate.
 
 - **C28-OPEN: three `@smoke` specs fail under CPU load — the pre-push Playwright lane is not deterministic.** Observed 2026-08-16 on one machine, twice, with a clean tree:
 
