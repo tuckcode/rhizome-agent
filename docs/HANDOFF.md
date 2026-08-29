@@ -224,14 +224,14 @@ push is not a release — releases are tagged builds with signed installers.
 - Welcome already has **Open existing vault** (optional skip).
 - Skipped when any remembered vault path `exists` on disk — DMG reinstall does **not** wipe app data or WebView `localStorage` (`tolaria_welcome_dismissed`, AI-agents dismissed keys).
 - Spotlight walkthrough: planned/spec only, never shipped.
-- Force Welcome: wipe `~/Library/Application Support/ai.rhizome.desktop` (and/or move vault).
+- Force Welcome: wipe `~/Library/Application Support/ai.rhizome.agent` (and/or move vault).
 
 **Key decisions (locked, don't re-litigate):**
 - Research panel yes, MCP bridge deferred (browser-extension bridge is a separate shipped lane)
 
-**Git state** (verified 2026-07-27):
-- `origin` = `git@github.com:knispo/rhizome.git` (**PUBLIC** — AGPL-3.0-or-later). Push blocked until account unsuspended.
-- Local `tolaria` remote exists for cherry-picks only — not pushed to.
+**Git state** (verified 2026-08-29):
+- `origin` = `https://github.com/tuckcode/rhizome-agent.git` (**PRIVATE**). Push when pre-push gates pass.
+- Do not add `knispo/rhizome` as a remote — that is Rhizome Desktop. See `docs/IDENTITY.md`.
 - Don't touch `.claude/settings.local.json`, `Fable-5s-one-brain-architecture-rhizome.md`
 
 **Reading order for a fresh session:**

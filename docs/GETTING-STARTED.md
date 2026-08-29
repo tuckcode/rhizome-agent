@@ -104,7 +104,7 @@ chunk validate --remote lint
 For Playwright smoke, prefer the shared-server shard runner after setup:
 
 ```bash
-chunk sidecar ssh --sidecar-id <playwright-sidecar-id> -- 'cd /home/user/tolaria && PLAYWRIGHT_CONCURRENCY=4 bash .chunk/run-playwright-shards.sh 8'
+chunk sidecar ssh --sidecar-id <playwright-sidecar-id> -- 'cd /home/user/rhizome-agent && PLAYWRIGHT_CONCURRENCY=4 bash .chunk/run-playwright-shards.sh 8'
 ```
 
 The pre-push hook uses the faster sidecar path automatically when Chunk is available. It syncs the checkout to three independent sidecars and fans out the automatic gates:
@@ -134,7 +134,7 @@ The bottom-left `VaultMenu` exposes quick include/exclude controls and a `Manage
 ## Directory Structure
 
 ```
-tolaria/
+rhizome-agent/
 ├── src/                          # React frontend
 │   ├── main.tsx                  # Entry point (renders <App />)
 │   ├── App.tsx                   # Root component — wires layout + state hooks
@@ -196,7 +196,7 @@ tolaria/
 │   │   ├── useNoteCreation.ts    # Note/type creation
 │   │   ├── useNoteRename.ts     # Note renaming + wikilink updates
 │   │   ├── useCliAiAgent.ts      # Selected AI agent state + normalized session pipeline
-│   │   ├── aiAgentPermissionMode.ts # Safe/Power User mode normalization + labels
+│   │   ├── aiAgentPermissionMode.ts # Limited-tools/Power User mode; Prime always power_user
 │   │   ├── useAiAgentsStatus.ts  # Claude/Codex/OpenCode/Pi/Antigravity/Kiro availability polling
 │   │   ├── useAiAgentPreferences.ts # Default-agent persistence + cycling
 │   │   ├── useAiActivity.ts      # MCP UI bridge listener
@@ -368,8 +368,8 @@ tolaria/
 | `src/components/Editor.tsx` | BlockNote setup, breadcrumb bar, diff/raw toggle. |
 | `src/components/SingleEditorView.tsx` | Shared BlockNote shell, formatting controllers, and suggestion menus. |
 | `src/components/editorSchema.tsx` | Custom wikilink inline content type definition. |
-| `src/components/tolariaEditorFormatting.tsx` | Markdown-safe formatting toolbar surface for BlockNote. |
-| `src/components/tolariaEditorFormattingConfig.ts` | Filters toolbar and slash-menu commands to markdown-roundtrippable actions. |
+| `src/components/rhizomeEditorFormatting.tsx` | Markdown-safe formatting toolbar surface for BlockNote. |
+| `src/components/rhizomeEditorFormattingConfig.ts` | Filters toolbar and slash-menu commands to markdown-roundtrippable actions. |
 | `src/utils/wikilinks.ts` | Wikilink preprocessing pipeline (markdown ↔ BlockNote). |
 | `src/components/RawEditorView.tsx` | CodeMirror 6 raw markdown editor. |
 
@@ -387,7 +387,7 @@ tolaria/
 | `src/utils/openAiWorkspaceWindow.ts` | Native Tauri AI workspace window creation, focus, and dock-back traffic-light handling. |
 | `src/hooks/useCliAiAgent.ts` | Thin React owner for the selected CLI agent session state. |
 | `src/lib/aiAgentSession.ts` | Single message/session lifecycle for prompt normalization, history, streaming, and reset behavior. |
-| `src/lib/aiAgentPermissionMode.ts` | Safe/Power User mode normalization, display labels, and local transcript marker text. |
+| `src/lib/aiAgentPermissionMode.ts` | Limited-tools/Power User mode normalization, Prime power-user default, display labels, and local transcript marker text. |
 | `src/lib/aiAgentFileOperations.ts` | Detects agent-created or modified vault files from normalized tool inputs. |
 | `src/lib/aiAgents.ts` | Supported agent definitions, status normalization, and default-agent helpers. |
 | `src/utils/ai-context.ts` | Context snapshot builder for AI conversations. |
@@ -524,15 +524,15 @@ BASE_URL="http://localhost:5173" npx playwright test tests/smoke/<slug>.spec.ts
 2. **Context building**: Edit `src/utils/ai-context.ts` for what data is sent to the agent
 3. **Tool action display**: Edit `src/components/AiActionCard.tsx`
 4. **Permission-mode UI and request plumbing**: Edit `src/lib/aiAgentPermissionMode.ts`, `src/components/AiPanel*.tsx`, `src/hooks/useCliAiAgent.ts`, and `src/utils/streamAiAgent.ts`
-5. **Shared CLI runtime behavior**: Edit `src-tauri/src/cli_agent_runtime.rs` for process lifecycle, prompt wrapping, version probing, and common Tolaria MCP path handling.
-6. **Agent-specific arguments/events**: Edit the per-agent adapter modules (`claude_cli.rs`, `codex_cli.rs`, `opencode_*`, `pi_*`, `antigravity_*`, `kiro_*`). Keep Codex Safe on `read-only` + `untrusted` and Codex Power User on active-vault `workspace-write` + `never`, keep Pi, Antigravity, and Kiro on transient MCP config, and do not use dangerous permission bypasses unless an ADR explicitly designs a new mode. Pi's transient agent directory must be seeded from the user's existing Pi agent directory before Tolaria MCP is merged so standalone provider/auth setup keeps working. Antigravity Safe uses sandboxed `proceed-in-sandbox`, Power User uses `always-proceed` without `--dangerously-skip-permissions`, and workspace MCP config lives in `.agents/mcp_config.json`. Kiro receives prompt content over stdin and writes Tolaria MCP config into `.kiro/settings/mcp.json` in the active vault.
+5. **Shared CLI runtime behavior**: Edit `src-tauri/src/cli_agent_runtime.rs` for process lifecycle, prompt wrapping, version probing, and common Rhizome MCP path handling.
+6. **Agent-specific arguments/events**: Edit the per-agent adapter modules (`claude_cli.rs`, `codex_cli.rs`, `opencode_*`, `pi_*`, `antigravity_*`, `kiro_*`). Keep Codex Safe on `read-only` + `untrusted` and Codex Power User on active-vault `workspace-write` + `never`, keep Pi, Antigravity, and Kiro on transient MCP config, and do not use dangerous permission bypasses unless an ADR explicitly designs a new mode. Pi's transient agent directory must be seeded from the user's existing Pi agent directory before Rhizome MCP is merged so standalone provider/auth setup keeps working. Antigravity Safe uses sandboxed `proceed-in-sandbox`, Power User uses `always-proceed` without `--dangerously-skip-permissions`, and workspace MCP config lives in `.agents/mcp_config.json`. Kiro receives prompt content over stdin and writes Rhizome MCP config into `.kiro/settings/mcp.json` in the active vault.
 7. **Availability probing**: Edit `src/hooks/useAiAgentsStatus.ts` and `src-tauri/src/ai_agents.rs` for AI-agent install/status detection. Keep renderer probing deferred until after first paint, skip it when AI features or AI surfaces are unavailable, and keep backend per-agent CLI checks parallel so missing tools do not serialize shell startup cost.
 
 ### Work with external MCP setup
 
-1. **Backend registration/status/snippets**: Edit `src-tauri/src/mcp.rs` and its `src-tauri/src/mcp/` helpers; registration and manual config generation must resolve an MCP runtime via `find_mcp_runtime` (Node.js 18+ preferred, Bun 1+ fallback) first, resolve the packaged `mcp-server/` for macOS, Windows executable-adjacent installs such as `%LOCALAPPDATA%\Tolaria`, Linux package roots (`/usr/local/Tolaria`, `/usr/local/lib/tolaria`, `/usr/lib/tolaria`, `/usr/lib/tolaria/resources`), and AppImage installs, and use a vault-neutral entry with `WS_UI_PORT=9711`. Client-facing Node script paths strip Windows extended-length `\\?\` prefixes before Tolaria writes durable config or transient agent entries, because stdio MCP clients pass that argument back to Node as the main module path. Linux AppImage startup must extract `mcp-server/` to `~/.local/share/tolaria/mcp-server/` before durable registration uses that stable path. App-owned bridge launches still pass `VAULT_PATH`/`VAULT_PATHS`; durable external registrations rely on the MCP server reading `vaults.json` at tool-call time.
-2. **Setup dialog copy/actions**: Edit `src/components/McpSetupDialog.tsx` and `src/hooks/useMcpStatus.ts`; users should see the runtime prerequisite (Node.js 18+ or Bun 1+), the exact generated standard `mcpServers` manual config, the exact generated OpenCode top-level `mcp` config, and copy actions before Tolaria writes third-party config files
+1. **Backend registration/status/snippets**: Edit `src-tauri/src/mcp.rs` and its `src-tauri/src/mcp/` helpers; registration and manual config generation must resolve an MCP runtime via `find_mcp_runtime` (Node.js 18+ preferred, Bun 1+ fallback) first, resolve the packaged `mcp-server/` for macOS, Windows executable-adjacent installs such as `%LOCALAPPDATA%\Tolaria`, Linux package roots (`/usr/local/Tolaria`, `/usr/local/lib/tolaria`, `/usr/lib/tolaria`, `/usr/lib/tolaria/resources`), and AppImage installs, and use a vault-neutral entry with `WS_UI_PORT=9711`. Client-facing Node script paths strip Windows extended-length `\\?\` prefixes before Rhizome writes durable config or transient agent entries, because stdio MCP clients pass that argument back to Node as the main module path. Linux AppImage startup must extract `mcp-server/` to `~/.local/share/tolaria/mcp-server/` before durable registration uses that stable path. App-owned bridge launches still pass `VAULT_PATH`/`VAULT_PATHS`; durable external registrations rely on the MCP server reading `vaults.json` at tool-call time.
+2. **Setup dialog copy/actions**: Edit `src/components/McpSetupDialog.tsx` and `src/hooks/useMcpStatus.ts`; users should see the runtime prerequisite (Node.js 18+ or Bun 1+), the exact generated standard `mcpServers` manual config, the exact generated OpenCode top-level `mcp` config, and copy actions before Rhizome writes third-party config files
 3. **Status hook/toasts**: Edit `src/hooks/useMcpStatus.ts` when setup, reconnect, disconnect, or failure messaging changes
-4. **Antigravity CLI compatibility**: Keep `~/.gemini/config/mcp_config.json` in the registration path list and keep optional `GEMINI.md` generation behind `restore_vault_ai_guidance`; app-managed Antigravity sessions still require the user to install and sign in to `agy`, but Tolaria supplies workspace MCP config when Antigravity is selected as the default AI agent
+4. **Antigravity CLI compatibility**: Keep `~/.gemini/config/mcp_config.json` in the registration path list and keep optional `GEMINI.md` generation behind `restore_vault_ai_guidance`; app-managed Antigravity sessions still require the user to install and sign in to `agy`, but Rhizome supplies workspace MCP config when Antigravity is selected as the default AI agent
 5. **OpenCode compatibility**: Keep `~/.config/opencode/opencode.json` in durable registration. OpenCode uses the top-level `mcp` key, `command` as an array, `environment` for env vars, `type: "local"`, and `enabled: true`; it must remain vault-neutral like the standard `mcpServers` entry.
 6. **Process lifecycle and vault guidance**: Stdio MCP servers in `mcp-server/index.js` must exit when their external client closes stdin, and the desktop-owned `ws-bridge.js` child must be stopped on vault deselection, vault switch, and app exit. MCP context must include root `AGENTS.md` instructions for every active mounted workspace when those files exist.

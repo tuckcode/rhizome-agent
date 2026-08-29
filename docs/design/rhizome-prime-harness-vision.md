@@ -24,7 +24,7 @@ The gap: **a desktop product where durable memory and a serious agent runtime ar
 - **AiWorkspace** (docked/pop-out multi-chat, agent targets, permission modes)  
 - **Multi-agent adapters** (already launches external CLIs—including Hermes and OpenCode—into the vault via MCP/safe modes)
 
-Public product / source: [knispo/rhizome](https://github.com/knispo/rhizome) (AGPL).
+Public product / source: [tuckcode/rhizome-agent](https://github.com/tuckcode/rhizome-agent) (private). Rhizome Desktop remains at [knispo/rhizome](https://github.com/knispo/rhizome) (AGPL) — a separate repo; see `docs/IDENTITY.md`.
 
 Rhizome’s strength is **memory architecture and desktop shell**, not “we rebuilt the best RLM from scratch.”
 
@@ -115,4 +115,4 @@ A user opens **Rhizome**, works in their **vault**, runs **long agent work** pow
 - pi (upstream TUI base): https://github.com/earendil-works/pi  
 - Hermes Agent: https://hermes-agent.nousresearch.com/  
 - OpenCode: https://opencode.ai/ · https://github.com/anomalyco/opencode  
-- Rhizome: https://github.com/knispo/rhizome  
+- Rhizome Agent: https://github.com/tuckcode/rhizome-agent  
