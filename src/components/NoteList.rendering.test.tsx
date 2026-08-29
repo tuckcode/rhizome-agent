@@ -12,7 +12,7 @@ import {
   mockEntries,
   renderNoteList,
 } from '../test-utils/noteListTestUtils'
-import type { ViewFile } from '../types'
+import type { ViewFile, SidebarSelection } from '../types'
 
 vi.mock('../hooks/useTabManagement', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../hooks/useTabManagement')>()
@@ -70,11 +70,11 @@ function renderManagedViewNoteList({
   entries,
   view = makeViewDefinition(),
 }: {
-  entries: Parameters<typeof renderNoteList>[0]['entries']
+  entries: readonly (ReturnType<typeof makeEntry> | ReturnType<typeof makeTypeDefinition>)[]
   view?: ViewFile
 }) {
   const built = buildNoteListProps({
-    entries,
+    entries: entries as Parameters<typeof renderNoteList>[0]['entries'],
     selection: { kind: 'view', filename: view.filename },
     views: [view],
   })
@@ -141,14 +141,15 @@ function installFullTextSearchMocks({
   })
 
   if (!window.__mockHandlers) window.__mockHandlers = {}
-  window.__mockHandlers.search_vault = searchVault
-  window.__mockHandlers.get_note_content = getNoteContent
+  const mockHandlers = window.__mockHandlers
+  mockHandlers.search_vault = searchVault
+  mockHandlers.get_note_content = getNoteContent
 
   return {
     getNoteContent,
     restore: () => {
-      window.__mockHandlers.search_vault = originalSearchHandler
-      window.__mockHandlers.get_note_content = originalContentHandler
+      mockHandlers.search_vault = originalSearchHandler
+      mockHandlers.get_note_content = originalContentHandler
     },
     searchVault,
   }
@@ -165,7 +166,7 @@ function renderBookNoteList({
 }: {
   displayProps?: string[]
   entryOverrides?: Parameters<typeof makeEntry>[0]
-  selection?: Parameters<typeof renderNoteList>[0]['selection']
+  selection?: SidebarSelection
   allNotesNoteListProperties?: string[] | null
   onUpdateAllNotesNoteListProperties?: () => void
   inboxNoteListProperties?: string[] | null
@@ -337,8 +338,9 @@ describe('NoteList rendering', () => {
   })
 
   it('ignores stale full-content results when the query changes before a slow search returns', async () => {
-    const originalContentHandler = window.__mockHandlers?.get_note_content
-    const originalSearchHandler = window.__mockHandlers?.search_vault
+    if (!window.__mockHandlers) window.__mockHandlers = {}
+    const originalContentHandler = window.__mockHandlers.get_note_content
+    const originalSearchHandler = window.__mockHandlers.search_vault
     let resolveSlowSearch: ((response: {
       elapsed_ms: number
       results: NoteListSearchMockResult[]
@@ -359,9 +361,9 @@ describe('NoteList rendering', () => {
       throw new Error('Note-list full-text search should not read note content in React')
     })
 
-    if (!window.__mockHandlers) window.__mockHandlers = {}
-    window.__mockHandlers.search_vault = searchVault
-    window.__mockHandlers.get_note_content = getNoteContent
+    const mockHandlers = window.__mockHandlers
+    mockHandlers.search_vault = searchVault
+    mockHandlers.get_note_content = getNoteContent
 
     try {
       renderNoteList({
@@ -411,8 +413,8 @@ describe('NoteList rendering', () => {
       expect(screen.queryByText('Beta Note')).not.toBeInTheDocument()
       expect(screen.getByText('No matching notes')).toBeInTheDocument()
     } finally {
-      window.__mockHandlers.search_vault = originalSearchHandler
-      window.__mockHandlers.get_note_content = originalContentHandler
+      mockHandlers.search_vault = originalSearchHandler
+      mockHandlers.get_note_content = originalContentHandler
     }
   })
 
@@ -867,6 +869,9 @@ describe('NoteList rendering', () => {
         filename: 'empty-view.yml',
         definition: {
           name: 'Empty View',
+          icon: null,
+          color: null,
+          sort: null,
           filters: { all: [{ field: 'type', op: 'equals', value: 'Project' }] },
         },
       }),

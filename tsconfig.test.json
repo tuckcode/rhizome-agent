@@ -38,7 +38,6 @@
     "src/components/InspectorPanels.test.tsx",
     "src/components/MarkdownContent.webkit.test.tsx",
     "src/components/NoteAutocomplete.test.tsx",
-    "src/components/NoteList.rendering.test.tsx",
     "src/components/PrimeSessionList.test.tsx",
     "src/components/PropertyValueCells.test.tsx",
     "src/components/QuickOpenPalette.test.tsx",
