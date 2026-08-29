@@ -50,7 +50,7 @@ export function ChatNotePane({
           aria-orientation="vertical"
           aria-label={t('ai.chatNote.resize')}
           data-testid="chat-note-pane-resize"
-          className="absolute inset-y-0 -left-[5px] z-20 w-3 cursor-col-resize bg-transparent transition-colors hover:bg-border"
+          className="absolute inset-y-0 -left-[10px] z-20 w-4 cursor-col-resize bg-transparent transition-colors hover:bg-border"
           onMouseDown={(event) => startResizeDrag(event, 'col-resize', (deltaX) => onResize(deltaX))}
         />
       ) : null}

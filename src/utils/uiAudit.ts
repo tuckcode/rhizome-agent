@@ -25,10 +25,26 @@ export interface UiAuditFinding {
   testId?: string
 }
 
-/** Apple's minimum is 44px, but this codebase is a dense desktop UI. 24px is
- *  the point below which a trackpad starts missing — the 8px resize handle
- *  that took three attempts to grab would have failed this. */
-const MIN_TARGET_PX = 24
+/**
+ * Apple's minimum is 44px; this is a dense desktop app driven by a mouse, so
+ * that floor would flag almost every control and the report would be noise
+ * nobody reads — the same failure mode as a gate nobody runs.
+ *
+ * Two thresholds instead, because two different things are hard to hit:
+ *
+ * - **Icon-sized**: small in *both* directions. A 21x21 icon button is a real
+ *   miss risk; a 71x21 pill is not, because it is 71px wide to aim at.
+ * - **Thin**: under 12px in either direction, however long. The resize handle
+ *   was 8x604 and took three attempts to grab even while aiming at exact
+ *   coordinates.
+ *
+ * Worth knowing when reading the numbers: this app's root font size is
+ * **14px, not 16**, so every Tailwind `rem` size renders at 87.5% of what its
+ * class name suggests. `h-6` reads as 24px and is 21px. That is why the
+ * session row actions failed this rule while looking correct in the source.
+ */
+const MIN_ICON_TARGET_PX = 24
+const MIN_THIN_TARGET_PX = 12
 
 const INTERACTIVE_SELECTOR = [
   'button',
@@ -69,7 +85,14 @@ function inertControls(root: ParentNode): UiAuditFinding[] {
   return suspects.flatMap((node) => {
     if (node.closest(INTERACTIVE_SELECTOR)) return []
     const style = getComputedStyle(node)
+    const { width, height } = node.getBoundingClientRect()
+    // Control-sized, not card-sized. A bordered rounded *panel* — the
+    // onboarding card, a settings section — is not pretending to be
+    // pressable; a 22px pill is. Without this the rule fires on every card in
+    // the app and the report becomes noise nobody reads.
+    const controlSized = height <= 40 && width <= 360
     const looksPressable =
+      controlSized &&
       Number.parseFloat(style.borderTopWidth) > 0 &&
       cornerRadius(style) >= 8 &&
       node.textContent!.trim().length > 0 &&
@@ -113,12 +136,20 @@ function tinyTargets(controls: HTMLElement[]): UiAuditFinding[] {
   return controls.flatMap((node) => {
     const { width, height } = node.getBoundingClientRect()
     const smallest = Math.min(width, height)
-    if (smallest === 0 || smallest >= MIN_TARGET_PX) return []
+    if (smallest === 0) return []
+
+    const iconSized = width < MIN_ICON_TARGET_PX && height < MIN_ICON_TARGET_PX
+    const thin = smallest < MIN_THIN_TARGET_PX
+    if (!iconSized && !thin) return []
+
+    const reason = thin
+      ? `thinner than ${MIN_THIN_TARGET_PX}px`
+      : `smaller than ${MIN_ICON_TARGET_PX}px in both directions`
     return [
       {
         rule: 'tiny-target' as const,
         label: accessibleName(node) || text(node),
-        detail: `${Math.round(width)}x${Math.round(height)}px — under the ${MIN_TARGET_PX}px floor.`,
+        detail: `${Math.round(width)}x${Math.round(height)}px — ${reason}.`,
         testId: node.dataset.testid,
       },
     ]
@@ -139,8 +170,18 @@ function overlappingControls(controls: HTMLElement[]): UiAuditFinding[] {
       const b = controls[j]
       // Nesting is not overlap: a button inside a menu item is normal.
       if (a.contains(b) || b.contains(a)) continue
-      const overlap = intersectionArea(a.getBoundingClientRect(), b.getBoundingClientRect())
+      const boxA = a.getBoundingClientRect()
+      const boxB = b.getBoundingClientRect()
+      const overlap = intersectionArea(boxA, boxB)
       if (overlap < 16) continue
+      // A control sitting entirely inside another's box is the ordinary
+      // row-action overlay: rename and archive drawn over the session row
+      // they belong to. Deliberate, and flagging it buried the real finding
+      // under 21 copies of one pattern. A *partial* overlap is the layout
+      // collision worth reporting — a label clipping a row, a pill over a
+      // transcript.
+      const smaller = Math.min(boxA.width * boxA.height, boxB.width * boxB.height)
+      if (overlap >= smaller - 1) continue
       findings.push({
         rule: 'overlapping-controls',
         label: `${accessibleName(a) || text(a)} / ${accessibleName(b) || text(b)}`,

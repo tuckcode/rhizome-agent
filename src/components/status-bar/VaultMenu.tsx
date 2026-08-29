@@ -127,8 +127,8 @@ interface VaultPathSelection extends VaultMenuInteractionOptions {
 function getVaultTriggerClassName(open: boolean, compact: boolean) {
   if (compact) {
     return open
-      ? 'h-6 w-6 rounded-sm bg-[var(--hover)] p-0 text-foreground hover:bg-[var(--hover)]'
-      : 'h-6 w-6 rounded-sm p-0 text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground'
+      ? 'h-7 w-7 rounded-sm bg-[var(--hover)] p-0 text-foreground hover:bg-[var(--hover)]'
+      : 'h-7 w-7 rounded-sm p-0 text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground'
   }
 
   return open
@@ -444,7 +444,7 @@ function VaultMenuRemoveButton({
       title={removeLabel}
       aria-label={removeLabel}
       data-testid={`vault-menu-remove-${vault.label}`}
-      className="ml-0.5 h-6 w-6 shrink-0 rounded-sm text-muted-foreground opacity-0 pointer-events-none transition-opacity hover:bg-[var(--hover)] hover:text-foreground focus-visible:opacity-100 focus-visible:pointer-events-auto group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
+      className="ml-0.5 h-7 w-7 shrink-0 rounded-sm text-muted-foreground opacity-0 pointer-events-none transition-opacity hover:bg-[var(--hover)] hover:text-foreground focus-visible:opacity-100 focus-visible:pointer-events-auto group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
     >
       <X size={10} />
     </Button>
