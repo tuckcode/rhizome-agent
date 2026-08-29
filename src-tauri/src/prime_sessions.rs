@@ -282,8 +282,18 @@ fn summarize_lines<I: Iterator<Item = String>>(lines: I) -> PrimeSessionSummary 
     }
     // A deliberate name beats a derived one. Someone who renamed a session
     // chose that label over whatever its first message happened to say.
+    //
+    // Except our own placeholder. `Rhizome · vault · id` says nothing a person
+    // wanted said — it exists so the daemon has a unique handle — and before
+    // #49 it was the only name most sessions ever got. Letting it win printed
+    // a column of near-identical rows over titles the log could already
+    // supply. Sessions named after their first exchange are unaffected: those
+    // names are not placeholders.
     if let Some(name) = session_name {
-        summary.title = Some(name);
+        let placeholder = crate::prime_session_host::is_rhizome_placeholder_name(&name);
+        if !placeholder || summary.title.is_none() {
+            summary.title = Some(name);
+        }
     }
     if summary.title.is_none() {
         summary.title = agent_opening;
@@ -806,6 +816,37 @@ mod tests {
         let summary = summarize_lines(log.iter().map(|line| line.to_string()));
 
         assert_eq!(summary.title.as_deref(), Some("Release notes for 0.8"));
+    }
+
+    /// Our own placeholder is not a choice anyone made. Before #49 it was the
+    /// only name most sessions got, and letting it win printed a column of
+    /// `Rhizome · Laputa · …` rows over titles the log already held.
+    #[test]
+    fn our_own_placeholder_loses_to_what_the_session_is_about() {
+        let summary = summarize_lines(
+            [
+                r#"{"type":"session_info","name":"Rhizome · Laputa · 4f2a1c"}"#,
+                r#"{"type":"message","message":{"role":"user","content":"Trace why search misses aliases"}}"#,
+            ]
+            .into_iter()
+            .map(str::to_string),
+        );
+        assert_eq!(
+            summary.title.as_deref(),
+            Some("Trace why search misses aliases")
+        );
+    }
+
+    /// With nothing to derive from, the placeholder is still better than
+    /// "Untitled session" — it at least names the vault.
+    #[test]
+    fn the_placeholder_stands_when_there_is_nothing_else() {
+        let summary = summarize_lines(
+            [r#"{"type":"session_info","name":"Rhizome · Laputa · 4f2a1c"}"#]
+                .into_iter()
+                .map(str::to_string),
+        );
+        assert_eq!(summary.title.as_deref(), Some("Rhizome · Laputa · 4f2a1c"));
     }
 
     /// A name is a choice; a title from the first message is a derivation.

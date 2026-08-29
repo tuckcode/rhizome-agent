@@ -1789,7 +1789,7 @@ fn title_candidate(text: &str) -> Option<String> {
 ///
 /// A name a person chose must never be overwritten — that is the whole reason
 /// rename exists. Only our own `Rhizome · vault · id` is fair game.
-fn is_rhizome_placeholder_name(name: &str) -> bool {
+pub(crate) fn is_rhizome_placeholder_name(name: &str) -> bool {
     name.starts_with("Rhizome · ")
 }
 
