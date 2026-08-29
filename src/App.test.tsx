@@ -1430,6 +1430,24 @@ describe('App', () => {
     })
   })
 
+  it('lets you drag the Notes panel wider, and remembers it', async () => {
+    render(<App />)
+    const handle = await screen.findByTestId('vault-panel-resize', {}, { timeout: 5000 })
+    const panel = document.querySelector('.app__vault-panel') as HTMLElement
+    expect(panel).toHaveStyle({ width: '300px' })
+
+    act(() => {
+      fireEvent.mouseDown(handle, { clientX: 1000, clientY: 300 })
+      fireEvent.mouseMove(document, { clientX: 900, clientY: 300 })
+      fireEvent.mouseUp(document)
+    })
+
+    await waitFor(() => {
+      expect(panel).toHaveStyle({ width: '400px' })
+    })
+    expect(JSON.parse(localStorage.getItem('rhizome:layout-panels') ?? '{}').noteList).toBe(400)
+  })
+
   it('Cmd+3 opens the vault panel with Browse above the note list after Cmd+1', async () => {
     render(<App />)
     await waitFor(() => {

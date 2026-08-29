@@ -4,7 +4,10 @@ import { Button } from '@/components/ui/button'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { invoke } from '@tauri-apps/api/core'
+import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import { useDocumentThemeMode } from '../hooks/useDocumentThemeMode'
+import { usePanelWidth } from '../hooks/usePanelWidth'
+import { ResizeHandle } from './ResizeHandle'
 
 interface MyceliumViewProps {
   locale?: AppLocale
@@ -37,6 +40,7 @@ export default function MyceliumView({
   const t = createTranslator(locale)
   const themeMode = useDocumentThemeMode()
   const sessionOnly = Boolean(focusSessionPath)
+  const sessionsWidth = usePanelWidth(APP_STORAGE_KEYS.myceliumSessionsWidth, 224, 180, 420)
   const [sessions, setSessions] = useState<SessionPick[]>([])
   const [selected, setSelected] = useState<SessionPick | null>(null)
   const [sidecar, setSidecar] = useState<SidecarStatus | null>(null)
@@ -113,7 +117,17 @@ export default function MyceliumView({
 
       <div className="flex min-h-0 flex-1">
         {sessionOnly ? null : (
-          <div className="flex w-56 shrink-0 flex-col border-r border-border" data-testid="mycelium-overview-list">
+          <div
+            className="relative flex shrink-0 flex-col border-r border-border"
+            style={{ width: sessionsWidth.width }}
+            data-testid="mycelium-overview-list"
+          >
+            <ResizeHandle
+              onResize={(delta) => sessionsWidth.resizeBy(-delta)}
+              placement="absolute"
+              label={t('mycelium.sessions.resize')}
+              testId="mycelium-sessions-resize"
+            />
             <div className="border-b border-border px-3 py-2 text-[11px] font-medium text-muted-foreground">
               {t('mycelium.sessionsHeading')}
             </div>

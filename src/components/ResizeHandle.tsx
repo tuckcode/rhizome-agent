@@ -9,9 +9,36 @@ interface ResizeHandleProps {
    * mean the opposite — otherwise the sidebar shrinks as you pull it wider.
    */
   edge?: 'leading' | 'trailing'
+  /**
+   * `flow` (default) is a flex sibling between columns. `absolute` sits on
+   * the panel's own edge so an overlay still has a handle — compact Notes
+   * is position:absolute, so a flex sibling would not line up with it.
+   */
+  placement?: 'flow' | 'absolute'
+  label?: string
+  testId?: string
 }
 
-export function ResizeHandle({ onResize, edge = 'leading' }: ResizeHandleProps) {
+function handleClassName(edge: 'leading' | 'trailing', placement: 'flow' | 'absolute'): string {
+  // w-4 is 14px at this app's 14px root — the 12px floor from the UI audit.
+  // w-1 (the old 4px strip) took three attempts to grab.
+  const hit =
+    'z-30 w-4 cursor-col-resize bg-transparent transition-colors hover:bg-[var(--border)]'
+  if (placement === 'absolute') {
+    const inset = edge === 'trailing' ? '-left-[10px]' : '-right-[10px]'
+    return `absolute inset-y-0 ${inset} ${hit}`
+  }
+  const overlap = edge === 'trailing' ? '-mr-2' : '-ml-2'
+  return `relative ${overlap} shrink-0 self-stretch ${hit}`
+}
+
+export function ResizeHandle({
+  onResize,
+  edge = 'leading',
+  placement = 'flow',
+  label,
+  testId,
+}: ResizeHandleProps) {
   const direction = edge === 'trailing' ? -1 : 1
   const handleRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
@@ -53,7 +80,6 @@ export function ResizeHandle({ onResize, edge = 'leading' }: ResizeHandleProps) 
         isDragging.current = false
         document.body.style.cursor = ''
         document.body.style.userSelect = ''
-        // Flush any pending delta
         if (rafId.current) {
           cancelAnimationFrame(rafId.current)
           rafId.current = 0
@@ -84,7 +110,11 @@ export function ResizeHandle({ onResize, edge = 'leading' }: ResizeHandleProps) 
   return (
     <div
       ref={handleRef}
-      className={`relative z-30 ${edge === 'trailing' ? '-mr-1' : '-ml-1'} w-1 shrink-0 self-stretch cursor-col-resize bg-transparent transition-colors hover:bg-[var(--border)]`}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={label}
+      data-testid={testId}
+      className={handleClassName(edge, placement)}
     />
   )
 }

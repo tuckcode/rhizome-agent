@@ -66,7 +66,9 @@ Closing a note is the breadcrumb **X** (`breadcrumb-close-note`). The
 sidebar-looking header control is Properties.
 
 Width-aware collapse: sessions overlay first, then the vault panel
-(`src/hooks/useShellCompactLayout.ts`).
+(`src/hooks/useShellCompactLayout.ts`). Dragging a panel does not
+enter or leave compact mode — that is window width only. The overlay
+Notes panel stays resizable.
 
 ---
 
