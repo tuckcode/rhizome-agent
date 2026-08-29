@@ -440,7 +440,7 @@
   "ai.panel.empty.withContextTitle": "Message {agent}",
   "ai.panel.empty.noContextTitle": "Message {agent}",
   "ai.panel.empty.withContextDescription": "Research, search your vault, or draft something worth saving.",
-  "ai.panel.empty.noContextDescription": "Chat works without a note. Attach a vault for memory tools and Save to vault.",
+  "ai.panel.empty.noContextDescription": "Chat works without a note. Open one to give Prime something to work from.",
   "ai.panel.placeholder.checking": "Checking AI agent availability...",
   "ai.panel.placeholder.missing": "{agent} is not installed. Install prime-agent and log in once.",
   "ai.panel.placeholder.ready": "Ask {agent}",
