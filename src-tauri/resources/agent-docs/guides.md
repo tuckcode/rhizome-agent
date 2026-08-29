@@ -295,10 +295,14 @@ If a coding agent is missing, install it and reopen Rhizome or switch to another
 
 ## Permission Mode
 
-Coding agents support per-vault permission modes:
+Prime (Chat) always runs with local tools available. It has no sandbox, so the old Vault Safe prompt is not sent — that text only asked the model not to use shell, and the model obeyed.
 
-- **Vault Safe** keeps agents limited to file, search, and edit tools.
-- **Power User** can allow shell commands for agents that support them.
+Claude Code and Antigravity still enforce a per-vault mode:
+
+- **Limited tools** blocks shell commands.
+- **Power User** allows local shell commands for this vault.
+
+Other CLI agents are asked to follow the same labels; enforcement depends on the adapter.
 
 Direct model targets always stay in chat mode. They can use note context, but they cannot edit vault files through tools.
 
