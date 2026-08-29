@@ -17,7 +17,7 @@ It indexes, it does not restate. Every row points at the issue, ADR, or C-number
 that owns the detail. If you find yourself copying a paragraph out of one of
 those into here, link it instead — the same rule `HANDOFF.md` runs on.
 
-Snapshot: **2026-08-29**, 25 open issues, 17 open C-numbers. Re-derive both
+Snapshot: **2026-08-29**, 20 open issues, 16 open C-numbers. Re-derive both
 before trusting the counts:
 
 ```bash
