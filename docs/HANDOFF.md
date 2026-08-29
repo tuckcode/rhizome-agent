@@ -89,6 +89,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-08-29 · Grok 4.6](plans/handoffs/2026-08-29-0158-grok-4-6-live-app-view-plan.md) — #50 plan only (not built): `pnpm live-ui` against the browser app, read + test-bridge steer, developer tooling not an in-app pane; scroll metrics required because `uiAudit` would have missed the missing transcript scroller. Awaiting Atticus. Writeup: [`docs/plans/2026-08-29-live-app-view-plan.md`](plans/2026-08-29-live-app-view-plan.md)
 - [2026-08-29 · Claude Opus 5](plans/handoffs/2026-08-29-0100-claude-opus-5-session-naming.md) — #49 step 2: a session names itself from its first exchange and the name is **stored** through `set_session_name`, so every client reads the same one; a name a person chose is never overwritten; the list stops printing Rhizome's own `Rhizome · vault · id` placeholder as if it were a name, so old sessions read better with no backfill; fixed a full stop inside `0.8` being treated as a sentence break; Mycelium's session picker stopped listing Prime's uuids; Mycelium's Evaluation failure is the `claude` CLI's expired login (`claude login`), not our bug; filed #50 — let the agent see the running app instead of screenshots macOS keeps blocking; open question on Vault Safe / Power User — enforced for Claude Code and Antigravity, prompt-text only elsewhere, and reaching Prime only as prompt text the model obeys — so it blocks real work without preventing anything
 - [2026-08-28 (afternoon) · Claude Opus 5](plans/handoffs/2026-08-28-1500-claude-opus-5-note-context.md) — Chat can see the note you have open (it passed nothing before), and any note can be handed to the agent by right-clicking it; both live-verified, the agent naming the note's contents with tools forbidden
 - [2026-08-28 (early) · Claude Opus 5](plans/handoffs/2026-08-28-0300-claude-opus-5-model-allow-list.md) — Nous Portal **confirmed working** through the existing OpenAI-compatible path (200 + `OK` on `hermes-4-405b`), so #45's custom-provider work is not needed for chat; #45 step 1 shipped — persisted chat-model allow-list, editor in Settings → AI agents; fixed the chat transcript having no scroll box (`6c4d91d`, regression from `b9983ad`); C54: the documented Rust coverage command is missing the gate's `--ignore-filename-regex` and fails on a healthy tree
@@ -243,6 +244,13 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 
 ## Open threads
+
+- **#50 (2026-08-29): let the agent see the running app — plan ready, not built.**
+  Three answers proposed: show `pnpm dev` (not native), read + steer through
+  `__rhizomeTest` (not click/type), ship as `pnpm live-ui` beside `pnpm deadcode`
+  (not a product pane). Awaiting Atticus.
+  [plan](plans/2026-08-29-live-app-view-plan.md) ·
+  [session](plans/handoffs/2026-08-29-0158-grok-4-6-live-app-view-plan.md).
 
 - **C56-OPEN (2026-08-28): two live-daemon tests fail against a healthy
   daemon, and nobody was running them.** `pnpm test:live-prime` (`db33c46`)
