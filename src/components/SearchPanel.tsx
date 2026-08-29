@@ -1,6 +1,7 @@
 import { createElement, forwardRef, useRef, useEffect, useCallback, useLayoutEffect, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import type { SearchResult, VaultEntry } from '../types'
+import { translate, type AppLocale } from '../lib/i18n'
 import { useUnifiedSearch } from '../hooks/useUnifiedSearch'
 import { getTypeColor, buildTypeEntryMap } from '../utils/typeColors'
 import { formatSearchSubtitle } from '../utils/noteListHelpers'
@@ -17,6 +18,7 @@ interface SearchPanelProps {
   entries: VaultEntry[]
   onSelectNote: (entry: VaultEntry) => void
   onClose: () => void
+  locale?: AppLocale
 }
 
 type SearchKeyboardAction = 'close' | 'next' | 'previous' | 'select'
@@ -310,6 +312,7 @@ export function SearchPanel({
   entries,
   onSelectNote,
   onClose,
+  locale = 'en',
 }: SearchPanelProps) {
   const dateDisplayFormat = useDateDisplayFormat()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -354,7 +357,7 @@ export function SearchPanel({
     >
       <button
         type="button"
-        aria-label="Close search"
+        aria-label={translate(locale, 'search.close')}
         className="absolute inset-0 z-0 cursor-default border-0 bg-transparent p-0"
         onClick={onClose}
       />
