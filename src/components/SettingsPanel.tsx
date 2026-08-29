@@ -54,7 +54,6 @@ import { AccentColorPicker } from './AccentColorPicker'
 import { normalizeReleaseChannel, serializeReleaseChannel, type ReleaseChannel } from '../lib/releaseChannel'
 import { shouldHideGitignoredFiles } from '../lib/gitignoredVisibility'
 import { areGitFeaturesEnabled } from '../lib/gitSettings'
-import { areAiFeaturesEnabled } from '../lib/aiFeatures'
 import { areAutomaticUpdateChecksEnabled } from '../lib/automaticUpdateChecks'
 import { trackAllNotesVisibilityChanged } from '../lib/productAnalytics'
 import { AiProviderSettings } from './AiProviderSettings'
@@ -132,7 +131,6 @@ interface SettingsDraft {
   autoGitIdleThresholdSeconds: number
   autoGitInactiveThresholdSeconds: number
   autoAdvanceInboxAfterOrganize: boolean
-  aiFeaturesEnabled: boolean
   celebrationsEnabled: boolean
   defaultAiAgent: AiAgentId
   defaultAiTarget: string
@@ -171,7 +169,6 @@ interface SettingsBodyProps {
   setAutoGitInactiveThresholdSeconds: (value: number) => void
   autoAdvanceInboxAfterOrganize: boolean
   setAutoAdvanceInboxAfterOrganize: (value: boolean) => void
-  aiFeaturesEnabled: boolean
   celebrationsEnabled: boolean
   setCelebrationsEnabled: (value: boolean) => void
   aiAgentsStatus: AiAgentsStatus
@@ -251,7 +248,6 @@ function createSettingsDraft(
       DEFAULT_AUTOGIT_INACTIVE_THRESHOLD_SECONDS,
     ),
     autoAdvanceInboxAfterOrganize: settings.auto_advance_inbox_after_organize ?? false,
-    aiFeaturesEnabled: areAiFeaturesEnabled(),
     // Absent means never chosen, which is on: the effect is opt-out.
     celebrationsEnabled: readCelebrationsEnabled(settings.celebrations_enabled),
     defaultAiAgent: resolveDefaultAiAgent(settings.default_ai_agent),
@@ -330,7 +326,6 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     note_width_mode: draft.defaultNoteWidth,
     sidebar_type_pluralization_enabled: draft.sidebarTypePluralizationEnabled,
     initial_h1_auto_rename_enabled: draft.initialH1AutoRename,
-    ai_features_enabled: draft.aiFeaturesEnabled,
     celebrations_enabled: draft.celebrationsEnabled,
     default_ai_agent: draft.defaultAiAgent,
     default_ai_target: draft.defaultAiTarget,
@@ -654,7 +649,6 @@ function SettingsBodyFromDraft({
       setAutoGitInactiveThresholdSeconds={(value) => updateDraft('autoGitInactiveThresholdSeconds', value)}
       autoAdvanceInboxAfterOrganize={draft.autoAdvanceInboxAfterOrganize}
       setAutoAdvanceInboxAfterOrganize={(value) => updateDraft('autoAdvanceInboxAfterOrganize', value)}
-      aiFeaturesEnabled={draft.aiFeaturesEnabled}
       celebrationsEnabled={draft.celebrationsEnabled}
       setCelebrationsEnabled={(value) => updateDraft('celebrationsEnabled', value)}
       aiAgentsStatus={aiAgentsStatus}
@@ -860,7 +854,6 @@ function SettingsAgentWorkflowSections({
   t,
   autoAdvanceInboxAfterOrganize,
   setAutoAdvanceInboxAfterOrganize,
-  aiFeaturesEnabled,
   celebrationsEnabled,
   setCelebrationsEnabled,
   aiAgentsStatus,
@@ -886,7 +879,6 @@ function SettingsAgentWorkflowSections({
       <SettingsSection id={SETTINGS_SECTION_IDS.ai}>
         <AiAgentSettingsSection
           t={t}
-          aiFeaturesEnabled={aiFeaturesEnabled}
           celebrationsEnabled={celebrationsEnabled}
           setCelebrationsEnabled={setCelebrationsEnabled}
           aiAgentsStatus={aiAgentsStatus}
@@ -1212,7 +1204,6 @@ function buildDefaultAiTargetOptions(
 
 function AiAgentSettingsSection({
   t,
-  aiFeaturesEnabled,
   celebrationsEnabled,
   setCelebrationsEnabled,
   aiAgentsStatus,
@@ -1226,7 +1217,6 @@ function AiAgentSettingsSection({
 }: Pick<
   SettingsBodyProps,
   | 't'
-  | 'aiFeaturesEnabled'
   | 'celebrationsEnabled'
   | 'setCelebrationsEnabled'
   | 'aiAgentsStatus'
@@ -1269,39 +1259,35 @@ function AiAgentSettingsSection({
         />
       </SettingsGroup>
 
-      {aiFeaturesEnabled ? (
-        <>
-          <SettingsGroup>
-            <SettingsRow
-              label={t('settings.aiAgents.defaultTarget')}
-              description={renderDefaultAiTargetSummary(selectedTarget, aiAgentsStatus, t)}
-              controlWidth="wide"
-            >
-              <SelectControl
-                ariaLabel={t('settings.aiAgents.defaultTarget')}
-                value={defaultAiTarget}
-                onValueChange={(value) => {
-                  setDefaultAiTarget(value)
-                  if (value.startsWith('agent:')) {
-                    const agent = value.replace('agent:', '') as AiAgentId
-                    setDefaultAiAgent(agent)
-                  }
-                }}
-                options={buildDefaultAiTargetOptions(aiAgentsStatus, aiModelProviders, t)}
-                testId="settings-default-ai-agent"
-              />
-            </SettingsRow>
-          </SettingsGroup>
-
-          <AiTargetManagementTabs
-            t={t}
-            aiAgentsStatus={aiAgentsStatus}
-            aiModelProviders={aiModelProviders}
-            setAiModelProviders={setAiModelProviders}
-            onCopyMcpConfig={onCopyMcpConfig}
+      <SettingsGroup>
+        <SettingsRow
+          label={t('settings.aiAgents.defaultTarget')}
+          description={renderDefaultAiTargetSummary(selectedTarget, aiAgentsStatus, t)}
+          controlWidth="wide"
+        >
+          <SelectControl
+            ariaLabel={t('settings.aiAgents.defaultTarget')}
+            value={defaultAiTarget}
+            onValueChange={(value) => {
+              setDefaultAiTarget(value)
+              if (value.startsWith('agent:')) {
+                const agent = value.replace('agent:', '') as AiAgentId
+                setDefaultAiAgent(agent)
+              }
+            }}
+            options={buildDefaultAiTargetOptions(aiAgentsStatus, aiModelProviders, t)}
+            testId="settings-default-ai-agent"
           />
-        </>
-      ) : null}
+        </SettingsRow>
+      </SettingsGroup>
+
+      <AiTargetManagementTabs
+        t={t}
+        aiAgentsStatus={aiAgentsStatus}
+        aiModelProviders={aiModelProviders}
+        setAiModelProviders={setAiModelProviders}
+        onCopyMcpConfig={onCopyMcpConfig}
+      />
     </>
   )
 }

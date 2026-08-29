@@ -1,13 +1,11 @@
 import type { Settings, NoteWidthMode } from '../types'
 import { trackEvent } from '../lib/telemetry'
 import {
-  trackAiFeaturesEnabledChanged,
   trackDateDisplayFormatChanged,
   trackDefaultNoteWidthChanged,
   trackGitFeaturesEnabledChanged,
   trackSidebarTypePluralizationChanged,
 } from '../lib/productAnalytics'
-import { areAiFeaturesEnabled } from '../lib/aiFeatures'
 import { areGitFeaturesEnabled } from '../lib/gitSettings'
 import { areAutomaticUpdateChecksEnabled } from '../lib/automaticUpdateChecks'
 import {
@@ -19,7 +17,6 @@ import { DEFAULT_NOTE_WIDTH_MODE, normalizeNoteWidthMode } from '../utils/noteWi
 
 export interface SettingsPreferenceDraft {
   analytics: boolean
-  aiFeaturesEnabled: boolean
   automaticUpdateChecksEnabled: boolean
   dateDisplayFormat: DateDisplayFormat
   defaultNoteWidth: NoteWidthMode
@@ -56,7 +53,6 @@ export function trackTelemetryConsentChange(previousAnalytics: boolean, nextAnal
 }
 
 export function trackSettingsPreferenceChanges(settings: Settings, draft: SettingsPreferenceDraft): void {
-  trackPreferenceChange(areAiFeaturesEnabled(), draft.aiFeaturesEnabled, trackAiFeaturesEnabledChanged)
   trackPreferenceChange(areGitFeaturesEnabled(settings), draft.gitFeaturesEnabled, trackGitFeaturesEnabledChanged)
   trackEnabledPreferenceChange(
     areAutomaticUpdateChecksEnabled(settings),

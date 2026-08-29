@@ -12,13 +12,11 @@ import { useCelebration } from './celebrationContext'
  */
 export function PrimeActivityProvider({
   children,
-  enabled,
 }: {
   children: ReactNode
-  enabled: boolean
 }) {
   const { celebrate } = useCelebration()
-  const value = usePrimeAgentActivity({ enabled, celebrate })
+  const value = usePrimeAgentActivity({ enabled: true, celebrate })
 
   return <PrimeActivityContext.Provider value={value}>{children}</PrimeActivityContext.Provider>
 }

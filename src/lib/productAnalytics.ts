@@ -212,12 +212,6 @@ export function trackAllNotesVisibilityChanged(
   }
 }
 
-export function trackAiFeaturesEnabledChanged(enabled: AnalyticsBoolean): void {
-  trackEvent('ai_features_visibility_changed', {
-    enabled: numericFlag(enabled),
-  })
-}
-
 export function trackGitFeaturesEnabledChanged(enabled: AnalyticsBoolean): void {
   trackEvent('git_features_visibility_changed', {
     enabled: numericFlag(enabled),

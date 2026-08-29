@@ -6,7 +6,6 @@ import { useSettings } from '../hooks/useSettings'
 import { useVaultAiGuidanceStatus } from '../hooks/useVaultAiGuidanceStatus'
 import { noteExistsOnDisk, persistNewNote } from '../hooks/useNoteCreation'
 import { isTauri } from '../mock-tauri'
-import { areAiFeaturesEnabled } from '../lib/aiFeatures'
 import { translate } from '../lib/i18n'
 import { trackVaultCredentialsHandled } from '../lib/productAnalytics'
 import { redactCredentialTokens } from '../lib/sensitiveTextRedaction'
@@ -249,7 +248,6 @@ export function AiWorkspaceWindowApp() {
   )
   const { settings, loaded: settingsLoaded, saveSettings } = useSettings()
   const aiAgentsStatus = useAiAgentsStatus()
-  const aiFeaturesEnabled = areAiFeaturesEnabled()
   const preferences = useAppPreferences({
     aiAgentsStatus,
     onToast: setToastMessage,
@@ -261,7 +259,7 @@ export function AiWorkspaceWindowApp() {
   const vaultPaths = context.vaultPaths ?? sharedContext.vaultPaths ?? (vaultPath ? [vaultPath] : [])
   const activeConversationId = context.activeConversationId ?? sharedContext.activeConversationId
   const { status: vaultAiGuidanceStatus } = useVaultAiGuidanceStatus(
-    aiFeaturesEnabled && vaultPath ? vaultPath : null,
+    vaultPath || null,
     vaultPath,
   )
   const handleConversationSettingsChange = useAiWorkspaceSettingsSaver(settingsLoaded, settings, saveSettings)
