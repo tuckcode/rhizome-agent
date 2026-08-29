@@ -172,17 +172,29 @@ function useBridgeVaultSync({
   windowMode,
   writableVaultPaths,
 }: BridgeVaultSyncParams): void {
+  // Keyed on the paths themselves, not on the array holding them.
+  // `writableVaultPaths` is memoized, but on a list its own caller rebuilds
+  // every render — so its identity changed constantly while its contents did
+  // not, and this effect re-synced the bridge over and over. The host now
+  // answers "unchanged" rather than restarting a healthy child (#54); this
+  // stops the pointless round trip as well.
+  const vaultPathsKey = writableVaultPaths.join('\u0000')
+  const stableVaultPaths = useMemo(
+    () => (vaultPathsKey ? vaultPathsKey.split('\u0000') : []),
+    [vaultPathsKey],
+  )
+
   useEffect(() => {
     if (windowMode || !vaultSwitcherLoaded) return
 
-    const bridgeVaultPath = writableVaultPaths[0] ?? null
+    const bridgeVaultPath = stableVaultPaths[0] ?? null
     void invokeAppCommand<string>('sync_mcp_bridge_vault', {
       vaultPath: bridgeVaultPath,
-      vaultPaths: writableVaultPaths,
+      vaultPaths: stableVaultPaths,
     }).catch((err) => {
       console.warn('Failed to sync MCP bridge vault scope:', err)
     })
-  }, [vaultSwitcherLoaded, windowMode, writableVaultPaths])
+  }, [vaultSwitcherLoaded, windowMode, stableVaultPaths])
 }
 
 export function hideWorkspaceMetadata(entries: VaultEntry[]): VaultEntry[] {
