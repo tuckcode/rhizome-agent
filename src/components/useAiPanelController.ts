@@ -7,6 +7,7 @@ import { trackAiAgentPermissionModeChanged } from '../lib/productAnalytics'
 import {
   aiAgentPermissionModeMarker,
   normalizeAiAgentPermissionMode,
+  resolvePermissionModeForAgent,
   type AiAgentPermissionMode,
 } from '../lib/aiAgentPermissionMode'
 import { useCliAiAgent, type AgentFileCallbacks } from '../hooks/useCliAiAgent'
@@ -109,7 +110,7 @@ function useAiPermissionModeHandler({
 
     updateVaultConfigField('ai_agent_permission_mode', nextMode)
     trackAiAgentPermissionModeChanged(defaultAiAgent, nextMode)
-    agent.addLocalMarker(aiAgentPermissionModeMarker(nextMode, locale))
+    agent.addLocalMarker(aiAgentPermissionModeMarker(nextMode, locale, defaultAiAgent))
   }, [agent, defaultAiAgent, isActive, locale, permissionMode])
 }
 
@@ -141,7 +142,8 @@ function usePanelAgent({
   | 'sessionId'
 > & { contextPrompt?: string }) {
   const fileCallbacks = useAgentFileCallbacks({ onFileCreated, onFileModified, onVaultChanged })
-  const permissionMode = useVaultAiAgentPermissionMode()
+  const storedPermissionMode = useVaultAiAgentPermissionMode()
+  const permissionMode = resolvePermissionModeForAgent(defaultAiAgent, storedPermissionMode)
   const sessionAutoDistillEnabled = useVaultSessionAutoDistillEnabled()
   const agent = useCliAiAgent(vaultPath, vaultPaths, contextPrompt, fileCallbacks, {
     agent: defaultAiAgent,

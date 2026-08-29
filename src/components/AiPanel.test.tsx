@@ -8,7 +8,7 @@ import type { AiPanelController } from './useAiPanelController'
 import type { VaultEntry } from '../types'
 import { queueAiPrompt } from '../utils/aiPromptBridge'
 import type { NoteReference } from '../utils/ai-context'
-import { bindVaultConfigStore, getVaultConfig, resetVaultConfigStore } from '../utils/vaultConfigStore'
+import { bindVaultConfigStore, resetVaultConfigStore } from '../utils/vaultConfigStore'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 
 const { sendToRunningTurnMock, trackEventMock } = vi.hoisted(() => ({
@@ -205,22 +205,35 @@ describe('AiPanel', () => {
     expect(screen.queryByTestId('ai-permission-mode-toggle')).toBeNull()
   })
 
-  it('still seeds the session permission mode from vault config under the hood', () => {
-    bindVaultConfigStore({
-      ...getVaultConfig(),
-      ai_agent_permission_mode: 'power_user',
-    }, vi.fn())
-
+  it('starts Prime sessions in power user even when the vault still stores safe', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
 
-    // Prime UI hides Safe/Power; session still receives stored mode for legacy backends.
     expect(screen.getByText('Prime Agent · Harness')).toBeTruthy()
     expect(mockUseCliAiAgent).toHaveBeenCalledWith(
       '/tmp/vault',
       undefined,
       undefined,
       expect.any(Object),
-      expect.objectContaining({ permissionMode: 'power_user' }),
+      expect.objectContaining({ agent: 'prime', permissionMode: 'power_user' }),
+    )
+  })
+
+  it('keeps Codex on the stored vault permission mode', () => {
+    render(
+      <AiPanel
+        onClose={vi.fn()}
+        vaultPath="/tmp/vault"
+        defaultAiAgent="codex"
+        defaultAiAgentReady
+      />,
+    )
+
+    expect(mockUseCliAiAgent).toHaveBeenCalledWith(
+      '/tmp/vault',
+      undefined,
+      undefined,
+      expect.any(Object),
+      expect.objectContaining({ agent: 'codex', permissionMode: 'safe' }),
     )
   })
 

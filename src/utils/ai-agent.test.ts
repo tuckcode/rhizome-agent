@@ -10,8 +10,8 @@ describe('buildAgentSystemPrompt', () => {
     expect(prompt).toContain('working inside Rhizome')
     expect(prompt).toContain('active vault')
     expect(prompt).toContain("vault's AGENTS.md")
-    expect(prompt).toContain('Vault Safe mode is active')
-    expect(prompt).toContain('not available in Vault Safe')
+    expect(prompt).toContain('Limited-tools mode is active')
+    expect(prompt).toContain('not available in this mode')
     expect(prompt).not.toContain('full shell access')
     expect(prompt).not.toContain('Vault context')
   })
@@ -48,7 +48,7 @@ describe('buildAgentSystemPrompt', () => {
     const prompt = buildAgentSystemPrompt({ agent: 'codex', permissionMode: 'power_user' })
     expect(prompt).toContain('Power User mode is active')
     expect(prompt).toContain('Local shell commands are available')
-    expect(prompt).not.toContain('not available in Vault Safe')
+    expect(prompt).not.toContain('not available in this mode')
   })
 
   it('does not promise shell execution for Pi power user mode', () => {
@@ -62,7 +62,30 @@ describe('buildAgentSystemPrompt', () => {
     expect(prompt).toContain('[[')
     expect(prompt).toMatch(/wikilink/i)
   })
-})
+
+  it('defaults Prime to full tools and does not call it a lock', () => {
+    const prompt = buildAgentSystemPrompt({ agent: 'prime' })
+    expect(prompt).not.toContain('Limited-tools mode is active')
+    expect(prompt).not.toContain('Vault Safe')
+    expect(prompt).toContain('Full-tools mode is selected')
+    expect(prompt).toContain('You may use shell')
+    expect(prompt).toContain('Prime has no sandbox')
+  })
+
+  it('ignores a stored safe permissionMode in Prime prompts', () => {
+    const prompt = buildAgentSystemPrompt({ agent: 'prime', permissionMode: 'safe' })
+    expect(prompt).toContain('Full-tools mode is selected')
+    expect(prompt).toContain('Prime has no sandbox')
+    expect(prompt).not.toContain('Vault Safe')
+    expect(prompt).not.toContain('Limited-tools mode is active')
+    expect(prompt).not.toContain('Notes-first mode is selected')
+  })
+
+  it('still tells Claude Code not to use shell in limited-tools mode', () => {
+    const prompt = buildAgentSystemPrompt({ agent: 'claude_code', permissionMode: 'safe' })
+    expect(prompt).toContain('Limited-tools mode is active')
+    expect(prompt).toContain('Do not use shell')
+  })
 
   it('tells Prime how to use rhizome-vault tools when a vault path is present', () => {
     const prompt = buildAgentSystemPrompt({
@@ -78,4 +101,13 @@ describe('buildAgentSystemPrompt', () => {
     const prompt = buildAgentSystemPrompt({ agent: 'prime', permissionMode: 'safe' })
     expect(prompt).toContain('no Rhizome vault is attached')
   })
+
+  it('points Prime at ripgrep for bundled docs in the default full-tools mode', () => {
+    const prompt = buildAgentSystemPrompt({
+      agent: 'prime',
+      agentDocsPath: '/app/agent-docs',
+    })
+    expect(prompt).toContain('ripgrep')
+  })
+})
 
