@@ -72,6 +72,7 @@ composition doc — do not restate them here.
 | Decision | Blocks | Where it stands |
 |---|---|---|
 | **Harness composition: option 2 + first slice** | #5, #40, and any graft of a foreign harness idea | Filter ratified (ADR-0168). Working notes in `harness-composition.md`. Still discuss/decide: ratify option 2, ratify native extension UI as first slice, name remaining incompatibilities. |
+| **#50 live app view: which surface** | agent QA of the drawn UI | Answers proposed 2026-08-29, awaiting Atticus. Browser `pnpm dev`, read + test-bridge steer, `pnpm live-ui` not an in-app pane. [plan](plans/2026-08-29-live-app-view-plan.md). |
 | **What ⌘1/⌘2/⌘3 and "Full Layout" mean once Chat is the centre** | — | **Settled 2026-08-25.** ⌘1 Chat only, ⌘2 opens the Notes panel with Browse collapsed, ⌘3 opens it with Browse expanded. Stored `viewMode` values unchanged. |
 | **Does Wiki Graph replace the canvas or feed a side panel** | #39 | **Settled for Research / Mycelium 2026-08-26 (local, live check leftover):** they replace Chat as the center canvas, like Graph. #39 (graph as an agent tool vs a place) is still open. |
 | **Right panel composition** | — | **Settled 2026-08-25.** One Notes panel: compact navigation above the selected list. Rail Inbox toggles it; Changes is a list filter. No Inbox/Notes tabs or second right column. |
@@ -124,6 +125,11 @@ becomes the editor. Captured in ADR-0166.
 | #24 | Promote produces a note worth keeping, not a transcript dump — **implemented locally** (live check leftover) |
 | #25 | Retrieval shows its work — `needs-triage`, oldest untriaged |
 | #37 | "Save as custom" in the research format modal has never done anything — **closed 2026-08-29** (UI `1b469fc`; storage `5d7587c`) |
+
+**Agent QA**
+| | |
+|---|---|
+| #50 | Let the agent see the running app — **plan written, not built.** Awaiting Atticus on `docs/plans/2026-08-29-live-app-view-plan.md` |
 
 **Platform and lifecycle**
 | | |
