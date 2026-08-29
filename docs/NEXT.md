@@ -99,17 +99,18 @@ becomes the editor. Captured in ADR-0166.
 |---|---|
 | #27 | Session list as a dockable sidebar — **closed 2026-08-26** (left column of Chat) |
 | #34 | Session list filter — **closed 2026-08-26** (title / place / branch) |
-| #22 | Mycelium: Rhizome chrome + rail overview vs This run — **closed 2026-08-27** (engine still Mindwalk; M4 restyle not started) |
-| #11 | Mycelium runs as an in-app sidecar embed — **closed 2026-08-27** |
+| #22 | Mycelium: Rhizome chrome + rail overview vs This run — **closed 2026-08-27** (`5d2d34a`, skin `6377b04`; engine still Mindwalk; M4 restyle not started) |
+| #11 | Mycelium runs as an in-app sidecar embed — **closed 2026-08-27** (`5d2d34a`) |
+| #44 | Panels resizable by dragging — **closed 2026-08-29** (`a26eb40`, `fe97f99`) |
 | #39 | Make the knowledge graph an agent tool, not a place you visit — **B** |
 
-**Composer and controls** — the densest ready-to-build cluster, no blockers
+**Composer and controls** — shipped as one strip 2026-08-25; closed on GitHub 2026-08-29
 | | |
 |---|---|
-| #38 | Composer pills look like controls but are inert — **implemented locally** |
-| #9 | Model and thinking level as one control on the strip — **relocated to composer with #38** |
-| #35 | Verbose modifier reachable from the composer — **implemented locally** (one-click thinking toggle) |
-| #21 | Argument hints for commands that take arguments — **already in the slash menu** |
+| #38 | Composer pills look like controls but are inert — **closed 2026-08-29** (`1a1bfa9`; context pill `7ed54cb`) |
+| #9 | Model and thinking level as one control on the strip — **closed 2026-08-29** (`163403f`; composer `1a1bfa9`) |
+| #35 | Verbose modifier reachable from the composer — **closed 2026-08-29** (`1a1bfa9`, one-click thinking toggle) |
+| #21 | Argument hints for commands that take arguments — **closed 2026-08-29** (`6037490`) |
 
 **Transcript and sessions**
 | | |
@@ -213,8 +214,7 @@ Worth doing, in order:
    document, not a cross-reference.
 4. **Spec the composer control strip.** #38, #9, #35 and #21 reshaped the
    same strip. Built as one surface 2026-08-25 rather than four redesigns.
-   The contract lives on `ChatComposerDeck`. GitHub issues still open
-   (no live Prime demo; C18).
+   The contract lives on `ChatComposerDeck`. Closed on GitHub 2026-08-29.
 5. `shell-final-direction.md` §2.1 and §2.3 are marked superseded by ADR-0166.
    The rest still stands. Do not treat the whole document as dead.
 
@@ -242,8 +242,8 @@ unprompted Prime verbs.
    side-errand, not a substitute.
 2. **Chat-centered shell shipped** (ADR-0166, 2026-08-25). Research and
    Mycelium on canvas (#11 / #22 closed 2026-08-27). Remaining canvas question
-   is Wiki Graph as a *tool* (#39). #27 / #34 / #31 closed on GitHub
-   2026-08-26.
+   is Wiki Graph as a *tool* (#39). #27 / #34 / #31 closed 2026-08-26;
+   composer cluster #38 / #9 / #35 / #21 and #44 closed 2026-08-29.
 3. **Memory loop (#25)** — #24 closed 2026-08-28; retrieval provenance is the
    product thesis gap with thinnest design coverage.
 4. **TokenJuice + Switchyard (§1)** — discuss/plan when you want the stacked
