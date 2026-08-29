@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { useAppKeyboard } from './useAppKeyboard'
+import { useAppKeyboard, type KeyboardActions } from './useAppKeyboard'
 import {
   APP_COMMAND_IDS,
   executeAppCommand,
   resetAppCommandDispatchStateForTests,
 } from './appCommandDispatcher'
+import type { NoteListMultiSelectionCommands } from '../components/note-list/multiSelectionCommands'
 
 function fireKey(
   key: string,
@@ -33,7 +34,7 @@ function fireKeyOnTarget(
   return event
 }
 
-function makeActions() {
+function makeActions(): KeyboardActions {
   return {
     onQuickOpen: vi.fn(),
     onCommandPalette: vi.fn(),
@@ -53,8 +54,14 @@ function makeActions() {
     onPastePlainText: vi.fn(),
     onGoBack: vi.fn(),
     onGoForward: vi.fn(),
-    activeTabPathRef: { current: '/vault/test.md' } as React.MutableRefObject<string | null>,
-    multiSelectionCommandRef: { current: null },
+    onFindInNote: vi.fn(),
+    onReplaceInNote: vi.fn(),
+    onToggleFavorite: vi.fn(),
+    onToggleRawEditor: vi.fn(),
+    onToggleInspector: vi.fn(),
+    onOpenInNewWindow: vi.fn(),
+    activeTabPathRef: { current: '/vault/test.md' },
+    multiSelectionCommandRef: { current: null } as React.MutableRefObject<NoteListMultiSelectionCommands | null>,
   }
 }
 
@@ -236,7 +243,7 @@ describe('useAppKeyboard', () => {
   it('Cmd+E uses the current multi-selection instead of the active note', () => {
     const actions = makeActions()
     const organizeSelected = vi.fn()
-    actions.multiSelectionCommandRef.current = {
+    actions.multiSelectionCommandRef!.current = {
       selectedPaths: ['/vault/a.md', '/vault/b.md'],
       organizeSelected,
     }
@@ -470,7 +477,7 @@ describe('useAppKeyboard', () => {
   it('Cmd+Backspace deletes the current multi-selection instead of the active note', () => {
     const actions = makeActions()
     const deleteSelected = vi.fn()
-    actions.multiSelectionCommandRef.current = {
+    actions.multiSelectionCommandRef!.current = {
       selectedPaths: ['/vault/a.md', '/vault/b.md'],
       deleteSelected,
     }

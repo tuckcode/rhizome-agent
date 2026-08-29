@@ -89,7 +89,7 @@ yours to choose.
 
 ## Recent sessions
 
-- [2026-08-29 · Grok 4.6](plans/handoffs/2026-08-29-0205-grok-4-6-prime-limited-tools.md) — Vault Safe no longer tells Prime to refuse shell. Prime sessions always run as power user (no sandbox; toggle stays hidden). Claude Code and Antigravity still honor the stored vault mode. Relabelled **Limited tools**. Uncommitted except copy/docs fragments that landed in parallel commits.
+- [2026-08-29 · Grok 4.6](plans/handoffs/2026-08-29-0205-grok-4-6-prime-limited-tools.md) — Prime sessions always **Power User** (no sandbox; toggle hidden). CLI agents still honor stored vault mode; UI relabelled **Limited tools**. Open product choices tracked as **C57**.
 - [2026-08-29 · Grok 4.6](plans/handoffs/2026-08-29-0158-grok-4-6-live-app-view-plan.md) — #50 plan only (not built): `pnpm live-ui` against the browser app, read + test-bridge steer, developer tooling not an in-app pane; scroll metrics required because `uiAudit` would have missed the missing transcript scroller. Awaiting Atticus. Writeup: [`docs/plans/2026-08-29-live-app-view-plan.md`](plans/2026-08-29-live-app-view-plan.md)
 - [2026-08-29 · Claude Opus 5](plans/handoffs/2026-08-29-0100-claude-opus-5-session-naming.md) — #49 step 2: a session names itself from its first exchange and the name is **stored** through `set_session_name`, so every client reads the same one; a name a person chose is never overwritten; the list stops printing Rhizome's own `Rhizome · vault · id` placeholder as if it were a name, so old sessions read better with no backfill; fixed a full stop inside `0.8` being treated as a sentence break; Mycelium's session picker stopped listing Prime's uuids; Mycelium's Evaluation failure is the `claude` CLI's expired login (`claude login`), not our bug; filed #50 — let the agent see the running app instead of screenshots macOS keeps blocking; Vault Safe / Power User question **answered** in the 02:05 Grok handoff
 - [2026-08-28 (afternoon) · Claude Opus 5](plans/handoffs/2026-08-28-1500-claude-opus-5-note-context.md) — Chat can see the note you have open (it passed nothing before), and any note can be handed to the agent by right-clicking it; both live-verified, the agent naming the note's contents with tools forbidden
@@ -245,6 +245,8 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 
 ## Open threads
+
+- **C57-OPEN (2026-08-29): permission mode product choices after Prime fix.** Code shipped: Prime ignores vault-safe prompts and defaults new sessions to power user; Claude Code / Antigravity still enforce stored mode; UI copy is **Limited tools** / Power User. **Awaiting Atticus:** keep CLI agents defaulting to Limited tools (`safe`)? keep the Prime permission toggle hidden? final naming — "Limited tools" vs retaining "Vault Safe" with an honest tooltip.
 
 - **#50 (2026-08-29): let the agent see the running app — plan ready, not built.**
   Three answers proposed: show `pnpm dev` (not native), read + steer through
@@ -571,25 +573,18 @@ push is not a release — releases are tagged builds with signed installers.
   decoration, making the toast the only part of a celebration a screen reader
   can reach.
 
-- **C34-OPEN (half done): the menu-bar roster's activity labels.** The eight
-  statuses are no longer English literals in `primeRunningSessions.ts` — the
-  module now returns a `RosterActivity` (`{kind:'summary'}` for the daemon's own
+- **C34-RESOLVED (copy + locale wiring): the menu-bar roster's activity labels.**
+  The eight statuses are no longer English literals in `primeRunningSessions.ts` —
+  the module returns a `RosterActivity` (`{kind:'summary'}` for the daemon's own
   prose, `{kind:'status', key}` for copy we own), the keys live in
   `menuBarCompanion.activity.*` in `en.json`, and `MenuBarCompanionApp` renders
-  them through `t()`. **Two things remain:**
-
-  1. **`pnpm l10n:translate` has never run for them.** It needs
-     `LARA_ACCESS_KEY_ID` / `LARA_ACCESS_KEY_SECRET`, which are not set on this
-     machine, so all 19 non-English locales are missing these 8 keys. That is
-     C18's existing gap (272 missing per locale before this change, 280 after)
-     — the change did not create the gap but did widen it by 8.
-  2. **The companion window ignores the user's locale entirely.**
-     `MenuBarCompanionApp.tsx:22` is `createTranslator(DEFAULT_APP_LOCALE)`,
-     where `DEFAULT_APP_LOCALE = 'en'`. Every other component in the tree takes
-     a `locale` prop. So even a fully translated locale file renders English in
-     that window. It is a separate Tauri window without the settings context,
-     which is presumably why — but until it is fixed, localizing anything in the
-     companion is preparation, not a user-visible change.
+  them through `t()` using the user's locale from `get_settings` (same
+  `resolveEffectiveLocale` path as the main app). **`pnpm l10n:translate` has
+  never run for these keys** — it needs `LARA_ACCESS_KEY_ID` /
+  `LARA_ACCESS_KEY_SECRET`, which are not set on this machine, so non-English
+  locales fall back to English for the eight new keys until C18 is in scope.
+  That is C18's existing gap (272 missing per locale before this change, 280
+  after) — the change did not create the gap but did widen it by 8.
 
 - ~~C4-OPEN: tolaria MCP server path mismatch across live configs~~ **RESOLVED `2fa620a5`**
 - ~~C6-OPEN: inbox automation default~~ **RESOLVED 2026-07-31.** Default ON for new vaults, plus a one-time per-vault migration for existing ones. See "Investigation done" item 1 above.
