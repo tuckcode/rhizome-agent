@@ -274,9 +274,36 @@ mod desktop {
         SESSION_ROW_FILES.get_or_init(|| Mutex::new(HashMap::new()))
     }
 
+    /// Bring up the two menu-bar surfaces, independently.
+    ///
+    /// The hidden quick-note window and the tray icon have nothing to do with
+    /// each other, and this used to run them with `?` between: a failure
+    /// creating the window meant the tray was never built, so the app lost its
+    /// menu-bar icon for a reason that had nothing to do with the icon. The
+    /// caller then folded the whole thing into one `log::warn!`, so the only
+    /// symptom was a missing icon and the cause sat in a log nobody reads.
+    ///
+    /// That matters more since the tray started reporting running sessions
+    /// (#52, #13) — it is the one surface that says an agent finished without
+    /// the app being opened. Losing it to an unrelated failure loses that.
+    ///
+    /// Each half is attempted, each failure is logged saying which half died,
+    /// and an error comes back only if BOTH failed — one working surface is
+    /// not a failed setup. #53.
     pub fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-        ensure_companion_window(app.handle())?;
-        setup_tray(app)?;
+        let window = ensure_companion_window(app.handle());
+        if let Err(error) = &window {
+            log::warn!("menu-bar quick-note window failed: {error}");
+        }
+
+        let tray = setup_tray(app);
+        if let Err(error) = &tray {
+            log::warn!("menu-bar tray icon failed: {error}");
+        }
+
+        if window.is_err() && tray.is_err() {
+            return Err("both the menu-bar quick-note window and the tray icon failed".into());
+        }
         Ok(())
     }
 
