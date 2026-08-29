@@ -49,6 +49,7 @@ import type { AppLocale } from '../lib/i18n'
 import { type NoteListItem } from '../utils/ai-context'
 import type { VaultEntry } from '../types'
 import { useAiPanelController, type AiPanelController } from './useAiPanelController'
+import type { AiAgentMessage } from '../lib/aiAgentConversation'
 import { useAiPanelPromptQueue } from './useAiPanelPromptQueue'
 import { useAiPanelFocus } from './useAiPanelFocus'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
@@ -141,6 +142,17 @@ interface AiPanelViewProps {
 
 function readinessFromReadyFlag(ready: boolean | undefined): AiAgentReadiness {
   return (ready ?? true) ? 'ready' : 'missing'
+}
+
+function getLastAgentMessage(messages: AiAgentMessage[]): string | null {
+  // Find the last message that has an agent response.
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const response = messages[i]?.response
+    if (response) {
+      return response
+    }
+  }
+  return null
 }
 
 interface AiPanelViewModel {
@@ -888,6 +900,7 @@ export function AiPanelView({
         attachments={attachments}
         onAttachImages={attachImages}
         onRemoveAttachment={removeAttachment}
+        lastAgentMessage={getLastAgentMessage(agent.messages)}
         foot={isPrimeTarget ? (
           <ChatComposerFoot
             locale={locale}
