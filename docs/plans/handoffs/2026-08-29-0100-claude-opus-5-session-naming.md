@@ -189,23 +189,45 @@ is real: it changes what the CLI is allowed to run.
 use shell, terminal, Bash …"*. That is a request to the model, not a
 restriction on it.
 
-**Where it does nothing at all.** `permission_mode` never reaches
-`prime_session_host.rs`. Prime is the engine and the default path, and the
-toggle does not touch it — so on the surface a user actually chats through,
-Vault Safe changes nothing. `AGENTS.md` already records that Prime has no
-security sandbox and that the desktop must not invent one, which is why this
-gap exists rather than being an oversight.
+**Where it reaches Prime — corrected.** The `permission_mode` *field* never
+reaches `prime_session_host.rs`, and reading only that suggests the toggle is
+inert for Prime. It is not. `buildAgentSystemPrompt` folds
+`permissionModeInstructions` into the system prompt, which travels
+`aiAgentSession.ts` → `streamWithSelectedTarget` → `PrimePromptRequest`'s
+`system_prompt` → `build_prompt`. So Prime's model does read *"Do not use
+shell, terminal, Bash, Python/Node script execution, git, or command-line
+tools"* — and obeys it.
+
+Reported by Atticus, 2026-08-29, unprompted: asking a model to audit
+rhizome-agent from inside Rhizome, it repeatedly answered that Vault Safe has
+to be disabled before it can do anything. That is the mechanism above,
+working as written.
+
+**Which makes this the actual problem.** Vault Safe stops real work without
+preventing anything. Nothing is blocked — `AGENTS.md` records that Prime has
+no security sandbox and that the desktop must not invent one — so the model is
+merely *asked* not to, and complies. A user gets the cost of a lock with none
+of its protection, and the honest workflow for auditing this repo from inside
+the app is to switch to Power User.
 
 The prompt text is also self-contradicting for Pi: Power User mode tells the
 model it is selected *and* that it changes nothing.
 
-**The decision, not yet made.** Three honest options: cut the control for
-Prime sessions so it stops implying a protection that is not there; keep it
-and label it plainly as guidance to the model rather than a guarantee; or
-wire real enforcement, which `AGENTS.md` explicitly forbids doing inside the
-desktop. Leaning toward the second — the words are still worth something for
-the CLI agents where they *are* enforced, but the control should not read as
-a lock when it is a note.
+**The decision, not yet made.** Options, in the order they now look:
+
+1. **Keep it, stop calling it safety.** It is enforced for Claude Code and
+   Antigravity, so it earns its place there. Relabel it as what it is for
+   Prime — an instruction the model follows — so nobody reads a lock into it.
+2. **Default Prime sessions to Power User.** Safe is the current default and
+   is what makes the model refuse ordinary work in this repo.
+3. **Cut it for Prime.** Honest, and loses the CLI agents nothing, but throws
+   away a control that does change model behaviour.
+4. **Wire real enforcement.** `AGENTS.md` explicitly forbids building a
+   sandbox in the desktop, so this is off the table unless that decision is
+   revisited.
+
+Not decided here: 1 and 2 together look right, but the default is Atticus's
+call, and it changes what every new session can do.
 
 ## Not done
 
