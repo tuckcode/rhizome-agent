@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { createTranslator, DEFAULT_APP_LOCALE } from '../lib/i18n'
+import {
+  createTranslator,
+  getBrowserLanguagePreferences,
+  resolveEffectiveLocale,
+  SYSTEM_UI_LANGUAGE,
+} from '../lib/i18n'
 import { isTauri } from '../mock-tauri'
 import { useMenuBarCompanionVault } from '../hooks/useMenuBarCompanionVault'
+import { useSettings } from '../hooks/useSettings'
 import { useMenuBarRunningSessions } from '../hooks/useMenuBarRunningSessions'
 import { rosterActivityMessageKey, type RunningSessionRow } from '../lib/primeRunningSessions'
 import { buildCaptureNote } from '../utils/menuBarCapture'
@@ -20,7 +26,12 @@ import { redactCredentialTokens } from '../lib/sensitiveTextRedaction'
  * this compact chrome. Revisit if the popover grows into a real form surface.
  */
 export function MenuBarCompanionApp() {
-  const t = useMemo(() => createTranslator(DEFAULT_APP_LOCALE), [])
+  const { settings } = useSettings()
+  const appLocale = useMemo(
+    () => resolveEffectiveLocale(settings.ui_language ?? SYSTEM_UI_LANGUAGE, getBrowserLanguagePreferences()),
+    [settings.ui_language],
+  )
+  const t = useMemo(() => createTranslator(appLocale), [appLocale])
   const [capture, setCapture] = useState('')
   const [pickingType, setPickingType] = useState(false)
   const [selectedType, setSelectedType] = useState<string | null>(null)

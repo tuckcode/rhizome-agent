@@ -14,14 +14,42 @@ vi.mock('@tauri-apps/api/window', () => ({
   }),
 }))
 
-vi.mock('../lib/i18n', () => ({
-  DEFAULT_APP_LOCALE: 'en',
-  createTranslator: () => (key: string) => key,
-}))
-
 vi.mock('../mock-tauri', () => ({
   isTauri: () => true,
 }))
+
+const defaultSettingsResponse = {
+  auto_pull_interval_minutes: null,
+  git_enabled: null,
+  autogit_enabled: null,
+  autogit_idle_threshold_seconds: null,
+  autogit_inactive_threshold_seconds: null,
+  auto_advance_inbox_after_organize: null,
+  telemetry_consent: null,
+  crash_reporting_enabled: null,
+  analytics_enabled: null,
+  anonymous_id: null,
+  release_channel: null,
+  automatic_update_checks_enabled: null,
+  theme_mode: null,
+  color_theme: null,
+  accent_color: null,
+  ui_language: null,
+  date_display_format: null,
+  note_width_mode: null,
+  sidebar_type_pluralization_enabled: null,
+  default_ai_agent: null,
+  ai_features_enabled: null,
+  default_ai_target: null,
+  agent_memory_vault_path: null,
+  ai_model_providers: null,
+  ai_workspace_conversations: null,
+  hide_gitignored_files: null,
+  all_notes_show_pdfs: null,
+  all_notes_show_images: null,
+  all_notes_show_unsupported: null,
+  multi_workspace_enabled: null,
+}
 
 // Default: a vault with no events. Individual tests override.
 function mockBackend({
@@ -44,6 +72,7 @@ function mockBackend({
     }
     if (cmd === 'call_rhizome_tool') return Promise.resolve(JSON.stringify(events))
     if (cmd === 'list_prime_running_sessions') return Promise.resolve(running)
+    if (cmd === 'get_settings') return Promise.resolve(defaultSettingsResponse)
     return Promise.resolve(undefined)
   })
 }
@@ -163,6 +192,7 @@ describe('MenuBarCompanionApp', () => {
       if (cmd === 'call_rhizome_tool') return Promise.resolve(JSON.stringify([]))
       if (cmd === 'read_text_from_clipboard') return Promise.resolve('  Durable idea from clipboard  ')
       if (cmd === 'start_rhizome_job') return Promise.resolve(null)
+      if (cmd === 'get_settings') return Promise.resolve(defaultSettingsResponse)
       return Promise.resolve(undefined)
     })
     render(<MenuBarCompanionApp />)
@@ -198,6 +228,7 @@ describe('MenuBarCompanionApp', () => {
       if (cmd === 'call_rhizome_tool') return Promise.resolve(JSON.stringify([]))
       if (cmd === 'read_text_from_clipboard') return Promise.resolve(`Durable idea ${pat}`)
       if (cmd === 'start_rhizome_job') return Promise.resolve(null)
+      if (cmd === 'get_settings') return Promise.resolve(defaultSettingsResponse)
       return Promise.resolve(undefined)
     })
     render(<MenuBarCompanionApp />)
@@ -248,6 +279,7 @@ describe('MenuBarCompanionApp', () => {
         return Promise.resolve({ vaults: [], active_vault: null })
       }
       if (cmd === 'list_prime_running_sessions') return Promise.reject(new Error('no daemon'))
+      if (cmd === 'get_settings') return Promise.resolve(defaultSettingsResponse)
       return Promise.resolve(undefined)
     })
     render(<MenuBarCompanionApp />)
@@ -275,6 +307,21 @@ describe('MenuBarCompanionApp', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0]).toHaveTextContent('Ship the menu bar roster')
     expect(rows[0]).toHaveTextContent('Reading the vault loader')
+  })
+
+  it('translates a roster status label through the locale file', async () => {
+    mockBackend({
+      running: [
+        runningSession({
+          summary: undefined,
+          isStreaming: true,
+          taskState: 'needs_input',
+        }),
+      ],
+    })
+    render(<MenuBarCompanionApp />)
+    const rows = await screen.findAllByTestId('menu-bar-companion-running-row')
+    expect(rows[0]).toHaveTextContent('Replying')
   })
 
   it('shows subagents as a count and not as rows', async () => {

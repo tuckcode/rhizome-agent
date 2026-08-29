@@ -87,7 +87,6 @@
     "src/hooks/appCommandDispatcher.test.ts",
     "src/hooks/commands/aiAgentCommands.test.ts",
     "src/hooks/useAiAgentsStatus.test.ts",
-    "src/hooks/useAppKeyboard.test.ts",
     "src/hooks/useAppNavigation.test.ts",
     "src/hooks/useAppSave.test.ts",
     "src/hooks/useBulkActions.test.ts",
