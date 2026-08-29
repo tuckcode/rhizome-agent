@@ -120,6 +120,22 @@
 
   The same reasoning forbids `git checkout`, `git restore`, `git reset`, and `git stash` on paths you do not own, and `git commit --amend` on any commit that is no longer `HEAD`.
 
+  **The pre-commit hook lints the whole repo, so one agent's half-finished
+  file blocks everyone else's commits.** Also observed 2026-08-29: an agent
+  clearing the typecheck backlog sat blocked for minutes on unused imports in
+  a file it had never opened, mid-refactor in another agent's hands. It did
+  the right thing — it refused `--no-verify` and reported — but the work
+  stalled. If this happens to you: run `pnpm lint` yourself, confirm the
+  failure is in someone else's file, keep working locally, and commit when it
+  clears. Never `--no-verify`.
+
+  **The real fix for all three is isolation, not discipline.** Three distinct
+  collisions in one day, and in two of them the agent had followed the rules
+  exactly. A shared working tree makes correctness depend on timing. When
+  dispatching parallel agents that will *write*, give each one its own git
+  worktree; keep the shared tree for agents that only read. Rules that depend
+  on nobody being unlucky are not rules.
+
 - Commit at natural checkpoints — one TDD cycle (below) for code, otherwise every 20–30 min: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
 - **Every agent must sign its commits with a `Co-Authored-By` trailer** naming the model that actually wrote the change:
   ```
