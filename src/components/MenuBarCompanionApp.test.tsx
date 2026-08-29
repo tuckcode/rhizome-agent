@@ -39,7 +39,6 @@ const defaultSettingsResponse = {
   note_width_mode: null,
   sidebar_type_pluralization_enabled: null,
   default_ai_agent: null,
-  ai_features_enabled: null,
   default_ai_target: null,
   agent_memory_vault_path: null,
   ai_model_providers: null,

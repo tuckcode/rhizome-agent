@@ -177,7 +177,6 @@ describe('mockHandlers coverage', () => {
       note_width_mode: null,
       sidebar_type_pluralization_enabled: null,
       initial_h1_auto_rename_enabled: null,
-      ai_features_enabled: null,
       ui_language: 'zh-CN',
       default_ai_agent: 'codex',
       default_ai_target: null,
