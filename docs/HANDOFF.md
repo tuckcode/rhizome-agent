@@ -276,35 +276,14 @@ push is not a release — releases are tagged builds with signed installers.
   Read the failure messages before assuming rot, and before assuming a bug:
   the lane is new, and its whole point is that none of this was being run.
 
-- **C55-OPEN (2026-08-28): the text-only-model warning does not fire in the
-  app.** Image attachments work end to end (a vision model described a pasted
-  PNG), but pasting into a model Prime reports as text-only produces no
-  warning. Reproduced four times across two builds, on `opencode/hy3-free`
-  (`input: ["text"]`), with a live session attached and the pill showing the
-  display name `Hy3 Free`.
-
-  **Ruled out with evidence, not reasoning:**
-  - Not toast timing — repeated with immediate capture, and the `<Toast>` is
-    rendered in the main shell (`App.tsx:2236`).
-  - Not missing data — `prime-agent --mode rpc` returns `input` on every model
-    (`hy3-free` → `["text"]`, `claude-fable-5` → `["text","image"]`), and
-    `get_state` returns the **whole** Model object, `input` included.
-  - Not a stale build — the running binary contains the `modelAcceptsImages`
-    field name and was launched from it.
-  - **Not the composer.** `AiPanel.textOnlyModel.test.tsx` gives the panel a
-    status with `modelAcceptsImages: false` and the warning fires. That half
-    is correct.
-
-  So the gap is between `apply_state` and the status the frontend receives.
-  **Next thing to check:** whether `model_accepts_images` is refreshed on the
-  status poll after `set_model`, or only at attach — `set_model` calls
-  `refresh_session_id`, not a state refresh, yet `model_name` does update, so
-  the two should not diverge. Instrument the status payload before theorising
-  again; that is what settled every other question in this session.
-
-  First cut fetched the model catalog and matched by provider+id; that was
-  replaced (`7258a4d`) with reading `input` straight off `get_state`. The
-  replacement is simpler and still does not fire.
+- **C55-RESOLVED (2026-08-29): the text-only-model warning did not fire when
+  the daemon's `get_state` model omitted `input`.** RPC mode returns `input` on
+  every model; the live daemon often sends id/name only, so
+  `model_accepts_images` stayed `None` and the composer stayed silent. Restored
+  a cached `get_available_models` lookup by provider+id when `get_state` omits
+  `input` (`c423445`). Regression:
+  `status_falls_back_to_the_catalog_when_get_state_omits_input`. Frontend path
+  unchanged (`AiPanel.textOnlyModel.test.tsx` still green).
 
 - **C54-RESOLVED (2026-08-29): the documented Rust coverage command was
   missing the gate's `--ignore-filename-regex "lib\.rs|main\.rs|menu\.rs"`**,
