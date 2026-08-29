@@ -592,6 +592,25 @@ describe('stdio process lifecycle', () => {
     }
   })
 
+  it('says what is missing when rhizome_graph_summary runs without the sidecar (C40)', async () => {
+    // Before the C40 fix this silently ran the external `rhizome-graph`
+    // Python CLI instead of erroring — wrong numbers with no signal
+    // anything was off. It must now fail the same way rhizome_graph_health
+    // does rather than falling back to the disagreeing CLI.
+    const { client, stderr } = await connectMcpClient()
+
+    try {
+      const result = await client.callTool({
+        name: 'rhizome_graph_summary',
+        arguments: {},
+      })
+      const text = result.content?.[0]?.text ?? ''
+      assert.match(text, /RHIZOME_TOOL_PATH/)
+    } finally {
+      await closeMcpClient(client, stderr)
+    }
+  })
+
   it('creates a note through the MCP create_note tool', async () => {
     const { client, stderr } = await connectMcpClient()
     const relativePath = 'note/mcp-tool-created.md'
@@ -725,6 +744,23 @@ console.log('[]')
         await lastStubArgv(),
         ['repo-research', tmpDir, 'owner/repo', '--mode', 'architecture', '--depth', 'fast'],
       )
+    } finally {
+      await closeMcpClient(client, stderr)
+    }
+  })
+
+  it('routes rhizome_graph_summary through the same graph-query health call as rhizome_graph_health (C40 regression guard)', async () => {
+    // rhizome_graph_summary used to shell out to the external `rhizome-graph`
+    // CLI, which builds its own graph and disagrees with the app's own graph
+    // view (docs/HANDOFF.md C40). It must now answer from the same in-repo
+    // graph as every other rhizome_graph_* tool.
+    const { client, stderr } = await connectMcpClient({
+      RHIZOME_TOOL_PATH: stubPath,
+      STUB_ARGV_LOG: argvLogPath,
+    })
+    try {
+      await client.callTool({ name: 'rhizome_graph_summary', arguments: {} })
+      assert.deepEqual(await lastStubArgv(), ['graph-query', tmpDir, 'health'])
     } finally {
       await closeMcpClient(client, stderr)
     }

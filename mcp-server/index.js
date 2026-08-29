@@ -286,7 +286,7 @@ const TOOLS = [
   },
   {
     name: 'rhizome_graph_summary',
-    description: 'Get a summary of the wikilink graph: page count, edge count, communities, and most-connected pages.',
+    description: 'Get a summary of the wikilink graph: note count, link count, orphans, dead links, and the most-connected notes. Answers from the same graph the app\'s own graph view uses.',
     annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
     inputSchema: {
       type: 'object',
@@ -563,11 +563,23 @@ async function handleRhizomeLint(args) {
   return { content: [{ type: 'text', text: output || 'No lint issues found.' }] }
 }
 
+/**
+ * `rhizome_graph_summary` used to shell out to the external Python
+ * `rhizome-graph` CLI, which builds its own graph independently of the
+ * in-repo `vault::graph::build_graph` the app's own graph view (and every
+ * other `rhizome_graph_*` tool) is built on. The two disagreed: on a vault
+ * with 1 note and 4 wikilinks to notes that were never written, the CLI's
+ * `summary` reported 0 edges (it drops uncreated wikilink targets
+ * entirely) while the in-repo graph reports 4 dead links — see C40 in
+ * docs/HANDOFF.md. `summary` and the CLI's `export` also disagreed with
+ * each other by 20 edges on a larger vault (slug collapsing), and its
+ * `communities` output was mostly singletons wearing a cluster label, so
+ * there is nothing here worth keeping from the CLI. Delegate to the same
+ * `graph-query health` path as `rhizome_graph_health` so an agent asking
+ * for "the graph" gets the graph the user is actually looking at.
+ */
 async function handleRhizomeGraphSummary(args) {
-  const vaultPath = resolveVaultPath(args, toolService)
-  const output = await runRhizoCli('rhizome-graph', ['summary', vaultPath], 30000)
-  appendRhizomeEvent(vaultPath, { type: 'graph-summary' })
-  return { content: [{ type: 'text', text: output || 'Graph summary generated.' }] }
+  return handleRhizomeGraphHealth(args)
 }
 
 /**
