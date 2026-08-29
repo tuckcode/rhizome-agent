@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import type { AppLocale } from '../lib/i18n'
 import type { ComponentType, ReactNode } from 'react'
 import { expect, vi } from 'vitest'
 import type { VaultEntry } from '../types'
@@ -193,6 +194,10 @@ vi.mock('./WikilinkSuggestionMenu', () => ({
 
 vi.mock('./editorSchema', () => ({
   _wikilinkEntriesRef: state.wikilinkEntriesRef,
+  // `SingleEditorView` writes the app locale into this ref on every render.
+  // Mocking the module without it left the write hitting `undefined`, which
+  // took all 37 tests in this file down at once.
+  _editorLocaleRef: { current: 'en' } as { current: AppLocale },
 }))
 
 vi.mock('./blockNoteSideMenuHoverGuard', () => ({
