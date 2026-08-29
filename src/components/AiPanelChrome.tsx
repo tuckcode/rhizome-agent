@@ -277,12 +277,24 @@ function ComposerControlsRow({
 function ComposerReplySuggestions({
   lastAgentMessage,
   isActive,
+  input,
   onChange,
 }: {
   lastAgentMessage?: string | null
   isActive: boolean
+  /** What is already typed. Suggestions are for an empty box, not a full one. */
+  input: string
   onChange: (value: string) => void
 }) {
+  // Once you start typing you have answered the question your own way, and a
+  // row of alternatives is clutter — worse, picking one would wipe what you
+  // wrote. Hidden rather than disabled: a dead control still asks to be read.
+  // Backspacing to empty brings them back, so nothing is lost by starting to
+  // type and changing your mind.
+  if (input.trim().length > 0) {
+    return null
+  }
+
   // Never show suggestions while streaming, and only show if there's a message to analyze.
   if (isActive || !lastAgentMessage) {
     return null
@@ -745,6 +757,7 @@ export function AiPanelComposer({
       <ComposerReplySuggestions
         lastAgentMessage={lastAgentMessage}
         isActive={isActive}
+        input={input}
         onChange={onChange}
       />
       {queue && !primeQueueIsEmpty(queue) ? (
