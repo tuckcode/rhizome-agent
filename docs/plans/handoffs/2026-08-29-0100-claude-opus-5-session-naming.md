@@ -173,6 +173,40 @@ exactly what the permissions block); whether it only reads or can also click
 and type; and whether it ships in the app or sits beside `pnpm deadcode` as
 developer tooling.
 
+## Open question: is Vault Safe / Power User still earning its place?
+
+Raised at the end of the session — inherited from Tolaria, and nobody has
+checked what it does since Prime became the engine. Read before deciding;
+the answer is not the same for every agent.
+
+**Where it is enforced.** `claude_invocation.rs` turns the mode into an
+`AgentToolPolicy` (`strict` / `compat`) and `antigravity_config.rs` reads it
+for `sandbox_enabled` and `tool_permission`. For those two agents the toggle
+is real: it changes what the CLI is allowed to run.
+
+**Where it is only words.** `permissionModeInstructions` in
+`src/utils/ai-agent.ts` writes a paragraph into the system prompt — *"Do not
+use shell, terminal, Bash …"*. That is a request to the model, not a
+restriction on it.
+
+**Where it does nothing at all.** `permission_mode` never reaches
+`prime_session_host.rs`. Prime is the engine and the default path, and the
+toggle does not touch it — so on the surface a user actually chats through,
+Vault Safe changes nothing. `AGENTS.md` already records that Prime has no
+security sandbox and that the desktop must not invent one, which is why this
+gap exists rather than being an oversight.
+
+The prompt text is also self-contradicting for Pi: Power User mode tells the
+model it is selected *and* that it changes nothing.
+
+**The decision, not yet made.** Three honest options: cut the control for
+Prime sessions so it stops implying a protection that is not there; keep it
+and label it plainly as guidance to the model rather than a guarantee; or
+wire real enforcement, which `AGENTS.md` explicitly forbids doing inside the
+desktop. Leaning toward the second — the words are still worth something for
+the CLI agents where they *are* enforced, but the control should not read as
+a lock when it is a note.
+
 ## Not done
 
 - **C55** — the text-only-model warning still does not fire in the app.
