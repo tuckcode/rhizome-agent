@@ -14,9 +14,7 @@ const SUPPORTED_DEFAULT_AI_AGENTS: &[&str] = &[
     "hermes",
 ];
 pub const DEFAULT_HIDE_GITIGNORED_FILES: bool = true;
-/// Matches `src/lib/aiFeatures.ts`'s `settings?.ai_features_enabled !== false`.
-pub const DEFAULT_AI_FEATURES_ENABLED: bool = true;
-/// A spike behind a flag: unlike `ai_features_enabled`, unset means OFF.
+/// A spike behind a flag; unset means OFF.
 /// See `docs/adr/0163-automatic-consolidation-l0-to-l1.md`.
 pub const DEFAULT_AUTOMATIC_CONSOLIDATION_ENABLED: bool = false;
 const SUPPORTED_NOTE_WIDTH_MODES: &[&str] = &["normal", "wide"];
@@ -138,9 +136,7 @@ pub struct Settings {
     pub note_width_mode: Option<String>,
     pub sidebar_type_pluralization_enabled: Option<bool>,
     pub initial_h1_auto_rename_enabled: Option<bool>,
-    pub ai_features_enabled: Option<bool>,
-    /// Gates the L0→L1 automatic-consolidation spike. Off unless both this
-    /// AND `ai_features_enabled` are on — see `automatic_consolidation_enabled`.
+    /// Gates the L0→L1 automatic-consolidation spike.
     pub automatic_consolidation_enabled: Option<bool>,
     pub default_ai_agent: Option<String>,
     pub default_ai_target: Option<String>,
@@ -312,17 +308,7 @@ pub fn hide_gitignored_files_enabled() -> bool {
         .unwrap_or(DEFAULT_HIDE_GITIGNORED_FILES)
 }
 
-/// First Rust consumer of `ai_features_enabled` — previously read only by
-/// the frontend (`src/lib/aiFeatures.ts`). Unset means ON.
-pub fn ai_features_enabled(settings: &Settings) -> bool {
-    settings
-        .ai_features_enabled
-        .unwrap_or(DEFAULT_AI_FEATURES_ENABLED)
-}
-
-/// Gate for the automatic-consolidation spike alone — does NOT also check
-/// `ai_features_enabled`. Callers that need the combined gate (both flags)
-/// should check both explicitly; see `consolidation::consolidation_enabled`.
+/// Gate for the automatic-consolidation spike.
 pub fn automatic_consolidation_enabled(settings: &Settings) -> bool {
     settings
         .automatic_consolidation_enabled
@@ -378,7 +364,6 @@ fn normalize_settings(settings: Settings) -> Settings {
         note_width_mode: normalize_note_width_mode(settings.note_width_mode.as_deref()),
         sidebar_type_pluralization_enabled: settings.sidebar_type_pluralization_enabled,
         initial_h1_auto_rename_enabled: settings.initial_h1_auto_rename_enabled,
-        ai_features_enabled: settings.ai_features_enabled,
         automatic_consolidation_enabled: settings.automatic_consolidation_enabled,
         default_ai_agent: normalize_default_ai_agent(settings.default_ai_agent.as_deref()),
         default_ai_target: normalize_optional_string(settings.default_ai_target),
@@ -626,30 +611,6 @@ mod tests {
     }
 
     #[test]
-    fn ai_features_default_to_on_when_unset() {
-        // Mirrors src/lib/aiFeatures.ts: `settings?.ai_features_enabled !== false`.
-        let settings = Settings {
-            ai_features_enabled: None,
-            ..Default::default()
-        };
-        assert!(ai_features_enabled(&settings));
-    }
-
-    #[test]
-    fn ai_features_are_off_only_when_explicitly_false() {
-        let on = Settings {
-            ai_features_enabled: Some(true),
-            ..Default::default()
-        };
-        let off = Settings {
-            ai_features_enabled: Some(false),
-            ..Default::default()
-        };
-        assert!(ai_features_enabled(&on));
-        assert!(!ai_features_enabled(&off));
-    }
-
-    #[test]
     fn automatic_consolidation_defaults_off_when_unset() {
         // A spike behind a flag: unlike ai_features, unset means OFF.
         let settings = Settings {
@@ -836,7 +797,6 @@ mod tests {
             note_width_mode: Some("wide".to_string()),
             sidebar_type_pluralization_enabled: Some(false),
             initial_h1_auto_rename_enabled: Some(false),
-            ai_features_enabled: Some(false),
             automatic_consolidation_enabled: Some(true),
             default_ai_agent: Some("codex".to_string()),
             default_ai_target: Some("agent:codex".to_string()),
@@ -882,7 +842,6 @@ mod tests {
             note_width_mode: Some("wide".to_string()),
             sidebar_type_pluralization_enabled: Some(false),
             initial_h1_auto_rename_enabled: Some(false),
-            ai_features_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
             agent_memory_vault_path: Some("  /Users/x/Rhizome Vault  ".to_string()),
             hide_gitignored_files: Some(false),
@@ -906,7 +865,6 @@ mod tests {
         assert_eq!(loaded.note_width_mode.as_deref(), Some("wide"));
         assert_eq!(loaded.sidebar_type_pluralization_enabled, Some(false));
         assert_eq!(loaded.initial_h1_auto_rename_enabled, Some(false));
-        assert_eq!(loaded.ai_features_enabled, Some(false));
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("codex"));
         assert_eq!(
             loaded.agent_memory_vault_path.as_deref(),
