@@ -590,6 +590,9 @@ struct PrimeHost {
     /// Whether the running model takes images, from `get_state`'s Model
     /// `input` array. `None` means Prime did not say — never "text only".
     model_accepts_images: Option<bool>,
+    /// Cached `get_available_models` payload for when `get_state`'s model
+    /// carries id/name but omits `input` — the daemon does that; RPC does not.
+    model_catalog: Option<Vec<PrimeModel>>,
     /// Whether this session still carries the placeholder name Rhizome wrote
     /// at creation. Set false the moment a real name is stored, so the first
     /// exchange names the session once and never fights a later rename.
@@ -1170,6 +1173,18 @@ fn model_accepts_images(model: &serde_json::Value) -> Option<bool> {
             .as_str()
             .is_some_and(|modality| modality.trim().eq_ignore_ascii_case("image"))
     }))
+}
+
+fn model_accepts_images_from_entry(model: &PrimeModel) -> Option<bool> {
+    let input = model.input.as_deref()?;
+    if input.is_empty() {
+        return None;
+    }
+    Some(
+        input
+            .iter()
+            .any(|modality| modality.trim().eq_ignore_ascii_case("image")),
+    )
 }
 
 fn models_from_response(data: &serde_json::Value) -> Vec<PrimeModel> {
@@ -2819,6 +2834,7 @@ impl PrimeHost {
 
         let mut host = Self {
             model_accepts_images: None,
+            model_catalog: None,
             name_is_placeholder: false,
             stream,
             pending,
@@ -3331,6 +3347,24 @@ impl PrimeHost {
         Ok(())
     }
 
+    fn ensure_model_catalog(&mut self) -> Result<(), String> {
+        if self.model_catalog.is_some() {
+            return Ok(());
+        }
+        let data = self.call(serde_json::json!({ "type": "get_available_models" }))?;
+        self.model_catalog = Some(models_from_response(&data));
+        Ok(())
+    }
+
+    fn lookup_model_accepts_images(&mut self, provider: &str, id: &str) -> Option<bool> {
+        self.ensure_model_catalog().ok()?;
+        let catalog = self.model_catalog.as_ref()?;
+        let model = catalog
+            .iter()
+            .find(|entry| entry.provider == provider && entry.id == id)?;
+        model_accepts_images_from_entry(model)
+    }
+
     fn apply_state_data(&mut self, data: &serde_json::Value) {
         if let Some(id) = crate::prime_events::session_id_from_state(data) {
             self.session_id = Some(id.to_string());
@@ -3362,6 +3396,14 @@ impl PrimeHost {
             .or_else(|| model["id"].as_str())
             .map(str::to_string);
         self.model_accepts_images = model_accepts_images(model);
+        // The daemon's `get_state` model often carries id/name without `input`;
+        // the catalog does, and C55 was the warning staying silent forever.
+        if self.model_accepts_images.is_none() {
+            if let (Some(provider), Some(id)) = (self.model_provider.clone(), self.model_id.clone())
+            {
+                self.model_accepts_images = self.lookup_model_accepts_images(&provider, &id);
+            }
+        }
     }
 }
 
@@ -5851,6 +5893,51 @@ mod tests {
             model_accepts_images(&serde_json::json!({"id": "empty", "input": []})),
             None
         );
+    }
+
+    /// The daemon's `get_state` model carries id and name but often omits
+    /// `input`; the catalog has it. Without this fallback C55 never fired.
+    #[cfg(unix)]
+    #[test]
+    fn status_falls_back_to_the_catalog_when_get_state_omits_input() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("get_state") => Some(vec![ok(
+                id,
+                "get_state",
+                serde_json::json!({
+                    "sessionId": "sess-a",
+                    "isStreaming": false,
+                    "model": {
+                        "provider": "opencode",
+                        "id": "hy3-free",
+                        "name": "Hy3 Free"
+                    }
+                }),
+            )]),
+            Some("get_available_models") => Some(vec![ok(
+                id,
+                "get_available_models",
+                serde_json::json!({
+                    "models": [
+                        {
+                            "id": "hy3-free",
+                            "provider": "opencode",
+                            "name": "Hy3 Free",
+                            "input": ["text"]
+                        },
+                    ]
+                }),
+            )]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        assert_eq!(get_status().model_accepts_images, Some(false));
+
+        let _ = shutdown_host();
     }
 
     /// Prime reports which modalities a model takes. Rhizome dropped the
