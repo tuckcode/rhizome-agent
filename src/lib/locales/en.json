@@ -310,8 +310,6 @@
   "settings.allNotesVisibility.unsupportedDescription": "Show other non-Markdown files without an in-app preview in All Notes. Folder browsing still shows them in their folders.",
   "settings.aiAgents.title": "AI Agents",
   "settings.aiAgents.description": "Choose Rhizome's default AI target. Local agents can edit through tools; API and local models run in chat mode without vault-write tools.",
-  "settings.aiFeatures.enable": "Enable Rhizome AI features",
-  "settings.aiFeatures.enableDescription": "Show AI panel controls, AI command-palette mode, and AI status prompts. Turn this off to hide AI surfaces until you re-enable them here.",
   "settings.aiAgents.default": "Default AI agent",
   "settings.aiAgents.defaultTarget": "Default AI target",
   "settings.aiAgents.agentGroup": "Local agent",

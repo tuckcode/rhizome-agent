@@ -117,7 +117,6 @@ import { trackEvent } from './lib/telemetry'
 import { trackVaultCredentialsHandled } from './lib/productAnalytics'
 import { redactCredentialTokens } from './lib/sensitiveTextRedaction'
 import { areAutomaticUpdateChecksEnabled } from './lib/automaticUpdateChecks'
-import { areAiFeaturesEnabled } from './lib/aiFeatures'
 import { aiTargetReady, type AiTarget } from './lib/aiTargets'
 import { areGitFeaturesEnabled } from './lib/gitSettings'
 import { useAppCommandAiActions } from './hooks/useAppCommandAiActions'
@@ -231,7 +230,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   }, [])
   const networkStatus = useNetworkStatus()
   const { settings, loaded: settingsLoaded, saveSettings } = useSettings()
-  const aiFeaturesEnabled = areAiFeaturesEnabled()
   const primeActiveClose = usePrimeActiveClose()
 
   // onSwitch closure captures `notes` declared below — safe because it's only
@@ -286,10 +284,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     registerVault: registerVaultSelection,
   }, vaultSwitcher.loaded)
   const aiAgentsStatus = useAiAgentsStatus({
-    enabled: aiFeaturesEnabled && !aiWorkspaceWindow,
+    enabled: !aiWorkspaceWindow,
   })
   const aiAgentsOnboarding = useAiAgentsOnboarding(
-    aiFeaturesEnabled && onboarding.state.status === 'ready' && !noteWindowParams && !aiWorkspaceWindow,
+    onboarding.state.status === 'ready' && !noteWindowParams && !aiWorkspaceWindow,
   )
 
   // Onboarding can briefly own the vault path for a newly created/opened vault
@@ -316,9 +314,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     handleOpenAiSettings,
     handleOpenDockedAiWorkspace,
   } = useAppAiWorkspaceBridge({
-    aiFeaturesEnabled,
     aiWorkspaceWindow,
-    closeAIChat,
     openAIChat,
     openChatHome,
     openSettings: dialogs.openSettings,
@@ -419,7 +415,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     status: vaultAiGuidanceStatus,
     refresh: refreshVaultAiGuidance,
   } = useVaultAiGuidanceStatus(
-    aiFeaturesEnabled ? resolvedPath : null,
+    resolvedPath,
     buildVaultAiGuidanceRefreshKey(vault.entries),
   )
   const explicitOrganizationEnabled = isExplicitOrganizationEnabled(vaultConfig.inbox?.explicitOrganization)
@@ -1343,7 +1339,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   // version comes from the daemon handshake (AiPanel already polls the same
   // status independently for its own chrome); this is a second lightweight
   // poll of the same cheap command, not a new connection to Prime.
-  const primeHostStatusForUpdates = usePrimeHostStatus(aiFeaturesEnabled, resolvedPath)
+  const primeHostStatusForUpdates = usePrimeHostStatus(true, resolvedPath)
   // Optional-chained deliberately: the hook resolves to null whenever its
   // command is absent from a test's fake-IPC table, and dereferencing that
   // unmounts the whole app rather than degrading this one badge. The same
@@ -1644,7 +1640,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     remoteStatusForRepository: gitSurfaces.remoteStatusForRepository,
     setToastMessage,
   })
-  const commandAiActions = useAppCommandAiActions(aiFeaturesEnabled, dialogs, aiAgentsStatus, vaultAiGuidanceStatus, restoreVaultAiGuidanceCommand, aiAgentPreferences)
+  const commandAiActions = useAppCommandAiActions(dialogs, aiAgentsStatus, vaultAiGuidanceStatus, restoreVaultAiGuidanceCommand, aiAgentPreferences)
   const undoCommand = useCallback(() => {
     if (runNativeTextHistoryCommand('undo')) return
     void notes.handleUndo()
@@ -1735,7 +1731,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     onInstallMcp: mcpSetupDialog.openDialog,
     onReloadVault: handleManualVaultReload,
     onRepairVault: handleRepairVault,
-    onReopenAiOnboarding: aiFeaturesEnabled ? handleReopenAiOnboarding : undefined,
+    onReopenAiOnboarding: handleReopenAiOnboarding,
     onSetNoteIcon: handleSetNoteIconCommand,
     onRemoveNoteIcon: handleRemoveNoteIconCommand,
     onChangeNoteType: changeNoteTypeCommand,
@@ -1839,7 +1835,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       onOpenAiSettings={handleOpenAiSettings}
       onOpenNote={notes.handleNavigateWikilink}
       onPromoteToVault={handlePromoteChatToVault}
-      onRestoreVaultAiGuidance={aiFeaturesEnabled ? () => { void restoreVaultAiGuidance() } : undefined}
+      onRestoreVaultAiGuidance={() => { void restoreVaultAiGuidance() }}
       onUnsupportedAiPaste={setToastMessage}
       onFileCreated={vaultBridge.handleAgentFileCreated}
       onFileModified={vaultBridge.handleAgentFileModified}
@@ -2002,7 +1998,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         enabled={readCelebrationsEnabled(settings.celebrations_enabled)}
         locale={appLocale}
       >
-      <PrimeActivityProvider enabled={aiFeaturesEnabled}>
+      <PrimeActivityProvider>
       <div className="app-shell">
         <div
           ref={shellRef}
@@ -2197,7 +2193,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               onChangeWorkspace={activeDeletedFile ? undefined : handleChangeWorkspace}
               onInitializeProperties={handleInitializeProperties}
               showAIChat={effectiveShowAIChat}
-              onToggleAIChat={aiFeaturesEnabled ? handleToggleAiWorkspace : undefined}
+              onToggleAIChat={handleToggleAiWorkspace}
               aiWorkspaceSurface={aiWorkspaceSurface}
               vaultPath={activeEditorVaultPath}
               vaultPaths={writableVaultPaths}
@@ -2255,7 +2251,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         </div>
         <UpdateBanner status={updateStatus} actions={updateActions} locale={appLocale} />
         <RenameDetectedBanner renames={detectedRenames} onUpdate={handleUpdateWikilinks} onDismiss={handleDismissRenames} />
-        <StatusBar noteCount={visibleEntries.length} modifiedCount={gitModifiedCount} vaultPath={resolvedPath} defaultWorkspacePath={defaultWorkspacePath} vaults={vaultSwitcher.allVaults} multiWorkspaceEnabled={multiWorkspaceEnabled} onSwitchVault={vaultSwitcher.switchVault} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onOpenSettings={handleOpenSettings} onOpenVaultSettings={handleOpenVaultSettings} onOpenFeedback={openFeedback} onOpenDocs={openDocs} onOpenResearch={handleRailSelectResearch} onOpenLocalFolder={vaultSwitcher.handleOpenLocalFolder} onCreateEmptyVault={vaultSwitcher.handleCreateEmptyVault} onCloneVault={dialogs.openCloneVault} onCloneGettingStarted={cloneGettingStartedVault} onClickPending={() => handleSetSelection({ kind: 'filter', filter: 'changes' })} onClickPulse={() => handleSetSelection({ kind: 'filter', filter: 'pulse' })} onClickGraph={() => handleSetSelection(toggleGraphSelection(effectiveSelection, vaultConfig.inbox?.explicitOrganization))} onCommitPush={handleCommitPush} commitActionPending={commitFlow.isOpeningCommitDialog} gitFeaturesEnabled={gitFeaturesEnabled} onInitializeGit={openGitSetupDialog} isOffline={networkStatus.isOffline} isGitVault={isGitVault} isVaultReloading={vault.isReloading || isVaultContentLoading} syncStatus={autoSync.syncStatus} lastSyncTime={autoSync.lastSyncTime} conflictCount={autoSync.conflictFiles.length} remoteStatus={autoSync.remoteStatus} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.syncRepositoryPath} onRepositoryChange={gitSurfaces.setSyncRepositoryPath} onTriggerSync={handlePullSelectedRepository} onPullAndPush={handlePullAndPushSelectedRepository} onOpenConflictResolver={conflictFlow.handleOpenConflictResolver} zoomLevel={zoom.zoomLevel} themeMode={documentThemeMode} onZoomReset={zoom.zoomReset} onToggleThemeMode={settingsLoaded ? handleToggleThemeMode : undefined} buildNumber={buildNumber} onCheckForUpdates={handleCheckForUpdates} versionUpdateIndicator={versionUpdateIndicator} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} aiFeaturesEnabled={aiFeaturesEnabled} mcpStatus={mcpSetupDialog.status} onInstallMcp={mcpSetupDialog.openDialog} commandRailActive={commandRailEnabled} locale={appLocale} />
+        <StatusBar noteCount={visibleEntries.length} modifiedCount={gitModifiedCount} vaultPath={resolvedPath} defaultWorkspacePath={defaultWorkspacePath} vaults={vaultSwitcher.allVaults} multiWorkspaceEnabled={multiWorkspaceEnabled} onSwitchVault={vaultSwitcher.switchVault} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onOpenSettings={handleOpenSettings} onOpenVaultSettings={handleOpenVaultSettings} onOpenFeedback={openFeedback} onOpenDocs={openDocs} onOpenResearch={handleRailSelectResearch} onOpenLocalFolder={vaultSwitcher.handleOpenLocalFolder} onCreateEmptyVault={vaultSwitcher.handleCreateEmptyVault} onCloneVault={dialogs.openCloneVault} onCloneGettingStarted={cloneGettingStartedVault} onClickPending={() => handleSetSelection({ kind: 'filter', filter: 'changes' })} onClickPulse={() => handleSetSelection({ kind: 'filter', filter: 'pulse' })} onClickGraph={() => handleSetSelection(toggleGraphSelection(effectiveSelection, vaultConfig.inbox?.explicitOrganization))} onCommitPush={handleCommitPush} commitActionPending={commitFlow.isOpeningCommitDialog} gitFeaturesEnabled={gitFeaturesEnabled} onInitializeGit={openGitSetupDialog} isOffline={networkStatus.isOffline} isGitVault={isGitVault} isVaultReloading={vault.isReloading || isVaultContentLoading} syncStatus={autoSync.syncStatus} lastSyncTime={autoSync.lastSyncTime} conflictCount={autoSync.conflictFiles.length} remoteStatus={autoSync.remoteStatus} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.syncRepositoryPath} onRepositoryChange={gitSurfaces.setSyncRepositoryPath} onTriggerSync={handlePullSelectedRepository} onPullAndPush={handlePullAndPushSelectedRepository} onOpenConflictResolver={conflictFlow.handleOpenConflictResolver} zoomLevel={zoom.zoomLevel} themeMode={documentThemeMode} onZoomReset={zoom.zoomReset} onToggleThemeMode={settingsLoaded ? handleToggleThemeMode : undefined} buildNumber={buildNumber} onCheckForUpdates={handleCheckForUpdates} versionUpdateIndicator={versionUpdateIndicator} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} mcpStatus={mcpSetupDialog.status} onInstallMcp={mcpSetupDialog.openDialog} commandRailActive={commandRailEnabled} locale={appLocale} />
         <GitSetupDialog open={gitFeaturesEnabled && shouldShowGitSetupDialog} onInitGit={handleInitGitRepo} onDismiss={dismissGitSetupDialog} onNeverForVault={neverForVaultGitSetupDialog} />
         <DeleteProgressNotice count={deleteActions.pendingDeleteCount} />
         <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
@@ -2266,7 +2262,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           entries={visibleEntries}
           aiAgentReady={quickPromptTargetReady}
           aiAgentLabel={quickPromptTarget.label}
-          aiModeEnabled={aiFeaturesEnabled}
           aiPromptTargetId={quickPromptTarget.id}
           locale={appLocale}
           onClose={dialogs.closeCommandPalette}
