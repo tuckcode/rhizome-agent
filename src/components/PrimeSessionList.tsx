@@ -112,7 +112,7 @@ function SessionRowAction({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className="h-6 w-6 p-0"
+      className="h-7 w-7 p-0"
     >
       {icon}
     </Button>
@@ -556,7 +556,7 @@ export default function PrimeSessionList({
             type="button"
             variant="ghost"
             size="icon-xs"
-            className="h-6 w-6 p-0"
+            className="h-7 w-7 p-0"
             onClick={onNewChat}
             aria-label={t('ai.sessions.newChat')}
             title={t('ai.sessions.newChat')}

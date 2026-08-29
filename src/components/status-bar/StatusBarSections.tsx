@@ -282,7 +282,7 @@ function StatusLinkButton({
   tooltipKey,
 }: StatusLinkButtonProps) {
   const className = compact
-    ? 'h-6 w-6 rounded-sm p-0 text-muted-foreground hover:text-foreground'
+    ? 'h-7 w-7 rounded-sm p-0 text-muted-foreground hover:text-foreground'
     : 'h-6 px-2 text-[12px] font-medium text-muted-foreground hover:text-foreground'
 
   return (

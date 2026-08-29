@@ -766,7 +766,7 @@ export function AiPanelView({
               aria-orientation="vertical"
               aria-label={translate(locale, 'ai.sessions.resize')}
               data-testid="prime-sessions-resize"
-              className="absolute inset-y-0 -right-[5px] z-20 w-3 cursor-col-resize bg-transparent transition-colors hover:bg-border"
+              className="absolute inset-y-0 -right-[10px] z-20 w-4 cursor-col-resize bg-transparent transition-colors hover:bg-border"
               onMouseDown={(event) =>
                 startResizeDrag(event, 'col-resize', (deltaX) => sessionsWidth.resizeBy(-deltaX))
               }

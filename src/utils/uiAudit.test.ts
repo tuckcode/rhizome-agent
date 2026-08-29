@@ -35,6 +35,15 @@ describe('auditUi', () => {
     expect(inert[0].label).toContain('memory-loop.md')
   })
 
+  /** A bordered, rounded *panel* is not pretending to be pressable. Without
+   *  this the rule fires on every card in the app. */
+  it('leaves a card alone, however rounded', () => {
+    const host = mount('<div style="border: 1px solid; border-radius: 12px">Prime is ready</div>')
+    sized(host.firstElementChild!, { w: 560, h: 320 })
+
+    expect(auditUi(host).filter((f) => f.rule === 'inert-control')).toHaveLength(0)
+  })
+
   it('leaves a real control alone, however pill-shaped', () => {
     const host = mount('<button style="border: 1px solid; border-radius: 999px">Rhizome Vault</button>')
     sized(host.firstElementChild!, { w: 120, h: 22 })
@@ -63,6 +72,26 @@ describe('auditUi', () => {
     const tiny = auditUi(host).filter((f) => f.rule === 'tiny-target')
     expect(tiny).toHaveLength(1)
     expect(tiny[0].detail).toContain('8x600')
+    expect(tiny[0].detail).toContain('thinner than')
+  })
+
+  /** A wide, short pill is easy to hit — 71px of width to aim at. Flagging
+   *  every one of those makes a report nobody reads. */
+  it('accepts a wide control that is only short', () => {
+    const host = mount('<button aria-label="Attached vault">Rhizome Vault</button>')
+    sized(host.firstElementChild!, { w: 110, h: 21 })
+
+    expect(auditUi(host).filter((f) => f.rule === 'tiny-target')).toHaveLength(0)
+  })
+
+  /** Small in both directions is the real miss risk. */
+  it('flags an icon button that is small both ways', () => {
+    const host = mount('<button aria-label="Archive"></button>')
+    sized(host.firstElementChild!, { w: 21, h: 21 })
+
+    const tiny = auditUi(host).filter((f) => f.rule === 'tiny-target')
+    expect(tiny).toHaveLength(1)
+    expect(tiny[0].detail).toContain('both directions')
   })
 
   it('accepts a target at the floor', () => {
@@ -84,6 +113,20 @@ describe('auditUi', () => {
 
     const overlaps = auditUi(host).filter((f) => f.rule === 'overlapping-controls')
     expect(overlaps).toHaveLength(1)
+  })
+
+  /** A row action drawn fully over its row is a deliberate overlay, not a
+   *  collision. Flagging it buried the real finding under 21 copies. */
+  it('does not flag a control drawn entirely inside another', () => {
+    const host = mount(`
+      <button aria-label="Open session">Session</button>
+      <button aria-label="Archive">x</button>
+    `)
+    const [row, action] = host.querySelectorAll('button')
+    sized(row, { x: 0, y: 0, w: 200, h: 54 })
+    sized(action, { x: 160, y: 16, w: 21, h: 21 })
+
+    expect(auditUi(host).filter((f) => f.rule === 'overlapping-controls')).toHaveLength(0)
   })
 
   /** Nesting is not overlap — a button inside a menu row is ordinary. */
