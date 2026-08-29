@@ -172,7 +172,6 @@ interface SettingsBodyProps {
   autoAdvanceInboxAfterOrganize: boolean
   setAutoAdvanceInboxAfterOrganize: (value: boolean) => void
   aiFeaturesEnabled: boolean
-  setAiFeaturesEnabled: (value: boolean) => void
   celebrationsEnabled: boolean
   setCelebrationsEnabled: (value: boolean) => void
   aiAgentsStatus: AiAgentsStatus
@@ -252,7 +251,7 @@ function createSettingsDraft(
       DEFAULT_AUTOGIT_INACTIVE_THRESHOLD_SECONDS,
     ),
     autoAdvanceInboxAfterOrganize: settings.auto_advance_inbox_after_organize ?? false,
-    aiFeaturesEnabled: areAiFeaturesEnabled(settings),
+    aiFeaturesEnabled: areAiFeaturesEnabled(),
     // Absent means never chosen, which is on: the effect is opt-out.
     celebrationsEnabled: readCelebrationsEnabled(settings.celebrations_enabled),
     defaultAiAgent: resolveDefaultAiAgent(settings.default_ai_agent),
@@ -656,7 +655,6 @@ function SettingsBodyFromDraft({
       autoAdvanceInboxAfterOrganize={draft.autoAdvanceInboxAfterOrganize}
       setAutoAdvanceInboxAfterOrganize={(value) => updateDraft('autoAdvanceInboxAfterOrganize', value)}
       aiFeaturesEnabled={draft.aiFeaturesEnabled}
-      setAiFeaturesEnabled={(value) => updateDraft('aiFeaturesEnabled', value)}
       celebrationsEnabled={draft.celebrationsEnabled}
       setCelebrationsEnabled={(value) => updateDraft('celebrationsEnabled', value)}
       aiAgentsStatus={aiAgentsStatus}
@@ -863,7 +861,6 @@ function SettingsAgentWorkflowSections({
   autoAdvanceInboxAfterOrganize,
   setAutoAdvanceInboxAfterOrganize,
   aiFeaturesEnabled,
-  setAiFeaturesEnabled,
   celebrationsEnabled,
   setCelebrationsEnabled,
   aiAgentsStatus,
@@ -890,7 +887,6 @@ function SettingsAgentWorkflowSections({
         <AiAgentSettingsSection
           t={t}
           aiFeaturesEnabled={aiFeaturesEnabled}
-          setAiFeaturesEnabled={setAiFeaturesEnabled}
           celebrationsEnabled={celebrationsEnabled}
           setCelebrationsEnabled={setCelebrationsEnabled}
           aiAgentsStatus={aiAgentsStatus}
@@ -1217,7 +1213,6 @@ function buildDefaultAiTargetOptions(
 function AiAgentSettingsSection({
   t,
   aiFeaturesEnabled,
-  setAiFeaturesEnabled,
   celebrationsEnabled,
   setCelebrationsEnabled,
   aiAgentsStatus,
@@ -1232,7 +1227,6 @@ function AiAgentSettingsSection({
   SettingsBodyProps,
   | 't'
   | 'aiFeaturesEnabled'
-  | 'setAiFeaturesEnabled'
   | 'celebrationsEnabled'
   | 'setCelebrationsEnabled'
   | 'aiAgentsStatus'
@@ -1259,13 +1253,6 @@ function AiAgentSettingsSection({
       />
 
       <SettingsGroup>
-        <SettingsSwitchRow
-          label={t('settings.aiFeatures.enable')}
-          description={t('settings.aiFeatures.enableDescription')}
-          checked={aiFeaturesEnabled}
-          onChange={setAiFeaturesEnabled}
-          testId="settings-ai-features-enabled"
-        />
         <SettingsSwitchRow
           label={t('settings.aiAgents.sessionAutoDistill')}
           description={t('settings.aiAgents.sessionAutoDistillDescription')}
