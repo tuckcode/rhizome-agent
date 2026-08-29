@@ -244,30 +244,36 @@ push is not a release — releases are tagged builds with signed installers.
 ## Open threads
 
 - **C56-OPEN (2026-08-28): two live-daemon tests fail against a healthy
-  daemon, and nobody was running them.** `pnpm test:live-prime` (new, `c71d265`)
+  daemon, and nobody was running them.** `pnpm test:live-prime` (`c71d265`)
   runs the six `#[ignore]`d tests in `prime_session_host.rs`. First run: 1
-  passes, 5 fail. Three state their own missing setup and are not defects — a
-  started session, a scheduled job, `RHIZOME_TEST_DAEMON_SOCKET`. **Two do
-  not:**
+  passes, 5 fail. **Three of the five are unmet preconditions the tests name
+  themselves** — a started session, a scheduled job, `RHIZOME_TEST_DAEMON_SOCKET`
+  — and are not defects. Two are real:
 
-  - `live_daemon_round_trip` — `assertion failed: !reconnected.is_empty()`
-  - `live_goal_round_trip` — `set_goal` refused with *"Cannot admit a session
-    action while queued session input is suspended."*
+  - **`live_goal_round_trip`.** Reproduced in isolation, so it is not a
+    cascade from the test before it. The *first* `set_goal` succeeds and
+    returns a well-formed `PrimeGoalState`; **replacing** the active goal is
+    refused with *"Cannot admit a session action while queued session input is
+    suspended."* Rhizome does not model that suspension at all —
+    `acquire_session_input_pause` / `release_session_input_pause` are among the
+    unspoken commands. Either we must wait for input to resume, or release it
+    first, and today we do neither.
+  - **`live_daemon_round_trip`** — after a real turn, `shutdown_host()` and
+    then `ensure_host()` returns an **empty session id**. The reconnect is the
+    property ADR-0163's whole transport change exists for, so this is worth
+    understanding before it is explained away.
 
-  Both smell like real adapter drift against Prime 0.8.0 rather than test rot,
-  but neither has been investigated. The second names a queue-suspension state
-  Rhizome does not model at all (`acquire_session_input_pause` /
-  `release_session_input_pause` are among the unspoken commands).
+  **A third failure looked like a product bug and is not — corrected here so
+  nobody chases it.** `roster_against_the_live_daemon` reports "expected at
+  least one session" while a Rhizome window is open, and a manual `list` over
+  the daemon socket returns `{"sessions":[]}`. That is **#28 working as
+  designed**: a vault attach creates no Prime session, and one is not created
+  until the first prompt. An idle app legitimately has zero sessions, and
+  `prime-agent status` agrees. It is the same unmet precondition as the other
+  three.
 
-  **A third observation worth checking first:** `roster_against_the_live_daemon`
-  fails with "expected at least one session" while the app has a live session
-  on screen — and a manual `list` over the daemon socket returned
-  `{"sessions":[]}` the same way. If the roster genuinely cannot see
-  `client_owned` sessions (ADR-0167), that is a product bug, not a test one,
-  and it would explain both.
-
-  Read the failure messages before assuming rot: the lane is new, and its
-  whole point is that these were never being run.
+  Read the failure messages before assuming rot, and before assuming a bug:
+  the lane is new, and its whole point is that none of this was being run.
 
 - **C55-OPEN (2026-08-28): the text-only-model warning does not fire in the
   app.** Image attachments work end to end (a vision model described a pasted
