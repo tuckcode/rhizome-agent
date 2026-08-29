@@ -6,7 +6,7 @@ description: >-
   pnpm live-ui against the browser build, read-only plus test-bridge steer,
   developer tooling not an in-app pane. Awaiting Atticus approval. No product
   code.
-commits: (docs-only; SHA filled after commit)
+commits: 821e8e5
 ---
 
 # #50 live-app-view plan — 2026-08-29
