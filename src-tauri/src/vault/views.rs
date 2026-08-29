@@ -9,7 +9,7 @@ use std::io::ErrorKind;
 use std::path::Path;
 
 use super::view_date_filters::parse_date_filter_timestamp;
-use super::view_migration::{is_view_definition_file, migrate_views};
+use super::view_migration::is_view_definition_file;
 use super::view_relationships::{evaluate_relationship_op, relationship_candidates};
 use super::view_value_conversions::{
     json_scalar_array_to_strings, json_scalar_to_string, yaml_value_to_string,
@@ -191,7 +191,6 @@ fn read_view_file(path: &Path) -> Option<ViewFile> {
 }
 
 pub fn scan_views(vault_path: &Path) -> Vec<ViewFile> {
-    migrate_views(vault_path);
     let views_dir = vault_path.join("views");
     if !views_dir.is_dir() {
         return Vec::new();

@@ -305,23 +305,6 @@ filters:
     }
 
     #[test]
-    fn test_migrate_views_from_old_location() {
-        let dir = tempfile::TempDir::new().unwrap();
-        let old_dir = dir.path().join(".laputa").join("views");
-        fs::create_dir_all(&old_dir).unwrap();
-
-        let yaml = "name: Migrated\nfilters:\n  all:\n    - field: type\n      op: equals\n      value: Note\n";
-        fs::write(old_dir.join("test.yml"), yaml).unwrap();
-
-        let views = scan_views(dir.path());
-        assert_eq!(views.len(), 1);
-        assert_eq!(views[0].definition.name, "Migrated");
-
-        assert!(dir.path().join("views").join("test.yml").exists());
-        assert!(!old_dir.join("test.yml").exists());
-    }
-
-    #[test]
     fn test_save_and_read_view() {
         let dir = tempfile::TempDir::new().unwrap();
 

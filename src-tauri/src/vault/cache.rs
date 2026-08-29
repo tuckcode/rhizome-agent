@@ -140,10 +140,6 @@ fn cache_temp_path(final_path: &Path) -> PathBuf {
 }
 
 /// Legacy cache path inside the vault directory (pre-migration).
-fn legacy_cache_path(vault: &Path) -> PathBuf {
-    vault.join(".laputa-cache.json")
-}
-
 fn git_head_hash(vault: &Path) -> Option<String> {
     run_git(vault, &["rev-parse", "HEAD"]).map(|s| s.trim().to_string())
 }
@@ -530,47 +526,6 @@ fn parse_files_at(
 }
 
 /// Copy legacy cache data to the new external location via temp file + rename.
-fn copy_legacy_cache_to(legacy: &Path, dest: &Path) {
-    if let Some(parent) = dest.parent() {
-        let _ = fs::create_dir_all(parent);
-    }
-    let tmp_path = dest.with_extension("tmp");
-    if let Ok(data) = fs::read_to_string(legacy) {
-        if fs::write(&tmp_path, &data).is_ok() {
-            let _ = fs::rename(&tmp_path, dest);
-        }
-    }
-}
-
-/// Migrate legacy cache from inside the vault to the new external location.
-/// Also removes the legacy file from git tracking if present.
-fn migrate_legacy_cache(vault: &Path) {
-    let legacy = legacy_cache_path(vault);
-    if !legacy.exists() {
-        return;
-    }
-
-    let new_path = cache_path(vault);
-    if !new_path.exists() {
-        copy_legacy_cache_to(&legacy, &new_path);
-    }
-
-    // Remove legacy file from git tracking if present
-    let _ = crate::hidden_command("git")
-        .args([
-            "rm",
-            "--cached",
-            "--quiet",
-            "--ignore-unmatch",
-            ".laputa-cache.json",
-        ])
-        .current_dir(vault)
-        .output();
-
-    // Delete the legacy file from disk
-    let _ = fs::remove_file(&legacy);
-}
-
 /// Remove entries for files that no longer exist on disk and deduplicate
 /// by case-folded relative path (handles case-insensitive filesystems like macOS APFS).
 /// Returns `true` if any entries were removed.
@@ -703,9 +658,6 @@ pub fn scan_vault_cached(vault_path: &Path) -> Result<Vec<VaultEntry>, String> {
             vault_path.display()
         ));
     }
-
-    // Migrate legacy in-vault cache to external location on first run
-    migrate_legacy_cache(vault_path);
 
     let current_hash = match git_head_hash(vault_path) {
         Some(h) => h,
@@ -908,35 +860,6 @@ mod tests {
         let data = fs::read_to_string(&final_path).unwrap();
         let loaded: VaultCache = serde_json::from_str(&data).unwrap();
         assert_eq!(loaded.commit_hash, "abc123");
-    }
-
-    #[test]
-    fn test_legacy_cache_migration() {
-        let (_lock, _cache_tmp, vault_dir) = setup_git_vault();
-        let vault = vault_dir.path();
-
-        // Create a legacy cache file inside the vault
-        let legacy = legacy_cache_path(vault);
-        let cache = VaultCache {
-            version: CACHE_VERSION,
-            vault_path: vault.to_string_lossy().to_string(),
-            commit_hash: "old123".to_string(),
-            entries: vec![],
-        };
-        fs::write(&legacy, serde_json::to_string(&cache).unwrap()).unwrap();
-
-        // Run migration
-        migrate_legacy_cache(vault);
-
-        // New cache file should exist with migrated data
-        let new_path = cache_path(vault);
-        assert!(new_path.exists(), "migrated cache must exist");
-        let data = fs::read_to_string(&new_path).unwrap();
-        let loaded: VaultCache = serde_json::from_str(&data).unwrap();
-        assert_eq!(loaded.commit_hash, "old123");
-
-        // Legacy file should be deleted
-        assert!(!legacy.exists(), "legacy cache file must be removed");
     }
 
     #[test]
