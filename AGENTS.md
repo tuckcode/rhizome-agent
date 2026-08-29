@@ -125,25 +125,41 @@ Red → Green → Refactor → Commit. One cycle per commit. For bugs: write fai
 
 **Test quality (Kent Beck's Desiderata):** Isolated · Deterministic · Fast · Behavioral · Structure-insensitive · Specific · Predictive. Fix flaky tests first. Prefer E2E over unit tests for user flows.
 
-### Localization — English only for v0
+### Localization — English only, and stop working on it
 
-All user-facing UI labels/copy must live in `src/lib/locales/en.json`. That part
-is mandatory and is not about translation: copy in `en.json` is how the rest of
-the code reads a label, and a string hardcoded in a component is a bug whatever
-the language policy is.
+**There is no localization work in v0. None.** Not translating, and — since
+2026-08-29 — not moving strings into `en.json` either.
 
-**Translating it is out of scope for v0.** Atticus, 2026-08-16: *"If I go public
-and there's demand for multiple languages, then I'll consider it. Until then I'm
-not worried."* Restated 2026-08-21. `CONTEXT.md` defines v0 as the trusted
-circle — nineteen locales is a strangers-first concern.
+Atticus, 2026-08-16: *"If I go public and there's demand for multiple
+languages, then I'll consider it. Until then I'm not worried."* Restated
+2026-08-21, and again 2026-08-29: *"I think I've said it 20 times that it's
+English only right now… at this time, English only for the last time."*
 
-So: **do not run `pnpm l10n:translate`** (it needs `LARA_ACCESS_KEY_ID` /
-`SECRET`, which are set on no machine here anyway), and **do not report
-`pnpm l10n:validate` failing.** It fails by design. It has been re-raised as a
-finding by at least four separate sessions after the decision was made, which is
-attention spent on a settled question. C18.
+**What changed on 2026-08-29.** This section used to require every user-facing
+string to live in `src/lib/locales/en.json`, on the reasoning that the rule was
+about code organisation rather than translation. That distinction was true and
+did not survive contact: agents read "localization is mandatory", labelled the
+work `fix: localize…`, and it read to the owner as the settled question being
+reopened for the fourth time. On the night the rule was dropped, a parallel
+session spent 8 of its 13 code commits on `en.json` moves — and that sweep
+broke all 37 tests in `SingleEditorView.test.tsx`, failing the push gate, for a
+change with no user-visible benefit in an English-only product.
 
-When localization does come into scope, the facts are in C18 in `HANDOFF.md`.
+So, now:
+
+- **A hardcoded English string in a component is fine.** Write the label where
+  it is used. Do not open `en.json` to add a key.
+- **Do not migrate existing strings** into or out of `en.json`. The keys
+  already there stay and keep working; removing them is churn of the same kind.
+- **Do not run `pnpm l10n:translate`** (it needs `LARA_ACCESS_KEY_ID` /
+  `SECRET`, set on no machine here) and **do not report `pnpm l10n:validate`
+  failing.** It fails by design.
+- **Do not raise any of this as a finding.** It has been re-raised by at least
+  five separate sessions after the decision was made. C18.
+
+If localization ever comes into scope, the facts are in C18 in `HANDOFF.md`,
+and the `en.json` convention can be reinstated then — for new copy going
+forward, not as a repo-wide migration.
 
 ### Product analytics (mandatory for meaningful features)
 
@@ -303,7 +319,7 @@ Before pushing, verify the release gates and add a **completion comment** to the
 - Tests/coverage: commands run and final coverage result.
 - Coverage commands passed (`pnpm test:coverage` and `cargo llvm-cov ... --ignore-filename-regex "lib\.rs|main\.rs|menu\.rs" --fail-under-lines 85`) or the change is docs-only.
 - Codacy: MCP/CLI scan summary; confirm no new Critical/High findings.
-- Localization: any user-facing copy lives in `src/lib/locales/en.json`. If no copy changed, say “Localization: no UI copy changes”. **Translations are out of scope for v0 (C18) — name the `en.json` keys you added and stop.** Do not run `pnpm l10n:translate`, and do not report `pnpm l10n:validate` failing: it fails by design until localization is in scope, and re-raising it spends the owner's attention on a decision already made twice.
+- Localization: say “Localization: none — English only (C18)”. There is nothing to report. Do not add `en.json` keys, do not migrate strings, do not run `pnpm l10n:translate`, and do not report `pnpm l10n:validate` failing.
 - PostHog: meaningful new user actions/events are instrumented with safe metadata; noisy/minor changes explicitly say “PostHog: no event needed because …”.
 - Refactoring: any cleanup done on touched files, or "none needed".
 - ADRs: any new/updated ADRs, or "none".
