@@ -117,7 +117,6 @@
     "src/hooks/useNoteActions.persistence.test.ts",
     "src/hooks/useNoteCreation.test.ts",
     "src/hooks/useNoteListKeyboard.test.ts",
-    "src/hooks/useNoteRename.test.ts",
     "src/hooks/useNoteRetargeting.test.ts",
     "src/hooks/useNoteSearch.test.ts",
     "src/hooks/usePropertyPanelState.extra.test.ts",
