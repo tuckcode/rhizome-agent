@@ -17,7 +17,7 @@ It indexes, it does not restate. Every row points at the issue, ADR, or C-number
 that owns the detail. If you find yourself copying a paragraph out of one of
 those into here, link it instead — the same rule `HANDOFF.md` runs on.
 
-Snapshot: **2026-08-29**, 25 open issues, 18 open C-numbers. Re-derive both
+Snapshot: **2026-08-29**, 25 open issues, 17 open C-numbers. Re-derive both
 before trusting the counts:
 
 ```bash
@@ -159,7 +159,7 @@ Save-to-vault refuse. Prime session jsonl stays out of scope.
 
 ## 3. Open threads (C-numbers)
 
-18 open. Full text in `HANDOFF.md` § Open threads — this is the shape of the
+17 open. Full text in `HANDOFF.md` § Open threads — this is the shape of the
 backlog, not a replacement for it.
 
 - **Blocks other work:** C23 (`get_messages` returns no assistant messages —
@@ -169,8 +169,9 @@ backlog, not a replacement for it.
   C31 (unreproducible `pnpm test` unhandled error), C39 (live-daemon tests not
   isolated), C25 (two stale regression specs), C52 (AI chat Playwright specs
   stale), C56 (two live-daemon tests fail against a healthy daemon)
-- **Correctness / warnings:** C55 (text-only-model warning does not fire in
-  native app)
+- ~~**Correctness / warnings:** C55 (text-only-model warning does not fire in
+  native app)~~ **RESOLVED 2026-08-29** (`c423445`) — catalog fallback when
+  daemon `get_state` omits `input`; see HANDOFF C55-RESOLVED
 - **Correctness:** C40 (`rhizome_graph_summary` answers about a different
   graph), C34 (menu-bar roster activity labels, half done)
 - **Health and cleanup:** C46 (`AiPanel.tsx` CCN 50 / 447 lines — grew during
