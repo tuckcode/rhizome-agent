@@ -1184,6 +1184,7 @@
   "ai.sessions.title": "Sessions",
   "ai.sessions.open": "Open sessions",
   "ai.sessions.close": "Close sessions",
+  "ai.sessions.resize": "Resize sessions column",
   "ai.sessions.empty": "No Prime sessions yet. Start a conversation and it will appear here.",
   "ai.sessions.error": "Could not read your Prime sessions. {message}",
   "ai.sessions.untitled": "Untitled session",
