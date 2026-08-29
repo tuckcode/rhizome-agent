@@ -51,7 +51,7 @@ file.
 
 ## State
 
-`origin/main` is **`1e20804`**. Confirm with `git log origin/main..HEAD`
+`origin/main` is **`c71d265`**. Confirm with `git log origin/main..HEAD`
 — it should be empty. Multi-day briefing since Claude last owned a
 session: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md).
 
@@ -243,6 +243,32 @@ push is not a release — releases are tagged builds with signed installers.
 
 ## Open threads
 
+- **C56-OPEN (2026-08-28): two live-daemon tests fail against a healthy
+  daemon, and nobody was running them.** `pnpm test:live-prime` (new, `c71d265`)
+  runs the six `#[ignore]`d tests in `prime_session_host.rs`. First run: 1
+  passes, 5 fail. Three state their own missing setup and are not defects — a
+  started session, a scheduled job, `RHIZOME_TEST_DAEMON_SOCKET`. **Two do
+  not:**
+
+  - `live_daemon_round_trip` — `assertion failed: !reconnected.is_empty()`
+  - `live_goal_round_trip` — `set_goal` refused with *"Cannot admit a session
+    action while queued session input is suspended."*
+
+  Both smell like real adapter drift against Prime 0.8.0 rather than test rot,
+  but neither has been investigated. The second names a queue-suspension state
+  Rhizome does not model at all (`acquire_session_input_pause` /
+  `release_session_input_pause` are among the unspoken commands).
+
+  **A third observation worth checking first:** `roster_against_the_live_daemon`
+  fails with "expected at least one session" while the app has a live session
+  on screen — and a manual `list` over the daemon socket returned
+  `{"sessions":[]}` the same way. If the roster genuinely cannot see
+  `client_owned` sessions (ADR-0167), that is a product bug, not a test one,
+  and it would explain both.
+
+  Read the failure messages before assuming rot: the lane is new, and its
+  whole point is that these were never being run.
+
 - **C55-OPEN (2026-08-28): the text-only-model warning does not fire in the
   app.** Image attachments work end to end (a vision model described a pasted
   PNG), but pasting into a model Prime reports as text-only produces no
@@ -281,39 +307,35 @@ push is not a release — releases are tagged builds with signed installers.
   shell-pipeline mistake that produced the first, wrong diagnosis:
   [2026-08-28-0300](plans/handoffs/2026-08-28-0300-claude-opus-5-model-allow-list.md).
 
-- **C51-RESOLVED (2026-08-26, fixed `373ee1f` / `2360cb5` / `9e50a8d`): Promote
-  accepted the empty-turn placeholder as content.** `writePromoteNoteFromChat`
-  is now guarded by `isTransientAgentFailureText`, the predicate auto-distill
-  already used — which widened the fix to error payloads, OAuth failures and
-  RPC host failures, all equally promotable and equally not knowledge.
-  `PromoteWriteResult` gained a `refused` variant and a toast. **#24 closed.**
-  Full finding and its native live check:
+- **C51-RESOLVED (2026-08-26, `373ee1f` / `2360cb5` / `9e50a8d`): Promote
+  accepted the empty-turn placeholder as content.** Guarded with
+  `isTransientAgentFailureText`, the predicate auto-distill already used —
+  which widened the fix to error payloads and OAuth failures, equally
+  promotable and equally not knowledge. **#24 closed.** Detail:
   [2026-08-26-2245](plans/handoffs/2026-08-26-2245-claude-opus-5-livecheck-and-mycelium-skin.md).
-  **Correct the record when citing it:** the empty turn was almost certainly
-  C53's dying worker, not a flaky `stealth/ox-alpha`.
+  **When citing it:** the empty turn was almost certainly C53's dying worker,
+  not a flaky `stealth/ox-alpha`.
 
 - **C53-RESOLVED (2026-08-27, fixed `be23da8`): a vault in `~/Documents`
-  silently breaks every chat turn on macOS.** `Info.plist` declared only
-  `NSLocalNetworkUsageDescription`, so macOS never prompted for the protected
-  folder and the app could not obtain access even when properly bundled. Prime's
-  session worker then died at launch on `process.cwd()`
-  (`EPERM: operation not permitted, uv_cwd`) and the supervisor timed out after
-  30s. **It reads exactly like a model/provider failure and is not one** — the
-  worker dies before any model is contacted. Keys added, guarded by
-  `src/utils/macOsFolderAccessConfig.test.ts`. Chain and daemon-log evidence:
+  silently breaks every chat turn on macOS.** `Info.plist` declared no
+  `NSDocumentsFolderUsageDescription`, so macOS never prompted and the app
+  could not obtain access even when properly bundled; Prime's session worker
+  then died at launch on `process.cwd()` (`EPERM … uv_cwd`) and Chat showed a
+  generic 30s timeout. **It reads exactly like a model failure and is not
+  one.** Keys added, guarded by `src/utils/macOsFolderAccessConfig.test.ts`.
+  Chain and daemon-log evidence:
   [2026-08-27-2223](plans/handoffs/2026-08-27-2223-claude-opus-5-failure-legibility.md).
 
-  **Still open:** (a) confirm a bundled build now prompts and that chat
-  completes with the Documents vault; (b) decide whether the session cwd
-  should be the vault at all — `pick_resumable_session` keys sessions on cwd
-  and Prime runs shell commands there, so changing it is ADR territory;
-  (c) surface a real error instead of a 30s generic timeout when a worker
-  fails to start. An existing grant may also need
-  `tccutil reset SystemPolicyDocumentsFolder ai.rhizome.agent` to re-prompt.
+  **Still open:** (a) decide whether the session cwd should be the vault at all
+  — `pick_resumable_session` keys sessions on cwd and Prime runs shell commands
+  there, so changing it is ADR territory; (b) surface a real error instead of a
+  30s generic timeout when a worker fails to start.
 
-  Note for QA: the dev binary `target/debug/RhizomeAgent` has **no bundle
-  identifier**, so it can never hold a TCC grant regardless of these keys.
-  Protected-folder behaviour can only be tested from a bundled `.app`.
+  **Every rebuild re-prompts** (confirmed repeatedly 2026-08-28): a fresh
+  build's ad-hoc signature is a different app to macOS, so the grant is dropped
+  and the window renders blank until the prompt is accepted. The dev binary has
+  no bundle identifier and can never hold the grant at all — protected-folder
+  behaviour is only testable from a bundled `.app`.
 
 - **C52-OPEN (2026-08-27): the AI chat Playwright specs are stale against the
   chat-centered shell.** `tests/smoke/ai-chat-history.spec.ts` fails all four
@@ -369,70 +391,20 @@ push is not a release — releases are tagged builds with signed installers.
   native QA of the close dialog, and UI that distinguishes attached vs
   resident work.
 
-- **C45-RESOLVED (2026-08-23): the Codacy gate was runnable all along,
-  and its first run refuted a security review.** `codacy-cli` analyses locally
-  with no account and no payment; only the MCP server needs a paid token for a
-  private repo, and that server just shells out to the same CLI. AGENTS.md had
-  told every session the paid tier blocked the whole gate, so it was skipped for
-  months. Setup and the trimmed tool set are documented in AGENTS.md's Codacy
-  section.
+- **C45-RESOLVED (2026-08-23): the Codacy gate was runnable all along, and its
+  first run refuted a security review.** `codacy-cli` analyses locally with no
+  account and no payment; only the MCP server needs a paid token for a private
+  repo, and that server just shells out to the same CLI. AGENTS.md had told
+  every session the paid tier blocked the whole gate, so it was skipped for
+  months, and the first real run found 95 dependency advisories — two of which
+  contradicted a prior review's reasoning. Setup, the trimmed tool set, and why
+  Codacy's eslint is excluded are all in AGENTS.md's Codacy section; the
+  advisory detail is in
+  [2026-08-23-1518](plans/handoffs/2026-08-23-1518-gpt-5-6-sol-mid-turn-and-folder-hardening.md).
 
-  First run: **95 advisories** across `pnpm-lock.yaml` (63), `mcp-server/package-lock.json`
-  (23), and `src-tauri/Cargo.lock` (9). No criticals. Two mattered because they
-  contradicted the 2026-08-22 review's reasoning, and both are **fixed in this
-  working tree**:
-  - `tauri` 2.10.2 → **2.11.1** (CVE-2026-42184, origin confusion). `is_local_url()`
-    compared only the first domain label, so `http://asset.attacker.com/` was
-    classified as a local origin and could invoke IPC. The review had ruled the
-    unguarded folder commands unreachable *because* "Tauri IPC is only callable
-    from the app's own webview" — and that premise, as a property of Tauri, was
-    false on Windows and Android for every version from 2.0 up.
-
-    **This app was not exploitable, but not for the reason the review gave.**
-    Three independent things had to hold, and the framework guarantee was the
-    one that didn't: #43's navigation guard sends any off-origin top-level
-    navigation to the system browser (`navigation_decision`, 2026-08-22), the
-    production CSP declares no `frame-src` so subframes inherit
-    `default-src 'self'` and cannot load an attacker host, and C42 means the app
-    has never launched on Windows at all. The lesson is about the review, not the
-    patch: a reachability argument resting on one framework guarantee is one CVE
-    away from wrong, and the two controls that actually held were never cited.
-
-    The bump carries the webview stack with it: wry 0.54→0.55, tao 0.34→0.35,
-    muda 0.17→0.19, tray-icon 0.21→0.23. **1631 Rust tests, clippy, and fmt
-    pass.** Cursor/CuaDriver native QA built and launched the app and verified
-    the real main window's close→hide behavior. Tray restore, a dispatched
-    native menu action, and #43's off-origin navigation guard remain unverified:
-    CuaDriver observed the menu/status elements but its exact-window provenance
-    guard refused dispatch, and Cursor blocked the pixel tray click. Do those
-    three checks before trusting a release build.
-  - `dompurify` 3.4.2 → **3.4.13** and `mermaid` 11.14.0 → **11.17.0** patch
-    the XSS/CSS-injection advisories on `SafeMarkup.tsx`, the one raw-markup path
-    the review cited as the reason no XSS could reach IPC. The two arguments
-    propped each other up.
-
-  The remaining High findings were patchable transitive pins, including versions
-  deliberately held in `pnpm-workspace.yaml` and `mcp-server/package.json`.
-  Updated `@hono/node-server`, `fast-uri`, `hono`, `ip-address`, `js-yaml`,
-  `linkify-it`, `nanoid`, `postcss`, `protobufjs`, `vite`, `quinn-proto`,
-  `openssl`, and `tar`; also patched the reachable markdown-it quadratic parser
-  path and serde_with's empty-map panic.
-
-  Final Trivy scan: **0 Critical, 0 High; 9 lockfile occurrences remain** (two
-  Medium advisories, four unique Low advisories, duplicated by versions/locks).
-  The Mediums are reviewed:
-  - `@opentelemetry/core` <2.8's unbounded W3C baggage-header parsing is under
-    PostHog's browser telemetry SDK. Rhizome sends telemetry outbound and never
-    parses attacker-controlled inbound HTTP baggage headers; overriding the core
-    alone would also split it from the coordinated OpenTelemetry 2.2/2.6 stack.
-  - `glib` 0.18's iterator unsoundness is Linux-only under Tauri's GTK 0.18
-    stack. Rhizome does not call the affected iterator API; 0.20 is an ecosystem
-    major that current Tauri/wry do not use.
-
-  Remaining Low findings are `body-parser` invalid-limit DoS (Rhizome supplies
-  fixed limits), dev-only `esbuild`, and transitive `lru`/old `rand` unsoundness
-  paths not called by repo code. The gate is now usable as a no-new-High ratchet;
-  do not require zero findings until those upstream stacks move.
+  **A gate nobody can run is indistinguishable from a gate that finds nothing.**
+  That is the transferable part, and it is why C54 (the coverage command that
+  fails on a healthy tree) reads as the same mistake in a different place.
 
 - **C46-OPEN (2026-08-23): `AiPanel.tsx` measures CCN 50 across 447 lines.**
   Codacy's `lizard` is the first tool in this repo to say so — it was the only
