@@ -3522,6 +3522,39 @@ mod tests {
         TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner())
     }
 
+    /// Cleanup guard for live daemon tests.
+    ///
+    /// Tracks a session ID and deletes its `.jsonl` file from
+    /// `~/.prime/agent/sessions/` when dropped. This ensures that tests
+    /// against the real daemon clean up after themselves even if they panic.
+    ///
+    /// Only deletes sessions this test actually created — identified by the
+    /// ID passed at construction. Will not error if the file doesn't exist
+    /// (e.g., if the test failed early), so cleanup is safe for all paths.
+    struct SessionCleanupGuard {
+        session_id: String,
+    }
+
+    impl Drop for SessionCleanupGuard {
+        fn drop(&mut self) {
+            if self.session_id.is_empty() {
+                return;
+            }
+            if let Some(home) = dirs::home_dir() {
+                let session_file = home
+                    .join(".prime/agent/sessions")
+                    .join(format!("{}.jsonl", self.session_id));
+                let _ = std::fs::remove_file(&session_file);
+            }
+        }
+    }
+
+    impl SessionCleanupGuard {
+        fn new(session_id: String) -> Self {
+            SessionCleanupGuard { session_id }
+        }
+    }
+
     /// #31. The name has to identify Rhizome *and* be useful. Vault folder
     /// plus the id tail — the tail is uniqueness for the daemon, taken from
     /// the end because uuidv7's leading characters are a clock.
@@ -6598,7 +6631,8 @@ mod tests {
     fn scheduled_work_against_the_live_daemon() {
         let _guard = host_guard();
         let home = dirs::home_dir().expect("home");
-        connect_host(&home).expect("connect");
+        let session_id = connect_host(&home).expect("connect");
+        let _cleanup = SessionCleanupGuard::new(session_id);
 
         let activity = agent_activity().expect("activity");
         println!(
@@ -7567,6 +7601,7 @@ mod tests {
             Ok(host.session_id.clone().unwrap_or_default())
         })
         .expect("a session to prompt in");
+        let _cleanup = SessionCleanupGuard::new(session_id.clone());
         println!("session: {session_id}");
         assert!(!session_id.is_empty(), "a live session must report an id");
 
@@ -7646,6 +7681,7 @@ mod tests {
             Ok(host.session_id.clone().unwrap_or_default())
         })
         .expect("a session to name");
+        let _cleanup = SessionCleanupGuard::new(session_id.clone());
         println!("session: {session_id}");
 
         // The placeholder is what a fresh session starts with.
@@ -7705,6 +7741,7 @@ mod tests {
         let vault = tempfile::tempdir().unwrap();
 
         let session_id = ensure_host(&vault.path().to_string_lossy()).expect("connect + attach");
+        let _cleanup = SessionCleanupGuard::new(session_id.clone());
         println!("session: {session_id}");
 
         let goal = set_goal("rhizome-agent live goal demo", Some(1234)).expect("set_goal");
@@ -7886,6 +7923,15 @@ mod tests {
             "an opted-in session must outlive quitting: {ids_after:?}"
         );
 
+        // Clean up the kept session before we shut down. Query the current Prime
+        // session_id (which may differ from the daemon's activeSessionId handle).
+        let prime_session_id =
+            with_host_mut(|host| Ok(host.session_id.clone().unwrap_or_default()))
+                .unwrap_or_default();
+        if !prime_session_id.is_empty() {
+            let _cleanup = SessionCleanupGuard::new(prime_session_id);
+        }
+
         let _ = shutdown_host();
         std::env::remove_var(DAEMON_SOCKET_ENV);
         record_problem(None);
@@ -7897,6 +7943,98 @@ mod tests {
         let unique: std::collections::HashSet<&String> = ids.iter().collect();
         assert_eq!(unique.len(), ids.len(), "ids must not repeat: {ids:?}");
         assert!(ids.iter().all(|id| id.starts_with("rhizome-")));
+    }
+
+    #[test]
+    fn session_cleanup_guard_deletes_session_files() {
+        // Create a fake session file to verify the guard deletes it
+        if let Some(home) = dirs::home_dir() {
+            let sessions_dir = home.join(".prime/agent/sessions");
+            let _ = std::fs::create_dir_all(&sessions_dir);
+
+            let test_id = "test-cleanup-session-id-12345".to_string();
+            let test_file = sessions_dir.join(format!("{}.jsonl", test_id));
+
+            // Create a dummy file
+            let _ = std::fs::write(&test_file, "test content");
+            assert!(test_file.exists(), "test file should exist before cleanup");
+
+            // Drop the guard, which should delete the file
+            {
+                let _guard = SessionCleanupGuard::new(test_id);
+                // Guard is still in scope
+                assert!(
+                    test_file.exists(),
+                    "test file should still exist while guard is in scope"
+                );
+            }
+            // Guard has dropped now
+
+            assert!(
+                !test_file.exists(),
+                "test file should be deleted after cleanup guard drops"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "requires a running prime-agent daemon"]
+    fn live_session_cleanup_works_end_to_end() {
+        let _guard = host_guard();
+        std::env::remove_var(DAEMON_SOCKET_ENV);
+        let vault = tempfile::tempdir().unwrap();
+
+        // Get session count before
+        let sessions_before: usize = if let Some(home) = dirs::home_dir() {
+            std::fs::read_dir(home.join(".prime/agent/sessions"))
+                .map(|entries| entries.count())
+                .unwrap_or(0)
+        } else {
+            0
+        };
+
+        // Create a session and let cleanup guard delete it
+        {
+            ensure_host(&vault.path().to_string_lossy()).expect("connect");
+            let session_id = with_host_mut(|host| {
+                host.ensure_session()?;
+                Ok(host.session_id.clone().unwrap_or_default())
+            })
+            .expect("session");
+            println!("created session: {session_id}");
+
+            let _cleanup = SessionCleanupGuard::new(session_id.clone());
+
+            // Verify session file exists while guard is in scope
+            if let Some(home) = dirs::home_dir() {
+                let session_file = home
+                    .join(".prime/agent/sessions")
+                    .join(format!("{}.jsonl", session_id));
+                assert!(session_file.exists(), "session file should exist in scope");
+            }
+
+            let _ = shutdown_host();
+        }
+        // Guard has dropped here
+
+        // Get session count after
+        let sessions_after: usize = if let Some(home) = dirs::home_dir() {
+            std::fs::read_dir(home.join(".prime/agent/sessions"))
+                .map(|entries| entries.count())
+                .unwrap_or(0)
+        } else {
+            0
+        };
+
+        println!(
+            "sessions before: {}, after: {}",
+            sessions_before, sessions_after
+        );
+        assert_eq!(
+            sessions_before, sessions_after,
+            "cleanup guard should have deleted the session file"
+        );
     }
 
     // ── Menu-bar roster (#13) ───────────────────────────────────────────────
