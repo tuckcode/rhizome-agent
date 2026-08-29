@@ -25,6 +25,8 @@ interface ChatComposerDeckProps {
   skillsLabel?: string | null
   /** Frame B — the note open in the secondary pane. */
   contextLabel?: string | null
+  /** Stop sending the open note. Without it the pill stays a plain label. */
+  onCloseContext?: () => void
   model?: string | null
   thinkingLevel?: string | null
   vaultPath?: string
@@ -76,6 +78,7 @@ export function ChatComposerDeck({
   vaultLabel,
   skillsLabel,
   contextLabel,
+  onCloseContext,
   model,
   thinkingLevel,
   vaultPath,
@@ -173,7 +176,43 @@ export function ChatComposerDeck({
         </DropdownMenu>
       ) : null}
 
-      {contextLabel ? <Chip>{t('ai.composer.context', { note: contextLabel })}</Chip> : null}
+      {/* #38: a pill that looks like a control has to be one. With no way to
+          act on the context there is nothing to open, so it stays a plain
+          label rather than a dropdown that shrugs. */}
+      {contextLabel && onCloseContext ? (
+        <DropdownMenu onOpenChange={(open) => { if (open) trackComposerPillOpened('context') }}>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className={pillClass()}
+              aria-label={t('ai.composer.context', { note: contextLabel })}
+              data-testid="composer-context-pill"
+            >
+              {t('ai.composer.context', { note: contextLabel })}
+              <CaretDown size={9} weight="bold" className="text-[var(--text-faint,var(--muted-foreground))]" aria-hidden="true" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="start" className="w-56">
+            <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+              {t('ai.composer.contextTitle')}
+            </DropdownMenuLabel>
+            {/* Says what the pill means. "ctx · note" is shorthand nobody is
+                born knowing, and this row is the only place to explain it. */}
+            <DropdownMenuItem disabled className="text-[12px] text-muted-foreground">
+              {t('ai.composer.contextExplain')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-[12.5px]"
+              data-testid="composer-context-clear"
+              onSelect={() => onCloseContext()}
+            >
+              {t('ai.composer.contextClear')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : contextLabel ? (
+        <Chip>{t('ai.composer.context', { note: contextLabel })}</Chip>
+      ) : null}
 
       {skillsLabel ? (
         <DropdownMenu onOpenChange={(open) => { if (open) trackComposerPillOpened('skills') }}>

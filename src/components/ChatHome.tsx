@@ -187,6 +187,7 @@ export default function ChatHome({
                 }))}
                 onSwitchVault={onSwitchVault}
                 contextLabel={openNote ? openNote.label.split('/').filter(Boolean).at(-1) ?? openNote.label : null}
+                onCloseContext={() => setOpenNote(null)}
                 skillsLabel="rhizome-vault"
                 model={primeModelLabel(primeHost)}
                 thinkingLevel={primeHost?.thinkingLevel ?? null}
