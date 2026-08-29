@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import type { VaultEntry } from '../types'
+import type { Dispatch, SetStateAction } from 'react'
 import {
   needsRenameOnSave,
   buildRenamedEntry,
@@ -24,7 +25,8 @@ const makeEntry = (overrides: Partial<VaultEntry> = {}): VaultEntry => ({
   modifiedAt: 1700000000, createdAt: 1700000000, fileSize: 100, snippet: '',
   wordCount: 0, relationships: {}, icon: null, color: null, order: null,
   outgoingLinks: [], template: null, sort: null, sidebarLabel: null,
-  view: null, visible: null, properties: {},
+  view: null, visible: null, properties: {}, organized: false, favorite: false,
+  favoriteIndex: null, listPropertiesDisplay: [], hasH1: false,
   ...overrides,
 })
 
@@ -103,9 +105,14 @@ describe('renameToastMessage', () => {
   })
 })
 
+type Tab = { entry: VaultEntry; content: string }
+
 describe('useNoteRename hook', () => {
   const setToastMessage = vi.fn()
-  const setTabs = vi.fn((fn: (prev: unknown[]) => unknown[]) => fn([]))
+  let tabs: Tab[] = []
+  const setTabs: Dispatch<SetStateAction<Tab[]>> = vi.fn((update: SetStateAction<Tab[]>) => {
+    tabs = typeof update === 'function' ? update(tabs) : update
+  })
   const handleSwitchTab = vi.fn()
   const updateTabContent = vi.fn()
   const activeTabPathRef = { current: null as string | null }
@@ -144,20 +151,20 @@ describe('useNoteRename hook', () => {
     entries = [],
     renameResult = { new_path: '/vault/new.md', updated_files: 0, failed_updates: 0 },
     activePath = null,
-    onEntryRenamed = vi.fn(),
+    onEntryRenamed = undefined,
   }: {
     path?: string
     entries?: VaultEntry[]
     renameResult?: RenameNoteResult
     activePath?: string | null
-    onEntryRenamed?: ReturnType<typeof vi.fn>
+    onEntryRenamed?: (oldPath: string, newEntry: Partial<VaultEntry> & { path: string }, newContent: string) => void
   } = {}) => {
     activeTabPathRef.current = activePath
     stubRenameNote(renameResult)
 
     const { result } = renderUseNoteRename(entries)
     await act(async () => {
-      await result.current.handleRenameNote(path, 'New', '/vault', onEntryRenamed)
+      await result.current.handleRenameNote(path, 'New', '/vault', onEntryRenamed ?? vi.fn())
     })
 
     return { onEntryRenamed }
