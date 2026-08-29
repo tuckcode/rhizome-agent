@@ -431,8 +431,13 @@ export default function PrimeSessionList({
     ordered.map((session) => metaFor.get(session.id) ?? null),
   )
   const titleFor = new Map(ordered.map((session, index) => [session.id, titles[index] ?? untitled]))
-  const live = ordered.filter((session) => !session.archived)
-  const archived = ordered.filter((session) => session.archived)
+  // Scratch sessions ran in a temp directory — test runs and probes, each of
+  // which creates a real session in Prime's shared store. On one machine they
+  // were 41 of 136 and outnumbered the vault's own sessions in the recent
+  // list. Grouped with archived rather than dropped: same rule as everywhere
+  // else here, separate but still reachable, and the search still finds them.
+  const live = ordered.filter((session) => !session.archived && !session.scratch)
+  const archived = ordered.filter((session) => session.archived || session.scratch)
   const searching = query.trim().length > 0
   const visibleLive = live.filter((session) =>
     primeSessionMatchesQuery(session, query, titleFor.get(session.id)),

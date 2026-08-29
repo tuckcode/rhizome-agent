@@ -508,3 +508,40 @@ describe('PrimeSessionList', () => {
     expect(screen.queryByRole('button', { name: 'New chat' })).not.toBeInTheDocument()
   })
 })
+
+describe('PrimeSessionList — scratch sessions', () => {
+  /**
+   * 41 of 136 saved sessions on one real machine ran in a temp directory:
+   * test runs and probes, each creating a real session in Prime's shared
+   * store. They outnumbered the vault's own sessions in the recent list and
+   * are named after the temp folder — `Rhizome · .tmpwkDuS · a1b2c3`.
+   */
+  it('keeps temp-directory sessions out of the main list', async () => {
+    invoked.result = [
+      summary({ id: 'real', path: '/sessions/real.jsonl', title: 'Where does the watcher debounce?' }),
+      summary({ id: 'junk', path: '/sessions/junk.jsonl', title: 'Rhizome · .tmpwkDuS · a1b2c3', scratch: true }),
+    ]
+
+    render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+
+    expect(await screen.findByText('Where does the watcher debounce?')).toBeInTheDocument()
+    expect(screen.queryByText('Rhizome · .tmpwkDuS · a1b2c3')).not.toBeInTheDocument()
+  })
+
+  /** Separate, not gone — the same rule the rest of this app follows. */
+  it('still finds a scratch session by search', async () => {
+    invoked.result = [
+      summary({ id: 'real', path: '/sessions/real.jsonl', title: 'Where does the watcher debounce?' }),
+      summary({ id: 'junk', path: '/sessions/junk.jsonl', title: 'Rhizome · .tmpwkDuS · a1b2c3', scratch: true }),
+    ]
+
+    render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+    await screen.findByText('Where does the watcher debounce?')
+
+    fireEvent.change(screen.getByTestId('prime-session-search'), {
+      target: { value: 'tmpwkDuS' },
+    })
+
+    expect(await screen.findByText('Rhizome · .tmpwkDuS · a1b2c3')).toBeInTheDocument()
+  })
+})

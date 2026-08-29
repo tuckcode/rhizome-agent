@@ -34,6 +34,8 @@ export interface PrimeSessionSummary {
    * other client. Archiving is a view, and it is reversible.
    */
   archived?: boolean
+  /** Ran in a temp directory — test and probe residue, grouped out of the main list. */
+  scratch?: boolean
 }
 
 /** Coarse age, for analytics only — never rendered. */
