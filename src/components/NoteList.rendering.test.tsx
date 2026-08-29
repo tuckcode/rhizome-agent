@@ -70,11 +70,11 @@ function renderManagedViewNoteList({
   entries,
   view = makeViewDefinition(),
 }: {
-  entries: readonly (ReturnType<typeof makeEntry> | ReturnType<typeof makeTypeDefinition>)[]
+  entries: (ReturnType<typeof makeEntry> | ReturnType<typeof makeTypeDefinition>)[]
   view?: ViewFile
 }) {
   const built = buildNoteListProps({
-    entries: entries as Parameters<typeof renderNoteList>[0]['entries'],
+    entries: entries,
     selection: { kind: 'view', filename: view.filename },
     views: [view],
   })
@@ -128,8 +128,9 @@ function installFullTextSearchMocks({
 }: {
   resultsByVault: Record<string, NoteListSearchMockResult[]>
 }) {
-  const originalContentHandler = window.__mockHandlers?.get_note_content
-  const originalSearchHandler = window.__mockHandlers?.search_vault
+  if (!window.__mockHandlers) window.__mockHandlers = {}
+  const originalContentHandler = window.__mockHandlers.get_note_content
+  const originalSearchHandler = window.__mockHandlers.search_vault
   const searchVault = vi.fn((args?: Record<string, unknown>) => ({
     elapsed_ms: 7,
     mode: args?.mode,
@@ -140,7 +141,6 @@ function installFullTextSearchMocks({
     throw new Error('Note-list full-text search should not read note content in React')
   })
 
-  if (!window.__mockHandlers) window.__mockHandlers = {}
   const mockHandlers = window.__mockHandlers
   mockHandlers.search_vault = searchVault
   mockHandlers.get_note_content = getNoteContent
