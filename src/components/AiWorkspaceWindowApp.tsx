@@ -249,7 +249,7 @@ export function AiWorkspaceWindowApp() {
   )
   const { settings, loaded: settingsLoaded, saveSettings } = useSettings()
   const aiAgentsStatus = useAiAgentsStatus()
-  const aiFeaturesEnabled = areAiFeaturesEnabled(settings)
+  const aiFeaturesEnabled = areAiFeaturesEnabled()
   const preferences = useAppPreferences({
     aiAgentsStatus,
     onToast: setToastMessage,

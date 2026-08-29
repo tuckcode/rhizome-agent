@@ -231,7 +231,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   }, [])
   const networkStatus = useNetworkStatus()
   const { settings, loaded: settingsLoaded, saveSettings } = useSettings()
-  const aiFeaturesEnabled = areAiFeaturesEnabled(settings)
+  const aiFeaturesEnabled = areAiFeaturesEnabled()
   const primeActiveClose = usePrimeActiveClose()
 
   // onSwitch closure captures `notes` declared below — safe because it's only

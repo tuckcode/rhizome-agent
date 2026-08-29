@@ -176,7 +176,18 @@ describe('SettingsPanel', () => {
     expect(screen.getByPlaceholderText('gemini-2.5-flash')).toBeInTheDocument()
   })
 
-  it('lets users disable AI surfaces without showing missing-agent setup', () => {
+  /**
+   * The switch this replaced tested a capability that no longer exists: an
+   * "Enable Rhizome AI features" toggle that turned off the AI surfaces.
+   * Inherited from Rhizome Desktop, where AI was one feature beside a note
+   * editor, a wiki and a graph. Here the AI is the product, so the switch
+   * offered nothing but a way to break the app. Removed 2026-08-29 at
+   * Atticus's call.
+   *
+   * A stored `ai_features_enabled: false` must not resurrect it — that would
+   * leave someone with the app off and no control to turn it back on.
+   */
+  it('offers no way to turn the AI surfaces off', () => {
     render(
       <SettingsPanel
         open={true}
@@ -186,13 +197,8 @@ describe('SettingsPanel', () => {
       />
     )
 
-    expect(within(screen.getByTestId('settings-ai-features-enabled')).getByRole('switch')).toHaveAttribute('aria-checked', 'false')
-    expect(screen.queryByText('Recognized local agents')).not.toBeInTheDocument()
-
-    fireEvent.click(within(screen.getByTestId('settings-ai-features-enabled')).getByRole('switch'))
-    saveSettingsPanel()
-
-    expectSettingsSaved({ ai_features_enabled: true })
+    expect(screen.queryByTestId('settings-ai-features-enabled')).not.toBeInTheDocument()
+    expect(screen.getByText('Recognized local agents')).toBeInTheDocument()
   })
 
   it('does not offer a global keep-sessions-running-on-quit toggle', () => {

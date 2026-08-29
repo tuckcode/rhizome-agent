@@ -56,7 +56,7 @@ export function trackTelemetryConsentChange(previousAnalytics: boolean, nextAnal
 }
 
 export function trackSettingsPreferenceChanges(settings: Settings, draft: SettingsPreferenceDraft): void {
-  trackPreferenceChange(areAiFeaturesEnabled(settings), draft.aiFeaturesEnabled, trackAiFeaturesEnabledChanged)
+  trackPreferenceChange(areAiFeaturesEnabled(), draft.aiFeaturesEnabled, trackAiFeaturesEnabledChanged)
   trackPreferenceChange(areGitFeaturesEnabled(settings), draft.gitFeaturesEnabled, trackGitFeaturesEnabledChanged)
   trackEnabledPreferenceChange(
     areAutomaticUpdateChecksEnabled(settings),
