@@ -51,13 +51,13 @@ file.
 
 ## State
 
-`HEAD` is **`2fc2570`**. `origin/main` is **`db33c46`** — branch is 12
+`HEAD` is **`7134638`**. `origin/main` is **`db33c46`** — branch is 28
 commits ahead. Confirm with `git log origin/main..HEAD`. Multi-day briefing since Claude last owned a
 session: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md).
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22 and #24 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Inverted Dock icon is
-`stash@{0}` (`wip: inverted dock icon`), not in the tree.
+`stash@{4}` (`wip: inverted dock icon`), not in the tree.
 
 Mycelium now renders with a Rhizome skin (`6377b04`): a loopback proxy
 fronts the Mindwalk sidecar and injects one stylesheet, so the engine
