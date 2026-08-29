@@ -42,14 +42,32 @@ pub fn list_prime_sessions() -> Result<Vec<PrimeSessionEntry>, String> {
     Ok(crate::prime_sessions::session_files()?
         .into_iter()
         .map(|path| PrimeSessionEntry {
-            name: path
-                .file_name()
-                .map(|name| name.to_string_lossy().into_owned())
-                .unwrap_or_default(),
+            name: session_display_name(&path),
             mtime_ms: mtime_ms(&path),
             path: path.to_string_lossy().into_owned(),
         })
         .collect())
+}
+
+/// What to call a session in the Mycelium picker.
+///
+/// The same title the sessions list shows, so one session is not two different
+/// things in two places. This used to be the bare filename, which is Prime's
+/// uuid — a column of `01a04c21-91d5-76aa-….jsonl` that names nothing and
+/// cannot be told apart at a glance. The uuid stays as the fallback for a log
+/// too damaged to summarise, because a row with no label at all is worse.
+fn session_display_name(path: &Path) -> String {
+    let filename = || {
+        path.file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    };
+    crate::prime_sessions::summarize_file(path)
+        .ok()
+        .and_then(|summary| summary.title)
+        .map(|title| title.trim().to_string())
+        .filter(|title| !title.is_empty())
+        .unwrap_or_else(filename)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -425,6 +443,39 @@ pub(crate) fn extract_bash_from_ipython(code: &str) -> Option<String> {
         return Some(lines.collect::<Vec<_>>().join("\n"));
     }
     None
+}
+
+#[cfg(test)]
+mod display_name_tests {
+    use super::*;
+
+    /// The picker used to list Prime's uuids. A column of
+    /// `01a04c21-….jsonl` rows names nothing and cannot be told apart.
+    #[test]
+    fn a_session_is_listed_under_its_title_not_its_uuid() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir
+            .path()
+            .join("01a04c21-91d5-76aa-8b75-350604727830.jsonl");
+        std::fs::write(
+            &log,
+            "{\"type\":\"session_info\",\"name\":\"Trace why search misses aliases\"}\n",
+        )
+        .unwrap();
+        assert_eq!(
+            session_display_name(&log),
+            "Trace why search misses aliases"
+        );
+    }
+
+    /// A log too damaged to summarise still gets a row. No label at all is
+    /// worse than an unfriendly one.
+    #[test]
+    fn an_unreadable_log_falls_back_to_its_filename() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("broken.jsonl");
+        assert_eq!(session_display_name(&log), "broken.jsonl");
+    }
 }
 
 #[cfg(test)]
