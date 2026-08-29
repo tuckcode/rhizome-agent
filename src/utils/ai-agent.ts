@@ -1,5 +1,8 @@
 import type { AiAgentId } from '../lib/aiAgents'
-import type { AiAgentPermissionMode } from '../lib/aiAgentPermissionMode'
+import {
+  resolvePermissionModeForAgent,
+  type AiAgentPermissionMode,
+} from '../lib/aiAgentPermissionMode'
 
 /**
  * AI Agent utilities for app-managed CLI agent sessions.
@@ -29,7 +32,13 @@ function permissionModeInstructions(
   mode: AiAgentPermissionMode = 'safe',
   agent?: AiAgentId,
 ): string {
-  if (mode === 'power_user') {
+  const resolvedMode = resolvePermissionModeForAgent(agent, mode)
+
+  if (agent === 'prime') {
+    return `Full-tools mode is selected. You may use shell, git, and local tools when the task needs them. Keep commands scoped to the active vault, avoid destructive commands unless explicitly requested, and do not expose note content unnecessarily. Prime has no sandbox — these are instructions, not enforced limits.`
+  }
+
+  if (resolvedMode === 'power_user') {
     if (agent === 'pi') {
       return `Power User mode is selected, but Pi currently uses the same conservative Rhizome MCP configuration in both modes. Do not promise shell execution unless the Pi CLI exposes it directly in this run.`
     }
@@ -37,7 +46,7 @@ function permissionModeInstructions(
     return `Power User mode is active. Local shell commands are available for this vault where the selected CLI agent supports them. Keep commands scoped to the active vault, avoid destructive commands unless explicitly requested, and do not expose note content unnecessarily.`
   }
 
-  return `Vault Safe mode is active. Do not use shell, terminal, Bash, Python/Node script execution, git, or command-line tools. If the user asks whether shell commands are available, say they are not available in Vault Safe. Use file/search/edit tools and Rhizome MCP tools instead.`
+  return `Limited-tools mode is active. Do not use shell, terminal, Bash, Python/Node script execution, git, or command-line tools. If the user asks whether shell commands are available, say they are not available in this mode. Use file/search/edit tools and Rhizome MCP tools instead.`
 }
 
 function agentDocsInstructions(
@@ -110,12 +119,13 @@ function primeVaultSkillInstructions(agent?: AiAgentId, vaultPaths?: string[]): 
 
 export function buildAgentSystemPrompt(options?: string | AgentSystemPromptOptions): string {
   const { vaultContext, agentDocsPath, permissionMode, agent, vaultPaths } = normalizePromptOptions(options)
-  const canUseShell = permissionMode === 'power_user' && agent !== 'pi'
+  const resolvedMode = resolvePermissionModeForAgent(agent, permissionMode)
+  const canUseShell = resolvedMode === 'power_user' && agent !== 'pi'
   const prompt = [
     AGENT_SYSTEM_PREAMBLE,
     vaultScopeInstructions(vaultPaths),
     agentDocsInstructions(agentDocsPath, canUseShell),
-    permissionModeInstructions(permissionMode, agent),
+    permissionModeInstructions(resolvedMode, agent),
     primeVaultSkillInstructions(agent, vaultPaths),
   ].filter(Boolean).join('\n\n')
 
