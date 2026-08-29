@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { cn } from '@/lib/utils'
 import { createTranslator } from '../lib/i18n'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { invoke } from '@tauri-apps/api/core'
@@ -33,6 +34,26 @@ interface PrimeProviderStatusSectionProps {
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (isTauri()) return invoke<T>(cmd, args)
   return mockInvoke<T>(cmd, args)
+}
+
+/**
+ * Prime's provider ids are lowercase slugs. A card headed "anthropic" beside
+ * one headed "Prime Agent" looks like two different kinds of thing; these are
+ * the names people actually use.
+ */
+const PROVIDER_LABELS: Record<string, string> = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  openrouter: 'OpenRouter',
+  opencode: 'OpenCode',
+  'opencode-go': 'OpenCode Go',
+  'prime-inference': 'Prime Inference',
+  xai: 'xAI',
+  google: 'Google',
+}
+
+function providerLabel(name: string): string {
+  return PROVIDER_LABELS[name] ?? name
 }
 
 function authKindLabel(kind: string): string {
@@ -75,34 +96,51 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
           {t('settings.providers.none')}
         </div>
       ) : (
-        <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
+        // Cards, matching "Recognized local agents" directly above. These are
+        // the same kind of fact — something this machine is connected to — and
+        // showing one as a card and the other as a text list made the
+        // connections read as an afterthought.
+        <div className="grid gap-2 sm:grid-cols-2" data-testid="prime-provider-cards">
           {providers.map((provider) => (
-            <li
+            <div
               key={provider.name}
-              className="flex items-center justify-between gap-2 px-2.5 py-1.5"
+              className="rounded-md border border-border bg-background px-3 py-2"
               data-testid="prime-provider-row"
             >
-              <span className="min-w-0 truncate font-mono text-[11px] text-foreground">
-                {provider.name}
-              </span>
-              <span className="flex shrink-0 items-center gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'size-1.5 shrink-0 rounded-full',
+                      provider.expired ? 'bg-destructive' : 'bg-[var(--accent-green)]',
+                    )}
+                  />
+                  <div className="truncate text-sm font-medium text-foreground">
+                    {providerLabel(provider.name)}
+                  </div>
+                </div>
                 {provider.expired ? (
                   // An expired token fails every turn while still looking
                   // connected — the exact ambiguity this section exists to end.
                   <span
-                    className="font-mono text-[10px] uppercase tracking-[0.08em] text-destructive"
+                    className="shrink-0 text-xs text-destructive"
                     data-testid="prime-provider-expired"
                   >
                     {t('settings.providers.expired')}
                   </span>
-                ) : null}
-                <span className="font-mono text-[10px] text-muted-foreground">
-                  {authKindLabel(provider.authKind)}
-                </span>
-              </span>
-            </li>
+                ) : (
+                  <span className="shrink-0 text-xs text-emerald-700">
+                    {t('settings.providers.connected')}
+                  </span>
+                )}
+              </div>
+              <div className="mt-1 truncate text-xs text-muted-foreground">
+                {authKindLabel(provider.authKind)}
+              </div>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   )

@@ -1350,6 +1350,7 @@
   "settings.providers.loading": "Checking connections…",
   "settings.providers.none": "No connected providers found.",
   "settings.providers.expired": "Expired",
+  "settings.providers.connected": "Connected",
   "settings.modelAllowList.title": "Chat model menu",
   "settings.modelAllowList.description": "Pick which of Prime's models the chat menu lists. The rest stay in the menu behind a disclosure — nothing is removed.",
   "settings.modelAllowList.loading": "Loading models…",

@@ -31,9 +31,33 @@ describe('PrimeProviderStatusSection', () => {
     await waitFor(() => {
       expect(screen.getAllByTestId('prime-provider-row')).toHaveLength(2)
     })
-    expect(screen.getByText('anthropic')).toBeInTheDocument()
+    // Names people use, not Prime's slugs — these cards sit beside one headed
+    // "Prime Agent", and "anthropic" next to it reads as a different kind of
+    // thing.
+    expect(screen.getByText('Anthropic')).toBeInTheDocument()
+    expect(screen.getByText('OpenCode')).toBeInTheDocument()
     expect(screen.getByText('OAuth')).toBeInTheDocument()
     expect(screen.getByText('API key')).toBeInTheDocument()
+  })
+
+  /** A healthy connection says so, rather than saying nothing. */
+  it('marks a working connection as connected', async () => {
+    state.providers = [{ name: 'xai', authKind: 'oauth', expiresAt: 9e12, expired: false }]
+    render(<PrimeProviderStatusSection t={t} />)
+    await waitFor(() => {
+      expect(screen.getByText('Connected')).toBeInTheDocument()
+    })
+    expect(screen.getByText('xAI')).toBeInTheDocument()
+    expect(screen.queryByTestId('prime-provider-expired')).not.toBeInTheDocument()
+  })
+
+  /** An unknown provider is still shown, under whatever Prime calls it. */
+  it('falls back to the raw name for a provider it does not know', async () => {
+    state.providers = [{ name: 'some-new-host', authKind: 'api_key', expired: false }]
+    render(<PrimeProviderStatusSection t={t} />)
+    await waitFor(() => {
+      expect(screen.getByText('some-new-host')).toBeInTheDocument()
+    })
   })
 
   // An expired token fails every turn while still looking connected — the
