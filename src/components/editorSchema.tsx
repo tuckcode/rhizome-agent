@@ -25,6 +25,7 @@ import { MERMAID_BLOCK_TYPE, mermaidFenceSource } from '../utils/mermaidMarkdown
 import { TLDRAW_BLOCK_TYPE, TLDRAW_DEFAULT_HEIGHT } from '../utils/tldrawMarkdown'
 import { MARKDOWN_HIGHLIGHT_STYLE } from '../utils/markdownHighlightMarkdown'
 import type { VaultEntry } from '../types'
+import type { AppLocale } from '../lib/i18n'
 import { createTolariaCodeBlockOptions } from './codeBlockOptions'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { MermaidDiagram } from './MermaidDiagram'
@@ -53,6 +54,7 @@ type MediaBlockPreviewProps = {
 
 // Module-level cache so the WikiLink renderer (defined outside React) can access entries
 export const _wikilinkEntriesRef: { current: VaultEntry[] } = { current: [] }
+export const _editorLocaleRef: { current: AppLocale } = { current: 'en' }
 
 function resolveWikilinkColor(target: string) {
   return resolveColor(_wikilinkEntriesRef.current, target)
