@@ -100,6 +100,14 @@
   and troubleshooting: **`docs/WINDOWS-DEV.md`**. Chat/sessions/goals need a
   live `prime-agent` daemon on that machine. Everything else works, and
   `pnpm dev` against `mock-tauri` drives the session list without a daemon.
+- **Stage your own files by name. Never `git add -A`, `git add .`, or `git add <dir>`** when anything else might be running — another agent, another session, a watch task. Use `git add path/to/one.ts path/to/two.ts`.
+
+  **Why:** on 2026-08-29 three agents worked in one tree. One ran a broad `git add`, and its commit swallowed 591 lines of another agent's in-progress Rust plus three frontend files from a third task — all under a message about none of them. Nothing was lost, but the history now says one agent wrote work it never touched, and a second agent's changes were committed mid-edit, before it considered them finished. The commit that swept them up was then no longer the newest, so the instruction its author had been given — "amend your commit" — would have rewritten a *different* agent's commit instead.
+
+  This is the third distinct way the shared working tree has bitten in two days; the other two are stranded uncommitted work (above) and the mislabelled `fbf2a12` → `0ccd9aa` → `94d6efa` revert-and-recommit. If you are dispatching sub-agents, put this rule in their brief — it is not something a fresh agent infers, and `git status` looks completely normal right up until the commit lands.
+
+  The same reasoning forbids `git checkout`, `git restore`, `git reset`, and `git stash` on paths you do not own, and `git commit --amend` on any commit that is no longer `HEAD`.
+
 - Commit at natural checkpoints — one TDD cycle (below) for code, otherwise every 20–30 min: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
 - **Every agent must sign its commits with a `Co-Authored-By` trailer** naming the model that actually wrote the change:
   ```
