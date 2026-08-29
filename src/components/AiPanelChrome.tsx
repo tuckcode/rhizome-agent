@@ -19,6 +19,7 @@ import type { VaultEntry } from '../types'
 import type { CommandMenuAction, CommandMenuEntry } from '../lib/primeCommandMenu'
 import { primeQueueIsEmpty, primeQueueItems, type PrimeQueue } from '../lib/primeQueue'
 import { cn } from '@/lib/utils'
+import { suggestReply } from '../lib/replySuggestions'
 
 interface AiPanelHeaderProps {
   agentLabel: string
@@ -93,6 +94,8 @@ interface AiPanelComposerProps {
   commandSkillLabel?: string
   commandInstantLabel?: string
   onCommandAction?: (action: CommandMenuAction, nextValue: string) => void
+  /** The last agent message in the conversation, used to compute reply suggestions. */
+  lastAgentMessage?: string | null
 }
 
 function getComposerPlaceholder(
@@ -267,6 +270,49 @@ function ComposerControlsRow({
         {children}
       </div>
       {sendButton}
+    </div>
+  )
+}
+
+function ComposerReplySuggestions({
+  lastAgentMessage,
+  isActive,
+  onChange,
+}: {
+  lastAgentMessage?: string | null
+  isActive: boolean
+  onChange: (value: string) => void
+}) {
+  // Never show suggestions while streaming, and only show if there's a message to analyze.
+  if (isActive || !lastAgentMessage) {
+    return null
+  }
+
+  const suggestion = suggestReply(lastAgentMessage)
+
+  // Render nothing if no options are suggested.
+  if (!suggestion || suggestion.kind !== 'options') {
+    return null
+  }
+
+  return (
+    <div
+      className="mb-1.5 flex min-w-0 flex-wrap gap-1.5"
+      data-testid="composer-reply-suggestions"
+    >
+      {suggestion.options.map((option) => (
+        <Button
+          key={option.label}
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 px-3 py-1.5 text-xs font-normal"
+          onClick={() => onChange(option.text)}
+          data-testid="composer-reply-suggestion"
+        >
+          {option.label}
+        </Button>
+      ))}
     </div>
   )
 }
@@ -648,6 +694,7 @@ export function AiPanelComposer({
   commandSkillLabel,
   commandInstantLabel,
   onCommandAction,
+  lastAgentMessage,
 }: AiPanelComposerProps) {
   const t = createTranslator(locale)
   // Steering keeps the input live during a turn. Without an onSteer handler the
@@ -695,6 +742,11 @@ export function AiPanelComposer({
           {controls}
         </div>
       ) : null}
+      <ComposerReplySuggestions
+        lastAgentMessage={lastAgentMessage}
+        isActive={isActive}
+        onChange={onChange}
+      />
       {queue && !primeQueueIsEmpty(queue) ? (
         <div
           className="mb-1.5 flex min-w-0 flex-col gap-0.5"
