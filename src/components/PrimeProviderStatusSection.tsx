@@ -59,6 +59,10 @@ function providerLabel(name: string): string {
 function authKindLabel(kind: string): string {
   if (kind === 'oauth') return 'OAuth'
   if (kind === 'api_key') return 'API key'
+  // Prime resolves a key from the environment too, and a provider connected
+  // that way used to have no card at all. Naming the source matters: it is
+  // where you go to change it.
+  if (kind === 'env') return 'Environment variable'
   return kind
 }
 

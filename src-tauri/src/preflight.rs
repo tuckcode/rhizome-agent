@@ -182,20 +182,46 @@ pub fn provider_status_from_auth(auth: &serde_json::Value, now_ms: i64) -> Vec<P
 
 /// Provider status for the settings surface, read from the engine's store.
 pub fn provider_statuses() -> Vec<ProviderStatus> {
-    let Some(path) = dirs::home_dir().map(|home| home.join(".prime/agent/auth.json")) else {
-        return Vec::new();
-    };
-    let Ok(raw) = std::fs::read_to_string(path) else {
-        return Vec::new();
-    };
-    let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&raw) else {
-        return Vec::new();
-    };
-    let now_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_millis() as i64)
-        .unwrap_or(0);
-    provider_status_from_auth(&parsed, now_ms)
+    let from_auth = dirs::home_dir()
+        .map(|home| home.join(".prime/agent/auth.json"))
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+        .map(|parsed| {
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|elapsed| elapsed.as_millis() as i64)
+                .unwrap_or(0);
+            provider_status_from_auth(&parsed, now_ms)
+        })
+        .unwrap_or_default();
+    merge_statuses(from_auth, providers_from_environment())
+}
+
+/// Add providers that are connected by environment variable to the cards.
+///
+/// A provider already in `auth.json` keeps that entry: it carries the auth
+/// kind and the expiry, which an environment variable cannot. This only adds
+/// the ones that would otherwise be invisible in Settings while Prime was
+/// using them.
+fn merge_statuses(
+    mut from_auth: Vec<ProviderStatus>,
+    from_env: Vec<String>,
+) -> Vec<ProviderStatus> {
+    for provider in from_env {
+        if from_auth.iter().any(|status| status.name == provider) {
+            continue;
+        }
+        from_auth.push(ProviderStatus {
+            name: provider,
+            auth_kind: "env".to_string(),
+            expires_at: None,
+            // An environment variable does not expire. It can be wrong, but
+            // nothing here can tell, and claiming otherwise would be a guess.
+            expired: false,
+        });
+    }
+    from_auth.sort_by(|a, b| a.name.cmp(&b.name));
+    from_auth
 }
 
 /// Provider names the engine holds credentials for.
@@ -211,7 +237,81 @@ pub fn provider_statuses() -> Vec<ProviderStatus> {
 /// Returns an empty set on any failure, which `check_provider_connected`
 /// treats as "unknown" and stays quiet about. Replace this with a daemon call
 /// the moment Prime grows one.
+/// Provider ids Prime will resolve from an environment variable, with the
+/// variable that supplies each.
+///
+/// From the installed 0.8.0's `docs/providers.md`. Prime resolves credentials
+/// from four places in order — CLI flag, `auth.json`, **environment
+/// variable**, then `models.json` — and Rhizome read only the second. A
+/// provider connected the ordinary way (`export ANTHROPIC_API_KEY=…`) was
+/// therefore reported as not connected: its models greyed out in the picker
+/// and its card missing from Settings, while Prime used it happily.
+///
+/// Not exhaustive by design. `models.json` custom providers are the fourth
+/// path and have no fixed variable name, so an unknown provider still resolves
+/// to "unknown", which `check_provider_connected` stays quiet about.
+const PROVIDER_ENV_VARS: &[(&str, &str)] = &[
+    ("anthropic", "ANTHROPIC_API_KEY"),
+    ("openai", "OPENAI_API_KEY"),
+    ("xai", "XAI_API_KEY"),
+    ("openrouter", "OPENROUTER_API_KEY"),
+    ("google", "GEMINI_API_KEY"),
+    ("groq", "GROQ_API_KEY"),
+    ("deepseek", "DEEPSEEK_API_KEY"),
+    ("mistral", "MISTRAL_API_KEY"),
+    ("cerebras", "CEREBRAS_API_KEY"),
+    ("prime-inference", "PRIME_API_KEY"),
+    ("opencode", "OPENCODE_API_KEY"),
+    ("zai", "ZAI_API_KEY"),
+    ("huggingface", "HF_TOKEN"),
+    ("fireworks", "FIREWORKS_API_KEY"),
+    ("minimax", "MINIMAX_API_KEY"),
+    ("kimi-coding", "KIMI_API_KEY"),
+    ("vercel-ai-gateway", "AI_GATEWAY_API_KEY"),
+    ("azure-openai-responses", "AZURE_OPENAI_API_KEY"),
+];
+
+/// Providers whose key is present in the environment.
+///
+/// Reads through the user's shell, not just this process: a bundled `.app`
+/// launched from Finder inherits almost no environment, so checking
+/// `std::env` alone would report nothing for exactly the users this exists to
+/// serve. Same lookup the AI-model providers already use for `api_key_env_var`.
+pub fn providers_from_environment() -> Vec<String> {
+    providers_from_environment_with_lookup(
+        crate::cli_agent_runtime::env_value_from_process_or_user_shell,
+    )
+}
+
+fn providers_from_environment_with_lookup(
+    lookup: impl Fn(crate::cli_agent_runtime::EnvName<'_>) -> Option<String>,
+) -> Vec<String> {
+    PROVIDER_ENV_VARS
+        .iter()
+        .filter(|(_, var)| {
+            crate::cli_agent_runtime::EnvName::new(var)
+                .and_then(&lookup)
+                .is_some_and(|value| !value.trim().is_empty())
+        })
+        .map(|(provider, _)| (*provider).to_string())
+        .collect()
+}
+
+fn merge_providers(mut from_auth: Vec<String>, from_env: Vec<String>) -> Vec<String> {
+    for provider in from_env {
+        if !from_auth.iter().any(|existing| existing == &provider) {
+            from_auth.push(provider);
+        }
+    }
+    from_auth.sort();
+    from_auth
+}
+
 pub fn connected_providers() -> Vec<String> {
+    merge_providers(providers_from_auth_file(), providers_from_environment())
+}
+
+fn providers_from_auth_file() -> Vec<String> {
     let Some(path) = dirs::home_dir().map(|home| home.join(".prime/agent/auth.json")) else {
         return Vec::new();
     };
@@ -236,6 +336,81 @@ pub fn run(vault_path: &Path, provider: &str, connected: &[String]) -> Preflight
 
 #[cfg(test)]
 mod tests {
+    /// A provider connected only by environment variable had no card at all,
+    /// so Settings showed nothing while Prime used it.
+    #[test]
+    fn an_environment_provider_gets_its_own_card() {
+        let merged = merge_statuses(Vec::new(), vec!["groq".to_string()]);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].name, "groq");
+        assert_eq!(merged[0].auth_kind, "env");
+        assert!(!merged[0].expired);
+    }
+
+    /// `auth.json` wins where both exist: it knows the auth kind and the
+    /// expiry, and an expired OAuth token must keep saying so.
+    #[test]
+    fn the_auth_file_entry_survives_an_environment_variable() {
+        let merged = merge_statuses(
+            vec![ProviderStatus {
+                name: "anthropic".to_string(),
+                auth_kind: "oauth".to_string(),
+                expires_at: Some(1),
+                expired: true,
+            }],
+            vec!["anthropic".to_string()],
+        );
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].auth_kind, "oauth");
+        assert!(merged[0].expired);
+    }
+
+    /// Prime resolves credentials from four places; Rhizome read one. A
+    /// provider connected the ordinary way — `export ANTHROPIC_API_KEY=…` —
+    /// was reported as not connected, greying its models out of the picker.
+    #[test]
+    fn a_key_in_the_environment_counts_as_connected() {
+        let found = providers_from_environment_with_lookup(|name| {
+            (name.as_str() == "ANTHROPIC_API_KEY").then(|| "sk-ant-live".to_string())
+        });
+        assert_eq!(found, vec!["anthropic".to_string()]);
+    }
+
+    /// A variable that exists but is empty is not a credential.
+    #[test]
+    fn a_blank_variable_is_not_a_connection() {
+        let found = providers_from_environment_with_lookup(|name| {
+            (name.as_str() == "OPENAI_API_KEY").then(|| "   ".to_string())
+        });
+        assert!(found.is_empty());
+    }
+
+    /// The two sources overlap constantly — `/login` writes `auth.json` for a
+    /// provider whose variable is also exported. One card, not two.
+    #[test]
+    fn the_two_credential_sources_merge_without_duplicating() {
+        let merged = merge_providers(
+            vec!["anthropic".to_string(), "xai".to_string()],
+            vec!["anthropic".to_string(), "groq".to_string()],
+        );
+        assert_eq!(
+            merged,
+            vec![
+                "anthropic".to_string(),
+                "groq".to_string(),
+                "xai".to_string()
+            ]
+        );
+    }
+
+    /// Nothing anywhere stays "unknown", which `check_provider_connected`
+    /// treats as a reason to stay quiet rather than to warn.
+    #[test]
+    fn no_credentials_anywhere_is_still_empty() {
+        assert!(providers_from_environment_with_lookup(|_| None).is_empty());
+        assert!(merge_providers(Vec::new(), Vec::new()).is_empty());
+    }
+
     use super::*;
 
     fn connected() -> Vec<String> {
