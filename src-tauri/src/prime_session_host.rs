@@ -3657,6 +3657,22 @@ mod tests {
                 .cloned()
         }
 
+        /// The command transcript with the model-catalog read removed.
+        ///
+        /// C55's fallback asks for `get_available_models` from inside
+        /// `apply_state_data` whenever `get_state` omits a model's modalities,
+        /// so it now appears mid-handshake. Three order tests broke at once
+        /// because each asserted the whole list. What those tests protect is
+        /// the session lifecycle — create, attach, read, name — and a
+        /// best-effort read is not part of it. Tests that care about the
+        /// catalog read still see it through `commands()`.
+        fn commands_without_catalog_read(&self) -> Vec<String> {
+            self.commands()
+                .into_iter()
+                .filter(|command| command != "get_available_models")
+                .collect()
+        }
+
         /// Every command of one type, in the order the daemon received them.
         fn commands_matching(&self, kind: &str) -> Vec<serde_json::Value> {
             self.received
@@ -3879,7 +3895,7 @@ mod tests {
 
         assert_eq!(session_id, "sess-a");
         assert_eq!(
-            daemon.commands(),
+            daemon.commands_without_catalog_read(),
             vec!["list", "create", "attach", "get_state", "set_session_name"]
         );
         let _ = shutdown_host();
@@ -3914,7 +3930,7 @@ mod tests {
 
         assert_eq!(session, "sess-a");
         assert_eq!(
-            daemon.commands(),
+            daemon.commands_without_catalog_read(),
             vec![
                 "list",
                 "create",
@@ -4016,15 +4032,14 @@ mod tests {
         get_available_models().expect("models list");
 
         assert_eq!(
-            daemon.commands(),
-            vec![
-                "list",
-                "create",
-                "attach",
-                "get_state",
-                "set_session_name",
-                "get_available_models"
-            ]
+            daemon.commands_without_catalog_read(),
+            vec!["list", "create", "attach", "get_state", "set_session_name"],
+            "the session is created and attached before anything reads from it"
+        );
+        assert_eq!(
+            daemon.commands().last().map(String::as_str),
+            Some("get_available_models"),
+            "and the read that needed the session is what finally ran"
         );
         let _ = shutdown_host();
     }
