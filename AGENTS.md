@@ -106,6 +106,18 @@
 
   This is the third distinct way the shared working tree has bitten in two days; the other two are stranded uncommitted work (above) and the mislabelled `fbf2a12` → `0ccd9aa` → `94d6efa` revert-and-recommit. If you are dispatching sub-agents, put this rule in their brief — it is not something a fresh agent infers, and `git status` looks completely normal right up until the commit lands.
 
+  **Staging by name is not enough on its own.** `git commit` commits the whole
+  index, not the paths you just added — so if another agent staged files a
+  moment earlier, they land in *your* commit even though you never touched
+  them. That is not hypothetical: it happened twice on 2026-08-29, the second
+  time to an agent that had followed the by-name rule exactly. Use the path
+  form, which commits only what you name and ignores everything else in the
+  index:
+
+  ```bash
+  git commit -- path/to/one.ts path/to/two.ts
+  ```
+
   The same reasoning forbids `git checkout`, `git restore`, `git reset`, and `git stash` on paths you do not own, and `git commit --amend` on any commit that is no longer `HEAD`.
 
 - Commit at natural checkpoints — one TDD cycle (below) for code, otherwise every 20–30 min: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
