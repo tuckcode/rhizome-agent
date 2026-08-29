@@ -179,6 +179,21 @@ When adding or changing a meaningful user-facing feature, include the event name
 
 **Dead-code sweep (`pnpm deadcode`, knip).** Not a gate — it is not wired into any hook, because the repo has a standing backlog of findings and a blocking gate nobody can pass is a gate nobody trusts. Run it when you touch a file's neighbours, when you suspect something is orphaned, or before deleting anything. It reports unused files, exports, types, and dependencies; `knip.json` already declares the real entry points (scripts, sidecar lanes, vitepress, mcp-server) so what it prints is mostly true signal. It exists because `AiAgentsBadge.tsx` sat in the tree unreferenced — 395 lines plus a passing test suite — while every gate stayed green: its tests imported it directly, so nothing noticed it was rendered from nowhere. Fix what your change touches; do not mass-delete the backlog in an unrelated commit.
 
+**⚠️ knip cannot see anything invoked from outside JavaScript, either.**
+`mcp-server/cli-call.mjs` is the entry point every Rhizome vault tool call
+goes through — four Rust files name it (`prime_vault_skill.rs`,
+`prime_sessions.rs`, `prime_events.rs`, `prime_tool_unwrap.rs`), and the
+seeded `rhizome-vault` skill tells the agent to run it with `node`. Nothing
+*imports* it, so knip reported it as an unused file and invited its deletion.
+Deleting it would break every vault tool call in the product while every gate
+stayed green. It is in `knip.json`'s `ignore` for that reason (2026-08-29).
+
+Generalise from this: **knip only sees `import`**. A file reached by a shell
+command, a spawned process, a config string, or a path built at runtime looks
+dead to it and is not. Before deleting anything knip flags, grep the whole
+repo for its **filename**, not just its exports, and include `src-tauri/` and
+`docs/` in that grep.
+
 **⚠️ knip cannot see ambient declarations.** A file whose whole job is
 `declare global { interface Window { … } }` is imported by nobody *by design*
 — TypeScript picks it up from the project include — so knip reports it as an
