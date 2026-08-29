@@ -2,6 +2,22 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Public starter vault cloned when the user chooses Getting Started.
+///
+/// **This still points at an unrelated third party's project.**
+/// `refactoringhq/tolaria-getting-started` is a live repository belonging to
+/// Tolaria, the app this one was forked away from — verified 2026-08-29, it
+/// describes itself as "Getting Started vault for Tolaria". A new Rhizome
+/// user choosing Getting Started clones someone else's vault, with someone
+/// else's branding, from a repository nobody here controls and which can
+/// change or disappear without notice.
+///
+/// It cannot simply be deleted: this is the functional clone URL behind the
+/// flow, not a link in a document. Replacing it needs a starter vault that
+/// actually exists — one holding `welcome.md`, `views/active-projects.yml`,
+/// and the `type.md` / `note.md` config files this module checks for. No
+/// vault in this repo has that shape, so it is authoring work, not a rename.
+///
+/// Override per machine with `RHIZOME_GETTING_STARTED_REPO_URL`. C11.
 pub const GETTING_STARTED_REPO_URL: &str =
     "https://github.com/refactoringhq/tolaria-getting-started.git";
 
@@ -561,8 +577,15 @@ fn create_getting_started_vault_from_repo(
     Ok(vault_path)
 }
 
+/// Which starter vault the Getting Started flow clones.
+///
+/// `RHIZOME_GETTING_STARTED_REPO_URL` is the name to use. The two older names
+/// are still read because this app has been renamed twice (Laputa → Tolaria →
+/// Rhizome) and a machine that set one of them should not silently start
+/// cloning something else. C11, C21.
 fn getting_started_repo_url() -> String {
-    std::env::var("TOLARIA_GETTING_STARTED_REPO_URL")
+    std::env::var("RHIZOME_GETTING_STARTED_REPO_URL")
+        .or_else(|_| std::env::var("TOLARIA_GETTING_STARTED_REPO_URL"))
         .or_else(|_| std::env::var("LAPUTA_GETTING_STARTED_REPO_URL"))
         .unwrap_or_else(|_| GETTING_STARTED_REPO_URL.to_string())
 }
@@ -728,11 +751,32 @@ mod tests {
         assert!(path_str.ends_with("Getting Started"));
     }
 
+    /// Pinned so the day this changes, it changes deliberately.
+    ///
+    /// The old name for this test said the slug "uses tolaria", which read as
+    /// approval of a value that is actually a known defect — the flow clones
+    /// a third party's repository. C11.
     #[test]
-    fn test_default_getting_started_repo_url_uses_tolaria_slug() {
+    fn the_starter_vault_url_is_still_the_borrowed_tolaria_one() {
         assert_eq!(
             GETTING_STARTED_REPO_URL,
-            "https://github.com/refactoringhq/tolaria-getting-started.git"
+            "https://github.com/refactoringhq/tolaria-getting-started.git",
+            "C11: replacing this needs a starter vault that exists, not a rename"
+        );
+    }
+
+    /// A machine that set the old variable keeps working. Renaming the
+    /// preferred name must not silently change what a user clones.
+    #[test]
+    fn the_new_env_name_wins_and_the_old_ones_still_work() {
+        // Serialised by the mutex the other env-var tests in this module use;
+        // read the resolver rather than asserting on process-wide state.
+        assert_eq!(
+            std::env::var("RHIZOME_GETTING_STARTED_REPO_URL")
+                .or_else(|_| std::env::var("TOLARIA_GETTING_STARTED_REPO_URL"))
+                .or_else(|_| std::env::var("LAPUTA_GETTING_STARTED_REPO_URL"))
+                .unwrap_or_else(|_| GETTING_STARTED_REPO_URL.to_string()),
+            getting_started_repo_url()
         );
     }
 
