@@ -11,10 +11,14 @@ Rhizome has two AI paths: coding agents that can use tools to inspect and edit a
 
 The AI panel can stream supported local CLI agents through Rhizome's normalized event layer. Current targets include Claude Code, Codex, OpenCode, Pi, and Antigravity CLI when they are installed on the machine.
 
-Coding agents can run in:
+Prime (Chat) always has local tools available. It has no sandbox; the old Vault Safe prompt is not sent.
 
-- **Vault Safe** mode, limited to file, search, and edit tools.
-- **Power User** mode, which can allow local shell commands scoped to the active vault for agents that support shell access.
+Claude Code and Antigravity still enforce a per-vault mode:
+
+- **Limited tools** blocks shell commands.
+- **Power User** allows local shell commands scoped to the active vault.
+
+Other CLI agents are asked to follow the same labels; enforcement depends on the adapter.
 
 ## Direct Models
 
