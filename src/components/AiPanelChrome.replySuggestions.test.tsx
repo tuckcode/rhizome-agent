@@ -180,4 +180,67 @@ describe('AiPanelComposer reply suggestions', () => {
 
     expect(screen.queryByTestId('composer-reply-suggestions')).toBeNull()
   })
+
+  /**
+   * Once you start typing you have answered the question your own way. Leaving
+   * the pills up is clutter, and picking one would wipe what you wrote.
+   */
+  it('hides the pills once anything is typed', () => {
+    vi.mocked(replySuggestionsLib.suggestReply).mockReturnValue({
+      kind: 'options',
+      options: [
+        { label: 'Fix the tests', text: 'Fix the tests' },
+        { label: 'Leave them', text: 'Leave them' },
+      ],
+    })
+    renderComposer({ lastAgentMessage: 'Fix the tests, or leave them?', input: 'actually, ' })
+    expect(screen.queryByTestId('composer-reply-suggestions')).not.toBeInTheDocument()
+  })
+
+  /**
+   * Backspacing to empty brings them back, so starting to type and changing
+   * your mind costs nothing.
+   */
+  it('brings the pills back when the box is emptied again', () => {
+    vi.mocked(replySuggestionsLib.suggestReply).mockReturnValue({
+      kind: 'options',
+      options: [
+        { label: 'Fix the tests', text: 'Fix the tests' },
+        { label: 'Leave them', text: 'Leave them' },
+      ],
+    })
+    const { rerender } = renderComposer({
+      lastAgentMessage: 'Fix the tests, or leave them?',
+      input: 'wait',
+    })
+    expect(screen.queryByTestId('composer-reply-suggestions')).not.toBeInTheDocument()
+    rerender(
+      <AiPanelComposer
+        entries={[]}
+        agentLabel="Prime"
+        agentReadiness="ready"
+        input=""
+        inputRef={{ current: null }}
+        isActive={false}
+        onChange={vi.fn()}
+        onSend={vi.fn()}
+        onStop={vi.fn()}
+        lastAgentMessage="Fix the tests, or leave them?"
+      />,
+    )
+    expect(screen.getByTestId('composer-reply-suggestions')).toBeInTheDocument()
+  })
+
+  /** Whitespace is not an answer. */
+  it('treats a box of only spaces as empty', () => {
+    vi.mocked(replySuggestionsLib.suggestReply).mockReturnValue({
+      kind: 'options',
+      options: [
+        { label: 'Fix the tests', text: 'Fix the tests' },
+        { label: 'Leave them', text: 'Leave them' },
+      ],
+    })
+    renderComposer({ lastAgentMessage: 'Fix the tests, or leave them?', input: '   ' })
+    expect(screen.getByTestId('composer-reply-suggestions')).toBeInTheDocument()
+  })
 })
