@@ -12,6 +12,7 @@ import { startResizeDrag } from '../utils/startResizeDrag'
 import { trackPrimeSessionTreeNavigated } from '../lib/productAnalytics'
 import { useAiPanelAttachments } from './useAiPanelAttachments'
 import { useAiPanelSendPolicy } from './useAiPanelSendPolicy'
+import { useAiPanelModelChangeMarker } from './useAiPanelModelChangeMarker'
 import { usePrimeQueue } from '../hooks/usePrimeQueue'
 import { usePrimeSessionTree } from '../hooks/usePrimeSessionTree'
 import { SessionBranchBand } from './SessionBranchBand'
@@ -340,26 +341,12 @@ export function AiPanelView({
     onTranscript: agent.replaceMessages,
   })
 
-  const lastModelId = useRef<string | null | undefined>(undefined)
-  const lastModelSession = useRef(primeHost.sessionPath)
-  useEffect(() => {
-    if (!isPrimeTarget) return
-    if (primeHost.sessionPath !== lastModelSession.current) {
-      lastModelSession.current = primeHost.sessionPath
-      lastModelId.current = primeHost.modelId ?? null
-      return
-    }
-    const next = primeHost.modelId ?? null
-    if (lastModelId.current === undefined) {
-      lastModelId.current = next
-      return
-    }
-    if (next && next !== lastModelId.current) {
-      const label = primeModelLabel(primeHost) ?? next
-      agent.addLocalMarker(translate(locale, 'ai.command.modelChanged', { model: label }))
-    }
-    lastModelId.current = next
-  }, [agent, isPrimeTarget, locale, primeHost])
+  useAiPanelModelChangeMarker({
+    isPrimeTarget,
+    primeHost,
+    locale,
+    addLocalMarker: agent.addLocalMarker,
+  })
 
   useAiPanelPromptQueue({
     agent,
