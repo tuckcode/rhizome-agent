@@ -7,6 +7,8 @@ import {
   storedChatSessionsOpen,
 } from '../lib/chatSessionsColumn'
 import { callHost } from '../lib/callHost'
+import { usePanelWidth } from '../hooks/usePanelWidth'
+import { startResizeDrag } from '../utils/startResizeDrag'
 import {
   MAX_IMAGES_PER_MESSAGE,
   readImageAttachment,
@@ -410,6 +412,9 @@ export function AiPanelView({
    * Cleared on every accepted send, so an attachment never rides along with a
    * later, unrelated turn.
    */
+  // 180–420: narrower and a session title is a truncation, wider and the
+  // transcript starts losing the room the design gives it.
+  const sessionsWidth = usePanelWidth(APP_STORAGE_KEYS.chatSessionsWidth, 228, 180, 420)
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([])
   const attachImages = useCallback((files: File[]) => {
     void (async () => {
@@ -747,9 +752,25 @@ export function AiPanelView({
       ) : null}
       <div className="flex min-h-0 flex-1">
         {sessionsVisible && (
-          // Design system: sessions are a 228px column beside the transcript,
-          // never a view that replaces it. Conversation owns the room.
-          <div className="flex w-[228px] shrink-0 border-r border-border">
+          // Design system: sessions are a column beside the transcript, never
+          // a view that replaces it. Conversation owns the room — which is
+          // why the drag has an upper bound rather than free rein.
+          <div
+            className="relative flex shrink-0 border-r border-border"
+            style={{ width: sessionsWidth.width }}
+          >
+            {/* Right edge, so dragging right widens it — the mirror of the
+                note pane, whose handle is on its left. */}
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label={translate(locale, 'ai.sessions.resize')}
+              data-testid="prime-sessions-resize"
+              className="absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize bg-transparent transition-colors hover:bg-border"
+              onMouseDown={(event) =>
+                startResizeDrag(event, 'col-resize', (deltaX) => sessionsWidth.resizeBy(-deltaX))
+              }
+            />
             <PrimeSessionList
               locale={locale}
               onSelectSession={(session) => void handleSelectSession(session)}
