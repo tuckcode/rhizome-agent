@@ -147,6 +147,32 @@ Smaller: rule 14 permits a closing question that rule 10's "no closers" bans,
 and the file mixes three unrelated topics (`/graphify`, session naming, output
 shape) under mismatched heading levels.
 
+## Next thing asked for: let the agent see the running app (#50)
+
+Filed as issue #50 at the end of the session. Chosen over an in-app code
+editor, which was raised and set aside.
+
+The agent cannot reliably see Rhizome while it runs. Native screenshots need
+macOS Accessibility and Screen Recording, and **every rebuild changes the
+app's signature, so those permissions are dropped** — it happened again this
+session, which is why the naming work was proven with a daemon test instead
+of a picture. The cost is not the screenshots: the chat transcript had no
+scroll box for three days while 5,829 automated tests passed, because none of
+them looked at the rendered layout.
+
+Three of the four pieces already exist: `src/utils/uiAudit.ts` (four layout
+rules), `tests/smoke/ui-audit.spec.ts` with its baseline, and
+`src/types/rhizomeTestBridge.ts` (`window.__rhizomeTest`). `MyceliumView.tsx`
+proves an embedded live page inside Rhizome works. What is missing is a
+surface that puts a live app in front of the agent on demand rather than only
+inside a test run.
+
+Three questions to settle before building, in #50: whether it shows `pnpm dev`
+(cheap, no permissions, but cannot exercise Rust) or the native app (real, but
+exactly what the permissions block); whether it only reads or can also click
+and type; and whether it ships in the app or sits beside `pnpm deadcode` as
+developer tooling.
+
 ## Not done
 
 - **C55** — the text-only-model warning still does not fire in the app.
