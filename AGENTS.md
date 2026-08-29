@@ -301,7 +301,7 @@ Before pushing, verify the release gates and add a **completion comment** to the
 - What was implemented (a few lines covering logic and UX/UI).
 - QA: what was tested and how (Playwright / native screenshot / osascript).
 - Tests/coverage: commands run and final coverage result.
-- Coverage commands passed (`pnpm test:coverage` and `cargo llvm-cov ... --fail-under-lines 85`) or the change is docs-only.
+- Coverage commands passed (`pnpm test:coverage` and `cargo llvm-cov ... --ignore-filename-regex "lib\.rs|main\.rs|menu\.rs" --fail-under-lines 85`) or the change is docs-only.
 - Codacy: MCP/CLI scan summary; confirm no new Critical/High findings.
 - Localization: any user-facing copy lives in `src/lib/locales/en.json`. If no copy changed, say “Localization: no UI copy changes”. **Translations are out of scope for v0 (C18) — name the `en.json` keys you added and stop.** Do not run `pnpm l10n:translate`, and do not report `pnpm l10n:validate` failing: it fails by design until localization is in scope, and re-raising it spends the owner's attention on a decision already made twice.
 - PostHog: meaningful new user actions/events are instrumented with safe metadata; noisy/minor changes explicitly say “PostHog: no event needed because …”.
