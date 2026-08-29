@@ -40,7 +40,7 @@
   pnpm prime:surface:github     # GitHub latest release tag vs snapshot
   ```
 
-  If it drifts, `--update` after you have understood the diff. Do **not** clone `PrimeIntellect-ai/prime-agent`, and do **not** dump `~/.local/lib/node_modules/prime-agent` into context — the snapshot is the list. User-facing "a newer Prime is out" is already `check_prime_update` / `usePrimeUpdate`; this is the adapter check.
+  If it drifts, `--update` after you have understood the diff. Do **not** clone `PrimeIntellect-ai/prime-agent`. User-facing "a newer Prime is out" is already `check_prime_update` / `usePrimeUpdate`; this is the adapter check.
 
   **The snapshot answers "does this command exist". It never answers "what does this command do".** It is a list of names, and a name is not a meaning. When you need the behaviour, read Prime's own docs — they are installed at `~/.local/lib/node_modules/prime-agent/docs/` (`usage.md`, `models.md`, `rpc.md`, `rlm.md`, `daemon.md`, and ~30 more). Reading one file is not dumping the package; it is the difference between knowing and guessing.
 
@@ -143,12 +143,18 @@
   failure is in someone else's file, keep working locally, and commit when it
   clears. Never `--no-verify`.
 
-  **The real fix for all three is isolation, not discipline.** Three distinct
-  collisions in one day, and in two of them the agent had followed the rules
-  exactly. A shared working tree makes correctness depend on timing. When
-  dispatching parallel agents that will *write*, give each one its own git
-  worktree; keep the shared tree for agents that only read. Rules that depend
-  on nobody being unlucky are not rules.
+  **The real fix for all three is isolation, not discipline.** Four distinct
+  collisions in one day (a broad `git add`, a bare `git commit` taking another
+  agent's staged files, a global lint gate, and `.git/index.lock`), and in two
+  of them the agent had followed the rules exactly. A shared working tree makes
+  correctness depend on timing.
+
+  So: **when dispatching parallel agents that will write, prefer a worktree
+  each** — the Agent tool takes `isolation: "worktree"`. The shared tree is
+  fine for agents that only read. Stated as a preference rather than a mandate
+  because nothing enforces it and, as of 2026-08-29, `git worktree list` shows
+  one worktree despite the four incidents above. A rule the file claims and
+  nobody follows is worse than an honest recommendation.
 
 - Commit at natural checkpoints — one TDD cycle (below) for code, otherwise every 20–30 min: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
 - **Every agent must sign its commits with a `Co-Authored-By` trailer** naming the model that actually wrote the change:
@@ -162,7 +168,29 @@
   Commits before 2026-07-31 are mostly unsigned; the 2026-07-27 session was Hermes and the 2026-07-31 sessions were Claude Opus 5. Don't retro-stamp them — history is pushed or about to be.
 - **If you write the words "pre-existing" (or "not introduced by this session" / "unrelated to this change" / "was never..."), open or update a `C`-number in `HANDOFF.md`'s Open threads, in the same commit.** A note buried in a session-status doc is not tracked — it is only findable by a session that happens to reopen that exact file. Don't split the difference with a one-line mention elsewhere in the doc; the C-number entry is the whole fix, because it's the one place a fresh session is guaranteed to look.
 
-  **Why:** a 2026-08-02 sweep of every `docs/plans/*.md` in this repo found the Ask-tab/Library-panel `wiki/`-prefix mismatch logged as "pre-existing, not this session's problem" independently in **three separate sessions** (07-08, 07-10, and again via `ARCHITECTURE.md`), and `pnpm l10n:validate`'s locale gap logged the same way in **three different docs** — each session rediscovering it, none fixing it, none escalating it, because "pre-existing" was treated as a reason to stop looking rather than a reason to make it someone's problem. Tracked now as C17 and C18. Passing gates prove nothing about a bug nobody's gate exercises — the same sweep found `AiAgentsBadge.tsx` sat dead in the tree for months because its own tests imported it directly, so every gate stayed green while it was unreachable from the app. A gate staying green is not evidence of health if nothing routes through the thing it's gating.
+  **Why:** the same finding gets rediscovered by session after session and
+  fixed by none, because "pre-existing" reads as a reason to stop looking
+  rather than a reason to make it someone's problem. The Ask-tab/Library-panel
+  `wiki/`-prefix mismatch was logged that way three separate times, and
+  `pnpm l10n:validate`'s locale gap three more; both are tracked now as C17 and
+  C18. A note buried in a session-status doc is not tracked — it is findable
+  only by a session that happens to reopen that exact file. The C-number entry
+  is the whole fix, because it is the one place a fresh session is guaranteed
+  to look.
+
+  **On the evidence:** those incidents happened in Rhizome Desktop before this
+  repo existed — the sweep is dated 2026-08-02 and the files it cites
+  2026-07-03 and 2026-07-10, all before this repo's first commit on
+  2026-08-09. The discipline is sound and C17/C18 are tracked here too, but the
+  story is inherited. Flagged 2026-08-29 rather than dropped, because the same
+  audit found this is the clearest example of a rule that arrived with the
+  source and was never re-decided.
+
+  Passing gates prove nothing about a bug nobody's gate exercises — that same
+  sweep found `AiAgentsBadge.tsx` sat dead in the tree for months because its
+  own tests imported it directly, so every gate stayed green while it was
+  unreachable from the app. A gate staying green is not evidence of health if
+  nothing routes through the thing it's gating.
 - Pre-commit is a lightweight lint gate only. Pre-push runs the full check suite (build + tests + coverage + core Playwright smoke), preferably on three Chunk sidecar lanes for automatic test/coverage work: frontend lint/build/coverage, Rust coverage, and Playwright smoke. The goal is lower wall-clock time than local hooks while keeping each heavy gate isolated; keep local Playwright mainly for authoring, focused reproduction, or sidecar outages.
 - **A task is NOT done until it is committed locally and pre-push checks pass locally (`git push --dry-run` style verification, or just running the check suite below manually).** If a hook blocks: read the error, fix it (clippy, tests, build), commit the fix, re-verify. **⛔ NEVER use --no-verify**
 - **Commit often, push in batches.** The full suite runs once per *push*, not per commit, and with the Chunk sidecars unavailable it runs serially on the local machine — measured 2026-08-21: **~4.5 minutes**, of which ~2 min is the Playwright smoke lane and ~1.5 min is `cargo llvm-cov`. Pushing after each of eight commits spent ~35 minutes on gates that one push at the end would have covered in under five.
@@ -411,6 +439,22 @@ Do not overwrite someone else's Origin line. Do not attribute a later insert to 
 
 ## 2. Product Rules
 
+> **Everything in Sections 2 and 3 is inherited from Rhizome Desktop and has
+> not been re-decided for this repo.** It arrived in one commit — `11e1315`,
+> 2026-08-09, the bootstrap snapshot — and was never independently judged
+> afterwards. Verified 2026-08-29 by diffing against Desktop's own `AGENTS.md`
+> at `~/code/projects/rhizome`: the demo-vault, `~/Laputa/` and shadcn/ui
+> sections below are **byte-for-byte identical** to Desktop's today, three
+> weeks after the fork.
+>
+> None of it is known to be wrong, and the specific claims that were checked
+> hold up against this tree. But apply more scepticism here than to Section 1,
+> which is actively maintained and mostly cites incidents that happened in
+> *this* repo. Where a rule below names a date or an incident, that history is
+> probably Desktop's, not ours. Full audit:
+> [`docs/plans/2026-08-29-agents-md-rule-audit.md`](plans/2026-08-29-agents-md-rule-audit.md).
+
+
 ### Demo vault hygiene (`demo-vault/`, `demo-vault-v2/`)
 
 Default to `demo-vault-v2/` for testing.
@@ -460,7 +504,7 @@ Default to `demo-vault-v2/`. If you must use `~/Laputa/` for testing:
 
 ### QA scripts
 
-The `~/.openclaw/skills/tolaria-qa/scripts/` path is dead — those scripts no longer exist. Use `computer-use` for native app focus, keyboard shortcuts, and screenshot capture. For keyboard-first checks: use Playwright for text input and deterministic assertions; use `osascript` only for app-focus and menu-shortcut verification (note: WKWebView blocks `osascript keystroke` inside editor content).
+Use `computer-use` for native app focus, keyboard shortcuts, and screenshot capture. For keyboard-first checks: use Playwright for text input and deterministic assertions; use `osascript` only for app-focus and menu-shortcut verification (note: WKWebView blocks `osascript keystroke` inside editor content).
 
 ### Diagrams
 
@@ -499,7 +543,7 @@ Single-context layout — root `CONTEXT.md` + `docs/adr/`. See `docs/agents/doma
 - Rhizome is the desk and durable memory; Prime is the engine. Chat first, vault on purpose. Sessions stay left (collapsible), Chat is the default center canvas, and rail Inbox toggles one right Notes panel with compact navigation above its selected list (ADR-0166, shipped). Research and Mycelium should replace Chat as the center canvas, not open as modals; Mycelium is an in-app rebranded view, not a browser launch of Mindwalk. Memory is gated; execution is not. Chat passes the currently open note to the agent as context; right-click a note → Ask the agent about this note switches to Chat and opens that note. This is wiring (`activeEntry` / `activeNoteContent`), not a missing MCP tool.
 - The Sessions column filter matches title, cwd/folder, and git branch — not transcript content. Archived rows are included; a hit expands that section. Prime sessions are named at creation (`Rhizome · {vault} · {id-tail}`) via `set_session_name`. Rename from the list speaks `rename_saved_session` (`sessionPath` + `name`) and must not create a session. Unnamed logs still fall back to "Untitled session".
 - Rhizome starts Prime's supervisor on connect (`prime-agent --mode daemon --daemon-socket <path>`), the same kick the CLI's `ensureInteractiveDaemonRunning` uses. Do not spawn when `RHIZOME_PRIME_DAEMON_SOCKET` is set. If the host is down, retry `ensure_prime_session_host` on the status poll — a one-shot connect at launch loses the race and freezes the model chip, session switch, and rename. Before diagnosing Prime or chat failures, read `~/.prime/agent/sessions/*.jsonl` and `~/.prime/agent/logs/` rather than inventing causes.
-- Selective harness doctrine (option 2): Rhizome is the product harness; Prime remains the only execution core and keeps receiving Prime updates through a thin versioned adapter. Absorb contracts and artifacts from Hermes/DeepSeek/others, never their runtimes or memory stores. Foreign pieces live in Rhizome (UX, vault, policy) or as Prime skills/MCP/extensions — never forked or patched into Prime. DeepSeek's Cordis plugin system is rejected as a kernel port; take extensibility on Prime's existing seams instead. Hermes Agent is its own runtime (not built on OpenCode); OpenCode is a delegated skill in Hermes. Coverage is by user job, not Prime command count. Ledger: `docs/design/harness-doctrine.md` (ADR-0168). Composition working notes: `docs/design/harness-composition.md` (unratified; `docs/NEXT.md` §1). Prime has no security sandbox; do not invent one in the desktop. Kern (getkern/kern) is Linux/WSL2 only.
+- **Selective harness doctrine (ADR-0168) is design intent, not settled fact, and the code disagrees with it.** Ratified 2026-08-23 by two agents (GPT-5.6 Sol and Grok, via Cursor) — not by Atticus — and cited by every session since as constitutional law. Issue #56 (Rhizome already has the second provider path the doctrine forbids) documents `src-tauri/src/ai_models.rs`, 788 lines of provider registry and credential storage that predates the doctrine and fails its own "delete Prime tomorrow" test. **Do not cite it as decided when arguing to adopt or reject a tool until #56 is resolved.** What it says: Rhizome is the product harness; Prime remains the only execution core and keeps receiving Prime updates through a thin versioned adapter. Absorb contracts and artifacts from Hermes/DeepSeek/others, never their runtimes or memory stores. Foreign pieces live in Rhizome (UX, vault, policy) or as Prime skills/MCP/extensions — never forked or patched into Prime. DeepSeek's Cordis plugin system is rejected as a kernel port; take extensibility on Prime's existing seams instead. Hermes Agent is its own runtime (not built on OpenCode); OpenCode is a delegated skill in Hermes. Coverage is by user job, not Prime command count. Ledger: `docs/design/harness-doctrine.md`. Composition working notes: `docs/design/harness-composition.md` (unratified; `docs/NEXT.md` §1). Prime has no security sandbox; do not invent one in the desktop. Kern (getkern/kern) is Linux/WSL2 only.
 - Prime supports `client_owned` sessions that stop after a disconnected-client grace period and can be promoted to `resident`; Rhizome creates new sessions as `client_owned` (ADR-0167 / C47). Idle close detaches; active close defaults to stop, with Keep working as an explicit promote. Quit follows ownership.
 - The `docs/grok-wiki-*` files are not live product guidance; Grok wiki is out of scope.
 - Keep the Notes panel's navigation and selected note list mounted together; making them exclusive broke Cmd+N, inbox auto-advance, and note selection.
