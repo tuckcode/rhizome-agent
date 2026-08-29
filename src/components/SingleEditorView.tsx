@@ -1282,12 +1282,13 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
     typeEntryMap,
     vaultPath,
   })
+  const t = useMemo(() => createTranslator(locale), [locale])
 
   return (
     <div
       ref={containerRef}
       role="application"
-      aria-label="Rich text editor"
+      aria-label={t('editor.richTextEditor')}
       className={`editor__blocknote-container${isDragOver ? ' editor__blocknote-container--drag-over' : ''}`}
       style={cssVars as React.CSSProperties}
       onCopyCapture={handleCopyCapture}
@@ -1299,7 +1300,7 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
     >
       {isDragOver && (
         <div className="editor__drop-overlay">
-          <div className="editor__drop-overlay-label">Drop image here</div>
+          <div className="editor__drop-overlay-label">{t('editor.dropImageHere')}</div>
         </div>
       )}
       <BlockNoteRenderRecoveryBoundary onRecover={(_, reason) => repairEditorDocumentForRenderRecovery(editor, reason)}>

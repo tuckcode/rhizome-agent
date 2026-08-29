@@ -430,7 +430,7 @@ function OpenCommandPalette({
     >
       <button
         type="button"
-        aria-label="Close command palette"
+        aria-label={t('command.closePalette')}
         className="absolute inset-0 z-0 cursor-default border-0 bg-transparent p-0"
         onClick={onClose}
       />

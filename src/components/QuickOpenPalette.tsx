@@ -157,7 +157,7 @@ export function QuickOpenPalette({ open, entries, isLoading = false, onSelect, o
     >
       <button
         type="button"
-        aria-label="Close quick open"
+        aria-label={translate(locale, 'quickOpen.close')}
         className="absolute inset-0 z-0 cursor-default border-0 bg-transparent p-0"
         onClick={onClose}
       />
