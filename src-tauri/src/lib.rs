@@ -101,7 +101,24 @@ fn suppress_windows_console(command: &mut Command) {
 fn suppress_windows_console(_command: &mut Command) {}
 
 #[cfg(desktop)]
-struct WsBridgeChild(Mutex<Option<Child>>);
+/// The running MCP bridge, and the vault set it was started for.
+///
+/// The vault set is kept so a sync that asks for the same thing can be
+/// answered by doing nothing. Without it, every call killed a healthy child
+/// and spawned a replacement: 12 restarts in one session on 2026-08-29,
+/// several pairs inside the same second, because the caller is a React effect
+/// keyed on an array whose identity changes on every render even when its
+/// contents do not. Fixed here rather than only there, so no amount of
+/// re-calling can cost a restart. #54.
+#[cfg(desktop)]
+struct RunningBridge {
+    child: Child,
+    vault: PathBuf,
+    active_vaults: Vec<PathBuf>,
+}
+
+#[cfg(desktop)]
+struct WsBridgeChild(Mutex<Option<RunningBridge>>);
 
 #[cfg(desktop)]
 struct AllowedAssetScopeRoots(Mutex<Vec<PathBuf>>);
@@ -170,11 +187,17 @@ fn validate_mcp_bridge_vault_path(vault_path: &Path) -> Result<PathBuf, String> 
 }
 
 #[cfg(desktop)]
-fn stop_ws_bridge_child(active_child: &mut Option<Child>) {
-    if let Some(mut child) = active_child.take() {
-        let _ = child.kill();
-        let _ = child.wait();
-        log::info!("ws-bridge child process stopped");
+fn stop_ws_bridge_child(active_child: &mut Option<RunningBridge>) {
+    if let Some(mut running) = active_child.take() {
+        let _ = running.child.kill();
+        let status = running.child.wait();
+        // Say how it went. The old line was "ws-bridge child process stopped"
+        // and nothing else, so a log full of restarts could not distinguish a
+        // deliberate stop from a crash — the one fact needed to diagnose it.
+        match status {
+            Ok(status) => log::info!("ws-bridge stopped (killed by us, {status})"),
+            Err(error) => log::warn!("ws-bridge stopped, but could not be reaped: {error}"),
+        }
     }
 }
 
@@ -205,16 +228,32 @@ pub(crate) fn sync_ws_bridge_for_vault(
         }
     };
 
-    stop_ws_bridge_child(&mut active_child);
-
     let resolved_active_vault_paths = active_vault_paths
         .iter()
         .filter_map(|path| validate_mcp_bridge_vault_path(path).ok())
         .collect::<Vec<_>>();
+
+    // Already serving exactly this? Then there is nothing to do. Restarting a
+    // healthy bridge costs a process kill, a spawn, and a window where the
+    // vault tools answer nothing — for no change at all.
+    if let Some(running) = active_child.as_ref() {
+        if running.vault == resolved_vault_path
+            && running.active_vaults == resolved_active_vault_paths
+        {
+            return Ok("unchanged");
+        }
+    }
+
+    stop_ws_bridge_child(&mut active_child);
+
     let child =
         mcp::spawn_ws_bridge_with_paths(&resolved_vault_path, &resolved_active_vault_paths)?;
 
-    *active_child = Some(child);
+    *active_child = Some(RunningBridge {
+        child,
+        vault: resolved_vault_path,
+        active_vaults: resolved_active_vault_paths,
+    });
     Ok("started")
 }
 
