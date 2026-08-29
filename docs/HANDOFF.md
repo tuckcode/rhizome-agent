@@ -89,7 +89,6 @@ yours to choose.
 
 ## Recent sessions
 
-- [2026-08-29 · Grok 4.6](plans/handoffs/2026-08-29-0158-grok-4-6-live-app-view-plan.md) — #50 plan only (not built): `pnpm live-ui` against the browser app, read + test-bridge steer, developer tooling not an in-app pane; scroll metrics required because `uiAudit` would have missed the missing transcript scroller. Awaiting Atticus. Writeup: [`docs/plans/2026-08-29-live-app-view-plan.md`](plans/2026-08-29-live-app-view-plan.md)
 - [2026-08-29 · Claude Opus 5](plans/handoffs/2026-08-29-0100-claude-opus-5-session-naming.md) — #49 step 2: a session names itself from its first exchange and the name is **stored** through `set_session_name`, so every client reads the same one; a name a person chose is never overwritten; the list stops printing Rhizome's own `Rhizome · vault · id` placeholder as if it were a name, so old sessions read better with no backfill; fixed a full stop inside `0.8` being treated as a sentence break; Mycelium's session picker stopped listing Prime's uuids; Mycelium's Evaluation failure is the `claude` CLI's expired login (`claude login`), not our bug; filed #50 — let the agent see the running app instead of screenshots macOS keeps blocking; open question on Vault Safe / Power User — enforced for Claude Code and Antigravity, prompt-text only elsewhere, and reaching Prime only as prompt text the model obeys — so it blocks real work without preventing anything
 - [2026-08-28 (afternoon) · Claude Opus 5](plans/handoffs/2026-08-28-1500-claude-opus-5-note-context.md) — Chat can see the note you have open (it passed nothing before), and any note can be handed to the agent by right-clicking it; both live-verified, the agent naming the note's contents with tools forbidden
 - [2026-08-28 (early) · Claude Opus 5](plans/handoffs/2026-08-28-0300-claude-opus-5-model-allow-list.md) — Nous Portal **confirmed working** through the existing OpenAI-compatible path (200 + `OK` on `hermes-4-405b`), so #45's custom-provider work is not needed for chat; #45 step 1 shipped — persisted chat-model allow-list, editor in Settings → AI agents; fixed the chat transcript having no scroll box (`6c4d91d`, regression from `b9983ad`); C54: the documented Rust coverage command is missing the gate's `--ignore-filename-regex` and fails on a healthy tree
@@ -245,13 +244,6 @@ push is not a release — releases are tagged builds with signed installers.
 
 ## Open threads
 
-- **#50 (2026-08-29): let the agent see the running app — plan ready, not built.**
-  Three answers proposed: show `pnpm dev` (not native), read + steer through
-  `__rhizomeTest` (not click/type), ship as `pnpm live-ui` beside `pnpm deadcode`
-  (not a product pane). Awaiting Atticus.
-  [plan](plans/2026-08-29-live-app-view-plan.md) ·
-  [session](plans/handoffs/2026-08-29-0158-grok-4-6-live-app-view-plan.md).
-
 - **C56-OPEN (2026-08-28): two live-daemon tests fail against a healthy
   daemon, and nobody was running them.** `pnpm test:live-prime` (`c71d265`)
   runs the six `#[ignore]`d tests in `prime_session_host.rs`. First run: 1
@@ -284,42 +276,23 @@ push is not a release — releases are tagged builds with signed installers.
   Read the failure messages before assuming rot, and before assuming a bug:
   the lane is new, and its whole point is that none of this was being run.
 
-- **C55-OPEN (2026-08-28): the text-only-model warning does not fire in the
-  app.** Image attachments work end to end (a vision model described a pasted
-  PNG), but pasting into a model Prime reports as text-only produces no
-  warning. Reproduced four times across two builds, on `opencode/hy3-free`
-  (`input: ["text"]`), with a live session attached and the pill showing the
-  display name `Hy3 Free`.
+- **C55-RESOLVED (2026-08-29): the text-only-model warning did not fire when
+  the daemon's `get_state` model omitted `input`.** RPC mode returns `input` on
+  every model; the live daemon often sends id/name only, so
+  `model_accepts_images` stayed `None` and the composer stayed silent. Restored
+  a cached `get_available_models` lookup by provider+id when `get_state` omits
+  `input`. Regression: `status_falls_back_to_the_catalog_when_get_state_omits_input`.
+  Frontend path unchanged (`AiPanel.textOnlyModel.test.tsx` still green).
 
-  **Ruled out with evidence, not reasoning:**
-  - Not toast timing — repeated with immediate capture, and the `<Toast>` is
-    rendered in the main shell (`App.tsx:2236`).
-  - Not missing data — `prime-agent --mode rpc` returns `input` on every model
-    (`hy3-free` → `["text"]`, `claude-fable-5` → `["text","image"]`), and
-    `get_state` returns the **whole** Model object, `input` included.
-  - Not a stale build — the running binary contains the `modelAcceptsImages`
-    field name and was launched from it.
-  - **Not the composer.** `AiPanel.textOnlyModel.test.tsx` gives the panel a
-    status with `modelAcceptsImages: false` and the warning fires. That half
-    is correct.
-
-  So the gap is between `apply_state` and the status the frontend receives.
-  **Next thing to check:** whether `model_accepts_images` is refreshed on the
-  status poll after `set_model`, or only at attach — `set_model` calls
-  `refresh_session_id`, not a state refresh, yet `model_name` does update, so
-  the two should not diverge. Instrument the status payload before theorising
-  again; that is what settled every other question in this session.
-
-  First cut fetched the model catalog and matched by provider+id; that was
-  replaced (`7258a4d`) with reading `input` straight off `get_state`. The
-  replacement is simpler and still does not fire.
-
-- **C54-RESOLVED (2026-08-28): the documented Rust coverage command was
+- **C54-RESOLVED (2026-08-29): the documented Rust coverage command was
   missing the gate's `--ignore-filename-regex "lib\.rs|main\.rs|menu\.rs"`**,
   so it reported 84.88% and exit 1 on a tree the hook passes at 85.68%.
-  `AGENTS.md`'s check suite now carries the flag. Confirmed against a worktree
-  at `087880d`, so it was never a regression. Full numbers and the
-  shell-pipeline mistake that produced the first, wrong diagnosis:
+  Without the flag, `lib.rs`/`main.rs`/`menu.rs` boilerplate drag the total
+  below 85% even when product code passes. `AGENTS.md`, `GETTING-STARTED.md`,
+  and `CROSS-MODEL-HANDOFF.md` §13 now match `.husky/pre-push` and
+  `.chunk/run-rust-gate.sh`. Confirmed against a worktree at `087880d`, so it
+  was never a regression. Full numbers and the shell-pipeline mistake that
+  produced the first, wrong diagnosis:
   [2026-08-28-0300](plans/handoffs/2026-08-28-0300-claude-opus-5-model-allow-list.md).
 
 - **C51-RESOLVED (2026-08-26, `373ee1f` / `2360cb5` / `9e50a8d`): Promote
@@ -735,11 +708,10 @@ push is not a release — releases are tagged builds with signed installers.
   without a running daemon, which is why the existing `live_*` tests are
   `#[ignore]`. Padding those would be chasing the number, not the coverage.
 
-  **Also correct §13's snippet while here:** it gives
-  `cargo llvm-cov clean --workspace`, which fails in this repo with
-  `could not find Cargo.toml` — there is no root manifest. It needs
-  `--manifest-path src-tauri/Cargo.toml`, same as every other cargo invocation
-  in these docs.
+  **Also correct §13's snippet while here:** the clean line lacked
+  `--manifest-path src-tauri/Cargo.toml` (fixed 2026-08-16); the coverage
+  line lacked `--ignore-filename-regex "lib\.rs|main\.rs|menu\.rs"` (fixed
+  2026-08-29, C54). Both are required to match the pre-push gate.
 
 - **C28-OPEN: three `@smoke` specs fail under CPU load — the pre-push Playwright lane is not deterministic.** Observed 2026-08-16 on one machine, twice, with a clean tree:
 
