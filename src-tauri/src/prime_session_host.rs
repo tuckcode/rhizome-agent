@@ -590,6 +590,10 @@ struct PrimeHost {
     /// Whether the running model takes images, from `get_state`'s Model
     /// `input` array. `None` means Prime did not say — never "text only".
     model_accepts_images: Option<bool>,
+    /// Whether this session still carries the placeholder name Rhizome wrote
+    /// at creation. Set false the moment a real name is stored, so the first
+    /// exchange names the session once and never fights a later rename.
+    name_is_placeholder: bool,
     thinking_level: Option<String>,
     socket_path: PathBuf,
     cwd: PathBuf,
@@ -1698,6 +1702,97 @@ pub fn rename_saved_session(session_path: &str, name: &str) -> Result<(), String
     })
 }
 
+/// A session name taken from the exchange that just happened.
+///
+/// Every other harness on this machine **stores** a name: Claude Code keeps a
+/// `customTitle`, OpenCode a `title` column seeded `"New session - <stamp>"`.
+/// Rhizome seeded a placeholder with `set_session_name` at creation and then
+/// never replaced it, so the list fell back to re-deriving a label from the
+/// first message on every render. That is why a session reads `/prime-intellect`
+/// or `hi'` — faithful to the first line, and useless as a name.
+///
+/// Rules, in order, each from a real row in the list:
+///
+/// - A slash command names the command, not the session. `/prime-intellect`
+///   becomes `prime-intellect`.
+/// - One sentence, not a paragraph. A pasted brief should not become the
+///   title of everything that follows it.
+/// - The user's words beat the agent's. A session the agent opened has no
+///   user turn at all — 7 of 31 here — and only then does its first line win.
+/// - Too short to mean anything is worse than no name: `hi` tells you less
+///   than the timestamp already beside it.
+fn session_title_from_exchange(
+    user_request: Option<&str>,
+    agent_opening: Option<&str>,
+) -> Option<String> {
+    user_request
+        .and_then(title_candidate)
+        .or_else(|| agent_opening.and_then(title_candidate))
+}
+
+/// The shortest useful name a single message can give.
+const MIN_TITLE_CHARS: usize = 8;
+/// Long enough to be a sentence, short enough for a 228px column.
+const MAX_SESSION_TITLE_CHARS: usize = 60;
+
+/// The first sentence, where a full stop inside a version or a filename is not
+/// the end of one.
+///
+/// Splitting on every `.` turned "Draft the release notes for 0.8" into
+/// "…for 0". A stop only ends a sentence when what follows is a space or the
+/// end of the text; `?` and `!` always do.
+fn first_sentence_of(text: &str) -> &str {
+    let bytes = text.as_bytes();
+    for (index, ch) in text.char_indices() {
+        let ends = match ch {
+            '?' | '!' | '\n' => true,
+            // `is_none_or` is newer than this crate's MSRV.
+            '.' => bytes
+                .get(index + 1)
+                .map_or(true, |next| next.is_ascii_whitespace()),
+            _ => false,
+        };
+        if ends {
+            return text[..index].trim();
+        }
+    }
+    text.trim()
+}
+
+fn title_candidate(text: &str) -> Option<String> {
+    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let unprefixed = collapsed.strip_prefix('/').unwrap_or(&collapsed);
+    let first_sentence = first_sentence_of(unprefixed);
+
+    if first_sentence.chars().count() < MIN_TITLE_CHARS {
+        return None;
+    }
+    if first_sentence.chars().count() <= MAX_SESSION_TITLE_CHARS {
+        return Some(first_sentence.to_string());
+    }
+    // Cut on a word so the name reads as a phrase rather than a slice.
+    let mut cut = String::new();
+    for word in first_sentence.split(' ') {
+        if cut.chars().count() + word.chars().count() + 1 > MAX_SESSION_TITLE_CHARS {
+            break;
+        }
+        if !cut.is_empty() {
+            cut.push(' ');
+        }
+        cut.push_str(word);
+    }
+    let cut = cut.trim_end_matches([',', ';', ':', '-']).trim();
+    (cut.chars().count() >= MIN_TITLE_CHARS).then(|| format!("{cut}…"))
+}
+
+/// Whether a name is still the placeholder Rhizome wrote at creation.
+///
+/// A name a person chose must never be overwritten — that is the whole reason
+/// rename exists. Only our own `Rhizome · vault · id` is fair game.
+fn is_rhizome_placeholder_name(name: &str) -> bool {
+    name.starts_with("Rhizome · ")
+}
+
 /// What Rhizome writes when it creates a session.
 ///
 /// Identifies this client and the vault the session is working in. The id
@@ -2058,14 +2153,23 @@ where
     // Stream events until agent_end (or timeout / host death).
     let mut saw_text = false;
     let mut provider_error: Option<String> = None;
+    // Enough of the agent's opening to name a session with, for the sessions a
+    // person never typed in (7 of 31 on this machine). Bounded so a long reply
+    // does not accumulate a second copy of itself in memory.
+    let mut agent_opening = String::new();
     let outcome = stream_until_agent_end(|json| {
         if json["type"].as_str() == Some("message_update")
             && json["assistantMessageEvent"]["type"].as_str() == Some("text_delta")
-            && json["assistantMessageEvent"]["delta"]
-                .as_str()
-                .is_some_and(|d| !d.is_empty())
         {
-            saw_text = true;
+            if let Some(delta) = json["assistantMessageEvent"]["delta"]
+                .as_str()
+                .filter(|d| !d.is_empty())
+            {
+                saw_text = true;
+                if agent_opening.len() < AGENT_OPENING_SAMPLE_BYTES {
+                    agent_opening.push_str(delta);
+                }
+            }
         }
         if json["type"].as_str() == Some("agent_end") {
             provider_error = crate::prime_events::provider_error_from_agent_end(json);
@@ -2110,8 +2214,27 @@ where
         });
     }
 
+    // Name the session from the exchange that just happened, replacing the
+    // placeholder written at creation. Runs after Done so it never delays the
+    // reply, and it is a no-op on every turn after the first.
+    let spoken = crate::cli_agent_runtime::user_request_from_prompt(&message)
+        .unwrap_or(request.message.as_str());
+    let _ = with_host_mut(|host| {
+        host.name_session_from_exchange(non_empty(spoken), non_empty(&agent_opening));
+        Ok(())
+    });
+
     emit(AiAgentStreamEvent::Done);
     Ok(session_id)
+}
+
+/// How much of the agent's first reply to keep for naming. A title is cut at
+/// 60 characters; this is slack for a long opening sentence, not a transcript.
+const AGENT_OPENING_SAMPLE_BYTES: usize = 400;
+
+fn non_empty(text: &str) -> Option<&str> {
+    let trimmed = text.trim();
+    (!trimmed.is_empty()).then_some(trimmed)
 }
 
 // ── Internals ───────────────────────────────────────────────────────────────
@@ -2287,7 +2410,17 @@ fn stream_until_agent_end(mut on_event: impl FnMut(&serde_json::Value)) -> Resul
 /// `lastActivityAt` is ISO-8601 in UTC with a `Z` suffix, so lexicographic
 /// order is chronological order and no date parsing is needed. A session
 /// missing the field sorts oldest rather than winning by accident.
-fn pick_resumable_session(data: &serde_json::Value, cwd: &Path) -> Option<String> {
+/// A session on this daemon that this client may rejoin.
+struct ResumableSession {
+    id: String,
+    /// Its stored name, when the daemon reports one.
+    name: Option<String>,
+}
+
+fn pick_resumable_row<'a>(
+    data: &'a serde_json::Value,
+    cwd: &Path,
+) -> Option<&'a serde_json::Value> {
     let cwd = cwd.to_string_lossy();
     data["sessions"]
         .as_array()?
@@ -2295,6 +2428,10 @@ fn pick_resumable_session(data: &serde_json::Value, cwd: &Path) -> Option<String
         .filter(|session| session["cwd"].as_str() == Some(cwd.as_ref()))
         .filter(|session| session["attachedClients"].as_u64().unwrap_or(0) == 0)
         .max_by_key(|session| session["lastActivityAt"].as_str().unwrap_or(""))
+}
+
+fn pick_resumable_session(data: &serde_json::Value, cwd: &Path) -> Option<String> {
+    pick_resumable_row(data, cwd)
         .and_then(|session| {
             session["activeSessionId"]
                 .as_str()
@@ -2682,6 +2819,7 @@ impl PrimeHost {
 
         let mut host = Self {
             model_accepts_images: None,
+            name_is_placeholder: false,
             stream,
             pending,
             event_tx,
@@ -2712,8 +2850,12 @@ impl PrimeHost {
         // daemon kept the session, so reopening should land back in it.
         match host.find_resumable_session(&cwd) {
             Ok(Some(found)) => {
-                log::info!("Reattaching to Prime session {found}");
-                host.active_session_id = found;
+                log::info!("Reattaching to Prime session {}", found.id);
+                host.name_is_placeholder = found
+                    .name
+                    .as_deref()
+                    .is_some_and(is_rhizome_placeholder_name);
+                host.active_session_id = found.id;
                 host.reattached = true;
                 host.attach_and_read_state()?;
             }
@@ -2772,7 +2914,39 @@ impl PrimeHost {
             "name": name.clone(),
         })) {
             log::debug!("Could not name the Prime session ({name}): {error}");
+            return;
         }
+        self.name_is_placeholder = true;
+    }
+
+    /// Replace the placeholder with a name taken from the first exchange.
+    ///
+    /// Stored through `set_session_name`, so `prime-agent` and every other
+    /// client see it too — not re-derived at render time, which is what left
+    /// sessions reading `/prime-intellect`. Runs once: after it succeeds the
+    /// session is no longer ours to rename, and a person's own rename is never
+    /// touched at all.
+    fn name_session_from_exchange(
+        &mut self,
+        user_request: Option<&str>,
+        agent_opening: Option<&str>,
+    ) {
+        if !self.name_is_placeholder {
+            return;
+        }
+        let Some(name) = session_title_from_exchange(user_request, agent_opening) else {
+            return;
+        };
+        if self
+            .call(serde_json::json!({ "type": "set_session_name", "name": name.clone() }))
+            .is_err()
+        {
+            // Keep the placeholder flag set so the next turn can try again;
+            // a failed rename should cost the name, not the retry.
+            return;
+        }
+        self.name_is_placeholder = false;
+        log::debug!("named the Prime session from its first exchange: {name}");
     }
 
     /// Join `active_session_id` and read its state.
@@ -2860,15 +3034,22 @@ impl PrimeHost {
     }
 
     /// Find a session already running here that this client can rejoin.
-    fn find_resumable_session(&mut self, cwd: &Path) -> Result<Option<String>, String> {
+    fn find_resumable_session(&mut self, cwd: &Path) -> Result<Option<ResumableSession>, String> {
         let response = self.send_bare_command(serde_json::json!({ "type": "list" }))?;
         if response["success"].as_bool() != Some(true) {
             return Err(response_error(&response, "list"));
         }
-        Ok(pick_resumable_session(
-            response.get("data").unwrap_or(&serde_json::Value::Null),
-            cwd,
-        ))
+        let data = response.get("data").unwrap_or(&serde_json::Value::Null);
+        let Some(id) = pick_resumable_session(data, cwd) else {
+            return Ok(None);
+        };
+        // The stored name comes back on the same row, so rejoining a session
+        // we created but nobody ever spoke in can still earn a real name on
+        // its first exchange.
+        let name = pick_resumable_row(data, cwd)
+            .and_then(|session| session["name"].as_str())
+            .map(str::to_string);
+        Ok(Some(ResumableSession { id, name }))
     }
 
     /// Wait for the daemon's opening `daemon_hello`.
@@ -3845,6 +4026,87 @@ mod tests {
         let folder = vault.path().file_name().unwrap().to_string_lossy();
         let expected = format!("Rhizome · {folder} · sess-a");
         assert_eq!(command["name"].as_str(), Some(expected.as_str()));
+        let _ = shutdown_host();
+    }
+
+    /// #49. The placeholder is a stand-in, not a name. After the first real
+    /// exchange the session is renamed through `set_session_name`, so the name
+    /// lands in Prime's own log and every client reads the same one — rather
+    /// than each client re-deriving a label from the first message, which is
+    /// what left rows reading `/prime-intellect`.
+    #[cfg(unix)]
+    #[test]
+    fn the_first_exchange_replaces_the_placeholder_name() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| {
+            (command["type"].as_str() == Some("prompt")).then(|| {
+                vec![
+                    ok(id, "prompt", serde_json::Value::Null),
+                    session_event(serde_json::json!({ "type": "agent_start" })),
+                    session_event(text_delta("On it.")),
+                    session_event(serde_json::json!({ "type": "agent_end", "messages": [] })),
+                ]
+            })
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let mut request = prompt_request(vault.path(), false);
+        request.message = "Draft the release notes for 0.8".into();
+        run_prompt_stream(request, |_| {}).unwrap();
+
+        let names = daemon.commands_matching("set_session_name");
+        assert_eq!(names.len(), 2, "placeholder, then the real name");
+        assert_eq!(
+            names[1]["name"].as_str(),
+            Some("Draft the release notes for 0.8")
+        );
+
+        // A session is named once. The second turn must not rewrite it — that
+        // would make the title follow whatever was asked most recently.
+        let mut again = prompt_request(vault.path(), false);
+        again.message = "And publish the tag".into();
+        run_prompt_stream(again, |_| {}).unwrap();
+        assert_eq!(daemon.commands_matching("set_session_name").len(), 2);
+
+        let _ = shutdown_host();
+    }
+
+    /// A turn too slight to name leaves the placeholder in place, and the next
+    /// turn may still earn one. Better a stand-in than a session called `hi`.
+    #[cfg(unix)]
+    #[test]
+    fn a_turn_with_nothing_to_name_it_keeps_the_placeholder() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| {
+            (command["type"].as_str() == Some("prompt")).then(|| {
+                vec![
+                    ok(id, "prompt", serde_json::Value::Null),
+                    session_event(serde_json::json!({ "type": "agent_start" })),
+                    session_event(text_delta("Hi!")),
+                    session_event(serde_json::json!({ "type": "agent_end", "messages": [] })),
+                ]
+            })
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        // "hi" — under the floor, and the reply is no better.
+        run_prompt_stream(prompt_request(vault.path(), false), |_| {}).unwrap();
+        assert_eq!(daemon.commands_matching("set_session_name").len(), 1);
+
+        let mut second = prompt_request(vault.path(), false);
+        second.message = "Trace why search misses aliases".into();
+        run_prompt_stream(second, |_| {}).unwrap();
+        let names = daemon.commands_matching("set_session_name");
+        assert_eq!(names.len(), 2);
+        assert_eq!(
+            names[1]["name"].as_str(),
+            Some("Trace why search misses aliases")
+        );
+
         let _ = shutdown_host();
     }
 
@@ -5615,6 +5877,100 @@ mod tests {
         // Not "text only" — Prime simply did not say, and a caller that reads
         // silence as a refusal would grey out working models.
         assert_eq!(models[2].input, None);
+    }
+
+    /// Real rows from the list, each of which named a session badly.
+    #[test]
+    fn a_session_is_named_from_what_the_user_asked() {
+        assert_eq!(
+            session_title_from_exchange(Some("can you look up the youtuber miner45"), None),
+            Some("can you look up the youtuber miner45".to_string())
+        );
+        // A slash command names the command, not the session.
+        assert_eq!(
+            session_title_from_exchange(Some("/prime-intellect"), None),
+            Some("prime-intellect".to_string())
+        );
+        // One sentence — a pasted brief must not title everything after it.
+        assert_eq!(
+            session_title_from_exchange(Some("Fix the scroll bug. Then rebuild and check."), None),
+            Some("Fix the scroll bug".to_string())
+        );
+    }
+
+    /// Too short to mean anything is worse than no name: "hi" tells you less
+    /// than the timestamp already beside it.
+    #[test]
+    fn a_greeting_is_not_a_name() {
+        assert_eq!(session_title_from_exchange(Some("hi"), None), None);
+        assert_eq!(session_title_from_exchange(Some("  "), None), None);
+        assert_eq!(session_title_from_exchange(None, None), None);
+    }
+
+    /// 7 of 31 sessions here have no user turn at all — agent-started or
+    /// heartbeat-driven. Only then does the agent's opening line win.
+    #[test]
+    fn the_agent_names_a_session_the_user_never_spoke_in() {
+        assert_eq!(
+            session_title_from_exchange(None, Some("Checking the vault watcher for debounce")),
+            Some("Checking the vault watcher for debounce".to_string())
+        );
+        // But never over the user's own words.
+        assert_eq!(
+            session_title_from_exchange(Some("why is promote refusing"), Some("Let me look")),
+            Some("why is promote refusing".to_string())
+        );
+    }
+
+    /// A version number is not the end of a sentence. Splitting on every `.`
+    /// named a session "Draft the release notes for 0".
+    #[test]
+    fn a_full_stop_inside_a_number_does_not_end_the_name() {
+        assert_eq!(
+            session_title_from_exchange(Some("Draft the release notes for 0.8"), None).as_deref(),
+            Some("Draft the release notes for 0.8")
+        );
+        assert_eq!(
+            session_title_from_exchange(Some("Rewrite config.toml by hand"), None).as_deref(),
+            Some("Rewrite config.toml by hand")
+        );
+        // A real sentence break still ends it.
+        assert_eq!(
+            session_title_from_exchange(Some("Fix the search index. Then ship it."), None)
+                .as_deref(),
+            Some("Fix the search index")
+        );
+    }
+
+    /// Cut on a word, so the name reads as a phrase and not a slice.
+    #[test]
+    fn a_long_request_is_cut_at_a_word() {
+        let title = session_title_from_exchange(
+            Some("investigate why the chat transcript grows without ever scrolling anywhere"),
+            None,
+        )
+        .expect("title");
+        assert!(title.ends_with('…'), "{title}");
+        assert!(
+            title.chars().count() <= MAX_SESSION_TITLE_CHARS + 1,
+            "{title}"
+        );
+        assert!(!title.contains("  "));
+        assert!(
+            title.starts_with("investigate why the chat transcript grows"),
+            "{title}"
+        );
+    }
+
+    /// A name someone chose must never be overwritten — that is what rename
+    /// is for. Only our own placeholder is fair game.
+    #[test]
+    fn only_our_own_placeholder_may_be_replaced() {
+        assert!(is_rhizome_placeholder_name(
+            "Rhizome · Rhizome Vault · 8228ec"
+        ));
+        assert!(!is_rhizome_placeholder_name("Latest handoff plan review"));
+        assert!(!is_rhizome_placeholder_name(""));
     }
 
     /// A text-only turn has to stay byte-identical to what Rhizome sent
