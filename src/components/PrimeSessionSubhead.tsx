@@ -110,7 +110,7 @@ export function PrimeSessionSubhead({
     <div
       className={cn(
         'flex min-h-[30px] shrink-0 items-center gap-2.5 border-b border-border pr-3',
-        'font-mono text-[10.5px] tracking-[0.03em] text-muted-foreground',
+        'font-mono text-[11px] tracking-[0.03em] text-muted-foreground',
         // macOS paints overlay traffic lights at x=58 (tauri.conf.json).
         // This strip is ChatHome's title bar, so the inset has to clear
         // them; the 46px rail is already to our left and comes off it.

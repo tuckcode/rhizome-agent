@@ -36,7 +36,7 @@ export function PrimeContextMeter({
   return (
     <div className="flex flex-col gap-1" data-testid="prime-context-meter">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+        <span className="font-mono-overline uppercase text-muted-foreground">
           {t('ai.panel.contextWindow')}
         </span>
         <span
