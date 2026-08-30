@@ -226,6 +226,20 @@ describe('SettingsPanel', () => {
     expect(screen.getByRole('switch', { name: 'Enable AutoGit' })).toHaveAttribute('aria-checked', 'true')
   })
 
+  it('renders the section descriptions that explain each group', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    // The telemetry promise is the costliest of these to lose: it is the sentence
+    // that earns the consent the checkboxes below it are asking for.
+    expect(
+      screen.getByText(/No vault content, note titles, or file paths are ever sent/)
+    ).toBeInTheDocument()
+    expect(screen.getByText(/Choose whether Rhizome shows the Inbox workflow/)).toBeInTheDocument()
+    expect(screen.getByText(/Choose Rhizome's default AI target/)).toBeInTheDocument()
+  })
+
   it('calls onSave with stable defaults on save', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />

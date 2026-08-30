@@ -769,7 +769,7 @@ function SettingsSyncAndAppearanceSections({
 }: SettingsBodyProps) {
   return (
     <>
-      <SettingsSection id={SETTINGS_SECTION_IDS.sync} showDivider={false}>
+      <SettingsSection id={SETTINGS_SECTION_IDS.sync}>
         <SyncAndUpdatesSection
           t={t}
           pullInterval={pullInterval}
@@ -810,7 +810,10 @@ function SettingsSyncAndAppearanceSections({
       </SettingsSection>
 
       <SettingsSection id={SETTINGS_SECTION_IDS.appearance}>
-        <SectionHeading title={t('settings.appearance.title')} />
+        <SectionHeading
+          title={t('settings.appearance.title')}
+          description={t('settings.appearance.description')}
+        />
         <SettingsGroup>
           <AppearanceSettingsSection
             t={t}
@@ -960,6 +963,7 @@ function SyncAndUpdatesSection({
     <>
       <SectionHeading
         title={t('settings.sync.title')}
+        description={t('settings.sync.description')}
       />
 
       <SettingsGroup>
@@ -1260,6 +1264,7 @@ function AiAgentSettingsSection({
     <>
       <SectionHeading
         title={t('settings.aiAgents.title')}
+        description={t('settings.aiAgents.description')}
       />
 
       <SettingsGroup>
@@ -1456,6 +1461,7 @@ function OrganizationWorkflowSection({
     <>
       <SectionHeading
         title={t('settings.workflow.title')}
+        description={t('settings.workflow.description')}
       />
 
       <SettingsGroup>
