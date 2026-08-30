@@ -44,12 +44,14 @@ export function ChatComposerFoot({
       <span>{status}</span>
       <span className="inline-flex items-center gap-1">
         {working ? (
-          <>
-            <Kbd>Esc</Kbd> {t('ai.composer.foot.stop')} · <Kbd>⌘</Kbd><Kbd>.</Kbd>
-          </>
+          // Nothing to advertise here. Escape reaches useAiPanelFocus and calls
+          // onClose(), which in ChatHome leaves Chat entirely, and no key is bound
+          // to onStop -- Stop is click-only. The old "Esc stop · ⌘." hint named one
+          // key that did the opposite and one that was never wired at all.
+          <span className="sr-only">{t('ai.composer.foot.workingBare')}</span>
         ) : (
           <>
-            <Kbd>⌘</Kbd><Kbd>↵</Kbd> {t('ai.composer.foot.send')}
+            <Kbd>↵</Kbd> {t('ai.composer.foot.send')} · <Kbd>⇧</Kbd><Kbd>↵</Kbd> newline
           </>
         )}
       </span>
