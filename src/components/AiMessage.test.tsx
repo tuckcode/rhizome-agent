@@ -117,6 +117,35 @@ describe('AiMessage', () => {
     expect(screen.getByTestId('reasoning-content')).toBeTruthy()
   })
 
+  it('keeps reasoning collapsed after the turn finishes', () => {
+    const { rerender } = render(
+      <AiMessage userMessage="Ask" reasoning="Thinking..." reasoningDone={false} actions={[]} />
+    )
+    // Streaming: auto-expanded.
+    expect(screen.getByTestId('reasoning-content')).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId('reasoning-toggle'))
+    expect(screen.queryByTestId('reasoning-content')).toBeNull()
+
+    // The turn finishes. A collapse the user asked for must survive it; the old
+    // boolean override inverted against autoExpanded and re-opened the block here.
+    rerender(<AiMessage userMessage="Ask" reasoning="Thinking..." reasoningDone actions={[]} />)
+    expect(screen.queryByTestId('reasoning-content')).toBeNull()
+  })
+
+  it('keeps reasoning expanded after the turn finishes when the user opened it', () => {
+    const { rerender } = render(
+      <AiMessage userMessage="Ask" reasoning="Thinking..." reasoningDone actions={[]} />
+    )
+    expect(screen.queryByTestId('reasoning-content')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('reasoning-toggle'))
+    expect(screen.getByTestId('reasoning-content')).toBeTruthy()
+
+    rerender(<AiMessage userMessage="Ask" reasoning="Thinking..." reasoningDone actions={[]} />)
+    expect(screen.getByTestId('reasoning-content')).toBeTruthy()
+  })
+
   it('collapses expanded reasoning on toggle click', () => {
     render(<AiMessage userMessage="Ask" reasoning="Thinking..." reasoningDone={false} actions={[]} />)
     // Starts expanded (reasoningDone=false)

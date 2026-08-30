@@ -417,14 +417,18 @@ export function AiMessage(props: AiMessageProps) {
 
 function ConversationMessage({ userMessage, references, locale = 'en', messageId, forkTargetId, reasoning, reasoningDone, actions, response, isStreaming, onFork, onOpenNote, onNavigateWikilink, onPromoteToVault, onRegenerate }: AiMessageProps) {
   // Manual override: null = follow auto behavior, true/false = user forced
-  const [userOverride, setUserOverride] = useState(false)
+  const [userOverride, setUserOverride] = useState<boolean | null>(null)
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())
   const [toolUseExpanded, setToolUseExpanded] = useState(false)
 
   // Auto: expanded while reasoning streams, collapsed once done
   // User can manually toggle to override the auto state
+  // Once the user has decided, their choice holds. The override used to be a plain
+  // boolean read as `userOverride ? !autoExpanded : autoExpanded`, which inverted
+  // against autoExpanded rather than storing a state -- so a block collapsed during
+  // streaming re-opened itself the moment reasoningDone flipped.
   const autoExpanded = !reasoningDone
-  const reasoningExpanded = userOverride ? !autoExpanded : autoExpanded
+  const reasoningExpanded = userOverride ?? autoExpanded
 
   const toggleAction = useCallback((toolId: string) => {
     setExpandedActions(prev => {
@@ -443,7 +447,7 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
           locale={locale}
           text={reasoning}
           expanded={reasoningExpanded}
-          onToggle={() => setUserOverride(prev => !prev)}
+          onToggle={() => setUserOverride(prev => !(prev ?? autoExpanded))}
         />
       )}
       {actions.length > 0 && (
