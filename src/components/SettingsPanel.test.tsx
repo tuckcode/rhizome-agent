@@ -202,6 +202,30 @@ describe('SettingsPanel', () => {
     expect(screen.queryByText('Settings')).not.toBeInTheDocument()
   }, 10_000)
 
+  it('keeps pending draft edits when an instant-apply control saves', () => {
+    const { rerender } = render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    // A draft-only edit: nothing is written until Save is pressed.
+    fireEvent.click(screen.getByRole('switch', { name: 'Enable AutoGit' }))
+    fireEvent.change(screen.getByTestId('settings-autogit-idle-threshold'), { target: { value: '120' } })
+    expect(screen.getByTestId('settings-autogit-idle-threshold')).toHaveValue(120)
+
+    // An instant-apply control: writes immediately, so the parent hands back a new settings object.
+    fireEvent.click(screen.getByTestId('settings-color-theme-dracula'))
+    const applied = onSave.mock.calls.at(-1)?.[0] as Settings
+    expect(applied.color_theme).toBe('dracula')
+
+    rerender(
+      <SettingsPanel open={true} settings={applied} onSave={onSave} onClose={onClose} />
+    )
+
+    // The unsaved edit must survive; rebuilding the draft here is silent data loss.
+    expect(screen.getByTestId('settings-autogit-idle-threshold')).toHaveValue(120)
+    expect(screen.getByRole('switch', { name: 'Enable AutoGit' })).toHaveAttribute('aria-checked', 'true')
+  })
+
   it('calls onSave with stable defaults on save', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />

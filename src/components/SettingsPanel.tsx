@@ -432,9 +432,28 @@ function SettingsPanelInner({
   const draftLocale = resolveEffectiveLocale(draft.uiLanguage, [systemLocale])
   const t = createTranslator(draftLocale)
 
-  useEffect(() => {
-    setDraft(createSettingsDraft(settings, explicitOrganizationEnabled, inboxAutomationEnabled))
-  }, [explicitOrganizationEnabled, inboxAutomationEnabled, settings])
+  // Adopt externally-loaded settings only while the draft has no unsaved edits.
+  // Instant-apply controls (theme, accent, providers, allow-list) call onSave mid-session,
+  // which hands back a fresh settings object; rebuilding the draft on that identity change
+  // silently discarded every pending edit the user had typed.
+  const [draftDirty, setDraftDirty] = useState(false)
+  const [adoptedSettings, setAdoptedSettings] = useState(settings)
+  const [adoptedExplicitOrganization, setAdoptedExplicitOrganization] = useState(explicitOrganizationEnabled)
+  const [adoptedInboxAutomation, setAdoptedInboxAutomation] = useState(inboxAutomationEnabled)
+
+  const settingsSourceChanged =
+    adoptedSettings !== settings ||
+    adoptedExplicitOrganization !== explicitOrganizationEnabled ||
+    adoptedInboxAutomation !== inboxAutomationEnabled
+
+  if (settingsSourceChanged) {
+    setAdoptedSettings(settings)
+    setAdoptedExplicitOrganization(explicitOrganizationEnabled)
+    setAdoptedInboxAutomation(inboxAutomationEnabled)
+    if (!draftDirty) {
+      setDraft(createSettingsDraft(settings, explicitOrganizationEnabled, inboxAutomationEnabled))
+    }
+  }
 
   useSettingsPanelAutofocus(panelRef)
   useSettingsPanelFocusTrap(panelRef)
@@ -449,6 +468,7 @@ function SettingsPanelInner({
 
   const updateDraft = useCallback(
     <Key extends keyof SettingsDraft>(key: Key, value: SettingsDraft[Key]) => {
+      setDraftDirty(true)
       setDraft((current) => ({ ...current, [key]: value }))
     },
     [],
