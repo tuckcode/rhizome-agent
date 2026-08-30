@@ -1,4 +1,5 @@
-import { useEffect, useRef, type CSSProperties, type MutableRefObject, type ReactNode, type RefObject } from 'react'
+import { useEffect, useRef, type MutableRefObject, type ReactNode, type RefObject } from 'react'
+import { aiPanelFrameStyle } from './aiPanelPulse'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 
 import { usePanelWidth } from '../hooks/usePanelWidth'
@@ -159,19 +160,6 @@ function resolveAiPanelViewModel({
     defaultAiAgent: resolvedAgent,
     defaultAiAgentReadiness: resolvedReadiness,
     targetKind: defaultAiTarget?.kind ?? 'agent',
-  }
-}
-
-function aiPanelFrameStyle(isActive: boolean, showLeftBorder: boolean): CSSProperties {
-  return {
-    outline: 'none',
-    borderLeft: showLeftBorder
-      ? isActive
-        ? '2px solid var(--accent-blue)'
-        : '1px solid var(--border)'
-      : undefined,
-    animation: showLeftBorder && isActive ? 'ai-border-pulse 2s ease-in-out infinite' : undefined,
-    transition: showLeftBorder ? 'border-color 0.3s ease' : undefined,
   }
 }
 
