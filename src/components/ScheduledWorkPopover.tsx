@@ -105,7 +105,7 @@ export function ScheduledWorkPopover({
                   <div className="truncate text-foreground">
                     {item.label?.trim() || t('ai.activity.scheduled.untitled')}
                   </div>
-                  <div className="truncate font-mono text-[10.5px] text-muted-foreground">
+                  <div className="truncate font-mono text-[11px] text-muted-foreground">
                     {[item.interval, nextRun, paused ? t('ai.activity.scheduled.paused') : null]
                       .filter(Boolean)
                       .join(' · ')}

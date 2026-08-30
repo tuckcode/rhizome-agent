@@ -161,7 +161,7 @@ function SessionNameInput({
         placeholder={t('ai.sessions.renamePlaceholder')}
         aria-label={t('ai.sessions.renameAria')}
         data-testid="prime-session-rename"
-        className="h-7 px-2 text-[12.5px] shadow-none md:text-[12.5px]"
+        className="h-7 px-2 text-[12px] shadow-none md:text-[12px]"
       />
     </div>
   )
@@ -208,7 +208,7 @@ function SessionRowButton({
         )}
       />
       <span className="min-w-0">
-        <span className="block truncate text-[12.5px] leading-[1.35] text-foreground">{title}</span>
+        <span className="block truncate text-[12px] leading-[1.35] text-foreground">{title}</span>
         {meta ? (
           <span className="mt-[3px] block truncate font-mono text-[10px] tracking-[0.02em] text-muted-foreground">
             {meta}
@@ -548,7 +548,7 @@ export default function PrimeSessionList({
   return (
     <div className="flex h-full w-full min-w-0 flex-col" data-testid="prime-session-list">
       <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border px-2.5">
-        <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+        <span className="font-mono-overline uppercase text-muted-foreground">
           {t('ai.sessions.title')}
         </span>
         {onNewChat ? (

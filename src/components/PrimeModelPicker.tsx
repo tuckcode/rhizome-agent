@@ -204,10 +204,10 @@ export function PrimeModelPicker({
           className={cn(
             'inline-flex items-center gap-1 transition-colors',
             strip
-              ? 'min-w-0 rounded-sm px-1 py-0.5 font-mono text-[10.5px] font-medium text-foreground hover:bg-accent'
+              ? 'min-w-0 rounded-sm px-1 py-0.5 font-mono text-[11px] font-medium text-foreground hover:bg-accent'
               : cn(
                   'rounded-full border border-border px-2 py-0.5',
-                  'font-mono text-[10.5px] text-muted-foreground',
+                  'font-mono text-[11px] text-muted-foreground',
                   'hover:border-border-strong hover:text-foreground',
                 ),
             disabled && 'cursor-not-allowed opacity-60',
@@ -264,7 +264,7 @@ export function PrimeModelPicker({
               <DropdownMenuItem
                 key={level}
                 onSelect={() => void selectLevel(level)}
-                className="text-[12.5px]"
+                className="text-[12px]"
                 data-testid={`prime-thinking-level-${level}`}
                 data-selected={level === (thinkingLevel ?? '') ? 'true' : undefined}
               >
@@ -284,7 +284,7 @@ export function PrimeModelPicker({
               <DropdownMenuItem
                 key={`${model.provider}/${model.id}`}
                 onSelect={() => void select(model)}
-                className="text-[12.5px]"
+                className="text-[12px]"
               >
                 <span className="truncate">{model.name}</span>
               </DropdownMenuItem>
@@ -323,7 +323,7 @@ export function PrimeModelPicker({
                       <DropdownMenuItem
                         key={`unavailable-${model.provider}/${model.id}`}
                         onSelect={() => void select(model)}
-                        className="text-[12.5px] opacity-60"
+                        className="text-[12px] opacity-60"
                       >
                         <span className="truncate">{model.name}</span>
                       </DropdownMenuItem>
@@ -364,7 +364,7 @@ export function PrimeModelPicker({
                       <DropdownMenuItem
                         key={`hidden-${model.provider}/${model.id}`}
                         onSelect={() => void select(model)}
-                        className="text-[12.5px] opacity-60"
+                        className="text-[12px] opacity-60"
                       >
                         <span className="truncate">{model.name}</span>
                       </DropdownMenuItem>

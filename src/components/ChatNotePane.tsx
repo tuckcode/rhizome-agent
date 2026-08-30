@@ -54,7 +54,7 @@ export function ChatNotePane({
           onMouseDown={(event) => startResizeDrag(event, 'col-resize', (deltaX) => onResize(deltaX))}
         />
       ) : null}
-      <div className="flex h-[30px] shrink-0 items-center gap-2 border-b border-border px-2.5 font-mono text-[10.5px] tracking-[0.03em] text-muted-foreground">
+      <div className="flex h-[30px] shrink-0 items-center gap-2 border-b border-border px-2.5 font-mono text-[11px] tracking-[0.03em] text-muted-foreground">
         <span className="rounded-sm border border-border px-1.5 py-px text-[10px] uppercase tracking-[0.08em]">
           {t('ai.chatNote.tag')}
         </span>

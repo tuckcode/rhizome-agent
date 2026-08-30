@@ -37,7 +37,7 @@ interface ChatComposerDeckProps {
 function pillClass(accent = false) {
   return cn(
     'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5',
-    'font-mono text-[10.5px] transition-colors',
+    'font-mono text-[11px] transition-colors',
     'border-[var(--border-default,var(--border))]',
     'hover:bg-[var(--state-hover,var(--accent))] hover:text-foreground',
     accent ? 'border-[var(--accent-green)]/40 text-foreground' : 'text-muted-foreground',
@@ -56,7 +56,7 @@ function Chip({
       title={title}
       className={cn(
         'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5',
-        'font-mono text-[10.5px] text-muted-foreground border-border',
+        'font-mono text-[11px] text-muted-foreground border-border',
       )}
     >
       {children}
@@ -114,7 +114,7 @@ export function ChatComposerDeck({
           {PRODUCT_AI_AGENT_DEFINITIONS.map((definition) => (
             <DropdownMenuItem
               key={definition.id}
-              className="text-[12.5px]"
+              className="text-[12px]"
               data-testid={`composer-agent-${definition.id}`}
             >
               {definition.shortLabel}
@@ -164,7 +164,7 @@ export function ChatComposerDeck({
             {vaultOptions.map((vault) => (
               <DropdownMenuItem
                 key={vault.path}
-                className="text-[12.5px]"
+                className="text-[12px]"
                 data-testid={`composer-vault-${vault.path}`}
                 onSelect={() => onSwitchVault?.(vault.path)}
               >
@@ -202,7 +202,7 @@ export function ChatComposerDeck({
               {t('ai.composer.contextExplain')}
             </DropdownMenuItem>
             <DropdownMenuItem
-              className="text-[12.5px]"
+              className="text-[12px]"
               data-testid="composer-context-clear"
               onSelect={() => onCloseContext()}
             >
@@ -232,7 +232,7 @@ export function ChatComposerDeck({
               {t('ai.composer.skills')}
             </DropdownMenuLabel>
             {skillNames.map((name) => (
-              <DropdownMenuItem key={name} disabled className="text-[12.5px]">
+              <DropdownMenuItem key={name} disabled className="text-[12px]">
                 {name}
               </DropdownMenuItem>
             ))}

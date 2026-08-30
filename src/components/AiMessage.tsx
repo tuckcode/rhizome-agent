@@ -44,7 +44,7 @@ function LocalMarker({ text }: { text: string }) {
   const detail = rest.join('\n').trim()
   return (
     <div
-      className="mx-auto flex w-full max-w-[85%] flex-col items-center gap-1 text-center font-mono text-[10.5px] tracking-[0.02em] text-muted-foreground"
+      className="mx-auto flex w-full max-w-[85%] flex-col items-center gap-1 text-center font-mono text-[11px] tracking-[0.02em] text-muted-foreground"
       style={{ margin: '12px 0 16px' }}
       data-testid="ai-local-marker"
       role="note"

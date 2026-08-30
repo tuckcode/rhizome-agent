@@ -410,6 +410,7 @@ export function AiPanelView({
               activeSessionPath={activeSessionPath}
               working={isActive}
               vaultPath={vaultPath}
+              titleBarGutter={!isPrimeTarget}
             />
           </div>
         )}

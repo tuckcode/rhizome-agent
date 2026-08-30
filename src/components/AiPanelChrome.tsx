@@ -182,7 +182,7 @@ function ComposerInput({
       unsupportedPasteMessage={unsupportedPasteMessage}
       disabled={disabled}
       placeholder={placeholder}
-      placeholderClassName={hasControls ? 'px-2 py-1.5 text-[13px] leading-5' : undefined}
+      placeholderClassName={hasControls ? 'px-2 py-1.5 text-[12px] leading-5' : undefined}
       inputRef={inputRef}
       commandEntries={commandEntries}
       commandDisabled={commandDisabled}
@@ -376,8 +376,7 @@ function AiPanelEmptyState({
   if (agentReadiness === 'checking') {
     return (
       <div
-        className="flex flex-col items-center justify-center text-center text-muted-foreground"
-        style={{ paddingTop: 40 }}
+        className="flex min-h-full flex-col items-center justify-center text-center text-muted-foreground"
       >
         <Sparkle size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
         <p style={{ fontSize: 13, margin: '0 0 4px' }}>
@@ -393,8 +392,7 @@ function AiPanelEmptyState({
   if (agentReadiness === 'missing') {
     return (
       <div
-        className="flex flex-col items-center justify-center text-center text-muted-foreground"
-        style={{ paddingTop: 40 }}
+        className="flex min-h-full flex-col items-center justify-center text-center text-muted-foreground"
       >
         <Sparkle size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
         <p style={{ fontSize: 13, margin: '0 0 4px' }}>
@@ -409,8 +407,7 @@ function AiPanelEmptyState({
 
   return (
     <div
-      className="flex flex-col items-center justify-center text-center text-muted-foreground"
-      style={{ paddingTop: 40 }}
+      className="flex min-h-full flex-col items-center justify-center text-center text-muted-foreground"
     >
       <Sparkle size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
       <p style={{ fontSize: 13, margin: '0 0 4px' }}>
@@ -766,7 +763,7 @@ export function AiPanelComposer({
           data-testid="composer-queued-follow-ups"
         >
           <div className="flex items-center gap-1.5 text-muted-foreground">
-            <span className="min-w-0 flex-1 font-mono text-[10.5px] tracking-[0.02em]">
+            <span className="min-w-0 flex-1 font-mono text-[11px] tracking-[0.02em]">
               {t('ai.panel.queuedLabel')}
             </span>
             {onClearQueue ? (
@@ -789,7 +786,7 @@ export function AiPanelComposer({
             {primeQueueItems(queue).map((item) => (
               <li
                 key={`${item.lane}-${item.index}-${item.text}`}
-                className="flex min-w-0 items-center gap-1.5 font-mono text-[10.5px] text-muted-foreground"
+                className="flex min-w-0 items-center gap-1.5 font-mono text-[11px] text-muted-foreground"
                 data-testid={item.lane === 'steer' ? 'composer-queued-steer' : 'composer-queued-follow-up'}
               >
                 <span className="truncate">
