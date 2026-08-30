@@ -13,6 +13,14 @@ import {
 import type { createTranslator } from '../lib/i18n'
 import { deleteAiModelProviderApiKey, saveAiModelProviderApiKey, testAiModelProvider } from '../utils/aiProviderSecrets'
 import { Button } from './ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog'
 import { Input } from './ui/input'
 import {
   Select,
@@ -262,7 +270,13 @@ function ProviderList({
               {target.provider.base_url || t('settings.aiProviders.defaultEndpoint')} · {providerStorageLabel(target.provider, t)}
             </div>
           </div>
-          <Button type="button" variant="ghost" size="sm" onClick={() => onRemove(target.provider.id)}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => onRemove(target.provider.id)}
+          >
             {t('common.remove')}
           </Button>
         </div>
@@ -275,6 +289,9 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
   const [draft, setDraft] = useState<ProviderDraft>(() => initialDraft(mode))
   const [error, setError] = useState<string | null>(null)
   const [testState, setTestState] = useState<TestState>('idle')
+  const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null)
+  const [removalError, setRemovalError] = useState<string | null>(null)
+  const pendingRemoval = providers.find((provider) => provider.id === pendingRemovalId) ?? null
   const updateDraft = (patch: Partial<ProviderDraft>) => setDraft((current) => ({ ...current, ...patch }))
   const resetTest = () => {
     setTestState('idle')
@@ -313,9 +330,28 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
       setError(error instanceof Error ? error.message : String(error))
     }
   }
-  const removeProvider = (providerId: string) => {
-    void deleteAiModelProviderApiKey(providerId)
-    onChange(providers.filter((provider) => provider.id !== providerId))
+  // Removing a provider deletes its stored API key from disk, and the user has to
+  // reissue one from the provider's console to undo it. Confirm first, and await the
+  // delete so a failure cannot leave the key on disk while the UI says it is gone.
+  const requestRemoveProvider = (providerId: string) => {
+    setRemovalError(null)
+    setPendingRemovalId(providerId)
+  }
+  const cancelRemoveProvider = () => {
+    setRemovalError(null)
+    setPendingRemovalId(null)
+  }
+  const confirmRemoveProvider = async () => {
+    if (!pendingRemoval) return
+    setRemovalError(null)
+    try {
+      await deleteAiModelProviderApiKey(pendingRemoval.id)
+    } catch (error) {
+      setRemovalError(error instanceof Error ? error.message : String(error))
+      return
+    }
+    onChange(providers.filter((provider) => provider.id !== pendingRemoval.id))
+    setPendingRemovalId(null)
   }
 
   return (
@@ -324,7 +360,39 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
         <div className="text-sm font-medium text-foreground">{providerModeTitle(mode, t)}</div>
         <div className="mt-1 text-xs leading-5 text-muted-foreground">{providerModeDescription(mode, t)}</div>
       </div>
-      <ProviderList t={t} mode={mode} providers={providers} onRemove={removeProvider} />
+      <ProviderList t={t} mode={mode} providers={providers} onRemove={requestRemoveProvider} />
+      <Dialog open={pendingRemoval !== null} onOpenChange={(open) => { if (!open) cancelRemoveProvider() }}>
+        <DialogContent data-testid="ai-provider-remove-confirm">
+          <DialogHeader>
+            <DialogTitle>Remove {pendingRemoval?.name}?</DialogTitle>
+            <DialogDescription>
+              This deletes the stored API key for {pendingRemoval?.name} from this Mac. To use it
+              again you will need a new key from the provider.
+            </DialogDescription>
+          </DialogHeader>
+          {removalError ? (
+            <p role="alert" className="text-xs text-destructive">{removalError}</p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="ai-provider-remove-confirm-cancel"
+              onClick={cancelRemoveProvider}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              data-testid="ai-provider-remove-confirm-action"
+              onClick={() => { void confirmRemoveProvider() }}
+            >
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="grid grid-cols-2 gap-3">
         <ProviderKindSelect mode={mode} t={t} value={draft.kind} onChange={updateKind} />
         <LabeledInput label={t('settings.aiProviders.name')} value={draft.name} onChange={(name) => updateForm({ name })} />
