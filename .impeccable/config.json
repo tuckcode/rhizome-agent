@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "bounce-easing",
+        "value": "typing-bounce",
+        "createdAt": "2026-08-30T03:26:56.692Z",
+        "reason": "Claude, 2026-08-30: rule matched the animation NAME, not its easing. index.css:704 is 'ease-in-out', and the keyframes are opacity 0.3->1 with translateY(-2px) -- no bounce or elastic curve anywhere. Not a design choice awaiting review; the detector misread the identifier."
+      }
+    ]
+  }
+}
