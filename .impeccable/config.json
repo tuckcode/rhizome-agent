@@ -8,6 +8,15 @@
         "value": "typing-bounce",
         "createdAt": "2026-08-30T03:26:56.692Z",
         "reason": "Claude, 2026-08-30: rule matched the animation NAME, not its easing. index.css:704 is 'ease-in-out', and the keyframes are opacity 0.3->1 with translateY(-2px) -- no bounce or elastic curve anywhere. Not a design choice awaiting review; the detector misread the identifier."
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/index.css"
+        ],
+        "createdAt": "2026-08-30T03:32:24.893Z",
+        "reason": "Claude, 2026-08-30: index.css:605 is .ai-markdown blockquote, border-inline-start 3px solid var(--border) -- the conventional quoted-text bar, and a neutral token, not an accent. The rule targets decorative colored stripes on cards; this is standard blockquote styling."
       }
     ]
   }
