@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { aiPanelFrameStyle } from './aiPanelPulse'
 
 /**
  * `ai-border-pulse` is applied to the <aside> wrapping the entire AI panel.
@@ -39,5 +40,30 @@ describe('ai-border-pulse', () => {
       expect(properties.has(inheritable), `must not animate ${inheritable}`).toBe(false)
     }
     expect(properties.has('border-left-color')).toBe(true)
+  })
+})
+
+describe('aiPanelFrameStyle', () => {
+  it('pulses the border while a turn runs', () => {
+    const style = aiPanelFrameStyle(true, true, false)
+
+    expect(style.animation).toContain('ai-border-pulse')
+    expect(style.borderLeft).toContain('var(--accent-blue)')
+  })
+
+  it('does not animate when the user has asked for reduced motion', () => {
+    // The pulse runs `infinite` for the whole length of a turn. It is applied as an
+    // inline style, so no stylesheet media query can switch it off -- this is the
+    // only place it can be honoured.
+    const style = aiPanelFrameStyle(true, true, true)
+
+    expect(style.animation).toBeUndefined()
+    // The border still marks the active panel; only the movement stops.
+    expect(style.borderLeft).toContain('var(--accent-blue)')
+  })
+
+  it('keeps the idle border unanimated either way', () => {
+    expect(aiPanelFrameStyle(false, true, false).animation).toBeUndefined()
+    expect(aiPanelFrameStyle(false, true, true).animation).toBeUndefined()
   })
 })

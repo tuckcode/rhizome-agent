@@ -117,6 +117,18 @@ describe('AiMessage', () => {
     expect(screen.getByTestId('reasoning-content')).toBeTruthy()
   })
 
+  it('reports the reasoning disclosure state to assistive tech', () => {
+    // The tool-use toggle beside it already carries aria-expanded; this one is the
+    // same disclosure pattern in the same file and was announced as a bare button.
+    const { rerender } = render(
+      <AiMessage userMessage="Ask" reasoning="Thinking..." reasoningDone actions={[]} />
+    )
+    expect(screen.getByTestId('reasoning-toggle')).toHaveAttribute('aria-expanded', 'false')
+
+    rerender(<AiMessage userMessage="Ask" reasoning="Thinking..." reasoningDone={false} actions={[]} />)
+    expect(screen.getByTestId('reasoning-toggle')).toHaveAttribute('aria-expanded', 'true')
+  })
+
   it('keeps reasoning collapsed after the turn finishes', () => {
     const { rerender } = render(
       <AiMessage userMessage="Ask" reasoning="Thinking..." reasoningDone={false} actions={[]} />

@@ -708,3 +708,33 @@
   0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
   30% { opacity: 1; transform: translateY(-2px); }
 }
+
+/*
+ * Honour prefers-reduced-motion on the looping animations.
+ *
+ * `reducedMotion.ts` notes that nothing consulted this setting before confetti,
+ * "which was fine while nothing moved on its own." That stopped being true: the
+ * Chat border pulse and the typing dots both run `infinite` for the whole length
+ * of a turn, and the header Sparkle and tool-count badge carry Tailwind's
+ * `animate-pulse`. For the people this setting exists for, that is the case it
+ * was meant to cover.
+ *
+ * The pulse conveys "a turn is running", which the status text also states, so
+ * dropping the animation loses no information. Holding the dots at full opacity
+ * keeps the indicator visible while it stops moving.
+ */
+@media (prefers-reduced-motion: reduce) {
+  /*
+   * The Chat border pulse is not here: it is an inline `animation` on the panel
+   * <aside> (aiPanelPulse.ts), which a stylesheet rule cannot override without
+   * !important. It consults prefersReducedMotion() in that module instead.
+   */
+  .typing-dot {
+    animation: none;
+    opacity: 0.7;
+  }
+
+  .animate-pulse {
+    animation: none;
+  }
+}

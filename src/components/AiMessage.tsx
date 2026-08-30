@@ -150,6 +150,7 @@ function ReasoningBlock({ locale, text, expanded, onToggle }: {
       <button type="button"
         className="flex items-center gap-1.5 w-full border-none bg-transparent cursor-pointer p-0 text-muted-foreground hover:text-foreground transition-colors"
         style={{ fontSize: 12, padding: '4px 0' }}
+        aria-expanded={expanded}
         onClick={onToggle}
         data-testid="reasoning-toggle"
       >
