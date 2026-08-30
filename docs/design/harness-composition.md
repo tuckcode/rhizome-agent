@@ -186,17 +186,30 @@ chat.
 
 **Review:** [`2026-08-24-deepseek-harness-source-review.md`](../plans/2026-08-24-deepseek-harness-source-review.md)
 
-### OpenCode and other CLIs — REJECT as product backends
+### OpenCode and other CLIs — never a candidate
 
-Hidden Desktop DNA. Prime is the only runtime in the Agent product UI.
-OpenCode remains a strong *coding CLI*, weak at lasting knowledge — same
-bucket as Claude Code / Codex. Do not run it as Rhizome’s engine or as a
-default delegated second loop.
+**Corrected 2026-08-29 by Atticus.** OpenCode was named at the start of this
+project purely as *an example of what a coding harness is* — a reference
+point in conversation, nothing more. It was never proposed as an engine,
+a backend, or a context layer for Rhizome.
 
-Weekend NotebookLM (2026-08-22) assigned OpenCode “context / provider
-routing / LSP.” That mix is more aggressive than the doctrine. The
-composition choice: take routing/LSP *ideas* onto Prime’s catalog if a
-user job needs them; do not take OpenCode as the context layer.
+Everything below this line is the docs elaborating a rejection nobody had
+asked for. Read it as history, not as a live verdict:
+
+- This section previously read “REJECT as product backends,” with reasoning
+  about “hidden Desktop DNA” and OpenCode being weak at lasting knowledge.
+- Weekend NotebookLM (2026-08-22) assigned OpenCode “context / provider
+  routing / LSP,” which was then treated as a standing disagreement
+  requiring resolution — item 3 in Still discuss / decide.
+
+There is no disagreement, because there was no proposal. Prime is the only
+runtime in the Agent product UI (ADR-0163, ADR-0168), and that was settled
+without reference to OpenCode. If a user job ever needs routing or LSP
+ideas, adapt them onto Prime’s catalog on their own merits.
+
+**Do not re-open this as a decision.** If a later doc or session presents
+OpenCode as a rejected alternative, it is repeating an artifact of the
+original example, not a call that was made.
 
 Vision draft: [`rhizome-prime-harness-vision.md`](./rhizome-prime-harness-vision.md)
 
@@ -260,22 +273,24 @@ Prime feature request, not a reason to embed `dsh`.
 
 ---
 
-## Weekend NotebookLM vs this plan
+## Weekend NotebookLM — not a source
 
-Saturday 2026-08-22 exports (Downloads, not in repo):
+**Downgraded 2026-08-29 by Atticus:** *“NotebookLM is probably misinformed,
+so don’t listen to that.”*
 
-- `Rhizome_Agent_Evolution_Design_Strategy.png` — “Pruning the Engine, Grafting the Best”
-- `NotebookLM Mind Map.png`
-- `The_harness_is_the_actual_AI_product.m4a`
+Saturday 2026-08-22 exports (Downloads, not in repo) — a mind map, a
+strategy image, and a generated audio overview — were machine-generated
+summaries of material fed into NotebookLM, not decisions and not research.
+They assigned: Prime = engine, DeepSeek = plugins, Hermes = UX,
+OpenCode = context / routing / LSP, Claude Code = MCP.
 
-That mix assigned: Prime = engine, DeepSeek = plugins / reversible seams,
-Hermes = UX, OpenCode = context / routing / LSP, Claude Code = MCP +
-progressive disclosure.
+That assignment carries no authority here. It was previously written up as
+a rival plan this file had to reconcile against, which is how OpenCode
+acquired a “rejected backend” verdict it never needed.
 
-This file keeps Prime as engine and Hermes as UX *contracts*. It takes
-DeepSeek’s **plugin idea** onto Prime extensions, not their plugin kernel.
-It rejects OpenCode as a backend. That is the stricter Sunday doctrine, plus
-the Monday option-2 clarification.
+**Do not cite these exports as a position, a disagreement, or a source.**
+Where they happen to agree with this file (Prime as engine), the reason is
+ADR-0163 and ADR-0168 — not the mind map.
 
 ---
 
@@ -316,7 +331,10 @@ Before treating this as build law:
 1. Ratify **option 2** as the composition rule (or name the alternative).
 2. Ratify **native extension UI** as the first extensibility slice — or
    pick another first slice.
-3. Confirm OpenCode stays reject-as-backend (NotebookLM still disagrees).
+3. ~~Confirm OpenCode stays reject-as-backend~~ **Not a decision — closed
+   2026-08-29.** Atticus confirmed OpenCode was only ever an example of what
+   a coding harness is, raised at the start of the project. There was no
+   proposal to reject. See [OpenCode and other CLIs](#opencode-and-other-clis--never-a-candidate).
 4. Name remaining incompatibilities the reviews left implicit (e.g. Hermes
    memory approval vs vault promote vs Prime refine ledger — one write
    authority).
