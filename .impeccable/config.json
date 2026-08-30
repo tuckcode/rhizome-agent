@@ -17,6 +17,12 @@
         ],
         "createdAt": "2026-08-30T03:32:24.893Z",
         "reason": "Claude, 2026-08-30: index.css:605 is .ai-markdown blockquote, border-inline-start 3px solid var(--border) -- the conventional quoted-text bar, and a neutral token, not an accent. The rule targets decorative colored stripes on cards; this is standard blockquote styling."
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-08-30T04:06:26.754Z",
+        "reason": "Claude, 2026-08-30: Inter is this app's interface font by three independent deliberate acts -- index.html loads it from Google Fonts with weights 400;500;600;700 named explicitly, index.css:22 sets it as the :root family, and index.css:511 documents the label scale as 'Label typography (Inter, sentence case)'. The app also loads IBM Plex Mono for code and bundles JetBrains Mono locally for the wordmark, so the typeface roster is a considered set, not a default."
       }
     ]
   }
