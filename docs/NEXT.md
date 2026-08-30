@@ -59,8 +59,10 @@ Filter: ADR-0168 / [`harness-doctrine.md`](design/harness-doctrine.md).
 - **Proposed first slice if ratified:** native extension UI (`extension_ui`
   — select / confirm / input). Rhizome auto-cancels those today.
 - **Corrections:** Hermes Agent is its own runtime, not built on OpenCode.
-  OpenCode stays reject-as-backend (weekend NotebookLM still assigned it
-  context/routing — that disagreement is part of the decide list).
+  **OpenCode is not a decision at all** (Atticus, 2026-08-29): it was named
+  early on only as *an example of a coding harness*, never proposed as an
+  engine or context layer. The docs elaborated a rejection nobody asked for.
+  Do not re-open it.
 
 Still open: ratify option 2; ratify the first slice; name remaining
 incompatibilities (especially one write authority for memory). #5 cannot
