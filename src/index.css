@@ -442,6 +442,8 @@
   --color-state-selected: var(--state-selected);
   --color-border-default: var(--border-default);
   --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-feedback-success-text: var(--feedback-success-text);
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);

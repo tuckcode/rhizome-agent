@@ -134,7 +134,7 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
                     {t('settings.providers.expired')}
                   </span>
                 ) : (
-                  <span className="shrink-0 text-xs text-emerald-700">
+                  <span className="shrink-0 text-xs text-feedback-success-text">
                     {t('settings.providers.connected')}
                   </span>
                 )}
