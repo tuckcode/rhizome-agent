@@ -407,7 +407,24 @@ push is not a release — releases are tagged builds with signed installers.
   That is the transferable part, and it is why C54 (the coverage command that
   fails on a healthy tree) reads as the same mistake in a different place.
 
-- **C46-OPEN (2026-08-23): `AiPanel.tsx` measures CCN 50 across 447 lines.**
+- **C46-RESOLVED (2026-08-23 → verified resolved 2026-08-30): `AiPanel.tsx`
+  measured CCN 50 across 447 lines.** The seam this entry named was taken: the
+  mid-turn send policy now lives in `src/components/useAiPanelSendPolicy.ts`,
+  whose docstring says so in as many words ("This is the seam C46 named
+  directly"). Re-measured on 2026-08-30 with the same tool that raised it:
+
+  ```
+  codacy-cli analyze --tool lizard src/components/AiPanel.tsx
+  NLOC 546 | Avg.NLOC 5.4 | AvgCCN 1.5 | function_cnt 26 | warnings 0
+  ```
+
+  Zero thresholds exceeded. Left open in this file for roughly a week after it
+  was fixed, which is the failure mode the C-number convention exists to stop —
+  a later session reading this list would have gone looking for a hotspot that
+  is not there. Re-measure before reopening; do not restore this from the old
+  wording.
+
+  <details><summary>Original entry (2026-08-23)</summary>
   Codacy's `lizard` is the first tool in this repo to say so — it was the only
   warning across the files this session touched (`src-tauri/src/vault/folders.rs`
   sits at avg CCN 2.5). Lizard aggregates a TSX module's top level into one
@@ -418,6 +435,7 @@ push is not a release — releases are tagged builds with signed installers.
   — which is decision logic with no JSX and could move to a hook or module
   beside `primeTurnMessaging.ts`. Not attempted here: it would have meant
   refactoring the component in the same change as the race fix.
+  </details>
 
 - **C44-RESOLVED (2026-08-23): Prime follow-up admission now
   propagates through Rust.** `queue_message` returns `data.queued` for
