@@ -403,7 +403,7 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
       <div className="text-xs leading-5 text-muted-foreground">
         {mode === 'api' ? t('settings.aiProviders.keySafetyLocal') : t('settings.aiProviders.localSafety')}
       </div>
-      {testState === 'success' ? <div className="text-xs text-emerald-700">{t('settings.aiProviders.testSuccess')}</div> : null}
+      {testState === 'success' ? <div className="text-xs text-feedback-success-text">{t('settings.aiProviders.testSuccess')}</div> : null}
       {error ? <div className="text-xs text-destructive">{error}</div> : null}
       <div className="flex items-center gap-3">
         <Button type="button" size="sm" onClick={() => void addProvider()} disabled={!canSave}>

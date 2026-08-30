@@ -1399,7 +1399,7 @@ function AiAgentsInstalledSection({
                   <AiAgentIcon agent={definition.id} size={16} />
                   <div className="truncate text-sm font-medium text-foreground">{definition.label}</div>
                 </div>
-                <div className={installed ? 'text-xs text-emerald-700' : 'text-xs text-muted-foreground'}>
+                <div className={installed ? 'text-xs text-feedback-success-text' : 'text-xs text-muted-foreground'}>
                   {installed ? t('settings.aiAgents.installed') : t('settings.aiAgents.missing')}
                 </div>
               </div>
