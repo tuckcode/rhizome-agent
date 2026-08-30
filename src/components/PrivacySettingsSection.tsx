@@ -54,7 +54,10 @@ export function PrivacySettingsSection({
 }: PrivacySettingsSectionProps) {
   return (
     <>
-      <SectionHeading title={t('settings.privacy.title')} />
+      <SectionHeading
+        title={t('settings.privacy.title')}
+        description={t('settings.privacy.description')}
+      />
       <SettingsGroup>
         <TelemetryToggle
           label={t('settings.privacy.crashReporting')}

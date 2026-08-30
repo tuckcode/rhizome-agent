@@ -25,7 +25,6 @@ export function SettingsSection({
 }: {
   children: ReactNode
   id?: string
-  showDivider?: boolean
 }) {
   return (
     <div id={id} className="scroll-mt-4" style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '18px 0' }}>
@@ -37,23 +36,27 @@ export function SettingsSection({
 export function SectionHeading({
   icon,
   title,
+  description,
 }: {
   icon?: ReactNode
   title: string
   description?: string
 }) {
   return (
-    <div className="flex items-center gap-2">
-      {icon ? <span className="flex size-5 items-center justify-center text-muted-foreground">{icon}</span> : null}
-      <div
-        style={{
-          fontSize: 14,
-          fontWeight: 600,
-          color: 'var(--foreground)',
-        }}
-      >
-        {title}
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        {icon ? <span className="flex size-5 items-center justify-center text-muted-foreground">{icon}</span> : null}
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            color: 'var(--foreground)',
+          }}
+        >
+          {title}
+        </div>
       </div>
+      {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
     </div>
   )
 }

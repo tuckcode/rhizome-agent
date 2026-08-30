@@ -79,6 +79,7 @@ export function VaultContentSettingsSection({
       <SectionHeading
         icon={<Article size={16} aria-hidden="true" />}
         title={t('settings.vaultContent.title')}
+        description={t('settings.vaultContent.description')}
       />
 
       <SettingsGroup>
