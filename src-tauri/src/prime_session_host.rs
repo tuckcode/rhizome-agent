@@ -1528,6 +1528,17 @@ fn session_is_streaming() -> bool {
 }
 
 /// Interrupt the running turn and wait for the session to go idle.
+///
+/// `abort` (`requestAbort` in the installed daemon) suspends Prime's session
+/// input pump as a side effect — every action after it is refused with
+/// "Cannot admit a session action while queued session input is suspended."
+/// until something resumes it. Nothing else in this module ever un-suspends
+/// it, so a goal *replace* (which clears the active goal by aborting its
+/// continuation, then immediately sends the new `/goal`) always tripped this
+/// on the second command. `resume_queue` is the daemon's own way to lift the
+/// suspension; it fails with "No queued work to resume" when — as here —
+/// nothing is queued, which is expected right after an abort and not a real
+/// error.
 fn abort_and_wait_for_idle() -> Result<(), String> {
     with_host_mut(|host| {
         // A failed abort is not fatal — the wait loop below is what actually
@@ -1543,10 +1554,28 @@ fn abort_and_wait_for_idle() -> Result<(), String> {
             thread::sleep(GOAL_CONFIRM_INTERVAL);
         }
         if !session_is_streaming() {
+            resume_session_input_pump();
             return Ok(());
         }
     }
     Err("Prime is still busy after aborting the current turn — try again".into())
+}
+
+/// Lift the session-input suspension `abort` leaves behind.
+///
+/// "No queued work to resume" is `resume_queue`'s answer when nothing is
+/// queued — routine here, since this always follows an abort that just
+/// cleared everything — and the pump is unsuspended as a side effect of that
+/// call regardless of whether it reports success. Any other error is worth a
+/// log: it means the very next session command will fail with the
+/// "suspended" refusal this exists to prevent.
+fn resume_session_input_pump() {
+    let result = with_host_mut(|host| host.call(serde_json::json!({ "type": "resume_queue" })));
+    if let Err(error) = result {
+        if !error.to_ascii_lowercase().contains("no queued work") {
+            log::warn!("Could not resume Prime's session input pump after abort: {error}");
+        }
+    }
 }
 
 fn send_goal_command(text: &str) -> Result<(), String> {
@@ -2760,6 +2789,21 @@ fn next_id() -> String {
     )
 }
 
+/// This process's identity to the daemon, stable across every connection.
+///
+/// Without a client-supplied id the daemon assigns a fresh anonymous one per
+/// socket (`client.id`), and a client-owned session's `ownerClientId` is
+/// pinned to whichever client id created it. A reconnect that shows up under
+/// a new anonymous id can neither see that session in `list` nor `attach` to
+/// it — `isWorkerAccessibleToClient` compares ids — so `shutdown_host`
+/// followed by `ensure_host` looked like the session had vanished. Generating
+/// one id per process and sending it on every envelope is what lets the
+/// daemon recognise "it's the same client back again."
+fn client_id() -> &'static str {
+    static CLIENT_ID: OnceLock<String> = OnceLock::new();
+    CLIENT_ID.get_or_init(|| format!("rhizome-{}", uuid::Uuid::new_v4()))
+}
+
 impl PrimeHost {
     /// Open a connection in `cwd` and rejoin work already running there.
     ///
@@ -3050,8 +3094,18 @@ impl PrimeHost {
     }
 
     /// Find a session already running here that this client can rejoin.
+    ///
+    /// `includeClientOwned` is required, not cosmetic: every session Rhizome
+    /// creates is `client_owned` (`create_session`), and the daemon's plain
+    /// `list` only ever reports the *visible* (non-owned) roster — an owned
+    /// session is invisible to `list` even to the same client that made it
+    /// and is still attached. Without this flag a reconnect always finds
+    /// nothing to rejoin, no matter how the client identifies itself.
     fn find_resumable_session(&mut self, cwd: &Path) -> Result<Option<ResumableSession>, String> {
-        let response = self.send_bare_command(serde_json::json!({ "type": "list" }))?;
+        let response = self.send_bare_command(serde_json::json!({
+            "type": "list",
+            "includeClientOwned": true,
+        }))?;
         if response["success"].as_bool() != Some(true) {
             return Err(response_error(&response, "list"));
         }
@@ -3206,15 +3260,20 @@ impl PrimeHost {
     ///
     /// Deliberately not a kill. The daemon is not ours to stop — that is the
     /// whole of ADR-0163, and the reason work survives closing the window.
+    ///
+    /// Waits for the daemon's response to `detach` (bounded by the same
+    /// timeout every other command uses) rather than firing it and moving on.
+    /// A detach the daemon has not yet processed still counts this client as
+    /// attached, so a `list` from the very next `ensure_host` — reconnecting
+    /// to the same cwd — sees `attachedClients: 1` and skips the row: the
+    /// property ADR-0163's transport exists for (reconnecting lands back in
+    /// the same session) silently degrades to a fresh, sessionless connect.
     fn shutdown(&mut self) -> Result<(), String> {
         if !self.active_session_id.is_empty() && self.is_alive() {
-            let _ = self.write_raw(&self.command_envelope(
-                serde_json::json!({
-                    "type": "detach",
-                    "activeSessionId": self.active_session_id,
-                }),
-                &next_id(),
-            ));
+            let _ = self.send_bare_command(serde_json::json!({
+                "type": "detach",
+                "activeSessionId": self.active_session_id,
+            }));
         }
         self.connected.store(false, Ordering::Relaxed);
         // Half-close: the daemon sees EOF after the detach it has yet to read,
@@ -3234,6 +3293,7 @@ impl PrimeHost {
         serde_json::json!({
             "type": "command",
             "id": id,
+            "clientId": client_id(),
             "protocol": { "name": DAEMON_PROTOCOL_NAME, "version": DAEMON_PROTOCOL_VERSION },
             "command": command,
         })
