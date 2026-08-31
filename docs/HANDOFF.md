@@ -256,37 +256,58 @@ push is not a release — releases are tagged builds with signed installers.
   [plan](plans/2026-08-29-live-app-view-plan.md) ·
   [session](plans/handoffs/2026-08-29-0158-grok-4-6-live-app-view-plan.md).
 
-- **C56-OPEN (2026-08-28): two live-daemon tests fail against a healthy
-  daemon, and nobody was running them.** `pnpm test:live-prime` (`db33c46`)
-  runs the six `#[ignore]`d tests in `prime_session_host.rs`. First run: 1
-  passes, 5 fail. **Three of the five are unmet preconditions the tests name
-  themselves** — a started session, a scheduled job, `RHIZOME_TEST_DAEMON_SOCKET`
-  — and are not defects. Two are real:
+- **C56-RESOLVED (2026-08-30): both live-daemon defects were the daemon
+  treating a reconnecting Rhizome as a stranger, not a queued-input model
+  Rhizome never spoke.** Root-caused against the installed `prime-agent`
+  0.8.0's own bundled source (`~/.local/lib/node_modules/prime-agent/dist/bundle`),
+  not guesswork:
 
-  - **`live_goal_round_trip`.** Reproduced in isolation, so it is not a
-    cascade from the test before it. The *first* `set_goal` succeeds and
-    returns a well-formed `PrimeGoalState`; **replacing** the active goal is
-    refused with *"Cannot admit a session action while queued session input is
-    suspended."* Rhizome does not model that suspension at all —
-    `acquire_session_input_pause` / `release_session_input_pause` are among the
-    unspoken commands. Either we must wait for input to resume, or release it
-    first, and today we do neither.
-  - **`live_daemon_round_trip`** — after a real turn, `shutdown_host()` and
-    then `ensure_host()` returns an **empty session id**. The reconnect is the
-    property ADR-0163's whole transport change exists for, so this is worth
-    understanding before it is explained away.
+  - **`live_daemon_round_trip`.** Every session Rhizome creates is
+    `lifecycle: "client_owned"`, scoped to the daemon's per-connection
+    `ownerClientId`. `command_envelope` never sent a `clientId`, so each
+    reconnect got a fresh anonymous one from the daemon and could never see
+    its own prior session again — and separately, `list` only reports the
+    *visible* (non-owned) roster unless the caller passes
+    `includeClientOwned: true`, which `find_resumable_session` never did.
+    Either gap alone was enough to make `ensure_host()` after
+    `shutdown_host()` return an empty session id. Fixed by generating one
+    `clientId` per process (`client_id()`, a `OnceLock<String>`) and sending
+    it on every envelope, adding `includeClientOwned: true` to the `list` in
+    `find_resumable_session`, and making `shutdown()` wait for the daemon's
+    `detach` response (via `send_bare_command` instead of a fire-and-forget
+    `write_raw`) so the very next `list` doesn't race a `detach` the daemon
+    hasn't processed yet and still see `attachedClients: 1`.
+  - **`live_goal_round_trip`.** `send_goal_command` calls
+    `abort_and_wait_for_idle()` to interrupt the goal's own continuation
+    before replacing it; the daemon's `abort` (`requestAbort` internally)
+    suspends the session's input pump as a side effect, and nothing in this
+    module ever lifted that suspension — so the replacement `/goal` right
+    after it was refused with "Cannot admit a session action while queued
+    session input is suspended." `acquire_session_input_pause` /
+    `release_session_input_pause` turned out to be a different, unrelated
+    pause mechanism; the actual counterpart is `resume_queue`, confirmed
+    against the daemon source. `abort_and_wait_for_idle` now calls
+    `resume_session_input_pump()` once the session is confirmed idle, which
+    sends `resume_queue` and tolerates its "No queued work to resume" answer
+    (expected right after an abort — the pump is unsuspended as its side
+    effect regardless of that response).
 
-  **A third failure looked like a product bug and is not — corrected here so
-  nobody chases it.** `roster_against_the_live_daemon` reports "expected at
-  least one session" while a Rhizome window is open, and a manual `list` over
-  the daemon socket returns `{"sessions":[]}`. That is **#28 working as
-  designed**: a vault attach creates no Prime session, and one is not created
-  until the first prompt. An idle app legitimately has zero sessions, and
-  `prime-agent status` agrees. It is the same unmet precondition as the other
-  three.
+  Both fixes verified against the live daemon (`prime-agent status`
+  reachable), not just read as "looking right": `live_daemon_round_trip` and
+  `live_goal_round_trip` are green, and `cargo test --lib` is still
+  1704 passed / 0 failed. `live_session_naming` and
+  `live_quit_stops_our_session_by_default_and_keeps_it_when_asked` still fail
+  — the former pre-dates this change (reproduced on a clean checkout before
+  touching anything), the latter is the documented
+  `RHIZOME_TEST_DAEMON_SOCKET` precondition — neither is C56.
 
-  Read the failure messages before assuming rot, and before assuming a bug:
-  the lane is new, and its whole point is that none of this was being run.
+  **A third failure looked like a product bug and is not.**
+  `roster_against_the_live_daemon` reports "expected at least one session"
+  while a Rhizome window is open, and a manual `list` over the daemon socket
+  returns `{"sessions":[]}`. That is **#28 working as designed**: a vault
+  attach creates no Prime session, and one is not created until the first
+  prompt. An idle app legitimately has zero sessions, and `prime-agent
+  status` agrees.
 
 - **C55-RESOLVED (2026-08-29): the text-only-model warning did not fire when
   the daemon's `get_state` model omitted `input`.** RPC mode returns `input` on
