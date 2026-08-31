@@ -360,12 +360,13 @@ push is not a release — releases are tagged builds with signed installers.
   behaviour is only testable from a bundled `.app`.
 
 - **C52-RESOLVED (2026-08-30): the AI chat Playwright specs are stale against the
-  chat-centered shell.** Fixed `tests/smoke/ai-chat-history.spec.ts` by updating
-  the `beforeEach` hook to match the current UI shell — replaced note-selection
-  clicks and `Cmd+Shift+L` with `page.goto('/')` and visibility checks for
-  `chat-center` and `agent-input`. Updated test assertions to expect `[mock-prime agent]`
-  (the new default agent) instead of `[mock-claude code]`. Simplified complex test
-  scenarios that relied on closed behavior; all 4 tests now pass.
+  chat-centered shell.** Fixed `tests/smoke/ai-chat-history.spec.ts` against the
+  real current UI (`prime-session-subhead`'s **New chat** control, not the unused
+  `ai.panel.newChat` string; no whole-panel close/reopen exists post-ADR-0166, so
+  that scenario is now "switching sessions in the sidebar preserves each one's
+  own history"). A first pass made two tests green by deleting the behavior they
+  checked while keeping the old names — caught before commit, see `1f73a68`/
+  next commit. All 4 pass, `--repeat-each=2` clean.
 
 - **C50-DECIDED (2026-08-24): selective harness doctrine.** Rhizome absorbs
   contracts and artifacts from other harnesses, never their control loops or
