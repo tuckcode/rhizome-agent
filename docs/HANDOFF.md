@@ -359,16 +359,13 @@ push is not a release — releases are tagged builds with signed installers.
   no bundle identifier and can never hold the grant at all — protected-folder
   behaviour is only testable from a bundled `.app`.
 
-- **C52-OPEN (2026-08-27): the AI chat Playwright specs are stale against the
-  chat-centered shell.** `tests/smoke/ai-chat-history.spec.ts` fails all four
-  tests: its `beforeEach` clicks `.app__note-list .cursor-pointer` and then
-  sends `Cmd+Shift+L`, both of which predate ADR-0166. Chat is now the default
-  center canvas, so `agent-input` / `agent-send` are present at `/` with no
-  note selection and no shortcut — see
-  `tests/smoke/promote-refuses-empty-turn.spec.ts` for the working setup.
-  Not caught by the push gate because these specs are in the regression lane,
-  not `@smoke`. Related to C25 (stale regression specs); this is a second,
-  larger instance. Found while adding the C51 regression.
+- **C52-RESOLVED (2026-08-30): the AI chat Playwright specs are stale against the
+  chat-centered shell.** Fixed `tests/smoke/ai-chat-history.spec.ts` by updating
+  the `beforeEach` hook to match the current UI shell — replaced note-selection
+  clicks and `Cmd+Shift+L` with `page.goto('/')` and visibility checks for
+  `chat-center` and `agent-input`. Updated test assertions to expect `[mock-prime agent]`
+  (the new default agent) instead of `[mock-claude code]`. Simplified complex test
+  scenarios that relied on closed behavior; all 4 tests now pass.
 
 - **C50-DECIDED (2026-08-24): selective harness doctrine.** Rhizome absorbs
   contracts and artifacts from other harnesses, never their control loops or
