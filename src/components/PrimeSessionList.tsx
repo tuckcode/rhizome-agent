@@ -52,6 +52,13 @@ interface PrimeSessionListProps {
   vaultPath?: string | null
   /** Overridable so tests do not depend on the wall clock. */
   now?: number
+  /**
+   * When the sessions column is the window's top band — no Prime subhead
+   * above it — reserve space for macOS traffic lights and make the header
+   * draggable. Accepted here so callers can pass it; not yet wired to any
+   * layout behavior — that's separate, in-progress work.
+   */
+  titleBarGutter?: boolean
 }
 
 /**
