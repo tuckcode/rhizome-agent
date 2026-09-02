@@ -4,6 +4,7 @@ import { isTauri } from '../mock-tauri'
 import {
   COMMAND_RAIL_TRAFFIC_LIGHT_INSET,
   MACOS_TRAFFIC_LIGHT_POSITION,
+  sessionsColumnTitleBarStyle,
   subheadTrafficLightInset,
 } from './trafficLights'
 
@@ -80,5 +81,17 @@ describe('subheadTrafficLightInset', () => {
       configuredTrafficLightX() + TRAFFIC_LIGHT_WIDTH_PX + TRAFFIC_LIGHT_CLEARANCE_PX
 
     expect(contentStart).toBeGreaterThanOrEqual(lightsEnd)
+  })
+
+  it('clears the sessions column header below the traffic lights when it is topmost', () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    Object.defineProperty(navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0) AppleWebKit/605.1.15',
+    })
+
+    const style = sessionsColumnTitleBarStyle()
+    expect(style.paddingTop).toBe(COMMAND_RAIL_TRAFFIC_LIGHT_INSET)
+    expect(style['--subhead-traffic-light-inset']).toBeTruthy()
   })
 })
