@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useMemo } from 'react'
 import { AiPanel } from './AiPanel'
 import { PrimeSessionSubhead } from './PrimeSessionSubhead'
 import { AgentActivityBand } from './AgentActivityBand'
@@ -12,8 +12,8 @@ import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import { vaultLabelFromPath } from '../lib/primeSubheadLabels'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 import { resolveChatOpenNote } from '../utils/resolveChatOpenNote'
+import { agentTargets, type AiTarget } from '../lib/aiTargets'
 import type { AiAgentId, AiAgentReadiness } from '../lib/aiAgents'
-import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
 import type { VaultEntry } from '../types'
 
@@ -73,7 +73,17 @@ export default function ChatHome({
   onOpenSessionFootprint,
   requestedNote,
 }: ChatHomeProps) {
-  const isPrimeTarget = defaultAiTarget?.kind !== 'api_model' && defaultAiAgent === 'prime'
+  // Chat is Prime's home canvas (ADR-0166). A direct API model chosen as the
+  // global default must not strip Prime chrome or route chat away from Prime.
+  const isPrimeChat = defaultAiAgent === 'prime'
+  const chatTarget = useMemo((): AiTarget | undefined => {
+    if (!isPrimeChat) return defaultAiTarget ?? undefined
+    if (defaultAiTarget?.kind === 'api_model') {
+      return agentTargets().find((target) => target.kind === 'agent' && target.agent === 'prime')
+    }
+    return defaultAiTarget ?? undefined
+  }, [defaultAiTarget, isPrimeChat])
+  const isPrimeTarget = isPrimeChat && chatTarget?.kind !== 'api_model'
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
@@ -128,7 +138,7 @@ export default function ChatHome({
         <AiPanel
           locale={locale}
           defaultAiAgent={defaultAiAgent}
-          defaultAiTarget={defaultAiTarget ?? undefined}
+          defaultAiTarget={chatTarget}
           defaultAiAgentReadiness={defaultAiAgentReadiness}
           defaultAiAgentReady={defaultAiAgentReady}
           vaultPath={vaultPath}

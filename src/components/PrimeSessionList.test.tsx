@@ -545,3 +545,13 @@ describe('PrimeSessionList — scratch sessions', () => {
     expect(await screen.findByText('Rhizome · .tmpwkDuS · a1b2c3')).toBeInTheDocument()
   })
 })
+
+describe('PrimeSessionList — macOS title bar gutter', () => {
+  it('reserves traffic-light space on the header when it is the top band', () => {
+    render(<PrimeSessionList locale="en" titleBarGutter />)
+
+    const header = screen.getByTestId('prime-session-list-header')
+    expect(header.className).toContain('pl-[var(--subhead-traffic-light-inset')
+    expect(header).not.toHaveClass('h-10')
+  })
+})

@@ -20,6 +20,7 @@ import type { CommandMenuAction, CommandMenuEntry } from '../lib/primeCommandMen
 import { primeQueueIsEmpty, primeQueueItems, type PrimeQueue } from '../lib/primeQueue'
 import { cn } from '@/lib/utils'
 import { suggestReply } from '../lib/replySuggestions'
+import { useDragRegion } from '../hooks/useDragRegion'
 
 interface AiPanelHeaderProps {
   agentLabel: string
@@ -615,6 +616,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
 }: AiPanelMessageHistoryProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
+  const { onMouseDown: onDragRegionMouseDown } = useDragRegion<HTMLDivElement>()
   // Following the stream is a mode, not an event: true while the reader is
   // parked at the bottom, false the moment they scroll up to read. Starts
   // true so a freshly opened conversation lands at the newest turn.
@@ -647,7 +649,14 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
     // `min-h-0` is load-bearing: a flex item defaults to `min-height: auto`,
     // so without it this refuses to shrink below its content and scrolls
     // nothing however tall the transcript gets.
-    <div ref={containerRef} className="min-h-0 flex-1 overflow-y-auto" style={{ padding: 12 }} onScroll={updateScrollState}>
+    <div
+      ref={containerRef}
+      className="min-h-0 flex-1 overflow-y-auto"
+      style={{ padding: 12 }}
+      onScroll={updateScrollState}
+      onMouseDown={onDragRegionMouseDown}
+      data-testid="ai-panel-message-history"
+    >
       {messages.length === 0 && !isActive && (
         <AiPanelEmptyState
           agentLabel={agentLabel}

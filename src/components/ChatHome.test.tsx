@@ -15,18 +15,24 @@ vi.mock('./AiPanel', () => ({
     notePane,
     activeEntry,
     activeNoteContent,
+    defaultAiTarget,
+    composerControls,
   }: {
     newChatRef?: MutableRefObject<(() => void) | null>
     onOpenNote?: (path: string) => void
     notePane?: React.ReactNode
     activeEntry?: { path: string } | null
     activeNoteContent?: string | null
+    defaultAiTarget?: { kind: string; label?: string; agent?: string }
+    composerControls?: React.ReactNode
   }) => {
     if (newChatRef) newChatRef.current = startNewChat
     return (
       <div data-testid="ai-panel-stub">
         <span data-testid="agent-active-note">{activeEntry?.path ?? 'none'}</span>
         <span data-testid="agent-note-body">{activeNoteContent ?? 'none'}</span>
+        <span data-testid="agent-target-kind">{defaultAiTarget?.kind ?? 'none'}</span>
+        <span data-testid="composer-controls">{composerControls ? 'yes' : 'no'}</span>
         <button type="button" onClick={() => onOpenNote?.('/Users/dtc/Documents/Laputa/wiki/decisions/memory-loop.md')}>
           Open
         </button>
@@ -68,6 +74,38 @@ describe('ChatHome', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
     expect(startNewChat).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps Prime chat chrome when settings picked a direct API model', () => {
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiTarget={{
+          kind: 'api_model',
+          id: 'model:nous-portal/tencent-hy3',
+          label: 'nous-portal · tencent-hy3',
+          shortLabel: 'tencent-hy3',
+          provider: {
+            id: 'nous-portal',
+            name: 'nous-portal',
+            kind: 'open_ai_compatible',
+            models: [{ id: 'tencent-hy3', capabilities: { streaming: false, tools: false, vision: false, json_mode: false, reasoning: false } }],
+          },
+          model: { id: 'tencent-hy3', capabilities: { streaming: false, tools: false, vision: false, json_mode: false, reasoning: false } },
+        }}
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath="/Users/dtc/Documents/Laputa"
+        vaultPaths={['/Users/dtc/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('agent-target-kind')).toHaveTextContent('agent')
+    expect(screen.getByTestId('composer-controls')).toHaveTextContent('yes')
+    expect(screen.getByTestId('prime-session-subhead')).toBeInTheDocument()
   })
 
   it('opens a note beside chat instead of leaving ChatHome', () => {

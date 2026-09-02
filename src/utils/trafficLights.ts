@@ -46,3 +46,17 @@ export function subheadTrafficLightInset(): Record<string, string> {
     COMMAND_RAIL_WIDTH_PX
   return { '--subhead-traffic-light-inset': `${inset}px` }
 }
+
+/**
+ * When the sessions column is the topmost band — no Prime subhead above it —
+ * its header must clear the overlay traffic lights vertically and horizontally.
+ * Same horizontal math as the subhead; vertical matches the command rail.
+ */
+export function sessionsColumnTitleBarStyle(): Record<string, string | number> {
+  if (!hasNativeMacosTrafficLights()) return {}
+  return {
+    ...subheadTrafficLightInset(),
+    paddingTop: COMMAND_RAIL_TRAFFIC_LIGHT_INSET,
+    minHeight: COMMAND_RAIL_TRAFFIC_LIGHT_INSET + 40,
+  }
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Archive, ArrowCounterClockwise, CaretRight, PencilSimple, Plus } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,6 +23,8 @@ import {
   trackPrimeSessionRenamed,
 } from '../lib/productAnalytics'
 import { usePrimeRunningSessionFiles } from '../hooks/usePrimeRunningSessionFiles'
+import { useDragRegion } from '../hooks/useDragRegion'
+import { sessionsColumnTitleBarStyle } from '../utils/trafficLights'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { invoke } from '@tauri-apps/api/core'
 
@@ -53,10 +55,8 @@ interface PrimeSessionListProps {
   /** Overridable so tests do not depend on the wall clock. */
   now?: number
   /**
-   * When the sessions column is the window's top band — no Prime subhead
-   * above it — reserve space for macOS traffic lights and make the header
-   * draggable. Accepted here so callers can pass it; not yet wired to any
-   * layout behavior — that's separate, in-progress work.
+   * When the sessions column is the window's top band — no Prime subhead above
+   * it — reserve space for macOS traffic lights and make the header draggable.
    */
   titleBarGutter?: boolean
 }
@@ -337,8 +337,11 @@ export default function PrimeSessionList({
   working = false,
   vaultPath = null,
   now,
+  titleBarGutter = false,
 }: PrimeSessionListProps) {
   const t = createTranslator(locale)
+  const titleBarStyle = titleBarGutter ? (sessionsColumnTitleBarStyle() as CSSProperties) : undefined
+  const { onMouseDown: onTitleBarMouseDown } = useDragRegion<HTMLDivElement>()
   const [sessions, setSessions] = useState<PrimeSessionSummary[] | null>(null)
   // Captured when the data is read, not at render: the label should describe
   // the moment the list was true, and reading a clock in a memo is impure.
@@ -554,7 +557,15 @@ export default function PrimeSessionList({
 
   return (
     <div className="flex h-full w-full min-w-0 flex-col" data-testid="prime-session-list">
-      <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border px-2.5">
+      <div
+        className={cn(
+          'flex shrink-0 items-center justify-between gap-2 border-b border-border px-2.5',
+          titleBarGutter ? 'pl-[var(--subhead-traffic-light-inset,0.625rem)]' : 'h-10',
+        )}
+        style={titleBarStyle}
+        data-testid="prime-session-list-header"
+        onMouseDown={titleBarGutter ? onTitleBarMouseDown : undefined}
+      >
         <span className="font-mono-overline uppercase text-muted-foreground">
           {t('ai.sessions.title')}
         </span>
