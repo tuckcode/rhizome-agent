@@ -496,26 +496,114 @@ Before treating this as build law:
    yes enough to build against.
 
 **Added 2026-08-31**, from the Pi-registry and Hermes source findings above.
-All four are cheap to answer and each currently blocks a guess:
+**Answered 2026-09-02** (Claude Opus 5, Claude Code) — all four turned out
+cheap, as predicted; findings below.
 
-7. **Does `pi.dev/packages` already contain the first slice?** The slice
-   table names native extension UI, a catalog, and profiles. Search the
-   registry before authoring any of them. If a package covers a row, the
-   decision becomes review-and-adopt, not build.
-8. **Can an agent install a package through the daemon's `bash`?** Install
-   is CLI-only, but `bash` is an RPC command and Rhizome already parses
-   bash tool calls. One live test settles whether package management can be
-   an in-app action or stays a Terminal step like provider sign-in. Nobody
-   has run it.
-9. **Is Prime's subagent/session state durable across restart and readable
-   mid-flight?** This decides whether a task-board surface is a view over
-   Prime state or a second store. A second store collides with item 4's
-   one-write-authority question, so answer 4 and 9 together.
-10. **Does `pi-hermes-memory` conflict with vault promote?** It is Hermes's
-    memory contract already built on Prime's seam. If its writes are
-    default-on and durable, it is a second memory authority wearing an
-    approved shape — exactly the pair test in Filter vs composition. Read
-    its source before installing it anywhere.
+7. ~~**Does `pi.dev/packages` already contain the first slice?**~~
+   **Answered.** Searched the npm registry (`registry.npmjs.org/-/v1/search`,
+   the same index `pi.dev/packages` reads from — filtered on the
+   `pi-package` keyword) for each slice-table row:
+   - **Slice 1, native extension UI:** no covering package, and structurally
+     none is possible. Rendering Prime's `extension_ui` RPC events
+     (`select`/`confirm`/`input`/`editor`) is Rhizome's own GUI — a Pi
+     package runs *inside* Prime/Pi and cannot reach into Rhizome's Tauri
+     window. Stays build, not adopt.
+   - **Slice 2, catalog:** no package renders a host-side "loaded skills"
+     chip for the same reason. Closest hits — `@pi-stef/catalog` ("managing
+     skill/package catalogs") and `@hk-vk/pi-package-search` ("Browse,
+     inspect, and install packages from the official Pi catalog") — are
+     Pi-side CLI/TUI tools an *agent* could shell out to (same `bash`
+     pathway as item 8), not something Rhizome's UI can embed. Stays build.
+   - **Slice 3, profiles:** real candidates exist and do the actual job —
+     `pi-permission-modes` ("Declarative, user-definable permission modes...
+     an allow/ask/deny policy engine... tool hiding, and skill/custom-tool
+     gating"), `@bacnh85/pi-permission` ("Granular permission system for
+     Pi — allow/ask/deny rules per tool with wildcard patterns"), and
+     `@georgedong32/permission-modes` ("Claude-Code-style permission modes...
+     with per-mode model profiles... per-mode skill filtering") already
+     implement named tool-allowlist presets as installable Pi extensions.
+     **This is the one row where review-and-adopt is live** — Rhizome could
+     ship a thin preset UI over one of these instead of building the
+     enforcement layer. Not evaluated further this session (needs its own
+     source read per the item-10 rule below); flagging as the concrete
+     candidate for whoever picks up slice 3.
+8. ~~**Can an agent install a package through the daemon's `bash`?**~~
+   **Answered: yes, live-tested.** `prime-agent --mode rpc`, no daemon
+   multiplexing needed to prove the mechanism (RPC session speaks the same
+   `bash` command whether reached via daemon socket or direct RPC stdio).
+   Sent `{"type":"bash","command":"prime-agent package install <local-path>
+   --local"}` against an isolated project dir with a throwaway probe
+   package (a package I authored, not a random third party — kept the test
+   inside the item-10 rule instead of exempting itself from it). Response:
+   `exitCode: 0`, `"Installed <path>"`, and `.prime/agent/settings.json` in
+   the isolated project picked up the package entry. **Package management
+   can be an in-app action** — an extension/skill install no longer has to
+   stay a Terminal step like provider sign-in does. One nuance caught in
+   `stderr`: `"Shell cwd was reset to <original launch dir>"` after the
+   sequence — the bash tool's cwd tracking reset itself at some point
+   mid-session; worth a closer look before wiring a UI button to this, but
+   it did not misroute the actual install (settings.json landed in the
+   right place, confirmed by content, not just exit code).
+9. ~~**Is Prime's subagent/session state durable across restart and
+   readable mid-flight?**~~ **Answered from Prime's own docs** (`rlm.md`,
+   `daemon.md` — not live-tested, but these are primary-source architecture
+   docs, not a repo note). Yes to both:
+   - Durable: `rlm.md` states outright — *"The parent-scoped child registry
+     survives compaction, kernel restart, and parent restoration"* via
+     `rlm.list_subagents()`. `daemon.md`: sessions are JSONL files under a
+     process-safe lease, and *"child registries and session artifacts make
+     subagents recoverable."*
+   - Readable mid-flight, **and from outside the kernel**: the RPC `observe`
+     command subscribes an external client to "another active root or
+     subagent session" and streams its live events
+     (`observed_session_event`), separate from `rlm.list_subagents()` which
+     is model/kernel-side only.
+   - **Answers item 4 together, as instructed:** a task-board surface can
+     be a *view* over Prime's existing registry + `observe`, not a second
+     store. That also narrows item 4's one-write-authority question — Prime
+     already owns subagent/session state as a single authority; Rhizome's
+     job is read-and-render, matching option 2's "adapt onto Prime's
+     catalog" framing rather than parallel storage.
+10. ~~**Does `pi-hermes-memory` conflict with vault promote?**~~
+    **Answered: yes, it conflicts. Recommendation: do not install, do
+    without.** (Atticus, 2026-09-02, mid-session: "I'm not sure how it would
+    tie in with Rhizome's own memory — if we can improve upon it or do
+    without you can make that decision.") Read its README
+    (github.com/chandra447/pi-hermes-memory) and npm metadata directly, not
+    a repo note. It is **default-on and automatic**, not opt-in:
+    - Writes on a background timer — *"Every 10 turns (or 15 tool calls) the
+      agent reviews and saves"* via `session_lifecycle.ts` — and immediately
+      on correction detection ("don't do that", "use yarn instead").
+      `flushOnShutdown: true` is the default.
+    - Storage is its own authority, split global/project:
+      `~/.pi/agent/pi-hermes-memory/{MEMORY,USER}.md` +
+      `sessions.db` (SQLite/FTS5) globally, `~/.pi/agent/projects-memory/
+      <project>/MEMORY.md` per project — entirely separate from Rhizome's
+      vault and from Prime's own refine ledger.
+    - Its docs make **no mention** of vault promote, Rhizome, or any other
+      memory system — it was built for bare Pi, with no awareness a host
+      might already own memory authority.
+    - No install-time script risk (`npm rebuild better-sqlite3` is a native
+      addon caveat, not a supply-chain one) — the objection is entirely the
+      **pair test**: default-on, durable, silent writes from a second
+      authority is exactly what Filter vs composition forbids, regardless
+      of how clean the code is.
+    - **"Improve upon it" doesn't apply either — Rhizome already targets
+      the same job with a different shape.** `pi-hermes-memory` is
+      Hermes's answer to "the agent should remember things between
+      sessions" for a host (bare Pi) that has no vault. Rhizome already has
+      that answer: `MEMORY.md`/`USER.md`-equivalent facts live in the vault
+      under owner-visible promote, not a background timer nobody sees fire.
+      Its one idea worth stealing on its own merits (not the package) is
+      **correction-triggered capture** — save immediately on "don't do
+      that" rather than waiting for the next scheduled review — which is a
+      prompt/hook pattern Rhizome's own memory surface could adopt without
+      taking the package, its SQLite store, or its silent authority. That
+      is a design question for whoever owns vault promote next, not an
+      install decision.
+    - This is the concrete case item 4 (name remaining incompatibilities)
+      should cite: Hermes memory approval vs vault promote vs Prime refine
+      ledger, resolved here as "reject the package, borrow the idea."
 
 ---
 

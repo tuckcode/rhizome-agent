@@ -51,9 +51,9 @@ file.
 
 ## State
 
-`HEAD` is **`7134638`**. `origin/main` is **`db33c46`** — branch is 28
-commits ahead. Confirm with `git log origin/main..HEAD`. Multi-day briefing since Claude last owned a
-session: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md).
+`main` is **`4342f34`**, in sync with `origin/main`, clean tree — confirm with
+`git status`. Multi-day briefing since Claude last owned a session:
+[`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date first).
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22 and #24 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Inverted Dock icon is
@@ -89,6 +89,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-02 (late) · Claude Opus 5](plans/handoffs/2026-09-02-2200-claude-opus-5-pi-registry-items-7-10.md) — closed all four open questions from the session below. **Live-tested:** the daemon's `bash` RPC command can run `prime-agent package install` end to end (exit 0, settings.json updated) — package management can be an in-app action, not just a Terminal step. **From Prime's own docs:** subagent/session state survives restart and is externally observable mid-flight (RPC `observe`), so a task board can be a *view* over Prime's state, not a second store. **From the npm registry** (the index `pi.dev/packages` reads): no package can cover native extension UI or the catalog chip — both are Rhizome's own GUI, structurally undelegatable — but the profiles slice has real review-and-adopt candidates (`pi-permission-modes` and peers). **`pi-hermes-memory` rejected**: default-on background writes, its own SQLite store, zero awareness of vault promote — recommendation is do without, borrow only its correction-triggered-capture idea.
 - [2026-09-02 · Claude Opus 5](plans/handoffs/2026-09-02-2028-claude-opus-5-impeccable-and-pi-registry.md) — **Prime Agent is a distribution of Pi (Earendil), and `pi.dev/packages` already lists ~5,000 installable extensions, skills, prompt templates and themes.** Verified against Prime's own `package.json` (`@earendil-works/pi-agent-core`) and its own `packages.md` ("the **inherited** extension ecosystem"), not a repo note — **search that registry before authoring any composition slice**; filter unchanged, install is CLI-only, packages run with full system access. Four new open questions as items 7–10 in [`harness-composition.md`](design/harness-composition.md). `/impeccable critique` on Settings scored **19/40** and found a **P0 silent data loss** — clicking a colour theme discarded every unsaved edit (`7eff708`) — plus an unconfirmed API-key delete (`56f5aef`) and six section descriptions that rendered nowhere including the telemetry privacy promise (`5b9e118`). Chat's composer advertised three shortcuts that did the opposite or did not exist, **and the existing test asserted the bug** (`44e06ce`). Hermes read at source for terminal / kanban / bots. Corrections: **OpenCode was never a decision** and **the NotebookLM exports are not a source** (both Atticus); Hermes's "Active now" is a 5s poll, not presence; C46 had been fixed a week and left open.
 - [2026-08-29 · Grok 4.6](plans/handoffs/2026-08-29-0205-grok-4-6-prime-limited-tools.md) — Prime sessions always **Power User** (no sandbox; toggle hidden). CLI agents still honor stored vault mode; UI relabelled **Limited tools**. Open product choices tracked as **C57**.
 - [2026-08-29 · Grok 4.6](plans/handoffs/2026-08-29-0158-grok-4-6-live-app-view-plan.md) — #50 plan only (not built): `pnpm live-ui` against the browser app, read + test-bridge steer, developer tooling not an in-app pane; scroll metrics required because `uiAudit` would have missed the missing transcript scroller. Awaiting Atticus. Writeup: [`docs/plans/2026-08-29-live-app-view-plan.md`](plans/2026-08-29-live-app-view-plan.md)
