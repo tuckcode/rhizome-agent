@@ -89,7 +89,7 @@ yours to choose.
 
 ## Recent sessions
 
-- [2026-09-02 (late) · Claude Opus 5](plans/handoffs/2026-09-02-2200-claude-opus-5-pi-registry-items-7-10.md) — closed all four open questions from the session below. **Live-tested:** the daemon's `bash` RPC command can run `prime-agent package install` end to end (exit 0, settings.json updated) — package management can be an in-app action, not just a Terminal step. **From Prime's own docs:** subagent/session state survives restart and is externally observable mid-flight (RPC `observe`), so a task board can be a *view* over Prime's state, not a second store. **From the npm registry** (the index `pi.dev/packages` reads): no package can cover native extension UI or the catalog chip — both are Rhizome's own GUI, structurally undelegatable — but the profiles slice has real review-and-adopt candidates (`pi-permission-modes` and peers). **`pi-hermes-memory` rejected**: default-on background writes, its own SQLite store, zero awareness of vault promote — recommendation is do without, borrow only its correction-triggered-capture idea.
+- [2026-09-02 (late) · Claude Opus 5](plans/handoffs/2026-09-02-2200-claude-opus-5-pi-registry-items-7-10.md) — closed items 7–10 in `harness-composition.md`: `bash`-driven package install works (live-tested), subagent/session state is durable + externally observable so a task board is a view not a second store, the registry covers the profiles slice but not extension-UI or catalog, and `pi-hermes-memory` is rejected (default-on, no vault awareness) — do without, borrow only its correction-triggered-capture idea. Filed **C58** (broken symlink on this machine failed 3 Rust tests, blocking the push).
 - [2026-09-02 · Claude Opus 5](plans/handoffs/2026-09-02-2028-claude-opus-5-impeccable-and-pi-registry.md) — **Prime Agent is a distribution of Pi (Earendil), and `pi.dev/packages` already lists ~5,000 installable extensions, skills, prompt templates and themes.** Verified against Prime's own `package.json` (`@earendil-works/pi-agent-core`) and its own `packages.md` ("the **inherited** extension ecosystem"), not a repo note — **search that registry before authoring any composition slice**; filter unchanged, install is CLI-only, packages run with full system access. Four new open questions as items 7–10 in [`harness-composition.md`](design/harness-composition.md). `/impeccable critique` on Settings scored **19/40** and found a **P0 silent data loss** — clicking a colour theme discarded every unsaved edit (`7eff708`) — plus an unconfirmed API-key delete (`56f5aef`) and six section descriptions that rendered nowhere including the telemetry privacy promise (`5b9e118`). Chat's composer advertised three shortcuts that did the opposite or did not exist, **and the existing test asserted the bug** (`44e06ce`). Hermes read at source for terminal / kanban / bots. Corrections: **OpenCode was never a decision** and **the NotebookLM exports are not a source** (both Atticus); Hermes's "Active now" is a 5s poll, not presence; C46 had been fixed a week and left open.
 - [2026-08-29 · Grok 4.6](plans/handoffs/2026-08-29-0205-grok-4-6-prime-limited-tools.md) — Prime sessions always **Power User** (no sandbox; toggle hidden). CLI agents still honor stored vault mode; UI relabelled **Limited tools**. Open product choices tracked as **C57**.
 - [2026-08-29 · Grok 4.6](plans/handoffs/2026-08-29-0158-grok-4-6-live-app-view-plan.md) — #50 plan only (not built): `pnpm live-ui` against the browser app, read + test-bridge steer, developer tooling not an in-app pane; scroll metrics required because `uiAudit` would have missed the missing transcript scroller. Awaiting Atticus. Writeup: [`docs/plans/2026-08-29-live-app-view-plan.md`](plans/2026-08-29-live-app-view-plan.md)
@@ -110,22 +110,11 @@ yours to choose.
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1345-grok-4-6-branches-schedules-markers.md) — #17 `get_session_tree`/`navigate_tree` in Chat; #14 create via `heartbeat_set`/`cron_add`; #18 compact/fork/model markers. Issues not closed (no live-Prime demo).
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1255-grok-4-6-prime-queue.md) — Chat shows Prime `get_queue`; Clear → `clear_queue`. Not a local follow-up list
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1148-grok-4-6-prime-surface-check.md) — mechanical Prime adapter snapshot (`docs/prime-adapter-surface.json`); `pnpm prime:surface` / `--github`. Do not clone upstream.
-- [2026-08-24 (late) · Grok 4.6](plans/handoffs/2026-08-24-2308-grok-4-6-origin-tags.md) — Origin tags on living docs; NEXT.md is a palimpsest (Claude Code then Grok); RLM was never a row
-- [2026-08-24 (late) · Grok 4.6](plans/handoffs/2026-08-24-2225-grok-4-6-stranded-work-check.md) — session-start stranded-work check in AGENTS.md; C47 listen-outside-Tauri guard (`b064272`) so the local stack can push
-- [2026-08-24 (evening) · Grok 4.6](plans/handoffs/2026-08-24-1740-grok-4-6-harness-composition.md) — option-2 composition notes (`docs/design/harness-composition.md`); NEXT.md §1 is discuss/decide; DeepSeek plugin *idea* on Prime extensions; sandbox is Prime’s (Kern is Linux-only)
-- [2026-08-24 · Claude Opus 5](plans/handoffs/2026-08-24-2122-claude-opus-5-shell-dock-and-next-index.md) — note tree docked right and ADR-0166 for the chat-centred shell (three questions left open); a tree/list exclusivity attempt reverted after it broke Cmd+N and inbox auto-advance; stale Tolaria/Desktop naming fixed in six live docs; the Linux/Windows menu bar tracks the pointer; scheduled security review found nothing above the bar; `docs/NEXT.md` added
-- [2026-08-24 · Grok 4.6](plans/handoffs/2026-08-24-1350-grok-4-6-c47-client-owned.md) — C47: client_owned create, promote/complete, idle detach, active-close dialog, quit without the global keep-running toggle
-- [2026-08-23 (wrap) · Grok 4.6](plans/handoffs/2026-08-23-2316-grok-4-6-session-wrap.md) — day closed; doctrine already on origin; local leftover is title clearance, Tauri JS align, C48/C49 corrections, Book → Skill; C47 still next
-- [2026-08-23 (late) · Grok 4.6](plans/handoffs/2026-08-23-2248-grok-4-6-book-to-skill.md) — Research Generate gained a Book → Skill format (`book-to-skill`); instruction produces a SKILL.md-shaped wiki page, does not vendor virgiliojr94/book-to-skill
-- [2026-08-23 (late) · GPT-5.6 Sol](plans/handoffs/2026-08-23-2235-gpt-5-6-sol-traffic-lights-and-qa-corrections.md) — traffic-light clearance native-verified; Tauri JS/Rust versions aligned; false two-model and Mycelium white-screen findings corrected
-- [2026-08-23 (evening) · GPT-5.6 Sol](plans/handoffs/2026-08-23-1920-gpt-5-6-sol-harness-doctrine.md) — selective harness doctrine ratified (ADR-0168): borrow contracts/artifacts, never second runtimes; Prime/Hermes/DeepSeek source reviews + five-frame scoring
-- [2026-08-23 · GPT-5.6 Sol](plans/handoffs/2026-08-23-1518-gpt-5-6-sol-mid-turn-and-folder-hardening.md) — C43/C44 and destructive folder paths fixed; Codacy activated and all High dependency findings patched; Switchyard evaluated behind Prime; foreground-owned sessions decided in ADR-0167
-- [2026-08-22 (evening) · Grok 4.6](plans/handoffs/2026-08-22-2108-grok-4-6-window-navigation-guard.md) — #43 window-level navigation guard built on the Tauri 2.10 plugin `on_navigation` hook (config-declared main window, so no window rebuild); off-origin links route to the system browser, webview never leaves; 7 Rust unit tests on the centralized policy; Rust gates green at 85.57%
-- [2026-08-22 · GPT-5.6 Luna](plans/handoffs/2026-08-22-2137-gpt-5.6-luna-recent-changes-review.md) — review of today's chat/native-chrome/pre-push changes; C43/C44 record two mid-turn message-loss paths, and the browser helper's repeated install check
-- [2026-08-22 · Claude Opus 5](plans/handoffs/2026-08-22-1100-claude-opus-5-ux-sweep.md) — Windows pipe landed by Cursor then its roster hang fixed; the ignored live-daemon tests run for the first time; C32 closed; a UX sweep found a silent screen-reader bug, a dead button and a session-select regression; #31–#39 opened
-- [2026-08-21 (evening) · Claude Opus 5](plans/handoffs/2026-08-21-1930-claude-opus-5-lazy-sessions.md) — #28's root cause: a vault attach creates no Prime session, verified against a live daemon; #28 closed, #30 opened and then finished (row labels, where a session ran, archiving); C33, test files typechecked behind a named exclusion list; and localization restated as decided
-- [2026-08-21 · Claude Opus 5](plans/handoffs/2026-08-21-1640-claude-opus-5-push-gate.md) — confetti end to end (ADR-0164), Chat home's rail and sessions column, #28, and the push gate cut from ~4m30s to ~2m16s
-- Everything before that: [handoff archive](plans/handoffs/archive-through-2026-08-20.md) — not in date order, search by date or issue number
+- Everything from 2026-08-24 and earlier: individual files still in
+  `docs/plans/handoffs/` (search by date), or for anything before
+  2026-08-21, [the archive](plans/handoffs/archive-through-2026-08-20.md) —
+  not in date order, search by date or issue number. Pruned from this index
+  2026-09-02 per this section's own rule; nothing was deleted from disk.
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)
 
@@ -248,6 +237,15 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 
 ## Open threads
+
+- **C58-OPEN (2026-09-02): 3 Rust tests fail from a broken symlink on this
+  machine, not the repo.** `pi_cli::tests::run_agent_stream_*` `.unwrap()`
+  on inspecting `~/.pi/agent/skills/hyperframes`, which resolves through
+  `~/.claude/skills/hyperframes` to a **self-referential symlink** at
+  `/Users/dtc/code/mods-plugins/agent-skills/claude/hyperframes` (points to
+  itself, dated 2026-08-31 — pre-existing). Blocked a push for a docs-only
+  commit. **Awaiting Atticus:** OK to delete that symlink, and should these
+  tests stop depending on real `~/.pi/agent/` state?
 
 - **C57-OPEN (2026-08-29): permission mode product choices after Prime fix.** Code shipped: Prime ignores vault-safe prompts and defaults new sessions to power user; Claude Code / Antigravity still enforce stored mode; UI copy is **Limited tools** / Power User. **Awaiting Atticus:** keep CLI agents defaulting to Limited tools (`safe`)? keep the Prime permission toggle hidden? final naming — "Limited tools" vs retaining "Vault Safe" with an honest tooltip.
 
