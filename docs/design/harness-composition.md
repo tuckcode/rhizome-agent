@@ -134,6 +134,74 @@ detaches; active close asks Stop vs Keep working; quit follows ownership.
 
 **Review:** [`2026-08-24-prime-harness-take-leave-audit.md`](../plans/2026-08-24-prime-harness-take-leave-audit.md)
 
+### Prime is a distribution of Pi, and Pi has a package registry
+
+**Origin:** Claude Opus 5 · 2026-08-31 · raised by Atticus, verified against
+primary sources the same session.
+
+**This section supersedes any reading of this file that treats Prime's
+extension surface as something we would have to populate ourselves.**
+
+Prime Agent is not a from-scratch runtime. It is a distribution of an
+existing agent called **Pi**, built by **Earendil Inc.** Verified three ways,
+none of them a repo note:
+
+1. Prime's own `package.json` lists the engine as a dependency:
+   `"@earendil-works/pi-agent-core": "…/prime-agent-core-0.8.0.tgz"`.
+2. Prime's own `docs/packages.md` calls the format "the **inherited**
+   extension ecosystem", declares resources under a `pi` key in
+   `package.json`, and asks authors to use the `pi-package` npm keyword.
+   Its peer-dependency list is `@earendil-works/pi-ai`,
+   `pi-agent-core`, `pi-coding-agent`, `pi-tui`.
+3. `pi.dev/packages` is a live registry — **~5,000 packages**, maintained by
+   Earendil, in exactly four kinds: **extensions, skills, prompt templates,
+   themes**.
+
+Those four kinds are the same three seams this file already calls the open
+door (extensions / skills / MCP). The difference is that the catalog already
+exists and was never checked before writing "Rhizome's gap is the product
+layer, not a missing kernel."
+
+**What this changes:** before hand-building anything that is an extension, a
+skill, a prompt template, or a theme, search `pi.dev/packages` first. Prime
+installs them directly:
+
+```bash
+prime-agent package install npm:<name>       # or git:… , or a local path
+prime-agent -e npm:<name>                    # try one without installing
+```
+
+**What this does not change.** The filter is untouched. A package that
+brings its own loop, provider registry, credential store, or durable memory
+store is still an organ and still fails the Frankenstein test. `dsh`-style
+plugin kernels are still closed. The catalog widens the *candidate list* for
+the open door; it does not open a new door.
+
+**Concrete example already found:** `pi-hermes-memory` (npm, author
+`chandra447`) is Hermes's memory tool ported to Pi. Its own credits say
+"Ported from the Hermes agent by Nous Research. Specifically:
+`tools/memory_tool.py` — MemoryStore class, content scanner, tool schema."
+That is the Hermes memory *contract* this file already says to adapt,
+already built against Prime's own seam by a third party. Worth a real
+review — including whether its default-on memory writes conflict with the
+vault-promote write authority in item 4 of Still discuss / decide. Not an
+endorsement; nobody here has read its source.
+
+**Two cautions, both from Prime's own docs:**
+
+- `packages.md` warns in bold: packages "run with full system access.
+  Extensions execute arbitrary code, and skills can instruct the model to
+  perform any action including running executables. Review source code
+  before installing third-party packages." Prime has no sandbox (see
+  Sandbox below), so an installed package is trusted code on the host.
+- Package install is **CLI-only**. It is absent from
+  `docs/prime-adapter-surface.json` and from Prime's `rpc.md`, so the
+  daemon exposes no install command and Rhizome cannot drive it as a
+  first-class action. Same shape as provider sign-in today. The daemon
+  *does* expose `bash`, and Rhizome already recognises bash tool calls
+  (`prime_events.rs`, `prime_tool_unwrap.rs`), so an agent-run install is
+  plausible — **untested, do not treat as working until someone runs it.**
+
 ### Hermes Agent — TAKE contracts, REJECT the stack
 
 Hermes is its **own** Python runtime (`AIAgent` in `run_agent.py`). It is
@@ -160,6 +228,82 @@ gateway scope.
 
 Easy mix-up: Hermes vs **OpenClaw**. Still not a fork. Separate TypeScript
 gateway (Pi). Hermes only has `hermes claw migrate`.
+
+#### Source-verified pass, 2026-08-31
+
+**Origin:** Claude Opus 5 · 2026-08-31 · three parallel sub-agents reading
+`github.com/NousResearch/hermes-agent` (public, MIT) at `main`, plus
+`hermes-agent.nousresearch.com/docs`. File paths below are real and were
+read; this supersedes doc-level guesses about the desktop app.
+
+**Structure.** No CLI-was-ported-to-desktop story. One Python `AIAgent`
+core, and separate purpose-built surfaces per platform: `cli.py`,
+`ui-tui/`, `apps/desktop/` (Electron 40), each with its own `node_modules`.
+Their own line: *"Platform differences live in the entry point, not the
+agent."* Desktop launches as `python -m hermes_cli.main desktop`. **They
+claim parity, never improvement** — searched for it specifically and found
+none: *"same config, same API keys, same sessions, same skills, same
+memory."* The premise that they ported and then improved is not supported.
+
+**Terminal — two mechanisms behind one look.** `apps/desktop/electron/
+terminal-ipc.ts` spawns real shells with `node-pty`, rendered by
+`@xterm/xterm`, keyed by session id, with SSH targets through the same
+path. The agent's terminal is a *different thing entirely*:
+`use-agent-terminal.ts` is documented in-file as *"a write-only xterm (no
+PTY, no input) fed live by the backend output stream"*, built with
+`disableStdin: true`, no IPC channel, mirroring a `terminal(background=true)`
+tool call with a capped 256KB replay backlog. `terminals.ts` types it
+explicitly: `kind: 'user' | 'agent'`.
+**Idea worth taking:** an agent's shell output rendered in the same widget
+as a human's, but read-only and on a separate data path — visual
+consistency with zero input-contention or ownership question. Directly
+relevant if Rhizome ever surfaces Prime's bash tool calls as a pane.
+
+**Kanban.** A feature absent from their docs nav; found by code search.
+`~/.hermes/kanban.db` (SQLite) holds durable task rows with a status
+lifecycle (`triage|todo|ready|running|blocked|review|done|archived`),
+parent→child dependency links with auto-promotion when parents finish,
+comments, events, and per-card model overrides. It exists because their
+`delegate_task` was a blocking in-process call whose work vanished on
+crash. "Swarm" (`hermes_cli/kanban_swarm.py`) is topology only — fan-out to
+N worker cards, gate on a verifier, fan-in to a synthesiser — and its own
+docs say it "does not introduce a second scheduler."
+**Idea worth taking:** *one write path.* CLI, model-facing tools, and the
+React board all bottom out in a single `kanban_db` module, so the three
+surfaces cannot disagree about a task's state. That discipline is the
+transferable part, not the schema.
+**Open question before anyone builds this here:** Prime already has
+child/subagent sessions, which is the primitive Hermes lacked. Whether
+Prime's own session state is already durable across restart and readable
+mid-flight is **unverified**. If it is, the Rhizome shape is a view over
+existing Prime state, not a second task store — which the one-vault,
+one-write-authority rule would push for anyway. Check before designing.
+
+**Bots.** `apps/desktop/src/plugins/hermes-bots/` (~95 files, a plugin on
+`@hermes/plugin-sdk`). A Bot is a profile directory under
+`~/.hermes/profiles/<name>/`. Isolation is **cheap**: `docs/profile-routing.md`
+shows one gateway process serving N profiles via a per-profile `HERMES_HOME`
+and namespaced session keys, and `tools/bot_mode_dm.py` delivers a DM by
+shelling out `hermes -p <name> chat … -Q --query-file <tmp>` as a
+background subprocess that runs one turn and exits. No standing per-bot
+process.
+**Correction to the doc-level read:** the "Active now" strip is not
+presence. `data.ts` polls `profiles.list` on a flat `refetchInterval: 5000`,
+and `isActiveRosterBot()` means "the bot whose chat is open" — not online,
+not working. Do not cite Hermes as prior art for agent presence.
+**Idea worth taking:** the ephemeral one-turn subprocess as the whole
+mechanism behind a named, persistent-feeling identity. Prime's subagent
+sessions already cover this; Hermes had to shell out to get it.
+
+**The pattern across all three:** one cheap primitive — a disposable
+one-turn agent — wearing three different UIs. Bots is that primitive plus a
+name and a face; kanban is that primitive plus a durable row; the agent
+terminal is that primitive's stdout in a read-only pane. Rhizome already has
+the primitive. What is missing here is not runtime capability.
+
+**Still rejected, unchanged:** Hermes as a second runtime, its
+messaging-gateway/bot-roster scope, and any parallel durable-memory stack.
+None of the above needs Hermes code; every item is an idea or a contract.
 
 ### DeepSeek Harness (`dsh`) — TAKE event/replay contracts, REJECT the runtime
 
@@ -236,6 +380,14 @@ OpenCode.
 ---
 
 ## Plugin extensibility (the idea, not the kernel)
+
+> **Read [Prime is a distribution of Pi](#prime-is-a-distribution-of-pi-and-pi-has-a-package-registry)
+> first (added 2026-08-31).** This section was written believing the open
+> door was empty and that we would author whatever went through it. It is
+> not empty: Prime inherits Pi's package format and `pi.dev/packages` lists
+> ~5,000 extensions, skills, prompt templates and themes that install with
+> `prime-agent package install`. The slice table below is still the right
+> *product* order; search the registry before hand-building any row of it.
 
 DeepSeek’s plugin system is popular because a plugin can add a tool, hook a
 turn, and block a call **without forking the loop**. That idea is not unique
@@ -343,6 +495,28 @@ Before treating this as build law:
 6. Finish **#5** (Prime harness surface spec) only after this matrix is
    yes enough to build against.
 
+**Added 2026-08-31**, from the Pi-registry and Hermes source findings above.
+All four are cheap to answer and each currently blocks a guess:
+
+7. **Does `pi.dev/packages` already contain the first slice?** The slice
+   table names native extension UI, a catalog, and profiles. Search the
+   registry before authoring any of them. If a package covers a row, the
+   decision becomes review-and-adopt, not build.
+8. **Can an agent install a package through the daemon's `bash`?** Install
+   is CLI-only, but `bash` is an RPC command and Rhizome already parses
+   bash tool calls. One live test settles whether package management can be
+   an in-app action or stays a Terminal step like provider sign-in. Nobody
+   has run it.
+9. **Is Prime's subagent/session state durable across restart and readable
+   mid-flight?** This decides whether a task-board surface is a view over
+   Prime state or a second store. A second store collides with item 4's
+   one-write-authority question, so answer 4 and 9 together.
+10. **Does `pi-hermes-memory` conflict with vault promote?** It is Hermes's
+    memory contract already built on Prime's seam. If its writes are
+    default-on and durable, it is a second memory authority wearing an
+    approved shape — exactly the pair test in Filter vs composition. Read
+    its source before installing it anywhere.
+
 ---
 
 ## Source index
@@ -360,3 +534,6 @@ Before treating this as build law:
 | [ADR-0167](../adr/0167-client-owned-prime-sessions-by-default.md) | Lifecycle: foreground-owned; residency is a grant |
 | [`docs/NEXT.md`](../NEXT.md) | Unclaimed work; §1 points here |
 | Prime `extensions.md` (installed package) | Event list the first slice sits on |
+| Prime `packages.md` (installed package) | Package format, install commands, the "inherited" Pi lineage, the full-system-access warning |
+| `pi.dev/packages` | Earendil's registry, ~5,000 packages, the catalog Prime inherits |
+| [`github.com/NousResearch/hermes-agent`](https://github.com/NousResearch/hermes-agent) | Hermes source (public, MIT). Read at `main` 2026-08-31: `apps/desktop/electron/terminal-ipc.ts`, `apps/desktop/src/app/right-sidebar/terminal/*`, `apps/desktop/src/plugins/kanban/*`, `apps/desktop/src/plugins/hermes-bots/*`, `hermes_cli/kanban_swarm.py`, `tools/bot_mode_dm.py`, `docs/profile-routing.md` |

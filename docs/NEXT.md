@@ -69,6 +69,23 @@ incompatibilities (especially one write authority for memory). #5 cannot
 finish until this is yes enough to build against. Closing #40 against the
 filter is not “composition done.”
 
+**Read before claiming the first slice (added 2026-08-31):** Prime is a
+distribution of **Pi** (Earendil) — its own `package.json` depends on
+`@earendil-works/pi-agent-core`, and its own `packages.md` calls the format
+"the inherited extension ecosystem". `pi.dev/packages` lists **~5,000**
+extensions, skills, prompt templates and themes that install with
+`prime-agent package install`. **Search that registry before authoring any
+slice-table row.** The filter is unchanged — a package carrying its own
+loop, providers, credentials or memory store is still an organ — but the
+candidate list for the open door is far larger than this file assumed.
+Four cheap open questions came out of it (registry coverage of slice 1,
+whether the daemon's `bash` can drive installs, whether Prime's subagent
+state is durable enough to make a task board a *view* rather than a second
+store, and whether `pi-hermes-memory` collides with vault promote):
+[`harness-composition.md`](design/harness-composition.md) § Still discuss /
+decide, items 7–10. Same session added a source-verified Hermes pass
+(terminal, kanban, bots) to that file's Hermes section.
+
 Layers, per-harness verdicts, and the Prime-update split live in the
 composition doc — do not restate them here.
 
