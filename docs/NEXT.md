@@ -102,13 +102,19 @@ extensions, skills, prompt templates and themes that install with
 slice-table row.** The filter is unchanged — a package carrying its own
 loop, providers, credentials or memory store is still an organ — but the
 candidate list for the open door is far larger than this file assumed.
-Four cheap open questions came out of it (registry coverage of slice 1,
-whether the daemon's `bash` can drive installs, whether Prime's subagent
-state is durable enough to make a task board a *view* rather than a second
-store, and whether `pi-hermes-memory` collides with vault promote):
+**Answered 2026-09-02** — items 7–10 in
 [`harness-composition.md`](design/harness-composition.md) § Still discuss /
-decide, items 7–10. Same session added a source-verified Hermes pass
-(terminal, kanban, bots) to that file's Hermes section.
+decide: no package covers slices 1/2 (structurally can't — Rhizome-side UI),
+but slice 3 (profiles) has real review-and-adopt candidates
+(`pi-permission-modes` and peers); the daemon's `bash` **can** drive
+`prime-agent package install` (live-tested, exit 0); Prime's subagent state
+**is** durable + externally observable (`rlm.list_subagents()`, RPC
+`observe`) so a task board can be a view, not a second store; and
+`pi-hermes-memory` **conflicts** with vault promote (default-on background
+writes, own SQLite store, zero awareness of Rhizome) — recommendation is
+reject the package, borrow its correction-triggered-capture idea only. Same
+session added a source-verified Hermes pass (terminal, kanban, bots) to that
+file's Hermes section.
 
 Layers, per-harness verdicts, and the Prime-update split live in the
 composition doc — do not restate them here.
