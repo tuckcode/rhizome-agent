@@ -182,7 +182,7 @@ becomes the editor. Captured in ADR-0166.
 | | |
 |---|---|
 | #24 | Promote produces a note worth keeping, not a transcript dump — **closed 2026-08-28** |
-| #25 | Retrieval shows its work — **implementation pushed; native gap fix committed locally 2026-09-04.** Real-vault QA found Prime 0.8.0 can wrap `get_note` as a `content`/Python `subprocess.run` call, so the answer was correct but provenance was absent. `prime_tool_unwrap` now recovers that live shape and its path; focused Rust tests pass. C22 did not reproduce in a controlled 10-cycle relaunch check. Remaining: repeat the real-vault answer and visually verify its link, then close. [Handoff](plans/handoffs/2026-09-03-1605-gpt-5-6-sol-retrieval-provenance.md). |
+| #25 | Retrieval shows its work — **closed 2026-09-04.** Real-vault QA found Prime 0.8.0 can wrap `get_note` as a `content`/Python `subprocess.run` call, so the answer was correct but provenance was absent. `prime_tool_unwrap` now recovers that live shape and its path; the saved native answer shows `From your vault`, and clicking it opens the exact Tab-completion note. C22 did not reproduce in a controlled 10-cycle relaunch check. [Handoff](plans/handoffs/2026-09-03-1605-gpt-5-6-sol-retrieval-provenance.md). |
 | #37 | "Save as custom" in the research format modal has never done anything — **closed 2026-08-29** (UI `1b469fc`; storage `5d7587c`) |
 | — | **Session import** (no GitHub issue yet) — **P.** [`plans/2026-09-01-session-import-plan.md`](plans/2026-09-01-session-import-plan.md). File issue when Atticus approves. |
 
