@@ -152,7 +152,7 @@ let mockSettings: Settings = {
 
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
 const mockArchivedSessions = new Set<string>()
-let mockPrimeModelAllowList: string[] = ['xai/grok-4.5']
+let mockPrimeModelAllowList: string[] = ['mock/mock-model']
 
 const mockSessionNames = new Map<string, string>()
 
@@ -596,9 +596,9 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     sessionId: null,
     isStreaming: false,
     binaryPath: '/mock/prime-agent',
-    modelProvider: 'xai',
-    modelId: 'grok-4.5',
-    modelName: 'Grok 4.5',
+    modelProvider: 'mock',
+    modelId: 'mock-model',
+    modelName: 'Mock model',
   }),
   check_prime_update: () => null,
   ensure_prime_session_host: () => 'mock-session',
@@ -744,6 +744,18 @@ export const mockHandlers: Record<string, (args: any) => any> = {
         kind: 'message',
         id: 'm2',
         parentId: 'm1',
+        ...(which === 'release notes'
+          ? {
+              tools: [
+                {
+                  id: 'mock-read-release-plan',
+                  tool: 'get_note',
+                  path: '/Users/mock/demo-vault-v2/release-plan.md',
+                  detail: 'Read release-plan.md',
+                },
+              ],
+            }
+          : {}),
         message: {
           role: 'assistant',
           content: [{ type: 'text', text: `Here is what I found about ${which}.` }],
@@ -775,8 +787,8 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     return mockResearchFormats
   },
   get_available_prime_models: () => [
-    { id: 'grok-4.5', name: 'Grok 4.5', provider: 'xai', contextWindow: 256000, reasoning: true },
-    { id: 'claude-fable-5', name: 'Claude Fable 5', provider: 'anthropic', reasoning: true },
+    { id: 'mock-model', name: 'Mock model', provider: 'mock', contextWindow: 200000, reasoning: true },
+    { id: 'mock-alternative', name: 'Mock alternative', provider: 'mock', contextWindow: 100000, reasoning: false },
   ],
   get_prime_commands: () => [
     {

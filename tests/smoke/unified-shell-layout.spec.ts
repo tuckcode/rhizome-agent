@@ -33,6 +33,7 @@ test.describe('Unified shell geometry', () => {
   test('opens one Notes panel from the left Inbox rail item @smoke', async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 900 })
     await page.goto('/', { waitUntil: 'domcontentloaded' })
+    await page.getByTestId('command-rail').hover()
     await expect(page.getByTestId('command-rail-inbox')).toContainText('Inbox')
     await expect(page.getByTestId('vault-panel')).toHaveCount(0)
 
@@ -95,6 +96,8 @@ test.describe('Unified shell geometry', () => {
     await expect(shell).toHaveAttribute('data-compact-sessions', 'false')
     await expect(shell).toHaveAttribute('data-compact-vault', 'false')
     await expect(page.getByTestId('vault-panel')).toBeVisible()
+    const rail = page.getByTestId('command-rail')
+    await rail.hover()
     await expect(page.getByTestId('prime-session-list')).toBeVisible()
 
     await page.getByTestId('vault-panel-collapse').click()
@@ -105,9 +108,9 @@ test.describe('Unified shell geometry', () => {
     await expect(page.getByTestId('vault-panel-navigation')).toHaveCount(0)
     await expect(page.getByTestId('note-list-container')).toBeVisible()
 
-    await page.getByRole('button', { name: 'Close sessions' }).click()
+    await page.locator('.app__editor').hover()
     await expect(page.getByTestId('prime-session-list')).toHaveCount(0)
-    await page.getByRole('button', { name: 'Open sessions' }).click()
+    await rail.hover()
     await expect(page.getByTestId('prime-session-list')).toBeVisible()
 
     await page.locator('.breadcrumb-bar').getByRole('button', { name: 'Open the properties panel' }).click()

@@ -630,7 +630,7 @@ describe('App', () => {
     render(<App />)
 
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
-    expect(screen.getByTestId('command-rail-inbox')).toHaveTextContent('Inbox')
+    expect(screen.getByTestId('command-rail-inbox')).toHaveAccessibleName('Inbox')
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
   })
 

@@ -57,4 +57,13 @@ describe('useChatNoteContent', () => {
     expect(result.current.loading).toBe(false)
     expect(result.current.body).toBeNull()
   })
+
+  it('finishes loading when the note exists but is empty', async () => {
+    loader.fn.mockResolvedValue('')
+    const { result } = renderHook(() => useChatNoteContent('empty.md', '/vault'))
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.body).toBe('')
+    expect(result.current.error).toBe(false)
+  })
 })

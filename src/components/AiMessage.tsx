@@ -8,6 +8,7 @@ import type { NoteReference } from '../utils/ai-context'
 import { writeClipboardText } from '../utils/clipboardText'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
 import { groupConsecutiveToolActions } from '../lib/groupConsecutiveToolActions'
+import { trackVaultRetrievalSourceOpened } from '../lib/productAnalytics'
 
 export interface AiAction {
   tool: string
@@ -347,20 +348,78 @@ function ResponseActions({
   )
 }
 
+function RetrievedNoteSources({
+  actions,
+  onOpenNote,
+}: {
+  actions: AiAction[]
+  onOpenNote?: (path: string) => void
+}) {
+  const paths = [...new Set(actions.flatMap((action) => (
+    action.tool === 'get_note' && action.status === 'done' && action.path
+      ? [action.path]
+      : []
+  )))]
+
+  if (paths.length === 0) return null
+
+  return (
+    <div
+      className="mt-3 flex max-w-full flex-wrap items-center gap-1.5"
+      data-testid="retrieved-note-sources"
+      role="group"
+      aria-label="Notes used from your vault"
+    >
+      <span className="text-xs text-muted-foreground">From your vault</span>
+      {paths.map((path) => {
+        const label = retrievedNoteSourceLabel(path)
+        return (
+          <Button
+            key={path}
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="max-w-full rounded-full text-xs font-normal"
+            disabled={!onOpenNote}
+            aria-label={`Open ${label}`}
+            title={path}
+            onClick={() => {
+              trackVaultRetrievalSourceOpened(paths.length)
+              onOpenNote?.(path)
+            }}
+          >
+            <span className="max-w-64 truncate">{label}</span>
+          </Button>
+        )
+      })}
+    </div>
+  )
+}
+
+function retrievedNoteSourceLabel(path: string): string {
+  const normalized = path.replace(/\\/gu, '/')
+  const absolute = normalized.startsWith('/') || /^[A-Za-z]:\//u.test(normalized)
+  return absolute ? (normalized.split('/').filter(Boolean).pop() ?? path) : path
+}
+
 function ResponseBlock({
+  actions,
   locale,
   messageId,
   forkTargetId,
   onFork,
+  onOpenNote,
   onNavigateWikilink,
   onPromoteToVault,
   onRegenerate,
   text,
 }: {
+  actions: AiAction[]
   locale: AppLocale
   messageId?: string
   forkTargetId?: string
   onFork?: (messageId: string) => void
+  onOpenNote?: (path: string) => void
   onNavigateWikilink?: (target: string) => void
   onPromoteToVault?: (text: string) => void
   onRegenerate?: (messageId: string) => void
@@ -382,6 +441,7 @@ function ResponseBlock({
       data-testid="ai-response-block"
     >
       <MarkdownContent content={text} onWikilinkClick={onNavigateWikilink} />
+      <RetrievedNoteSources actions={actions} onOpenNote={onOpenNote} />
       <ResponseActions
         locale={locale}
         messageId={messageId}
@@ -464,11 +524,13 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
       )}
       {response && (
         <ResponseBlock
+          actions={actions}
           locale={locale}
           messageId={messageId}
           forkTargetId={forkTargetId}
           text={response}
           onFork={onFork}
+          onOpenNote={onOpenNote}
           onNavigateWikilink={onNavigateWikilink}
           onPromoteToVault={onPromoteToVault}
           onRegenerate={onRegenerate}

@@ -49,7 +49,7 @@ export function useChatNoteContent(
   // in the agent's context, which is the worse of the two.
   const body = path && loaded?.path === path ? loaded.body : null
   const error = Boolean(path && failedPath === path)
-  const loading = Boolean(path && vaultPath && !body && !error)
+  const loading = Boolean(path && vaultPath && loaded?.path !== path && !error)
 
   return { body, error, loading }
 }

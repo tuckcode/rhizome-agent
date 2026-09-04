@@ -182,7 +182,7 @@ becomes the editor. Captured in ADR-0166.
 | | |
 |---|---|
 | #24 | Promote produces a note worth keeping, not a transcript dump — **closed 2026-08-28** |
-| #25 | Retrieval shows its work — `needs-triage`, oldest untriaged |
+| #25 | Retrieval shows its work — **implementation + browser live-review ready locally 2026-09-03.** Completed `get_note` calls become deduplicated, one-click `From your vault` links beneath the answer; searches, writes, pending calls, and failures never claim provenance. Browser fixture now says `Mock model` (not a real provider), cites a neutral `release-plan.md` demo note, and cannot hang forever on an empty/stalled dev read. Sessions now live in the Command Rail's open middle, leaving the note readable; the rail starts compact, expands as a whole on hover, can be pinned open, and its right edge drag-resizes the remembered open width. Remaining: real-vault native demo, then commit/close. [Handoff](plans/handoffs/2026-09-03-1605-gpt-5-6-sol-retrieval-provenance.md). |
 | #37 | "Save as custom" in the research format modal has never done anything — **closed 2026-08-29** (UI `1b469fc`; storage `5d7587c`) |
 | — | **Session import** (no GitHub issue yet) — **P.** [`plans/2026-09-01-session-import-plan.md`](plans/2026-09-01-session-import-plan.md). File issue when Atticus approves. |
 

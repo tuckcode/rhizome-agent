@@ -19,6 +19,7 @@ export const APP_STORAGE_KEYS = {
   chatSessionsWidth: 'rhizome:chat-sessions-width',
   myceliumSessionsWidth: 'rhizome:mycelium-sessions-width',
   commandRailExpanded: 'rhizome:command-rail-expanded',
+  commandRailWidth: 'rhizome:command-rail-width',
   welcomeDismissed: 'rhizome_welcome_dismissed',
 } as const
 

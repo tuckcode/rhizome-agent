@@ -30,6 +30,8 @@ const mocks = vi.hoisted(() => {
   }
 })
 
+const runtime = vi.hoisted(() => ({ tauri: false }))
+
 vi.mock('react-dom/client', () => ({ createRoot: mocks.createRoot }))
 vi.mock('@sentry/react', () => ({ reactErrorHandler: mocks.reactErrorHandler }))
 vi.mock('./App.tsx', () => ({
@@ -56,6 +58,7 @@ vi.mock('./hooks/appCommandCatalog', async (importOriginal) => {
     getShortcutEventInit: mocks.getShortcutEventInit,
   }
 })
+vi.mock('./mock-tauri', () => ({ isTauri: () => runtime.tauri }))
 
 async function importEntrypoint() {
   await import('./main')
@@ -127,6 +130,7 @@ describe('main entrypoint', () => {
     document.body.className = ''
     window.__rhizomeFrontendReady = false
     sessionStorage.clear()
+    runtime.tauri = false
   })
 
   it('captures React root errors through Sentry with component stack context', async () => {
@@ -159,7 +163,17 @@ describe('main entrypoint', () => {
     expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack: '' })
   }, MAIN_ENTRYPOINT_IMPORT_TIMEOUT_MS)
 
-  it('marks macOS chrome for traffic-light layout offsets', async () => {
+  it('does not reserve traffic-light layout space in a macOS browser preview', async () => {
+    await withUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 Safari/605.1.15', async () => {
+      await importEntrypoint()
+    })
+
+    expect(document.body).not.toHaveClass('mac-chrome')
+  }, MAIN_ENTRYPOINT_IMPORT_TIMEOUT_MS)
+
+  it('marks native macOS chrome for traffic-light layout offsets', async () => {
+    runtime.tauri = true
+
     await withUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 Safari/605.1.15', async () => {
       await importEntrypoint()
     })

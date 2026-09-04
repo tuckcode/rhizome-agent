@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render as rtlRender, screen, fireEvent, act, waitFor } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent, act, waitFor, within } from '@testing-library/react'
 import { AiPanel, AiPanelView } from './AiPanel'
 import { UNSUPPORTED_INLINE_PASTE_MESSAGE } from './InlineWikilinkInput'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -665,6 +665,25 @@ describe('Chat home opens with its sessions column', () => {
       'false',
     )
   })
+
+  it('mounts Sessions in the rail slot instead of beside the transcript', () => {
+    const slot = document.createElement('div')
+    document.body.append(slot)
+
+    render(
+      <AiPanelView
+        controller={primeController()}
+        onClose={vi.fn()}
+        showHeader={false}
+        targetId="agent:prime"
+        sessionsRailSlot={slot}
+      />,
+    )
+
+    expect(within(slot).getByTestId('prime-session-list')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Close sessions' })).not.toBeInTheDocument()
+    slot.remove()
+  })
 })
 
 /**
@@ -824,4 +843,3 @@ describe('talking to a turn that is already running', () => {
     expect(screen.getByTestId('agent-input')).toHaveTextContent('still worth keeping')
   })
 })
-

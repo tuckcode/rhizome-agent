@@ -4,6 +4,19 @@
  */
 
 export const MOCK_CONTENT: Record<string, string> = {
+  '/Users/mock/demo-vault-v2/release-plan.md': `---
+title: Rhizome Agent Release Plan
+type: Project
+status: Active
+---
+
+# Rhizome Agent Release Plan
+
+## Before public release
+- Verify the core chat flow
+- Make retrieved vault sources easy to inspect
+- Keep narrow-window layouts usable
+`,
   '/Users/luca/Laputa/26q1-laputa-app.md': `---
 title: Build Laputa App
 type: Project

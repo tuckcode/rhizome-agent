@@ -1,4 +1,5 @@
 import { useEffect, useRef, type MutableRefObject, type ReactNode, type RefObject } from 'react'
+import { createPortal } from 'react-dom'
 import { aiPanelFrameStyle } from './aiPanelPulse'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 
@@ -79,6 +80,8 @@ interface AiPanelProps {
   notePane?: ReactNode
   /** Temporarily hide Sessions when the containing shell cannot fit it. */
   sessionsAutoCollapsed?: boolean
+  /** Expanded Command Rail slot. `undefined` preserves the classic-shell column. */
+  sessionsRailSlot?: HTMLElement | null
   onForkMessage?: (entryId: string) => void
   /** Fork branches the Prime session rather than copying the conversation. */
   forkTargetsPrimeEntry?: boolean
@@ -111,6 +114,7 @@ interface AiPanelViewProps {
   composerControls?: ReactNode
   notePane?: ReactNode
   sessionsAutoCollapsed?: boolean
+  sessionsRailSlot?: HTMLElement | null
   onForkMessage?: (messageId: string) => void
   forkTargetsPrimeEntry?: boolean
   onQueuedPromptTarget?: (targetId: string) => void
@@ -209,6 +213,7 @@ export function AiPanelView({
   composerControls,
   notePane,
   sessionsAutoCollapsed = false,
+  sessionsRailSlot,
   onForkMessage,
   forkTargetsPrimeEntry,
   onQueuedPromptTarget,
@@ -328,6 +333,8 @@ export function AiPanelView({
     refreshSessionTree,
     primeHostSessionPath: primeHost.sessionPath,
   })
+  const sessionsShown = sessionsVisible
+  const usesRailSessions = sessionsRailSlot !== undefined
 
   const { commandEntries: localizedCommands, commandDisabled, handleCommandAction } = usePrimeCommandActions({
     isPrimeTarget,
@@ -341,7 +348,8 @@ export function AiPanelView({
   })
 
   return (
-    <AiPanelFrame panelRef={panelRef} isActive={isActive} showLeftBorder={showLeftBorder} surface={surface}>
+    <>
+      <AiPanelFrame panelRef={panelRef} isActive={isActive} showLeftBorder={showLeftBorder} surface={surface}>
       {showHeader && (
         <AiPanelHeader
           agentLabel={view.agentLabel}
@@ -359,7 +367,7 @@ export function AiPanelView({
           onNewChat={handleNewChat}
         />
       )}
-      {isPrimeTarget && (
+      {isPrimeTarget && !usesRailSessions && (
         <div className="flex shrink-0 justify-end px-3 pt-1.5">
           <Button
             type="button"
@@ -383,11 +391,12 @@ export function AiPanelView({
         </p>
       ) : null}
       <div className="flex min-h-0 flex-1">
-        {sessionsVisible && (
+        {sessionsShown && !usesRailSessions && (
           // Design system: sessions are a column beside the transcript, never
           // a view that replaces it. Conversation owns the room — which is
           // why the drag has an upper bound rather than free rein.
           <div
+            data-testid="prime-sessions-region"
             className="relative flex shrink-0 border-r border-border"
             style={{ width: sessionsWidth.width }}
           >
@@ -535,7 +544,21 @@ export function AiPanelView({
         commandInstantLabel={translate(locale, 'ai.command.instant')}
         onCommandAction={isPrimeTarget ? (action, nextValue) => void handleCommandAction(action, nextValue) : undefined}
       />
-    </AiPanelFrame>
+      </AiPanelFrame>
+      {usesRailSessions && sessionsRailSlot && isPrimeTarget
+        ? createPortal(
+            <PrimeSessionList
+              locale={locale}
+              onSelectSession={(session) => void handleSelectSession(session)}
+              onNewChat={handleNewChat}
+              activeSessionPath={activeSessionPath}
+              working={isActive}
+              vaultPath={vaultPath}
+            />,
+            sessionsRailSlot,
+          )
+        : null}
+    </>
   )
 }
 
@@ -567,6 +590,7 @@ export function AiPanel({
   newChatRef,
   notePane,
   sessionsAutoCollapsed,
+  sessionsRailSlot,
 }: AiPanelProps) {
   const defaultAiAgentReadiness = providedDefaultAiAgentReadiness
     ?? readinessFromReadyFlag(providedDefaultAiAgentReady)
@@ -604,6 +628,7 @@ export function AiPanel({
       forkTargetsPrimeEntry={forkTargetsPrimeEntry}
       notePane={notePane}
       sessionsAutoCollapsed={sessionsAutoCollapsed}
+      sessionsRailSlot={sessionsRailSlot}
       onClose={onClose}
       onOpenNote={onOpenNote}
       onPromoteToVault={onPromoteToVault}

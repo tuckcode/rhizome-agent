@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommandRail } from './CommandRail'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
@@ -36,10 +36,10 @@ describe('CommandRail', () => {
     trackRailDestinationClicked.mockClear()
   })
 
-  it('renders the four destinations and the settings gear', () => {
+  it('renders the destinations, Sessions space, and settings gear', () => {
     renderRail()
     expect(screen.getByTestId('command-rail')).toBeInTheDocument()
-    expect(screen.getByTestId('command-rail-inbox')).toHaveTextContent('Inbox')
+    expect(screen.getByTestId('command-rail-inbox')).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-graph')).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-research')).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-changes')).toBeInTheDocument()
@@ -84,35 +84,101 @@ describe('CommandRail', () => {
 })
 
 /**
- * The visual audit (2026-08-20): "Six destinations + Settings, all 30x30, no
- * labels, no expand, no hover-required to *know* they exist if you do not
- * already." The strings were always there — `rail.chat` and friends — they
- * just only reached a tooltip and an aria-label, so a sighted person had to
- * hover each icon to learn what the app could do.
+ * The 2026-08-20 audit expanded the rail because an icon-only launcher hid
+ * its available places. Atticus later chose a compact default: familiar
+ * icons save room, while a readable hover label says what each one is and an
+ * explicit expand action reveals the persistent Sessions area.
  */
-describe('the rail says what its destinations are', () => {
+describe('the rail puts navigation first and sessions in its empty middle', () => {
   beforeEach(() => {
     localStorage.clear()
   })
 
-  it('shows every label as text, not only on hover', () => {
+  it('starts compact but keeps every destination discoverable by its accessible label', () => {
     renderRail()
 
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'false')
     for (const label of ['Chat', 'Inbox', 'Wiki Graph', 'Mycelium', 'Research', 'Changes', 'Settings']) {
-      expect(screen.getByText(label)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
     }
   })
 
-  it('collapses back to icons for someone who wants the room', () => {
+  it('expands to show labels and mounts Sessions below all destinations', async () => {
+    const onSessionsSlotReady = vi.fn()
+    renderRail({ onSessionsSlotReady })
+
+    fireEvent.mouseEnter(screen.getByTestId('command-rail'))
+
+    await waitFor(() => expect(screen.getByText('Wiki Graph')).toBeInTheDocument())
+    const sessions = screen.getByTestId('command-rail-sessions')
+    expect(sessions).toBeInTheDocument()
+    expect(onSessionsSlotReady).toHaveBeenCalledWith(sessions)
+    expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).toBeNull()
+  })
+
+  it('returns to compact mode when the pointer leaves an unpinned rail', async () => {
     renderRail()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse rail' }))
+    const rail = screen.getByTestId('command-rail')
+    fireEvent.mouseEnter(rail)
+    await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'true'))
 
-    expect(screen.queryByText('Wiki Graph')).not.toBeInTheDocument()
-    // The destination itself must survive the collapse — it is still
-    // reachable, just unlabelled.
-    expect(screen.getByTestId('command-rail-graph')).toBeInTheDocument()
-    expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).toBe('0')
+    fireEvent.mouseMove(window, { clientX: 500, clientY: 220 })
+    await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'false'))
+    expect(screen.queryByTestId('command-rail-sessions')).not.toBeInTheDocument()
+  })
+
+  it('ignores a false leave whose pointer coordinates remain inside the rail', async () => {
+    renderRail()
+
+    const rail = screen.getByTestId('command-rail')
+    vi.spyOn(rail, 'getBoundingClientRect').mockReturnValue({
+      bottom: 600,
+      height: 600,
+      left: 0,
+      right: 168,
+      top: 0,
+      width: 168,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+    fireEvent.mouseEnter(rail)
+    await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'true'))
+    fireEvent.mouseMove(window, { clientX: 40, clientY: 220 })
+
+    await new Promise((resolve) => setTimeout(resolve, 220))
+    expect(rail).toHaveAttribute('data-expanded', 'true')
+  })
+
+  it('can be pinned open after hover expansion', async () => {
+    renderRail()
+
+    const rail = screen.getByTestId('command-rail')
+    fireEvent.mouseEnter(rail)
+    await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'true'))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep rail open' }))
+    fireEvent.mouseMove(window, { clientX: 500, clientY: 220 })
+
+    expect(rail).toHaveAttribute('data-expanded', 'true')
+    expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).toBe('1')
+  })
+
+  it('widens from its right edge and remembers the chosen width', async () => {
+    renderRail()
+
+    const rail = screen.getByTestId('command-rail')
+    fireEvent.mouseEnter(rail)
+    await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'true'))
+    const handle = screen.getByRole('separator', { name: 'Resize Sessions sidebar' })
+
+    fireEvent.mouseDown(handle, { clientX: 168 })
+    fireEvent.mouseMove(window, { clientX: 248 })
+    fireEvent.mouseUp(window)
+
+    expect(rail).toHaveStyle({ width: '320px' })
+    expect(localStorage.getItem('rhizome:command-rail-width')).toBe('320')
+    expect(rail).toHaveAttribute('data-pinned', 'true')
   })
 
   it('stays collapsed when that is what the machine remembers', () => {

@@ -11,12 +11,12 @@ import { ChatNotePane } from './ChatNotePane'
  * Loading is covered by that hook's tests; what is left here is rendering.
  */
 describe('ChatNotePane', () => {
-  it('shows the note path and closes without leaving chat', () => {
+  it('shows the note path and can hide the pane without leaving chat', () => {
     const onClose = vi.fn()
     render(<ChatNotePane label="wiki/decisions/memory-loop.md" onClose={onClose} />)
 
     expect(screen.getByTestId('chat-note-pane')).toHaveTextContent('wiki/decisions/memory-loop.md')
-    fireEvent.click(screen.getByRole('button', { name: 'Close note' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Hide note' }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
