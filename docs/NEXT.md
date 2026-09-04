@@ -17,7 +17,7 @@ It indexes, it does not restate. Every row points at the issue, ADR, or C-number
 that owns the detail. If you find yourself copying a paragraph out of one of
 those into here, link it instead — the same rule `HANDOFF.md` runs on.
 
-Snapshot: **2026-09-02**, 27 open issues, 13 open C-numbers. Re-derive both
+Snapshot: **2026-09-04**, 27 open issues, 12 open C-numbers. Re-derive both
 before trusting the counts:
 
 ```bash
@@ -182,7 +182,7 @@ becomes the editor. Captured in ADR-0166.
 | | |
 |---|---|
 | #24 | Promote produces a note worth keeping, not a transcript dump — **closed 2026-08-28** |
-| #25 | Retrieval shows its work — **implementation pushed; native gap fixed locally 2026-09-04.** Real-vault QA found Prime 0.8.0 can wrap `get_note` as a `content`/Python `subprocess.run` call, so the answer was correct but provenance was absent. `prime_tool_unwrap` now recovers that live shape and its path; focused Rust tests pass. Remaining: visual recheck after C22's reopened hidden-window failure, then commit/close. [Handoff](plans/handoffs/2026-09-03-1605-gpt-5-6-sol-retrieval-provenance.md). |
+| #25 | Retrieval shows its work — **implementation pushed; native gap fix committed locally 2026-09-04.** Real-vault QA found Prime 0.8.0 can wrap `get_note` as a `content`/Python `subprocess.run` call, so the answer was correct but provenance was absent. `prime_tool_unwrap` now recovers that live shape and its path; focused Rust tests pass. C22 did not reproduce in a controlled 10-cycle relaunch check. Remaining: repeat the real-vault answer and visually verify its link, then close. [Handoff](plans/handoffs/2026-09-03-1605-gpt-5-6-sol-retrieval-provenance.md). |
 | #37 | "Save as custom" in the research format modal has never done anything — **closed 2026-08-29** (UI `1b469fc`; storage `5d7587c`) |
 | — | **Session import** (no GitHub issue yet) — **P.** [`plans/2026-09-01-session-import-plan.md`](plans/2026-09-01-session-import-plan.md). File issue when Atticus approves. |
 
@@ -235,7 +235,7 @@ Save-to-vault refuse. Prime session jsonl stays out of scope.
 
 ## 3. Open threads (C-numbers)
 
-13 open. Full text in `HANDOFF.md` § Open threads — this is the shape of the
+12 open. Full text in `HANDOFF.md` § Open threads — this is the shape of the
 backlog, not a replacement for it.
 
 - **Blocks other work:** C42 (Windows never launched — #32 sits on top of it),
@@ -252,9 +252,7 @@ backlog, not a replacement for it.
 - ~~**Correctness:** C34~~ **RESOLVED 2026-08-29** (`1509f9f`, `be85f80`)
 - ~~**Correctness:** C52~~ **RESOLVED 2026-08-30** — see HANDOFF C52-RESOLVED
 - ~~**Correctness:** C56~~ **RESOLVED 2026-08-30** — see HANDOFF C56-RESOLVED
-- **Correctness:** C22 (reopened: rebuilt macOS app can relaunch as a running
-  process with no reachable window), C40 (`rhizome_graph_summary` answers about
-  a different graph)
+- **Correctness:** C40 (`rhizome_graph_summary` answers about a different graph)
 - ~~**Health and cleanup:** C46~~ **RESOLVED 2026-08-30** — see HANDOFF
   C46-RESOLVED
 - **Health and cleanup:** C21 / C30 (branding residues), C11 (Getting
