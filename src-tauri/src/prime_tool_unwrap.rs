@@ -24,7 +24,7 @@ use serde::Serialize;
 const CLI_ENTRY: &str = "cli-call.mjs";
 
 /// Wrappers whose payload is a shell/python snippet worth looking inside.
-const WRAPPER_TOOLS: &[&str] = &["ipython", "bash", "shell", "sh", "python"];
+const WRAPPER_TOOLS: &[&str] = &["ipython", "bash", "shell", "sh", "python", "content"];
 
 /// Argument keys that carry the wrapped source, by wrapper.
 const CODE_KEYS: &[&str] = &["code", "command", "script", "input"];
@@ -148,13 +148,35 @@ fn parse_cli_invocation(code: &str) -> Option<(String, Option<String>)> {
     // closing quote from the script path is out of the way.
     let tool = after_entry
         .split_whitespace()
-        .map(|token| token.trim_matches(|c| c == '\'' || c == '"' || c == '\\'))
+        .map(|token| {
+            token.trim_matches(|c| matches!(c, '\'' | '"' | '\\' | ',' | '[' | ']' | '(' | ')'))
+        })
         .find(|token| is_tool_name(token))?
         .to_string();
 
     // Undo one layer of quoting first: the JSON blob is embedded in a shell
     // string inside a python literal, so the keys can arrive as \\"path\\".
-    Some((tool, path_from_json_argument(&unescape_quotes(after_entry))))
+    let path = path_from_json_argument(&unescape_quotes(after_entry))
+        .filter(|path| !path.contains('{'))
+        .or_else(|| path_from_python_assignment(code));
+    Some((tool, path))
+}
+
+/// Recover the common `path = "…"` variable used by Python argv wrappers.
+/// This only runs after a real `cli-call.mjs` invocation was found.
+fn path_from_python_assignment(code: &str) -> Option<String> {
+    code.lines().rev().find_map(|line| {
+        let rest = line.trim().strip_prefix("path")?.trim_start();
+        let value = rest.strip_prefix('=')?.trim_start();
+        let quote = value.chars().next()?;
+        if !matches!(quote, '\'' | '"') {
+            return None;
+        }
+        let value = &value[quote.len_utf8()..];
+        let end = value.find(quote)?;
+        let path = value[..end].trim();
+        (!path.is_empty()).then(|| path.to_string())
+    })
 }
 
 fn unescape_quotes(text: &str) -> String {
@@ -288,6 +310,31 @@ mod tests {
 
         assert_eq!(unwrapped.tool, "create_note");
         assert_eq!(unwrapped.path.as_deref(), Some("inbox/idea.md"));
+    }
+
+    /// Captured from the real Prime 0.8.0 native run on 2026-09-04. Prime
+    /// labelled this wrapper `content` and passed argv to `subprocess.run`
+    /// instead of writing one shell command. Without this shape, a successful
+    /// read produces no `From your vault` provenance link.
+    #[test]
+    fn a_live_subprocess_argv_get_note_reports_the_inner_tool_and_path() {
+        let code = r#"
+import subprocess
+path = "projects/rhizome-agent/sub-agents/2026-09-01-tab-completion-ux-research.md"
+result = subprocess.run([
+    "node", "/Users/dtc/code/projects/rhizome-agent/mcp-server/cli-call.mjs",
+    "get_note", f'{{"path":"{path}"}}'
+], capture_output=True, text=True)
+"#;
+
+        let unwrapped = unwrap_tool("content", &serde_json::json!({ "code": code }));
+
+        assert_eq!(unwrapped.tool, "get_note");
+        assert_eq!(
+            unwrapped.path.as_deref(),
+            Some("projects/rhizome-agent/sub-agents/2026-09-01-tab-completion-ux-research.md")
+        );
+        assert!(unwrapped.unwrapped);
     }
 
     /// A wrapper doing something unrelated must keep its own name. A wrong

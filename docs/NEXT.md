@@ -182,7 +182,7 @@ becomes the editor. Captured in ADR-0166.
 | | |
 |---|---|
 | #24 | Promote produces a note worth keeping, not a transcript dump — **closed 2026-08-28** |
-| #25 | Retrieval shows its work — **implementation + browser live-review ready locally 2026-09-03.** Completed `get_note` calls become deduplicated, one-click `From your vault` links beneath the answer; searches, writes, pending calls, and failures never claim provenance. Browser fixture now says `Mock model` (not a real provider), cites a neutral `release-plan.md` demo note, and cannot hang forever on an empty/stalled dev read. Sessions now live in the Command Rail's open middle, leaving the note readable; the rail starts compact, expands as a whole on hover, can be pinned open, and its right edge drag-resizes the remembered open width. Remaining: real-vault native demo, then commit/close. [Handoff](plans/handoffs/2026-09-03-1605-gpt-5-6-sol-retrieval-provenance.md). |
+| #25 | Retrieval shows its work — **implementation pushed; native gap fixed locally 2026-09-04.** Real-vault QA found Prime 0.8.0 can wrap `get_note` as a `content`/Python `subprocess.run` call, so the answer was correct but provenance was absent. `prime_tool_unwrap` now recovers that live shape and its path; focused Rust tests pass. Remaining: visual recheck after C22's reopened hidden-window failure, then commit/close. [Handoff](plans/handoffs/2026-09-03-1605-gpt-5-6-sol-retrieval-provenance.md). |
 | #37 | "Save as custom" in the research format modal has never done anything — **closed 2026-08-29** (UI `1b469fc`; storage `5d7587c`) |
 | — | **Session import** (no GitHub issue yet) — **P.** [`plans/2026-09-01-session-import-plan.md`](plans/2026-09-01-session-import-plan.md). File issue when Atticus approves. |
 
@@ -238,19 +238,23 @@ Save-to-vault refuse. Prime session jsonl stays out of scope.
 13 open. Full text in `HANDOFF.md` § Open threads — this is the shape of the
 backlog, not a replacement for it.
 
-- **Blocks other work:** C23 (`get_messages` returns no assistant messages —
-  rehydration shape undecided, and #23/#17 need it), C42 (Windows never
-  launched — #32 sits on top of it), **C57** (Limited tools / Vault Safe
-  naming and CLI defaults — Atticus)
+- **Blocks other work:** C42 (Windows never launched — #32 sits on top of it),
+  **C57** (Limited tools / Vault Safe naming and CLI defaults — Atticus)
+- **Resolved but previously misindexed here:** C23. Session replay reads the
+  full on-disk Prime log; `get_messages` remains a live, post-compaction view.
+  See `HANDOFF.md` C23-RESOLVED and
+  [`2026-08-13-prime-session-list-spec.md`](plans/2026-08-13-prime-session-list-spec.md).
 - **Test and gate reliability:** C28 (three `@smoke` specs fail under CPU load),
   C31 (unreproducible `pnpm test` unhandled error), C39 (live-daemon tests not
-  isolated), C25 (two stale regression specs)
+  isolated). C25 is resolved: the create-note flow follows the current Notes
+  panel and duplicate type-visibility browser coverage was removed.
 - ~~**Correctness / warnings:** C55~~ **RESOLVED 2026-08-29** (`c423445`)
 - ~~**Correctness:** C34~~ **RESOLVED 2026-08-29** (`1509f9f`, `be85f80`)
 - ~~**Correctness:** C52~~ **RESOLVED 2026-08-30** — see HANDOFF C52-RESOLVED
 - ~~**Correctness:** C56~~ **RESOLVED 2026-08-30** — see HANDOFF C56-RESOLVED
-- **Correctness:** C40 (`rhizome_graph_summary` answers about a different
-  graph)
+- **Correctness:** C22 (reopened: rebuilt macOS app can relaunch as a running
+  process with no reachable window), C40 (`rhizome_graph_summary` answers about
+  a different graph)
 - ~~**Health and cleanup:** C46~~ **RESOLVED 2026-08-30** — see HANDOFF
   C46-RESOLVED
 - **Health and cleanup:** C21 / C30 (branding residues), C11 (Getting

@@ -1025,8 +1025,8 @@ pub fn get_session_stats() -> Result<PrimeSessionStats, String> {
 
 /// Fetch the live session's conversation history.
 ///
-/// This is what a transcript rehydrates from: reopening a session, or
-/// recovering the panel after a reload, without replaying the stream.
+/// This is Prime's persisted, post-compaction working history. User-visible
+/// session replay reads the full on-disk log through `prime_sessions` instead.
 pub fn get_messages() -> Result<Vec<PrimeMessage>, String> {
     with_host_mut(|host| {
         let data = host.call(serde_json::json!({ "type": "get_messages" }))?;
