@@ -504,7 +504,7 @@ pub fn get_prime_session_stats() -> Result<crate::prime_session_host::PrimeSessi
     crate::prime_session_host::get_session_stats()
 }
 
-/// Conversation history for the live Prime session, for transcript rehydration.
+/// Prime's persisted, post-compaction history for the live session.
 #[cfg(desktop)]
 #[tauri::command]
 pub fn get_prime_session_messages() -> Result<Vec<crate::prime_session_host::PrimeMessage>, String>
