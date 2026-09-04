@@ -15,6 +15,7 @@ describe('ChatNotePane', () => {
     const onClose = vi.fn()
     render(<ChatNotePane label="wiki/decisions/memory-loop.md" onClose={onClose} />)
 
+    expect(screen.getByText('Note preview')).toBeInTheDocument()
     expect(screen.getByTestId('chat-note-pane')).toHaveTextContent('wiki/decisions/memory-loop.md')
     fireEvent.click(screen.getByRole('button', { name: 'Hide note' }))
     expect(onClose).toHaveBeenCalledTimes(1)

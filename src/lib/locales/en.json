@@ -1294,7 +1294,7 @@
   "ai.command.exportNeedsSession": "Needs a saved session to export",
   "ai.command.exported": "Saved this conversation to {path}",
   "ai.marker.credentialsRedactedDistill": "Removed {count} credential{plural} before saving this turn to the wiki",
-  "ai.chatNote.tag": "Note",
+  "ai.chatNote.tag": "Note preview",
   "ai.chatNote.close": "Close note",
   "ai.chatNote.resize": "Resize note panel",
   "ai.chatNote.loading": "Loading note…",
