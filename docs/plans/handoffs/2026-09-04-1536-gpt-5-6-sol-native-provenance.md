@@ -23,6 +23,8 @@ commits: 31741f8
 - C22: the attempted reopening was retired. A CoreGraphics visible-window
   probe and exact-process-path check showed the debug bundle opening normally
   in 10/10 controlled quit/relaunch cycles; no window code changed.
+- #25: native rehydration showed `From your vault` beneath the saved answer;
+  clicking it opened the exact Tab-completion research note. GitHub #25 closed.
 
 ## Verification
 
@@ -38,5 +40,5 @@ commits: 31741f8
 
 ## Next
 
-Repeat the real-vault retrieval and verify the `From your vault` link opens the
-cited note. Commit/push only with Atticus's approval.
+Pick the next pre-public stability/core-UX item from `docs/NEXT.md`. Push only
+with Atticus's approval.
