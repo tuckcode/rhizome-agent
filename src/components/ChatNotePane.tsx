@@ -65,8 +65,8 @@ export function ChatNotePane({
           size="icon-xs"
           className="h-6 w-6 shrink-0 p-0 [&_svg:not([class*=size-])]:size-3.5"
           onClick={onClose}
-          aria-label={t('ai.chatNote.close')}
-          title={t('ai.chatNote.close')}
+          aria-label="Hide note"
+          title="Hide note"
         >
           <X size={14} />
         </Button>

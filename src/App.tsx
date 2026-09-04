@@ -1568,13 +1568,15 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   })
   const activeTabEntry = activeTab?.entry ?? null
   const activeTabPath = activeTabEntry?.path
+  const [chatNotePaneOpen, setChatNotePaneOpen] = useState(false)
+  const [sessionRailSlot, setSessionRailSlot] = useState<HTMLDivElement | null>(null)
   const {
     shellRef,
     collapseSessions: compactSessions,
     collapseVaultPanel: compactVaultPanel,
   } = useShellCompactLayout(
     chatCentered,
-    Boolean(activeTab),
+    Boolean(activeTab) || chatNotePaneOpen,
     !layout.inspectorCollapsed,
   )
   const [compactVaultPanelOpen, setCompactVaultPanelOpen] = useState(false)
@@ -1986,6 +1988,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         onVaultChanged={vaultBridge.handleAgentVaultChanged}
         onUnsupportedAiPaste={setToastMessage}
         sessionsAutoCollapsed={compactSessions}
+        sessionsRailSlot={commandRailEnabled ? sessionRailSlot : undefined}
+        onNotePaneOpenChange={setChatNotePaneOpen}
         onOpenSessionFootprint={handleOpenSessionFootprint}
         requestedNote={chatNoteRequest}
       />
@@ -2036,6 +2040,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                 if (compactVaultPanel) setCompactVaultPanelOpen(true)
               }}
               onOpenSettings={handleOpenSettings}
+              onSessionsSlotReady={setSessionRailSlot}
             />
           )}
           {sidebarDock === 'left' && sidebarPanel}

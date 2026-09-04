@@ -130,8 +130,16 @@ describe('ChatHome', () => {
     expect(screen.getByTestId('chat-note-pane')).toHaveTextContent('wiki/decisions/memory-loop.md')
     expect(onOpenNote).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close note' }))
-    expect(screen.queryByTestId('chat-note-pane')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Hide note' }))
+    const edge = screen.getByTestId('chat-note-hover-edge')
+
+    fireEvent.mouseLeave(edge)
+    fireEvent.mouseEnter(edge)
+    const pane = screen.getByTestId('chat-note-hover-region')
+    expect(screen.getByTestId('chat-note-pane')).toBeInTheDocument()
+
+    fireEvent.mouseLeave(pane)
+    expect(screen.getByTestId('chat-note-hover-edge')).toBeInTheDocument()
   })
 })
 
@@ -287,7 +295,7 @@ describe('ChatHome — a note handed in from the vault', () => {
     const { rerender } = renderWith({ ...note, requestId: 1 })
     await waitFor(() => expect(screen.getByTestId('chat-note-pane')).toBeInTheDocument())
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close note' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Hide note' }))
     expect(screen.queryByTestId('chat-note-pane')).not.toBeInTheDocument()
 
     rerender(

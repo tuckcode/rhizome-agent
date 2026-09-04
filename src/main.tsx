@@ -19,6 +19,7 @@ import {
 } from './hooks/appCommandCatalog'
 import { isRecoverableBlockNoteRenderError } from './components/blockNoteRenderRecovery'
 import { isRecoveredActionTooltipError } from './components/ui/actionTooltipRecovery'
+import { isTauri } from './mock-tauri'
 import { isMac, shouldUseCustomWindowChrome } from './utils/platform'
 import { reloadFrontendOnceIfStartupFailed } from './utils/frontendReady'
 
@@ -65,7 +66,7 @@ if (shouldUseCustomWindowChrome()) {
   document.body.classList.add('custom-window-chrome')
 }
 
-if (isMac()) {
+if (isTauri() && isMac()) {
   document.body.classList.add('mac-chrome')
 }
 

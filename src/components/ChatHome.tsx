@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { AiPanel } from './AiPanel'
 import { PrimeSessionSubhead } from './PrimeSessionSubhead'
 import { AgentActivityBand } from './AgentActivityBand'
@@ -35,10 +35,14 @@ interface ChatHomeProps {
   onVaultChanged?: () => void
   onUnsupportedAiPaste?: (message: string) => void
   sessionsAutoCollapsed?: boolean
+  /** Expanded Command Rail slot, if this shell has the rail enabled. */
+  sessionsRailSlot?: HTMLElement | null
   /** Where "close" goes when chat owns the window — back to the vault. */
   onExit: () => void
   /** Open Mycelium on this Prime session only (#22). */
   onOpenSessionFootprint?: (sessionPath: string) => void
+  /** Lets the shell make room for Chat's secondary note pane at narrow widths. */
+  onNotePaneOpenChange?: (open: boolean) => void
   /**
    * A note handed to Chat from outside — the vault's "Ask the agent about this
    * note". Carries an id so asking about the *same* note twice still reopens
@@ -69,8 +73,10 @@ export default function ChatHome({
   onVaultChanged,
   onUnsupportedAiPaste,
   sessionsAutoCollapsed = false,
+  sessionsRailSlot,
   onExit,
   onOpenSessionFootprint,
+  onNotePaneOpenChange,
   requestedNote,
 }: ChatHomeProps) {
   // Chat is Prime's home canvas (ADR-0166). A direct API model chosen as the
@@ -87,6 +93,8 @@ export default function ChatHome({
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
+  const [notePaneCollapsed, setNotePaneCollapsed] = useState(false)
+  const [noteHoverArmed, setNoteHoverArmed] = useState(true)
   // One read of the open note, shared by the pane and the agent. Chat used to
   // pass nothing to `AiPanel`, so a note open on screen was invisible to the
   // model — "summarise this" had no "this".
@@ -101,7 +109,16 @@ export default function ChatHome({
   if (requestedNote && requestedNote.requestId !== lastRequestId) {
     setLastRequestId(requestedNote.requestId)
     setOpenNote({ path: requestedNote.path, label: requestedNote.label })
+    setNotePaneCollapsed(false)
+    setNoteHoverArmed(true)
   }
+  const notePaneOpen = openNote !== null
+  useEffect(() => {
+    onNotePaneOpenChange?.(notePaneOpen)
+    return () => {
+      if (notePaneOpen) onNotePaneOpenChange?.(false)
+    }
+  }, [notePaneOpen, onNotePaneOpenChange])
   const openNoteContent = useChatNoteContent(openNote?.path, vaultPath)
   // Bounds, not decoration: below ~260px the note is unreadable, and past
   // ~880px the conversation it sits beside stops being the point.
@@ -148,7 +165,10 @@ export default function ChatHome({
           activeNoteContent={openNoteContent.body}
           onOpenNote={(target) => {
             const resolved = resolveChatOpenNote(target, vaultPath, entries)
-            if (resolved) setOpenNote(resolved)
+            if (resolved) {
+              setOpenNote(resolved)
+              setNotePaneCollapsed(false)
+            }
           }}
           onPromoteToVault={onPromoteToVault}
           onFileCreated={onFileCreated}
@@ -157,10 +177,29 @@ export default function ChatHome({
           onUnsupportedAiPaste={onUnsupportedAiPaste}
           showHeader={false}
           sessionsAutoCollapsed={sessionsAutoCollapsed}
+          sessionsRailSlot={sessionsRailSlot}
           forkTargetsPrimeEntry
           newChatRef={newChatRef}
           notePane={
-            openNote ? (
+            openNote ? notePaneCollapsed ? (
+              <div
+                aria-hidden="true"
+                data-testid="chat-note-hover-edge"
+                className="flex w-7 shrink-0 cursor-pointer items-center justify-center border-l border-border bg-background text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                style={{ writingMode: 'vertical-rl' }}
+                onMouseEnter={() => {
+                  if (noteHoverArmed) setNotePaneCollapsed(false)
+                }}
+                onMouseLeave={() => setNoteHoverArmed(true)}
+              >
+                Note
+              </div>
+            ) : (
+              <div
+                data-testid="chat-note-hover-region"
+                className="flex min-h-0 shrink-0"
+                onMouseLeave={() => setNotePaneCollapsed(true)}
+              >
               <ChatNotePane
                 locale={locale}
                 label={openNote.label}
@@ -169,12 +208,21 @@ export default function ChatHome({
                 body={openNoteContent.body}
                 error={openNoteContent.error}
                 loading={openNoteContent.loading}
-                onClose={() => setOpenNote(null)}
+                onClose={() => {
+                  // The edge replaces this button under the pointer. Require
+                  // a leave-and-return before it counts as a deliberate hover.
+                  setNoteHoverArmed(false)
+                  setNotePaneCollapsed(true)
+                }}
                 onOpenNote={(target) => {
                   const resolved = resolveChatOpenNote(target, vaultPath, entries)
-                  if (resolved) setOpenNote(resolved)
+                  if (resolved) {
+                    setOpenNote(resolved)
+                    setNotePaneCollapsed(false)
+                  }
                 }}
               />
+              </div>
             ) : null
           }
           composerControls={
@@ -197,7 +245,10 @@ export default function ChatHome({
                 }))}
                 onSwitchVault={onSwitchVault}
                 contextLabel={openNote ? openNote.label.split('/').filter(Boolean).at(-1) ?? openNote.label : null}
-                onCloseContext={() => setOpenNote(null)}
+                onCloseContext={() => {
+                  setOpenNote(null)
+                  setNotePaneCollapsed(false)
+                }}
                 skillsLabel="rhizome-vault"
                 model={primeModelLabel(primeHost)}
                 thinkingLevel={primeHost?.thinkingLevel ?? null}

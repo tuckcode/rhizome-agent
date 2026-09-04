@@ -14,7 +14,7 @@ import { CommandRail } from './CommandRail'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 
 const RAIL_WIDTH = 46
-const RAIL_EXPANDED_WIDTH = 168
+const RAIL_EXPANDED_WIDTH = 240
 /** macOS draws the three window buttons ~54px wide from the configured x. */
 const TRAFFIC_LIGHT_SPAN = 54
 
@@ -94,7 +94,7 @@ describe('CommandRail vs macOS traffic lights', () => {
 
   /**
    * Expanding the rail (2026-08-20, to label the destinations) put it back
-   * under the lights: 168px of rail against lights that start at x=58. The
+   * under the lights: 240px of rail against lights that start at x=58. The
    * horizontal escape the config bought only holds while the rail is narrow,
    * so the wide state makes room vertically instead — which is what every
    * macOS sidebar does with the lights sitting in its top band.

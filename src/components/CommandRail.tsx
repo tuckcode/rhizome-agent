@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CaretLeft, CaretRight, ChatCircle, CirclesThree, GearSix, GitBranch, MagnifyingGlass, ShareNetwork, Tray } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { ActionTooltip } from './ui/action-tooltip'
@@ -7,6 +7,8 @@ import { createTranslator, type AppLocale } from '../lib/i18n'
 import { trackRailDestinationClicked } from '../lib/productAnalytics'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import { readStoredBooleanPreference, writeStoredBooleanPreference } from '../lib/uiPreference'
+import { usePanelWidth } from '../hooks/usePanelWidth'
+import { startResizeDrag } from '../utils/startResizeDrag'
 import {
   COMMAND_RAIL_TRAFFIC_LIGHT_INSET,
   hasNativeMacosTrafficLights,
@@ -25,16 +27,22 @@ interface CommandRailProps {
   onSelectResearch: () => void
   onSelectChanges: () => void
   onOpenSettings: () => void
+  /** Expanded rail's open middle, where Chat mounts its session list. */
+  onSessionsSlotReady?: (slot: HTMLDivElement | null) => void
 }
 
 const RAIL_BUTTON_SIZE = 30
 const RAIL_ICON_SIZE = 16
 const RAIL_COLLAPSED_WIDTH = 46
-const RAIL_EXPANDED_WIDTH = 168
+const RAIL_EXPANDED_DEFAULT_WIDTH = 240
+const RAIL_EXPANDED_MIN_WIDTH = 180
+const RAIL_EXPANDED_MAX_WIDTH = 360
+const RAIL_HOVER_OPEN_DELAY_MS = 150
+const RAIL_HOVER_CLOSE_DELAY_MS = 180
 /**
  * Room for the macOS traffic lights, in both rail states.
  *
- * `tauri.conf.json` puts them at x=58, y=16. Expanded, the 168px rail runs
+ * `tauri.conf.json` puts them at x=58, y=16. Expanded, the 240px rail runs
  * underneath them. Collapsed, the 46px rail clears them horizontally — but the
  * lights then sit level with the first destination, close enough to read as
  * part of it. The visual audit's words: "the lights themselves still look
@@ -124,17 +132,77 @@ export function CommandRail({
   onSelectResearch,
   onSelectChanges,
   onOpenSettings,
+  onSessionsSlotReady,
 }: CommandRailProps) {
   const t = createTranslator(locale)
-  const [expanded, setExpanded] = useState(() =>
-    readStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, true),
+  const [pinnedExpanded, setPinnedExpanded] = useState(() =>
+    readStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, false),
   )
-  const toggleExpanded = () => {
-    setExpanded((open) => {
-      const next = !open
-      writeStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, next)
-      return next
-    })
+  const [hoverExpanded, setHoverExpanded] = useState(false)
+  const railWidth = usePanelWidth(
+    APP_STORAGE_KEYS.commandRailWidth,
+    RAIL_EXPANDED_DEFAULT_WIDTH,
+    RAIL_EXPANDED_MIN_WIDTH,
+    RAIL_EXPANDED_MAX_WIDTH,
+  )
+  const railRef = useRef<HTMLDivElement>(null)
+  const hoverOpenTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const expanded = pinnedExpanded || hoverExpanded
+  const openFromHover = () => {
+    if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current)
+    hoverCloseTimer.current = null
+    if (pinnedExpanded || hoverExpanded || hoverOpenTimer.current) return
+    hoverOpenTimer.current = setTimeout(() => {
+      setHoverExpanded(true)
+      hoverOpenTimer.current = null
+    }, RAIL_HOVER_OPEN_DELAY_MS)
+  }
+  const cancelPendingHoverOpen = () => {
+    if (hoverOpenTimer.current) clearTimeout(hoverOpenTimer.current)
+    hoverOpenTimer.current = null
+  }
+  useEffect(() => {
+    if (!hoverExpanded || pinnedExpanded) return
+
+    const trackPointer = (event: MouseEvent) => {
+      const bounds = railRef.current?.getBoundingClientRect()
+      const pointerInside = bounds
+        && event.clientX >= bounds.left
+        && event.clientX <= bounds.right
+        && event.clientY >= bounds.top
+        && event.clientY <= bounds.bottom
+
+      if (pointerInside) {
+        if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current)
+        hoverCloseTimer.current = null
+        return
+      }
+
+      if (hoverCloseTimer.current) return
+      hoverCloseTimer.current = setTimeout(() => {
+        setHoverExpanded(false)
+        hoverCloseTimer.current = null
+      }, RAIL_HOVER_CLOSE_DELAY_MS)
+    }
+
+    window.addEventListener('mousemove', trackPointer)
+    return () => window.removeEventListener('mousemove', trackPointer)
+  }, [hoverExpanded, pinnedExpanded])
+  useEffect(() => () => {
+    if (hoverOpenTimer.current) clearTimeout(hoverOpenTimer.current)
+    if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current)
+  }, [])
+  const togglePinnedExpanded = () => {
+    const next = !pinnedExpanded
+    setPinnedExpanded(next)
+    writeStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, next)
+    if (!next) setHoverExpanded(false)
+  }
+  const beginResize = (event: React.MouseEvent) => {
+    setPinnedExpanded(true)
+    writeStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, true)
+    startResizeDrag(event, 'col-resize', (deltaX) => railWidth.resizeBy(-deltaX))
   }
   // Read once per render rather than memoised: the platform does not change,
   // and a stale memo here would be a dent in the wrong place.
@@ -146,16 +214,30 @@ export function CommandRail({
 
   return (
     <div
-      className={`flex shrink-0 flex-col gap-1 py-2 ${expanded ? 'items-stretch px-2' : 'items-center'}`}
+      ref={railRef}
+      className={`relative flex shrink-0 flex-col gap-1 py-2 transition-[width] duration-150 motion-reduce:transition-none ${expanded ? 'items-stretch px-2' : 'items-center'}`}
       data-testid="command-rail"
       data-expanded={expanded ? 'true' : 'false'}
+      data-pinned={pinnedExpanded ? 'true' : 'false'}
+      onMouseEnter={openFromHover}
+      onMouseLeave={cancelPendingHoverOpen}
       style={{
-        width: expanded ? RAIL_EXPANDED_WIDTH : RAIL_COLLAPSED_WIDTH,
+        width: expanded ? railWidth.width : RAIL_COLLAPSED_WIDTH,
         paddingTop: trafficLightRoom ? COMMAND_RAIL_TRAFFIC_LIGHT_INSET : undefined,
         background: 'var(--surface-sidebar)',
         borderRight: '1px solid var(--border-subtle)',
       }}
     >
+      {expanded ? (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize Sessions sidebar"
+          data-testid="command-rail-resize"
+          className="absolute inset-y-0 -right-[10px] z-30 w-4 cursor-col-resize bg-transparent transition-colors hover:bg-[var(--border)]"
+          onMouseDown={beginResize}
+        />
+      ) : null}
       <RailButton
         active={activeDestination === 'chat'}
         expanded={expanded}
@@ -206,14 +288,25 @@ export function CommandRail({
         testId="command-rail-changes"
       />
 
-      <div className="flex-1" />
+      {/* Conversations sit below the places a person can go — not as a child
+          of Chat and not beside the transcript. Compact mode keeps this
+          quiet, while the expanded rail gives Sessions the open middle. */}
+      <div className="mt-3 min-h-0 flex-1">
+        {expanded ? (
+          <div
+            ref={onSessionsSlotReady}
+            data-testid="command-rail-sessions"
+            className="h-full min-h-0"
+          />
+        ) : null}
+      </div>
 
       <RailButton
         active={false}
         expanded={expanded}
-        icon={expanded ? CaretLeft : CaretRight}
-        label={t(expanded ? 'rail.collapse' : 'rail.expand')}
-        onClick={toggleExpanded}
+        icon={pinnedExpanded ? CaretLeft : CaretRight}
+        label={pinnedExpanded ? t('rail.collapse') : expanded ? 'Keep rail open' : t('rail.expand')}
+        onClick={togglePinnedExpanded}
         testId="command-rail-toggle"
       />
 

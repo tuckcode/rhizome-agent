@@ -25,6 +25,7 @@ function mockNoteContentFetch(content: string) {
     }
     if (url === '/api/vault/content') {
       expect(requestBody(init)).toEqual({ path: '/fixture/alpha.md' })
+      expect(init?.signal).toBeInstanceOf(AbortSignal)
       return jsonResponse({ content })
     }
     throw new Error(`Unexpected fetch: ${url}`)

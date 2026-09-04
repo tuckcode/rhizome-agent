@@ -42,6 +42,46 @@ test.describe('AI chat conversation history', () => {
     await expect(response).toContainText('You said: "Hello"')
   })
 
+  test('development mode labels its fake model as a mock, not a real provider', async ({ page }) => {
+    await expect(page.getByTestId('prime-model-chip')).toContainText('Mock model')
+  })
+
+  test('the compact rail opens on hover and closes when the pointer leaves', async ({ page }) => {
+    const rail = page.getByTestId('command-rail')
+    await expect(rail).toHaveAttribute('data-expanded', 'false')
+
+    const compactBox = await rail.boundingBox()
+    if (!compactBox) throw new Error('Command rail has no visible box')
+    await page.mouse.move(compactBox.x + compactBox.width - 1, compactBox.y + 220)
+    await expect(rail).toHaveAttribute('data-expanded', 'true')
+    await expect(rail.getByText('Wiki Graph')).toBeVisible()
+    await expect(rail.getByTestId('prime-session-list')).toBeVisible()
+    await page.waitForTimeout(600)
+    await expect(rail).toHaveAttribute('data-expanded', 'true')
+
+    await visibleAgentInput(page).hover()
+    await expect(rail).toHaveAttribute('data-expanded', 'false')
+  })
+
+  test('the expanded rail can be dragged wider and remembers its width', async ({ page }) => {
+    const rail = page.getByTestId('command-rail')
+    await rail.hover()
+    await expect(rail).toHaveCSS('width', '240px')
+    const handle = page.getByTestId('command-rail-resize')
+    const handleBox = await handle.boundingBox()
+    if (!handleBox) throw new Error('Command rail resize handle has no visible box')
+
+    await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + 200)
+    await page.mouse.down()
+    await page.mouse.move(handleBox.x + handleBox.width / 2 + 80, handleBox.y + 200)
+    await page.mouse.up()
+
+    await expect(rail).toHaveCSS('width', '320px')
+    await expect(rail).toHaveAttribute('data-pinned', 'true')
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('rhizome:command-rail-width')))
+      .toBe('320')
+  })
+
   test('second message appends to the current visible conversation', async ({ page }) => {
     // Send first message
     const input = visibleAgentInput(page)
@@ -124,5 +164,45 @@ test.describe('AI chat conversation history', () => {
     await expect
       .poll(async () => visibleAiMessages(page).first().innerText(), { timeout: 5000 })
       .toBe(vaultText)
+  })
+
+  test('a replayed vault read is visible beside the answer and opens the note pane', async ({ page }) => {
+    await page.setViewportSize({ width: 834, height: 815 })
+    await page.getByTestId('command-rail').hover()
+    await page.getByRole('button', { name: 'Keep rail open' }).click()
+    const railSessions = page.getByTestId('command-rail-sessions')
+    const releaseSession = page.getByRole('button', {
+      name: /^Open session Draft the release notes/,
+    })
+
+    await expect(railSessions.getByTestId('prime-session-list')).toBeVisible()
+    await releaseSession.click()
+
+    const sources = page.getByTestId('retrieved-note-sources')
+    await expect(sources).toContainText('From your vault')
+
+    await page.getByRole('button', { name: 'Open release-plan.md' }).click()
+
+    await expect(railSessions.getByTestId('prime-session-list')).toBeVisible()
+    await expect(page.getByTestId('chat-note-pane')).toContainText('release-plan.md')
+    await expect(page.getByTestId('chat-note-pane')).toContainText('Rhizome Agent Release Plan')
+
+    await page.getByRole('button', { name: 'Hide note' }).click()
+    const noteEdge = page.getByTestId('chat-note-hover-edge')
+    await expect(noteEdge).toBeVisible()
+    await expect(railSessions.getByTestId('prime-session-list')).toBeVisible()
+
+    await page.getByTestId('agent-input').hover()
+    await noteEdge.hover()
+    await expect(page.getByTestId('chat-note-pane')).toContainText('Rhizome Agent Release Plan')
+
+    await page.getByTestId('agent-input').hover()
+    await expect(noteEdge).toBeVisible()
+
+    await page.getByRole('button', { name: 'Open release-plan.md' }).click()
+    await expect(railSessions.getByTestId('prime-session-list')).toBeVisible()
+    await page.setViewportSize({ width: 1500, height: 900 })
+    await expect(railSessions.getByTestId('prime-session-list')).toBeVisible()
+    await expect(page.getByTestId('chat-note-pane')).toContainText('Rhizome Agent Release Plan')
   })
 })

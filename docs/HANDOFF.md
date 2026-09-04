@@ -50,9 +50,11 @@ file.
 ---
 
 ## State
-
-`main` is **`4342f34`**, in sync with `origin/main`, clean tree — confirm with
-`git status`. Multi-day briefing since Claude last owned a session:
+`main` is **`8e49f3a`**, in sync with `origin/main`. The worktree has an
+uncommitted #25 retrieval-provenance slice, browser-fixture hardening, macOS
+traffic-light browser-fit fix, a compact-by-default Command Rail whose hover-expanded
+middle holds Sessions, tests, analytics, and architecture/handoff docs; Atticus asked to review before any
+commit or push. Confirm with `git status`. Multi-day briefing since Claude last owned a session:
 [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date first).
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22 and #24 closed** — C51 blocked #24 and is fixed
@@ -89,6 +91,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-03 · GPT-5.6 Sol](plans/handoffs/2026-09-03-1605-gpt-5-6-sol-retrieval-provenance.md) — built #25's trustworthy first slice in the worktree: only completed `get_note` calls become deduplicated, one-click `From your vault` links beneath the answer. Browser live-review proves click-through + neutral `release-plan.md` note body; fake model copy says `Mock model`, with no provider login/use. Empty/stalled reads no longer spin forever. Atticus chose Sessions in the Command Rail's middle (below every destination); the rail starts compact, expands as a whole on hover, and can be pinned open (C59 resolved). The macOS traffic-light audit keeps native clearance while removing a browser-only phantom gutter. No commit/push; native acceptance demo remains because Orca returned `runtime_open_timeout`.
 - [2026-09-02 (late) · Claude Opus 5](plans/handoffs/2026-09-02-2200-claude-opus-5-pi-registry-items-7-10.md) — closed items 7–10 in `harness-composition.md`: `bash`-driven package install works (live-tested), subagent/session state is durable + externally observable so a task board is a view not a second store, the registry covers the profiles slice but not extension-UI or catalog, and `pi-hermes-memory` is rejected (default-on, no vault awareness) — do without, borrow only its correction-triggered-capture idea. Filed **C58** (broken symlink on this machine failed 3 Rust tests, blocking the push).
 - [2026-09-02 · Claude Opus 5](plans/handoffs/2026-09-02-2028-claude-opus-5-impeccable-and-pi-registry.md) — **Prime Agent is a distribution of Pi (Earendil), and `pi.dev/packages` already lists ~5,000 installable extensions, skills, prompt templates and themes.** Verified against Prime's own `package.json` (`@earendil-works/pi-agent-core`) and its own `packages.md` ("the **inherited** extension ecosystem"), not a repo note — **search that registry before authoring any composition slice**; filter unchanged, install is CLI-only, packages run with full system access. Four new open questions as items 7–10 in [`harness-composition.md`](design/harness-composition.md). `/impeccable critique` on Settings scored **19/40** and found a **P0 silent data loss** — clicking a colour theme discarded every unsaved edit (`7eff708`) — plus an unconfirmed API-key delete (`56f5aef`) and six section descriptions that rendered nowhere including the telemetry privacy promise (`5b9e118`). Chat's composer advertised three shortcuts that did the opposite or did not exist, **and the existing test asserted the bug** (`44e06ce`). Hermes read at source for terminal / kanban / bots. Corrections: **OpenCode was never a decision** and **the NotebookLM exports are not a source** (both Atticus); Hermes's "Active now" is a 5s poll, not presence; C46 had been fixed a week and left open.
 - [2026-08-29 · Grok 4.6](plans/handoffs/2026-08-29-0205-grok-4-6-prime-limited-tools.md) — Prime sessions always **Power User** (no sandbox; toggle hidden). CLI agents still honor stored vault mode; UI relabelled **Limited tools**. Open product choices tracked as **C57**.
@@ -103,9 +106,6 @@ yours to choose.
 - [2026-08-26 (night) · Grok 4.6](YOU-SHOULD-KNOW.md) — multi-day “you should know” briefing since Claude last owned a session (2026-08-24)
 - [2026-08-26 (afternoon) · Grok 4.6](plans/handoffs/2026-08-26-1718-grok-4-6-research-mycelium-canvas.md) — Research as canvas; Mycelium #11/#22 in-app sidecar + Rhizome chrome; #24 promote. Pushed as `5d2d34a` / `80fa720`. Live check leftover.
 - [2026-08-26 · Grok 4.6](plans/handoffs/2026-08-26-1155-grok-4-6-housekeeping.md) — pushed Notes panel / #34 / #31; closed GitHub #27 #29 #31 #34; icon WIP on stash
-- [2026-08-25 (night) · Grok 4.6](plans/handoffs/2026-08-25-2348-grok-4-6-shell-harden.md) — unified Notes panel + close-note X + titlebar drag fix. Native QA 2026-08-26: double-click holds, X closes the note.
-- [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1608-grok-4-6-chat-centered-shell.md) — first chat-centered ship (two right columns). Superseded in the working tree by the 23:48 unify.
-- [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1445-grok-4-6-composer-strip.md) — composer strip: live pills, model moved off the subhead, one-click thinking toggle. #21 was already in the slash menu.
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1430-grok-4-6-vault-credentials.md) — #29: tokens-only redaction before distill; Save to vault refuses. Detector was telemetry-only.
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1345-grok-4-6-branches-schedules-markers.md) — #17 `get_session_tree`/`navigate_tree` in Chat; #14 create via `heartbeat_set`/`cron_add`; #18 compact/fork/model markers. Issues not closed (no live-Prime demo).
 - [2026-08-25 · Grok 4.6](plans/handoffs/2026-08-25-1255-grok-4-6-prime-queue.md) — Chat shows Prime `get_queue`; Clear → `clear_queue`. Not a local follow-up list
@@ -237,6 +237,8 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 
 ## Open threads
+
+- **C59-RESOLVED (2026-09-03, uncommitted): the 448px Chat note pane was almost entirely clipped at an 834px app width while Sessions occupied its own Chat column.** Atticus rejected the column: in Command-Rail mode, `PrimeSessionList` mounts into the rail's blank middle, below Chat/Inbox/Wiki Graph/Mycelium/Research/Changes and above rail controls. The rail starts compact and opens as a whole on hover; `Keep rail open` pins it, `Collapse rail` returns it to hover mode, and dragging its right edge resizes the remembered 180–360px open width. Classic-shell fallback keeps its prior column. Focused Playwright and visible-browser checks pass.
 
 - **C58-OPEN (2026-09-02): 3 Rust tests fail from a broken symlink on this
   machine, not the repo.** `pi_cli::tests::run_agent_stream_*` `.unwrap()`

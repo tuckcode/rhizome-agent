@@ -5,6 +5,7 @@
  */
 
 let vaultApiAvailable: boolean | null = null
+const VAULT_API_REQUEST_TIMEOUT_MS = 2_000
 
 async function detectVaultApiAvailability(): Promise<boolean> {
   try {
@@ -153,6 +154,7 @@ function buildFetchOptions(request: { body: Record<string, unknown> }): RequestI
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request.body),
+    signal: AbortSignal.timeout(VAULT_API_REQUEST_TIMEOUT_MS),
   }
 }
 

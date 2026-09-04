@@ -7,15 +7,21 @@ vi.mock('./MarkdownContent', () => ({
 }))
 
 const writeClipboardText = vi.fn()
+const trackVaultRetrievalSourceOpened = vi.fn()
 
 vi.mock('../utils/clipboardText', () => ({
   writeClipboardText: (text: string) => writeClipboardText(text),
+}))
+
+vi.mock('../lib/productAnalytics', () => ({
+  trackVaultRetrievalSourceOpened: (sourceCount: number) => trackVaultRetrievalSourceOpened(sourceCount),
 }))
 
 describe('AiMessage', () => {
   beforeEach(() => {
     writeClipboardText.mockReset()
     writeClipboardText.mockResolvedValue(undefined)
+    trackVaultRetrievalSourceOpened.mockReset()
   })
 
   it('renders a local marker as a system event, not a chat turn', () => {
@@ -65,6 +71,111 @@ describe('AiMessage', () => {
     render(<AiMessage userMessage="Ask" actions={[]} response="Here is the **answer**" />)
     expect(screen.getByTestId('markdown-content')).toBeTruthy()
     expect(screen.getByText('Here is the **answer**')).toBeTruthy()
+  })
+
+  it('shows every completed vault note read beside the answer and opens it', () => {
+    const onOpenNote = vi.fn()
+    render(
+      <AiMessage
+        userMessage="What did I decide?"
+        response="You chose the smaller launch."
+        actions={[
+          {
+            tool: 'get_note',
+            toolId: 'read-1',
+            label: 'Read launch.md',
+            path: 'projects/launch.md',
+            status: 'done',
+          },
+          {
+            tool: 'get_note',
+            toolId: 'read-2',
+            label: 'Read decisions.md',
+            path: 'meta/decisions.md',
+            status: 'done',
+          },
+        ]}
+        onOpenNote={onOpenNote}
+      />,
+    )
+
+    expect(screen.getByTestId('retrieved-note-sources')).toHaveTextContent('From your vault')
+    expect(screen.getByRole('button', { name: 'Open projects/launch.md' })).toHaveAttribute('data-size', 'sm')
+    expect(screen.getByRole('button', { name: 'Open meta/decisions.md' })).toBeVisible()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open meta/decisions.md' }))
+    expect(onOpenNote).toHaveBeenCalledWith('meta/decisions.md')
+    expect(trackVaultRetrievalSourceOpened).toHaveBeenCalledWith(2)
+  })
+
+  it('shows a note once when Prime read the same path more than once', () => {
+    render(
+      <AiMessage
+        userMessage="Check that again"
+        response="The decision still stands."
+        actions={[
+          {
+            tool: 'get_note',
+            toolId: 'read-1',
+            label: 'Read decision.md',
+            path: 'decisions/launch.md',
+            status: 'done',
+          },
+          {
+            tool: 'get_note',
+            toolId: 'read-2',
+            label: 'Read decision.md',
+            path: 'decisions/launch.md',
+            status: 'done',
+          },
+        ]}
+        onOpenNote={vi.fn()}
+      />,
+    )
+
+    expect(screen.getAllByRole('button', { name: 'Open decisions/launch.md' })).toHaveLength(1)
+  })
+
+  it('keeps an absolute vault path out of the source label while opening the exact note', () => {
+    const onOpenNote = vi.fn()
+    render(
+      <AiMessage
+        userMessage="Read the plan"
+        response="The plan is ready."
+        actions={[{
+          tool: 'get_note',
+          toolId: 'read-absolute',
+          label: 'Read plan.md',
+          path: '/Users/luca/Laputa/projects/plan.md',
+          status: 'done',
+        }]}
+        onOpenNote={onOpenNote}
+      />,
+    )
+
+    const source = screen.getByRole('button', { name: 'Open plan.md' })
+    expect(source).not.toHaveTextContent('/Users/luca/Laputa')
+    fireEvent.click(source)
+    expect(onOpenNote).toHaveBeenCalledWith('/Users/luca/Laputa/projects/plan.md')
+  })
+
+  it('does not claim a vault source unless a note read completed successfully', () => {
+    render(
+      <AiMessage
+        userMessage="Find the launch plan"
+        response="I could not verify it."
+        actions={[
+          { tool: 'search_notes', toolId: 'search', label: 'Searched', path: 'launch.md', status: 'done' },
+          { tool: 'create_note', toolId: 'write', label: 'Created', path: 'new.md', status: 'done' },
+          { tool: 'get_note', toolId: 'pending', label: 'Reading', path: 'pending.md', status: 'pending' },
+          { tool: 'get_note', toolId: 'failed', label: 'Read failed', path: 'failed.md', status: 'error' },
+          { tool: 'get_note', toolId: 'missing-path', label: 'Read', status: 'done' },
+        ]}
+        onOpenNote={vi.fn()}
+      />,
+    )
+
+    expect(screen.queryByTestId('retrieved-note-sources')).not.toBeInTheDocument()
   })
 
   it('constrains assistant responses to the available chat width', () => {

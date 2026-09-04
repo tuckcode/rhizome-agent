@@ -92,6 +92,16 @@ export function trackComposerPillOpened(
 }
 
 /**
+ * A user opened one of the notes shown beneath a vault-backed answer (#25).
+ *
+ * The number of displayed sources measures whether the links are useful
+ * without sending the note path, title, or content off the device.
+ */
+export function trackVaultRetrievalSourceOpened(sourceCount: number): void {
+  trackEvent('vault_retrieval_source_opened', { source_count: sourceCount })
+}
+
+/**
  * A user-authored research format was saved (#37).
  *
  * Only the resulting count. The title and the instruction are user content —
