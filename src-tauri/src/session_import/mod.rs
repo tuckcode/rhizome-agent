@@ -12,5 +12,6 @@ pub mod adapters;
 pub mod dedup;
 pub mod fingerprint;
 pub mod ledger;
+pub mod preview;
 pub mod selection;
 pub mod vault_note;
