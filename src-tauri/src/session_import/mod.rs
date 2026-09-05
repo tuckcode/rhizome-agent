@@ -12,3 +12,4 @@ pub mod adapters;
 pub mod dedup;
 pub mod fingerprint;
 pub mod ledger;
+pub mod selection;
