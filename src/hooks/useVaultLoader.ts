@@ -565,6 +565,7 @@ function useEntryMutations(
   setEntries: Dispatch<SetStateAction<VaultEntry[]>>,
   trackNew: (entry: VaultEntry) => void,
   untrackNew: (path: string) => void,
+  newEntriesRef: MutableRefObject<Map<string, VaultEntry>>,
 ) {
   const addEntry = useCallback((entry: VaultEntry) => {
     const normalizedEntry = normalizeVaultEntry(entry)
@@ -602,9 +603,30 @@ function useEntryMutations(
 
   const replaceEntry = useCallback((oldPath: string, patch: Partial<VaultEntry> & { path: string }) => {
     setEntries((prev) => replaceEntryByPath(prev, oldPath, patch))
-  }, [setEntries])
+    // A just-created note is protected from a stale reload snapshot by path.
+    // Renaming it has to carry that protection to the new name: leaving it on
+    // the old one makes the reload after the rename restore the untitled row
+    // from memory, so one file on disk shows as two rows until a restart (C62).
+    const protectedEntry = findProtectedEntry(newEntriesRef.current, oldPath)
+    if (!protectedEntry) return
+    untrackNew(protectedEntry.path)
+    trackNew(normalizeVaultEntry({ ...protectedEntry, ...patch }))
+  }, [setEntries, trackNew, untrackNew, newEntriesRef])
 
   return { addEntry, updateEntry, removeEntry, removeEntries, replaceEntry }
+}
+
+/** The tracked new-note entry for `path`, matched the way renames match paths. */
+function findProtectedEntry(
+  protectedEntries: Map<string, VaultEntry>,
+  path: string,
+): VaultEntry | undefined {
+  const exact = protectedEntries.get(path)
+  if (exact) return exact
+  for (const entry of protectedEntries.values()) {
+    if (notePathsMatch(entry.path, path)) return entry
+  }
+  return undefined
 }
 
 function removeEntryByPath(entries: VaultEntry[], path: string): VaultEntry[] {
@@ -1387,7 +1409,12 @@ function useVaultLoaderResult({
 export function useVaultLoader(vaultPath: string, vaults?: VaultOption[], defaultWorkspacePath?: string | null, folderVaults?: VaultOption[]) {
   const state = useVaultState(vaultPath)
   const setInitialFolders = useInitialFolderSetter(folderVaults, state.setFolders)
-  const entryMutations = useEntryMutations(state.setEntries, state.tracker.trackNew, state.tracker.untrack)
+  const entryMutations = useEntryMutations(
+    state.setEntries,
+    state.tracker.trackNew,
+    state.tracker.untrack,
+    state.tracker.newEntriesRef,
+  )
   const gitLoaders = useGitLoaders(vaultPath)
   const unavailableVault = useVaultUnavailable(vaultPath, state)
   const newPathsRef = state.tracker.newPathsRef
