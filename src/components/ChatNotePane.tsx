@@ -1,4 +1,4 @@
-import { X } from '@phosphor-icons/react'
+import { ArrowLeft, X } from '@phosphor-icons/react'
 import { startResizeDrag } from '../utils/startResizeDrag'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -16,6 +16,7 @@ interface ChatNotePaneProps {
   width?: number
   /** Raw horizontal delta from a drag on this pane's left edge. */
   onResize?: (deltaX: number) => void
+  onBackToNotes?: () => void
   onClose: () => void
   onOpenNote?: (target: string) => void
 }
@@ -32,6 +33,7 @@ export function ChatNotePane({
   loading = false,
   width,
   onResize,
+  onBackToNotes,
   onClose,
   onOpenNote,
 }: ChatNotePaneProps) {
@@ -55,6 +57,19 @@ export function ChatNotePane({
         />
       ) : null}
       <div className="flex h-[30px] shrink-0 items-center gap-2 border-b border-border px-2.5 font-mono text-[11px] tracking-[0.03em] text-muted-foreground">
+        {onBackToNotes ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="h-6 w-6 shrink-0 p-0 [&_svg:not([class*=size-])]:size-3.5"
+            onClick={onBackToNotes}
+            aria-label="Back to notes"
+            title="Back to notes"
+          >
+            <ArrowLeft size={14} />
+          </Button>
+        ) : null}
         <span className="rounded-sm border border-border px-1.5 py-px text-[10px] uppercase tracking-[0.08em]">
           {t('ai.chatNote.tag')}
         </span>
@@ -65,8 +80,8 @@ export function ChatNotePane({
           size="icon-xs"
           className="h-6 w-6 shrink-0 p-0 [&_svg:not([class*=size-])]:size-3.5"
           onClick={onClose}
-          aria-label="Hide note"
-          title="Hide note"
+          aria-label={t('ai.chatNote.close')}
+          title={t('ai.chatNote.close')}
         >
           <X size={14} />
         </Button>

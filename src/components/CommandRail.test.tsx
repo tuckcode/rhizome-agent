@@ -20,8 +20,6 @@ function renderRail(overrides: Partial<React.ComponentProps<typeof CommandRail>>
     activeDestination: 'inbox',
     onSelectChat: vi.fn(),
     onSelectInbox: vi.fn(),
-    onSelectGraph: vi.fn(),
-    onSelectMycelium: vi.fn(),
     onSelectResearch: vi.fn(),
     onSelectChanges: vi.fn(),
     onOpenSettings: vi.fn(),
@@ -40,7 +38,6 @@ describe('CommandRail', () => {
     renderRail()
     expect(screen.getByTestId('command-rail')).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-inbox')).toBeInTheDocument()
-    expect(screen.getByTestId('command-rail-graph')).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-research')).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-changes')).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-settings')).toBeInTheDocument()
@@ -48,10 +45,6 @@ describe('CommandRail', () => {
 
   it('fires the matching handler and tracks the destination when a rail button is clicked', () => {
     const props = renderRail()
-
-    fireEvent.click(screen.getByTestId('command-rail-graph'))
-    expect(props.onSelectGraph).toHaveBeenCalledOnce()
-    expect(trackRailDestinationClicked).toHaveBeenCalledWith('graph')
 
     fireEvent.click(screen.getByTestId('command-rail-research'))
     expect(props.onSelectResearch).toHaveBeenCalledOnce()
@@ -67,8 +60,8 @@ describe('CommandRail', () => {
   })
 
   it('marks the active destination with aria-pressed', () => {
-    renderRail({ activeDestination: 'graph' })
-    expect(screen.getByTestId('command-rail-graph')).toHaveAttribute('aria-pressed', 'true')
+    renderRail({ activeDestination: 'research' })
+    expect(screen.getByTestId('command-rail-research')).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByTestId('command-rail-inbox')).toHaveAttribute('aria-pressed', 'false')
   })
 
@@ -98,7 +91,7 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
     renderRail()
 
     expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'false')
-    for (const label of ['Chat', 'Inbox', 'Wiki Graph', 'Mycelium', 'Research', 'Changes', 'Settings']) {
+    for (const label of ['Chat', 'Inbox', 'Research', 'Changes', 'Settings']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
     }
   })
@@ -109,8 +102,7 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
 
     fireEvent.mouseEnter(screen.getByTestId('command-rail'))
 
-    await waitFor(() => expect(screen.getByText('Wiki Graph')).toBeInTheDocument())
-    const sessions = screen.getByTestId('command-rail-sessions')
+    const sessions = await screen.findByTestId('command-rail-sessions')
     expect(sessions).toBeInTheDocument()
     expect(onSessionsSlotReady).toHaveBeenCalledWith(sessions)
     expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).toBeNull()

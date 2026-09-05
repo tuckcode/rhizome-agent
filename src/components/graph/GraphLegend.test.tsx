@@ -39,6 +39,14 @@ function renderLegend(d: WikiGraphData = data(), ghostCount = 0, defaultOpen = t
 describe('GraphLegend', () => {
   beforeEach(() => vi.clearAllMocks())
 
+  it('starts collapsed so a large key does not cover the graph', () => {
+    render(<GraphLegend data={data()} ghostCount={0} colorForNode={colorForNode} colorForEdge={colorForEdge} locale="en" />)
+    expect(screen.getByTestId('graph-legend-toggle')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('graph-legend-body')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('graph-legend-toggle'))
+    expect(screen.getByTestId('graph-legend-body')).toBeInTheDocument()
+  })
+
   it('lists each node type once, not once per node', () => {
     // Two Project nodes must produce one Project row.
     renderLegend()

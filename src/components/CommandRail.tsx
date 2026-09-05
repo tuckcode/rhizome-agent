@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CaretLeft, CaretRight, ChatCircle, CirclesThree, GearSix, GitBranch, MagnifyingGlass, ShareNetwork, Tray } from '@phosphor-icons/react'
+import { CaretLeft, CaretRight, ChatCircle, GearSix, GitBranch, MagnifyingGlass, Tray } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { ActionTooltip } from './ui/action-tooltip'
 import { Button } from './ui/button'
@@ -14,7 +14,7 @@ import {
   hasNativeMacosTrafficLights,
 } from '../utils/trafficLights'
 
-export type CommandRailDestination = 'chat' | 'inbox' | 'graph' | 'mycelium' | 'research' | 'changes'
+export type CommandRailDestination = 'chat' | 'inbox' | 'research' | 'changes'
 
 interface CommandRailProps {
   locale: AppLocale
@@ -22,8 +22,6 @@ interface CommandRailProps {
   inboxCount?: number
   onSelectChat: () => void
   onSelectInbox: () => void
-  onSelectGraph: () => void
-  onSelectMycelium: () => void
   onSelectResearch: () => void
   onSelectChanges: () => void
   onOpenSettings: () => void
@@ -127,8 +125,6 @@ export function CommandRail({
   inboxCount = 0,
   onSelectChat,
   onSelectInbox,
-  onSelectGraph,
-  onSelectMycelium,
   onSelectResearch,
   onSelectChanges,
   onOpenSettings,
@@ -254,22 +250,6 @@ export function CommandRail({
         label={t('rail.inbox')}
         onClick={() => handleSelect('inbox', onSelectInbox)}
         testId="command-rail-inbox"
-      />
-      <RailButton
-        active={activeDestination === 'graph'}
-        expanded={expanded}
-        icon={ShareNetwork}
-        label={t('rail.graph')}
-        onClick={() => handleSelect('graph', onSelectGraph)}
-        testId="command-rail-graph"
-      />
-      <RailButton
-        active={activeDestination === 'mycelium'}
-        expanded={expanded}
-        icon={CirclesThree}
-        label={t('rail.mycelium')}
-        onClick={() => handleSelect('mycelium', onSelectMycelium)}
-        testId="command-rail-mycelium"
       />
       <RailButton
         active={activeDestination === 'research'}

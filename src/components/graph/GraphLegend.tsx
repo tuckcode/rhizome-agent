@@ -40,7 +40,7 @@ export function GraphLegend({
   colorForNode,
   colorForEdge,
   locale,
-  defaultOpen = true,
+  defaultOpen = false,
 }: GraphLegendProps) {
   const [open, setOpen] = useState(defaultOpen)
   const t = (key: Parameters<typeof translate>[1], values?: Parameters<typeof translate>[2]) =>
@@ -77,7 +77,7 @@ export function GraphLegend({
   return (
     <div
       data-testid="graph-legend"
-      className="absolute bottom-3 left-3 z-10 max-w-[240px] rounded-[var(--radius)] border text-[11px]"
+      className="absolute bottom-3 left-3 z-10 flex max-h-[40%] max-w-[240px] flex-col rounded-[var(--radius)] border text-[11px]"
       style={{
         borderColor: 'var(--border)',
         background: 'var(--surface-panel, var(--sidebar))',
@@ -89,7 +89,7 @@ export function GraphLegend({
         onClick={toggle}
         data-testid="graph-legend-toggle"
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left"
+        className="flex w-full shrink-0 items-center justify-between gap-2 px-2.5 py-1.5 text-left"
         style={{ color: 'var(--foreground)' }}
       >
         <span className="font-medium">{t('graph.legend.title')}</span>
@@ -97,7 +97,7 @@ export function GraphLegend({
       </button>
 
       {open && (
-        <div className="flex flex-col gap-2.5 px-2.5 pb-2.5" data-testid="graph-legend-body">
+        <div className="flex min-h-0 flex-col gap-2.5 overflow-y-auto px-2.5 pb-2.5" data-testid="graph-legend-body">
           <div data-testid="graph-legend-counts">
             {t('graph.legend.counts', {
               nodes: String(data.nodes.length),

@@ -90,7 +90,7 @@ export function GraphControls({
   return (
     <div
       data-testid="graph-controls"
-      className="absolute left-3 top-3 z-10 flex max-w-[260px] flex-col gap-2 rounded-[var(--radius)] border p-2"
+      className="absolute left-3 top-3 z-10 flex max-h-[calc(60%-2.25rem)] max-w-[260px] flex-col gap-2 overflow-y-auto rounded-[var(--radius)] border p-2"
       style={{
         borderColor: 'var(--border)',
         background: 'var(--surface-panel, var(--sidebar))',

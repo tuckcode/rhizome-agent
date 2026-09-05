@@ -130,6 +130,16 @@ export function useVaultBridge({
     shouldRefocusActiveEditor,
   })
 
+  /**
+   * Session history records paths from other vaults and from code checkouts.
+   * `openNoteByPath` silently does nothing for those, so callers that offer an
+   * "open" affordance ask here first rather than promising a dead action.
+   */
+  const canOpenNoteByPath = useCallback(
+    (path: string) => Boolean(findEntry(entriesByPath, resolvedPath, path)),
+    [entriesByPath, resolvedPath],
+  )
+
   const openNoteByPath = useCallback((path: string) => {
     const entry = findEntry(entriesByPath, resolvedPath, path)
     if (entry) onSelectNote(entry)
@@ -152,6 +162,7 @@ export function useVaultBridge({
 
   return {
     openNoteByPath,
+    canOpenNoteByPath,
     handlePulseOpenNote,
     handleAgentFileCreated: reloadAndOpen,
     handleAgentFileModified,

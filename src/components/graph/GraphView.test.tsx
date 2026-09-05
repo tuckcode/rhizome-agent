@@ -68,6 +68,16 @@ describe('GraphView', () => {
     expect(screen.getByText('Daily Log')).toBeInTheDocument()
   })
 
+  it('reports graph selection as lightweight retained state for an owning panel', async () => {
+    const onRetainedStateChange = vi.fn()
+    render(<GraphView vaultPath="/Users/mock/demo-vault-v2" onRetainedStateChange={onRetainedStateChange} />)
+    await waitFor(() => expect(screen.getByTestId('graph-view')).toBeInTheDocument())
+    act(() => lastCanvasProps?.onNodeClick('note/daily-log.md'))
+    await waitFor(() => expect(onRetainedStateChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      selectedId: 'note/daily-log.md',
+    })))
+  })
+
   it('derives project chips from belongs_to edges', async () => {
     await renderGraph()
     act(() => lastCanvasProps?.onNodeClick('project/second-project.md'))

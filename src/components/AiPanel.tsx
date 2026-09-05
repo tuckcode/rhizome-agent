@@ -78,6 +78,8 @@ interface AiPanelProps {
   composerControls?: ReactNode
   /** Frame B note split — sits beside the transcript so the composer spans both. */
   notePane?: ReactNode
+  /** Docked at the far right, outside the note split. */
+  sidePanel?: ReactNode
   /** Temporarily hide Sessions when the containing shell cannot fit it. */
   sessionsAutoCollapsed?: boolean
   /** Expanded Command Rail slot. `undefined` preserves the classic-shell column. */
@@ -113,6 +115,8 @@ interface AiPanelViewProps {
   vaultPath?: string | null
   composerControls?: ReactNode
   notePane?: ReactNode
+  /** Docked at the far right, outside the note split. */
+  sidePanel?: ReactNode
   sessionsAutoCollapsed?: boolean
   sessionsRailSlot?: HTMLElement | null
   onForkMessage?: (messageId: string) => void
@@ -212,6 +216,7 @@ export function AiPanelView({
   surface = 'default',
   composerControls,
   notePane,
+  sidePanel,
   sessionsAutoCollapsed = false,
   sessionsRailSlot,
   onForkMessage,
@@ -423,7 +428,7 @@ export function AiPanelView({
             />
           </div>
         )}
-      <div className="flex min-h-0 min-w-[55%] flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {isPrimeTarget ? (
         <SessionBranchBand
           locale={locale}
@@ -460,6 +465,7 @@ export function AiPanelView({
       </div>
       </div>
       {notePane}
+      {sidePanel}
       </div>
       {isPrimeTarget && (
         <div style={{ padding: '0 12px 6px' }} className="flex items-center gap-2">
@@ -589,6 +595,7 @@ export function AiPanel({
   noteListFilter,
   newChatRef,
   notePane,
+  sidePanel,
   sessionsAutoCollapsed,
   sessionsRailSlot,
 }: AiPanelProps) {
@@ -627,6 +634,7 @@ export function AiPanel({
       onForkMessage={providedOnForkMessage}
       forkTargetsPrimeEntry={forkTargetsPrimeEntry}
       notePane={notePane}
+      sidePanel={sidePanel}
       sessionsAutoCollapsed={sessionsAutoCollapsed}
       sessionsRailSlot={sessionsRailSlot}
       onClose={onClose}

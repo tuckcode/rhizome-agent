@@ -40,8 +40,6 @@ const SHARED = BASELINE._shared ?? []
 const SCREENS = [
   { name: 'chat', testId: 'command-rail-chat' },
   { name: 'inbox', testId: 'command-rail-inbox' },
-  { name: 'graph', testId: 'command-rail-graph' },
-  { name: 'mycelium', testId: 'command-rail-mycelium' },
   { name: 'research', testId: 'command-rail-research' },
   { name: 'changes', testId: 'command-rail-changes' },
 ] as const

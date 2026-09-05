@@ -16,6 +16,7 @@ export const APP_STORAGE_KEYS = {
   // `tolaria` twin and is deliberately absent from LEGACY_APP_STORAGE_KEYS.
   chatSessionsOpen: 'rhizome:chat-sessions-open',
   chatNotePaneWidth: 'rhizome:chat-note-pane-width',
+  connectionsPanelWidth: 'rhizome:connections-panel-width',
   chatSessionsWidth: 'rhizome:chat-sessions-width',
   myceliumSessionsWidth: 'rhizome:mycelium-sessions-width',
   commandRailExpanded: 'rhizome:command-rail-expanded',

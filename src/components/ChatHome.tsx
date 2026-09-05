@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo, type ReactNode } from 'react'
 import { AiPanel } from './AiPanel'
 import { PrimeSessionSubhead } from './PrimeSessionSubhead'
 import { AgentActivityBand } from './AgentActivityBand'
@@ -37,8 +37,12 @@ interface ChatHomeProps {
   sessionsAutoCollapsed?: boolean
   /** Expanded Command Rail slot, if this shell has the rail enabled. */
   sessionsRailSlot?: HTMLElement | null
+  /** Docked to the right of Chat, opposite the rail. */
+  connectionsPanel?: ReactNode
   /** Where "close" goes when chat owns the window — back to the vault. */
   onExit: () => void
+  /** Reveals the existing Notes workspace after leaving a note preview. */
+  onShowNotes?: () => void
   /** Open Mycelium on this Prime session only (#22). */
   onOpenSessionFootprint?: (sessionPath: string) => void
   /** Lets the shell make room for Chat's secondary note pane at narrow widths. */
@@ -74,7 +78,9 @@ export default function ChatHome({
   onUnsupportedAiPaste,
   sessionsAutoCollapsed = false,
   sessionsRailSlot,
+  connectionsPanel,
   onExit,
+  onShowNotes,
   onOpenSessionFootprint,
   onNotePaneOpenChange,
   requestedNote,
@@ -94,7 +100,6 @@ export default function ChatHome({
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
   const [notePaneCollapsed, setNotePaneCollapsed] = useState(false)
-  const [noteHoverArmed, setNoteHoverArmed] = useState(true)
   // One read of the open note, shared by the pane and the agent. Chat used to
   // pass nothing to `AiPanel`, so a note open on screen was invisible to the
   // model — "summarise this" had no "this".
@@ -110,7 +115,6 @@ export default function ChatHome({
     setLastRequestId(requestedNote.requestId)
     setOpenNote({ path: requestedNote.path, label: requestedNote.label })
     setNotePaneCollapsed(false)
-    setNoteHoverArmed(true)
   }
   const notePaneOpen = openNote !== null
   useEffect(() => {
@@ -178,6 +182,7 @@ export default function ChatHome({
           showHeader={false}
           sessionsAutoCollapsed={sessionsAutoCollapsed}
           sessionsRailSlot={sessionsRailSlot}
+          sidePanel={connectionsPanel}
           forkTargetsPrimeEntry
           newChatRef={newChatRef}
           notePane={
@@ -187,12 +192,9 @@ export default function ChatHome({
                 data-testid="chat-note-hover-edge"
                 className="flex w-7 shrink-0 cursor-pointer items-center justify-center border-l border-border bg-background text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 style={{ writingMode: 'vertical-rl' }}
-                onMouseEnter={() => {
-                  if (noteHoverArmed) setNotePaneCollapsed(false)
-                }}
-                onMouseLeave={() => setNoteHoverArmed(true)}
+                onMouseEnter={() => setNotePaneCollapsed(false)}
               >
-                Note
+                Inbox
               </div>
             ) : (
               <div
@@ -208,11 +210,14 @@ export default function ChatHome({
                 body={openNoteContent.body}
                 error={openNoteContent.error}
                 loading={openNoteContent.loading}
+                onBackToNotes={() => {
+                  setOpenNote(null)
+                  setNotePaneCollapsed(false)
+                  onShowNotes?.()
+                }}
                 onClose={() => {
-                  // The edge replaces this button under the pointer. Require
-                  // a leave-and-return before it counts as a deliberate hover.
-                  setNoteHoverArmed(false)
-                  setNotePaneCollapsed(true)
+                  setOpenNote(null)
+                  setNotePaneCollapsed(false)
                 }}
                 onOpenNote={(target) => {
                   const resolved = resolveChatOpenNote(target, vaultPath, entries)
