@@ -17,6 +17,7 @@ import type {
   WikiGraphNode,
 } from './graphTypes'
 import { toGraphData } from './graphData'
+import { clampedCameraPosition } from './cameraFraming'
 
 export interface ForceGraphHandle {
   /** Animate the camera to look at a node. */
@@ -69,6 +70,23 @@ export const ForceGraph3DCanvas = forwardRef<ForceGraphHandle, ForceGraph3DCanva
   ) {
     const containerRef = useRef<HTMLDivElement | null>(null)
     const graphRef = useRef<ForceGraph3DInstance<GraphNodeObject> | null>(null)
+    // zoomToFit frames the bounding box, and a one-node graph is a zero-size
+    // box — left alone it flies the camera in until a single note fills the
+    // canvas (C63). Runs after the fit, including its animated form.
+    const framePreservingMinimumDistance = (
+      graph: ForceGraph3DInstance<GraphNodeObject>,
+      transitionMs: number,
+    ) => {
+      graph.zoomToFit(transitionMs, 60)
+      window.setTimeout(() => {
+        // The view can unmount mid-transition, and _destructor() has already
+        // torn down the renderer by then — reading the camera off a destroyed
+        // graph throws. graphRef is nulled on cleanup, so it is the liveness check.
+        if (graphRef.current !== graph) return
+        const clamped = clampedCameraPosition(graph.cameraPosition())
+        if (clamped) graph.cameraPosition(clamped, undefined, 0)
+      }, transitionMs)
+    }
     const latest = useRef({ data, colorForNode, colorForEdge, onNodeClick, onBackgroundClick, selectedId, onError })
     latest.current = { data, colorForNode, colorForEdge, onNodeClick, onBackgroundClick, selectedId, onError }
 
@@ -104,7 +122,7 @@ export const ForceGraph3DCanvas = forwardRef<ForceGraphHandle, ForceGraph3DCanva
             // library automatically. cooldownTime defaults to 15s, too
             // slow for first paint, so frame immediately below and again
             // once physics settles.
-            .onEngineStop(() => graph.zoomToFit(400, 60))
+            .onEngineStop(() => framePreservingMinimumDistance(graph, 400))
           graphRef.current = graph
 
           // Feed data here, not just in the [data] effect below — that
@@ -115,7 +133,7 @@ export const ForceGraph3DCanvas = forwardRef<ForceGraphHandle, ForceGraph3DCanva
           // nodes/links: a fully working, fully empty scene that renders
           // its background and nothing else, with no error anywhere.
           graph.graphData(toGraphData(latest.current.data))
-          graph.zoomToFit(0, 60)
+          framePreservingMinimumDistance(graph, 0)
 
           resizeObserver = new ResizeObserver(() => {
             if (!containerRef.current) return
@@ -144,7 +162,7 @@ export const ForceGraph3DCanvas = forwardRef<ForceGraphHandle, ForceGraph3DCanva
       const graph = graphRef.current
       if (!graph) return
       graph.graphData(toGraphData(data))
-      graph.zoomToFit(0, 60)
+      framePreservingMinimumDistance(graph, 0)
     }, [data])
 
     // Re-evaluate node colors on selection or theme change.

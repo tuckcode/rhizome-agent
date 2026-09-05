@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const invoked = vi.hoisted(() => ({
   calls: [] as Array<{ cmd: string; args?: Record<string, unknown> }>,
   running: true,
+  problem: null as { code: string } | null,
 }))
 
 vi.mock('../mock-tauri', () => ({
@@ -21,6 +22,7 @@ vi.mock('../mock-tauri', () => ({
         modelName: 'Grok 4.5',
         modelId: 'grok-4.5',
         modelProvider: 'xai',
+        problem: invoked.problem,
       })
     }
     return Promise.resolve('sess-1')
@@ -33,6 +35,7 @@ describe('usePrimeHostStatus', () => {
   beforeEach(() => {
     invoked.calls = []
     invoked.running = true
+    invoked.problem = null
   })
 
   it('starts the Prime host when a vault is attached', async () => {
@@ -58,6 +61,42 @@ describe('usePrimeHostStatus', () => {
     await waitFor(() => {
       const ensures = invoked.calls.filter((call) => call.cmd === 'ensure_prime_session_host')
       expect(ensures.length).toBeGreaterThanOrEqual(2)
+    })
+  })
+
+  /**
+   * C64: at launch the window is up before Prime's service is listening, so the
+   * first poll can answer `not_installed` for an engine that is only still
+   * starting. Showing that instructs the user to install software they already
+   * have, seconds before the strip corrects itself.
+   */
+  it('withholds a first problem report while the engine may still be starting', async () => {
+    invoked.running = false
+    invoked.problem = { code: 'not_installed' }
+
+    const { result } = renderHook(() => usePrimeHostStatus(true, '/vault'))
+
+    await waitFor(() => {
+      expect(invoked.calls.some((call) => call.cmd === 'get_prime_session_host_status')).toBe(true)
+    })
+    expect(result.current.problem).toBeNull()
+  })
+
+  it('surfaces a problem once a second poll agrees with it', async () => {
+    invoked.running = false
+    invoked.problem = { code: 'not_installed' }
+
+    const { result } = renderHook(() => usePrimeHostStatus(true, '/vault'))
+
+    await waitFor(() => {
+      expect(invoked.calls.some((call) => call.cmd === 'get_prime_session_host_status')).toBe(true)
+    })
+    expect(result.current.problem).toBeNull()
+
+    document.dispatchEvent(new Event('visibilitychange'))
+
+    await waitFor(() => {
+      expect(result.current.problem).toEqual({ code: 'not_installed' })
     })
   })
 })

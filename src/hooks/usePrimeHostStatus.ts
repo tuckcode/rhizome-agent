@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type MutableRefObject } from 'react'
 import { callHost } from '../lib/callHost'
 
 /**
@@ -64,11 +64,31 @@ const EMPTY: PrimeHostStatus = {
 
 
 /**
+ * Hold a problem back until a second poll agrees with it.
+ *
+ * At launch the window is up before Prime's service is listening, so the first
+ * status can answer `not_installed` for an engine that is merely still
+ * starting. Rendering that immediately tells the user to go install software
+ * that is already there, seconds before the strip corrects itself to live
+ * (C64). A problem is only real once it survives one more poll.
+ */
+function withCorroboratedProblem(
+  next: PrimeHostStatus,
+  lastProblemCode: MutableRefObject<string | null>,
+): PrimeHostStatus {
+  const code = next.problem?.code ?? null
+  const corroborated = code !== null && code === lastProblemCode.current
+  lastProblemCode.current = code
+  return corroborated || code === null ? next : { ...next, problem: null }
+}
+
+/**
  * Lightweight poll of the long-lived Prime RPC host status (model name, running).
  * Used for AI panel chrome — not a substitute for stream events.
  */
 export function usePrimeHostStatus(enabled = true, vaultPath?: string): PrimeHostStatus {
   const [status, setStatus] = useState<PrimeHostStatus>(EMPTY)
+  const lastProblemCode = useRef<string | null>(null)
 
   useEffect(() => {
     if (!enabled) return
@@ -95,9 +115,12 @@ export function usePrimeHostStatus(enabled = true, vaultPath?: string): PrimeHos
           await connect()
           next = await callHost<PrimeHostStatus>('get_prime_session_host_status')
         }
-        if (!cancelled) setStatus(next)
+        if (!cancelled) setStatus(withCorroboratedProblem(next, lastProblemCode))
       } catch {
-        if (!cancelled) setStatus(EMPTY)
+        if (!cancelled) {
+          lastProblemCode.current = null
+          setStatus(EMPTY)
+        }
       }
     }
 
