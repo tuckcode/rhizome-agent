@@ -32,7 +32,24 @@ file, check for `declare global` before believing it's dead.
 
 ## Native QA on macOS: permissions, and which binary you can drive
 
-Two traps cost a session on 2026-08-27. Both are environment, not code.
+**0. The debug bundle cannot run at all while the installed app is open —
+found 2026-09-05, after two prior sessions misdiagnosed this as a Codex
+attachment quirk.** The debug bundle and `/Applications/Rhizome Agent.app`
+share the same bundle identifier (`ai.rhizome.agent`), and
+`tauri-plugin-single-instance` (`src-tauri/src/lib.rs:403`) allows only one
+running process per identifier. Launching the debug bundle while the
+installed app is running (`open -n`, or the raw executable) silently
+forwards to the installed instance; the new process exits immediately with
+no error or log output. It never stays alive to attach to — this is why
+prior sessions' native controls kept landing on the installed app's old
+UI no matter what they launched. **Fix: quit the installed app first**
+(`osascript -e 'tell application id "ai.rhizome.agent" to quit'`, after
+asking the user — it may hold unsaved chat/note state), **then** launch the
+debug `.app`. Confirm it's really the debug process with `ps aux | grep
+RhizomeAgent` (path should point at `target/debug/bundle/macos/`, not
+`/Applications`) before attaching.
+
+Two more traps cost a session on 2026-08-27. Both are environment, not code.
 
 **1. The dev binary cannot be driven or screenshotted reliably.**
 `target/debug/RhizomeAgent` has **no bundle identifier** (`osascript ... get
