@@ -4,3 +4,4 @@
 //! `dedup::decide`, so a new source cannot invent its own dedup behaviour.
 
 pub mod claude_code;
+pub mod claude_code_scan;
