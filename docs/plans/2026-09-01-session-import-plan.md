@@ -122,6 +122,52 @@ Convert `NormalizedTranscript` → Prime **JSONL import shape**, call daemon
 `import_jsonl`. Imported threads appear in the **session list** — same UX as
 Cursor/Claude. Runs with or without a vault attached.
 
+> ⚠️ **Verified 2026-09-05 — `import_jsonl` does not do what this section
+> assumes, and this is unresolved.**
+>
+> Checked against Prime 0.8.0's own docs and installed source, not the adapter
+> snapshot (which lists the command's name but never its behaviour):
+>
+> - `docs/daemon.md:27`: "New, switch, fork, and import operations **replace the
+>   root runtime inside the worker** while preserving the public active-session
+>   ID."
+> - `dist/modes/agent-connection/daemon-agent-connection.js:1094`:
+>   `importFromJsonl(inputPath, cwdOverride)` sends `{ type: "import_jsonl",
+>   activeSessionId, inputPath, cwdOverride }`.
+>
+> So `import_jsonl` **replaces the contents of the active session**. It does not
+> mint a list entry per call. Calling it N times imports N threads into the same
+> session, one after another, keeping only the last — not N rows in the session
+> list.
+>
+> The session list is the set of files in `~/.prime/agent/sessions/<uuid>.jsonl`,
+> and `prime_sessions.rs` states plainly that Rhizome touches nothing in that
+> directory (consistent with ADR-0163: we are a client of the daemon, not its
+> owner).
+>
+> **Three routes, none of them free — needs a decision before Slice 0's writer
+> is built:**
+>
+> 1. **`new_session` then `import_jsonl`, per thread.** Uses only public
+>    commands. But it is two daemon round trips per thread, it displaces the
+>    user's working session on every one of them, and importing a few hundred
+>    threads means a few hundred session switches. Whatever session the user had
+>    open is not where they left it afterwards.
+> 2. **Write converted JSONL straight into `~/.prime/agent/sessions/`.** One
+>    file per thread, appears in the list immediately, no daemon traffic and no
+>    session displacement — but it writes into Prime's own store, which both
+>    `prime_sessions.rs` and ADR-0163 say we do not do. It would also break if
+>    Prime changes its on-disk shape.
+> 3. **Vault-only import, drop the session-list destination.** Contradicts the
+>    decided "always import to Prime sessions", and gives no import at all to a
+>    user with no vault attached.
+>
+> Route 1 is the only one that respects the existing boundary, so it is the
+> default unless Atticus says otherwise — but its session-displacement cost is
+> real and worth knowing before it is built. Do not treat the "always import to
+> Prime sessions" decision as settled against this constraint; it was made
+> before the constraint was known.
+
 ### B. Vault archive (when vault attached)
 
 On every successful import, **if a vault is open**, also write one note into a
