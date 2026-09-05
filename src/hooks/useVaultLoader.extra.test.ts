@@ -207,6 +207,30 @@ describe('useVaultLoader extra', () => {
     expect(result.current.entries).toHaveLength(1)
   })
 
+  /**
+   * C62, the mechanism that actually reproduced natively: a just-created note
+   * is protected from a stale reload snapshot by path. Renaming it moved the
+   * row but left the protection pointing at the old path, so the reload after
+   * the rename restored the untitled row from memory — two rows for one file,
+   * and gone after a restart because the protection set starts empty.
+   */
+  it('moves new-note protection to the new path on rename', async () => {
+    const created = makeEntry({ path: '/vault/note/untitled-note-1.md', title: 'Untitled Note 1' })
+    const renamed = makeEntry({ path: '/vault/note/renamed.md', title: 'Renamed' })
+    configureBackend({ list_vault: [], reload_vault: [renamed], get_modified_files: [] })
+
+    const { result } = renderHook(() => useVaultLoader('/vault'))
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    act(() => { result.current.addEntry(created) })
+    act(() => {
+      result.current.replaceEntry(created.path, { path: renamed.path, title: 'Renamed' })
+    })
+    await act(async () => { await result.current.reloadVault() })
+
+    expect(result.current.entries.map((entry) => entry.path)).toEqual(['/vault/note/renamed.md'])
+  })
+
   it('removes an entry whose stored path differs only by /private/tmp aliasing', async () => {
     configureBackend({
       list_vault: [makeEntry({ path: '/private/tmp/vault/note/hello.md' })],
