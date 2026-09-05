@@ -103,12 +103,27 @@ fn restore_main_window_frame(app_handle: &AppHandle, window: &WebviewWindow, pha
         return;
     };
 
-    if let Err(err) = apply_window_frame(window, restored_frame) {
-        log::warn!("Failed to restore main window state {phase}: {err}");
-        return;
+    if frame_needs_applying(read_window_frame(window), restored_frame) {
+        if let Err(err) = apply_window_frame(window, restored_frame) {
+            log::warn!("Failed to restore main window state {phase}: {err}");
+            return;
+        }
     }
 
     cache_frame(app_handle, restored_frame);
+}
+
+/// Whether the window actually has to move to reach `target`.
+///
+/// The saved frame is restored twice at launch — once during setup and again
+/// on `RunEvent::Ready` — so the second call normally re-applies a frame the
+/// window already has. Resizing an NSWindow while WKWebView is still doing its
+/// first layout is a known way to desync its compositing layer, which is the
+/// leading suspect for the blank-but-live window in C60. Skipping a resize
+/// that changes nothing removes that redundant hit; it is a mitigation for a
+/// cause that has not been proven, not a confirmed fix.
+fn frame_needs_applying(current: Option<WindowFrame>, target: WindowFrame) -> bool {
+    current != Some(target)
 }
 
 fn cache_current_normal_frame(app_handle: &AppHandle) {
@@ -549,6 +564,20 @@ mod tests {
         assert!(!should_save_live_window_frame(true, false));
         assert!(!should_save_live_window_frame(false, true));
         assert!(!should_save_live_window_frame(true, true));
+    }
+
+    #[test]
+    fn skips_a_restore_that_would_not_move_the_window() {
+        let target = frame(100, 120, 1400, 900);
+
+        assert!(!frame_needs_applying(Some(target), target));
+        assert!(frame_needs_applying(Some(frame(0, 0, 1400, 900)), target));
+        assert!(frame_needs_applying(
+            Some(frame(100, 120, 800, 900)),
+            target
+        ));
+        // An unreadable current frame is not evidence the window is in place.
+        assert!(frame_needs_applying(None, target));
     }
 
     #[test]
