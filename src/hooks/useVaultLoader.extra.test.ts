@@ -165,6 +165,64 @@ describe('useVaultLoader extra', () => {
     expect(result.current.entries[0]?.title).toBe('Renamed')
   })
 
+  // C62: the rename flow finds its entry with notePathsMatch, which normalizes
+  // separators and macOS's /private/tmp alias. The list mutations compared raw
+  // strings, so a differently-spelled path left the old row in place while the
+  // post-rename reload added the renamed file — two rows for one file on disk.
+  it('replaces an entry whose stored path differs only by /private/tmp aliasing', async () => {
+    const initialEntry = makeEntry({ path: '/private/tmp/vault/note/untitled.md' })
+    configureBackend({ list_vault: [initialEntry], get_modified_files: [] })
+
+    const { result } = renderHook(() => useVaultLoader('/vault'))
+    await waitForEntries(result)
+
+    act(() => {
+      result.current.replaceEntry('/tmp/vault/note/untitled.md', {
+        path: '/tmp/vault/note/renamed.md',
+        title: 'Renamed',
+      })
+    })
+
+    expect(result.current.entries).toHaveLength(1)
+    expect(result.current.entries[0]?.path).toBe('/tmp/vault/note/renamed.md')
+    expect(result.current.entries[0]?.title).toBe('Renamed')
+  })
+
+  it('does not leave a duplicate row when the renamed path is already listed', async () => {
+    const oldEntry = makeEntry({ path: '/vault/note/untitled.md', title: 'Untitled' })
+    const watcherEntry = makeEntry({ path: '/vault/note/renamed.md', title: 'Renamed' })
+    configureBackend({ list_vault: [oldEntry, watcherEntry], get_modified_files: [] })
+
+    const { result } = renderHook(() => useVaultLoader('/vault'))
+    await waitForEntries(result)
+
+    act(() => {
+      result.current.replaceEntry('/vault/note/untitled.md', {
+        path: '/vault/note/renamed.md',
+        title: 'Renamed',
+      })
+    })
+
+    expect(result.current.entries.filter((entry) => entry.path === '/vault/note/renamed.md')).toHaveLength(1)
+    expect(result.current.entries).toHaveLength(1)
+  })
+
+  it('removes an entry whose stored path differs only by /private/tmp aliasing', async () => {
+    configureBackend({
+      list_vault: [makeEntry({ path: '/private/tmp/vault/note/hello.md' })],
+      get_modified_files: [],
+    })
+
+    const { result } = renderHook(() => useVaultLoader('/vault'))
+    await waitForEntries(result)
+
+    act(() => {
+      result.current.removeEntry('/tmp/vault/note/hello.md')
+    })
+
+    expect(result.current.entries).toHaveLength(0)
+  })
+
   it('surfaces modified-file refresh failures with an empty fallback list', async () => {
     configureBackend({
       list_vault: [makeEntry()],

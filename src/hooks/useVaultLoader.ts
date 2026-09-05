@@ -22,6 +22,7 @@ import {
   tauriCall,
 } from './vaultLoaderCommands'
 import { normalizeVaultEntry } from '../utils/vaultMetadataNormalization'
+import { normalizeNotePathForIdentity, notePathsMatch } from '../utils/notePathIdentity'
 import { isNoteWindow } from '../utils/windowMode'
 import { useUnavailableVaultState } from './useUnavailableVaultState'
 import { resetVaultState } from './vaultStateReset'
@@ -607,15 +608,15 @@ function useEntryMutations(
 }
 
 function removeEntryByPath(entries: VaultEntry[], path: string): VaultEntry[] {
-  const nextEntries = entries.filter((entry) => entry.path !== path)
+  const nextEntries = entries.filter((entry) => !notePathsMatch(entry.path, path))
   return nextEntries.length === entries.length ? entries : nextEntries
 }
 
 function removeEntriesByPath(entries: VaultEntry[], paths: string[]): VaultEntry[] {
   if (paths.length === 0) return entries
 
-  const pathSet = new Set(paths)
-  const nextEntries = entries.filter((entry) => !pathSet.has(entry.path))
+  const pathSet = new Set(paths.map(normalizeNotePathForIdentity))
+  const nextEntries = entries.filter((entry) => !pathSet.has(normalizeNotePathForIdentity(entry.path)))
   return nextEntries.length === entries.length ? entries : nextEntries
 }
 
@@ -624,11 +625,19 @@ function replaceEntryByPath(
   oldPath: string,
   patch: Partial<VaultEntry> & { path: string },
 ): VaultEntry[] {
-  const entryIndex = entries.findIndex((entry) => entry.path === oldPath)
+  const entryIndex = entries.findIndex((entry) => notePathsMatch(entry.path, oldPath))
   if (entryIndex < 0) return entries
 
-  const nextEntries = [...entries]
-  nextEntries[entryIndex] = normalizeVaultEntry({ ...entries[entryIndex], ...patch }, '', entryIndex)
+  // A file watcher can list the renamed file before this replace runs. Dropping
+  // the duplicate here keeps one row per file on disk (C62).
+  const nextEntries = entries.filter((entry, index) =>
+    index === entryIndex || !notePathsMatch(entry.path, patch.path))
+  const replacedIndex = nextEntries.findIndex((entry) => notePathsMatch(entry.path, oldPath))
+  nextEntries[replacedIndex] = normalizeVaultEntry(
+    { ...nextEntries[replacedIndex], ...patch },
+    '',
+    replacedIndex,
+  )
   return nextEntries
 }
 
