@@ -62,6 +62,7 @@ pub mod rhizome_search;
 pub mod rhizome_vault_seed;
 pub mod rhizome_write_location;
 pub mod search;
+pub mod session_import;
 pub mod settings;
 pub mod telemetry;
 pub mod vault;
