@@ -32,6 +32,14 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 // Mock @tauri-apps/api/core before importing App
+vi.mock('./components/graph/GraphView', () => ({
+  default: ({ onOpenNote }: { onOpenNote: (path: string) => void }) => (
+    <div data-testid="graph-view">
+      <button onClick={() => onOpenNote('project/test.md')}>Open note</button>
+    </div>
+  ),
+}))
+
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }))
@@ -623,6 +631,68 @@ describe('App', () => {
     render(<App />)
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByText('Select a note to start editing')).not.toBeInTheDocument()
+  })
+
+  it('preserves the unsent chat draft across graph navigation', async () => {
+    localStorage.setItem('rhizome:command-rail-expanded', '1')
+    render(<App />)
+    const input = await screen.findByTestId('agent-input')
+    input.textContent = 'Keep this unsent draft'
+    fireEvent.input(input)
+    fireEvent.click(screen.getByRole('button', { name: 'Connections' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Expand connections' }))
+    await screen.findByTestId('graph-view')
+    fireEvent.click(screen.getByRole('button', { name: 'Close connections' }))
+    expect(await screen.findByTestId('agent-input')).toHaveTextContent('Keep this unsent draft')
+  })
+
+  it('leaves the graph and displays the note when Open note is clicked', async () => {
+    localStorage.setItem('rhizome:command-rail-expanded', '1')
+    render(<App />)
+    await screen.findByTestId('chat-home')
+    fireEvent.click(screen.getByRole('button', { name: 'Connections' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Expand connections' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open note' }))
+    await waitFor(() => expect(screen.queryByTestId('graph-view')).not.toBeInTheDocument())
+    await waitFor(() => expect(window.__rhizomeTest?.activeTabPath).toBe('/vault/project/test.md'))
+    expect(await screen.findByTestId('blocknote-view')).toBeVisible()
+  })
+
+  it('opens the session-footprint chip into Connections, not the full-page Mycelium destination', async () => {
+    localStorage.setItem('rhizome:command-rail-expanded', '1')
+    mockCommandResults.get_prime_session_host_status = {
+      installed: true,
+      version: 'mock',
+      running: true,
+      sessionId: 'session-1',
+      isStreaming: false,
+      binaryPath: '/mock/prime-agent',
+      modelProvider: 'xai',
+      modelId: 'grok-4.5',
+      modelName: 'Grok 4.5',
+      sessionPath: '/prime/sessions/session-1.jsonl',
+    }
+    mockCommandResults.list_prime_sessions = [{ path: '/prime/sessions/session-1.jsonl', name: 'session-1' }]
+    mockCommandResults.read_prime_session_transcript = []
+    render(<App />)
+    fireEvent.click(await screen.findByTestId('prime-session-footprint'))
+    expect(await screen.findByTestId('connections-panel')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Mycelium', selected: true })).toBeInTheDocument()
+    expect(screen.queryByText('No saved sessions')).not.toBeInTheDocument()
+    expect(await screen.findByLabelText('Activity session')).toHaveValue('/prime/sessions/session-1.jsonl')
+  })
+
+  it('routes the status-bar Graph pill into Connections in command-rail mode', async () => {
+    localStorage.setItem('rhizome:command-rail-expanded', '1')
+    render(<App />)
+    await screen.findByTestId('chat-home')
+    // In command-rail mode the status bar renders as pills without a
+    // clickable Graph badge (see StatusBarSections' pillMode) — Graph lives
+    // in Connections instead. This documents that split rather than clicking
+    // a control that command-rail mode does not render.
+    expect(screen.queryByRole('button', { name: 'Graph' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Connections' }))
+    expect(await screen.findByTestId('graph-view')).toBeInTheDocument()
   })
 
   it('starts with the vault panel closed when no view preference is stored', async () => {

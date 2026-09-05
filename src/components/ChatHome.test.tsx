@@ -108,7 +108,7 @@ describe('ChatHome', () => {
     expect(screen.getByTestId('prime-session-subhead')).toBeInTheDocument()
   })
 
-  it('opens a note beside chat instead of leaving ChatHome', () => {
+  it('opens and closes a note beside chat without leaving ChatHome', () => {
     const onOpenNote = vi.fn()
     render(
       <ChatHome
@@ -130,16 +130,39 @@ describe('ChatHome', () => {
     expect(screen.getByTestId('chat-note-pane')).toHaveTextContent('wiki/decisions/memory-loop.md')
     expect(onOpenNote).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Hide note' }))
+    fireEvent.mouseLeave(screen.getByTestId('chat-note-hover-region'))
     const edge = screen.getByTestId('chat-note-hover-edge')
-
-    fireEvent.mouseLeave(edge)
+    expect(edge).toHaveTextContent('Inbox')
+    expect(screen.queryByTestId('chat-note-pane')).not.toBeInTheDocument()
     fireEvent.mouseEnter(edge)
-    const pane = screen.getByTestId('chat-note-hover-region')
     expect(screen.getByTestId('chat-note-pane')).toBeInTheDocument()
 
-    fireEvent.mouseLeave(pane)
-    expect(screen.getByTestId('chat-note-hover-edge')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close note' }))
+    expect(screen.queryByTestId('chat-note-pane')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('chat-note-hover-edge')).not.toBeInTheDocument()
+  })
+
+  it('returns from a note preview to the existing Notes workspace', () => {
+    const onShowNotes = vi.fn()
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath="/Users/dtc/Documents/Laputa"
+        vaultPaths={['/Users/dtc/Documents/Laputa']}
+        entries={[]}
+        onShowNotes={onShowNotes}
+        onExit={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back to notes' }))
+
+    expect(onShowNotes).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('chat-note-pane')).not.toBeInTheDocument()
   })
 })
 
@@ -293,9 +316,11 @@ describe('ChatHome — a note handed in from the vault', () => {
       label: 'Memory loop',
     }
     const { rerender } = renderWith({ ...note, requestId: 1 })
-    await waitFor(() => expect(screen.getByTestId('chat-note-pane')).toBeInTheDocument())
+    await waitFor(() => {
+      expect(screen.getByTestId('agent-note-body')).toHaveTextContent('Promote is explicit')
+    })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Hide note' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close note' }))
     expect(screen.queryByTestId('chat-note-pane')).not.toBeInTheDocument()
 
     rerender(
@@ -311,6 +336,9 @@ describe('ChatHome — a note handed in from the vault', () => {
         onExit={vi.fn()}
       />,
     )
+    await waitFor(() => {
+      expect(screen.getByTestId('agent-note-body')).toHaveTextContent('Promote is explicit')
+    })
     expect(screen.getByTestId('chat-note-pane')).toBeInTheDocument()
   })
 })

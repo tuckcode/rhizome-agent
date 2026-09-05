@@ -17,8 +17,22 @@ describe('ChatNotePane', () => {
 
     expect(screen.getByText('Note preview')).toBeInTheDocument()
     expect(screen.getByTestId('chat-note-pane')).toHaveTextContent('wiki/decisions/memory-loop.md')
-    fireEvent.click(screen.getByRole('button', { name: 'Hide note' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close note' }))
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns to the Notes workspace', () => {
+    const onBackToNotes = vi.fn()
+    render(
+      <ChatNotePane
+        label="wiki/decisions/memory-loop.md"
+        onBackToNotes={onBackToNotes}
+        onClose={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to notes' }))
+    expect(onBackToNotes).toHaveBeenCalledTimes(1)
   })
 
   it('renders the body it is given', () => {

@@ -37,6 +37,7 @@ function tauriCall<T>(command: string, args: Record<string, unknown>): Promise<T
 
 export interface GraphViewProps {
   vaultPath: string
+  compact?: boolean
   onOpenNote?: (relativePath: string) => void
   refreshKey?: number
   locale?: AppLocale
@@ -44,6 +45,17 @@ export interface GraphViewProps {
    *  is a one-way trip: Escape only cleared selection and there was no close
    *  control, so the only way out was re-clicking the rail/status-bar toggle. */
   onExit?: () => void
+  /** Small UI state retained by an owning panel while this WebGL view is idle. */
+  retainedState?: GraphViewRetainedState
+  onRetainedStateChange?: (state: GraphViewRetainedState) => void
+}
+
+export interface GraphViewRetainedState {
+  selectedId: string | null
+  egoRootId: string | null
+  query: string
+  hiddenTypes: string[]
+  hideGhosts: boolean
 }
 
 /**
@@ -53,24 +65,37 @@ export interface GraphViewProps {
  */
 export function GraphView({
   vaultPath,
+  compact = false,
   onOpenNote,
   refreshKey = 0,
   locale = DEFAULT_APP_LOCALE,
   onExit,
+  retainedState,
+  onRetainedStateChange,
 }: GraphViewProps) {
   const [data, setData] = useState<WikiGraphData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [egoRootId, setEgoRootId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(() => retainedState?.selectedId ?? null)
+  const [egoRootId, setEgoRootId] = useState<string | null>(() => retainedState?.egoRootId ?? null)
   const [creatingIds, setCreatingIds] = useState<ReadonlySet<string>>(new Set())
-  const [query, setQuery] = useState('')
-  const [hiddenTypes, setHiddenTypes] = useState<ReadonlySet<string>>(new Set())
-  const [hideGhosts, setHideGhosts] = useState(false)
+  const [query, setQuery] = useState(() => retainedState?.query ?? '')
+  const [hiddenTypes, setHiddenTypes] = useState<ReadonlySet<string>>(() => new Set(retainedState?.hiddenTypes ?? []))
+  const [hideGhosts, setHideGhosts] = useState(() => retainedState?.hideGhosts ?? false)
   const [colorVersion, setColorVersion] = useState(0)
   const canvasRef = useRef<ForceGraphHandle | null>(null)
   const { startJob } = useRhizomeJobs()
   const { graphPreviewWidth, handleGraphPreviewResize } = useLayoutPanels()
+
+  useEffect(() => {
+    onRetainedStateChange?.({
+      selectedId,
+      egoRootId,
+      query,
+      hiddenTypes: [...hiddenTypes],
+      hideGhosts,
+    })
+  }, [egoRootId, hiddenTypes, hideGhosts, onRetainedStateChange, query, selectedId])
 
   const t = useCallback(
     (key: Parameters<typeof translate>[1], values?: Parameters<typeof translate>[2]) =>
@@ -267,8 +292,8 @@ export function GraphView({
   }
 
   return (
-    <div className="flex h-full w-full min-h-0 bg-background" data-testid="graph-view">
-      <div className="relative min-w-0 flex-1">
+    <div className={`flex h-full w-full min-h-0 bg-background ${compact ? 'flex-col' : ''}`} data-testid="graph-view">
+      <div className="relative min-h-0 min-w-0 flex-1">
         <ForceGraph3DCanvas
           ref={canvasRef}
           data={displayData}
@@ -336,10 +361,10 @@ export function GraphView({
       </div>
       {selectedNode && (
         <>
-          <ResizeHandle onResize={handleGraphPreviewResize} />
+          {!compact && <ResizeHandle onResize={handleGraphPreviewResize} />}
           <div
             className="shrink-0 flex flex-col min-h-0 p-2"
-            style={{ width: graphPreviewWidth, minWidth: 280, height: '100%' }}
+            style={compact ? { width: '100%', maxHeight: '45%', overflowY: 'auto' } : { width: graphPreviewWidth, minWidth: 280, height: '100%' }}
             data-testid="graph-preview-dock"
           >
             <NodePreviewPanel
