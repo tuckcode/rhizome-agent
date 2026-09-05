@@ -15,20 +15,40 @@ source with regressions; C60 has a mechanism and a mitigation but no proof.
 
 ## C62 — duplicate Inbox row after automatic rename
 
-`useVaultLoader.ts`'s list mutations compared paths with raw `===`, while the
-rename flow finds its entry through `notePathsMatch`, which normalizes
-separators and macOS's `/private/tmp` → `/tmp` alias. When the two spellings
-disagreed, `replaceEntryByPath` matched nothing and returned the list
-untouched — so the old row survived, and the reload that runs right after the
-rename added the renamed file as a fresh row. Restarting cleared it because
-that re-reads the vault from disk, which is exactly the symptom the audit
-recorded.
+**Fixed on the second attempt. The first attempt was wrong, and the way it was
+wrong is the most useful thing in this handoff.**
 
-`replaceEntryByPath`, `removeEntryByPath` and `removeEntriesByPath` now use
-the same normalized comparison as the rest of the rename path. Replace also
-drops an entry already sitting at the new path, since a file watcher can list
-the renamed file before the replace runs — that is a second, independent way
-to end up with two rows.
+A just-created note is protected from being dropped by a stale reload snapshot:
+`addEntry` tracks it in `newPathsRef`/`newEntriesRef`, and
+`reconcileReloadedEntries` re-appends any tracked note the fresh snapshot is
+missing. That guard exists because a reload's directory read can resolve after
+the optimistic `addEntry` and silently drop a brand-new note forever.
+
+Renaming moved the row but left the protection pointing at the **old** path.
+So the reload that runs right after a rename found the untitled note missing
+from disk, concluded it was a just-created note the snapshot had raced, and
+restored it from memory. One file, two rows — and a restart cleared it because
+the protection set starts empty. `replaceEntry` now moves the protection to the
+new path.
+
+### The wrong first fix, and why it looked right
+
+The first attempt blamed a genuine inconsistency: the list mutations compared
+paths with raw `===` while the rename flow finds its entry through
+`notePathsMatch`, which normalizes separators and macOS's `/private/tmp` alias.
+A differing spelling would make `replaceEntryByPath` no-op, leaving the old row
+while the reload added the new one. That story fits the symptom exactly,
+including the restart behaviour. Its regressions passed. It was still wrong.
+
+The normalization change was kept — it is real hardening, and it also drops a
+duplicate already sitting at the new path, which a file watcher can produce —
+but it was not this defect.
+
+What exposed it was rebuilding and repeating the actual user sequence
+natively. The first regression tested `replaceEntryByPath` in isolation, where
+the wrong theory is true by construction; the current one drives create →
+rename → reload, which is where the real mechanism lives. **A green test
+written from the same reasoning as the fix cannot falsify that reasoning.**
 
 ## C64 — "Prime is not installed" while the header says live
 
@@ -98,13 +118,31 @@ the document), and persisted zoom was investigated and ruled out
 
 ## Verification
 
-- `pnpm test` — **6002 passed** across 572 files.
+- `pnpm test` — **6003 passed** across 572 files.
 - `cargo test --lib` — **1706 passed**, 20 ignored.
 - `pnpm lint`, `pnpm typecheck`, `cargo clippy -- -D warnings`, `cargo fmt --check` all clean.
-- **No native verification of any of these four.** Every one of them was
-  originally *found* natively, so source-level green is weaker evidence than
-  usual here. C60 especially cannot be confirmed this way at all.
+- Codacy: `trivy` reports 24 dependency advisories (4 high in each npm/pnpm
+  lockfile, 0 critical), all pre-existing in lockfiles this session did not
+  touch. `opengrep` on the changed files: 82 rules, **0 findings**. Note
+  `opengrep` crashes with a `UnicodeDecodeError` unless run with
+  `PYTHONUTF8=1 LC_ALL=en_US.UTF-8` — a tool-environment bug, not a finding.
 - Localization: none — English only (C18).
 - PostHog: no event needed — these are defect fixes to existing surfaces, not
   new user actions to measure adoption of.
-- Codacy: not run this session.
+
+### Native pass on the release build
+
+Built, installed to `/Applications`, and driven through the real app:
+
+- **C61 verified** — typed a draft, opened Graph, draft still there.
+- **C63 verified** — filtered to one node; ordinary circle, not a wall of colour.
+- **C62 reproduced, then fixed and re-verified** — see above. The pre-fix build
+  showed two rows; the rebuilt one shows one.
+- **C64 weakly verified** — three launches showed no false install instruction,
+  but the symptom is a sub-second flash and the first look was ~6s in.
+- **C60 not verified and not verifiable this way** — the window painted every
+  launch, which is what an intermittent bug looks like most of the time.
+
+Test notes were cleaned from `demo-vault-v2`; `git status` on the demo vaults is
+empty. One unintended side effect: a stray Return sent the C61 test string to
+the agent as a real prompt. It was stopped after one tool call.
