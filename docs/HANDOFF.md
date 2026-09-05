@@ -1,12 +1,9 @@
 # Handoff — read this first
-
 **What is true right now.** Not a history log: per-session records live in
 `docs/plans/handoffs/`, one file each, newest by filename.
-
 ```bash
 ls docs/plans/handoffs | grep -v archive | tail -1    # the latest handoff
 ```
-
 ## Adding your session
 
 Write **one new file** in `docs/plans/handoffs/`, named
@@ -50,14 +47,13 @@ file.
 ---
 
 ## State
-`main` is **`31741f8`**, one local commit ahead of `origin/main`. The Prime
-0.8.0 provenance-wrapper fix for #25, C23 tracking/comment corrections, and
-C25 stale browser-test cleanup are committed locally. Native QA then confirmed
-the saved #25 answer renders its exact vault source and opens the correct note;
-GitHub #25 is closed. A controlled native recheck could not reproduce the
-reported C22 relaunch failure: the exact debug bundle exposed a visible window
-in 10/10 quit/relaunch cycles. Confirm with `git status`. Multi-day briefing since Claude last owned a session:
-[`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date first).
+`main` is **`45562a5`**, with no local commits ahead of `origin/main` at the
+2026-09-04 note-preview review. Preview and graph corrections remain
+uncommitted: collapsed strip says Inbox; graph Open note exits Graph; Key is bounded.
+97 tests and focused browser checks pass. Native blank painting recovered after a clean restart (C60). The user requires
+approval before commit/push. #25 provenance, C23, and C25 fixes are committed;
+the earlier C22 relaunch check passed 10/10. Confirm with `git status`.
+Multi-day briefing: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date first).
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Inverted Dock icon is
@@ -93,6 +89,8 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-05 · Claude Sonnet 5](plans/handoffs/2026-09-05-0620-claude-sonnet-5-a1-connections-routing.md) — `ConnectionsPanel` gained a controlled `openView` API; the session-footprint chip and status-bar Graph pill now route through it in command-rail mode. 105 focused tests, lint, typecheck, diff-check, handoff:check pass. **Found the real cause of the multi-session native-attach blocker: the debug bundle shares a bundle identifier with the installed app, and single-instance enforcement silently kills the debug process on launch while the installed app is open** — not a Codex attachment quirk as previously assumed. After quitting the installed app (approved), verified Chat/Changes/Graph/Mycelium panel switching in the exact debug bundle is instant with no spinner and flat CPU/memory across 8 rapid toggles — could not reproduce the spinning-wheel hang Atticus saw, which was on the installed app. Precise ten-cycle timing still open. No commit/push.
+- [2026-09-05 · GPT-5](plans/handoffs/2026-09-05-0535-gpt-5-a1-lifecycle-slice.md) — A1’s first slice stops inactive Graph/Mycelium renderers, retains lightweight panel state, removes duplicate rail entries, and fixes narrow-window panel reachability. 126 focused tests, lint, typecheck, detector, and debug build pass; ten-cycle native measurement remains open. No commit/push.
 - [2026-09-04 · GPT-5.6 Sol](plans/handoffs/2026-09-04-1536-gpt-5-6-sol-native-provenance.md) — real-vault native QA found #25 missed Prime 0.8.0's `content` + Python argv wrapper; added a live-shape regression/fix and resolved stale C23/C25 tracking/tests. The source link now appears and opens the exact Tab-completion note, so #25 is closed. A controlled check retired the attempted C22 reopening after the exact debug bundle showed a visible window in 10/10 relaunches.
 - [2026-09-03 · GPT-5.6 Sol](plans/handoffs/2026-09-03-1605-gpt-5-6-sol-retrieval-provenance.md) — built #25's trustworthy first slice in the worktree: only completed `get_note` calls become deduplicated, one-click `From your vault` links beneath the answer. Browser live-review proves click-through + neutral `release-plan.md` note body; fake model copy says `Mock model`, with no provider login/use. Empty/stalled reads no longer spin forever. Atticus chose Sessions in the Command Rail's middle (below every destination); the rail starts compact, expands as a whole on hover, and can be pinned open (C59 resolved). The macOS traffic-light audit keeps native clearance while removing a browser-only phantom gutter. No commit/push; native acceptance demo remains because Orca returned `runtime_open_timeout`.
 - [2026-09-02 (late) · Claude Opus 5](plans/handoffs/2026-09-02-2200-claude-opus-5-pi-registry-items-7-10.md) — closed items 7–10 in `harness-composition.md`: `bash`-driven package install works (live-tested), subagent/session state is durable + externally observable so a task board is a view not a second store, the registry covers the profiles slice but not extension-UI or catalog, and `pi-hermes-memory` is rejected (default-on, no vault awareness) — do without, borrow only its correction-triggered-capture idea. Filed **C58** (broken symlink on this machine failed 3 Rust tests, blocking the push).
@@ -235,7 +233,12 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 
 ## Open threads
-
+- **C65-RESOLVED (2026-09-05): the debug bundle can't run natively while the installed app is open — diagnosed, not a defect to fix.** `tauri-plugin-single-instance` enforces one process per bundle identifier, and the debug bundle and `/Applications/Rhizome Agent.app` both carry `ai.rhizome.agent`. Launching the debug bundle (via `open -n` or its raw executable) while the installed app is running silently forwards to the installed instance and the new process exits instantly with no log output — it never stays alive to attach to. This is the actual mechanism behind two prior sessions' "Codex native controls select the wrong app by bundle ID" observations; it's not an attachment/selection quirk, the debug process is genuinely not there. **Workaround, verified working:** quit the installed app first (`osascript -e 'tell application id "ai.rhizome.agent" to quit'`), then launch the debug `.app` — it runs as its own process, confirmed by executable path (`ps aux`), and cua-driver attaches by pid normally. Always ask before quitting the installed app — it may hold unsaved chat/note state. Not filing this as a product bug to fix: single-instance-per-identifier is standard, intentional behavior; the fix is procedural (quit-then-launch), not code. Detail: [2026-09-05-0620](plans/handoffs/2026-09-05-0620-claude-sonnet-5-a1-connections-routing.md).
+- **C61-VERIFY (2026-09-05): native Graph navigation discarded unsent drafts and hid current chat.** Reproduced twice; sent history recoverable from saved session. Regression failed before keep-mounted fix, then passed; focused panel browser check passed. Final Claude-edited source/native verification is separate. See latest GPT-6 handoff audit.
+- **C62-OPEN (2026-09-05): Inbox retains an old untitled row after automatic rename.** Native showed two rows, disk held one renamed note; restart cleared stale row. Save/reopen content passed.
+- **C63-OPEN (2026-09-05): one-result graph search over-zooms the node.** Native single result occupied roughly 500px; selection/open still worked. Bound camera framing for sparse graphs.
+- **C64-OPEN (2026-09-05): startup transiently says Prime is not installed while header says live.** Self-corrects; real QA_OK send passed. Distinguish loading from confirmed unavailable.
+- **C60-OPEN (2026-09-04): native blank painting after rebuild/relaunch.** User saw white; Codex screenshot confirmed blank while accessibility controls remained live. Graph canvas drew but surrounding UI did not. Resize/reload/view switch did not restore it; full quit (process exit verified) and Finder relaunch restored visible chat/sidebar/composer. Cause unproven; see latest GPT-6 handoff. Do not confuse recovered rendering with a permanent fix.
 - **C59-RESOLVED (2026-09-03, uncommitted): the 448px Chat note pane was almost entirely clipped at an 834px app width while Sessions occupied its own Chat column.** Atticus rejected the column: in Command-Rail mode, `PrimeSessionList` mounts into the rail's blank middle, below Chat/Inbox/Wiki Graph/Mycelium/Research/Changes and above rail controls. The rail starts compact and opens as a whole on hover; `Keep rail open` pins it, `Collapse rail` returns it to hover mode, and dragging its right edge resizes the remembered 180–360px open width. Classic-shell fallback keeps its prior column. Focused Playwright and visible-browser checks pass.
 
 - **C58-OPEN (2026-09-02): 3 Rust tests fail from a broken symlink on this
@@ -443,18 +446,9 @@ push is not a release — releases are tagged builds with signed installers.
   is not there. Re-measure before reopening; do not restore this from the old
   wording.
 
-  <details><summary>Original entry (2026-08-23)</summary>
-  Codacy's `lizard` is the first tool in this repo to say so — it was the only
-  warning across the files this session touched (`src-tauri/src/vault/folders.rs`
-  sits at avg CCN 2.5). Lizard aggregates a TSX module's top level into one
-  `*global*` entry, so the number reads high by construction, but the direction
-  is real: the C43 fix added a ref, a layout effect, and two send callbacks to a
-  component that was already the largest in the panel. The natural seam is the
-  mid-turn send policy — accepted / not-running / failed, plus the idle fallback
-  — which is decision logic with no JSX and could move to a hook or module
-  beside `primeTurnMessaging.ts`. Not attempted here: it would have meant
-  refactoring the component in the same change as the race fix.
-  </details>
+  (Original 2026-08-23 detail on the lizard warning and the seam it named is
+  in git history for this file, not repeated here — pruned per this file's
+  own rule since C46 is resolved and re-verified.)
 
 - **C44-RESOLVED (2026-08-23): Prime follow-up admission now
   propagates through Rust.** `queue_message` returns `data.queued` for
@@ -818,7 +812,6 @@ push is not a release — releases are tagged builds with signed installers.
   flake.
 
 - **C29-RESOLVED (2026-08-16g): after `Cmd+N`, the note list did not refresh.** A stale vault scan (or a load-reset that cleared the just-created protection set) overwrote `entries` with a pre-create snapshot. Fixed by keeping the optimistic `VaultEntry` in a ref, refusing to drop that path on reconcile, and not clearing the protection set when a load reset is preserving workspace entries. Vite fixture timestamps were also converted to unix seconds so a new note is not sorted off-screen behind year-58595 fixture dates. Verified: 18/18 on `fix-crash-create-note.spec.ts` × 6, `--retries=0`.
-
 
 - **C30-RESOLVED (2026-08-29): `window.__tolariaFrontendReady` → `window.__rhizomeFrontendReady`.** Renamed in `src/utils/frontendReady.ts` (ambient `Window` typing + set/read), `index.html` (startup reload guard), `src/main.test.ts`, `src/utils/frontendReady.test.ts`, and `tests/smoke/helpers.ts`. Left `tolaria:frontend-ready` / `tolaria:startup-reload-attempted` sessionStorage keys unchanged — separate from the window flag. Verified: `pnpm lint`, `pnpm typecheck`, targeted vitest on touched tests.
 
