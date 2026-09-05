@@ -89,12 +89,15 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
     style={{ width: width.width }}
     aria-label="Connections"
   >
+    {/* `resizeBy` already assumes a handle on the panel's left edge, which is
+        where this one is, so it takes the raw delta. Negating first cancels
+        that out and inverts the drag. */}
     <div
       role="separator"
       aria-orientation="vertical"
       aria-label="Resize connections"
       className="absolute inset-y-0 -left-[10px] z-20 w-4 cursor-col-resize bg-transparent transition-colors hover:bg-border"
-      onMouseDown={event => startResizeDrag(event, 'col-resize', deltaX => width.resizeBy(-deltaX))}
+      onMouseDown={event => startResizeDrag(event, 'col-resize', deltaX => width.resizeBy(deltaX))}
     />
     <div className="flex shrink-0 items-center">
       <button type="button" className="flex min-h-8 min-w-0 flex-1 items-center gap-1 px-2 text-left text-xs" aria-expanded onClick={() => setOpen(false)}>
