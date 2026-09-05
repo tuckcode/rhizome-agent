@@ -8,6 +8,7 @@
 //! decision logic over candidates an adapter has already parsed, which is what
 //! makes the dedup rules testable without fixtures from five different apps.
 
+pub mod adapters;
 pub mod dedup;
 pub mod fingerprint;
 pub mod ledger;
