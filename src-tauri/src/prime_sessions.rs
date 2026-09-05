@@ -367,12 +367,51 @@ pub fn mark_archived(
 /// A log that cannot be read is skipped rather than failing the whole list:
 /// one unreadable file must not hide every other session.
 pub fn list_sessions() -> Result<Vec<PrimeSessionSummary>, String> {
-    Ok(worth_listing(
+    let mut summaries = worth_listing(
         session_files()?
             .iter()
             .filter_map(|path| summarize_file(path).ok())
             .collect(),
-    ))
+    );
+    sort_by_when_the_conversation_happened(&mut summaries);
+    Ok(summaries)
+}
+
+/// Order the list by when each conversation actually happened.
+///
+/// `session_files` can only sort by file mtime, because it sorts paths before
+/// anything is parsed. mtime is a decent stand-in for a session Prime itself
+/// wrote and never touched again — and a poor one otherwise. A backup, a sync,
+/// a file copy, or a restore silently reorders a user's whole history without
+/// a single conversation having changed.
+///
+/// It is also wrong for imported sessions by construction: a thread from last
+/// year, written to disk today, would sit at the top of the list above this
+/// morning's work. Sorting on the `session` header's own timestamp puts it back
+/// where the user would look for it.
+///
+/// mtime remains the fallback for logs with no parseable header timestamp, so
+/// nothing loses its place; those simply keep the previous behaviour.
+fn sort_by_when_the_conversation_happened(summaries: &mut [PrimeSessionSummary]) {
+    summaries.sort_by(|left, right| {
+        conversation_sort_key(right)
+            .cmp(&conversation_sort_key(left))
+            // Same instant: keep a stable, repeatable order rather than
+            // whatever the directory read happened to yield.
+            .then_with(|| left.id.cmp(&right.id))
+    });
+}
+
+/// Milliseconds since the epoch for ordering: the session header's timestamp
+/// when it parses, else the file mtime.
+fn conversation_sort_key(summary: &PrimeSessionSummary) -> i64 {
+    summary
+        .started_at
+        .as_deref()
+        .and_then(|timestamp| chrono::DateTime::parse_from_rfc3339(timestamp).ok())
+        .map(|parsed| parsed.timestamp_millis())
+        .or_else(|| summary.mtime_ms.map(|millis| millis as i64))
+        .unwrap_or(i64::MIN)
 }
 
 /// One item in a replayed conversation, in the order it happened.
@@ -760,6 +799,82 @@ mod tests {
             has_conversation: true,
             ..Default::default()
         }
+    }
+
+    fn dated_summary(
+        id: &str,
+        started_at: Option<&str>,
+        mtime_ms: Option<u64>,
+    ) -> PrimeSessionSummary {
+        PrimeSessionSummary {
+            id: id.into(),
+            has_conversation: true,
+            started_at: started_at.map(str::to_string),
+            mtime_ms,
+            ..Default::default()
+        }
+    }
+
+    fn ordered_ids(mut summaries: Vec<PrimeSessionSummary>) -> Vec<String> {
+        sort_by_when_the_conversation_happened(&mut summaries);
+        summaries.into_iter().map(|summary| summary.id).collect()
+    }
+
+    /// An imported session is written to disk today but happened long ago. With
+    /// mtime ordering it would sit above this morning's work; the user looks
+    /// for it where the conversation belongs.
+    #[test]
+    fn orders_by_the_conversation_date_not_the_file_date() {
+        let listed = ordered_ids(vec![
+            dated_summary("imported-2024", Some("2024-03-01T09:00:00Z"), Some(9_000)),
+            dated_summary("this-morning", Some("2026-09-05T08:00:00Z"), Some(1_000)),
+            dated_summary("last-week", Some("2026-08-29T08:00:00Z"), Some(2_000)),
+        ]);
+
+        assert_eq!(listed, vec!["this-morning", "last-week", "imported-2024"]);
+    }
+
+    /// A backup or a file copy must not silently reshuffle history.
+    #[test]
+    fn ignores_an_mtime_that_disagrees_with_the_conversation_date() {
+        let listed = ordered_ids(vec![
+            dated_summary(
+                "older-touched-now",
+                Some("2026-01-01T00:00:00Z"),
+                Some(u64::MAX),
+            ),
+            dated_summary("newer-untouched", Some("2026-09-01T00:00:00Z"), Some(1)),
+        ]);
+
+        assert_eq!(listed, vec!["newer-untouched", "older-touched-now"]);
+    }
+
+    /// Logs with no parseable header timestamp keep the previous behaviour
+    /// rather than sinking to the bottom.
+    #[test]
+    fn falls_back_to_mtime_when_a_session_has_no_header_timestamp() {
+        let listed = ordered_ids(vec![
+            dated_summary("no-timestamp-old", None, Some(1_000)),
+            dated_summary("no-timestamp-new", None, Some(5_000)),
+            dated_summary("unparseable", Some("not a date"), Some(3_000)),
+        ]);
+
+        assert_eq!(
+            listed,
+            vec!["no-timestamp-new", "unparseable", "no-timestamp-old"]
+        );
+    }
+
+    #[test]
+    fn orders_identical_timestamps_stably() {
+        let same = Some("2026-09-05T08:00:00Z");
+        let first = ordered_ids(vec![
+            dated_summary("c", same, None),
+            dated_summary("a", same, None),
+            dated_summary("b", same, None),
+        ]);
+
+        assert_eq!(first, vec!["a", "b", "c"]);
     }
 
     /// Archiving is a *view*, so an archived session stays in the payload and
