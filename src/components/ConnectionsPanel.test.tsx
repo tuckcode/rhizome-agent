@@ -60,6 +60,39 @@ it('re-focuses Mycelium to a new session on a second request', async () => {
   ref.current?.openView('mycelium', { focusPath: '/prime/sessions/second.jsonl' })
   await waitFor(() => expect(screen.getByTestId('mock-session-activity')).toHaveAttribute('data-focused-path', '/prime/sessions/second.jsonl'))
 })
+/**
+ * Connections is docked right with its handle on its own left edge, so pulling
+ * the handle left must widen it. `usePanelWidth.resizeBy` already applies the
+ * sign for exactly that geometry ("takes the raw horizontal delta from a drag
+ * on the panel's left edge"), so the panel must hand it the raw delta —
+ * negating first cancels the two out and inverts the drag.
+ */
+it('widens when its edge is dragged away from the window edge', async () => {
+  render(<ConnectionsPanel vaultPath="/vault" />)
+  fireEvent.click(screen.getByTestId('connections-edge'))
+  const panel = await screen.findByRole('region', { name: 'Connections' })
+  const startingWidth = panel.style.width
+
+  fireEvent.mouseDown(screen.getByRole('separator', { name: 'Resize connections' }), { clientX: 900, clientY: 300 })
+  fireEvent.mouseMove(window, { clientX: 800, clientY: 300 })
+  fireEvent.mouseUp(window)
+
+  expect(parseInt(panel.style.width, 10)).toBeGreaterThan(parseInt(startingWidth, 10))
+})
+
+it('narrows when its edge is dragged toward the window edge', async () => {
+  render(<ConnectionsPanel vaultPath="/vault" />)
+  fireEvent.click(screen.getByTestId('connections-edge'))
+  const panel = await screen.findByRole('region', { name: 'Connections' })
+  const startingWidth = panel.style.width
+
+  fireEvent.mouseDown(screen.getByRole('separator', { name: 'Resize connections' }), { clientX: 800, clientY: 300 })
+  fireEvent.mouseMove(window, { clientX: 900, clientY: 300 })
+  fireEvent.mouseUp(window)
+
+  expect(parseInt(panel.style.width, 10)).toBeLessThan(parseInt(startingWidth, 10))
+})
+
 it('persists independent view preferences and retains a way to re-enable views', () => {
   const first = render(<ConnectionsPanel vaultPath="/vault" />)
   fireEvent.click(screen.getByTestId('connections-edge'))
