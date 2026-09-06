@@ -259,8 +259,8 @@ const FEATURE_DEFAULTS: Record<string, boolean> = {
   chat_primary_shell: true,
 }
 
-export function setReleaseChannel(_channel: ReleaseChannel): void {
-  // Callers still announce the channel for analytics; flags no longer key off it.
+export function setReleaseChannel(channel: ReleaseChannel): void {
+  void channel
 }
 
 export function isFeatureEnabled(flagKey: FeatureFlagKey): boolean {
