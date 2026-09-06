@@ -26,6 +26,8 @@ export interface EditorContentProps {
   onToggleDiff: () => void
   rawMode: boolean
   onToggleRaw: () => void
+  noteLocked?: boolean
+  onToggleNoteLock?: () => void
   onRawContentChange?: (path: string, content: string) => void
   onSave?: () => void
   activeStatus: NoteStatus

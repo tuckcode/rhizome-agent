@@ -23,6 +23,8 @@ type BreadcrumbActions = Pick<
   | 'effectiveRawMode'
   | 'onToggleRaw'
   | 'forceRawMode'
+  | 'noteLocked'
+  | 'onToggleNoteLock'
   | 'showAIChat'
   | 'onToggleAIChat'
   | 'showTableOfContents'
@@ -121,9 +123,11 @@ function RawModeEditorSection({
   rawLatestContentRef,
   vaultPath,
   locale,
+  noteLocked,
+  isDeletedPreview,
 }: Pick<
   EditorContentModel,
-  'activeTab' | 'entries' | 'findRequest' | 'onRawContentChange' | 'onSave' | 'rawLatestContentRef' | 'rawModeContent' | 'vaultPath'
+  'activeTab' | 'entries' | 'findRequest' | 'onRawContentChange' | 'onSave' | 'rawLatestContentRef' | 'rawModeContent' | 'vaultPath' | 'noteLocked' | 'isDeletedPreview'
 > & {
   rawMode: boolean
   locale?: AppLocale
@@ -144,6 +148,7 @@ function RawModeEditorSection({
         latestContentRef={rawLatestContentRef}
         vaultPath={vaultPath}
         locale={locale}
+        readOnly={Boolean(noteLocked) || isDeletedPreview}
       />
     </EditorFindScope>
   )
@@ -183,6 +188,8 @@ function ActiveTabBreadcrumb({
       onToggleDiff={actions.onToggleDiff}
       rawMode={actions.effectiveRawMode}
       onToggleRaw={actions.onToggleRaw}
+      noteLocked={actions.noteLocked}
+      onToggleNoteLock={actions.onToggleNoteLock}
       forceRawMode={actions.forceRawMode}
       showAIChat={actions.showAIChat}
       onToggleAIChat={actions.onToggleAIChat}
@@ -254,6 +261,8 @@ function buildBreadcrumbActions(model: EditorContentModel): BreadcrumbActions {
     effectiveRawMode: model.effectiveRawMode,
     onToggleRaw: model.onToggleRaw,
     forceRawMode: model.forceRawMode,
+    noteLocked: model.noteLocked,
+    onToggleNoteLock: model.onToggleNoteLock,
     showAIChat: model.showAIChat,
     onToggleAIChat: model.onToggleAIChat,
     showTableOfContents: model.showTableOfContents,
@@ -367,6 +376,7 @@ function EditorCanvas({
   onRawContentChange,
   sheetFlushRef,
   isDeletedPreview,
+  noteLocked,
   vaultPath,
   locale,
 }: Pick<
@@ -383,6 +393,7 @@ function EditorCanvas({
   | 'onRawContentChange'
   | 'sheetFlushRef'
   | 'isDeletedPreview'
+  | 'noteLocked'
   | 'vaultPath'
   | 'locale'
 >) {
@@ -426,7 +437,7 @@ function EditorCanvas({
           onChange={onEditorChange}
           sourceEntry={activeTab?.entry ?? null}
           vaultPath={vaultPath}
-          editable={!isDeletedPreview}
+          editable={!isDeletedPreview && !noteLocked}
           locale={locale}
         />
       </div>
@@ -498,6 +509,7 @@ export function EditorContentLayout(model: EditorContentModel) {
     rawModeContent,
     sheetFlushRef,
     noteWidth,
+    noteLocked,
     isSheet,
     richEditorContentReady,
     findRequest,
@@ -550,6 +562,8 @@ export function EditorContentLayout(model: EditorContentModel) {
             rawLatestContentRef={rawLatestContentRef}
             vaultPath={vaultPath}
             locale={locale}
+            noteLocked={noteLocked}
+            isDeletedPreview={isDeletedPreview}
           />
           <EditorCanvas
             showEditor={showEditor}
@@ -564,6 +578,7 @@ export function EditorContentLayout(model: EditorContentModel) {
             onRawContentChange={onRawContentChange}
             sheetFlushRef={sheetFlushRef}
             isDeletedPreview={isDeletedPreview}
+            noteLocked={noteLocked}
             isSheet={isSheet}
             locale={locale}
           />

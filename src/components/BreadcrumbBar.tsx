@@ -34,6 +34,8 @@ import {
   ArrowsInLineHorizontal,
   ArrowsOutLineHorizontal,
   DotsThree,
+  LockSimple,
+  LockSimpleOpen,
   X,
 } from '@phosphor-icons/react'
 import { slugify } from '../hooks/useNoteCreation'
@@ -48,6 +50,9 @@ interface BreadcrumbBarProps {
   onToggleDiff: () => void
   rawMode?: boolean
   onToggleRaw?: () => void
+  /** When true, the note is read-only (C68). Distinct from raw vs formatted. */
+  noteLocked?: boolean
+  onToggleNoteLock?: () => void
   /** When true, raw mode is forced (non-markdown file) — hide the toggle. */
   forceRawMode?: boolean
   showAIChat?: boolean
@@ -280,6 +285,29 @@ function ConfiguredToggleAction({
 
 function RawToggleButton({ rawMode, locale = 'en', onToggleRaw }: { rawMode?: boolean; locale?: AppLocale; onToggleRaw?: () => void }) {
   return <ConfiguredToggleAction active={!!rawMode} config={TOGGLE_ACTION_CONFIGS.raw} locale={locale} onClick={onToggleRaw} />
+}
+
+function LockToggleButton({
+  noteLocked = false,
+  onToggleNoteLock,
+}: {
+  noteLocked?: boolean
+  onToggleNoteLock?: () => void
+}) {
+  if (!onToggleNoteLock) return null
+
+  return (
+    <IconActionButton
+      copy={{ label: noteLocked ? 'Unlock note' : 'Lock note' }}
+      onClick={onToggleNoteLock}
+      className={cn(noteLocked ? 'text-foreground' : 'hover:text-foreground')}
+      testId="breadcrumb-note-lock"
+    >
+      {noteLocked
+        ? <LockSimple size={16} weight="fill" className={BREADCRUMB_ICON_CLASS} />
+        : <LockSimpleOpen size={16} className={BREADCRUMB_ICON_CLASS} />}
+    </IconActionButton>
+  )
 }
 
 function NoteWidthAction({
@@ -849,6 +877,8 @@ function BreadcrumbActions({
   onToggleDiff,
   rawMode,
   onToggleRaw,
+  noteLocked,
+  onToggleNoteLock,
   forceRawMode,
   noteWidth,
   onToggleNoteWidth,
@@ -901,6 +931,7 @@ function BreadcrumbActions({
         <NeighborhoodAction entry={entry} locale={locale} onEnterNeighborhood={onEnterNeighborhood} />
       </OverflowToolbarAction>
       {!forceRawMode && <RawToggleButton rawMode={rawMode} locale={locale} onToggleRaw={onToggleRaw} />}
+      <LockToggleButton noteLocked={noteLocked} onToggleNoteLock={onToggleNoteLock} />
       <OverflowToolbarAction>
         <NoteWidthAction noteWidth={noteWidth} locale={locale} onToggleNoteWidth={onToggleNoteWidth} />
       </OverflowToolbarAction>

@@ -24,6 +24,7 @@ interface ViewCommandsConfig {
   onToggleInspector: () => void
   onToggleDiff?: () => void
   onToggleRawEditor?: () => void
+  onToggleNoteLock?: () => void
   noteWidth?: NoteWidthMode
   defaultNoteWidth?: NoteWidthMode
   onSetNoteWidth?: (mode: NoteWidthMode) => void
@@ -121,7 +122,7 @@ function buildAiViewCommands(
 export function buildViewCommands(config: ViewCommandsConfig): CommandAction[] {
   const {
     hasActiveNote, activeNoteModified,
-    onSetViewMode, onToggleInspector, onToggleDiff, onToggleRawEditor,
+    onSetViewMode, onToggleInspector, onToggleDiff, onToggleRawEditor, onToggleNoteLock,
     noteWidth = DEFAULT_NOTE_WIDTH_MODE, defaultNoteWidth = DEFAULT_NOTE_WIDTH_MODE,
     onSetNoteWidth, onSetDefaultNoteWidth, onToggleAIChat, onToggleTableOfContents, onKeyboardShortcuts,
     zoomLevel, onZoomIn, onZoomOut, onZoomReset,
@@ -139,6 +140,7 @@ export function buildViewCommands(config: ViewCommandsConfig): CommandAction[] {
     { id: 'toggle-inspector', label: 'Toggle Properties Panel', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewToggleProperties), keywords: ['properties', 'inspector', 'panel', 'right', 'sidebar'], enabled: true, execute: onToggleInspector },
     { id: 'toggle-diff', label: 'Toggle Diff Mode', group: 'View', keywords: ['diff', 'changes', 'git', 'compare', 'version'], enabled: hasActiveNote && activeNoteModified, execute: () => onToggleDiff?.() },
     { id: 'toggle-raw-editor', label: 'Toggle Raw Editor', group: 'View', keywords: ['raw', 'source', 'markdown', 'frontmatter', 'code', 'textarea'], enabled: hasActiveNote && !!onToggleRawEditor, execute: () => onToggleRawEditor?.() },
+    { id: 'toggle-note-lock', label: 'Lock/Unlock Note', group: 'View', keywords: ['lock', 'unlock', 'readonly', 'read-only', 'view', 'edit'], enabled: hasActiveNote && !!onToggleNoteLock, execute: () => onToggleNoteLock?.() },
     buildSetNoteWidthCommand('normal', noteWidth, hasActiveNote, onSetNoteWidth),
     buildSetNoteWidthCommand('wide', noteWidth, hasActiveNote, onSetNoteWidth),
     buildSetDefaultNoteWidthCommand('normal', defaultNoteWidth, onSetDefaultNoteWidth),
