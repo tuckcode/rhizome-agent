@@ -159,5 +159,3 @@ export function GraphControls({
     </div>
   )
 }
-
-export default GraphControls

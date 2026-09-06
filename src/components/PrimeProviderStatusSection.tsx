@@ -239,5 +239,3 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
     </div>
   )
 }
-
-export default PrimeProviderStatusSection

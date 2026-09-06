@@ -124,7 +124,7 @@ describe('ResearchPanel', () => {
 
   it('renders as a rail canvas without the dialog overlay', () => {
     render(
-      <ResearchPanel variant="pane" open={true} onClose={onClose} vaultPath="/vault" onOpenNote={onOpenNote} />,
+      <ResearchPanel open={true} onClose={onClose} vaultPath="/vault" onOpenNote={onOpenNote} />,
     )
     expect(screen.getByTestId('research-canvas')).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()

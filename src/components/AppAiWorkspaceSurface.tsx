@@ -20,7 +20,7 @@ interface AppAiWorkspaceSurfaceProps {
   entries: VaultEntry[]
   initialActiveConversationId?: string
   locale: AppLocale
-  mode: 'docked' | 'side' | 'window'
+  mode: 'side' | 'window'
   noteList: NoteListItem[]
   noteListFilter: { type: string | null; query: string }
   onActiveConversationChange?: (id: string) => void
@@ -33,7 +33,6 @@ interface AppAiWorkspaceSurfaceProps {
   onOpenAiSettings?: () => void
   onOpenNote?: (path: string) => void
   onPromoteToVault?: (text: string) => void
-  onPopOut?: (context?: { activeConversationId?: string }) => void
   onRestoreVaultAiGuidance?: () => void
   onUnsupportedAiPaste?: (message: string) => void
   onVaultChanged?: () => void
@@ -71,7 +70,6 @@ export function AppAiWorkspaceSurface({
   onOpenAiSettings,
   onOpenNote,
   onPromoteToVault,
-  onPopOut,
   onRestoreVaultAiGuidance,
   onUnsupportedAiPaste,
   onVaultChanged,
@@ -105,7 +103,6 @@ export function AppAiWorkspaceSurface({
       onClose={onClose}
       onConversationSettingsChange={onConversationSettingsChange}
       onDock={onDock}
-      onPopOut={onPopOut}
       onOpenAiSettings={onOpenAiSettings}
       onOpenNote={onOpenNote}
       onPromoteToVault={onPromoteToVault}

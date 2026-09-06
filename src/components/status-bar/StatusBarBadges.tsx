@@ -1,9 +1,8 @@
-import { ArrowDown, ArrowsClockwise as RefreshCw, CircleNotch as Loader2, Cpu, GitBranch, GitCommit as GitCommitHorizontal, GitDiff, Pulse, ShareNetwork, Terminal, Warning as AlertTriangle } from '@phosphor-icons/react'
+import { ArrowDown, ArrowsClockwise as RefreshCw, CircleNotch as Loader2, Cpu, GitBranch, GitCommit as GitCommitHorizontal, GitDiff, Pulse, ShareNetwork, Warning as AlertTriangle } from '@phosphor-icons/react'
 import { useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { ActionTooltip, type ActionTooltipCopy } from '@/components/ui/action-tooltip'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { ClaudeCodeStatus } from '../../hooks/useClaudeCodeStatus'
 import type { McpStatus } from '../../hooks/useMcpStatus'
 import { translate, type AppLocale, type TranslationKey } from '../../lib/i18n'
 import type { GitRemoteStatus, LastCommitInfo, SyncStatus } from '../../types'
@@ -29,8 +28,6 @@ const SYNC_COLORS = new Map<SyncStatus, string>([
 const MCP_TOOLTIP_KEYS = new Map<McpStatus, TranslationKey>([
   ['not_installed', 'status.mcp.notConnected'],
 ])
-
-const CLAUDE_INSTALL_URL = 'https://docs.anthropic.com/en/docs/claude-code'
 
 function formatElapsedSync(locale: AppLocale, lastSyncTime: number | null): string {
   if (!lastSyncTime) return translate(locale, 'status.sync.notSynced')
@@ -102,18 +99,6 @@ function getMcpBadgeConfig(locale: AppLocale, status: McpStatus, onInstall?: () 
     clickable,
     tooltip: translate(locale, MCP_TOOLTIP_KEYS.get(status) ?? 'status.mcp.unknown'),
     onClick: clickable ? onInstall : undefined,
-  }
-}
-
-function getClaudeCodeBadgeConfig(locale: AppLocale, status: ClaudeCodeStatus, version?: string | null) {
-  if (status === 'checking') return null
-  const missing = status === 'missing'
-  const label = translate(locale, missing ? 'status.claude.missing' : 'status.claude.label')
-  return {
-    missing,
-    label,
-    tooltip: missing ? translate(locale, 'status.claude.install') : `${label}${version ? ` ${version}` : ''}`,
-    onActivate: missing ? () => openExternalUrl(CLAUDE_INSTALL_URL) : undefined,
   }
 }
 
@@ -286,7 +271,6 @@ type StatusWarningBadgeProps = {
   | { kind: 'conflict'; count: number; onClick?: () => void }
   | { kind: 'missingGit'; onClick?: () => void }
   | { kind: 'mcp'; status: McpStatus; onInstall?: () => void }
-  | { kind: 'claude'; status: ClaudeCodeStatus; version?: string | null }
 )
 
 interface StatusBadgeDisplayOptions {
@@ -307,11 +291,6 @@ type MissingGitBadgeProps = StatusBadgeDisplayOptions & {
 type McpBadgeProps = StatusBadgeDisplayOptions & {
   status: McpStatus
   onInstall?: () => void
-}
-
-type ClaudeCodeBadgeProps = StatusBadgeDisplayOptions & {
-  status: ClaudeCodeStatus
-  version?: string | null
 }
 
 function withStatusBadgeDefaults({
@@ -353,18 +332,6 @@ function getStatusWarningBadgeConfig(props: StatusWarningBadgeProps): StatusWarn
         icon: <Cpu size={13} />,
         label: 'MCP',
         trailingWarning: true,
-      }
-    }
-    case 'claude': {
-      const config = getClaudeCodeBadgeConfig(props.locale, props.status, props.version)
-      return config && {
-        copyLabel: config.tooltip,
-        onClick: config.onActivate,
-        testId: 'status-claude-code',
-        className: config.missing ? 'text-[var(--accent-orange)]' : undefined,
-        icon: <Terminal size={13} />,
-        label: config.label,
-        trailingWarning: config.missing,
       }
     }
   }
@@ -871,21 +838,6 @@ export function McpBadge({
       kind="mcp"
       status={status}
       onInstall={onInstall}
-      {...withStatusBadgeDefaults(displayOptions)}
-    />
-  )
-}
-
-export function ClaudeCodeBadge({
-  status,
-  version,
-  ...displayOptions
-}: ClaudeCodeBadgeProps) {
-  return (
-    <StatusWarningBadge
-      kind="claude"
-      status={status}
-      version={version}
       {...withStatusBadgeDefaults(displayOptions)}
     />
   )

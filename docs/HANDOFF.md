@@ -47,12 +47,9 @@ file.
 ---
 
 ## State
-`main` is **`45562a5`**, with no local commits ahead of `origin/main` at the
-2026-09-04 note-preview review. Preview and graph corrections remain
-uncommitted: collapsed strip says Inbox; graph Open note exits Graph; Key is bounded.
-97 tests and focused browser checks pass. Native blank painting recovered after a clean restart (C60). The user requires
-approval before commit/push. #25 provenance, C23, and C25 fixes are committed;
-the earlier C22 relaunch check passed 10/10. Confirm with `git status`.
+`main` is **`a309a17`** (C67/C68). Area C orphan-UI subtraction is on
+`cursor/area-c-orphan-ui-7f62`: deleted unused components/exports and dead
+dialog / docked / right-panel-chat branches. Confirm with `git status`.
 Multi-day briefing: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date first).
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
@@ -88,6 +85,8 @@ docs need filling. Read it when a handoff task is finished and the next one is
 yours to choose.
 
 ## Recent sessions
+
+- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2155-grok-4-6-area-c-orphan-ui.md) — **Area C:** deleted orphan UI under `src/components/` (onboarding/create-note/autocomplete/NoteIcon), unused exports, and dead dialog/docked/right-panel-chat branches.
 
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-0805-composer-c67-c68.md) — **C67/C68 shipped:** sessions right-click menu; note lock (default editable, breadcrumb + Cmd+K).
 

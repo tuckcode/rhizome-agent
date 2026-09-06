@@ -194,66 +194,6 @@ export function SettingsSwitchControl({
   return <Switch id={id} checked={checked} onCheckedChange={onChange} aria-label={label} disabled={disabled} />
 }
 
-export function LabeledSelect({
-  label,
-  value,
-  onValueChange,
-  options,
-  testId,
-  autoFocus = false,
-}: {
-  label: string
-  value: string
-  onValueChange: (value: string) => void
-  options: Array<{ value: string; label: string }>
-  testId: string
-  autoFocus?: boolean
-}) {
-  const triggerId = useId()
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <label htmlFor={triggerId} style={{ fontSize: 12, fontWeight: 500, color: 'var(--foreground)' }}>{label}</label>
-      <SelectControl
-        id={triggerId}
-        value={value}
-        onValueChange={onValueChange}
-        options={options}
-        testId={testId}
-        ariaLabel={label}
-        autoFocus={autoFocus}
-      />
-    </div>
-  )
-}
-
-export function LabeledNumberInput({
-  label,
-  value,
-  onValueChange,
-  testId,
-  disabled = false,
-}: {
-  label: string
-  value: number
-  onValueChange: (value: number) => void
-  testId: string
-  disabled?: boolean
-}) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--foreground)' }} htmlFor={testId}>{label}</label>
-      <NumberInputControl
-        value={value}
-        onValueChange={onValueChange}
-        testId={testId}
-        ariaLabel={label}
-        disabled={disabled}
-      />
-    </div>
-  )
-}
-
 export function SettingsSwitchRow({
   label,
   description,
