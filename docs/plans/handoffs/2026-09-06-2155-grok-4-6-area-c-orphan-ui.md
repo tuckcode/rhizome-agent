@@ -5,7 +5,7 @@ description: >-
   Area C subtraction: deleted orphan components under src/components/, unused
   exports, and dead dialog/docked/right-panel-chat branches. GraphView default
   export kept (lazy import).
-commits: pending
+commits: a1cea22
 ---
 
 # Area C — orphan UI cleanup
