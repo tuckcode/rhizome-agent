@@ -5,7 +5,7 @@ description: >-
   Area E subtraction: unused Tauri IPC wrappers, Laputa launch migrate, and
   stale iOS/Tolaria apple leftovers. Domain helpers that still have callers
   stayed. Multi-CLI / ai_models (#56) untouched.
-commits: pending
+commits: c0158a5
 ---
 
 # Area E — dead IPC + iOS leftovers
@@ -36,3 +36,7 @@ Left alone: `ai_models` / CLI streams (#56), `session_import/**`, dual search,
 sheet engine, inbox watcher, prime_session_host split, docs/site, MCP JS.
 `#[allow(dead_code)]` on `event_tx` / `format_empty_turn` unchanged — not
 made unused by this cut.
+
+Linux CI clippy failed on this PR for the same macOS-only unused items
+(`menu_bar_capture.rs`, `should_reopen_main_window`). Filed **C69**. Not
+this diff — same fail on area A–D PRs. Left unfixed (scope).
