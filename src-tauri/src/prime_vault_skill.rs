@@ -179,7 +179,7 @@ fn skill_markdown_with_tool(
     format!(
         r##"---
 name: rhizome-vault
-description: Call Rhizome vault tools (search, read, create note, open note) for the attached vault via the local MCP one-shot CLI. Prefer these tools over raw filesystem walks of the vault.
+description: Search, read, and write notes in the attached Rhizome vault, and ask its wikilink graph what connects to what — a note's neighbours, the chain between two notes, orphans, and dead links. Reach for this before reading a pile of notes to find how something relates, and in place of find/grep over the vault.
 ---
 
 # Rhizome vault tools
@@ -211,6 +211,36 @@ Call tools with the one-shot CLI (keep the environment prefix — the graph tool
 | `refresh_vault` | `{{}}` | Rescan so new files appear |
 | `show_confetti` | `{{"message":"Migration landed"}}` | Celebrate a hard-won milestone |
 
+## The graph
+
+The vault is a graph: notes are nodes, wikilinks are edges. Ask it structural
+questions instead of reading notes to infer the same answer.
+
+| Tool | Args example | Answers |
+|------|----------------|---------|
+| `rhizome_graph_neighbors` | `{{"note":"bi-temporal-facts","depth":1}}` | What is this note connected to? |
+| `rhizome_graph_path` | `{{"from":"rhizome","to":"persistent-wiki"}}` | How do these two relate, if at all? |
+| `rhizome_graph_health` | `{{}}` | Size, orphan count, dead-link count, most-connected notes |
+| `rhizome_graph_orphans` | `{{}}` | Which notes are unreachable by following links? |
+| `rhizome_graph_dead_links` | `{{}}` | Which notes were linked to but never written? |
+
+`note` resolves a vault path, a title, or a filename stem, so
+`"bi-temporal-facts"` and `"concepts/bi-temporal-facts.md"` both work.
+
+**Reach for the graph before reading.** Asked how one thing relates to another,
+or what surrounds a topic, one `rhizome_graph_neighbors` call answers what
+would otherwise take ten `get_note` calls — and it names the notes worth
+opening, so the reads that follow are the right ones. `search_notes` finds
+notes that *mention* a phrase; the graph finds notes that are actually *linked*,
+which is the better signal for "what belongs with this".
+
+Two of these answer questions nothing else can. `rhizome_graph_dead_links`
+lists wikilink targets with no note behind them — each one a note somebody
+meant to write, ordered by how many notes are waiting on it, which makes it a
+worklist rather than a complaint. `rhizome_graph_orphans` lists notes nothing
+links to and which link nowhere: real content that no path through the vault
+will ever reach.
+
 ## Celebrate (sparingly)
 
 `show_confetti` throws a burst of confetti across the Rhizome window. Use it
@@ -241,6 +271,8 @@ Example:
 ## Rules
 
 1. Prefer `search_notes` then `get_note` over guessing paths.
+1. Relationship questions — how two notes connect, what surrounds a topic,
+   what is missing — start at the graph, then read the notes it names.
 2. Paths are vault-relative unless absolute under the vault root.
 3. Do not claim vault tools work if VAULT_PATH is missing or the CLI errors.
 4. Prefer this skill for vault Q&A; do not roam the whole disk looking for notes.
@@ -324,6 +356,24 @@ fn write_mcp_stdio_settings(
 mod tests {
     use super::*;
 
+    /// An agent decides whether to open a skill from its description, before
+    /// it reads a word of the body. A description naming only note CRUD gives
+    /// it no reason to look here when asked how two things relate, so the
+    /// graph stays unused however well the body documents it.
+    #[test]
+    fn the_description_advertises_relationship_questions() {
+        let skill = skill_markdown(Path::new("/opt/rhizome/mcp-server/cli-call.mjs"), "/vault");
+        let description = skill
+            .lines()
+            .find(|line| line.starts_with("description:"))
+            .expect("a description line");
+
+        assert!(description.contains("graph"));
+        assert!(description.contains("connects"));
+        assert!(description.contains("orphans"));
+        assert!(description.contains("dead links"));
+    }
+
     /// The graph tools shell out to `rhizome-tool` and fail closed without
     /// `RHIZOME_TOOL_PATH`. A bash tool inherits none of the environment the
     /// app gives its own MCP server, so unless the skill's own command carries
@@ -390,6 +440,14 @@ mod tests {
         assert!(skill.contains("search_notes"));
         assert!(skill.contains("get_note"));
         assert!(skill.contains("create_note"));
+        // The graph tools shipped documented nowhere the agent reads, so it
+        // never learned they existed — the reason the vault's own structure
+        // went unused for a year of sessions.
+        assert!(skill.contains("rhizome_graph_neighbors"));
+        assert!(skill.contains("rhizome_graph_dead_links"));
+        assert!(skill.contains("rhizome_graph_orphans"));
+        assert!(skill.contains("rhizome_graph_path"));
+        assert!(skill.contains("rhizome_graph_health"));
         assert!(skill.contains("Promote"));
         assert!(skill.contains("rhizome-vault"));
         assert!(skill.contains("/vault"));
