@@ -85,7 +85,8 @@ describe('EditorRightPanel', () => {
   it('shows properties when the inspector is open', () => {
     renderRightPanel({ inspectorCollapsed: false })
 
-    expect(screen.getByText('Test Note')).toBeTruthy()
+    expect(screen.getByTestId('properties-panel-icon')).toBeTruthy()
+    expect(screen.getByText('Properties')).toBeTruthy()
     expect(screen.queryByTestId('ai-panel')).toBeNull()
   })
 
