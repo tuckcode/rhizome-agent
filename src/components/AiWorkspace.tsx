@@ -84,7 +84,7 @@ interface AiWorkspaceProps {
   entries?: VaultEntry[]
   initialActiveConversationId?: string
   locale?: AppLocale
-  mode?: 'docked' | 'side' | 'window'
+  mode?: 'side' | 'window'
   noteList?: NoteListItem[]
   noteListFilter?: { type: string | null; query: string }
   onActiveConversationChange?: (id: string) => void
@@ -97,7 +97,6 @@ interface AiWorkspaceProps {
   onOpenAiSettings?: () => void
   onOpenNote?: (path: string) => void
   onPromoteToVault?: (text: string) => void
-  onPopOut?: (context?: { activeConversationId?: string }) => void
   onRestoreVaultAiGuidance?: () => void
   onUnsupportedAiPaste?: (message: string) => void
   onVaultChanged?: () => void
@@ -336,7 +335,6 @@ type ConversationSessionProps = {
   onOpenAiSettings?: () => void
   onOpenNote?: (path: string) => void
   onPromoteToVault?: (text: string) => void
-  onPopOut?: () => void
   onRestoreVaultAiGuidance?: () => void
   onSelectTarget: (targetId: string) => void
   onStatusChange: (id: string, status: AgentStatus) => void
@@ -518,10 +516,9 @@ function ConversationWorkspaceHeader({
   onClose,
   onDock,
   onOpenAiSettings,
-  onPopOut,
 }: Pick<
   ConversationSessionProps,
-  'conversation' | 'locale' | 'mode' | 'onArchive' | 'onClose' | 'onDock' | 'onOpenAiSettings' | 'onPopOut'
+  'conversation' | 'locale' | 'mode' | 'onArchive' | 'onClose' | 'onDock' | 'onOpenAiSettings'
 >) {
   if (mode === 'side') return null
 
@@ -530,12 +527,10 @@ function ConversationWorkspaceHeader({
       archiveDisabled={!canArchiveConversation(conversation)}
       conversation={conversation}
       locale={locale}
-      mode={mode}
       onArchive={onArchive}
       onClose={onClose}
       onDock={onDock}
       onOpenAiSettings={onOpenAiSettings}
-      onPopOut={onPopOut}
     />
   )
 }
@@ -563,7 +558,6 @@ function ConversationSession({
   onOpenAiSettings,
   onOpenNote,
   onPromoteToVault,
-  onPopOut,
   onRestoreVaultAiGuidance,
   onSelectTarget,
   onStatusChange,
@@ -647,7 +641,6 @@ function ConversationSession({
         onClose={onClose}
         onDock={onDock}
         onOpenAiSettings={onOpenAiSettings}
-        onPopOut={onPopOut}
       />
       <GuidanceWarning locale={locale} onRestore={onRestoreVaultAiGuidance} status={vaultAiGuidanceStatus} />
       <div className="flex min-h-0 flex-1">
@@ -723,7 +716,7 @@ function resolveAiWorkspaceProps(props: AiWorkspaceProps): ResolvedAiWorkspacePr
     defaultAiAgentReady: props.defaultAiAgentReady ?? true,
     entries: props.entries ?? [],
     locale: props.locale ?? 'en',
-    mode: props.mode ?? 'docked',
+    mode: props.mode ?? 'side',
   }
 }
 
@@ -1083,7 +1076,6 @@ function ConversationSessions({
             onOpenAiSettings={workspace.onOpenAiSettings}
             onOpenNote={workspace.onOpenNote}
             onPromoteToVault={workspace.onPromoteToVault}
-            onPopOut={workspace.onPopOut}
             onRestoreVaultAiGuidance={workspace.onRestoreVaultAiGuidance}
             onSelectTarget={(targetId) => model.setConversationTarget(conversation.id, targetId)}
             onStatusChange={model.handleStatusChange}

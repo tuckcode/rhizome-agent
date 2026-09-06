@@ -54,6 +54,10 @@ pick up the toggle. Native Chat glance **PASSED** (2026-09-06). Quit the
 daily app, uninstall it, then install. Do not launch leftovers. After
 install, delete leftover `.app` copies.
 
+Area C orphan-UI subtraction is on `cursor/area-c-orphan-ui-7f62`: deleted
+unused components/exports and dead dialog / docked / right-panel-chat
+branches.
+
 Still open / parked: **C72** Inbox rename; Prime list-import; **#51** Tab;
 **C64** full verify; **#47** confirm-close; Grokbot **#60/#61/#62** (held);
 Rhizome in-app updater stub. Evening design dump (portfolio, vault-as-skills,
@@ -120,6 +124,7 @@ yours to choose.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1537-composer-midturn-stream-and-session-names.md) — mid-turn: host kept stopping at first `agent_end` (follow-up reply missing in Chat); fix `stream_until_turn_complete` + optimistic follow-up bubble. New session names lead with local clock. Rebuild `/Applications` still required.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1522-composer-midturn-waiting-chrome.md) — daily-drive: **#41 mid-turn** confirmed (“Waiting in this session” / `MIDTURN_QUEUE_PROBE` while Working; DeepSeek · Rhizome Vault); graph tools still healthy.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1147-composer-daily-drive-cli-call-bundle.md) — daily-drive: **C69** packaged `cli-call` missing (fixed + `/Applications` patched); **live Chat graph ask succeeded** on Obsidian Vault (Big Pickle → `rhizome_graph_health`: 69 notes / 11 links / 60 orphans / 7 dead links). Same day: `/Applications` rebuild with ADR-0170 native QA; vault skills point at packaged `cli-call.mjs`; **graph Find** collapsed to bottom-right expandable box (Atticus: type-pill wall hid the canvas).
+- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2155-grok-4-6-area-c-orphan-ui.md) — **Area C:** deleted orphan UI under `src/components/` (onboarding/create-note/autocomplete/NoteIcon), unused exports, and dead dialog/docked/right-panel-chat branches.
 
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-0805-composer-c67-c68.md) — **C67/C68 shipped:** sessions right-click menu; note lock (default editable, breadcrumb + Cmd+K).
 

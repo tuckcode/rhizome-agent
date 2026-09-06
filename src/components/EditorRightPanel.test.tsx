@@ -1,47 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render as rtlRender, screen, fireEvent } from '@testing-library/react'
+import { render as rtlRender, screen } from '@testing-library/react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { EditorRightPanel } from './EditorRightPanel'
 import type { VaultEntry } from '../types'
 import { bindVaultConfigStore, resetVaultConfigStore } from '../utils/vaultConfigStore'
-
-vi.mock('../hooks/useCliAiAgent', async () => {
-  const React = await import('react')
-
-  return {
-    useCliAiAgent: () => {
-      const [messages, setMessages] = React.useState<Array<{
-        id: string
-        userMessage: string
-        actions: unknown[]
-        response?: string
-        localMarker?: string
-      }>>([])
-
-      return {
-        messages,
-        status: 'idle',
-        sendMessage: (text: string) => {
-          setMessages([{
-            id: 'mock-session-message',
-            userMessage: text,
-            actions: [],
-            response: 'Mock response',
-          }])
-        },
-        clearConversation: () => setMessages([]),
-        addLocalMarker: (text: string) => {
-          setMessages([{
-            id: 'mock-local-marker',
-            userMessage: '',
-            actions: [],
-            localMarker: text,
-          }])
-        },
-      }
-    },
-  }
-})
 
 const entry: VaultEntry = {
   path: '/vault/note/test.md',
@@ -78,30 +40,28 @@ const entry: VaultEntry = {
   hasH1: false,
 }
 
-function editorRightPanel(showAIChat: boolean) {
-  return (
+function renderRightPanel({
+  inspectorCollapsed = true,
+  showTableOfContents = false,
+}: {
+  inspectorCollapsed?: boolean
+  showTableOfContents?: boolean
+} = {}) {
+  return rtlRender(
     <EditorRightPanel
-      showAIChat={showAIChat}
-      showTableOfContents={false}
-      inspectorCollapsed
+      showTableOfContents={showTableOfContents}
+      inspectorCollapsed={inspectorCollapsed}
       inspectorWidth={320}
       editor={{} as never}
       inspectorEntry={entry}
-      inspectorContent="Active note content"
+      inspectorContent="# Test Note\n\nBody"
       entries={[entry]}
       gitHistory={[]}
       vaultPath="/tmp/vault"
       onToggleInspector={vi.fn()}
-      onToggleAIChat={vi.fn()}
       onNavigateWikilink={vi.fn()}
       onViewCommitDiff={vi.fn()}
-    />
-  )
-}
-
-function renderRightPanel(showAIChat: boolean) {
-  return rtlRender(
-    editorRightPanel(showAIChat),
+    />,
     { wrapper: TooltipProvider },
   )
 }
@@ -122,23 +82,24 @@ describe('EditorRightPanel', () => {
     }, vi.fn())
   })
 
-  it('preserves the AI panel transcript across close and reopen', () => {
-    const view = renderRightPanel(true)
+  it('shows properties when the inspector is open', () => {
+    renderRightPanel({ inspectorCollapsed: false })
 
-    const input = screen.getByTestId('agent-input')
-    input.textContent = 'keep this session'
-    fireEvent.input(input)
-    fireEvent.click(screen.getByTestId('agent-send'))
-
-    expect(screen.getByText('keep this session')).toBeTruthy()
-    expect(screen.getByText('Mock response')).toBeTruthy()
-
-    view.rerender(editorRightPanel(false))
+    expect(screen.getByText('Test Note')).toBeTruthy()
     expect(screen.queryByTestId('ai-panel')).toBeNull()
+  })
 
-    view.rerender(editorRightPanel(true))
+  it('shows the table of contents when that panel is open', () => {
+    renderRightPanel({ showTableOfContents: true })
 
-    expect(screen.getByText('keep this session')).toBeTruthy()
-    expect(screen.getByText('Mock response')).toBeTruthy()
+    expect(screen.getByTestId('table-of-contents-panel')).toBeTruthy()
+    expect(screen.queryByTestId('ai-panel')).toBeNull()
+  })
+
+  it('renders nothing when both side panels are closed', () => {
+    const { container } = renderRightPanel()
+
+    expect(container).toBeEmptyDOMElement()
+    expect(screen.queryByTestId('ai-panel')).toBeNull()
   })
 })

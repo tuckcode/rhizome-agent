@@ -114,5 +114,3 @@ export function ChatPreflightBanner({
     </div>
   )
 }
-
-export default ChatPreflightBanner
