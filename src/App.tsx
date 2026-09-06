@@ -1,6 +1,9 @@
 import { noteExistsOnDisk, persistNewNote } from './hooks/useNoteCreation'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ConnectionsPanel, type ConnectionsPanelHandle } from './components/ConnectionsPanel'
+import { APP_STORAGE_KEYS } from './constants/appStorage'
+import { usePanelWidth } from './hooks/usePanelWidth'
+import { startResizeDrag } from './utils/startResizeDrag'
 import { Sidebar } from './components/Sidebar'
 import { CommandRail, type CommandRailDestination } from './components/CommandRail'
 import { NoteList } from './components/NoteList'
@@ -558,6 +561,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   // as a full-page destination — route requests there instead. Classic shell
   // has no Connections panel, so it keeps the old full-page toggle.
   const connectionsPanelRef = useRef<ConnectionsPanelHandle>(null)
+  // The editor keeps its own generous margins, so a fixed half of the centre
+  // reads as wasted space when the window is narrow. Bounds leave room for the
+  // editor's own minimum on one side and a usable chat on the other.
+  const chatNoteEditorWidth = usePanelWidth(APP_STORAGE_KEYS.chatNoteEditorWidth, 560, 320, 1200)
   const handleRailSelectGraph = useCallback(() => {
     if (chatCentered) { connectionsPanelRef.current?.openView('graph'); return }
     handleSetSelection(toggleGraphSelection(effectiveSelection, vaultConfig.inbox?.explicitOrganization))
@@ -2057,7 +2064,21 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
             {chatCentered ? (
               <div className="app__chat-center" data-testid="chat-center" style={isGraphDestination || isMyceliumDestination || isResearchDestination ? { display: 'none' } : undefined}>
                 {chatHomeSurface}
-                <div className={activeTab ? 'app__note-editor' : 'app__note-editor app__note-editor--idle'}>
+                {/* Chat and the editor split the centre. Without a handle the
+                    split is a fixed half each, and the editor's own margins
+                    make that read as wasted space on a narrow window. */}
+                <div
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label={translate(appLocale, 'notes.panel.resize')}
+                  data-testid="chat-note-editor-resize"
+                  className="relative z-20 w-1 shrink-0 cursor-col-resize bg-transparent transition-colors hover:bg-border"
+                  onMouseDown={event => startResizeDrag(event, 'col-resize', deltaX => chatNoteEditorWidth.resizeBy(deltaX))}
+                />
+                <div
+                  className={activeTab ? 'app__note-editor' : 'app__note-editor app__note-editor--idle'}
+                  style={{ flex: `0 0 ${chatNoteEditorWidth.width}px` }}
+                >
                     <Editor
                       tabs={notes.tabs}
                       activeTabPath={notes.activeTabPath}
