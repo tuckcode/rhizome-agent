@@ -1,9 +1,7 @@
 import {
   ArrowsClockwise,
-  BookOpen,
   GearSix as Settings,
   GitCommit,
-  Megaphone,
   Moon,
   Package,
   Pulse,
@@ -18,10 +16,8 @@ import type { ThemeMode } from '../../lib/themeMode'
 import { translate, type AppLocale, type TranslationKey } from '../../lib/i18n'
 import { useStatusBarAddRemote } from '../../hooks/useStatusBarAddRemote'
 import type { GitRemoteStatus, SyncStatus } from '../../types'
-import { rememberFeedbackDialogOpener } from '../../lib/feedbackDialogOpener'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
 import { AddRemoteModal } from '../AddRemoteModal'
-import { AgentsPill } from './AgentsPill'
 import { Button } from '@/components/ui/button'
 import {
   CommitButton,
@@ -85,13 +81,6 @@ interface StatusBarPrimarySectionProps {
   onTriggerSync?: () => void
   onPullAndPush?: () => void
   onOpenConflictResolver?: () => void
-  buildNumber?: string
-  onCheckForUpdates?: () => void
-  /** Single Rhizome+Prime update indicator (issue #19), composed by the
-   *  caller so this file doesn't need its own update-status hooks. Renders
-   *  as nothing when neither has an update, so it never adds a second
-   *  version number next to the build-number pill above. */
-  versionUpdateIndicator?: ReactNode
   onRemoveVault?: (path: string) => void
   onReorderVaults?: (orderedPaths: string[]) => void
   onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
@@ -111,8 +100,10 @@ interface StatusBarSecondarySectionProps {
   themeMode?: ThemeMode
   onZoomReset?: () => void
   onToggleThemeMode?: () => void
-  onOpenFeedback?: () => void
-  onOpenDocs?: () => void
+  buildNumber?: string
+  onCheckForUpdates?: () => void
+  /** Single Rhizome+Prime update indicator (issue #19). */
+  versionUpdateIndicator?: ReactNode
   onOpenResearch?: () => void
   onOpenSettings?: () => void
   /** When the command rail is active it owns Research + Settings, so the
@@ -253,9 +244,7 @@ function StatusBarPrimaryBadges({
       {mcpStatus && <McpBadge status={mcpStatus} onInstall={onInstallMcp} showSeparator={!compact} compact={compact} locale={locale} />}
       {/* The rail owns the Graph destination (§2.6.3). */}
       {pillMode ? null : <GraphBadge onClick={onClickGraph} showSeparator={!compact} compact={compact} locale={locale} />}
-      {pillMode ? (
-        <AgentsPill jobs={rhizomeJobs.activeJobs} onCancelJob={rhizomeJobs.cancelJob} locale={locale} />
-      ) : (
+      {pillMode ? null : (
         <RhizomeJobsBadge jobs={rhizomeJobs.activeJobs} onCancelJob={rhizomeJobs.cancelJob} showSeparator={!compact} compact={compact} locale={locale} />
       )}
     </>
@@ -303,31 +292,6 @@ function StatusLinkButton({
   )
 }
 
-function FeedbackButton({
-  compact,
-  locale,
-  onOpenFeedback,
-}: {
-  compact: boolean
-  locale: AppLocale
-  onOpenFeedback: () => void
-}) {
-  return (
-    <StatusLinkButton
-      compact={compact}
-      icon={Megaphone}
-      labelKey="status.feedback.label"
-      locale={locale}
-      onClick={(event) => {
-        rememberFeedbackDialogOpener(event.currentTarget)
-        onOpenFeedback()
-      }}
-      testId="status-feedback"
-      tooltipKey="status.feedback.contribute"
-    />
-  )
-}
-
 function ResearchButton({
   compact,
   locale,
@@ -346,28 +310,6 @@ function ResearchButton({
       onClick={onOpenResearch}
       testId="status-research"
       tooltipKey="status.research.open"
-    />
-  )
-}
-
-function DocsButton({
-  compact,
-  locale,
-  onOpenDocs,
-}: {
-  compact: boolean
-  locale: AppLocale
-  onOpenDocs: () => void
-}) {
-  return (
-    <StatusLinkButton
-      compact={compact}
-      icon={BookOpen}
-      labelKey="status.docs.label"
-      locale={locale}
-      onClick={onOpenDocs}
-      testId="status-docs"
-      tooltipKey="status.docs.open"
     />
   )
 }
@@ -571,9 +513,6 @@ export function StatusBarPrimarySection({
   onTriggerSync,
   onPullAndPush,
   onOpenConflictResolver,
-  buildNumber,
-  onCheckForUpdates,
-  versionUpdateIndicator,
   onRemoveVault,
   onReorderVaults,
   onUpdateWorkspaceIdentity,
@@ -610,8 +549,6 @@ export function StatusBarPrimarySection({
         locale={locale}
       />
       {pillMode ? null : <PrimarySeparator compact={compact} />}
-      <BuildNumberButton buildNumber={buildNumber} onCheckForUpdates={onCheckForUpdates} compact={compact} locale={locale} />
-      {versionUpdateIndicator}
       <StatusBarGitControls
         commandRailActive={commandRailActive}
         modifiedCount={modifiedCount}
@@ -653,8 +590,9 @@ export function StatusBarSecondarySection({
   themeMode = 'light',
   onZoomReset,
   onToggleThemeMode,
-  onOpenFeedback,
-  onOpenDocs,
+  buildNumber,
+  onCheckForUpdates,
+  versionUpdateIndicator,
   onOpenResearch,
   onOpenSettings,
   commandRailActive = false,
@@ -694,9 +632,9 @@ export function StatusBarSecondarySection({
           </Button>
         </ActionTooltip>
       )}
-      {onOpenFeedback && <FeedbackButton compact={compact} locale={locale} onOpenFeedback={onOpenFeedback} />}
-      {onOpenDocs && <DocsButton compact={compact} locale={locale} onOpenDocs={onOpenDocs} />}
       {onOpenResearch && !commandRailActive && <ResearchButton compact={compact} locale={locale} onOpenResearch={onOpenResearch} />}
+      <BuildNumberButton buildNumber={buildNumber} onCheckForUpdates={onCheckForUpdates} compact={compact} locale={locale} />
+      {versionUpdateIndicator}
       <ActionTooltip copy={themeTooltip} side="top" align="end" contentTestId="status-theme-mode-tooltip">
         <Button
           type="button"

@@ -94,8 +94,6 @@ interface StatusBarProps {
   themeMode?: ThemeMode
   onZoomReset?: () => void
   onToggleThemeMode?: () => void
-  onOpenFeedback?: () => void
-  onOpenDocs?: () => void
   onOpenResearch?: () => void
   buildNumber?: string
   onCheckForUpdates?: () => void
@@ -147,9 +145,6 @@ function StatusBarPrimaryFromFooter({
   onTriggerSync,
   onPullAndPush,
   onOpenConflictResolver,
-  buildNumber,
-  onCheckForUpdates,
-  versionUpdateIndicator,
   onRemoveVault,
   onReorderVaults,
   onUpdateWorkspaceIdentity,
@@ -194,9 +189,6 @@ function StatusBarPrimaryFromFooter({
       onTriggerSync={onTriggerSync}
       onPullAndPush={onPullAndPush}
       onOpenConflictResolver={onOpenConflictResolver}
-      buildNumber={buildNumber}
-      onCheckForUpdates={onCheckForUpdates}
-      versionUpdateIndicator={versionUpdateIndicator}
       onRemoveVault={onRemoveVault}
       onReorderVaults={onReorderVaults}
       onUpdateWorkspaceIdentity={onUpdateWorkspaceIdentity}
@@ -216,8 +208,9 @@ function StatusBarSecondaryFromFooter({
   themeMode = 'light',
   onZoomReset,
   onToggleThemeMode,
-  onOpenFeedback,
-  onOpenDocs,
+  buildNumber,
+  onCheckForUpdates,
+  versionUpdateIndicator,
   onOpenResearch,
   onOpenSettings,
   commandRailActive,
@@ -232,8 +225,9 @@ function StatusBarSecondaryFromFooter({
         themeMode={themeMode}
         onZoomReset={onZoomReset}
         onToggleThemeMode={onToggleThemeMode}
-        onOpenFeedback={onOpenFeedback}
-        onOpenDocs={onOpenDocs}
+        buildNumber={buildNumber}
+        onCheckForUpdates={onCheckForUpdates}
+        versionUpdateIndicator={versionUpdateIndicator}
         onOpenResearch={onOpenResearch}
         onOpenSettings={onOpenSettings}
         commandRailActive={commandRailActive}

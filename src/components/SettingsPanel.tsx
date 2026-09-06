@@ -63,6 +63,7 @@ import { AiAgentIcon } from './AiAgentIcon'
 import { readCelebrationsEnabled } from '../lib/celebration'
 import { GitSettingsSection } from './GitSettingsSection'
 import { PrivacySettingsSection } from './PrivacySettingsSection'
+import { AboutSettingsSection } from './AboutSettingsSection'
 import { SettingsBodyNav } from './SettingsBodyNav'
 import {
   SectionHeading,
@@ -121,6 +122,8 @@ interface SettingsPanelProps {
   inboxAutomationEnabled?: boolean
   onSaveInboxAutomation?: (enabled: boolean) => void
   onAdoptPortentTypes?: () => void
+  onOpenFeedback?: () => void
+  onOpenDocs?: () => void
   onClose: () => void
 }
 
@@ -219,6 +222,8 @@ interface SettingsBodyProps {
   setCrashReporting: (value: boolean) => void
   analytics: boolean
   setAnalytics: (value: boolean) => void
+  onOpenFeedback?: () => void
+  onOpenDocs?: () => void
 }
 
 const PULL_INTERVAL_OPTIONS = [1, 2, 5, 10, 15, 30] as const
@@ -371,6 +376,8 @@ export function SettingsPanel({
   inboxAutomationEnabled = true,
   onSaveInboxAutomation,
   onAdoptPortentTypes,
+  onOpenFeedback,
+  onOpenDocs,
   onClose,
 }: SettingsPanelProps) {
   if (!open) return null
@@ -393,6 +400,8 @@ export function SettingsPanel({
       inboxAutomationEnabled={inboxAutomationEnabled}
       onSaveInboxAutomation={onSaveInboxAutomation}
       onAdoptPortentTypes={onAdoptPortentTypes}
+      onOpenFeedback={onOpenFeedback}
+      onOpenDocs={onOpenDocs}
       onClose={onClose}
     />
   )
@@ -424,6 +433,8 @@ function SettingsPanelInner({
   inboxAutomationEnabled,
   onSaveInboxAutomation,
   onAdoptPortentTypes,
+  onOpenFeedback,
+  onOpenDocs,
   onClose,
 }: SettingsPanelInnerProps) {
   const [draft, setDraft] = useState(() => createSettingsDraft(settings, explicitOrganizationEnabled, inboxAutomationEnabled))
@@ -566,6 +577,8 @@ function SettingsPanelInner({
           aiAgentsStatus={aiAgentsStatus}
           onCopyMcpConfig={onCopyMcpConfig}
           onAdoptPortentTypes={onAdoptPortentTypes}
+          onOpenFeedback={onOpenFeedback}
+          onOpenDocs={onOpenDocs}
           vaults={vaults ?? []}
           defaultWorkspacePath={defaultWorkspacePath}
           {...{ onRemoveVault, onReorderVaults, onSetDefaultWorkspace, onUpdateWorkspaceIdentity }}
@@ -622,6 +635,8 @@ interface SettingsBodyFromDraftProps {
   aiAgentsStatus: AiAgentsStatus
   onCopyMcpConfig?: () => void
   onAdoptPortentTypes?: () => void
+  onOpenFeedback?: () => void
+  onOpenDocs?: () => void
   vaults: VaultOption[]
   defaultWorkspacePath?: string | null
   onRemoveVault?: (path: string) => void; onReorderVaults?: (orderedPaths: string[]) => void; onSetDefaultWorkspace?: (path: string) => void; onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
@@ -642,6 +657,8 @@ function SettingsBodyFromDraft({
   aiAgentsStatus,
   onCopyMcpConfig,
   onAdoptPortentTypes,
+  onOpenFeedback,
+  onOpenDocs,
   vaults,
   defaultWorkspacePath,
   onRemoveVault, onReorderVaults, onSetDefaultWorkspace, onUpdateWorkspaceIdentity,
@@ -717,6 +734,8 @@ function SettingsBodyFromDraft({
       setCrashReporting={(value) => updateDraft('crashReporting', value)}
       analytics={draft.analytics}
       setAnalytics={(value) => updateDraft('analytics', value)}
+      onOpenFeedback={onOpenFeedback}
+      onOpenDocs={onOpenDocs}
     />
   )
 }
@@ -896,6 +915,8 @@ function SettingsAgentWorkflowSections({
   setCrashReporting,
   analytics,
   setAnalytics,
+  onOpenFeedback,
+  onOpenDocs,
 }: SettingsBodyProps) {
   return (
     <>
@@ -935,6 +956,14 @@ function SettingsAgentWorkflowSections({
           setCrashReporting={setCrashReporting}
           analytics={analytics}
           setAnalytics={setAnalytics}
+        />
+      </SettingsSection>
+
+      <SettingsSection id={SETTINGS_SECTION_IDS.about}>
+        <AboutSettingsSection
+          t={t}
+          onOpenFeedback={onOpenFeedback}
+          onOpenDocs={onOpenDocs}
         />
       </SettingsSection>
     </>

@@ -1109,4 +1109,32 @@ describe('SettingsPanel', () => {
       }))
     })
   })
+
+  describe('About section', () => {
+    it('is last in the settings nav and opens Contribute and Docs', () => {
+      const onOpenFeedback = vi.fn()
+      const onOpenDocs = vi.fn()
+      render(
+        <SettingsPanel
+          open={true}
+          settings={emptySettings}
+          onSave={onSave}
+          onClose={onClose}
+          onOpenFeedback={onOpenFeedback}
+          onOpenDocs={onOpenDocs}
+        />,
+      )
+
+      expect(document.getElementById('settings-section-about')).not.toBeNull()
+      expect(screen.getByText('Contribute ideas and open the docs.')).toBeInTheDocument()
+      expect(screen.getByTestId('settings-about-contribute')).toBeInTheDocument()
+      expect(screen.getByTestId('settings-about-docs')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByTestId('settings-about-contribute-open'))
+      expect(onOpenFeedback).toHaveBeenCalledOnce()
+
+      fireEvent.click(screen.getByTestId('settings-about-docs-open'))
+      expect(onOpenDocs).toHaveBeenCalledOnce()
+    })
+  })
 })
