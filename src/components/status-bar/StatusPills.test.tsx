@@ -109,10 +109,10 @@ describe('status bar pills (wave 5.4b, gated on the command rail)', () => {
     expect(screen.queryByTestId('status-graph')).not.toBeInTheDocument()
   })
 
-  it('renders the agents pill alongside the vault pill', () => {
+  it('does not put the agents pill on the status bar; the composer owns it', () => {
     renderPillStatusBar()
 
-    expect(screen.getByTestId('status-agents-pill')).toBeInTheDocument()
+    expect(screen.queryByTestId('status-agents-pill')).not.toBeInTheDocument()
     expect(screen.queryByTestId('status-rhizome-jobs')).not.toBeInTheDocument()
   })
 

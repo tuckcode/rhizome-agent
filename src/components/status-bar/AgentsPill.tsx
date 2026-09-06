@@ -20,10 +20,11 @@ function pillLabel(jobs: RhizomeJob[], locale: AppLocale): string {
 }
 
 /**
- * Wave 5.4b agents pill — `docs/design/shell-final-direction.md` §2.6 cluster 2.
- * Reads the same `useRhizomeJobs` store the rail's agent-avatar dot lights off,
- * so the two are guaranteed to agree. The dropdown lists in-flight jobs today;
- * the shared agent-activity feed (§2.4) replaces the body in wave 5.4c.
+ * Agent idle/working pill. Lives on the composer strip next to thinking, not
+ * the status bar. Reads the same `useRhizomeJobs` store the rail's agent-avatar
+ * dot lights off, so the two are guaranteed to agree. The dropdown lists
+ * in-flight jobs today; the shared agent-activity feed (§2.4) replaces the
+ * body in wave 5.4c.
  */
 export function AgentsPill({ jobs, onCancelJob, locale = 'en' }: AgentsPillProps) {
   const [open, setOpen] = useState(false)

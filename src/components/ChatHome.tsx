@@ -5,11 +5,12 @@ import { AgentActivityBand } from './AgentActivityBand'
 import { RlmFamilyBand } from './RlmFamilyBand'
 import { ChatComposerDeck } from './ChatComposerDeck'
 import { ChatPreflightBanner } from './ChatPreflightBanner'
+import { AgentsPill } from './status-bar/AgentsPill'
+import { useRhizomeJobs } from '../hooks/useRhizomeJobs'
 import { ChatNotePane } from './ChatNotePane'
 import { useChatNoteContent } from '../hooks/useChatNoteContent'
 import { usePanelWidth } from '../hooks/usePanelWidth'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
-import { vaultLabelFromPath } from '../lib/primeSubheadLabels'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 import { resolveChatOpenNote } from '../utils/resolveChatOpenNote'
 import { agentTargets, type AiTarget } from '../lib/aiTargets'
@@ -25,8 +26,6 @@ interface ChatHomeProps {
   defaultAiAgentReady: boolean
   vaultPath: string
   vaultPaths: string[]
-  vaults?: { label: string; path: string }[]
-  onSwitchVault?: (path: string) => void
   entries: VaultEntry[]
   onOpenNote?: (path: string) => void
   onPromoteToVault?: (text: string) => void
@@ -66,8 +65,6 @@ export default function ChatHome({
   defaultAiAgentReady,
   vaultPath,
   vaultPaths,
-  vaults,
-  onSwitchVault,
   entries,
   onPromoteToVault,
   onFileCreated,
@@ -127,6 +124,7 @@ export default function ChatHome({
   const openNoteEntry = openNote
     ? entries.find((entry) => entry.path === openNote.path) ?? null
     : null
+  const rhizomeJobs = useRhizomeJobs()
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="chat-home">
@@ -238,13 +236,7 @@ export default function ChatHome({
               />
               <ChatComposerDeck
                 locale={locale}
-                vaultLabel={vaultLabelFromPath(vaultPath)}
                 vaultPath={vaultPath}
-                vaults={vaults ?? vaultPaths.map((path) => ({
-                  label: vaultLabelFromPath(path) ?? path,
-                  path,
-                }))}
-                onSwitchVault={onSwitchVault}
                 contextLabel={openNote ? openNote.label.split('/').filter(Boolean).at(-1) ?? openNote.label : null}
                 onCloseContext={() => {
                   setOpenNote(null)
@@ -253,6 +245,13 @@ export default function ChatHome({
                 skillsLabel="rhizome-vault"
                 model={primeModelLabel(primeHost)}
                 thinkingLevel={primeHost?.thinkingLevel ?? null}
+                activity={
+                  <AgentsPill
+                    jobs={rhizomeJobs.activeJobs}
+                    onCancelJob={rhizomeJobs.cancelJob}
+                    locale={locale}
+                  />
+                }
               />
               </>
             ) : undefined

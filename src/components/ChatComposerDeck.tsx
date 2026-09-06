@@ -14,14 +14,8 @@ import { trackComposerPillOpened } from '../lib/productAnalytics'
 import { PrimeModelPicker } from './PrimeModelPicker'
 import { PrimeThinkingToggle } from './PrimeThinkingToggle'
 
-export interface ComposerVaultOption {
-  label: string
-  path: string
-}
-
 interface ChatComposerDeckProps {
   locale?: AppLocale
-  vaultLabel?: string | null
   skillsLabel?: string | null
   /** Frame B — the note open in the secondary pane. */
   contextLabel?: string | null
@@ -30,8 +24,8 @@ interface ChatComposerDeckProps {
   model?: string | null
   thinkingLevel?: string | null
   vaultPath?: string
-  vaults?: readonly ComposerVaultOption[]
-  onSwitchVault?: (path: string) => void
+  /** Agent activity — idle/working pill, sits next to thinking. */
+  activity?: ReactNode
 }
 
 function pillClass(accent = false) {
@@ -67,29 +61,25 @@ function Chip({
 /**
  * Frame A's composer control strip (#38 / #9 / #35).
  *
- * This is where a turn is configured: agent, model, reasoning depth, vault,
- * skills. Pills are DropdownMenu triggers (caret, hover, 999px) except the
- * thinking toggle, which is one click so the next turn's depth is obvious
+ * This is where a turn is configured: agent, model, reasoning depth, skills.
+ * Agent idle/working sits next to thinking. The vault switcher lives only in
+ * the status bar. Pills are DropdownMenu triggers (caret, hover, 999px) except
+ * the thinking toggle, which is one click so the next turn's depth is obvious
  * without a menu. The telemetry subhead keeps status (live, session, uptime)
  * and does not duplicate these controls.
  */
 export function ChatComposerDeck({
   locale = 'en',
-  vaultLabel,
   skillsLabel,
   contextLabel,
   onCloseContext,
   model,
   thinkingLevel,
   vaultPath,
-  vaults = [],
-  onSwitchVault,
+  activity,
 }: ChatComposerDeckProps) {
   const t = createTranslator(locale)
   const agent = PRODUCT_AI_AGENT_DEFINITIONS[0]
-  const vaultOptions = vaults.length > 0
-    ? vaults
-    : (vaultPath && vaultLabel ? [{ label: vaultLabel, path: vaultPath }] : [])
   const skillNames = skillsLabel ? skillsLabel.split(/,\s*/).filter(Boolean) : []
 
   return (
@@ -143,38 +133,7 @@ export function ChatComposerDeck({
         vaultPath={vaultPath}
       />
 
-      {vaultLabel ? (
-        <DropdownMenu onOpenChange={(open) => { if (open) trackComposerPillOpened('vault') }}>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className={pillClass()}
-              aria-label={t('ai.composer.vault')}
-              title={t('ai.composer.vault')}
-              data-testid="composer-vault-pill"
-            >
-              {vaultLabel}
-              <CaretDown size={9} weight="bold" className="text-[var(--text-faint,var(--muted-foreground))]" aria-hidden="true" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="start" className="w-52">
-            <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-              {t('ai.composer.vault')}
-            </DropdownMenuLabel>
-            {vaultOptions.map((vault) => (
-              <DropdownMenuItem
-                key={vault.path}
-                className="text-[12px]"
-                data-testid={`composer-vault-${vault.path}`}
-                onSelect={() => onSwitchVault?.(vault.path)}
-              >
-                {vault.label}
-                {vault.path === vaultPath ? ` · ${t('ai.composer.current')}` : ''}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : null}
+      {activity}
 
       {/* #38: a pill that looks like a control has to be one. With no way to
           act on the context there is nothing to open, so it stays a plain

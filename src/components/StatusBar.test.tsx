@@ -31,7 +31,6 @@ function renderDenseStatusBar() {
       remoteStatus={{ branch: 'main', ahead: 0, behind: 0, hasRemote: false }}
       onCommitPush={vi.fn()}
       onClickPulse={vi.fn()}
-      onOpenFeedback={vi.fn()}
       buildNumber="b281"
       onCheckForUpdates={vi.fn()}
       mcpStatus="not_installed"
@@ -95,17 +94,30 @@ describe('StatusBar', () => {
     expect(screen.queryByText('main')).not.toBeInTheDocument()
   })
 
-  it('shows Contribute button when callback is provided', () => {
-    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} onOpenFeedback={vi.fn()} />)
-    expect(screen.getByTestId('status-feedback')).toBeInTheDocument()
-    expect(screen.getByText('Contribute')).toBeInTheDocument()
+  it('keeps Contribute and Docs out of the status bar', () => {
+    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} />)
+    expect(screen.queryByTestId('status-feedback')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('status-docs')).not.toBeInTheDocument()
+    expect(screen.queryByText('Contribute')).not.toBeInTheDocument()
+    expect(screen.queryByText('Docs')).not.toBeInTheDocument()
   })
 
-  it('calls onOpenFeedback when Contribute is clicked', () => {
-    const onOpenFeedback = vi.fn()
-    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} onOpenFeedback={onOpenFeedback} />)
-    fireEvent.click(screen.getByTestId('status-feedback'))
-    expect(onOpenFeedback).toHaveBeenCalledOnce()
+  it('places check-for-updates next to the theme toggle', () => {
+    render(
+      <StatusBar
+        noteCount={100}
+        vaultPath="/Users/luca/Laputa"
+        vaults={vaults}
+        onSwitchVault={vi.fn()}
+        buildNumber="b281"
+        onCheckForUpdates={vi.fn()}
+        themeMode="light"
+        onToggleThemeMode={vi.fn()}
+      />,
+    )
+    const build = screen.getByTestId('status-build-number')
+    const theme = screen.getByTestId('status-theme-mode')
+    expect(build.compareDocumentPosition(theme) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('shows Research and Settings by default (legacy shell, no command rail)', () => {
@@ -118,16 +130,6 @@ describe('StatusBar', () => {
     render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} onOpenResearch={vi.fn()} onOpenSettings={vi.fn()} commandRailActive />)
     expect(screen.queryByTestId('status-research')).not.toBeInTheDocument()
     expect(screen.queryByTestId('status-settings')).not.toBeInTheDocument()
-  })
-
-  it('shows and opens Docs from the bottom bar', () => {
-    const onOpenDocs = vi.fn()
-    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} onOpenDocs={onOpenDocs} />)
-    expect(screen.getByTestId('status-docs')).toHaveTextContent('Docs')
-
-    fireEvent.click(screen.getByTestId('status-docs'))
-
-    expect(onOpenDocs).toHaveBeenCalledOnce()
   })
 
   it('shows a theme toggle instead of the notifications placeholder', () => {
@@ -543,7 +545,8 @@ describe('StatusBar', () => {
     })
     expect(screen.getByTestId('status-commit-push')).toBeInTheDocument()
     expect(screen.getByTestId('status-pulse')).toBeInTheDocument()
-    expect(screen.getByTestId('status-feedback')).toBeInTheDocument()
+    expect(screen.getByTestId('status-build-number')).toBeInTheDocument()
+    expect(screen.queryByTestId('status-feedback')).not.toBeInTheDocument()
     expect(screen.queryByText('Commit')).not.toBeInTheDocument()
     expect(screen.queryByText('History')).not.toBeInTheDocument()
     expect(screen.queryByText('Contribute')).not.toBeInTheDocument()
@@ -559,7 +562,7 @@ describe('StatusBar', () => {
     })
     expect(screen.getByTestId('status-commit-push')).toBeInTheDocument()
     expect(screen.getByTestId('status-pulse')).toBeInTheDocument()
-    expect(screen.getByTestId('status-feedback')).toBeInTheDocument()
+    expect(screen.queryByTestId('status-feedback')).not.toBeInTheDocument()
     expect(screen.getByTestId('status-build-number')).toBeInTheDocument()
     expect(screen.queryByTestId('status-claude-code')).not.toBeInTheDocument()
     expect(screen.queryByText('Commit')).not.toBeInTheDocument()
@@ -581,7 +584,8 @@ describe('StatusBar', () => {
     })
     expect(screen.getByTestId('status-commit-push')).toBeInTheDocument()
     expect(screen.getByTestId('status-pulse')).toBeInTheDocument()
-    expect(screen.getByTestId('status-feedback')).toBeInTheDocument()
+    expect(screen.getByTestId('status-build-number')).toBeInTheDocument()
+    expect(screen.queryByTestId('status-feedback')).not.toBeInTheDocument()
   })
 
   it('does not render the legacy AI agent control in the status bar', () => {
