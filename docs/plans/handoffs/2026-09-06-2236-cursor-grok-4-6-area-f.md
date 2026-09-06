@@ -4,7 +4,7 @@ model: Cursor Grok 4.6
 description: >-
   Area F subtraction: unadvertise Grok-wiki / wiki-generation MCP verbs,
   delete rhizome_grok_import, and drop parked smoke junk.
-commits: pending
+commits: eb6461a
 ---
 
 # Area F — MCP wiki tools + parked smoke
