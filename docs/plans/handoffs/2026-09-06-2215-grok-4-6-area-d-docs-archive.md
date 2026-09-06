@@ -5,7 +5,7 @@ description: >-
   Area D subtraction: removed Tolaria public site, Desktop release-notes,
   stale docs/plans/design archive, Pencil mocks, Laputa commands, and C18
   l10n invitation leftovers. No src/ or src-tauri/ product rewrites.
-commits: pending
+commits: 09fda32
 ---
 
 # Area D — Tolaria/docs archive
@@ -44,3 +44,6 @@ deleted only what was still dead.
 IDENTITY, VAULT_CONTRACT, WINDOWS-DEV, YOU-SHOULD-KNOW, prime-adapter-surface.json,
 harness-doctrine/composition, token-routing, automatic-memory-consolidation,
 current `docs/plans/handoffs/`, `2026-09-01-session-import-plan.md`, ADR index.
+
+Linux CI clippy on this PR is **C69** (macOS-only dead code). Not an Area D
+defect; do not “fix” it by editing `src-tauri/` in the docs-archive PR.

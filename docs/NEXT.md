@@ -429,7 +429,9 @@ backlog, not a replacement for it.
   [`2026-08-13-prime-session-list-spec.md`](plans/2026-08-13-prime-session-list-spec.md).
 - **Test and gate reliability:** C28 (three `@smoke` specs fail under CPU load),
   C31 (unreproducible `pnpm test` unhandled error), C39 (live-daemon tests not
-  isolated). C25 is resolved: the create-note flow follows the current Notes
+  isolated), **C69** (Linux CI clippy `-D warnings` on macOS-only dead code in
+  `menu_bar_capture.rs` / `should_reopen_main_window` — not an Area D defect).
+  C25 is resolved: the create-note flow follows the current Notes
   panel and duplicate type-visibility browser coverage was removed.
 - ~~**Correctness / warnings:** C55~~ **RESOLVED 2026-08-29** (`c423445`)
 - ~~**Correctness:** C34~~ **RESOLVED 2026-08-29** (`1509f9f`, `be85f80`)
