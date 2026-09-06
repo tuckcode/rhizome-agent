@@ -1,10 +1,9 @@
-import { Archive, ArrowSquareIn, ArrowSquareOut, GearSix, WarningCircle, X } from '@phosphor-icons/react'
+import { Archive, ArrowSquareIn, GearSix, WarningCircle, X } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { useDragRegion } from '../hooks/useDragRegion'
 import { getVaultAiGuidanceSummary, vaultAiGuidanceNeedsRestore, type VaultAiGuidanceStatus } from '../lib/vaultAiGuidance'
 import { translate, type AppLocale } from '../lib/i18n'
 import type { AiConversation } from './aiWorkspaceConversations'
-import type { AiWorkspaceMode } from './aiWorkspaceSizing'
 
 export function GuidanceWarning({
   locale,
@@ -39,22 +38,18 @@ export function WorkspaceHeader({
   conversation,
   archiveDisabled,
   locale,
-  mode,
   onArchive,
   onClose,
   onDock,
   onOpenAiSettings,
-  onPopOut,
 }: {
   conversation: AiConversation
   archiveDisabled: boolean
   locale: AppLocale
-  mode: AiWorkspaceMode
   onArchive: () => void
   onClose: () => void
   onDock?: () => void
   onOpenAiSettings?: () => void
-  onPopOut?: (context?: { activeConversationId?: string }) => void
 }) {
   const { dragRegionRef } = useDragRegion<HTMLDivElement>()
 
@@ -78,15 +73,9 @@ export function WorkspaceHeader({
         <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.archive')} title={translate(locale, 'ai.workspace.archive')} disabled={archiveDisabled} onClick={onArchive}>
           <Archive size={16} />
         </Button>
-        {mode === 'docked' ? (
-          <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.popOut')} title={translate(locale, 'ai.workspace.popOut')} onClick={() => onPopOut?.({ activeConversationId: conversation.id })}>
-            <ArrowSquareOut size={16} />
-          </Button>
-        ) : (
-          <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.dock')} title={translate(locale, 'ai.workspace.dock')} onClick={onDock}>
-            <ArrowSquareIn size={16} />
-          </Button>
-        )}
+        <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.dock')} title={translate(locale, 'ai.workspace.dock')} onClick={onDock}>
+          <ArrowSquareIn size={16} />
+        </Button>
         <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.close')} title={translate(locale, 'ai.workspace.close')} onClick={onClose}>
           <X size={16} />
         </Button>

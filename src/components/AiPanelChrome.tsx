@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
-import { Sparkle, X, PaperPlaneRight, Plus, Link, Stop, ImageSquare } from '@phosphor-icons/react'
+import { Sparkle, X, PaperPlaneRight, Plus, Stop, ImageSquare } from '@phosphor-icons/react'
 import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
@@ -43,12 +43,6 @@ interface AiPanelHeaderProps {
   skillsLabel?: string | null
   onClose: () => void
   onNewChat: () => void
-}
-
-interface AiPanelContextBarProps {
-  activeEntry: VaultEntry
-  locale?: AppLocale
-  linkedCount: number
 }
 
 interface AiPanelMessageHistoryProps {
@@ -614,28 +608,6 @@ function AiPermissionModeToggle({
     </TooltipProvider>
   )
 }
-
-export const AiPanelContextBar = memo(function AiPanelContextBar({
-  activeEntry,
-  linkedCount,
-  locale = 'en',
-}: AiPanelContextBarProps) {
-  const t = createTranslator(locale)
-
-  return (
-    <div
-      className="flex shrink-0 items-center border-b border-border text-muted-foreground"
-      style={{ padding: '6px 12px', gap: 6, fontSize: 11 }}
-      data-testid="context-bar"
-    >
-      <Link size={12} className="shrink-0" />
-      <span className="truncate" style={{ fontWeight: 500 }}>{activeEntry.title}</span>
-      {linkedCount > 0 && (
-        <span style={{ opacity: 0.6 }}>{t('ai.panel.linkedCount', { count: linkedCount })}</span>
-      )}
-    </div>
-  )
-})
 
 /**
  * How close to the bottom still counts as "reading the live output".

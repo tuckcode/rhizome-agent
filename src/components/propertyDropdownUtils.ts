@@ -1,7 +1,5 @@
 import { useEffect, type RefObject } from 'react'
 
-export { getAnchoredDropdownLeft } from './anchoredDropdown'
-
 export function getNextHighlightIndex(current: number, total: number) {
   if (total <= 0) return 0
   return current < total - 1 ? current + 1 : 0

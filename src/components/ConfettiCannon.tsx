@@ -180,5 +180,3 @@ export function ConfettiCannon({ fireKey, enabled = true }: ConfettiCannonProps)
     />
   )
 }
-
-export default ConfettiCannon

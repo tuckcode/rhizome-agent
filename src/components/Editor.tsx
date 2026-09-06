@@ -4,7 +4,7 @@ import { useCreateBlockNote } from '@blocknote/react'
 import '@blocknote/mantine/style.css'
 import 'katex/dist/katex.min.css'
 import { uploadImageFile } from '../hooks/useImageDrop'
-import { DEFAULT_AI_AGENT, type AiAgentId, type AiAgentReadiness } from '../lib/aiAgents'
+import { type AiAgentId, type AiAgentReadiness } from '../lib/aiAgents'
 import type { AiTarget } from '../lib/aiTargets'
 import { translate, type AppLocale } from '../lib/i18n'
 import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
@@ -437,7 +437,6 @@ function EditorLayout({
   onArchiveNote,
   onUnarchiveNote,
   vaultPath,
-  vaultPaths,
   rawModeContent,
   findRequest,
   rawLatestContentRef,
@@ -450,15 +449,9 @@ function EditorLayout({
   onKeepTheirs,
   onInspectorResize,
   inspectorWidth,
-  defaultAiAgent,
-  defaultAiTarget,
-  defaultAiAgentReadiness,
-  defaultAiAgentReady,
   inspectorEntry,
   inspectorContent,
   gitHistory,
-  noteList,
-  noteListFilter,
   handleViewCommitDiff,
   onUpdateFrontmatter,
   onDeleteProperty,
@@ -467,11 +460,7 @@ function EditorLayout({
   onCreateAndOpenNote,
   onChangeWorkspace,
   onInitializeProperties,
-  onFileCreated,
-  onFileModified,
-  onVaultChanged,
   workspaces,
-  onUnsupportedAiPaste,
   locale,
   leadingControl,
 }: {
@@ -518,7 +507,6 @@ function EditorLayout({
   onArchiveNote?: (path: string) => void
   onUnarchiveNote?: (path: string) => void
   vaultPath?: string
-  vaultPaths?: string[]
   rawModeContent: string | null
   findRequest?: RawEditorFindRequest | null
   rawLatestContentRef: React.MutableRefObject<string | null>
@@ -531,15 +519,9 @@ function EditorLayout({
   onKeepTheirs?: (path: string) => void
   onInspectorResize: (delta: number) => void
   inspectorWidth: number
-  defaultAiAgent: AiAgentId
-  defaultAiTarget?: AiTarget
-  defaultAiAgentReadiness?: AiAgentReadiness
-  defaultAiAgentReady: boolean
   inspectorEntry: VaultEntry | null
   inspectorContent: string | null
   gitHistory: GitCommit[]
-  noteList?: NoteListItem[]
-  noteListFilter?: { type: string | null; query: string }
   handleViewCommitDiff: (commitHash: string) => Promise<void>
   onUpdateFrontmatter?: (path: string, key: string, value: FrontmatterValue, options?: FrontmatterOpOptions) => Promise<void>
   onDeleteProperty?: (path: string, key: string, options?: FrontmatterOpOptions) => Promise<void>
@@ -548,11 +530,7 @@ function EditorLayout({
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
   onChangeWorkspace?: (entry: VaultEntry, workspace: WorkspaceIdentity) => Promise<void> | void
   onInitializeProperties?: (path: string) => void
-  onFileCreated?: (relativePath: string) => void
-  onFileModified?: (relativePath: string) => void
-  onVaultChanged?: () => void
   workspaces?: WorkspaceIdentity[]
-  onUnsupportedAiPaste?: (message: string) => void
   locale?: AppLocale
   onExportPdf?: (source?: NotePdfExportSource) => void
   leadingControl?: ReactNode
@@ -636,26 +614,16 @@ function EditorLayout({
         }
         {(showTableOfContents || !inspectorCollapsed) && <ResizeHandle onResize={onInspectorResize} />}
         <EditorRightPanel
-          showAIChat={false}
           showTableOfContents={showTableOfContents}
           inspectorCollapsed={inspectorCollapsed}
           inspectorWidth={inspectorWidth}
           editor={editor}
-          defaultAiAgent={defaultAiAgent}
-          defaultAiTarget={defaultAiTarget}
-          defaultAiAgentReadiness={defaultAiAgentReadiness}
-          defaultAiAgentReady={defaultAiAgentReady}
-          onUnsupportedAiPaste={onUnsupportedAiPaste}
           inspectorEntry={inspectorEntry}
           inspectorContent={inspectorContent}
           entries={entries}
           gitHistory={gitHistory}
           vaultPath={vaultPath ?? ''}
-          vaultPaths={vaultPaths}
-          noteList={noteList}
-          noteListFilter={noteListFilter}
           onToggleInspector={onToggleInspector}
-          onToggleAIChat={onToggleAIChat}
           onToggleTableOfContents={onToggleTableOfContents}
           onNavigateWikilink={onNavigateWikilink}
           onViewCommitDiff={handleViewCommitDiff}
@@ -667,10 +635,6 @@ function EditorLayout({
           onChangeWorkspace={onChangeWorkspace}
           onInitializeProperties={onInitializeProperties}
           onToggleRawEditor={handleToggleRawExclusive}
-          onOpenNote={onNavigateWikilink}
-          onFileCreated={onFileCreated}
-          onFileModified={onFileModified}
-          onVaultChanged={onVaultChanged}
           workspaces={workspaces}
           locale={locale}
         />
@@ -693,8 +657,6 @@ function buildEditorLayoutProps(
     ...props,
     ...runtime,
     activeTabPath: props.activeTabPath,
-    defaultAiAgent: props.defaultAiAgent ?? DEFAULT_AI_AGENT,
-    defaultAiAgentReady: props.defaultAiAgentReady ?? true,
     findRequest,
   }
 }
