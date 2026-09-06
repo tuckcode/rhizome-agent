@@ -636,19 +636,6 @@ pub fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[tauri::command]
-pub fn toggle_menu_bar_companion(app: tauri::AppHandle) -> Result<(), String> {
-    #[cfg(desktop)]
-    {
-        desktop::toggle_companion_window(&app, None)
-    }
-    #[cfg(not(desktop))]
-    {
-        let _ = app;
-        Err("menu-bar companion is desktop-only".into())
-    }
-}
-
-#[tauri::command]
 pub fn hide_menu_bar_companion(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(desktop)]
     {

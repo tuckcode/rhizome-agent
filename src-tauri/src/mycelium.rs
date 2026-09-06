@@ -270,34 +270,6 @@ pub fn which_binary(name: &str) -> WhichBinaryResult {
     }
 }
 
-pub fn run_mindwalk_open(path: &str) -> Result<String, String> {
-    let path_buf = PathBuf::from(path);
-    if !path_buf.is_file() {
-        return Err(format!("Session file not found: {path}"));
-    }
-    // Only allow opening under the user's home .prime sessions (or temp) for safety
-    let home = dirs::home_dir().ok_or_else(|| "no home".to_string())?;
-    let sessions = home.join(".prime").join("agent").join("sessions");
-    let canonical = path_buf
-        .canonicalize()
-        .map_err(|e| format!("canonicalize: {e}"))?;
-    if !canonical.starts_with(&sessions) {
-        return Err("Refusing to open a session outside ~/.prime/agent/sessions".into());
-    }
-    let which = which_binary("mindwalk");
-    if !which.found {
-        return Err("mindwalk not found on PATH".into());
-    }
-    let status = Command::new("mindwalk")
-        .arg("open")
-        .arg(&canonical)
-        .spawn()
-        .map_err(|e| format!("spawn mindwalk: {e}"))?;
-    // Detached — don't wait for UI to close
-    drop(status);
-    Ok(canonical.to_string_lossy().into_owned())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -349,18 +321,6 @@ fn write_bridged_session(path: &str) -> Result<PathBuf, String> {
     let out_path = sessions.join(out_name);
     std::fs::write(&out_path, bridged).map_err(|e| format!("write bridge: {e}"))?;
     Ok(out_path)
-}
-
-/// Read a Prime session, rewrite ipython %%bash → bash-shaped toolCalls, write bridge file.
-pub fn bridge_prime_session(path: &str) -> Result<String, String> {
-    Ok(write_bridged_session(path)?.to_string_lossy().into_owned())
-}
-
-/// Legacy browser launch — kept for existing command bindings, unused by Mycelium UI.
-pub fn bridge_and_open_prime_session(path: &str) -> Result<String, String> {
-    let out_path = write_bridged_session(path)?;
-    run_mindwalk_open(out_path.to_str().unwrap_or_default())?;
-    Ok(out_path.to_string_lossy().into_owned())
 }
 
 fn bridge_prime_session_jsonl(raw: &str) -> (String, usize) {

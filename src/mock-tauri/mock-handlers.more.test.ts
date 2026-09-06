@@ -148,7 +148,7 @@ describe('mockHandlers additional coverage', () => {
       hasRemote: false,
     })
 
-    expect(mockHandlers.clone_repo({
+    expect(mockHandlers.clone_git_repo({
       url: 'https://example.test/repo.git',
       local_path: clonedVaultPath,
     })).toBe(`Cloned to ${clonedVaultPath}`)
@@ -215,14 +215,11 @@ describe('mockHandlers additional coverage', () => {
       message: 'Pushed to remote',
     })
     expect(mockHandlers.get_conflict_files()).toEqual([])
-    expect(mockHandlers.get_conflict_mode()).toBe('none')
     expect(mockHandlers.purge_trash()).toEqual([])
     expect(mockHandlers.empty_trash()).toEqual([])
     expect(mockHandlers.delete_note({ path: '/vault/trash/me.md' })).toBe('/vault/trash/me.md')
     expect(mockHandlers.batch_delete_notes({ paths: ['/a.md', '/b.md'] })).toEqual(['/a.md', '/b.md'])
-    expect(mockHandlers.batch_archive_notes({ paths: ['/a.md', '/b.md', '/c.md'] })).toBe(3)
     expect(mockHandlers.batch_trash_notes({ paths: ['/a.md', '/b.md'] })).toBe(2)
-    expect(mockHandlers.migrate_is_a_to_type()).toBe(0)
     expect(mockHandlers.register_mcp_tools()).toBe('registered')
     expect(mockHandlers.check_mcp_status()).toBe('installed')
     expect(mockHandlers.copy_text_to_clipboard()).toBeNull()
