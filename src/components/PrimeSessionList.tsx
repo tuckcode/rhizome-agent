@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from 'react'
 import { Archive, ArrowCounterClockwise, CaretRight, PencilSimple, Plus } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,8 +34,13 @@ import {
 import { usePrimeRunningSessionFiles } from '../hooks/usePrimeRunningSessionFiles'
 import { useDragRegion } from '../hooks/useDragRegion'
 import { sessionsColumnTitleBarStyle } from '../utils/trafficLights'
+import { copyLocalPath } from '../utils/url'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { invoke } from '@tauri-apps/api/core'
+import {
+  PrimeSessionListContextMenu,
+  type PrimeSessionContextMenuState,
+} from './PrimeSessionListContextMenu'
 
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (isTauri()) return invoke<T>(cmd, args)
@@ -38,6 +52,11 @@ interface PrimeSessionListProps {
   /** Chosen session. The caller switches and rehydrates — this list only picks. */
   onSelectSession?: (session: PrimeSessionSummary) => void
   onNewChat?: () => void
+  /**
+   * Open Mycelium (the codebase citymap) focused on this session's path —
+   * same handler as the subhead footprint chip.
+   */
+  onOpenMycelium?: (sessionPath: string) => void
   /** Path the live host is on, so that row can read as current. */
   activeSessionPath?: string | null
   /**
@@ -68,7 +87,15 @@ interface PrimeSessionListProps {
  * normally and filled only while that session is working, so a glance answers
  * "is anything running" without reading a word.
  */
-function SessionRowFrame({ active, children }: { active: boolean; children: ReactNode }) {
+function SessionRowFrame({
+  active,
+  children,
+  onContextMenu,
+}: {
+  active: boolean
+  children: ReactNode
+  onContextMenu?: (event: ReactMouseEvent) => void
+}) {
   return (
     <div
       className={cn(
@@ -76,6 +103,7 @@ function SessionRowFrame({ active, children }: { active: boolean; children: Reac
         'transition-colors hover:border-border hover:bg-background',
         active && 'border-border-strong bg-background',
       )}
+      onContextMenu={onContextMenu}
     >
       {children}
     </div>
@@ -242,6 +270,7 @@ function LiveSessionRow({
   active,
   status,
   onSelect,
+  onContextMenu,
   renameLabel,
   onRename,
   archiveLabel,
@@ -253,13 +282,14 @@ function LiveSessionRow({
   active: boolean
   status: PrimeSessionStatus
   onSelect: () => void
+  onContextMenu: (event: ReactMouseEvent) => void
   renameLabel: string
   onRename: () => void
   archiveLabel: string
   onArchive: () => void
 }) {
   return (
-    <SessionRowFrame active={active}>
+    <SessionRowFrame active={active} onContextMenu={onContextMenu}>
       <SessionRowButton
         label={label}
         title={title}
@@ -283,6 +313,7 @@ function ArchivedSessionRow({
   meta,
   active,
   onSelect,
+  onContextMenu,
   renameLabel,
   onRename,
   restoreLabel,
@@ -293,13 +324,14 @@ function ArchivedSessionRow({
   meta: string | null
   active: boolean
   onSelect: () => void
+  onContextMenu: (event: ReactMouseEvent) => void
   renameLabel: string
   onRename: () => void
   restoreLabel: string
   onRestore: () => void
 }) {
   return (
-    <SessionRowFrame active={active}>
+    <SessionRowFrame active={active} onContextMenu={onContextMenu}>
       <SessionRowButton
         label={label}
         title={title}
@@ -333,6 +365,7 @@ export default function PrimeSessionList({
   locale = 'en',
   onSelectSession,
   onNewChat,
+  onOpenMycelium,
   activeSessionPath = null,
   working = false,
   vaultPath = null,
@@ -350,10 +383,44 @@ export default function PrimeSessionList({
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<PrimeSessionContextMenuState | null>(null)
+  const ctxMenuRef = useRef<HTMLDivElement>(null)
   const filterTracked = useRef(false)
   // Which of these logs the daemon still holds. Polled only while this column
   // is mounted, which is while it is open.
   const running = usePrimeRunningSessionFiles(true)
+
+  const closeContextMenu = useCallback(() => setCtxMenu(null), [])
+
+  useEffect(() => {
+    if (!ctxMenu) return
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (ctxMenuRef.current && !ctxMenuRef.current.contains(event.target as Node)) {
+        closeContextMenu()
+      }
+    }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeContextMenu()
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [ctxMenu, closeContextMenu])
+
+  const openContextMenu = useCallback((session: PrimeSessionSummary, event: ReactMouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setCtxMenu({ x: event.clientX, y: event.clientY, session })
+  }, [])
+
+  const copySessionPath = useCallback((sessionPath: string) => {
+    void copyLocalPath(sessionPath)
+  }, [])
 
   /**
    * The row's accessible name, carrying its state.
@@ -649,6 +716,7 @@ export default function PrimeSessionList({
                 active={active}
                 status={status}
                 onSelect={() => select(session)}
+                onContextMenu={(event) => openContextMenu(session, event)}
                 renameLabel={t('ai.sessions.rename', { title })}
                 onRename={() => startRename(session)}
                 archiveLabel={t('ai.sessions.archive', { title })}
@@ -702,6 +770,7 @@ export default function PrimeSessionList({
                         label={t('ai.sessions.selectAria', { title })}
                         active={active}
                         onSelect={() => select(session)}
+                        onContextMenu={(event) => openContextMenu(session, event)}
                         renameLabel={t('ai.sessions.rename', { title })}
                         onRename={() => startRename(session)}
                         restoreLabel={t('ai.sessions.restore', { title })}
@@ -714,6 +783,17 @@ export default function PrimeSessionList({
           ) : null}
         </div>
       </ScrollArea>
+
+      <PrimeSessionListContextMenu
+        ctxMenu={ctxMenu}
+        ctxMenuRef={ctxMenuRef}
+        onOpen={select}
+        onRename={startRename}
+        onSetArchived={setArchived}
+        onOpenMycelium={onOpenMycelium}
+        onCopyPath={copySessionPath}
+        onClose={closeContextMenu}
+      />
     </div>
   )
 }

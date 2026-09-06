@@ -163,4 +163,21 @@ describe('useCodeMirror', () => {
     // The extension overrides posAtCoords on the instance (not the prototype)
     expect(Object.hasOwn(view, 'posAtCoords')).toBe(true)
   })
+
+  it('toggles EditorView.editable when readOnly changes', () => {
+    const ref = { current: container }
+    const { result, rerender } = renderHook(
+      ({ readOnly }: { readOnly: boolean }) =>
+        useCodeMirror(ref, 'hello', noopCallbacks, null, readOnly),
+      { initialProps: { readOnly: false } },
+    )
+
+    expect(result.current.current!.state.facet(EditorView.editable)).toBe(true)
+
+    rerender({ readOnly: true })
+    expect(result.current.current!.state.facet(EditorView.editable)).toBe(false)
+
+    rerender({ readOnly: false })
+    expect(result.current.current!.state.facet(EditorView.editable)).toBe(true)
+  })
 })

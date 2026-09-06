@@ -196,6 +196,14 @@ export function trackMenuBarSessionOpened(options: {
   })
 }
 
+/**
+ * Note lock toggled from the breadcrumb or Cmd+K (C68).
+ * Boolean only — never path or note content.
+ */
+export function trackNoteLockToggled(locked: boolean): void {
+  trackEvent('note_lock_toggled', { locked: numericFlag(locked) })
+}
+
 export function trackNotePdfExportStarted(source: NotePdfExportSource): void {
   trackEvent('note_pdf_export_started', { source })
 }

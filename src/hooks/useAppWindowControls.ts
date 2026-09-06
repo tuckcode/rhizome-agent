@@ -29,6 +29,7 @@ interface UseAppWindowControlsParams {
 interface AppWindowActionRefs {
   diffToggleRef: MutableRefObject<() => void>
   findInNoteRef: MutableRefObject<FindInNoteHandler | null>
+  noteLockToggleRef: MutableRefObject<() => void>
   pdfExportRef: MutableRefObject<PdfExportHandler | null>
   rawToggleRef: MutableRefObject<() => void>
   tableOfContentsToggleRef: MutableRefObject<() => void>
@@ -42,6 +43,7 @@ interface AppWindowControls {
   handleSetViewMode: (mode: ViewMode) => void
   handleToggleInspector: () => void
   noteListVisible: boolean
+  noteLockToggleRef: MutableRefObject<() => void>
   pdfExportRef: MutableRefObject<PdfExportHandler | null>
   rawToggleRef: MutableRefObject<() => void>
   sidebarVisible: boolean
@@ -54,6 +56,7 @@ function useAppWindowActionRefs(): AppWindowActionRefs {
   return {
     diffToggleRef: useRef<() => void>(() => {}),
     findInNoteRef: useRef<FindInNoteHandler | null>(null),
+    noteLockToggleRef: useRef<() => void>(() => {}),
     pdfExportRef: useRef<PdfExportHandler | null>(null),
     rawToggleRef: useRef<() => void>(() => {}),
     tableOfContentsToggleRef: useRef<() => void>(() => {}),
@@ -102,6 +105,7 @@ export function useAppWindowControls({
   const {
     diffToggleRef,
     findInNoteRef,
+    noteLockToggleRef,
     pdfExportRef,
     rawToggleRef,
     tableOfContentsToggleRef,
@@ -153,6 +157,7 @@ export function useAppWindowControls({
     handleSetViewMode,
     handleToggleInspector,
     noteListVisible,
+    noteLockToggleRef,
     pdfExportRef,
     rawToggleRef,
     sidebarVisible,

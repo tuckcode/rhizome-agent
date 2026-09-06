@@ -179,6 +179,7 @@ export default function ChatHome({
           sessionsRailSlot={sessionsRailSlot}
           forkTargetsPrimeEntry
           newChatRef={newChatRef}
+          onOpenMycelium={onOpenSessionFootprint}
           notePane={
             openNote ? notePaneCollapsed ? (
               <div

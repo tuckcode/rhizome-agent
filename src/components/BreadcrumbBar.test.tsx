@@ -777,6 +777,35 @@ describe('BreadcrumbBar — raw editor toggle', () => {
   })
 })
 
+describe('BreadcrumbBar — note lock toggle', () => {
+  it('hides lock button when onToggleNoteLock is omitted', () => {
+    render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
+    expect(screen.queryByTestId('breadcrumb-note-lock')).not.toBeInTheDocument()
+  })
+
+  it('shows Lock note when unlocked and Unlock note when locked', () => {
+    const onToggleNoteLock = vi.fn()
+    const { rerender } = render(
+      <BreadcrumbBar entry={baseEntry} {...defaultProps} noteLocked={false} onToggleNoteLock={onToggleNoteLock} />,
+    )
+    expect(screen.getByRole('button', { name: 'Lock note' })).toBeInTheDocument()
+
+    rerender(
+      <BreadcrumbBar entry={baseEntry} {...defaultProps} noteLocked onToggleNoteLock={onToggleNoteLock} />,
+    )
+    expect(screen.getByRole('button', { name: 'Unlock note' })).toBeInTheDocument()
+  })
+
+  it('calls onToggleNoteLock when clicked', () => {
+    const onToggleNoteLock = vi.fn()
+    render(
+      <BreadcrumbBar entry={baseEntry} {...defaultProps} noteLocked={false} onToggleNoteLock={onToggleNoteLock} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Lock note' }))
+    expect(onToggleNoteLock).toHaveBeenCalledOnce()
+  })
+})
+
 describe('BreadcrumbBar — note width toggle', () => {
   it('shows the wide width action while normal', () => {
     render(<BreadcrumbBar entry={baseEntry} {...defaultProps} noteWidth="normal" onToggleNoteWidth={vi.fn()} />)

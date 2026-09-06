@@ -55,6 +55,7 @@ interface AppCommandsConfig {
   onToggleInspector: () => void
   onToggleDiff?: () => void
   onToggleRawEditor?: () => void
+  onToggleNoteLock?: () => void
   selectedViewName?: string
   onMoveSelectedViewUp?: () => void
   onMoveSelectedViewDown?: () => void
@@ -192,6 +193,7 @@ type CommandRegistryCoreActions = Pick<
   | 'onToggleInspector'
   | 'onToggleDiff'
   | 'onToggleRawEditor'
+  | 'onToggleNoteLock'
   | 'onKeyboardShortcuts'
   | 'selectedViewName'
   | 'onMoveSelectedViewUp'
@@ -497,6 +499,7 @@ function createCommandRegistryCoreConfig(
     onToggleInspector: config.onToggleInspector,
     onToggleDiff: config.onToggleDiff,
     onToggleRawEditor: config.onToggleRawEditor,
+    onToggleNoteLock: config.onToggleNoteLock,
     selectedViewName: config.selectedViewName,
     onMoveSelectedViewUp: config.onMoveSelectedViewUp,
     onMoveSelectedViewDown: config.onMoveSelectedViewDown,

@@ -37,6 +37,8 @@ export interface RawEditorViewProps {
   latestContentRef?: React.MutableRefObject<string | null>
   locale?: AppLocale
   findRequest?: RawEditorFindRequest | null
+  /** When true, the raw editor rejects edits (C68 note lock / deleted preview). */
+  readOnly?: boolean
 }
 
 const DEBOUNCE_MS = 500
@@ -393,7 +395,7 @@ function useRawEditorPlainTextPasteTarget({
   }, [])
 }
 
-export function RawEditorView({ content, path, entries, sourceEntry, onContentChange, onSave, latestContentRef, vaultPath, locale = 'en', findRequest }: RawEditorViewProps) {
+export function RawEditorView({ content, path, entries, sourceEntry, onContentChange, onSave, latestContentRef, vaultPath, locale = 'en', findRequest, readOnly = false }: RawEditorViewProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [rawDoc, setRawDoc] = useState(content)
@@ -426,7 +428,7 @@ export function RawEditorView({ content, path, entries, sourceEntry, onContentCh
     onCursorActivity: handleCursorActivity,
     onSave: pendingChanges.handleSave,
     onEscape: handleEscape,
-  }, path)
+  }, path, readOnly)
   const activatePlainTextPaste = useRawEditorPlainTextPasteTarget({
     containerRef,
     setAutocomplete,

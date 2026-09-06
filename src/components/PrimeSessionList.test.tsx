@@ -44,6 +44,20 @@ vi.mock('../lib/productAnalytics', () => ({
   },
 }))
 
+const clipboard = vi.hoisted(() => ({
+  copied: [] as string[],
+}))
+vi.mock('../utils/url', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/url')>()
+  return {
+    ...actual,
+    copyLocalPath: (path: string) => {
+      clipboard.copied.push(path)
+      return Promise.resolve()
+    },
+  }
+})
+
 const NOW = new Date(2026, 7, 13, 15, 0, 0).getTime()
 const HOUR = 60 * 60 * 1000
 const DAY = 24 * HOUR
@@ -64,6 +78,7 @@ beforeEach(() => {
   tracked.archived = []
   tracked.filtered = []
   tracked.renamed = 0
+  clipboard.copied = []
 })
 
 describe('PrimeSessionList', () => {
@@ -553,5 +568,117 @@ describe('PrimeSessionList — macOS title bar gutter', () => {
     const header = screen.getByTestId('prime-session-list-header')
     expect(header.className).toContain('pl-[var(--subhead-traffic-light-inset')
     expect(header).not.toHaveClass('h-10')
+  })
+})
+
+describe('PrimeSessionList — context menu (C67)', () => {
+  async function openRowMenu(title: string) {
+    const row = await screen.findByRole('button', { name: new RegExp(`Open session ${title}`) })
+    fireEvent.contextMenu(row)
+    return screen.getByTestId('prime-session-context-menu')
+  }
+
+  it('opens session actions on right-click — not note actions', async () => {
+    invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: 'Right-click me' })]
+    const onOpenMycelium = vi.fn()
+
+    render(<PrimeSessionList now={NOW} onOpenMycelium={onOpenMycelium} />)
+    await openRowMenu('Right-click me')
+
+    const menu = screen.getByTestId('prime-session-context-menu')
+    expect(menu).toHaveClass('z-[12000]')
+    expect(screen.getByTestId('prime-session-ctx-open')).toBeInTheDocument()
+    expect(screen.getByTestId('prime-session-ctx-rename')).toBeInTheDocument()
+    expect(screen.getByTestId('prime-session-ctx-archive')).toBeInTheDocument()
+    expect(screen.getByTestId('prime-session-ctx-mycelium')).toBeInTheDocument()
+    expect(screen.getByTestId('prime-session-ctx-copy-path')).toBeInTheDocument()
+    expect(screen.queryByText('Add to Favorites')).not.toBeInTheDocument()
+    expect(screen.queryByText('Export note as PDF')).not.toBeInTheDocument()
+  })
+
+  it('opens the session when Open is chosen', async () => {
+    invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: 'pick me' })]
+    const onSelectSession = vi.fn()
+
+    render(<PrimeSessionList now={NOW} onSelectSession={onSelectSession} />)
+    await openRowMenu('pick me')
+    fireEvent.click(screen.getByTestId('prime-session-ctx-open'))
+
+    expect(onSelectSession).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }))
+    expect(screen.queryByTestId('prime-session-context-menu')).not.toBeInTheDocument()
+  })
+
+  it('starts rename from the menu', async () => {
+    invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: 'Name me' })]
+
+    render(<PrimeSessionList now={NOW} />)
+    await openRowMenu('Name me')
+    fireEvent.click(screen.getByTestId('prime-session-ctx-rename'))
+
+    expect(screen.getByTestId('prime-session-rename')).toBeInTheDocument()
+    expect(screen.queryByTestId('prime-session-context-menu')).not.toBeInTheDocument()
+  })
+
+  it('archives from the menu', async () => {
+    invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: 'File me' })]
+
+    render(<PrimeSessionList now={NOW} />)
+    await openRowMenu('File me')
+    fireEvent.click(screen.getByTestId('prime-session-ctx-archive'))
+
+    await waitFor(() => expect(screen.queryByText('File me')).not.toBeInTheDocument())
+    expect(invoked.calls).toContain('set_prime_session_archived')
+  })
+
+  it('restores an archived session from the menu', async () => {
+    invoked.result = [
+      summary({ id: 'live', path: '/sessions/live.jsonl', title: 'Live one' }),
+      summary({ id: 'filed', path: '/sessions/filed.jsonl', title: 'Filed one', archived: true }),
+    ]
+
+    render(<PrimeSessionList now={NOW} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Archived/ }))
+    const archivedRow = await screen.findByRole('button', { name: 'Open session Filed one' })
+    fireEvent.contextMenu(archivedRow)
+
+    expect(screen.getByTestId('prime-session-ctx-restore')).toBeInTheDocument()
+    expect(screen.queryByTestId('prime-session-ctx-archive')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('prime-session-ctx-restore'))
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Open session Filed one' })).toBeInTheDocument(),
+    )
+    expect(invoked.calls).toContain('set_prime_session_archived')
+  })
+
+  it('opens Mycelium for that session path', async () => {
+    invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: 'Citymap me' })]
+    const onOpenMycelium = vi.fn()
+
+    render(<PrimeSessionList now={NOW} onOpenMycelium={onOpenMycelium} />)
+    await openRowMenu('Citymap me')
+    fireEvent.click(screen.getByTestId('prime-session-ctx-mycelium'))
+
+    expect(onOpenMycelium).toHaveBeenCalledWith('/sessions/a.jsonl')
+  })
+
+  it('hides View in Mycelium when the caller did not wire it', async () => {
+    invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: 'No map' })]
+
+    render(<PrimeSessionList now={NOW} />)
+    await openRowMenu('No map')
+
+    expect(screen.queryByTestId('prime-session-ctx-mycelium')).not.toBeInTheDocument()
+    expect(screen.getByTestId('prime-session-ctx-copy-path')).toBeInTheDocument()
+  })
+
+  it('copies the session path', async () => {
+    invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: 'Copy me' })]
+
+    render(<PrimeSessionList now={NOW} />)
+    await openRowMenu('Copy me')
+    fireEvent.click(screen.getByTestId('prime-session-ctx-copy-path'))
+
+    expect(clipboard.copied).toEqual(['/sessions/a.jsonl'])
   })
 })

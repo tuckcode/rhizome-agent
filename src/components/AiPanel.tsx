@@ -87,6 +87,8 @@ interface AiPanelProps {
   onForkMessage?: (entryId: string) => void
   /** Fork branches the Prime session rather than copying the conversation. */
   forkTargetsPrimeEntry?: boolean
+  /** Sessions-list → Mycelium for that session (C67). */
+  onOpenMycelium?: (sessionPath: string) => void
 }
 
 interface AiPanelViewProps {
@@ -125,6 +127,8 @@ interface AiPanelViewProps {
   onSendPrompt?: (text: string) => void
   onMessageHistoryScrollStateChange?: (scrolled: boolean) => void
   targetId?: string
+  /** Sessions-list → Mycelium for that session (C67). */
+  onOpenMycelium?: (sessionPath: string) => void
 }
 
 function readinessFromReadyFlag(ready: boolean | undefined): AiAgentReadiness {
@@ -226,6 +230,7 @@ export function AiPanelView({
   onMessageHistoryScrollStateChange,
   targetId,
   vaultPath = null,
+  onOpenMycelium,
 }: AiPanelViewProps) {
   const view = resolveAiPanelViewModel({
     defaultAiAgent: providedDefaultAiAgent,
@@ -421,6 +426,7 @@ export function AiPanelView({
               locale={locale}
               onSelectSession={(session) => void handleSelectSession(session)}
               onNewChat={handleNewChat}
+              onOpenMycelium={onOpenMycelium}
               activeSessionPath={activeSessionPath}
               working={isActive}
               vaultPath={vaultPath}
@@ -557,6 +563,7 @@ export function AiPanelView({
               locale={locale}
               onSelectSession={(session) => void handleSelectSession(session)}
               onNewChat={handleNewChat}
+              onOpenMycelium={onOpenMycelium}
               activeSessionPath={activeSessionPath}
               working={isActive}
               vaultPath={vaultPath}
@@ -598,6 +605,7 @@ export function AiPanel({
   sidePanel,
   sessionsAutoCollapsed,
   sessionsRailSlot,
+  onOpenMycelium,
 }: AiPanelProps) {
   const defaultAiAgentReadiness = providedDefaultAiAgentReadiness
     ?? readinessFromReadyFlag(providedDefaultAiAgentReady)
@@ -637,6 +645,7 @@ export function AiPanel({
       sidePanel={sidePanel}
       sessionsAutoCollapsed={sessionsAutoCollapsed}
       sessionsRailSlot={sessionsRailSlot}
+      onOpenMycelium={onOpenMycelium}
       onClose={onClose}
       onOpenNote={onOpenNote}
       onPromoteToVault={onPromoteToVault}

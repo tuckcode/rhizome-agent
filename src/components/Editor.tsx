@@ -30,6 +30,7 @@ import {
 } from './editorRawModeSync'
 import { useRegisterEditorContentFlushes } from './editorContentFlushRegistration'
 import { useRawModeWithFlush } from './useRawModeWithFlush'
+import { useNoteLockMode } from '../hooks/useNoteLockMode'
 import { createImeCompositionKeyGuardExtension } from './imeCompositionKeyGuardExtension'
 import { createMarkdownHighlightShortcutExtension } from './markdownHighlightShortcutExtension'
 import { handleRichEditorPaste } from './richEditorPaste'
@@ -127,6 +128,8 @@ interface EditorProps {
   leftPanelsCollapsed?: boolean
   /** Mutable ref that Editor registers its raw-mode toggle into, for command palette access. */
   rawToggleRef?: React.MutableRefObject<() => void>
+  /** Mutable ref that Editor registers its note-lock toggle into, for command palette access. */
+  noteLockToggleRef?: React.MutableRefObject<() => void>
   /** Mutable ref that Editor registers editor find commands into, for shortcuts and menus. */
   findInNoteRef?: React.MutableRefObject<((options?: { replace?: boolean }) => void) | null>
   /** Mutable ref that Editor registers its diff-mode toggle into, for command palette access. */
@@ -402,6 +405,8 @@ function EditorLayout({
   handleToggleDiffExclusive,
   rawMode,
   handleToggleRawExclusive,
+  noteLocked,
+  onToggleNoteLock,
   onContentChange,
   onSave,
   activeStatus,
@@ -481,6 +486,8 @@ function EditorLayout({
   handleToggleDiffExclusive: () => void | Promise<void>
   rawMode: boolean
   handleToggleRawExclusive: () => void
+  noteLocked?: boolean
+  onToggleNoteLock?: () => void
   onContentChange?: (path: string, content: string) => void
   onSave?: () => void
   activeStatus: NoteStatus
@@ -581,6 +588,8 @@ function EditorLayout({
               onToggleDiff={handleToggleDiffExclusive}
               rawMode={rawMode}
               onToggleRaw={handleToggleRawExclusive}
+              noteLocked={noteLocked}
+              onToggleNoteLock={onToggleNoteLock}
               onRawContentChange={onContentChange}
               onSave={onSave}
               activeStatus={activeStatus}
@@ -699,6 +708,10 @@ export const Editor = memo(function Editor(props: EditorProps) {
     rawToggleRef: props.rawToggleRef,
     diffToggleRef: props.diffToggleRef,
   })
+  const { noteLocked, onToggleNoteLock } = useNoteLockMode(
+    props.activeTabPath,
+    props.noteLockToggleRef,
+  )
   const findRequest = useEditorFindCommand({
     activeTab: runtime.activeTab,
     findInNoteRef: props.findInNoteRef,
@@ -736,6 +749,8 @@ export const Editor = memo(function Editor(props: EditorProps) {
   return (
     <EditorLayout
       {...buildEditorLayoutProps(props, runtime, findRequest)}
+      noteLocked={noteLocked}
+      onToggleNoteLock={onToggleNoteLock}
       onToggleInspector={rightPanel.handleToggleInspectorPanel}
       showAIChat={props.showAIChat}
       onToggleAIChat={props.onToggleAIChat ? rightPanel.handleToggleAIChatPanel : undefined}

@@ -9,7 +9,7 @@ import {
   ViewPlugin,
   type ViewUpdate,
 } from '@codemirror/view'
-import { EditorState, Prec } from '@codemirror/state'
+import { Compartment, EditorState, Prec } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { rawEditorLanguageExtensionsForPath } from '../extensions/rawEditorLanguage'
 import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
@@ -177,10 +177,12 @@ export function useCodeMirror(
   content: string,
   callbacks: CodeMirrorCallbacks,
   sourcePath?: string | null,
+  readOnly = false,
 ) {
   const viewRef = useRef<EditorView | null>(null)
   const callbacksRef = useRef(callbacks)
   const initialContentRef = useRef(content)
+  const editableCompartmentRef = useRef(new Compartment())
   useEffect(() => {
     callbacksRef.current = callbacks
   }, [callbacks])
@@ -197,6 +199,16 @@ export function useCodeMirror(
     view.dispatch({ changes: { from: 0, to: current.length, insert: content } })
     externalSyncRef.current = false
   }, [content])
+
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      effects: editableCompartmentRef.current.reconfigure(
+        EditorView.editable.of(!readOnly),
+      ),
+    })
+  }, [readOnly])
 
   useEffect(() => {
     const parent = readRefCurrent(containerRef)
@@ -218,6 +230,7 @@ export function useCodeMirror(
         EditorView.contentAttributes.of(rawEditorTextInputAttributes),
         rawEditorLanguageExtensionsForPath(sourcePath),
         zoomCursorFix(),
+        editableCompartmentRef.current.of(EditorView.editable.of(!readOnly)),
         EditorView.updateListener.of((update) => {
           if (update.docChanged && !externalSyncRef.current) {
             callbacksRef.current.onDocChange(update.state.doc.toString())
@@ -249,6 +262,8 @@ export function useCodeMirror(
       view.destroy()
       viewRef.current = null
     }
+    // Initial readOnly is applied above; later changes go through the reconfigure effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- remount only on container/language, not readOnly
   }, [containerRef, sourcePath])
 
   return viewRef

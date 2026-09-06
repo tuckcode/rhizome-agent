@@ -89,9 +89,11 @@ yours to choose.
 
 ## Recent sessions
 
-- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-0405-grok-4-6-status-bar-pills.md) — status-bar chrome: Contribute/Docs → Settings → About; build/update next to theme; composer lost the duplicate vault pill and hosts agent idle. Vault dropdown stays bottom-left. C67/C68 still unbuilt.
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-0805-composer-c67-c68.md) — **C67/C68 shipped:** sessions right-click menu; note lock (default editable, breadcrumb + Cmd+K).
 
-- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-0338-grok-4-6-lock-and-session-menu.md) — on paper, not built: **C68** restore note lock (default stays **editable**; control must be obvious); **C67** sessions-list context menu like the note one, including Mycelium/codebase. Lock is gone, not hidden. Right-panel stack lives on this branch (`44634d9`, ADR-0170).
+- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-0405-grok-4-6-status-bar-pills.md) — status-bar chrome: Contribute/Docs → Settings → About; build/update next to theme; composer lost the duplicate vault pill and hosts agent idle. Vault dropdown stays bottom-left.
+
+- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-0338-grok-4-6-lock-and-session-menu.md) — captured then shipped later as C67/C68 (see 0805 Composer handoff).
 
 - [2026-09-05 · Claude Opus 5](plans/handoffs/2026-09-05-2145-claude-opus-5-session-import-and-agent-graph.md) — **no agent had ever successfully run a graph query**: the `rhizome_graph_*` tools need `RHIZOME_TOOL_PATH`, and the seeded skill tells the agent to run `cli-call.mjs` from a bash tool, which inherits none of the app's environment. Fixed, and rewrote the skill description so agents discover the graph at all (they were told only about note CRUD). Built the **session-import engine** — ledger, dedup, Claude Code adapter, selection, preview, vault writer — verified on real history: 318 notes written, zero failures, second run wrote nothing. Fixed four UI defects (inverted Connections resize, titlebar stealing the window drag, unresizable chat/editor split, session list sorted by file mtime). **Right-panel layout agreed but unbuilt**; skill change not yet verified with a real agent.
 
@@ -257,15 +259,8 @@ push is not a release — releases are tagged builds with signed installers.
   allow-lists). Do not store it as Prime `USER.md` / Hermes `SOUL.md` (ADR-0168:
   one memory store, the vault). Still open: one profile vs per-agent; app-wide
   vs per-vault; new Settings section vs under the existing AI agents page.
-- **C67-OPEN (2026-09-06): sessions list needs a right-click menu** like the
-  note list's snappy menu, with session actions (rename, archive, open this
-  run in Mycelium/codebase). Hover icons today; no `onContextMenu`. Capture:
-  [2026-09-06-0338](plans/handoffs/2026-09-06-0338-grok-4-6-lock-and-session-menu.md).
-- **C68-OPEN (2026-09-06): restore note lock/view.** Gone, not hidden. Raw vs
-  formatted is a different toggle and both stay editable. **Default: editable**
-  (Atticus). Lock control must be obvious — breadcrumb beside raw, plus Cmd+K.
-  Do not reuse vault `editor_mode` (`preview` already means BlockNote). Capture:
-  same handoff as C67.
+- ~~**C67-OPEN (2026-09-06): sessions list needs a right-click menu**~~ **RESOLVED 2026-09-06.** Right-click Open / Rename / Archive·Restore / View in Mycelium / Copy path via `PrimeSessionListContextMenu`; Mycelium uses `handleOpenSessionFootprint`.
+- ~~**C68-OPEN (2026-09-06): restore note lock/view.**~~ **RESOLVED 2026-09-06.** Ephemeral per-note lock (default editable); breadcrumb + Cmd+K; BlockNote/CodeMirror read-only when locked. Not vault `editor_mode`.
 
 - **C57-OPEN (2026-08-29): permission mode product choices after Prime fix.** Code shipped: Prime ignores vault-safe prompts and defaults new sessions to power user; Claude Code / Antigravity still enforce stored mode; UI copy is **Limited tools** / Power User. **Awaiting Atticus:** keep CLI agents defaulting to Limited tools (`safe`)? keep the Prime permission toggle hidden? final naming — "Limited tools" vs retaining "Vault Safe" with an honest tooltip.
 

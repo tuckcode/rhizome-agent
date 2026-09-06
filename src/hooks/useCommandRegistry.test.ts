@@ -464,6 +464,23 @@ describe('useCommandRegistry', () => {
     expect(findCommand(result.current, 'toggle-raw-editor')?.enabled).toBe(false)
   })
 
+  it('exposes Lock/Unlock Note when onToggleNoteLock is provided', () => {
+    const onToggleNoteLock = vi.fn()
+    const { result } = renderHook(() => useCommandRegistry(makeConfig({ onToggleNoteLock })))
+    const command = findCommand(result.current, 'toggle-note-lock')
+
+    expect(command?.label).toBe('Lock/Unlock Note')
+    expect(command?.group).toBe('View')
+    expect(command?.enabled).toBe(true)
+    command?.execute()
+    expect(onToggleNoteLock).toHaveBeenCalledOnce()
+  })
+
+  it('disables Lock/Unlock Note when onToggleNoteLock is omitted', () => {
+    const { result } = renderHook(() => useCommandRegistry(makeConfig({ onToggleNoteLock: undefined })))
+    expect(findCommand(result.current, 'toggle-note-lock')?.enabled).toBe(false)
+  })
+
   it('exposes command palette actions for note width modes', () => {
     const onSetNoteWidth = vi.fn()
     const config = makeConfig({ noteWidth: 'normal', onSetNoteWidth })

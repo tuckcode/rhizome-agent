@@ -1297,6 +1297,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     handleSetViewMode,
     handleToggleInspector,
     noteListVisible,
+    noteLockToggleRef,
     pdfExportRef,
     rawToggleRef,
     sidebarVisible,
@@ -1488,6 +1489,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     () => canToggleRichEditor ? () => rawToggleRef.current() : undefined,
     [canToggleRichEditor, rawToggleRef],
   )
+  const toggleNoteLockCommand = useCallback(() => {
+    if (notes.activeTabPath) noteLockToggleRef.current()
+  }, [noteLockToggleRef, notes.activeTabPath])
   const toggleTableOfContentsCommand = useCallback(() => {
     if (notes.activeTabPath) tableOfContentsToggleRef.current()
   }, [notes.activeTabPath, tableOfContentsToggleRef])
@@ -1711,6 +1715,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     onToggleInspector: handleToggleInspector,
     onToggleDiff: toggleDiffCommand,
     onToggleRawEditor: toggleRawEditorCommand,
+    onToggleNoteLock: notes.activeTabPath ? toggleNoteLockCommand : undefined,
     onToggleTableOfContents: toggleTableOfContentsCommand,
     onExportNoteAsPdf: activeDeletedFile ? undefined : exportNotePdfCommand,
     noteWidth: activeNoteWidth,
@@ -2151,6 +2156,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                       noteWidth={activeNoteWidth}
                       onToggleNoteWidth={handleToggleNoteWidth}
                       rawToggleRef={rawToggleRef}
+                      noteLockToggleRef={noteLockToggleRef}
                       tableOfContentsToggleRef={tableOfContentsToggleRef}
                       pdfExportRef={pdfExportRef}
                       findInNoteRef={findInNoteRef}
@@ -2272,6 +2278,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               noteWidth={activeNoteWidth}
               onToggleNoteWidth={handleToggleNoteWidth}
               rawToggleRef={rawToggleRef}
+              noteLockToggleRef={noteLockToggleRef}
               tableOfContentsToggleRef={tableOfContentsToggleRef}
               pdfExportRef={pdfExportRef}
               findInNoteRef={findInNoteRef}
