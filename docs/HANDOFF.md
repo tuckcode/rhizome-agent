@@ -47,12 +47,9 @@ file.
 ---
 
 ## State
-`main` is **`45562a5`**, with no local commits ahead of `origin/main` at the
-2026-09-04 note-preview review. Preview and graph corrections remain
-uncommitted: collapsed strip says Inbox; graph Open note exits Graph; Key is bounded.
-97 tests and focused browser checks pass. Native blank painting recovered after a clean restart (C60). The user requires
-approval before commit/push. #25 provenance, C23, and C25 fixes are committed;
-the earlier C22 relaunch check passed 10/10. Confirm with `git status`.
+`origin/main` is **`a309a17`** (C67/C68). Area E dead-IPC subtraction is on
+`cursor/tauri-dead-ipc-bf88` — unused Tauri wrappers + iOS leftovers only;
+`ai_models` / multi-CLI (#56) untouched.
 Multi-day briefing: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date first).
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
@@ -88,6 +85,8 @@ docs need filling. Read it when a handoff task is finished and the next one is
 yours to choose.
 
 ## Recent sessions
+
+- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2230-grok-4-6-area-e-dead-ipc.md) — **Area E:** deleted unused Tauri IPC (messages/compaction/owned-session/shutdown/conflict-mode/title-sync/migrate/archive/clone_repo/mindwalk-open/bridge/toggle-tray) and `src-tauri/gen/apple` + `mobile.json`. Launch no longer migrates `~/Laputa`.
 
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-0805-composer-c67-c68.md) — **C67/C68 shipped:** sessions right-click menu; note lock (default editable, breadcrumb + Cmd+K).
 
