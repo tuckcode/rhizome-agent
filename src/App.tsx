@@ -1397,8 +1397,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       await vault.reloadVault()
       setToastMessage(
         created.length > 0
-          ? `Added ${created.length} Portent type${created.length === 1 ? '' : 's'}`
-          : 'Portent types are already present in this vault',
+          ? `Added ${created.length} default work type${created.length === 1 ? '' : 's'}`
+          : 'Default work types are already present in this vault',
       )
     } catch (err) {
       setToastMessage(`Failed to adopt Portent types: ${err}`)

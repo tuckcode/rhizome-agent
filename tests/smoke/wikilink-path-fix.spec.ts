@@ -74,7 +74,17 @@ Anchor target reached.
 }
 
 async function openNote(page: Page, title: string) {
-  await page.locator('[data-testid="note-list-container"]').getByText(title, { exact: true }).click()
+  // Notes under Graph (ADR-0170) shortens the virtualized list. Search so the
+  // row is on-DOM even when it would otherwise sit below the fold.
+  const noteList = page.locator('[data-testid="note-list-container"]')
+  const visibleRow = noteList.getByText(title, { exact: true })
+  if (!(await visibleRow.isVisible().catch(() => false))) {
+    await page.getByTitle('Search notes').click()
+    const searchInput = page.getByPlaceholder('Search notes...')
+    await expect(searchInput).toBeVisible({ timeout: 5_000 })
+    await searchInput.fill(title)
+  }
+  await noteList.getByText(title, { exact: true }).click()
   await expect(page.locator('.bn-editor h1').first()).toHaveText(title, { timeout: 5_000 })
 }
 

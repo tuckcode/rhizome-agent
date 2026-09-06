@@ -41,9 +41,12 @@ A Note is a general-purpose document — research notes, meeting notes, strategy
 /// type-frontmatter schema (`icon`/`color`/`order`/`sidebar label`, not
 /// Portent's own `_icon`/`_order` convention). Rhizome's own `Note` type
 /// (above) is kept as-is and not duplicated here — only the 7 other
-/// Portent types are seeded. Opt-in only: `seed_portent_type_definitions`
-/// is a separate entry point from `seed_config_files`, not called on every
-/// vault open, matching the "when the user asks" framing in AGENTS.md.
+/// Portent types are listed.
+///
+/// These are Rhizome's default vault skeleton (same type set as a cleaned
+/// Rhizome Vault): `seed_config_files` / repair write them with
+/// `write_if_missing`. `seed_portent_type_definitions` remains for Settings
+/// on older vaults that predate this default.
 const PORTENT_RESPONSIBILITY_TYPE_DEFINITION: &str = "\
 ---
 type: Type
@@ -447,9 +450,13 @@ fn ensure_root_type_definition(vault_path: &Path, file_name: &str, content: &str
 }
 
 /// Ensure the default root type definitions exist for opened/repaired vaults.
+/// Note + Type always; Portent work types fill in when missing.
 fn ensure_root_type_definitions(vault_path: &Path) {
     ensure_root_type_definition(vault_path, "type.md", TYPE_TYPE_DEFINITION);
     ensure_root_type_definition(vault_path, "note.md", NOTE_TYPE_DEFINITION);
+    for (file_name, content) in PORTENT_TYPE_DEFINITIONS {
+        ensure_root_type_definition(vault_path, file_name, content);
+    }
 }
 
 /// Repair config files: ensure `AGENTS.md` at vault root and root type definitions.
@@ -461,17 +468,22 @@ pub fn repair_config_files(vault_path: impl AsRef<str>) -> Result<String, String
 
     write_if_missing(&vault.join("type.md"), TYPE_TYPE_DEFINITION)?;
     write_if_missing(&vault.join("note.md"), NOTE_TYPE_DEFINITION)?;
+    for (file_name, content) in PORTENT_TYPE_DEFINITIONS {
+        write_if_missing(&vault.join(file_name), content)?;
+    }
 
     Ok("Config files repaired".to_string())
 }
 
-/// Seed the 7 Portent (https://portent.md) default type definitions
+/// Seed the 7 Portent (https://portent.md) work-type definitions
 /// (Responsibility, Operation, Project, Task, Event, Topic, Person) at
 /// vault root, skipping any file that already exists so a user's own
 /// customized or same-named type is never overwritten. Rhizome's own
-/// `Note` type is untouched. Opt-in: unlike `seed_config_files`, this is
-/// not called on every vault open — invoke it only when the user asks to
-/// adopt Portent's type model. Returns the file names actually created.
+/// `Note` type is untouched.
+///
+/// New vaults already get these via `seed_config_files`. This entry point
+/// remains for Settings on older vaults. Returns the file names actually
+/// created.
 pub fn seed_portent_type_definitions(vault_path: impl AsRef<str>) -> Result<Vec<String>, String> {
     let vault = Path::new(vault_path.as_ref());
     let mut created = Vec::new();
@@ -603,6 +615,12 @@ mod tests {
     fn assert_root_type_definitions_seeded(vault: &Path) {
         assert!(vault.join("type.md").exists());
         assert!(vault.join("note.md").exists());
+        for file_name in PORTENT_TYPE_FILES {
+            assert!(
+                vault.join(file_name).exists(),
+                "{file_name} should be part of the default vault skeleton"
+            );
+        }
         assert!(!vault.join("config").exists());
     }
 

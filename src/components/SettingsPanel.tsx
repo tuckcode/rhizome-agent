@@ -69,6 +69,7 @@ import {
   SectionHeading,
   SelectControl,
   SettingsGroup,
+  SettingsGroupItem,
   SettingsRow,
   SettingsSection,
   SettingsSwitchRow,
@@ -1519,15 +1520,19 @@ function OrganizationWorkflowSection({
         />
 
         {onAdoptPortentTypes ? (
-          <div className="flex flex-col gap-1.5 py-2">
-            <span className="text-sm font-medium text-foreground">
-              {t('settings.workflow.adoptPortentTypes')}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {t('settings.workflow.adoptPortentTypesDescription')}
-            </span>
-            <AdoptPortentTypesButton t={t} onAdoptPortentTypes={onAdoptPortentTypes} />
-          </div>
+          <SettingsGroupItem testId="settings-adopt-portent-types-row">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              <span className="min-w-0 flex-1 space-y-1">
+                <span className="block text-sm font-medium text-foreground">
+                  {t('settings.workflow.adoptPortentTypes')}
+                </span>
+                <span className="block text-xs leading-5 text-muted-foreground">
+                  {t('settings.workflow.adoptPortentTypesDescription')}
+                </span>
+              </span>
+              <AdoptPortentTypesButton t={t} onAdoptPortentTypes={onAdoptPortentTypes} />
+            </div>
+          </SettingsGroupItem>
         ) : null}
       </SettingsGroup>
     </>
