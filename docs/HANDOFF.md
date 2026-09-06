@@ -91,6 +91,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-06 · Cursor Grok 4.6](plans/handoffs/2026-09-06-2236-cursor-grok-4-6-area-f.md) — **Area F:** MCP no longer advertises `rhizome_grok_import` / `rhizome_generate_wiki` / `rhizome_repo_research`; deleted `rhizome_grok_import.rs` and parked smoke junk.
 - [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2145-grok-4-6-area-b-orphan-hooks.md) — **Area B subtraction:** deleted unused hooks (`useMcpBridge`, `useClaudeCodeOnboarding`, `useClaudeCodeStatus`, `useNoteLayout`), the TS Mindwalk duplicate, unused Claude CLI wrappers, and confirmed-dead app-core exports. Claude onboarding/badge UI files left for area C.
 - [2026-09-06 · Cursor Grok 4.6](plans/handoffs/2026-09-06-2141-cursor-grok-4-6-area-a-orphans.md) — **area A subtraction:** deleted orphaned `e2e/` (24 unused specs), unused scripts, unused `biome.json`, leftover `mcp-server/package-lock.json`, and unused `verifyFocusable`. Live `tests/smoke/` and `tests/integration/` kept.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md) — **native Chat glance PASS** on `f76b46c`/`ac36e10`; daily-drive north-star leftover closed. Parked: C72, Prime list-import, #51 Tab, C64 full verify, #47, Grokbot.
