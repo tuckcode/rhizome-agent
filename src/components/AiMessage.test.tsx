@@ -37,6 +37,19 @@ describe('AiMessage', () => {
     expect(screen.getByText('Hello AI')).toBeTruthy()
   })
 
+  it('shows a clock under the ask when createdAtMs is set (C70)', () => {
+    const createdAtMs = new Date(2026, 8, 6, 15, 35, 0).getTime()
+    render(<AiMessage userMessage="Hello AI" actions={[]} createdAtMs={createdAtMs} />)
+    const stamp = screen.getByTestId('message-timestamp')
+    expect(stamp).toHaveTextContent('3:35p')
+    expect(screen.queryByTestId('message-timestamp')).toBeTruthy()
+  })
+
+  it('omits the clock when there is no createdAtMs', () => {
+    render(<AiMessage userMessage="Hello AI" actions={[]} />)
+    expect(screen.queryByTestId('message-timestamp')).not.toBeInTheDocument()
+  })
+
   /**
    * A turn boundary has to be findable while scrolling past screens of answer.
    * The bubble used to be tinted with `--state-hover`, a hover affordance that

@@ -104,6 +104,11 @@ pub enum AiAgentStreamEvent {
         #[serde(skip_serializing_if = "Option::is_none")]
         tokens_before: Option<u64>,
     },
+    /// One Prime agent turn finished; a queued follow-up may still stream on
+    /// the same `stream_prime_session` socket. Chat seals the current bubble
+    /// and retargets to the queued user turn so the interrupt is not buried
+    /// inside the first reply.
+    TurnBoundary,
     Done,
 }
 

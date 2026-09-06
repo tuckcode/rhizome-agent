@@ -971,6 +971,26 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     setMockRemoteState(targetPath, false)
     return targetPath
   },
+  preview_claude_code_session_import: () => ({
+    source: 'claude_code',
+    projectsDir: '/Users/mock/.claude/projects',
+    found: 0,
+    willImport: 0,
+    vaultOnly: 0,
+    withSessionRowPlanned: 0,
+    skippedDuplicate: 0,
+    needsConfirmation: 0,
+    sessionListNotYetWired: true,
+    sessions: [],
+  }),
+  run_claude_code_session_import: () => ({
+    writtenNotes: [],
+    imported: 0,
+    skipped: 0,
+    failed: 0,
+    failures: [],
+    sessionListNotYetWired: true,
+  }),
   register_mcp_tools: () => 'registered',
   check_mcp_status: () => 'installed',
   get_mcp_config_snippet: () => JSON.stringify({

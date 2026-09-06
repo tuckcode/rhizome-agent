@@ -17,6 +17,8 @@ interface UseAiPanelSendPolicyArgs {
   clearAttachments: () => void
   refreshQueue: () => void
   setInput: (value: string) => void
+  /** Show a queued follow-up in the transcript, not only under Waiting. */
+  onFollowUpQueued?: (text: string) => void
 }
 
 interface UseAiPanelSendPolicyResult {
@@ -60,6 +62,7 @@ export function useAiPanelSendPolicy({
   clearAttachments,
   refreshQueue,
   setInput,
+  onFollowUpQueued,
 }: UseAiPanelSendPolicyArgs): UseAiPanelSendPolicyResult {
   const latestTurnState = useRef({ handleSend, isActive, onSendPrompt })
   useLayoutEffect(() => {
@@ -88,6 +91,9 @@ export function useAiPanelSendPolicy({
         // Send it as a new turn rather than losing it.
         if (result === 'accepted') {
           trackPrimeTurnMessage('followUp')
+          // Show the interrupt in the transcript immediately — queue chrome
+          // alone made it look like Chat ignored the follow-up (#41 dogfood).
+          onFollowUpQueued?.(text)
           setInput('')
           refreshQueue()
         } else if (result === 'not-running') {
@@ -97,7 +103,7 @@ export function useAiPanelSendPolicy({
       return
     }
     sendAsNewTurn(text, references)
-  }, [attachments.length, isActive, isPrimeTarget, refreshQueue, sendAsNewTurn, sendAsNewTurnIfIdle, setInput])
+  }, [attachments.length, isActive, isPrimeTarget, onFollowUpQueued, refreshQueue, sendAsNewTurn, sendAsNewTurnIfIdle, setInput])
 
   const handleSteer = useCallback((text: string, references: SendReferences) => {
     if (!text.trim() && attachments.length === 0) return

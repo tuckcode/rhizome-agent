@@ -25,6 +25,7 @@ vi.mock('../utils/ai-chat', () => ({
 
 import {
   appendLocalResponse,
+  appendQueuedFollowUpMessage,
   appendStreamingMessage,
   buildFormattedMessage,
   createMissingAgentResponse,
@@ -76,6 +77,7 @@ describe('aiAgentConversation', () => {
         actions: [],
         response: 'Sure',
         id: 'msg-local',
+        createdAtMs: expect.any(Number),
       },
     ])
   })
@@ -94,8 +96,58 @@ describe('aiAgentConversation', () => {
         actions: [],
         isStreaming: true,
         id: 'msg-stream',
+        createdAtMs: expect.any(Number),
       },
     ])
+  })
+
+  it('appends a queued follow-up without marking it streaming', () => {
+    nextMessageIdMock.mockReturnValue('msg-follow')
+    const store = createMessageStore([
+      {
+        userMessage: 'first',
+        actions: [],
+        response: 'ack',
+        id: 'msg-1',
+      },
+    ])
+
+    const messageId = appendQueuedFollowUpMessage(store.setMessages, 'MIDTURN_QUEUE_PROBE')
+
+    expect(messageId).toBe('msg-follow')
+    expect(store.getMessages()).toEqual([
+      {
+        userMessage: 'first',
+        actions: [],
+        response: 'ack',
+        id: 'msg-1',
+      },
+      {
+        userMessage: 'MIDTURN_QUEUE_PROBE',
+        actions: [],
+        id: 'msg-follow',
+        queuedFollowUp: true,
+        createdAtMs: expect.any(Number),
+      },
+    ])
+  })
+
+  it('does not duplicate a follow-up already waiting in the transcript', () => {
+    nextMessageIdMock.mockReturnValueOnce('msg-follow').mockReturnValueOnce('msg-dup')
+    const store = createMessageStore([
+      {
+        userMessage: 'first',
+        actions: [],
+        response: 'ack',
+        id: 'msg-1',
+      },
+    ])
+
+    appendQueuedFollowUpMessage(store.setMessages, 'MIDTURN_QUEUE_PROBE')
+    appendQueuedFollowUpMessage(store.setMessages, 'MIDTURN_QUEUE_PROBE')
+
+    expect(store.getMessages()).toHaveLength(2)
+    expect(store.getMessages()[1]?.userMessage).toBe('MIDTURN_QUEUE_PROBE')
   })
 
   it('builds a formatted message from completed history only', () => {

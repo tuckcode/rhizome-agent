@@ -270,13 +270,13 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
 
   const handleGettingStartedVaultReady = useCallback((vaultPath: string) => {
     rememberVaultChoice(vaultPath)
-    setToastMessage(`Getting Started vault cloned and opened at ${vaultPath}`)
+    setToastMessage(`Getting Started vault created and opened at ${vaultPath}`)
   }, [rememberVaultChoice])
 
   const handleOnboardingVaultReady = useCallback((vaultPath: string, source: 'template' | 'empty' | 'existing') => {
     rememberVaultChoice(vaultPath)
     if (source === 'template') {
-      setToastMessage(`Getting Started vault cloned and opened at ${vaultPath}`)
+      setToastMessage(`Getting Started vault created and opened at ${vaultPath}`)
     }
   }, [rememberVaultChoice])
   const cloneGettingStartedVault = useGettingStartedClone({
@@ -2373,7 +2373,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           onCommit={conflictResolver.commitResolution}
           onClose={conflictFlow.handleCloseConflictResolver}
         />
-        <SettingsPanel open={dialogs.showSettings} initialSectionId={settingsInitialSectionId} settings={settings} aiAgentsStatus={aiAgentsStatus} locale={appLocale} systemLocale={systemLocale} vaults={vaultSwitcher.allVaults} defaultWorkspacePath={vaultSwitcher.defaultWorkspacePath} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} isGitVault={gitRepoState !== 'missing'} onSave={saveSettings} onCopyMcpConfig={mcpSetupDialog.copyManualConfig} explicitOrganizationEnabled={explicitOrganizationEnabled} onSaveExplicitOrganization={handleSaveExplicitOrganization} inboxAutomationEnabled={isInboxAutomationEnabled(vaultConfig.inbox_automation_enabled)} onSaveInboxAutomation={(enabled) => updateConfig('inbox_automation_enabled', enabled)} onAdoptPortentTypes={() => { void handleAdoptPortentTypes() }} onOpenFeedback={openFeedback} onOpenDocs={openDocs} onClose={dialogs.closeSettings} />
+        <SettingsPanel open={dialogs.showSettings} initialSectionId={settingsInitialSectionId} settings={settings} aiAgentsStatus={aiAgentsStatus} locale={appLocale} systemLocale={systemLocale} vaults={vaultSwitcher.allVaults} activeVaultPath={resolvedPath} defaultWorkspacePath={vaultSwitcher.defaultWorkspacePath} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} isGitVault={gitRepoState !== 'missing'} onSave={saveSettings} onCopyMcpConfig={mcpSetupDialog.copyManualConfig} explicitOrganizationEnabled={explicitOrganizationEnabled} onSaveExplicitOrganization={handleSaveExplicitOrganization} inboxAutomationEnabled={isInboxAutomationEnabled(vaultConfig.inbox_automation_enabled)} onSaveInboxAutomation={(enabled) => updateConfig('inbox_automation_enabled', enabled)} onAdoptPortentTypes={() => { void handleAdoptPortentTypes() }} onOpenFeedback={openFeedback} onOpenDocs={openDocs} onClose={dialogs.closeSettings} />
         <PrimeActiveCloseDialog
           open={primeActiveClose.open}
           locale={appLocale}

@@ -17,7 +17,7 @@ It indexes, it does not restate. Every row points at the issue, ADR, or C-number
 that owns the detail. If you find yourself copying a paragraph out of one of
 those into here, link it instead — the same rule `HANDOFF.md` runs on.
 
-Snapshot: **2026-09-04**, 27 open issues, 12 open C-numbers. Re-derive both
+Snapshot: **2026-09-06**, open C-numbers ~13 (re-derive). Re-derive both
 before trusting the counts:
 
 ```bash
@@ -30,22 +30,62 @@ were missing from this index (#41–#57 cluster), session-import plan, #51 Tab
 research, C57, and a pre-public priority note. Counts refreshed against live
 `gh` + HANDOFF.
 
+**Origin:** Cursor · 2026-09-06 — Atticus starts daily-driving; §0 retargeted
+to Chat ↔ Prime reliability + harness tooling. C67/C68 marked shipped.
+
 ---
 
-## 0. Pre-public focus (read before §5)
+## 0. Daily-drive focus (read before §5)
 
-**Origin:** Cursor · 2026-09-01 — Atticus preference, this session.
+**Origin:** Cursor · 2026-09-06 — Atticus: use this as the daily app; make
+Chat, the model, and harness tooling rock solid. Packaging stays deferred.
 
-Product stability and core chat/memory UX before public release packaging
-(macOS builds, release CI). Harness *composition* (§1) remains discuss/decide —
-it does **not** block claiming #25, C23, C57, or session import.
+**North star:** Chat talks to Prime without false status or silent failures;
+the agent can discover and run vault/graph tools (`rhizome-vault` +
+`RHIZOME_TOOL_PATH`), mid-turn steer/queue works, and session lifecycle is
+trustworthy. Verify on a **real vault + live agent turn**, not unit tests alone.
 
-**Do now (when free to choose):** #25 · C23 · C57 · session-import plan ·
-first-run / Getting Started (C11 / #55) · failure leftovers (#47 / C53
-already mostly done — check issue before reopening).
+**Do now (when free to choose):**
+1. **Agent tooling path** — ~~**C69** packaged `cli-call.mjs`~~ fixed; live graph
+   tools proven on vault. Graph Find bottom-right shipped.
+2. **Chat reliability leftovers** — mid-turn live-proven; suspend-retry; DOM
+   composer send; selection Copy allowlist. Still open: C64 flash; #54; #47.
+3. **Atticus Chat wishlist (parked 2026-09-06, do not drop):**
+   - ~~**C70** per-message timestamps on Chat bubbles.~~ shipped in tree 2026-09-06 18:12.
+   - ~~**C71** composer up-arrow previous-prompt history.~~ shipped in tree 2026-09-06 18:12 (#51 Tab remainder still separate).
+   - ~~DeepSeek + Nous in Settings~~ — in working tree (`PrimeProviderStatusSection`);
+     Nous env detection + expired-OAuth Chat preflight fixed 2026-09-06 18:02.
+   - Anthropic / xAI reconnect: Settings **Reconnect** copies Terminal command;
+     Chat now treats Expired as not connected (banner).
+   - ~~First-run default vault = cleaned Rhizome Vault scaffold (structure kept).~~
+     **Shipped 2026-09-06 18:16:** local scaffold (no Tolaria clone). C11 remote
+     URL still deferred for env override / published starter.
+4. ~~**C57** — Atticus answers on Limited tools / CLI defaults.~~ **Closed 2026-09-06:** CLI default Limited tools; Prime toggle hidden; keep Limited tools / Power User names.
+5. ~~**Session import UI**~~ — **Settings + vault writer shipped 2026-09-06 18:16**
+   (Claude Code → `Imports/`). Still open: Prime session-list rows; other
+   source adapters; first-run Welcome import step (C9).
+6. **C72 side-panel layout session** — right Notes/Graph column discoverability + defaults + whether a right icon rail exists; do not drive-by.
+7. **Tonight (Atticus):** review **Grokbot full audits** — rhizome-agent **and** CodexGPT lob. See [1819 handoff](plans/handoffs/2026-09-06-1819-composer-park-grokbot-audits-tonight.md).
 
-**Defer:** release packaging, Windows (#32 / C42), TokenJuice/Switchyard build,
-ratifying harness grafts.
+**Already shipped (do not re-claim):** #25 provenance · C23 rehydration ·
+C67 sessions context menu · C68 note lock · ADR-0170 right-panel stack ·
+status chrome (Contribute/Docs → About; idle on composer).
+
+**Daily-drive status (2026-09-06 18:16):**
+- **Done / in tree:** mid-turn live; TurnBoundary; suspend-retry; DOM send;
+  selection Copy; DeepSeek/Nous Settings cards; expired OAuth fails Chat
+  preflight; Nous `NOUS_API_KEY` counts connected; **C70 clocks; C71 Up/Down recall**;
+  **C57 settled**; **session-import Settings (vault notes)**; **local Getting
+  Started scaffold**.
+- **Still open for goal:** Prime session-list import half; Cursor/etc. adapters;
+  first-run Welcome import prompt (C9); **C72**; packaging/Windows deferred.
+  Restart `pnpm tauri dev` for Rust import commands + scaffold.
+
+**Defer:** full release packaging, first Windows launch verification (#32 /
+C42 — still unrun on a real box), TokenJuice/Switchyard build, ratifying
+harness grafts, #50 live-app view until Atticus picks a surface. **Do keep
+Windows paths in mind for every packaging/tooling fix** (named pipe, 
+`rhizome-tool.exe`, `resources/mcp-server`) even while launch is unverified.
 
 ---
 
@@ -122,15 +162,15 @@ composition doc — do not restate them here.
 | Decision | Blocks | Where it stands |
 |---|---|---|
 | **Harness composition: option 2 + first slice** | #5, #40, #56, and any graft of a foreign harness idea | Filter ratified (ADR-0168). Working notes in `harness-composition.md`. Still discuss/decide: ratify option 2, first slice, remaining incompatibilities. Code already disagrees with doctrine on providers (#56). |
-| **Session import destinations** | first-run + Settings import build | **Mostly decided 2026-09-01.** Always → Prime session list; also vault note under `Imports/<source>/` (`type: Imported Session`) when a vault is attached; no vault → list only. Cross-harness dedup (fingerprint + provenance). Plan: [`plans/2026-09-01-session-import-plan.md`](plans/2026-09-01-session-import-plan.md). Needs Atticus go-ahead + GitHub issue before build. Relates to #23, C9. |
-| **C57 permission naming / defaults** | honest Limited-tools UX | Code shipped (Prime always Power User; CLI agents still honor stored mode). **Awaiting Atticus:** CLI default Limited tools? keep Prime toggle hidden? "Limited tools" vs "Vault Safe" + honest tooltip. |
+| **Session import destinations** | first-run + Settings import build | **Vault half shipped 2026-09-06** (Settings → Import chat history; Claude Code → `Imports/`). Prime session-list half still blocked on `import_jsonl` semantics (Atticus decision). Plan: [`plans/2026-09-01-session-import-plan.md`](plans/2026-09-01-session-import-plan.md). Relates to #23, C9. |
+| **C57 permission naming / defaults** | honest Limited-tools UX | **Settled 2026-09-06 (Atticus).** CLI default Limited tools; Prime toggle stays hidden (always Power User); keep Limited tools / Power User — no Vault Safe. Code already matched. |
 | **#50 live app view: which surface** | agent QA of the drawn UI | Answers proposed 2026-08-29, awaiting Atticus. Browser `pnpm dev`, read + test-bridge steer, `pnpm live-ui` not an in-app pane. [plan](plans/2026-08-29-live-app-view-plan.md). |
 | **What ⌘1/⌘2/⌘3 and "Full Layout" mean once Chat is the centre** | — | **Settled 2026-08-25.** ⌘1 Chat only, ⌘2 opens the Notes panel with Browse collapsed, ⌘3 opens it with Browse expanded. Stored `viewMode` values unchanged. |
 | **Does Wiki Graph replace the canvas or feed a side panel** | #39 | **Settled 2026-09-06 (ADR-0170).** Graph and Mycelium sit under Notes in the right column. They no longer replace Chat. #39 (graph as an agent tool vs a place) is still open for the *agent* interface. |
-| **Right panel composition** | — | **Settled 2026-09-06 (ADR-0170), revising 2026-08-25.** Notes is the heavy top half; Graph/Mycelium a resizable sub-panel below; Connections strip gone. Right-hand icon rail still undecided. |
+| **Right panel composition** | — | **ADR-0170 settled the stack** (Notes heavy + Graph/Mycelium below). **C72 (2026-09-06):** Atticus still can’t find/keep the column — needs a layout session on defaults, Inbox label, and right icon rail (still undecided). |
 | **C66 agent profile / instructions in Settings** | chat personality UX | **Agreed, not built 2026-09-06.** How the agent should respond, rules, for whichever agent. Not vault `AGENTS.md`, not the model picker, not tool-allowlist profiles. Awaiting: one vs per-agent; app vs vault. |
-| **C67 sessions-list context menu** | session row actions | **Agreed, not built 2026-09-06.** Same snappy menu as notes; different items, including Mycelium/codebase for that session. [handoff](plans/handoffs/2026-09-06-0338-grok-4-6-lock-and-session-menu.md). |
-| **C68 restore note lock** | accidental edits while reading | **Agreed, not built 2026-09-06.** Lock comes back. **Default stays editable.** Control must be obvious (breadcrumb + Cmd+K). Distinct from raw vs formatted. Same handoff as C67. |
+| **C67 sessions-list context menu** | session row actions | **Shipped 2026-09-06** (`a309a17`). Open / Rename / Archive·Restore / View in Mycelium / Copy path. |
+| **C68 restore note lock** | accidental edits while reading | **Shipped 2026-09-06** (`a309a17`). Default editable; breadcrumb + Cmd+K; not vault `editor_mode`. |
 | **TokenJuice + Switchyard** | later stacked system; not a Rhizome organ | **Wanted 2026-08-26, not started.** Discuss/plan only. TokenJuice-shaped tool-output shrink first (Prime owns what the model sees). Switchyard-shaped model hop second (sidecar behind Prime; halfway house is `set_scoped_models`). Write-up: [`token-routing-and-compression.md`](design/token-routing-and-compression.md). Do not vendor either in this tree. |
 
 **#40** can close against ADR-0168 (Rhizome is a client of Prime, not a second
@@ -159,7 +199,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | #44 | Panels resizable by dragging — **closed 2026-08-29** (Chat sessions `a26eb40`, chat note pane `fe97f99`; Notes + Mycelium list resizable) |
 | #39 | Make the knowledge graph an agent tool, not a place you visit — **B** |
 | #43 | No window-level navigation guard — slip past the link handler strands the app |
-| C68 | Restore note lock/view — **agreed, not built.** Default stays editable; control must be obvious |
+| C68 | Restore note lock/view — **shipped 2026-09-06.** Default editable; breadcrumb + Cmd+K |
 
 **Composer and controls** — strip shipped 2026-08-25; closed on GitHub 2026-08-29
 | | |
@@ -168,8 +208,10 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | #9 | Model and thinking level as one control on the strip — **closed 2026-08-29** (`163403f`; composer `1a1bfa9`) |
 | #35 | Verbose modifier reachable from the composer — **closed 2026-08-29** (`1a1bfa9`, one-click thinking toggle) |
 | #21 | Argument hints for commands that take arguments — **closed 2026-08-29** (`6037490`) |
-| #41 | Typing while Prime is working: steer/queue path wired end-to-end to nothing |
-| #51 | Tab to fill in the reply you were going to type — **partial.** Options pills shipped (`replySuggestions` / `ComposerReplySuggestions`); `completion` kind + Tab ghost text **not** wired. Research: vault `projects/rhizome-agent/sub-agents/2026-09-01-tab-completion-ux-research.md` (rules-first v1; model-backed opt-in later). |
+| #41 | Typing while Prime is working: steer/queue — **native dogfood confirmed 2026-09-06** (“Waiting in this session” / `MIDTURN_QUEUE_PROBE` on DeepSeek · Rhizome Vault). Code path C43/C44. |
+| #51 | Tab to fill in the reply you were going to type — **partial.** Options pills shipped (`replySuggestions` / `ComposerReplySuggestions`); `completion` kind + Tab ghost text **not** wired. Research: vault `projects/rhizome-agent/sub-agents/2026-09-01-tab-completion-ux-research.md` (rules-first v1; model-backed opt-in later). **Related:** ~~C71~~ up-arrow history shipped 2026-09-06. |
+| C70 | Per-message timestamps on Chat bubbles — **RESOLVED 2026-09-06** (`3:35p` under ask). |
+| C71 | Composer up-arrow previous-prompt history — **RESOLVED 2026-09-06** (in-memory; caret at start / empty). |
 
 **Transcript and sessions**
 | | |
@@ -179,7 +221,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | #31 | Name Prime sessions at creation — **closed 2026-08-26** (create-time name + rename from the list) |
 | #49 | Sessions should be named by the model, not by whatever text came first — step 2 shipped in handoff; issue may still be open for remainder |
 | #23 | Sessions are searchable knowledge, not opaque logs — also fed by **session import** plan (§1) |
-| C67 | Sessions list right-click menu (rename / archive / Mycelium codebase) — **agreed, not built** |
+| C67 | Sessions list right-click menu — **shipped 2026-09-06** |
 | #42 | Tool cards say "ipython" five times — **closed 2026-08-26** (expandable Tool use group; `%%bash` → command) |
 
 **Memory loop** — the product thesis; least covered by design docs
@@ -242,8 +284,8 @@ Save-to-vault refuse. Prime session jsonl stays out of scope.
 14 open. Full text in `HANDOFF.md` § Open threads — this is the shape of the
 backlog, not a replacement for it.
 
-- **Blocks other work:** C42 (Windows never launched — #32 sits on top of it),
-  **C57** (Limited tools / Vault Safe naming and CLI defaults — Atticus)
+- **Blocks other work:** C42 (Windows never launched — #32 sits on top of it)
+- ~~**C57** (Limited tools / Vault Safe naming and CLI defaults — Atticus)~~ **RESOLVED 2026-09-06**
 - **Resolved but previously misindexed here:** C23. Session replay reads the
   full on-disk Prime log; `get_messages` remains a live, post-compaction view.
   See `HANDOFF.md` C23-RESOLVED and
@@ -263,8 +305,8 @@ backlog, not a replacement for it.
   Started clones an unrelated upstream repo — blocked on GitHub access; #55)
 - **Product decisions pending:** C9 (optional first-run Welcome — ties to
   session import), C10 (spotlight onboarding, spec written and unbuilt), C7
-  (native QA gate for shell waves), **C67** (sessions context menu — agreed),
-  **C68** (note lock — agreed, default editable)
+  (native QA gate for shell waves), ~~**C67**~~ / ~~**C68**~~ shipped 2026-09-06,
+  **C66** (agent profile — agreed, not built)
 
 ⚠️ **C-numbers and issue numbers collide and mean different things.** C40 is
 `rhizome_graph_summary`; issue #40 is the harness question. C34 is menu-bar
@@ -323,13 +365,15 @@ composer cluster. Item 1 below was Grok's later insertion (`2b5daba`).
 **Origin:** Cursor · 2026-09-02 — order below matches §0 pre-public focus;
 composition stays discuss-only until Atticus wants a graft.
 
-1. **Memory / trust loop** — #25 (retrieval provenance), C23 (rehydration),
-   then **session import** once the plan is approved and filed. #24 already
-   closed.
-2. **Honest permissions** — C57 naming/defaults (Atticus answers, small code).
-3. **Composer remainder** — #51 Tab ghost text (research done; rules-first),
-   #41 steer/queue wiring.
-4. **First-run** — #55 / C11 starter vault; C9 Welcome + import offer.
+1. **Agent tooling path** — re-seed `rhizome-vault` (vault skill still dated
+   2026-08-21 without `RHIZOME_TOOL_PATH` / graph verbs); live Chat ask that
+   needs the graph. Then **session import** UI once Atticus green-lights.
+2. **Chat reliability** — #41 steer/queue (mostly proven), failure
+   leftovers (#47 / #54). ~~C57~~ settled 2026-09-06.
+3. **Composer remainder** — #51 Tab ghost text (research done; rules-first).
+   ~~Up-arrow Ask-box history~~ shipped as C71 2026-09-06.
+4. **First-run** — #55 / C11 starter vault; C9 Welcome + import offer; **C66**
+   agent profile once one-vs-per-agent and app-vs-vault are picked.
 5. **Harness composition (§1)** — discuss/decide when you want grafts; closing
    **#40** / confronting **#56** is paperwork, not a substitute for product UX.
    TokenJuice/Switchyard and Windows stay later.

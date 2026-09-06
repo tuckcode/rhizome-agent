@@ -1,7 +1,15 @@
-import { fireEvent, render } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AiPanelMessageHistory } from './AiPanelChrome'
 import type { AiAgentMessage } from '../lib/aiAgentConversation'
+
+const { startDragging } = vi.hoisted(() => ({
+  startDragging: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('@tauri-apps/api/window', () => ({
+  getCurrentWindow: () => ({ startDragging }),
+}))
 
 function message(userMessage: string, response: string): AiAgentMessage {
   return { userMessage, response, actions: [] }
@@ -36,6 +44,7 @@ let scrollIntoView: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   scrollIntoView = vi.fn()
+  startDragging.mockClear()
   Element.prototype.scrollIntoView = scrollIntoView as unknown as Element['scrollIntoView']
 })
 
@@ -100,5 +109,34 @@ describe('AiPanelMessageHistory follow-the-stream scrolling', () => {
     rerender(<AiPanelMessageHistory {...historyProps([...messages, message('two', '')])} />)
 
     expect(scrollIntoView).toHaveBeenCalled()
+  })
+})
+
+describe('AiPanelMessageHistory text selection vs window drag', () => {
+  it('does not start a window drag when dragging across a chat message', () => {
+    // Chat history is a drag surface for empty chrome, but message bodies
+    // must stay selectable — otherwise copy/paste is impossible.
+    render(<AiPanelMessageHistory {...historyProps([message('copy me', '429 rate limit')])} />)
+
+    const bubble = screen.getByText('copy me')
+    expect(bubble.closest('[data-no-drag]')).not.toBeNull()
+
+    fireEvent.mouseDown(bubble, { button: 0, clientX: 10, clientY: 10 })
+    fireEvent.mouseMove(window, { clientX: 40, clientY: 10 })
+
+    expect(startDragging).not.toHaveBeenCalled()
+  })
+
+  it('still starts a window drag from empty padding around messages', () => {
+    render(<AiPanelMessageHistory {...historyProps([message('copy me', 'ok')])} />)
+
+    fireEvent.mouseDown(screen.getByTestId('ai-panel-message-history'), {
+      button: 0,
+      clientX: 10,
+      clientY: 10,
+    })
+    fireEvent.mouseMove(window, { clientX: 40, clientY: 10 })
+
+    expect(startDragging).toHaveBeenCalledOnce()
   })
 })

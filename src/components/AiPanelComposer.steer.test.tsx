@@ -51,6 +51,33 @@ describe('AiPanelComposer steering', () => {
     expect(screen.getByRole('button', { name: 'Stop response' })).toBeTruthy()
   })
 
+  /**
+   * Computer-use and paste can fill the contenteditable without firing `input`,
+   * so React's draft stays empty and the chrome shows Stop. Click must still
+   * steer what is on screen — otherwise mid-turn queue probes die as "Stopped."
+   */
+  it('steers DOM text when Stop is showing because the React draft is stale', () => {
+    const onSteer = vi.fn()
+    const onStop = vi.fn()
+    const inputRef: React.RefObject<HTMLDivElement | null> = { current: null }
+
+    renderComposer({
+      isActive: true,
+      input: '',
+      inputRef,
+      onSteer,
+      onStop,
+    })
+
+    const editor = screen.getByTestId('agent-input')
+    editor.textContent = 'MIDTURN_QUEUE_PROBE'
+
+    screen.getByRole('button', { name: 'Stop response' }).click()
+
+    expect(onSteer).toHaveBeenCalledWith('MIDTURN_QUEUE_PROBE', [])
+    expect(onStop).not.toHaveBeenCalled()
+  })
+
   /** Agents without steering support must keep the old locked behaviour rather
    *  than offering an action their backend cannot honour. */
   it('falls back to Stop-only when the agent cannot steer', () => {

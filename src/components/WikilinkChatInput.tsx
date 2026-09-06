@@ -23,6 +23,15 @@ interface WikilinkChatInputProps {
   commandSkillLabel?: string
   commandInstantLabel?: string
   onCommandAction?: (action: CommandMenuAction, nextValue: string) => void
+  onBrowsePromptHistory?: (
+    direction: 'up' | 'down',
+    meta: {
+      value: string
+      selectionStart: number
+      selectionEnd: number
+      suggestionsOpen: boolean
+    },
+  ) => boolean
 }
 
 export function WikilinkChatInput({
@@ -44,6 +53,7 @@ export function WikilinkChatInput({
   commandSkillLabel,
   commandInstantLabel,
   onCommandAction,
+  onBrowsePromptHistory,
 }: WikilinkChatInputProps) {
   return (
     <InlineWikilinkInput
@@ -65,6 +75,7 @@ export function WikilinkChatInput({
       commandSkillLabel={commandSkillLabel}
       commandInstantLabel={commandInstantLabel}
       onCommandAction={onCommandAction}
+      onBrowsePromptHistory={onBrowsePromptHistory}
     />
   )
 }

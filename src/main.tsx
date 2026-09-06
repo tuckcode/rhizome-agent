@@ -22,8 +22,7 @@ import { isRecoveredActionTooltipError } from './components/ui/actionTooltipReco
 import { isTauri } from './mock-tauri'
 import { isMac, shouldUseCustomWindowChrome } from './utils/platform'
 import { reloadFrontendOnceIfStartupFailed } from './utils/frontendReady'
-
-const TLDRAW_CONTEXT_MENU_SELECTOR = '.tldraw-whiteboard'
+import { shouldAllowNativeContextMenu } from './utils/nativeContextMenu'
 
 const RootApp = lazy(() => import('./App.tsx'))
 
@@ -41,12 +40,8 @@ function preventFileDropNavigation(event: DragEvent): void {
   event.preventDefault()
 }
 
-function isTldrawContextMenuTarget(target: EventTarget | null): boolean {
-  return target instanceof Element && target.closest(TLDRAW_CONTEXT_MENU_SELECTOR) !== null
-}
-
 function preventNativeContextMenu(event: MouseEvent): void {
-  if (isTldrawContextMenuTarget(event.target)) return
+  if (shouldAllowNativeContextMenu(event.target)) return
 
   event.preventDefault()
 }

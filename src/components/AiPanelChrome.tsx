@@ -7,6 +7,8 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import type { ComposerAttachment } from '../lib/composerAttachments'
 import { WikilinkChatInput } from './WikilinkChatInput'
 import { extractInlineWikilinkReferences } from './inlineWikilinkText'
+import { serializeInlineNode } from './inlineWikilinkDom'
+import { normalizeInlineWikilinkValue } from './inlineWikilinkTokens'
 import {
   aiAgentPermissionModeLabels,
   type AiAgentPermissionMode,
@@ -21,6 +23,7 @@ import { primeQueueIsEmpty, primeQueueItems, type PrimeQueue } from '../lib/prim
 import { cn } from '@/lib/utils'
 import { suggestReply } from '../lib/replySuggestions'
 import { useDragRegion } from '../hooks/useDragRegion'
+import { useComposerPromptHistory } from '../hooks/useComposerPromptHistory'
 
 interface AiPanelHeaderProps {
   agentLabel: string
@@ -154,6 +157,7 @@ function ComposerInput({
   commandSkillLabel,
   commandInstantLabel,
   onCommandAction,
+  onBrowsePromptHistory,
 }: {
   disabled: boolean
   entries: VaultEntry[]
@@ -171,6 +175,15 @@ function ComposerInput({
   commandSkillLabel?: string
   commandInstantLabel?: string
   onCommandAction?: (action: CommandMenuAction, nextValue: string) => void
+  onBrowsePromptHistory?: (
+    direction: 'up' | 'down',
+    meta: {
+      value: string
+      selectionStart: number
+      selectionEnd: number
+      suggestionsOpen: boolean
+    },
+  ) => boolean
 }) {
   return (
     <WikilinkChatInput
@@ -190,6 +203,7 @@ function ComposerInput({
       commandSkillLabel={commandSkillLabel}
       commandInstantLabel={commandInstantLabel}
       onCommandAction={onCommandAction}
+      onBrowsePromptHistory={onBrowsePromptHistory}
       editorClassName={cn(
         'max-h-[120px] overflow-y-auto overscroll-contain',
         hasControls && 'min-h-[34px] border-0 px-2 py-1.5 leading-5',
@@ -203,12 +217,14 @@ function ComposerSendButton({
   canSend,
   entries,
   input,
+  inputRef,
   label,
   onSend,
 }: {
   canSend: boolean
   entries: VaultEntry[]
   input: string
+  inputRef?: React.RefObject<HTMLDivElement | null>
   label: string
   onSend: (text: string, references: NoteReference[]) => void
 }) {
@@ -219,7 +235,13 @@ function ComposerSendButton({
       size="icon-sm"
       className="shrink-0 flex items-center justify-center border-none cursor-pointer transition-colors"
       style={composerSendButtonStyle(canSend)}
-      onClick={() => onSend(input, extractInlineWikilinkReferences(input, entries))}
+      onClick={() => {
+        const editor = inputRef?.current
+        const live = editor
+          ? normalizeInlineWikilinkValue(serializeInlineNode(editor))
+          : input
+        onSend(live, extractInlineWikilinkReferences(live, entries))
+      }}
       disabled={!canSend}
       aria-label={label}
       title={label}
@@ -233,9 +255,17 @@ function ComposerSendButton({
 function ComposerStopButton({
   label,
   onStop,
+  entries,
+  input,
+  inputRef,
+  onSteer,
 }: {
   label: string
   onStop: () => void
+  entries?: VaultEntry[]
+  input?: string
+  inputRef?: React.RefObject<HTMLDivElement | null>
+  onSteer?: (text: string, references: NoteReference[]) => void
 }) {
   return (
     <Button
@@ -244,7 +274,22 @@ function ComposerStopButton({
       size="icon-sm"
       className="shrink-0 flex items-center justify-center border-none cursor-pointer transition-colors hover:opacity-90"
       style={composerStopButtonStyle()}
-      onClick={onStop}
+      onClick={() => {
+        // Mid-turn chrome shows Stop when React's draft is empty. Automation
+        // and some paste paths can leave real text in the contenteditable
+        // without syncing React — prefer that text as a steer, not a stop.
+        if (onSteer) {
+          const editor = inputRef?.current
+          const live = editor
+            ? normalizeInlineWikilinkValue(serializeInlineNode(editor))
+            : (input ?? '')
+          if (live.trim().length > 0) {
+            onSteer(live, extractInlineWikilinkReferences(live, entries ?? []))
+            return
+          }
+        }
+        onStop()
+      }}
       aria-label={label}
       title={label}
       data-testid="agent-stop"
@@ -715,6 +760,16 @@ export function AiPanelComposer({
   lastAgentMessage,
 }: AiPanelComposerProps) {
   const t = createTranslator(locale)
+  const { recordSent, browse } = useComposerPromptHistory(onChange)
+  const handleSend = useCallback((text: string, references: NoteReference[]) => {
+    recordSent(text)
+    onSend(text, references)
+  }, [onSend, recordSent])
+  const handleSteer = useCallback((text: string, references: NoteReference[]) => {
+    if (!onSteer) return
+    recordSent(text)
+    onSteer(text, references)
+  }, [onSteer, recordSent])
   // Steering keeps the input live during a turn. Without an onSteer handler the
   // composer locks while streaming, exactly as it did before.
   const canSteer = isActive && typeof onSteer === 'function'
@@ -735,18 +790,28 @@ export function AiPanelComposer({
               canSend
               entries={entries}
               input={input}
+              inputRef={inputRef}
               label={t('ai.panel.steer')}
-              onSend={onSteer}
+              onSend={handleSteer}
             />
           )
-        : <ComposerStopButton label={t('ai.panel.stop')} onStop={onStop} />)
+        : (
+            <ComposerStopButton
+              label={t('ai.panel.stop')}
+              onStop={onStop}
+              {...(canSteer
+                ? { entries, input, inputRef, onSteer: handleSteer }
+                : {})}
+            />
+          ))
     : (
         <ComposerSendButton
           canSend={canSend}
           entries={entries}
           input={input}
+          inputRef={inputRef}
           label={t('ai.panel.send')}
-          onSend={onSend}
+          onSend={handleSend}
         />
       )
 
@@ -851,7 +916,7 @@ export function AiPanelComposer({
             input={input}
             inputRef={inputRef}
             onChange={onChange}
-            onSend={onSend}
+            onSend={handleSend}
             onUnsupportedAiPaste={onUnsupportedAiPaste}
             onImagePaste={onAttachImages}
             unsupportedPasteMessage={t('ai.composer.pasteTextOnly')}
@@ -861,6 +926,7 @@ export function AiPanelComposer({
             commandSkillLabel={commandSkillLabel}
             commandInstantLabel={commandInstantLabel}
             onCommandAction={onCommandAction}
+            onBrowsePromptHistory={browse}
           />
         </div>
         <ComposerControlsRow hasControls={false} sendButton={sendButton} />

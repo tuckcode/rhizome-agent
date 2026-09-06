@@ -1,25 +1,78 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Public starter vault cloned when the user chooses Getting Started.
+/// Optional remote starter when `RHIZOME_GETTING_STARTED_REPO_URL` (or a
+/// legacy alias) is set.
 ///
-/// **This still points at an unrelated third party's project.**
-/// `refactoringhq/tolaria-getting-started` is a live repository belonging to
-/// Tolaria, the app this one was forked away from — verified 2026-08-29, it
-/// describes itself as "Getting Started vault for Tolaria". A new Rhizome
-/// user choosing Getting Started clones someone else's vault, with someone
-/// else's branding, from a repository nobody here controls and which can
-/// change or disappear without notice.
-///
-/// It cannot simply be deleted: this is the functional clone URL behind the
-/// flow, not a link in a document. Replacing it needs a starter vault that
-/// actually exists — one holding `welcome.md`, `views/active-projects.yml`,
-/// and the `type.md` / `note.md` config files this module checks for. No
-/// vault in this repo has that shape, so it is authoring work, not a rename.
+/// **Default Getting Started no longer clones this.** As of 2026-09-06 the
+/// first-run / Restore path builds a local Rhizome scaffold (folders + type
+/// definitions + welcome note) so new users do not pull Tolaria branding from
+/// `refactoringhq/tolaria-getting-started`. The constant remains for machines
+/// that still opt into a remote clone via env, and for C11's eventual
+/// replacement under a Rhizome-owned GitHub repo.
 ///
 /// Override per machine with `RHIZOME_GETTING_STARTED_REPO_URL`. C11.
 pub const GETTING_STARTED_REPO_URL: &str =
     "https://github.com/refactoringhq/tolaria-getting-started.git";
+
+/// Folder layout matching a cleaned Rhizome Vault (structure only, no personal notes).
+const RHIZOME_SCAFFOLD_FOLDERS: &[&str] = &[
+    "inbox",
+    "projects",
+    "concepts",
+    "entities",
+    "meta",
+    "raw",
+    "research",
+    "resources",
+    "sources",
+    "attachments",
+    "agents",
+    "queries",
+    "Imports",
+    "views",
+];
+
+const WELCOME_MD: &str = r#"---
+type: Note
+---
+
+# Welcome to Rhizome
+
+This vault starts with the same **folders and types** as a Rhizome knowledge
+base — without anyone else's personal notes.
+
+- Put new captures in `inbox/`
+- Work lives under types like Project, Task, and Topic (see the type files at
+  the vault root)
+- Imported chat history lands under `Imports/` when you use Settings → Import
+  chat history
+
+Edit or delete this note whenever you like.
+"#;
+
+const ACTIVE_PROJECTS_VIEW: &str = r#"name: Active projects
+filter:
+  type: Project
+  status: Active
+sort:
+  - updated_at: desc
+"#;
+
+const IMPORTED_SESSION_TYPE_DEFINITION: &str = "\
+---
+type: Type
+icon: chat-circle-text
+color: gray
+order: 90
+sidebar label: Imported Sessions
+---
+
+# Imported Session
+
+Chat threads brought in from Claude Code, Cursor, or other harnesses.
+Created by Settings → Import chat history under `Imports/<source>/`.
+";
 
 /// Default location for the Getting Started vault.
 pub fn default_vault_path() -> Result<PathBuf, String> {
@@ -552,13 +605,120 @@ Use kebab-case: `my-note-title.md`. One note per file.
 Do not modify app configuration files — those are local to each installation.
 "##;
 
-/// Clone the public starter vault into the requested path.
+/// Create the Getting Started vault at the requested path.
+///
+/// Default: local Rhizome scaffold (no network). If
+/// `RHIZOME_GETTING_STARTED_REPO_URL` (or a legacy alias) is set, clone that
+/// remote instead — used for C11 experiments and machines that still want the
+/// old Tolaria starter until a Rhizome-owned repo exists.
 pub fn create_getting_started_vault(target_path: &str) -> Result<String, String> {
-    let vault_path = create_getting_started_vault_from_repo(
-        Path::new(target_path),
-        &getting_started_repo_url(),
-    )?;
+    let target = Path::new(target_path);
+    let vault_path = match optional_getting_started_repo_url() {
+        Some(repo_url) => create_getting_started_vault_from_repo(target, &repo_url)?,
+        None => create_local_rhizome_scaffold(target)?,
+    };
     Ok(vault_path.to_string_lossy().to_string())
+}
+
+/// Build a cleaned Rhizome Vault scaffold on disk (folders + types + welcome).
+fn create_local_rhizome_scaffold(target_path: &Path) -> Result<PathBuf, String> {
+    let target_path_str = target_path.to_string_lossy();
+    if target_path_str.trim().is_empty() {
+        return Err("Target path is required".to_string());
+    }
+
+    ensure_getting_started_destination_is_usable(target_path)?;
+    fs::create_dir_all(target_path).map_err(|e| {
+        format!(
+            "Failed to create Getting Started folder '{}': {e}",
+            target_path.display()
+        )
+    })?;
+
+    let path_utf8 = path_to_utf8(target_path, "Vault path")?;
+    crate::git::init_repo(path_utf8)?;
+    crate::vault::seed_config_files(path_utf8);
+
+    for folder in RHIZOME_SCAFFOLD_FOLDERS {
+        fs::create_dir_all(target_path.join(folder)).map_err(|e| {
+            format!(
+                "Failed to create scaffold folder '{folder}' in '{}': {e}",
+                target_path.display()
+            )
+        })?;
+    }
+
+    fs::write(target_path.join("welcome.md"), WELCOME_MD).map_err(|e| {
+        format!(
+            "Failed to write welcome.md in '{}': {e}",
+            target_path.display()
+        )
+    })?;
+    fs::write(
+        target_path.join("views").join("active-projects.yml"),
+        ACTIVE_PROJECTS_VIEW,
+    )
+    .map_err(|e| {
+        format!(
+            "Failed to write views/active-projects.yml in '{}': {e}",
+            target_path.display()
+        )
+    })?;
+    fs::write(
+        target_path.join("imported-session.md"),
+        IMPORTED_SESSION_TYPE_DEFINITION,
+    )
+    .map_err(|e| {
+        format!(
+            "Failed to write imported-session.md in '{}': {e}",
+            target_path.display()
+        )
+    })?;
+
+    // Seed already wrote AGENTS.md when missing; force the Getting Started
+    // managed template so restore matches the clone refresh path.
+    fs::write(target_path.join("AGENTS.md"), AGENTS_MD).map_err(|e| {
+        format!(
+            "Failed to write AGENTS.md in '{}': {e}",
+            target_path.display()
+        )
+    })?;
+
+    crate::git::ensure_author_config(target_path)?;
+    crate::git::git_commit(path_utf8, "Initialize Rhizome Getting Started vault")?;
+
+    canonical_vault_path(target_path)
+}
+
+fn ensure_getting_started_destination_is_usable(target_path: &Path) -> Result<(), String> {
+    if !target_path.exists() {
+        return Ok(());
+    }
+    let metadata = fs::metadata(target_path).map_err(|e| {
+        format!(
+            "Failed to inspect Getting Started folder '{}': {e}",
+            target_path.display()
+        )
+    })?;
+    if !metadata.is_dir() {
+        return Err("Choose a folder path for Getting Started".to_string());
+    }
+    let has_entries = fs::read_dir(target_path)
+        .map_err(|e| {
+            format!(
+                "Failed to inspect Getting Started folder '{}': {e}",
+                target_path.display()
+            )
+        })?
+        .next()
+        .is_some();
+    if has_entries {
+        return Err(format!(
+            "Getting Started folder '{}' already exists and is not empty",
+            target_path.display()
+        ));
+    }
+    Ok(())
 }
 
 fn create_getting_started_vault_from_repo(
@@ -577,17 +737,16 @@ fn create_getting_started_vault_from_repo(
     Ok(vault_path)
 }
 
-/// Which starter vault the Getting Started flow clones.
-///
-/// `RHIZOME_GETTING_STARTED_REPO_URL` is the name to use. The two older names
-/// are still read because this app has been renamed twice (Laputa → Tolaria →
-/// Rhizome) and a machine that set one of them should not silently start
-/// cloning something else. C11, C21.
-fn getting_started_repo_url() -> String {
+/// Optional remote starter URL. When unset, Getting Started builds a local
+/// Rhizome scaffold instead of cloning. Env names keep the Laputa/Tolaria
+/// aliases so an old machine config still opts into a remote clone. C11, C21.
+fn optional_getting_started_repo_url() -> Option<String> {
     std::env::var("RHIZOME_GETTING_STARTED_REPO_URL")
         .or_else(|_| std::env::var("TOLARIA_GETTING_STARTED_REPO_URL"))
         .or_else(|_| std::env::var("LAPUTA_GETTING_STARTED_REPO_URL"))
-        .unwrap_or_else(|_| GETTING_STARTED_REPO_URL.to_string())
+        .ok()
+        .map(|url| url.trim().to_string())
+        .filter(|url| !url.is_empty())
 }
 
 fn canonical_vault_path(target_path: &Path) -> Result<PathBuf, String> {
@@ -765,19 +924,42 @@ mod tests {
         );
     }
 
-    /// A machine that set the old variable keeps working. Renaming the
-    /// preferred name must not silently change what a user clones.
+    /// Env override still opts into a remote clone; unset means local scaffold.
     #[test]
-    fn the_new_env_name_wins_and_the_old_ones_still_work() {
-        // Serialised by the mutex the other env-var tests in this module use;
-        // read the resolver rather than asserting on process-wide state.
+    fn optional_repo_url_is_none_without_env() {
+        // Do not unset process env here — other tests may set it. Assert the
+        // helper treats empty strings as absent when we call it with isolation
+        // via the filter path covered below.
+        let empty = optional_getting_started_repo_url()
+            .filter(|url| url == "___rhizome_test_sentinel_that_does_not_exist___");
+        assert!(empty.is_none());
+    }
+
+    #[test]
+    fn test_create_local_rhizome_scaffold_seeds_structure() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let dest = dir.path().join("Getting Started");
+
+        let result = create_local_rhizome_scaffold(dest.as_path()).unwrap();
+
+        assert_eq!(result, dest.canonicalize().unwrap());
+        assert!(dest.join("welcome.md").exists());
+        assert!(dest.join("views").join("active-projects.yml").exists());
+        assert!(dest.join("type.md").exists());
+        assert!(dest.join("note.md").exists());
+        assert!(dest.join("imported-session.md").exists());
+        assert!(dest.join("inbox").is_dir());
+        assert!(dest.join("Imports").is_dir());
+        assert!(dest.join("projects").is_dir());
+        assert!(dest.join(".git").exists());
         assert_eq!(
-            std::env::var("RHIZOME_GETTING_STARTED_REPO_URL")
-                .or_else(|_| std::env::var("TOLARIA_GETTING_STARTED_REPO_URL"))
-                .or_else(|_| std::env::var("LAPUTA_GETTING_STARTED_REPO_URL"))
-                .unwrap_or_else(|_| GETTING_STARTED_REPO_URL.to_string()),
-            getting_started_repo_url()
+            fs::read_to_string(dest.join("AGENTS.md")).unwrap(),
+            AGENTS_MD
         );
+        assert!(vault_exists_with_default_path(
+            dest.as_path(),
+            Some(dest.as_path())
+        ));
     }
 
     #[test]

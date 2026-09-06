@@ -33,6 +33,19 @@ const DAEMON_HELLO_TIMEOUT: Duration = Duration::from_secs(10);
 /// Prime's own CLI waits 30s for `ensureDaemonRunning` (installed 0.8.0).
 const DAEMON_STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 const TURN_IDLE_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+/// After `agent_end`, Prime may still deliver a queued `follow_up` as a new
+/// agent turn (`set_follow_up_mode` defaults to one-at-a-time). Stopping the
+/// stream at the first `agent_end` drops that reply — Chat showed
+/// "Waiting in this session" then only the first turn's answer (2026-09-06).
+///
+/// When the queue is empty we only wait briefly (race: dequeue already happened
+/// and `agent_start` is in flight). When follow-ups remain, wait longer for the
+/// next turn to start — do not add a multi-second pause to every normal reply.
+// Empty-queue grace must cover the dequeue race: Prime may already have
+// pulled the follow-up out of `get_queue` before `agent_end` is visible here,
+// so a 400ms window dropped live mid-turn replies under load (2026-09-06).
+const FOLLOW_UP_DRAIN_GRACE_EMPTY: Duration = Duration::from_secs(2);
+const FOLLOW_UP_DRAIN_GRACE_QUEUED: Duration = Duration::from_secs(120);
 
 /// Protocol Rhizome speaks. Verified against `prime-agent` 0.7.1, whose
 /// `DAEMON_PROTOCOL_VERSION` is 7 — the first version accepting the command
@@ -1832,18 +1845,48 @@ fn title_candidate(text: &str) -> Option<String> {
 /// Whether a name is still the placeholder Rhizome wrote at creation.
 ///
 /// A name a person chose must never be overwritten — that is the whole reason
-/// rename exists. Only our own `Rhizome · vault · id` is fair game.
+/// rename exists. Only our own `Rhizome · …` placeholders are fair game
+/// (including the older `Rhizome · vault · id` shape).
 pub(crate) fn is_rhizome_placeholder_name(name: &str) -> bool {
     name.starts_with("Rhizome · ")
 }
 
+/// Local clock fragment for a new-session placeholder (`Sep 6 · 3:35p`).
+///
+/// Time goes early in the title so the sessions list is scannable after a
+/// quit/reopen — the meta line alone was not enough for daily drive.
+fn rhizome_session_clock(now: chrono::DateTime<chrono::Local>) -> String {
+    use chrono::{Datelike, Timelike};
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let month = MONTHS
+        .get(now.month0() as usize)
+        .copied()
+        .unwrap_or("???");
+    let (is_pm, hour12) = now.hour12();
+    let meridiem = if is_pm { "p" } else { "a" };
+    format!(
+        "{month} {} · {hour12}:{:02}{meridiem}",
+        now.day(),
+        now.minute()
+    )
+}
+
 /// What Rhizome writes when it creates a session.
 ///
-/// Identifies this client and the vault the session is working in. The id
-/// tail is uniqueness for the daemon, which rejects a name already held by
-/// another live session at the same depth — not a timestamp; the row already
-/// shows one. `primeSessionRowTitles` then leaves a unique name alone.
+/// Time first (local), then vault, then a short id tail so the daemon still
+/// gets a unique name when two chats start in the same minute. First-message
+/// titles and human renames still replace this via `is_rhizome_placeholder_name`.
 fn rhizome_created_session_name(cwd: &Path, session_id: &str) -> String {
+    rhizome_created_session_name_at(cwd, session_id, chrono::Local::now())
+}
+
+fn rhizome_created_session_name_at(
+    cwd: &Path,
+    session_id: &str,
+    now: chrono::DateTime<chrono::Local>,
+) -> String {
     let vault = cwd
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
@@ -1851,7 +1894,8 @@ fn rhizome_created_session_name(cwd: &Path, session_id: &str) -> String {
         .unwrap_or_else(|| "vault".to_string());
     let tail: String = session_id.chars().rev().take(6).collect();
     let suffix: String = tail.chars().rev().collect();
-    format!("Rhizome · {vault} · {suffix}")
+    let when = rhizome_session_clock(now);
+    format!("Rhizome · {when} · {vault} · {suffix}")
 }
 
 /// A rename talks to the daemon about a path the user picked from the list.
@@ -1984,15 +2028,68 @@ fn queue_message(kind: &str, message: &str, images: &[PrimeImageContent]) -> Res
     if trimmed.is_empty() && prompt_images_field(images).is_none() {
         return Err("Cannot queue an empty message".into());
     }
-    with_host_mut(|host| {
+    let command = build_queue_command(kind, trimmed, images);
+    let first = with_host_mut(|host| {
         if !host.is_streaming {
             return Ok(false);
         }
-        let data = host.call(build_queue_command(kind, trimmed, images))?;
+        let data = host.call(command.clone())?;
         if kind == "follow_up" {
             return Ok(data["queued"].as_bool().unwrap_or(false));
         }
         Ok(true)
+    });
+    match first {
+        Err(error) if is_session_input_suspended_error(&error) => {
+            // Stop / abort can leave the pump paused; lift it and try once.
+            resume_session_input_pump();
+            with_host_mut(|host| {
+                if !host.is_streaming {
+                    return Ok(false);
+                }
+                let data = host.call(command)?;
+                if kind == "follow_up" {
+                    return Ok(data["queued"].as_bool().unwrap_or(false));
+                }
+                Ok(true)
+            })
+        }
+        other => other,
+    }
+}
+
+fn is_session_input_suspended_error(error: &str) -> bool {
+    error
+        .to_ascii_lowercase()
+        .contains("queued session input is suspended")
+}
+
+fn prompt_response_is_suspended(response: &serde_json::Value) -> bool {
+    response["success"].as_bool() != Some(true)
+        && is_session_input_suspended_error(&response_error(response, "prompt"))
+}
+
+/// Send `prompt`, lifting a post-abort input-pump suspension once if needed.
+///
+/// Prime's `abort` leaves `_sessionInputPumpSuspended` set. `resume_queue`
+/// clears it. The refusal arrives as `success: false` on the response envelope
+/// (not a socket Err), so callers that only retry on `Err` leave Chat idle but
+/// unable to send — live miss 2026-09-06.
+fn send_prompt_command(prompt_command: serde_json::Value) -> Result<serde_json::Value, String> {
+    let first = with_host_mut(|host| {
+        host.is_streaming = true;
+        host.send_command(prompt_command.clone())
+    })?;
+    if first["success"].as_bool() == Some(true) {
+        return Ok(first);
+    }
+    if !prompt_response_is_suspended(&first) {
+        return Ok(first);
+    }
+    resume_session_input_pump();
+    with_host_mut(|host| {
+        host.is_streaming = true;
+        host.send_command(prompt_command)
     })
 }
 
@@ -2091,6 +2188,13 @@ pub fn abort_turn() -> Result<bool, String> {
     let response = host.send_command(serde_json::json!({ "type": "abort" }))?;
     let ok = response["success"].as_bool().unwrap_or(false);
     host.is_streaming = false;
+    // Drop the lock before resume_queue — that call needs the same host mutex.
+    drop(guard);
+    // `abort` suspends Prime's session input pump. Without this, the next
+    // prompt / follow_up fails with "Cannot admit a session action while
+    // queued session input is suspended." — exactly what Atticus hit when
+    // Stop (or an abort) left Chat looking idle but unable to send.
+    resume_session_input_pump();
     Ok(ok)
 }
 
@@ -2157,8 +2261,7 @@ where
     // Drain any stale events left from a previous turn.
     drain_pending_events();
 
-    let prompt_response = match with_host_mut(|host| {
-        host.is_streaming = true;
+    let prompt_command = {
         let mut command = serde_json::json!({
             "type": "prompt",
             "message": message,
@@ -2166,8 +2269,13 @@ where
         if let Some(images) = images_field.clone() {
             command["images"] = images;
         }
-        host.send_command(command)
-    }) {
+        command
+    };
+
+    // `send_command` returns Ok even when the daemon says success:false.
+    // Stop/`abort` leaves the input pump suspended; that refusal arrives as a
+    // failed response, not a transport Err — so the retry must inspect both.
+    let prompt_response = match send_prompt_command(prompt_command.clone()) {
         Ok(response) => response,
         Err(error) => {
             let _ = with_host_mut(|host| {
@@ -2201,7 +2309,7 @@ where
     // person never typed in (7 of 31 on this machine). Bounded so a long reply
     // does not accumulate a second copy of itself in memory.
     let mut agent_opening = String::new();
-    let outcome = stream_until_agent_end(|json| {
+    let outcome = stream_until_turn_complete(|json| {
         if json["type"].as_str() == Some("message_update")
             && json["assistantMessageEvent"]["type"].as_str() == Some("text_delta")
         {
@@ -2217,6 +2325,10 @@ where
         }
         if json["type"].as_str() == Some("agent_end") {
             provider_error = crate::prime_events::provider_error_from_agent_end(json);
+            // Tell Chat to seal this bubble before any follow-up text lands on
+            // the same stream. Without this, mid-turn interrupts merge into the
+            // first reply and the optimistic queued bubble looks abandoned.
+            emit(AiAgentStreamEvent::TurnBoundary);
         }
         crate::prime_events::dispatch_event(json, &mut emit);
     });
@@ -2361,7 +2473,15 @@ fn drain_pending_events() {
     }
 }
 
-fn stream_until_agent_end(mut on_event: impl FnMut(&serde_json::Value)) -> Result<(), String> {
+/// Stream Prime events until the turn is truly idle — including follow-ups
+/// that run after the first `agent_end`.
+///
+/// Prime's `follow_up` queue drains after the agent finishes. With the default
+/// `one-at-a-time` mode that is a *second* agent turn on the same socket. If we
+/// stop at the first `agent_end`, those events sit unread (or get wiped by
+/// `drain_pending_events` on the next prompt) and Chat never shows the
+/// interrupt the user already saw under "Waiting in this session".
+fn stream_until_turn_complete(mut on_event: impl FnMut(&serde_json::Value)) -> Result<(), String> {
     let rx = {
         let slot = host_slot();
         let guard = slot.host.lock().map_err(poison)?;
@@ -2372,18 +2492,30 @@ fn stream_until_agent_end(mut on_event: impl FnMut(&serde_json::Value)) -> Resul
     };
 
     let deadline = Instant::now() + TURN_IDLE_TIMEOUT;
+    // After an agent_end we wait briefly for a follow-up turn to start.
+    let mut awaiting_follow_up = false;
+    let mut follow_up_grace = FOLLOW_UP_DRAIN_GRACE_EMPTY;
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
             return Err("Prime agent turn timed out".into());
         }
 
+        let wait = if awaiting_follow_up {
+            remaining.min(follow_up_grace)
+        } else {
+            remaining.min(Duration::from_secs(1))
+        };
+
         let line = {
             let rx = rx.lock().map_err(poison)?;
-            match rx.recv_timeout(remaining.min(Duration::from_secs(1))) {
+            match rx.recv_timeout(wait) {
                 Ok(line) => line,
                 Err(RecvTimeoutError::Timeout) => {
-                    // Still within overall deadline; check liveness.
+                    if awaiting_follow_up {
+                        // No follow-up turn started — the queue is done.
+                        return Ok(());
+                    }
                     if !with_host_mut(|h| Ok(h.is_alive())).unwrap_or(false) {
                         return Err("Prime session host process exited during turn".into());
                     }
@@ -2403,9 +2535,20 @@ fn stream_until_agent_end(mut on_event: impl FnMut(&serde_json::Value)) -> Resul
             }
             OutboundLine::Event(json) => {
                 let ty = json["type"].as_str().unwrap_or_default();
+                awaiting_follow_up = false;
                 if ty == "agent_end" {
                     on_event(&json);
-                    return Ok(());
+                    let queue_pending = get_queue().is_ok_and(|q| {
+                        !q.follow_up.is_empty() || !q.steering.is_empty()
+                    });
+                    follow_up_grace = if queue_pending {
+                        FOLLOW_UP_DRAIN_GRACE_QUEUED
+                    } else {
+                        FOLLOW_UP_DRAIN_GRACE_EMPTY
+                    };
+                    // Follow-ups (if any) start after this — keep listening.
+                    awaiting_follow_up = true;
+                    continue;
                 }
                 // Rhizome does not claim the `extension_ui` capability, so the
                 // daemon should never route one of these here. If one arrives
@@ -2837,7 +2980,11 @@ impl PrimeHost {
                 );
             }
             Err(error) => {
-                log::debug!("Prime vault skill not seeded: {error}");
+                // Packaged builds historically omitted cli-call.mjs from
+                // resources/mcp-server, which made every seed fail here and
+                // left agents on a stale skill with no graph path. Warn so
+                // the miss shows up in logs instead of vanishing as debug.
+                log::warn!("Prime vault skill not seeded: {error}");
             }
         }
 
@@ -3615,25 +3762,35 @@ mod tests {
         }
     }
 
-    /// #31. The name has to identify Rhizome *and* be useful. Vault folder
-    /// plus the id tail — the tail is uniqueness for the daemon, taken from
-    /// the end because uuidv7's leading characters are a clock.
+    /// #31 / daily-drive: time first so quit/reopen still shows which chat
+    /// is newest; vault + id tail stay for place and daemon uniqueness.
     #[test]
-    fn created_session_names_identify_rhizome_and_the_vault() {
+    fn created_session_names_lead_with_local_time_then_vault() {
+        use chrono::TimeZone;
+        let noon = chrono::Local
+            .with_ymd_and_hms(2026, 9, 6, 15, 35, 0)
+            .single()
+            .expect("fixed local noon");
         assert_eq!(
-            rhizome_created_session_name(
+            rhizome_created_session_name_at(
                 Path::new("/Users/dtc/Documents/Notes"),
                 "01a0252e-b9d5-71e9-83de-2bce32f65c06",
+                noon,
             ),
-            "Rhizome · Notes · f65c06"
+            "Rhizome · Sep 6 · 3:35p · Notes · f65c06"
         );
     }
 
     #[test]
     fn created_session_names_fall_back_when_the_folder_has_no_name() {
+        use chrono::TimeZone;
+        let morning = chrono::Local
+            .with_ymd_and_hms(2026, 1, 2, 9, 5, 0)
+            .single()
+            .expect("fixed local morning");
         assert_eq!(
-            rhizome_created_session_name(Path::new("/"), "abc123xyz"),
-            "Rhizome · vault · 123xyz"
+            rhizome_created_session_name_at(Path::new("/"), "abc123xyz", morning),
+            "Rhizome · Jan 2 · 9:05a · vault · 123xyz"
         );
     }
 
@@ -4156,10 +4313,8 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    /// #31. A name at create time is what the list later reads back. The
-    /// payload is the contract: Rhizome, the vault, the id tail. The type
-    /// sequence already asserted `set_session_name` is sent; this is the
-    /// half that says *what*.
+    /// #31 / daily-drive. Name at create: time · vault · id tail — scannable
+    /// after quit/reopen, unique for the daemon.
     #[cfg(unix)]
     #[test]
     fn a_new_session_is_named_for_rhizome_and_the_vault() {
@@ -4174,8 +4329,19 @@ mod tests {
             .command("set_session_name")
             .expect("the new session must be named");
         let folder = vault.path().file_name().unwrap().to_string_lossy();
-        let expected = format!("Rhizome · {folder} · sess-a");
-        assert_eq!(command["name"].as_str(), Some(expected.as_str()));
+        let name = command["name"].as_str().expect("name string");
+        assert!(
+            name.starts_with("Rhizome · "),
+            "placeholder prefix for later replace: {name}"
+        );
+        assert!(
+            name.ends_with(&format!(" · {folder} · sess-a")),
+            "vault + id tail: {name}"
+        );
+        assert!(
+            name.contains(" · ") && (name.contains('a') || name.contains('p')),
+            "local clock fragment: {name}"
+        );
         let _ = shutdown_host();
     }
 
@@ -5262,6 +5428,61 @@ mod tests {
         let _ = shutdown_host();
     }
 
+    /// A mid-turn `follow_up` becomes a second agent turn after the first
+    /// `agent_end`. Chat must keep listening — otherwise the interrupt the
+    /// user already saw under "Waiting in this session" never appears as a
+    /// reply (Atticus dogfood 2026-09-06).
+    #[cfg(unix)]
+    #[test]
+    fn prompt_keeps_streaming_through_follow_up_after_first_agent_end() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| {
+            (command["type"].as_str() == Some("prompt")).then(|| {
+                vec![
+                    ok(id, "prompt", serde_json::Value::Null),
+                    session_event(serde_json::json!({ "type": "agent_start" })),
+                    session_event(text_delta("first-turn-done")),
+                    session_event(serde_json::json!({ "type": "agent_end", "messages": [] })),
+                    // Queued follow-up drains after agent_end:
+                    session_event(serde_json::json!({ "type": "agent_start" })),
+                    session_event(text_delta("follow-up-ack")),
+                    session_event(serde_json::json!({ "type": "agent_end", "messages": [] })),
+                ]
+            })
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let mut events = Vec::new();
+        run_prompt_stream(prompt_request(vault.path(), false), |e| events.push(e)).unwrap();
+
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "first-turn-done")),
+            "first turn text missing: {events:?}"
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "follow-up-ack")),
+            "follow-up reply must reach the UI stream: {events:?}"
+        );
+        let boundary_count = events
+            .iter()
+            .filter(|e| matches!(e, AiAgentStreamEvent::TurnBoundary))
+            .count();
+        assert!(
+            boundary_count >= 2,
+            "each agent_end must emit TurnBoundary so Chat can split bubbles: {events:?}"
+        );
+        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
+        assert!(!get_status().is_streaming);
+
+        let _ = shutdown_host();
+    }
+
     #[cfg(unix)]
     #[test]
     fn prompt_rejected_by_the_daemon_emits_error_then_done_and_clears_streaming() {
@@ -5758,6 +5979,108 @@ mod tests {
         let _guard = host_guard();
         let _ = shutdown_host();
         assert!(!abort_turn().unwrap());
+    }
+
+    /// Stop must leave the session able to take the next message. Prime's
+    /// `abort` suspends the input pump; we lift it with `resume_queue`.
+    #[cfg(unix)]
+    #[test]
+    fn abort_resumes_the_session_input_pump() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("abort") => Some(vec![ok(id, "abort", serde_json::json!({}))]),
+            Some("resume_queue") => Some(vec![ok(
+                id,
+                "resume_queue",
+                serde_json::json!({ "error": "No queued work to resume" }),
+            )]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        assert!(abort_turn().unwrap());
+        assert!(
+            daemon.commands().contains(&"resume_queue".to_string()),
+            "abort must resume the pump so the next send is not refused as suspended"
+        );
+
+        let _ = shutdown_host();
+    }
+
+    #[test]
+    fn suspended_input_error_is_detected_by_message() {
+        assert!(is_session_input_suspended_error(
+            "Cannot admit a session action while queued session input is suspended."
+        ));
+        assert!(!is_session_input_suspended_error("session not found"));
+    }
+
+    /// Abort leaves the pump suspended. The daemon answers the next prompt with
+    /// `success: false` (not a socket Err). Retry must call `resume_queue` and
+    /// send again — otherwise Chat looks idle and every Enter fails.
+    #[cfg(unix)]
+    #[test]
+    fn prompt_retries_after_suspended_input_refusal() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let prompt_attempts = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let attempts = std::sync::Arc::clone(&prompt_attempts);
+        let daemon = FakeDaemon::start(move |command, id| match command["type"].as_str() {
+            Some("prompt") => {
+                let n = attempts.fetch_add(1, Ordering::SeqCst);
+                if n == 0 {
+                    Some(vec![failed(
+                        id,
+                        "prompt",
+                        "Cannot admit a session action while queued session input is suspended.",
+                    )])
+                } else {
+                    Some(vec![
+                        ok(id, "prompt", serde_json::Value::Null),
+                        session_event(serde_json::json!({ "type": "agent_start" })),
+                        session_event(text_delta("recovered")),
+                        session_event(serde_json::json!({ "type": "agent_end", "messages": [] })),
+                    ])
+                }
+            }
+            Some("resume_queue") => Some(vec![failed(
+                id,
+                "resume_queue",
+                "No queued work to resume",
+            )]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let mut events = Vec::new();
+        run_prompt_stream(prompt_request(vault.path(), false), |e| events.push(e)).unwrap();
+
+        assert_eq!(
+            prompt_attempts.load(Ordering::SeqCst),
+            2,
+            "first refusal must retry once after resume_queue"
+        );
+        assert!(
+            daemon.commands().contains(&"resume_queue".to_string()),
+            "must lift the pump before the second prompt"
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "recovered")),
+            "events={events:?}"
+        );
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, AiAgentStreamEvent::Error { .. })),
+            "suspended refusal must not surface once resume succeeds: {events:?}"
+        );
+
+        let _ = shutdown_host();
     }
 
     #[test]

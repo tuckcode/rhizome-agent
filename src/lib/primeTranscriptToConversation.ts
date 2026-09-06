@@ -14,6 +14,7 @@
 
 import type { AiAction } from '../components/AiMessage'
 import type { AiAgentMessage } from './aiAgentConversation'
+import { normalizeMessageTimestampMs } from '../utils/messageTimestamp'
 
 /** Mirrors `PrimeTranscriptItem` in `src-tauri/src/prime_sessions.rs`. */
 export type PrimeTranscriptItem =
@@ -186,6 +187,7 @@ export function primeTranscriptToConversation(items: PrimeTranscriptItem[]): AiA
           ...emptyTurn(message.text, item.id ?? `replay-${index++}`),
           // What `fork` branches from. Absent on live turns by necessity.
           primeEntryId: item.id,
+          createdAtMs: normalizeMessageTimestampMs(message.timestamp),
         })
         break
       case 'assistant': {

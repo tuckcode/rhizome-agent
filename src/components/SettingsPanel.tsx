@@ -64,6 +64,7 @@ import { readCelebrationsEnabled } from '../lib/celebration'
 import { GitSettingsSection } from './GitSettingsSection'
 import { PrivacySettingsSection } from './PrivacySettingsSection'
 import { AboutSettingsSection } from './AboutSettingsSection'
+import { SessionImportSettingsSection } from './SessionImportSettingsSection'
 import { SettingsBodyNav } from './SettingsBodyNav'
 import {
   SectionHeading,
@@ -115,6 +116,7 @@ interface SettingsPanelProps {
   onSave: (settings: Settings) => void
   onCopyMcpConfig?: () => void
   vaults?: VaultOption[]
+  activeVaultPath?: string | null
   defaultWorkspacePath?: string | null
   onRemoveVault?: (path: string) => void; onReorderVaults?: (orderedPaths: string[]) => void; onSetDefaultWorkspace?: (path: string) => void; onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
   isGitVault?: boolean
@@ -213,6 +215,7 @@ interface SettingsBodyProps {
   multiWorkspaceEnabled: boolean
   setMultiWorkspaceEnabled: (value: boolean) => void
   vaults: VaultOption[]
+  activeVaultPath?: string | null
   defaultWorkspacePath?: string | null
   onRemoveVault?: (path: string) => void; onReorderVaults?: (orderedPaths: string[]) => void; onSetDefaultWorkspace?: (path: string) => void; onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
   explicitOrganization: boolean
@@ -369,6 +372,7 @@ export function SettingsPanel({
   onSave,
   onCopyMcpConfig,
   vaults = [],
+  activeVaultPath = null,
   defaultWorkspacePath = null,
   onRemoveVault, onReorderVaults, onSetDefaultWorkspace, onUpdateWorkspaceIdentity,
   isGitVault = true,
@@ -393,6 +397,7 @@ export function SettingsPanel({
       onSave={onSave}
       onCopyMcpConfig={onCopyMcpConfig}
       vaults={vaults}
+      activeVaultPath={activeVaultPath}
       defaultWorkspacePath={defaultWorkspacePath}
       {...{ onRemoveVault, onReorderVaults, onSetDefaultWorkspace, onUpdateWorkspaceIdentity }}
       isGitVault={isGitVault}
@@ -426,6 +431,7 @@ function SettingsPanelInner({
   onSave,
   onCopyMcpConfig,
   vaults,
+  activeVaultPath,
   defaultWorkspacePath,
   onRemoveVault, onReorderVaults, onSetDefaultWorkspace, onUpdateWorkspaceIdentity,
   isGitVault,
@@ -581,6 +587,7 @@ function SettingsPanelInner({
           onOpenFeedback={onOpenFeedback}
           onOpenDocs={onOpenDocs}
           vaults={vaults ?? []}
+          activeVaultPath={activeVaultPath}
           defaultWorkspacePath={defaultWorkspacePath}
           {...{ onRemoveVault, onReorderVaults, onSetDefaultWorkspace, onUpdateWorkspaceIdentity }}
           setThemeMode={handleThemeModeChange}
@@ -639,6 +646,7 @@ interface SettingsBodyFromDraftProps {
   onOpenFeedback?: () => void
   onOpenDocs?: () => void
   vaults: VaultOption[]
+  activeVaultPath?: string | null
   defaultWorkspacePath?: string | null
   onRemoveVault?: (path: string) => void; onReorderVaults?: (orderedPaths: string[]) => void; onSetDefaultWorkspace?: (path: string) => void; onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
   setThemeMode: (value: ThemeMode) => void
@@ -661,6 +669,7 @@ function SettingsBodyFromDraft({
   onOpenFeedback,
   onOpenDocs,
   vaults,
+  activeVaultPath,
   defaultWorkspacePath,
   onRemoveVault, onReorderVaults, onSetDefaultWorkspace, onUpdateWorkspaceIdentity,
   setThemeMode,
@@ -725,6 +734,7 @@ function SettingsBodyFromDraft({
       multiWorkspaceEnabled={draft.multiWorkspaceEnabled}
       setMultiWorkspaceEnabled={(value) => updateDraft('multiWorkspaceEnabled', value)}
       vaults={vaults}
+      activeVaultPath={activeVaultPath}
       defaultWorkspacePath={defaultWorkspacePath}
       {...{ onRemoveVault, onReorderVaults, onSetDefaultWorkspace, onUpdateWorkspaceIdentity }}
       explicitOrganization={draft.explicitOrganization}
@@ -918,6 +928,7 @@ function SettingsAgentWorkflowSections({
   setAnalytics,
   onOpenFeedback,
   onOpenDocs,
+  activeVaultPath,
 }: SettingsBodyProps) {
   return (
     <>
@@ -935,6 +946,9 @@ function SettingsAgentWorkflowSections({
           setAiModelProviders={setAiModelProviders}
           onCopyMcpConfig={onCopyMcpConfig}
         />
+        <div className="mt-4">
+          <SessionImportSettingsSection vaultPath={activeVaultPath ?? null} />
+        </div>
       </SettingsSection>
 
       <SettingsSection id={SETTINGS_SECTION_IDS.workflow}>
@@ -1317,7 +1331,13 @@ function AiAgentSettingsSection({
       <SettingsGroup>
         <SettingsRow
           label={t('settings.aiAgents.defaultTarget')}
-          description={renderDefaultAiTargetSummary(selectedTarget, aiAgentsStatus, t)}
+          description={
+            // Daily-drive: Prime is the engine. API models in this menu are a
+            // legacy direct path that skips Prime tools — say that up front.
+            selectedTarget.kind === 'agent' && selectedTarget.agent === 'prime'
+              ? `${renderDefaultAiTargetSummary(selectedTarget, aiAgentsStatus, t)} Keep this on Prime for Chat with vault tools. Pick Claude/Grok/DeepSeek in the Chat model menu — not by switching this to an API model.`
+              : `${renderDefaultAiTargetSummary(selectedTarget, aiAgentsStatus, t)} This API model path skips Prime sessions and vault tools. Switch back to Prime Agent for daily Chat.`
+          }
           controlWidth="wide"
         >
           <SelectControl

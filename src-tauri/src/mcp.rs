@@ -38,10 +38,7 @@ pub(crate) fn mcp_server_dir() -> Result<PathBuf, String> {
     let dev_path = build_time_dev_mcp_server_dir();
     let resource_roots = paths::runtime_resource_roots();
     let candidates = mcp_server_dir_candidates(&dev_path, &resource_roots);
-    if let Some(path) = candidates
-        .iter()
-        .find(|path| mcp_server_dir_has_files(path))
-    {
+    if let Some(path) = pick_mcp_server_dir(&candidates) {
         return Ok(std::fs::canonicalize(path).unwrap_or_else(|_| path.clone()));
     }
 
@@ -53,6 +50,64 @@ pub(crate) fn mcp_server_dir() -> Result<PathBuf, String> {
     Err(format!(
         "mcp-server not found. Searched these paths: {searched}"
     ))
+}
+
+/// Choose among candidate mcp-server dirs.
+///
+/// Preference order (daily-drive / packaging, all platforms):
+/// 1. A dir that has `index.js` **and** `cli-call` (agents need the CLI).
+/// 2. Prefer a **packaged install layout** over the compile-time repo
+///    checkout — otherwise a developer machine's installed app keeps seeding
+///    skills that point at the git tree forever (C69). Layouts:
+///    - macOS: `Something.app/Contents/Resources/mcp-server`
+///    - Windows / Linux Tauri: `…/resources/mcp-server` next to the install
+/// 3. Fall back to any dir that has the server files.
+fn pick_mcp_server_dir(candidates: &[PathBuf]) -> Option<&PathBuf> {
+    let with_files: Vec<&PathBuf> = candidates
+        .iter()
+        .filter(|path| mcp_server_dir_has_files(path))
+        .collect();
+    let with_cli: Vec<&PathBuf> = with_files
+        .iter()
+        .copied()
+        .filter(|path| mcp_server_has_cli_call(path))
+        .collect();
+    let pool = if with_cli.is_empty() {
+        with_files
+    } else {
+        with_cli
+    };
+    pool.iter()
+        .copied()
+        .find(|path| is_packaged_mcp_server(path))
+        .or_else(|| pool.first().copied())
+}
+
+fn mcp_server_has_cli_call(path: &Path) -> bool {
+    path.join("cli-call.mjs").is_file() || path.join("cli-call.js").is_file()
+}
+
+/// True when `path` looks like a shipped app resource dir, not a git checkout.
+fn is_packaged_mcp_server(path: &Path) -> bool {
+    // macOS .app bundle
+    if path.components().any(|component| {
+        component
+            .as_os_str()
+            .to_str()
+            .is_some_and(|name| name.ends_with(".app"))
+    }) {
+        return true;
+    }
+    // Tauri resources on Windows/Linux (and macOS non-bundle layouts):
+    // `…/resources/mcp-server`
+    let mut parts = path.components().rev();
+    let Some(std::path::Component::Normal(mcp)) = parts.next() else {
+        return false;
+    };
+    let Some(std::path::Component::Normal(resources)) = parts.next() else {
+        return false;
+    };
+    mcp == "mcp-server" && resources == "resources"
 }
 
 fn mcp_server_dir_for_registration() -> Result<PathBuf, String> {
@@ -805,6 +860,57 @@ mod tests {
         assert_eq!(candidates[0], dev_path);
         assert_eq!(candidates[1], resource_dir);
         assert!(1 < linux_pos);
+    }
+
+    #[test]
+    fn pick_mcp_server_dir_prefers_app_bundle_when_both_have_cli_call() {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path().join("repo/mcp-server");
+        let app = dir
+            .path()
+            .join("Rhizome Agent.app/Contents/Resources/mcp-server");
+        for path in [&repo, &app] {
+            std::fs::create_dir_all(path).unwrap();
+            std::fs::write(path.join("index.js"), b"x").unwrap();
+            std::fs::write(path.join("ws-bridge.js"), b"x").unwrap();
+            std::fs::write(path.join("cli-call.mjs"), b"x").unwrap();
+        }
+        let candidates = vec![repo.clone(), app.clone()];
+        assert_eq!(pick_mcp_server_dir(&candidates), Some(&app));
+    }
+
+    #[test]
+    fn pick_mcp_server_dir_prefers_windows_resources_layout_over_repo() {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path().join("code/projects/rhizome-agent/mcp-server");
+        // Typical Tauri Windows install: resources next to the exe tree.
+        let installed = dir
+            .path()
+            .join("Program Files/Rhizome Agent/resources/mcp-server");
+        for path in [&repo, &installed] {
+            std::fs::create_dir_all(path).unwrap();
+            std::fs::write(path.join("index.js"), b"x").unwrap();
+            std::fs::write(path.join("ws-bridge.js"), b"x").unwrap();
+            std::fs::write(path.join("cli-call.mjs"), b"x").unwrap();
+        }
+        let candidates = vec![repo.clone(), installed.clone()];
+        assert_eq!(pick_mcp_server_dir(&candidates), Some(&installed));
+    }
+
+    #[test]
+    fn pick_mcp_server_dir_skips_server_without_cli_when_another_has_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let incomplete = dir.path().join("Resources/mcp-server");
+        let complete = dir.path().join("repo/mcp-server");
+        std::fs::create_dir_all(&incomplete).unwrap();
+        std::fs::create_dir_all(&complete).unwrap();
+        for path in [&incomplete, &complete] {
+            std::fs::write(path.join("index.js"), b"x").unwrap();
+            std::fs::write(path.join("ws-bridge.js"), b"x").unwrap();
+        }
+        std::fs::write(complete.join("cli-call.mjs"), b"x").unwrap();
+        let candidates = vec![incomplete, complete.clone()];
+        assert_eq!(pick_mcp_server_dir(&candidates), Some(&complete));
     }
 
     #[test]
