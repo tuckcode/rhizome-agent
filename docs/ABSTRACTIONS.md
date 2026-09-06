@@ -802,7 +802,6 @@ App UI strings are resolved through `src/lib/i18n.ts`, with flat JSON catalogs i
 - `UiLanguagePreference`: `'system' | AppLocale`; persisted settings serialize `system` as `null`
 - `resolveEffectiveLocale()`: maps an explicit preference or system/browser language list to the effective supported locale, including legacy aliases
 - `translate()` / `createTranslator()`: resolve keys with English fallback and simple `{name}` interpolation
-- `scripts/validate-locales.mjs`: asserts every checked-in locale catalog matches the English keyset and stays flat-string-only
 
 `App.tsx` owns the effective locale and passes it to localized app chrome through props. Settings and command-palette language commands call back into `saveSettings`, so UI language changes update the current session without touching vault content or reopening the vault.
 
