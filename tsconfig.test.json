@@ -89,7 +89,6 @@
     "src/hooks/useAppNavigation.test.ts",
     "src/hooks/useAppSave.test.ts",
     "src/hooks/useBulkActions.test.ts",
-    "src/hooks/useClaudeCodeStatus.test.ts",
     "src/hooks/useCommandRegistry.editorFind.test.ts",
     "src/hooks/useCommandRegistry.test.ts",
     "src/hooks/useDeepLinks.ts",

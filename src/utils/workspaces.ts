@@ -102,15 +102,6 @@ export function vaultPathForEntry(entry: Pick<VaultEntry, 'workspace'>, fallback
   return workspacePathForEntry(entry) ?? fallbackVaultPath
 }
 
-export function workspaceLabelForEntry(entry: Pick<VaultEntry, 'workspace'>): string | null {
-  return entry.workspace?.label ?? null
-}
-
-export function workspaceDisplayPrefix(entry: Pick<VaultEntry, 'workspace'>): string | null {
-  const workspace = entry.workspace ?? null
-  return workspace ? `${workspace.label} / ` : null
-}
-
 export function mountedWorkspacePaths(vaults: VaultOption[]): string[] {
   return vaults
     .filter((vault) => vault.available !== false && vault.mounted !== false)

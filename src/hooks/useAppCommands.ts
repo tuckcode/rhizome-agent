@@ -111,8 +111,6 @@ interface AppCommandsConfig {
   selectedAiAgent?: AiAgentId
   onCycleDefaultAiAgent?: () => void
   selectedAiAgentLabel?: string
-  claudeCodeStatus?: string
-  claudeCodeVersion?: string
   onReloadVault?: () => void
   onRepairVault?: () => void
   onReopenAiOnboarding?: () => void

@@ -203,13 +203,6 @@ export function setAiWorkspaceSessionStatus(
   })
 }
 
-export function resetAiWorkspaceSession(sessionId: SessionId): void {
-  publishSessions({
-    ...sessionStore.getSnapshot(),
-    [sessionId]: EMPTY_SESSION,
-  })
-}
-
 export function cloneAiWorkspaceSessionUntilMessage(
   sourceSessionId: SessionId,
   targetSessionId: SessionId,

@@ -190,7 +190,6 @@ function App() {
 }
 
 function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | null }) {
-  const aiWorkspaceWindow = false
   const [selection, setSelection] = useState<SidebarSelection>(DEFAULT_SELECTION)
   const [noteListFilter, setNoteListFilter] = useState<NoteListFilter>('open')
   const [pendingNoteListPdfExportPath, setPendingNoteListPdfExportPath] = useState<string | null>(null)
@@ -210,7 +209,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     selectionRef,
     setSelection: handleSetSelection,
   })
-  const layout = useLayoutPanels(noteWindowParams || aiWorkspaceWindow ? { initialInspectorCollapsed: true } : undefined)
+  const layout = useLayoutPanels(noteWindowParams ? { initialInspectorCollapsed: true } : undefined)
   const { setInspectorCollapsed } = layout
   const visibleNotesRef = useRef<VaultEntry[]>([])
   const multiSelectionCommandRef = useRef<NoteListMultiSelectionCommands | null>(null)
@@ -241,7 +240,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   // guarantee the latest closure is always used).
   const vaultSwitcher = useVaultSwitcher({
     onSwitch: () => {
-      if (noteWindowParams || aiWorkspaceWindow) return
+      if (noteWindowParams) return
       handleSetSelection(DEFAULT_SELECTION)
       notes.closeAllTabs()
     },
@@ -287,11 +286,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     onVaultReady: handleOnboardingVaultReady,
     registerVault: registerVaultSelection,
   }, vaultSwitcher.loaded)
-  const aiAgentsStatus = useAiAgentsStatus({
-    enabled: !aiWorkspaceWindow,
-  })
+  const aiAgentsStatus = useAiAgentsStatus()
   const aiAgentsOnboarding = useAiAgentsOnboarding(
-    onboarding.state.status === 'ready' && !noteWindowParams && !aiWorkspaceWindow,
+    onboarding.state.status === 'ready' && !noteWindowParams,
   )
 
   // Onboarding can briefly own the vault path for a newly created/opened vault
@@ -318,7 +315,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     handleOpenAiSettings,
     handleOpenDockedAiWorkspace,
   } = useAppAiWorkspaceBridge({
-    aiWorkspaceWindow,
+    aiWorkspaceWindow: false,
     openAIChat,
     openChatHome,
     openSettings: dialogs.openSettings,
@@ -356,7 +353,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     resolvedPath,
     settings,
     vaultSwitcherLoaded: vaultSwitcher.loaded,
-    windowMode: Boolean(noteWindowParams) || aiWorkspaceWindow,
+    windowMode: Boolean(noteWindowParams),
   })
   const vaultWorkspaceOrder = useMemo(
     () => vaultSwitcher.allVaults.map((vault) => vault.path),
@@ -379,7 +376,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     onGitSetupPreferenceChange: handleGitSetupPreferenceChange,
     onToast: setToastMessage,
     resolvedPath,
-    windowMode: Boolean(noteWindowParams) || aiWorkspaceWindow,
+    windowMode: Boolean(noteWindowParams),
   })
 
   const vault = useVaultLoader(resolvedPath, graphVaults, multiWorkspaceEnabled ? defaultWorkspacePath : null, folderVaults)
@@ -621,8 +618,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     void refreshGitModifiedFiles()
   }, [markRecentVaultWrite, refreshGitModifiedFiles])
   const handleMissingActiveVault = useCallback(() => {
-    if (!noteWindowParams && !aiWorkspaceWindow && resolvedPath) vault.markVaultUnavailable(resolvedPath)
-  }, [aiWorkspaceWindow, noteWindowParams, resolvedPath, vault])
+    if (!noteWindowParams && resolvedPath) vault.markVaultUnavailable(resolvedPath)
+  }, [noteWindowParams, resolvedPath, vault])
 
   const notes = useNoteActions({
     addEntry: vault.addEntry,
@@ -1307,7 +1304,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   } = useAppWindowControls({
     layout,
     unifiedVaultPanel: chatCentered,
-    windowMode: Boolean(noteWindowParams) || aiWorkspaceWindow,
+    windowMode: Boolean(noteWindowParams),
   })
   const handleChatViewMode = useCallback((mode: typeof viewMode) => {
     if (mode === 'editor-only') handleRailSelectChat()
@@ -1634,7 +1631,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     shouldShowStartupScreen,
   } = useStartupScreenState({
     aiAgentsPromptVisible: aiAgentsOnboarding.showPrompt,
-    isNoteWindow: Boolean(noteWindowParams) || aiWorkspaceWindow,
+    isNoteWindow: Boolean(noteWindowParams),
     onboardingState: onboarding.state,
     runtimeMissingVaultPath,
     selectedVaultPath,
@@ -1647,7 +1644,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const deepLinks = useDeepLinks({
     activeEntry: activeTab?.entry ?? null,
     currentVaultPath: resolvedPath,
-    enabled: !noteWindowParams && !aiWorkspaceWindow,
+    enabled: !noteWindowParams,
     entries: visibleEntries,
     isVaultContentLoading,
     locale: appLocale,
@@ -1892,14 +1889,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         toastMessage={toastMessage}
         vaultSwitcher={vaultSwitcher}
       />
-    )
-  }
-
-  if (aiWorkspaceWindow) {
-    return (
-      <AppPreferencesProvider dateDisplayFormat={dateDisplayFormat}>
-        {aiWorkspaceSurface}
-      </AppPreferencesProvider>
     )
   }
 

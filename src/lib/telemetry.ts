@@ -259,20 +259,13 @@ const FEATURE_DEFAULTS: Record<string, boolean> = {
   chat_primary_shell: true,
 }
 
-let currentReleaseChannel: ReleaseChannel = 'stable'
-
-export function setReleaseChannel(channel: ReleaseChannel): void {
-  currentReleaseChannel = channel
-}
-
-/** Last channel passed to setReleaseChannel (analytics / callers). */
-export function getReleaseChannel(): ReleaseChannel {
-  return currentReleaseChannel
+export function setReleaseChannel(_channel: ReleaseChannel): void {
+  // Callers still announce the channel for analytics; flags no longer key off it.
 }
 
 export function isFeatureEnabled(flagKey: FeatureFlagKey): boolean {
   // PostHog when available; else defaults. Channel is tracked for analytics
-  // via setReleaseChannel/getReleaseChannel but no longer forces flags on.
+  // via setReleaseChannel but no longer forces flags on.
   const fromPosthog = posthogInstance?.isFeatureEnabled(flagKey)
   if (typeof fromPosthog === 'boolean') return fromPosthog
   return (Reflect.get(FEATURE_DEFAULTS, flagKey) as boolean | undefined) ?? false
