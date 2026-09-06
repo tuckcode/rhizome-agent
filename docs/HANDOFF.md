@@ -260,6 +260,12 @@ push is not a release — releases are tagged builds with signed installers.
   vs per-vault; new Settings section vs under the existing AI agents page.
 - ~~**C67-OPEN (2026-09-06): sessions list needs a right-click menu**~~ **RESOLVED 2026-09-06.** Right-click Open / Rename / Archive·Restore / View in Mycelium / Copy path via `PrimeSessionListContextMenu`; Mycelium uses `handleOpenSessionFootprint`.
 - ~~**C68-OPEN (2026-09-06): restore note lock/view.**~~ **RESOLVED 2026-09-06.** Ephemeral per-note lock (default editable); breadcrumb + Cmd+K; BlockNote/CodeMirror read-only when locked. Not vault `editor_mode`.
+- **C69-OPEN (2026-09-06): Linux CI clippy `-D warnings` fails on macOS-only
+  dead code.** `CI / Linux build verification` errors on unused items in
+  `menu_bar_capture.rs` and `should_reopen_main_window` (`lib.rs`), because
+  the only callers are `#[cfg(target_os = "macos")]`. Same 8 errors on
+  unrelated area A/B/C/D PRs; macOS rust-quality clippy is green. Not
+  introduced by Area E. Fix is a cfg-gate, not more IPC deletion.
 
 - **C57-OPEN (2026-08-29): permission mode product choices after Prime fix.** Code shipped: Prime ignores vault-safe prompts and defaults new sessions to power user; Claude Code / Antigravity still enforce stored mode; UI copy is **Limited tools** / Power User. **Awaiting Atticus:** keep CLI agents defaulting to Limited tools (`safe`)? keep the Prime permission toggle hidden? final naming — "Limited tools" vs retaining "Vault Safe" with an honest tooltip.
 
