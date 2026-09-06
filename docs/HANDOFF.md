@@ -89,6 +89,8 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-05 · Claude Opus 5](plans/handoffs/2026-09-05-2145-claude-opus-5-session-import-and-agent-graph.md) — **no agent had ever successfully run a graph query**: the `rhizome_graph_*` tools need `RHIZOME_TOOL_PATH`, and the seeded skill tells the agent to run `cli-call.mjs` from a bash tool, which inherits none of the app's environment. Fixed, and rewrote the skill description so agents discover the graph at all (they were told only about note CRUD). Built the **session-import engine** — ledger, dedup, Claude Code adapter, selection, preview, vault writer — verified on real history: 318 notes written, zero failures, second run wrote nothing. Fixed four UI defects (inverted Connections resize, titlebar stealing the window drag, unresizable chat/editor split, session list sorted by file mtime). **Right-panel layout agreed but unbuilt**; skill change not yet verified with a real agent.
+
 - [2026-09-05 · Claude Opus 5](plans/handoffs/2026-09-05-0920-claude-opus-5-audit-findings.md) — closed the native audit's backlog and verified it in the real app: **C61** (draft survives Graph navigation) and **C63** (one-node graph no longer fills the canvas) confirmed natively; **C64** fixed and weakly confirmed; **C62 fixed on the second attempt** — the first fix was source-reasoned, self-consistent, green, and wrong, and the native retest is what caught it (real cause: a rename left new-note reload protection on the old path, so the reload restored the ghost row). For **C60** found the leading mechanism — the saved window frame is applied twice at launch, and resizing an NSWindow mid-WKWebView-layout desyncs its compositing layer, which fits blank-DOM-but-WebGL-paints and quit-fixes-but-reload-doesn't — and skipped the redundant resize; **mitigated, not proven fixed.** 6003 frontend + 1706 Rust tests, lint, typecheck, clippy, fmt, Codacy all pass.
 - [2026-09-05 · Claude Sonnet 5](plans/handoffs/2026-09-05-0620-claude-sonnet-5-a1-connections-routing.md) — `ConnectionsPanel` gained a controlled `openView` API; the session-footprint chip and status-bar Graph pill now route through it in command-rail mode. 105 focused tests, lint, typecheck, diff-check, handoff:check pass. **Found the real cause of the multi-session native-attach blocker: the debug bundle shares a bundle identifier with the installed app, and single-instance enforcement silently kills the debug process on launch while the installed app is open** — not a Codex attachment quirk as previously assumed. After quitting the installed app (approved), verified Chat/Changes/Graph/Mycelium panel switching in the exact debug bundle is instant with no spinner and flat CPU/memory across 8 rapid toggles — could not reproduce the spinning-wheel hang Atticus saw, which was on the installed app. Precise ten-cycle timing still open. No commit/push.
 - [2026-09-05 · GPT-5](plans/handoffs/2026-09-05-0535-gpt-5-a1-lifecycle-slice.md) — A1’s first slice stops inactive Graph/Mycelium renderers, retains lightweight panel state, removes duplicate rail entries, and fixes narrow-window panel reachability. 126 focused tests, lint, typecheck, detector, and debug build pass; ten-cycle native measurement remains open. No commit/push.
@@ -319,14 +321,10 @@ push is not a release — releases are tagged builds with signed installers.
   prompt. An idle app legitimately has zero sessions, and `prime-agent
   status` agrees.
 
-- **C55-RESOLVED (2026-08-29): the text-only-model warning did not fire when
-  the daemon's `get_state` model omitted `input`.** RPC mode returns `input` on
-  every model; the live daemon often sends id/name only, so
-  `model_accepts_images` stayed `None` and the composer stayed silent. Restored
-  a cached `get_available_models` lookup by provider+id when `get_state` omits
-  `input` (`c423445`). Regression:
-  `status_falls_back_to_the_catalog_when_get_state_omits_input`. Frontend path
-  unchanged (`AiPanel.textOnlyModel.test.tsx` still green).
+- **C55-RESOLVED (2026-08-29, `c423445`): the text-only-model warning stayed
+  silent when the live daemon's `get_state` omitted a model's `input`.** Fixed
+  by falling back to the cached catalogue; regressed by
+  `status_falls_back_to_the_catalog_when_get_state_omits_input`.
 
 - **C54-RESOLVED (2026-08-29): the documented Rust coverage command was
   missing the gate's `--ignore-filename-regex "lib\.rs|main\.rs|menu\.rs"`**,
