@@ -129,6 +129,8 @@ composition doc — do not restate them here.
 | **Does Wiki Graph replace the canvas or feed a side panel** | #39 | **Settled 2026-09-06 (ADR-0170).** Graph and Mycelium sit under Notes in the right column. They no longer replace Chat. #39 (graph as an agent tool vs a place) is still open for the *agent* interface. |
 | **Right panel composition** | — | **Settled 2026-09-06 (ADR-0170), revising 2026-08-25.** Notes is the heavy top half; Graph/Mycelium a resizable sub-panel below; Connections strip gone. Right-hand icon rail still undecided. |
 | **C66 agent profile / instructions in Settings** | chat personality UX | **Agreed, not built 2026-09-06.** How the agent should respond, rules, for whichever agent. Not vault `AGENTS.md`, not the model picker, not tool-allowlist profiles. Awaiting: one vs per-agent; app vs vault. |
+| **C67 sessions-list context menu** | session row actions | **Agreed, not built 2026-09-06.** Same snappy menu as notes; different items, including Mycelium/codebase for that session. [handoff](plans/handoffs/2026-09-06-0338-grok-4-6-lock-and-session-menu.md). |
+| **C68 restore note lock** | accidental edits while reading | **Agreed, not built 2026-09-06.** Lock comes back. **Default stays editable.** Control must be obvious (breadcrumb + Cmd+K). Distinct from raw vs formatted. Same handoff as C67. |
 | **TokenJuice + Switchyard** | later stacked system; not a Rhizome organ | **Wanted 2026-08-26, not started.** Discuss/plan only. TokenJuice-shaped tool-output shrink first (Prime owns what the model sees). Switchyard-shaped model hop second (sidecar behind Prime; halfway house is `set_scoped_models`). Write-up: [`token-routing-and-compression.md`](design/token-routing-and-compression.md). Do not vendor either in this tree. |
 
 **#40** can close against ADR-0168 (Rhizome is a client of Prime, not a second
@@ -157,6 +159,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | #44 | Panels resizable by dragging — **closed 2026-08-29** (Chat sessions `a26eb40`, chat note pane `fe97f99`; Notes + Mycelium list resizable) |
 | #39 | Make the knowledge graph an agent tool, not a place you visit — **B** |
 | #43 | No window-level navigation guard — slip past the link handler strands the app |
+| C68 | Restore note lock/view — **agreed, not built.** Default stays editable; control must be obvious |
 
 **Composer and controls** — strip shipped 2026-08-25; closed on GitHub 2026-08-29
 | | |
@@ -176,6 +179,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | #31 | Name Prime sessions at creation — **closed 2026-08-26** (create-time name + rename from the list) |
 | #49 | Sessions should be named by the model, not by whatever text came first — step 2 shipped in handoff; issue may still be open for remainder |
 | #23 | Sessions are searchable knowledge, not opaque logs — also fed by **session import** plan (§1) |
+| C67 | Sessions list right-click menu (rename / archive / Mycelium codebase) — **agreed, not built** |
 | #42 | Tool cards say "ipython" five times — **closed 2026-08-26** (expandable Tool use group; `%%bash` → command) |
 
 **Memory loop** — the product thesis; least covered by design docs
@@ -235,7 +239,7 @@ Save-to-vault refuse. Prime session jsonl stays out of scope.
 
 ## 3. Open threads (C-numbers)
 
-12 open. Full text in `HANDOFF.md` § Open threads — this is the shape of the
+14 open. Full text in `HANDOFF.md` § Open threads — this is the shape of the
 backlog, not a replacement for it.
 
 - **Blocks other work:** C42 (Windows never launched — #32 sits on top of it),
@@ -259,7 +263,8 @@ backlog, not a replacement for it.
   Started clones an unrelated upstream repo — blocked on GitHub access; #55)
 - **Product decisions pending:** C9 (optional first-run Welcome — ties to
   session import), C10 (spotlight onboarding, spec written and unbuilt), C7
-  (native QA gate for shell waves)
+  (native QA gate for shell waves), **C67** (sessions context menu — agreed),
+  **C68** (note lock — agreed, default editable)
 
 ⚠️ **C-numbers and issue numbers collide and mean different things.** C40 is
 `rhizome_graph_summary`; issue #40 is the harness question. C34 is menu-bar
