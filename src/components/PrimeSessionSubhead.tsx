@@ -111,6 +111,11 @@ export function PrimeSessionSubhead({
       className={cn(
         'flex min-h-[30px] shrink-0 items-center gap-2.5 border-b border-border pr-3',
         'font-mono text-[11px] tracking-[0.03em] text-muted-foreground',
+        // This strip is the window's title bar, so a drag on it has to move
+        // the window. Selectable text wins the gesture instead: the pointer
+        // sweeps a text selection and the window never moves, which leaves a
+        // maximised window with no obvious way to grab it.
+        'select-none',
         // macOS paints overlay traffic lights at x=58 (tauri.conf.json).
         // This strip is ChatHome's title bar, so the inset has to clear
         // them; the 46px rail is already to our left and comes off it.

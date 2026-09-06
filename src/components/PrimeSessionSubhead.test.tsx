@@ -143,4 +143,17 @@ describe('PrimeSessionSubhead', () => {
     expect(screen.getByText('Prime session live')).toBeInTheDocument()
     expect(screen.queryByText(/npm i -g/)).not.toBeInTheDocument()
   })
+
+  /**
+   * This strip is the window's title bar. Selectable text wins a drag against
+   * the drag region, so the pointer sweeps a selection and the window never
+   * moves — leaving a maximised window with no obvious place to grab it.
+   * Reported from use, 2026-09-05.
+   */
+  it('does not let a drag select its text instead of moving the window', () => {
+    const { container } = render(<PrimeSessionSubhead live sessionId="abc123" vaultPath="/vault" />)
+
+    const strip = container.firstElementChild
+    expect(strip).toHaveClass('select-none')
+  })
 })
