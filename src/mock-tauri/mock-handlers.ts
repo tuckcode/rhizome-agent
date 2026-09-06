@@ -497,7 +497,6 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   delete_view_cmd: () => {},
   reload_vault: () => MOCK_ENTRIES,
   reload_vault_entry: (args: { path: string }) => MOCK_ENTRIES.find(e => e.path === args.path) ?? { path: args.path, title: 'Unknown', filename: 'unknown.md', aliases: [], belongsTo: [], relatedTo: [], archived: false, snippet: '', wordCount: 0, fileSize: 0, relationships: {}, outgoingLinks: [], properties: {} },
-  sync_note_title: () => false,
   get_note_content: (args: { path: string }) => MOCK_CONTENT[args.path] ?? '',
   validate_note_content: (args: { path: string; content: string }) => (MOCK_CONTENT[args.path] ?? '') === args.content,
   get_all_content: () => MOCK_CONTENT,
@@ -567,7 +566,6 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     return commits.slice(0, limit)
   },
   get_conflict_files: (): string[] => [],
-  get_conflict_mode: () => 'none',
   check_claude_cli: () => ({ installed: false, version: null }),
   get_ai_agents_status: () => ({
     prime: { installed: true, version: 'mock' },
@@ -602,7 +600,6 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   }),
   check_prime_update: () => null,
   ensure_prime_session_host: () => 'mock-session',
-  shutdown_prime_session_host: () => false,
   prime_session_new_session: () => 'mock-session',
   abort_prime_session_turn: () => false,
   stream_prime_session: () => 'mock-session',
@@ -814,8 +811,6 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     return null
   },
   fork_prime_session: () => ({ sessionId: 'mock-fork', branchedFrom: 'branch point' }),
-  promote_owned_prime_session: () => undefined,
-  complete_owned_prime_session: () => undefined,
   settle_prime_session: () => ({ outcome: 'keep_session_running' }),
   compact_prime_session: () => 12000,
   export_prime_session: ({ sessionPath }: { sessionPath: string }) =>
@@ -829,15 +824,11 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     mockPrimeGoal = { active: false }
     return null
   },
-  which_binary: ({ name }: { name: string }) => ({ found: name === 'mindwalk', path: name === 'mindwalk' ? '/usr/bin/mindwalk' : null }),
-  run_mindwalk_open: ({ path }: { path: string }) => path,
-  bridge_and_open_prime_session: ({ path }: { path: string }) => path,
   start_mindwalk_sidecar: ({ path }: { path?: string } = {}) => ({
     url: 'http://127.0.0.1:18765',
     mode: path ? 'session' : 'overview',
   }),
   stop_mindwalk_sidecar: () => {},
-  bridge_prime_session: ({ path }: { path: string }) => path,
   get_agent_docs_path: () => '/mock/Rhizome/resources/agent-docs',
   get_vault_ai_guidance_status: () => ({ ...mockVaultAiGuidanceStatus }),
   restore_vault_ai_guidance: () => {
@@ -918,11 +909,6 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   rename_note_filename: handleRenameNoteFilename,
   move_note_to_folder: handleMoveNoteToFolder,
   move_note_to_workspace: handleMoveNoteToWorkspace,
-  clone_repo: (args: { url: string; localPath?: string; local_path?: string }) => {
-    const localPath = args.localPath ?? args.local_path ?? ''
-    setMockRemoteState(localPath, true)
-    return `Cloned to ${localPath}`
-  },
   clone_git_repo: (args: { url: string; localPath?: string; local_path?: string }) => {
     const localPath = args.localPath ?? args.local_path ?? ''
     setMockRemoteState(localPath, true)
@@ -932,8 +918,6 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   delete_note: (args: { path: string }) => args.path,
   batch_delete_notes: (args: { paths: string[] }) => args.paths,
   empty_trash: () => [],
-  migrate_is_a_to_type: () => 0,
-  batch_archive_notes: (args: { paths: string[] }) => args.paths.length,
   batch_trash_notes: (args: { paths: string[] }) => args.paths.length,
   search_vault: (args: { query: string; mode: string; excludeFrontmatter?: boolean }) => {
     const q = (args.query ?? '').toLowerCase()

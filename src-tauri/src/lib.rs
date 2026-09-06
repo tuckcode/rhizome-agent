@@ -124,15 +124,6 @@ struct WsBridgeChild(Mutex<Option<RunningBridge>>);
 struct AllowedAssetScopeRoots(Mutex<Vec<PathBuf>>);
 
 #[cfg(desktop)]
-fn log_startup_result(label: &str, result: Result<usize, String>) {
-    match result {
-        Ok(n) if n > 0 => log::info!("{}: {} files", label, n),
-        Err(e) => log::warn!("{}: {}", label, e),
-        _ => {}
-    }
-}
-
-#[cfg(desktop)]
 fn selected_mcp_bridge_vault_paths(vault_list: &vault_list::VaultList) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     if let Some(active_vault) = vault_list
@@ -267,39 +258,6 @@ where
     {
         log::warn!("Failed to start {thread_name}: {e}");
     }
-}
-
-/// Run startup housekeeping on the legacy default vault (migrate legacy frontmatter, seed configs).
-#[cfg(desktop)]
-fn run_startup_tasks_for_vault(vault_path: &Path) {
-    let vp_str = vault_path.to_str().unwrap_or_default();
-    log_startup_result(
-        "Migrated is_a to type on startup",
-        vault::migrate_is_a_to_type(vp_str),
-    );
-    // Seed AGENTS.md and starter type definitions at vault root if missing
-    vault::seed_config_files(vp_str);
-}
-
-#[cfg(desktop)]
-fn spawn_startup_tasks_for_vault_with<F>(vault_path: PathBuf, task: F) -> bool
-where
-    F: FnOnce(PathBuf) + Send + 'static,
-{
-    if !vault_path.is_dir() {
-        return false;
-    }
-
-    spawn_background_task("tolaria-startup-tasks", move || task(vault_path));
-    true
-}
-
-#[cfg(desktop)]
-fn spawn_startup_tasks() {
-    let Some(vault_path) = dirs::home_dir().map(|h| h.join("Laputa")) else {
-        return;
-    };
-    spawn_startup_tasks_for_vault_with(vault_path, |path| run_startup_tasks_for_vault(&path));
 }
 
 #[cfg(desktop)]
@@ -550,7 +508,6 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(desktop)]
     {
-        spawn_startup_tasks();
         spawn_initial_ws_bridge_sync(app);
     }
 
@@ -644,7 +601,6 @@ macro_rules! app_invoke_handler {
             commands::git_file_url,
             commands::git_add_remote,
             commands::get_conflict_files,
-            commands::get_conflict_mode,
             commands::git_resolve_conflict,
             commands::git_commit_conflict_resolution,
             commands::git_discard_file,
@@ -661,7 +617,6 @@ macro_rules! app_invoke_handler {
             commands::get_prime_session_host_status,
             commands::list_prime_running_sessions,
             commands::get_prime_session_stats,
-            commands::get_prime_session_messages,
             commands::list_prime_session_summaries,
             commands::set_prime_session_archived,
             commands::get_prime_model_allow_list,
@@ -676,8 +631,6 @@ macro_rules! app_invoke_handler {
             commands::set_prime_thinking_level,
             commands::get_prime_thinking_levels,
             commands::fork_prime_session,
-            commands::promote_owned_prime_session,
-            commands::complete_owned_prime_session,
             commands::settle_prime_session,
             commands::get_prime_agent_activity,
             commands::manage_prime_heartbeat,
@@ -693,22 +646,16 @@ macro_rules! app_invoke_handler {
             commands::navigate_prime_session_tree,
             commands::cancel_prime_rlm_child,
             commands::compact_prime_session,
-            commands::set_prime_auto_compaction,
             commands::ensure_prime_session_host,
-            commands::shutdown_prime_session_host,
             commands::prime_session_new_session,
             commands::abort_prime_session_turn,
             commands::stream_prime_session,
             commands::list_prime_sessions,
-            commands::which_binary,
-            commands::run_mindwalk_open,
-            commands::bridge_and_open_prime_session,
             commands::get_connected_providers,
             commands::get_prime_provider_status,
             commands::preflight_chat,
             commands::start_mindwalk_sidecar,
             commands::stop_mindwalk_sidecar,
-            commands::bridge_prime_session,
             commands::stream_ai_model,
             commands::save_ai_model_provider_api_key,
             commands::delete_ai_model_provider_api_key,
@@ -717,17 +664,14 @@ macro_rules! app_invoke_handler {
             commands::reload_vault_entry,
             commands::sync_vault_asset_scope_for_window,
             commands::open_vault_file_external,
-            commands::sync_note_title,
             commands::save_image,
             commands::copy_image_to_vault,
             commands::delete_note,
             commands::batch_delete_notes,
             commands::batch_delete_notes_async,
-            commands::migrate_is_a_to_type,
             commands::create_vault_folder,
             commands::rename_vault_folder,
             commands::delete_vault_folder,
-            commands::batch_archive_notes,
             commands::get_settings,
             commands::get_ai_workspace_sessions,
             commands::check_for_app_update,
@@ -781,7 +725,6 @@ macro_rules! app_invoke_handler {
             rhizome_commands::delete_research_format,
             rhizome_jobs::start_rhizome_job,
             rhizome_jobs::cancel_rhizome_job,
-            menu_bar_companion::toggle_menu_bar_companion,
             menu_bar_companion::hide_menu_bar_companion,
             menu_bar_companion::open_main_from_menu_bar_companion
         ]
@@ -953,8 +896,7 @@ mod tests {
 
     #[cfg(desktop)]
     use super::{
-        missing_asset_scope_roots, selected_mcp_bridge_vault_paths,
-        spawn_startup_tasks_for_vault_with, validate_mcp_bridge_vault_path,
+        missing_asset_scope_roots, selected_mcp_bridge_vault_paths, validate_mcp_bridge_vault_path,
     };
     #[cfg(desktop)]
     use crate::vault_list::{VaultEntry, VaultList};
@@ -1019,42 +961,6 @@ mod tests {
         };
 
         assert!(selected_mcp_bridge_vault_paths(&list).is_empty());
-    }
-
-    #[cfg(desktop)]
-    #[test]
-    fn startup_tasks_skip_missing_legacy_vault() {
-        let missing_vault = tempfile::tempdir().unwrap().path().join("missing");
-        let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let called_from_task = called.clone();
-
-        let spawned = spawn_startup_tasks_for_vault_with(missing_vault, move |_| {
-            called_from_task.store(true, std::sync::atomic::Ordering::SeqCst);
-        });
-
-        assert!(!spawned);
-        assert!(!called.load(std::sync::atomic::Ordering::SeqCst));
-    }
-
-    #[cfg(desktop)]
-    #[test]
-    fn startup_tasks_run_in_background() {
-        let dir = tempfile::tempdir().unwrap();
-        let (entered_tx, entered_rx) = std::sync::mpsc::channel();
-        let (release_tx, release_rx) = std::sync::mpsc::channel();
-
-        let spawned = spawn_startup_tasks_for_vault_with(dir.path().to_path_buf(), move |_| {
-            entered_tx.send(()).unwrap();
-            release_rx
-                .recv_timeout(std::time::Duration::from_secs(1))
-                .unwrap();
-        });
-
-        assert!(spawned);
-        entered_rx
-            .recv_timeout(std::time::Duration::from_secs(1))
-            .unwrap();
-        release_tx.send(()).unwrap();
     }
 
     #[cfg(desktop)]

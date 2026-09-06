@@ -504,14 +504,6 @@ pub fn get_prime_session_stats() -> Result<crate::prime_session_host::PrimeSessi
     crate::prime_session_host::get_session_stats()
 }
 
-/// Prime's persisted, post-compaction history for the live session.
-#[cfg(desktop)]
-#[tauri::command]
-pub fn get_prime_session_messages() -> Result<Vec<crate::prime_session_host::PrimeMessage>, String>
-{
-    crate::prime_session_host::get_messages()
-}
-
 /// Compact now. Returns tokens held before compaction when Prime reports it.
 #[cfg(desktop)]
 #[tauri::command]
@@ -521,21 +513,9 @@ pub fn compact_prime_session(custom_instructions: Option<String>) -> Result<Opti
 
 #[cfg(desktop)]
 #[tauri::command]
-pub fn set_prime_auto_compaction(enabled: bool) -> Result<(), String> {
-    crate::prime_session_host::set_auto_compaction(enabled)
-}
-
-#[cfg(desktop)]
-#[tauri::command]
 pub fn ensure_prime_session_host(vault_path: String) -> Result<String, String> {
     let vault_path = expand_tilde(&vault_path).into_owned();
     crate::prime_session_host::ensure_host(&vault_path)
-}
-
-#[cfg(desktop)]
-#[tauri::command]
-pub fn shutdown_prime_session_host() -> Result<bool, String> {
-    crate::prime_session_host::shutdown_host()
 }
 
 #[cfg(desktop)]
@@ -591,12 +571,6 @@ pub fn get_prime_session_host_status() -> Result<(), String> {
 #[cfg(not(desktop))]
 #[tauri::command]
 pub fn ensure_prime_session_host(_vault_path: String) -> Result<String, String> {
-    Err("Prime session host is only available on desktop".into())
-}
-
-#[cfg(not(desktop))]
-#[tauri::command]
-pub fn shutdown_prime_session_host() -> Result<bool, String> {
     Err("Prime session host is only available on desktop".into())
 }
 
@@ -919,20 +893,6 @@ pub fn fork_prime_session(
     crate::prime_session_host::fork(&entry_id)
 }
 
-/// Promote the attached client-owned session to resident background work.
-#[cfg(desktop)]
-#[tauri::command]
-pub fn promote_owned_prime_session() -> Result<(), String> {
-    crate::prime_session_host::promote_owned_session()
-}
-
-/// Stop the attached client-owned session's worker. Transcript stays on disk.
-#[cfg(desktop)]
-#[tauri::command]
-pub fn complete_owned_prime_session() -> Result<(), String> {
-    crate::prime_session_host::complete_owned_session()
-}
-
 /// Settle the attached Prime session, then drop the Rhizome connection.
 ///
 /// The active-close dialog calls this, then hides. Helpers this process
@@ -1008,16 +968,6 @@ pub fn list_prime_sessions() -> Result<Vec<crate::mycelium::PrimeSessionEntry>, 
     crate::mycelium::list_prime_sessions()
 }
 
-#[tauri::command]
-pub fn which_binary(name: String) -> crate::mycelium::WhichBinaryResult {
-    crate::mycelium::which_binary(&name)
-}
-
-#[tauri::command]
-pub fn run_mindwalk_open(path: String) -> Result<String, String> {
-    crate::mycelium::run_mindwalk_open(&path)
-}
-
 /// Read-only connection status for each provider the engine knows about.
 ///
 /// Answers "am I actually connected, and how?" — the question that had no
@@ -1067,14 +1017,4 @@ pub fn start_mindwalk_sidecar(
 #[tauri::command]
 pub fn stop_mindwalk_sidecar() -> Result<(), String> {
     crate::mycelium::stop_mindwalk_sidecar()
-}
-
-#[tauri::command]
-pub fn bridge_prime_session(path: String) -> Result<String, String> {
-    crate::mycelium::bridge_prime_session(&path)
-}
-
-#[tauri::command]
-pub fn bridge_and_open_prime_session(path: String) -> Result<String, String> {
-    crate::mycelium::bridge_and_open_prime_session(&path)
 }

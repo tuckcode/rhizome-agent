@@ -27,7 +27,7 @@ describe('mockHandlers git remote state', () => {
     expect(mockHandlers.create_empty_vault({ targetPath: emptyVaultPath })).toBe(emptyVaultPath)
     expect(mockHandlers.git_remote_status({ vaultPath: emptyVaultPath }).hasRemote).toBe(false)
 
-    expect(mockHandlers.clone_repo({ url: 'https://example.com/repo.git', localPath: clonedVaultPath })).toContain(clonedVaultPath)
+    expect(mockHandlers.clone_git_repo({ url: 'https://example.com/repo.git', localPath: clonedVaultPath })).toContain(clonedVaultPath)
     expect(mockHandlers.git_remote_status({ vaultPath: clonedVaultPath }).hasRemote).toBe(true)
   })
 })
