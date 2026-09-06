@@ -255,19 +255,28 @@ fn rhizome_tool_file_name() -> &'static str {
 }
 
 /// `rhizome-tool` sitting beside `exe`, if it is actually there. Both binaries
-/// come out of the same Cargo build, so in a dev run
-/// (`target/debug/Rhizome` + `target/debug/rhizome-tool`) this resolves.
+/// come out of the same Cargo build, so a dev run
+/// (`target/debug/Rhizome` + `target/debug/rhizome-tool`) resolves, and so does
+/// a packaged build — verified 2026-09-05 at
+/// `/Applications/Rhizome Agent.app/Contents/MacOS/rhizome-tool`.
 ///
-/// **Packaged builds do not ship it yet** — that needs Tauri `externalBin`
-/// packaging (MCP bridge Phase 3, see `docs/HANDOFF.md`). Returning `None`
-/// rather than a wrong guess is what makes the bridge report
-/// "rhizome-tool is not available" instead of failing to spawn a ghost.
+/// The existence check is the whole point. Returning `None` rather than a
+/// plausible guess is what makes a build without the sidecar report
+/// "rhizome-tool is not available" instead of handing `index.js` a path to
+/// nothing — which would send graph queries down its deprecated Python
+/// fallback silently (`docs/CROSS-MODEL-HANDOFF.md` §16).
 fn rhizome_tool_beside(exe: &Path) -> Option<PathBuf> {
     let candidate = exe.parent()?.join(rhizome_tool_file_name());
     candidate.is_file().then_some(candidate)
 }
 
-fn rhizome_tool_path() -> Option<PathBuf> {
+/// The sidecar this build can actually run, if any.
+///
+/// Public because the seeded Prime skill has to put the same path in the shell
+/// command it tells the agent to run: the app's own MCP server gets this in its
+/// environment, but an agent running `cli-call.mjs` from a bash tool inherits
+/// none of that, and every graph query fails without it.
+pub fn rhizome_tool_path() -> Option<PathBuf> {
     rhizome_tool_beside(&std::env::current_exe().ok()?)
 }
 

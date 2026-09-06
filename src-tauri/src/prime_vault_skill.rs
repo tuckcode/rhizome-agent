@@ -118,8 +118,63 @@ fn resolve_cli_call_path() -> Result<PathBuf, String> {
     Ok(cli.canonicalize().unwrap_or(cli))
 }
 
+/// The environment prefix the skill's shell examples carry.
+///
+/// `VAULT_PATH` always; `RHIZOME_TOOL_PATH` only when the sidecar is really
+/// there. The graph tools shell out to that binary and fail closed without it —
+/// an agent following this skill would get "Graph queries need the Rhizome
+/// sidecar" on every graph question, because a bash tool inherits none of the
+/// environment the app gives its own MCP server. Omitted rather than guessed
+/// when it is missing, so a build without the sidecar says so instead of
+/// silently routing through `index.js`'s deprecated Python fallback.
+fn shell_env_prefix(vault_path: &str, rhizome_tool: Option<&Path>) -> String {
+    let vault = format!("VAULT_PATH={}", shell_single_quote(vault_path));
+    match rhizome_tool {
+        Some(tool) => format!(
+            "{vault} RHIZOME_TOOL_PATH={}",
+            shell_single_quote(&tool.display().to_string()),
+        ),
+        None => vault,
+    }
+}
+
+/// Environment for the stdio MCP server declaration.
+///
+/// Same reasoning as [`shell_env_prefix`]: the sidecar path is included only
+/// when the binary exists, so a build without it fails loudly rather than
+/// pointing at nothing.
+fn mcp_stdio_env(vault_path: &str, rhizome_tool: Option<&Path>) -> serde_json::Value {
+    let mut env = serde_json::Map::new();
+    env.insert("VAULT_PATH".into(), serde_json::json!(vault_path));
+    env.insert(
+        "VAULT_PATHS".into(),
+        serde_json::json!(serde_json::to_string(&vec![vault_path])
+            .unwrap_or_else(|_| format!("[\"{vault_path}\"]"))),
+    );
+    if let Some(tool) = rhizome_tool {
+        env.insert(
+            "RHIZOME_TOOL_PATH".into(),
+            serde_json::json!(tool.display().to_string()),
+        );
+    }
+    serde_json::Value::Object(env)
+}
+
 fn skill_markdown(cli_call: &Path, vault_path: &str) -> String {
+    skill_markdown_with_tool(
+        cli_call,
+        vault_path,
+        crate::mcp::rhizome_tool_path().as_deref(),
+    )
+}
+
+fn skill_markdown_with_tool(
+    cli_call: &Path,
+    vault_path: &str,
+    rhizome_tool: Option<&Path>,
+) -> String {
     let cli = cli_call.display();
+    let env_prefix = shell_env_prefix(vault_path, rhizome_tool);
     // r## so embedded "# Idea" / .md" examples do not terminate the raw string.
     format!(
         r##"---
@@ -137,10 +192,10 @@ The active vault root is:
 {vault_path}
 ```
 
-Call tools with the one-shot CLI (always set VAULT_PATH):
+Call tools with the one-shot CLI (keep the environment prefix — the graph tools need it):
 
 ```bash
-VAULT_PATH={vault_path_q} node {cli_q} <toolName> '<jsonArgs>'
+{env_prefix} node {cli_q} <toolName> '<jsonArgs>'
 ```
 
 ## Tools
@@ -179,8 +234,8 @@ When the user wants to **keep** something from chat, write a vault note with `cr
 Example:
 
 ```bash
-VAULT_PATH={vault_path_q} node {cli_q} create_note '{{"path":"inbox/20260809-example.md","content":"---\ntitle: Example\nis_a: Note\n---\n\n# Example\n\nBody here.\n"}}'
-VAULT_PATH={vault_path_q} node {cli_q} open_note '{{"path":"inbox/20260809-example.md"}}'
+{env_prefix} node {cli_q} create_note '{{"path":"inbox/20260809-example.md","content":"---\ntitle: Example\nis_a: Note\n---\n\n# Example\n\nBody here.\n"}}'
+{env_prefix} node {cli_q} open_note '{{"path":"inbox/20260809-example.md"}}'
 ```
 
 ## Rules
@@ -192,7 +247,7 @@ VAULT_PATH={vault_path_q} node {cli_q} open_note '{{"path":"inbox/20260809-examp
 5. Durable knowledge the user wants to keep → `create_note` (or the UI Save to vault control) — not only a chat summary.
 "##,
         vault_path = vault_path,
-        vault_path_q = shell_single_quote(vault_path),
+        env_prefix = env_prefix,
         cli_q = shell_single_quote(&cli.to_string()),
     )
 }
@@ -251,10 +306,7 @@ fn write_mcp_stdio_settings(
         serde_json::json!({
             "command": "node",
             "args": [index_js.to_string_lossy()],
-            "env": {
-                "VAULT_PATH": vault_path,
-                "VAULT_PATHS": serde_json::to_string(&vec![vault_path]).unwrap_or_else(|_| format!("[\"{vault_path}\"]"))
-            }
+            "env": mcp_stdio_env(vault_path, crate::mcp::rhizome_tool_path().as_deref())
         }),
     );
 
@@ -271,6 +323,66 @@ fn write_mcp_stdio_settings(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The graph tools shell out to `rhizome-tool` and fail closed without
+    /// `RHIZOME_TOOL_PATH`. A bash tool inherits none of the environment the
+    /// app gives its own MCP server, so unless the skill's own command carries
+    /// the path, every graph question an agent asks returns "Graph queries need
+    /// the Rhizome sidecar". Verified against the real CLI on 2026-09-05.
+    #[test]
+    fn skill_command_carries_the_sidecar_path_when_it_exists() {
+        let skill = skill_markdown_with_tool(
+            Path::new("/opt/rhizome/mcp-server/cli-call.mjs"),
+            "/vault",
+            Some(Path::new(
+                "/Applications/Rhizome Agent.app/Contents/MacOS/rhizome-tool",
+            )),
+        );
+
+        assert!(skill.contains("RHIZOME_TOOL_PATH="));
+        assert!(skill.contains("/Contents/MacOS/rhizome-tool"));
+        assert!(skill.contains("VAULT_PATH="));
+    }
+
+    /// Omitted rather than guessed: a build with no sidecar must let the tool
+    /// report that it is missing, not hand `index.js` a path to nothing.
+    #[test]
+    fn skill_command_omits_the_sidecar_path_when_it_is_absent() {
+        let skill = skill_markdown_with_tool(
+            Path::new("/opt/rhizome/mcp-server/cli-call.mjs"),
+            "/vault",
+            None,
+        );
+
+        assert!(!skill.contains("RHIZOME_TOOL_PATH"));
+        assert!(skill.contains("VAULT_PATH="));
+    }
+
+    #[test]
+    fn stdio_settings_env_matches_the_same_rule() {
+        let with_tool = mcp_stdio_env("/vault", Some(Path::new("/opt/rhizome-tool")));
+        assert_eq!(with_tool["RHIZOME_TOOL_PATH"], "/opt/rhizome-tool");
+        assert_eq!(with_tool["VAULT_PATH"], "/vault");
+
+        let without = mcp_stdio_env("/vault", None);
+        assert!(without.get("RHIZOME_TOOL_PATH").is_none());
+        assert_eq!(without["VAULT_PATH"], "/vault");
+    }
+
+    /// A path with a space is the normal case on macOS
+    /// (`/Applications/Rhizome Agent.app/...`), so the shell example has to
+    /// quote it or the agent's command splits mid-path.
+    #[test]
+    fn quotes_a_sidecar_path_containing_spaces() {
+        let prefix = shell_env_prefix(
+            "/vault",
+            Some(Path::new(
+                "/Applications/Rhizome Agent.app/Contents/MacOS/rhizome-tool",
+            )),
+        );
+
+        assert!(prefix.contains("'/Applications/Rhizome Agent.app/Contents/MacOS/rhizome-tool'"));
+    }
 
     #[test]
     fn skill_markdown_lists_default_tools_and_promote() {
