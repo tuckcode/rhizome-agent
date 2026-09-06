@@ -29,3 +29,8 @@ Deleted:
 
 Not touched: Claude onboarding/badge UI (area C), e2e/scripts (A),
 Tolaria archive (D), Tauri IPC (E), MCP grok tools (F), dual-shell / #56.
+
+CI on `58637fe`: frontend lint, frontend tests/coverage, and Rust tests
+passed. Linux build verification failed in Clippy on macOS-only
+`menu_bar_capture.rs` / `should_reopen_main_window` — tracked as C69,
+left out of this PR.
