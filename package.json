@@ -22,7 +22,6 @@
     "deadcode": "knip",
     "l10n:translate": "lara-cli translate",
     "l10n:translate:force": "lara-cli translate --force",
-    "l10n:validate": "node scripts/validate-locales.mjs",
     "perf:editor": "node scripts/editor-performance-benchmark.mjs",
     "perf:editor:update": "node scripts/editor-performance-benchmark.mjs --update",
     "preview": "vite preview",
