@@ -22,10 +22,8 @@ fn initialize_empty_vault(vault_dir: &Path, vault_path: &str) -> Result<(), Stri
         .map_err(|e| format!("Failed to create vault directory: {}", e))?;
 
     git::init_repo(vault_path)?;
+    // Note + Portent work types (Project, Operation, …) come from seed_config_files.
     vault::seed_config_files(vault_path);
-    // Portent's type model (Project/Operation/Responsibility/Task/Event/Topic/Person)
-    // is the default vault structure for every new blank vault, not just an opt-in.
-    vault::seed_portent_type_definitions(vault_path)?;
     Ok(())
 }
 

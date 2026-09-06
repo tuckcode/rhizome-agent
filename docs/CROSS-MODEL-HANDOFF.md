@@ -259,11 +259,11 @@ no file, no agent, no user ever writes or reads camelCase. This looks like
 drift from the spec; it isn't.
 
 Also: Portent's 8 canonical types (Project/Operation/Responsibility/Task +
-Event/Note/Topic/Person) are all seeded, just split across two code paths —
-`seed_portent_type_definitions()` in `config_seed.rs` writes 7 (deliberately
-excluding Note, per the comment at line 161), because Rhizome already seeds
-its own Note type unconditionally via `NOTE_TYPE_DEFINITION` on every vault.
-This is a documented, deliberate split, not a missing type.
+Event/Note/Topic/Person) are all seeded on vault open/create —
+`seed_config_files` / repair write Note via `NOTE_TYPE_DEFINITION` and the
+other 7 via the Portent templates (`write_if_missing`). Settings still
+exposes `seed_portent_type_definitions` for older vaults. Updated 2026-09-06
+(was opt-in-only before).
 
 ## 8. Hermes CLI `--source` value must be literally `"tool"`, not a product name
 
