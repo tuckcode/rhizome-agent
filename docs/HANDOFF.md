@@ -89,6 +89,8 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-0338-grok-4-6-lock-and-session-menu.md) — on paper, not built: **C68** restore note lock (default stays **editable**; control must be obvious); **C67** sessions-list context menu like the note one, including Mycelium/codebase. Lock is gone, not hidden. Right-panel stack lives on this branch (`44634d9`, ADR-0170).
+
 - [2026-09-05 · Claude Opus 5](plans/handoffs/2026-09-05-2145-claude-opus-5-session-import-and-agent-graph.md) — **no agent had ever successfully run a graph query**: the `rhizome_graph_*` tools need `RHIZOME_TOOL_PATH`, and the seeded skill tells the agent to run `cli-call.mjs` from a bash tool, which inherits none of the app's environment. Fixed, and rewrote the skill description so agents discover the graph at all (they were told only about note CRUD). Built the **session-import engine** — ledger, dedup, Claude Code adapter, selection, preview, vault writer — verified on real history: 318 notes written, zero failures, second run wrote nothing. Fixed four UI defects (inverted Connections resize, titlebar stealing the window drag, unresizable chat/editor split, session list sorted by file mtime). **Right-panel layout agreed but unbuilt**; skill change not yet verified with a real agent.
 
 - [2026-09-05 · Claude Opus 5](plans/handoffs/2026-09-05-0920-claude-opus-5-audit-findings.md) — closed the native audit's backlog and verified it in the real app: **C61** (draft survives Graph navigation) and **C63** (one-node graph no longer fills the canvas) confirmed natively; **C64** fixed and weakly confirmed; **C62 fixed on the second attempt** — the first fix was source-reasoned, self-consistent, green, and wrong, and the native retest is what caught it (real cause: a rename left new-note reload protection on the old path, so the reload restored the ghost row). For **C60** found the leading mechanism — the saved window frame is applied twice at launch, and resizing an NSWindow mid-WKWebView-layout desyncs its compositing layer, which fits blank-DOM-but-WebGL-paints and quit-fixes-but-reload-doesn't — and skipped the redundant resize; **mitigated, not proven fixed.** 6003 frontend + 1706 Rust tests, lint, typecheck, clippy, fmt, Codacy all pass.
@@ -98,14 +100,7 @@ yours to choose.
 - [2026-09-03 · GPT-5.6 Sol](plans/handoffs/2026-09-03-1605-gpt-5-6-sol-retrieval-provenance.md) — built #25's trustworthy first slice in the worktree: only completed `get_note` calls become deduplicated, one-click `From your vault` links beneath the answer. Browser live-review proves click-through + neutral `release-plan.md` note body; fake model copy says `Mock model`, with no provider login/use. Empty/stalled reads no longer spin forever. Atticus chose Sessions in the Command Rail's middle (below every destination); the rail starts compact, expands as a whole on hover, and can be pinned open (C59 resolved). The macOS traffic-light audit keeps native clearance while removing a browser-only phantom gutter. No commit/push; native acceptance demo remains because Orca returned `runtime_open_timeout`.
 - [2026-09-02 (late) · Claude Opus 5](plans/handoffs/2026-09-02-2200-claude-opus-5-pi-registry-items-7-10.md) — closed items 7–10 in `harness-composition.md`: `bash`-driven package install works (live-tested), subagent/session state is durable + externally observable so a task board is a view not a second store, the registry covers the profiles slice but not extension-UI or catalog, and `pi-hermes-memory` is rejected (default-on, no vault awareness) — do without, borrow only its correction-triggered-capture idea. Filed **C58** (broken symlink on this machine failed 3 Rust tests, blocking the push).
 - [2026-09-02 · Claude Opus 5](plans/handoffs/2026-09-02-2028-claude-opus-5-impeccable-and-pi-registry.md) — **Prime Agent is a distribution of Pi (Earendil), and `pi.dev/packages` already lists ~5,000 installable extensions, skills, prompt templates and themes.** Verified against Prime's own `package.json` (`@earendil-works/pi-agent-core`) and its own `packages.md` ("the **inherited** extension ecosystem"), not a repo note — **search that registry before authoring any composition slice**; filter unchanged, install is CLI-only, packages run with full system access. Four new open questions as items 7–10 in [`harness-composition.md`](design/harness-composition.md). `/impeccable critique` on Settings scored **19/40** and found a **P0 silent data loss** — clicking a colour theme discarded every unsaved edit (`7eff708`) — plus an unconfirmed API-key delete (`56f5aef`) and six section descriptions that rendered nowhere including the telemetry privacy promise (`5b9e118`). Chat's composer advertised three shortcuts that did the opposite or did not exist, **and the existing test asserted the bug** (`44e06ce`). Hermes read at source for terminal / kanban / bots. Corrections: **OpenCode was never a decision** and **the NotebookLM exports are not a source** (both Atticus); Hermes's "Active now" is a 5s poll, not presence; C46 had been fixed a week and left open.
-- [2026-08-29 · Grok 4.6](plans/handoffs/2026-08-29-0205-grok-4-6-prime-limited-tools.md) — Prime sessions always **Power User** (no sandbox; toggle hidden). CLI agents still honor stored vault mode; UI relabelled **Limited tools**. Open product choices tracked as **C57**.
-- [2026-08-29 · Grok 4.6](plans/handoffs/2026-08-29-0158-grok-4-6-live-app-view-plan.md) — #50 plan only (not built): `pnpm live-ui` against the browser app, read + test-bridge steer, developer tooling not an in-app pane; scroll metrics required because `uiAudit` would have missed the missing transcript scroller. Awaiting Atticus. Writeup: [`docs/plans/2026-08-29-live-app-view-plan.md`](plans/2026-08-29-live-app-view-plan.md)
-- [2026-08-29 · Claude Opus 5](plans/handoffs/2026-08-29-0100-claude-opus-5-session-naming.md) — #49 step 2: a session names itself from its first exchange and the name is **stored** through `set_session_name`, so every client reads the same one; a name a person chose is never overwritten; the list stops printing Rhizome's own `Rhizome · vault · id` placeholder as if it were a name, so old sessions read better with no backfill; fixed a full stop inside `0.8` being treated as a sentence break; Mycelium's session picker stopped listing Prime's uuids; Mycelium's Evaluation failure is the `claude` CLI's expired login (`claude login`), not our bug; filed #50 — let the agent see the running app instead of screenshots macOS keeps blocking; Vault Safe / Power User question **answered** in the 02:05 Grok handoff
-- [2026-08-28 (afternoon) · Claude Opus 5](plans/handoffs/2026-08-28-1500-claude-opus-5-note-context.md) — Chat can see the note you have open (it passed nothing before), and any note can be handed to the agent by right-clicking it; both live-verified, the agent naming the note's contents with tools forbidden
-- [2026-08-28 (early) · Claude Opus 5](plans/handoffs/2026-08-28-0300-claude-opus-5-model-allow-list.md) — Nous Portal **confirmed working** through the existing OpenAI-compatible path (200 + `OK` on `hermes-4-405b`), so #45's custom-provider work is not needed for chat; #45 step 1 shipped — persisted chat-model allow-list, editor in Settings → AI agents; fixed the chat transcript having no scroll box (`6c4d91d`, regression from `b9983ad`); C54: the documented Rust coverage command is missing the gate's `--ignore-filename-regex` and fails on a healthy tree
-- [2026-08-28 · Claude Opus 5](plans/handoffs/2026-08-28-0010-claude-opus-5-model-settings-triage.md) — closed #24; specced model settings (#45); corrected a wrong “blocked upstream” call — Rhizome already supports OpenAI-compatible endpoints; filed #48 OmniRoute; Mycelium duplicate entry point still undecided
-- [2026-08-26 · Grok 4.6](plans/handoffs/2026-08-26-1155-grok-4-6-housekeeping.md) — pushed Notes panel / #34 / #31; closed GitHub #27 #29 #31 #34; icon WIP on stash
-- Everything from 2026-08-25 and earlier: individual files still in
+- Everything from 2026-09-02 and earlier: individual files still in
   `docs/plans/handoffs/` (search by date), or for anything before
   2026-08-21, [the archive](plans/handoffs/archive-through-2026-08-20.md) —
   not in date order, search by date or issue number. Pruned from this index
@@ -260,6 +255,15 @@ push is not a release — releases are tagged builds with signed installers.
   allow-lists). Do not store it as Prime `USER.md` / Hermes `SOUL.md` (ADR-0168:
   one memory store, the vault). Still open: one profile vs per-agent; app-wide
   vs per-vault; new Settings section vs under the existing AI agents page.
+- **C67-OPEN (2026-09-06): sessions list needs a right-click menu** like the
+  note list's snappy menu, with session actions (rename, archive, open this
+  run in Mycelium/codebase). Hover icons today; no `onContextMenu`. Capture:
+  [2026-09-06-0338](plans/handoffs/2026-09-06-0338-grok-4-6-lock-and-session-menu.md).
+- **C68-OPEN (2026-09-06): restore note lock/view.** Gone, not hidden. Raw vs
+  formatted is a different toggle and both stay editable. **Default: editable**
+  (Atticus). Lock control must be obvious — breadcrumb beside raw, plus Cmd+K.
+  Do not reuse vault `editor_mode` (`preview` already means BlockNote). Capture:
+  same handoff as C67.
 
 - **C57-OPEN (2026-08-29): permission mode product choices after Prime fix.** Code shipped: Prime ignores vault-safe prompts and defaults new sessions to power user; Claude Code / Antigravity still enforce stored mode; UI copy is **Limited tools** / Power User. **Awaiting Atticus:** keep CLI agents defaulting to Limited tools (`safe`)? keep the Prime permission toggle hidden? final naming — "Limited tools" vs retaining "Vault Safe" with an honest tooltip.
 
@@ -270,58 +274,12 @@ push is not a release — releases are tagged builds with signed installers.
   [plan](plans/2026-08-29-live-app-view-plan.md) ·
   [session](plans/handoffs/2026-08-29-0158-grok-4-6-live-app-view-plan.md).
 
-- **C56-RESOLVED (2026-08-30): both live-daemon defects were the daemon
-  treating a reconnecting Rhizome as a stranger, not a queued-input model
-  Rhizome never spoke.** Root-caused against the installed `prime-agent`
-  0.8.0's own bundled source (`~/.local/lib/node_modules/prime-agent/dist/bundle`),
-  not guesswork:
-
-  - **`live_daemon_round_trip`.** Every session Rhizome creates is
-    `lifecycle: "client_owned"`, scoped to the daemon's per-connection
-    `ownerClientId`. `command_envelope` never sent a `clientId`, so each
-    reconnect got a fresh anonymous one from the daemon and could never see
-    its own prior session again — and separately, `list` only reports the
-    *visible* (non-owned) roster unless the caller passes
-    `includeClientOwned: true`, which `find_resumable_session` never did.
-    Either gap alone was enough to make `ensure_host()` after
-    `shutdown_host()` return an empty session id. Fixed by generating one
-    `clientId` per process (`client_id()`, a `OnceLock<String>`) and sending
-    it on every envelope, adding `includeClientOwned: true` to the `list` in
-    `find_resumable_session`, and making `shutdown()` wait for the daemon's
-    `detach` response (via `send_bare_command` instead of a fire-and-forget
-    `write_raw`) so the very next `list` doesn't race a `detach` the daemon
-    hasn't processed yet and still see `attachedClients: 1`.
-  - **`live_goal_round_trip`.** `send_goal_command` calls
-    `abort_and_wait_for_idle()` to interrupt the goal's own continuation
-    before replacing it; the daemon's `abort` (`requestAbort` internally)
-    suspends the session's input pump as a side effect, and nothing in this
-    module ever lifted that suspension — so the replacement `/goal` right
-    after it was refused with "Cannot admit a session action while queued
-    session input is suspended." `acquire_session_input_pause` /
-    `release_session_input_pause` turned out to be a different, unrelated
-    pause mechanism; the actual counterpart is `resume_queue`, confirmed
-    against the daemon source. `abort_and_wait_for_idle` now calls
-    `resume_session_input_pump()` once the session is confirmed idle, which
-    sends `resume_queue` and tolerates its "No queued work to resume" answer
-    (expected right after an abort — the pump is unsuspended as its side
-    effect regardless of that response).
-
-  Both fixes verified against the live daemon (`prime-agent status`
-  reachable), not just read as "looking right": `live_daemon_round_trip` and
-  `live_goal_round_trip` are green, and `cargo test --lib` is still
-  1704 passed / 0 failed. `live_session_naming` and
-  `live_quit_stops_our_session_by_default_and_keeps_it_when_asked` still fail
-  — the former pre-dates this change (reproduced on a clean checkout before
-  touching anything), the latter is the documented
-  `RHIZOME_TEST_DAEMON_SOCKET` precondition — neither is C56.
-
-  **A third failure looked like a product bug and is not.**
-  `roster_against_the_live_daemon` reports "expected at least one session"
-  while a Rhizome window is open, and a manual `list` over the daemon socket
-  returns `{"sessions":[]}`. That is **#28 working as designed**: a vault
-  attach creates no Prime session, and one is not created until the first
-  prompt. An idle app legitimately has zero sessions, and `prime-agent
-  status` agrees.
+- **C56-RESOLVED (2026-08-30): live-daemon reconnect treated Rhizome as a
+  stranger.** Per-process `clientId` on every envelope, `includeClientOwned`
+  on `list`, `shutdown` waits for `detach`, and `abort_and_wait_for_idle`
+  sends `resume_queue`. Empty roster with a window open is #28 (no session
+  until first prompt), not a bug. Code is the record; this was an index
+  dump.
 
 - **C55-RESOLVED (2026-08-29, `c423445`): the text-only-model warning stayed
   silent when the live daemon's `get_state` omitted a model's `input`.** Fixed
