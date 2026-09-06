@@ -138,6 +138,26 @@ function toolOutputIndicatesFailure({ output }: ToolOutputInspection): boolean {
   return parsed.isError === true || typeof error === 'string' || isRecord(error)
 }
 
+function sealPendingActions(message: AiAgentMessage): AiAgentMessage['actions'] {
+  return message.actions.map((action) => (
+    action.status === 'pending' ? { ...action, status: 'done' as const } : action
+  ))
+}
+
+function findQueuedFollowUpId(
+  messages: AiAgentMessage[],
+  sealedMessageId: string,
+): string | undefined {
+  const sealedIndex = messages.findIndex((message) => message.id === sealedMessageId)
+  const searchFrom = sealedIndex >= 0 ? sealedIndex + 1 : 0
+  return messages.slice(searchFrom).find((message) => (
+    !message.localMarker
+    && !!message.userMessage.trim()
+    && !message.response
+    && (message.queuedFollowUp || !message.isStreaming)
+  ))?.id
+}
+
 export function createStreamCallbacks(context: StreamMutationContext) {
   const {
     messageId,
@@ -155,11 +175,82 @@ export function createStreamCallbacks(context: StreamMutationContext) {
   } = context
   let failureTracked = false
   let streamFailed = false
+  // Retargeted after each Prime TurnBoundary so a queued follow-up owns its
+  // own bubble instead of merging into the first turn's reply.
+  let activeMessageId = messageId
+  let sealedByTurnBoundary = false
+
+  function sealActiveTurn(): void {
+    const sealedText = finalResponseText(responseAccRef.current, agent)
+    const rawResponse = responseAccRef.current
+    const toolCount = toolInputMapRef.current.size
+    const toolNames = Array.from(toolInputMapRef.current.values()).map((t) => t.tool)
+    trackAiAgentResponseCompleted(agent, rawResponse, toolCount, failureTracked)
+    const sealedId = activeMessageId
+    const retarget: { id?: string; userMessage?: string } = {}
+
+    setMessages((current) => {
+      const prior = current.find((message) => message.id === sealedId)
+      retarget.userMessage = prior?.userMessage
+      const sealed = current.map((message) => (
+        message.id === sealedId
+          ? {
+              ...message,
+              isStreaming: false,
+              reasoningDone: true,
+              response: sealedText,
+              actions: sealPendingActions(message),
+            }
+          : message
+      ))
+      retarget.id = findQueuedFollowUpId(sealed, sealedId)
+      if (!retarget.id) return sealed
+      return sealed.map((message) => (
+        message.id === retarget.id
+          ? {
+              ...message,
+              isStreaming: true,
+              queuedFollowUp: undefined,
+            }
+          : message
+      ))
+    })
+
+    if (isSessionAutoDistillEnabled(sessionAutoDistillEnabled)) {
+      void queueSessionAutoDistill({
+        vaultPath,
+        userMessage: retarget.userMessage ?? userMessage,
+        assistantResponse: sealedText,
+        toolNames,
+      }).then((result) => {
+        if (!result.queued || result.redactedCount <= 0) return
+        trackVaultCredentialsHandled('auto_distill', 'redact', result.redactedCount)
+        appendLocalMarker(
+          setMessages,
+          translate(locale, 'ai.marker.credentialsRedactedDistill', {
+            count: result.redactedCount,
+            plural: result.redactedCount === 1 ? '' : 's',
+          }),
+        )
+      }).catch(() => {
+        // best-effort — never block the chat UI on distill failures
+      })
+    }
+
+    responseAccRef.current = ''
+    toolInputMapRef.current = new Map()
+    failureTracked = false
+    if (retarget.id) {
+      activeMessageId = retarget.id
+    }
+    sealedByTurnBoundary = true
+  }
 
   return {
     onThinking: (chunk: string) => {
       if (abortRef.current.aborted) return
-      updateMessage(setMessages, messageId, (message) => ({
+      sealedByTurnBoundary = false
+      updateMessage(setMessages, activeMessageId, (message) => ({
         ...message,
         reasoning: (message.reasoning ?? '') + chunk,
       }))
@@ -167,20 +258,22 @@ export function createStreamCallbacks(context: StreamMutationContext) {
 
     onText: (chunk: string) => {
       if (abortRef.current.aborted) return
-      markReasoningDone(setMessages, messageId)
+      sealedByTurnBoundary = false
+      markReasoningDone(setMessages, activeMessageId)
       responseAccRef.current += chunk
     },
 
     onToolStart: (toolName: string, toolId: string, input?: string) => {
       if (abortRef.current.aborted) return
+      sealedByTurnBoundary = false
 
-      markReasoningDone(setMessages, messageId)
+      markReasoningDone(setMessages, activeMessageId)
       setStatus('tool-executing')
 
       const previous = toolInputMapRef.current.get(toolId)
       toolInputMapRef.current.set(toolId, { tool: toolName, input: input ?? previous?.input })
 
-      updateMessage(setMessages, messageId, (message) => updateToolAction(message, toolName, toolId, input))
+      updateMessage(setMessages, activeMessageId, (message) => updateToolAction(message, toolName, toolId, input))
     },
 
     onToolDone: (toolId: ToolInvocationId, output?: ToolOutputText) => {
@@ -198,7 +291,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
         })
       }
 
-      updateMessage(setMessages, messageId, (message) => ({
+      updateMessage(setMessages, activeMessageId, (message) => ({
         ...message,
         actions: message.actions.map((action) => (
           action.toolId === toolId
@@ -217,7 +310,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       const partial = normalizeAssistantResponseText(responseAccRef.current)
       failureTracked = true
       trackAiAgentResponseFailed(agent, partial, toolInputMapRef.current.size)
-      updateMessage(setMessages, messageId, (message) => ({
+      updateMessage(setMessages, activeMessageId, (message) => ({
         ...message,
         isStreaming: false,
         reasoningDone: true,
@@ -225,7 +318,16 @@ export function createStreamCallbacks(context: StreamMutationContext) {
         actions: message.actions.map((action) => (
           action.status === 'pending' ? { ...action, status: 'error' as const } : action
         )),
+        queuedFollowUp: undefined,
       }))
+    },
+
+    onTurnBoundary: () => {
+      if (abortRef.current.aborted) return
+      if (streamFailed) return
+      sealActiveTurn()
+      // Stay in thinking — a follow-up turn may still be streaming.
+      setStatus('thinking')
     },
 
     onDone: () => {
@@ -233,16 +335,29 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       if (streamFailed) return
 
       setStatus('done')
+      // TurnBoundary already sealed the last agent_end and cleared the
+      // accumulator. Do not invent "finished without returning a reply".
+      if (sealedByTurnBoundary && !responseAccRef.current.trim()) {
+        updateMessage(setMessages, activeMessageId, (message) => ({
+          ...message,
+          isStreaming: false,
+          reasoningDone: true,
+          queuedFollowUp: undefined,
+          actions: sealPendingActions(message),
+        }))
+        fileCallbacksRef.current?.onVaultChanged?.()
+        return
+      }
+
       const finalResponse = finalResponseText(responseAccRef.current, agent)
       trackAiAgentResponseCompleted(agent, responseAccRef.current, toolInputMapRef.current.size, failureTracked)
-      updateMessage(setMessages, messageId, (message) => ({
+      updateMessage(setMessages, activeMessageId, (message) => ({
         ...message,
         isStreaming: false,
         reasoningDone: true,
         response: finalResponse,
-        actions: message.actions.map((action) => (
-          action.status === 'pending' ? { ...action, status: 'done' as const } : action
-        )),
+        queuedFollowUp: undefined,
+        actions: sealPendingActions(message),
       }))
       fileCallbacksRef.current?.onVaultChanged?.()
 

@@ -9,6 +9,7 @@ import { writeClipboardText } from '../utils/clipboardText'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
 import { groupConsecutiveToolActions } from '../lib/groupConsecutiveToolActions'
 import { trackVaultRetrievalSourceOpened } from '../lib/productAnalytics'
+import { formatMessageClock } from '../utils/messageTimestamp'
 
 export interface AiAction {
   tool: string
@@ -33,6 +34,8 @@ export interface AiMessageProps {
   actions: AiAction[]
   response?: string
   isStreaming?: boolean
+  /** When this turn was created (ms). Shown as a small clock under the ask. */
+  createdAtMs?: number
   onFork?: (messageId: string) => void
   onOpenNote?: (path: string) => void
   onNavigateWikilink?: (target: string) => void
@@ -48,6 +51,7 @@ function LocalMarker({ text }: { text: string }) {
       className="mx-auto flex w-full max-w-[85%] flex-col items-center gap-1 text-center font-mono text-[11px] tracking-[0.02em] text-muted-foreground"
       style={{ margin: '12px 0 16px' }}
       data-testid="ai-local-marker"
+      data-no-drag
       role="note"
     >
       <span className="flex w-full items-center gap-2">
@@ -88,13 +92,15 @@ function ReferencePill({ reference, onClick }: {
   )
 }
 
-function UserBubble({ content, references, onOpenNote }: {
+function UserBubble({ content, references, onOpenNote, createdAtMs }: {
   content: string
   references?: NoteReference[]
   onOpenNote?: (path: string) => void
+  createdAtMs?: number
 }) {
+  const clock = typeof createdAtMs === 'number' ? formatMessageClock(createdAtMs) : ''
   return (
-    <div className="flex justify-end" style={{ marginBottom: 8 }}>
+    <div className="flex flex-col items-end" style={{ marginBottom: 8 }}>
       {/*
         Tinted with the accent rather than `--state-hover`, and carrying a
         2px accent rule down its right edge.
@@ -130,6 +136,16 @@ function UserBubble({ content, references, onOpenNote }: {
         )}
         {content}
       </div>
+      {clock ? (
+        <time
+          className="text-muted-foreground"
+          dateTime={new Date(createdAtMs!).toISOString()}
+          data-testid="message-timestamp"
+          style={{ fontSize: 11, marginTop: 4, paddingRight: 2 }}
+        >
+          {clock}
+        </time>
+      ) : null}
     </div>
   )
 }
@@ -476,7 +492,7 @@ export function AiMessage(props: AiMessageProps) {
   return <ConversationMessage {...props} />
 }
 
-function ConversationMessage({ userMessage, references, locale = 'en', messageId, forkTargetId, reasoning, reasoningDone, actions, response, isStreaming, onFork, onOpenNote, onNavigateWikilink, onPromoteToVault, onRegenerate }: AiMessageProps) {
+function ConversationMessage({ userMessage, references, locale = 'en', messageId, forkTargetId, reasoning, reasoningDone, actions, response, isStreaming, createdAtMs, onFork, onOpenNote, onNavigateWikilink, onPromoteToVault, onRegenerate }: AiMessageProps) {
   // Manual override: null = follow auto behavior, true/false = user forced
   const [userOverride, setUserOverride] = useState<boolean | null>(null)
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())
@@ -501,8 +517,18 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
   }, [])
 
   return (
-    <div className="min-w-0 max-w-full" data-testid="ai-message" style={{ marginBottom: 16 }}>
-      <UserBubble content={userMessage} references={references} onOpenNote={onOpenNote} />
+    <div
+      className="min-w-0 max-w-full"
+      data-testid="ai-message"
+      data-no-drag
+      style={{ marginBottom: 16 }}
+    >
+      <UserBubble
+        content={userMessage}
+        references={references}
+        onOpenNote={onOpenNote}
+        createdAtMs={createdAtMs}
+      />
       {reasoning && (
         <ReasoningBlock
           locale={locale}

@@ -23,6 +23,15 @@ function renderControls(overrides: Partial<Parameters<typeof GraphControls>[0]> 
 }
 
 describe('GraphControls', () => {
+  it('anchors bottom-right as a collapsed Find box so the canvas stays visible', () => {
+    renderControls()
+    const controls = screen.getByTestId('graph-controls')
+    expect(controls).toHaveAttribute('data-expanded', 'false')
+    expect(controls.className).toContain('bottom-3')
+    expect(controls.className).toContain('right-3')
+    expect(screen.queryByTestId('graph-type-filters')).not.toBeInTheDocument()
+  })
+
   it('reports typing straight through', () => {
     const props = renderControls()
     fireEvent.change(screen.getByTestId('graph-search'), { target: { value: 'alpha' } })
@@ -40,13 +49,15 @@ describe('GraphControls', () => {
     expect(props.onQueryChange).toHaveBeenCalledWith('')
   })
 
-  it('renders a pill per type and reports toggles', () => {
+  it('expands to reveal type pills on demand', () => {
     const props = renderControls()
+    fireEvent.click(screen.getByTestId('graph-controls-expand'))
+    expect(screen.getByTestId('graph-controls')).toHaveAttribute('data-expanded', 'true')
     fireEvent.click(screen.getByTestId('graph-type-filter-Project'))
     expect(props.onToggleType).toHaveBeenCalledWith('Project')
   })
 
-  it('shows hidden types as off rather than removing them', () => {
+  it('auto-expands when a type filter is already hiding notes', () => {
     // A filter control that hides itself when used leaves no way to undo.
     renderControls({ hiddenTypes: new Set(['Project']) })
     const pill = screen.getByTestId('graph-type-filter-Project')
@@ -57,17 +68,17 @@ describe('GraphControls', () => {
   })
 
   it('labels the untyped bucket instead of rendering a blank pill', () => {
-    renderControls({ types: ['', 'Project'] })
+    renderControls({ types: ['', 'Project'], defaultExpanded: true })
     expect(screen.getByTestId('graph-type-filter-untyped').textContent).toContain('Untyped')
   })
 
   it('offers a ghost toggle only when ghosts exist', () => {
-    renderControls({ ghostCount: 0 })
+    renderControls({ ghostCount: 0, defaultExpanded: true })
     expect(screen.queryByTestId('graph-type-filter-ghosts')).not.toBeInTheDocument()
   })
 
   it('toggles ghosts when there are some', () => {
-    const props = renderControls({ ghostCount: 3 })
+    const props = renderControls({ ghostCount: 3, defaultExpanded: true })
     fireEvent.click(screen.getByTestId('graph-type-filter-ghosts'))
     expect(props.onToggleGhosts).toHaveBeenCalled()
   })
@@ -86,7 +97,8 @@ describe('GraphControls', () => {
   it('hides the whole filter row when there is only one type and no ghosts', () => {
     // Filtering a single-type graph does nothing useful; the row would be
     // pure noise on a small vault.
-    renderControls({ types: ['Note'], ghostCount: 0 })
+    renderControls({ types: ['Note'], ghostCount: 0, defaultExpanded: true })
     expect(screen.queryByTestId('graph-type-filters')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('graph-controls-expand')).not.toBeInTheDocument()
   })
 })

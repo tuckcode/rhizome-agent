@@ -505,4 +505,61 @@ describe('aiAgentStreamCallbacks', () => {
     const marker = messages.getMessages().find((message) => message.localMarker)
     expect(marker?.localMarker).toBe('Removed 2 credentials before saving this turn to the wiki')
   })
+
+  it('seals the first turn and streams the follow-up into its own bubble', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'First ask',
+        actions: [],
+        isStreaming: true,
+      },
+      {
+        id: 'msg-follow',
+        userMessage: 'MIDTURN_QUEUE_PROBE',
+        actions: [],
+        queuedFollowUp: true,
+      },
+    ])
+    const status = createStatusStore()
+    const responseAccRef = { current: '' }
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: status.setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef,
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+
+    callbacks.onText('first-turn-done')
+    callbacks.onTurnBoundary()
+    expect(status.getStatus()).toBe('thinking')
+    expect(messages.getMessages()[0]).toMatchObject({
+      id: 'msg-1',
+      response: 'first-turn-done',
+      isStreaming: false,
+    })
+    expect(messages.getMessages()[1]).toMatchObject({
+      id: 'msg-follow',
+      isStreaming: true,
+    })
+    expect(messages.getMessages()[1].queuedFollowUp).toBeUndefined()
+    expect(responseAccRef.current).toBe('')
+
+    callbacks.onText('follow-up-ack')
+    callbacks.onTurnBoundary()
+    callbacks.onDone()
+
+    expect(status.getStatus()).toBe('done')
+    expect(messages.getMessages()[1]).toMatchObject({
+      id: 'msg-follow',
+      response: 'follow-up-ack',
+      isStreaming: false,
+    })
+    expect(messages.getMessages()[0].response).toBe('first-turn-done')
+  })
 })

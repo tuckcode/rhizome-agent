@@ -37,6 +37,23 @@ describe('primeTranscriptToConversation', () => {
     expect(turns[1].response).toBe('second answer')
   })
 
+  it('carries Prime message timestamps onto turns as createdAtMs (C70)', () => {
+    const ms = new Date(2026, 8, 6, 15, 35, 0).getTime()
+    const turns = primeTranscriptToConversation([
+      {
+        kind: 'message',
+        id: 'u-ts',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'when?' }],
+          text: 'when?',
+          timestamp: ms,
+        },
+      },
+    ])
+    expect(turns[0]?.createdAtMs).toBe(ms)
+  })
+
   /** Frame A shows tool cards in the transcript; prose-only replay loses them. */
   it('rebuilds tool cards from the unwrapped tools, with the path when there is one', () => {
     const turns = primeTranscriptToConversation([

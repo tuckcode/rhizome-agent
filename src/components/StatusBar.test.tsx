@@ -460,7 +460,7 @@ describe('StatusBar', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Switch vault' }))
-    expect(screen.getByText('Clone Getting Started Vault')).toBeInTheDocument()
+    expect(screen.getByText('Create Getting Started Vault')).toBeInTheDocument()
   })
 
   it('calls onCloneGettingStarted when clicking the vault menu action', () => {
@@ -476,7 +476,7 @@ describe('StatusBar', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Switch vault' }))
-    fireEvent.click(screen.getByText('Clone Getting Started Vault'))
+    fireEvent.click(screen.getByText('Create Getting Started Vault'))
     expect(onCloneGettingStarted).toHaveBeenCalledOnce()
   })
 

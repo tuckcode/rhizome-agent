@@ -107,3 +107,13 @@ pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis
 ```
 
 Output under `src-tauri\target\x86_64-pc-windows-msvc\release\bundle\nsis\`.
+
+## Vault tools in a packaged Windows build (C69)
+
+`pnpm tauri build` runs `pnpm bundle-mcp`, which must put `cli-call.mjs`
+next to `index.js` under the app’s `resources/mcp-server/`. Without it,
+skill seeding fails and graph/vault tools stay broken for agents — same
+bug as macOS. The installer must ship `rhizome-tool.exe` beside the main
+exe so `RHIZOME_TOOL_PATH` can be embedded in the seeded skill. Prefer the
+packaged `resources/mcp-server` over a leftover git checkout on the same
+machine (`pick_mcp_server_dir`). Unverified on a real Windows box (C42).

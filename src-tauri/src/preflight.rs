@@ -258,6 +258,7 @@ const PROVIDER_ENV_VARS: &[(&str, &str)] = &[
     ("google", "GEMINI_API_KEY"),
     ("groq", "GROQ_API_KEY"),
     ("deepseek", "DEEPSEEK_API_KEY"),
+    ("nous-portal", "NOUS_API_KEY"),
     ("mistral", "MISTRAL_API_KEY"),
     ("cerebras", "CEREBRAS_API_KEY"),
     ("prime-inference", "PRIME_API_KEY"),
@@ -321,10 +322,17 @@ fn providers_from_auth_file() -> Vec<String> {
     let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&raw) else {
         return Vec::new();
     };
-    parsed
-        .as_object()
-        .map(|entries| entries.keys().cloned().collect())
-        .unwrap_or_default()
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_millis() as i64)
+        .unwrap_or(0);
+    // Expired OAuth used to count as "connected", so Chat preflight stayed green
+    // while every turn failed. Settings already showed Expired; Chat must too.
+    provider_status_from_auth(&parsed, now_ms)
+        .into_iter()
+        .filter(|status| !status.expired)
+        .map(|status| status.name)
+        .collect()
 }
 
 pub fn run(vault_path: &Path, provider: &str, connected: &[String]) -> Preflight {
@@ -557,6 +565,39 @@ mod tests {
         let anthropic = statuses.iter().find(|s| s.name == "anthropic").unwrap();
         assert!(xai.expired, "expiry 500 is in the past at now=1000");
         assert!(!anthropic.expired, "expiry 2000 is still in the future");
+    }
+
+    /// Chat preflight only saw provider *names*, so Expired OAuth still looked
+    /// connected and every turn failed with no banner.
+    #[test]
+    fn expired_oauth_is_dropped_from_the_connected_name_list() {
+        let live: Vec<String> = provider_status_from_auth(&auth_fixture(), 1_000)
+            .into_iter()
+            .filter(|status| !status.expired)
+            .map(|status| status.name)
+            .collect();
+        assert!(live.contains(&"opencode".to_string()));
+        assert!(live.contains(&"anthropic".to_string()));
+        assert!(
+            !live.contains(&"xai".to_string()),
+            "expired xai must not pass Chat preflight as connected"
+        );
+        assert_eq!(
+            check_provider_connected("xai", &live),
+            CheckResult::failed(
+                "Not connected to xai",
+                "Rhizome has no credentials for xai. Connect it, or pick a model from a \
+                 provider you have already signed in to."
+            )
+        );
+    }
+
+    #[test]
+    fn nous_portal_key_in_the_environment_counts_as_connected() {
+        let found = providers_from_environment_with_lookup(|name| {
+            (name.as_str() == "NOUS_API_KEY").then(|| "nous-live".to_string())
+        });
+        assert_eq!(found, vec!["nous-portal".to_string()]);
     }
 
     #[test]

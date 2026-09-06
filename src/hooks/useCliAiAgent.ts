@@ -9,6 +9,7 @@ import type { NoteReference } from '../utils/ai-context'
 import {
   type AgentStatus,
   type AiAgentMessage,
+  appendQueuedFollowUpMessage,
 } from '../lib/aiAgentConversation'
 import type { AgentFileCallbacks } from '../lib/aiAgentFileOperations'
 import {
@@ -188,15 +189,39 @@ export function useCliAiAgent(
     addAgentLocalMarker(runtime, text)
   }
 
+  function appendQueuedFollowUp(text: string): void {
+    appendQueuedFollowUpMessage(runtime.setMessages, text)
+  }
+
   /**
    * Replace the whole conversation, for rehydrating a switched-to session.
    *
    * Deliberately a replace rather than an append: the panel is now showing a
    * different session, and merging two conversations would attribute one
    * session's turns to another.
+   *
+   * While a turn is live, keep optimistic mid-turn follow-up bubbles that the
+   * disk transcript has not caught up to yet — otherwise a rehydrate race
+   * makes Chat look like it ignored the interrupt (Atticus 2026-09-06).
    */
   function replaceMessages(next: AiAgentMessage[]): void {
-    runtime.setMessages(next)
+    const status = runtime.statusRef.current
+    const turnLive = status === 'thinking' || status === 'tool-executing'
+    if (!turnLive) {
+      runtime.setMessages(next)
+      return
+    }
+    runtime.setMessages((current) => {
+      const preserved = current.filter((message) => (
+        !!message.queuedFollowUp
+        && !message.localMarker
+        && !!message.userMessage.trim()
+        && !next.some((candidate) => (
+          candidate.userMessage.trim() === message.userMessage.trim()
+        ))
+      ))
+      return preserved.length === 0 ? next : [...next, ...preserved]
+    })
   }
 
   return {
@@ -207,6 +232,7 @@ export function useCliAiAgent(
     regenerateMessage,
     clearConversation,
     addLocalMarker,
+    appendQueuedFollowUp,
     replaceMessages,
   }
 }

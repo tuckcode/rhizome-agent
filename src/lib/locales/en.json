@@ -912,7 +912,7 @@
   "status.vault.createEmpty": "Create empty vault",
   "status.vault.openLocal": "Open local folder",
   "status.vault.cloneGit": "Clone Git repo",
-  "status.vault.cloneGettingStarted": "Clone Getting Started Vault",
+  "status.vault.cloneGettingStarted": "Create Getting Started Vault",
   "status.vault.availableHeader": "Available vaults",
   "status.vault.manageWorkspaces": "Manage vaults",
   "status.vault.includeWorkspace": "Include {label} in the unified graph",

@@ -88,6 +88,19 @@ interface InlineWikilinkInputProps {
   commandSkillLabel?: string
   commandInstantLabel?: string
   onCommandAction?: (action: CommandMenuAction, nextValue: string) => void
+  /**
+   * Up/Down recall of previously sent Ask-box text (C71). Only when caret is
+   * at the start (or the box is empty) and no suggestion menu is open.
+   */
+  onBrowsePromptHistory?: (
+    direction: 'up' | 'down',
+    meta: {
+      value: string
+      selectionStart: number
+      selectionEnd: number
+      suggestionsOpen: boolean
+    },
+  ) => boolean
 }
 
 function collapseSelectionRange(nextSelectionIndex: number) {
@@ -249,6 +262,7 @@ export function InlineWikilinkInput({
   commandSkillLabel = 'Skill',
   commandInstantLabel = 'Command',
   onCommandAction,
+  onBrowsePromptHistory,
 }: InlineWikilinkInputProps) {
   const [renderVersion, forceRender] = useState(0)
   const isComposingRef = useRef(false)
@@ -313,7 +327,6 @@ export function InlineWikilinkInput({
   const selectedCommandIndex = commandMenuOpen
     ? Math.min(commandIndex, commandMatches.length - 1)
     : 0
-  const references = useMemo(() => extractInlineWikilinkReferences(value, entries), [entries, value])
   const {
     suggestions,
     selectedSuggestionIndex,
@@ -603,8 +616,24 @@ export function InlineWikilinkInput({
     pendingCompositionInputRef.current = false
     syncValueFromEditor()
   }
-  const submitValue = () =>
-    submitInlineValue({ onSubmit, submitOnEmpty, value, references })
+  const submitValue = () => {
+    const editor = editorRef.current
+    const liveValue = editor
+      ? normalizeInlineWikilinkValue(serializeInlineNode(editor))
+      : normalizeInlineWikilinkValue(value)
+    // Computer-use and some paste paths update the contenteditable without an
+    // `input` event, so React's draft can be empty while the box shows text.
+    // Enter must send what is on screen, not the stale controlled value.
+    if (liveValue !== value) {
+      onChange(liveValue)
+    }
+    submitInlineValue({
+      onSubmit,
+      submitOnEmpty,
+      value: liveValue,
+      references: extractInlineWikilinkReferences(liveValue, entries),
+    })
+  }
   const selectCommand = (index: number) => {
     const entry = commandMatches[index]
     if (!entry || commandDisabled?.[entry.slash]) return
@@ -633,11 +662,38 @@ export function InlineWikilinkInput({
       return
     }
 
+    const suggestionsOpen = commandMenuOpen || suggestions.length > 0
+    if (
+      !disabled
+      && onBrowsePromptHistory
+      && (event.key === 'ArrowUp' || event.key === 'ArrowDown')
+      && !event.altKey
+      && !event.ctrlKey
+      && !event.metaKey
+      && !isComposingRef.current
+      && !event.nativeEvent.isComposing
+    ) {
+      // Suggestion menus own ArrowUp/Down while open — do not steal them.
+      const handled = onBrowsePromptHistory(
+        event.key === 'ArrowUp' ? 'up' : 'down',
+        {
+          value,
+          selectionStart: selectionRange.start,
+          selectionEnd: selectionRange.end,
+          suggestionsOpen,
+        },
+      )
+      if (handled) {
+        event.preventDefault()
+        return
+      }
+    }
+
     handleInlineWikilinkKeyDown({
       event,
       disabled,
       isComposing: isComposingRef.current,
-      suggestionsOpen: commandMenuOpen || suggestions.length > 0,
+      suggestionsOpen,
       onCycleSuggestions: commandMenuOpen
         ? (direction) => {
             setCommandState((current) => {
