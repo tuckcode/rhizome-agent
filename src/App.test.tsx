@@ -639,23 +639,22 @@ describe('App', () => {
     const input = await screen.findByTestId('agent-input')
     input.textContent = 'Keep this unsent draft'
     fireEvent.input(input)
-    fireEvent.click(screen.getByRole('button', { name: 'Connections' }))
     fireEvent.click(screen.getByRole('button', { name: 'Expand connections' }))
     await screen.findByTestId('graph-view')
-    fireEvent.click(screen.getByRole('button', { name: 'Close connections' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Return to side panel' }))
     expect(await screen.findByTestId('agent-input')).toHaveTextContent('Keep this unsent draft')
   })
 
-  it('leaves the graph and displays the note when Open note is clicked', async () => {
+  it('leaves the expanded graph overlay and displays the note when Open note is clicked', async () => {
     localStorage.setItem('rhizome:command-rail-expanded', '1')
     render(<App />)
     await screen.findByTestId('chat-home')
-    fireEvent.click(screen.getByRole('button', { name: 'Connections' }))
     fireEvent.click(screen.getByRole('button', { name: 'Expand connections' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Open note' }))
-    await waitFor(() => expect(screen.queryByTestId('graph-view')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('connections-panel')).toHaveAttribute('data-expanded', 'false'))
     await waitFor(() => expect(window.__rhizomeTest?.activeTabPath).toBe('/vault/project/test.md'))
     expect(await screen.findByTestId('blocknote-view')).toBeVisible()
+    expect(screen.getByTestId('graph-view')).toBeInTheDocument()
   })
 
   it('opens the session-footprint chip into Connections, not the full-page Mycelium destination', async () => {
@@ -682,17 +681,51 @@ describe('App', () => {
     expect(await screen.findByLabelText('Activity session')).toHaveValue('/prime/sessions/session-1.jsonl')
   })
 
-  it('routes the status-bar Graph pill into Connections in command-rail mode', async () => {
+  it('routes the status-bar Graph pill into the Notes column in command-rail mode', async () => {
     localStorage.setItem('rhizome:command-rail-expanded', '1')
     render(<App />)
     await screen.findByTestId('chat-home')
     // In command-rail mode the status bar renders as pills without a
     // clickable Graph badge (see StatusBarSections' pillMode) — Graph lives
-    // in Connections instead. This documents that split rather than clicking
+    // under Notes instead. This documents that split rather than clicking
     // a control that command-rail mode does not render.
     expect(screen.queryByRole('button', { name: 'Graph' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Connections' }))
+    expect(screen.queryByTestId('connections-edge')).not.toBeInTheDocument()
     expect(await screen.findByTestId('graph-view')).toBeInTheDocument()
+  })
+
+  it('stacks Graph under Notes in the right panel, with no Connections strip', async () => {
+    render(<App />)
+    const notes = await screen.findByTestId('vault-panel')
+    const graph = await screen.findByTestId('connections-panel')
+    expect(screen.queryByTestId('connections-edge')).not.toBeInTheDocument()
+    expect(notes.compareDocumentPosition(graph) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('opens Notes and Mycelium from the session-footprint chip when Notes is closed', async () => {
+    localStorage.setItem('rhizome-view-mode', 'editor-only')
+    localStorage.setItem('rhizome:command-rail-expanded', '1')
+    mockCommandResults.get_prime_session_host_status = {
+      installed: true,
+      version: 'mock',
+      running: true,
+      sessionId: 'session-1',
+      isStreaming: false,
+      binaryPath: '/mock/prime-agent',
+      modelProvider: 'xai',
+      modelId: 'grok-4.5',
+      modelName: 'Grok 4.5',
+      sessionPath: '/prime/sessions/session-1.jsonl',
+    }
+    mockCommandResults.list_prime_sessions = [{ path: '/prime/sessions/session-1.jsonl', name: 'session-1' }]
+    mockCommandResults.read_prime_session_transcript = []
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
+    fireEvent.click(await screen.findByTestId('prime-session-footprint'))
+    expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
+    expect(await screen.findByTestId('connections-panel')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Mycelium', selected: true })).toBeInTheDocument()
   })
 
   it('starts with the vault panel closed when no view preference is stored', async () => {

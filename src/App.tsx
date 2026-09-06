@@ -1,6 +1,6 @@
 import { noteExistsOnDisk, persistNewNote } from './hooks/useNoteCreation'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ConnectionsPanel, type ConnectionsPanelHandle } from './components/ConnectionsPanel'
+import { ConnectionsPanel, type ConnectionsPanelHandle, type ConnectionsViewRequest } from './components/ConnectionsPanel'
 import { APP_STORAGE_KEYS } from './constants/appStorage'
 import { usePanelWidth } from './hooks/usePanelWidth'
 import { startResizeDrag } from './utils/startResizeDrag'
@@ -557,23 +557,15 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const handleRailSelectInbox = useCallback(() => {
     handleSetSelection({ kind: 'filter', filter: explicitOrganizationEnabled ? 'inbox' : 'all' })
   }, [handleSetSelection, explicitOrganizationEnabled])
-  // In command-rail mode Graph and Mycelium live in the Connections panel, not
-  // as a full-page destination — route requests there instead. Classic shell
-  // has no Connections panel, so it keeps the old full-page toggle.
+  // In command-rail mode Graph and Mycelium live under Notes in the right
+  // panel, not as a full-page destination. Classic shell keeps the old toggle.
   const connectionsPanelRef = useRef<ConnectionsPanelHandle>(null)
+  const connectionsRequestSeq = useRef(0)
+  const [connectionsRequest, setConnectionsRequest] = useState<ConnectionsViewRequest | null>(null)
   // The editor keeps its own generous margins, so a fixed half of the centre
   // reads as wasted space when the window is narrow. Bounds leave room for the
   // editor's own minimum on one side and a usable chat on the other.
   const chatNoteEditorWidth = usePanelWidth(APP_STORAGE_KEYS.chatNoteEditorWidth, 560, 320, 1200)
-  const handleRailSelectGraph = useCallback(() => {
-    if (chatCentered) { connectionsPanelRef.current?.openView('graph'); return }
-    handleSetSelection(toggleGraphSelection(effectiveSelection, vaultConfig.inbox?.explicitOrganization))
-  }, [chatCentered, handleSetSelection, effectiveSelection, vaultConfig.inbox?.explicitOrganization])
-  const handleOpenSessionFootprint = useCallback((path: string) => {
-    if (chatCentered) { connectionsPanelRef.current?.openView('mycelium', { focusPath: path }); return }
-    setMyceliumFocusPath(path)
-    handleSetSelection({ kind: 'filter', filter: 'mycelium' })
-  }, [chatCentered, handleSetSelection])
   const handleRailSelectChanges = useCallback(() => {
     handleSetSelection({ kind: 'filter', filter: 'changes' })
   }, [handleSetSelection])
@@ -1586,6 +1578,27 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     !layout.inspectorCollapsed,
   )
   const [compactVaultPanelOpen, setCompactVaultPanelOpen] = useState(false)
+  const handleRailSelectGraph = useCallback(() => {
+    if (chatCentered) {
+      if (viewMode === 'editor-only') handleSetViewMode('all')
+      setCompactVaultPanelOpen(true)
+      setConnectionsRequest({ view: 'graph', requestId: ++connectionsRequestSeq.current })
+      connectionsPanelRef.current?.openView('graph')
+      return
+    }
+    handleSetSelection(toggleGraphSelection(effectiveSelection, vaultConfig.inbox?.explicitOrganization))
+  }, [chatCentered, handleSetSelection, effectiveSelection, handleSetViewMode, setCompactVaultPanelOpen, setConnectionsRequest, viewMode, vaultConfig.inbox?.explicitOrganization])
+  const handleOpenSessionFootprint = useCallback((path: string) => {
+    if (chatCentered) {
+      if (viewMode === 'editor-only') handleSetViewMode('all')
+      setCompactVaultPanelOpen(true)
+      setConnectionsRequest({ view: 'mycelium', focusPath: path, requestId: ++connectionsRequestSeq.current })
+      connectionsPanelRef.current?.openView('mycelium', { focusPath: path })
+      return
+    }
+    setMyceliumFocusPath(path)
+    handleSetSelection({ kind: 'filter', filter: 'mycelium' })
+  }, [chatCentered, handleSetSelection, handleSetViewMode, setCompactVaultPanelOpen, setConnectionsRequest, viewMode])
   const handleSelectNoteForPdfExport = notes.handleSelectNote
   const handleExportNotePdfFromList = useCallback((entry: VaultEntry) => {
     if (!isMarkdownEntry(entry)) return
@@ -1970,6 +1983,19 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           handleSetViewMode('editor-only')
         }}
       />
+      {chatCentered ? (
+        <ConnectionsPanel
+          ref={connectionsPanelRef}
+          vaultPath={resolvedPath}
+          locale={appLocale}
+          requestedView={connectionsRequest}
+          canOpenNote={vaultBridge.canOpenNoteByPath}
+          onOpenNote={path => {
+            handleRailSelectChat()
+            vaultBridge.openNoteByPath(path)
+          }}
+        />
+      ) : null}
     </div>
   ) : null
 
@@ -1999,13 +2025,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         }}
         sessionsAutoCollapsed={compactSessions}
         sessionsRailSlot={commandRailEnabled ? sessionRailSlot : undefined}
-        connectionsPanel={chatCentered ? <ConnectionsPanel ref={connectionsPanelRef} vaultPath={resolvedPath} locale={appLocale} canOpenNote={vaultBridge.canOpenNoteByPath} onOpenNote={path => {
-          // Graph, Mycelium and Research own the center canvas, so opening a
-          // note from Connections has to come back to Chat first or the editor
-          // stays hidden behind the destination that launched it.
-          handleRailSelectChat()
-          vaultBridge.openNoteByPath(path)
-        }} /> : undefined}
         onNotePaneOpenChange={setChatNotePaneOpen}
         onOpenSessionFootprint={handleOpenSessionFootprint}
         requestedNote={chatNoteRequest}

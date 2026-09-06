@@ -219,7 +219,8 @@ flowchart TD
 The **network-shell** product map (ADR-0166, shipped 2026-08-25) is:
 
 ```
-rail (Inbox toggle) | sessions | CHAT | Notes panel (navigation over list)
+rail (Inbox toggle) | sessions | CHAT | Notes (nav over list)
+                                      | Graph / Mycelium (resizable, below)
 ```
 
 Chat is the center canvas. Sessions are a collapsible column on its left.
@@ -231,7 +232,10 @@ The right Notes panel starts closed; compact Inbox/All Notes/Archive/type/folder
 navigation sits above its selected note list. Browse and the whole panel
 collapse independently (⌘1 / ⌘2 / ⌘3). Selecting a note opens the editor
 beside Chat rather than replacing it.
-Graph and Mycelium still replace the canvas. The diagram below is the
+When that right column is open, Graph and Mycelium sit under Notes as a
+resizable sub-panel (ADR-0170). The Connections edge strip is gone. Inbox
+opens the column; a Graph or session-footprint request opens it too if it
+was closed. The diagram below is the
 inherited Desktop notes-app map (classic shell / note windows / editor
 internals); do not treat it as the Agent main-window layout.
 

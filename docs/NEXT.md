@@ -126,8 +126,9 @@ composition doc — do not restate them here.
 | **C57 permission naming / defaults** | honest Limited-tools UX | Code shipped (Prime always Power User; CLI agents still honor stored mode). **Awaiting Atticus:** CLI default Limited tools? keep Prime toggle hidden? "Limited tools" vs "Vault Safe" + honest tooltip. |
 | **#50 live app view: which surface** | agent QA of the drawn UI | Answers proposed 2026-08-29, awaiting Atticus. Browser `pnpm dev`, read + test-bridge steer, `pnpm live-ui` not an in-app pane. [plan](plans/2026-08-29-live-app-view-plan.md). |
 | **What ⌘1/⌘2/⌘3 and "Full Layout" mean once Chat is the centre** | — | **Settled 2026-08-25.** ⌘1 Chat only, ⌘2 opens the Notes panel with Browse collapsed, ⌘3 opens it with Browse expanded. Stored `viewMode` values unchanged. |
-| **Does Wiki Graph replace the canvas or feed a side panel** | #39 | **Settled for Research / Mycelium 2026-08-26 (local, live check leftover):** they replace Chat as the center canvas, like Graph. #39 (graph as an agent tool vs a place) is still open. |
-| **Right panel composition** | — | **Settled 2026-08-25.** One Notes panel: compact navigation above the selected list. Rail Inbox toggles it; Changes is a list filter. No Inbox/Notes tabs or second right column. |
+| **Does Wiki Graph replace the canvas or feed a side panel** | #39 | **Settled 2026-09-06 (ADR-0170).** Graph and Mycelium sit under Notes in the right column. They no longer replace Chat. #39 (graph as an agent tool vs a place) is still open for the *agent* interface. |
+| **Right panel composition** | — | **Settled 2026-09-06 (ADR-0170), revising 2026-08-25.** Notes is the heavy top half; Graph/Mycelium a resizable sub-panel below; Connections strip gone. Right-hand icon rail still undecided. |
+| **C66 agent profile / instructions in Settings** | chat personality UX | **Agreed, not built 2026-09-06.** How the agent should respond, rules, for whichever agent. Not vault `AGENTS.md`, not the model picker, not tool-allowlist profiles. Awaiting: one vs per-agent; app vs vault. |
 | **TokenJuice + Switchyard** | later stacked system; not a Rhizome organ | **Wanted 2026-08-26, not started.** Discuss/plan only. TokenJuice-shaped tool-output shrink first (Prime owns what the model sees). Switchyard-shaped model hop second (sidecar behind Prime; halfway house is `set_scoped_models`). Write-up: [`token-routing-and-compression.md`](design/token-routing-and-compression.md). Do not vendor either in this tree. |
 
 **#40** can close against ADR-0168 (Rhizome is a client of Prime, not a second
@@ -135,10 +136,9 @@ harness). Do not treat that close as "the harness question is done."
 Ratify `harness-composition.md` before grafting. Resolve **#56** before treating
 the doctrine as constitutional for build choices.
 
-The shipped map is sessions left, Chat center, and one optional Notes panel
-on the right. Rail Inbox opens that panel; its compact navigation sits above
-the selected note list. It is not a bottom Chat strip and the list never
-becomes the editor. Captured in ADR-0166.
+The shipped map is sessions left, Chat center, and one optional right column:
+Notes on top, Graph/Mycelium resizable below (ADR-0170). Rail Inbox opens that
+column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 
 ---
 

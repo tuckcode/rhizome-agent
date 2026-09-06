@@ -8,6 +8,9 @@ test.use({ launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-s
 test('a large graph key stays compact and never overlaps the type filters', async ({ page }) => {
   await installMockAiAgent(page)
   await pinNotesShellLaunch(page)
+  await page.addInitScript(() => {
+    localStorage.setItem('rhizome-view-mode', 'all')
+  })
   await page.route('**/api/vault/ping', route => route.fulfill({ status: 503 }))
   await page.goto('/')
   await expect(page.getByTestId('agent-input')).toBeVisible()
@@ -24,7 +27,7 @@ test('a large graph key stays compact and never overlaps the type filters', asyn
     })
   })
   await page.getByTestId('agent-input').fill('Keep my graph audit draft')
-  await page.getByTestId('connections-edge').click()
+  await expect(page.getByTestId('graph-view')).toBeVisible()
   await page.getByRole('button', { name: 'Expand connections' }).click()
   const toggle = page.getByTestId('graph-legend-toggle')
   await expect(toggle).toHaveAttribute('aria-expanded', 'false')
@@ -41,6 +44,6 @@ test('a large graph key stays compact and never overlaps the type filters', asyn
     await body.evaluate(el => { el.scrollTop = el.scrollHeight })
     await expect(page.getByTestId('graph-legend-controls')).toBeVisible()
   }
-  await page.getByRole('button', { name: 'Close connections' }).click()
+  await page.getByRole('button', { name: 'Return to side panel' }).click()
   await expect(page.getByTestId('agent-input')).toHaveText('Keep my graph audit draft')
 })
