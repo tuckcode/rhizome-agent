@@ -179,8 +179,8 @@ On main. GitHub open until live check.
 - **M4 not started:** a Rhizome-themed client against Mindwalk’s
   `schema/` / `/api/*`, so engine bumps keep the lipstick. Iframe CSS
   is not that. MIT *allows* absorb; we chose chrome-now, fork-later.
-- C24 resolved: dead session-list helpers removed from
-  `primeSessionToMindwalk.ts`. Listing is Rust `prime_sessions`.
+- C24 resolved: the TS `primeSessionToMindwalk.ts` duplicate is gone
+  (area B). Listing and bridging stay in Rust `prime_sessions`.
 
 ### Tool cards
 

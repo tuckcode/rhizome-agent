@@ -215,7 +215,6 @@ rhizome-agent/
 │   │   ├── useGettingStartedClone.ts # Shared Getting Started clone action
 │   │   ├── useOnboarding.ts      # First-launch flow
 │   │   ├── useCodeMirror.ts      # CodeMirror raw editor
-│   │   ├── useMcpBridge.ts       # MCP WebSocket client
 │   │   ├── useMcpStatus.ts       # Explicit external AI tool connection status + connect/disconnect actions
 │   │   ├── useUpdater.ts         # In-app updates
 │   │   └── ...

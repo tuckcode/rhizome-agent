@@ -639,7 +639,7 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    FE["Frontend\n(useMcpBridge)"] <-->|"ws://localhost:9710"| WSB["ws-bridge.js"]
+    FE["Frontend\n(useMcpBridgeVaultSync)"] <-->|"ws://localhost:9710"| WSB["ws-bridge.js"]
     WSB <--> VAULT["vault.js"]
     STDIO["MCP stdio tools"] <-->|"ws://localhost:9711"| FE2["Frontend UI actions\n(useAiActivity)"]
 ```
@@ -1226,7 +1226,6 @@ Per-vault UI settings stored locally per vault path (currently in browser/Tauri 
 - `zoom`: Float zoom level (0.8–1.5)
 - `view_mode`: "all" | "editor-list" | "editor-only"
 - `editor_mode`: "raw" | "preview" (persists across note switches and sessions)
-- `note_layout`: "centered" | "left" (wide-screen note column alignment for rich and raw editors)
 - `tag_colors`, `status_colors`: Custom color overrides
 - `property_display_modes`: Property display preferences
 - `inbox.noteListProperties`: Optional Inbox-only property chip override for the note list

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   looksLikeLocalFileReference,
   shouldStripAutoLinkedLocalFileMark,
-  shouldAutoLinkTolariaHref,
 } from './editorLinkAutolink'
 
 describe('looksLikeLocalFileReference', () => {
@@ -21,19 +20,6 @@ describe('looksLikeLocalFileReference', () => {
     expect(looksLikeLocalFileReference({ raw: 'https://example.com/README.md' })).toBe(false)
     expect(looksLikeLocalFileReference({ raw: 'example.com/README.md' })).toBe(false)
     expect(looksLikeLocalFileReference({ raw: 'www.example.com/README.md' })).toBe(false)
-  })
-})
-
-describe('shouldAutoLinkTolariaHref', () => {
-  it('rejects plain filename-like text', () => {
-    expect(shouldAutoLinkTolariaHref({ raw: 'AGENTS.md' })).toBe(false)
-    expect(shouldAutoLinkTolariaHref({ raw: 'docs/README.md' })).toBe(false)
-  })
-
-  it('keeps normal url-like values eligible for autolinking', () => {
-    expect(shouldAutoLinkTolariaHref({ raw: 'https://example.com/docs' })).toBe(true)
-    expect(shouldAutoLinkTolariaHref({ raw: 'example.com' })).toBe(true)
-    expect(shouldAutoLinkTolariaHref({ raw: 'example.com/README.md' })).toBe(true)
   })
 })
 

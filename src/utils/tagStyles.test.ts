@@ -49,7 +49,7 @@ describe('tagStyles — color overrides', () => {
     expect(getTagColorKey('React')).toBe('red')
     setTagColor('React', null)
     expect(getTagColorKey('React')).toBeNull()
-    // Falls back to hash-based color (no longer DEFAULT_TAG_STYLE)
+    // Falls back to hash-based color
     const style = getTagStyle('React')
     expect(style.bg).toMatch(/^var\(--accent-\w+-light\)$/)
   })
