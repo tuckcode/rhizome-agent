@@ -133,22 +133,6 @@ pub fn call_rhizome_tool(
             invalidate_search_on_success(&app, vault, &result);
             result
         }
-        "rhizome_grok_import" => {
-            let vault = args.get("vaultPath").ok_or("Missing vaultPath")?;
-            let mode = if args.contains_key("listOnly") {
-                crate::rhizome_api::GrokImportMode::List
-            } else if let Some(path) = args.get("path") {
-                crate::rhizome_api::GrokImportMode::One(Path::new(path))
-            } else {
-                crate::rhizome_api::GrokImportMode::Auto
-            };
-            let result =
-                crate::rhizome_api::grok_import(Path::new(vault), mode, &mut |line: &str| {
-                    let _ = app.emit("rhizome-progress", serde_json::json!({ "line": line }));
-                });
-            invalidate_search_on_success(&app, vault, &result);
-            result
-        }
         "rhizome_scan_library" => {
             let vault = args.get("vaultPath").ok_or("Missing vaultPath")?;
             scan_vault_library(vault)
