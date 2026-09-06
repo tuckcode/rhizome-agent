@@ -18,7 +18,7 @@ English only (C18). This repo is **private**; several workflows are
 | [`release.yml`](release.yml) | Alpha release build + GitHub Release | `workflow_dispatch` only |
 | [`release-stable.yml`](release-stable.yml) | Stable release | `workflow_dispatch` only |
 | [`release-build-artifacts.yml`](release-build-artifacts.yml) | Shared macOS artifact build (called by release workflows) | `workflow_call` |
-| [`deploy-docs.yml`](deploy-docs.yml) | VitePress docs site → GitHub Pages | `workflow_dispatch` only (private repo) |
+| ~~`deploy-docs.yml`~~ | Removed — no public VitePress site until Agent has one | — |
 | [`auto-update-prs.yml`](auto-update-prs.yml) | Rebase open PRs onto latest `main` | `workflow_dispatch` only |
 
 **Not automatic on push to `main`:** `ci.yml`, release workflows, and
@@ -109,9 +109,7 @@ Manual cloud verification when you want a clean-room run:
 
 ## Deploy docs
 
-`deploy-docs.yml` builds `pnpm docs:build` and publishes to GitHub Pages.
-**Manual only** while the repo is private (Pages needs Pro+ or a public repo).
-Re-add a `push:` trigger when Pages is enabled.
+There is no public VitePress site until Agent has one. `pnpm docs:build` only refreshes the existing in-app agent-docs bundle when `site/` is present.
 
 ---
 

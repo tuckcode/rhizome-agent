@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -146,6 +146,13 @@ function searchIndexFor(doc) {
 }
 
 async function main() {
+  try {
+    await access(siteRoot)
+  } catch {
+    console.log('site/ is not present; leaving existing src-tauri/resources/agent-docs unchanged')
+    return
+  }
+
   const files = sortDocs(await listMarkdownFiles(siteRoot))
   const docs = []
 

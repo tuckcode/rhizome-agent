@@ -10,8 +10,8 @@ commit as the code).
 consolidation model (L0 raw → L1 atoms → L2 scenes → L3 persona, run
 automatically every N turns, no agent decision required) directly answers
 Rhizome's own standing question better than anything shipped so far: not
-"is the save path reliable when triggered" (audited and fixed 2026-08-02,
-`docs/plans/2026-07-31-save-path-audit-session-status.md`) but "what if the
+"is the save path reliable when triggered" (audited and fixed 2026-08-02)
+but "what if the
 agent never decides to trigger it at all." The 2026-07-19 top-priority
 question in `docs/HANDOFF.md` is still open on exactly that axis.
 
