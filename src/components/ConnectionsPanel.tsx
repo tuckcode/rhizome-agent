@@ -1,5 +1,5 @@
 import { forwardRef, lazy, Suspense, useImperativeHandle, useState } from 'react'
-import { ArrowsIn, ArrowsOut, CaretRight, DotsThree, X } from '@phosphor-icons/react'
+import { ArrowsIn, ArrowsOut, DotsThree } from '@phosphor-icons/react'
 import { trackEvent } from '../lib/telemetry'
 import type { AppLocale } from '../lib/i18n'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
@@ -14,6 +14,11 @@ export interface ConnectionsPanelHandle {
   /** Opens the given view, focusing a specific Mycelium session when asked. */
   openView: (view: View, options?: { focusPath?: string }) => void
 }
+export interface ConnectionsViewRequest {
+  view: View
+  focusPath?: string
+  requestId: number
+}
 const STORAGE_KEY = 'rhizome:connections-placement:v1'
 function readPlacements(): Record<View, Placement> {
   try {
@@ -23,9 +28,9 @@ function readPlacements(): Record<View, Placement> {
   } catch { return { graph: 'sidebar', mycelium: 'sidebar' } }
 }
 /**
- * Connections docks on the right, opposite the rail, so the left column stays
- * for navigation. Closed it is a one-word edge strip; open it is a resizable
- * column with room for a graph and an activity list side by side.
+ * Graph and Mycelium sit under Notes in the right column. Height is the
+ * thing you drag — Notes stays the heavy half, this is the bottom quarter
+ * to half. There is no closed-edge strip; Inbox is how you reach this.
  */
 export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
   vaultPath: string
@@ -33,21 +38,29 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
   onOpenNote?: (path: string) => void
   /** Whether the opener can actually resolve a path, asked before offering it. */
   canOpenNote?: (path: string) => boolean
-}>(function ConnectionsPanel({ vaultPath, locale = 'en', onOpenNote, canOpenNote }, ref) {
+  /** Opens a view after mount, used when Inbox was closed at the moment of the request. */
+  requestedView?: ConnectionsViewRequest | null
+}>(function ConnectionsPanel({ vaultPath, locale = 'en', onOpenNote, canOpenNote, requestedView }, ref) {
   const [placements, setPlacements] = useState(readPlacements)
-  const [open, setOpen] = useState(false)
-  const [view, setView] = useState<View>('graph')
+  const [view, setView] = useState<View>(() => requestedView?.view ?? 'graph')
   const [expanded, setExpanded] = useState(false)
   const [graphState, setGraphState] = useState<GraphViewRetainedState>({ selectedId: null, egoRootId: null, query: '', hiddenTypes: [], hideGhosts: false })
-  const [myceliumState, setMyceliumState] = useState<SessionActivityRetainedState>({ path: '', selected: null, scrollTop: 0 })
+  const [myceliumState, setMyceliumState] = useState<SessionActivityRetainedState>(() => ({
+    path: requestedView?.view === 'mycelium' ? requestedView.focusPath ?? '' : '',
+    selected: null,
+    scrollTop: 0,
+  }))
   // Bumped on every external focus request so SessionActivityHistory remounts
   // with the new session path — its own `path` state only reads the retained
   // value once, on mount.
   const [myceliumFocusToken, setMyceliumFocusToken] = useState(0)
-  const width = usePanelWidth(APP_STORAGE_KEYS.connectionsPanelWidth, 420, 300, 900)
+  const [seenRequestId, setSeenRequestId] = useState<number | null>(
+    () => requestedView?.requestId ?? null,
+  )
+  const height = usePanelWidth(APP_STORAGE_KEYS.connectionsPanelHeight, 280, 140, 560)
   const available = (['graph', 'mycelium'] as const).filter(v => placements[v] !== 'off')
   const selected = available.includes(view) ? view : available[0]
-  const full = open && Boolean(selected) && (expanded || placements[selected] === 'full')
+  const full = Boolean(selected) && (expanded || placements[selected] === 'full')
   function changePlacement(target: View, placement: Placement) {
     const next = { ...placements, [target]: placement }
     setPlacements(next)
@@ -56,76 +69,69 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
   }
   function select(target: View) {
     setView(target)
-    setOpen(true)
     trackEvent('connections_view_selected', { view: target })
   }
+  function applyRequest(target: View, options?: { focusPath?: string }) {
+    select(target)
+    if (target === 'mycelium' && options?.focusPath) {
+      setMyceliumState({ path: options.focusPath, selected: null, scrollTop: 0 })
+      setMyceliumFocusToken(token => token + 1)
+    }
+  }
   // Both views open notes the same way: hand the path up, then get out of the
-  // editor's way. Without the shared handler an expanded Mycelium stayed over
-  // the file it had just opened.
+  // editor's way. Overlay collapses; the docked sub-panel stays so Notes and
+  // Graph are still both there after you open a file.
   function openNote(path: string) {
     onOpenNote?.(path)
     setExpanded(false)
-    if (full) setOpen(false)
   }
   useImperativeHandle(ref, () => ({
     openView(target, options) {
-      select(target)
-      if (target === 'mycelium' && options?.focusPath) {
-        setMyceliumState({ path: options.focusPath, selected: null, scrollTop: 0 })
-        setMyceliumFocusToken(token => token + 1)
-      }
+      applyRequest(target, options)
     },
   }))
-  if (!open) return <button
-    type="button"
-    aria-expanded="false"
-    data-testid="connections-edge"
-    className="flex w-7 shrink-0 cursor-pointer items-center justify-center border-l border-border bg-background text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-    style={{ writingMode: 'vertical-rl' }}
-    onClick={() => setOpen(true)}
-  >Connections</button>
+  if (requestedView && requestedView.requestId !== seenRequestId) {
+    setSeenRequestId(requestedView.requestId)
+    setView(requestedView.view)
+    if (requestedView.view === 'mycelium' && requestedView.focusPath) {
+      setMyceliumState({ path: requestedView.focusPath, selected: null, scrollTop: 0 })
+      setMyceliumFocusToken(token => token + 1)
+    }
+  }
   return <section
-    className="relative flex min-h-0 shrink-0 flex-col border-l border-border bg-background"
-    style={{ width: width.width }}
+    className="relative flex min-h-0 shrink-0 flex-col border-t border-border bg-background"
+    style={{ height: full ? undefined : height.width }}
     aria-label="Connections"
   >
-    {/* `resizeBy` already assumes a handle on the panel's left edge, which is
-        where this one is, so it takes the raw delta. Negating first cancels
-        that out and inverts the drag. */}
-    <div
+    {/* Top-edge handle: dragging up (negative deltaY) grows the panel, which
+        matches `usePanelWidth.resizeBy` ("negative delta means growth"). */}
+    {!full && <div
       role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize connections"
-      className="absolute inset-y-0 -left-[10px] z-20 w-4 cursor-col-resize bg-transparent transition-colors hover:bg-border"
-      onMouseDown={event => startResizeDrag(event, 'col-resize', deltaX => width.resizeBy(deltaX))}
-    />
-    <div className="flex shrink-0 items-center">
-      <button type="button" className="flex min-h-8 min-w-0 flex-1 items-center gap-1 px-2 text-left text-xs" aria-expanded onClick={() => setOpen(false)}>
-        <CaretRight size={14} /> Connections
-      </button>
-      <details className="relative">
-        <summary aria-label="Connections settings" className="cursor-pointer px-2 py-2 text-xs"><DotsThree size={16} aria-hidden="true" /><span className="sr-only">Connections settings</span></summary>
-        <div className="absolute right-0 z-50 w-56 space-y-3 rounded border border-border bg-background p-3 text-xs shadow-md">
-          {(['graph', 'mycelium'] as const).map(target => <label className="flex flex-col gap-1" key={target}>
-            {target === 'graph' ? 'Graph' : 'Mycelium'} placement
-            <select aria-label={`${target === 'graph' ? 'Graph' : 'Mycelium'} placement`} className="rounded border border-border bg-background p-1" value={placements[target]} onChange={e => changePlacement(target, e.target.value as Placement)}>
-              <option value="sidebar">Side panel</option><option value="full">Full view only</option><option value="off">Off</option>
-            </select>
-          </label>)}
-        </div>
-      </details>
-    </div>
-    <div data-testid="connections-panel" data-expanded={full ? 'true' : 'false'} className={full ? 'fixed inset-4 top-10 z-40 flex min-h-0 flex-col rounded border border-border bg-background shadow-lg' : 'flex min-h-0 flex-1 flex-col border-t border-border'}>
-      <div className="flex shrink-0 items-center gap-1 border-b border-border px-1 py-1">
+      aria-orientation="horizontal"
+      aria-label="Resize graph"
+      className="absolute inset-x-0 -top-[10px] z-20 h-4 cursor-row-resize bg-transparent transition-colors hover:bg-border"
+      onMouseDown={event => startResizeDrag(event, 'row-resize', (_deltaX, deltaY) => height.resizeBy(deltaY))}
+    />}
+    <div data-testid="connections-panel" data-expanded={full ? 'true' : 'false'} className={full ? 'fixed inset-4 top-10 z-40 flex min-h-0 flex-col rounded border border-border bg-background shadow-lg' : 'flex min-h-0 flex-1 flex-col'}>
+      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-1">
         <div role="tablist" aria-label="Connection views" className="flex min-w-0 flex-1">
           {available.map(target => <button type="button" role="tab" aria-selected={selected === target} key={target} className={`min-h-8 px-2 text-xs ${selected === target ? 'bg-muted text-foreground' : 'text-muted-foreground'}`} onClick={() => select(target)}>{target === 'graph' ? 'Graph' : 'Mycelium'}</button>)}
         </div>
         {selected && <button type="button" className="p-2" aria-label={full ? 'Return to side panel' : 'Expand connections'} onClick={() => {
-          if (full && placements[selected] === 'full') setOpen(false)
           setExpanded(!full)
           trackEvent('connections_expanded', { expanded: full ? 0 : 1 })
         }}>{full ? <ArrowsIn size={14} /> : <ArrowsOut size={14} />}</button>}
-        <button type="button" className="p-2" aria-label="Close connections" onClick={() => { setOpen(false); setExpanded(false) }}><X size={14} /></button>
+        <details className="relative">
+          <summary aria-label="Connections settings" className="cursor-pointer px-2 py-2 text-xs"><DotsThree size={16} aria-hidden="true" /><span className="sr-only">Connections settings</span></summary>
+          <div className="absolute right-0 z-50 w-56 space-y-3 rounded border border-border bg-background p-3 text-xs shadow-md">
+            {(['graph', 'mycelium'] as const).map(target => <label className="flex flex-col gap-1" key={target}>
+              {target === 'graph' ? 'Graph' : 'Mycelium'} placement
+              <select aria-label={`${target === 'graph' ? 'Graph' : 'Mycelium'} placement`} className="rounded border border-border bg-background p-1" value={placements[target]} onChange={e => changePlacement(target, e.target.value as Placement)}>
+                <option value="sidebar">Under Notes</option><option value="full">Full view only</option><option value="off">Off</option>
+              </select>
+            </label>)}
+          </div>
+        </details>
       </div>
       {!selected && <p className="p-3 text-xs text-muted-foreground">Enable a view in Connections settings.</p>}
       {selected && <div

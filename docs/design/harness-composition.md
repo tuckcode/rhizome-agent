@@ -418,7 +418,7 @@ Rhizome’s gap is the **product layer**, not a missing kernel:
 |---|---|---|
 | **1. Native extension UI** | Claim `extension_ui`; render Prime’s `select` / `confirm` / `input` / `editor`. Today Rhizome auto-cancels those requests so the turn can finish. | Doctrine already: required before any “supports Prime extensions” claim. First slice if option 2 stands. |
 | **2. Catalog** | Show loaded skills/extensions from Prime, not a static “rhizome-vault” chip. | Discovery/consent. Hermes provenance idea, Prime as loader. |
-| **3. Profiles** | Prime tool allow-lists as Rhizome presets. | Compose capability without a second plugin tree. |
+| **3. Profiles** | Prime tool allow-lists as Rhizome presets. | Compose capability without a second plugin tree. **Not** Atticus's Settings profile page for "how the agent should respond" (C66) — that is user instructions, not tool policy. |
 
 If a hook does not exist on Prime (`pre-step` as `dsh` names it), that is a
 Prime feature request, not a reason to embed `dsh`.

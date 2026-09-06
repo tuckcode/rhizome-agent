@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { AiPanel } from './AiPanel'
 import { PrimeSessionSubhead } from './PrimeSessionSubhead'
 import { AgentActivityBand } from './AgentActivityBand'
@@ -37,8 +37,6 @@ interface ChatHomeProps {
   sessionsAutoCollapsed?: boolean
   /** Expanded Command Rail slot, if this shell has the rail enabled. */
   sessionsRailSlot?: HTMLElement | null
-  /** Docked to the right of Chat, opposite the rail. */
-  connectionsPanel?: ReactNode
   /** Where "close" goes when chat owns the window — back to the vault. */
   onExit: () => void
   /** Reveals the existing Notes workspace after leaving a note preview. */
@@ -78,7 +76,6 @@ export default function ChatHome({
   onUnsupportedAiPaste,
   sessionsAutoCollapsed = false,
   sessionsRailSlot,
-  connectionsPanel,
   onExit,
   onShowNotes,
   onOpenSessionFootprint,
@@ -182,7 +179,6 @@ export default function ChatHome({
           showHeader={false}
           sessionsAutoCollapsed={sessionsAutoCollapsed}
           sessionsRailSlot={sessionsRailSlot}
-          sidePanel={connectionsPanel}
           forkTargetsPrimeEntry
           newChatRef={newChatRef}
           notePane={
