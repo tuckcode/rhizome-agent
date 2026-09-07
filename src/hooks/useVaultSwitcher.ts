@@ -184,11 +184,6 @@ function syncDefaultVaultExport(path: string) {
   DEFAULT_VAULTS[0] = { label: GETTING_STARTED_LABEL, path }
 }
 
-function selectedBridgeVaultPath(selectedVaultPath: string | null): string | null {
-  const path = selectedVaultPath?.trim()
-  return path ? path : null
-}
-
 function isCanonicalGettingStartedPath(path: string, resolvedDefaultPath: string): boolean {
   return path === resolvedDefaultPath
 }
@@ -553,18 +548,6 @@ function usePersistedVaultState(onSwitchRef: MutableRefObject<() => void>): Pers
     setVaultPath,
     vaultPath,
   }
-}
-
-function useMcpBridgeVaultSync(loaded: boolean, selectedVaultPath: string | null) {
-  useEffect(() => {
-    if (!loaded) return
-
-    tauriCall<string>('sync_mcp_bridge_vault', {
-      vaultPath: selectedBridgeVaultPath(selectedVaultPath),
-    }).catch(err => {
-      console.warn('Failed to sync MCP bridge vault:', err)
-    })
-  }, [loaded, selectedVaultPath])
 }
 
 function formatGettingStartedRestoreError(err: unknown): string {
@@ -1236,7 +1219,10 @@ export function useVaultSwitcher({ onSwitch, onToast }: UseVaultSwitcherOptions)
     hiddenDefaults,
     extraVaults,
   )
-  useMcpBridgeVaultSync(loaded, selectedVaultPath)
+  // MCP bridge vault sync lives in useWorkspaceGraphState only (#54).
+  // A second caller here sent vaultPath without vaultPaths (Rust saw []),
+  // so the host treated empty vs non-empty active sets as a change and
+  // restarted ws-bridge on every competing sync.
   const {
     handleCreateEmptyVault,
     handleOpenLocalFolder,
