@@ -15,6 +15,11 @@ use std::path::{Path, PathBuf};
 pub const GETTING_STARTED_REPO_URL: &str =
     "https://github.com/refactoringhq/tolaria-getting-started.git";
 
+/// Non-test readers of the pinned C11 URL (env override still wins at runtime).
+pub fn getting_started_repo_url() -> &'static str {
+    GETTING_STARTED_REPO_URL
+}
+
 /// Folder layout matching a cleaned Rhizome Vault (structure only, no personal notes).
 const RHIZOME_SCAFFOLD_FOLDERS: &[&str] = &[
     "inbox",
@@ -741,6 +746,11 @@ fn create_getting_started_vault_from_repo(
 /// Rhizome scaffold instead of cloning. Env names keep the Laputa/Tolaria
 /// aliases so an old machine config still opts into a remote clone. C11, C21.
 fn optional_getting_started_repo_url() -> Option<String> {
+    // Keep the C11 pin reachable from non-test code. Default path is still
+    // local scaffold; only a non-empty env override clones.
+    let _c11_pin = getting_started_repo_url();
+    debug_assert!(!_c11_pin.is_empty());
+
     std::env::var("RHIZOME_GETTING_STARTED_REPO_URL")
         .or_else(|_| std::env::var("TOLARIA_GETTING_STARTED_REPO_URL"))
         .or_else(|_| std::env::var("LAPUTA_GETTING_STARTED_REPO_URL"))
@@ -918,7 +928,7 @@ mod tests {
     #[test]
     fn the_starter_vault_url_is_still_the_borrowed_tolaria_one() {
         assert_eq!(
-            GETTING_STARTED_REPO_URL,
+            getting_started_repo_url(),
             "https://github.com/refactoringhq/tolaria-getting-started.git",
             "C11: replacing this needs a starter vault that exists, not a rename"
         );

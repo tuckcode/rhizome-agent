@@ -71,15 +71,12 @@ trustworthy. Verify on a **real vault + live agent turn**, not unit tests alone.
 C67 sessions context menu · C68 note lock · ADR-0170 right-panel stack ·
 status chrome (Contribute/Docs → About; idle on composer).
 
-**Daily-drive status (2026-09-06 18:16):**
-- **Done / in tree:** mid-turn live; TurnBoundary; suspend-retry; DOM send;
-  selection Copy; DeepSeek/Nous Settings cards; expired OAuth fails Chat
-  preflight; Nous `NOUS_API_KEY` counts connected; **C70 clocks; C71 Up/Down recall**;
-  **C57 settled**; **session-import Settings (vault notes)**; **local Getting
-  Started scaffold**.
-- **Still open for goal:** Prime session-list import half; Cursor/etc. adapters;
-  first-run Welcome import prompt (C9); **C72**; packaging/Windows deferred.
-  Restart `pnpm tauri dev` for Rust import commands + scaffold.
+**Daily-drive status (2026-09-06 18:37 — paused):**
+- **North star (Chat↔Prime + tools + mid-turn):** strong live evidence today; code in
+  `0a71d84` (local only — push blocked / stopped for laptop).
+- **Not goal-complete yet:** push to origin; one live glance on that build; then confetti.
+- **Parked (not blocking north star):** C72 side panels; Prime list-import half; C9;
+  Grokbot audits tonight; packaging/Windows.
 
 **Defer:** full release packaging, first Windows launch verification (#32 /
 C42 — still unrun on a real box), TokenJuice/Switchyard build, ratifying
