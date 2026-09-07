@@ -97,6 +97,7 @@ skills-lock.json
 
 # Rhizome Agent — never treat as Desktop satellite
 .claude/worktrees/
+.worktrees/
 
 # Stray sibling directories that land in the repo root — a Claude Code
 # session dump (multi-MB transcript) and a separate git repo. Neither

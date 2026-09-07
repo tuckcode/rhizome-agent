@@ -2044,8 +2044,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               activeDestination={railActiveDestination}
               inboxCount={inboxCount}
               onSelectChat={() => {
+                // C72: selecting Chat must not wipe the right Notes column.
                 handleRailSelectChat()
-                if (chatCentered) handleSetViewMode('editor-only')
               }}
               onSelectInbox={() => {
                 handleRailSelectInbox()

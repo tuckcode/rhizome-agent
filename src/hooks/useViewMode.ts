@@ -14,7 +14,8 @@ function loadViewMode(): ViewMode {
   // Fallback to localStorage during initial load (before vault config is ready)
   const ls = getAppStorageItem('viewMode')
   if (isViewMode(ls)) return ls
-  return 'editor-only'
+  // C72: open the right Notes stack on fresh launch (Browse collapsed).
+  return 'editor-list'
 }
 
 export function useViewMode(initialOverride?: ViewMode) {

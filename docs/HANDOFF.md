@@ -47,15 +47,14 @@ file.
 ---
 
 ## State
-`main` code **`f76b46c`** / docs land **`ac36e10`** on origin (2026-09-06).
-Daily-drive Chat↔Prime hardening, gate fixes, #54 dual-sync stop, and
-Chat-first smoke are **on origin**. Native Chat glance **PASSED** — goal
-leftover closed ([2245](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md)).
+`main` on origin includes daily-drive Chat↔Prime through **`f76b46c`**,
+**#58/#59/#63** merged, and local rebase adds **C72** Notes open-by-default
+plus icon AI message toolbar (pre-push). Native Chat glance **PASSED**.
 
-Still open / parked: **C72** side panels; Prime list-import route; **#51** Tab;
-**C64** full native verify; **#47** confirm-close; Grokbot audits. Multi-day
-briefing: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date
-first).
+Still open / parked: **C72** remainder (right icon rail / Inbox rename);
+Prime list-import; **#51** Tab; **C64** full verify; **#47** confirm-close;
+Grokbot **#60/#61/#62** (held); updater stub / Applications rebuild.
+[`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date first).
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Inverted Dock icon is
@@ -91,9 +90,11 @@ yours to choose.
 
 ## Recent sessions
 
-- [2026-09-06 · Cursor Grok 4.6](plans/handoffs/2026-09-06-2236-cursor-grok-4-6-area-f.md) — **Area F:** MCP no longer advertises `rhizome_grok_import` / `rhizome_generate_wiki` / `rhizome_repo_research`; deleted `rhizome_grok_import.rs` and parked smoke junk.
-- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2145-grok-4-6-area-b-orphan-hooks.md) — **Area B subtraction:** deleted unused hooks (`useMcpBridge`, `useClaudeCodeOnboarding`, `useClaudeCodeStatus`, `useNoteLayout`), the TS Mindwalk duplicate, unused Claude CLI wrappers, and confirmed-dead app-core exports. Claude onboarding/badge UI files left for area C.
-- [2026-09-06 · Cursor Grok 4.6](plans/handoffs/2026-09-06-2141-cursor-grok-4-6-area-a-orphans.md) — **area A subtraction:** deleted orphaned `e2e/` (24 unused specs), unused scripts, unused `biome.json`, leftover `mcp-server/package-lock.json`, and unused `verifyFocusable`. Live `tests/smoke/` and `tests/integration/` kept.
+- [2026-09-07 · Composer](plans/handoffs/2026-09-07-0111-composer-c72-notes-default-open.md) — **C72 partial:** default `editor-list` on fresh launch; Chat does not wipe Notes; Mycelium chip tooltip = “Mycelium”. Inbox rename / right rail still open. Needs `/Applications` rebuild.
+- [2026-09-07 · Composer](plans/handoffs/2026-09-07-0003-composer-beachball-lag.md) — **beachball diagnosis (docs only):** session switch = 3 sync Prime awaits + full chat `messages.map`; Settings = full remount; cold start = ensure daemon + vault + Graph if Inbox open; Applications smoother but same shapes; quit Applications before `tauri:dev` (same bundle id).
+- [2026-09-06 · Cursor Grok 4.6](plans/handoffs/2026-09-06-2236-cursor-grok-4-6-area-f.md) — **Area F:** MCP no longer advertises `rhizome_grok_import` / `rhizome_generate_wiki` / `rhizome_repo_research`; deleted `rhizome_grok_import.rs` and parked smoke junk. **Merged as #63**.
+- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2145-grok-4-6-area-b-orphan-hooks.md) — **Area B subtraction:** deleted unused hooks (`useMcpBridge`, `useClaudeCodeOnboarding`, `useClaudeCodeStatus`, `useNoteLayout`), the TS Mindwalk duplicate, unused Claude CLI wrappers, and confirmed-dead app-core exports. Claude onboarding/badge UI files left for area C. **Merged as #59**.
+- [2026-09-06 · Cursor Grok 4.6](plans/handoffs/2026-09-06-2141-cursor-grok-4-6-area-a-orphans.md) — **area A subtraction:** deleted orphaned `e2e/` (24 unused specs), unused scripts, unused `biome.json`, leftover `mcp-server/package-lock.json`, and unused `verifyFocusable`. Live `tests/smoke/` and `tests/integration/` kept. **Merged as #58** (`de80c90`).
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md) — **native Chat glance PASS** on `f76b46c`/`ac36e10`; daily-drive north-star leftover closed. Parked: C72, Prime list-import, #51 Tab, C64 full verify, #47, Grokbot.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-2241-composer-push-landed.md) — **push landed:** `f76b46c` on origin; glance leftover now closed by 2245.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-2154-composer-shower-brief-index.md) — shower briefs index (2150–2153 + C64/47 checklists 2156–2157); Atticus decisions only.
@@ -297,7 +298,7 @@ push is not a release — releases are tagged builds with signed installers.
 
 - ~~**C71-OPEN (2026-09-06): composer up-arrow previous-prompt history.**~~ **RESOLVED 2026-09-06.** Session-scoped in-memory recall (cap 50); Up/Down when empty or caret at start; suggestion menus keep Arrow keys. See `composerPromptHistory` + `useComposerPromptHistory`.
 
-- **C72-OPEN (2026-09-06): side panels need a dedicated layout session.** Atticus: right Notes/Graph column is gone unless Notes is opened from the left — feels broken. Today rail **Inbox** toggles the ADR-0170 right stack; Chat sets `editor-only` and hides it; right icon rail still undecided. Session should map surfaces, pick defaults, rename/relabel, then ship one coherent layout. Detail: [2026-09-06-1814](plans/handoffs/2026-09-06-1814-composer-c72-side-panel-session.md).
+- **C72 (2026-09-06/07): side-panel discoverability.** **PARTIAL 2026-09-07:** fresh launch defaults to `editor-list` (right Notes open, Browse collapsed); Chat rail no longer forces `editor-only`; Mycelium footprint tooltip uses `mycelium.title`. Inbox still toggles. Still open: right icon rail; Inbox rename (deferred). `/Applications` needs rebuild to see it. Detail: [2026-09-07-0111](plans/handoffs/2026-09-07-0111-composer-c72-notes-default-open.md) · prior park [1814](plans/handoffs/2026-09-06-1814-composer-c72-side-panel-session.md).
 
 - **#50 (2026-08-29): let the agent see the running app — plan ready, not built.**
   Three answers proposed: show `pnpm dev` (not native), read + steer through
