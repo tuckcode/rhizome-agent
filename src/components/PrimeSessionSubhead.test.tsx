@@ -56,7 +56,7 @@ describe('PrimeSessionSubhead', () => {
 
     fireEvent.click(screen.getByTestId('prime-session-footprint'))
     expect(onOpenFootprint).toHaveBeenCalledTimes(1)
-    expect(screen.getByLabelText('This run')).toBeInTheDocument()
+    expect(screen.getByLabelText('Mycelium')).toBeInTheDocument()
   })
   /**
    * A session outlives the window now (ADR-0163), so how long it has been

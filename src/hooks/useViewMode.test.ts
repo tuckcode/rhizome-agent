@@ -16,11 +16,12 @@ describe('useViewMode', () => {
     )
   })
 
-  it('defaults to a closed vault panel when no value is stored', () => {
+  it('defaults to right Notes open (editor-list) when no value is stored', () => {
+    // C72: fresh launch must show the ADR-0170 Notes stack without hunting Inbox.
     const { result } = renderHook(() => useViewMode())
-    expect(result.current.viewMode).toBe('editor-only')
+    expect(result.current.viewMode).toBe('editor-list')
     expect(result.current.sidebarVisible).toBe(false)
-    expect(result.current.noteListVisible).toBe(false)
+    expect(result.current.noteListVisible).toBe(true)
   })
 
   it('loads persisted view mode from vault config', () => {
@@ -73,6 +74,6 @@ describe('useViewMode', () => {
       vi.fn(),
     )
     const { result } = renderHook(() => useViewMode())
-    expect(result.current.viewMode).toBe('editor-only')
+    expect(result.current.viewMode).toBe('editor-list')
   })
 })

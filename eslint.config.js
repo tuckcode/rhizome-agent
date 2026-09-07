@@ -29,6 +29,9 @@ export default defineConfig([
     // would otherwise lint whatever generated/build artifacts happen to
     // exist in a sibling worktree at the time.
     '.claude/worktrees/',
+    // Cursor / Agent isolation worktrees at repo-root `.worktrees/<name>/`
+    // (same nested-checkout lint hazard as `.claude/worktrees/`).
+    '.worktrees/',
     // Same hazard, different location: worktrees also land at
     // `rhizome-agent/<branch-name>/` — a full second checkout nested inside
     // this one. `.gitignore` keeps it out of commits but eslint walks it
