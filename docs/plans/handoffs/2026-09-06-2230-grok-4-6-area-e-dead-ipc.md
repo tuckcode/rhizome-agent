@@ -37,6 +37,6 @@ sheet engine, inbox watcher, prime_session_host split, docs/site, MCP JS.
 `#[allow(dead_code)]` on `event_tx` / `format_empty_turn` unchanged — not
 made unused by this cut.
 
-Linux CI clippy failed on this PR for the same macOS-only unused items
-(`menu_bar_capture.rs`, `should_reopen_main_window`). Filed **C69**. Not
-this diff — same fail on area A–D PRs. Left unfixed (scope).
+Linux CI clippy failed on unused macOS-only capture/reopen items. Filed
+**C69**, then cfg-gated those helpers (`any(macos, test)`) so Linux
+verification can pass. Same errors had failed area A–D PRs.
