@@ -2,7 +2,6 @@ const FILE_LIKE_EXTENSION_PATTERN =
   /\.(?:md|markdown|txt|ya?ml|json|toml|csv|tsv|pdf|png|jpe?g|gif|svg|webp|avif|mp3|wav|ogg|mp4|mov|zip|tar|gz|tsx?|jsx?|cjs|mjs|rs|py|sh|css|html?)$/i
 
 const EXPLICIT_PROTOCOL_PATTERN = /^[a-z][a-z0-9+.-]*:\/\//i
-const MAYBE_PROTOCOL_PATTERN = /^[a-z][a-z0-9+.-]*:/i
 const LOCAL_PATH_PREFIX_PATTERN = /^(?:\.{1,2}\/|~\/|\/)/
 const WINDOWS_PATH_SEPARATOR = '\\'
 const WWW_PREFIX = 'www.'
@@ -32,10 +31,6 @@ function isExplicitProtocolUrl(value: LinkValue) {
   return EXPLICIT_PROTOCOL_PATTERN.test(value.raw)
 }
 
-function isMaybeProtocolUrl(value: LinkValue) {
-  return MAYBE_PROTOCOL_PATTERN.test(value.raw)
-}
-
 function hasWindowsPathSeparator(value: LinkValue) {
   return value.raw.includes(WINDOWS_PATH_SEPARATOR)
 }
@@ -56,11 +51,6 @@ function isDomainLikePath(value: LinkValue) {
   return firstPathSegment(value).includes('.')
 }
 
-function hostnameFromUrlLikeValue(value: LinkValue) {
-  const withoutUserinfo = value.raw.includes('@') ? value.raw.split('@').pop() ?? value.raw : value.raw
-  return withoutUserinfo.split(/[/?#:]/, 1)[0] ?? withoutUserinfo
-}
-
 function isExplicitWebUrl(value: LinkValue) {
   return isExplicitProtocolUrl(value) || startsWithWebHostPrefix(value)
 }
@@ -75,23 +65,6 @@ function isLocalPathPrefix(value: LinkValue) {
 
 function isPathLikeFileReference(value: LinkValue) {
   return hasPathSeparator(value) && !isDomainLikePath(value)
-}
-
-function hasBareProtocolPrefix(value: LinkValue) {
-  return isMaybeProtocolUrl(value) && !value.raw.includes('@')
-}
-
-function hostnameHasTld(hostname: string) {
-  return hostname.includes('.')
-}
-
-function isIpv4Host(hostname: string) {
-  const parts = hostname.split('.')
-  return parts.length === 4 && parts.every((part) => {
-    if (part.length === 0 || part.length > 3) return false
-    if ([...part].some((char) => char < '0' || char > '9')) return false
-    return Number(part) <= 255
-  })
 }
 
 function normalizeInput(value: LinkValue) {
@@ -119,23 +92,6 @@ export function looksLikeLocalFileReference(value: LinkValue) {
   }
 
   return isPathLikeFileReference(normalized)
-}
-
-export function shouldAutoLinkTolariaHref(url: LinkValue) {
-  if (looksLikeLocalFileReference(url)) {
-    return false
-  }
-
-  if (isExplicitProtocolUrl(url) || hasBareProtocolPrefix(url)) {
-    return true
-  }
-
-  const hostname = hostnameFromUrlLikeValue(url)
-  if (isIpv4Host(hostname)) {
-    return false
-  }
-
-  return hostnameHasTld(hostname)
 }
 
 export function shouldStripAutoLinkedLocalFileMark(mark: LinkMarkCandidate) {

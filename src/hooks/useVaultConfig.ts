@@ -38,7 +38,7 @@ function legacyStorageKey(vaultPath: string): string {
  * direct unit tests, so the legacy-key fallback needs its own test surface. */
 export function loadFromStorage(vaultPath: string): VaultConfig {
   const DEFAULT: VaultConfig = {
-    zoom: null, view_mode: null, editor_mode: null, note_layout: null,
+    zoom: null, view_mode: null, editor_mode: null,
     git_setup_preference: 'prompt',
     ai_agent_permission_mode: DEFAULT_AI_AGENT_PERMISSION_MODE,
     tag_colors: null, status_colors: null, property_display_modes: null,
