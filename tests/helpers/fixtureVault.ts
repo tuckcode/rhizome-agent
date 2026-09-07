@@ -538,25 +538,42 @@ async function waitForFixtureVaultReady({
 }: FixturePageArgs & { initialPanel: 'inbox' | 'notes' }): Promise<void> {
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => Boolean(window.__mockHandlers?.list_vault))
-  if (!(await page.getByTestId('vault-panel').isVisible().catch(() => false))) {
+
+  // C72: fresh launch defaults to editor-list (Notes open, Browse collapsed).
+  // Rail Inbox is a toggle — clicking it while Notes is already open closes the
+  // panel. Wait for the default panel first; only click Inbox if it never appears.
+  const vaultPanel = page.getByTestId('vault-panel')
+  try {
+    await vaultPanel.waitFor({ state: 'visible', timeout: 5_000 })
+  } catch {
     await page.getByTestId('command-rail-inbox').click()
+    await vaultPanel.waitFor({ state: 'visible', timeout: FIXTURE_VAULT_READY_TIMEOUT })
   }
+
   const noteList = page.locator('[data-testid="note-list-container"]')
   await noteList.waitFor({ timeout: FIXTURE_VAULT_READY_TIMEOUT })
 
   // Product default is Inbox when explicit organization is enabled. Fixture
-  // tests use the full seed set, so normalize to All Notes. Do not wait on one
+  // tests use the full seed set, so normalize to All Notes. All Notes lives in
+  // Browse — expand it when C72 left Browse collapsed. Do not wait on one
   // title: the virtualized list may legitimately keep that row off-DOM.
+  const browseNav = page.getByTestId('vault-panel-navigation')
+  if ((await browseNav.count()) === 0) {
+    await page.getByTestId('vault-panel-browse-toggle').click()
+    await expect(browseNav).toBeVisible({ timeout: FIXTURE_VAULT_READY_TIMEOUT })
+  }
   await page.getByTestId('sidebar-top-nav').getByText('All Notes', { exact: true }).click()
   await expect(noteList.getByRole('option').first()).toBeVisible({
     timeout: FIXTURE_VAULT_READY_TIMEOUT,
   })
 
   if (initialPanel === 'inbox') {
-    await page.getByTestId('vault-panel-browse-toggle').click()
-    await expect(page.getByTestId('vault-panel-navigation')).toHaveCount(0)
+    if ((await browseNav.count()) > 0) {
+      await page.getByTestId('vault-panel-browse-toggle').click()
+    }
+    await expect(browseNav).toHaveCount(0)
   } else {
-    await expect(page.getByTestId('vault-panel-navigation')).toBeVisible()
+    await expect(browseNav).toBeVisible()
   }
 }
 
