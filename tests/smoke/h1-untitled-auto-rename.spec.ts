@@ -2,6 +2,7 @@ import fs from 'fs'
 import { test, expect, type Page } from '@playwright/test'
 import { APP_COMMAND_IDS } from '../../src/hooks/appCommandCatalog'
 import { createFixtureVaultCopy, openFixtureVaultTauri, removeFixtureVaultCopy } from '../helpers/fixtureVault'
+import { ensureNotesPanelOpen, expectNoteEditorReady } from './helpers'
 import { triggerMenuCommand, triggerShortcutCommand } from './testBridge'
 
 function markdownFiles(vaultPath: string): string[] {
@@ -49,9 +50,11 @@ function collectReactUpdateLoopErrors(page: Page): string[] {
 }
 
 async function createUntitledNote(page: Page): Promise<void> {
-  await page.locator('body').click()
+  // Chat-first shell: open Notes first, and avoid body-centre clicks (they land on Chat).
+  await ensureNotesPanelOpen(page)
+  await page.locator('body').click({ position: { x: 2, y: 2 } })
   await triggerMenuCommand(page, 'file-new-note')
-  await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
+  await expectNoteEditorReady(page)
   await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText(/untitled-note-\d+(?:-\d+)?/i, {
     timeout: 5_000,
   })

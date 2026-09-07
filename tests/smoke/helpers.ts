@@ -138,3 +138,39 @@ export async function sendShortcut(
   const combo = [...new Set(normalizedModifiers), key].join('+')
   await page.keyboard.press(combo)
 }
+
+/**
+ * Chat is the default centre canvas (ADR-0166). Note-list / editor smokes must
+ * open the Notes column explicitly — launch does not leave Notes as default.
+ */
+export async function ensureNotesPanelOpen(page: Page) {
+  const noteList = page.getByTestId('note-list-container')
+  if (await noteList.isVisible().catch(() => false)) return noteList
+
+  const restore = page.getByTestId('vault-panel-restore')
+  if (await restore.isVisible().catch(() => false)) {
+    await restore.click()
+  } else {
+    await page.getByTestId('command-rail-inbox').click()
+  }
+  await expect(noteList).toBeVisible({ timeout: 10_000 })
+  return noteList
+}
+
+/** Open a vault note into the centre editor beside Chat. */
+export async function openNoteFromNotesList(page: Page, title: string): Promise<void> {
+  const noteList = await ensureNotesPanelOpen(page)
+  await noteList.getByText(title, { exact: true }).click()
+  await expectNoteEditorReady(page)
+}
+
+/**
+ * Wait until the chat-centre note pane is active (not idle) and BlockNote is up.
+ * Idle `.app__note-editor--idle` is `display: none` until a note is open.
+ */
+export async function expectNoteEditorReady(page: Page): Promise<void> {
+  await expect(page.locator('.app__note-editor:not(.app__note-editor--idle)')).toBeVisible({
+    timeout: 5_000,
+  })
+  await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
+}
