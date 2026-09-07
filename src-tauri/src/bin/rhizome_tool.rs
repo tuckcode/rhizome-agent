@@ -1,14 +1,14 @@
-//! `rhizome-tool` — headless CLI sidecar for the six MCP research verbs
-//! (ADR-0152, MCP bridge Phase 2). Wraps `rhizome_lib::rhizome_api` so
-//! external agents can reach the same reasoning/write path the in-app
-//! Research panel uses, without shelling the Python toolkit.
+//! `rhizome-tool` — headless CLI sidecar for the remaining MCP research
+//! verbs (ADR-0152, MCP bridge Phase 2). Wraps `rhizome_lib::rhizome_api`
+//! so external agents can reach the same write path the in-app Research
+//! panel uses, without shelling the Python toolkit.
 //!
-//! argv only, no shell strings (ADR-0152). `generate_wiki` has no
-//! subcommand of its own — it's an alias of `repo-research`; the MCP
-//! server routes it there directly.
+//! argv only, no shell strings (ADR-0152). Grok-wiki / wiki-generation
+//! verbs (`grok-import`, `generate_wiki`) are out of scope and have no
+//! subcommand.
 
 use rhizome_lib::inbox_action::CaptureRequest;
-use rhizome_lib::rhizome_api::{self, GraphQuery, GrokImportMode};
+use rhizome_lib::rhizome_api::{self, GraphQuery};
 use std::path::PathBuf;
 
 /// Trigger recorded when a caller does not name itself. Everything reaching
@@ -40,10 +40,6 @@ enum Command {
         depth: String,
         project: Option<String>,
     },
-    GrokImport {
-        vault_path: PathBuf,
-        mode: GrokImportModeArg,
-    },
     Graph {
         vault_path: PathBuf,
     },
@@ -60,13 +56,6 @@ enum Command {
     },
 }
 
-#[derive(Debug, PartialEq)]
-enum GrokImportModeArg {
-    List,
-    Auto,
-    One(PathBuf),
-}
-
 /// Pull `--flag value` out of the remaining argv, removing both entries.
 fn take_flag(args: &mut Vec<String>, flag: &str) -> Option<String> {
     let idx = args.iter().position(|a| a == flag)?;
@@ -75,15 +64,6 @@ fn take_flag(args: &mut Vec<String>, flag: &str) -> Option<String> {
     }
     args.remove(idx);
     Some(args.remove(idx))
-}
-
-fn take_switch(args: &mut Vec<String>, flag: &str) -> bool {
-    if let Some(idx) = args.iter().position(|a| a == flag) {
-        args.remove(idx);
-        true
-    } else {
-        false
-    }
 }
 
 fn parse_args(argv: &[String]) -> Result<Command, String> {
@@ -163,36 +143,6 @@ fn parse_args(argv: &[String]) -> Result<Command, String> {
                 mode,
                 depth,
                 project,
-            })
-        }
-        "grok-import" => {
-            let list = take_switch(&mut rest, "--list");
-            let auto = take_switch(&mut rest, "--auto");
-            if list && auto {
-                return Err("pass only one of --list or --auto".to_string());
-            }
-            let mode = if list {
-                if rest.len() != 1 {
-                    return Err("usage: grok-import <vault_path> --list".to_string());
-                }
-                GrokImportModeArg::List
-            } else if auto {
-                if rest.len() != 1 {
-                    return Err("usage: grok-import <vault_path> --auto".to_string());
-                }
-                GrokImportModeArg::Auto
-            } else {
-                if rest.len() != 2 {
-                    return Err(
-                        "usage: grok-import <vault_path> [--list | --auto | <json_path>]"
-                            .to_string(),
-                    );
-                }
-                GrokImportModeArg::One(PathBuf::from(&rest[1]))
-            };
-            Ok(Command::GrokImport {
-                vault_path: PathBuf::from(&rest[0]),
-                mode,
             })
         }
         "graph" => {
@@ -321,14 +271,6 @@ fn run(command: Command) -> Result<String, String> {
             None,
             &mut stderr_line,
         ),
-        Command::GrokImport { vault_path, mode } => {
-            let mode = match &mode {
-                GrokImportModeArg::List => GrokImportMode::List,
-                GrokImportModeArg::Auto => GrokImportMode::Auto,
-                GrokImportModeArg::One(path) => GrokImportMode::One(path.as_path()),
-            };
-            rhizome_api::grok_import(&vault_path, mode, &mut stderr_line)
-        }
         Command::Graph { vault_path } => rhizome_api::build_wiki_graph(&vault_path),
         Command::GraphQuery { vault_path, query } => rhizome_api::graph_query(&vault_path, &query),
         Command::SaveCapture {
@@ -527,45 +469,9 @@ mod tests {
     }
 
     #[test]
-    fn parses_grok_import_list() {
-        let cmd = parse_args(&args(&["grok-import", "/vault", "--list"])).unwrap();
-        assert_eq!(
-            cmd,
-            Command::GrokImport {
-                vault_path: PathBuf::from("/vault"),
-                mode: GrokImportModeArg::List,
-            }
-        );
-    }
-
-    #[test]
-    fn parses_grok_import_auto() {
-        let cmd = parse_args(&args(&["grok-import", "/vault", "--auto"])).unwrap();
-        assert_eq!(
-            cmd,
-            Command::GrokImport {
-                vault_path: PathBuf::from("/vault"),
-                mode: GrokImportModeArg::Auto,
-            }
-        );
-    }
-
-    #[test]
-    fn parses_grok_import_one_path() {
-        let cmd = parse_args(&args(&["grok-import", "/vault", "/data/wiki.json"])).unwrap();
-        assert_eq!(
-            cmd,
-            Command::GrokImport {
-                vault_path: PathBuf::from("/vault"),
-                mode: GrokImportModeArg::One(PathBuf::from("/data/wiki.json")),
-            }
-        );
-    }
-
-    #[test]
-    fn grok_import_rejects_list_and_auto_together() {
-        let err = parse_args(&args(&["grok-import", "/vault", "--list", "--auto"])).unwrap_err();
-        assert!(err.contains("only one"));
+    fn grok_import_is_an_unknown_subcommand() {
+        let err = parse_args(&args(&["grok-import", "/vault", "--list"])).unwrap_err();
+        assert!(err.contains("unknown subcommand"));
     }
 
     #[test]

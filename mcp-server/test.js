@@ -575,6 +575,24 @@ describe('stdio process lifecycle', () => {
     }
   })
 
+  it('does not advertise Grok-wiki / wiki-generation verbs (AGENTS.md out of scope)', async () => {
+    const { client, stderr } = await connectMcpClient()
+
+    try {
+      const { tools } = await client.listTools()
+      const names = tools.map(tool => tool.name)
+      for (const name of [
+        'rhizome_grok_import',
+        'rhizome_generate_wiki',
+        'rhizome_repo_research',
+      ]) {
+        assert.equal(names.includes(name), false, `${name} must not be in the MCP tool list`)
+      }
+    } finally {
+      await closeMcpClient(client, stderr)
+    }
+  })
+
   it('says what is missing when a graph query runs without the sidecar', async () => {
     const { client, stderr } = await connectMcpClient()
 
@@ -725,25 +743,6 @@ console.log('[]')
       )
       const after = await readFile(eventsFile, 'utf-8').catch(() => '')
       assert.equal(after, before, 'JS-side appendRhizomeEvent must not fire on the Rust path')
-    } finally {
-      await closeMcpClient(client, stderr)
-    }
-  })
-
-  it('routes rhizome_generate_wiki onto a single repo-research call (alias, no second wiki call)', async () => {
-    const { client, stderr } = await connectMcpClient({
-      RHIZOME_TOOL_PATH: stubPath,
-      STUB_ARGV_LOG: argvLogPath,
-    })
-    try {
-      await client.callTool({
-        name: 'rhizome_generate_wiki',
-        arguments: { repo: 'owner/repo', mode: 'architecture', depth: 'fast' },
-      })
-      assert.deepEqual(
-        await lastStubArgv(),
-        ['repo-research', tmpDir, 'owner/repo', '--mode', 'architecture', '--depth', 'fast'],
-      )
     } finally {
       await closeMcpClient(client, stderr)
     }

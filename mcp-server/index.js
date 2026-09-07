@@ -40,10 +40,10 @@ function resolveVaultPath(args = {}, toolService) {
 
 const WS_UI_PORT = parseInt(process.env.WS_UI_PORT || '9711', 10)
 const WS_UI_URL = `ws://localhost:${WS_UI_PORT}`
-// ADR-0152 / MCP bridge Phase 2: when set, the six research verbs below
-// call the `rhizome-tool` Rust sidecar instead of shelling the Python
-// `rhizome-*` CLIs. Unset by default — Python remains the zero-risk path
-// until Phase 3 packages the binary via Tauri `externalBin`.
+// ADR-0152 / MCP bridge Phase 2: when set, remaining research verbs
+// (search / distill / import-source / graph) call the `rhizome-tool`
+// Rust sidecar instead of shelling the Python `rhizome-*` CLIs.
+// Grok-wiki / wiki-generation verbs are out of scope and unadvertised.
 const RHIZOME_TOOL_PATH = process.env.RHIZOME_TOOL_PATH || null
 const LOCAL_READ_ONLY_TOOL_ANNOTATIONS = Object.freeze({
   readOnlyHint: true,
@@ -359,50 +359,6 @@ const TOOLS = [
     },
   },
   {
-    name: 'rhizome_repo_research',
-    description: 'Research a GitHub repository or local codebase and generate one or more wiki pages in the Rhizome vault. Uses the specified research mode (architecture, hidden-lessons, reusable-patterns, first-hour, agent-handoff, integration-plan, book-to-skill). Specify pageCount for multi-page output.',
-    annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        repo: { type: 'string', description: 'GitHub URL (github.com/owner/repo) or local path to the repository' },
-        mode: { type: 'string', description: 'Research mode (default: architecture)', enum: ['architecture', 'hidden-lessons', 'reusable-patterns', 'first-hour', 'agent-handoff', 'integration-plan', 'feature-scout', 'mental-model', 'eli5', 'debugging-atlas', 'book-to-skill'] },
-        depth: { type: 'string', description: 'Research depth: fast (3-5 pages), regular (8-18 pages), deep (25+ pages) (default: fast)', enum: ['fast', 'regular', 'deep'] },
-        vaultPath: { type: 'string', description: 'Optional target vault root. Uses active vault if omitted.' },
-      },
-      required: ['repo'],
-    },
-  },
-  {
-    name: 'rhizome_generate_wiki',
-    description: 'Full Grok-Wiki-style wiki generation: explore a repo, plan a structure, then generate multiple organized wiki pages into sources/repos/<slug>/ within the Rhizome vault.',
-    annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        repo: { type: 'string', description: 'GitHub URL (github.com/owner/repo) or local path to the repository' },
-        mode: { type: 'string', description: 'Research mode (default: architecture)', enum: ['architecture', 'hidden-lessons', 'reusable-patterns', 'first-hour', 'agent-handoff', 'integration-plan', 'feature-scout', 'mental-model', 'eli5', 'debugging-atlas', 'book-to-skill'] },
-        depth: { type: 'string', description: 'Depth: fast (3-5 pages), regular (8-18), deep (25+) (default: fast)', enum: ['fast', 'regular', 'deep'] },
-        pageCount: { type: 'number', description: 'Exact number of pages (overrides depth auto-count)' },
-        vaultPath: { type: 'string', description: 'Optional target vault root' },
-      },
-      required: ['repo'],
-    },
-  },
-  {
-    name: 'rhizome_grok_import',
-    description: 'Import Grok-Wiki generated JSON files into the Rhizome vault as structured markdown wiki pages under sources/repos/<owner>-<repo>/. Use --list to discover available Grok-Wiki wikis.',
-    annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        path: { type: 'string', description: 'Path to a specific Grok-Wiki JSON file. Omit to scan default Grok-Wiki data directory.' },
-        listOnly: { type: 'boolean', description: 'If true, list available Grok-Wiki wikis without importing.' },
-        vaultPath: { type: 'string', description: 'Optional target vault root.' },
-      },
-    },
-  },
-  {
     name: 'rhizome_import_source',
     description: 'Import a document (PDF, web URL, YouTube video, or text file) into the Rhizome vault. Extracts text content and writes as a structured markdown page under sources/documents/ or projects/<name>/sources/.',
     annotations: LOCAL_CREATE_TOOL_ANNOTATIONS,
@@ -654,110 +610,6 @@ async function handleRhizomeGraphPath(args) {
   return { content: [{ type: 'text', text: output }] }
 }
 
-async function handleRhizomeRepoResearch(args) {
-  const vaultPath = resolveVaultPath(args, toolService)
-  const repo = typeof args.repo === 'string' ? args.repo.trim() : ''
-  if (!repo) throw new Error('Repository or path is required')
-  const mode = typeof args.mode === 'string' ? args.mode.trim() : 'architecture'
-  const depth = typeof args.depth === 'string' ? args.depth.trim() : 'fast'
-  const rounds = depth === 'deep' ? 3 : depth === 'regular' ? 2 : 1
-  const target = resolveRhizoTarget(
-    'rhizome-research',
-    [vaultPath, repo, '--rounds', String(rounds)],
-    'repo-research',
-    [vaultPath, repo, '--mode', mode, '--depth', depth],
-  )
-  // rhizome_api::repo_research already appends its own .rhizome/events.jsonl
-  // entry — skip the JS-side event on the Rust path to avoid double-logging.
-  if (!target.isRust) appendRhizomeEvent(vaultPath, { type: 'research-started', mode, repo, depth })
-  const output = await runRhizoCli(target.bin, target.args, 120000)
-  if (!target.isRust) appendRhizomeEvent(vaultPath, { type: 'research-finished', mode, repo })
-  return { content: [{ type: 'text', text: output || `Research complete in ${mode} mode (${depth} depth). Check vault for generated pages.` }] }
-}
-
-async function handleRhizomeGenerateWiki(args) {
-  const vaultPath = resolveVaultPath(args, toolService)
-  const repo = typeof args.repo === 'string' ? args.repo.trim() : ''
-  if (!repo) throw new Error('Repository or path is required')
-  const mode = typeof args.mode === 'string' ? args.mode.trim() : 'architecture'
-  const depth = typeof args.depth === 'string' ? args.depth.trim() : 'fast'
-
-  if (RHIZOME_TOOL_PATH) {
-    // generate_wiki is an alias of repo_research (ADR-0152 verb table) —
-    // 4c already writes the page, no separate wiki-generation call needed.
-    const output = await runRhizoCli(
-      RHIZOME_TOOL_PATH,
-      ['repo-research', vaultPath, repo, '--mode', mode, '--depth', depth],
-      120000,
-    )
-    return { content: [{ type: 'text', text: output || `Wiki generated in ${mode} mode (${depth} depth).` }] }
-  }
-
-  appendRhizomeEvent(vaultPath, { type: 'wiki-generate-started', mode, repo, depth })
-  const rounds = depth === 'deep' ? 3 : depth === 'regular' ? 2 : 1
-  const researchOutput = await runRhizoCli(
-    'rhizome-research',
-    [vaultPath, repo, '--rounds', String(rounds)],
-    120000,
-  )
-  let wikiOutput = ''
-  try {
-    wikiOutput = await runRhizoCli(
-      'rhizome-repo-wiki',
-      [vaultPath, repo, '--mode', mode],
-      120000,
-    )
-  } catch {
-    wikiOutput = '(rhizome-repo-wiki command not available — research phase completed)'
-  }
-  appendRhizomeEvent(vaultPath, { type: 'wiki-generate-finished', mode, repo, depth })
-  const text = wikiOutput
-    ? `Wiki generated in ${mode} mode (${depth} depth).\\n\\nResearch:\\n${researchOutput}\\n\\nWiki:\\n${wikiOutput}`
-    : researchOutput
-  return { content: [{ type: 'text', text }] }
-}
-
-async function handleRhizomeGrokImport(args) {
-  const vaultPath = resolveVaultPath(args, toolService)
-
-  if (args.listOnly) {
-    const target = resolveRhizoTarget(
-      'rhizome-grok-import',
-      [vaultPath, '--list'],
-      'grok-import',
-      [vaultPath, '--list'],
-    )
-    const output = await runRhizoCli(target.bin, target.args, 15000)
-    return { content: [{ type: 'text', text: output }] }
-  }
-
-  const jsonPath = typeof args.path === 'string' ? args.path.trim() : ''
-  if (jsonPath) {
-    const target = resolveRhizoTarget(
-      'rhizome-grok-import',
-      [vaultPath, jsonPath],
-      'grok-import',
-      [vaultPath, jsonPath],
-    )
-    const output = await runRhizoCli(target.bin, target.args, 60000)
-    return { content: [{ type: 'text', text: output }] }
-  }
-
-  // No path specified, auto-import from default Grok-Wiki directory.
-  // rhizome_api::grok_import (Auto mode) already appends its own
-  // .rhizome/events.jsonl entry per imported wiki — skip the JS-side
-  // summary event on the Rust path to avoid double-logging.
-  const target = resolveRhizoTarget(
-    'rhizome-grok-import',
-    [vaultPath, '--auto'],
-    'grok-import',
-    [vaultPath, '--auto'],
-  )
-  const output = await runRhizoCli(target.bin, target.args, 120000)
-  if (!target.isRust) appendRhizomeEvent(vaultPath, { type: 'grok-import', auto: true })
-  return { content: [{ type: 'text', text: output || 'Grok-Wiki import complete.' }] }
-}
-
 async function handleRhizomeImportSource(args) {
   const vaultPath = resolveVaultPath(args, toolService)
   const source = typeof args.source === 'string' ? args.source.trim() : ''
@@ -828,9 +680,6 @@ const TOOL_HANDLERS = new Map([
   ['rhizome_graph_dead_links', handleRhizomeGraphDeadLinks],
   ['rhizome_graph_neighbors', handleRhizomeGraphNeighbors],
   ['rhizome_graph_path', handleRhizomeGraphPath],
-  ['rhizome_repo_research', handleRhizomeRepoResearch],
-  ['rhizome_generate_wiki', handleRhizomeGenerateWiki],
-  ['rhizome_grok_import', handleRhizomeGrokImport],
   ['rhizome_import_source', handleRhizomeImportSource],
   ['rhizome_distill', handleRhizomeDistill],
 ])
