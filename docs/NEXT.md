@@ -50,7 +50,8 @@ trustworthy. Verify on a **real vault + live agent turn**, not unit tests alone.
    tools proven on vault. Graph Find bottom-right shipped.
 2. **Chat reliability leftovers** — mid-turn live-proven; suspend-retry; DOM
    composer send; selection Copy allowlist. ~~#54 dual sync~~ on origin
-   `f76b46c`. Still open: C64 native glance; #47 confirm-close.
+   `f76b46c`. ~~Native Chat glance~~ **PASS** ([2245](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md)).
+   Still open: C64 full native verify; #47 confirm-close.
 3. **Atticus Chat wishlist (parked 2026-09-06, do not drop):**
    - ~~**C70** per-message timestamps on Chat bubbles.~~ shipped in tree 2026-09-06 18:12.
    - ~~**C71** composer up-arrow previous-prompt history.~~ shipped in tree 2026-09-06 18:12 (#51 Tab remainder still separate).
@@ -72,12 +73,14 @@ trustworthy. Verify on a **real vault + live agent turn**, not unit tests alone.
 C67 sessions context menu · C68 note lock · ADR-0170 right-panel stack ·
 status chrome (Contribute/Docs → About; idle on composer).
 
-**Daily-drive status (2026-09-06 22:41 — push landed):**
+**Daily-drive status (2026-09-06 22:45 — glance PASS; leftover closed):**
 - **North star code on origin:** `f76b46c` (Chat↔Prime hardening + gate fixes +
-  #54 sync + Chat-first smoke). See [2241](plans/handoffs/2026-09-06-2241-composer-push-landed.md).
-- **Not goal-complete yet:** one native Chat glance on that build; then confetti.
+  #54 sync + Chat-first smoke); docs land `ac36e10`. See
+  [2241](plans/handoffs/2026-09-06-2241-composer-push-landed.md).
+- **Goal leftover closed:** native Chat glance **PASS** on that build
+  ([2245](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md) + PNG).
 - **Parked (not blocking north star):** C72 side panels; Prime list-import route;
-  #51 Tab; C64 native glance; #47; Grokbot audits; C9; packaging/Windows.
+  #51 Tab; C64 full verify; #47 close; Grokbot audits; C9; packaging/Windows.
 
 **Defer:** full release packaging, first Windows launch verification (#32 /
 C42 — still unrun on a real box), TokenJuice/Switchyard build, ratifying

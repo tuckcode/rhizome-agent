@@ -47,14 +47,15 @@ file.
 ---
 
 ## State
-`main` is **`f76b46c`** = `origin/main` (2026-09-06). Daily-drive Chat↔Prime
-hardening, gate fixes, #54 dual-sync stop, and Chat-first smoke (open Notes
-before editor asserts) are **on origin**. Confirm with `git status`.
+`main` code **`f76b46c`** / docs land **`ac36e10`** on origin (2026-09-06).
+Daily-drive Chat↔Prime hardening, gate fixes, #54 dual-sync stop, and
+Chat-first smoke are **on origin**. Native Chat glance **PASSED** — goal
+leftover closed ([2245](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md)).
 
 Still open / parked: **C72** side panels; Prime list-import route; **#51** Tab;
-**C64** native glance; **#47** confirm-close; Grokbot audits. Goal leftover:
-one native Chat glance on this build. Multi-day briefing:
-[`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date first).
+**C64** full native verify; **#47** confirm-close; Grokbot audits. Multi-day
+briefing: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date
+first).
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Inverted Dock icon is
@@ -90,10 +91,11 @@ yours to choose.
 
 ## Recent sessions
 
-- [2026-09-06 · Composer](plans/handoffs/2026-09-06-2241-composer-push-landed.md) — **push landed:** `f76b46c` on origin; goal leftover = native Chat glance. Parked: C72, Prime list-import, #51 Tab, C64, #47, Grokbot.
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md) — **native Chat glance PASS** on `f76b46c`/`ac36e10`; daily-drive north-star leftover closed. Parked: C72, Prime list-import, #51 Tab, C64 full verify, #47, Grokbot.
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-2241-composer-push-landed.md) — **push landed:** `f76b46c` on origin; glance leftover now closed by 2245.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-2154-composer-shower-brief-index.md) — shower briefs index (2150–2153 + C64/47 checklists 2156–2157); Atticus decisions only.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-2155-composer-push-result.md) — first push attempt failed (Chat-first smoke); superseded by 2241 / `f76b46c`.
-- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1837-composer-daily-drive-goal-audit.md) — honest goal audit; push now done — glance still open.
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1837-composer-daily-drive-goal-audit.md) — honest goal audit; push + glance both done (2241 / 2245).
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1819-composer-park-grokbot-audits-tonight.md) — **tonight:** review Grokbot full audits of rhizome-agent **and** CodexGPT lob (after dinner).
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1816-composer-session-import-first-run.md) — **session-import Settings UI** (Claude Code → vault `Imports/`); **Getting Started = local Rhizome scaffold** (no Tolaria clone by default). Prime list rows + C11 remote starter still open.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1814-composer-c72-side-panel-session.md) — **C72 parked:** right Notes/Graph column feels missing unless Notes opened from the left; dedicated side-panel layout session (defaults, Inbox label, right icon rail).
