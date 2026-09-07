@@ -117,16 +117,6 @@ export async function verifyVisible(
   await expect(page.locator(selector).first()).toBeVisible()
 }
 
-export async function verifyFocusable(
-  page: Page,
-  selector: string,
-): Promise<void> {
-  const el = page.locator(selector).first()
-  await expect(el).toBeVisible()
-  await el.focus()
-  await expect(el).toBeFocused()
-}
-
 export async function sendShortcut(
   page: Page,
   key: string,

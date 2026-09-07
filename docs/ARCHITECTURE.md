@@ -1712,7 +1712,7 @@ push stable-vYYYY.M.D tag
       → deploy to gh-pages
 ```
 
-Linux AppImage release jobs use Tauri's stock linuxdeploy AppImage output plugin. `scripts/appimage-launcher-tools.mjs` remains available for local experiments with symlink-safe AppRun patching and fcitx module bundling, but release packaging does not pre-seed that shim because linuxdeploy currently exits before sealing the AppImage when the shim replaces the stock output plugin in Tauri's tools cache.
+Linux AppImage release jobs use Tauri's stock linuxdeploy AppImage output plugin.
 
 ### Versioning
 
