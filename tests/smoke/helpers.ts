@@ -130,17 +130,27 @@ export async function sendShortcut(
 }
 
 /**
- * Chat is the default centre canvas (ADR-0166). Note-list / editor smokes must
- * open the Notes column explicitly — launch does not leave Notes as default.
+ * Chat is the default centre canvas (ADR-0166). C72 opens Notes (editor-list)
+ * on fresh launch; rail Inbox toggles that column. Only click Inbox / restore
+ * when the note list is not already visible.
  */
 export async function ensureNotesPanelOpen(page: Page) {
   const noteList = page.getByTestId('note-list-container')
   if (await noteList.isVisible().catch(() => false)) return noteList
 
+  // C72: Notes often opens as editor-list. Rail Inbox toggles — do not click it
+  // while the vault panel shell is already present (that would close Notes).
+  try {
+    await noteList.waitFor({ state: 'visible', timeout: 5_000 })
+    return noteList
+  } catch {
+    // fall through to restore / open
+  }
+
   const restore = page.getByTestId('vault-panel-restore')
   if (await restore.isVisible().catch(() => false)) {
     await restore.click()
-  } else {
+  } else if (!(await page.getByTestId('vault-panel').isVisible().catch(() => false))) {
     await page.getByTestId('command-rail-inbox').click()
   }
   await expect(noteList).toBeVisible({ timeout: 10_000 })
