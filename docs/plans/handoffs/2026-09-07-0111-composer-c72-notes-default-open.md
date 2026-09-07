@@ -4,7 +4,7 @@ model: Composer
 description: >-
   C72 partial — fresh launch defaults to editor-list (right Notes open); Chat
   no longer forces editor-only; Mycelium footprint tooltip says Mycelium.
-commits: pending
+commits: c69c1bb
 ---
 
 # C72 — Notes column open by default
