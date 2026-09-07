@@ -2,9 +2,9 @@ import { test, expect, type Page } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
 import {
-  createFixtureVaultCopy,
   openFixtureVault,
   pinNotesShellLaunch,
+  createFixtureVaultCopy,
   removeFixtureVaultCopy,
 } from '../helpers/fixtureVault'
 
@@ -106,15 +106,26 @@ async function dispatchModifiedLinkActivation(link: ReturnType<Page['locator']>)
 
 test.describe('Wikilink insertion and navigation', () => {
   test.beforeEach(async ({ page }) => {
-    // This block navigates without openFixtureVault, so use the unified Notes
-    // tab to choose the source type before opening the note from Inbox.
+    // Mock-tauri vault (Grow Newsletter). C72 opens Notes (editor-list) on
+    // launch; rail Inbox toggles that closed — wait for the panel instead.
     await pinNotesShellLaunch(page)
     await page.route('**/api/vault/ping', route => route.fulfill({ status: 503 }))
     await page.goto('/')
-    await page.waitForTimeout(500)
 
-    await page.getByTestId('command-rail-inbox').click()
-    await page.locator('aside').getByText('Responsibilities', { exact: true }).first().click()
+    const vaultPanel = page.getByTestId('vault-panel')
+    try {
+      await vaultPanel.waitFor({ state: 'visible', timeout: 10_000 })
+    } catch {
+      await page.getByTestId('command-rail-inbox').click()
+      await vaultPanel.waitFor({ state: 'visible', timeout: 10_000 })
+    }
+
+    const browseNav = page.getByTestId('vault-panel-navigation')
+    if ((await browseNav.count()) === 0) {
+      await page.getByTestId('vault-panel-browse-toggle').click()
+      await expect(browseNav).toBeVisible({ timeout: 10_000 })
+    }
+    await browseNav.getByText('Responsibilities', { exact: true }).first().click()
     const noteItem = page.getByTestId('note-list-container').getByText(SOURCE_NOTE_TITLE, { exact: true }).first()
     await noteItem.click()
     await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 10_000 })
