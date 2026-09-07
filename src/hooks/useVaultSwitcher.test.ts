@@ -267,32 +267,10 @@ describe('useVaultSwitcher', () => {
     expect(mockVaultListStore.active_vault).toBeNull()
   })
 
-  it('stops the MCP bridge when there is no selected active vault', async () => {
-    await renderLoadedVaultSwitcher()
-
-    await waitFor(() => {
-      expect(mockInvokeFn).toHaveBeenCalledWith('sync_mcp_bridge_vault', { vaultPath: null })
-    })
-  })
-
-  it('syncs the MCP bridge to a persisted active vault', async () => {
+  it('does not sync the MCP bridge (workspace graph owns that path)', async () => {
     mockVaultListStore = {
       vaults: [{ label: 'Work', path: '/work/vault' }],
       active_vault: '/work/vault',
-      hidden_defaults: [],
-    }
-
-    await renderLoadedVaultSwitcher()
-
-    await waitFor(() => {
-      expect(mockInvokeFn).toHaveBeenCalledWith('sync_mcp_bridge_vault', { vaultPath: '/work/vault' })
-    })
-  })
-
-  it('syncs the MCP bridge after switching vaults', async () => {
-    mockVaultListStore = {
-      vaults: [{ label: 'Work', path: '/work/vault' }],
-      active_vault: null,
       hidden_defaults: [],
     }
 
@@ -303,8 +281,13 @@ describe('useVaultSwitcher', () => {
     })
 
     await waitFor(() => {
-      expect(mockInvokeFn).toHaveBeenCalledWith('sync_mcp_bridge_vault', { vaultPath: '/work/vault' })
+      expect(result.current.selectedVaultPath).toBe('/work/vault')
     })
+
+    expect(mockInvokeFn).not.toHaveBeenCalledWith(
+      'sync_mcp_bridge_vault',
+      expect.anything(),
+    )
   })
 
   it('keeps the implicit default vault out of the list when its path is missing', async () => {
