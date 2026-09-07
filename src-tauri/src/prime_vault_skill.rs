@@ -554,8 +554,7 @@ mod tests {
             "expected graph tools in skill body"
         );
         assert!(
-            md.contains("RHIZOME_TOOL_PATH=")
-                || std::env::var_os("RHIZOME_TOOL_PATH").is_none(),
+            md.contains("RHIZOME_TOOL_PATH=") || std::env::var_os("RHIZOME_TOOL_PATH").is_none(),
             "expected sidecar path when RHIZOME_TOOL_PATH is set"
         );
     }
