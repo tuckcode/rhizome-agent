@@ -7,7 +7,9 @@
 #[cfg(any(test, target_os = "macos"))]
 use std::fs;
 #[cfg(any(test, target_os = "macos"))]
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(target_os = "macos")]
+use std::path::PathBuf;
 #[cfg(target_os = "macos")]
 use std::process::Command;
 #[cfg(target_os = "macos")]
