@@ -291,10 +291,10 @@ push is not a release — releases are tagged builds with signed installers.
   vs per-vault; new Settings section vs under the existing AI agents page.
 - ~~**C67-OPEN (2026-09-06): sessions list needs a right-click menu**~~ **RESOLVED 2026-09-06.** Right-click Open / Rename / Archive·Restore / View in Mycelium / Copy path via `PrimeSessionListContextMenu`; Mycelium uses `handleOpenSessionFootprint`.
 - ~~**C68-OPEN (2026-09-06): restore note lock/view.**~~ **RESOLVED 2026-09-06.** Ephemeral per-note lock (default editable); breadcrumb + Cmd+K; BlockNote/CodeMirror read-only when locked. Not vault `editor_mode`.
-- **C69-OPEN (2026-09-06): Linux CI Clippy (`-D warnings`) fails on macOS-only
-  `src-tauri`; `git diff origin/main...HEAD -- src-tauri` is empty. Linux
-  clippy reports unused imports / dead code in `menu_bar_capture.rs` and
-  cfg-gates — not area B.
+- ~~**C69-OPEN (2026-09-06): Linux CI Clippy (`-D warnings`) fails on macOS-only
+  `src-tauri`.**~~ **RESOLVED 2026-09-07 on `cursor/tauri-dead-ipc-bf88`.**
+  Capture helpers and `should_reopen_main_window` are `cfg(any(macos, test))`;
+  Linux lib clippy no longer sees them. Same errors had failed area A–D PRs.
 - ~~**C69-OPEN (2026-09-06): packaged mcp-server omitted `cli-call.mjs`.**~~ **FIXED + `/Applications` rebuilt 2026-09-06 afternoon.** Bundle ships self-contained `cli-call.mjs`; seed failures `log::warn`; `pick_mcp_server_dir` prefers packaged macOS/Windows/Linux layouts over compile-time repo. Live Chat graph ask + Obsidian/Documents skills point at `/Applications/.../cli-call.mjs`. Windows launch itself remains C42.
 
 - ~~**C57-OPEN (2026-08-29): permission mode product choices after Prime fix.**~~ **RESOLVED 2026-09-06 (Atticus).** CLI agents default **Limited tools** (`safe`); Prime toggle stays **hidden** (always Power User); keep labels **Limited tools** / **Power User** — do not restore “Vault Safe.” Code already matched (`aiAgentPermissionMode.ts`, `hidePermissionMode` on Prime).
