@@ -47,10 +47,6 @@ file.
 ---
 
 ## State
-`main` is **`a309a17`**. Area B orphan-hook cleanup is PR #59
-(`cursor/area-b-orphan-hooks-a307`). Confirm with `git status`.
-`main` is **`a309a17`**. Area B orphan-hook cleanup is
-`4227207` on `cursor/area-b-orphan-hooks-a307` (PR #59). Confirm with `git status`.
 `main` code **`f76b46c`** / docs land **`ac36e10`** on origin (2026-09-06).
 Daily-drive Chat↔Prime hardening, gate fixes, #54 dual-sync stop, and
 Chat-first smoke are **on origin**. Native Chat glance **PASSED** — goal
