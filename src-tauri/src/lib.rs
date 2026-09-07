@@ -370,6 +370,7 @@ pub(crate) fn window_hides_instead_of_closing(label: &str) -> bool {
 ///
 /// Only when nothing is already on screen. Clicking the dock while a window is
 /// visible must not steal focus or raise a window the user did not ask for.
+#[cfg(any(test, target_os = "macos"))]
 pub(crate) fn should_reopen_main_window(has_visible_windows: bool) -> bool {
     !has_visible_windows
 }

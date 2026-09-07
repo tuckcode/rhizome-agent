@@ -4,15 +4,23 @@
 //! PNG lands in `attachments/`; a markdown stub lands in `raw/inbox/` so
 //! inbox automation / history can pick it up. Escape cancel = no files.
 
+#[cfg(any(test, target_os = "macos"))]
 use std::fs;
+#[cfg(any(test, target_os = "macos"))]
 use std::path::{Path, PathBuf};
+#[cfg(target_os = "macos")]
 use std::process::Command;
+#[cfg(target_os = "macos")]
 use std::thread;
+#[cfg(target_os = "macos")]
 use std::time::Duration;
 
+#[cfg(any(test, target_os = "macos"))]
 use chrono::Local;
 
+#[cfg(any(test, target_os = "macos"))]
 use crate::rhizome_distill::append_vault_event_best_effort;
+#[cfg(target_os = "macos")]
 use crate::vault_list;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,6 +31,7 @@ pub enum CaptureKind {
 }
 
 impl CaptureKind {
+    #[cfg(any(test, target_os = "macos"))]
     fn slug(self) -> &'static str {
         match self {
             CaptureKind::Area => "area",
@@ -31,6 +40,7 @@ impl CaptureKind {
         }
     }
 
+    #[cfg(any(test, target_os = "macos"))]
     fn title(self) -> &'static str {
         match self {
             CaptureKind::Area => "Screen capture (area)",
@@ -41,6 +51,7 @@ impl CaptureKind {
 }
 
 /// Resolve the vault that tray capture should write into.
+#[cfg(target_os = "macos")]
 pub fn resolve_capture_vault_path() -> Result<PathBuf, String> {
     let list = vault_list::load_vault_list()?;
     let path = list
@@ -62,7 +73,7 @@ pub fn capture_to_vault(kind: CaptureKind) -> Result<Option<CaptureResult>, Stri
     #[cfg(not(target_os = "macos"))]
     {
         let _ = kind;
-        return Err("Screen capture from the menu bar is macOS-only for now.".into());
+        Err("Screen capture from the menu bar is macOS-only for now.".into())
     }
 
     #[cfg(target_os = "macos")]
@@ -96,6 +107,7 @@ pub struct CaptureResult {
 }
 
 /// Pure write path — unit-tested without screencapture.
+#[cfg(any(test, target_os = "macos"))]
 pub fn write_capture_files(
     vault_path: &Path,
     kind: CaptureKind,
