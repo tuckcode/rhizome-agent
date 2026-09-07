@@ -66,8 +66,12 @@ trustworthy. Verify on a **real vault + live agent turn**, not unit tests alone.
 5. ~~**Session import UI**~~ — **Settings + vault writer shipped 2026-09-06 18:16**
    (Claude Code → `Imports/`). Still open: Prime session-list rows; other
    source adapters; first-run Welcome import step (C9).
-6. **C72 side-panel layout session** — right Notes/Graph column discoverability + defaults + whether a right icon rail exists; do not drive-by.
-7. **Tonight (Atticus):** review **Grokbot full audits** — rhizome-agent **and** CodexGPT lob. See [1819 handoff](plans/handoffs/2026-09-06-1819-composer-park-grokbot-audits-tonight.md).
+6. **C72 side-panel layout session** — ~~right Notes open by default~~ on
+   origin `cd97743`. **WIP:** Graph/Mycelium only on **Changes**; Inbox keeps
+   the full notes list; collapsed Notes leaves a **46px right rail** (same
+   width as the left command rail). Later: expand the Changes split instead
+   of a second side panel. Still open: Inbox rename / discoverability.
+7. **Tonight (Atticus):** review **Grokbot full audits** — rhizome-agent **and** CodexGPT lob. See [1819 handoff](plans/handoffs/2026-09-06-1819-composer-park-grokbot-audits-tonight.md). **Local WIP:** thinking-pill full level menu (needs commit + Apps rebuild).
 
 **Already shipped (do not re-claim):** #25 provenance · C23 rehydration ·
 C67 sessions context menu · C68 note lock · ADR-0170 right-panel stack ·

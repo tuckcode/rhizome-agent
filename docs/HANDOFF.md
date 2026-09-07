@@ -47,13 +47,13 @@ file.
 ---
 
 ## State
-`main` on origin includes daily-drive Chat↔Prime through **`f76b46c`**,
-**#58/#59/#63** merged, and local rebase adds **C72** Notes open-by-default
-plus icon AI message toolbar (pre-push). Native Chat glance **PASSED**.
+Local tip (this commit): thinking-level menu, Graph/Mycelium on Changes,
+matching Notes restore rail, skip-ensure on session switch. Origin still
+**`cd97743`** until push. Native Chat glance **PASSED** (2026-09-06).
 
-Still open / parked: **C72** remainder (right icon rail / Inbox rename);
-Prime list-import; **#51** Tab; **C64** full verify; **#47** confirm-close;
-Grokbot **#60/#61/#62** (held); updater stub / Applications rebuild.
+Still open / parked: **C72** Inbox rename; Prime list-import; **#51** Tab;
+**C64** full verify; **#47** confirm-close; Grokbot **#60/#61/#62** (held);
+Rhizome in-app updater stub.
 [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date first).
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
@@ -90,19 +90,15 @@ yours to choose.
 
 ## Recent sessions
 
-- [2026-09-07 · Composer](plans/handoffs/2026-09-07-0111-composer-c72-notes-default-open.md) — **C72 partial:** default `editor-list` on fresh launch; Chat does not wipe Notes; Mycelium chip tooltip = “Mycelium”. Inbox rename / right rail still open. Needs `/Applications` rebuild.
+- [2026-09-07 · Composer](plans/handoffs/2026-09-07-0324-composer-graph-on-changes.md) — **Graph/Mycelium only on Changes;** Inbox keeps the full notes list; collapsed Notes leaves a 46px right rail (same as left command rail).
+- [2026-09-07 · Composer](plans/handoffs/2026-09-07-0308-composer-lag-audit-pickup.md) — **lag/pinwheel audit pickup** for a fresh session (start / page switch / Settings); prior beachball diagnosis linked; only one Rhizome process; Apps was `.bak` at write time.
 - [2026-09-07 · Composer](plans/handoffs/2026-09-07-0003-composer-beachball-lag.md) — **beachball diagnosis (docs only):** session switch = 3 sync Prime awaits + full chat `messages.map`; Settings = full remount; cold start = ensure daemon + vault + Graph if Inbox open; Applications smoother but same shapes; quit Applications before `tauri:dev` (same bundle id).
 - [2026-09-06 · Cursor Grok 4.6](plans/handoffs/2026-09-06-2236-cursor-grok-4-6-area-f.md) — **Area F:** MCP no longer advertises `rhizome_grok_import` / `rhizome_generate_wiki` / `rhizome_repo_research`; deleted `rhizome_grok_import.rs` and parked smoke junk. **Merged as #63**.
 - [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2145-grok-4-6-area-b-orphan-hooks.md) — **Area B subtraction:** deleted unused hooks (`useMcpBridge`, `useClaudeCodeOnboarding`, `useClaudeCodeStatus`, `useNoteLayout`), the TS Mindwalk duplicate, unused Claude CLI wrappers, and confirmed-dead app-core exports. Claude onboarding/badge UI files left for area C. **Merged as #59**.
 - [2026-09-06 · Cursor Grok 4.6](plans/handoffs/2026-09-06-2141-cursor-grok-4-6-area-a-orphans.md) — **area A subtraction:** deleted orphaned `e2e/` (24 unused specs), unused scripts, unused `biome.json`, leftover `mcp-server/package-lock.json`, and unused `verifyFocusable`. Live `tests/smoke/` and `tests/integration/` kept. **Merged as #58** (`de80c90`).
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md) — **native Chat glance PASS** on `f76b46c`/`ac36e10`; daily-drive north-star leftover closed. Parked: C72, Prime list-import, #51 Tab, C64 full verify, #47, Grokbot.
-- [2026-09-06 · Composer](plans/handoffs/2026-09-06-2241-composer-push-landed.md) — **push landed:** `f76b46c` on origin; glance leftover now closed by 2245.
-- [2026-09-06 · Composer](plans/handoffs/2026-09-06-2154-composer-shower-brief-index.md) — shower briefs index (2150–2153 + C64/47 checklists 2156–2157); Atticus decisions only.
-- [2026-09-06 · Composer](plans/handoffs/2026-09-06-2155-composer-push-result.md) — first push attempt failed (Chat-first smoke); superseded by 2241 / `f76b46c`.
-- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1837-composer-daily-drive-goal-audit.md) — honest goal audit; push + glance both done (2241 / 2245).
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1819-composer-park-grokbot-audits-tonight.md) — **tonight:** review Grokbot full audits of rhizome-agent **and** CodexGPT lob (after dinner).
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1816-composer-session-import-first-run.md) — **session-import Settings UI** (Claude Code → vault `Imports/`); **Getting Started = local Rhizome scaffold** (no Tolaria clone by default). Prime list rows + C11 remote starter still open.
-- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1814-composer-c72-side-panel-session.md) — **C72 parked:** right Notes/Graph column feels missing unless Notes opened from the left; dedicated side-panel layout session (defaults, Inbox label, right icon rail).
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1813-composer-c57-permission-decisions.md) — **C57 closed by Atticus:** CLI default Limited tools; Prime toggle stays hidden; keep “Limited tools” / Power User (no Vault Safe rename). Code already matched.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1812-composer-c70-c71-clocks-and-history.md) — **C70/C71 shipped in tree:** Chat bubble clocks (`3:35p`); Ask-box Up/Down prompt recall (caret at start / empty only).
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1802-composer-provider-preflight-gap.md) — gap audit: DeepSeek/Nous Settings already in tree; Chat preflight now drops expired OAuth; `NOUS_API_KEY` counts as connected.
@@ -117,8 +113,6 @@ yours to choose.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-0805-composer-c67-c68.md) — **C67/C68 shipped:** sessions right-click menu; note lock (default editable, breadcrumb + Cmd+K).
 
 - [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-0405-grok-4-6-status-bar-pills.md) — status-bar chrome: Contribute/Docs → Settings → About; build/update next to theme; composer lost the duplicate vault pill and hosts agent idle. Vault dropdown stays bottom-left.
-
-- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-0338-grok-4-6-lock-and-session-menu.md) — captured then shipped later as C67/C68 (see 0805 Composer handoff).
 
 - [2026-09-05 · Claude Opus 5](plans/handoffs/2026-09-05-2145-claude-opus-5-session-import-and-agent-graph.md) — **no agent had ever successfully run a graph query**: the `rhizome_graph_*` tools need `RHIZOME_TOOL_PATH`, and the seeded skill tells the agent to run `cli-call.mjs` from a bash tool, which inherits none of the app's environment. Fixed, and rewrote the skill description so agents discover the graph at all (they were told only about note CRUD). Built the **session-import engine** — ledger, dedup, Claude Code adapter, selection, preview, vault writer — verified on real history: 318 notes written, zero failures, second run wrote nothing. Fixed four UI defects (inverted Connections resize, titlebar stealing the window drag, unresizable chat/editor split, session list sorted by file mtime). **Right-panel layout agreed but unbuilt**; skill change not yet verified with a real agent.
 

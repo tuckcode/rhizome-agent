@@ -554,8 +554,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const handleRailSelectInbox = useCallback(() => {
     handleSetSelection({ kind: 'filter', filter: explicitOrganizationEnabled ? 'inbox' : 'all' })
   }, [handleSetSelection, explicitOrganizationEnabled])
-  // In command-rail mode Graph and Mycelium live under Notes in the right
-  // panel, not as a full-page destination. Classic shell keeps the old toggle.
+  // Graph and Mycelium live under Notes on the Changes tab only. Inbox
+  // keeps the full notes list. Classic shell still uses the old toggle.
   const connectionsPanelRef = useRef<ConnectionsPanelHandle>(null)
   const connectionsRequestSeq = useRef(0)
   const [connectionsRequest, setConnectionsRequest] = useState<ConnectionsViewRequest | null>(null)
@@ -1581,25 +1581,27 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const [compactVaultPanelOpen, setCompactVaultPanelOpen] = useState(false)
   const handleRailSelectGraph = useCallback(() => {
     if (chatCentered) {
-      if (viewMode === 'editor-only') handleSetViewMode('all')
+      if (viewMode === 'editor-only') handleSetViewMode('editor-list')
       setCompactVaultPanelOpen(true)
+      handleRailSelectChanges()
       setConnectionsRequest({ view: 'graph', requestId: ++connectionsRequestSeq.current })
       connectionsPanelRef.current?.openView('graph')
       return
     }
     handleSetSelection(toggleGraphSelection(effectiveSelection, vaultConfig.inbox?.explicitOrganization))
-  }, [chatCentered, handleSetSelection, effectiveSelection, handleSetViewMode, setCompactVaultPanelOpen, setConnectionsRequest, viewMode, vaultConfig.inbox?.explicitOrganization])
+  }, [chatCentered, handleRailSelectChanges, handleSetSelection, effectiveSelection, handleSetViewMode, setCompactVaultPanelOpen, setConnectionsRequest, viewMode, vaultConfig.inbox?.explicitOrganization])
   const handleOpenSessionFootprint = useCallback((path: string) => {
     if (chatCentered) {
-      if (viewMode === 'editor-only') handleSetViewMode('all')
+      if (viewMode === 'editor-only') handleSetViewMode('editor-list')
       setCompactVaultPanelOpen(true)
+      handleRailSelectChanges()
       setConnectionsRequest({ view: 'mycelium', focusPath: path, requestId: ++connectionsRequestSeq.current })
       connectionsPanelRef.current?.openView('mycelium', { focusPath: path })
       return
     }
     setMyceliumFocusPath(path)
     handleSetSelection({ kind: 'filter', filter: 'mycelium' })
-  }, [chatCentered, handleSetSelection, handleSetViewMode, setCompactVaultPanelOpen, setConnectionsRequest, viewMode])
+  }, [chatCentered, handleRailSelectChanges, handleSetSelection, handleSetViewMode, setCompactVaultPanelOpen, setConnectionsRequest, viewMode])
   const handleSelectNoteForPdfExport = notes.handleSelectNote
   const handleExportNotePdfFromList = useCallback((entry: VaultEntry) => {
     if (!isMarkdownEntry(entry)) return
@@ -1915,10 +1917,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     (!compactVaultPanel || compactVaultPanelOpen)
   const showVaultPanelRestore =
     chatCentered &&
-    viewMode !== 'editor-only' &&
-    !hideNoteListForCanvas &&
-    compactVaultPanel &&
-    !compactVaultPanelOpen
+    !showVaultPanel &&
+    !hideNoteListForCanvas
 
   const handleVaultTreeSelect = (nextSelection: SidebarSelection) => {
     handleSetSelection(nextSelection)
@@ -1977,7 +1977,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           handleSetViewMode('editor-only')
         }}
       />
-      {chatCentered ? (
+      {chatCentered && isChangesSelection ? (
         <ConnectionsPanel
           ref={connectionsPanelRef}
           vaultPath={resolvedPath}
@@ -2294,7 +2294,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           {showVaultPanelRestore && (
             <VaultPanelRestoreButton
               locale={appLocale}
-              onClick={() => setCompactVaultPanelOpen(true)}
+              onClick={() => {
+                handleSetViewMode('editor-list')
+                setCompactVaultPanelOpen(true)
+              }}
             />
           )}
           {vaultPanel}

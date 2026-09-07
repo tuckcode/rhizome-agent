@@ -28,9 +28,9 @@ function readPlacements(): Record<View, Placement> {
   } catch { return { graph: 'sidebar', mycelium: 'sidebar' } }
 }
 /**
- * Graph and Mycelium sit under Notes in the right column. Height is the
+ * Graph and Mycelium sit under Notes on the Changes tab. Height is the
  * thing you drag — Notes stays the heavy half, this is the bottom quarter
- * to half. There is no closed-edge strip; Inbox is how you reach this.
+ * to half. Inbox keeps the full notes list (no graph chrome).
  */
 export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
   vaultPath: string

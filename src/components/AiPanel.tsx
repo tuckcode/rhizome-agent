@@ -351,6 +351,7 @@ export function AiPanelView({
     sessionsAutoCollapsed,
     refreshSessionTree,
     primeHostSessionPath: primeHost.sessionPath,
+    hostRunning: primeHost.running,
   })
   const sessionsShown = sessionsVisible
   const usesRailSessions = sessionsRailSlot !== undefined
