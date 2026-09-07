@@ -1,6 +1,17 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { CaretRight, CaretDown, Brain, Terminal } from '@phosphor-icons/react'
+import {
+  ArrowClockwise,
+  Brain,
+  CaretDown,
+  CaretRight,
+  Copy,
+  FloppyDisk,
+  GitFork,
+  Terminal,
+} from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import { ActionTooltip } from '@/components/ui/action-tooltip'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { AiActionCard, type AiActionStatus } from './AiActionCard'
 import { MarkdownContent } from './MarkdownContent'
 import { translate, type AppLocale } from '../lib/i18n'
@@ -303,64 +314,74 @@ function ResponseActions({
   const regenerateDisabled = !messageId || !onRegenerate
   const forkDisabled = !forkTargetId || !onFork
   const saveDisabled = promoteDisabled || !onPromoteToVault
+  const regenerateLabel = translate(locale, 'ai.message.regenerate')
+  const copyLabel = translate(locale, 'ai.message.copy')
+  const saveLabel = translate(locale, 'ai.message.saveToVault')
+  const forkLabel = translate(locale, 'ai.message.fork')
 
   return (
-    <div
-      className="mt-1.5 flex flex-wrap items-center gap-1"
-      data-testid="ai-message-actions"
-    >
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-        disabled={regenerateDisabled}
-        aria-label={translate(locale, 'ai.message.regenerate')}
-        title={translate(locale, 'ai.message.regenerate')}
-        onClick={() => messageId && onRegenerate?.(messageId)}
-        data-testid="ai-message-regenerate"
+    <TooltipProvider delayDuration={200}>
+      <div
+        className="mt-1.5 flex flex-wrap items-center gap-0.5"
+        data-testid="ai-message-actions"
       >
-        {translate(locale, 'ai.message.regenerate')}
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-        aria-label={translate(locale, 'ai.message.copy')}
-        title={translate(locale, 'ai.message.copy')}
-        onClick={onCopy}
-        data-testid="ai-message-copy"
-      >
-        {translate(locale, 'ai.message.copy')}
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="h-7 px-2 text-xs text-primary hover:text-primary"
-        disabled={saveDisabled}
-        aria-label={translate(locale, 'ai.message.saveToVault')}
-        title={translate(locale, 'ai.message.saveToVault')}
-        onClick={() => onPromoteToVault?.()}
-        data-testid="ai-message-save-to-vault"
-      >
-        {translate(locale, 'ai.message.saveToVault')}
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-        disabled={forkDisabled}
-        aria-label={translate(locale, 'ai.message.fork')}
-        title={translate(locale, 'ai.message.fork')}
-        onClick={() => forkTargetId && onFork?.(forkTargetId)}
-        data-testid="ai-message-fork"
-      >
-        {translate(locale, 'ai.message.fork')}
-      </Button>
-    </div>
+        <ActionTooltip copy={{ label: regenerateLabel }}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            disabled={regenerateDisabled}
+            aria-label={regenerateLabel}
+            onClick={() => messageId && onRegenerate?.(messageId)}
+            data-testid="ai-message-regenerate"
+          >
+            <ArrowClockwise size={14} aria-hidden="true" />
+          </Button>
+        </ActionTooltip>
+        <ActionTooltip copy={{ label: copyLabel }}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            aria-label={copyLabel}
+            onClick={onCopy}
+            data-testid="ai-message-copy"
+          >
+            <Copy size={14} aria-hidden="true" />
+          </Button>
+        </ActionTooltip>
+        <ActionTooltip copy={{ label: saveLabel }}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-primary hover:text-primary"
+            disabled={saveDisabled}
+            aria-label={saveLabel}
+            onClick={() => onPromoteToVault?.()}
+            data-testid="ai-message-save-to-vault"
+          >
+            <FloppyDisk size={14} aria-hidden="true" />
+          </Button>
+        </ActionTooltip>
+        <ActionTooltip copy={{ label: forkLabel }}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            disabled={forkDisabled}
+            aria-label={forkLabel}
+            onClick={() => forkTargetId && onFork?.(forkTargetId)}
+            data-testid="ai-message-fork"
+          >
+            <GitFork size={14} aria-hidden="true" />
+          </Button>
+        </ActionTooltip>
+      </div>
+    </TooltipProvider>
   )
 }
 
