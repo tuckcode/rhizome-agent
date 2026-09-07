@@ -716,13 +716,13 @@ describe('App', () => {
     expect(screen.getByRole('tab', { name: 'Mycelium', selected: true })).toBeInTheDocument()
   })
 
-  it('starts with the vault panel closed when no view preference is stored', async () => {
+  it('starts with the vault panel open when no view preference is stored (C72)', async () => {
     localStorage.removeItem('rhizome-view-mode')
     render(<App />)
 
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-inbox')).toHaveAccessibleName('Inbox')
-    expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
+    expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
   })
 
   it('opens a note window after loading the active vault graph', async () => {
