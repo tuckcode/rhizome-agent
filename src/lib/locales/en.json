@@ -1273,7 +1273,7 @@
   "ai.composer.skills": "Skills",
   "ai.composer.thinkingToggle": "Think",
   "ai.composer.thinkingToggleAria": "Thinking level · {level}",
-  "ai.composer.thinkingToggleHint": "Click to switch between a quiet and a high reasoning level",
+  "ai.composer.thinkingToggleHint": "Choose how hard the agent thinks on the next turn",
   "ai.composer.vault": "Attached vault",
   "ai.composer.context": "ctx · {note}",
   "ai.composer.contextTitle": "Note context",

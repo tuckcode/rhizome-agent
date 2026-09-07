@@ -72,11 +72,11 @@ export function trackFilePreviewFailed(previewKind: FilePreviewKind): void {
  *
  * The level id is a fixed, non-identifying enum from Prime's own list, so it
  * is safe to record as-is. `source` says whether it came from the model menu
- * or the one-click toggle — whether anyone uses the toggle is the question.
+ * or the composer thinking pill.
  */
 export function trackPrimeThinkingLevelChanged(
   level: string,
-  source: 'menu' | 'toggle' = 'menu',
+  source: 'menu' | 'pill' | 'toggle' = 'menu',
 ): void {
   trackEvent('prime_thinking_level_changed', { level, source })
 }

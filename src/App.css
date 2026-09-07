@@ -132,20 +132,17 @@
   padding: 0;
 }
 
-.vault-panel__restore {
-  position: absolute;
-  top: 50%;
-  right: 0;
+.app__notes-rail {
+  flex: 0 0 auto;
+  align-self: stretch;
+  height: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
   z-index: 40;
-  width: 32px;
-  height: 40px;
-  padding: 0;
-  transform: translateY(-50%);
-  border: 1px solid var(--sidebar-border);
-  border-right: 0;
-  border-radius: var(--radius) 0 0 var(--radius);
   background: var(--surface-sidebar);
-  box-shadow: -4px 0 12px color-mix(in srgb, black 10%, transparent);
+  border-left: 1px solid var(--sidebar-border);
+  border-right: 0;
 }
 
 .vault-panel__content {

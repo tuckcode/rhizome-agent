@@ -28,6 +28,8 @@ interface UsePrimeSessionSwitcherArgs {
   refreshSessionTree: () => void
   /** The live host's current session, used as the branch-navigate fallback when no past session has been selected. */
   primeHostSessionPath: string | null | undefined
+  /** Skip ensure-on-switch when Chat already has a live Prime host. */
+  hostRunning?: boolean
 }
 
 interface UsePrimeSessionSwitcherResult {
@@ -61,6 +63,7 @@ export function usePrimeSessionSwitcher({
   sessionsAutoCollapsed,
   refreshSessionTree,
   primeHostSessionPath,
+  hostRunning = false,
 }: UsePrimeSessionSwitcherArgs): UsePrimeSessionSwitcherResult {
   // Open unless this machine says otherwise. The column is the only thing on
   // Chat home that says other sessions exist, so a closed default left the
@@ -108,7 +111,7 @@ export function usePrimeSessionSwitcher({
   const handleSelectSession = useCallback(async (session: PrimeSessionSummary) => {
     setSwitchError(null)
     try {
-      if (vaultPath) {
+      if (vaultPath && !hostRunning) {
         await callHost('ensure_prime_session_host', { vaultPath })
       }
       await callHost<string>('switch_prime_session', { path: session.path })
@@ -126,7 +129,7 @@ export function usePrimeSessionSwitcher({
     } catch (e) {
       reportSwitchError(e)
     }
-  }, [agent, refreshSessionTree, reportSwitchError, vaultPath])
+  }, [agent, hostRunning, refreshSessionTree, reportSwitchError, vaultPath])
 
   // A roster row clicked in the menu bar lands here (#13). Reuses the same
   // switch path as the in-app session list so there is one way to change
