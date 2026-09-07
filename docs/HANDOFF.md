@@ -91,6 +91,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-06 · Cursor Grok 4.6](plans/handoffs/2026-09-06-2141-cursor-grok-4-6-area-a-orphans.md) — **area A subtraction:** deleted orphaned `e2e/` (24 unused specs), unused scripts, unused `biome.json`, leftover `mcp-server/package-lock.json`, and unused `verifyFocusable`. Live `tests/smoke/` and `tests/integration/` kept.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md) — **native Chat glance PASS** on `f76b46c`/`ac36e10`; daily-drive north-star leftover closed. Parked: C72, Prime list-import, #51 Tab, C64 full verify, #47, Grokbot.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-2241-composer-push-landed.md) — **push landed:** `f76b46c` on origin; glance leftover now closed by 2245.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-2154-composer-shower-brief-index.md) — shower briefs index (2150–2153 + C64/47 checklists 2156–2157); Atticus decisions only.
