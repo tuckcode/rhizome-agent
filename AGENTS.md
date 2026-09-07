@@ -5,8 +5,8 @@
 > It is **not** Rhizome Desktop (`ai.rhizome.desktop`, `knispo/rhizome`).  
 > Do not push here to desktop origin. Do not “fix branding back to Desktop.”  
 > Direction: chat UI + **Prime Agent** harness. Details: `docs/IDENTITY.md`.
-> **ADHD skills are off here.** Do not load `/adhd`, `voice-adhd.md`, or the
-> parallel-ideation ADHD skill. Do not switch this repo into ADHD short-mode.
+> **Personal reply-voice skills stay out of this repo.** Global voice is STE-100
+> in Rhizome Vault `agents/shared/`. Do not copy voice skills into this tree.
 
 ---
 
@@ -535,7 +535,7 @@ Single-context layout — root `CONTEXT.md` + `docs/adr/`. See `docs/agents/doma
 - Shares strategy docs and harness take/leave recommendations as decision context for joint calls, not as a shipped bill of materials. Intended product shape is option 2 (Rhizome harness, Prime engine); the take/adapt/reject/defer matrix with named incompatibilities is still unwritten. OpenCode was only an early coding-harness example at project start, not a Rhizome integration target.
 - Route agent work by cost and complexity: Composer or the cheapest viable model for simple chores; stronger models (e.g. Grok 4.6) for complex tasks.
 - Use judgment on obvious UI and product fixes without asking; not every decision needs owner confirmation.
-- Prioritize product stability and core UX before public release or distribution packaging; keep Windows parity in mind for features, docs, and QA (not macOS-only). Daily-driving focus is rock-solid Chat ↔ Prime tooling/harness communication. Prefer the packaged `/Applications/Rhizome Agent.app` for daily drive over debug `pnpm tauri` (Settings and session switch lag/beachball on the debug stack). Wants Rhizome’s own in-app update path (green bottom bar / update control) — not Prime’s updater.
+- Prioritize product stability and core UX before public release or distribution packaging; keep Windows parity in mind for features, docs, and QA (not macOS-only). Daily-driving focus is rock-solid Chat ↔ Prime tooling/harness communication. Prefer the packaged `/Applications/Rhizome Agent.app` for daily drive over debug `pnpm tauri` (Settings and session switch lag/beachball on the debug stack). Quit the running Applications copy before replacing it — installing while it is open leaves the old binary. Wants Rhizome’s own in-app update path (green bottom bar / update control) — not Prime’s updater. Personal reply voice is STE-100 in the global agent files, not a skill in this tree. If it is ever productized, it belongs as a Settings option, not a default.
 - Wants cross-client session import (Claude, Cursor, GPT, Hermes, etc.) on first launch and in Settings: always into the Prime session list; also vault notes under `Imports/<source>/` (`type: Imported Session`) when a vault is attached. Dedup must work across any re-import chain (fingerprint + provenance), not only one app pair like Cursor→Claude.
 - Treat token routing/compression (tinyhumans tokenjuice and NVIDIA's router) as discuss/plan material in a design doc, not opportunistic implementation.
 - Wants background agent execution to be explicit: active window close should default to stopping work, while explicitly scheduled work may continue if it stays visible and revocable.
