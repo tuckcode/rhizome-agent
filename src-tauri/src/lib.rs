@@ -53,7 +53,6 @@ mod prime_vault_skill;
 pub mod rhizome_api;
 pub mod rhizome_commands;
 pub mod rhizome_distill;
-pub mod rhizome_grok_import;
 pub mod rhizome_import;
 pub mod rhizome_jobs;
 pub mod rhizome_repo_research;

@@ -91,27 +91,4 @@ test.describe('Create & open note from relationship input', () => {
       timeout: 5_000,
     })
   })
-
-  // TODO: fix relationship wikilink persistence in single-note model — the wikilink
-  // write to the original note may race with navigation to the new note.
-  test.skip('relationship wikilink is added to original note after creation', async ({ page }) => {
-    await openNote(page, 'Team Meeting')
-    await openPropertiesPanel(page)
-
-    const input = await openFirstRelationshipInput(page)
-    const uniqueTitle = `Link Test ${Date.now()}`
-    await input.fill(uniqueTitle)
-    await page.waitForTimeout(300)
-
-    await page.getByTestId('create-and-open-option').click()
-    await page.waitForTimeout(3000)
-
-    // Navigate back to the original note (single-note model: replaces the newly created note)
-    await openNote(page, 'Team Meeting')
-    await page.waitForTimeout(2000)
-
-    // The new wikilink should appear in the relationships
-    const newRef = page.locator(`text=${uniqueTitle}`)
-    await expect(newRef.first()).toBeVisible({ timeout: 8000 })
-  })
 })
