@@ -392,7 +392,7 @@ describe('AiMessage', () => {
     expect(screen.getByTestId('ai-message-save-to-vault')).toBeDisabled()
   })
 
-  it('shows Save to vault as a visible labeled control', () => {
+  it('shows Save to vault as an icon control with full accessible name', () => {
     render(
       <AiMessage
         userMessage="Ask"
@@ -402,9 +402,10 @@ describe('AiMessage', () => {
       />,
     )
 
-    const save = screen.getByTestId('ai-message-save-to-vault')
-    expect(save).toHaveTextContent('Save to vault')
+    const save = screen.getByRole('button', { name: 'Save to vault' })
+    expect(save).toHaveAttribute('data-testid', 'ai-message-save-to-vault')
     expect(save).toBeVisible()
+    expect(save).not.toHaveTextContent('Save to vault')
     expect(screen.getByTestId('ai-message-actions')).not.toHaveClass('opacity-0')
   })
 
