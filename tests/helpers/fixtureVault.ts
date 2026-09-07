@@ -67,6 +67,9 @@ function copyDirSync({ src, dest }: CopyDirArgs): void {
 export async function pinNotesShellLaunch(page: Page): Promise<void> {
   await page.addInitScript((key: string) => {
     sessionStorage.setItem(key, '1')
+    // Force C72 default (editor-list): drop any leftover view-mode from prior runs.
+    localStorage.removeItem('rhizome-view-mode')
+    localStorage.removeItem('tolaria-view-mode')
   }, AGENT_CHAT_OPENED_SESSION_KEY)
 }
 
