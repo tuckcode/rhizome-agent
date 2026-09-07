@@ -1860,10 +1860,7 @@ fn rhizome_session_clock(now: chrono::DateTime<chrono::Local>) -> String {
     const MONTHS: [&str; 12] = [
         "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     ];
-    let month = MONTHS
-        .get(now.month0() as usize)
-        .copied()
-        .unwrap_or("???");
+    let month = MONTHS.get(now.month0() as usize).copied().unwrap_or("???");
     let (is_pm, hour12) = now.hour12();
     let meridiem = if is_pm { "p" } else { "a" };
     format!(
@@ -2538,9 +2535,8 @@ fn stream_until_turn_complete(mut on_event: impl FnMut(&serde_json::Value)) -> R
                 awaiting_follow_up = false;
                 if ty == "agent_end" {
                     on_event(&json);
-                    let queue_pending = get_queue().is_ok_and(|q| {
-                        !q.follow_up.is_empty() || !q.steering.is_empty()
-                    });
+                    let queue_pending = get_queue()
+                        .is_ok_and(|q| !q.follow_up.is_empty() || !q.steering.is_empty());
                     follow_up_grace = if queue_pending {
                         FOLLOW_UP_DRAIN_GRACE_QUEUED
                     } else {
@@ -5458,15 +5454,15 @@ mod tests {
         run_prompt_stream(prompt_request(vault.path(), false), |e| events.push(e)).unwrap();
 
         assert!(
-            events
-                .iter()
-                .any(|e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "first-turn-done")),
+            events.iter().any(
+                |e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "first-turn-done")
+            ),
             "first turn text missing: {events:?}"
         );
         assert!(
-            events
-                .iter()
-                .any(|e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "follow-up-ack")),
+            events.iter().any(
+                |e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "follow-up-ack")
+            ),
             "follow-up reply must reach the UI stream: {events:?}"
         );
         let boundary_count = events
@@ -6045,11 +6041,9 @@ mod tests {
                     ])
                 }
             }
-            Some("resume_queue") => Some(vec![failed(
-                id,
-                "resume_queue",
-                "No queued work to resume",
-            )]),
+            Some("resume_queue") => {
+                Some(vec![failed(id, "resume_queue", "No queued work to resume")])
+            }
             _ => None,
         });
         daemon.install();
@@ -6068,9 +6062,9 @@ mod tests {
             "must lift the pump before the second prompt"
         );
         assert!(
-            events
-                .iter()
-                .any(|e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "recovered")),
+            events.iter().any(
+                |e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "recovered")
+            ),
             "events={events:?}"
         );
         assert!(

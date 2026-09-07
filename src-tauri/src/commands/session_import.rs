@@ -13,7 +13,9 @@ use crate::commands::expand_tilde;
 use crate::session_import::adapters::claude_code_scan::{
     default_projects_dir, scan_projects_dir, ScannedSession,
 };
-use crate::session_import::ledger::{ledger_path_in, read_ledger_at, write_ledger_at, ImportLedger};
+use crate::session_import::ledger::{
+    ledger_path_in, read_ledger_at, write_ledger_at, ImportLedger,
+};
 use crate::session_import::preview::{preview_import, PlannedAction, PlannedSession};
 use crate::session_import::run::{record_outcome, run_vault_import};
 use crate::session_import::selection::SelectionPolicy;
@@ -207,8 +209,8 @@ pub fn run_claude_code_session_import(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::session_import::adapters::claude_code_scan::ScannedSession;
     use crate::session_import::adapters::claude_code::ParsedSession;
+    use crate::session_import::adapters::claude_code_scan::ScannedSession;
     use crate::session_import::fingerprint::{DateSpan, ImportedMessage};
     use crate::session_import::ledger::{ImportDestination, ImportLedgerEntry, ImportStatus};
     use std::fs;
@@ -264,7 +266,11 @@ mod tests {
         fs::create_dir_all(&vault).unwrap();
 
         let scanned = vec![scanned("a", "First chat")];
-        let preview = preview_import(&scanned, &ImportLedger::default(), SelectionPolicy::default());
+        let preview = preview_import(
+            &scanned,
+            &ImportLedger::default(),
+            SelectionPolicy::default(),
+        );
         let outcome = run_vault_import(&scanned, &preview, &vault, "2026-09-06T00:00:00Z");
         let mut ledger = ImportLedger::default();
         record_outcome(&mut ledger, &outcome);
