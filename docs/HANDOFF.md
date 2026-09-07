@@ -47,9 +47,10 @@ file.
 ---
 
 ## State
-Local tip (this commit): thinking-level menu, Graph/Mycelium on Changes,
-matching Notes restore rail, skip-ensure on session switch. Origin still
-**`cd97743`** until push. Native Chat glance **PASSED** (2026-09-06).
+`main` on origin is **`0fa00a2`**: thinking-level menu, Graph/Mycelium on
+Changes, matching Notes restore rail, skip-ensure on session switch.
+Native Chat glance **PASSED** (2026-09-06). Do not rebuild `/Applications`
+over a live Rhizome.
 
 Still open / parked: **C72** Inbox rename; Prime list-import; **#51** Tab;
 **C64** full verify; **#47** confirm-close; Grokbot **#60/#61/#62** (held);
@@ -90,6 +91,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-07 · Cursor Grok 4.6](plans/handoffs/2026-09-07-0351-cursor-grok-4-6-push-and-adhd-off.md) — **`0fa00a2` on origin;** ADHD ideation skill removed from this repo; no Applications rebuild.
 - [2026-09-07 · Composer](plans/handoffs/2026-09-07-0324-composer-graph-on-changes.md) — **Graph/Mycelium only on Changes;** Inbox keeps the full notes list; collapsed Notes leaves a 46px right rail (same as left command rail).
 - [2026-09-07 · Composer](plans/handoffs/2026-09-07-0308-composer-lag-audit-pickup.md) — **lag/pinwheel audit pickup** for a fresh session (start / page switch / Settings); prior beachball diagnosis linked; only one Rhizome process; Apps was `.bak` at write time.
 - [2026-09-07 · Composer](plans/handoffs/2026-09-07-0003-composer-beachball-lag.md) — **beachball diagnosis (docs only):** session switch = 3 sync Prime awaits + full chat `messages.map`; Settings = full remount; cold start = ensure daemon + vault + Graph if Inbox open; Applications smoother but same shapes; quit Applications before `tauri:dev` (same bundle id).

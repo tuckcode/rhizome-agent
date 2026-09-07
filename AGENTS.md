@@ -5,6 +5,8 @@
 > It is **not** Rhizome Desktop (`ai.rhizome.desktop`, `knispo/rhizome`).  
 > Do not push here to desktop origin. Do not “fix branding back to Desktop.”  
 > Direction: chat UI + **Prime Agent** harness. Details: `docs/IDENTITY.md`.
+> **ADHD skills are off here.** Do not load `/adhd`, `voice-adhd.md`, or the
+> parallel-ideation ADHD skill. Do not switch this repo into ADHD short-mode.
 
 ---
 
