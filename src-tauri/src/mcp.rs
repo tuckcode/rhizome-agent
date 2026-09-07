@@ -1225,9 +1225,10 @@ mod tests {
     #[test]
     fn mcp_server_dir_resolves_in_dev() {
         let dir = mcp_server_dir().unwrap();
+        // Packaged/resource copies (preferred by C69) ship index + ws-bridge
+        // (+ cli-call); vault.js is only in the full repo checkout.
         assert!(dir.join("ws-bridge.js").exists());
         assert!(dir.join("index.js").exists());
-        assert!(dir.join("vault.js").exists());
     }
 
     #[test]

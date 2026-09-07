@@ -4184,6 +4184,8 @@ mod tests {
                 "get_state",
                 "set_session_name",
                 "prompt",
+                // Mid-turn drain checks the queue after agent_end.
+                "get_queue",
                 "get_state"
             ],
             "the session is created inside the prompt, attached before it, and \
