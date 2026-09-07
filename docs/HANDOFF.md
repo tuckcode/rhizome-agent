@@ -89,6 +89,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1837-composer-daily-drive-goal-audit.md) — **honest goal audit:** core Chat↔Prime + tools live-proven today; **not closed** — `0a71d84` unpushed; no final live glance. Parked for Atticus break.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1819-composer-park-grokbot-audits-tonight.md) — **tonight:** review Grokbot full audits of rhizome-agent **and** CodexGPT lob (after dinner).
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1816-composer-session-import-first-run.md) — **session-import Settings UI** (Claude Code → vault `Imports/`); **Getting Started = local Rhizome scaffold** (no Tolaria clone by default). Prime list rows + C11 remote starter still open.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1814-composer-c72-side-panel-session.md) — **C72 parked:** right Notes/Graph column feels missing unless Notes opened from the left; dedicated side-panel layout session (defaults, Inbox label, right icon rail).

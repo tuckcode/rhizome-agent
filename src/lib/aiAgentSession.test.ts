@@ -160,6 +160,7 @@ function expectStreamingRuntimeState(session: RuntimeFixture): void {
     actions: [],
     isStreaming: true,
     id: 'msg-stream',
+    createdAtMs: expect.any(Number),
   })
 }
 
@@ -252,6 +253,7 @@ describe('aiAgentSession', () => {
         actions: [],
         response: options.response,
         id: options.messageId,
+        createdAtMs: expect.any(Number),
       },
     ])
     expect(streamAiAgentMock).not.toHaveBeenCalled()
@@ -424,6 +426,7 @@ describe('aiAgentSession', () => {
       reasoningDone: true,
       response: 'Stopped.',
       id: 'msg-stream',
+      createdAtMs: expect.any(Number),
     }])
     expect(trackEventMock).toHaveBeenCalledWith('ai_agent_response_stopped', {
       agent: 'codex',
