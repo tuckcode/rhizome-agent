@@ -1067,7 +1067,6 @@ export default defineConfig({
         'src/mock-tauri.ts',
         'src/main.tsx',
         'src/types.ts',
-        'src/hooks/useMcpBridge.ts',
         'src/hooks/useAiAgent.ts',
         'src/utils/ai-chat.ts',
         'src/utils/ai-agent.ts',

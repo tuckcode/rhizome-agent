@@ -70,20 +70,6 @@ export function aiAgentPermissionModeLabels(
   }
 }
 
-export function aiAgentPermissionModeTooltipKey(
-  mode: AiAgentPermissionMode,
-  agent?: AiAgentId | string,
-): 'ai.permission.prime.safe.tooltip'
-  | 'ai.permission.prime.powerUser.tooltip'
-  | 'ai.permission.safe.tooltip'
-  | 'ai.permission.powerUser.tooltip' {
-  const instruction = permissionModeIsInstructionOnly(agent)
-  if (mode === 'power_user') {
-    return instruction ? 'ai.permission.prime.powerUser.tooltip' : 'ai.permission.powerUser.tooltip'
-  }
-  return instruction ? 'ai.permission.prime.safe.tooltip' : 'ai.permission.safe.tooltip'
-}
-
 export function aiAgentPermissionModeMarker(
   mode: AiAgentPermissionMode,
   locale: AppLocale = 'en',

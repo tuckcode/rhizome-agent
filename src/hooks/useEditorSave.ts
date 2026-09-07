@@ -38,7 +38,6 @@ interface EditorSaveConfig {
 const noop = () => {}
 
 export const AUTO_SAVE_DEBOUNCE_MS = 1_500
-export const MISSING_ACTIVE_VAULT_SAVE_MESSAGE = 'Select or restore a vault before saving.'
 type Translator = ReturnType<typeof createTranslator>
 
 interface PendingContent {

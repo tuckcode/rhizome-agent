@@ -366,18 +366,6 @@ vi.mock('./mock-tauri', () => ({
   trackMockChange: vi.fn(),
 }))
 
-// Mock ai-chat utilities
-vi.mock('./utils/ai-chat', async () => {
-  const actual = await vi.importActual<typeof import('./utils/ai-chat')>('./utils/ai-chat')
-
-  return {
-    ...actual,
-    buildSystemPrompt: vi.fn(() => ({ prompt: '', totalTokens: 0, truncated: false })),
-    checkClaudeCli: vi.fn(async () => ({ installed: false })),
-    streamClaudeChat: vi.fn(async () => 'mock-session'),
-  }
-})
-
 vi.mock('./utils/streamAiAgent', () => ({
   streamAiAgent: vi.fn(async () => {}),
 }))

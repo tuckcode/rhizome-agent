@@ -1,5 +1,5 @@
 import { ArrowUpRight, CheckCircle as CheckCircle2, CircleNotch as Loader2, Robot as Bot } from '@phosphor-icons/react'
-import type { ClaudeCodeStatus } from '../hooks/useClaudeCodeStatus'
+import type { ClaudeCodeStatus } from '../types'
 import { openExternalUrl } from '../utils/url'
 import { Button } from './ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card'

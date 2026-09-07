@@ -71,10 +71,3 @@ export function validGitRepositoryPath(
   if (repositories.some((repository) => repository.path === fallbackPath)) return fallbackPath
   return repositories[0]?.path ?? fallbackPath
 }
-
-export function gitRepositoryLabel(
-  path: string,
-  repositories: readonly GitRepositoryOption[],
-): string {
-  return repositories.find((repository) => repository.path === path)?.label ?? labelFromWorkspacePath(path)
-}

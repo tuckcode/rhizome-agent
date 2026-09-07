@@ -103,10 +103,10 @@ Confirmed live at runtime under `pnpm tauri dev` — `lsof -i:9711` showed
 `ws-bridge.js` LISTENING with **two** established client connections (the
 Rhizome app itself, and an external MCP client). The full chain works.
 
-`src/hooks/useMcpBridge.ts` is still genuinely unimported and is dead code
-in the ordinary sense — but it is NOT evidence of a broken bridge, because
-the bridge doesn't depend on it. It can be deleted on its own merits;
-just run `pnpm typecheck` after (see #1).
+`src/hooks/useMcpBridge.ts` was genuinely unimported and has been deleted
+(area B nightly, 2026-09-06). That is not evidence of a broken bridge —
+the live path is `useMcpBridgeVaultSync` inside the vault switcher. Run
+`pnpm typecheck` after further hook deletes (see #1).
 
 **General lesson: before concluding "this export has no callers," check for
 a self-invoking entrypoint at the bottom of the same file, and prefer

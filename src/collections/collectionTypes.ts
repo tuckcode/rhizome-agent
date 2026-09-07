@@ -2,8 +2,6 @@ import type { FilterGroup, SidebarSelection, VaultEntry, ViewFile } from '../typ
 
 export const COLLECTION_PRESENTATION_LIST = 'list'
 
-export type CollectionPresentationType = typeof COLLECTION_PRESENTATION_LIST
-
 export interface ListCollectionPresentationConfig {
   type: typeof COLLECTION_PRESENTATION_LIST
   sort: string | null

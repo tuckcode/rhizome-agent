@@ -32,32 +32,6 @@ export const EMOJI_GROUPS = [
   'Flags',
 ] as const
 
-/** Short labels for category tabs. */
-export const GROUP_SHORT_LABELS: Record<string, string> = {
-  'Smileys & Emotion': 'Smileys',
-  'People & Body': 'People',
-  'Animals & Nature': 'Nature',
-  'Food & Drink': 'Food',
-  'Travel & Places': 'Travel',
-  Activities: 'Activities',
-  Objects: 'Objects',
-  Symbols: 'Symbols',
-  Flags: 'Flags',
-}
-
-/** Representative emoji for each category tab. */
-export const GROUP_ICONS: Record<string, string> = {
-  'Smileys & Emotion': '😀',
-  'People & Body': '👋',
-  'Animals & Nature': '🐻',
-  'Food & Drink': '🍔',
-  'Travel & Places': '✈️',
-  Activities: '⚽',
-  Objects: '💡',
-  Symbols: '❤️',
-  Flags: '🏁',
-}
-
 type RawEmojiData = Record<string, { name: string; group: string }>
 
 const raw = emojiData as RawEmojiData
