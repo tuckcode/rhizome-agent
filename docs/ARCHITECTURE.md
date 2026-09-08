@@ -216,11 +216,16 @@ flowchart TD
 
 ## Chat-Centered Layout
 
-The **network-shell** product map (ADR-0166, shipped 2026-08-25) is:
+**Origin:** Cursor Grok 4.6 · 2026-09-08 — corrected against `App.tsx`,
+`useViewMode.ts`, `VaultPanel.tsx`, and `ConnectionsPanel.tsx` (C72 +
+Graph-on-Changes). Do not restore Graph as a center-canvas destination.
+
+The **network-shell** product map (ADR-0166, refined by ADR-0170 / ADR-0171) is:
 
 ```
 rail (Inbox toggle) | sessions | CHAT | Notes (nav over list)
-                                      | Graph / Mycelium (resizable, below)
+                                      | 46px restore rail when Notes is shut
+Changes only:                         | Graph / Mycelium (resizable, below Notes)
 ```
 
 Chat is the center canvas. Sessions are a collapsible column on its left.
@@ -228,16 +233,30 @@ When Chat opens its secondary note pane, that pane joins the shell's existing
 width calculation: below the established compact-session threshold, Sessions
 temporarily auto-collapses and returns when the window widens, without changing
 the person's stored open/closed preference.
-The right Notes panel starts closed; compact Inbox/All Notes/Archive/type/folder
-navigation sits above its selected note list. Browse and the whole panel
-collapse independently (⌘1 / ⌘2 / ⌘3). Selecting a note opens the editor
-beside Chat rather than replacing it.
-When that right column is open, Graph and Mycelium sit under Notes as a
-resizable sub-panel (ADR-0170). The Connections edge strip is gone. Inbox
-opens the column; a Graph or session-footprint request opens it too if it
-was closed. The diagram below is the
-inherited Desktop notes-app map (classic shell / note windows / editor
-internals); do not treat it as the Agent main-window layout.
+
+The right Notes panel **starts open** on a fresh vault (`editor-list` —
+Browse collapsed). Stored `view_mode` still wins when one exists. Compact
+Inbox/All Notes/Archive/type/folder navigation sits above the selected note
+list. Browse and the whole panel collapse independently (⌘1 Chat only /
+⌘2 Notes, Browse collapsed / ⌘3 Notes, Browse expanded). Selecting a note
+opens the editor beside Chat rather than replacing it.
+
+Shutting Notes leaves a **46px restore rail** (`VaultPanelRestoreButton`,
+same width as the collapsed command rail in `COMMAND_RAIL_WIDTH_PX`). Inbox
+still toggles the column; Chat no longer forces `editor-only`. Inbox and
+other Notes filters keep a tall notes list — they do **not** mount Graph or
+Mycelium under the list.
+
+Graph and Mycelium mount only while Changes is selected
+(`ConnectionsPanel` inside `showVaultPanel && isChangesSelection`). A Graph
+or session-footprint request opens Notes if it was shut, then switches to
+Changes so the cell can appear. Expanding Graph or Mycelium is an overlay
+you can leave; it does not replace Chat. The Connections edge strip is gone
+(ADR-0170). Graph “Find a note” is a compact bottom-right box
+(`GraphControls`, collapsed until focus or an active filter) — not a large
+overlay. The diagram below is the inherited Desktop notes-app map (classic
+shell / note windows / editor internals); do not treat it as the Agent
+main-window layout.
 
 ```
 ┌────────┬─────────────┬─────────────────────────┬────────────┐
@@ -458,13 +477,57 @@ Each answers "nothing", which is true of a host with no session.
   `usePrimeQueue` (composer queue from `get_queue`; Clear → `clear_queue`),
   `usePrimeSessionTree` / `SessionBranchBand` (`get_session_tree` / `navigate_tree`,
   #17 — this conversation, not the sessions drawer),
+  `usePrimeSessionSwitcher` (list switch / fork / branch; **skips**
+  `ensure_prime_session_host` when Chat already reports the host running —
+  a redundant ensure on every click was the session-switch beachball),
   `AiMessage` (turn rendering; successful `get_note` actions become deduplicated,
   one-click `From your vault` source links beneath the answer, while searches,
   writes, pending calls, and failed calls never claim provenance),
   `PrimeScheduleDialog` (`heartbeat_set` / `cron_add`, #14 create),
   `PrimeSessionList` (the Command Rail's expanded history area; classic shell
   fallback is a Chat sidebar), `primeSessionMeta.ts` (row labels),
-  `PrimeModelPicker` + `primeModels.ts` (the chat model menu — see below)
+  `PrimeModelPicker` + `primeModels.ts` (the chat model menu — see below),
+  `PrimeThinkingToggle` (composer reasoning menu — see below)
+
+#### Thinking levels (composer pill)
+
+The host owns the list. `get_prime_thinking_levels` returns Prime's
+`PRIME_THINKING_LEVELS`; the frontend must not hardcode Off → Max.
+`PrimeThinkingToggle` opens a menu of every level the host sent and writes
+the pick with `set_prime_thinking_level`. `primeThinkingLevels.ts` only
+renders labels (`xhigh` → “X-High”) and still has a quiet/loud helper for
+older one-click tests — the shipped pill is the full menu, not a binary
+toggle. The model picker lists the same scale.
+
+Constraint: opening the menu or changing a level still calls
+`ensure_prime_session_host` when a vault path is present, because those
+commands need an attached session. Session *switch* is the path that skips
+ensure once the host is already up.
+
+#### New-session names
+
+`prime_session_host::rhizome_created_session_name` writes
+
+`Rhizome · {Mon D} · {h:mm}{a|p} · {vault} · {id-tail}`
+
+so a quit/reopen can find the latest chat by the local clock. The older
+`Rhizome · {vault} · {id-tail}` shape is still treated as a replaceable
+placeholder (`is_rhizome_placeholder_name` = starts with `Rhizome · `).
+First-message titles and human renames win. List rename speaks
+`rename_saved_session` (`sessionPath` + `name`) and must not create a
+session.
+
+#### Mid-turn send and message actions
+
+Composer Enter mid-turn is **not** a new turn. `useAiPanelSendPolicy` +
+`sendToRunningTurn` is tri-state: accepted (follow-up stays visibly queued),
+no longer running (fallback starts a new turn only from the latest idle UI
+state), or transport failure. Steer is a separate control. Escape leaves
+Chat; Stop is click-only.
+
+Assistant actions on `AiMessage` are icon-only (`size="icon"`) with hover
+tooltips: regenerate, copy, save to vault, fork. Accessible names stay on
+the buttons (`ai.message.*`). Do not restore text labels.
 
 #### The chat model menu (#45)
 
@@ -802,20 +865,24 @@ With 4c, no Research-panel tab needs the Python toolkit: the
 CLI-availability gate, banner, `rhizome_check_availability` command, and
 `rhizome_discovery` module were all removed.
 
-**Not yet wired: the MCP verbs** (`mcp-server/index.js`,
-used by external agents). That process is a standalone Node process spawned
-fresh per agent session — it has no live connection to the running Tauri
-app's warm index, and reaching it would mean either (a) a compiled Rust
-sidecar the Node process execs (real new-infrastructure cost: `externalBin`
-packaging, cross-platform binary naming, macOS signing — this app has no
-existing sidecar today), or (b) new two-way request/response plumbing into
-the live app (the existing `ws-bridge.js` "UI bridge" is one-way broadcast
-only, not a callback channel). Deliberately deferred as its own follow-up
-rather than folded into this pass; the MCP handlers for `rhizome_search`,
-`rhizome_distill`, `rhizome_import_source`, `rhizome_repo_research`,
-`rhizome_generate_wiki`, and `rhizome_grok_import` all still shell Python.
-The MCP-bridge follow-up would cut every one of them over to the Rust
-implementations at once.
+**MCP verbs today** (`mcp-server/index.js`, used by external agents and
+by the seeded `rhizome-vault` skill via `cli-call.mjs`). That process is a
+standalone Node process spawned fresh per agent session — it has no live
+connection to the running Tauri app's warm index.
+
+Advertised tools (asserted in `mcp-server/test.js`): note CRUD / search /
+context (`search_notes`, `get_note`, `create_note`, …), `rhizome_search`,
+`rhizome_lint`, `rhizome_distill`, `rhizome_import_source`, and the
+`rhizome_graph_*` queries. Graph queries require `RHIZOME_TOOL_PATH`
+(the packaged `rhizome-tool` / `cli-call.mjs` path). Distill / import /
+search still branch through `resolveRhizoTarget`: Rust sidecar when
+`RHIZOME_TOOL_PATH` is set, otherwise the legacy Python CLIs.
+
+**Not advertised (Area F, 2026-09-06):** `rhizome_grok_import`,
+`rhizome_generate_wiki`, and `rhizome_repo_research`. Grok wiki is out of
+scope. In-app Research Generate still calls `rhizome_repo_research` through
+`call_rhizome_tool`; `rhizome-tool grok-import` is an unknown subcommand.
+Do not add those three names back to `TOOLS`.
 
 **Known pre-existing gap, not introduced by this cutover:** Ask-tab result
 paths are relative to `wiki_root` (matching Python's `page` field exactly),
@@ -1015,23 +1082,22 @@ shelling the public Python `rhizome-*` CLIs — `src-tauri/src/bin/rhizome_tool.
 
 - **New `[[bin]]` target** (`rhizome-tool`, alongside the `Rhizome` GUI
   binary) — a thin argv-parsing `fn main()` over `rhizome_lib::rhizome_api`,
-  no Tauri `AppHandle` involved. Subcommands map 1:1 onto the façade:
-  `search`, `distill`, `import-source`, `repo-research`, `grok-import`.
-  `generate_wiki` has no subcommand of its own — per ADR-0152's locked verb
-  table it's an alias of `repo-research`, so the MCP handler routes it
-  there directly. Write verbs hardcode `trigger: "agent"` (the Lane B
+  no Tauri `AppHandle` involved. Live subcommands: `search`, `distill`,
+  `import-source`, `repo-research`, plus graph-query verbs. **Grok-wiki /
+  wiki-generation are gone** (`grok-import` and `generate_wiki` have no
+  subcommand; MCP does not advertise them). `repo-research` remains for
+  the in-app Research Generate tab via `call_rhizome_tool`, not as an
+  external MCP tool. Write verbs hardcode `trigger: "agent"` (the Lane B
   convention). Progress lines go to stderr; the final result string is the
   sole stdout contract the MCP server parses.
-- **`mcp-server/index.js`** branches every one of the six handlers on
-  `RHIZOME_TOOL_PATH` (env var, unset by default) through a shared
-  `resolveRhizoTarget(pythonBin, pythonArgs, rustSubcommand, rustArgs)`
-  helper. Unset keeps the pre-existing Python `execFileSync` calls
-  byte-for-byte — zero behavior change until something sets the var.
-  `rhizome_api::distill`/`import_source`/`repo_research`/`grok_import`
-  already append their own `.rhizome/events.jsonl` entry, so the JS-side
-  `appendRhizomeEvent` call is skipped on the Rust path to avoid double-
-  logging; `rhizome_search`'s hit shape differs from the Python CLI's
-  (`{path,title,snippet}` vs `{page,score}`), so response formatting
+- **`mcp-server/index.js`** branches distill / import / search on
+  `RHIZOME_TOOL_PATH` through `resolveRhizoTarget`. Unset keeps the
+  pre-existing Python `execFileSync` calls. Packaged Chat/graph asks set
+  the path (C69). `rhizome_api::distill` / `import_source` already append
+  their own `.rhizome/events.jsonl` entry, so the JS-side
+  `appendRhizomeEvent` call is skipped on the Rust path to avoid
+  double-logging. `rhizome_search`'s hit shape differs from the Python
+  CLI's (`{path,title,snippet}` vs `{page,score}`), so response formatting
   branches per-path too. `distill --list-kinds` has no Rust equivalent
   (static enum introspection, not a write verb) and always stays Python.
 - **Not yet wired**: nothing sets `RHIZOME_TOOL_PATH` for real MCP clients
@@ -1059,23 +1125,27 @@ graph — `src-tauri/src/vault/graph.rs`:
   `rhizome_commands::call_rhizome_tool`, and a `graph <vault_path>`
   subcommand on the `rhizome-tool` sidecar (ADR-0152) — so MCP agents get
   the same structural map as the GUI, for free.
-- **Frontend** (`src/components/graph/`): `GraphView.tsx` is a top-level
-  view mounted in `App.tsx` (same pattern as `PulseView`, gated by
-  `SidebarFilter: 'graph'`), lazy-loaded via `React.lazy` so
-  `3d-force-graph`/three.js never touch the main bundle chunk
-  (`ForceGraph3DCanvas.tsx` is the sole file that imports it, and even it
-  defers the import inside a `useEffect`). Node colors resolve
-  `typeColors.ts`'s CSS-var references to concrete values for three.js
-  materials (`typeColorResolver.ts`), re-resolved on theme change.
-  Clicking a node opens a docked `NodePreviewPanel` (type-color dot,
-  icon, title, snippet, project/kind chips, relative timestamp,
-  links·backlinks toggling an ego/local-subgraph view, Open note /
-  Local graph actions); ghost nodes swap the footer for a **Create
-  note** action that fires the existing `rhizome_distill` job via
-  `useRhizomeJobs` — same write path the Research panel's Distill tab
-  uses. `useGraphKeyboardNav` steps focus between connected nodes on
-  arrow keys (latest-ref pattern, same shape as `useKeyboardNavigation`),
-  Enter opens, Escape exits ego view then closes the preview.
+- **Frontend** (`src/components/graph/`): `GraphView.tsx` is lazy-loaded
+  via `React.lazy` so `3d-force-graph`/three.js never touch the main
+  bundle chunk (`ForceGraph3DCanvas.tsx` is the sole file that imports
+  it, and even it defers the import inside a `useEffect`). In the
+  chat-centered shell it is **not** a top-level canvas destination.
+  `ConnectionsPanel` mounts it under Notes **only on Changes**
+  (ADR-0171). Classic shell (`ff_shell_command_rail=false`) can still
+  treat Graph as a filter view. Node colors resolve `typeColors.ts`'s
+  CSS-var references to concrete values for three.js materials
+  (`typeColorResolver.ts`), re-resolved on theme change. Clicking a node
+  opens a docked `NodePreviewPanel` (type-color dot, icon, title,
+  snippet, project/kind chips, relative timestamp, links·backlinks
+  toggling an ego/local-subgraph view, Open note / Local graph actions);
+  ghost nodes swap the footer for a **Create note** action that fires
+  the existing `rhizome_distill` job via `useRhizomeJobs` — same write
+  path the Research panel's Distill tab uses. `useGraphKeyboardNav` steps
+  focus between connected nodes on arrow keys (latest-ref pattern, same
+  shape as `useKeyboardNavigation`), Enter opens, Escape exits ego view
+  then closes the preview. **Find** lives in `GraphControls`: a compact
+  bottom-right search box, collapsed until focus or an active type/ghost
+  filter, so a type-pill wall does not hide the canvas.
 - See ADR-0155 for the 3D-vs-2D rendering-library decision and bundle-size
   mitigations (verified: `3d-force-graph` lands in its own ~1.36MB chunk,
   separate from `index-*.js`).
