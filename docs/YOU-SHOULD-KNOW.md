@@ -13,8 +13,10 @@ re-litigate.
 Last Claude-owned session on this repo: **2026-08-24**
 ([shell dock + ADR-0166 + NEXT.md](plans/handoffs/2026-08-24-2122-claude-opus-5-shell-dock-and-next-index.md)).
 Claude’s last *code* was **2026-08-22** (right-dock + ADR-0166).
-`origin/main` at writing: **`80fa720`**. Confirm with
-`git log origin/main..HEAD` — it should be empty.
+`origin/main` at writing was **`80fa720`**. **Corrected 2026-09-08:**
+confirm with `git log origin/main -1` (this briefing is not the daily
+index — `HANDOFF.md` holds the tip). Do not treat the shell map below as
+current without reading §2’s correction block.
 
 ---
 
@@ -39,8 +41,13 @@ with `pnpm prime:surface` / `pnpm prime:surface:github`. Snapshot:
 
 ## 2. The shell, as shipped (not as ADR-0166 first drafted it)
 
+**Origin:** Cursor Grok 4.6 · 2026-09-08 — §2 corrected against `App.tsx`
+/ ADR-0170 / ADR-0171. The 2026-08-26 “Graph replaces Chat” map is stale.
+
 ```
-rail | sessions | CHAT (or Graph / Mycelium / Research) | Notes (optional)
+rail | sessions | CHAT | Notes (default open; 46px rail when shut)
+Changes only:          | Graph / Mycelium under Notes
+Research:              | still a center-canvas pane (not Chat)
 ```
 
 Claude left ADR-0166 with three questions open (what ⌘1/2/3 mean, whether
@@ -49,9 +56,9 @@ longer open the way the ADR text still sounds.
 
 | Question | Now |
 |---|---|
-| ⌘1 / ⌘2 / ⌘3 | **Settled 2026-08-25.** ⌘1 Chat only. ⌘2 Notes panel, Browse collapsed. ⌘3 Notes panel, Browse expanded. Stored `viewMode` values unchanged (`editor-only` / `editor-list` / `all`). |
-| Right panel | **Settled 2026-08-25 night.** One Notes panel. Compact nav above the selected list. Rail **Inbox** toggles it. Changes is a list filter. No Inbox/Notes tabs, no second right column. |
-| Canvas destinations | **Settled 2026-08-26 for Research and Mycelium.** They replace Chat as the center canvas, like Graph. Rail Chat / ⌘1 come back. #39 (graph as an *agent tool*) is still open. |
+| ⌘1 / ⌘2 / ⌘3 | **Settled 2026-08-25.** ⌘1 Chat only. ⌘2 Notes panel, Browse collapsed. ⌘3 Notes panel, Browse expanded. Stored `viewMode` values unchanged (`editor-only` / `editor-list` / `all`). Fresh vaults default to `editor-list` (C72). |
+| Right panel | **Settled 2026-08-25, refined 2026-09-07.** One Notes panel. Compact nav above the selected list. Rail **Inbox** toggles it. Shut Notes leaves a 46px restore rail. No Inbox/Notes tabs, no second right column. |
+| Canvas destinations | **Corrected 2026-09-07.** Chat stays the centre. Graph/Mycelium are a Changes-only cell under Notes (ADR-0171), not a place you go instead of chatting. Research is still a centre pane. #39 (graph as an *agent tool*) is still open. |
 
 **Do not** make nav and the note list exclusive. Claude tried; it broke
 Cmd+N, inbox auto-advance, and note selection. Keep them mounted
@@ -102,9 +109,13 @@ unless a row below is the task.
 - Left column of Chat. Always on in the chat-centered shell. **#27 closed.**
 - Filter matches **title / cwd / git branch**, not transcript. Archived
   rows included; a hit expands that section. **#34 closed.**
-- Named at creation: `Rhizome · {vault} · {id-tail}` via
-  `set_session_name`. Rename speaks `rename_saved_session`
+- Named at creation: `Rhizome · {Mon D} · {h:mm}{a|p} · {vault} · {id-tail}`
+  via `set_session_name` (clock first so quit/reopen can find the latest).
+  The older `Rhizome · {vault} · {id-tail}` shape is still a replaceable
+  placeholder. Rename speaks `rename_saved_session`
   (`sessionPath` + `name`) and must **not** create a session. **#31 closed.**
+- Session switch skips `ensure_prime_session_host` when the host is
+  already running (`usePrimeSessionSwitcher` `hostRunning`).
 - New sessions are Prime `client_owned` (ADR-0167 / C47). Idle close
   detaches. Active close defaults to **stop**, with Keep working as an
   explicit promote to `resident`. Quit follows ownership.
@@ -123,7 +134,11 @@ Do not redesign the strip again.
 
 - Pills are live, not inert.
 - Model + thinking live on the strip (moved off the Prime subhead).
-- Thinking toggle is one click (verbose / thinking reachable without a menu).
+- Thinking is a **menu of every host level** (`get_prime_thinking_levels` →
+  Off / Minimal / Low / Medium / High / X-High / Max as offered). Do not
+  restore a binary quiet/loud toggle. The model picker lists the same scale.
+- Assistant message actions are icon-only with hover tooltips (regenerate,
+  copy, save to vault, fork).
 - Command argument hints were already in the slash menu.
 
 ### Prime verbs that landed in Chat
@@ -161,9 +176,9 @@ Implemented on main; GitHub still open until a live Prime demo:
 
 Not a dialog. `ResearchPanel` `variant="pane"` in the editor slot.
 No Chat overlay inside it (no second conversation). Graph and Mycelium
-*can* still show Chat on top; Research does not. Book → Skill is a
-Generate format (`book-to-skill`) — produces a SKILL.md-shaped wiki
-page; does not vendor the upstream repo.
+do **not** take the Chat canvas (ADR-0171); Research still does. Book →
+Skill is a Generate format (`book-to-skill`) — produces a SKILL.md-shaped
+wiki page; does not vendor the upstream repo.
 
 ### Mycelium (#11 / #22) — in-app, not a browser
 
@@ -319,7 +334,7 @@ User leftover, in this order:
 | Unclaimed work | [`NEXT.md`](NEXT.md) |
 | Traps | [`CROSS-MODEL-HANDOFF.md`](CROSS-MODEL-HANDOFF.md) |
 | Identity / Prime-first | [`IDENTITY.md`](IDENTITY.md) |
-| Shell ADR (partially stale on canvas Qs) | [`adr/0166-chat-centered-shell.md`](adr/0166-chat-centered-shell.md) |
+| Shell ADR (Chat centre; canvas Qs superseded) | [`adr/0166-chat-centered-shell.md`](adr/0166-chat-centered-shell.md) · [0170](adr/0170-notes-heavy-right-panel.md) · [0171](adr/0171-graph-on-changes-only.md) |
 | Doctrine | [`design/harness-doctrine.md`](design/harness-doctrine.md) · ADR-0168 |
 | Composition (unratified) | [`design/harness-composition.md`](design/harness-composition.md) |
 | Token routing (discuss only) | [`design/token-routing-and-compression.md`](design/token-routing-and-compression.md) |

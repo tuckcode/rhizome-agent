@@ -47,8 +47,9 @@ file.
 ---
 
 ## State
-`main` on origin is **`0fa00a2`**: thinking-level menu, Graph/Mycelium on
-Changes, matching Notes restore rail, skip-ensure on session switch.
+`main` on origin is **`9f07f60`**: STE-100 stays a global vault voice (not
+in this repo), ADHD skill removed, plus thinking-level menu, Graph/Mycelium
+on Changes, Notes restore rail, skip-ensure on session switch (`0fa00a2`).
 Native Chat glance **PASSED** (2026-09-06). Do not rebuild `/Applications`
 over a live Rhizome.
 
@@ -91,6 +92,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-08 · Cursor Grok 4.6](plans/handoffs/2026-09-08-0335-cursor-grok-4-6-docs-refresh.md) — living docs catch-up: shell/Prime/MCP/first-run match the tree; ADR-0171.
 - [2026-09-07 · Cursor Grok 4.6](plans/handoffs/2026-09-07-0351-cursor-grok-4-6-push-and-adhd-off.md) — **`0fa00a2` on origin;** ADHD ideation skill removed from this repo; no Applications rebuild.
 - [2026-09-07 · Composer](plans/handoffs/2026-09-07-0324-composer-graph-on-changes.md) — **Graph/Mycelium only on Changes;** Inbox keeps the full notes list; collapsed Notes leaves a 46px right rail (same as left command rail).
 - [2026-09-07 · Composer](plans/handoffs/2026-09-07-0308-composer-lag-audit-pickup.md) — **lag/pinwheel audit pickup** for a fresh session (start / page switch / Settings); prior beachball diagnosis linked; only one Rhizome process; Apps was `.bak` at write time.
@@ -294,7 +296,7 @@ push is not a release — releases are tagged builds with signed installers.
 
 - ~~**C71-OPEN (2026-09-06): composer up-arrow previous-prompt history.**~~ **RESOLVED 2026-09-06.** Session-scoped in-memory recall (cap 50); Up/Down when empty or caret at start; suggestion menus keep Arrow keys. See `composerPromptHistory` + `useComposerPromptHistory`.
 
-- **C72 (2026-09-06/07): side-panel discoverability.** **PARTIAL 2026-09-07:** fresh launch defaults to `editor-list` (right Notes open, Browse collapsed); Chat rail no longer forces `editor-only`; Mycelium footprint tooltip uses `mycelium.title`. Inbox still toggles. Still open: right icon rail; Inbox rename (deferred). `/Applications` needs rebuild to see it. Detail: [2026-09-07-0111](plans/handoffs/2026-09-07-0111-composer-c72-notes-default-open.md) · prior park [1814](plans/handoffs/2026-09-06-1814-composer-c72-side-panel-session.md).
+- **C72 (2026-09-06/07): side-panel discoverability.** **PARTIAL 2026-09-07:** fresh launch defaults to `editor-list`; Chat does not force `editor-only`; Graph/Mycelium mount **only on Changes** (ADR-0171); shut Notes leaves a 46px restore rail. Inbox still toggles the column and keeps a tall list. Still open: right icon rail; Inbox rename. Detail: [0324](plans/handoffs/2026-09-07-0324-composer-graph-on-changes.md) · [0111](plans/handoffs/2026-09-07-0111-composer-c72-notes-default-open.md).
 
 - **#50 (2026-08-29): let the agent see the running app — plan ready, not built.**
   Three answers proposed: show `pnpm dev` (not native), read + steer through
