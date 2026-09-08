@@ -37,7 +37,8 @@ to Chat ↔ Prime reliability + harness tooling. C67/C68 marked shipped.
 
 **Origin:** Cursor Grok 4.6 · evening dump closed for the night. Full notes:
 [2208 evening design dump](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md).
-Do not miss that file.
+Chart: [2216 dock](plans/handoffs/2026-09-07-2216-cursor-grok-4-6-next-agent-paste.md).
+Doctor-door hanging is parked (not `@` a file). Do not miss the dump.
 
 Parked, **not** tonight’s build, **not** the north star: portfolio-on-boot,
 vault as skill/memory home, STE copies must not drift, **no CC Switch in the
