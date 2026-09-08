@@ -119,7 +119,18 @@ The sidecar is Linux-based, so keep native macOS Tauri QA and app-focus screensh
 
 ## Starter Vaults And Remotes
 
-`create_getting_started_vault` clones the public starter repo and then removes every git remote from the new local copy. That means Getting Started vaults open local-only by default. Users connect a compatible remote later through the bottom-bar `No remote` chip or the command palette, both of which feed the same `AddRemoteModal` and `git_add_remote` backend flow.
+**Default first-run / Restore is a local Rhizome scaffold** — folders and
+type documents only, no personal notes, no network
+(`create_local_rhizome_scaffold` in `src-tauri/src/vault/getting_started.rs`).
+It does **not** clone `refactoringhq/tolaria-getting-started` unless
+`RHIZOME_GETTING_STARTED_REPO_URL` (or a legacy alias) is set. C11’s
+Rhizome-owned remote starter is still deferred.
+
+When a remote URL *is* set, `create_getting_started_vault` clones that repo
+and then removes every git remote from the new local copy, so the vault
+still opens local-only. Users connect a compatible remote later through the
+bottom-bar `No remote` chip or the command palette, both of which feed the
+same `AddRemoteModal` and `git_add_remote` backend flow.
 
 Linux AppImage builds still use the user's system `git` and `node`. Before the app spawns those Git or MCP Node subprocesses, it removes AppImage loader overrides such as `LD_LIBRARY_PATH`, `LD_PRELOAD`, and `GIT_EXEC_PATH` so HTTPS clone helpers and MCP tooling use the host library stack instead of bundled AppImage libraries.
 
@@ -263,7 +274,7 @@ rhizome-agent/
 │   │   │   ├── rename.rs         # Rename + cross-vault wikilink update
 │   │   │   ├── image.rs          # Image attachment saving
 │   │   │   ├── migration.rs      # Frontmatter migration
-│   │   │   └── getting_started.rs # Getting Started vault clone orchestration
+│   │   │   └── getting_started.rs # First-run local scaffold (optional remote clone)
 │   │   ├── frontmatter/          # Frontmatter module
 │   │   │   ├── mod.rs, yaml.rs, ops.rs
 │   │   ├── git/                  # Git module
@@ -336,7 +347,7 @@ rhizome-agent/
 | `src/hooks/useVaultLoader.ts` | How vault data is loaded and managed. The Tauri/mock branching pattern. |
 | `src/hooks/useNoteActions.ts` | Orchestrates note operations: composes `useNoteCreation`, `useNoteRename`, frontmatter CRUD, and wikilink navigation. |
 | `src/hooks/useVaultSwitcher.ts` | Multi-vault management, vault switching, and persisting cloned vaults in the switcher list. |
-| `src/hooks/useGettingStartedClone.ts` | Shared "Clone Getting Started Vault" action for the status bar and command palette. |
+| `src/hooks/useGettingStartedClone.ts` | Shared Restore / Getting Started action (local scaffold by default; remote clone only with env override). |
 | `src/hooks/useNoteWindowLifecycle.ts` | Note-window URL opening, asset-scope sync, and window-title updates. |
 | `src/hooks/useVaultRenameDetection.ts` | Focus-triggered Git rename detection and wikilink update action wiring. |
 | `src/hooks/useStartupScreenState.ts` | Startup-screen and vault-content loading visibility decisions. |
@@ -381,6 +392,10 @@ rhizome-agent/
 | `src/components/aiWorkspaceConversations.ts` | Conversation metadata state, settings persistence, default title generation, and target resolution. |
 | `src/components/aiWorkspaceSizing.ts` | AI workspace sizing, localStorage persistence, class names, and layout style helpers. |
 | `src/components/AiPanel.tsx` | Reusable AI transcript/composer surface — selected target with tool execution, reasoning, actions, and per-vault permission mode. |
+| `src/components/PrimeThinkingToggle.tsx` | Composer thinking-level menu. Levels come from `get_prime_thinking_levels`, not a hardcoded list. |
+| `src/components/usePrimeSessionSwitcher.ts` | Session list switch / fork / branch. Skips `ensure_prime_session_host` when the host is already running. |
+| `src/hooks/useViewMode.ts` | Persisted `editor-only` / `editor-list` / `all`. Fresh default is Notes open (`editor-list`). |
+| `src/components/ConnectionsPanel.tsx` | Graph/Mycelium cell. Chat-centered shell mounts this only on Changes. |
 | `src/utils/openAiWorkspaceWindow.ts` | Native Tauri AI workspace window creation, focus, and dock-back traffic-light handling. |
 | `src/hooks/useCliAiAgent.ts` | Thin React owner for the selected CLI agent session state. |
 | `src/lib/aiAgentSession.ts` | Single message/session lifecycle for prompt normalization, history, streaming, and reset behavior. |
@@ -453,6 +468,30 @@ For automated shortcut QA, use the explicit proof path from `appCommandCatalog.t
 - `window.__rhizomeTest.triggerMenuCommand()` for deterministic native menu-command coverage
 
 That browser harness is a deterministic desktop command bridge, not real native accelerator QA. For macOS browser-reserved chords, still perform native QA in the real Tauri app because the webview-init prevent-default layer is only active there. Do not treat flaky synthesized macOS keystrokes as proof that a shortcut works unless you also confirm the visible app behavior.
+
+## Developer pitfalls (current tree)
+
+Verified against source 2026-09-08. Longer landmine list:
+[`CROSS-MODEL-HANDOFF.md`](CROSS-MODEL-HANDOFF.md).
+
+- **One Rhizome at a time.** Debug bundle and `/Applications/Rhizome Agent.app`
+  share `ai.rhizome.agent`. Launching a second copy silently forwards to the
+  first. Quit the installed app before `pnpm tauri dev`.
+- **Notes default open.** `useViewMode` returns `editor-list` when nothing is
+  stored. Chat must not force `editor-only`. Shut Notes leaves
+  `VaultPanelRestoreButton` (46px). Inbox toggles; it does not mount Graph.
+- **Graph/Mycelium only on Changes.** `ConnectionsPanel` is gated on
+  `isChangesSelection`. Do not remount it under Inbox to “make Graph findable.”
+- **Thinking levels come from the host.** Call `get_prime_thinking_levels`.
+  Do not hardcode Off → Max in the frontend.
+- **Session switch skip-ensure.** `usePrimeSessionSwitcher` skips
+  `ensure_prime_session_host` when `hostRunning` is true. Status-poll retry
+  of ensure is still required when the host is down.
+- **MCP wiki verbs are gone.** `listTools` must not include
+  `rhizome_grok_import`, `rhizome_generate_wiki`, or `rhizome_repo_research`.
+  Graph queries need `RHIZOME_TOOL_PATH` / packaged `cli-call.mjs`.
+- **`pnpm typecheck` is `tsc -b`.** `npx tsc --noEmit` compiles zero files.
+- **English only.** Do not add `en.json` keys or run `pnpm l10n:translate`.
 
 ## Running Tests
 
