@@ -33,6 +33,18 @@ research, C57, and a pre-public priority note. Counts refreshed against live
 **Origin:** Cursor · 2026-09-06 — Atticus starts daily-driving; §0 retargeted
 to Chat ↔ Prime reliability + harness tooling. C67/C68 marked shipped.
 
+**Latest — 2026-09-07 22:08 (America/Chicago)**
+
+**Origin:** Cursor Grok 4.6 · evening dump closed for the night. Full notes:
+[2208 evening design dump](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md).
+Do not miss that file.
+
+Parked, **not** tonight’s build, **not** the north star: portfolio-on-boot,
+vault as skill/memory home, STE copies must not drift, **no CC Switch in the
+product**. Chat ↔ Prime still first. Do not replace Chat. Do not add
+`kanban.db`. Do not invent the briefing. Do not expand two big overlays at
+once.
+
 ---
 
 ## 0. Daily-drive focus (read before §5)
@@ -83,13 +95,133 @@ status chrome (Contribute/Docs → About; idle on composer).
 - **Goal leftover closed:** native Chat glance **PASS** on that build
   ([2245](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md) + PNG).
 - **Parked (not blocking north star):** C72 side panels; Prime list-import route;
-  #51 Tab; C64 full verify; #47 close; Grokbot audits; C9; packaging/Windows.
+  #51 Tab; C64 full verify; #47 close; Grokbot audits; C9; packaging/Windows;
+  vault/app kanban + Chat briefing + scheduled lint report (see parked row below).
+
+**Parked — vault/app kanban (not blocking north star)**
+
+**Origin:** Cursor Grok 4.6 · 2026-09-07 — Atticus: a board in the app and/or
+vault would be useful.
+
+**Origin:** Cursor Grok 4.6 · 2026-09-07 evening — launcher + neighbors settled.
+
+Vault notes with `status` are the cards. The app later draws columns
+(`presentation.type: board`, [ADR-0144](adr/0144-collections-and-presentations.md)).
+Do not copy Hermes `~/.hermes/kanban.db`. Two boards, do not mix: human work
+= vault notes; agent work = a view over Prime sessions
+([harness-composition.md](design/harness-composition.md) Kanban).
+
+**Launcher (not the board on the 30px rail):** one small control, bottom bar,
+middle-right, same upward open as the vault menu. Neighbors in that menu:
+board, scheduled work, other work-in-flight. Idle/working stays on the composer
+(next to thinking). Choosing Board opens a **centered rising panel** (hotkey
+too) — full kanban, not a lopsided popover. Agents get the vault view, not a
+second store.
+
+**On boot: portfolio overview in Chat (does not replace Chat).**
+
+**Origin:** Cursor Grok 4.6 · 2026-09-07 evening — Atticus: briefing in the
+Chat scroll, then per-project yesterday bullets. Clarified 21:31: this is
+**not** a blank canvas. The whole point of the board is the overview.
+
+Composer stays at the bottom. On a new or idle Session you see a **portfolio
+overview**: projects touched in about the last **two weeks**, plus **pinned**
+projects that may stay longer. That view fills the chat scroll, full width.
+The old dead-center “start a conversation” line is **not** the home page.
+Keep a **small hint of that same line** (same style, or a light redesign)
+**just above the composer**, not in the middle of the window. Replies push
+the overview up like a message. As it leaves, it docks into a thin
+**Today** strip in the chat column — about as tall as the left/right rails
+(`COMMAND_RAIL_WIDTH_PX`, maybe a little thinner). **Click to open.** Not hover.
+Atticus: hover is too sensitive, worse when the app lags, and a display
+*above* the main window (TV / second monitor) makes accidental hover open a
+full overlay you then have to kill. **Top and bottom overlays are click.**
+Prefer click for the right Notes column too. Left command rail already
+expands on hover (Claude-like collapse is fine; do not add drag-to-move).
+Not a 46px-wide side chip. Do not keep half the window. Do not
+delete it. Settings can turn the strip off. The bottom Board launcher still
+opens a centered rising kanban. **Do not fully expand both at once.** The
+strip may stay; the kanban overlay is on-demand. Overlays and side panels
+**react to each other**: if Notes, Sessions, the Today briefing, or the
+kanban is expanded, the others collapse or stay thin so Chat does not sit
+in a box. Same idea as Graph only on Changes (ADR-0170) — one big extra
+surface at a time.
+
+**Per-project yesterday:** a few bullets (or one short paragraph) for each
+project that moved — what changed in the last day / sessions. Bind to real
+git, vault, and session facts. Do not let an agent invent the briefing.
+
+**Scheduled lint (report only):** every other night run `rhizome_lint` (and
+the intake audit when due). Write a short note of what is new vs noise.
+Do **not** auto-delete. Atticus or a later Chat turn picks what to purge.
+Visible and cancelable.
+
+**Theme toggle (later polish):** keep the corner sun/moon for ease. It is
+light/dark only. Tooltip or a short upward menu should say color skins live
+in Settings. A pinned skin (e.g. Dracula) currently resets to Rhizome when
+that control flips. Not north star.
 
 **Defer:** full release packaging, first Windows launch verification (#32 /
-C42 — still unrun on a real box), TokenJuice/Switchyard build, ratifying
-harness grafts, #50 live-app view until Atticus picks a surface. **Do keep
-Windows paths in mind for every packaging/tooling fix** (named pipe, 
-`rhizome-tool.exe`, `resources/mcp-server`) even while launch is unverified.
+C42 — still unrun on a real box; last check: unbootable). TokenJuice/Switchyard
+build, ratifying harness grafts, #50 live-app view until Atticus picks a
+surface. **Mac is the daily drive.** First public **may be Mac-only**. Windows
+polish is not a gate for that. **Do keep Windows paths in mind** for packaging
+and tooling (named pipe, `rhizome-tool.exe`, `resources/mcp-server`) so a later
+Windows first boot is not starting from Mac-only paths.
+
+**Reply shape (parked, not the ADHD plugin):** Atticus interrupts mid-read
+and may miss later sentences. STE-100 stays the voice. The useful ADHD
+*quirks* (lead with the answer, short blocks, stop then offer more, first
+and last line must stand alone) can fold into the vault STE file later.
+Do **not** reinstall the skill or plugin. Do not copy it into this repo.
+
+**Living docs audit (parked):** Atticus agrees this repo’s `AGENTS.md`
+(~560 lines) is the Cursor tax, and would go further: audit **living docs**
+(`HANDOFF`, `NEXT`, `ARCHITECTURE`, ADRs, `WINDOWS-DEV`) for stale or false
+claims. Same failure as C42’s “first-class Windows app” line. Not tonight.
+Not a mass rewrite. Origin tags stay.
+
+**Learned memory (parked, not the Prime harness):** Cursor’s
+`continual-learning` plugin mines Cursor chats and writes “Learned” bullets
+into **this repo’s** `AGENTS.md`. That is a Cursor coding-tool helper. It is
+**not** Rhizome Agent, and **not** Prime. Atticus: keep that job (durable
+prefs/facts), but store the **personal / all-tools** bullets in vault
+`agents/shared/` so Cursor, Claude Code, Hermes, and the rest actually load
+them. This repo’s `AGENTS.md` then holds **product rules for this tree** plus a
+few precise product-wide guidelines. Do not teach the memory-updater to write
+STE. Voice still lives in `voice-ste.md` and sync.
+
+**Why a vault file is ignored:** tools do not auto-read arbitrary paths.
+They load **sacred files** (Cursor: `~/.cursor/AGENTS.md` + repo
+`AGENTS.md`; Claude Code: `~/CLAUDE.md` then what that chain names; Codex:
+`~/.codex/AGENTS.md`; Prime in Chat: vault/Prime **skills**, not these files).
+A pointer (“go read the vault”) often loses. A paste into the sacred file
+wins. That is why Atticus over-copied `AGENTS.md`. Fix: **one source in
+vault, sync copies into each sacred file** (already `sync-voice.sh`). Do not
+rely on pointers alone.
+
+**Take from continual-learning (not the plugin):** trigger after a Session,
+not every turn; incremental transcript index (mtime); two buckets only
+(prefs vs facts); cap + update-in-place + dedupe; skip secrets and one-offs;
+do not write voice or process notes into memory. Point that writer at vault
+`agents/shared/`, then sync. Live bug: `mode` is `ste` but `sync-voice.sh`
+still only accepts `adhd`/`normal`, so Cursor’s pack can stay stale.
+
+**CC Switch (parked, coding-tools only):** already on this Mac (`~/.cc-switch`).
+It is a desktop manager for Claude Code, Codex, Hermes, and others: one
+store, then **symlink or copy** skills / MCP / prompt files into each app’s
+must-load path. Same job as vault+sync. Source of truth there is SQLite
+(`cc-switch.db`), not the vault. Cursor is not a first-class target in his
+current app list. Take the **copy/symlink + backup** idea. **Do not implement
+CC Switch as a whole** in Rhizome Agent or Prime. Skip the “Claude inside
+Codex” side. Keys stay in that app’s backups, never in git.
+
+**Vault as skill home (parked harness idea):** Prime today seeds
+`<vault>/.prime/agent/skills/…` (three hidden folders). Atticus: Rhizome
+should house skills and shared agent memory **in the vault we already made**
+(markdown first; the vault can hold other files). Searchable. One place.
+Prime stays the engine and may read or link those files. It is not a second
+home. Full dump: [2208](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md).
 
 ---
 
