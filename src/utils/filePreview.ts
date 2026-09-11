@@ -31,14 +31,6 @@ export function previewExtension(entry: Pick<VaultEntry, 'filename' | 'path'>): 
   return extensionFromFilename(entry.filename) ?? extensionFromFilename(entry.path)
 }
 
-export function isImagePreviewEntry(entry: Pick<VaultEntry, 'fileKind' | 'filename' | 'path'>): boolean {
-  return filePreviewKind(entry) === 'image'
-}
-
-export function isPdfPreviewEntry(entry: Pick<VaultEntry, 'fileKind' | 'filename' | 'path'>): boolean {
-  return filePreviewKind(entry) === 'pdf'
-}
-
 export function filePreviewKind(entry: Pick<VaultEntry, 'fileKind' | 'filename' | 'path'>): FilePreviewKind | null {
   if (entry.fileKind && entry.fileKind !== 'binary') return null
 
@@ -49,10 +41,6 @@ export function filePreviewKind(entry: Pick<VaultEntry, 'fileKind' | 'filename' 
   if (AUDIO_PREVIEW_EXTENSIONS.has(extension)) return 'audio'
   if (VIDEO_PREVIEW_EXTENSIONS.has(extension)) return 'video'
   return null
-}
-
-export function isFilePreviewEntry(entry: Pick<VaultEntry, 'fileKind' | 'filename' | 'path'>): boolean {
-  return filePreviewKind(entry) !== null
 }
 
 export function previewFileTypeLabel(entry: Pick<VaultEntry, 'filename' | 'path'>): string {

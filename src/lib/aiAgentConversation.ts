@@ -35,6 +35,13 @@ export interface AiAgentMessage {
    * presence is what makes forking possible at all.
    */
   primeEntryId?: string
+  /**
+   * Optimistic mid-turn follow-up waiting for its own reply bubble.
+   * Cleared when the stream retargets onto this message after `TurnBoundary`.
+   */
+  queuedFollowUp?: boolean
+  /** When the user turn was created (ms since epoch). Shown as a clock on the bubble. */
+  createdAtMs?: number
 }
 
 export type AgentStatus = 'idle' | 'thinking' | 'tool-executing' | 'done' | 'error'
@@ -109,8 +116,61 @@ export function appendLocalResponse(
       actions: [],
       response,
       id: nextMessageId(),
+      createdAtMs: Date.now(),
     },
   ])
+}
+
+export function appendQueuedFollowUpMessage(
+  setMessages: Dispatch<SetStateAction<AiAgentMessage[]>>,
+  text: string,
+): string {
+  const trimmed = text.trim()
+  const messageId = nextMessageId()
+  if (!trimmed) return messageId
+
+  setMessages((current) => {
+    // Same interrupt already on screen — do not duplicate when queue poll
+    // and the send-policy append both see it.
+    const already = current.some((message) => (
+      !message.localMarker
+      && message.userMessage.trim() === trimmed
+      && (message.queuedFollowUp || (!message.response && !message.isStreaming))
+    ))
+    if (already) return current
+
+    return [
+      ...current,
+      {
+        userMessage: trimmed,
+        actions: [],
+        id: messageId,
+        queuedFollowUp: true,
+        createdAtMs: Date.now(),
+        // Not streaming yet — the reply arrives when Prime drains the queue.
+        // Keeping this visible is what makes "Waiting in this session" match
+        // the transcript instead of vanishing into a reply-only first bubble.
+      },
+    ]
+  })
+  return messageId
+}
+
+/**
+ * Mirror Prime's follow-up queue into the transcript.
+ *
+ * The send path also appends on accept, but Chat can lose that bubble when a
+ * mid-turn rehydrate/`replaceMessages` races the live stream. `get_queue` is
+ * the daemon's source of truth for what is still waiting — keep those lines
+ * on screen until their own reply owns them.
+ */
+export function ensureQueuedFollowUpsInTranscript(
+  setMessages: Dispatch<SetStateAction<AiAgentMessage[]>>,
+  followUps: string[],
+): void {
+  for (const text of followUps) {
+    appendQueuedFollowUpMessage(setMessages, text)
+  }
 }
 
 export function appendStreamingMessage(
@@ -126,6 +186,7 @@ export function appendStreamingMessage(
       actions: [],
       isStreaming: true,
       id: messageId,
+      createdAtMs: Date.now(),
     },
   ])
   return messageId

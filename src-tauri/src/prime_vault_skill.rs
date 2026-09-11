@@ -108,14 +108,18 @@ fn resolve_cli_call_path() -> Result<PathBuf, String> {
     let mcp_dir = Path::new(&mcp_index)
         .parent()
         .ok_or_else(|| "MCP server path has no parent directory".to_string())?;
-    let cli = mcp_dir.join("cli-call.mjs");
-    if !cli.is_file() {
-        return Err(format!(
-            "Rhizome MCP cli-call.mjs not found next to index.js at {}",
-            cli.display()
-        ));
+    // Dev tree and packaged resources both ship `cli-call.mjs` next to index.js
+    // (see scripts/bundle-mcp-server.mjs). Accept `cli-call.js` as a fallback.
+    for name in ["cli-call.mjs", "cli-call.js"] {
+        let cli = mcp_dir.join(name);
+        if cli.is_file() {
+            return Ok(cli.canonicalize().unwrap_or(cli));
+        }
     }
-    Ok(cli.canonicalize().unwrap_or(cli))
+    Err(format!(
+        "Rhizome MCP cli-call not found next to index.js at {} (tried cli-call.mjs, cli-call.js)",
+        mcp_dir.display()
+    ))
 }
 
 /// The environment prefix the skill's shell examples carry.
@@ -161,11 +165,16 @@ fn mcp_stdio_env(vault_path: &str, rhizome_tool: Option<&Path>) -> serde_json::V
 }
 
 fn skill_markdown(cli_call: &Path, vault_path: &str) -> String {
-    skill_markdown_with_tool(
-        cli_call,
-        vault_path,
-        crate::mcp::rhizome_tool_path().as_deref(),
-    )
+    skill_markdown_with_tool(cli_call, vault_path, rhizome_tool_for_seed().as_deref())
+}
+
+/// Sidecar path for skill/MCP seed: honor `RHIZOME_TOOL_PATH` when it points at
+/// a real binary (manual reseed / agents), else the binary beside this process.
+fn rhizome_tool_for_seed() -> Option<PathBuf> {
+    std::env::var_os("RHIZOME_TOOL_PATH")
+        .map(PathBuf::from)
+        .filter(|path| path.is_file())
+        .or_else(crate::mcp::rhizome_tool_path)
 }
 
 fn skill_markdown_with_tool(
@@ -338,7 +347,7 @@ fn write_mcp_stdio_settings(
         serde_json::json!({
             "command": "node",
             "args": [index_js.to_string_lossy()],
-            "env": mcp_stdio_env(vault_path, crate::mcp::rhizome_tool_path().as_deref())
+            "env": mcp_stdio_env(vault_path, rhizome_tool_for_seed().as_deref())
         }),
     );
 
@@ -497,6 +506,18 @@ mod tests {
     }
 
     #[test]
+    fn seed_honors_rhizome_tool_path_env_when_file_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let fake_tool = dir.path().join("rhizome-tool");
+        std::fs::write(&fake_tool, b"x").unwrap();
+        // SAFETY: test-only, serial within this module's env-sensitive cases.
+        unsafe { std::env::set_var("RHIZOME_TOOL_PATH", &fake_tool) };
+        let resolved = rhizome_tool_for_seed();
+        unsafe { std::env::remove_var("RHIZOME_TOOL_PATH") };
+        assert_eq!(resolved.as_deref(), Some(fake_tool.as_path()));
+    }
+
+    #[test]
     fn seed_writes_skill_when_mcp_cli_resolves() {
         // Only runs when repo mcp-server/cli-call.mjs is discoverable (dev tree).
         let Ok(cli) = resolve_cli_call_path() else {
@@ -512,5 +533,29 @@ mod tests {
         let raw = std::fs::read_to_string(settings).unwrap();
         assert!(raw.contains("rhizome"));
         assert!(raw.contains("VAULT_PATH"));
+    }
+
+    /// Manual reseed for a real vault when the installed skill is stale.
+    /// Example:
+    /// `RHIZOME_RESEED_VAULT="$HOME/Documents/Rhizome Vault" \
+    ///  RHIZOME_TOOL_PATH="/Applications/Rhizome Agent.app/Contents/MacOS/rhizome-tool" \
+    ///  cargo test -p rhizome reseed_vault_skill_from_env -- --ignored --nocapture`
+    #[test]
+    #[ignore = "set RHIZOME_RESEED_VAULT (+ optional RHIZOME_TOOL_PATH) to rewrite a vault skill"]
+    fn reseed_vault_skill_from_env() {
+        let vault = std::env::var("RHIZOME_RESEED_VAULT")
+            .expect("RHIZOME_RESEED_VAULT must point at a vault directory");
+        let seed = seed_vault_skill(Path::new(&vault)).expect("seed");
+        let skill_path = seed.skill_dir.join("SKILL.md");
+        let md = std::fs::read_to_string(&skill_path).expect("read skill");
+        println!("reseeded {}", skill_path.display());
+        assert!(
+            md.contains("rhizome_graph_neighbors"),
+            "expected graph tools in skill body"
+        );
+        assert!(
+            md.contains("RHIZOME_TOOL_PATH=") || std::env::var_os("RHIZOME_TOOL_PATH").is_none(),
+            "expected sidecar path when RHIZOME_TOOL_PATH is set"
+        );
     }
 }

@@ -47,10 +47,22 @@ file.
 ---
 
 ## State
-`main` is **`a309a17`** (C67/C68). Area C orphan-UI subtraction is on
-`cursor/area-c-orphan-ui-7f62`: deleted unused components/exports and dead
-dialog / docked / right-panel-chat branches. Confirm with `git status`.
-Multi-day briefing: [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date first).
+`main` on origin is **`457ee96`** (docs after **`0fa00a2`**: thinking-level
+menu, Graph/Mycelium on Changes, matching Notes restore rail, skip-ensure
+on session switch). Native Chat glance **PASSED** (2026-09-06). Do not
+rebuild `/Applications` over a live Rhizome.
+
+Area C orphan-UI subtraction is on `cursor/area-c-orphan-ui-7f62`: deleted
+unused components/exports and dead dialog / docked / right-panel-chat
+branches. Linux clippy cfg-gates close the unused macOS-helper thread (the
+C69 that is not the packaged `cli-call` fix).
+
+Still open / parked: **C72** Inbox rename; Prime list-import; **#51** Tab;
+**C64** full verify; **#47** confirm-close; Grokbot **#60/#61/#62** (held);
+Rhizome in-app updater stub. Evening design dump (portfolio, vault-as-skills,
+no CC Switch):
+[2208](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md).
+[`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date first).
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Inverted Dock icon is
@@ -86,13 +98,33 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-11 · Grok 4.6](plans/handoffs/2026-09-11-1445-grok-4-6-area-c-main-merge.md) — **merged `origin/main` into Area C:** kept unused `ClaudeCodeOnboardingPrompt` deleted; HANDOFF takes main's index plus Area C / C69 clippy close.
 - [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2155-grok-4-6-area-c-orphan-ui.md) — **Area C:** deleted orphan UI under `src/components/` (onboarding/create-note/autocomplete/NoteIcon), unused exports, and dead dialog/docked/right-panel-chat branches.
+- [2026-09-07 · Cursor Grok 4.6](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md) — **parked evening dump (no UI):** portfolio-on-boot, vault as skill/memory home, STE must not drift, no CC Switch in product. Chat ↔ Prime still first.
+- [2026-09-07 · Cursor Grok 4.6](plans/handoffs/2026-09-07-0351-cursor-grok-4-6-push-and-adhd-off.md) — **`0fa00a2` on origin;** ADHD ideation skill removed from this repo; no Applications rebuild.
+- [2026-09-07 · Composer](plans/handoffs/2026-09-07-0324-composer-graph-on-changes.md) — **Graph/Mycelium only on Changes;** Inbox keeps the full notes list; collapsed Notes leaves a 46px right rail (same as left command rail).
+- [2026-09-07 · Composer](plans/handoffs/2026-09-07-0308-composer-lag-audit-pickup.md) — **lag/pinwheel audit pickup** for a fresh session (start / page switch / Settings); prior beachball diagnosis linked; only one Rhizome process; Apps was `.bak` at write time.
+- [2026-09-07 · Composer](plans/handoffs/2026-09-07-0003-composer-beachball-lag.md) — **beachball diagnosis (docs only):** session switch = 3 sync Prime awaits + full chat `messages.map`; Settings = full remount; cold start = ensure daemon + vault + Graph if Inbox open; Applications smoother but same shapes; quit Applications before `tauri:dev` (same bundle id).
+- [2026-09-06 · Cursor Grok 4.6](plans/handoffs/2026-09-06-2236-cursor-grok-4-6-area-f.md) — **Area F:** MCP no longer advertises `rhizome_grok_import` / `rhizome_generate_wiki` / `rhizome_repo_research`; deleted `rhizome_grok_import.rs` and parked smoke junk. **Merged as #63**.
+- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2145-grok-4-6-area-b-orphan-hooks.md) — **Area B subtraction:** deleted unused hooks (`useMcpBridge`, `useClaudeCodeOnboarding`, `useClaudeCodeStatus`, `useNoteLayout`), the TS Mindwalk duplicate, unused Claude CLI wrappers, and confirmed-dead app-core exports. Claude onboarding/badge UI files left for area C. **Merged as #59**.
+- [2026-09-06 · Cursor Grok 4.6](plans/handoffs/2026-09-06-2141-cursor-grok-4-6-area-a-orphans.md) — **area A subtraction:** deleted orphaned `e2e/` (24 unused specs), unused scripts, unused `biome.json`, leftover `mcp-server/package-lock.json`, and unused `verifyFocusable`. Live `tests/smoke/` and `tests/integration/` kept. **Merged as #58** (`de80c90`).
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md) — **native Chat glance PASS** on `f76b46c`/`ac36e10`; daily-drive north-star leftover closed. Parked: C72, Prime list-import, #51 Tab, C64 full verify, #47, Grokbot.
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1819-composer-park-grokbot-audits-tonight.md) — **tonight:** review Grokbot full audits of rhizome-agent **and** CodexGPT lob (after dinner).
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1816-composer-session-import-first-run.md) — **session-import Settings UI** (Claude Code → vault `Imports/`); **Getting Started = local Rhizome scaffold** (no Tolaria clone by default). Prime list rows + C11 remote starter still open.
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1813-composer-c57-permission-decisions.md) — **C57 closed by Atticus:** CLI default Limited tools; Prime toggle stays hidden; keep “Limited tools” / Power User (no Vault Safe rename). Code already matched.
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1812-composer-c70-c71-clocks-and-history.md) — **C70/C71 shipped in tree:** Chat bubble clocks (`3:35p`); Ask-box Up/Down prompt recall (caret at start / empty only).
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1802-composer-provider-preflight-gap.md) — gap audit: DeepSeek/Nous Settings already in tree; Chat preflight now drops expired OAuth; `NOUS_API_KEY` counts as connected.
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1800-composer-park-chat-wishlist.md) — parked Atticus Chat wishlist as **C70** timestamps + **C71** up-arrow history; providers/OAuth + first-run vault already in prefs/`NEXT` §0.
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1758-composer-midturn-live-and-selection-copy.md) — live mid-turn probe got its own reply; Chat selection Copy via native context-menu allowlist (messages + composer).
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1715-composer-suspend-retry-and-dom-send.md) — post-Stop Chat looked idle but Enter failed (`queued session input is suspended`); prompt now resumes on `success: false`. Composer reads on-screen text when React draft is stale. Live two-bubble mid-turn still open.
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1616-composer-midturn-turn-boundary.md) — mid-turn: follow-up reply was merging into first bubble; `TurnBoundary` + 2s empty-queue grace. Live two-bubble dogfood still required.
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1537-composer-midturn-stream-and-session-names.md) — mid-turn: host kept stopping at first `agent_end` (follow-up reply missing in Chat); fix `stream_until_turn_complete` + optimistic follow-up bubble. New session names lead with local clock. Rebuild `/Applications` still required.
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1522-composer-midturn-waiting-chrome.md) — daily-drive: **#41 mid-turn** confirmed (“Waiting in this session” / `MIDTURN_QUEUE_PROBE` while Working; DeepSeek · Rhizome Vault); graph tools still healthy.
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1147-composer-daily-drive-cli-call-bundle.md) — daily-drive: **C69** packaged `cli-call` missing (fixed + `/Applications` patched); **live Chat graph ask succeeded** on Obsidian Vault (Big Pickle → `rhizome_graph_health`: 69 notes / 11 links / 60 orphans / 7 dead links). Same day: `/Applications` rebuild with ADR-0170 native QA; vault skills point at packaged `cli-call.mjs`; **graph Find** collapsed to bottom-right expandable box (Atticus: type-pill wall hid the canvas).
 
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-0805-composer-c67-c68.md) — **C67/C68 shipped:** sessions right-click menu; note lock (default editable, breadcrumb + Cmd+K).
 
 - [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-0405-grok-4-6-status-bar-pills.md) — status-bar chrome: Contribute/Docs → Settings → About; build/update next to theme; composer lost the duplicate vault pill and hosts agent idle. Vault dropdown stays bottom-left.
-
-- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-0338-grok-4-6-lock-and-session-menu.md) — captured then shipped later as C67/C68 (see 0805 Composer handoff).
 
 - [2026-09-05 · Claude Opus 5](plans/handoffs/2026-09-05-2145-claude-opus-5-session-import-and-agent-graph.md) — **no agent had ever successfully run a graph query**: the `rhizome_graph_*` tools need `RHIZOME_TOOL_PATH`, and the seeded skill tells the agent to run `cli-call.mjs` from a bash tool, which inherits none of the app's environment. Fixed, and rewrote the skill description so agents discover the graph at all (they were told only about note CRUD). Built the **session-import engine** — ledger, dedup, Claude Code adapter, selection, preview, vault writer — verified on real history: 318 notes written, zero failures, second run wrote nothing. Fixed four UI defects (inverted Connections resize, titlebar stealing the window drag, unresizable chat/editor split, session list sorted by file mtime). **Right-panel layout agreed but unbuilt**; skill change not yet verified with a real agent.
 
@@ -260,8 +292,20 @@ push is not a release — releases are tagged builds with signed installers.
   vs per-vault; new Settings section vs under the existing AI agents page.
 - ~~**C67-OPEN (2026-09-06): sessions list needs a right-click menu**~~ **RESOLVED 2026-09-06.** Right-click Open / Rename / Archive·Restore / View in Mycelium / Copy path via `PrimeSessionListContextMenu`; Mycelium uses `handleOpenSessionFootprint`.
 - ~~**C68-OPEN (2026-09-06): restore note lock/view.**~~ **RESOLVED 2026-09-06.** Ephemeral per-note lock (default editable); breadcrumb + Cmd+K; BlockNote/CodeMirror read-only when locked. Not vault `editor_mode`.
+- ~~**C69-OPEN (2026-09-06): Linux CI Clippy (`-D warnings`) fails on macOS-only
+  `src-tauri`.**~~ **FIXED on `cursor/area-c-orphan-ui-7f62` (2026-09-11).**
+  macOS-only menu-bar capture helpers and `should_reopen_main_window` are
+  cfg-gated so Linux clippy `-D warnings` stays clean. This is the unused
+  macOS-helper C69, not the packaged `cli-call.mjs` C69 below.
+- ~~**C69-OPEN (2026-09-06): packaged mcp-server omitted `cli-call.mjs`.**~~ **FIXED + `/Applications` rebuilt 2026-09-06 afternoon.** Bundle ships self-contained `cli-call.mjs`; seed failures `log::warn`; `pick_mcp_server_dir` prefers packaged macOS/Windows/Linux layouts over compile-time repo. Live Chat graph ask + Obsidian/Documents skills point at `/Applications/.../cli-call.mjs`. Windows launch itself remains C42.
 
-- **C57-OPEN (2026-08-29): permission mode product choices after Prime fix.** Code shipped: Prime ignores vault-safe prompts and defaults new sessions to power user; Claude Code / Antigravity still enforce stored mode; UI copy is **Limited tools** / Power User. **Awaiting Atticus:** keep CLI agents defaulting to Limited tools (`safe`)? keep the Prime permission toggle hidden? final naming — "Limited tools" vs retaining "Vault Safe" with an honest tooltip.
+- ~~**C57-OPEN (2026-08-29): permission mode product choices after Prime fix.**~~ **RESOLVED 2026-09-06 (Atticus).** CLI agents default **Limited tools** (`safe`); Prime toggle stays **hidden** (always Power User); keep labels **Limited tools** / **Power User** — do not restore “Vault Safe.” Code already matched (`aiAgentPermissionMode.ts`, `hidePermissionMode` on Prime).
+
+- ~~**C70-OPEN (2026-09-06): per-message timestamps in Chat.**~~ **RESOLVED 2026-09-06.** Live sends + transcript replay stamp `createdAtMs`; bubble shows `3:35p` under the ask (`messageTimestamp` / `AiMessage`).
+
+- ~~**C71-OPEN (2026-09-06): composer up-arrow previous-prompt history.**~~ **RESOLVED 2026-09-06.** Session-scoped in-memory recall (cap 50); Up/Down when empty or caret at start; suggestion menus keep Arrow keys. See `composerPromptHistory` + `useComposerPromptHistory`.
+
+- **C72 (2026-09-06/07): side-panel discoverability.** **PARTIAL 2026-09-07:** fresh launch defaults to `editor-list` (right Notes open, Browse collapsed); Chat rail no longer forces `editor-only`; Mycelium footprint tooltip uses `mycelium.title`. Inbox still toggles. Still open: right icon rail; Inbox rename (deferred). `/Applications` needs rebuild to see it. Detail: [2026-09-07-0111](plans/handoffs/2026-09-07-0111-composer-c72-notes-default-open.md) · prior park [1814](plans/handoffs/2026-09-06-1814-composer-c72-side-panel-session.md).
 
 - **#50 (2026-08-29): let the agent see the running app — plan ready, not built.**
   Three answers proposed: show `pnpm dev` (not native), read + steer through
@@ -583,7 +627,12 @@ push is not a release — releases are tagged builds with signed installers.
 - ~~C6-OPEN: inbox automation default~~ **RESOLVED 2026-07-31.** Default ON for new vaults, plus a one-time per-vault migration for existing ones. See "Investigation done" item 1 above.
 - C7-OPEN: native QA for shell waves — requires a real `.app` bundle or Accessibility permission. Do not graduate shell flags without it.
 - **C8-NOT-APPLICABLE-HERE: GitHub account suspended** — this is the **`knispo`** account, inherited from the pre-fork Desktop history. This repo pushes to **`tuckcode/rhizome-agent`**, which works (verified 2026-08-15, two successful pushes). Left in the list rather than deleted because it is still the origin of the stale "do not push until asked" rule corrected at the top of this file. Original entry: GitHub account suspended — blocks push + Windows CI release for friend build. Unblock tonight from home device/`knispo13@gmail.com`.
-- **C11-OPEN: `GETTING_STARTED_REPO_URL` still clones `refactoringhq/tolaria-getting-started.git`** (`src-tauri/src/vault/getting_started.rs:6`) — an unrelated upstream project. The seeded `AGENTS.md` link was removed 2026-07-31, but this one is a *functional* clone URL behind the Getting Started flow, so it can't just be deleted. Needs a replacement starter-vault repo under `knispo` — blocked on GitHub access. Full breakdown incl. what must NOT be renamed: CROSS-MODEL-HANDOFF §6.
+- **C11-OPEN (mitigated 2026-09-06):** default Getting Started **no longer clones**
+  `refactoringhq/tolaria-getting-started.git` — it builds a local Rhizome
+  scaffold (`create_local_rhizome_scaffold`). `GETTING_STARTED_REPO_URL` remains
+  for env override (`RHIZOME_GETTING_STARTED_REPO_URL`) until a Rhizome-owned
+  remote starter exists. Still blocked: publishing that remote under
+  `tuckcode`/`knispo`. CROSS-MODEL-HANDOFF §6.
 - C9-OPEN: optional first-run Welcome even when a default vault already exists (user wants optional onboard with skip-to-existing). Product decision pending.
 - C10-OPEN: spotlight onboarding walkthrough still unbuilt (`docs/design/onboarding-walkthrough.md`).
 - **C12-RESOLVED (2026-08-19): the exposed GitHub PAT is revoked and no local copy remains.** A fine-grained PAT (`github_pat_…`) had been configured as `mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN`, captured into session transcripts.
@@ -651,7 +700,7 @@ push is not a release — releases are tagged builds with signed installers.
 - **C23-RESOLVED (2026-08-13): the transcript comes from the on-disk `.jsonl`, not `get_messages`.** Decided in `docs/plans/2026-08-13-prime-session-list-spec.md`. The disk log is the only source describing a session the app is not currently running — the whole point of a switchable list — and is strictly richer (`parentId` fork lineage, `model_change`, `compaction`). `get_messages` stays as landed, correct for the live session, no longer load-bearing. Original finding retained below for the record.
 - **C23-HISTORICAL (original finding; superseded by C23-CORRECTED and C23-RESOLVED above): `get_messages` appeared insufficient for transcript rehydration.** Found 2026-08-13 while verifying the newly-landed command against the live `prime-agent --mode rpc` binary. Within a **single** host process: send `prompt` → wait for `agent_end` → `agent_end` carries `messages` with **both** roles (`['user','assistant']`) → then `get_messages` on that same process returns **only the user message**. Reproduced across two runs. The later probe established that this was a fresh session mid-turn: `get_messages` reflects persisted, post-compaction working history. Session replay uses the richer on-disk `.jsonl` instead. The command itself remains correct for its live-session purpose.
 
-- **C24-RESOLVED (2026-08-26): removed the three dead exports** (`listPrimeSessionCandidates`, `PRIME_SESSIONS_DIR_DEFAULT`, `BridgedSessionResult`) from `src/utils/primeSessionToMindwalk.ts`. Session listing stays in Rust (`prime_sessions::session_files` / `sessions_dir`). The Mindwalk rewrite helpers in that file remain live.
+- **C24-RESOLVED (2026-08-26): removed the three dead exports** (`listPrimeSessionCandidates`, `PRIME_SESSIONS_DIR_DEFAULT`, `BridgedSessionResult`) from `src/utils/primeSessionToMindwalk.ts`. Session listing stays in Rust (`prime_sessions::session_files` / `sessions_dir`). **Follow-up 2026-09-06 (area B):** the remaining TS rewrite helpers were test-only; the file is deleted. Rust `bridge_and_open_prime_session` is the live path.
 
 - **C25-RESOLVED (2026-09-04): stale regression specs now match the settled chat-centered shell.** The create-note spec opens the Notes panel through the rail's Inbox button and selects Projects / All Notes by accessible button name; both create flows pass. `visible-type-property.spec.ts` was deleted because it no longer installed a vault containing `visible: false`, targeted the removed `.app__sidebar` section controls, and only asserted label count/uniqueness—not its claimed behavior. The real behavior remains covered by 81 passing tests across `Sidebar.test.tsx` and `Sidebar.typeVisibilityWorkspaces.test.tsx`.
 

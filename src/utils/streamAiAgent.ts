@@ -17,6 +17,7 @@ type AiAgentStreamEvent =
   | { kind: 'Error'; message: string }
   | { kind: 'QueueUpdate'; queued: number }
   | { kind: 'Compaction'; phase: string; reason?: string; tokens_before?: number }
+  | { kind: 'TurnBoundary' }
   | { kind: 'Done' }
 
 export interface AgentStreamCallbacks {
@@ -29,6 +30,11 @@ export interface AgentStreamCallbacks {
   onCompaction?: (phase: string, reason?: string, tokensBefore?: number) => void
   /** Steering/follow-up queue depth changed. Optional. */
   onQueueUpdate?: (queued: number) => void
+  /**
+   * Prime finished one agent turn; more may follow on the same stream
+   * (queued follow-up). Optional — non-Prime agents never emit it.
+   */
+  onTurnBoundary?: () => void
   onDone: () => void
 }
 
@@ -94,6 +100,9 @@ function handleStreamEvent(data: AiAgentStreamEvent, callbacks: AgentStreamCallb
       return
     case 'QueueUpdate':
       callbacks.onQueueUpdate?.(data.queued)
+      return
+    case 'TurnBoundary':
+      callbacks.onTurnBoundary?.()
       return
     case 'Done':
       callbacks.onDone()

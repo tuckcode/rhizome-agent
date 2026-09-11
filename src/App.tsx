@@ -190,7 +190,6 @@ function App() {
 }
 
 function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | null }) {
-  const aiWorkspaceWindow = false
   const [selection, setSelection] = useState<SidebarSelection>(DEFAULT_SELECTION)
   const [noteListFilter, setNoteListFilter] = useState<NoteListFilter>('open')
   const [pendingNoteListPdfExportPath, setPendingNoteListPdfExportPath] = useState<string | null>(null)
@@ -210,7 +209,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     selectionRef,
     setSelection: handleSetSelection,
   })
-  const layout = useLayoutPanels(noteWindowParams || aiWorkspaceWindow ? { initialInspectorCollapsed: true } : undefined)
+  const layout = useLayoutPanels(noteWindowParams ? { initialInspectorCollapsed: true } : undefined)
   const { setInspectorCollapsed } = layout
   const visibleNotesRef = useRef<VaultEntry[]>([])
   const multiSelectionCommandRef = useRef<NoteListMultiSelectionCommands | null>(null)
@@ -241,7 +240,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   // guarantee the latest closure is always used).
   const vaultSwitcher = useVaultSwitcher({
     onSwitch: () => {
-      if (noteWindowParams || aiWorkspaceWindow) return
+      if (noteWindowParams) return
       handleSetSelection(DEFAULT_SELECTION)
       notes.closeAllTabs()
     },
@@ -270,13 +269,13 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
 
   const handleGettingStartedVaultReady = useCallback((vaultPath: string) => {
     rememberVaultChoice(vaultPath)
-    setToastMessage(`Getting Started vault cloned and opened at ${vaultPath}`)
+    setToastMessage(`Getting Started vault created and opened at ${vaultPath}`)
   }, [rememberVaultChoice])
 
   const handleOnboardingVaultReady = useCallback((vaultPath: string, source: 'template' | 'empty' | 'existing') => {
     rememberVaultChoice(vaultPath)
     if (source === 'template') {
-      setToastMessage(`Getting Started vault cloned and opened at ${vaultPath}`)
+      setToastMessage(`Getting Started vault created and opened at ${vaultPath}`)
     }
   }, [rememberVaultChoice])
   const cloneGettingStartedVault = useGettingStartedClone({
@@ -287,11 +286,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     onVaultReady: handleOnboardingVaultReady,
     registerVault: registerVaultSelection,
   }, vaultSwitcher.loaded)
-  const aiAgentsStatus = useAiAgentsStatus({
-    enabled: !aiWorkspaceWindow,
-  })
+  const aiAgentsStatus = useAiAgentsStatus()
   const aiAgentsOnboarding = useAiAgentsOnboarding(
-    onboarding.state.status === 'ready' && !noteWindowParams && !aiWorkspaceWindow,
+    onboarding.state.status === 'ready' && !noteWindowParams,
   )
 
   // Onboarding can briefly own the vault path for a newly created/opened vault
@@ -318,7 +315,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     handleOpenAiSettings,
     handleOpenDockedAiWorkspace,
   } = useAppAiWorkspaceBridge({
-    aiWorkspaceWindow,
+    aiWorkspaceWindow: false,
     openAIChat,
     openChatHome,
     openSettings: dialogs.openSettings,
@@ -356,7 +353,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     resolvedPath,
     settings,
     vaultSwitcherLoaded: vaultSwitcher.loaded,
-    windowMode: Boolean(noteWindowParams) || aiWorkspaceWindow,
+    windowMode: Boolean(noteWindowParams),
   })
   const vaultWorkspaceOrder = useMemo(
     () => vaultSwitcher.allVaults.map((vault) => vault.path),
@@ -379,7 +376,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     onGitSetupPreferenceChange: handleGitSetupPreferenceChange,
     onToast: setToastMessage,
     resolvedPath,
-    windowMode: Boolean(noteWindowParams) || aiWorkspaceWindow,
+    windowMode: Boolean(noteWindowParams),
   })
 
   const vault = useVaultLoader(resolvedPath, graphVaults, multiWorkspaceEnabled ? defaultWorkspacePath : null, folderVaults)
@@ -557,8 +554,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const handleRailSelectInbox = useCallback(() => {
     handleSetSelection({ kind: 'filter', filter: explicitOrganizationEnabled ? 'inbox' : 'all' })
   }, [handleSetSelection, explicitOrganizationEnabled])
-  // In command-rail mode Graph and Mycelium live under Notes in the right
-  // panel, not as a full-page destination. Classic shell keeps the old toggle.
+  // Graph and Mycelium live under Notes on the Changes tab only. Inbox
+  // keeps the full notes list. Classic shell still uses the old toggle.
   const connectionsPanelRef = useRef<ConnectionsPanelHandle>(null)
   const connectionsRequestSeq = useRef(0)
   const [connectionsRequest, setConnectionsRequest] = useState<ConnectionsViewRequest | null>(null)
@@ -621,8 +618,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     void refreshGitModifiedFiles()
   }, [markRecentVaultWrite, refreshGitModifiedFiles])
   const handleMissingActiveVault = useCallback(() => {
-    if (!noteWindowParams && !aiWorkspaceWindow && resolvedPath) vault.markVaultUnavailable(resolvedPath)
-  }, [aiWorkspaceWindow, noteWindowParams, resolvedPath, vault])
+    if (!noteWindowParams && resolvedPath) vault.markVaultUnavailable(resolvedPath)
+  }, [noteWindowParams, resolvedPath, vault])
 
   const notes = useNoteActions({
     addEntry: vault.addEntry,
@@ -1307,7 +1304,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   } = useAppWindowControls({
     layout,
     unifiedVaultPanel: chatCentered,
-    windowMode: Boolean(noteWindowParams) || aiWorkspaceWindow,
+    windowMode: Boolean(noteWindowParams),
   })
   const handleChatViewMode = useCallback((mode: typeof viewMode) => {
     if (mode === 'editor-only') handleRailSelectChat()
@@ -1584,25 +1581,27 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const [compactVaultPanelOpen, setCompactVaultPanelOpen] = useState(false)
   const handleRailSelectGraph = useCallback(() => {
     if (chatCentered) {
-      if (viewMode === 'editor-only') handleSetViewMode('all')
+      if (viewMode === 'editor-only') handleSetViewMode('editor-list')
       setCompactVaultPanelOpen(true)
+      handleRailSelectChanges()
       setConnectionsRequest({ view: 'graph', requestId: ++connectionsRequestSeq.current })
       connectionsPanelRef.current?.openView('graph')
       return
     }
     handleSetSelection(toggleGraphSelection(effectiveSelection, vaultConfig.inbox?.explicitOrganization))
-  }, [chatCentered, handleSetSelection, effectiveSelection, handleSetViewMode, setCompactVaultPanelOpen, setConnectionsRequest, viewMode, vaultConfig.inbox?.explicitOrganization])
+  }, [chatCentered, handleRailSelectChanges, handleSetSelection, effectiveSelection, handleSetViewMode, setCompactVaultPanelOpen, setConnectionsRequest, viewMode, vaultConfig.inbox?.explicitOrganization])
   const handleOpenSessionFootprint = useCallback((path: string) => {
     if (chatCentered) {
-      if (viewMode === 'editor-only') handleSetViewMode('all')
+      if (viewMode === 'editor-only') handleSetViewMode('editor-list')
       setCompactVaultPanelOpen(true)
+      handleRailSelectChanges()
       setConnectionsRequest({ view: 'mycelium', focusPath: path, requestId: ++connectionsRequestSeq.current })
       connectionsPanelRef.current?.openView('mycelium', { focusPath: path })
       return
     }
     setMyceliumFocusPath(path)
     handleSetSelection({ kind: 'filter', filter: 'mycelium' })
-  }, [chatCentered, handleSetSelection, handleSetViewMode, setCompactVaultPanelOpen, setConnectionsRequest, viewMode])
+  }, [chatCentered, handleRailSelectChanges, handleSetSelection, handleSetViewMode, setCompactVaultPanelOpen, setConnectionsRequest, viewMode])
   const handleSelectNoteForPdfExport = notes.handleSelectNote
   const handleExportNotePdfFromList = useCallback((entry: VaultEntry) => {
     if (!isMarkdownEntry(entry)) return
@@ -1634,7 +1633,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     shouldShowStartupScreen,
   } = useStartupScreenState({
     aiAgentsPromptVisible: aiAgentsOnboarding.showPrompt,
-    isNoteWindow: Boolean(noteWindowParams) || aiWorkspaceWindow,
+    isNoteWindow: Boolean(noteWindowParams),
     onboardingState: onboarding.state,
     runtimeMissingVaultPath,
     selectedVaultPath,
@@ -1647,7 +1646,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const deepLinks = useDeepLinks({
     activeEntry: activeTab?.entry ?? null,
     currentVaultPath: resolvedPath,
-    enabled: !noteWindowParams && !aiWorkspaceWindow,
+    enabled: !noteWindowParams,
     entries: visibleEntries,
     isVaultContentLoading,
     locale: appLocale,
@@ -1895,14 +1894,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     )
   }
 
-  if (aiWorkspaceWindow) {
-    return (
-      <AppPreferencesProvider dateDisplayFormat={dateDisplayFormat}>
-        {aiWorkspaceSurface}
-      </AppPreferencesProvider>
-    )
-  }
-
   const noteListModifiedFiles = isChangesSelection ? selectedChangesModifiedFiles : undefined
   const noteListModifiedFilesError = isChangesSelection ? gitSurfaces.changesModifiedFilesError : null
 
@@ -1926,10 +1917,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     (!compactVaultPanel || compactVaultPanelOpen)
   const showVaultPanelRestore =
     chatCentered &&
-    viewMode !== 'editor-only' &&
-    !hideNoteListForCanvas &&
-    compactVaultPanel &&
-    !compactVaultPanelOpen
+    !showVaultPanel &&
+    !hideNoteListForCanvas
 
   const handleVaultTreeSelect = (nextSelection: SidebarSelection) => {
     handleSetSelection(nextSelection)
@@ -1988,7 +1977,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           handleSetViewMode('editor-only')
         }}
       />
-      {chatCentered ? (
+      {chatCentered && isChangesSelection ? (
         <ConnectionsPanel
           ref={connectionsPanelRef}
           vaultPath={resolvedPath}
@@ -2055,8 +2044,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               activeDestination={railActiveDestination}
               inboxCount={inboxCount}
               onSelectChat={() => {
+                // C72: selecting Chat must not wipe the right Notes column.
                 handleRailSelectChat()
-                if (chatCentered) handleSetViewMode('editor-only')
               }}
               onSelectInbox={() => {
                 handleRailSelectInbox()
@@ -2304,7 +2293,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           {showVaultPanelRestore && (
             <VaultPanelRestoreButton
               locale={appLocale}
-              onClick={() => setCompactVaultPanelOpen(true)}
+              onClick={() => {
+                handleSetViewMode('editor-list')
+                setCompactVaultPanelOpen(true)
+              }}
             />
           )}
           {vaultPanel}
@@ -2372,7 +2364,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           onCommit={conflictResolver.commitResolution}
           onClose={conflictFlow.handleCloseConflictResolver}
         />
-        <SettingsPanel open={dialogs.showSettings} initialSectionId={settingsInitialSectionId} settings={settings} aiAgentsStatus={aiAgentsStatus} locale={appLocale} systemLocale={systemLocale} vaults={vaultSwitcher.allVaults} defaultWorkspacePath={vaultSwitcher.defaultWorkspacePath} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} isGitVault={gitRepoState !== 'missing'} onSave={saveSettings} onCopyMcpConfig={mcpSetupDialog.copyManualConfig} explicitOrganizationEnabled={explicitOrganizationEnabled} onSaveExplicitOrganization={handleSaveExplicitOrganization} inboxAutomationEnabled={isInboxAutomationEnabled(vaultConfig.inbox_automation_enabled)} onSaveInboxAutomation={(enabled) => updateConfig('inbox_automation_enabled', enabled)} onAdoptPortentTypes={() => { void handleAdoptPortentTypes() }} onOpenFeedback={openFeedback} onOpenDocs={openDocs} onClose={dialogs.closeSettings} />
+        <SettingsPanel open={dialogs.showSettings} initialSectionId={settingsInitialSectionId} settings={settings} aiAgentsStatus={aiAgentsStatus} locale={appLocale} systemLocale={systemLocale} vaults={vaultSwitcher.allVaults} activeVaultPath={resolvedPath} defaultWorkspacePath={vaultSwitcher.defaultWorkspacePath} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} isGitVault={gitRepoState !== 'missing'} onSave={saveSettings} onCopyMcpConfig={mcpSetupDialog.copyManualConfig} explicitOrganizationEnabled={explicitOrganizationEnabled} onSaveExplicitOrganization={handleSaveExplicitOrganization} inboxAutomationEnabled={isInboxAutomationEnabled(vaultConfig.inbox_automation_enabled)} onSaveInboxAutomation={(enabled) => updateConfig('inbox_automation_enabled', enabled)} onAdoptPortentTypes={() => { void handleAdoptPortentTypes() }} onOpenFeedback={openFeedback} onOpenDocs={openDocs} onClose={dialogs.closeSettings} />
         <PrimeActiveCloseDialog
           open={primeActiveClose.open}
           locale={appLocale}

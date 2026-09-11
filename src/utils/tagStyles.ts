@@ -7,11 +7,6 @@ export interface TagStyle {
   color: string
 }
 
-export const DEFAULT_TAG_STYLE: TagStyle = {
-  bg: 'var(--accent-blue-light)',
-  color: 'var(--accent-blue)',
-}
-
 /** Deterministic hash → accent color index for tags without a manual override. */
 function hashTagColor(tag: string): TagStyle {
   let hash = 0

@@ -1,6 +1,7 @@
 import { CaretDown, CaretUp, SidebarSimple } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
 import { translate, type AppLocale } from '../lib/i18n'
+import { COMMAND_RAIL_WIDTH_PX } from '../utils/trafficLights'
 import { Button } from './ui/button'
 
 interface VaultPanelProps {
@@ -83,8 +84,8 @@ export function VaultPanelRestoreButton({
     <Button
       type="button"
       variant="ghost"
-      size="icon-sm"
-      className="vault-panel__restore"
+      className="app__notes-rail h-full min-h-full rounded-none p-0 pt-2.5"
+      style={{ width: COMMAND_RAIL_WIDTH_PX }}
       onClick={onClick}
       title={label}
       aria-label={label}

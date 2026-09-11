@@ -322,30 +322,3 @@ export function formatPromptWithReferences(text: string, references?: NoteRefere
     '```',
   ].join('\n')
 }
-
-/** Legacy: Build a contextual system prompt (text-based). */
-export function buildContextualPrompt(
-  active: VaultEntry,
-  linkedEntries: VaultEntry[],
-): string {
-  const parts: string[] = [
-    'You are an AI assistant integrated into Rhizome, a personal knowledge management app.',
-    'The user is viewing a specific note. Use the note and its linked context to answer questions accurately.',
-    'You can also use MCP tools to search, read, create, or edit notes in the vault.',
-    '',
-    `## Active Note: ${active.title}`,
-    `Type: ${active.isA ?? 'Note'} | Path: ${active.path}`,
-  ]
-
-  if (linkedEntries.length > 0) {
-    parts.push('', '## Linked Notes')
-    for (const entry of linkedEntries) {
-      parts.push(
-        '',
-        `### ${entry.title} (${entry.isA ?? 'Note'})`,
-      )
-    }
-  }
-
-  return parts.join('\n')
-}

@@ -17,7 +17,7 @@ It indexes, it does not restate. Every row points at the issue, ADR, or C-number
 that owns the detail. If you find yourself copying a paragraph out of one of
 those into here, link it instead — the same rule `HANDOFF.md` runs on.
 
-Snapshot: **2026-09-04**, 27 open issues, 12 open C-numbers. Re-derive both
+Snapshot: **2026-09-06**, open C-numbers ~13 (re-derive). Re-derive both
 before trusting the counts:
 
 ```bash
@@ -30,22 +30,199 @@ were missing from this index (#41–#57 cluster), session-import plan, #51 Tab
 research, C57, and a pre-public priority note. Counts refreshed against live
 `gh` + HANDOFF.
 
+**Origin:** Cursor · 2026-09-06 — Atticus starts daily-driving; §0 retargeted
+to Chat ↔ Prime reliability + harness tooling. C67/C68 marked shipped.
+
+**Latest — 2026-09-07 22:08 (America/Chicago)**
+
+**Origin:** Cursor Grok 4.6 · evening dump closed for the night. Full notes:
+[2208 evening design dump](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md).
+Chart: [2216 dock](plans/handoffs/2026-09-07-2216-cursor-grok-4-6-next-agent-paste.md).
+Doctor-door hanging is parked (not `@` a file). Do not miss the dump.
+
+Parked, **not** tonight’s build, **not** the north star: portfolio-on-boot,
+vault as skill/memory home, STE copies must not drift, **no CC Switch in the
+product**. Chat ↔ Prime still first. Do not replace Chat. Do not add
+`kanban.db`. Do not invent the briefing. Do not expand two big overlays at
+once.
+
 ---
 
-## 0. Pre-public focus (read before §5)
+## 0. Daily-drive focus (read before §5)
 
-**Origin:** Cursor · 2026-09-01 — Atticus preference, this session.
+**Origin:** Cursor · 2026-09-06 — Atticus: use this as the daily app; make
+Chat, the model, and harness tooling rock solid. Packaging stays deferred.
 
-Product stability and core chat/memory UX before public release packaging
-(macOS builds, release CI). Harness *composition* (§1) remains discuss/decide —
-it does **not** block claiming #25, C23, C57, or session import.
+**North star:** Chat talks to Prime without false status or silent failures;
+the agent can discover and run vault/graph tools (`rhizome-vault` +
+`RHIZOME_TOOL_PATH`), mid-turn steer/queue works, and session lifecycle is
+trustworthy. Verify on a **real vault + live agent turn**, not unit tests alone.
 
-**Do now (when free to choose):** #25 · C23 · C57 · session-import plan ·
-first-run / Getting Started (C11 / #55) · failure leftovers (#47 / C53
-already mostly done — check issue before reopening).
+**Do now (when free to choose):**
+1. **Agent tooling path** — ~~**C69** packaged `cli-call.mjs`~~ fixed; live graph
+   tools proven on vault. Graph Find bottom-right shipped.
+2. **Chat reliability leftovers** — mid-turn live-proven; suspend-retry; DOM
+   composer send; selection Copy allowlist. ~~#54 dual sync~~ on origin
+   `f76b46c`. ~~Native Chat glance~~ **PASS** ([2245](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md)).
+   Still open: C64 full native verify; #47 confirm-close.
+3. **Atticus Chat wishlist (parked 2026-09-06, do not drop):**
+   - ~~**C70** per-message timestamps on Chat bubbles.~~ shipped in tree 2026-09-06 18:12.
+   - ~~**C71** composer up-arrow previous-prompt history.~~ shipped in tree 2026-09-06 18:12 (#51 Tab remainder still separate).
+   - ~~DeepSeek + Nous in Settings~~ — in working tree (`PrimeProviderStatusSection`);
+     Nous env detection + expired-OAuth Chat preflight fixed 2026-09-06 18:02.
+   - Anthropic / xAI reconnect: Settings **Reconnect** copies Terminal command;
+     Chat now treats Expired as not connected (banner).
+   - ~~First-run default vault = cleaned Rhizome Vault scaffold (structure kept).~~
+     **Shipped 2026-09-06 18:16:** local scaffold (no Tolaria clone). C11 remote
+     URL still deferred for env override / published starter.
+4. ~~**C57** — Atticus answers on Limited tools / CLI defaults.~~ **Closed 2026-09-06:** CLI default Limited tools; Prime toggle hidden; keep Limited tools / Power User names.
+5. ~~**Session import UI**~~ — **Settings + vault writer shipped 2026-09-06 18:16**
+   (Claude Code → `Imports/`). Still open: Prime session-list rows; other
+   source adapters; first-run Welcome import step (C9).
+6. **C72 side-panel layout session** — ~~right Notes open by default~~ and
+   ~~Graph/Mycelium only on Changes + 46px Notes restore rail~~ on origin
+   `0fa00a2`. Later: expand the Changes split instead of a second side panel.
+   Still open: Inbox rename / discoverability.
+7. **Tonight (Atticus):** review **Grokbot full audits** — rhizome-agent **and** CodexGPT lob. See [1819 handoff](plans/handoffs/2026-09-06-1819-composer-park-grokbot-audits-tonight.md). ~~Thinking-pill full level menu~~ on origin `0fa00a2` (not in every running binary until a rebuild he asks for).
 
-**Defer:** release packaging, Windows (#32 / C42), TokenJuice/Switchyard build,
-ratifying harness grafts.
+**Already shipped (do not re-claim):** #25 provenance · C23 rehydration ·
+C67 sessions context menu · C68 note lock · ADR-0170 right-panel stack ·
+status chrome (Contribute/Docs → About; idle on composer).
+
+**Daily-drive status (2026-09-06 22:45 — glance PASS; leftover closed):**
+- **North star code on origin:** `f76b46c` (Chat↔Prime hardening + gate fixes +
+  #54 sync + Chat-first smoke); docs land `ac36e10`. See
+  [2241](plans/handoffs/2026-09-06-2241-composer-push-landed.md).
+- **Goal leftover closed:** native Chat glance **PASS** on that build
+  ([2245](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md) + PNG).
+- **Parked (not blocking north star):** C72 side panels; Prime list-import route;
+  #51 Tab; C64 full verify; #47 close; Grokbot audits; C9; packaging/Windows;
+  vault/app kanban + Chat briefing + scheduled lint report (see parked row below).
+
+**Parked — vault/app kanban (not blocking north star)**
+
+**Origin:** Cursor Grok 4.6 · 2026-09-07 — Atticus: a board in the app and/or
+vault would be useful.
+
+**Origin:** Cursor Grok 4.6 · 2026-09-07 evening — launcher + neighbors settled.
+
+Vault notes with `status` are the cards. The app later draws columns
+(`presentation.type: board`, [ADR-0144](adr/0144-collections-and-presentations.md)).
+Do not copy Hermes `~/.hermes/kanban.db`. Two boards, do not mix: human work
+= vault notes; agent work = a view over Prime sessions
+([harness-composition.md](design/harness-composition.md) Kanban).
+
+**Launcher (not the board on the 30px rail):** one small control, bottom bar,
+middle-right, same upward open as the vault menu. Neighbors in that menu:
+board, scheduled work, other work-in-flight. Idle/working stays on the composer
+(next to thinking). Choosing Board opens a **centered rising panel** (hotkey
+too) — full kanban, not a lopsided popover. Agents get the vault view, not a
+second store.
+
+**On boot: portfolio overview in Chat (does not replace Chat).**
+
+**Origin:** Cursor Grok 4.6 · 2026-09-07 evening — Atticus: briefing in the
+Chat scroll, then per-project yesterday bullets. Clarified 21:31: this is
+**not** a blank canvas. The whole point of the board is the overview.
+
+Composer stays at the bottom. On a new or idle Session you see a **portfolio
+overview**: projects touched in about the last **two weeks**, plus **pinned**
+projects that may stay longer. That view fills the chat scroll, full width.
+The old dead-center “start a conversation” line is **not** the home page.
+Keep a **small hint of that same line** (same style, or a light redesign)
+**just above the composer**, not in the middle of the window. Replies push
+the overview up like a message. As it leaves, it docks into a thin
+**Today** strip in the chat column — about as tall as the left/right rails
+(`COMMAND_RAIL_WIDTH_PX`, maybe a little thinner). **Click to open.** Not hover.
+Atticus: hover is too sensitive, worse when the app lags, and a display
+*above* the main window (TV / second monitor) makes accidental hover open a
+full overlay you then have to kill. **Top and bottom overlays are click.**
+Prefer click for the right Notes column too. Left command rail already
+expands on hover (Claude-like collapse is fine; do not add drag-to-move).
+Not a 46px-wide side chip. Do not keep half the window. Do not
+delete it. Settings can turn the strip off. The bottom Board launcher still
+opens a centered rising kanban. **Do not fully expand both at once.** The
+strip may stay; the kanban overlay is on-demand. Overlays and side panels
+**react to each other**: if Notes, Sessions, the Today briefing, or the
+kanban is expanded, the others collapse or stay thin so Chat does not sit
+in a box. Same idea as Graph only on Changes (ADR-0170) — one big extra
+surface at a time.
+
+**Per-project yesterday:** a few bullets (or one short paragraph) for each
+project that moved — what changed in the last day / sessions. Bind to real
+git, vault, and session facts. Do not let an agent invent the briefing.
+
+**Scheduled lint (report only):** every other night run `rhizome_lint` (and
+the intake audit when due). Write a short note of what is new vs noise.
+Do **not** auto-delete. Atticus or a later Chat turn picks what to purge.
+Visible and cancelable.
+
+**Theme toggle (later polish):** keep the corner sun/moon for ease. It is
+light/dark only. Tooltip or a short upward menu should say color skins live
+in Settings. A pinned skin (e.g. Dracula) currently resets to Rhizome when
+that control flips. Not north star.
+
+**Defer:** full release packaging, first Windows launch verification (#32 /
+C42 — still unrun on a real box; last check: unbootable). TokenJuice/Switchyard
+build, ratifying harness grafts, #50 live-app view until Atticus picks a
+surface. **Mac is the daily drive.** First public **may be Mac-only**. Windows
+polish is not a gate for that. **Do keep Windows paths in mind** for packaging
+and tooling (named pipe, `rhizome-tool.exe`, `resources/mcp-server`) so a later
+Windows first boot is not starting from Mac-only paths.
+
+**Reply shape (parked, not the ADHD plugin):** Atticus interrupts mid-read
+and may miss later sentences. STE-100 stays the voice. The useful ADHD
+*quirks* (lead with the answer, short blocks, stop then offer more, first
+and last line must stand alone) can fold into the vault STE file later.
+Do **not** reinstall the skill or plugin. Do not copy it into this repo.
+
+**Living docs audit (parked):** Atticus agrees this repo’s `AGENTS.md`
+(~560 lines) is the Cursor tax, and would go further: audit **living docs**
+(`HANDOFF`, `NEXT`, `ARCHITECTURE`, ADRs, `WINDOWS-DEV`) for stale or false
+claims. Same failure as C42’s “first-class Windows app” line. Not tonight.
+Not a mass rewrite. Origin tags stay.
+
+**Learned memory (parked, not the Prime harness):** Cursor’s
+`continual-learning` plugin mines Cursor chats and writes “Learned” bullets
+into **this repo’s** `AGENTS.md`. That is a Cursor coding-tool helper. It is
+**not** Rhizome Agent, and **not** Prime. Atticus: keep that job (durable
+prefs/facts), but store the **personal / all-tools** bullets in vault
+`agents/shared/` so Cursor, Claude Code, Hermes, and the rest actually load
+them. This repo’s `AGENTS.md` then holds **product rules for this tree** plus a
+few precise product-wide guidelines. Do not teach the memory-updater to write
+STE. Voice still lives in `voice-ste.md` and sync.
+
+**Why a vault file is ignored:** tools do not auto-read arbitrary paths.
+They load **sacred files** (Cursor: `~/.cursor/AGENTS.md` + repo
+`AGENTS.md`; Claude Code: `~/CLAUDE.md` then what that chain names; Codex:
+`~/.codex/AGENTS.md`; Prime in Chat: vault/Prime **skills**, not these files).
+A pointer (“go read the vault”) often loses. A paste into the sacred file
+wins. That is why Atticus over-copied `AGENTS.md`. Fix: **one source in
+vault, sync copies into each sacred file** (already `sync-voice.sh`). Do not
+rely on pointers alone.
+
+**Take from continual-learning (not the plugin):** trigger after a Session,
+not every turn; incremental transcript index (mtime); two buckets only
+(prefs vs facts); cap + update-in-place + dedupe; skip secrets and one-offs;
+do not write voice or process notes into memory. Point that writer at vault
+`agents/shared/`, then sync. Live bug: `mode` is `ste` but `sync-voice.sh`
+still only accepts `adhd`/`normal`, so Cursor’s pack can stay stale.
+
+**CC Switch (parked, coding-tools only):** already on this Mac (`~/.cc-switch`).
+It is a desktop manager for Claude Code, Codex, Hermes, and others: one
+store, then **symlink or copy** skills / MCP / prompt files into each app’s
+must-load path. Same job as vault+sync. Source of truth there is SQLite
+(`cc-switch.db`), not the vault. Cursor is not a first-class target in his
+current app list. Take the **copy/symlink + backup** idea. **Do not implement
+CC Switch as a whole** in Rhizome Agent or Prime. Skip the “Claude inside
+Codex” side. Keys stay in that app’s backups, never in git.
+
+**Vault as skill home (parked harness idea):** Prime today seeds
+`<vault>/.prime/agent/skills/…` (three hidden folders). Atticus: Rhizome
+should house skills and shared agent memory **in the vault we already made**
+(markdown first; the vault can hold other files). Searchable. One place.
+Prime stays the engine and may read or link those files. It is not a second
+home. Full dump: [2208](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md).
 
 ---
 
@@ -122,15 +299,15 @@ composition doc — do not restate them here.
 | Decision | Blocks | Where it stands |
 |---|---|---|
 | **Harness composition: option 2 + first slice** | #5, #40, #56, and any graft of a foreign harness idea | Filter ratified (ADR-0168). Working notes in `harness-composition.md`. Still discuss/decide: ratify option 2, first slice, remaining incompatibilities. Code already disagrees with doctrine on providers (#56). |
-| **Session import destinations** | first-run + Settings import build | **Mostly decided 2026-09-01.** Always → Prime session list; also vault note under `Imports/<source>/` (`type: Imported Session`) when a vault is attached; no vault → list only. Cross-harness dedup (fingerprint + provenance). Plan: [`plans/2026-09-01-session-import-plan.md`](plans/2026-09-01-session-import-plan.md). Needs Atticus go-ahead + GitHub issue before build. Relates to #23, C9. |
-| **C57 permission naming / defaults** | honest Limited-tools UX | Code shipped (Prime always Power User; CLI agents still honor stored mode). **Awaiting Atticus:** CLI default Limited tools? keep Prime toggle hidden? "Limited tools" vs "Vault Safe" + honest tooltip. |
+| **Session import destinations** | first-run + Settings import build | **Vault half shipped 2026-09-06** (Settings → Import chat history; Claude Code → `Imports/`). Prime session-list half still blocked on `import_jsonl` semantics (Atticus decision). Plan: [`plans/2026-09-01-session-import-plan.md`](plans/2026-09-01-session-import-plan.md). Relates to #23, C9. |
+| **C57 permission naming / defaults** | honest Limited-tools UX | **Settled 2026-09-06 (Atticus).** CLI default Limited tools; Prime toggle stays hidden (always Power User); keep Limited tools / Power User — no Vault Safe. Code already matched. |
 | **#50 live app view: which surface** | agent QA of the drawn UI | Answers proposed 2026-08-29, awaiting Atticus. Browser `pnpm dev`, read + test-bridge steer, `pnpm live-ui` not an in-app pane. [plan](plans/2026-08-29-live-app-view-plan.md). |
 | **What ⌘1/⌘2/⌘3 and "Full Layout" mean once Chat is the centre** | — | **Settled 2026-08-25.** ⌘1 Chat only, ⌘2 opens the Notes panel with Browse collapsed, ⌘3 opens it with Browse expanded. Stored `viewMode` values unchanged. |
 | **Does Wiki Graph replace the canvas or feed a side panel** | #39 | **Settled 2026-09-06 (ADR-0170).** Graph and Mycelium sit under Notes in the right column. They no longer replace Chat. #39 (graph as an agent tool vs a place) is still open for the *agent* interface. |
-| **Right panel composition** | — | **Settled 2026-09-06 (ADR-0170), revising 2026-08-25.** Notes is the heavy top half; Graph/Mycelium a resizable sub-panel below; Connections strip gone. Right-hand icon rail still undecided. |
+| **Right panel composition** | — | **ADR-0170 settled the stack** (Notes heavy + Graph/Mycelium below). **C72 (2026-09-06):** Atticus still can’t find/keep the column — needs a layout session on defaults, Inbox label, and right icon rail (still undecided). |
 | **C66 agent profile / instructions in Settings** | chat personality UX | **Agreed, not built 2026-09-06.** How the agent should respond, rules, for whichever agent. Not vault `AGENTS.md`, not the model picker, not tool-allowlist profiles. Awaiting: one vs per-agent; app vs vault. |
-| **C67 sessions-list context menu** | session row actions | **Agreed, not built 2026-09-06.** Same snappy menu as notes; different items, including Mycelium/codebase for that session. [handoff](plans/handoffs/2026-09-06-0338-grok-4-6-lock-and-session-menu.md). |
-| **C68 restore note lock** | accidental edits while reading | **Agreed, not built 2026-09-06.** Lock comes back. **Default stays editable.** Control must be obvious (breadcrumb + Cmd+K). Distinct from raw vs formatted. Same handoff as C67. |
+| **C67 sessions-list context menu** | session row actions | **Shipped 2026-09-06** (`a309a17`). Open / Rename / Archive·Restore / View in Mycelium / Copy path. |
+| **C68 restore note lock** | accidental edits while reading | **Shipped 2026-09-06** (`a309a17`). Default editable; breadcrumb + Cmd+K; not vault `editor_mode`. |
 | **TokenJuice + Switchyard** | later stacked system; not a Rhizome organ | **Wanted 2026-08-26, not started.** Discuss/plan only. TokenJuice-shaped tool-output shrink first (Prime owns what the model sees). Switchyard-shaped model hop second (sidecar behind Prime; halfway house is `set_scoped_models`). Write-up: [`token-routing-and-compression.md`](design/token-routing-and-compression.md). Do not vendor either in this tree. |
 
 **#40** can close against ADR-0168 (Rhizome is a client of Prime, not a second
@@ -159,7 +336,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | #44 | Panels resizable by dragging — **closed 2026-08-29** (Chat sessions `a26eb40`, chat note pane `fe97f99`; Notes + Mycelium list resizable) |
 | #39 | Make the knowledge graph an agent tool, not a place you visit — **B** |
 | #43 | No window-level navigation guard — slip past the link handler strands the app |
-| C68 | Restore note lock/view — **agreed, not built.** Default stays editable; control must be obvious |
+| C68 | Restore note lock/view — **shipped 2026-09-06.** Default editable; breadcrumb + Cmd+K |
 
 **Composer and controls** — strip shipped 2026-08-25; closed on GitHub 2026-08-29
 | | |
@@ -168,8 +345,10 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | #9 | Model and thinking level as one control on the strip — **closed 2026-08-29** (`163403f`; composer `1a1bfa9`) |
 | #35 | Verbose modifier reachable from the composer — **closed 2026-08-29** (`1a1bfa9`, one-click thinking toggle) |
 | #21 | Argument hints for commands that take arguments — **closed 2026-08-29** (`6037490`) |
-| #41 | Typing while Prime is working: steer/queue path wired end-to-end to nothing |
-| #51 | Tab to fill in the reply you were going to type — **partial.** Options pills shipped (`replySuggestions` / `ComposerReplySuggestions`); `completion` kind + Tab ghost text **not** wired. Research: vault `projects/rhizome-agent/sub-agents/2026-09-01-tab-completion-ux-research.md` (rules-first v1; model-backed opt-in later). |
+| #41 | Typing while Prime is working: steer/queue — **native dogfood confirmed 2026-09-06** (“Waiting in this session” / `MIDTURN_QUEUE_PROBE` on DeepSeek · Rhizome Vault). Code path C43/C44. |
+| #51 | Tab to fill in the reply you were going to type — **partial.** Options pills shipped (`replySuggestions` / `ComposerReplySuggestions`); `completion` kind + Tab ghost text **not** wired. Research: vault `projects/rhizome-agent/sub-agents/2026-09-01-tab-completion-ux-research.md` (rules-first v1; model-backed opt-in later). **Related:** ~~C71~~ up-arrow history shipped 2026-09-06. |
+| C70 | Per-message timestamps on Chat bubbles — **RESOLVED 2026-09-06** (`3:35p` under ask). |
+| C71 | Composer up-arrow previous-prompt history — **RESOLVED 2026-09-06** (in-memory; caret at start / empty). |
 
 **Transcript and sessions**
 | | |
@@ -179,7 +358,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | #31 | Name Prime sessions at creation — **closed 2026-08-26** (create-time name + rename from the list) |
 | #49 | Sessions should be named by the model, not by whatever text came first — step 2 shipped in handoff; issue may still be open for remainder |
 | #23 | Sessions are searchable knowledge, not opaque logs — also fed by **session import** plan (§1) |
-| C67 | Sessions list right-click menu (rename / archive / Mycelium codebase) — **agreed, not built** |
+| C67 | Sessions list right-click menu — **shipped 2026-09-06** |
 | #42 | Tool cards say "ipython" five times — **closed 2026-08-26** (expandable Tool use group; `%%bash` → command) |
 
 **Memory loop** — the product thesis; least covered by design docs
@@ -242,8 +421,8 @@ Save-to-vault refuse. Prime session jsonl stays out of scope.
 14 open. Full text in `HANDOFF.md` § Open threads — this is the shape of the
 backlog, not a replacement for it.
 
-- **Blocks other work:** C42 (Windows never launched — #32 sits on top of it),
-  **C57** (Limited tools / Vault Safe naming and CLI defaults — Atticus)
+- **Blocks other work:** C42 (Windows never launched — #32 sits on top of it)
+- ~~**C57** (Limited tools / Vault Safe naming and CLI defaults — Atticus)~~ **RESOLVED 2026-09-06**
 - **Resolved but previously misindexed here:** C23. Session replay reads the
   full on-disk Prime log; `get_messages` remains a live, post-compaction view.
   See `HANDOFF.md` C23-RESOLVED and
@@ -263,8 +442,8 @@ backlog, not a replacement for it.
   Started clones an unrelated upstream repo — blocked on GitHub access; #55)
 - **Product decisions pending:** C9 (optional first-run Welcome — ties to
   session import), C10 (spotlight onboarding, spec written and unbuilt), C7
-  (native QA gate for shell waves), **C67** (sessions context menu — agreed),
-  **C68** (note lock — agreed, default editable)
+  (native QA gate for shell waves), ~~**C67**~~ / ~~**C68**~~ shipped 2026-09-06,
+  **C66** (agent profile — agreed, not built)
 
 ⚠️ **C-numbers and issue numbers collide and mean different things.** C40 is
 `rhizome_graph_summary`; issue #40 is the harness question. C34 is menu-bar
@@ -323,13 +502,15 @@ composer cluster. Item 1 below was Grok's later insertion (`2b5daba`).
 **Origin:** Cursor · 2026-09-02 — order below matches §0 pre-public focus;
 composition stays discuss-only until Atticus wants a graft.
 
-1. **Memory / trust loop** — #25 (retrieval provenance), C23 (rehydration),
-   then **session import** once the plan is approved and filed. #24 already
-   closed.
-2. **Honest permissions** — C57 naming/defaults (Atticus answers, small code).
-3. **Composer remainder** — #51 Tab ghost text (research done; rules-first),
-   #41 steer/queue wiring.
-4. **First-run** — #55 / C11 starter vault; C9 Welcome + import offer.
+1. **Agent tooling path** — re-seed `rhizome-vault` (vault skill still dated
+   2026-08-21 without `RHIZOME_TOOL_PATH` / graph verbs); live Chat ask that
+   needs the graph. Then **session import** UI once Atticus green-lights.
+2. **Chat reliability** — #41 steer/queue (mostly proven), failure
+   leftovers (#47 / #54). ~~C57~~ settled 2026-09-06.
+3. **Composer remainder** — #51 Tab ghost text (research done; rules-first).
+   ~~Up-arrow Ask-box history~~ shipped as C71 2026-09-06.
+4. **First-run** — #55 / C11 starter vault; C9 Welcome + import offer; **C66**
+   agent profile once one-vs-per-agent and app-vs-vault are picked.
 5. **Harness composition (§1)** — discuss/decide when you want grafts; closing
    **#40** / confronting **#56** is paperwork, not a substitute for product UX.
    TokenJuice/Switchyard and Windows stay later.

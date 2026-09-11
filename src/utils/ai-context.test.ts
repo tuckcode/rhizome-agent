@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   resolveTarget,
   collectLinkedEntries,
-  buildContextualPrompt,
   buildContextSnapshot,
   formatPromptWithReferences,
 } from './ai-context'
@@ -131,30 +130,6 @@ describe('collectLinkedEntries', () => {
     })
     const linked = collectLinkedEntries(active, [...allEntries, active])
     expect(linked.map(e => e.title)).toEqual(['Alpha'])
-  })
-})
-
-describe('buildContextualPrompt', () => {
-  it('includes active note title and type', () => {
-    const active = makeEntry({ path: '/vault/a.md', title: 'Alpha', isA: 'Project' })
-    const prompt = buildContextualPrompt(active, [])
-    expect(prompt).toContain('Alpha')
-    expect(prompt).toContain('Project')
-  })
-
-  it('includes linked note titles', () => {
-    const active = makeEntry({ path: '/vault/a.md', title: 'Alpha' })
-    const linked = makeEntry({ path: '/vault/b.md', title: 'Beta', isA: 'Person' })
-    const prompt = buildContextualPrompt(active, [linked])
-    expect(prompt).toContain('Beta')
-    expect(prompt).toContain('Person')
-    expect(prompt).toContain('Linked Notes')
-  })
-
-  it('includes the system preamble', () => {
-    const active = makeEntry({ path: '/vault/a.md', title: 'Alpha' })
-    const prompt = buildContextualPrompt(active, [])
-    expect(prompt).toContain('AI assistant integrated into Rhizome')
   })
 })
 

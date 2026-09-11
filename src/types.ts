@@ -208,15 +208,6 @@ export interface SearchResult {
   noteType: string | null
 }
 
-export interface SearchResponse {
-  results: SearchResult[]
-  elapsedMs: number
-  query: string
-  mode: string
-}
-
-export type SearchMode = 'keyword' | 'semantic' | 'hybrid'
-
 /** Vault-scoped UI configuration stored locally per vault path. */
 export interface InboxConfig {
   noteListProperties: string[] | null
@@ -229,8 +220,6 @@ export interface AllNotesConfig {
 }
 
 /** Vault-scoped UI configuration stored locally per vault path. */
-export type NoteLayout = 'centered' | 'left'
-
 export type NoteWidthMode = 'normal' | 'wide'
 export type NoteDisplayMode = 'text' | 'sheet'
 export type GitSetupPreference = 'prompt' | 'never'
@@ -240,7 +229,6 @@ export interface VaultConfig {
   zoom: number | null
   view_mode: string | null
   editor_mode: string | null
-  note_layout?: NoteLayout | null
   git_setup_preference?: GitSetupPreference | null
   ai_agent_permission_mode?: AiAgentPermissionMode | null
   tag_colors: Record<string, string> | null

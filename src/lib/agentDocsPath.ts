@@ -14,7 +14,3 @@ export async function getAgentDocsPath(): Promise<string | undefined> {
 
   return cachedAgentDocsPath ?? undefined
 }
-
-export function resetAgentDocsPathCacheForTests(): void {
-  cachedAgentDocsPath = undefined
-}

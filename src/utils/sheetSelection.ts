@@ -1,7 +1,5 @@
 import type { Area as IronCalcArea, CellStyle } from '@ironcalc/wasm'
 import type { Model } from '@ironcalc/workbook'
-import { metadataCellAddress } from './sheetMetadata'
-import { isExternalFormulaInput } from './sheetExternalReferences'
 import {
   boundedSheetIndex,
   MAX_SHEET_COLUMNS,
@@ -58,25 +56,6 @@ export function mergeDirtyBodyRows(current: SheetBodyDirtyRows, update: SheetBod
   if (update === 'none') return current
   if (!hasDirtyRowsUpdate(update) || current === 'all') return 'all'
   return mergedDirtyRowSet(current, update) ?? current
-}
-
-export function selectedRangeHasExternalFormulas(
-  model: Model,
-  area: IronCalcArea,
-  externalFormulaInputs: Map<string, unknown>,
-): boolean {
-  if (area.sheet !== SHEET_INDEX) return false
-
-  for (let rowOffset = 0; rowOffset < area.height; rowOffset += 1) {
-    for (let columnOffset = 0; columnOffset < area.width; columnOffset += 1) {
-      const row = area.row + rowOffset
-      const column = area.column + columnOffset
-      const content = model.getCellContent(SHEET_INDEX, row, column)
-      if (externalFormulaInputs.has(metadataCellAddress(row, column)) || isExternalFormulaInput(content)) return true
-    }
-  }
-
-  return false
 }
 
 export function selectedCellIndexes(model: Model): { column: number; row: number; sheet: number } | null {

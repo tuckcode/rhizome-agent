@@ -17,6 +17,10 @@ import { writeClipboardText } from '../utils/clipboardText'
  * Prime owns the credential store (ADR-0168). Rhizome cannot finish OAuth from
  * here — Prime's daemon exposes no auth command — but it can show who is
  * connected and hand the user the one terminal command that starts sign-in.
+ *
+ * API-key hosts (DeepSeek) and custom OpenAI-compatible hosts (Nous Portal)
+ * use the same Terminal handoff: copy a command / setup snippet, never write
+ * Prime's auth.json from the desktop.
  */
 
 interface ProviderStatus {
@@ -32,8 +36,13 @@ interface PrimeProviderStatusSectionProps {
   t: Translate
 }
 
-/** OAuth providers users expect to connect from Settings. */
-const OAUTH_SIGN_IN_PROVIDERS = ['anthropic', 'xai'] as const
+/** Always-visible cards so missing/expired providers are not invisible. */
+const ALWAYS_SHOW_PROVIDERS: ReadonlyArray<{ name: string; authKind: string }> = [
+  { name: 'anthropic', authKind: 'oauth' },
+  { name: 'xai', authKind: 'oauth' },
+  { name: 'deepseek', authKind: 'api_key' },
+  { name: 'nous-portal', authKind: 'api_key' },
+]
 
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (isTauri()) return invoke<T>(cmd, args)
@@ -52,8 +61,10 @@ const PROVIDER_LABELS: Record<string, string> = {
   opencode: 'OpenCode',
   'opencode-go': 'OpenCode Go',
   'prime-inference': 'Prime Inference',
-  xai: 'xAI',
+  xai: 'xAI (Grok)',
   google: 'Google',
+  deepseek: 'DeepSeek',
+  'nous-portal': 'Nous Portal',
 }
 
 function providerLabel(name: string): string {
@@ -71,18 +82,44 @@ function authKindLabel(kind: string): string {
 }
 
 function primeProviderLoginCommand(provider: string): string {
+  if (provider === 'nous-portal') {
+    // Nous is OpenAI-compatible, not a built-in Prime OAuth host. The desktop
+    // copies a paste-ready Terminal block; Atticus fills in the key once.
+    return [
+      'export NOUS_API_KEY=\'paste-your-key-here\'',
+      'mkdir -p ~/.prime/agent',
+      'cat >> ~/.prime/agent/models.json <<\'EOF\'',
+      '{',
+      '  "providers": {',
+      '    "nous-portal": {',
+      '      "baseUrl": "https://inference-api.nousresearch.com/v1",',
+      '      "apiKey": "NOUS_API_KEY"',
+      '    }',
+      '  }',
+      '}',
+      'EOF',
+    ].join('\n')
+  }
   return `prime-agent --provider ${provider}`
+}
+
+function setupButtonLabel(provider: ProviderStatus, connected: boolean): string {
+  if (provider.authKind === 'oauth') {
+    return connected || provider.expired ? 'Reconnect' : 'Sign in'
+  }
+  if (provider.name === 'nous-portal') return 'Copy setup'
+  return 'Add key'
 }
 
 function mergeProviderCards(
   connected: ProviderStatus[],
 ): ProviderStatus[] {
   const byName = new Map(connected.map((provider) => [provider.name, provider]))
-  for (const name of OAUTH_SIGN_IN_PROVIDERS) {
-    if (!byName.has(name)) {
-      byName.set(name, {
-        name,
-        authKind: 'oauth',
+  for (const placeholder of ALWAYS_SHOW_PROVIDERS) {
+    if (!byName.has(placeholder.name)) {
+      byName.set(placeholder.name, {
+        name: placeholder.name,
+        authKind: placeholder.authKind,
         expired: false,
       })
     }
@@ -124,7 +161,9 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
       setSignInNotice(
         t('settings.providers.signInCopied', {
           provider: providerLabel(provider.name),
-          command,
+          command: provider.name === 'nous-portal'
+            ? 'Nous Portal setup (Terminal)'
+            : command,
         }),
       )
     } catch (error) {
@@ -132,10 +171,13 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
     }
   }, [t])
 
-  const showSignIn = (provider: ProviderStatus): boolean => {
-    if (provider.authKind !== 'oauth') return false
+  const showSetup = (provider: ProviderStatus): boolean => {
     const connected = providers?.some((entry) => entry.name === provider.name) ?? false
-    return !connected || provider.expired
+    if (provider.authKind === 'oauth') {
+      return !connected || provider.expired
+    }
+    // API-key / custom: offer setup until Prime reports the provider.
+    return !connected
   }
 
   return (
@@ -161,7 +203,7 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
         <div className="grid gap-2 sm:grid-cols-2" data-testid="prime-provider-cards">
           {cards.map((provider) => {
             const connected = providers.some((entry) => entry.name === provider.name)
-            const signIn = showSignIn(provider)
+            const setup = showSetup(provider)
             return (
               <div
                 key={provider.name}
@@ -205,7 +247,7 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
                 <div className="mt-1 truncate text-xs text-muted-foreground">
                   {authKindLabel(provider.authKind)}
                 </div>
-                {signIn ? (
+                {setup ? (
                   <div className="mt-2">
                     <Button
                       type="button"
@@ -215,9 +257,7 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
                       data-testid={`prime-provider-sign-in-${provider.name}`}
                       onClick={() => void startSignIn(provider)}
                     >
-                      {provider.expired
-                        ? t('settings.providers.reconnect')
-                        : t('settings.providers.signIn')}
+                      {setupButtonLabel(provider, connected)}
                     </Button>
                   </div>
                 ) : null}

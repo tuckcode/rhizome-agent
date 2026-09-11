@@ -2,9 +2,9 @@ import { test, expect, type Page } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
 import {
-  createFixtureVaultCopy,
   openFixtureVault,
   pinNotesShellLaunch,
+  createFixtureVaultCopy,
   removeFixtureVaultCopy,
 } from '../helpers/fixtureVault'
 
@@ -106,18 +106,29 @@ async function dispatchModifiedLinkActivation(link: ReturnType<Page['locator']>)
 
 test.describe('Wikilink insertion and navigation', () => {
   test.beforeEach(async ({ page }) => {
-    // This block navigates without openFixtureVault, so use the unified Notes
-    // tab to choose the source type before opening the note from Inbox.
+    // Mock-tauri vault (Grow Newsletter). C72 opens Notes (editor-list) on
+    // launch; rail Inbox toggles that closed — wait for the panel / restore.
+    test.setTimeout(60_000)
     await pinNotesShellLaunch(page)
     await page.route('**/api/vault/ping', route => route.fulfill({ status: 503 }))
     await page.goto('/')
-    await page.waitForTimeout(500)
 
-    await page.getByTestId('command-rail-inbox').click()
-    await page.locator('aside').getByText('Responsibilities', { exact: true }).first().click()
-    const noteItem = page.getByTestId('note-list-container').getByText(SOURCE_NOTE_TITLE, { exact: true }).first()
-    await noteItem.click()
-    await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 10_000 })
+    const vaultPanel = page.getByTestId('vault-panel')
+    try {
+      await vaultPanel.waitFor({ state: 'visible', timeout: 15_000 })
+    } catch {
+      const restore = page.getByTestId('vault-panel-restore')
+      if (await restore.isVisible().catch(() => false)) {
+        await restore.click()
+      } else {
+        await page.getByTestId('command-rail-inbox').click()
+      }
+      await vaultPanel.waitFor({ state: 'visible', timeout: 15_000 })
+    }
+
+    await expect(page.getByTestId('note-list-container')).toBeVisible({ timeout: 15_000 })
+    // Search so the row is on-DOM even when Browse is collapsed / list virtualized.
+    await openNote(page, SOURCE_NOTE_TITLE)
   })
 
   test('[[ autocomplete inserts wikilink that is not broken', async ({ page }) => {

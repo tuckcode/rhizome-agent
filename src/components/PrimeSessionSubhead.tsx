@@ -187,8 +187,8 @@ export function PrimeSessionSubhead({
               className="h-[32px] w-[32px] p-0 [&_svg:not([class*=size-])]:size-3.5"
               onClick={onOpenFootprint}
               onMouseDown={(event) => event.stopPropagation()}
-              aria-label={t('mycelium.openThisRun')}
-              title={t('mycelium.openThisRun')}
+              aria-label={t('mycelium.title')}
+              title={t('mycelium.title')}
               data-testid="prime-session-footprint"
             >
               <CirclesThree size={14} />

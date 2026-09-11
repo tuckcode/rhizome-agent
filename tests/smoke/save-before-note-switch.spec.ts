@@ -43,13 +43,18 @@ function collectReactUpdateLoopErrors(page: Page): string[] {
 async function openNote(page: Page, title: string) {
   const noteList = page.locator('[data-testid="note-list-container"]')
   if (!(await noteList.isVisible().catch(() => false))) {
-    const restore = page.getByTestId('vault-panel-restore')
-    if (await restore.isVisible().catch(() => false)) {
-      await restore.click()
-    } else {
-      await page.getByTestId('command-rail-inbox').click()
+    // C72: Inbox toggles; wait for default Notes / restore before clicking Inbox.
+    try {
+      await noteList.waitFor({ state: 'visible', timeout: 5_000 })
+    } catch {
+      const restore = page.getByTestId('vault-panel-restore')
+      if (await restore.isVisible().catch(() => false)) {
+        await restore.click()
+      } else if (!(await page.getByTestId('vault-panel').isVisible().catch(() => false))) {
+        await page.getByTestId('command-rail-inbox').click()
+      }
+      await expect(noteList).toBeVisible()
     }
-    await expect(noteList).toBeVisible()
   }
   await noteList.getByText(title, { exact: true }).click()
 }

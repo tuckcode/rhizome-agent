@@ -1,17 +1,11 @@
-import { describe, it, expect, vi } from 'vitest'
-
-// Mock the mock-tauri module before importing ai-chat
-vi.mock('../mock-tauri', () => ({
-  isTauri: () => false,
-}))
+import { describe, it, expect } from 'vitest'
 
 import {
-  estimateTokens, buildSystemPrompt,
-  nextMessageId, checkClaudeCli, streamClaudeChat,
+  estimateTokens,
+  nextMessageId,
   trimHistory, formatMessageWithHistory,
   type ChatMessage, MAX_HISTORY_TOKENS,
 } from './ai-chat'
-import type { VaultEntry } from '../types'
 
 // --- estimateTokens ---
 
@@ -26,40 +20,6 @@ describe('estimateTokens', () => {
   })
 })
 
-// --- buildSystemPrompt ---
-
-describe('buildSystemPrompt', () => {
-  const makeEntry = (path: string, title: string): VaultEntry => ({
-    path, title, filename: `${title}.md`, isA: 'Note',
-    aliases: [], belongsTo: [], relatedTo: [],
-    status: null,
-    modifiedAt: null, createdAt: null, fileSize: 100,
-    snippet: '', relationships: {},
-  })
-
-  it('returns empty prompt for no notes', () => {
-    const result = buildSystemPrompt([])
-    expect(result.prompt).toBe('')
-    expect(result.totalTokens).toBe(0)
-    expect(result.truncated).toBe(false)
-  })
-
-  it('includes note metadata in the prompt', () => {
-    const notes = [makeEntry('/test.md', 'Test Note')]
-    const result = buildSystemPrompt(notes)
-    expect(result.prompt).toContain('Test Note')
-    expect(result.prompt).toContain('/test.md')
-    expect(result.totalTokens).toBeGreaterThan(0)
-  })
-
-  it('instructs AI to use wikilink syntax', () => {
-    const notes = [makeEntry('/test.md', 'Test Note')]
-    const result = buildSystemPrompt(notes)
-    expect(result.prompt).toContain('[[')
-    expect(result.prompt).toMatch(/wikilink/i)
-  })
-})
-
 // --- nextMessageId ---
 
 describe('nextMessageId', () => {
@@ -68,16 +28,6 @@ describe('nextMessageId', () => {
     const id2 = nextMessageId()
     expect(id1).not.toBe(id2)
     expect(id1).toMatch(/^msg-/)
-  })
-})
-
-// --- checkClaudeCli ---
-
-describe('checkClaudeCli', () => {
-  it('returns not installed in non-Tauri environment', async () => {
-    const status = await checkClaudeCli()
-    expect(status.installed).toBe(false)
-    expect(status.version).toBeNull()
   })
 })
 
@@ -179,50 +129,5 @@ describe('MAX_HISTORY_TOKENS', () => {
   it('is a reasonable token limit', () => {
     expect(MAX_HISTORY_TOKENS).toBeGreaterThan(10_000)
     expect(MAX_HISTORY_TOKENS).toBeLessThan(200_000)
-  })
-})
-
-// --- streamClaudeChat ---
-
-describe('streamClaudeChat', () => {
-  it('returns mock session in non-Tauri environment', async () => {
-    const onText = vi.fn()
-    const onDone = vi.fn()
-    const onError = vi.fn()
-
-    const sessionId = await streamClaudeChat('hello', undefined, undefined, {
-      onText,
-      onError,
-      onDone,
-    })
-
-    // Wait for the setTimeout mock response
-    await new Promise(r => setTimeout(r, 400))
-
-    expect(sessionId).toBe('mock-session')
-    expect(onText).toHaveBeenCalledWith(expect.stringContaining('[mock-no-history]'))
-    expect(onDone).toHaveBeenCalled()
-    expect(onError).not.toHaveBeenCalled()
-  })
-
-  it('mock detects conversation history in message', async () => {
-    const onText = vi.fn()
-    const onDone = vi.fn()
-    const onError = vi.fn()
-
-    const msgWithHistory = formatMessageWithHistory(
-      [{ role: 'user', content: 'What is 2+2?', id: 'm1' }, { role: 'assistant', content: '4', id: 'm2' }],
-      'What was my previous question?',
-    )
-
-    await streamClaudeChat(msgWithHistory, undefined, undefined, {
-      onText, onError, onDone,
-    })
-
-    await new Promise(r => setTimeout(r, 400))
-
-    expect(onText).toHaveBeenCalledWith(expect.stringContaining('[mock-with-history'))
-    expect(onText).toHaveBeenCalledWith(expect.stringContaining('turns=2'))
-    expect(onText).toHaveBeenCalledWith(expect.stringContaining('What was my previous question?'))
   })
 })

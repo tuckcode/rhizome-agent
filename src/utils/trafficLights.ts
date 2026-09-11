@@ -16,8 +16,8 @@ const TRAFFIC_LIGHT_RUN_PX = 70
 /** Extra gap after the last light. 70px ends flush with the status text. */
 const TRAFFIC_LIGHT_CLEARANCE_PX = 16
 
-/** The command rail the chat surface sits to the right of. */
-const COMMAND_RAIL_WIDTH_PX = 46
+/** Collapsed command rail and matching Notes restore rail. */
+export const COMMAND_RAIL_WIDTH_PX = 46
 
 export const MACOS_TRAFFIC_LIGHT_SAFE_PADDING =
   MACOS_TRAFFIC_LIGHT_POSITION.x +

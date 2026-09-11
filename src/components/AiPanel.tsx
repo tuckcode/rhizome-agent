@@ -260,6 +260,14 @@ export function AiPanelView({
   // usage reflects the exchange that just happened.
   const primeStats = usePrimeSessionStats(isPrimeTarget, agent.status)
   const { queue, refresh: refreshQueue, clear: clearQueue } = usePrimeQueue(isPrimeTarget, isActive)
+  // If Waiting chrome shows a follow-up, the transcript must show it too —
+  // send-path append alone can lose a race with rehydrate (2026-09-06 dogfood).
+  useEffect(() => {
+    if (!isPrimeTarget || !queue?.followUp.length) return
+    for (const text of queue.followUp) {
+      agent.appendQueuedFollowUp(text)
+    }
+  }, [agent, isPrimeTarget, queue?.followUp])
   const { tree: sessionTree, refresh: refreshSessionTree } = usePrimeSessionTree(
     isPrimeTarget,
     primeHost.sessionPath ?? isActive,
@@ -322,6 +330,7 @@ export function AiPanelView({
     clearAttachments,
     refreshQueue,
     setInput,
+    onFollowUpQueued: agent.appendQueuedFollowUp,
   })
 
   const {
@@ -342,6 +351,7 @@ export function AiPanelView({
     sessionsAutoCollapsed,
     refreshSessionTree,
     primeHostSessionPath: primeHost.sessionPath,
+    hostRunning: primeHost.running,
   })
   const sessionsShown = sessionsVisible
   const usesRailSessions = sessionsRailSlot !== undefined

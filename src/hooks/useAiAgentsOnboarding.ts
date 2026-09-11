@@ -2,10 +2,10 @@ import { useCallback, useState } from 'react'
 
 const AI_AGENTS_ONBOARDING_DISMISSED_STORAGE_NAME = 'rhizome:ai-agents-onboarding-dismissed'
 // Genuinely historical — a user who dismissed the old Claude-only
-// onboarding flow via `useClaudeCodeOnboarding` should not see the merged
-// AI-agents onboarding either. Do not rename this to "rhizome:...": that
-// flow wrote "tolaria:...", so this must keep reading that literal string
-// to still find a real prior dismissal, not the current generation's name.
+// onboarding flow should not see the merged AI-agents onboarding either.
+// Do not rename this to "rhizome:...": that flow wrote "tolaria:...", so
+// this must keep reading that literal string to still find a real prior
+// dismissal, not the current generation's name.
 const LEGACY_CLAUDE_ONBOARDING_DISMISSED_STORAGE_NAME = 'tolaria:claude-code-onboarding-dismissed'
 
 function wasDismissed(): boolean {

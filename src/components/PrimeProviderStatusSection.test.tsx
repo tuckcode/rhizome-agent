@@ -36,12 +36,15 @@ describe('PrimeProviderStatusSection', () => {
     ]
     render(<PrimeProviderStatusSection t={t} />)
     await waitFor(() => {
-      expect(screen.getAllByTestId('prime-provider-row')).toHaveLength(3)
+      // Connected + always-show placeholders (xai, deepseek, nous-portal).
+      expect(screen.getAllByTestId('prime-provider-row').length).toBeGreaterThanOrEqual(5)
     })
     expect(screen.getByText('Anthropic')).toBeInTheDocument()
     expect(screen.getByText('OpenCode')).toBeInTheDocument()
+    expect(screen.getByText('DeepSeek')).toBeInTheDocument()
+    expect(screen.getByText('Nous Portal')).toBeInTheDocument()
     expect(screen.getAllByText('OAuth').length).toBeGreaterThan(0)
-    expect(screen.getByText('API key')).toBeInTheDocument()
+    expect(screen.getAllByText('API key').length).toBeGreaterThan(0)
   })
 
   it('marks a working connection as connected', async () => {
@@ -50,7 +53,7 @@ describe('PrimeProviderStatusSection', () => {
     await waitFor(() => {
       expect(screen.getByText('Connected')).toBeInTheDocument()
     })
-    expect(screen.getByText('xAI')).toBeInTheDocument()
+    expect(screen.getByText('xAI (Grok)')).toBeInTheDocument()
     expect(screen.queryByTestId('prime-provider-expired')).not.toBeInTheDocument()
     expect(screen.queryByTestId('prime-provider-sign-in-xai')).not.toBeInTheDocument()
   })
@@ -81,13 +84,15 @@ describe('PrimeProviderStatusSection', () => {
     expect(screen.queryByTestId('prime-provider-expired')).not.toBeInTheDocument()
   })
 
-  it('shows OAuth providers to sign in even when nothing is connected yet', async () => {
+  it('shows OAuth and API-key providers to set up even when nothing is connected yet', async () => {
     state.providers = []
     render(<PrimeProviderStatusSection t={t} />)
     await waitFor(() => {
       expect(screen.getByTestId('prime-provider-sign-in-anthropic')).toBeInTheDocument()
     })
     expect(screen.getByTestId('prime-provider-sign-in-xai')).toBeInTheDocument()
+    expect(screen.getByTestId('prime-provider-sign-in-deepseek')).toBeInTheDocument()
+    expect(screen.getByTestId('prime-provider-sign-in-nous-portal')).toBeInTheDocument()
     expect(screen.queryByTestId('prime-provider-status-empty')).not.toBeInTheDocument()
   })
 
@@ -106,11 +111,39 @@ describe('PrimeProviderStatusSection', () => {
     expect(await screen.findByTestId('prime-provider-sign-in-notice')).toHaveTextContent('prime-agent --provider xai')
   })
 
-  it('degrades to OAuth placeholders when the check fails', async () => {
+  it('copies DeepSeek add-key command', async () => {
+    state.providers = []
+    render(<PrimeProviderStatusSection t={t} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('prime-provider-sign-in-deepseek')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('prime-provider-sign-in-deepseek'))
+    await waitFor(() => {
+      expect(writeClipboardText).toHaveBeenCalledWith('prime-agent --provider deepseek')
+    })
+  })
+
+  it('copies Nous Portal setup snippet', async () => {
+    state.providers = []
+    render(<PrimeProviderStatusSection t={t} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('prime-provider-sign-in-nous-portal')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('prime-provider-sign-in-nous-portal'))
+    await waitFor(() => {
+      expect(writeClipboardText).toHaveBeenCalled()
+    })
+    const copied = vi.mocked(writeClipboardText).mock.calls.at(-1)?.[0] as string
+    expect(copied).toContain('NOUS_API_KEY')
+    expect(copied).toContain('inference-api.nousresearch.com')
+  })
+
+  it('degrades to setup placeholders when the check fails', async () => {
     state.fail = true
     render(<PrimeProviderStatusSection t={t} />)
     await waitFor(() => {
       expect(screen.getByTestId('prime-provider-sign-in-anthropic')).toBeInTheDocument()
     })
+    expect(screen.getByTestId('prime-provider-sign-in-deepseek')).toBeInTheDocument()
   })
 })

@@ -4,7 +4,7 @@ import { PrimeThinkingToggle } from './PrimeThinkingToggle'
 
 const invoked = vi.hoisted(() => ({
   calls: [] as Array<{ cmd: string; args?: Record<string, unknown> }>,
-  levels: ['off', 'low', 'high'] as string[],
+  levels: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as string[],
 }))
 
 vi.mock('../mock-tauri', () => ({
@@ -25,7 +25,7 @@ vi.mock('../lib/productAnalytics', () => ({
 
 beforeEach(() => {
   invoked.calls = []
-  invoked.levels = ['off', 'low', 'high']
+  invoked.levels = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
   tracked.levels = []
 })
 
@@ -41,20 +41,39 @@ describe('PrimeThinkingToggle', () => {
     expect(screen.getByTestId('prime-thinking-toggle')).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('cycles off to high from the host list', async () => {
+  function openPill() {
+    // Radix opens on pointerdown, not click.
+    fireEvent.pointerDown(
+      screen.getByTestId('prime-thinking-toggle'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+  }
+
+  it('opens a menu of every host thinking level', async () => {
     render(<PrimeThinkingToggle thinkingLevel="off" vaultPath="/vault" />)
-    fireEvent.click(screen.getByTestId('prime-thinking-toggle'))
+    openPill()
 
     await waitFor(() => {
-      expect(invoked.calls.map((call) => call.cmd)).toEqual([
-        'ensure_prime_session_host',
-        'get_prime_thinking_levels',
-        'set_prime_thinking_level',
-      ])
+      expect(screen.getByTestId('prime-thinking-pill-menu')).toBeInTheDocument()
+    })
+    for (const level of invoked.levels) {
+      expect(screen.getByTestId(`prime-thinking-pill-${level}`)).toBeInTheDocument()
+    }
+    expect(screen.getByTestId('prime-thinking-pill-xhigh')).toHaveTextContent('X-High')
+  })
+
+  it('sets the chosen level from the pill menu', async () => {
+    render(<PrimeThinkingToggle thinkingLevel="off" vaultPath="/vault" />)
+    openPill()
+    await waitFor(() => expect(screen.getByTestId('prime-thinking-pill-medium')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('prime-thinking-pill-medium'))
+
+    await waitFor(() => {
+      expect(invoked.calls.some((call) => call.cmd === 'set_prime_thinking_level')).toBe(true)
     })
     expect(invoked.calls.find((call) => call.cmd === 'set_prime_thinking_level')?.args).toEqual({
-      level: 'high',
+      level: 'medium',
     })
-    expect(tracked.levels).toEqual([{ level: 'high', source: 'toggle' }])
+    expect(tracked.levels).toEqual([{ level: 'medium', source: 'pill' }])
   })
 })

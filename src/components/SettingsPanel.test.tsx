@@ -155,7 +155,9 @@ describe('SettingsPanel', () => {
     expect(screen.getByText('Recognized local agents')).toBeInTheDocument()
     expect(screen.getByText('Prime Agent')).toBeInTheDocument()
     expect(screen.getByText('2.1.18')).toBeInTheDocument()
-    expect(screen.queryByText('Claude Code')).not.toBeInTheDocument()
+    // Claude Code is import-source copy (SessionImportSettingsSection), not a
+    // listed local agent. Probe status must still stay off the agents list.
+    expect(screen.getByText(/Bring Claude Code sessions into this vault/)).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Local model' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'API model' })).toBeInTheDocument()
 

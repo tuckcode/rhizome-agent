@@ -37,6 +37,19 @@ describe('AiMessage', () => {
     expect(screen.getByText('Hello AI')).toBeTruthy()
   })
 
+  it('shows a clock under the ask when createdAtMs is set (C70)', () => {
+    const createdAtMs = new Date(2026, 8, 6, 15, 35, 0).getTime()
+    render(<AiMessage userMessage="Hello AI" actions={[]} createdAtMs={createdAtMs} />)
+    const stamp = screen.getByTestId('message-timestamp')
+    expect(stamp).toHaveTextContent('3:35p')
+    expect(screen.queryByTestId('message-timestamp')).toBeTruthy()
+  })
+
+  it('omits the clock when there is no createdAtMs', () => {
+    render(<AiMessage userMessage="Hello AI" actions={[]} />)
+    expect(screen.queryByTestId('message-timestamp')).not.toBeInTheDocument()
+  })
+
   /**
    * A turn boundary has to be findable while scrolling past screens of answer.
    * The bubble used to be tinted with `--state-hover`, a hover affordance that
@@ -379,7 +392,7 @@ describe('AiMessage', () => {
     expect(screen.getByTestId('ai-message-save-to-vault')).toBeDisabled()
   })
 
-  it('shows Save to vault as a visible labeled control', () => {
+  it('shows Save to vault as an icon control with full accessible name', () => {
     render(
       <AiMessage
         userMessage="Ask"
@@ -389,9 +402,10 @@ describe('AiMessage', () => {
       />,
     )
 
-    const save = screen.getByTestId('ai-message-save-to-vault')
-    expect(save).toHaveTextContent('Save to vault')
+    const save = screen.getByRole('button', { name: 'Save to vault' })
+    expect(save).toHaveAttribute('data-testid', 'ai-message-save-to-vault')
     expect(save).toBeVisible()
+    expect(save).not.toHaveTextContent('Save to vault')
     expect(screen.getByTestId('ai-message-actions')).not.toHaveClass('opacity-0')
   })
 

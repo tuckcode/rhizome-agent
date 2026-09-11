@@ -578,6 +578,21 @@ describe('WikilinkChatInput', () => {
     ])
   })
 
+  it('submits DOM text when the React draft is stale', () => {
+    const onSend = vi.fn()
+    render(<Controlled onSend={onSend} />)
+
+    const editor = screen.getByTestId('agent-input')
+    editor.focus()
+    // Synthetic typing (computer-use / some paste paths) can update the
+    // contenteditable without an `input` event — React's draft stays empty.
+    editor.textContent = 'MIDTURN_QUEUE_PROBE'
+    setSelection(editor, 'MIDTURN_QUEUE_PROBE'.length)
+    fireEvent.keyDown(editor, { key: 'Enter' })
+
+    expect(onSend).toHaveBeenCalledWith('MIDTURN_QUEUE_PROBE', [])
+  })
+
   it('does not send on Shift+Enter', () => {
     const onSend = vi.fn()
     render(<Controlled onSend={onSend} />)

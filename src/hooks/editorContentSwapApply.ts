@@ -36,11 +36,6 @@ interface ApplyBlankStateToEditorOptions extends Omit<AppliedEditorContentCommit
   editor: ReturnType<typeof useCreateBlockNote>
 }
 
-interface ApplyMarkupStateToEditorOptions extends Omit<AppliedEditorContentCommit, 'scrollTop'> {
-  editor: ReturnType<typeof useCreateBlockNote>
-  markup: string
-}
-
 interface ProgressiveAppendResult {
   aborted: boolean
   appliedChunks: number
@@ -244,25 +239,6 @@ export async function applyBlocksToEditorProgressively(
 
 export function applyBlankStateToEditor(options: ApplyBlankStateToEditorOptions): boolean {
   return applyBlocksToEditor({ ...options, blocks: blankParagraphBlocks(), scrollTop: 0 })
-}
-
-export function applyHtmlStateToEditor(options: ApplyMarkupStateToEditorOptions) {
-  const {
-    editor,
-    markup,
-    suppressChangeRef,
-  } = options
-  suppressChangeRef.current = true
-  try {
-    resetTextSelectionBeforeContentSwap(editor)
-    editor._tiptapEditor.commands.setContent(markup)
-  } catch (err) {
-    console.error('applyHtmlStateToEditor failed:', err)
-    suppressChangeRef.current = false
-    throw err
-  }
-
-  commitAppliedEditorContent({ ...options, scrollTop: 0 })
 }
 
 function commitAppliedEditorContent(

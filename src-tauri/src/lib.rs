@@ -53,7 +53,6 @@ mod prime_vault_skill;
 pub mod rhizome_api;
 pub mod rhizome_commands;
 pub mod rhizome_distill;
-pub mod rhizome_grok_import;
 pub mod rhizome_import;
 pub mod rhizome_jobs;
 pub mod rhizome_repo_research;
@@ -719,6 +718,8 @@ macro_rules! app_invoke_handler {
             commands::search_vault,
             commands::create_empty_vault,
             commands::create_getting_started_vault,
+            commands::preview_claude_code_session_import,
+            commands::run_claude_code_session_import,
             commands::check_vault_exists,
             commands::is_wiki_vault,
             commands::get_default_vault_path,

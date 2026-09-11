@@ -366,18 +366,6 @@ vi.mock('./mock-tauri', () => ({
   trackMockChange: vi.fn(),
 }))
 
-// Mock ai-chat utilities
-vi.mock('./utils/ai-chat', async () => {
-  const actual = await vi.importActual<typeof import('./utils/ai-chat')>('./utils/ai-chat')
-
-  return {
-    ...actual,
-    buildSystemPrompt: vi.fn(() => ({ prompt: '', totalTokens: 0, truncated: false })),
-    checkClaudeCli: vi.fn(async () => ({ installed: false })),
-    streamClaudeChat: vi.fn(async () => 'mock-session'),
-  }
-})
-
 vi.mock('./utils/streamAiAgent', () => ({
   streamAiAgent: vi.fn(async () => {}),
 }))
@@ -639,7 +627,8 @@ describe('App', () => {
     const input = await screen.findByTestId('agent-input')
     input.textContent = 'Keep this unsent draft'
     fireEvent.input(input)
-    fireEvent.click(screen.getByRole('button', { name: 'Expand connections' }))
+    fireEvent.click(await screen.findByTestId('command-rail-changes'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Expand connections' }))
     await screen.findByTestId('graph-view')
     fireEvent.click(screen.getByRole('button', { name: 'Return to side panel' }))
     expect(await screen.findByTestId('agent-input')).toHaveTextContent('Keep this unsent draft')
@@ -649,7 +638,8 @@ describe('App', () => {
     localStorage.setItem('rhizome:command-rail-expanded', '1')
     render(<App />)
     await screen.findByTestId('chat-home')
-    fireEvent.click(screen.getByRole('button', { name: 'Expand connections' }))
+    fireEvent.click(await screen.findByTestId('command-rail-changes'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Expand connections' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Open note' }))
     await waitFor(() => expect(screen.getByTestId('connections-panel')).toHaveAttribute('data-expanded', 'false'))
     await waitFor(() => expect(window.__rhizomeTest?.activeTabPath).toBe('/vault/project/test.md'))
@@ -681,22 +671,23 @@ describe('App', () => {
     expect(await screen.findByLabelText('Activity session')).toHaveValue('/prime/sessions/session-1.jsonl')
   })
 
-  it('routes the status-bar Graph pill into the Notes column in command-rail mode', async () => {
+  it('routes Graph under Notes only on Changes, not Inbox', async () => {
     localStorage.setItem('rhizome:command-rail-expanded', '1')
     render(<App />)
     await screen.findByTestId('chat-home')
-    // In command-rail mode the status bar renders as pills without a
-    // clickable Graph badge (see StatusBarSections' pillMode) — Graph lives
-    // under Notes instead. This documents that split rather than clicking
-    // a control that command-rail mode does not render.
-    expect(screen.queryByRole('button', { name: 'Graph' })).not.toBeInTheDocument()
-    expect(screen.queryByTestId('connections-edge')).not.toBeInTheDocument()
+    expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
+    expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('graph-view')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('command-rail-changes'))
+    expect(await screen.findByTestId('connections-panel')).toBeInTheDocument()
     expect(await screen.findByTestId('graph-view')).toBeInTheDocument()
   })
 
-  it('stacks Graph under Notes in the right panel, with no Connections strip', async () => {
+  it('stacks Graph under Notes on Changes, with no Connections strip', async () => {
     render(<App />)
     const notes = await screen.findByTestId('vault-panel')
+    expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
+    fireEvent.click(await screen.findByTestId('command-rail-changes'))
     const graph = await screen.findByTestId('connections-panel')
     expect(screen.queryByTestId('connections-edge')).not.toBeInTheDocument()
     expect(notes.compareDocumentPosition(graph) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -728,13 +719,13 @@ describe('App', () => {
     expect(screen.getByRole('tab', { name: 'Mycelium', selected: true })).toBeInTheDocument()
   })
 
-  it('starts with the vault panel closed when no view preference is stored', async () => {
+  it('starts with the vault panel open when no view preference is stored (C72)', async () => {
     localStorage.removeItem('rhizome-view-mode')
     render(<App />)
 
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-inbox')).toHaveAccessibleName('Inbox')
-    expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
+    expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
   })
 
   it('opens a note window after loading the active vault graph', async () => {
@@ -1516,6 +1507,13 @@ describe('App', () => {
     fireEvent.keyDown(window, { key: '1', metaKey: true })
     await waitFor(() => {
       expect(document.querySelector('.app__vault-panel')).not.toBeInTheDocument()
+    })
+    const restore = await screen.findByTestId('vault-panel-restore')
+    expect(restore).toBeVisible()
+    expect(restore).toHaveStyle({ width: '46px' })
+    fireEvent.click(restore)
+    await waitFor(() => {
+      expect(document.querySelector('.app__vault-panel')).toBeInTheDocument()
     })
   })
 
