@@ -52,10 +52,8 @@ menu, Graph/Mycelium on Changes, matching Notes restore rail, skip-ensure
 on session switch). Native Chat glance **PASSED** (2026-09-06). Do not
 rebuild `/Applications` over a live Rhizome.
 
-Area C orphan-UI subtraction is on `cursor/area-c-orphan-ui-7f62`: deleted
-unused components/exports and dead dialog / docked / right-panel-chat
-branches. Linux clippy cfg-gates close the unused macOS-helper thread (the
-C69 that is not the packaged `cli-call` fix).
+Area C orphan-UI subtraction is on `cursor/area-c-orphan-ui-7f62` (unused
+components/exports + dead dialog/docked/right-panel-chat; C69 clippy gated).
 
 Still open / parked: **C72** Inbox rename; Prime list-import; **#51** Tab;
 **C64** full verify; **#47** confirm-close; Grokbot **#60/#61/#62** (held);
@@ -293,10 +291,8 @@ push is not a release — releases are tagged builds with signed installers.
 - ~~**C67-OPEN (2026-09-06): sessions list needs a right-click menu**~~ **RESOLVED 2026-09-06.** Right-click Open / Rename / Archive·Restore / View in Mycelium / Copy path via `PrimeSessionListContextMenu`; Mycelium uses `handleOpenSessionFootprint`.
 - ~~**C68-OPEN (2026-09-06): restore note lock/view.**~~ **RESOLVED 2026-09-06.** Ephemeral per-note lock (default editable); breadcrumb + Cmd+K; BlockNote/CodeMirror read-only when locked. Not vault `editor_mode`.
 - ~~**C69-OPEN (2026-09-06): Linux CI Clippy (`-D warnings`) fails on macOS-only
-  `src-tauri`.**~~ **FIXED on `cursor/area-c-orphan-ui-7f62` (2026-09-11).**
-  macOS-only menu-bar capture helpers and `should_reopen_main_window` are
-  cfg-gated so Linux clippy `-D warnings` stays clean. This is the unused
-  macOS-helper C69, not the packaged `cli-call.mjs` C69 below.
+  `src-tauri`.**~~ **FIXED 2026-09-11** on this branch: cfg-gate unused macOS
+  capture helpers and `should_reopen_main_window` (not the `cli-call` C69).
 - ~~**C69-OPEN (2026-09-06): packaged mcp-server omitted `cli-call.mjs`.**~~ **FIXED + `/Applications` rebuilt 2026-09-06 afternoon.** Bundle ships self-contained `cli-call.mjs`; seed failures `log::warn`; `pick_mcp_server_dir` prefers packaged macOS/Windows/Linux layouts over compile-time repo. Live Chat graph ask + Obsidian/Documents skills point at `/Applications/.../cli-call.mjs`. Windows launch itself remains C42.
 
 - ~~**C57-OPEN (2026-08-29): permission mode product choices after Prime fix.**~~ **RESOLVED 2026-09-06 (Atticus).** CLI agents default **Limited tools** (`safe`); Prime toggle stays **hidden** (always Power User); keep labels **Limited tools** / **Power User** — do not restore “Vault Safe.” Code already matched (`aiAgentPermissionMode.ts`, `hidePermissionMode` on Prime).
