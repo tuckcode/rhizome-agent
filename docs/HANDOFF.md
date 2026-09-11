@@ -47,7 +47,8 @@ file.
 ---
 
 ## State
-`main` on origin is **`0fa00a2`**: thinking-level menu, Graph/Mycelium on
+`main` on origin is **`457ee96`** (docs: evening dump + next-agent dock).
+Last **app** build is **`0fa00a2`**: thinking-level menu, Graph/Mycelium on
 Changes, matching Notes restore rail, skip-ensure on session switch.
 Native Chat glance **PASSED** (2026-09-06). Do not rebuild `/Applications`
 over a live Rhizome.
@@ -93,6 +94,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-08 · Cursor Grok 4.6](plans/handoffs/2026-09-08-1918-cursor-grok-4-6-c64-stamp.md) — stamped origin **`457ee96`** vs last app **`0fa00a2`**. C64 first-2s verify blocked (Documents sheet, then blank chrome).
 - [2026-09-07 · Cursor Grok 4.6](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md) — **parked evening dump (no UI):** portfolio-on-boot, vault as skill/memory home, STE must not drift, no CC Switch in product. Chat ↔ Prime still first.
 - [2026-09-07 · Cursor Grok 4.6](plans/handoffs/2026-09-07-0351-cursor-grok-4-6-push-and-adhd-off.md) — **`0fa00a2` on origin;** ADHD ideation skill removed from this repo; no Applications rebuild.
 - [2026-09-07 · Composer](plans/handoffs/2026-09-07-0324-composer-graph-on-changes.md) — **Graph/Mycelium only on Changes;** Inbox keeps the full notes list; collapsed Notes leaves a 46px right rail (same as left command rail).
