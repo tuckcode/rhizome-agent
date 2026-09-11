@@ -54,10 +54,7 @@ pick up the toggle. Native Chat glance **PASSED** (2026-09-06). Quit the
 daily app, uninstall it, then install. Do not launch leftovers. After
 install, delete leftover `.app` copies.
 
-Area C orphan-UI subtraction is on `cursor/area-c-orphan-ui-7f62`: deleted
-unused components/exports and dead dialog / docked / right-panel-chat
-branches.
-
+Area C orphan-UI subtraction (#60): unused components/exports + dead dialog/docked/right-panel-chat.
 Still open / parked: **C72** Inbox rename; Prime list-import; **#51** Tab;
 **C64** full verify; **#47** confirm-close; Grokbot **#60/#61/#62** (held);
 Rhizome in-app updater stub. Evening design dump (portfolio, vault-as-skills,
@@ -125,9 +122,7 @@ yours to choose.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1522-composer-midturn-waiting-chrome.md) — daily-drive: **#41 mid-turn** confirmed (“Waiting in this session” / `MIDTURN_QUEUE_PROBE` while Working; DeepSeek · Rhizome Vault); graph tools still healthy.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1147-composer-daily-drive-cli-call-bundle.md) — daily-drive: **C69** packaged `cli-call` missing (fixed + `/Applications` patched); **live Chat graph ask succeeded** on Obsidian Vault (Big Pickle → `rhizome_graph_health`: 69 notes / 11 links / 60 orphans / 7 dead links). Same day: `/Applications` rebuild with ADR-0170 native QA; vault skills point at packaged `cli-call.mjs`; **graph Find** collapsed to bottom-right expandable box (Atticus: type-pill wall hid the canvas).
 - [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2155-grok-4-6-area-c-orphan-ui.md) — **Area C:** deleted orphan UI under `src/components/` (onboarding/create-note/autocomplete/NoteIcon), unused exports, and dead dialog/docked/right-panel-chat branches.
-
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-0805-composer-c67-c68.md) — **C67/C68 shipped:** sessions right-click menu; note lock (default editable, breadcrumb + Cmd+K).
-
 - [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-0405-grok-4-6-status-bar-pills.md) — status-bar chrome: Contribute/Docs → Settings → About; build/update next to theme; composer lost the duplicate vault pill and hosts agent idle. Vault dropdown stays bottom-left.
 
 - [2026-09-05 · Claude Opus 5](plans/handoffs/2026-09-05-2145-claude-opus-5-session-import-and-agent-graph.md) — **no agent had ever successfully run a graph query**: the `rhizome_graph_*` tools need `RHIZOME_TOOL_PATH`, and the seeded skill tells the agent to run `cli-call.mjs` from a bash tool, which inherits none of the app's environment. Fixed, and rewrote the skill description so agents discover the graph at all (they were told only about note CRUD). Built the **session-import engine** — ledger, dedup, Claude Code adapter, selection, preview, vault writer — verified on real history: 318 notes written, zero failures, second run wrote nothing. Fixed four UI defects (inverted Connections resize, titlebar stealing the window drag, unresizable chat/editor split, session list sorted by file mtime). **Right-panel layout agreed but unbuilt**; skill change not yet verified with a real agent.
