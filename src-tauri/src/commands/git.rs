@@ -10,8 +10,6 @@ type NotePathArg = String;
 type CommitHashArg = String;
 type CommitMessageArg = String;
 type ConflictStrategyArg = String;
-type RemoteUrlArg = String;
-type LocalPathArg = String;
 
 // ── Git commands (desktop) ──────────────────────────────────────────────────
 
@@ -123,13 +121,6 @@ pub async fn git_pull(vault_path: VaultPathArg) -> Result<GitPullResult, String>
 pub fn get_conflict_files(vault_path: VaultPathArg) -> Result<Vec<String>, String> {
     let vault_path = expand_tilde(&vault_path);
     crate::git::get_conflict_files(&vault_path)
-}
-
-#[cfg(desktop)]
-#[tauri::command]
-pub fn get_conflict_mode(vault_path: VaultPathArg) -> String {
-    let vault_path = expand_tilde(&vault_path);
-    crate::git::get_conflict_mode(&vault_path)
 }
 
 #[cfg(desktop)]
@@ -284,13 +275,6 @@ pub fn init_git_repo(vault_path: VaultPathArg) -> Result<(), String> {
     crate::git::init_repo(std::path::Path::new(vault_path.as_ref()))
 }
 
-#[cfg(desktop)]
-#[tauri::command]
-pub fn clone_repo(url: RemoteUrlArg, local_path: LocalPathArg) -> Result<String, String> {
-    let local_path = expand_tilde(&local_path);
-    crate::git::clone_repo(&url, &local_path)
-}
-
 // ── Git commands (mobile stubs) ─────────────────────────────────────────────
 
 #[cfg(mobile)]
@@ -369,12 +353,6 @@ pub fn get_conflict_files(_vault_path: VaultPathArg) -> Result<Vec<String>, Stri
 
 #[cfg(mobile)]
 #[tauri::command]
-pub fn get_conflict_mode(_vault_path: VaultPathArg) -> String {
-    "none".to_string()
-}
-
-#[cfg(mobile)]
-#[tauri::command]
 pub fn git_resolve_conflict(
     _vault_path: VaultPathArg,
     _file: NotePathArg,
@@ -434,12 +412,6 @@ pub fn is_git_repo(_vault_path: VaultPathArg) -> bool {
 #[tauri::command]
 pub fn init_git_repo(_vault_path: VaultPathArg) -> Result<(), String> {
     Err("Git init is not available on mobile".into())
-}
-
-#[cfg(mobile)]
-#[tauri::command]
-pub fn clone_repo(_url: RemoteUrlArg, _local_path: LocalPathArg) -> Result<String, String> {
-    Err("Git clone is not available on mobile".into())
 }
 
 #[cfg(test)]
@@ -504,7 +476,7 @@ mod tests {
         );
 
         assert!(get_conflict_files(vault.clone()).unwrap().is_empty());
-        assert_eq!(get_conflict_mode(vault.clone()), "none");
+        assert_eq!(crate::git::get_conflict_mode(&vault), "none");
         assert!(
             git_resolve_conflict(vault.clone(), "note.md".to_string(), "invalid".to_string(),)
                 .is_err()

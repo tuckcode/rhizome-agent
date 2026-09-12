@@ -17,13 +17,6 @@ export function WorkspaceResizeHandles({
         data-testid="ai-workspace-left-resize"
         onMouseDown={(event) => startResizeDrag(event, 'col-resize', (deltaX) => onResize(-deltaX, 0))}
       />
-      {mode === 'docked' && (
-        <div
-          className="absolute top-0 right-0 left-0 z-30 h-1 cursor-row-resize bg-transparent transition-colors hover:bg-border"
-          data-testid="ai-workspace-top-resize"
-          onMouseDown={(event) => startResizeDrag(event, 'row-resize', (_deltaX, deltaY) => onResize(0, -deltaY))}
-        />
-      )}
     </>
   )
 }

@@ -27,10 +27,6 @@ mod tests {
         Some(vault_path.to_path_buf())
     }
 
-    fn vault_path_string_arg(vault_path: &Path) -> Option<String> {
-        Some(vault_path.to_string_lossy().to_string())
-    }
-
     fn assert_note_write_rejects_escape<T: std::fmt::Debug>(
         action: impl FnOnce(std::path::PathBuf, String, Option<std::path::PathBuf>) -> Result<T, String>,
     ) {
@@ -73,13 +69,6 @@ mod tests {
         assert_eq!(err, INVALID_VIEW_FILENAME_ERROR);
     }
 
-    fn temp_note(body: &str) -> (tempfile::TempDir, std::path::PathBuf) {
-        let dir = tempfile::TempDir::new().unwrap();
-        let note = dir.path().join("note.md");
-        std::fs::write(&note, body).unwrap();
-        (dir, note)
-    }
-
     fn assert_paths_exist(root: &Path, paths: &[&str]) {
         for path in paths {
             assert!(root.join(path).exists(), "{path} should exist");
@@ -110,22 +99,6 @@ mod tests {
 
         assert!(type_definition.contains("visible: false"));
         assert!(type_definition.contains("# Type"));
-    }
-
-    #[test]
-    fn test_batch_archive_notes() {
-        let (dir, note) = temp_note("---\nStatus: Active\n---\n# Note\n");
-        assert_eq!(
-            batch_archive_notes(
-                vec![note.to_str().unwrap().to_string()],
-                vault_path_string_arg(dir.path()),
-            )
-            .unwrap(),
-            1
-        );
-        let content = std::fs::read_to_string(&note).unwrap();
-        assert!(content.contains("_archived: true"));
-        assert!(content.contains("Status: Active"));
     }
 
     #[test]

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { cn } from '@/lib/utils'
 
-export type AiWorkspaceMode = 'docked' | 'side' | 'window'
+export type AiWorkspaceMode = 'side' | 'window'
 
 export interface AiWorkspaceSizing {
   onSidebarResize: (delta: number) => void
@@ -72,11 +72,7 @@ export function workspaceClassName(mode: AiWorkspaceMode): string {
     )
   }
 
-  if (mode === 'window') {
-    return 'flex h-full w-full overflow-hidden bg-background text-foreground'
-  }
-
-  return 'fixed right-4 bottom-[30px] z-40 flex overflow-hidden rounded-lg border border-border bg-background text-foreground'
+  return 'flex h-full w-full overflow-hidden bg-background text-foreground'
 }
 
 export function workspaceStyle(
@@ -85,22 +81,9 @@ export function workspaceStyle(
   expanded = false,
 ): CSSProperties | undefined {
   if (mode === 'window') return undefined
-  if (mode === 'side') {
-    // Expanded takes a bounded majority share, never the whole parent — the
-    // editor column stays in flow and reachable.
-    if (expanded) return { minWidth: MIN_SIDE_WORKSPACE_WIDTH, width: CHAT_PRIMARY_WIDTH }
-    return {
-      minWidth: MIN_SIDE_WORKSPACE_WIDTH,
-      width: size.width,
-    }
-  }
-
+  if (expanded) return { minWidth: MIN_SIDE_WORKSPACE_WIDTH, width: CHAT_PRIMARY_WIDTH }
   return {
-    height: size.height,
-    maxHeight: 'calc(100vh - 62px)',
-    maxWidth: 'calc(100vw - 32px)',
-    minHeight: MIN_DOCKED_WORKSPACE_SIZE.height,
-    minWidth: MIN_DOCKED_WORKSPACE_SIZE.width,
+    minWidth: MIN_SIDE_WORKSPACE_WIDTH,
     width: size.width,
   }
 }

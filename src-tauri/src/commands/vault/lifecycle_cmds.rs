@@ -3,12 +3,6 @@ use crate::{git, vault};
 use std::path::Path;
 
 #[tauri::command]
-pub fn migrate_is_a_to_type(vault_path: String) -> Result<usize, String> {
-    let vault_path = expand_tilde(&vault_path);
-    vault::migrate_is_a_to_type(&vault_path)
-}
-
-#[tauri::command]
 pub fn create_empty_vault(target_path: String) -> Result<String, String> {
     let path = expand_tilde(&target_path).into_owned();
     let vault_dir = Path::new(&path);

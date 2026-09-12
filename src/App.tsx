@@ -2233,7 +2233,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
             ) : isResearchDestination ? (
               <div className="relative flex min-h-0 flex-1" data-testid="research-destination">
                 <ResearchPanel
-                  variant="pane"
                   open
                   onClose={handleRailSelectChat}
                   vaultPath={resolvedPath}

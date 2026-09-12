@@ -6,7 +6,6 @@ import { InlineWikilinkInput } from './InlineWikilinkInput'
 interface CommandPaletteAiModeProps {
   entries: VaultEntry[]
   value: string
-  claudeCodeReady: boolean
   aiAgentReady?: boolean
   aiAgentLabel?: string
   inputRef?: React.RefObject<HTMLDivElement | null>
@@ -21,15 +20,12 @@ function stripLeadingSpace(value: string): string {
 export function CommandPaletteAiMode({
   entries,
   value,
-  claudeCodeReady,
-  aiAgentReady,
+  aiAgentReady = true,
   aiAgentLabel = 'Claude Code',
   inputRef,
   onChange,
   onSubmit,
 }: CommandPaletteAiModeProps) {
-  const resolvedAiAgentReady = aiAgentReady ?? claudeCodeReady
-
   return (
     <InlineWikilinkInput
       entries={entries}
@@ -50,7 +46,7 @@ export function CommandPaletteAiMode({
       )}
       paletteEmptyState={(
         <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">
-          {!resolvedAiAgentReady ? (
+          {!aiAgentReady ? (
             `${aiAgentLabel} is not available on this machine.`
           ) : (
             <>

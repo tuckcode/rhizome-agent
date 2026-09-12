@@ -4,9 +4,9 @@
 //! PNG lands in `attachments/`; a markdown stub lands in `raw/inbox/` so
 //! inbox automation / history can pick it up. Escape cancel = no files.
 
-#[cfg(any(test, target_os = "macos"))]
+#[cfg(any(target_os = "macos", test))]
 use std::fs;
-#[cfg(any(test, target_os = "macos"))]
+#[cfg(any(target_os = "macos", test))]
 use std::path::Path;
 #[cfg(target_os = "macos")]
 use std::path::PathBuf;
@@ -17,10 +17,10 @@ use std::thread;
 #[cfg(target_os = "macos")]
 use std::time::Duration;
 
-#[cfg(any(test, target_os = "macos"))]
+#[cfg(any(target_os = "macos", test))]
 use chrono::Local;
 
-#[cfg(any(test, target_os = "macos"))]
+#[cfg(any(target_os = "macos", test))]
 use crate::rhizome_distill::append_vault_event_best_effort;
 #[cfg(target_os = "macos")]
 use crate::vault_list;
@@ -34,6 +34,7 @@ pub enum CaptureKind {
 
 #[cfg(any(test, target_os = "macos"))]
 impl CaptureKind {
+    #[cfg(any(target_os = "macos", test))]
     fn slug(self) -> &'static str {
         match self {
             CaptureKind::Area => "area",
@@ -42,6 +43,7 @@ impl CaptureKind {
         }
     }
 
+    #[cfg(any(target_os = "macos", test))]
     fn title(self) -> &'static str {
         match self {
             CaptureKind::Area => "Screen capture (area)",
@@ -108,7 +110,7 @@ pub struct CaptureResult {
 }
 
 /// Pure write path — unit-tested without screencapture.
-#[cfg(any(test, target_os = "macos"))]
+#[cfg(any(target_os = "macos", test))]
 pub fn write_capture_files(
     vault_path: &Path,
     kind: CaptureKind,

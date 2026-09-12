@@ -189,12 +189,10 @@ describe('AiWorkspace', () => {
   })
 
   it('creates chats from the sidebar and hides the legacy AI panel header', () => {
-    render(<AiWorkspace open mode="docked" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
+    render(<AiWorkspace open mode="window" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
 
     const workspace = screen.getByTestId('ai-workspace')
-    expect(workspace).toHaveAttribute('data-ai-workspace-mode', 'docked')
-    expect(workspace).toHaveStyle({ width: '560px' })
-    expect(workspace.className).toContain('bottom-[30px]')
+    expect(workspace).toHaveAttribute('data-ai-workspace-mode', 'window')
     expect(workspace.className).not.toContain('shadow')
     expect(screen.getByTestId('ai-panel-view')).toHaveAttribute('data-show-header', 'false')
     expect(screen.queryByText('Agents')).toBeNull()
@@ -352,15 +350,11 @@ describe('AiWorkspace', () => {
     ])
   })
 
-  it('resizes the docked workspace from the left edge and the sidebar split', () => {
-    render(<AiWorkspace open mode="docked" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
+  it('resizes the window workspace sidebar split', () => {
+    render(<AiWorkspace open mode="window" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
 
     const workspace = screen.getByTestId('ai-workspace')
     fireEvent.click(screen.getByRole('button', { name: 'Expand AI chat list' }))
-    fireEvent.mouseDown(screen.getByTestId('ai-workspace-left-resize'), { clientX: 100, clientY: 20 })
-    fireEvent.mouseMove(window, { clientX: 60, clientY: 20 })
-    fireEvent.mouseUp(window)
-    expect(workspace).toHaveStyle({ width: '600px' })
 
     const sidebar = screen.getByTestId('ai-workspace-sidebar-header').parentElement
     const sidebarHandle = workspace.querySelector('.cursor-col-resize:not([data-testid])')
@@ -457,7 +451,7 @@ describe('AiWorkspace', () => {
   })
 
   it('does not archive an empty chat', () => {
-    render(<AiWorkspace open mode="docked" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
+    render(<AiWorkspace open mode="window" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
 
     const archiveButtons = screen.getAllByRole('button', { name: 'Archive chat' })
     expect(archiveButtons.every((button) => button.hasAttribute('disabled'))).toBe(true)
@@ -471,7 +465,7 @@ describe('AiWorkspace', () => {
     render(
       <AiWorkspace
         open
-        mode="docked"
+        mode="window"
         aiAgentsStatus={installedStatuses()}
         aiModelProviders={providers}
         conversationSettings={[
@@ -495,7 +489,7 @@ describe('AiWorkspace', () => {
     const singleConversation = render(
       <AiWorkspace
         open
-        mode="docked"
+        mode="window"
         aiAgentsStatus={installedStatuses()}
         aiModelProviders={providers}
         activeEntry={entries[0]}
@@ -514,7 +508,7 @@ describe('AiWorkspace', () => {
     render(
       <AiWorkspace
         open
-        mode="docked"
+        mode="window"
         aiAgentsStatus={installedStatuses()}
         aiModelProviders={providers}
         activeEntry={entries[0]}
@@ -534,7 +528,7 @@ describe('AiWorkspace', () => {
   })
 
   it('shows grouped target choices without missing agents', async () => {
-    render(<AiWorkspace open mode="docked" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
+    render(<AiWorkspace open mode="window" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
 
     const trigger = screen.getByTestId('ai-workspace-target-trigger')
     act(() => {
@@ -559,7 +553,7 @@ describe('AiWorkspace', () => {
     render(
       <AiWorkspace
         open
-        mode="docked"
+        mode="window"
         aiAgentsStatus={installedStatuses()}
         aiModelProviders={providers}
         vaultPath="/tmp/vault"
@@ -597,7 +591,7 @@ describe('AiWorkspace', () => {
     const { rerender } = render(
       <AiWorkspace
         open
-        mode="docked"
+        mode="window"
         aiAgentsStatus={installedStatuses()}
         aiModelProviders={[]}
         defaultAiAgent="prime"
@@ -620,7 +614,7 @@ describe('AiWorkspace', () => {
       rerender(
         <AiWorkspace
           open
-          mode="docked"
+          mode="window"
           aiAgentsStatus={installedStatuses()}
           aiModelProviders={[]}
           defaultAiAgent="prime"
@@ -637,7 +631,7 @@ describe('AiWorkspace', () => {
 
   it('marks the first chat active when a prompt is submitted', () => {
     const onConversationSettingsChange = vi.fn()
-    render(<AiWorkspace open mode="docked" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} onConversationSettingsChange={onConversationSettingsChange} />)
+    render(<AiWorkspace open mode="window" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} onConversationSettingsChange={onConversationSettingsChange} />)
 
     fireEvent.click(screen.getByText('Send mocked prompt'))
 
@@ -657,7 +651,7 @@ describe('AiWorkspace', () => {
       id: 'msg-title',
     }]
     const onConversationSettingsChange = vi.fn()
-    render(<AiWorkspace open mode="docked" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} onConversationSettingsChange={onConversationSettingsChange} />)
+    render(<AiWorkspace open mode="window" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} onConversationSettingsChange={onConversationSettingsChange} />)
 
     await waitFor(() => {
       expect(screen.getAllByText('Quarterly sponsor outreach').length).toBeGreaterThan(0)
@@ -689,7 +683,7 @@ describe('AiWorkspace', () => {
     render(
       <AiWorkspace
         open
-        mode="docked"
+        mode="window"
         aiAgentsStatus={installedStatuses()}
         aiModelProviders={providers}
         conversationSettings={[{ id: 'stored-chat', title: 'Chat 1', target_id: null, archived: false }]}
@@ -714,7 +708,7 @@ describe('AiWorkspace', () => {
 
   it('allows a chat title to be renamed from the sidebar', () => {
     const onConversationSettingsChange = vi.fn()
-    render(<AiWorkspace open mode="docked" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} onConversationSettingsChange={onConversationSettingsChange} />)
+    render(<AiWorkspace open mode="window" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} onConversationSettingsChange={onConversationSettingsChange} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand AI chat list' }))
     fireEvent.doubleClick(screen.getByRole('button', { name: /^AI Chat$/i }))
@@ -729,7 +723,7 @@ describe('AiWorkspace', () => {
   })
 
   it('opens with the workspace sidebar collapsed and expands from the sidebar header', () => {
-    render(<AiWorkspace open mode="docked" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
+    render(<AiWorkspace open mode="window" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
 
     expect(screen.queryByText('Agents')).toBeNull()
     expect(screen.getByRole('button', { name: 'Expand AI chat list' })).toBeTruthy()

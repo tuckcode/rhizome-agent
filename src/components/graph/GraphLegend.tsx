@@ -171,5 +171,3 @@ export function GraphLegend({
     </div>
   )
 }
-
-export default GraphLegend

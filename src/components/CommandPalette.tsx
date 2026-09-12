@@ -19,7 +19,6 @@ interface CommandPaletteProps {
   open: boolean
   commands: CommandAction[]
   entries?: VaultEntry[]
-  claudeCodeReady?: boolean
   aiAgentReady?: boolean
   aiAgentLabel?: string
   aiModeEnabled?: boolean
@@ -285,8 +284,7 @@ export function CommandPalette({ open, ...props }: CommandPaletteProps) {
 function OpenCommandPalette({
   commands,
   entries = [],
-  claudeCodeReady = true,
-  aiAgentReady,
+  aiAgentReady = true,
   aiAgentLabel = 'Claude Code',
   aiModeEnabled = true,
   aiPromptTargetId,
@@ -301,7 +299,6 @@ function OpenCommandPalette({
   const listRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const aiMode = aiModeEnabled && aiValue.startsWith(' ')
-  const resolvedAiAgentReady = aiAgentReady ?? claudeCodeReady
   const { groups, flatList } = usePaletteResults(commands, query)
   const t = createTranslator(locale)
   const footerText = {
@@ -414,7 +411,7 @@ function OpenCommandPalette({
       return
     }
 
-    if (!resolvedAiAgentReady) return
+    if (!aiAgentReady) return
 
     if (aiPromptTargetId) queueAiPrompt(text, references, aiPromptTargetId)
     else queueAiPrompt(text, references)
@@ -444,8 +441,7 @@ function OpenCommandPalette({
           <CommandPaletteAiMode
             entries={entries}
             value={aiValue}
-            claudeCodeReady={claudeCodeReady}
-            aiAgentReady={resolvedAiAgentReady}
+            aiAgentReady={aiAgentReady}
             aiAgentLabel={aiAgentLabel}
             inputRef={aiInputRef}
             onChange={handleAiValueChange}
