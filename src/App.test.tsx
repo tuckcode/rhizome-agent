@@ -787,8 +787,32 @@ describe('App', () => {
     render(<App />)
 
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
-    expect(screen.getByTestId('command-rail-inbox')).toHaveAccessibleName('Inbox')
+    expect(screen.getByTestId('command-rail-inbox')).toHaveAccessibleName('Notes')
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
+  })
+
+  it('keeps Chat as the canvas while Notes is open, and Inbox only opens the list', async () => {
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('command-rail-inbox')).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.keyDown(window, { key: '1', metaKey: true })
+    await waitFor(() => {
+      expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
+    })
+    expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('command-rail-inbox')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('vault-panel-restore')).toHaveAccessibleName('Show Notes')
+
+    fireEvent.click(screen.getByTestId('command-rail-inbox'))
+    expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
+    expect(screen.queryByTestId('vault-panel-navigation')).not.toBeInTheDocument()
+    expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(screen.getByTestId('command-rail-inbox'))
+    expect(screen.getByTestId('vault-panel')).toBeInTheDocument()
   })
 
   it('opens a note window after loading the active vault graph', async () => {

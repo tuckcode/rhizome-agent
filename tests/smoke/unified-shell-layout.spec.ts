@@ -34,7 +34,7 @@ test.describe('Unified shell geometry', () => {
     await page.setViewportSize({ width: 1400, height: 900 })
     await page.goto('/', { waitUntil: 'domcontentloaded' })
     await page.getByTestId('command-rail').hover()
-    await expect(page.getByTestId('command-rail-inbox')).toContainText('Inbox')
+    await expect(page.getByTestId('command-rail-inbox')).toContainText('Notes')
     // C72: fresh launch defaults to Notes open (editor-list), Browse collapsed
     await expect(page.getByTestId('vault-panel')).toBeVisible()
     await expect(page.getByTestId('vault-panel-navigation')).toHaveCount(0)

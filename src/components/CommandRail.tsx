@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChatCircle, GearSix, GitBranch, MagnifyingGlass, PushPin, Tray } from '@phosphor-icons/react'
+import { ChatCircle, GearSix, GitBranch, MagnifyingGlass, Notebook, PushPin } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { ActionTooltip } from './ui/action-tooltip'
 import { Button } from './ui/button'
@@ -19,6 +19,8 @@ export type CommandRailDestination = 'chat' | 'inbox' | 'research' | 'changes'
 interface CommandRailProps {
   locale: AppLocale
   activeDestination: CommandRailDestination
+  /** Notes column is open. Independent of Chat / Research / Changes. */
+  notesOpen?: boolean
   inboxCount?: number
   onSelectChat: () => void
   onSelectInbox: () => void
@@ -126,6 +128,7 @@ function RailButton({
 export function CommandRail({
   locale,
   activeDestination,
+  notesOpen = false,
   inboxCount = 0,
   onSelectChat,
   onSelectInbox,
@@ -247,11 +250,11 @@ export function CommandRail({
         testId="command-rail-chat"
       />
       <RailButton
-        active={activeDestination === 'inbox'}
+        active={notesOpen}
         badge={inboxCount}
         expanded={expanded}
-        icon={Tray}
-        label={t('rail.inbox')}
+        icon={Notebook}
+        label={t('rail.notes')}
         onClick={() => handleSelect('inbox', onSelectInbox)}
         testId="command-rail-inbox"
       />
@@ -288,7 +291,7 @@ export function CommandRail({
       <div className={expanded ? 'flex items-center justify-end gap-1' : 'flex flex-col items-center gap-1'}>
         <RailButton
           active={false}
-          expanded={false}
+          expanded={expanded}
           icon={GearSix}
           label={t('rail.settings')}
           onClick={onOpenSettings}

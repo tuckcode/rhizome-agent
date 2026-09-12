@@ -65,6 +65,14 @@ describe('CommandRail', () => {
     expect(screen.getByTestId('command-rail-inbox')).toHaveAttribute('aria-pressed', 'false')
   })
 
+  it('keeps Chat pressed while Notes is open, without treating Inbox as the canvas', () => {
+    renderRail({ activeDestination: 'chat', notesOpen: true })
+    expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('command-rail-inbox')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('command-rail-inbox')).toHaveAccessibleName('Notes')
+    expect(screen.getByTestId('command-rail-research')).toHaveAttribute('aria-pressed', 'false')
+  })
+
   it('opens settings from the gear without tracking a destination', () => {
     const props = renderRail()
 
@@ -91,7 +99,7 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
     renderRail()
 
     expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'false')
-    for (const label of ['Chat', 'Inbox', 'Research', 'Changes', 'Settings']) {
+    for (const label of ['Chat', 'Notes', 'Research', 'Changes', 'Settings']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
     }
   })

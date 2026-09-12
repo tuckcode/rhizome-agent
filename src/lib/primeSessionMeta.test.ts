@@ -6,6 +6,7 @@ import {
   primeSessionPlace,
   primeSessionRowTitles,
   primeSessionStatus,
+  pickLastConversation,
   sortPrimeSessions,
   type PrimeSessionSummary,
 } from './primeSessionMeta'
@@ -93,6 +94,19 @@ describe('sortPrimeSessions', () => {
     sortPrimeSessions(input)
 
     expect(input.map((s) => s.id)).toEqual(['a', 'b'])
+  })
+})
+
+describe('pickLastConversation', () => {
+  it('returns the newest real conversation, not archive or scratch', () => {
+    const last = pickLastConversation([
+      session({ id: 'scratch', mtimeMs: NOW, scratch: true, hasConversation: true }),
+      session({ id: 'old', mtimeMs: NOW - HOUR, hasConversation: true }),
+      session({ id: 'archived', mtimeMs: NOW, archived: true, hasConversation: true }),
+      session({ id: 'empty', mtimeMs: NOW, hasConversation: false }),
+    ])
+
+    expect(last?.id).toBe('old')
   })
 })
 

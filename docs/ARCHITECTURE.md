@@ -254,9 +254,11 @@ Changes so the cell can appear. Expanding Graph or Mycelium is an overlay
 you can leave; it does not replace Chat. The Connections edge strip is gone
 (ADR-0170). Graph “Find a note” is a compact bottom-right box
 (`GraphControls`, collapsed until focus or an active filter) — not a large
-overlay. The diagram below is the inherited Desktop notes-app map (classic
-shell / note windows / editor internals); do not treat it as the Agent
-main-window layout.
+overlay. `useChatCenteredShellLayout` owns `notesOpen`, the restore strip,
+compact/Beside fold, and rail pressed state so App does not recombine view
+mode with compact flags. The diagram below is the inherited Desktop notes-app
+map (classic shell / note windows / editor internals); do not treat it as the
+Agent main-window layout.
 
 ```
 ┌────────┬─────────────┬─────────────────────────┬────────────┐
@@ -331,7 +333,7 @@ The AI workspace can also open in a separate Tauri window through `openAiWorkspa
 
 Full agent mode — spawns the selected local CLI agent as a subprocess with tool access and MCP vault integration.
 
-1. **Frontend** (`AiPanel` + `useCliAiAgent` + `aiAgentSession.ts` + `aiAgents.ts` + `aiTargets.ts`) — one normalized session lifecycle for message state, reasoning blocks, tool action cards, response display, onboarding, default-target selection, bundled-docs prompt injection, and the per-vault Limited tools / Power User permission mode shown in the panel header for coding agents
+1. **Frontend** (`AiPanel` + `useCliAiAgent` + `aiAgentSession.ts` + `aiAgents.ts` + `aiTargets.ts`) — one normalized session lifecycle for message state, reasoning blocks, tool action cards, response display, onboarding, default-target selection, bundled-docs prompt injection, and the per-vault Limited tools / Power User permission mode shown in the panel header for coding agents. Launch restore is `usePrimeSessionRestore`: given host status and disk summaries, show this conversation. AiPanel does not combine `reattached`, `running`, `sessionPath`, or `isTauri` for that choice.
 2. **Backend orchestration** (`ai_agents.rs`) — normalizes agent availability, streaming, and the request permission mode before dispatching to per-agent adapters
 3. **Shared runtime scaffold** (`cli_agent_runtime.rs` and submodules) — owns the common request shape, prompt wrapping, JSON-line and line-oriented subprocess lifecycle, stdout/stderr/stdin plumbing, normalized error/done handling, version probing, Tolaria stdio MCP server entry generation, and MCP server path resolution used by app-managed CLI agents
 4. **Agent adapters** — Shared prompts are mode-aware on every turn, including turns with note context snapshots: Limited-tools mode tells CLI agents not to use or advertise shell, while Power User tells shell-capable agents to keep local commands scoped to the active vault. **Prime ignores vault-safe** (the toggle is hidden; there is no sandbox) and always receives power-user prompt guidance. Claude Code still uses `claude_cli.rs` with `acceptEdits`, strict Tolaria MCP config, and a scoped tool list: Safe enables file/search/edit tools only, while Power User adds Bash to the available tools and pre-approves Bash with `--allowedTools` without using dangerous permission-bypass flags. Codex runtime specifics live in `codex_cli.rs`; Safe runs `codex --sandbox read-only --ask-for-approval untrusted exec --json`, while Power User runs `codex --sandbox workspace-write --ask-for-approval never exec --json` so shell execution stays enabled across repeated turns. OpenCode runs through `opencode run --format json` with transient permissions: Safe denies bash and external directories, while Power User allows bash but still denies external directories. Pi runs through `pi --mode json --no-session` with `npm:pi-mcp-adapter`; both modes currently share the same transient MCP config and the prompt does not promise shell for Pi Power User. Antigravity runs through `agy -p <prompt> --cwd <vault>`, streams line-oriented stdout, and writes Tolaria MCP into the active vault's `.agents/mcp_config.json`; Safe uses `--sandbox=true --toolPermission=proceed-in-sandbox`, while Power User uses `--sandbox=false --toolPermission=always-proceed` without `--dangerously-skip-permissions`. Kiro runs through `kiro-cli chat --no-interactive --trust-all-tools`, streams line-oriented stdout, drains stderr concurrently, and writes prompt content through stdin to avoid OS argument length limits. Hermes Agent runs through `hermes chat --quiet --source tolaria -q`, streams line-oriented stdout, and uses the user's existing Hermes profile/configuration without mutating `~/.hermes/config.yaml`; setup errors point users to `hermes setup`, `hermes model`, and `hermes doctor`. Codex, OpenCode, Pi, Antigravity, Kiro, and Hermes all launch from the active vault cwd; Codex, OpenCode, Pi, Antigravity, and Kiro receive transient Tolaria MCP config. Pi seeds its transient agent directory from the user's Pi agent directory before merging Tolaria MCP, so app-managed runs keep standalone Pi provider/auth settings. All app-launched paths use hidden Windows launches and avoid dangerous permission-bypass flags.
@@ -1649,7 +1651,9 @@ No Redux or global context. State lives in the root `App.tsx` and custom hooks:
 | `useNoteActions` | `tabs`, `activeTabPath` | Composes `useNoteCreation` + `useNoteRename` + `frontmatterOps` |
 | `useNoteWindowLifecycle` | note-window open/title side effects | Opens `tauri://` note windows without full vault scans and keeps the native title current |
 | `useStartupScreenState` | startup visibility booleans | Keeps onboarding, telemetry-consent, missing-vault, and initial indexing decisions out of `App.tsx` |
-| `useAppWindowControls` | view mode, panel visibility, command refs, zoom/build labels | Keeps main-window sizing and editor command ref plumbing out of `App.tsx` |
+| `useAppWindowControls` | view mode persistence, panel visibility for window min-size, command refs, zoom/build labels | Keeps main-window sizing and editor command ref plumbing out of `App.tsx` |
+| `useChatCenteredShellLayout` | `notesOpen`, Browse, restore strip, compact/Beside, split | Chat-centered shell layout. Classic shell uses the same discriminant. |
+| `usePrimeSessionRestore` | conversation to show at Chat launch | Live attach vs idle disk log. Hides host `reattached` / `running` / `sessionPath`. |
 | `useAppViewActions` | saved-view/type creation and saved-view mutation callbacks | Keeps saved-view persistence and Type auto-creation orchestration out of `App.tsx` |
 | `useAiWorkspacePublishedContext` | AI workspace note-list snapshot and BroadcastChannel context publishing | Keeps AI workspace context derivation close to its cross-window publication side effect |
 | `useMcpSetupDialogController` | MCP setup dialog state/actions | Keeps MCP status, manual config, and connect/disconnect dialog flow out of `App.tsx` |

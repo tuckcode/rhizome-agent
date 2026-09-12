@@ -140,3 +140,25 @@ describe('AiPanelMessageHistory text selection vs window drag', () => {
     expect(startDragging).toHaveBeenCalledOnce()
   })
 })
+
+describe('AiPanelMessageHistory latest-reply marker', () => {
+  it('marks only the newest assistant reply, then moves when a newer one lands', () => {
+    const messages = [
+      { ...message('one', 'first'), id: 'a' },
+      { ...message('two', 'second'), id: 'b' },
+    ]
+    const { rerender } = render(<AiPanelMessageHistory {...historyProps(messages)} />)
+
+    expect(screen.getAllByTestId('latest-assistant-reply-marker')).toHaveLength(1)
+    expect(screen.getByTestId('latest-assistant-reply-marker').parentElement).toHaveTextContent('second')
+    expect(screen.getByTestId('latest-assistant-reply-marker').parentElement).not.toHaveTextContent('first')
+
+    rerender(<AiPanelMessageHistory {...historyProps([
+      ...messages,
+      { ...message('three', 'third'), id: 'c' },
+    ])} />)
+
+    expect(screen.getAllByTestId('latest-assistant-reply-marker')).toHaveLength(1)
+    expect(screen.getByTestId('latest-assistant-reply-marker').parentElement).toHaveTextContent('third')
+  })
+})

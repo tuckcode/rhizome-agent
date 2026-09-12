@@ -15,7 +15,6 @@ import {
 import { Editor } from './components/Editor'
 import { AskChatExcerptMenu } from './components/AskChatExcerptMenu'
 import { ChatNoteSplitToggle } from './components/ChatNoteSplitToggle'
-import { useChatNoteSplit, shouldForceChatShellCompact, type ChatNoteSplit } from './components/chatNoteSplit'
 import { formatAskChatExcerpt } from './components/askChatExcerpt'
 import { prefillAiComposer } from './utils/aiPromptBridge'
 import { ResizeHandle } from './components/ResizeHandle'
@@ -93,7 +92,7 @@ import { useVaultBridge } from './hooks/useVaultBridge'
 import { useSavedViewOrdering } from './hooks/useSavedViewOrdering'
 import { useAppViewActions } from './hooks/useAppViewActions'
 import { useAppWindowControls } from './hooks/useAppWindowControls'
-import { useShellCompactLayout } from './hooks/useShellCompactLayout'
+import { useChatCenteredShellLayout } from './hooks/useChatCenteredShellLayout'
 import { useAiWorkspacePublishedContext } from './hooks/useAiWorkspacePublishedContext'
 import {
   useNeighborhoodEntry,
@@ -567,7 +566,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const [connectionsRequest, setConnectionsRequest] = useState<ConnectionsViewRequest | null>(null)
   // Note sits on top of Chat by default. Side-by-side reuses width.
   // Bounds leave a usable note and a usable composer in both layouts.
-  const { split: chatNoteSplitMode, setSplit: setChatNoteSplit } = useChatNoteSplit()
   const chatNoteEditorWidth = usePanelWidth(APP_STORAGE_KEYS.chatNoteEditorWidth, 560, 220, 900)
   const chatNoteEditorHeight = usePanelWidth(APP_STORAGE_KEYS.chatNoteEditorHeight, 320, 140, 720)
   const handleRailSelectChanges = useCallback(() => {
@@ -1320,16 +1318,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const railActiveDestination = useMemo((): CommandRailDestination => {
     if (isResearchDestination) return 'research'
     if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'changes') return 'changes'
-    if (chatCentered && viewMode === 'editor-only') return 'chat'
-    if (isChatDestination) return 'chat'
-    return 'inbox'
-  }, [
-    chatCentered,
-    effectiveSelection,
-    isChatDestination,
-    isResearchDestination,
-    viewMode,
-  ])
+    return 'chat'
+  }, [effectiveSelection, isResearchDestination])
 
 
 
@@ -1580,38 +1570,43 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   }, [activeTabEntry])
   const [, setChatNotePaneOpen] = useState(false)
   const [sessionRailSlot, setSessionRailSlot] = useState<HTMLDivElement | null>(null)
+  const hideNotesForCanvas = isGraphDestination || isMyceliumDestination || isResearchDestination
   const {
     shellRef,
-    collapseSessions: widthCompactSessions,
-    collapseVaultPanel: widthCompactVaultPanel,
-  } = useShellCompactLayout(
-    chatCentered,
-    false,
-    !layout.inspectorCollapsed,
-  )
-  const forceChatShellCompact = shouldForceChatShellCompact(chatNoteSplitMode, Boolean(activeTab))
-  const compactSessions = forceChatShellCompact || widthCompactSessions
-  const compactVaultPanel = forceChatShellCompact || widthCompactVaultPanel
-  const [compactVaultPanelOpen, setCompactVaultPanelOpen] = useState(false)
-  const handleChatNoteSplit = useCallback((next: ChatNoteSplit) => {
-    setChatNoteSplit(next)
-    if (next === 'side-by-side') setCompactVaultPanelOpen(false)
-  }, [setChatNoteSplit])
+    split: chatNoteSplitMode,
+    compactSessions,
+    compactVaultPanel,
+    notesOpen,
+    browseOpen: vaultBrowseOpen,
+    showRestoreStrip,
+    classicSidebarVisible,
+    classicNoteListVisible,
+    ensureNotesOpen,
+    collapseNotes,
+    toggleBrowse,
+    setSplit: handleChatNoteSplit,
+  } = useChatCenteredShellLayout({
+    kind: chatCentered ? 'chat-centered' : 'classic',
+    viewMode,
+    setViewMode: handleSetViewMode,
+    noteOpen: Boolean(activeTab),
+    inspectorOpen: !layout.inspectorCollapsed,
+    hideNotesForCanvas,
+    chatDestination: isChatDestination,
+  })
   const handleRailSelectGraph = useCallback(() => {
     if (chatCentered) {
-      if (viewMode === 'editor-only') handleSetViewMode('editor-list')
-      setCompactVaultPanelOpen(true)
+      ensureNotesOpen()
       handleRailSelectChanges()
       setConnectionsRequest({ view: 'graph', requestId: ++connectionsRequestSeq.current })
       connectionsPanelRef.current?.openView('graph')
       return
     }
     handleSetSelection(toggleGraphSelection(effectiveSelection, vaultConfig.inbox?.explicitOrganization))
-  }, [chatCentered, handleRailSelectChanges, handleSetSelection, effectiveSelection, handleSetViewMode, setCompactVaultPanelOpen, setConnectionsRequest, viewMode, vaultConfig.inbox?.explicitOrganization])
+  }, [chatCentered, ensureNotesOpen, handleRailSelectChanges, handleSetSelection, effectiveSelection, setConnectionsRequest, vaultConfig.inbox?.explicitOrganization])
   const handleOpenSessionFootprint = useCallback((path: string) => {
     if (chatCentered) {
-      if (viewMode === 'editor-only') handleSetViewMode('editor-list')
-      setCompactVaultPanelOpen(true)
+      ensureNotesOpen()
       handleRailSelectChanges()
       setConnectionsRequest({ view: 'mycelium', focusPath: path, requestId: ++connectionsRequestSeq.current })
       connectionsPanelRef.current?.openView('mycelium', { focusPath: path })
@@ -1619,7 +1614,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     }
     setMyceliumFocusPath(path)
     handleSetSelection({ kind: 'filter', filter: 'mycelium' })
-  }, [chatCentered, handleRailSelectChanges, handleSetSelection, handleSetViewMode, setCompactVaultPanelOpen, setConnectionsRequest, viewMode])
+  }, [chatCentered, ensureNotesOpen, handleRailSelectChanges, handleSetSelection, setConnectionsRequest])
   const handleSelectNoteForPdfExport = notes.handleSelectNote
   const handleExportNotePdfFromList = useCallback((entry: VaultEntry) => {
     if (!isMarkdownEntry(entry)) return
@@ -1918,25 +1913,16 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   /*
     Chat-centered shell: navigation and the selected note list share one
     right-side panel. The existing view-mode values remain the persisted
-    contract:
+    contract, owned by the shell-layout module:
       editor-only -> panel hidden
       editor-list -> panel open, Browse collapsed
       all         -> panel open, Browse expanded
     The classic shell keeps its historical adjacent-column interpretation.
   */
-  const vaultBrowseOpen = viewMode === 'all'
-  const showSidebarTree = !chatCentered && sidebarVisible && !isChatDestination
-  const hideNoteListForCanvas = isGraphDestination || isMyceliumDestination || isResearchDestination
-  const showNoteListPanel = !chatCentered && noteListVisible && !isChatDestination && !hideNoteListForCanvas
-  const showVaultPanel =
-    chatCentered &&
-    viewMode !== 'editor-only' &&
-    !hideNoteListForCanvas &&
-    (!compactVaultPanel || compactVaultPanelOpen)
-  const showVaultPanelRestore =
-    chatCentered &&
-    !showVaultPanel &&
-    !hideNoteListForCanvas
+  const showSidebarTree = classicSidebarVisible
+  const showNoteListPanel = classicNoteListVisible
+  const showVaultPanel = chatCentered && notesOpen
+  const showVaultPanelRestore = showRestoreStrip
 
   const handleVaultTreeSelect = (nextSelection: SidebarSelection) => {
     handleSetSelection(nextSelection)
@@ -1989,11 +1975,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         locale={appLocale}
         navigation={sidebarSurface(true)}
         noteList={noteListSurface}
-        onBrowseToggle={() => handleSetViewMode(vaultBrowseOpen ? 'editor-list' : 'all')}
-        onCollapse={() => {
-          setCompactVaultPanelOpen(false)
-          handleSetViewMode('editor-only')
-        }}
+        onBrowseToggle={toggleBrowse}
+        onCollapse={collapseNotes}
       />
       {chatCentered && isChangesSelection ? (
         <ConnectionsPanel
@@ -2029,10 +2012,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         onFileModified={vaultBridge.handleAgentFileModified}
         onVaultChanged={vaultBridge.handleAgentVaultChanged}
         onUnsupportedAiPaste={setToastMessage}
-        onShowNotes={() => {
-          handleSetViewMode('all')
-          if (compactVaultPanel) setCompactVaultPanelOpen(true)
-        }}
+        onShowNotes={ensureNotesOpen}
         sessionsAutoCollapsed={compactSessions}
         sessionsRailSlot={commandRailEnabled ? sessionRailSlot : undefined}
         onNotePaneOpenChange={setChatNotePaneOpen}
@@ -2060,6 +2040,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
             <CommandRail
               locale={appLocale}
               activeDestination={railActiveDestination}
+              notesOpen={notesOpen}
               inboxCount={inboxCount}
               onSelectChat={() => {
                 // C72: selecting Chat must not wipe the right Notes column.
@@ -2067,21 +2048,12 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               }}
               onSelectInbox={() => {
                 handleRailSelectInbox()
-                if (chatCentered) {
-                  if (viewMode === 'editor-only') {
-                    handleSetViewMode('all')
-                    if (compactVaultPanel) setCompactVaultPanelOpen(true)
-                  } else {
-                    setCompactVaultPanelOpen(false)
-                    handleSetViewMode('editor-only')
-                  }
-                }
+                if (chatCentered) ensureNotesOpen()
               }}
               onSelectResearch={handleRailSelectResearch}
               onSelectChanges={() => {
                 handleRailSelectChanges()
-                if (chatCentered && viewMode === 'editor-only') handleSetViewMode('editor-list')
-                if (compactVaultPanel) setCompactVaultPanelOpen(true)
+                if (chatCentered) ensureNotesOpen()
               }}
               onOpenSettings={handleOpenSettings}
               onSessionsSlotReady={setSessionRailSlot}
@@ -2332,10 +2304,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           {showVaultPanelRestore && (
             <VaultPanelRestoreButton
               locale={appLocale}
-              onClick={() => {
-                handleSetViewMode('editor-list')
-                setCompactVaultPanelOpen(true)
-              }}
+              onClick={ensureNotesOpen}
             />
           )}
           {vaultPanel}

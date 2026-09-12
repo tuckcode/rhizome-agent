@@ -24,6 +24,9 @@ import { loadPrimeModelCatalog } from '../lib/primeModelCatalog'
 import { trackPrimeModelChanged, trackPrimeThinkingLevelChanged } from '../lib/productAnalytics'
 
 
+const PROVIDER_LABEL_CLASS = 'font-mono text-[10px] uppercase tracking-[0.1em] text-primary'
+const MUTED_SECTION_LABEL_CLASS = 'font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground'
+
 interface PrimeModelPickerProps {
   locale?: AppLocale
   /** Current model, as the host reports it. */
@@ -257,7 +260,7 @@ export function PrimeModelPicker({
         ) : null}
         {levels.length > 0 ? (
           <div data-testid="prime-thinking-levels">
-            <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+            <DropdownMenuLabel className={MUTED_SECTION_LABEL_CLASS}>
               {t('ai.subhead.thinking')}
             </DropdownMenuLabel>
             {levels.map((level) => (
@@ -277,7 +280,7 @@ export function PrimeModelPicker({
         {groups.map((group, index) => (
           <div key={group.provider}>
             {index > 0 ? <DropdownMenuSeparator /> : null}
-            <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+            <DropdownMenuLabel className={PROVIDER_LABEL_CLASS} data-testid="prime-model-provider">
               {group.provider}
             </DropdownMenuLabel>
             {group.models.map((model) => (
@@ -316,7 +319,7 @@ export function PrimeModelPicker({
             {showUnavailable
               ? unavailableGroups.map((group) => (
                   <div key={`unavailable-${group.provider}`}>
-                    <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+                    <DropdownMenuLabel className={PROVIDER_LABEL_CLASS} data-testid="prime-model-provider">
                       {group.provider}
                     </DropdownMenuLabel>
                     {group.models.map((model) => (
@@ -357,7 +360,7 @@ export function PrimeModelPicker({
             {showHidden
               ? hiddenGroups.map((group) => (
                   <div key={`hidden-${group.provider}`}>
-                    <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+                    <DropdownMenuLabel className={PROVIDER_LABEL_CLASS} data-testid="prime-model-provider">
                       {group.provider}
                     </DropdownMenuLabel>
                     {group.models.map((model) => (

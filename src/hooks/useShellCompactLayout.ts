@@ -35,7 +35,7 @@ export function useShellCompactLayout(
   enabled: boolean,
   noteOpen: boolean,
   inspectorOpen = false,
-): ShellCompactState & { shellRef: RefObject<HTMLDivElement | null> } {
+): ShellCompactState & { shellRef: RefObject<HTMLDivElement | null>; width: number | null } {
   const shellRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState<number | null>(null)
 
@@ -65,6 +65,7 @@ export function useShellCompactLayout(
 
   return {
     shellRef,
+    width: enabled ? width : null,
     ...getShellCompactState(enabled ? width : null, noteOpen, inspectorOpen),
   }
 }

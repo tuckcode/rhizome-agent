@@ -683,6 +683,12 @@
 .ai-markdown .hljs-deletion { color: var(--syntax-highlight-deletion); background: var(--syntax-highlight-deletion-bg); }
 .ai-markdown .hljs-meta { color: var(--syntax-highlight-comment); }
 
+.reasoning-markdown .ai-markdown {
+  color: var(--muted-foreground);
+  font-size: inherit;
+  line-height: inherit;
+}
+
 /* --- AI panel working border animation --- */
 
 /*

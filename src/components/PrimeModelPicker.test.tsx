@@ -122,6 +122,21 @@ describe('PrimeModelPicker', () => {
     expect(screen.getByTestId('prime-model-chip')).toHaveTextContent('Grok 4.5')
   })
 
+  it('renders provider names in the accent so they scan in a long list', async () => {
+    render(<PrimeModelPicker label="Grok 4.5" hostReady />)
+    fireEvent.pointerDown(
+      screen.getByTestId('prime-model-chip'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+
+    const labels = await screen.findAllByTestId('prime-model-provider')
+    expect(labels.map((label) => label.textContent)).toEqual(expect.arrayContaining(['xai', 'anthropic']))
+    for (const label of labels) {
+      expect(label).toHaveClass('text-primary')
+      expect(label).not.toHaveClass('text-muted-foreground')
+    }
+  })
+
   /** A fresh host reports no model; the chip must still be usable. */
   it('falls back to a generic label when no model is known', () => {
     render(<PrimeModelPicker label={null} />)

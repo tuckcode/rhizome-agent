@@ -47,16 +47,16 @@ file.
 ---
 
 ## State
-`main` is about to carry the Chat note **On top / Beside** toggle (this
-push). Last **app** git was **`0fa00a2`**. `/Applications/Rhizome Agent.app`
-was last installed **2026-09-11 21:59** with note-on-top only — rebuild to
-pick up the toggle. Native Chat glance **PASSED** (2026-09-06). Quit the
-daily app, uninstall it, then install. Do not launch leftovers. After
-install, delete leftover `.app` copies.
+`main` is about to carry Chat shell-layout deepen, launch restore, Notes-rail
+polish, latest-reply marker, provider contrast, and formatted thinking (this
+push). Last **app** was **`3a21f9f`** at **2026-09-12 08:32**. Rebuild
+`/Applications` after this lands. C64 first-2s is still weak. Native Chat
+glance **PASSED** (2026-09-06). Quit the daily app, uninstall it, then install.
+Do not launch leftovers. After install, delete leftover `.app` copies.
 
 Area C orphan-UI subtraction (#60): unused components/exports + dead dialog/docked/right-panel-chat.
 Still open / parked: **C72** Inbox rename; Prime list-import; **#51** Tab;
-**C64** full verify; **#47** confirm-close; Grokbot **#60/#61/#62** (held);
+**C64** full verify; **#47** confirm-close; Grokbot PRs **#60/#61/#62** landed;
 Rhizome in-app updater stub. Evening design dump (portfolio, vault-as-skills,
 no CC Switch):
 [2208](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md).
@@ -97,27 +97,26 @@ yours to choose.
 
 ## Recent sessions
 
-- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-1551-cursor-grok-4-6-area-d-rebase.md) — **#61 rebased onto origin/main.** Tolaria `site/` / Desktop archive gone; `YOU-SHOULD-KNOW.md` kept; Linux clippy C69 resolved on this branch. Not merged.
+- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-1059-cursor-grok-4-6-architecture-deepen.md) — Chat shell layout + launch restore modules. App no longer derives Notes-open. AiPanel no longer mutexes rehydrate vs resume. C64 still weak.
+- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-0845-cursor-grok-4-6-ux-visual-pass.md) — visual pass on Applications `3a21f9f`; Inbox no longer hides Notes; Show Notes strip. C64 still weak.
+- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-1551-cursor-grok-4-6-area-d-rebase.md) — **#61** Tolaria `site/` / Desktop archive gone; `YOU-SHOULD-KNOW.md` kept. Squash-merged as #61.
 - [2026-09-12 · Grok 4.6](plans/handoffs/2026-09-12-1051-grok-4-6-area-c-rebase.md) — **PR #60 Area C** rebased onto `origin/main` after #62; unused onboarding prompt stayed deleted.
 - [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-0018-cursor-grok-4-6-chat-note-split.md) — Chat note **On top / Beside**; Beside folds Sessions/Notes; Ask Chat about highlight. Not in `/Applications` until a rebuild.
 - [2026-09-11 · Cursor Grok 4.6](plans/handoffs/2026-09-11-2045-cursor-grok-4-6-applications-rebuild.md) — `/Applications` rebuilt 18:39 then 21:59; extra `.app` copies gone. C64 still not first-2s; #47 open.
 - [2026-09-08 · Cursor Grok 4.6](plans/handoffs/2026-09-08-1918-cursor-grok-4-6-c64-stamp.md) — stamped origin **`457ee96`** vs last app **`0fa00a2`**. C64 first-2s verify blocked (Documents sheet, then blank chrome).
 - [2026-09-08 · Cursor Grok 4.6](plans/handoffs/2026-09-08-0335-cursor-grok-4-6-docs-refresh.md) — living docs catch-up: shell/Prime/MCP/first-run match the tree; ADR-0171.
 - [2026-09-07 · Cursor Grok 4.6](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md) — **parked evening dump (no UI):** portfolio-on-boot, vault as skill/memory home, STE must not drift, no CC Switch in product. Chat ↔ Prime still first.
-- [2026-09-07 · Cursor Grok 4.6](plans/handoffs/2026-09-07-0351-cursor-grok-4-6-push-and-adhd-off.md) — **`0fa00a2` on origin;** ADHD ideation skill removed from this repo; no Applications rebuild.
 - [2026-09-07 · Composer](plans/handoffs/2026-09-07-0324-composer-graph-on-changes.md) — **Graph/Mycelium only on Changes;** Inbox keeps the full notes list; collapsed Notes leaves a 46px right rail (same as left command rail).
 - [2026-09-07 · Composer](plans/handoffs/2026-09-07-0308-composer-lag-audit-pickup.md) — **lag/pinwheel audit pickup** for a fresh session (start / page switch / Settings); prior beachball diagnosis linked; only one Rhizome process; Apps was `.bak` at write time.
 - [2026-09-07 · Composer](plans/handoffs/2026-09-07-0003-composer-beachball-lag.md) — **beachball diagnosis (docs only):** session switch = 3 sync Prime awaits + full chat `messages.map`; Settings = full remount; cold start = ensure daemon + vault + Graph if Inbox open; Applications smoother but same shapes; quit Applications before `tauri:dev` (same bundle id).
 - [2026-09-06 · Cursor Grok 4.6](plans/handoffs/2026-09-06-2236-cursor-grok-4-6-area-f.md) — **Area F:** MCP no longer advertises `rhizome_grok_import` / `rhizome_generate_wiki` / `rhizome_repo_research`; deleted `rhizome_grok_import.rs` and parked smoke junk. **Merged as #63**.
-- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2230-grok-4-6-area-e-dead-ipc.md) — **Area E:** deleted unused Tauri IPC (messages/compaction/owned-session/shutdown/conflict-mode/title-sync/migrate/archive/clone_repo/mindwalk-open/bridge/toggle-tray) and `src-tauri/gen/apple` + `mobile.json`. Launch no longer migrates `~/Laputa`.
+- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2230-grok-4-6-area-e-dead-ipc.md) — **Area E:** deleted unused Tauri IPC (messages/compaction/owned-session/shutdown/conflict-mode/title-sync/migrate/archive/clone_repo/mindwalk-open/bridge/toggle-tray) and `src-tauri/gen/apple` + `mobile.json`. Launch no longer migrates `~/Laputa`. **Merged as #62**.
 - [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2145-grok-4-6-area-b-orphan-hooks.md) — **Area B subtraction:** deleted unused hooks (`useMcpBridge`, `useClaudeCodeOnboarding`, `useClaudeCodeStatus`, `useNoteLayout`), the TS Mindwalk duplicate, unused Claude CLI wrappers, and confirmed-dead app-core exports. Claude onboarding/badge UI files left for area C. **Merged as #59**.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md) — **native Chat glance PASS** on `f76b46c`/`ac36e10`; daily-drive north-star leftover closed. Parked: C72, Prime list-import, #51 Tab, C64 full verify, #47, Grokbot.
-- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1819-composer-park-grokbot-audits-tonight.md) — **tonight:** review Grokbot full audits of rhizome-agent **and** CodexGPT lob (after dinner).
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1816-composer-session-import-first-run.md) — **session-import Settings UI** (Claude Code → vault `Imports/`); **Getting Started = local Rhizome scaffold** (no Tolaria clone by default). Prime list rows + C11 remote starter still open.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1813-composer-c57-permission-decisions.md) — **C57 closed by Atticus:** CLI default Limited tools; Prime toggle stays hidden; keep “Limited tools” / Power User (no Vault Safe rename). Code already matched.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1812-composer-c70-c71-clocks-and-history.md) — **C70/C71 shipped in tree:** Chat bubble clocks (`3:35p`); Ask-box Up/Down prompt recall (caret at start / empty only).
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1802-composer-provider-preflight-gap.md) — gap audit: DeepSeek/Nous Settings already in tree; Chat preflight now drops expired OAuth; `NOUS_API_KEY` counts as connected.
-- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1800-composer-park-chat-wishlist.md) — parked Atticus Chat wishlist as **C70** timestamps + **C71** up-arrow history; providers/OAuth + first-run vault already in prefs/`NEXT` §0.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1758-composer-midturn-live-and-selection-copy.md) — live mid-turn probe got its own reply; Chat selection Copy via native context-menu allowlist (messages + composer).
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1715-composer-suspend-retry-and-dom-send.md) — post-Stop Chat looked idle but Enter failed (`queued session input is suspended`); prompt now resumes on `success: false`. Composer reads on-screen text when React draft is stale. Live two-bubble mid-turn still open.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1616-composer-midturn-turn-boundary.md) — mid-turn: follow-up reply was merging into first bubble; `TurnBoundary` + 2s empty-queue grace. Live two-bubble dogfood still required.
@@ -294,7 +293,7 @@ push is not a release — releases are tagged builds with signed installers.
 - ~~**C67-OPEN (2026-09-06): sessions list needs a right-click menu**~~ **RESOLVED 2026-09-06.** Right-click Open / Rename / Archive·Restore / View in Mycelium / Copy path via `PrimeSessionListContextMenu`; Mycelium uses `handleOpenSessionFootprint`.
 - ~~**C68-OPEN (2026-09-06): restore note lock/view.**~~ **RESOLVED 2026-09-06.** Ephemeral per-note lock (default editable); breadcrumb + Cmd+K; BlockNote/CodeMirror read-only when locked. Not vault `editor_mode`.
 - ~~**C69-OPEN (2026-09-06): Linux CI Clippy (`-D warnings`) fails on macOS-only
-  `src-tauri`.**~~ **RESOLVED 2026-09-07 on `cursor/tauri-dead-ipc-bf88`.**
+  `src-tauri`.**~~ **RESOLVED 2026-09-12 on main (`f4b8b60`).**
   Capture helpers and `should_reopen_main_window` are `cfg(any(macos, test))`;
   Linux lib clippy no longer sees them. Same errors had failed area A–D PRs.
 - ~~**C69-OPEN (2026-09-06): packaged mcp-server omitted `cli-call.mjs`.**~~ **FIXED + `/Applications` rebuilt 2026-09-06 afternoon.** Bundle ships self-contained `cli-call.mjs`; seed failures `log::warn`; `pick_mcp_server_dir` prefers packaged macOS/Windows/Linux layouts over compile-time repo. Live Chat graph ask + Obsidian/Documents skills point at `/Applications/.../cli-call.mjs`. Windows launch itself remains C42.
@@ -305,7 +304,7 @@ push is not a release — releases are tagged builds with signed installers.
 
 - ~~**C71-OPEN (2026-09-06): composer up-arrow previous-prompt history.**~~ **RESOLVED 2026-09-06.** Session-scoped in-memory recall (cap 50); Up/Down when empty or caret at start; suggestion menus keep Arrow keys. See `composerPromptHistory` + `useComposerPromptHistory`.
 
-- **C72 (2026-09-06/07): side-panel discoverability.** **PARTIAL 2026-09-07:** fresh launch defaults to `editor-list`; Chat does not force `editor-only`; Graph/Mycelium mount **only on Changes** (ADR-0171); shut Notes leaves a 46px restore rail. Inbox still toggles the column and keeps a tall list. Still open: right icon rail; Inbox rename. Detail: [0324](plans/handoffs/2026-09-07-0324-composer-graph-on-changes.md) · [0111](plans/handoffs/2026-09-07-0111-composer-c72-notes-default-open.md).
+- **C72 (2026-09-06/07): side-panel discoverability.** **PARTIAL 2026-09-12 polish:** rail control is **Notes** (Inbox stays a folder in the list); Chat stays the canvas; last idle conversation resumes on native relaunch; composer Prime/skills are labels. Still open: Inbox rename inside the list (deferred). `/Applications` needs rebuild. Detail: [2026-09-12-0845](plans/handoffs/2026-09-12-0845-cursor-grok-4-6-ux-visual-pass.md).
 
 - **#50 (2026-08-29): let the agent see the running app — plan ready, not built.**
   Three answers proposed: show `pnpm dev` (not native), read + steer through

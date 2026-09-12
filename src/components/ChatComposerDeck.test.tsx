@@ -33,11 +33,13 @@ describe('ChatComposerDeck', () => {
     expect(screen.getByTestId('prime-thinking-toggle')).toHaveTextContent('Off')
   })
 
-  it('makes the agent and skills chips real buttons with carets (#38)', () => {
+  it('names Prime and the skill as labels, not fake menus', () => {
     render(<ChatComposerDeck skillsLabel="rhizome-vault" />)
 
-    expect(screen.getByTestId('composer-agent-pill').tagName).toBe('BUTTON')
-    expect(screen.getByTestId('composer-skills-pill').tagName).toBe('BUTTON')
+    expect(screen.getByTestId('composer-agent-pill').tagName).toBe('SPAN')
+    expect(screen.getByTestId('composer-skills-pill').tagName).toBe('SPAN')
+    expect(screen.getByTestId('composer-agent-pill')).toHaveTextContent('Prime')
+    expect(screen.getByTestId('composer-skills-pill')).toHaveTextContent('rhizome-vault')
   })
 
   it('does not duplicate the vault switcher on the composer strip', () => {

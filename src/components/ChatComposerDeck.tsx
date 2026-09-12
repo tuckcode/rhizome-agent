@@ -9,7 +9,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { createTranslator, type AppLocale } from '../lib/i18n'
-import { PRODUCT_AI_AGENT_DEFINITIONS } from '../lib/aiAgents'
 import { trackComposerPillOpened } from '../lib/productAnalytics'
 import { PrimeModelPicker } from './PrimeModelPicker'
 import { PrimeThinkingToggle } from './PrimeThinkingToggle'
@@ -43,13 +42,16 @@ function pillClass(accent = false) {
 function Chip({
   children,
   title,
+  testId,
 }: {
   children: ReactNode
   title?: string
+  testId?: string
 }) {
   return (
     <span
       title={title}
+      data-testid={testId}
       className={cn(
         'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5',
         'font-mono text-[11px] text-muted-foreground border-border',
@@ -63,12 +65,9 @@ function Chip({
 /**
  * Frame A's composer control strip (#38 / #9 / #35).
  *
- * This is where a turn is configured: agent, model, reasoning depth, skills.
- * Agent idle/working sits next to thinking. The vault switcher lives only in
- * the status bar. Pills are DropdownMenu triggers (caret, hover, 999px) except
- * the thinking toggle, which is one click so the next turn's depth is obvious
- * without a menu. The telemetry subhead keeps status (live, session, uptime)
- * and does not duplicate these controls.
+ * Model and thinking are live turn controls. Prime and the skill name are
+ * labels — menus that cannot change either were lying. Agent idle/working
+ * sits next to thinking. The vault switcher lives only in the status bar.
  */
 export function ChatComposerDeck({
   locale = 'en',
@@ -82,40 +81,13 @@ export function ChatComposerDeck({
   activity,
 }: ChatComposerDeckProps) {
   const t = createTranslator(locale)
-  const agent = PRODUCT_AI_AGENT_DEFINITIONS[0]
-  const skillNames = skillsLabel ? skillsLabel.split(/,\s*/).filter(Boolean) : []
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1.5" data-testid="chat-composer-deck">
-      <DropdownMenu onOpenChange={(open) => { if (open) trackComposerPillOpened('agent') }}>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className={pillClass(true)}
-            aria-label={t('ai.composer.agent')}
-            data-testid="composer-agent-pill"
-          >
-            <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--accent-green)]" />
-            {t('ai.panel.title')}
-            <CaretDown size={9} weight="bold" className="text-[var(--text-faint,var(--muted-foreground))]" aria-hidden="true" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="start" className="w-48">
-          <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-            {t('ai.composer.agent')}
-          </DropdownMenuLabel>
-          {PRODUCT_AI_AGENT_DEFINITIONS.map((definition) => (
-            <DropdownMenuItem
-              key={definition.id}
-              className="text-[12px]"
-              data-testid={`composer-agent-${definition.id}`}
-            >
-              {definition.shortLabel}
-              {definition.id === agent?.id ? ` · ${t('ai.composer.current')}` : ''}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Chip title={t('ai.composer.agent')} testId="composer-agent-pill">
+        <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--accent-green)]" />
+        {t('ai.panel.title')}
+      </Chip>
 
       <span
         onPointerDown={() => trackComposerPillOpened('model')}
@@ -178,32 +150,9 @@ export function ChatComposerDeck({
       ) : null}
 
       {skillsLabel ? (
-        <DropdownMenu onOpenChange={(open) => { if (open) trackComposerPillOpened('skills') }}>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className={pillClass()}
-              aria-label={t('ai.composer.skills')}
-              data-testid="composer-skills-pill"
-            >
-              {t('ai.panel.skills.withVault', { skills: skillsLabel })}
-              <CaretDown size={9} weight="bold" className="text-[var(--text-faint,var(--muted-foreground))]" aria-hidden="true" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="start" className="w-56">
-            <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-              {t('ai.composer.skills')}
-            </DropdownMenuLabel>
-            {skillNames.map((name) => (
-              <DropdownMenuItem key={name} disabled className="text-[12px]">
-                {name}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuItem disabled className="text-[12px] text-muted-foreground">
-              {t('ai.panel.skills.default')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Chip title={t('ai.composer.skills')} testId="composer-skills-pill">
+          {t('ai.panel.skills.withVault', { skills: skillsLabel })}
+        </Chip>
       ) : null}
     </div>
   )

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { VaultPanel } from './VaultPanel'
+import { VaultPanel, VaultPanelRestoreButton } from './VaultPanel'
 
 describe('VaultPanel', () => {
   it('keeps navigation above the note list and collapses from one stable header', () => {
@@ -43,5 +43,12 @@ describe('VaultPanel', () => {
     expect(screen.getByTestId('vault-panel-browse-toggle')).toHaveClass('vault-panel__browse-toggle')
     expect(screen.getByTestId('vault-panel-collapse')).toHaveClass('vault-panel__collapse')
     expect(screen.queryByTestId('vault-panel-navigation')).not.toBeInTheDocument()
+  })
+
+  it('labels the closed Notes strip as Show Notes', () => {
+    render(<VaultPanelRestoreButton locale="en" onClick={vi.fn()} />)
+    const restore = screen.getByTestId('vault-panel-restore')
+    expect(restore).toHaveAccessibleName('Show Notes')
+    expect(restore).toHaveClass('app__notes-rail--restore')
   })
 })
