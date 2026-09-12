@@ -196,6 +196,21 @@ describe('AiMessage', () => {
     expect(screen.getByTestId('ai-response-block')).toHaveClass('min-w-0', 'max-w-full', 'overflow-hidden')
   })
 
+  it('puts a find-aid dot on the latest assistant reply only', () => {
+    const { rerender } = render(
+      <AiMessage userMessage="Ask" actions={[]} response="Done" isLatestReply />,
+    )
+    expect(screen.getByTestId('latest-assistant-reply-marker')).toBeInTheDocument()
+
+    rerender(<AiMessage userMessage="Ask" actions={[]} response="Done" />)
+    expect(screen.queryByTestId('latest-assistant-reply-marker')).not.toBeInTheDocument()
+  })
+
+  it('keeps the find-aid on a streaming reply before text arrives', () => {
+    render(<AiMessage userMessage="Ask" actions={[]} isStreaming isLatestReply />)
+    expect(screen.getByTestId('latest-assistant-reply-marker')).toBeInTheDocument()
+  })
+
   it('shows assistant message actions with response', () => {
     render(<AiMessage userMessage="Ask" actions={[]} response="Done" />)
     expect(screen.getByTestId('ai-message-actions')).toBeTruthy()
@@ -288,6 +303,44 @@ describe('AiMessage', () => {
     expect(screen.getByTestId('reasoning-content')).toBeTruthy()
     fireEvent.click(screen.getByTestId('reasoning-toggle'))
     expect(screen.queryByTestId('reasoning-content')).toBeNull()
+  })
+
+  it('shows glued thinking sentences as separate sentences when expanded', () => {
+    render(
+      <AiMessage
+        userMessage="Ask"
+        reasoning="The path is blocked.Next I will try another route."
+        reasoningDone={false}
+        actions={[]}
+      />,
+    )
+    expect(screen.getByTestId('reasoning-content')).toHaveTextContent(
+      'The path is blocked. Next I will try another route.',
+    )
+  })
+
+  it('keeps thinking newlines in the expanded display source', () => {
+    render(
+      <AiMessage
+        userMessage="Ask"
+        reasoning={'First line\nSecond line'}
+        reasoningDone={false}
+        actions={[]}
+      />,
+    )
+    const markdown = screen.getByTestId('reasoning-content').querySelector('[data-testid="markdown-content"]')
+    expect(markdown?.textContent).toContain('First line')
+    expect(markdown?.textContent).toContain('Second line')
+    expect(markdown?.textContent).toContain('\n')
+  })
+
+  it('gives expanded thinking a taller scroll window than the old 200px cap', () => {
+    render(
+      <AiMessage userMessage="Ask" reasoning="Thinking..." reasoningDone={false} actions={[]} />,
+    )
+    const style = screen.getByTestId('reasoning-content').getAttribute('style') ?? ''
+    expect(style).toContain('max-height: 280px')
+    expect(style).toContain('overflow-y: auto')
   })
 
   it('collapses tool use by default and shows the live call count', () => {

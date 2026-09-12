@@ -38,7 +38,7 @@ import { useAiPanelPromptQueue } from './useAiPanelPromptQueue'
 import { useAiPanelFocus } from './useAiPanelFocus'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 import { promoteSessionFromHost } from '../utils/promoteChatToVault'
-import { usePrimeSessionRehydrate } from '../hooks/usePrimeSessionRehydrate'
+import { usePrimeSessionRestore } from '../hooks/usePrimeSessionRestore'
 import { usePrimeSessionStats } from '../hooks/usePrimeSessionStats'
 import { PrimeContextMeter } from './PrimeContextMeter'
 import { ChatComposerFoot } from './ChatComposerFoot'
@@ -275,15 +275,6 @@ export function AiPanelView({
   const goalDialog = useAiPanelGoalDialog()
   const scheduleDialog = useAiPanelScheduleDialog()
 
-  // Reopening lands back in work the daemon kept running, so the panel has to
-  // show that conversation rather than an empty one over a live session (#7).
-  usePrimeSessionRehydrate({
-    enabled: isPrimeTarget,
-    reattached: primeHost.reattached ?? false,
-    sessionPath: primeHost.sessionPath,
-    onTranscript: agent.replaceMessages,
-  })
-
   useAiPanelModelChangeMarker({
     isPrimeTarget,
     primeHost,
@@ -352,6 +343,12 @@ export function AiPanelView({
     refreshSessionTree,
     primeHostSessionPath: primeHost.sessionPath,
     hostRunning: primeHost.running,
+  })
+  usePrimeSessionRestore({
+    enabled: isPrimeTarget,
+    host: primeHost,
+    onTranscript: agent.replaceMessages,
+    onOpen: handleSelectSession,
   })
   const sessionsShown = sessionsVisible
   const usesRailSessions = sessionsRailSlot !== undefined

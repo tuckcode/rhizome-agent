@@ -73,25 +73,24 @@ export function VaultPanel({
 }
 
 export function VaultPanelRestoreButton({
-  locale,
   onClick,
 }: {
   locale: AppLocale
   onClick: () => void
 }) {
-  const label = translate(locale, 'sidebar.action.expand')
+  const label = 'Show Notes'
   return (
     <Button
       type="button"
       variant="ghost"
-      className="app__notes-rail h-full min-h-full rounded-none p-0 pt-2.5"
+      className="app__notes-rail app__notes-rail--restore h-full min-h-full rounded-none p-0 pt-2.5"
       style={{ width: COMMAND_RAIL_WIDTH_PX }}
       onClick={onClick}
       title={label}
       aria-label={label}
       data-testid="vault-panel-restore"
     >
-      <SidebarSimple size={16} weight="regular" mirrored />
+      <SidebarSimple size={16} weight="fill" mirrored />
     </Button>
   )
 }

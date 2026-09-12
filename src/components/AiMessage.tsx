@@ -15,6 +15,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { AiActionCard, type AiActionStatus } from './AiActionCard'
 import { MarkdownContent } from './MarkdownContent'
 import { translate, type AppLocale } from '../lib/i18n'
+import { normalizeReasoningDisplay } from '../lib/normalizeReasoningDisplay'
 import type { NoteReference } from '../utils/ai-context'
 import { writeClipboardText } from '../utils/clipboardText'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
@@ -47,6 +48,8 @@ export interface AiMessageProps {
   isStreaming?: boolean
   /** When this turn was created (ms). Shown as a small clock under the ask. */
   createdAtMs?: number
+  /** Find-aid: green dot left of the first line of the newest assistant reply. */
+  isLatestReply?: boolean
   onFork?: (messageId: string) => void
   onOpenNote?: (path: string) => void
   onNavigateWikilink?: (target: string) => void
@@ -189,11 +192,11 @@ function ReasoningBlock({ locale, text, expanded, onToggle }: {
       {expanded && (
         <div
           ref={contentRef}
-          className="text-muted-foreground"
-          style={{ fontSize: 12, lineHeight: 1.5, padding: '4px 0 4px 20px', maxHeight: 200, overflowY: 'auto' }}
+          className="text-muted-foreground reasoning-markdown"
+          style={{ fontSize: 12, lineHeight: 1.5, padding: '4px 0 4px 20px', maxHeight: 280, overflowY: 'auto' }}
           data-testid="reasoning-content"
         >
-          {text}
+          <MarkdownContent content={normalizeReasoningDisplay(text)} />
         </div>
       )}
     </div>
@@ -439,6 +442,16 @@ function retrievedNoteSourceLabel(path: string): string {
   return absolute ? (normalized.split('/').filter(Boolean).pop() ?? path) : path
 }
 
+function LatestReplyMarker() {
+  return (
+    <span
+      data-testid="latest-assistant-reply-marker"
+      aria-hidden="true"
+      className="pointer-events-none absolute top-[0.55em] -left-2.5 size-1.5 rounded-full bg-[var(--accent-blue)]"
+    />
+  )
+}
+
 function ResponseBlock({
   actions,
   locale,
@@ -450,6 +463,7 @@ function ResponseBlock({
   onPromoteToVault,
   onRegenerate,
   text,
+  isLatestReply = false,
 }: {
   actions: AiAction[]
   locale: AppLocale
@@ -461,6 +475,7 @@ function ResponseBlock({
   onPromoteToVault?: (text: string) => void
   onRegenerate?: (messageId: string) => void
   text: string
+  isLatestReply?: boolean
 }) {
   const handleCopy = useCallback(() => {
     void writeClipboardText(text).catch((error) => {
@@ -472,30 +487,36 @@ function ResponseBlock({
   }, [onPromoteToVault, text])
 
   return (
-    <div
-      className="group/ai-response min-w-0 max-w-full overflow-hidden"
-      style={{ marginBottom: 4 }}
-      data-testid="ai-response-block"
-    >
-      <MarkdownContent content={text} onWikilinkClick={onNavigateWikilink} />
-      <RetrievedNoteSources actions={actions} onOpenNote={onOpenNote} />
-      <ResponseActions
-        locale={locale}
-        messageId={messageId}
-        forkTargetId={forkTargetId}
-        onCopy={handleCopy}
-        onFork={onFork}
-        onPromoteToVault={onPromoteToVault ? handlePromote : undefined}
-        onRegenerate={onRegenerate}
-        promoteDisabled={!text.trim()}
-      />
+    <div className="relative min-w-0 max-w-full" style={{ marginBottom: 4 }}>
+      {isLatestReply ? <LatestReplyMarker /> : null}
+      <div
+        className="group/ai-response min-w-0 max-w-full overflow-hidden"
+        data-testid="ai-response-block"
+      >
+        <MarkdownContent content={text} onWikilinkClick={onNavigateWikilink} />
+        <RetrievedNoteSources actions={actions} onOpenNote={onOpenNote} />
+        <ResponseActions
+          locale={locale}
+          messageId={messageId}
+          forkTargetId={forkTargetId}
+          onCopy={handleCopy}
+          onFork={onFork}
+          onPromoteToVault={onPromoteToVault ? handlePromote : undefined}
+          onRegenerate={onRegenerate}
+          promoteDisabled={!text.trim()}
+        />
+      </div>
     </div>
   )
 }
 
-function StreamingIndicator() {
+function StreamingIndicator({ isLatestReply = false }: { isLatestReply?: boolean }) {
   return (
-    <div className="flex items-center gap-2 text-muted-foreground" style={{ fontSize: 12, marginTop: 8, padding: 0 }}>
+    <div
+      className="relative flex items-center gap-2 text-muted-foreground"
+      style={{ fontSize: 12, marginTop: 8, padding: 0 }}
+    >
+      {isLatestReply ? <LatestReplyMarker /> : null}
       <div className="flex gap-1">
         <span className="typing-dot" />
         <span className="typing-dot" style={{ animationDelay: '0.2s' }} />
@@ -513,7 +534,7 @@ export function AiMessage(props: AiMessageProps) {
   return <ConversationMessage {...props} />
 }
 
-function ConversationMessage({ userMessage, references, locale = 'en', messageId, forkTargetId, reasoning, reasoningDone, actions, response, isStreaming, createdAtMs, onFork, onOpenNote, onNavigateWikilink, onPromoteToVault, onRegenerate }: AiMessageProps) {
+function ConversationMessage({ userMessage, references, locale = 'en', messageId, forkTargetId, reasoning, reasoningDone, actions, response, isStreaming, createdAtMs, isLatestReply = false, onFork, onOpenNote, onNavigateWikilink, onPromoteToVault, onRegenerate }: AiMessageProps) {
   // Manual override: null = follow auto behavior, true/false = user forced
   const [userOverride, setUserOverride] = useState<boolean | null>(null)
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())
@@ -581,9 +602,10 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
           onNavigateWikilink={onNavigateWikilink}
           onPromoteToVault={onPromoteToVault}
           onRegenerate={onRegenerate}
+          isLatestReply={isLatestReply}
         />
       )}
-      {isStreaming && !response && <StreamingIndicator />}
+      {isStreaming && !response && <StreamingIndicator isLatestReply={isLatestReply} />}
     </div>
   )
 }

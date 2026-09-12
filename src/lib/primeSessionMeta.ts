@@ -231,6 +231,19 @@ export function sortPrimeSessions(sessions: PrimeSessionSummary[]): PrimeSession
 }
 
 /**
+ * The conversation to reopen when Chat would otherwise be empty.
+ *
+ * Archived and scratch rows stay out. `list_sessions` already drops unused
+ * drafts (#28); `hasConversation === false` is the same idea if it arrives.
+ */
+export function pickLastConversation(sessions: PrimeSessionSummary[]): PrimeSessionSummary | null {
+  const eligible = sessions.filter(
+    (session) => !session.archived && !session.scratch && session.hasConversation !== false,
+  )
+  return sortPrimeSessions(eligible)[0] ?? null
+}
+
+/**
  * Whether a session row belongs in a typed filter (#34).
  *
  * Title, place, and branch are already on the row. Conversation content is

@@ -22,6 +22,7 @@ import type { CommandMenuAction, CommandMenuEntry } from '../lib/primeCommandMen
 import { primeQueueIsEmpty, primeQueueItems, type PrimeQueue } from '../lib/primeQueue'
 import { cn } from '@/lib/utils'
 import { suggestReply } from '../lib/replySuggestions'
+import { latestAssistantMessageIndex } from '../lib/latestAssistantMessage'
 import { useDragRegion } from '../hooks/useDragRegion'
 import { useComposerPromptHistory } from '../hooks/useComposerPromptHistory'
 
@@ -662,6 +663,8 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
     else updateScrollState()
   }, [messages, isActive, updateScrollState])
 
+  const latestReplyIndex = latestAssistantMessageIndex(messages)
+
   return (
     // `min-h-0` is load-bearing: a flex item defaults to `min-height: auto`,
     // so without it this refuses to shrink below its content and scrolls
@@ -687,6 +690,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
           key={message.id ?? index}
           {...message}
           locale={locale}
+          isLatestReply={index === latestReplyIndex}
           messageId={message.id}
           // ChatHome forks the Prime session and needs its entry id, which
           // only replayed turns carry; the AI workspace copies its own
