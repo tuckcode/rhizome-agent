@@ -4,6 +4,7 @@ import { ConnectionsPanel, type ConnectionsPanelHandle, type ConnectionsViewRequ
 import { APP_STORAGE_KEYS } from './constants/appStorage'
 import { usePanelWidth } from './hooks/usePanelWidth'
 import { startResizeDrag } from './utils/startResizeDrag'
+import { subheadTrafficLightInset } from './utils/trafficLights'
 import { Sidebar } from './components/Sidebar'
 import { CommandRail, type CommandRailDestination } from './components/CommandRail'
 import { NoteList } from './components/NoteList'
@@ -2091,7 +2092,15 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           {!chatCentered && noteListPanel}
           <div className={`app__editor${aiActivity.highlightElement === 'editor' || aiActivity.highlightElement === 'tab' ? ' ai-highlight' : ''}`}>
             {chatCentered ? (
-              <div className="app__chat-center" data-testid="chat-center" data-split={activeTab ? chatNoteSplitMode : 'stacked'} style={isGraphDestination || isMyceliumDestination || isResearchDestination ? { display: 'none' } : undefined}>
+              <div
+                className="app__chat-center"
+                data-testid="chat-center"
+                data-split={activeTab ? chatNoteSplitMode : 'stacked'}
+                style={{
+                  ...(isGraphDestination || isMyceliumDestination || isResearchDestination ? { display: 'none' } : {}),
+                  ...subheadTrafficLightInset(),
+                }}
+              >
                 {activeTab ? (
                   <div className="app__chat-note-split-bar">
                     <ChatNoteSplitToggle split={chatNoteSplitMode} onChange={handleChatNoteSplit} />

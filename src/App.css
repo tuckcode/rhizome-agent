@@ -227,6 +227,10 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
+body.mac-chrome .app:has([data-testid='command-rail'][data-expanded='false']):not(:has([data-testid='prime-session-list'])) .app__chat-note-split-bar {
+  padding-left: var(--subhead-traffic-light-inset, 8px);
+}
+
 .app__chat-center-body {
   display: flex;
   flex: 1 1 0;

@@ -76,6 +76,13 @@ describe('BreadcrumbBar filename visibility', () => {
     expect(editorCss).toContain('--breadcrumb-bar-left-padding: 144px;')
   })
 
+  it('offsets the Chat note breadcrumb past the traffic lights when the left rail is collapsed', () => {
+    const editorCss = readFileSync(`${process.cwd()}/src/components/Editor.css`, 'utf8')
+
+    expect(editorCss).toContain("body.mac-chrome .app:has([data-testid='command-rail'][data-expanded='false']):not(:has([data-testid='prime-session-list'])) .app__chat-center .breadcrumb-bar")
+    expect(editorCss).toContain('--breadcrumb-bar-left-padding: var(--subhead-traffic-light-inset, 16px)')
+  })
+
   it('keeps a permanent overflow menu while moving lower-priority actions from measured overflow state', () => {
     const editorCss = readFileSync(`${process.cwd()}/src/components/Editor.css`, 'utf8')
 
