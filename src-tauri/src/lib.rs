@@ -373,9 +373,38 @@ pub(crate) fn should_reopen_main_window(has_visible_windows: bool) -> bool {
     !has_visible_windows
 }
 
+/// Idle close of the main window. Work stops; the window still hides (C22).
+pub(crate) fn idle_main_window_close_intent() -> crate::prime_session_host::SessionCloseIntent {
+    crate::prime_session_host::SessionCloseIntent::Stop
+}
+
+/// Prime and MCP helpers this process started. They keep a Dock "running"
+/// mark after the window hides if we leave them. A Keep-working session is the
+/// exception: that daemon must stay.
+#[cfg(desktop)]
+pub(crate) fn release_helpers_for_hidden_window(
+    app_handle: &tauri::AppHandle,
+    keep_prime_daemon: bool,
+) {
+    use tauri::Manager;
+
+    crate::prime_session_host::set_host_suspended(true);
+    if !keep_prime_daemon {
+        crate::prime_session_host::stop_spawned_daemon();
+    }
+
+    let state: tauri::State<'_, WsBridgeChild> = app_handle.state();
+    if let Ok(mut guard) = state.0.lock() {
+        stop_ws_bridge_child(&mut guard);
+    }
+    let _ = crate::mycelium::stop_mindwalk_sidecar();
+}
+
 #[cfg(desktop)]
 pub(crate) fn focus_main_window(app_handle: &tauri::AppHandle) {
     use tauri::Manager;
+
+    crate::prime_session_host::set_host_suspended(false);
 
     // Unhide the *application* first. Once C22's fix hides the last window,
     // macOS treats the app as hidden, and `window.show()` alone leaves it
@@ -765,8 +794,6 @@ fn with_invoke_handler(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<ta
 
 #[cfg(desktop)]
 fn handle_run_event(app_handle: &tauri::AppHandle, event: &tauri::RunEvent) {
-    use tauri::Manager;
-
     window_state::handle_run_event(app_handle, event);
 
     // macOS dock click. Without this, a window hidden by the C22 close fix has
@@ -785,17 +812,25 @@ fn handle_run_event(app_handle: &tauri::AppHandle, event: &tauri::RunEvent) {
 
     if let tauri::RunEvent::Exit = event {
         // Quitting settles this client's session (ADR-0167): foreground-owned
-        // work stops; explicitly promoted work stays resident. Prime's daemon
-        // is shared infrastructure and is never Rhizome's to stop. See #12.
-        match crate::prime_session_host::settle_session_on_quit() {
-            Ok(disposition) => log::info!("Prime session on quit: {disposition:?}"),
+        // work stops; explicitly promoted work stays resident. A daemon this
+        // process started is stopped unless Keep working left it resident.
+        // We still never send Prime's `shutdown` RPC — that would kill other
+        // clients. See #12.
+        let keep_prime_daemon = match crate::prime_session_host::settle_session_on_quit() {
+            Ok(disposition) => {
+                log::info!("Prime session on quit: {disposition:?}");
+                matches!(
+                    disposition,
+                    crate::prime_session_host::QuitDisposition::KeepSessionRunning
+                )
+            }
             // Never block the exit on this.
-            Err(error) => log::debug!("Could not settle the Prime session on quit: {error}"),
-        }
-
-        let state: tauri::State<'_, WsBridgeChild> = app_handle.state();
-        let mut guard = state.0.lock().unwrap();
-        stop_ws_bridge_child(&mut guard);
+            Err(error) => {
+                log::debug!("Could not settle the Prime session on quit: {error}");
+                false
+            }
+        };
+        release_helpers_for_hidden_window(app_handle, keep_prime_daemon);
     }
 }
 
@@ -832,7 +867,7 @@ pub fn run() {
             // fixes. `WindowEvent` is core to Tauri on every target.
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window_hides_instead_of_closing(window.label()) {
-                    use tauri::Emitter;
+                    use tauri::{Emitter, Manager};
                     api.prevent_close();
                     if crate::prime_session_host::is_streaming() {
                         log::info!(
@@ -844,11 +879,22 @@ pub fn run() {
                         return;
                     }
                     log::info!(
-                        "main window close requested — detaching and hiding (C22, ADR-0167)"
+                        "main window close requested — stopping owned work and hiding (C22)"
                     );
-                    let _ = crate::prime_session_host::settle_session(
-                        crate::prime_session_host::SessionCloseIntent::Detach,
-                    );
+                    let keep_prime_daemon = match crate::prime_session_host::settle_session(
+                        idle_main_window_close_intent(),
+                    ) {
+                        Ok(disposition) => matches!(
+                            disposition,
+                            crate::prime_session_host::QuitDisposition::KeepSessionRunning
+                        ),
+                        Err(error) => {
+                            log::debug!("Could not settle the Prime session on hide: {error}");
+                            false
+                        }
+                    };
+                    #[cfg(desktop)]
+                    release_helpers_for_hidden_window(window.app_handle(), keep_prime_daemon);
                     if let Err(err) = window.hide() {
                         log::warn!("main window hide failed, it will close: {err}");
                     }
@@ -875,6 +921,16 @@ mod tests {
     #[test]
     fn the_main_window_hides_on_close_so_it_can_be_reopened() {
         assert!(window_hides_instead_of_closing("main"));
+    }
+
+    /// Closing the window must stop owned work. Detach left Prime helpers
+    /// running after a hide, which looked like a hang in the Dock.
+    #[test]
+    fn idle_window_close_stops_owned_work() {
+        assert_eq!(
+            super::idle_main_window_close_intent(),
+            crate::prime_session_host::SessionCloseIntent::Stop
+        );
     }
 
     /// A dock click with a window already up must not steal focus.
