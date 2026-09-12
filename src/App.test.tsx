@@ -348,6 +348,17 @@ function resetMockCommandResults() {
     get_default_vault_path: expectedDefaultVaultPath,
     list_themes: [],
     get_vault_settings: { theme: null },
+    get_prime_session_host_status: {
+      installed: true,
+      version: 'mock',
+      running: false,
+      sessionId: null,
+      isStreaming: false,
+      binaryPath: '/mock/prime-agent',
+      modelProvider: 'xai',
+      modelId: 'grok-4.5',
+      modelName: 'Grok 4.5',
+    },
   })
 }
 
@@ -478,7 +489,8 @@ vi.mock('./components/rhizomeEditorFormatting', () => ({
 import App from './App'
 import { TooltipProvider } from './components/ui/tooltip'
 import { useUpdater } from './hooks/useUpdater'
-import { isTauri } from './mock-tauri'
+import { isTauri, mockInvoke } from './mock-tauri'
+import { resetPrimeHostStatus } from './hooks/usePrimeHostStatus'
 import { streamAiAgent } from './utils/streamAiAgent'
 
 const AI_AGENTS_ONBOARDING_DISMISSED_STORAGE_NAME = 'rhizome:ai-agents-onboarding-dismissed'
@@ -509,6 +521,7 @@ function createMockUpdaterResult(
 describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resetPrimeHostStatus()
     resetMockCommandResults()
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: unknown) => resolveMockCommandResult(cmd, args))
     vi.mocked(isTauri).mockReturnValue(false)
@@ -533,6 +546,52 @@ describe('App', () => {
     render(<App />)
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(await screen.findByText('All Notes')).toBeInTheDocument()
+  })
+
+  it('starts Prime once when Chat first opens', async () => {
+    sessionStorage.removeItem(AGENT_CHAT_OPENED_SESSION_KEY)
+    mockCommandResults.get_prime_session_host_status = {
+      installed: true,
+      version: 'mock',
+      running: true,
+      sessionId: 'sess-1',
+      isStreaming: false,
+      binaryPath: '/mock/prime-agent',
+      modelProvider: 'xai',
+      modelId: 'grok-4.5',
+      modelName: 'Grok 4.5',
+    }
+
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+
+    await waitFor(() => {
+      const ensures = vi.mocked(mockInvoke).mock.calls.filter(([cmd]) => cmd === 'ensure_prime_session_host')
+      expect(ensures.length).toBeGreaterThan(0)
+    })
+    // Vault list can change the path once on boot. That is a second connect,
+    // not one poll per Chat widget (that used to be three).
+    expect(
+      vi.mocked(mockInvoke).mock.calls.filter(([cmd]) => cmd === 'ensure_prime_session_host').length,
+    ).toBeLessThanOrEqual(2)
+
+    vi.mocked(mockInvoke).mockClear()
+    await new Promise((resolve) => setTimeout(resolve, 80))
+    expect(
+      vi.mocked(mockInvoke).mock.calls.filter(([cmd]) => cmd === 'ensure_prime_session_host'),
+    ).toHaveLength(0)
+  })
+
+  it('opens Settings from Chat without leaving Chat', async () => {
+    sessionStorage.removeItem(AGENT_CHAT_OPENED_SESSION_KEY)
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+
+    fireEvent.click(await screen.findByTestId('command-rail-settings'))
+    const panel = await screen.findByTestId('settings-panel')
+    expect(panel).not.toHaveAttribute('hidden')
+    expect(screen.getByText('Settings')).toBeInTheDocument()
+    expect(screen.getByTestId('chat-home')).toBeInTheDocument()
   })
 
   it('creates custom views with a portable fallback filename for symbol-only names', async () => {
