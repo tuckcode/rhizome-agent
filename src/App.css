@@ -69,7 +69,8 @@
   position: relative;
   z-index: 20;
   background: var(--surface-sidebar);
-  border-left: 1px solid var(--sidebar-border);
+  /* Same inner rule as CommandRail's border-right --border-subtle. */
+  border-left: 1px solid var(--border-subtle);
 }
 
 .vault-panel {
@@ -135,7 +136,7 @@
   padding-top: 8px;
   z-index: 40;
   background: var(--surface-sidebar);
-  border-left: 1px solid var(--border-subtle, var(--sidebar-border));
+  border-left: 1px solid var(--border-subtle);
   border-right: 0;
 }
 

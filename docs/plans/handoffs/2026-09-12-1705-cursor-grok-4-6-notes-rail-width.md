@@ -19,6 +19,8 @@ it a mirror of the left, not a different color.
   remaps to 240. A drag to another width still wins.
 - Shut Notes rail stays **46px**, same sidebar surface as the left rail.
   The blue-tinted Show Notes strip is gone. Label stays **Show Notes**.
+- Inner divider matches Sessions: `1px solid var(--border-subtle)`, not the
+  stronger `--sidebar-border` line.
 
 ## Not done
 
