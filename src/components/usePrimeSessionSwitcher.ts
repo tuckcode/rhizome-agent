@@ -104,12 +104,18 @@ export function usePrimeSessionSwitcher({
   /**
    * Switch the live host to a past session and rehydrate the transcript.
    *
-   * The switch goes first: if the host refuses (it will not switch mid-turn),
-   * the panel must keep showing the conversation it is actually on rather than
-   * a transcript from a session that was never loaded.
+   * The host switch still goes before the transcript replace: if the host
+   * refuses (it will not switch mid-turn), we must not paint another session's
+   * messages. The row highlight moves immediately so the list does not look
+   * stuck for the whole round trip; a failed switch rolls the highlight back.
    */
   const handleSelectSession = useCallback(async (session: PrimeSessionSummary) => {
     setSwitchError(null)
+    const previousPath = activeSessionPath
+    // Highlight the row immediately. The host switch and transcript read still
+    // run in order below — painting the selection first stops the list from
+    // looking stuck for the whole round trip (session-switch beachball).
+    setActiveSessionPath(session.path)
     try {
       if (vaultPath && !hostRunning) {
         await callHost('ensure_prime_session_host', { vaultPath })
@@ -119,7 +125,6 @@ export function usePrimeSessionSwitcher({
         path: session.path,
       })
       agent.replaceMessages(primeTranscriptToConversation(transcript))
-      setActiveSessionPath(session.path)
       refreshSessionTree()
       // The column deliberately stays open. Closing it made sense when this
       // list was an overlay covering the conversation — dismissing it was how
@@ -127,9 +132,10 @@ export function usePrimeSessionSwitcher({
       // it on select throws away the standing context you opened it for, then
       // makes you reopen it to pick a second session.
     } catch (e) {
+      setActiveSessionPath(previousPath)
       reportSwitchError(e)
     }
-  }, [agent, hostRunning, refreshSessionTree, reportSwitchError, vaultPath])
+  }, [activeSessionPath, agent, hostRunning, refreshSessionTree, reportSwitchError, vaultPath])
 
   // A roster row clicked in the menu bar lands here (#13). Reuses the same
   // switch path as the in-app session list so there is one way to change
