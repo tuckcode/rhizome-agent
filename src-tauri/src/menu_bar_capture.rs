@@ -32,6 +32,7 @@ pub enum CaptureKind {
     Fullscreen,
 }
 
+#[cfg(any(test, target_os = "macos"))]
 impl CaptureKind {
     #[cfg(any(target_os = "macos", test))]
     fn slug(self) -> &'static str {

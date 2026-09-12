@@ -308,17 +308,14 @@ rhizome-agent/
 │   └── package.json
 │
 ├── tests/smoke/                  # Playwright specs (full regression + @smoke subset)
-├── design/                       # Per-task design files
 ├── demo-vault-v2/                # Curated local QA fixture for native/dev flows
 ├── scripts/                      # Build/utility scripts
 │
 ├── package.json                  # Frontend dependencies + scripts
-├── lara.yaml                     # Lara CLI locale sync configuration
 ├── vite.config.ts                # Vite bundler config
 ├── tsconfig.json                 # TypeScript config
 ├── playwright.config.ts          # Full Playwright regression config
 ├── playwright.smoke.config.ts    # Curated pre-push Playwright config
-├── ui-design.pen                 # Master design file
 ├── AGENTS.md                     # Canonical shared instructions for coding agents
 ├── CLAUDE.md                     # Claude Code compatibility shim importing AGENTS.md as an organized Note
 └── docs/                         # This documentation

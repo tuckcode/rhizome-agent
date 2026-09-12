@@ -4,8 +4,6 @@
     "src/main.tsx",
     "scripts/*.mjs",
     ".chunk/*.mjs",
-    "site/.vitepress/config.ts",
-    "site/.vitepress/theme/index.ts",
     "mcp-server/index.js",
     "tests/**/*.spec.ts",
     "tests/**/*.setup.ts",

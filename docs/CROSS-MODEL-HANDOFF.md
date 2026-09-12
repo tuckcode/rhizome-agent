@@ -152,27 +152,15 @@ QA passing is not evidence it's safe.**
 
 ## 6. Several separate "Tolaria" residues exist — know which is which before touching any
 
-- **The docs site + AI system prompt had ~450 real, substantive mentions**
-  of the pre-rename product name "Tolaria" (`site/*.md`, which compiles into
-  `src-tauri/resources/agent-docs/` and ships in every build; and
-  `src/utils/ai-agent.ts`/`ai-context.ts`, the literal system prompt text
-  sent to every coding-agent session). **This was fixed** (`c5197d84`,
-  `fbd18219`) — plain word-boundary swap, `Tolaria`→`Rhizome`.
-- **`site/public/CNAME` contains `tolaria.md`** — this is the actual **live,
-  deployed custom domain** for the docs site and release-download page
-  (`deploy-docs.yml`/`release.yml` both deploy to it). This is NOT text
-  residue — it's a real domain that would need to be owned, DNS-configured,
-  and swapped before any URL referencing it could be safely rewritten.
-  **Left untouched on purpose.** Don't "fix" `https://tolaria.md/...` links
-  in `site/start/install.md` or `src/utils/releaseDownloadPage.ts` without
-  first confirming a replacement domain is owned and configured.
-- **`github.com/refactoringhq/tolaria`** (Issues/PRs/Discussions/CONTRIBUTING
-  links in `site/reference/contribute.md`) points at the **unrelated
-  upstream fork-origin project**, not this repo. Confirmed: `knispo/rhizome`
-  has Issues enabled + 5 releases (so Issues/Releases links COULD correctly
-  redirect there), but Discussions is disabled there. Left untouched —
-  needs a real decision (enable Discussions? maintain a separate
-  getting-started vault repo?), not a mechanical rename.
+- **The public VitePress `site/` tree shipped Tolaria branding** (`tolaria.md`
+  CNAME, Download Tolaria, `refactoringhq/tolaria`). **Removed 2026-09-06**
+  (area D). `pnpm agent-docs` now no-ops if `site/` is absent and leaves the
+  existing `src-tauri/resources/agent-docs/` bundle in place. Do not recreate
+  a Tolaria or Desktop public site here.
+- **`https://tolaria.md/...` and `refactoringhq/tolaria` may still appear in
+  product code** (`src/utils/releaseDownloadPage.ts`, vault getting-started).
+  Those are not this slice. Don't "fix" them without a replacement domain and
+  a C11 replacement starter vault.
 - **Same URL, second surface — `src-tauri/src/vault/getting_started.rs`**
   (found 2026-07-31). This ships into **every vault a user creates**, not
   just the docs site. Partially resolved; the three parts are *not*
@@ -295,27 +283,16 @@ about remotes/history looks confusing, this is why — it's resolved, not an
 active hazard, but the folder names (`rhizome` / `rhizome-old`) are recent
 (2026-07-24) and older docs/scripts/memory may still say `rhizome-desktop`.
 
-## 10. LARA (`pnpm l10n:translate`) is a paid, per-character service — don't run it speculatively
+## 10. LARA / `l10n:*` invitation is gone (C18)
 
-The CLI installs and runs fine; it's blocked only on missing
-`LARA_ACCESS_KEY_ID`/`LARA_ACCESS_KEY_SECRET` credentials, which is an
-account decision not a tooling bug. As of 2026-07-24: `pnpm l10n:validate`
-reports 139 keys missing per locale × 18 locales ≈ 2,500 translations on a
-first run. **Do not run `l10n:translate` speculatively or "to test it" — it
-spends real money.** If you add UI copy without translating it, say so
-explicitly ("English only, LARA unfunded") rather than silently leaving a
-gate that looks like it passed.
+The `l10n:*` scripts, `lara.yaml`, and `@translated/lara-cli` were removed
+in area D. Do not re-add them. English only for v0.
 
 ## 11. Status-bar/shell work is mid-migration behind `shell_command_rail` — check HANDOFF before assuming spec fidelity
 
-`docs/design/shell-final-direction.md` is the design spec, but at least one
-build decision deliberately diverged from what it says (§8 item 2 sketched
-the 3-pill status bar as unflagged; it shipped gated behind
-`shell_command_rail` instead, matching an earlier user call on wave 5.4a).
-The spec has since been updated to reflect what actually shipped, but if
-you're reading an older cached copy or a summary of it, verify against
-`docs/HANDOFF.md`'s wave-by-wave bullets and actual commit history before
-assuming the spec is ground truth for current behavior.
+ADR-0166 / ADR-0170 are the living shell decisions. Verify against
+`docs/HANDOFF.md` and the code before assuming an older design spec is
+ground truth.
 
 ## 12. "Default ON when unset" flags don't help existing vaults — explicit `false` is already persisted
 

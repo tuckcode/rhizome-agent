@@ -884,10 +884,7 @@ Tolaria tracks managed vault-level AI guidance separately from normal note conte
 - Editing a usable `AGENTS.md`, including changing its frontmatter `type`, makes the file custom rather than broken; broken is reserved for missing, empty, frontmatter-only, unreadable, or exact replaceable managed templates/stubs
 - The status bar AI badge and command palette consume that abstraction to expose restore actions only when the managed guidance is missing or broken
 
-Vault guidance is intentionally short and vault-specific. General Tolaria product behavior is delivered through the bundled agent docs resource instead:
-- `scripts/build-agent-docs.mjs` compiles the public `site/` Markdown into `src-tauri/resources/agent-docs/`
-- `src-tauri/resources/agent-docs/AGENTS.md` orients agents to the generated docs bundle, while `index.md`, section bundles, `all.md`, `search-index.json`, and `pages/` provide fast local lookup
-- `get_agent_docs_path` exposes the resolved resource folder to the renderer, and `buildAgentSystemPrompt()` tells every app-managed CLI agent to read vault `AGENTS.md` first, then search the bundled docs for Tolaria behavior
+Vault guidance is intentionally short and vault-specific. There is no public `site/` tree; `scripts/build-agent-docs.mjs` leaves the existing `src-tauri/resources/agent-docs/` bundle in place. `get_agent_docs_path` exposes that folder to the renderer.
 
 ### Vault event writer
 
