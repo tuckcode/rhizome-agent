@@ -6,7 +6,7 @@ description: >-
   Daily-drive batch before push: land the thinking-pill model filter, paint the
   Notes list with the sidebar surface, and highlight the session row as soon as
   you click it.
-commits: TBD
+commits: f58611f..316e119
 ---
 
 # Daily-drive batch (thinking pill + Notes color + session highlight) — 2026-09-12
