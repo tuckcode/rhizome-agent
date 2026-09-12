@@ -20,6 +20,7 @@ import {
   type PrimeModel,
 } from '../lib/primeModels'
 import { modelThinkingLabel, thinkingLevelLabel } from '../lib/primeThinkingLevels'
+import { loadPrimeModelCatalog } from '../lib/primeModelCatalog'
 import { trackPrimeModelChanged, trackPrimeThinkingLevelChanged } from '../lib/productAnalytics'
 
 
@@ -33,6 +34,8 @@ interface PrimeModelPickerProps {
   side?: 'top' | 'bottom'
   /** Vault the host should attach to. Required to spawn if nothing is running. */
   vaultPath?: string
+  /** True when Chat already has a live Prime host. Skip a second ensure. */
+  hostReady?: boolean
   /**
    * `strip` renders as inline instrumentation text for the telemetry strip;
    * `chip` is the original rounded composer chip. #9 moves this control to the
@@ -48,8 +51,9 @@ interface PrimeModelPickerProps {
  *
  * Rhizome Agent is bring-your-own-model: which model Prime happens to default
  * to is a property of the user's machine, so this picker is load-bearing
- * product surface rather than a convenience. The list is fetched on open, not
- * on mount — there are ~78 models and most sessions never change one.
+ * product surface rather than a convenience. The catalog is fetched once the
+ * host is live, or when the menu opens — never on a cold mount that races
+ * Prime's start and then remembers "not running".
  */
 export function PrimeModelPicker({
   locale = 'en',
@@ -58,6 +62,7 @@ export function PrimeModelPicker({
   disabled = false,
   side = 'top',
   vaultPath,
+  hostReady = false,
   variant = 'chip',
 }: PrimeModelPickerProps) {
   const t = createTranslator(locale)
@@ -71,46 +76,41 @@ export function PrimeModelPicker({
   const [showHidden, setShowHidden] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Chat starts the host. Prefetch once it is live so the menu is ready.
+  // Opening without a live host still ensures, then loads. A failure is
+  // not remembered — the host is often still starting.
   useEffect(() => {
-    if (!open || models !== null) return
+    if (models !== null) return
+    if (!hostReady && !open) return
     let cancelled = false
     void (async () => {
       let listed: PrimeModel[] = []
       let failure: string | null = null
       try {
-        if (vaultPath) {
+        if (!hostReady && vaultPath) {
           await callHost('ensure_prime_session_host', { vaultPath })
         }
-        listed = await callHost<PrimeModel[]>('get_available_prime_models')
-        // Which providers this account can actually reach. Best-effort: an
-        // empty answer means "unknown", and the partition then shows
-        // everything rather than greying out a model that works.
-        try {
-          const providers = await callHost<string[]>('get_connected_providers')
-          if (!cancelled) setConnected(Array.isArray(providers) ? providers : [])
-        } catch {
-          if (!cancelled) setConnected([])
-        }
-        // The level list comes from the host too (#9: nothing hardcoded).
-        // Its own failure must not blank the model list, which is the larger
-        // half of this menu.
-        try {
-          const listedLevels = await callHost<string[]>('get_prime_thinking_levels')
-          if (!cancelled) setLevels(Array.isArray(listedLevels) ? listedLevels : [])
-        } catch {
-          if (!cancelled) setLevels([])
+        const [catalog, providers, listedLevels] = await Promise.all([
+          loadPrimeModelCatalog(),
+          callHost<string[]>('get_connected_providers').catch(() => [] as string[]),
+          callHost<string[]>('get_prime_thinking_levels').catch(() => [] as string[]),
+        ])
+        listed = catalog
+        if (!cancelled) {
+          setConnected(Array.isArray(providers) ? providers : [])
+          setLevels(Array.isArray(listedLevels) ? listedLevels : [])
         }
       } catch (e) {
         failure = e instanceof Error ? e.message : String(e)
       }
       if (cancelled) return
       setError(failure)
-      setModels(listed)
+      if (!failure) setModels(listed)
     })()
     return () => {
       cancelled = true
     }
-  }, [open, models, vaultPath])
+  }, [open, models, vaultPath, hostReady])
 
   // Re-read on every open, unlike the catalog above, which is cached because
   // it is a daemon round-trip. The allow-list is a local settings read and it

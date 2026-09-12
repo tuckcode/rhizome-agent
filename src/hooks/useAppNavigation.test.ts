@@ -95,5 +95,18 @@ describe('useAppNavigation', () => {
 
       expect(onSelectNote).toHaveBeenCalledWith(entries[1])
     })
+
+    it('mouse back follows a wikilink trail from inside the open note', () => {
+      const { entries } = renderAfterNavigatingToSecondEntry()
+      const editor = document.createElement('div')
+      editor.contentEditable = 'true'
+      document.body.append(editor)
+      editor.addEventListener('mouseup', (event) => event.stopPropagation())
+      act(() => {
+        editor.dispatchEvent(new MouseEvent('mousedown', { button: 3, bubbles: true, cancelable: true }))
+      })
+      expect(onSelectNote).toHaveBeenCalledWith(entries[0])
+      editor.remove()
+    })
   })
 })

@@ -168,7 +168,7 @@ test.describe('AI chat conversation history', () => {
   test('a replayed vault read is visible beside the answer and opens the note pane', async ({ page }) => {
     await page.setViewportSize({ width: 834, height: 815 })
     await page.getByTestId('command-rail').hover()
-    await page.getByRole('button', { name: 'Keep rail open' }).click()
+    await page.getByRole('button', { name: 'Pin sidebar' }).click()
     const railSessions = page.getByTestId('command-rail-sessions')
     const releaseSession = page.getByRole('button', {
       name: /^Open session Draft the release notes/,

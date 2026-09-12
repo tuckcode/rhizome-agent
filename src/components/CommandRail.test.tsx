@@ -149,7 +149,7 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
     const rail = screen.getByTestId('command-rail')
     fireEvent.mouseEnter(rail)
     await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'true'))
-    fireEvent.click(screen.getByRole('button', { name: 'Keep rail open' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Pin sidebar' }))
     fireEvent.mouseMove(window, { clientX: 500, clientY: 220 })
 
     expect(rail).toHaveAttribute('data-expanded', 'true')
@@ -179,6 +179,6 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
     renderRail()
 
     expect(screen.queryByText('Notes')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Expand rail' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pin sidebar' })).toBeInTheDocument()
   })
 })

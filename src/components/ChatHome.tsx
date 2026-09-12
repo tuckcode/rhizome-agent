@@ -238,6 +238,7 @@ export default function ChatHome({
               <ChatComposerDeck
                 locale={locale}
                 vaultPath={vaultPath}
+                hostReady={Boolean(primeHost?.running)}
                 contextLabel={openNote ? openNote.label.split('/').filter(Boolean).at(-1) ?? openNote.label : null}
                 onCloseContext={() => {
                   setOpenNote(null)

@@ -65,6 +65,7 @@ export interface EditorContentProps {
   onKeepMine?: (path: string) => void
   onKeepTheirs?: (path: string) => void
   locale?: AppLocale
+  leadingControl?: React.ReactNode
 }
 
 export function useEditorContentModel(props: EditorContentProps) {

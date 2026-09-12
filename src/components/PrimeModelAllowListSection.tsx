@@ -3,9 +3,9 @@ import { Check } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { createTranslator } from '../lib/i18n'
 import { filterModels, groupModelsByProvider, modelKey, type PrimeModel } from '../lib/primeModels'
+import { loadPrimeModelCatalog } from '../lib/primeModelCatalog'
 import { trackPrimeModelAllowListChanged } from '../lib/productAnalytics'
-import { isTauri, mockInvoke } from '../mock-tauri'
-import { invoke } from '@tauri-apps/api/core'
+import { callHost } from '../lib/callHost'
 import { Button } from './ui/button'
 
 /**
@@ -36,11 +36,6 @@ interface PrimeModelAllowListSectionProps {
  */
 const MAX_VISIBLE_MATCHES = 40
 
-async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  if (isTauri()) return invoke<T>(cmd, args)
-  return mockInvoke<T>(cmd, args)
-}
-
 export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProps) {
   const [models, setModels] = useState<PrimeModel[] | null>(null)
   const [allowList, setAllowList] = useState<string[]>([])
@@ -53,22 +48,29 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
       // An unreadable list is "not curated", never "curated to nothing" —
       // the same refusal the picker and the Rust normalizer make.
       try {
-        const listed = await call<string[]>('get_prime_model_allow_list')
+        const listed = await callHost<string[]>('get_prime_model_allow_list')
         if (!cancelled) setAllowList(Array.isArray(listed) ? listed : [])
       } catch {
         if (!cancelled) setAllowList([])
       }
-      try {
-        const listed = await call<PrimeModel[]>('get_available_prime_models')
-        if (!cancelled) setModels(Array.isArray(listed) ? listed : [])
-      } catch {
-        // Covers "Prime is not installed here" as much as a real failure, so
-        // it renders as an empty catalog rather than an alarm.
-        if (!cancelled) setModels([])
-      }
     })()
+    // The catalog is hundreds of models and shares Prime's host lock with Chat.
+    // Wait one frame so Settings can paint before that round-trip.
+    const idle = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const listed = await loadPrimeModelCatalog()
+          if (!cancelled) setModels(listed)
+        } catch {
+          // Covers "Prime is not installed here" as much as a real failure, so
+          // it renders as an empty catalog rather than an alarm.
+          if (!cancelled) setModels([])
+        }
+      })()
+    }, 0)
     return () => {
       cancelled = true
+      window.clearTimeout(idle)
     }
   }, [])
 
@@ -81,7 +83,7 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
       setAllowList(next)
       setError(null)
       try {
-        await call('set_prime_model_allow_list', { models: next })
+        await callHost('set_prime_model_allow_list', { models: next })
         trackPrimeModelAllowListChanged(next.length, available.length)
       } catch (e) {
         // Put the checkbox back rather than showing a state the file does

@@ -2,10 +2,10 @@ import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 
 /**
  * Compact mode is about the *window*, not the panel the user just dragged.
- * Narrowing Notes does not postpone overlay, and widening it does not force
- * the overlay back into the flex row. Those thresholds exist so Chat keeps a
- * usable centre when a note is open; the overlay is still resizable (same
- * persisted 220–500px width, capped so it cannot cover the rail).
+ * Narrowing Notes does not hide the column, and widening it does not force
+ * Notes back. Those thresholds exist so Chat keeps a usable centre when a
+ * note is open. Notes that are open always stay in the flex row so they
+ * cannot cover Chat or the editor.
  */
 export const SHELL_COLLAPSE_SESSIONS_WIDTH = 1420
 export const SHELL_COLLAPSE_VAULT_PANEL_WIDTH = 1180

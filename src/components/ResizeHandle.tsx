@@ -11,8 +11,7 @@ interface ResizeHandleProps {
   edge?: 'leading' | 'trailing'
   /**
    * `flow` (default) is a flex sibling between columns. `absolute` sits on
-   * the panel's own edge so an overlay still has a handle — compact Notes
-   * is position:absolute, so a flex sibling would not line up with it.
+   * the panel's own edge so a docked Notes column still has a handle.
    */
   placement?: 'flow' | 'absolute'
   label?: string

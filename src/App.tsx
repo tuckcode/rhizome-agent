@@ -1975,7 +1975,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
 
   const vaultPanel = showVaultPanel ? (
     <div
-      className={`app__vault-panel${compactVaultPanel ? ' app__vault-panel--overlay' : ''}${aiActivity.highlightElement === 'notelist' ? ' ai-highlight' : ''}`}
+      className={`app__vault-panel${aiActivity.highlightElement === 'notelist' ? ' ai-highlight' : ''}`}
       style={{ width: layout.noteListWidth }}
     >
       <ResizeHandle
@@ -2101,11 +2101,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                   ...subheadTrafficLightInset(),
                 }}
               >
-                {activeTab ? (
-                  <div className="app__chat-note-split-bar">
-                    <ChatNoteSplitToggle split={chatNoteSplitMode} onChange={handleChatNoteSplit} />
-                  </div>
-                ) : null}
                 <div className="app__chat-center-body">
                 <div
                   className={activeTab ? 'app__note-editor' : 'app__note-editor app__note-editor--idle'}
@@ -2113,6 +2108,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                 >
                   <AskChatExcerptMenu onAsk={handleAskChatAboutExcerpt}>
                     <Editor
+                      leadingControl={activeTab ? (
+                        <ChatNoteSplitToggle split={chatNoteSplitMode} onChange={handleChatNoteSplit} />
+                      ) : undefined}
                       tabs={notes.tabs}
                       activeTabPath={notes.activeTabPath}
                       isVaultLoading={isVaultContentLoading}

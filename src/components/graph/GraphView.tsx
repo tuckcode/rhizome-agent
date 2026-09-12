@@ -292,8 +292,12 @@ export function GraphView({
   }
 
   return (
-    <div className={`flex h-full w-full min-h-0 bg-background ${compact ? 'flex-col' : ''}`} data-testid="graph-view">
-      <div className="relative min-h-0 min-w-0 flex-1">
+    <div className={`flex h-full w-full min-h-0 overflow-hidden bg-background ${compact ? 'flex-col' : ''}`} data-testid="graph-view">
+      <div
+        className="relative min-h-0 min-w-0 flex-1 overflow-hidden isolate"
+        data-testid="graph-canvas-host"
+        style={{ clipPath: 'inset(0)' }}
+      >
         <ForceGraph3DCanvas
           ref={canvasRef}
           data={displayData}

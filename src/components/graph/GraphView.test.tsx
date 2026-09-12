@@ -50,6 +50,14 @@ describe('GraphView', () => {
     expect(screen.getByTestId('graph-view')).toHaveClass('bg-background')
   })
 
+  it('clips the canvas so a compact sidebar graph cannot paint over Notes', async () => {
+    render(<GraphView compact vaultPath="/Users/mock/demo-vault-v2" />)
+    await waitFor(() => expect(screen.getByTestId('graph-view')).toBeInTheDocument())
+    const host = screen.getByTestId('graph-canvas-host')
+    expect(host).toHaveClass('overflow-hidden')
+    expect(host).toHaveStyle({ clipPath: 'inset(0)' })
+  })
+
   it('fires the view-opened telemetry with counts only (no content)', async () => {
     await renderGraph()
     expect(trackEvent).toHaveBeenCalledWith('graph_view_opened', {

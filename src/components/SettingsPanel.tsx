@@ -385,10 +385,13 @@ export function SettingsPanel({
   onOpenDocs,
   onClose,
 }: SettingsPanelProps) {
-  if (!open) return null
+  const [beenOpen, setBeenOpen] = useState(open)
+  if (open && !beenOpen) setBeenOpen(true)
+  if (!beenOpen) return null
 
   return (
     <SettingsPanelInner
+      open={open}
       settings={settings}
       aiAgentsStatus={aiAgentsStatus}
       initialSectionId={initialSectionId}
@@ -413,7 +416,8 @@ export function SettingsPanel({
   )
 }
 
-type SettingsPanelInnerProps = Omit<SettingsPanelProps, 'open' | 'explicitOrganizationEnabled' | 'inboxAutomationEnabled' | 'aiAgentsStatus' | 'isGitVault'> & {
+type SettingsPanelInnerProps = Omit<SettingsPanelProps, 'explicitOrganizationEnabled' | 'inboxAutomationEnabled' | 'aiAgentsStatus' | 'isGitVault'> & {
+  open: boolean
   aiAgentsStatus: AiAgentsStatus
   initialSectionId: string | null
   locale: AppLocale
@@ -424,6 +428,7 @@ type SettingsPanelInnerProps = Omit<SettingsPanelProps, 'open' | 'explicitOrgani
 }
 
 function SettingsPanelInner({
+  open,
   settings,
   aiAgentsStatus,
   initialSectionId,
@@ -473,8 +478,8 @@ function SettingsPanelInner({
     }
   }
 
-  useSettingsPanelAutofocus(panelRef)
-  useSettingsPanelFocusTrap(panelRef)
+  useSettingsPanelAutofocus(panelRef, open)
+  useSettingsPanelFocusTrap(panelRef, open)
 
   useEffect(() => {
     if (!initialSectionId) return
@@ -531,6 +536,7 @@ function SettingsPanelInner({
   }, [draft, onClose, onSave, onSaveExplicitOrganization, onSaveInboxAutomation, settings])
 
   useEffect(() => {
+    if (!open) return
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation()
@@ -546,9 +552,10 @@ function SettingsPanelInner({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleSave, onClose])
+  }, [handleSave, onClose, open])
 
   useEffect(() => {
+    if (!open) return
     const backdrop = backdropRef.current
     if (!backdrop) return
 
@@ -558,13 +565,15 @@ function SettingsPanelInner({
 
     backdrop.addEventListener('click', handleBackdropClick)
     return () => backdrop.removeEventListener('click', handleBackdropClick)
-  }, [onClose])
+  }, [onClose, open])
 
   return (
     <div
       ref={backdropRef}
-      className="fixed inset-0 z-[1300] flex items-center justify-center"
-      style={{ background: 'var(--shadow-overlay)' }}
+      hidden={!open}
+      aria-hidden={!open}
+      className="fixed inset-0 z-[1300] items-center justify-center"
+      style={{ background: 'var(--shadow-overlay)', display: open ? 'flex' : 'none' }}
       data-testid="settings-panel"
     >
       <SettingsBackdropCloseButton onClose={onClose} t={t} />

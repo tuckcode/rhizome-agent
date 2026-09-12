@@ -691,6 +691,10 @@ describe('App', () => {
     const graph = await screen.findByTestId('connections-panel')
     expect(screen.queryByTestId('connections-edge')).not.toBeInTheDocument()
     expect(notes.compareDocumentPosition(graph) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const list = screen.getByTestId('vault-panel-note-list')
+    expect(list).not.toContainElement(graph)
+    expect(graph).toHaveClass('overflow-hidden')
+    expect(screen.getByRole('region', { name: 'Connections' })).toHaveStyle({ maxHeight: '50%' })
   })
 
   it('opens Notes and Mycelium from the session-footprint chip when Notes is closed', async () => {
@@ -1481,6 +1485,31 @@ describe('App', () => {
     expect(editor).toBeInTheDocument()
     expect(vaultPanel).toBeInTheDocument()
     expect(editor.compareDocumentPosition(vaultPanel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(vaultPanel).not.toHaveClass('app__vault-panel--overlay')
+  })
+
+  it('keeps Inbox Notes in the layout row so it cannot cover Chat or the note', async () => {
+    render(<App />)
+    await screen.findByTestId('vault-panel')
+    const noteList = await screen.findByTestId('note-list-container')
+    await clickNoteListItem(noteList, 'Test Project')
+    const vaultPanel = document.querySelector('.app__vault-panel') as HTMLElement
+    expect(vaultPanel).toBeInTheDocument()
+    expect(vaultPanel).not.toHaveClass('app__vault-panel--overlay')
+    const editor = document.querySelector('.app__editor') as HTMLElement
+    expect(editor.compareDocumentPosition(vaultPanel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('docks Notes when reopened beside a note instead of covering the editor', async () => {
+    localStorage.setItem('rhizome:command-rail-expanded', '1')
+    render(<App />)
+    const noteList = await screen.findByTestId('note-list-container')
+    await clickNoteListItem(noteList, 'Test Project')
+    fireEvent.click(screen.getByRole('radio', { name: 'Note beside Chat' }))
+    fireEvent.click(await screen.findByTestId('vault-panel-restore'))
+    const vaultPanel = document.querySelector('.app__vault-panel') as HTMLElement
+    expect(vaultPanel).toBeInTheDocument()
+    expect(vaultPanel).not.toHaveClass('app__vault-panel--overlay')
   })
 
   it('puts compact navigation above the selected note list in one right panel', async () => {

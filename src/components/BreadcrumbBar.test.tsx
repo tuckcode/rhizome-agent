@@ -576,6 +576,24 @@ describe('BreadcrumbBar — filename controls', () => {
   })
 })
 
+describe('BreadcrumbBar — leading layout control', () => {
+  it('sits the layout control on the notes header, before the action cluster', () => {
+    const { container } = render(
+      <BreadcrumbBar
+        entry={baseEntry}
+        {...defaultProps}
+        leadingControl={<div data-testid="note-layout-toggle">On top</div>}
+      />,
+    )
+
+    const toggle = screen.getByTestId('note-layout-toggle')
+    const actions = container.querySelector('.breadcrumb-bar__actions')
+    expect(toggle).toBeInTheDocument()
+    expect(actions).toBeTruthy()
+    expect(toggle.compareDocumentPosition(actions as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})
+
 describe('BreadcrumbBar — action buttons always right-aligned', () => {
   it('actions container has ml-auto so buttons are always right-aligned', () => {
     const { container } = render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
