@@ -33,7 +33,7 @@ If Prime already has a mechanism, use Prime’s. Do not build a Rhizome
 twin beside it. Vault knowledge still lands as markdown — Prime’s
 `~/.prime/agent` is harness state, not the memory store.
 
-This machine’s Prime is **0.8.0** (102 public daemon commands). Recheck
+This machine’s Prime is **0.9.3** (106 public daemon commands). Recheck
 with `pnpm prime:surface` / `pnpm prime:surface:github`. Snapshot:
 `docs/prime-adapter-surface.json`. Do not clone upstream Prime.
 
@@ -134,9 +134,12 @@ Do not redesign the strip again.
 
 - Pills are live, not inert.
 - Model + thinking live on the strip (moved off the Prime subhead).
-- Thinking is a **menu of every host level** (`get_prime_thinking_levels` →
-  Off / Minimal / Low / Medium / High / X-High / Max as offered). Do not
-  restore a binary quiet/loud toggle. The model picker lists the same scale.
+- Thinking is a **menu of the levels the model can run**
+  (`get_prime_thinking_levels` filtered by
+  `get_prime_supported_thinking_levels`; on `deepseek-v4-flash` that is Off /
+  High / X-High, and the menu says "Limited by this model" when it is short).
+  Do not restore a binary quiet/loud toggle. The model picker lists the same
+  set.
 - Assistant message actions are icon-only with hover tooltips (regenerate,
   copy, save to vault, fork).
 - Command argument hints were already in the slash menu.
