@@ -36,6 +36,10 @@ describe('usePrimeHostStatus', () => {
     invoked.calls = []
     invoked.running = true
     invoked.problem = null
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    })
   })
 
   it('starts the Prime host when a vault is attached', async () => {
@@ -47,6 +51,21 @@ describe('usePrimeHostStatus', () => {
         args: { vaultPath: '/Users/dtc/Documents/Rhizome Vault' },
       })
     })
+  })
+
+  it('does not restart Prime while the window is hidden', async () => {
+    invoked.running = false
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'hidden',
+    })
+
+    renderHook(() => usePrimeHostStatus(true, '/Users/dtc/Documents/Rhizome Vault'))
+    await new Promise((resolve) => setTimeout(resolve, 80))
+
+    expect(
+      invoked.calls.filter((call) => call.cmd === 'ensure_prime_session_host'),
+    ).toHaveLength(0)
   })
 
   /**

@@ -95,8 +95,10 @@ export function usePrimeHostStatus(enabled = true, vaultPath?: string): PrimeHos
 
     let cancelled = false
 
+    const windowIsVisible = () => document.visibilityState === 'visible'
+
     const connect = async () => {
-      if (!vaultPath) return
+      if (!vaultPath || !windowIsVisible()) return
       try {
         await callHost('ensure_prime_session_host', { vaultPath })
       } catch {
@@ -105,6 +107,7 @@ export function usePrimeHostStatus(enabled = true, vaultPath?: string): PrimeHos
     }
 
     const refresh = async () => {
+      if (!windowIsVisible()) return
       try {
         let next = await callHost<PrimeHostStatus>('get_prime_session_host_status')
         // A test build often loses the first connect: the window is up before

@@ -128,6 +128,68 @@ fn current_problem() -> Option<PrimeConnectionProblem> {
 const DAEMON_SOCKET_ENV: &str = "RHIZOME_PRIME_DAEMON_SOCKET";
 
 static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
+/// Hidden window (C22): do not spawn Prime again from the status poll.
+static HOST_SUSPENDED: AtomicBool = AtomicBool::new(false);
+
+fn spawned_daemon_pid() -> &'static Mutex<Option<u32>> {
+    static PID: OnceLock<Mutex<Option<u32>>> = OnceLock::new();
+    PID.get_or_init(|| Mutex::new(None))
+}
+
+/// Pause Prime reconnect while the main window is hidden.
+pub fn set_host_suspended(suspended: bool) {
+    HOST_SUSPENDED.store(suspended, Ordering::SeqCst);
+}
+
+fn host_is_suspended() -> bool {
+    HOST_SUSPENDED.load(Ordering::SeqCst)
+}
+
+fn record_spawned_daemon_pid(pid: u32) {
+    if let Ok(mut slot) = spawned_daemon_pid().lock() {
+        *slot = Some(pid);
+    }
+}
+
+/// Stop a Prime supervisor this process started.
+///
+/// We never send Prime's `shutdown` RPC (that would stop other clients). A
+/// daemon we spawned is ours to reap so it does not keep a Dock running mark
+/// after hide or quit.
+pub fn stop_spawned_daemon() {
+    if daemon_socket_is_overridden() {
+        return;
+    }
+    let pid = spawned_daemon_pid()
+        .lock()
+        .ok()
+        .and_then(|mut slot| slot.take());
+    let Some(pid) = pid else {
+        return;
+    };
+    kill_process_group(pid);
+}
+
+fn kill_process_group(pid: u32) {
+    #[cfg(unix)]
+    {
+        let pgid = format!("-{pid}");
+        let pid = pid.to_string();
+        let _ = std::process::Command::new("kill")
+            .args(["-TERM", &pgid, &pid])
+            .status();
+        thread::sleep(Duration::from_millis(50));
+        let _ = std::process::Command::new("kill")
+            .args(["-KILL", &pgid, &pid])
+            .status();
+    }
+    #[cfg(windows)]
+    {
+        let _ = std::process::Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .status();
+    }
+}
 
 /// The socket type per platform.
 ///
@@ -693,6 +755,9 @@ fn daemon_launch_args(socket_path: &Path) -> Vec<String> {
 /// in. We do the same, then attach. Never fatal to try: a refused spawn
 /// still surfaces as `ServiceUnreachable`.
 fn ensure_daemon_listening(socket_path: &Path) -> Result<(), String> {
+    if host_is_suspended() {
+        return Err("Prime is paused while the window is hidden".into());
+    }
     if connect_stream(socket_path).is_ok() {
         return Ok(());
     }
@@ -738,10 +803,17 @@ fn spawn_prime_daemon(socket_path: &Path) -> Result<(), String> {
     let mut child = command
         .spawn()
         .map_err(|error| format!("Failed to start Prime's background service: {error}"))?;
+    let pid = child.id();
+    record_spawned_daemon_pid(pid);
     // `Child` waits on drop. A supervisor that stays up would hang
     // `ensure_host` for the rest of the process. Reap it in the background.
     thread::spawn(move || {
         let _ = child.wait();
+        if let Ok(mut slot) = spawned_daemon_pid().lock() {
+            if *slot == Some(pid) {
+                *slot = None;
+            }
+        }
     });
     Ok(())
 }
@@ -2422,6 +2494,9 @@ fn with_host_mut<T>(f: impl FnOnce(&mut PrimeHost) -> Result<T, String>) -> Resu
 }
 
 fn ensure_host_for_cwd(cwd: PathBuf) -> Result<String, String> {
+    if host_is_suspended() {
+        return Err("Prime is paused while the window is hidden".into());
+    }
     let slot = host_slot();
     {
         let mut guard = slot.host.lock().map_err(poison)?;
@@ -2678,8 +2753,8 @@ pub enum QuitDisposition {
 
 /// How Rhizome should settle its attached Prime session.
 ///
-/// ADR-0167: idle close detaches, stop completes owned work, keep-working
-/// promotes then detaches. There is no global "survive quit" toggle.
+/// Idle close and quit stop owned work. Keep-working promotes then detaches.
+/// There is no global "survive quit" toggle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SessionCloseIntent {
@@ -3722,7 +3797,12 @@ mod tests {
     static TEST_LOCK: Mutex<()> = Mutex::new(());
 
     fn host_guard() -> MutexGuard<'static, ()> {
-        TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner())
+        let guard = TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        set_host_suspended(false);
+        if let Ok(mut slot) = spawned_daemon_pid().lock() {
+            *slot = None;
+        }
+        guard
     }
 
     /// Cleanup guard for live daemon tests.
@@ -5290,6 +5370,45 @@ mod tests {
         );
         assert!(!commands.contains(&"kill".to_string()), "{commands:?}");
         assert!(!commands.contains(&"shutdown".to_string()));
+    }
+
+    /// Hidden-window status polls used to call ensure_host, which spawned
+    /// Prime again. That left a Dock running mark after close.
+    #[test]
+    fn ensure_host_does_not_start_prime_while_the_window_is_hidden() {
+        let _guard = host_guard();
+        let _ = shutdown_host();
+        set_host_suspended(true);
+        std::env::set_var(DAEMON_SOCKET_ENV, "/tmp/rhizome-hidden-test/daemon.sock");
+        let start = Instant::now();
+        let error = ensure_host("/tmp/rhizome-hidden-test-vault").unwrap_err();
+        set_host_suspended(false);
+        std::env::remove_var(DAEMON_SOCKET_ENV);
+        assert!(
+            start.elapsed() < Duration::from_secs(2),
+            "hidden ensure must not wait on a daemon spawn"
+        );
+        assert!(error.to_ascii_lowercase().contains("hidden"), "{error}");
+    }
+
+    /// A supervisor we spawned is ours to stop. We still never send `shutdown`.
+    #[cfg(unix)]
+    #[test]
+    fn stop_spawned_daemon_kills_the_process_group() {
+        use std::os::unix::process::CommandExt;
+
+        let _guard = host_guard();
+        std::env::remove_var(DAEMON_SOCKET_ENV);
+        let mut child = std::process::Command::new("sleep")
+            .arg("30")
+            .process_group(0)
+            .spawn()
+            .unwrap();
+        let pid = child.id();
+        record_spawned_daemon_pid(pid);
+        stop_spawned_daemon();
+        let status = child.wait().unwrap();
+        assert!(!status.success(), "the helper must not stay running");
     }
 
     /// Keep working is the explicit grant: promote, then detach.

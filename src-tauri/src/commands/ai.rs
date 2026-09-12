@@ -934,12 +934,25 @@ pub fn complete_owned_prime_session() -> Result<(), String> {
 }
 
 /// Settle the attached Prime session, then drop the Rhizome connection.
+///
+/// The active-close dialog calls this, then hides. Helpers this process
+/// started must stop here too — `window.hide()` does not raise CloseRequested
+/// again.
 #[cfg(desktop)]
 #[tauri::command]
 pub fn settle_prime_session(
+    app: tauri::AppHandle,
     intent: crate::prime_session_host::SessionCloseIntent,
 ) -> Result<crate::prime_session_host::QuitDisposition, String> {
-    crate::prime_session_host::settle_session(intent)
+    let disposition = crate::prime_session_host::settle_session(intent)?;
+    crate::release_helpers_for_hidden_window(
+        &app,
+        matches!(
+            disposition,
+            crate::prime_session_host::QuitDisposition::KeepSessionRunning
+        ),
+    );
+    Ok(disposition)
 }
 
 /// Every model the live Prime host can switch to.
