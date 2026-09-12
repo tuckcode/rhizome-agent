@@ -393,6 +393,19 @@ pub fn get_prime_thinking_levels() -> Vec<String> {
         .collect()
 }
 
+/// The subset of that scale the attached model can actually run, ordered.
+///
+/// Prime clamps every pick to the model's own set. Offering a level outside it
+/// is a click that applies nothing, which reads as a broken control rather
+/// than as a model limitation — the reason a pill on `deepseek-v4-flash`
+/// would not leave High. Falls back to the full scale when no model is known
+/// yet, so this is never a narrower menu than the truth.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn get_prime_supported_thinking_levels() -> Vec<String> {
+    crate::prime_session_host::supported_thinking_levels_for_session()
+}
+
 /// Pause, resume, or stop one heartbeat (#14).
 ///
 /// Only heartbeats accept this. The daemon has no `cron_pause`, so a plain

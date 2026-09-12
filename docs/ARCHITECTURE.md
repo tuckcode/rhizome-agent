@@ -496,12 +496,17 @@ Each answers "nothing", which is true of a host with no session.
 #### Thinking levels (composer pill)
 
 The host owns the list. `get_prime_thinking_levels` returns Prime's
-`PRIME_THINKING_LEVELS`; the frontend must not hardcode Off → Max.
-`PrimeThinkingToggle` opens a menu of every level the host sent and writes
-the pick with `set_prime_thinking_level`. `primeThinkingLevels.ts` only
-renders labels (`xhigh` → “X-High”) and still has a quiet/loud helper for
-older one-click tests — the shipped pill is the full menu, not a binary
-toggle. The model picker lists the same scale.
+`PRIME_THINKING_LEVELS`, and `get_prime_supported_thinking_levels` returns
+that scale filtered by the attached model's own `thinkingLevelMap`; the
+frontend must not hardcode Off → Max. `PrimeThinkingToggle` opens a menu of
+the levels the model can actually run and writes the pick with
+`set_prime_thinking_level`. The filter matters: Prime clamps every pick to the
+model's own set, so a menu drawn from the full scale offers clicks that apply
+nothing and then reads as a broken control (`deepseek-v4-flash` has no
+`medium`, and picking it landed back on High). `primeThinkingLevels.ts`
+renders labels (`xhigh` → “X-High”), filters the scale by the model's answer,
+and still has a quiet/loud helper for older one-click tests — the shipped pill
+is the menu, not a binary toggle. The model picker lists the same set.
 
 Constraint: opening the menu or changing a level still calls
 `ensure_prime_session_host` when a vault path is present, because those

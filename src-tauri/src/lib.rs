@@ -631,6 +631,7 @@ macro_rules! app_invoke_handler {
             commands::set_prime_model,
             commands::set_prime_thinking_level,
             commands::get_prime_thinking_levels,
+            commands::get_prime_supported_thinking_levels,
             commands::fork_prime_session,
             commands::settle_prime_session,
             commands::get_prime_agent_activity,
