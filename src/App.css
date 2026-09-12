@@ -121,12 +121,18 @@
 }
 
 .app__notes-rail {
-  flex: 0 0 auto;
+  box-sizing: border-box;
+  flex: 0 0 46px;
   align-self: stretch;
+  width: 46px;
+  min-width: 46px;
+  max-width: 46px;
   height: 100%;
   display: flex;
   align-items: flex-start;
   justify-content: center;
+  overflow: hidden;
+  padding-top: 8px;
   z-index: 40;
   background: var(--surface-sidebar);
   border-left: 1px solid var(--sidebar-border);

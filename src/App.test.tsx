@@ -1622,7 +1622,11 @@ describe('App', () => {
     })
     const restore = await screen.findByTestId('vault-panel-restore')
     expect(restore).toBeVisible()
-    expect(restore).toHaveStyle({ width: '46px' })
+    expect(restore.closest('.app__notes-rail')).toHaveStyle({
+      width: '46px',
+      minWidth: '46px',
+      maxWidth: '46px',
+    })
     fireEvent.click(restore)
     await waitFor(() => {
       expect(document.querySelector('.app__vault-panel')).toBeInTheDocument()

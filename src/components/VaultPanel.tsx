@@ -80,17 +80,27 @@ export function VaultPanelRestoreButton({
 }) {
   const label = 'Show Notes'
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      className="app__notes-rail app__notes-rail--restore h-full min-h-full rounded-none p-0 pt-2.5"
-      style={{ width: COMMAND_RAIL_WIDTH_PX }}
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      data-testid="vault-panel-restore"
+    <div
+      className="app__notes-rail app__notes-rail--restore"
+      style={{
+        width: COMMAND_RAIL_WIDTH_PX,
+        minWidth: COMMAND_RAIL_WIDTH_PX,
+        maxWidth: COMMAND_RAIL_WIDTH_PX,
+      }}
     >
-      <SidebarSimple size={16} weight="fill" mirrored />
-    </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        className="rounded-[var(--radius)] p-0 hover:bg-[var(--state-hover,var(--accent))]"
+        style={{ width: 30, height: 30 }}
+        onClick={onClick}
+        title={label}
+        aria-label={label}
+        data-testid="vault-panel-restore"
+      >
+        <SidebarSimple size={16} weight="fill" mirrored />
+      </Button>
+    </div>
   )
 }
