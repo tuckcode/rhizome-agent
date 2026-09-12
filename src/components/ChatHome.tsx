@@ -93,7 +93,6 @@ export default function ChatHome({
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
-  const [notePaneCollapsed, setNotePaneCollapsed] = useState(false)
   // One read of the open note, shared by the pane and the agent. Chat used to
   // pass nothing to `AiPanel`, so a note open on screen was invisible to the
   // model — "summarise this" had no "this".
@@ -108,7 +107,6 @@ export default function ChatHome({
   if (requestedNote && requestedNote.requestId !== lastRequestId) {
     setLastRequestId(requestedNote.requestId)
     setOpenNote({ path: requestedNote.path, label: requestedNote.label })
-    setNotePaneCollapsed(false)
   }
   const notePaneOpen = openNote !== null
   useEffect(() => {
@@ -164,10 +162,7 @@ export default function ChatHome({
           activeNoteContent={openNoteContent.body}
           onOpenNote={(target) => {
             const resolved = resolveChatOpenNote(target, vaultPath, entries)
-            if (resolved) {
-              setOpenNote(resolved)
-              setNotePaneCollapsed(false)
-            }
+            if (resolved) setOpenNote(resolved)
           }}
           onPromoteToVault={onPromoteToVault}
           onFileCreated={onFileCreated}
@@ -181,21 +176,10 @@ export default function ChatHome({
           newChatRef={newChatRef}
           onOpenMycelium={onOpenSessionFootprint}
           notePane={
-            openNote ? notePaneCollapsed ? (
+            openNote ? (
               <div
-                aria-hidden="true"
-                data-testid="chat-note-hover-edge"
-                className="flex w-7 shrink-0 cursor-pointer items-center justify-center border-l border-border bg-background text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                style={{ writingMode: 'vertical-rl' }}
-                onMouseEnter={() => setNotePaneCollapsed(false)}
-              >
-                Inbox
-              </div>
-            ) : (
-              <div
-                data-testid="chat-note-hover-region"
+                data-testid="chat-note-pane-region"
                 className="flex min-h-0 shrink-0"
-                onMouseLeave={() => setNotePaneCollapsed(true)}
               >
               <ChatNotePane
                 locale={locale}
@@ -207,19 +191,14 @@ export default function ChatHome({
                 loading={openNoteContent.loading}
                 onBackToNotes={() => {
                   setOpenNote(null)
-                  setNotePaneCollapsed(false)
                   onShowNotes?.()
                 }}
                 onClose={() => {
                   setOpenNote(null)
-                  setNotePaneCollapsed(false)
                 }}
                 onOpenNote={(target) => {
                   const resolved = resolveChatOpenNote(target, vaultPath, entries)
-                  if (resolved) {
-                    setOpenNote(resolved)
-                    setNotePaneCollapsed(false)
-                  }
+                  if (resolved) setOpenNote(resolved)
                 }}
               />
               </div>
@@ -242,7 +221,6 @@ export default function ChatHome({
                 contextLabel={openNote ? openNote.label.split('/').filter(Boolean).at(-1) ?? openNote.label : null}
                 onCloseContext={() => {
                   setOpenNote(null)
-                  setNotePaneCollapsed(false)
                 }}
                 skillsLabel="rhizome-vault"
                 model={primeModelLabel(primeHost)}

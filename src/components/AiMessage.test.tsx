@@ -200,7 +200,9 @@ describe('AiMessage', () => {
     const { rerender } = render(
       <AiMessage userMessage="Ask" actions={[]} response="Done" isLatestReply />,
     )
-    expect(screen.getByTestId('latest-assistant-reply-marker')).toBeInTheDocument()
+    const marker = screen.getByTestId('latest-assistant-reply-marker')
+    expect(marker).toBeInTheDocument()
+    expect(marker.className).toContain('accent-green')
 
     rerender(<AiMessage userMessage="Ask" actions={[]} response="Done" />)
     expect(screen.queryByTestId('latest-assistant-reply-marker')).not.toBeInTheDocument()

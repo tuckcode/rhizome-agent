@@ -130,16 +130,14 @@ describe('ChatHome', () => {
     expect(screen.getByTestId('chat-note-pane')).toHaveTextContent('wiki/decisions/memory-loop.md')
     expect(onOpenNote).not.toHaveBeenCalled()
 
-    fireEvent.mouseLeave(screen.getByTestId('chat-note-hover-region'))
-    const edge = screen.getByTestId('chat-note-hover-edge')
-    expect(edge).toHaveTextContent('Inbox')
-    expect(screen.queryByTestId('chat-note-pane')).not.toBeInTheDocument()
-    fireEvent.mouseEnter(edge)
+    // Moving the mouse must not hide the note — click Close is the only exit
+    // (hover-collapse made reading beside Chat brittle on a second display).
+    fireEvent.mouseLeave(screen.getByTestId('chat-note-pane-region'))
     expect(screen.getByTestId('chat-note-pane')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Close note' }))
     expect(screen.queryByTestId('chat-note-pane')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('chat-note-hover-edge')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('chat-note-pane-region')).not.toBeInTheDocument()
   })
 
   it('returns from a note preview to the existing Notes workspace', () => {
