@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { SettingsPanel } from './SettingsPanel'
 import type { Settings } from '../types'
 import { THEME_MODE_STORAGE_KEY } from '../lib/themeMode'
@@ -149,6 +149,7 @@ describe('SettingsPanel', () => {
     try {
       renderOpenSettings()
       expect(screen.getByText('Settings')).toBeInTheDocument()
+      expect(screen.queryByTestId('prime-model-allow-list')).not.toBeInTheDocument()
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 30))
       })
@@ -157,11 +158,7 @@ describe('SettingsPanel', () => {
       ).toHaveLength(0)
 
       fireEvent.click(screen.getByTestId(`settings-nav-${SETTINGS_SECTION_IDS.ai}`))
-      await waitFor(() => {
-        expect(
-          spy.mock.calls.some(([cmd]) => cmd === 'get_available_prime_models'),
-        ).toBe(true)
-      })
+      expect(await screen.findByTestId('prime-model-allow-list')).toBeInTheDocument()
     } finally {
       spy.mockRestore()
       resetPrimeModelCatalog()
@@ -170,26 +167,16 @@ describe('SettingsPanel', () => {
 
   it('loads the Prime catalog when Settings opens on Agents', async () => {
     resetPrimeModelCatalog()
-    const spy = vi.spyOn(mockTauri, 'mockInvoke')
-    try {
-      render(
-        <SettingsPanel
-          open={true}
-          settings={emptySettings}
-          initialSectionId={SETTINGS_SECTION_IDS.ai}
-          onSave={onSave}
-          onClose={onClose}
-        />
-      )
-      await waitFor(() => {
-        expect(
-          spy.mock.calls.some(([cmd]) => cmd === 'get_available_prime_models'),
-        ).toBe(true)
-      })
-    } finally {
-      spy.mockRestore()
-      resetPrimeModelCatalog()
-    }
+    render(
+      <SettingsPanel
+        open={true}
+        settings={emptySettings}
+        initialSectionId={SETTINGS_SECTION_IDS.ai}
+        onSave={onSave}
+        onClose={onClose}
+      />
+    )
+    expect(await screen.findByTestId('prime-model-allow-list')).toBeInTheDocument()
   })
 
   it('renders modal when open', () => {

@@ -4,6 +4,7 @@ import { loadPrimeModelCatalog, peekPrimeModelCatalog, resetPrimeModelCatalog } 
 const invoked = vi.hoisted(() => ({
   calls: 0,
   fail: '',
+  hold: null as Promise<void> | null,
   models: [{ id: 'grok-4.5', name: 'Grok 4.5', provider: 'xai' }],
 }))
 
@@ -11,8 +12,11 @@ vi.mock('./callHost', () => ({
   callHost: (cmd: string) => {
     if (cmd !== 'get_available_prime_models') return Promise.resolve(null)
     invoked.calls += 1
-    if (invoked.fail) return Promise.reject(new Error(invoked.fail))
-    return Promise.resolve(invoked.models)
+    const done = invoked.hold ?? Promise.resolve()
+    return done.then(() => {
+      if (invoked.fail) return Promise.reject(new Error(invoked.fail))
+      return invoked.models
+    })
   },
 }))
 
@@ -20,6 +24,7 @@ afterEach(() => {
   resetPrimeModelCatalog()
   invoked.calls = 0
   invoked.fail = ''
+  invoked.hold = null
 })
 
 describe('loadPrimeModelCatalog', () => {
@@ -39,6 +44,22 @@ describe('loadPrimeModelCatalog', () => {
     expect(peekPrimeModelCatalog()).toBeNull()
 
     invoked.fail = ''
+    await expect(loadPrimeModelCatalog()).resolves.toEqual(invoked.models)
+    expect(invoked.calls).toBe(2)
+  })
+
+  it('does not keep a fetch that finished after reset', async () => {
+    let release!: () => void
+    invoked.hold = new Promise((resolve) => {
+      release = resolve
+    })
+    const pending = loadPrimeModelCatalog()
+    resetPrimeModelCatalog()
+    invoked.hold = null
+    release()
+    await pending
+    expect(peekPrimeModelCatalog()).toBeNull()
+
     await expect(loadPrimeModelCatalog()).resolves.toEqual(invoked.models)
     expect(invoked.calls).toBe(2)
   })

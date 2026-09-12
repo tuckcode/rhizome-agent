@@ -3,6 +3,7 @@ import type { PrimeModel } from './primeModels'
 
 let catalog: PrimeModel[] | null = null
 let inflight: Promise<PrimeModel[]> | null = null
+let epoch = 0
 
 export function peekPrimeModelCatalog(): PrimeModel[] | null {
   return catalog
@@ -11,6 +12,7 @@ export function peekPrimeModelCatalog(): PrimeModel[] | null {
 export function resetPrimeModelCatalog(): void {
   catalog = null
   inflight = null
+  epoch += 1
 }
 
 /**
@@ -24,9 +26,12 @@ export function resetPrimeModelCatalog(): void {
 export async function loadPrimeModelCatalog(): Promise<PrimeModel[]> {
   if (catalog) return catalog
   if (inflight) return inflight
+  const started = epoch
   inflight = callHost<PrimeModel[]>('get_available_prime_models')
     .then((listed) => {
-      catalog = Array.isArray(listed) ? listed : []
+      const next = Array.isArray(listed) ? listed : []
+      if (started !== epoch) return next
+      catalog = next
       return catalog
     })
     .finally(() => {
