@@ -47,21 +47,19 @@ file.
 ---
 
 ## State
-`main` is about to carry Chat shell-layout deepen, launch restore, Notes-rail
-polish, latest-reply marker, provider contrast, and formatted thinking (this
-push). Last **app** was **`3a21f9f`** at **2026-09-12 08:32**. Rebuild
+`main` is about to carry Notes-rail polish, model-aware thinking levels,
+Notes sidebar color match, and snappier session-row highlight (this push).
+Last **app** was **`3a21f9f`** at **2026-09-12 08:32**. Rebuild
 `/Applications` after this lands. C64 first-2s is still weak. Native Chat
 glance **PASSED** (2026-09-06). Quit the daily app, uninstall it, then install.
 Do not launch leftovers. After install, delete leftover `.app` copies.
 
-Area C orphan-UI subtraction (#60): unused components/exports + dead dialog/docked/right-panel-chat.
 Still open / parked: **C72** Inbox rename; Prime list-import; **#51** Tab;
 **C64** full verify; **#47** confirm-close; Grokbot PRs **#60/#61/#62** landed;
 Rhizome in-app updater stub. Evening design dump (portfolio, vault-as-skills,
 no CC Switch):
 [2208](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md).
 [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date first).
-Area D: public `site/` and Desktop `release-notes/` gone; `pnpm agent-docs` no-ops without `site/`.
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Inverted Dock icon is
@@ -73,9 +71,11 @@ stays upstream's and its updates keep arriving. M4 (a native client on
 Mindwalk's `/api/sessions/{key}/snapshot`) is still unstarted and is
 unblocked, not replaced, by this.
 
-This machine's installed Prime is **0.8.0** (102 public daemon commands —
-`docs/prime-adapter-surface.json`). GitHub latest is also `v0.8.0`.
-`pnpm prime:surface` / `pnpm prime:surface:github` is the cheap re-check.
+This machine's installed Prime is **0.9.3** (106 public daemon commands —
+`docs/prime-adapter-surface.json`). Snapshot refreshed 2026-09-12; new names
+only (`get_direct_worker_transport`, `list_agent_peers`, roster subscribe
+pair, spoken `resume_queue`) — not wired in Rhizome yet. Re-check with
+`pnpm prime:surface` / `pnpm prime:surface:github`.
 
 Prime **0.7.4+** on Windows speaks
 `\\.\pipe\prime-agent-daemon` — see `docs/WINDOWS-DEV.md`. On macOS/Linux the
@@ -97,6 +97,8 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-12 · Cursor Composer](plans/handoffs/2026-09-12-1721-cursor-daily-drive-batch.md) — thinking-pill model filter landed; Notes list uses sidebar color; session row highlights on click.
+- [2026-09-12 · DeepSeek V4 Flash (Rhizome Chat)](plans/handoffs/2026-09-12-1714-rhizome-deepseek-v4-flash-thinking-pill.md) — thinking pill offers only the model's own levels; `deepseek-v4-flash` has no Medium, so Medium snapped back to High.
 - [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-1705-cursor-grok-4-6-notes-rail-width.md) — right Notes mirrors left Sessions: 240px open, 46px shut, same color.
 - [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-1059-cursor-grok-4-6-architecture-deepen.md) — Chat shell layout + launch restore modules. App no longer derives Notes-open. AiPanel no longer mutexes rehydrate vs resume. C64 still weak.
 - [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-0845-cursor-grok-4-6-ux-visual-pass.md) — visual pass on Applications `3a21f9f`; Inbox no longer hides Notes; Show Notes strip. C64 still weak.
@@ -119,14 +121,9 @@ yours to choose.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1812-composer-c70-c71-clocks-and-history.md) — **C70/C71 shipped in tree:** Chat bubble clocks (`3:35p`); Ask-box Up/Down prompt recall (caret at start / empty only).
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1802-composer-provider-preflight-gap.md) — gap audit: DeepSeek/Nous Settings already in tree; Chat preflight now drops expired OAuth; `NOUS_API_KEY` counts as connected.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1758-composer-midturn-live-and-selection-copy.md) — live mid-turn probe got its own reply; Chat selection Copy via native context-menu allowlist (messages + composer).
-- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1715-composer-suspend-retry-and-dom-send.md) — post-Stop Chat looked idle but Enter failed (`queued session input is suspended`); prompt now resumes on `success: false`. Composer reads on-screen text when React draft is stale. Live two-bubble mid-turn still open.
-- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1616-composer-midturn-turn-boundary.md) — mid-turn: follow-up reply was merging into first bubble; `TurnBoundary` + 2s empty-queue grace. Live two-bubble dogfood still required.
-- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1537-composer-midturn-stream-and-session-names.md) — mid-turn: host kept stopping at first `agent_end` (follow-up reply missing in Chat); fix `stream_until_turn_complete` + optimistic follow-up bubble. New session names lead with local clock. Rebuild `/Applications` still required.
-- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1522-composer-midturn-waiting-chrome.md) — daily-drive: **#41 mid-turn** confirmed (“Waiting in this session” / `MIDTURN_QUEUE_PROBE` while Working; DeepSeek · Rhizome Vault); graph tools still healthy.
-- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1147-composer-daily-drive-cli-call-bundle.md) — daily-drive: **C69** packaged `cli-call` missing (fixed + `/Applications` patched); **live Chat graph ask succeeded** on Obsidian Vault (Big Pickle → `rhizome_graph_health`: 69 notes / 11 links / 60 orphans / 7 dead links). Same day: `/Applications` rebuild with ADR-0170 native QA; vault skills point at packaged `cli-call.mjs`; **graph Find** collapsed to bottom-right expandable box (Atticus: type-pill wall hid the canvas).
+- [2026-09-06 · Composer](plans/handoffs/2026-09-06-1147-composer-daily-drive-cli-call-bundle.md) — daily-drive: **C69** packaged `cli-call` missing (fixed + `/Applications` patched); **live Chat graph ask succeeded** on Obsidian Vault.
 - [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2215-grok-4-6-area-d-docs-archive.md) — **Area D subtraction:** killed Tolaria `site/`, Desktop `release-notes/`, stale vision/wiki/podcast/plans/design one-shots, 50 `.pen` mocks, Laputa Claude commands, empty `.mcp.json`, Desktop `trademarks.md`, and C18 l10n invitation scripts. `YOU-SHOULD-KNOW.md` stays (living briefing). `CONTRIBUTING.md` is now a private-repo stub.
 - [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2155-grok-4-6-area-c-orphan-ui.md) — **Area C:** deleted orphan UI under `src/components/` (onboarding/create-note/autocomplete/NoteIcon), unused exports, and dead dialog/docked/right-panel-chat branches.
-- [2026-09-06 · Composer](plans/handoffs/2026-09-06-0805-composer-c67-c68.md) — **C67/C68 shipped:** sessions right-click menu; note lock (default editable, breadcrumb + Cmd+K).
 - [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-0405-grok-4-6-status-bar-pills.md) — status-bar chrome: Contribute/Docs → Settings → About; build/update next to theme; composer lost the duplicate vault pill and hosts agent idle. Vault dropdown stays bottom-left.
 - [2026-09-05 · Claude Opus 5](plans/handoffs/2026-09-05-2145-claude-opus-5-session-import-and-agent-graph.md) — **no agent had ever successfully run a graph query**: the `rhizome_graph_*` tools need `RHIZOME_TOOL_PATH`, and the seeded skill tells the agent to run `cli-call.mjs` from a bash tool, which inherits none of the app's environment. Fixed, and rewrote the skill description so agents discover the graph at all (they were told only about note CRUD). Built the **session-import engine** — ledger, dedup, Claude Code adapter, selection, preview, vault writer — verified on real history: 318 notes written, zero failures, second run wrote nothing. Fixed four UI defects (inverted Connections resize, titlebar stealing the window drag, unresizable chat/editor split, session list sorted by file mtime). **Right-panel layout agreed but unbuilt**; skill change not yet verified with a real agent.
 - [2026-09-05 · Claude Opus 5](plans/handoffs/2026-09-05-0920-claude-opus-5-audit-findings.md) — closed the native audit's backlog and verified it in the real app: **C61** (draft survives Graph navigation) and **C63** (one-node graph no longer fills the canvas) confirmed natively; **C64** fixed and weakly confirmed; **C62 fixed on the second attempt** — the first fix was source-reasoned, self-consistent, green, and wrong, and the native retest is what caught it (real cause: a rename left new-note reload protection on the old path, so the reload restored the ghost row). For **C60** found the leading mechanism — the saved window frame is applied twice at launch, and resizing an NSWindow mid-WKWebView-layout desyncs its compositing layer, which fits blank-DOM-but-WebGL-paints and quit-fixes-but-reload-doesn't — and skipped the redundant resize; **mitigated, not proven fixed.** 6003 frontend + 1706 Rust tests, lint, typecheck, clippy, fmt, Codacy all pass.
