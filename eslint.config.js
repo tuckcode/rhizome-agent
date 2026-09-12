@@ -9,8 +9,6 @@ export default defineConfig([
   globalIgnores([
     'dist',
     'coverage',
-    'site/.vitepress/cache/',
-    'site/.vitepress/dist/',
     'src-tauri/resources/mcp-server/',
     'src-tauri/target/',
     'src-tauri/gen/',

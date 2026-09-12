@@ -25,9 +25,8 @@ already shipped as the chat-model allow-list (#45 step 1) — the same thing,
 not a routing engine.
 
 `docs/design/token-routing-and-compression.md` calls it *"the halfway house if
-pulled sooner … so a human can pin scopes without a proxy"*, and
-`docs/YOU-SHOULD-KNOW.md` repeats it as *"halfway house already in Prime"*.
-Both are wrong, and both were written by agents reading the name.
+pulled sooner … so a human can pin scopes without a proxy"*. That reading is
+wrong — it was written by an agent reading the name.
 
 **What follows from the correction:** Prime has no per-task model routing. An
 external router would therefore add a capability rather than duplicate one.

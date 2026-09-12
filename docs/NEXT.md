@@ -4,10 +4,10 @@
 tagged in place. This file is a palimpsest — several models have edited it;
 `rg` cannot tell whose voice a heading is.
 
-**Coming in cold after 2026-08-24:** read
-[`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) before claiming a row. It is
-the multi-day briefing (what shipped, what GitHub still calls open, what
-not to re-litigate). This file stays the unclaimed-work index.
+**Coming in cold:** read [`docs/HANDOFF.md`](HANDOFF.md),
+[`docs/IDENTITY.md`](IDENTITY.md), and
+[`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) before claiming a row. This
+file stays the unclaimed-work index.
 
 **For an agent that just finished the task its handoff gave it and needs to
 choose the next one.** `HANDOFF.md` says what is true right now; this file says
@@ -429,7 +429,9 @@ backlog, not a replacement for it.
   [`2026-08-13-prime-session-list-spec.md`](plans/2026-08-13-prime-session-list-spec.md).
 - **Test and gate reliability:** C28 (three `@smoke` specs fail under CPU load),
   C31 (unreproducible `pnpm test` unhandled error), C39 (live-daemon tests not
-  isolated). C25 is resolved: the create-note flow follows the current Notes
+  isolated). ~~**C69** Linux CI clippy on macOS-only dead code~~ **RESOLVED
+  on #61** (`menu_bar_capture` / `should_reopen_main_window` cfg-gated).
+  C25 is resolved: the create-note flow follows the current Notes
   panel and duplicate type-visibility browser coverage was removed.
 - ~~**Correctness / warnings:** C55~~ **RESOLVED 2026-08-29** (`c423445`)
 - ~~**Correctness:** C34~~ **RESOLVED 2026-08-29** (`1509f9f`, `be85f80`)
@@ -484,11 +486,9 @@ Worth doing, in order:
    The contract lives on `ChatComposerDeck`. Closed on GitHub 2026-08-29.
    **#51 Tab completion** research is done (rules-first); implement when
    claimed — do not invent a second suggestion system that fights pills.
-5. `shell-final-direction.md` §2.1 and §2.3 are marked superseded by ADR-0166.
-   The rest still stands. Do not treat the whole document as dead.
+5. Shell region map is ADR-0166 / ADR-0170, not a separate design spec.
 
-Not needed: a new theme doc (`rhizome-default-themes.md` is thorough and
-current). The harness *filter* is settled (ADR-0168). Composition working
+The harness *filter* is settled (ADR-0168). Composition working
 notes now live in [`harness-composition.md`](design/harness-composition.md);
 they are not ratified. Do not treat the doctrine or that file as a license
 to start grafting — and read **#56** before treating the filter as law.

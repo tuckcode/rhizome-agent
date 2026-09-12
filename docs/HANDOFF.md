@@ -61,6 +61,7 @@ Rhizome in-app updater stub. Evening design dump (portfolio, vault-as-skills,
 no CC Switch):
 [2208](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md).
 [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date first).
+Area D: public `site/` and Desktop `release-notes/` gone; `pnpm agent-docs` no-ops without `site/`.
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Inverted Dock icon is
@@ -96,6 +97,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-1551-cursor-grok-4-6-area-d-rebase.md) — **#61 rebased onto origin/main.** Tolaria `site/` / Desktop archive gone; `YOU-SHOULD-KNOW.md` kept; Linux clippy C69 resolved on this branch. Not merged.
 - [2026-09-12 · Grok 4.6](plans/handoffs/2026-09-12-1051-grok-4-6-area-c-rebase.md) — **PR #60 Area C** rebased onto `origin/main` after #62; unused onboarding prompt stayed deleted.
 - [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-0018-cursor-grok-4-6-chat-note-split.md) — Chat note **On top / Beside**; Beside folds Sessions/Notes; Ask Chat about highlight. Not in `/Applications` until a rebuild.
 - [2026-09-11 · Cursor Grok 4.6](plans/handoffs/2026-09-11-2045-cursor-grok-4-6-applications-rebuild.md) — `/Applications` rebuilt 18:39 then 21:59; extra `.app` copies gone. C64 still not first-2s; #47 open.
@@ -122,11 +124,11 @@ yours to choose.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1537-composer-midturn-stream-and-session-names.md) — mid-turn: host kept stopping at first `agent_end` (follow-up reply missing in Chat); fix `stream_until_turn_complete` + optimistic follow-up bubble. New session names lead with local clock. Rebuild `/Applications` still required.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1522-composer-midturn-waiting-chrome.md) — daily-drive: **#41 mid-turn** confirmed (“Waiting in this session” / `MIDTURN_QUEUE_PROBE` while Working; DeepSeek · Rhizome Vault); graph tools still healthy.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1147-composer-daily-drive-cli-call-bundle.md) — daily-drive: **C69** packaged `cli-call` missing (fixed + `/Applications` patched); **live Chat graph ask succeeded** on Obsidian Vault (Big Pickle → `rhizome_graph_health`: 69 notes / 11 links / 60 orphans / 7 dead links). Same day: `/Applications` rebuild with ADR-0170 native QA; vault skills point at packaged `cli-call.mjs`; **graph Find** collapsed to bottom-right expandable box (Atticus: type-pill wall hid the canvas).
+- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2215-grok-4-6-area-d-docs-archive.md) — **Area D subtraction:** killed Tolaria `site/`, Desktop `release-notes/`, stale vision/wiki/podcast/plans/design one-shots, 50 `.pen` mocks, Laputa Claude commands, empty `.mcp.json`, Desktop `trademarks.md`, and C18 l10n invitation scripts. `YOU-SHOULD-KNOW.md` stays (living briefing). `CONTRIBUTING.md` is now a private-repo stub.
 - [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2155-grok-4-6-area-c-orphan-ui.md) — **Area C:** deleted orphan UI under `src/components/` (onboarding/create-note/autocomplete/NoteIcon), unused exports, and dead dialog/docked/right-panel-chat branches.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-0805-composer-c67-c68.md) — **C67/C68 shipped:** sessions right-click menu; note lock (default editable, breadcrumb + Cmd+K).
 - [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-0405-grok-4-6-status-bar-pills.md) — status-bar chrome: Contribute/Docs → Settings → About; build/update next to theme; composer lost the duplicate vault pill and hosts agent idle. Vault dropdown stays bottom-left.
 - [2026-09-05 · Claude Opus 5](plans/handoffs/2026-09-05-2145-claude-opus-5-session-import-and-agent-graph.md) — **no agent had ever successfully run a graph query**: the `rhizome_graph_*` tools need `RHIZOME_TOOL_PATH`, and the seeded skill tells the agent to run `cli-call.mjs` from a bash tool, which inherits none of the app's environment. Fixed, and rewrote the skill description so agents discover the graph at all (they were told only about note CRUD). Built the **session-import engine** — ledger, dedup, Claude Code adapter, selection, preview, vault writer — verified on real history: 318 notes written, zero failures, second run wrote nothing. Fixed four UI defects (inverted Connections resize, titlebar stealing the window drag, unresizable chat/editor split, session list sorted by file mtime). **Right-panel layout agreed but unbuilt**; skill change not yet verified with a real agent.
-
 - [2026-09-05 · Claude Opus 5](plans/handoffs/2026-09-05-0920-claude-opus-5-audit-findings.md) — closed the native audit's backlog and verified it in the real app: **C61** (draft survives Graph navigation) and **C63** (one-node graph no longer fills the canvas) confirmed natively; **C64** fixed and weakly confirmed; **C62 fixed on the second attempt** — the first fix was source-reasoned, self-consistent, green, and wrong, and the native retest is what caught it (real cause: a rename left new-note reload protection on the old path, so the reload restored the ghost row). For **C60** found the leading mechanism — the saved window frame is applied twice at launch, and resizing an NSWindow mid-WKWebView-layout desyncs its compositing layer, which fits blank-DOM-but-WebGL-paints and quit-fixes-but-reload-doesn't — and skipped the redundant resize; **mitigated, not proven fixed.** 6003 frontend + 1706 Rust tests, lint, typecheck, clippy, fmt, Codacy all pass.
 - [2026-09-05 · Claude Sonnet 5](plans/handoffs/2026-09-05-0620-claude-sonnet-5-a1-connections-routing.md) — `ConnectionsPanel` gained a controlled `openView` API; the session-footprint chip and status-bar Graph pill now route through it in command-rail mode. 105 focused tests, lint, typecheck, diff-check, handoff:check pass. **Found the real cause of the multi-session native-attach blocker: the debug bundle shares a bundle identifier with the installed app, and single-instance enforcement silently kills the debug process on launch while the installed app is open** — not a Codex attachment quirk as previously assumed. After quitting the installed app (approved), verified Chat/Changes/Graph/Mycelium panel switching in the exact debug bundle is instant with no spinner and flat CPU/memory across 8 rapid toggles — could not reproduce the spinning-wheel hang Atticus saw, which was on the installed app. Precise ten-cycle timing still open. No commit/push.
 - [2026-09-05 · GPT-5](plans/handoffs/2026-09-05-0535-gpt-5-a1-lifecycle-slice.md) — A1’s first slice stops inactive Graph/Mycelium renderers, retains lightweight panel state, removes duplicate rail entries, and fixes narrow-window panel reachability. 126 focused tests, lint, typecheck, detector, and debug build pass; ten-cycle native measurement remains open. No commit/push.
@@ -186,7 +188,7 @@ push is not a release — releases are tagged builds with signed installers.
 3. ~~Distill-clipboard is an unwired stub~~ — **wired** (`5c208466`).
 4. ~~No standing instruction nudges agents to save proactively~~ — **shipped** in the seeded `AGENTS_MD` (`vault/getting_started.rs`, "Saving durable knowledge" section).
 
-**Workstream A audit DONE 2026-07-31, all 10 findings CLOSED 2026-08-02** → `docs/plans/2026-07-31-save-path-audit-session-status.md` (its status table is the per-finding source of truth). All six entry points (Research panel, menu-bar, inbox watcher, MCP, CLI, hand-edit) traced end to end.
+**Workstream A audit DONE 2026-07-31, all 10 findings CLOSED 2026-08-02.** All six entry points (Research panel, menu-bar, inbox watcher, MCP, CLI, hand-edit) traced end to end.
 
 **Audit verdict at the time: the write path is reliable; the trigger path was not — nothing read `trigger`.** Six sites carefully populated a write-only field, behind four independent writers with divergent field sets, five distinct field shapes in a single real 15-event log, and 33% of real events carrying no `trigger` at all.
 
@@ -194,9 +196,9 @@ push is not a release — releases are tagged builds with signed installers.
 
 **Still genuinely open from that area (not findings, noted in passing):** nothing rotates `.rhizome/events.jsonl`, and the reader caps at the newest 200 lines — so the file grows without bound. Native confirmation of the activity-feed source labels is C13.
 
-**Menu-bar companion — capture/activity/vault-context WIRED + committed** (`11e7ca65`, 2026-07-19). Popover now works: quick-capture, activity feed, vault label. Distill-clipboard wired (`5c208466`, 2026-07-19) — reads clipboard, calls `start_rhizome_job` with `rhizome_distill`, sets flash, refreshes activity. Needs native QA (`pnpm tauri dev` → click tray mark → type → Enter). Detail: `docs/plans/2026-07-19-menu-bar-companion-skeleton-session-status.md`.
+**Menu-bar companion — capture/activity/vault-context WIRED + committed** (`11e7ca65`, 2026-07-19). Popover now works: quick-capture, activity feed, vault label. Distill-clipboard wired (`5c208466`, 2026-07-19) — reads clipboard, calls `start_rhizome_job` with `rhizome_distill`, sets flash, refreshes activity. Needs native QA (`pnpm tauri dev` → click tray mark → type → Enter).
 
-**Design specs banked** (Fable 5): `docs/design/onboarding-walkthrough.md` and `docs/design/shell-final-direction.md`. Spotlight walkthrough was **specced, never built** — Welcome + AI-agents onboarding exist; the in-app tour does not.
+**Spotlight onboarding walkthrough** was specced, never built — Welcome + AI-agents onboarding exist; the in-app tour does not (C10).
 
 **Wave 5.3 — icon command rail — BUILT 2026-07-24 (Opus).** `src/components/CommandRail.tsx` (46px fixed left rail), gated on `useFeatureFlag('shell_command_rail')`. Default ON (`cce13385`). Detail: see HANDOFF items 4 and 4b.
 
@@ -255,9 +257,9 @@ push is not a release — releases are tagged builds with signed installers.
 **Reading order for a fresh session:**
 0. If non-Anthropic model: `docs/CROSS-MODEL-HANDOFF.md`
 1. This file
-2. `docs/plans/*-session-status.md` with latest date
+2. Latest file in `docs/plans/handoffs/`
 3. `docs/ARCHITECTURE.md`
-4. `docs/plans/2026-07-10-rhizome-desktop-alpha-roadmap.md`
+4. `docs/NEXT.md` / `docs/IDENTITY.md`
 5. `AGENTS.md` at repo root
 
 ## Open threads
@@ -632,7 +634,7 @@ push is not a release — releases are tagged builds with signed installers.
   remote starter exists. Still blocked: publishing that remote under
   `tuckcode`/`knispo`. CROSS-MODEL-HANDOFF §6.
 - C9-OPEN: optional first-run Welcome even when a default vault already exists (user wants optional onboard with skip-to-existing). Product decision pending.
-- C10-OPEN: spotlight onboarding walkthrough still unbuilt (`docs/design/onboarding-walkthrough.md`).
+- C10-OPEN: spotlight onboarding walkthrough still unbuilt.
 - **C12-RESOLVED (2026-08-19): the exposed GitHub PAT is revoked and no local copy remains.** A fine-grained PAT (`github_pat_…`) had been configured as `mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN`, captured into session transcripts.
 
   **How it actually leaked — measured, and not what this entry previously claimed.** The original note blamed `ps aux` making the env var world-readable. The redacted transcripts show otherwise: **76 of the 78 occurrences are the MCP config block itself**, in the form `"command":"npx","args":["-y","@modelcontextprotocol/server-github"],"env":{"GITHUB_PERSONAL_ACCESS_TOKEN":"…"}`. The remaining 2 are later sessions discussing the leak. The vector was mundane — the secret lived in a file that agents routinely read (`~/.claude.json`), so every config inspection copied it into a transcript. `ps aux` exposure is real but is not what happened here, and the distinction matters because the prevention is different.
@@ -893,8 +895,5 @@ push is not a release — releases are tagged builds with signed installers.
 ## Links out
 
 - Prime harness coverage, quantified → `docs/plans/2026-08-22-prime-harness-coverage.md` (25% of the daemon surface; what is missing, and in what order)
-- Full history + session details → `docs/plans/` (see classification in `docs/plans/handoff-classification.md`)
-- Context retooling plan → `docs/plans/2026-07-25-context-retooling-plan.md`
-- Duplication analysis → `docs/plans/duplication-analysis.md`
-- Rules ledger → `docs/plans/context-rules-ledger.md`
+- Session records → `docs/plans/handoffs/`
 - Cross-model traps → `docs/CROSS-MODEL-HANDOFF.md`

@@ -66,7 +66,7 @@ jobs:
             echo "should-build=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if git diff --name-only "$BASE_SHA" HEAD | grep -qE '^(docs/|site/|scripts/build-agent-docs\.mjs|package\.json|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'; then
+          if git diff --name-only "$BASE_SHA" HEAD | grep -qE '^(docs/|scripts/build-agent-docs\.mjs|package\.json|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'; then
             echo "should-build=true" >> "$GITHUB_OUTPUT"
           else
             echo "should-build=false" >> "$GITHUB_OUTPUT"

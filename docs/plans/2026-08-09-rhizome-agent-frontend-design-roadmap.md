@@ -20,7 +20,9 @@ Phase 1 made Prime chat **work**. Dogfood showed the product truth:
 
 That is expected (Option C bootstrap) and **not a Phase 1 failure**. It is the design debt this roadmap sequences.
 
-Desktop-era shell specs (e.g. `docs/design/shell-final-direction.md` — network shell, command rail, graph dock, research-as-right-dock) remain useful **reference for components and tokens**. They are **not** the destination layout for Agent v0.
+Desktop-era shell specs are gone. The destination layout is ADR-0166 /
+ADR-0170 (chat-centered shell, notes-heavy right panel), not a separate
+design one-shot.
 
 ---
 
