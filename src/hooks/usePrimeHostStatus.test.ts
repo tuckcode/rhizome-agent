@@ -29,13 +29,14 @@ vi.mock('../mock-tauri', () => ({
   },
 }))
 
-import { usePrimeHostStatus } from './usePrimeHostStatus'
+import { resetPrimeHostStatus, usePrimeHostStatus } from './usePrimeHostStatus'
 
 describe('usePrimeHostStatus', () => {
   beforeEach(() => {
     invoked.calls = []
     invoked.running = true
     invoked.problem = null
+    resetPrimeHostStatus()
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,
       get: () => 'visible',
@@ -73,6 +74,23 @@ describe('usePrimeHostStatus', () => {
    * service is listening. Status-only polling then froze the model chip for
    * the rest of the session. A down host has to be retried, not observed.
    */
+  it('shares one Prime poll across Chat chrome instead of starting one per widget', async () => {
+    const vault = '/Users/dtc/Documents/Rhizome Vault'
+    renderHook(() => usePrimeHostStatus(true, vault))
+    renderHook(() => usePrimeHostStatus(true, vault))
+    renderHook(() => usePrimeHostStatus(true, vault))
+
+    await waitFor(() => {
+      expect(invoked.calls[0]).toEqual({
+        cmd: 'ensure_prime_session_host',
+        args: { vaultPath: vault },
+      })
+    })
+
+    const ensures = invoked.calls.filter((call) => call.cmd === 'ensure_prime_session_host')
+    expect(ensures).toHaveLength(1)
+  })
+
   it('reconnects when a status poll finds the host down', async () => {
     invoked.running = false
     renderHook(() => usePrimeHostStatus(true, '/Users/dtc/Documents/Rhizome Vault'))

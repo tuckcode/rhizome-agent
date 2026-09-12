@@ -228,6 +228,8 @@ interface SettingsBodyProps {
   setAnalytics: (value: boolean) => void
   onOpenFeedback?: () => void
   onOpenDocs?: () => void
+  initialSectionId?: string | null
+  loadModelCatalog?: boolean
 }
 
 const PULL_INTERVAL_OPTIONS = [1, 2, 5, 10, 15, 30] as const
@@ -604,6 +606,7 @@ function SettingsPanelInner({
           setAccentColor={handleAccentColorChange}
           setHideGitignoredFiles={handleGitignoredVisibilityChange}
           setAllNotesFileVisibility={handleAllNotesFileVisibilityChange}
+          initialSectionId={initialSectionId}
         />
         <SettingsFooter onClose={onClose} onSave={handleSave} t={t} />
       </div>
@@ -663,6 +666,7 @@ interface SettingsBodyFromDraftProps {
   setAccentColor: (value: AccentColor) => void
   setHideGitignoredFiles: (value: boolean) => void
   setAllNotesFileVisibility: (value: AllNotesFileVisibility) => void
+  initialSectionId?: string | null
 }
 
 function SettingsBodyFromDraft({
@@ -686,6 +690,7 @@ function SettingsBodyFromDraft({
   setAccentColor,
   setHideGitignoredFiles,
   setAllNotesFileVisibility,
+  initialSectionId,
 }: SettingsBodyFromDraftProps) {
   return (
     <SettingsBody
@@ -740,6 +745,7 @@ function SettingsBodyFromDraft({
       setHideGitignoredFiles={setHideGitignoredFiles}
       allNotesFileVisibility={draft.allNotesFileVisibility}
       setAllNotesFileVisibility={setAllNotesFileVisibility}
+      initialSectionId={initialSectionId}
       multiWorkspaceEnabled={draft.multiWorkspaceEnabled}
       setMultiWorkspaceEnabled={(value) => updateDraft('multiWorkspaceEnabled', value)}
       vaults={vaults}
@@ -761,13 +767,37 @@ function SettingsBodyFromDraft({
 }
 
 function SettingsBody(props: SettingsBodyProps) {
+  const [loadModelCatalog, setLoadModelCatalog] = useState(
+    props.initialSectionId === SETTINGS_SECTION_IDS.ai,
+  )
+
+  useEffect(() => {
+    if (loadModelCatalog) return
+    const el = document.getElementById(SETTINGS_SECTION_IDS.ai)
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const root = el.closest('.overflow-auto')
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setLoadModelCatalog(true)
+      },
+      { root: root instanceof Element ? root : null, threshold: 0.15 },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [loadModelCatalog])
+
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden">
-      <SettingsBodyNav t={props.t} />
+      <SettingsBodyNav
+        t={props.t}
+        onVisit={(id) => {
+          if (id === SETTINGS_SECTION_IDS.ai) setLoadModelCatalog(true)
+        }}
+      />
       <div className="min-w-0 flex-1 overflow-auto px-6 py-4">
         <SettingsSyncAndAppearanceSections {...props} />
         <SettingsContentSections {...props} />
-        <SettingsAgentWorkflowSections {...props} />
+        <SettingsAgentWorkflowSections {...props} loadModelCatalog={loadModelCatalog} />
       </div>
     </div>
   )
@@ -938,6 +968,7 @@ function SettingsAgentWorkflowSections({
   onOpenFeedback,
   onOpenDocs,
   activeVaultPath,
+  loadModelCatalog = false,
 }: SettingsBodyProps) {
   return (
     <>
@@ -954,6 +985,7 @@ function SettingsAgentWorkflowSections({
           aiModelProviders={aiModelProviders}
           setAiModelProviders={setAiModelProviders}
           onCopyMcpConfig={onCopyMcpConfig}
+          loadModelCatalog={loadModelCatalog}
         />
         <div className="mt-4">
           <SessionImportSettingsSection vaultPath={activeVaultPath ?? null} />
@@ -1291,6 +1323,7 @@ function AiAgentSettingsSection({
   aiModelProviders,
   setAiModelProviders,
   onCopyMcpConfig,
+  loadModelCatalog,
 }: Pick<
   SettingsBodyProps,
   | 't'
@@ -1304,6 +1337,7 @@ function AiAgentSettingsSection({
   | 'aiModelProviders'
   | 'setAiModelProviders'
   | 'onCopyMcpConfig'
+  | 'loadModelCatalog'
 >) {
   const selectedTarget = resolveAiTarget({
     default_ai_agent: defaultAiAgent,
@@ -1371,6 +1405,7 @@ function AiAgentSettingsSection({
         aiModelProviders={aiModelProviders}
         setAiModelProviders={setAiModelProviders}
         onCopyMcpConfig={onCopyMcpConfig}
+        loadModelCatalog={loadModelCatalog}
       />
     </>
   )
@@ -1382,12 +1417,14 @@ function AiTargetManagementTabs({
   aiModelProviders,
   setAiModelProviders,
   onCopyMcpConfig,
+  loadModelCatalog,
 }: {
   t: Translate
   aiAgentsStatus: AiAgentsStatus
   aiModelProviders: AiModelProvider[]
   setAiModelProviders: (value: AiModelProvider[]) => void
   onCopyMcpConfig?: () => void
+  loadModelCatalog?: boolean
 }) {
   return (
     <Tabs defaultValue="agents" className="gap-3">
@@ -1399,7 +1436,7 @@ function AiTargetManagementTabs({
       <TabsContent value="agents" className="space-y-3">
         <AiAgentsInstalledSection t={t} aiAgentsStatus={aiAgentsStatus} />
         <PrimeProviderStatusSection t={t} />
-        <PrimeModelAllowListSection t={t} />
+        {loadModelCatalog ? <PrimeModelAllowListSection t={t} /> : null}
         {onCopyMcpConfig ? <CopyMcpConfigButton t={t} onCopyMcpConfig={onCopyMcpConfig} /> : null}
         <BridgeTokenRow t={t} />
       </TabsContent>

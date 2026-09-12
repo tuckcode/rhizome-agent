@@ -1338,10 +1338,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     areAutomaticUpdateChecksEnabled(settings),
   )
 
-  // #19: one indicator covering both Rhizome and Prime. Prime's installed
-  // version comes from the daemon handshake (AiPanel already polls the same
-  // status independently for its own chrome); this is a second lightweight
-  // poll of the same cheap command, not a new connection to Prime.
+  // #19: one indicator covering both Rhizome and Prime. Chat already polls
+  // host status for its chrome; that loop is shared, so this is not a second
+  // ensure/reconnect.
   const primeHostStatusForUpdates = usePrimeHostStatus(true, resolvedPath)
   // Optional-chained deliberately: the hook resolves to null whenever its
   // command is absent from a test's fake-IPC table, and dereferencing that

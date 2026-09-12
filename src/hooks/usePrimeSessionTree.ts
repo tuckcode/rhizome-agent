@@ -8,8 +8,9 @@ import {
 /**
  * Fork/branch history of the attached Prime session.
  *
- * Polled while Chat is on Prime. Must not create a session — the host
- * answers an empty tree when nothing is attached (#28).
+ * Read when Chat is on Prime and when the session changes. Must not create a
+ * session — the host answers an empty tree when nothing is attached (#28).
+ * Do not poll this on a timer: Chat already holds the host lock for status.
  */
 export function usePrimeSessionTree(
   enabled = true,
@@ -30,8 +31,6 @@ export function usePrimeSessionTree(
   useEffect(() => {
     if (!enabled) return
     refresh()
-    const id = window.setInterval(refresh, 4_000)
-    return () => window.clearInterval(id)
   }, [enabled, refresh, refreshKey])
 
   return {

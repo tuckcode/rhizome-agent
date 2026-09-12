@@ -6,6 +6,7 @@ import { SETTINGS_SECTION_IDS } from './settingsSectionIds'
 
 interface SettingsBodyNavProps {
   t: (key: TranslationKey) => string
+  onVisit?: (id: string) => void
 }
 
 interface SettingsNavItem {
@@ -14,7 +15,7 @@ interface SettingsNavItem {
   Icon: ComponentType<IconProps>
 }
 
-export function SettingsBodyNav({ t }: SettingsBodyNavProps) {
+export function SettingsBodyNav({ t, onVisit }: SettingsBodyNavProps) {
   const items: SettingsNavItem[] = [
     { id: SETTINGS_SECTION_IDS.sync, label: t('settings.sync.title'), Icon: RefreshCw },
     { id: SETTINGS_SECTION_IDS.workspaces, label: t('settings.workspaces.title'), Icon: Cube },
@@ -37,7 +38,11 @@ export function SettingsBodyNav({ t }: SettingsBodyNavProps) {
             variant="ghost"
             size="sm"
             className="h-10 w-full justify-start gap-2.5 px-2.5 text-sm font-medium text-muted-foreground hover:text-foreground"
-            onClick={() => document.getElementById(item.id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })}
+            data-testid={`settings-nav-${item.id}`}
+            onClick={() => {
+              onVisit?.(item.id)
+              document.getElementById(item.id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+            }}
           >
             <item.Icon size={16} weight="regular" className="shrink-0" />
             <span className="truncate">{item.label}</span>
