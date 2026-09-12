@@ -83,7 +83,7 @@ trustworthy. Verify on a **real vault + live agent turn**, not unit tests alone.
    ~~Graph/Mycelium only on Changes + 46px Notes restore rail~~ on origin
    `0fa00a2`. Later: expand the Changes split instead of a second side panel.
    Still open: Inbox rename / discoverability.
-7. **Tonight (Atticus):** review **Grokbot full audits** — rhizome-agent **and** CodexGPT lob. See [1819 handoff](plans/handoffs/2026-09-06-1819-composer-park-grokbot-audits-tonight.md). ~~Thinking-pill full level menu~~ on origin `0fa00a2` (not in every running binary until a rebuild he asks for).
+7. **Tonight (Atticus):** review **Grokbot full audits** — rhizome-agent **and** CodexGPT lob. See [1819 handoff](plans/handoffs/2026-09-06-1819-composer-park-grokbot-audits-tonight.md). ~~Thinking-pill full level menu~~ and Graph-on-Changes were in `/Applications` as of **2026-09-11**. Chat note **On top / Beside** is in this tree; rebuild Applications to pick it up.
 
 **Already shipped (do not re-claim):** #25 provenance · C23 rehydration ·
 C67 sessions context menu · C68 note lock · ADR-0170 right-panel stack ·

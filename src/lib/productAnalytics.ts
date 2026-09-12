@@ -204,6 +204,10 @@ export function trackNoteLockToggled(locked: boolean): void {
   trackEvent('note_lock_toggled', { locked: numericFlag(locked) })
 }
 
+export function trackChatNoteSplitChanged(split: 'stacked' | 'side-by-side'): void {
+  trackEvent('chat_note_split_changed', { split })
+}
+
 export function trackNotePdfExportStarted(source: NotePdfExportSource): void {
   trackEvent('note_pdf_export_started', { source })
 }

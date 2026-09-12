@@ -47,11 +47,12 @@ file.
 ---
 
 ## State
-`main` on origin is **`457ee96`** (docs: evening dump + next-agent dock).
-Last **app** build is **`0fa00a2`**: thinking-level menu, Graph/Mycelium on
-Changes, matching Notes restore rail, skip-ensure on session switch.
-Native Chat glance **PASSED** (2026-09-06). Do not rebuild `/Applications`
-over a live Rhizome.
+`main` is about to carry the Chat note **On top / Beside** toggle (this
+push). Last **app** git was **`0fa00a2`**. `/Applications/Rhizome Agent.app`
+was last installed **2026-09-11 21:59** with note-on-top only — rebuild to
+pick up the toggle. Native Chat glance **PASSED** (2026-09-06). Quit the
+daily app, uninstall it, then install. Do not launch leftovers. After
+install, delete leftover `.app` copies.
 
 Still open / parked: **C72** Inbox rename; Prime list-import; **#51** Tab;
 **C64** full verify; **#47** confirm-close; Grokbot **#60/#61/#62** (held);
@@ -94,6 +95,8 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-0018-cursor-grok-4-6-chat-note-split.md) — Chat note **On top / Beside**; Beside folds Sessions/Notes; Ask Chat about highlight. Not in `/Applications` until a rebuild.
+- [2026-09-11 · Cursor Grok 4.6](plans/handoffs/2026-09-11-2045-cursor-grok-4-6-applications-rebuild.md) — `/Applications` rebuilt 18:39 then 21:59; extra `.app` copies gone. C64 still not first-2s; #47 open.
 - [2026-09-08 · Cursor Grok 4.6](plans/handoffs/2026-09-08-1918-cursor-grok-4-6-c64-stamp.md) — stamped origin **`457ee96`** vs last app **`0fa00a2`**. C64 first-2s verify blocked (Documents sheet, then blank chrome).
 - [2026-09-07 · Cursor Grok 4.6](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md) — **parked evening dump (no UI):** portfolio-on-boot, vault as skill/memory home, STE must not drift, no CC Switch in product. Chat ↔ Prime still first.
 - [2026-09-07 · Cursor Grok 4.6](plans/handoffs/2026-09-07-0351-cursor-grok-4-6-push-and-adhd-off.md) — **`0fa00a2` on origin;** ADHD ideation skill removed from this repo; no Applications rebuild.
@@ -102,7 +105,6 @@ yours to choose.
 - [2026-09-07 · Composer](plans/handoffs/2026-09-07-0003-composer-beachball-lag.md) — **beachball diagnosis (docs only):** session switch = 3 sync Prime awaits + full chat `messages.map`; Settings = full remount; cold start = ensure daemon + vault + Graph if Inbox open; Applications smoother but same shapes; quit Applications before `tauri:dev` (same bundle id).
 - [2026-09-06 · Cursor Grok 4.6](plans/handoffs/2026-09-06-2236-cursor-grok-4-6-area-f.md) — **Area F:** MCP no longer advertises `rhizome_grok_import` / `rhizome_generate_wiki` / `rhizome_repo_research`; deleted `rhizome_grok_import.rs` and parked smoke junk. **Merged as #63**.
 - [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2145-grok-4-6-area-b-orphan-hooks.md) — **Area B subtraction:** deleted unused hooks (`useMcpBridge`, `useClaudeCodeOnboarding`, `useClaudeCodeStatus`, `useNoteLayout`), the TS Mindwalk duplicate, unused Claude CLI wrappers, and confirmed-dead app-core exports. Claude onboarding/badge UI files left for area C. **Merged as #59**.
-- [2026-09-06 · Cursor Grok 4.6](plans/handoffs/2026-09-06-2141-cursor-grok-4-6-area-a-orphans.md) — **area A subtraction:** deleted orphaned `e2e/` (24 unused specs), unused scripts, unused `biome.json`, leftover `mcp-server/package-lock.json`, and unused `verifyFocusable`. Live `tests/smoke/` and `tests/integration/` kept. **Merged as #58** (`de80c90`).
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md) — **native Chat glance PASS** on `f76b46c`/`ac36e10`; daily-drive north-star leftover closed. Parked: C72, Prime list-import, #51 Tab, C64 full verify, #47, Grokbot.
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1819-composer-park-grokbot-audits-tonight.md) — **tonight:** review Grokbot full audits of rhizome-agent **and** CodexGPT lob (after dinner).
 - [2026-09-06 · Composer](plans/handoffs/2026-09-06-1816-composer-session-import-first-run.md) — **session-import Settings UI** (Claude Code → vault `Imports/`); **Getting Started = local Rhizome scaffold** (no Tolaria clone by default). Prime list rows + C11 remote starter still open.

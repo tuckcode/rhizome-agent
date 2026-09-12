@@ -12,6 +12,11 @@ import {
   VaultPanelRestoreButton,
 } from './components/VaultPanel'
 import { Editor } from './components/Editor'
+import { AskChatExcerptMenu } from './components/AskChatExcerptMenu'
+import { ChatNoteSplitToggle } from './components/ChatNoteSplitToggle'
+import { useChatNoteSplit, shouldForceChatShellCompact, type ChatNoteSplit } from './components/chatNoteSplit'
+import { formatAskChatExcerpt } from './components/askChatExcerpt'
+import { prefillAiComposer } from './utils/aiPromptBridge'
 import { ResizeHandle } from './components/ResizeHandle'
 import { CreateTypeDialog } from './components/CreateTypeDialog'
 import { CreateViewDialog } from './components/CreateViewDialog'
@@ -536,7 +541,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   /**
    * Right-click a note → hand it to the agent.
    *
-   * Switches to Chat and opens the note beside it, which is what makes the
+   * Switches to Chat and opens the note above it, which is what makes the
    * agent able to see it — `ChatHome` feeds its open note into the agent's
    * context. So this is one action, not two: go to chat, and bring the note.
    */
@@ -559,10 +564,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const connectionsPanelRef = useRef<ConnectionsPanelHandle>(null)
   const connectionsRequestSeq = useRef(0)
   const [connectionsRequest, setConnectionsRequest] = useState<ConnectionsViewRequest | null>(null)
-  // The editor keeps its own generous margins, so a fixed half of the centre
-  // reads as wasted space when the window is narrow. Bounds leave room for the
-  // editor's own minimum on one side and a usable chat on the other.
-  const chatNoteEditorWidth = usePanelWidth(APP_STORAGE_KEYS.chatNoteEditorWidth, 560, 320, 1200)
+  // Note sits on top of Chat by default. Side-by-side reuses width.
+  // Bounds leave a usable note and a usable composer in both layouts.
+  const { split: chatNoteSplitMode, setSplit: setChatNoteSplit } = useChatNoteSplit()
+  const chatNoteEditorWidth = usePanelWidth(APP_STORAGE_KEYS.chatNoteEditorWidth, 560, 220, 900)
+  const chatNoteEditorHeight = usePanelWidth(APP_STORAGE_KEYS.chatNoteEditorHeight, 320, 140, 720)
   const handleRailSelectChanges = useCallback(() => {
     handleSetSelection({ kind: 'filter', filter: 'changes' })
   }, [handleSetSelection])
@@ -1567,18 +1573,30 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   })
   const activeTabEntry = activeTab?.entry ?? null
   const activeTabPath = activeTabEntry?.path
-  const [chatNotePaneOpen, setChatNotePaneOpen] = useState(false)
+  const handleAskChatAboutExcerpt = useCallback((excerpt: string) => {
+    const title = activeTabEntry?.title || activeTabEntry?.filename || 'this note'
+    prefillAiComposer(formatAskChatExcerpt(title, excerpt))
+    trackEvent('note_excerpt_ask_chat')
+  }, [activeTabEntry])
+  const [, setChatNotePaneOpen] = useState(false)
   const [sessionRailSlot, setSessionRailSlot] = useState<HTMLDivElement | null>(null)
   const {
     shellRef,
-    collapseSessions: compactSessions,
-    collapseVaultPanel: compactVaultPanel,
+    collapseSessions: widthCompactSessions,
+    collapseVaultPanel: widthCompactVaultPanel,
   } = useShellCompactLayout(
     chatCentered,
-    Boolean(activeTab) || chatNotePaneOpen,
+    false,
     !layout.inspectorCollapsed,
   )
+  const forceChatShellCompact = shouldForceChatShellCompact(chatNoteSplitMode, Boolean(activeTab))
+  const compactSessions = forceChatShellCompact || widthCompactSessions
+  const compactVaultPanel = forceChatShellCompact || widthCompactVaultPanel
   const [compactVaultPanelOpen, setCompactVaultPanelOpen] = useState(false)
+  const handleChatNoteSplit = useCallback((next: ChatNoteSplit) => {
+    setChatNoteSplit(next)
+    if (next === 'side-by-side') setCompactVaultPanelOpen(false)
+  }, [setChatNoteSplit])
   const handleRailSelectGraph = useCallback(() => {
     if (chatCentered) {
       if (viewMode === 'editor-only') handleSetViewMode('editor-list')
@@ -1931,7 +1949,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const noteListSurface = effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse' ? (
     <PulseView vaultPath={gitSurfaces.historyRepositoryPath} onOpenNote={handlePulseOpenNote} refreshKey={gitHistoryRefreshKey} sidebarCollapsed={!showSidebarTree && !chatCentered} onExpandSidebar={() => handleSetViewMode('all')} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.historyRepositoryPath} onRepositoryChange={gitSurfaces.setHistoryRepositoryPath} locale={appLocale} />
   ) : (
-    <NoteList entries={visibleEntries} selection={effectiveSelection} selectedNote={activeTab?.entry ?? null} loading={isVaultContentLoading} noteListFilter={noteListFilter} onNoteListFilterChange={setNoteListFilter} inboxPeriod={inboxPeriod} modifiedFiles={noteListModifiedFiles} modifiedFilesError={noteListModifiedFilesError} gitRepositories={gitRepositories} selectedGitRepositoryPath={gitSurfaces.changesRepositoryPath} onGitRepositoryChange={gitSurfaces.setChangesRepositoryPath} getNoteStatus={vault.getNoteStatus} sidebarCollapsed={!showSidebarTree && !chatCentered} onSelectNote={(entry) => { notes.handleSelectNote(entry); if (compactVaultPanel) setCompactVaultPanelOpen(false) }} onReplaceActiveTab={(entry) => { handleReplaceActiveTabWithQueuedDiff(entry); if (compactVaultPanel) setCompactVaultPanelOpen(false) }} onEnterNeighborhood={handleEnterNeighborhood} onCreateNote={notes.handleCreateNoteImmediate} onBulkOrganize={explicitOrganizationEnabled ? bulkActions.handleBulkOrganize : undefined} onBulkArchive={bulkActions.handleBulkArchive} onBulkDeletePermanently={deleteActions.handleBulkDeletePermanently} onUpdateTypeSort={notes.handleUpdateFrontmatter} onUpdateViewDefinition={handleUpdateViewDefinition} updateEntry={vault.updateEntry} onOpenInNewWindow={handleOpenEntryInNewWindow} onRenameFilename={appSave.handleFilenameRename} onExportPdf={handleExportNotePdfFromList} onToggleFavorite={entryActions.handleToggleFavorite} onToggleOrganized={explicitOrganizationEnabled ? entryActions.handleToggleOrganized : undefined} onAskAgent={handleAskAgentAboutNote} onRevealFile={fileActions.revealFile} onCopyFilePath={fileActions.copyFilePath} canCopyGitUrl={noteGitUrls.canCopyEntryGitUrl} onCopyGitUrl={noteGitUrls.copyEntryGitUrl} onDiscardFile={handleDiscardFile} onOpenDeletedNote={handleOpenDeletedNote} allNotesNoteListProperties={vaultConfig.allNotes?.noteListProperties ?? null} onUpdateAllNotesNoteListProperties={handleUpdateAllNotesNoteListProperties} inboxNoteListProperties={vaultConfig.inbox?.noteListProperties ?? null} onUpdateInboxNoteListProperties={handleUpdateInboxNoteListProperties} views={vault.views} visibleNotesRef={visibleNotesRef} allNotesFileVisibility={allNotesFileVisibility} multiSelectionCommandRef={multiSelectionCommandRef} locale={appLocale} />
+    <NoteList entries={visibleEntries} selection={effectiveSelection} selectedNote={activeTab?.entry ?? null} loading={isVaultContentLoading} noteListFilter={noteListFilter} onNoteListFilterChange={setNoteListFilter} inboxPeriod={inboxPeriod} modifiedFiles={noteListModifiedFiles} modifiedFilesError={noteListModifiedFilesError} gitRepositories={gitRepositories} selectedGitRepositoryPath={gitSurfaces.changesRepositoryPath} onGitRepositoryChange={gitSurfaces.setChangesRepositoryPath} getNoteStatus={vault.getNoteStatus} sidebarCollapsed={!showSidebarTree && !chatCentered} onSelectNote={(entry) => { notes.handleSelectNote(entry) }} onReplaceActiveTab={(entry) => { handleReplaceActiveTabWithQueuedDiff(entry) }} onEnterNeighborhood={handleEnterNeighborhood} onCreateNote={notes.handleCreateNoteImmediate} onBulkOrganize={explicitOrganizationEnabled ? bulkActions.handleBulkOrganize : undefined} onBulkArchive={bulkActions.handleBulkArchive} onBulkDeletePermanently={deleteActions.handleBulkDeletePermanently} onUpdateTypeSort={notes.handleUpdateFrontmatter} onUpdateViewDefinition={handleUpdateViewDefinition} updateEntry={vault.updateEntry} onOpenInNewWindow={handleOpenEntryInNewWindow} onRenameFilename={appSave.handleFilenameRename} onExportPdf={handleExportNotePdfFromList} onToggleFavorite={entryActions.handleToggleFavorite} onToggleOrganized={explicitOrganizationEnabled ? entryActions.handleToggleOrganized : undefined} onAskAgent={handleAskAgentAboutNote} onRevealFile={fileActions.revealFile} onCopyFilePath={fileActions.copyFilePath} canCopyGitUrl={noteGitUrls.canCopyEntryGitUrl} onCopyGitUrl={noteGitUrls.copyEntryGitUrl} onDiscardFile={handleDiscardFile} onOpenDeletedNote={handleOpenDeletedNote} allNotesNoteListProperties={vaultConfig.allNotes?.noteListProperties ?? null} onUpdateAllNotesNoteListProperties={handleUpdateAllNotesNoteListProperties} inboxNoteListProperties={vaultConfig.inbox?.noteListProperties ?? null} onUpdateInboxNoteListProperties={handleUpdateInboxNoteListProperties} views={vault.views} visibleNotesRef={visibleNotesRef} allNotesFileVisibility={allNotesFileVisibility} multiSelectionCommandRef={multiSelectionCommandRef} locale={appLocale} />
   )
 
   const sidebarPanel = showSidebarTree ? (
@@ -2073,23 +2091,18 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           {!chatCentered && noteListPanel}
           <div className={`app__editor${aiActivity.highlightElement === 'editor' || aiActivity.highlightElement === 'tab' ? ' ai-highlight' : ''}`}>
             {chatCentered ? (
-              <div className="app__chat-center" data-testid="chat-center" style={isGraphDestination || isMyceliumDestination || isResearchDestination ? { display: 'none' } : undefined}>
-                {chatHomeSurface}
-                {/* Chat and the editor split the centre. Without a handle the
-                    split is a fixed half each, and the editor's own margins
-                    make that read as wasted space on a narrow window. */}
-                <div
-                  role="separator"
-                  aria-orientation="vertical"
-                  aria-label={translate(appLocale, 'notes.panel.resize')}
-                  data-testid="chat-note-editor-resize"
-                  className="relative z-20 w-1 shrink-0 cursor-col-resize bg-transparent transition-colors hover:bg-border"
-                  onMouseDown={event => startResizeDrag(event, 'col-resize', deltaX => chatNoteEditorWidth.resizeBy(deltaX))}
-                />
+              <div className="app__chat-center" data-testid="chat-center" data-split={activeTab ? chatNoteSplitMode : 'stacked'} style={isGraphDestination || isMyceliumDestination || isResearchDestination ? { display: 'none' } : undefined}>
+                {activeTab ? (
+                  <div className="app__chat-note-split-bar">
+                    <ChatNoteSplitToggle split={chatNoteSplitMode} onChange={handleChatNoteSplit} />
+                  </div>
+                ) : null}
+                <div className="app__chat-center-body">
                 <div
                   className={activeTab ? 'app__note-editor' : 'app__note-editor app__note-editor--idle'}
-                  style={{ flex: `0 0 ${chatNoteEditorWidth.width}px` }}
+                  style={activeTab ? { flex: `0 0 ${chatNoteSplitMode === 'side-by-side' ? chatNoteEditorWidth.width : chatNoteEditorHeight.width}px` } : undefined}
                 >
+                  <AskChatExcerptMenu onAsk={handleAskChatAboutExcerpt}>
                     <Editor
                       tabs={notes.tabs}
                       activeTabPath={notes.activeTabPath}
@@ -2167,7 +2180,27 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                       onToast={setToastMessage}
                       locale={appLocale}
                     />
-                  </div>
+                  </AskChatExcerptMenu>
+                </div>
+                {activeTab ? (
+                  <div
+                    role="separator"
+                    aria-orientation={chatNoteSplitMode === 'side-by-side' ? 'vertical' : 'horizontal'}
+                    aria-label={translate(appLocale, 'notes.panel.resize')}
+                    data-testid="chat-note-editor-resize"
+                    className="app__chat-note-split"
+                    onMouseDown={event => startResizeDrag(
+                      event,
+                      chatNoteSplitMode === 'side-by-side' ? 'col-resize' : 'row-resize',
+                      (deltaX, deltaY) => {
+                        if (chatNoteSplitMode === 'side-by-side') chatNoteEditorWidth.resizeBy(deltaX)
+                        else chatNoteEditorHeight.resizeBy(-deltaY)
+                      },
+                    )}
+                  />
+                ) : null}
+                {chatHomeSurface}
+                </div>
               </div>
             ) : null}
             {isGraphDestination ? (

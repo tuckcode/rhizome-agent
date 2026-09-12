@@ -70,33 +70,42 @@ test.describe('Unified shell geometry', () => {
     await expect(page.getByTestId('note-list-container')).toBeVisible()
   })
 
-  test('temporarily collapses side panels while preserving Chat and the editor @smoke', async ({ page }) => {
+  test('opens a note above Chat and keeps the Notes list @smoke', async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 900 })
     await openFixtureVault(page, tempVaultDir)
     await openAlphaProject(page)
 
     const shell = page.locator('.app')
-    await expect(shell).toHaveAttribute('data-compact-sessions', 'true')
-    await expect(shell).toHaveAttribute('data-compact-vault', 'false')
-    await expect(page.getByTestId('chat-home')).toBeVisible()
-    await expect(page.locator('.app__note-editor:not(.app__note-editor--idle)')).toBeVisible()
-    await expect(page.getByTestId('vault-panel')).toBeVisible()
-
-    await page.setViewportSize({ width: 1100, height: 800 })
-    await expect(shell).toHaveAttribute('data-compact-vault', 'true')
-    await expect(page.getByTestId('vault-panel')).toHaveCount(0)
-    await expectMinimumTarget(page.getByTestId('vault-panel-restore'))
-    await expect(page.getByTestId('chat-home')).toBeVisible()
-    await expect(page.locator('.app__note-editor:not(.app__note-editor--idle)')).toBeVisible()
-    expect(await shell.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
-
-    await page.getByTestId('vault-panel-restore').click()
-    await expect(page.locator('.app__vault-panel--overlay')).toBeVisible()
-    expect(await shell.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
-
-    await page.setViewportSize({ width: 1500, height: 900 })
     await expect(shell).toHaveAttribute('data-compact-sessions', 'false')
     await expect(shell).toHaveAttribute('data-compact-vault', 'false')
+    await expect(page.getByTestId('chat-home')).toBeVisible()
+    const noteEditor = page.locator('.app__note-editor:not(.app__note-editor--idle)')
+    await expect(noteEditor).toBeVisible()
+    await expect(page.getByTestId('vault-panel')).toBeVisible()
+    await expect(page.getByTestId('chat-note-editor-resize')).toHaveAttribute('aria-orientation', 'horizontal')
+    await expect(page.getByRole('radio', { name: 'Note on top of Chat' })).toBeVisible()
+    await expect(page.getByRole('radio', { name: 'Note beside Chat' })).toBeVisible()
+
+    const noteBox = await noteEditor.boundingBox()
+    const chatBox = await page.getByTestId('chat-home').boundingBox()
+    expect(noteBox).toBeTruthy()
+    expect(chatBox).toBeTruthy()
+    expect(noteBox!.y + noteBox!.height).toBeLessThanOrEqual(chatBox!.y + 2)
+
+    await page.setViewportSize({ width: 1100, height: 800 })
+    await expect(shell).toHaveAttribute('data-compact-vault', 'false')
+    await expect(page.getByTestId('vault-panel')).toBeVisible()
+    await expect(page.getByTestId('chat-home')).toBeVisible()
+    await expect(noteEditor).toBeVisible()
+    expect(await shell.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
+
+    await page.getByTestId('vault-panel-collapse').click()
+    await expect(page.getByTestId('vault-panel')).toHaveCount(0)
+    await expectMinimumTarget(page.getByTestId('vault-panel-restore'))
+    await page.getByTestId('vault-panel-restore').click()
+    await expect(page.getByTestId('vault-panel')).toBeVisible()
+
+    await page.setViewportSize({ width: 1500, height: 900 })
     await expect(page.getByTestId('vault-panel')).toBeVisible()
     const rail = page.getByTestId('command-rail')
     await rail.hover()
@@ -114,13 +123,32 @@ test.describe('Unified shell geometry', () => {
     await expect(page.getByTestId('prime-session-list')).toHaveCount(0)
     await rail.hover()
     await expect(page.getByTestId('prime-session-list')).toBeVisible()
+  })
 
-    await page.locator('.breadcrumb-bar').getByRole('button', { name: 'Open the properties panel' }).click()
+  test('puts the note beside Chat and collapses Notes @smoke', async ({ page }) => {
+    await page.setViewportSize({ width: 1400, height: 900 })
+    await openFixtureVault(page, tempVaultDir)
+    await openAlphaProject(page)
+
+    await page.getByRole('radio', { name: 'Note beside Chat' }).click()
+
+    const shell = page.locator('.app')
     await expect(shell).toHaveAttribute('data-compact-sessions', 'true')
-    await expect(shell).toHaveAttribute('data-compact-vault', 'false')
-
-    await page.setViewportSize({ width: 1300, height: 800 })
     await expect(shell).toHaveAttribute('data-compact-vault', 'true')
+    await expect(page.getByTestId('chat-note-editor-resize')).toHaveAttribute('aria-orientation', 'vertical')
     await expect(page.getByTestId('vault-panel')).toHaveCount(0)
+    await expectMinimumTarget(page.getByTestId('vault-panel-restore'))
+
+    const noteEditor = page.locator('.app__note-editor:not(.app__note-editor--idle)')
+    const noteBox = await noteEditor.boundingBox()
+    const chatBox = await page.getByTestId('chat-home').boundingBox()
+    expect(noteBox).toBeTruthy()
+    expect(chatBox).toBeTruthy()
+    expect(noteBox!.x).toBeGreaterThanOrEqual(chatBox!.x + chatBox!.width - 2)
+
+    await page.getByRole('radio', { name: 'Note on top of Chat' }).click()
+    await expect(shell).toHaveAttribute('data-compact-vault', 'false')
+    await expect(page.getByTestId('vault-panel')).toBeVisible()
+    await expect(page.getByTestId('chat-note-editor-resize')).toHaveAttribute('aria-orientation', 'horizontal')
   })
 })
