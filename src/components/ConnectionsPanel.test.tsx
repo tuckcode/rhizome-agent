@@ -11,6 +11,12 @@ it('shows Graph immediately, with no closed-edge strip', async () => {
   expect(screen.queryByTestId('connections-edge')).not.toBeInTheDocument()
   expect(await screen.findByText('Graph canvas')).toBeVisible()
 })
+it('clips Graph to its own pane so it cannot paint over the Changes list', async () => {
+  render(<ConnectionsPanel vaultPath="/vault" />)
+  const pane = await screen.findByTestId('connections-panel')
+  expect(pane).toHaveClass('overflow-hidden')
+  expect(screen.getByRole('region', { name: 'Connections' })).toHaveStyle({ maxHeight: '50%' })
+})
 it('shows one view at a time and can expand and collapse it', async () => {
   render(<ConnectionsPanel vaultPath="/vault" />)
   expect(await screen.findByText('Graph canvas')).toBeVisible()

@@ -82,6 +82,8 @@ interface BreadcrumbBarProps {
   locale?: AppLocale
   loadingTitle?: boolean
   content?: string | null
+  /** Chat note layout (On top / Beside). Lives on the notes header, not the window chrome. */
+  leadingControl?: ReactNode
 }
 
 const BREADCRUMB_ICON_CLASS = 'size-[16px]'
@@ -1157,6 +1159,7 @@ export const BreadcrumbBar = memo(function BreadcrumbBar({
   locale = 'en',
   loadingTitle = false,
   onRenameFilename,
+  leadingControl,
   ...actionProps
 }: BreadcrumbBarProps) {
   type DragRegionResult = ReturnType<typeof useDragRegion<HTMLDivElement>> & {
@@ -1205,6 +1208,14 @@ export const BreadcrumbBar = memo(function BreadcrumbBar({
           aria-hidden="true"
           className="breadcrumb-bar__drag-spacer w-6 shrink-0"
         />
+        {leadingControl ? (
+          <div
+            className="breadcrumb-bar__layout-control mr-2 shrink-0"
+            onMouseDown={event => event.stopPropagation()}
+          >
+            {leadingControl}
+          </div>
+        ) : null}
         <BreadcrumbActions
           actionsRef={actionsRef}
           entry={entry}

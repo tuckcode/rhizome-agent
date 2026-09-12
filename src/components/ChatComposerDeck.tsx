@@ -24,6 +24,8 @@ interface ChatComposerDeckProps {
   model?: string | null
   thinkingLevel?: string | null
   vaultPath?: string
+  /** True when Chat already has a live Prime host. */
+  hostReady?: boolean
   /** Agent activity — idle/working pill, sits next to thinking. */
   activity?: ReactNode
 }
@@ -76,6 +78,7 @@ export function ChatComposerDeck({
   model,
   thinkingLevel,
   vaultPath,
+  hostReady = false,
   activity,
 }: ChatComposerDeckProps) {
   const t = createTranslator(locale)
@@ -124,6 +127,7 @@ export function ChatComposerDeck({
           side="top"
           variant="chip"
           vaultPath={vaultPath}
+          hostReady={hostReady}
         />
       </span>
 

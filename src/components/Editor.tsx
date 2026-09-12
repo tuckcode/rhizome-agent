@@ -155,6 +155,8 @@ interface EditorProps {
   /** Registers a hook that flushes the raw editor buffer into app state before external actions. */
   flushPendingRawContentRef?: React.MutableRefObject<((path: string) => void) | null>
   locale?: AppLocale
+  /** Chat note On top / Beside control, rendered in the breadcrumb. */
+  leadingControl?: ReactNode
 }
 
 function useEditorModeExclusion({
@@ -471,6 +473,7 @@ function EditorLayout({
   workspaces,
   onUnsupportedAiPaste,
   locale,
+  leadingControl,
 }: {
   tabs: Tab[]
   activeTabPath: string | null
@@ -552,6 +555,7 @@ function EditorLayout({
   onUnsupportedAiPaste?: (message: string) => void
   locale?: AppLocale
   onExportPdf?: (source?: NotePdfExportSource) => void
+  leadingControl?: ReactNode
 }) {
   const activeBinaryTab = activeTab?.entry.fileKind === 'binary' ? activeTab : null
   const showEmptyState = tabs.length === 0 && activeTabPath === null && !isVaultLoading
@@ -627,6 +631,7 @@ function EditorLayout({
               onKeepMine={onKeepMine}
               onKeepTheirs={onKeepTheirs}
               locale={locale}
+              leadingControl={leadingControl}
             />
         }
         {(showTableOfContents || !inspectorCollapsed) && <ResizeHandle onResize={onInspectorResize} />}

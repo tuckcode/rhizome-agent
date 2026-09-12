@@ -52,23 +52,25 @@ const trapSettingsPanelFocus = (event: KeyboardEvent, panel: HTMLElement | null)
   focusTarget.focus()
 }
 
-export function useSettingsPanelAutofocus(panelRef: RefObject<HTMLDivElement | null>): void {
+export function useSettingsPanelAutofocus(panelRef: RefObject<HTMLDivElement | null>, enabled = true): void {
   useEffect(() => {
+    if (!enabled) return
     const timer = setTimeout(() => {
       const focusTarget = panelRef.current?.querySelector<HTMLElement>('[data-settings-autofocus="true"]')
       focusTarget?.focus()
     }, 50)
     return () => clearTimeout(timer)
-  }, [panelRef])
+  }, [enabled, panelRef])
 }
 
-export function useSettingsPanelFocusTrap(panelRef: RefObject<HTMLDivElement | null>): void {
+export function useSettingsPanelFocusTrap(panelRef: RefObject<HTMLDivElement | null>, enabled = true): void {
   useEffect(() => {
+    if (!enabled) return
     const handleDocumentKeyDown = (event: KeyboardEvent) => {
       trapSettingsPanelFocus(event, panelRef.current)
     }
 
     document.addEventListener('keydown', handleDocumentKeyDown, true)
     return () => document.removeEventListener('keydown', handleDocumentKeyDown, true)
-  }, [panelRef])
+  }, [enabled, panelRef])
 }

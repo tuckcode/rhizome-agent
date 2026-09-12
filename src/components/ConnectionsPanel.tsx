@@ -100,7 +100,7 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
   }
   return <section
     className="relative flex min-h-0 shrink-0 flex-col border-t border-border bg-background"
-    style={{ height: full ? undefined : height.width }}
+    style={{ height: full ? undefined : height.width, maxHeight: full ? undefined : '50%' }}
     aria-label="Connections"
   >
     {/* Top-edge handle: dragging up (negative deltaY) grows the panel, which
@@ -112,7 +112,7 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
       className="absolute inset-x-0 -top-[10px] z-20 h-4 cursor-row-resize bg-transparent transition-colors hover:bg-border"
       onMouseDown={event => startResizeDrag(event, 'row-resize', (_deltaX, deltaY) => height.resizeBy(deltaY))}
     />}
-    <div data-testid="connections-panel" data-expanded={full ? 'true' : 'false'} className={full ? 'fixed inset-4 top-10 z-40 flex min-h-0 flex-col rounded border border-border bg-background shadow-lg' : 'flex min-h-0 flex-1 flex-col'}>
+    <div data-testid="connections-panel" data-expanded={full ? 'true' : 'false'} className={full ? 'fixed inset-4 top-10 z-40 flex min-h-0 flex-col overflow-hidden rounded border border-border bg-background shadow-lg' : 'flex min-h-0 flex-1 flex-col overflow-hidden'}>
       <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-1">
         <div role="tablist" aria-label="Connection views" className="flex min-w-0 flex-1">
           {available.map(target => <button type="button" role="tab" aria-selected={selected === target} key={target} className={`min-h-8 px-2 text-xs ${selected === target ? 'bg-muted text-foreground' : 'text-muted-foreground'}`} onClick={() => select(target)}>{target === 'graph' ? 'Graph' : 'Mycelium'}</button>)}
@@ -136,7 +136,8 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
       {!selected && <p className="p-3 text-xs text-muted-foreground">Enable a view in Connections settings.</p>}
       {selected && <div
         role="tabpanel"
-        className="flex min-h-0 flex-1 overflow-hidden"
+        className="flex min-h-0 flex-1 overflow-hidden isolate"
+        style={{ clipPath: 'inset(0)' }}
       >
         <Suspense fallback={<p className="p-3 text-xs">Loading connections…</p>}>
           {selected === 'graph'

@@ -72,18 +72,6 @@
   border-left: 1px solid var(--sidebar-border);
 }
 
-.app__vault-panel--overlay {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  /* Compact only changes docking. Width stays the persisted note-list size;
-     do not force 360px with !important — that made the overlay unresizable. */
-  max-width: min(500px, calc(100% - 48px));
-  z-index: 50;
-  box-shadow: -10px 0 28px color-mix(in srgb, black 18%, transparent);
-}
-
 .vault-panel {
   min-width: 0;
   min-height: 0;
@@ -217,18 +205,6 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-}
-
-.app__chat-note-split-bar {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-body.mac-chrome .app:has([data-testid='command-rail'][data-expanded='false']):not(:has([data-testid='prime-session-list'])) .app__chat-note-split-bar {
-  padding-left: var(--subhead-traffic-light-inset, 8px);
 }
 
 .app__chat-center-body {

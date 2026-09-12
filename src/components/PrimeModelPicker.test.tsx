@@ -1,12 +1,14 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PrimeModelPicker } from './PrimeModelPicker'
+import { resetPrimeModelCatalog } from '../lib/primeModelCatalog'
 
 const invoked = vi.hoisted(() => ({
   calls: [] as Array<{ cmd: string; args?: Record<string, unknown> }>,
   models: [] as unknown[],
   levels: ['off', 'low', 'high'] as string[],
   fail: '',
+  failList: '',
   connected: [] as string[],
   allowList: [] as string[],
 }))
@@ -16,7 +18,10 @@ vi.mock('../mock-tauri', () => ({
   mockInvoke: (cmd: string, args?: Record<string, unknown>) => {
     invoked.calls.push({ cmd, args })
     if (cmd === 'set_prime_model' && invoked.fail) return Promise.reject(new Error(invoked.fail))
-    if (cmd === 'get_available_prime_models') return Promise.resolve(invoked.models)
+    if (cmd === 'get_available_prime_models') {
+      if (invoked.failList) return Promise.reject(new Error(invoked.failList))
+      return Promise.resolve(invoked.models)
+    }
     if (cmd === 'get_prime_thinking_levels') return Promise.resolve(invoked.levels)
     if (cmd === 'get_connected_providers') return Promise.resolve(invoked.connected)
     if (cmd === 'get_prime_model_allow_list') return Promise.resolve(invoked.allowList)
@@ -45,25 +50,40 @@ beforeEach(() => {
   invoked.connected = []
   invoked.allowList = []
   invoked.fail = ''
+  invoked.failList = ''
   tracked.providers = []
+  resetPrimeModelCatalog()
 })
 
 describe('PrimeModelPicker', () => {
-  /** ~78 models, and most sessions never change one. */
-  it('does not fetch the model list until the menu is opened', async () => {
-    render(<PrimeModelPicker label="Grok 4.5" />)
+  it('loads the catalog in the background so opening the menu is not a wait', async () => {
+    render(<PrimeModelPicker label="Grok 4.5" hostReady />)
 
-    expect(cmds()).not.toContain('get_available_prime_models')
+    await waitFor(() => expect(cmds()).toContain('get_available_prime_models'))
 
     fireEvent.pointerDown(
       screen.getByTestId('prime-model-chip'),
       new PointerEvent('pointerdown', { bubbles: true, ctrlKey: false, button: 0 }),
     )
 
-    await waitFor(() => expect(cmds()).toContain('get_available_prime_models'))
+    await waitFor(() => expect(screen.getByTestId('prime-model-filter')).toBeInTheDocument())
+    expect(cmds().filter((cmd) => cmd === 'get_available_prime_models')).toHaveLength(1)
   })
 
-  it('starts the Prime host before listing models', async () => {
+  it('lists models without a host ensure once the host is already live', async () => {
+    render(
+      <PrimeModelPicker
+        label={null}
+        vaultPath="/Users/dtc/Documents/Rhizome Vault"
+        hostReady
+      />,
+    )
+
+    await waitFor(() => expect(cmds()).toContain('get_available_prime_models'))
+    expect(cmds()).not.toContain('ensure_prime_session_host')
+  })
+
+  it('starts the Prime host before listing when the menu opens without a live host', async () => {
     render(<PrimeModelPicker label={null} vaultPath="/Users/dtc/Documents/Rhizome Vault" />)
     fireEvent.pointerDown(
       screen.getByTestId('prime-model-chip'),
@@ -75,6 +95,25 @@ describe('PrimeModelPicker', () => {
       expect(invoked.calls[0]?.args).toEqual({ vaultPath: '/Users/dtc/Documents/Rhizome Vault' })
     })
     expect(cmds()).toContain('get_available_prime_models')
+  })
+
+  it('does not keep a failed catalog so a later open can retry', async () => {
+    invoked.failList = 'Prime session host is not running'
+    render(<PrimeModelPicker vaultPath="/v" />)
+    fireEvent.pointerDown(
+      screen.getByTestId('prime-model-chip'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Prime session host is not running'))
+
+    invoked.failList = ''
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    fireEvent.pointerDown(
+      screen.getByTestId('prime-model-chip'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+    await waitFor(() => expect(screen.getByTestId('prime-model-filter')).toBeInTheDocument())
+    expect(screen.getByText('Grok 4.5')).toBeInTheDocument()
   })
 
   it('shows the current model on the chip', () => {

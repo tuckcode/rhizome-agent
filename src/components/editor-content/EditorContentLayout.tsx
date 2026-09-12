@@ -166,6 +166,7 @@ function ActiveTabBreadcrumb({
   actions,
   locale,
   loadingTitle,
+  leadingControl,
 }: {
   activeTab: NonNullable<EditorContentModel['activeTab']>
   barRef: React.RefObject<HTMLDivElement | null>
@@ -174,6 +175,7 @@ function ActiveTabBreadcrumb({
   actions: BreadcrumbActions
   locale?: AppLocale
   loadingTitle?: boolean
+  leadingControl?: React.ReactNode
 }) {
   return (
     <BreadcrumbBar
@@ -182,6 +184,7 @@ function ActiveTabBreadcrumb({
       wordCount={wordCount}
       barRef={barRef}
       loadingTitle={loadingTitle}
+      leadingControl={leadingControl}
       showDiffToggle={actions.showDiffToggle}
       diffMode={actions.diffMode}
       diffLoading={actions.diffLoading}
@@ -222,10 +225,12 @@ function EditorLoadingBreadcrumb({
   actions,
   barRef,
   locale,
+  leadingControl,
 }: {
   actions: BreadcrumbActions
   barRef: React.RefObject<HTMLDivElement | null>
   locale?: AppLocale
+  leadingControl?: React.ReactNode
 }) {
   return (
     <BreadcrumbBar
@@ -233,6 +238,7 @@ function EditorLoadingBreadcrumb({
       wordCount={0}
       barRef={barRef}
       loadingTitle
+      leadingControl={leadingControl}
       showDiffToggle={false}
       diffMode={false}
       diffLoading={false}
@@ -297,6 +303,7 @@ function EditorBreadcrumbArea({
   chromeWordCount,
   isVaultLoading,
   locale,
+  leadingControl,
 }: {
   actions: BreadcrumbActions
   barRef: React.RefObject<HTMLDivElement | null>
@@ -305,6 +312,7 @@ function EditorBreadcrumbArea({
   chromeWordCount: number
   isVaultLoading?: boolean
   locale?: AppLocale
+  leadingControl?: React.ReactNode
 }) {
   if (chromeTab) {
     return (
@@ -316,6 +324,7 @@ function EditorBreadcrumbArea({
         locale={locale}
         loadingTitle={isVaultLoading}
         actions={actions}
+        leadingControl={leadingControl}
       />
     )
   }
@@ -327,6 +336,7 @@ function EditorBreadcrumbArea({
       actions={actions}
       barRef={barRef}
       locale={locale}
+      leadingControl={leadingControl}
     />
   )
 }
@@ -515,6 +525,7 @@ export function EditorContentLayout(model: EditorContentModel) {
     findRequest,
     locale,
     isVaultLoading,
+    leadingControl,
   } = model
   const rootClassName = cn(
     'flex flex-1 flex-col min-w-0 min-h-0',
@@ -536,6 +547,7 @@ export function EditorContentLayout(model: EditorContentModel) {
         chromeWordCount={chromeWordCount}
         isVaultLoading={isVaultLoading}
         locale={locale}
+        leadingControl={leadingControl}
       />
       {showActiveContent && (
         <>

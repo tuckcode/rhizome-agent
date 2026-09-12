@@ -127,6 +127,19 @@ describe('SettingsPanel', () => {
     expect(container.innerHTML).toBe('')
   })
 
+  it('stays mounted after close so the next open does not rebuild the page', () => {
+    const { rerender } = render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+    expect(screen.getByTestId('settings-panel')).toBeInTheDocument()
+
+    rerender(
+      <SettingsPanel open={false} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+    expect(screen.getByTestId('settings-panel')).toHaveAttribute('hidden')
+    expect(screen.getByTestId('settings-panel')).toHaveAttribute('aria-hidden', 'true')
+  })
+
   it('renders modal when open', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />

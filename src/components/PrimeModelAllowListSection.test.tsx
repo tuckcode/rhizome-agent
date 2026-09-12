@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PrimeModelAllowListSection } from './PrimeModelAllowListSection'
+import { resetPrimeModelCatalog } from '../lib/primeModelCatalog'
 import { createTranslator } from '../lib/i18n'
 
 const invoked = vi.hoisted(() => ({
@@ -50,6 +51,7 @@ beforeEach(() => {
   invoked.allowList = []
   invoked.failList = false
   tracked.changes = []
+  resetPrimeModelCatalog()
 })
 
 async function renderSection() {

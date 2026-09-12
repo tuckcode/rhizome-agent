@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CaretLeft, CaretRight, ChatCircle, GearSix, GitBranch, MagnifyingGlass, Tray } from '@phosphor-icons/react'
+import { ChatCircle, GearSix, GitBranch, MagnifyingGlass, PushPin, Tray } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { ActionTooltip } from './ui/action-tooltip'
 import { Button } from './ui/button'
@@ -78,14 +78,18 @@ function RailButton({
       data-testid={testId}
       className={
         expanded
-          ? 'relative flex w-full items-center justify-start gap-2 rounded-[var(--radius)] px-2'
-          : 'relative rounded-[var(--radius)] p-0'
+          ? `relative flex w-full items-center justify-start gap-2 rounded-[var(--radius)] px-2 ${
+              active ? '' : 'hover:bg-[var(--state-hover,var(--accent))]'
+            }`
+          : `relative rounded-[var(--radius)] p-0 ${
+              active ? '' : 'hover:bg-[var(--state-hover,var(--accent))]'
+            }`
       }
       style={{
         width: expanded ? '100%' : RAIL_BUTTON_SIZE,
         height: RAIL_BUTTON_SIZE,
         color: active ? 'var(--accent-blue)' : 'var(--text-muted)',
-        backgroundColor: active ? 'var(--accent-blue-bg)' : 'transparent',
+        backgroundColor: active ? 'var(--accent-blue-bg)' : undefined,
       }}
     >
       <IconComponent size={RAIL_ICON_SIZE} weight={active ? 'fill' : 'regular'} />
@@ -281,23 +285,36 @@ export function CommandRail({
         ) : null}
       </div>
 
-      <RailButton
-        active={false}
-        expanded={expanded}
-        icon={pinnedExpanded ? CaretLeft : CaretRight}
-        label={pinnedExpanded ? t('rail.collapse') : expanded ? 'Keep rail open' : t('rail.expand')}
-        onClick={togglePinnedExpanded}
-        testId="command-rail-toggle"
-      />
-
-      <RailButton
-        active={false}
-        expanded={expanded}
-        icon={GearSix}
-        label={t('rail.settings')}
-        onClick={onOpenSettings}
-        testId="command-rail-settings"
-      />
+      <div className={expanded ? 'flex items-center justify-end gap-1' : 'flex flex-col items-center gap-1'}>
+        <RailButton
+          active={false}
+          expanded={false}
+          icon={GearSix}
+          label={t('rail.settings')}
+          onClick={onOpenSettings}
+          testId="command-rail-settings"
+        />
+        <ActionTooltip copy={{ label: pinnedExpanded ? 'Unpin sidebar' : 'Pin sidebar' }} side="right">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={togglePinnedExpanded}
+            aria-label={pinnedExpanded ? 'Unpin sidebar' : 'Pin sidebar'}
+            aria-pressed={pinnedExpanded}
+            data-testid="command-rail-toggle"
+            className="rounded-[var(--radius)] p-0 hover:bg-[var(--state-hover,var(--accent))]"
+            style={{
+              width: RAIL_BUTTON_SIZE,
+              height: RAIL_BUTTON_SIZE,
+              color: pinnedExpanded ? 'var(--accent-blue)' : 'var(--text-muted)',
+              backgroundColor: pinnedExpanded ? 'var(--accent-blue-bg)' : undefined,
+            }}
+          >
+            <PushPin size={RAIL_ICON_SIZE} weight={pinnedExpanded ? 'fill' : 'regular'} />
+          </Button>
+        </ActionTooltip>
+      </div>
     </div>
   )
 }

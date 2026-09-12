@@ -99,7 +99,14 @@ export const ForceGraph3DCanvas = forwardRef<ForceGraphHandle, ForceGraph3DCanva
       import('3d-force-graph')
         .then(({ default: ForceGraph3D }) => {
           if (disposed || !containerRef.current) return
-          const graph = new ForceGraph3D(containerRef.current) as unknown as ForceGraph3DInstance<GraphNodeObject>
+          const host = containerRef.current
+          const graph = new ForceGraph3D(host) as unknown as ForceGraph3DInstance<GraphNodeObject>
+          graphRef.current = graph
+          const sizeToHost = () => {
+            if (graphRef.current !== graph) return
+            graph.width(Math.max(1, host.clientWidth))
+            graph.height(Math.max(1, host.clientHeight))
+          }
           graph
             .backgroundColor('rgba(0,0,0,0)')
             .showNavInfo(false)
@@ -123,7 +130,7 @@ export const ForceGraph3DCanvas = forwardRef<ForceGraphHandle, ForceGraph3DCanva
             // slow for first paint, so frame immediately below and again
             // once physics settles.
             .onEngineStop(() => framePreservingMinimumDistance(graph, 400))
-          graphRef.current = graph
+          sizeToHost()
 
           // Feed data here, not just in the [data] effect below — that
           // effect runs synchronously on mount, before this async import
@@ -135,12 +142,8 @@ export const ForceGraph3DCanvas = forwardRef<ForceGraphHandle, ForceGraph3DCanva
           graph.graphData(toGraphData(latest.current.data))
           framePreservingMinimumDistance(graph, 0)
 
-          resizeObserver = new ResizeObserver(() => {
-            if (!containerRef.current) return
-            graph.width(containerRef.current.clientWidth)
-            graph.height(containerRef.current.clientHeight)
-          })
-          resizeObserver.observe(containerRef.current)
+          resizeObserver = new ResizeObserver(sizeToHost)
+          resizeObserver.observe(host)
         })
         .catch((err: unknown) => {
           if (disposed) return
@@ -212,7 +215,15 @@ export const ForceGraph3DCanvas = forwardRef<ForceGraphHandle, ForceGraph3DCanva
       <div
         ref={containerRef}
         data-testid="graph-canvas"
-        style={{ width: '100%', height: '100%', ...style }}
+        style={{
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+          isolation: 'isolate',
+          clipPath: 'inset(0)',
+          position: 'relative',
+          ...style,
+        }}
       />
     )
   },
