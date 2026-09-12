@@ -45,5 +45,6 @@ IDENTITY, VAULT_CONTRACT, WINDOWS-DEV, YOU-SHOULD-KNOW, prime-adapter-surface.js
 harness-doctrine/composition, token-routing, automatic-memory-consolidation,
 current `docs/plans/handoffs/`, `2026-09-01-session-import-plan.md`, ADR index.
 
-Linux CI clippy on this PR is **C69** (macOS-only dead code). Not an Area D
-defect; do not “fix” it by editing `src-tauri/` in the docs-archive PR.
+Linux CI clippy on this PR was **C69** (macOS-only dead code). The docs
+archive commit did not touch `src-tauri/`. A follow-up on this same branch
+cfg-gates the helpers.

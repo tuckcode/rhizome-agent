@@ -60,9 +60,7 @@ Rhizome in-app updater stub. Evening design dump (portfolio, vault-as-skills,
 no CC Switch):
 [2208](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md).
 [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date first).
-Public VitePress `site/` and May–Jun Desktop `release-notes/` are gone on
-this Area D branch; `pnpm agent-docs` no-ops without `site/` and leaves the
-existing in-app bundle.
+Area D: public `site/` and Desktop `release-notes/` gone; `pnpm agent-docs` no-ops without `site/`.
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Inverted Dock icon is
@@ -98,6 +96,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-1551-cursor-grok-4-6-area-d-rebase.md) — **#61 rebased onto origin/main.** Tolaria `site/` / Desktop archive gone; `YOU-SHOULD-KNOW.md` kept; Linux clippy C69 resolved on this branch. Not merged.
 - [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-0018-cursor-grok-4-6-chat-note-split.md) — Chat note **On top / Beside**; Beside folds Sessions/Notes; Ask Chat about highlight. Not in `/Applications` until a rebuild.
 - [2026-09-11 · Cursor Grok 4.6](plans/handoffs/2026-09-11-2045-cursor-grok-4-6-applications-rebuild.md) — `/Applications` rebuilt 18:39 then 21:59; extra `.app` copies gone. C64 still not first-2s; #47 open.
 - [2026-09-08 · Cursor Grok 4.6](plans/handoffs/2026-09-08-1918-cursor-grok-4-6-c64-stamp.md) — stamped origin **`457ee96`** vs last app **`0fa00a2`**. C64 first-2s verify blocked (Documents sheet, then blank chrome).
@@ -294,10 +293,7 @@ push is not a release — releases are tagged builds with signed installers.
   vs per-vault; new Settings section vs under the existing AI agents page.
 - ~~**C67-OPEN (2026-09-06): sessions list needs a right-click menu**~~ **RESOLVED 2026-09-06.** Right-click Open / Rename / Archive·Restore / View in Mycelium / Copy path via `PrimeSessionListContextMenu`; Mycelium uses `handleOpenSessionFootprint`.
 - ~~**C68-OPEN (2026-09-06): restore note lock/view.**~~ **RESOLVED 2026-09-06.** Ephemeral per-note lock (default editable); breadcrumb + Cmd+K; BlockNote/CodeMirror read-only when locked. Not vault `editor_mode`.
-- **C69-OPEN (2026-09-06): Linux CI Clippy (`-D warnings`) fails on macOS-only
-  `src-tauri`; `git diff origin/main...HEAD -- src-tauri` is empty. Linux
-  clippy reports unused imports / dead code in `menu_bar_capture.rs` and
-  cfg-gates — not area B.
+- ~~**C69-OPEN (2026-09-06): Linux CI Clippy on macOS-only `src-tauri`.**~~ **RESOLVED on #61.** `menu_bar_capture` / `should_reopen_main_window` cfg-gated to macOS (`cfg(test)` keeps tests). Number collision with `cli-call` C69 below.
 - ~~**C69-OPEN (2026-09-06): packaged mcp-server omitted `cli-call.mjs`.**~~ **FIXED + `/Applications` rebuilt 2026-09-06 afternoon.** Bundle ships self-contained `cli-call.mjs`; seed failures `log::warn`; `pick_mcp_server_dir` prefers packaged macOS/Windows/Linux layouts over compile-time repo. Live Chat graph ask + Obsidian/Documents skills point at `/Applications/.../cli-call.mjs`. Windows launch itself remains C42.
 
 - ~~**C57-OPEN (2026-08-29): permission mode product choices after Prime fix.**~~ **RESOLVED 2026-09-06 (Atticus).** CLI agents default **Limited tools** (`safe`); Prime toggle stays **hidden** (always Power User); keep labels **Limited tools** / **Power User** — do not restore “Vault Safe.” Code already matched (`aiAgentPermissionMode.ts`, `hidePermissionMode` on Prime).
