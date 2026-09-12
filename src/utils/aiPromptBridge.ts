@@ -2,6 +2,8 @@ import type { NoteReference } from './ai-context'
 
 export const OPEN_AI_CHAT_EVENT = 'tolaria:open-ai-chat'
 export const AI_PROMPT_QUEUED_EVENT = 'tolaria:ai-prompt-queued'
+/** Fill the Chat composer without sending or starting a new conversation. */
+export const AI_COMPOSER_PREFILL_EVENT = 'rhizome:ai-composer-prefill'
 export const NEW_AI_CHAT_EVENT = 'tolaria:new-ai-chat'
 export const AI_WORKSPACE_DOCK_REQUESTED_EVENT = 'tolaria:ai-workspace-dock-requested'
 export const AI_WORKSPACE_OPEN_NOTE_REQUESTED_EVENT = 'tolaria:ai-workspace-open-note-requested'
@@ -47,6 +49,10 @@ export function takeQueuedAiPrompt(): QueuedAiPrompt | null {
   const queuedPrompt = pendingPrompt
   pendingPrompt = null
   return queuedPrompt
+}
+
+export function prefillAiComposer(text: string): void {
+  window.dispatchEvent(new CustomEvent(AI_COMPOSER_PREFILL_EVENT, { detail: { text } }))
 }
 
 export function requestOpenAiChat() {

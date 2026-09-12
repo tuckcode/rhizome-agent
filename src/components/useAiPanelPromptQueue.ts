@@ -1,6 +1,9 @@
 import { startTransition, useCallback, useEffect, useState } from 'react'
 import type { NoteReference } from '../utils/ai-context'
-import type { QueuedAiPrompt } from '../utils/aiPromptBridge'
+import {
+  AI_COMPOSER_PREFILL_EVENT,
+  type QueuedAiPrompt,
+} from '../utils/aiPromptBridge'
 import { useQueuedAiPrompt } from './useQueuedAiPrompt'
 
 interface AiAgentBridge {
@@ -73,6 +76,16 @@ export function useAiPanelPromptQueue({
   }, [currentTargetId, onTargetChange, setInput])
 
   useQueuedAiPrompt(handleQueuedPrompt, enabled)
+
+  useEffect(() => {
+    if (!enabled) return
+    const onPrefill = (event: Event) => {
+      const text = (event as CustomEvent<{ text?: string }>).detail?.text
+      if (typeof text === 'string' && text.trim()) setInput(text)
+    }
+    window.addEventListener(AI_COMPOSER_PREFILL_EVENT, onPrefill)
+    return () => window.removeEventListener(AI_COMPOSER_PREFILL_EVENT, onPrefill)
+  }, [enabled, setInput])
 
   useEffect(() => {
     const prompt = readyQueuedPrompt({ currentTargetId, enabled, input, isActive, onTargetChange, queuedPrompt })

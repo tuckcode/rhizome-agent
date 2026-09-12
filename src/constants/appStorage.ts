@@ -18,6 +18,8 @@ export const APP_STORAGE_KEYS = {
   chatNotePaneWidth: 'rhizome:chat-note-pane-width',
   connectionsPanelHeight: 'rhizome:connections-panel-height',
   chatNoteEditorWidth: 'rhizome:chat-note-editor-width',
+  chatNoteEditorHeight: 'rhizome:chat-note-editor-height',
+  chatNoteSplit: 'rhizome:chat-note-split',
   chatSessionsWidth: 'rhizome:chat-sessions-width',
   myceliumSessionsWidth: 'rhizome:mycelium-sessions-width',
   commandRailExpanded: 'rhizome:command-rail-expanded',
