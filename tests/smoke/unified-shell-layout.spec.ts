@@ -66,7 +66,8 @@ test.describe('Unified shell geometry', () => {
     await expect(vaultPanel).toHaveCount(0)
 
     await page.getByTestId('command-rail-inbox').click()
-    await expect(page.getByTestId('vault-panel-navigation')).toBeVisible()
+    await expect(page.getByTestId('vault-panel')).toBeVisible()
+    await expect(page.getByTestId('vault-panel-navigation')).toHaveCount(0)
     await expect(page.getByTestId('note-list-container')).toBeVisible()
   })
 
