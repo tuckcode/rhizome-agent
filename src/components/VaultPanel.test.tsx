@@ -49,7 +49,7 @@ describe('VaultPanel', () => {
     render(<VaultPanelRestoreButton locale="en" onClick={vi.fn()} />)
     const restore = screen.getByTestId('vault-panel-restore')
     expect(restore).toHaveAccessibleName('Show Notes')
-    expect(restore.closest('.app__notes-rail')).toHaveClass('app__notes-rail--restore')
+    expect(restore.closest('.app__notes-rail')).not.toHaveClass('app__notes-rail--restore')
   })
 
   it('matches the collapsed left command rail at 46px', () => {

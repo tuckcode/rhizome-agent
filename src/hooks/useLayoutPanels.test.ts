@@ -48,7 +48,7 @@ describe('useLayoutPanels', () => {
 
   it('returns default widths', () => {
     const { result } = renderHook(() => useLayoutPanels())
-    expectPanelWidths(result, { sidebar: 250, noteList: 300, inspector: 280 })
+    expectPanelWidths(result, { sidebar: 250, noteList: 240, inspector: 280 })
   })
 
   it('clamps sidebar resize to minimum', () => {
@@ -130,7 +130,19 @@ describe('useLayoutPanels', () => {
 
     const { result } = renderHook(() => useLayoutPanels())
 
-    expectPanelWidths(result, { sidebar: 250, noteList: 300, inspector: 280 })
+    expectPanelWidths(result, { sidebar: 250, noteList: 240, inspector: 280 })
+  })
+
+  it('treats the old 300px Notes default as the mirrored 240px Sessions width', () => {
+    storePanelWidths(APP_STORAGE_KEYS.layoutPanels, {
+      sidebar: 250,
+      noteList: 300,
+      inspector: 280,
+    })
+
+    const { result } = renderHook(() => useLayoutPanels())
+
+    expect(result.current.noteListWidth).toBe(240)
   })
 
   it('persists resized panel widths with the Tolaria storage key', () => {

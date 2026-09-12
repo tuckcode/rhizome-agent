@@ -135,14 +135,8 @@
   padding-top: 8px;
   z-index: 40;
   background: var(--surface-sidebar);
-  border-left: 1px solid var(--sidebar-border);
+  border-left: 1px solid var(--border-subtle, var(--sidebar-border));
   border-right: 0;
-}
-
-.app__notes-rail--restore {
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--accent-blue, #3d6b8a) 14%, var(--surface-sidebar));
-  border-left: 1px solid color-mix(in srgb, var(--accent-blue, #3d6b8a) 35%, var(--sidebar-border));
 }
 
 .vault-panel__content {

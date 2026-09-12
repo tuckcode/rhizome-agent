@@ -10,6 +10,7 @@ import { readStoredBooleanPreference, writeStoredBooleanPreference } from '../li
 import { usePanelWidth } from '../hooks/usePanelWidth'
 import { startResizeDrag } from '../utils/startResizeDrag'
 import {
+  COMMAND_RAIL_EXPANDED_WIDTH_PX,
   COMMAND_RAIL_TRAFFIC_LIGHT_INSET,
   hasNativeMacosTrafficLights,
 } from '../utils/trafficLights'
@@ -34,7 +35,7 @@ interface CommandRailProps {
 const RAIL_BUTTON_SIZE = 30
 const RAIL_ICON_SIZE = 16
 const RAIL_COLLAPSED_WIDTH = 46
-const RAIL_EXPANDED_DEFAULT_WIDTH = 240
+const RAIL_EXPANDED_DEFAULT_WIDTH = COMMAND_RAIL_EXPANDED_WIDTH_PX
 const RAIL_EXPANDED_MIN_WIDTH = 180
 const RAIL_EXPANDED_MAX_WIDTH = 360
 const RAIL_HOVER_OPEN_DELAY_MS = 150

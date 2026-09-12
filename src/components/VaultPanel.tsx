@@ -81,7 +81,7 @@ export function VaultPanelRestoreButton({
   const label = 'Show Notes'
   return (
     <div
-      className="app__notes-rail app__notes-rail--restore"
+      className="app__notes-rail"
       style={{
         width: COMMAND_RAIL_WIDTH_PX,
         minWidth: COMMAND_RAIL_WIDTH_PX,
@@ -99,7 +99,7 @@ export function VaultPanelRestoreButton({
         aria-label={label}
         data-testid="vault-panel-restore"
       >
-        <SidebarSimple size={16} weight="fill" mirrored />
+        <SidebarSimple size={16} weight="regular" mirrored />
       </Button>
     </div>
   )
