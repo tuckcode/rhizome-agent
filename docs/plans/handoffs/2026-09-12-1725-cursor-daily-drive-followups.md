@@ -4,7 +4,7 @@ model: Cursor Composer
 description: >-
   Three more daily-drive fixes from the explore pass: Chat note no longer
   hover-collapses, latest-reply marker is green, note highlight menu has Copy.
-commits: TBD
+commits: 095bf25
 ---
 
 # Daily-drive follow-ups (hover / green / Copy) — 2026-09-12
