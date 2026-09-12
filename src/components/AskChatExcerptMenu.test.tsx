@@ -36,13 +36,38 @@ describe('AskChatExcerptMenu', () => {
     expect(onAsk).toHaveBeenCalledWith('Keep replies short.')
   })
 
-  it('stays closed when nothing is highlighted', () => {
+  it('copies the highlight from the same menu', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+
     render(
       <AskChatExcerptMenu onAsk={vi.fn()}>
         <p>Keep replies short.</p>
       </AskChatExcerptMenu>,
     )
 
+    const body = screen.getByText('Keep replies short.')
+    selectNodeText(body)
+    fireEvent.contextMenu(body)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy' }))
+
+    await vi.waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith('Keep replies short.')
+    })
+  })
+
+  it('allows the native context menu when nothing is highlighted', () => {
+    render(
+      <AskChatExcerptMenu onAsk={vi.fn()}>
+        <p>Keep replies short.</p>
+      </AskChatExcerptMenu>,
+    )
+
+    const root = screen.getByText('Keep replies short.').parentElement
+    expect(root).toHaveAttribute('data-allow-native-context-menu')
     fireEvent.contextMenu(screen.getByText('Keep replies short.'))
     expect(screen.queryByRole('menuitem', { name: 'Ask Chat about this' })).not.toBeInTheDocument()
   })

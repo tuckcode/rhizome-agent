@@ -186,11 +186,9 @@ test.describe('AI chat conversation history', () => {
     await expect(page.getByTestId('chat-note-pane')).toContainText('release-plan.md')
     await expect(page.getByTestId('chat-note-pane')).toContainText('Rhizome Agent Release Plan')
 
-    await page.getByTestId('chat-note-hover-region').hover()
+    // Mouse leave must not collapse the note (click Close / Back is the exit).
+    await page.getByTestId('chat-note-pane-region').hover()
     await page.getByTestId('agent-input').hover()
-    const noteEdge = page.getByTestId('chat-note-hover-edge')
-    await expect(noteEdge).toHaveText('Inbox')
-    await noteEdge.hover()
     await expect(page.getByTestId('chat-note-pane')).toContainText('Rhizome Agent Release Plan')
 
     await page.getByRole('button', { name: 'Back to notes' }).click()
@@ -204,7 +202,7 @@ test.describe('AI chat conversation history', () => {
     await page.getByRole('button', { name: 'Open release-plan.md' }).click()
     await page.getByRole('button', { name: 'Close note' }).click()
     await expect(page.getByTestId('chat-note-pane')).toHaveCount(0)
-    await expect(page.getByTestId('chat-note-hover-edge')).toHaveCount(0)
+    await expect(page.getByTestId('chat-note-pane-region')).toHaveCount(0)
 
     await page.getByRole('button', { name: 'Open release-plan.md' }).click()
     await expect(railSessions.getByTestId('prime-session-list')).toBeVisible()

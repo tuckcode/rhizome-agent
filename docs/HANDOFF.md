@@ -97,6 +97,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-12 · Cursor Composer](plans/handoffs/2026-09-12-1725-cursor-daily-drive-followups.md) — note hover-collapse gone; green latest-reply marker; note highlight Copy.
 - [2026-09-12 · Cursor Composer](plans/handoffs/2026-09-12-1721-cursor-daily-drive-batch.md) — thinking-pill model filter landed; Notes list uses sidebar color; session row highlights on click.
 - [2026-09-12 · DeepSeek V4 Flash (Rhizome Chat)](plans/handoffs/2026-09-12-1714-rhizome-deepseek-v4-flash-thinking-pill.md) — thinking pill offers only the model's own levels; `deepseek-v4-flash` has no Medium, so Medium snapped back to High.
 - [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-1705-cursor-grok-4-6-notes-rail-width.md) — right Notes mirrors left Sessions: 240px open, 46px shut, same color.

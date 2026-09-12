@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
-import { ChatTeardropText } from '@phosphor-icons/react'
+import { ChatTeardropText, CopySimple } from '@phosphor-icons/react'
+import { writeClipboardText } from '../utils/clipboardText'
 import { getContextMenuPositionStyle } from './contextMenuPosition'
 
 function selectedTextInside(root: HTMLElement): string {
@@ -16,8 +17,10 @@ interface AskChatExcerptMenuProps {
 }
 
 /**
- * Highlight in the open note, then Ask Chat about this.
- * Stays in the current thread — it fills the composer, it does not start a new chat.
+ * Highlight in the open note, then Ask Chat about this — or Copy.
+ * Stays in the current thread — Ask fills the composer, it does not start a new chat.
+ * The root allows the native context menu when nothing is selected, so Paste /
+ * Select All still work in the editor (Chat Copy allowlist pattern, 2026-09-06).
  */
 export function AskChatExcerptMenu({ children, onAsk }: AskChatExcerptMenuProps) {
   const rootRef = useRef<HTMLDivElement>(null)
@@ -54,7 +57,12 @@ export function AskChatExcerptMenu({ children, onAsk }: AskChatExcerptMenuProps)
   }, [close, menu])
 
   return (
-    <div ref={rootRef} className="flex min-h-0 min-w-0 flex-1 flex-col" onContextMenu={handleContextMenu}>
+    <div
+      ref={rootRef}
+      className="flex min-h-0 min-w-0 flex-1 flex-col"
+      data-allow-native-context-menu=""
+      onContextMenu={handleContextMenu}
+    >
       {children}
       {menu ? (
         <div
@@ -64,6 +72,18 @@ export function AskChatExcerptMenu({ children, onAsk }: AskChatExcerptMenuProps)
           className="fixed z-[12000] rounded-md border bg-popover p-1 shadow-md"
           style={getContextMenuPositionStyle(menu, { minWidth: 220 })}
         >
+          <button
+            type="button"
+            role="menuitem"
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] hover:bg-accent"
+            onClick={() => {
+              void writeClipboardText(menu.excerpt).catch(() => undefined)
+              close()
+            }}
+          >
+            <CopySimple size={14} />
+            Copy
+          </button>
           <button
             type="button"
             role="menuitem"

@@ -447,7 +447,7 @@ function LatestReplyMarker() {
     <span
       data-testid="latest-assistant-reply-marker"
       aria-hidden="true"
-      className="pointer-events-none absolute top-[0.55em] -left-2.5 size-1.5 rounded-full bg-[var(--accent-blue)]"
+      className="pointer-events-none absolute top-[0.55em] -left-2.5 size-1.5 rounded-full bg-[var(--accent-green)]"
     />
   )
 }
