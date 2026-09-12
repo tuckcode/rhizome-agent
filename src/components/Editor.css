@@ -34,6 +34,10 @@ body.mac-chrome .app:not(:has([data-testid='command-rail'])):not(:has(.app__side
   --breadcrumb-bar-left-padding: 144px;
 }
 
+body.mac-chrome .app:has([data-testid='command-rail'][data-expanded='false']):not(:has([data-testid='prime-session-list'])) .app__chat-center .breadcrumb-bar {
+  --breadcrumb-bar-left-padding: var(--subhead-traffic-light-inset, 16px);
+}
+
 .breadcrumb-bar[data-title-hidden] {
   border-bottom-color: var(--border);
 }
