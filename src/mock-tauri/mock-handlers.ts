@@ -767,6 +767,11 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   cancel_prime_scheduled_work: () => null,
   create_prime_scheduled_work: () => null,
   get_prime_thinking_levels: () => ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+  // The full scale, deliberately: the browser mock has no daemon and so no
+  // model map to filter by. Answering with a narrow set here would hide the
+  // filtered menu that the real host produces, which is the defect this
+  // command exists to fix.
+  get_prime_supported_thinking_levels: () => ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
   set_prime_thinking_level: () => null,
   // Real data, not `[]`: a mock that returns nothing makes the custom-format
   // section look unbuilt rather than empty (the mock has hidden three real

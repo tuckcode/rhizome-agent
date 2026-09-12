@@ -5,6 +5,7 @@ import { PrimeThinkingToggle } from './PrimeThinkingToggle'
 const invoked = vi.hoisted(() => ({
   calls: [] as Array<{ cmd: string; args?: Record<string, unknown> }>,
   levels: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as string[],
+  supported: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as string[],
 }))
 
 vi.mock('../mock-tauri', () => ({
@@ -12,6 +13,7 @@ vi.mock('../mock-tauri', () => ({
   mockInvoke: (cmd: string, args?: Record<string, unknown>) => {
     invoked.calls.push({ cmd, args })
     if (cmd === 'get_prime_thinking_levels') return Promise.resolve(invoked.levels)
+    if (cmd === 'get_prime_supported_thinking_levels') return Promise.resolve(invoked.supported)
     return Promise.resolve(null)
   },
 }))
@@ -26,6 +28,7 @@ vi.mock('../lib/productAnalytics', () => ({
 beforeEach(() => {
   invoked.calls = []
   invoked.levels = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
+  invoked.supported = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
   tracked.levels = []
 })
 
@@ -60,6 +63,46 @@ describe('PrimeThinkingToggle', () => {
       expect(screen.getByTestId(`prime-thinking-pill-${level}`)).toBeInTheDocument()
     }
     expect(screen.getByTestId('prime-thinking-pill-xhigh')).toHaveTextContent('X-High')
+  })
+
+  it('offers only the levels the attached model can run', async () => {
+    // deepseek-v4-flash, as the host reports it: `medium` is null in the
+    // model's map. Prime clamps the pick up to High, so offering Medium was a
+    // click that applied nothing and read as the pill being stuck.
+    invoked.supported = ['off', 'high', 'xhigh']
+    render(<PrimeThinkingToggle thinkingLevel="high" vaultPath="/vault" />)
+    openPill()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('prime-thinking-pill-high')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('prime-thinking-pill-off')).toBeInTheDocument()
+    expect(screen.getByTestId('prime-thinking-pill-xhigh')).toBeInTheDocument()
+    expect(screen.queryByTestId('prime-thinking-pill-medium')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('prime-thinking-pill-max')).not.toBeInTheDocument()
+  })
+
+  it('says the model is the reason when the menu is shorter than the scale', async () => {
+    invoked.supported = ['off', 'high', 'xhigh']
+    render(<PrimeThinkingToggle thinkingLevel="high" vaultPath="/vault" />)
+    openPill()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('prime-thinking-pill-model-limited')).toBeInTheDocument()
+    })
+  })
+
+  it('offers the whole scale when the model answer cannot be read', async () => {
+    // An unreadable answer is not an answer. Hiding levels the user has would
+    // be a worse failure than showing one the model refuses.
+    invoked.supported = []
+    render(<PrimeThinkingToggle thinkingLevel="off" vaultPath="/vault" />)
+    openPill()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('prime-thinking-pill-medium')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('prime-thinking-pill-model-limited')).not.toBeInTheDocument()
   })
 
   it('sets the chosen level from the pill menu', async () => {

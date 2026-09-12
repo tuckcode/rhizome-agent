@@ -1274,6 +1274,7 @@
   "ai.composer.thinkingToggle": "Think",
   "ai.composer.thinkingToggleAria": "Thinking level · {level}",
   "ai.composer.thinkingToggleHint": "Choose how hard the agent thinks on the next turn",
+  "ai.composer.thinkingModelLimited": "Limited by this model",
   "ai.composer.vault": "Attached vault",
   "ai.composer.context": "ctx · {note}",
   "ai.composer.contextTitle": "Note context",

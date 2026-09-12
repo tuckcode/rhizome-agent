@@ -673,6 +673,11 @@ struct PrimeHost {
     /// exchange names the session once and never fights a later rename.
     name_is_placeholder: bool,
     thinking_level: Option<String>,
+    /// Levels the attached model can actually run, from `get_state`'s model
+    /// `thinkingLevelMap`. `None` until a model is reported — read it through
+    /// `supported_thinking_levels_for_session`, which falls back to the full
+    /// scale rather than treating `None` as "no levels".
+    supported_thinking_levels: Option<Vec<String>>,
     socket_path: PathBuf,
     cwd: PathBuf,
     is_streaming: bool,
@@ -1338,6 +1343,46 @@ pub fn set_model(provider: &str, model_id: &str) -> Result<(), String> {
 pub const PRIME_THINKING_LEVELS: [&str; 7] =
     ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 
+/// The reasoning levels a model can actually run, in Prime's own order.
+///
+/// Mirrors `getSupportedThinkingLevels` in pi-ai: an explicit `null` in the
+/// model's `thinkingLevelMap` means the model does not have that level, and
+/// `xhigh`/`max` count only when the map names them. Prime clamps every
+/// request to this set before it applies it, so a control built from the full
+/// scale offers levels whose click does nothing and then reads as broken —
+/// which is what the composer pill did on `deepseek-v4-flash`, whose map is
+/// `{minimal: null, low: null, medium: null, high: "high", xhigh: "max",
+/// max: null}`. Picking Medium there snapped back to High with no message.
+///
+/// `None` means Prime did not say (no model, no `reasoning` flag). That is not
+/// the same as "no levels", and callers must fall back to the full scale
+/// rather than to a narrower menu.
+pub fn supported_thinking_levels(
+    reasoning: Option<bool>,
+    map: Option<&serde_json::Map<String, serde_json::Value>>,
+) -> Option<Vec<String>> {
+    let reasoning = reasoning?;
+    if !reasoning {
+        // Prime reports one level for a model that does not reason at all.
+        return Some(vec!["off".to_string()]);
+    }
+    Some(
+        PRIME_THINKING_LEVELS
+            .iter()
+            .copied()
+            .filter(|level| match map.and_then(|map| map.get(*level)) {
+                Some(serde_json::Value::Null) => false,
+                Some(_) => true,
+                // Absent is Prime saying nothing about this level. For the
+                // other five that means "ordinary"; for these two it means
+                // the model never opted in.
+                None => !matches!(*level, "xhigh" | "max"),
+            })
+            .map(|level| level.to_string())
+            .collect(),
+    )
+}
+
 /// Set the attached session's reasoning level.
 ///
 /// Validated against `PRIME_THINKING_LEVELS` before it goes out rather than
@@ -1368,6 +1413,26 @@ pub fn set_thinking_level(level: &str) -> Result<(), String> {
         host.refresh_session_id()?;
         Ok(())
     })
+}
+
+/// The levels the attached session's model can actually run, in Prime's order.
+///
+/// Falls back to the full scale when Prime has not reported a model. Before a
+/// session exists that is the honest answer, and the fallback is deliberately
+/// the wider list: a menu narrower than the truth hides a level the user has,
+/// which is a worse failure than showing one they do not. Same reasoning as
+/// `get_status` falling back to Prime's configured defaults for the model
+/// chip.
+pub fn supported_thinking_levels_for_session() -> Vec<String> {
+    with_host_mut(|host| Ok(host.supported_thinking_levels.clone()))
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| {
+            PRIME_THINKING_LEVELS
+                .iter()
+                .map(|level| (*level).to_string())
+                .collect()
+        })
 }
 
 /// Pause, resume, or stop one heartbeat.
@@ -3097,6 +3162,7 @@ impl PrimeHost {
         let mut host = Self {
             model_accepts_images: None,
             model_catalog: None,
+            supported_thinking_levels: None,
             name_is_placeholder: false,
             stream,
             pending,
@@ -3662,6 +3728,14 @@ impl PrimeHost {
         if model.is_null() {
             return;
         }
+        // Read with the model, and only when there is one: a payload with a
+        // null model is a payload that knows nothing about the level list
+        // either, and overwriting a good set with `None` would swap a correct
+        // menu for the full scale mid-session.
+        self.supported_thinking_levels = supported_thinking_levels(
+            model["reasoning"].as_bool(),
+            model["thinkingLevelMap"].as_object(),
+        );
         self.model_provider = model["provider"].as_str().map(str::to_string).or_else(|| {
             model
                 .get("provider")
@@ -7062,9 +7136,24 @@ mod tests {
                 Some("get_state") => {
                     let mut n = calls.lock().unwrap();
                     *n += 1;
-                    // First reply carries a model, second does not.
+                    // First reply carries a model, second does not. The first
+                    // carries a level map too, so the second has something to
+                    // preserve rather than nothing to lose.
                     let model = if *n <= 1 {
-                        serde_json::json!({ "provider": "xai", "id": "grok-4.5", "name": "Grok 4.5" })
+                        serde_json::json!({
+                            "provider": "deepseek",
+                            "id": "deepseek-v4-flash",
+                            "name": "DeepSeek V4 Flash",
+                            "reasoning": true,
+                            "thinkingLevelMap": {
+                                "minimal": null,
+                                "low": null,
+                                "medium": null,
+                                "high": "high",
+                                "xhigh": "max",
+                                "max": null
+                            }
+                        })
                     } else {
                         serde_json::Value::Null
                     };
@@ -7098,6 +7187,11 @@ mod tests {
             get_status().thinking_level.as_deref(),
             Some("max"),
             "a null model must not swallow the level",
+        );
+        assert_eq!(
+            supported_thinking_levels_for_session(),
+            ["off", "high", "xhigh"],
+            "a null model must not widen the menu back to the full scale",
         );
 
         let _ = shutdown_host();
@@ -7634,6 +7728,111 @@ mod tests {
         assert!(error.contains("unsupported"), "got: {error}");
 
         let _ = shutdown_host();
+    }
+
+    fn thinking_level_map(value: serde_json::Value) -> serde_json::Map<String, serde_json::Value> {
+        value.as_object().expect("a level map is an object").clone()
+    }
+
+    #[test]
+    fn supported_levels_follow_the_models_own_map() {
+        // deepseek-v4-flash, as the installed catalog reports it. Prime clamps
+        // Medium to High here, so a pill offering Medium was offering a click
+        // that could not apply.
+        let model = thinking_level_map(serde_json::json!({
+            "minimal": null,
+            "low": null,
+            "medium": null,
+            "high": "high",
+            "xhigh": "max",
+            "max": null
+        }));
+        assert_eq!(
+            supported_thinking_levels(Some(true), Some(&model)).unwrap(),
+            ["off", "high", "xhigh"],
+        );
+    }
+
+    #[test]
+    fn supported_levels_without_a_map_are_the_ordinary_scale() {
+        // A missing map is not a map of nulls. Prime reads an absent level as
+        // available, except xhigh and max, which only exist when named.
+        assert_eq!(
+            supported_thinking_levels(Some(true), None).unwrap(),
+            ["off", "minimal", "low", "medium", "high"],
+        );
+    }
+
+    #[test]
+    fn supported_levels_are_off_alone_for_a_model_that_cannot_reason() {
+        assert_eq!(
+            supported_thinking_levels(Some(false), None).unwrap(),
+            ["off"],
+        );
+    }
+
+    #[test]
+    fn supported_levels_stay_unknown_when_prime_does_not_say() {
+        // Unknown must stay unknown. The caller falls back to the full scale;
+        // reading this as "no levels" would hide levels the user has.
+        assert!(supported_thinking_levels(None, None).is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn supported_levels_come_from_the_live_state_payload() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
+            Some("get_state") => Some(vec![ok(
+                id,
+                "get_state",
+                serde_json::json!({
+                    "sessionId": "sess-a",
+                    "isStreaming": false,
+                    "thinkingLevel": "high",
+                    "model": {
+                        "provider": "deepseek",
+                        "id": "deepseek-v4-flash",
+                        "name": "DeepSeek V4 Flash",
+                        "reasoning": true,
+                        "thinkingLevelMap": {
+                            "minimal": null,
+                            "low": null,
+                            "medium": null,
+                            "high": "high",
+                            "xhigh": "max",
+                            "max": null
+                        }
+                    }
+                }),
+            )]),
+            _ => None,
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        assert_eq!(
+            supported_thinking_levels_for_session(),
+            ["off", "high", "xhigh"],
+        );
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn supported_levels_fall_back_to_the_scale_before_a_model_is_known() {
+        // No session yet: the honest answer is the whole scale. A menu
+        // narrower than the truth is the failure this feature exists to avoid.
+        let _guard = host_guard();
+        assert_eq!(
+            supported_thinking_levels_for_session(),
+            PRIME_THINKING_LEVELS
+                .iter()
+                .map(|level| (*level).to_string())
+                .collect::<Vec<_>>(),
+        );
     }
 
     #[test]

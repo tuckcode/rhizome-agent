@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { callHost } from '../lib/callHost'
+import { callHost, callHostOr } from '../lib/callHost'
 import { CaretDown } from '@phosphor-icons/react'
 import {
   DropdownMenu,
@@ -19,7 +19,7 @@ import {
   partitionModelsByConnection,
   type PrimeModel,
 } from '../lib/primeModels'
-import { modelThinkingLabel, thinkingLevelLabel } from '../lib/primeThinkingLevels'
+import { modelThinkingLabel, offeredThinkingLevels, thinkingLevelLabel } from '../lib/primeThinkingLevels'
 import { loadPrimeModelCatalog } from '../lib/primeModelCatalog'
 import { trackPrimeModelChanged, trackPrimeThinkingLevelChanged } from '../lib/productAnalytics'
 
@@ -93,15 +93,25 @@ export function PrimeModelPicker({
         if (!hostReady && vaultPath) {
           await callHost('ensure_prime_session_host', { vaultPath })
         }
-        const [catalog, providers, listedLevels] = await Promise.all([
+        // The level section shows the model's own set, not the whole scale:
+        // this control sets the level on the attached session, and Prime
+        // clamps it to what that model can run, so the rest would be clicks
+        // that do nothing (#9).
+        const [catalog, providers, listedLevels, supportedLevels] = await Promise.all([
           loadPrimeModelCatalog(),
           callHost<string[]>('get_connected_providers').catch(() => [] as string[]),
           callHost<string[]>('get_prime_thinking_levels').catch(() => [] as string[]),
+          callHostOr<string[]>('get_prime_supported_thinking_levels', []),
         ])
         listed = catalog
         if (!cancelled) {
           setConnected(Array.isArray(providers) ? providers : [])
-          setLevels(Array.isArray(listedLevels) ? listedLevels : [])
+          setLevels(
+            offeredThinkingLevels(
+              Array.isArray(listedLevels) ? listedLevels : [],
+              Array.isArray(supportedLevels) ? supportedLevels : [],
+            ),
+          )
         }
       } catch (e) {
         failure = e instanceof Error ? e.message : String(e)

@@ -389,7 +389,7 @@ rhizome-agent/
 | `src/components/aiWorkspaceConversations.ts` | Conversation metadata state, settings persistence, default title generation, and target resolution. |
 | `src/components/aiWorkspaceSizing.ts` | AI workspace sizing, localStorage persistence, class names, and layout style helpers. |
 | `src/components/AiPanel.tsx` | Reusable AI transcript/composer surface — selected target with tool execution, reasoning, actions, and per-vault permission mode. |
-| `src/components/PrimeThinkingToggle.tsx` | Composer thinking-level menu. Levels come from `get_prime_thinking_levels`, not a hardcoded list. |
+| `src/components/PrimeThinkingToggle.tsx` | Composer thinking-level menu. Levels come from the host and are filtered to the model's own set; no hardcoded list. |
 | `src/components/usePrimeSessionSwitcher.ts` | Session list switch / fork / branch. Skips `ensure_prime_session_host` when the host is already running. |
 | `src/hooks/useViewMode.ts` | Persisted `editor-only` / `editor-list` / `all`. Fresh default is Notes open (`editor-list`). |
 | `src/components/ConnectionsPanel.tsx` | Graph/Mycelium cell. Chat-centered shell mounts this only on Changes. |
@@ -479,8 +479,10 @@ Verified against source 2026-09-08. Longer landmine list:
   `VaultPanelRestoreButton` (46px). Inbox toggles; it does not mount Graph.
 - **Graph/Mycelium only on Changes.** `ConnectionsPanel` is gated on
   `isChangesSelection`. Do not remount it under Inbox to “make Graph findable.”
-- **Thinking levels come from the host.** Call `get_prime_thinking_levels`.
-  Do not hardcode Off → Max in the frontend.
+- **Thinking levels come from the host.** Call `get_prime_thinking_levels`
+  for the scale and `get_prime_supported_thinking_levels` for the attached
+  model's subset of it. Do not hardcode Off → Max in the frontend, and do not
+  offer a level the model refuses — Prime clamps it and the click looks dead.
 - **Session switch skip-ensure.** `usePrimeSessionSwitcher` skips
   `ensure_prime_session_host` when `hostRunning` is true. Status-poll retry
   of ensure is still required when the host is down.

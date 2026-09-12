@@ -87,6 +87,30 @@ export function nextThinkingToggleLevel(
   return loud
 }
 
+/**
+ * The levels a control should offer for the attached session's model.
+ *
+ * Prime clamps every pick to the model's own set, so a menu drawn from the full
+ * scale offers levels whose click applies nothing. The pill on a model whose
+ * map omits `medium` would not leave `high`, and the control read as broken
+ * rather than as a model limitation (#9).
+ *
+ * `all` is the host's whole scale and `supported` is the host's answer for the
+ * current model. Anything the model's answer does not name is dropped, and an
+ * empty or unusable answer falls back to the full scale: a menu narrower than
+ * the truth hides a level the user has, which is worse than showing one they
+ * do not.
+ */
+export function offeredThinkingLevels(
+  all: readonly string[],
+  supported: readonly string[],
+): string[] {
+  const scale = all.map((level) => level.trim()).filter(Boolean)
+  const usable = supported.map((level) => level.trim()).filter(Boolean)
+  const offered = scale.filter((level) => usable.includes(level))
+  return offered.length > 0 ? offered : scale
+}
+
 export function thinkingLevelIsLoud(current: string | null | undefined): boolean {
   const now = (current ?? '').trim().toLowerCase()
   return LOUD_LEVEL_IDS.some((id) => id === now)
