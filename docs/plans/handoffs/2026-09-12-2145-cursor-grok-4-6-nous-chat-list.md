@@ -4,7 +4,7 @@ model: Cursor Grok 4.6
 description: >-
   Nous Portal sits in the Chat model list. Settings can tick unused models
   off. Expanded left rail keeps Settings as a gear; pin is on the left.
-commits: pending-this-push
+commits: 476756c
 ---
 
 # Nous Portal in Chat + Settings gear
