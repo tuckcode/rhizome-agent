@@ -49,6 +49,20 @@ describe('VaultPanel', () => {
     render(<VaultPanelRestoreButton locale="en" onClick={vi.fn()} />)
     const restore = screen.getByTestId('vault-panel-restore')
     expect(restore).toHaveAccessibleName('Show Notes')
-    expect(restore).toHaveClass('app__notes-rail--restore')
+    expect(restore.closest('.app__notes-rail')).not.toHaveClass('app__notes-rail--restore')
+  })
+
+  it('matches the collapsed left command rail at 46px', () => {
+    render(<VaultPanelRestoreButton locale="en" onClick={vi.fn()} />)
+    const rail = document.querySelector('.app__notes-rail')
+    expect(rail).toHaveStyle({
+      width: '46px',
+      minWidth: '46px',
+      maxWidth: '46px',
+    })
+    expect(screen.getByTestId('vault-panel-restore')).toHaveStyle({
+      width: '30px',
+      height: '30px',
+    })
   })
 })
