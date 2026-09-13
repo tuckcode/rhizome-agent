@@ -69,8 +69,8 @@
   position: relative;
   z-index: 20;
   background: var(--surface-sidebar);
-  /* Same inner rule as CommandRail's border-right --border-subtle. */
-  border-left: 1px solid var(--border-subtle);
+  /* Inner seam against Chat — keep this visible so the column reads as a panel. */
+  border-left: 1px solid var(--sidebar-border);
 }
 
 .vault-panel {
@@ -136,7 +136,7 @@
   padding-top: 8px;
   z-index: 40;
   background: var(--surface-sidebar);
-  border-left: 1px solid var(--border-subtle);
+  border-left: 1px solid var(--sidebar-border);
   border-right: 0;
 }
 
