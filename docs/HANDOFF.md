@@ -47,10 +47,11 @@ file.
 ---
 
 ## State
-`main` is **`6908554`**. Last **app** is **`6908554`** at **2026-09-12 20:31**.
-Tonight's daily-drive batch and Settings → Packages install are in
-`/Applications`. C64 first-2s is still weak. Native Chat glance **PASSED**
-(2026-09-06). After future installs, delete leftover `.app` copies.
+`main` on origin is **`013481f`** (Notes divider). Last **app** is still
+**`6908554`** at **2026-09-12 20:31**. Unified picture:
+[`docs/BOARD.md`](BOARD.md). C64 first-2s is still weak. Native Chat glance
+**PASSED** (2026-09-06). After future installs, delete leftover `.app`
+copies.
 
 Still open / parked: **C72** Inbox rename; Prime list-import; **#51** Case 2
 (model-backed Tab); **C64** full verify; **#47** confirm-close; Grokbot PRs
@@ -95,6 +96,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-2100-cursor-grok-4-6-session-board.md) — one STE board of tonight: finished, found, pile, ideas. Detail: [`docs/BOARD.md`](BOARD.md).
 - [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-2018-cursor-grok-4-6-packages-install-rebuild.md) — Packages **Install** runs the Prime CLI then reloads. Tonight's daily-drive batch goes to main + `/Applications`.
 - [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-13-0048-cursor-grok-4-6-lag-audit-evidence.md) — session switch clears the transcript immediately; Settings provider status waits until Agents is visible.
 - [2026-09-12 · Cursor Composer](plans/handoffs/2026-09-12-1725-cursor-daily-drive-followups.md) — note hover-collapse gone; green latest-reply marker; note highlight Copy.
