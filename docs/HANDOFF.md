@@ -47,11 +47,11 @@ file.
 ---
 
 ## State
-`main` is about to take tonight's Nous Chat list + Settings gear. Last
-**app** is still **`6908554`** at **2026-09-12 20:31** until this rebuild.
-Unified picture: [`docs/BOARD.md`](BOARD.md). C64 first-2s is still weak.
-Native Chat glance **PASSED** (2026-09-06). After future installs, delete
-leftover `.app` copies.
+`main` on origin is **`476756c`** (Nous Chat list + Settings gear). Last
+**app** is **`476756c`** at **2026-09-12 22:43**. Unified picture:
+[`docs/BOARD.md`](BOARD.md). C64 first-2s is still weak. Native Chat glance
+**PASSED** (2026-09-06). After future installs, delete leftover `.app`
+copies.
 
 Still open / parked: **C72** Inbox rename; Prime list-import; **#51** Case 2
 (model-backed Tab); **C64** full verify; **#47** confirm-close; Grokbot PRs

@@ -11,16 +11,14 @@ still unclaimed work. Older parked design lives in the
 
 ## True right now
 
-- Origin `main` last stamped app: **`6908554`**, installed
-  **2026-09-12 20:31** as `/Applications/Rhizome Agent.app`.
-- Notes divider commit **`013481f`** is on origin. It is **not** in
-  `/Applications` until a rebuild.
+- Origin `main` last stamped app: **`476756c`**, installed
+  **2026-09-12 22:43** as `/Applications/Rhizome Agent.app`.
 - Vite / mock-tauri is not the Applications vault.
 - Prime on this machine: **0.9.3**.
 
 ---
 
-## Finished (in the packaged app, `6908554`)
+## Finished (in the packaged app, `476756c`)
 
 Daily-drive shell:
 
@@ -46,19 +44,18 @@ Also landed on origin tonight (not only this chat):
 - PR **#65**: closed Notes rail matches the 46px left rail.
 - Session-switch lag cut: clear transcript first; Settings provider
   status waits until Agents is open.
+- Notes inner divider is back (`--sidebar-border`) so the right panel
+  has a clear edge. Sessions rail stays faint so Chat’s pulsing green
+  working strip still reads.
+- Nous Portal **Add to Chat list** from Settings. Tick unused models off
+  by provider.
+- Expanded left rail: Settings stays a **gear**. Pin left, gear right.
 
 ---
 
 ## Finished here, not in `/Applications` yet
 
-- Notes inner divider is back (`--sidebar-border`) so the right panel
-  has a clear edge.
-- Sessions rail stays faint so Chat’s **pulsing green working strip**
-  (`ai-border-pulse`) still reads.
-- Learned memory: Packages hub, hide-on-close should stop Prime/MCP
-  helpers, Tab Case 1 is shipped, Copy covers notes.
-
-That is `013481f` on origin. Rebuild `/Applications` to see it.
+Nothing. Tonight’s tree is in `/Applications` as **`476756c`**.
 
 ---
 
@@ -90,11 +87,10 @@ That is `013481f` on origin. Rebuild `/Applications` to see it.
 5. Prime **session-list import** for Claude / Cursor / GPT / Hermes
    (vault `Imports/` writer exists; list rows do not).
 6. Hide-on-close: actually **stop** spawned Prime and MCP helpers.
-7. Rebuild `/Applications` if Atticus will use the divider tonight.
-8. Grokbot leftover review (parked 2026-09-06).
-9. Windows first boot (C42, last check unbootable). Not a Mac daily-drive
+7. Grokbot leftover review (parked 2026-09-06).
+8. Windows first boot (C42, last check unbootable). Not a Mac daily-drive
    gate.
-10. Dirty file to leave alone:
+9. Dirty file to leave alone:
     `docs/plans/handoffs/2026-09-12-1714-rhizome-deepseek-v4-flash-thinking-pill.md`.
 
 ---
