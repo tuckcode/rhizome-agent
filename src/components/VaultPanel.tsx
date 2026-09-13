@@ -93,7 +93,7 @@ export function VaultPanelRestoreButton({
         variant="ghost"
         size="icon-sm"
         className="rounded-[var(--radius)] p-0 hover:bg-[var(--state-hover,var(--accent))]"
-        style={{ width: 30, height: 30 }}
+        style={{ width: 32, height: 32 }}
         onClick={onClick}
         title={label}
         aria-label={label}

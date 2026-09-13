@@ -61,8 +61,8 @@ describe('VaultPanel', () => {
       maxWidth: '46px',
     })
     expect(screen.getByTestId('vault-panel-restore')).toHaveStyle({
-      width: '30px',
-      height: '30px',
+      width: '32px',
+      height: '32px',
     })
   })
 })
