@@ -11,7 +11,7 @@
 //! Prime itself while Rhizome is open, and a stale label is the failure this
 //! module exists to avoid.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// The defaults a new Prime session inherits.
@@ -25,6 +25,56 @@ pub struct PrimeDefaults {
 
 fn settings_path() -> Option<PathBuf> {
     dirs::home_dir().map(|home| home.join(".prime").join("agent").join("settings.json"))
+}
+
+/// A package listed in Prime's settings (`packages` array).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InstalledPrimePackage {
+    pub source: String,
+}
+
+#[derive(Deserialize)]
+struct PrimeSettingsPackages {
+    #[serde(default)]
+    packages: Vec<PrimePackageEntry>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum PrimePackageEntry {
+    Source(String),
+    Object { source: String },
+}
+
+/// Packages Prime will load, or empty when we cannot say.
+pub fn list_packages() -> Vec<InstalledPrimePackage> {
+    let Some(path) = settings_path() else {
+        return Vec::new();
+    };
+    list_packages_from(&path)
+}
+
+fn list_packages_from(path: &std::path::Path) -> Vec<InstalledPrimePackage> {
+    let Ok(raw) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let Ok(parsed) = serde_json::from_str::<PrimeSettingsPackages>(&raw) else {
+        return Vec::new();
+    };
+    let mut seen = std::collections::BTreeSet::new();
+    let mut listed = Vec::new();
+    for entry in parsed.packages {
+        let source = match entry {
+            PrimePackageEntry::Source(value) => value,
+            PrimePackageEntry::Object { source } => source,
+        };
+        let source = source.trim().to_string();
+        if source.is_empty() || !seen.insert(source.clone()) {
+            continue;
+        }
+        listed.push(InstalledPrimePackage { source });
+    }
+    listed
 }
 
 /// Prime's configured defaults, or nothing.
@@ -111,6 +161,37 @@ mod tests {
         let defaults = read_defaults_from(&dir.path().join("settings.json"));
 
         assert_eq!(defaults, PrimeDefaults::default());
+    }
+
+    #[test]
+    fn packages_read_string_and_object_entries() {
+        let (_dir, path) = written(
+            r#"{
+                "packages": [
+                    "pi-skills",
+                    { "source": "npm:@org/ext", "extensions": [] },
+                    "  ",
+                    { "source": "pi-skills" }
+                ]
+            }"#,
+        );
+        assert_eq!(
+            list_packages_from(&path),
+            vec![
+                InstalledPrimePackage {
+                    source: "pi-skills".into()
+                },
+                InstalledPrimePackage {
+                    source: "npm:@org/ext".into()
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn missing_packages_array_is_empty() {
+        let (_dir, path) = written(r#"{ "defaultModel": "grok-4.6" }"#);
+        assert!(list_packages_from(&path).is_empty());
     }
 
     /// Same for a file that is not JSON at all — a half-written settings file

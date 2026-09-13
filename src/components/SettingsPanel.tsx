@@ -59,6 +59,7 @@ import { trackAllNotesVisibilityChanged } from '../lib/productAnalytics'
 import { AiProviderSettings } from './AiProviderSettings'
 import { PrimeModelAllowListSection } from './PrimeModelAllowListSection'
 import { PrimeProviderStatusSection } from './PrimeProviderStatusSection'
+import { PrimeExtensionsSection } from './PrimeExtensionsSection'
 import { AiAgentIcon } from './AiAgentIcon'
 import { readCelebrationsEnabled } from '../lib/celebration'
 import { GitSettingsSection } from './GitSettingsSection'
@@ -230,6 +231,7 @@ interface SettingsBodyProps {
   onOpenDocs?: () => void
   initialSectionId?: string | null
   loadModelCatalog?: boolean
+  loadExtensionCatalog?: boolean
 }
 
 const PULL_INTERVAL_OPTIONS = [1, 2, 5, 10, 15, 30] as const
@@ -770,6 +772,9 @@ function SettingsBody(props: SettingsBodyProps) {
   const [loadModelCatalog, setLoadModelCatalog] = useState(
     props.initialSectionId === SETTINGS_SECTION_IDS.ai,
   )
+  const [loadExtensionCatalog, setLoadExtensionCatalog] = useState(
+    props.initialSectionId === SETTINGS_SECTION_IDS.extensions,
+  )
 
   useEffect(() => {
     if (loadModelCatalog) return
@@ -786,18 +791,38 @@ function SettingsBody(props: SettingsBodyProps) {
     return () => io.disconnect()
   }, [loadModelCatalog])
 
+  useEffect(() => {
+    if (loadExtensionCatalog) return
+    const el = document.getElementById(SETTINGS_SECTION_IDS.extensions)
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const root = el.closest('.overflow-auto')
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setLoadExtensionCatalog(true)
+      },
+      { root: root instanceof Element ? root : null, threshold: 0.15 },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [loadExtensionCatalog])
+
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden">
       <SettingsBodyNav
         t={props.t}
         onVisit={(id) => {
           if (id === SETTINGS_SECTION_IDS.ai) setLoadModelCatalog(true)
+          if (id === SETTINGS_SECTION_IDS.extensions) setLoadExtensionCatalog(true)
         }}
       />
       <div className="min-w-0 flex-1 overflow-auto px-6 py-4">
         <SettingsSyncAndAppearanceSections {...props} />
         <SettingsContentSections {...props} />
-        <SettingsAgentWorkflowSections {...props} loadModelCatalog={loadModelCatalog} />
+        <SettingsAgentWorkflowSections
+          {...props}
+          loadModelCatalog={loadModelCatalog}
+          loadExtensionCatalog={loadExtensionCatalog}
+        />
       </div>
     </div>
   )
@@ -969,6 +994,7 @@ function SettingsAgentWorkflowSections({
   onOpenDocs,
   activeVaultPath,
   loadModelCatalog = false,
+  loadExtensionCatalog = false,
 }: SettingsBodyProps) {
   return (
     <>
@@ -990,6 +1016,10 @@ function SettingsAgentWorkflowSections({
         <div className="mt-4">
           <SessionImportSettingsSection vaultPath={activeVaultPath ?? null} />
         </div>
+      </SettingsSection>
+
+      <SettingsSection id={SETTINGS_SECTION_IDS.extensions}>
+        <PrimeExtensionsSection active={loadExtensionCatalog} />
       </SettingsSection>
 
       <SettingsSection id={SETTINGS_SECTION_IDS.workflow}>
@@ -1435,7 +1465,8 @@ function AiTargetManagementTabs({
       </TabsList>
       <TabsContent value="agents" className="space-y-3">
         <AiAgentsInstalledSection t={t} aiAgentsStatus={aiAgentsStatus} />
-        <PrimeProviderStatusSection t={t} />
+        {/* Same Agents-visible gate as the model list: skip provider IPC until then. */}
+        {loadModelCatalog ? <PrimeProviderStatusSection t={t} /> : null}
         {loadModelCatalog ? <PrimeModelAllowListSection t={t} /> : null}
         {onCopyMcpConfig ? <CopyMcpConfigButton t={t} onCopyMcpConfig={onCopyMcpConfig} /> : null}
         <BridgeTokenRow t={t} />

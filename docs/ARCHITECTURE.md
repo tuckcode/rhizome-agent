@@ -562,6 +562,15 @@ itself: an empty allow-list means *never curated* (normalized to `None` in
 Rust), and a list matching no live model shows everything. `activeModelKey`
 keeps whatever is running listed, since the picker only ever receives a label.
 
+#### Prime packages (Pi catalog)
+
+Settings → **Extensions** is how you find Prime packages. Prime is a
+distribution of Pi, so the catalog is npm's `pi-package` keyword — the same
+index as [pi.dev/packages](https://pi.dev/packages). Installed entries come
+from `~/.prime/agent/settings.json` via `list_prime_packages`. Install stays
+CLI-only: the UI copies `prime-agent package install npm:<name>`. Prime's own
+docs warn that packages run with full system access.
+
 The allow-list is Rhizome's view of Prime's catalog, in the same sense as
 archiving below: Prime's CLI and every other client still see all 501.
 
