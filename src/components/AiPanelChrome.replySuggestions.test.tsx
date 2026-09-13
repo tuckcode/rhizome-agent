@@ -243,4 +243,65 @@ describe('AiPanelComposer reply suggestions', () => {
     renderComposer({ lastAgentMessage: 'Fix the tests, or leave them?', input: '   ' })
     expect(screen.getByTestId('composer-reply-suggestions')).toBeInTheDocument()
   })
+
+  it('shows ghost text for a completion and Tab fills it', () => {
+    const onChange = vi.fn()
+    vi.mocked(replySuggestionsLib.suggestReply).mockReturnValue({
+      kind: 'completion',
+      text: 'Yes, go ahead',
+    })
+    renderComposer({
+      lastAgentMessage: 'Want me to run it now instead?',
+      onChange,
+    })
+
+    expect(screen.getByTestId('composer-reply-completion')).toHaveTextContent('Yes, go ahead')
+    expect(screen.queryByTestId('composer-reply-suggestions')).toBeNull()
+
+    fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Tab' })
+    expect(onChange).toHaveBeenCalledWith('Yes, go ahead')
+  })
+
+  it('Escape dismisses ghost text until the next agent message', () => {
+    vi.mocked(replySuggestionsLib.suggestReply).mockReturnValue({
+      kind: 'completion',
+      text: 'Ready — proceed',
+    })
+    const { rerender } = renderComposer({
+      lastAgentMessage: 'Let me know when you are ready.',
+    })
+    expect(screen.getByTestId('composer-reply-completion')).toBeInTheDocument()
+
+    fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Escape' })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+
+    rerender(
+      <AiPanelComposer
+        entries={[]}
+        agentLabel="Prime"
+        agentReadiness="ready"
+        input=""
+        inputRef={{ current: null }}
+        isActive={false}
+        onChange={vi.fn()}
+        onSend={vi.fn()}
+        onStop={vi.fn()}
+        lastAgentMessage="Let me know when you are ready."
+      />,
+    )
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+  })
+
+  it('does not show ghost text when options pills are available', () => {
+    vi.mocked(replySuggestionsLib.suggestReply).mockReturnValue({
+      kind: 'options',
+      options: [
+        { label: 'Fix the tests', text: 'Fix the tests' },
+        { label: 'Leave them', text: 'Leave them' },
+      ],
+    })
+    renderComposer({ lastAgentMessage: 'Fix the tests, or leave them?' })
+    expect(screen.getByTestId('composer-reply-suggestions')).toBeInTheDocument()
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+  })
 })

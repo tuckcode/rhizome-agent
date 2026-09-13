@@ -171,6 +171,7 @@ export function InlineWikilinkEditorField({
   inputRef,
   dataTestId,
   placeholderClassName,
+  placeholderTestId,
   editorClassName,
   editorStyle,
   onCompositionEnd,
@@ -191,6 +192,7 @@ export function InlineWikilinkEditorField({
   inputRef: React.Ref<HTMLDivElement>
   dataTestId: string
   placeholderClassName?: string
+  placeholderTestId?: string
   editorClassName?: string
   editorStyle?: CSSProperties
   onCompositionEnd: (editor: HTMLDivElement) => void
@@ -230,6 +232,7 @@ export function InlineWikilinkEditorField({
             placeholderClassName ?? 'flex items-center',
           )}
           style={placeholderClassName ? undefined : { padding: '8px 10px', fontSize: 13 }}
+          data-testid={placeholderTestId}
         >
           {placeholder}
         </div>

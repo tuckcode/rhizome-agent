@@ -37,12 +37,12 @@ describe('suggestReply', () => {
     })
 
     /**
-     * Old parser returned the question back as a yes/no option.
-     * A question that just echoes itself back is not a usable reply —
-     * it's just repetition. Must return null for these.
+     * "Want me to…?" is a consent offer, not a closed choice. Pills would
+     * echo the question; Tab fills a named continuation instead of bare "yes".
      */
-    it('non_imperative_yes_no_returns_null', () => {
-      expect(suggestReply('Want me to run it now instead?')).toBeNull()
+    it('want_me_to_returns_named_completion', () => {
+      const result = suggestReply('Want me to run it now instead?')
+      expect(result).toEqual({ kind: 'completion', text: 'Yes, go ahead' })
     })
 
     /**
@@ -235,6 +235,43 @@ describe('suggestReply', () => {
         expect(result.options[0].label).toBe('Commit and push')
         expect(result.options[1].label).toBe('No')
       }
+    })
+  })
+
+  describe('Tab completions', () => {
+    it('soft_consent_is_yes_go_ahead_not_bare_yes', () => {
+      expect(suggestReply('I can run the tests if you would like.')).toEqual({
+        kind: 'completion',
+        text: 'Yes, go ahead',
+      })
+      expect(suggestReply('Shall I start the rebuild?')).toEqual({
+        kind: 'completion',
+        text: 'Yes, go ahead',
+      })
+    })
+
+    it('ready_when_you_are_does_not_need_a_question_mark', () => {
+      expect(suggestReply('Let me know when you are ready.')).toEqual({
+        kind: 'completion',
+        text: 'Ready — proceed',
+      })
+    })
+
+    it('echoes_a_stated_next_step', () => {
+      expect(suggestReply('Next I will run the tests.')).toEqual({
+        kind: 'completion',
+        text: 'Run the tests',
+      })
+    })
+
+    it('open_questions_still_return_null', () => {
+      expect(suggestReply('What should I do next?')).toBeNull()
+      expect(suggestReply('How do you want to proceed?')).toBeNull()
+    })
+
+    it('options_win_when_a_closed_choice_is_also_a_consent_offer', () => {
+      const result = suggestReply('Want me to keep it or cut it?')
+      expect(result?.kind).toBe('options')
     })
   })
 })

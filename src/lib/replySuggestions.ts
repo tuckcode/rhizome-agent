@@ -52,38 +52,81 @@ const MAX_OPTION_LENGTH = 40
 export function suggestReply(agentMessage: string): ReplySuggestion | null {
   const trimmed = agentMessage.trim()
 
-  // Must end with a question mark.
-  if (!trimmed.match(/\?+!*$/)) {
-    return null
+  // Closed-question pills win when both could apply. Never both.
+  if (trimmed.match(/\?+!*$/)) {
+    const withoutQuestion = trimmed.replace(/[?!]+$/, '').trim()
+
+    const numberedOptions = tryExtractNumberedOptions(withoutQuestion)
+    if (numberedOptions !== null) {
+      return numberedOptions
+    }
+
+    const bulletOptions = tryExtractBulletOptions(withoutQuestion)
+    if (bulletOptions !== null) {
+      return bulletOptions
+    }
+
+    const orOptions = tryExtractOrOptions(withoutQuestion)
+    if (orOptions !== null) {
+      return orOptions
+    }
+
+    const actionOptions = tryExtractActionYesNo(withoutQuestion)
+    if (actionOptions !== null) {
+      return actionOptions
+    }
   }
 
-  // Remove trailing punctuation (?, !, ?!, etc.) for parsing.
-  const withoutQuestion = trimmed.replace(/[?!]+$/, '').trim()
+  return tryExtractCompletion(trimmed)
+}
 
-  // Try to extract options using various patterns, in order of specificity.
+/**
+ * One obvious continuation for Tab, or null. Never a bare "yes".
+ *
+ * Reads the last sentence so a buried "want me to" earlier in the turn does
+ * not become a ghost after the agent has already moved on.
+ */
+function lastSentenceOf(text: string): string {
+  const sentences = text
+    .split(/(?<=[.!?])(?:\s+|$)/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+  return sentences[sentences.length - 1] ?? text
+}
 
-  // Pattern 1: Numbered list "1. X 2. Y — which?"
-  const numberedOptions = tryExtractNumberedOptions(withoutQuestion)
-  if (numberedOptions !== null) {
-    return numberedOptions
+function tryExtractCompletion(text: string): ReplySuggestion | null {
+  const last = lastSentenceOf(text)
+
+  if (
+    /let me know when you(?:'re| are) ready/i.test(last)
+    || /when you(?:'re| are) ready\.?$/i.test(last)
+  ) {
+    return { kind: 'completion', text: 'Ready — proceed' }
   }
 
-  // Pattern 2: Bullet list "- X\n- Y — which?"
-  const bulletOptions = tryExtractBulletOptions(withoutQuestion)
-  if (bulletOptions !== null) {
-    return bulletOptions
+  if (
+    /\bwant me to\b/i.test(last)
+    || /\bshall i\b/i.test(last)
+    || /\bi can\b[\s\S]+\bif you(?:'d| would) like/i.test(last)
+  ) {
+    return { kind: 'completion', text: 'Yes, go ahead' }
   }
 
-  // Pattern 3: "X or Y?" pattern — split on " or " FIRST, then strip lead-in
-  const orOptions = tryExtractOrOptions(withoutQuestion)
-  if (orOptions !== null) {
-    return orOptions
-  }
-
-  // Pattern 4: Yes/no question — only if already in imperative form
-  const actionOptions = tryExtractActionYesNo(withoutQuestion)
-  if (actionOptions !== null) {
-    return actionOptions
+  const nextStep = last.replace(/[?!]+$/, '').trim().match(
+    /^(?:next[,:]?\s+(?:i(?:'ll| will)|we(?:'ll| will))\s+|the next step is to\s+)(.+)$/i,
+  )
+  if (nextStep) {
+    const echo = nextStep[1].replace(/[.]+$/, '').trim()
+    if (
+      echo.length >= 3
+      && echo.length <= 80
+      && !/^(what|how|why|when|where|who|which)\b/i.test(echo)
+    ) {
+      return {
+        kind: 'completion',
+        text: echo.charAt(0).toUpperCase() + echo.slice(1),
+      }
+    }
   }
 
   return null
@@ -258,7 +301,7 @@ function tryExtractActionYesNo(text: string): ReplySuggestion | null {
 
   // Reject open questions (what, how, why, when, where, who, which, etc.)
   const openQuestionStart =
-    /^(what|how|why|when|where|who|which|whose|can you|could you|would you|should you|want me|should i|would i|any\s)/i
+    /^(what|how|why|when|where|who|which|whose|can you|could you|would you|should you|want me|should i|shall i|would i|any\s)/i
   if (openQuestionStart.test(text)) {
     return null
   }
