@@ -1008,6 +1008,18 @@ pub async fn install_prime_package(
         .map_err(|error| format!("Install task failed: {error}"))?
 }
 
+/// Fetch Nous Portal's public model list and merge it into Prime's catalog.
+///
+/// Does not write the API key. Prime still reads `NOUS_API_KEY` from the
+/// environment. Reloads the attached session so Chat's picker sees the models.
+#[tauri::command]
+pub async fn ensure_nous_portal_models(
+) -> Result<crate::prime_custom_models::EnsureNousPortalResult, String> {
+    tokio::task::spawn_blocking(crate::prime_custom_models::ensure_nous_portal)
+        .await
+        .map_err(|error| format!("Nous Portal update failed: {error}"))?
+}
+
 /// Providers the engine holds credentials for.
 ///
 /// Powers the picker's split between models this account can use and models it

@@ -62,13 +62,20 @@ async function renderSection() {
 describe('PrimeModelAllowListSection (#45)', () => {
   /**
    * 501 models is the complaint the feature exists for, so the editor must
-   * not itself be a wall of 501 checkboxes. Uncurated, it shows the search
-   * box and says so.
+   * not itself be a wall of 501 checkboxes. Uncurated, it shows providers.
    */
-  it('starts on the shortlist rather than the whole catalog', async () => {
+  it('starts on provider names rather than the whole catalog', async () => {
     await renderSection()
     expect(screen.getByTestId('model-allow-list-uncurated')).toBeInTheDocument()
+    expect(screen.getByTestId('model-allow-list-provider-xai')).toBeInTheDocument()
     expect(screen.queryByText('Grok 4.5')).not.toBeInTheDocument()
+  })
+
+  it('opens one provider and adds a model to the shortlist', async () => {
+    await renderSection()
+    fireEvent.click(screen.getByTestId('model-allow-list-provider-xai'))
+    fireEvent.click(await screen.findByTestId('model-allow-list-item-xai/grok-4.5'))
+    await waitFor(() => expect(saved()).toEqual([['xai/grok-4.5']]))
   })
 
   it('lists the curated models without needing a search', async () => {
@@ -87,6 +94,16 @@ describe('PrimeModelAllowListSection (#45)', () => {
 
     await waitFor(() => expect(saved()).toEqual([['xai/grok-4.5']]))
     expect(tracked.changes).toEqual([[1, 3]])
+  })
+
+  it('reloads after Nous models land in the catalog', async () => {
+    await renderSection()
+    invoked.models = [
+      ...MODELS,
+      { id: 'hermes-4-405b', name: 'Hermes 4 405B', provider: 'nous-portal' },
+    ]
+    resetPrimeModelCatalog()
+    expect(await screen.findByTestId('model-allow-list-provider-nous-portal')).toBeInTheDocument()
   })
 
   it('removes a model from the list when it is unticked', async () => {

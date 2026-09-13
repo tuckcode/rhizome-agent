@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { loadPrimeModelCatalog, peekPrimeModelCatalog, resetPrimeModelCatalog } from './primeModelCatalog'
+import {
+  loadPrimeModelCatalog,
+  onPrimeModelCatalogReset,
+  peekPrimeModelCatalog,
+  resetPrimeModelCatalog,
+} from './primeModelCatalog'
 
 const invoked = vi.hoisted(() => ({
   calls: 0,
@@ -62,5 +67,15 @@ describe('loadPrimeModelCatalog', () => {
 
     await expect(loadPrimeModelCatalog()).resolves.toEqual(invoked.models)
     expect(invoked.calls).toBe(2)
+  })
+
+  it('tells listeners the catalog was cleared', () => {
+    const listener = vi.fn()
+    const stop = onPrimeModelCatalogReset(listener)
+    resetPrimeModelCatalog()
+    expect(listener).toHaveBeenCalledTimes(1)
+    stop()
+    resetPrimeModelCatalog()
+    expect(listener).toHaveBeenCalledTimes(1)
   })
 })

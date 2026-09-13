@@ -792,6 +792,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   get_available_prime_models: () => [
     { id: 'mock-model', name: 'Mock model', provider: 'mock', contextWindow: 200000, reasoning: true },
     { id: 'mock-alternative', name: 'Mock alternative', provider: 'mock', contextWindow: 100000, reasoning: false },
+    { id: 'hermes-4-405b', name: 'Hermes 4 405B', provider: 'nous-portal', contextWindow: 128000, reasoning: true },
   ],
   get_prime_commands: () => [
     {
@@ -822,6 +823,11 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     if (!mockPrimePackages.includes(spec)) mockPrimePackages.push(spec)
     return { source: spec, reloaded: true }
   },
+  ensure_nous_portal_models: () => ({
+    provider: 'nous-portal',
+    modelCount: 1,
+    reloaded: true,
+  }),
   set_prime_model_allow_list: (args: { models?: string[] }) => {
     mockPrimeModelAllowList = (args?.models ?? []).map((key) => key.trim()).filter(Boolean)
     return null

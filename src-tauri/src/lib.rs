@@ -42,6 +42,7 @@ mod pi_discovery;
 mod pi_events;
 pub mod preflight;
 pub mod prime_agent_activity;
+mod prime_custom_models;
 mod prime_discovery;
 mod prime_events;
 mod prime_packages;
@@ -658,6 +659,7 @@ macro_rules! app_invoke_handler {
             commands::get_prime_provider_status,
             commands::list_prime_packages,
             commands::install_prime_package,
+            commands::ensure_nous_portal_models,
             commands::preflight_chat,
             commands::start_mindwalk_sidecar,
             commands::stop_mindwalk_sidecar,

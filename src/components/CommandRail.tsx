@@ -58,6 +58,7 @@ function RailButton({
   badge,
   expanded,
   icon: IconComponent,
+  iconOnly = false,
   label,
   onClick,
   testId,
@@ -66,10 +67,12 @@ function RailButton({
   badge?: number
   expanded: boolean
   icon: Icon
+  iconOnly?: boolean
   label: string
   onClick: () => void
   testId: string
 }) {
+  const showLabel = expanded && !iconOnly
   const button = (
     <Button
       type="button"
@@ -80,23 +83,23 @@ function RailButton({
       aria-pressed={active}
       data-testid={testId}
       className={
-        expanded
+        showLabel
           ? `relative flex w-full items-center justify-start gap-2 rounded-[var(--radius)] px-2 ${
               active ? '' : 'hover:bg-[var(--state-hover,var(--accent))]'
             }`
-          : `relative rounded-[var(--radius)] p-0 ${
+          : `relative shrink-0 rounded-[var(--radius)] p-0 ${
               active ? '' : 'hover:bg-[var(--state-hover,var(--accent))]'
             }`
       }
       style={{
-        width: expanded ? '100%' : RAIL_BUTTON_SIZE,
+        width: showLabel ? '100%' : RAIL_BUTTON_SIZE,
         height: RAIL_BUTTON_SIZE,
         color: active ? 'var(--accent-blue)' : 'var(--text-muted)',
         backgroundColor: active ? 'var(--accent-blue-bg)' : undefined,
       }}
     >
       <IconComponent size={RAIL_ICON_SIZE} weight={active ? 'fill' : 'regular'} />
-      {expanded ? <span className="truncate text-[13px] leading-none">{label}</span> : null}
+      {showLabel ? <span className="truncate text-[13px] leading-none">{label}</span> : null}
       {badge && badge > 0 ? (
         <span
           className={expanded
@@ -111,8 +114,9 @@ function RailButton({
   )
 
   // A tooltip that repeats a label already on screen is noise, and it steals
-  // the pointer from a target the user can already read.
-  return expanded ? button : (
+  // the pointer from a target the user can already read. The Settings gear is
+  // icon-only in both rail widths, so it keeps the tooltip.
+  return showLabel ? button : (
     <ActionTooltip copy={{ label }} side="right">
       {button}
     </ActionTooltip>
@@ -215,6 +219,39 @@ export function CommandRail({
     trackRailDestinationClicked(destination)
     action()
   }
+  const settingsButton = (
+    <RailButton
+      active={false}
+      expanded={expanded}
+      icon={GearSix}
+      iconOnly
+      label={t('rail.settings')}
+      onClick={onOpenSettings}
+      testId="command-rail-settings"
+    />
+  )
+  const pinButton = (
+    <ActionTooltip copy={{ label: pinnedExpanded ? 'Unpin sidebar' : 'Pin sidebar' }} side="right">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={togglePinnedExpanded}
+        aria-label={pinnedExpanded ? 'Unpin sidebar' : 'Pin sidebar'}
+        aria-pressed={pinnedExpanded}
+        data-testid="command-rail-toggle"
+        className="rounded-[var(--radius)] p-0 hover:bg-[var(--state-hover,var(--accent))]"
+        style={{
+          width: RAIL_BUTTON_SIZE,
+          height: RAIL_BUTTON_SIZE,
+          color: pinnedExpanded ? 'var(--accent-blue)' : 'var(--text-muted)',
+          backgroundColor: pinnedExpanded ? 'var(--accent-blue-bg)' : undefined,
+        }}
+      >
+        <PushPin size={RAIL_ICON_SIZE} weight={pinnedExpanded ? 'fill' : 'regular'} />
+      </Button>
+    </ActionTooltip>
+  )
 
   return (
     <div
@@ -289,35 +326,18 @@ export function CommandRail({
         ) : null}
       </div>
 
-      <div className={expanded ? 'flex items-center justify-end gap-1' : 'flex flex-col items-center gap-1'}>
-        <RailButton
-          active={false}
-          expanded={expanded}
-          icon={GearSix}
-          label={t('rail.settings')}
-          onClick={onOpenSettings}
-          testId="command-rail-settings"
-        />
-        <ActionTooltip copy={{ label: pinnedExpanded ? 'Unpin sidebar' : 'Pin sidebar' }} side="right">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={togglePinnedExpanded}
-            aria-label={pinnedExpanded ? 'Unpin sidebar' : 'Pin sidebar'}
-            aria-pressed={pinnedExpanded}
-            data-testid="command-rail-toggle"
-            className="rounded-[var(--radius)] p-0 hover:bg-[var(--state-hover,var(--accent))]"
-            style={{
-              width: RAIL_BUTTON_SIZE,
-              height: RAIL_BUTTON_SIZE,
-              color: pinnedExpanded ? 'var(--accent-blue)' : 'var(--text-muted)',
-              backgroundColor: pinnedExpanded ? 'var(--accent-blue-bg)' : undefined,
-            }}
-          >
-            <PushPin size={RAIL_ICON_SIZE} weight={pinnedExpanded ? 'fill' : 'regular'} />
-          </Button>
-        </ActionTooltip>
+      <div className={expanded ? 'flex items-center gap-1' : 'flex flex-col items-center gap-1'}>
+        {expanded ? (
+          <>
+            {pinButton}
+            <span className="ml-auto">{settingsButton}</span>
+          </>
+        ) : (
+          <>
+            {settingsButton}
+            {pinButton}
+          </>
+        )}
       </div>
     </div>
   )

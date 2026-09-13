@@ -3,14 +3,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PrimeProviderStatusSection } from './PrimeProviderStatusSection'
 import { createTranslator } from '../lib/i18n'
 
-const state = vi.hoisted(() => ({ providers: [] as unknown[], fail: false }))
+const state = vi.hoisted(() => ({
+  providers: [] as unknown[],
+  fail: false,
+  nousFail: '',
+  nousResult: { provider: 'nous-portal', modelCount: 2, reloaded: true },
+}))
 
 vi.mock('../mock-tauri', () => ({
   isTauri: () => false,
   mockInvoke: async (cmd: string) => {
-    if (cmd !== 'get_prime_provider_status') return null
-    if (state.fail) throw new Error('unavailable')
-    return state.providers
+    if (cmd === 'get_prime_provider_status') {
+      if (state.fail) throw new Error('unavailable')
+      return state.providers
+    }
+    if (cmd === 'ensure_nous_portal_models') {
+      if (state.nousFail) throw new Error(state.nousFail)
+      return state.nousResult
+    }
+    return null
   },
 }))
 
@@ -18,14 +29,24 @@ vi.mock('../utils/clipboardText', () => ({
   writeClipboardText: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('../lib/productAnalytics', () => ({
+  trackNousPortalAddedToChat: vi.fn(),
+}))
+
 import { writeClipboardText } from '../utils/clipboardText'
+import { trackNousPortalAddedToChat } from '../lib/productAnalytics'
+import { resetPrimeModelCatalog } from '../lib/primeModelCatalog'
 
 const t = createTranslator('en')
 
 beforeEach(() => {
   state.providers = []
   state.fail = false
+  state.nousFail = ''
+  state.nousResult = { provider: 'nous-portal', modelCount: 2, reloaded: true }
   vi.mocked(writeClipboardText).mockClear()
+  vi.mocked(trackNousPortalAddedToChat).mockClear()
+  resetPrimeModelCatalog()
 })
 
 describe('PrimeProviderStatusSection', () => {
@@ -123,19 +144,41 @@ describe('PrimeProviderStatusSection', () => {
     })
   })
 
-  it('copies Nous Portal setup snippet', async () => {
+  it('adds Nous Portal models to Prime so Chat can list them', async () => {
     state.providers = []
     render(<PrimeProviderStatusSection t={t} />)
     await waitFor(() => {
       expect(screen.getByTestId('prime-provider-sign-in-nous-portal')).toBeInTheDocument()
     })
     fireEvent.click(screen.getByTestId('prime-provider-sign-in-nous-portal'))
+    expect(await screen.findByTestId('prime-provider-sign-in-notice')).toHaveTextContent(
+      'Added 2 Nous Portal models',
+    )
+    expect(trackNousPortalAddedToChat).toHaveBeenCalledWith(2)
+    expect(writeClipboardText).not.toHaveBeenCalled()
+  })
+
+  it('still offers Add to Chat list after the key is already connected', async () => {
+    state.providers = [{ name: 'nous-portal', authKind: 'api_key', expired: false }]
+    render(<PrimeProviderStatusSection t={t} />)
     await waitFor(() => {
-      expect(writeClipboardText).toHaveBeenCalled()
+      expect(screen.getByTestId('prime-provider-sign-in-nous-portal')).toBeInTheDocument()
     })
-    const copied = vi.mocked(writeClipboardText).mock.calls.at(-1)?.[0] as string
-    expect(copied).toContain('NOUS_API_KEY')
-    expect(copied).toContain('inference-api.nousresearch.com')
+    expect(screen.getByTestId('prime-provider-sign-in-nous-portal')).toHaveTextContent(
+      'Add to Chat list',
+    )
+  })
+
+  it('copies the Nous API key line without rewriting models.json', async () => {
+    state.providers = []
+    render(<PrimeProviderStatusSection t={t} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('prime-provider-copy-nous-key')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('prime-provider-copy-nous-key'))
+    await waitFor(() => {
+      expect(writeClipboardText).toHaveBeenCalledWith("export NOUS_API_KEY='paste-your-key-here'")
+    })
   })
 
   it('degrades to setup placeholders when the check fails', async () => {

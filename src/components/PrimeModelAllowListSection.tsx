@@ -3,10 +3,11 @@ import { Check } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { createTranslator } from '../lib/i18n'
 import { filterModels, groupModelsByProvider, modelKey, type PrimeModel } from '../lib/primeModels'
-import { loadPrimeModelCatalog } from '../lib/primeModelCatalog'
+import { loadPrimeModelCatalog, onPrimeModelCatalogReset } from '../lib/primeModelCatalog'
 import { trackPrimeModelAllowListChanged } from '../lib/productAnalytics'
 import { callHost } from '../lib/callHost'
 import { Button } from './ui/button'
+import { Input } from './ui/input'
 
 /**
  * Choose which of Prime's models appear in the chat model menu (#45).
@@ -16,8 +17,9 @@ import { Button } from './ui/button'
  * filter. A hand-picked list is the mechanism that actually holds.
  *
  * The editor therefore must not be the same wall it is fixing: it opens on
- * the shortlist, and the catalog is reached by searching. Adding a model is a
- * search away; the default view is the handful the user actually runs.
+ * the shortlist (or, when nothing is curated yet, on provider names — not
+ * 501 checkboxes). Search still reaches every model. Checking a model keeps
+ * it in Chat. Unchecking removes it from the Chat menu's first view.
  *
  * Writes land immediately, like archiving a session. A draft-and-Save cycle
  * over a list this long only adds a way to lose the work.
@@ -40,13 +42,21 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
   const [models, setModels] = useState<PrimeModel[] | null>(null)
   const [allowList, setAllowList] = useState<string[]>([])
   const [query, setQuery] = useState('')
+  const [providerFilter, setProviderFilter] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const loadCatalog = useCallback(async (cancelled: () => boolean) => {
+    try {
+      const listed = await loadPrimeModelCatalog()
+      if (!cancelled()) setModels(listed)
+    } catch {
+      if (!cancelled()) setModels([])
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      // An unreadable list is "not curated", never "curated to nothing" —
-      // the same refusal the picker and the Rust normalizer make.
       try {
         const listed = await callHost<string[]>('get_prime_model_allow_list')
         if (!cancelled) setAllowList(Array.isArray(listed) ? listed : [])
@@ -54,27 +64,20 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
         if (!cancelled) setAllowList([])
       }
     })()
-    // The catalog is hundreds of models and shares Prime's host lock with Chat.
-    // Wait one frame so Settings can paint before that round-trip.
     const idle = window.setTimeout(() => {
-      void (async () => {
-        try {
-          const listed = await loadPrimeModelCatalog()
-          if (!cancelled) setModels(listed)
-        } catch {
-          // Covers "Prime is not installed here" as much as a real failure, so
-          // it renders as an empty catalog rather than an alarm.
-          if (!cancelled) setModels([])
-        }
-      })()
+      void loadCatalog(() => cancelled)
     }, 0)
+    const stop = onPrimeModelCatalogReset(() => {
+      void loadCatalog(() => cancelled)
+    })
     return () => {
       cancelled = true
       window.clearTimeout(idle)
+      stop()
     }
-  }, [])
+  }, [loadCatalog])
 
-  const available = models ?? []
+  const available = useMemo(() => models ?? [], [models])
   const selected = useMemo(() => new Set(allowList), [allowList])
 
   const persist = useCallback(
@@ -105,21 +108,26 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
     [allowList, persist, selected],
   )
 
-  // No query shows the shortlist; a query searches the whole catalog. That is
-  // the whole interaction — the list you keep, and the way to add to it.
-  const matches = query.trim()
+  const providers = useMemo(() => groupModelsByProvider(available).map((group) => group.provider), [available])
+  const trimmedQuery = query.trim()
+  const browsingProvider = !trimmedQuery && allowList.length === 0
+  const matches = trimmedQuery
     ? filterModels(available, query)
-    : available.filter((model) => selected.has(modelKey(model)))
+    : browsingProvider && providerFilter
+      ? available.filter((model) => model.provider === providerFilter)
+      : available.filter((model) => selected.has(modelKey(model)))
   const groups = groupModelsByProvider(matches.slice(0, MAX_VISIBLE_MATCHES))
   const truncated = matches.length - Math.min(matches.length, MAX_VISIBLE_MATCHES)
+  const showProviderBrowse = browsingProvider && !providerFilter
 
   return (
     <div className="flex flex-col gap-1.5" data-testid="prime-model-allow-list">
       <div className="text-[11px] font-medium text-foreground">
-        {t('settings.modelAllowList.title')}
+        Chat model menu
       </div>
       <p className="text-[11px] text-muted-foreground">
-        {t('settings.modelAllowList.description')}
+        Check models you want in Chat. Uncheck models you do not use. The first
+        check starts a shortlist. Search or pick a provider to find the rest.
       </p>
       {models === null ? (
         <div className="text-[11px] text-muted-foreground">
@@ -132,18 +140,14 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
       ) : (
         <>
           <div className="flex items-center gap-2">
-            <input
+            <Input
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t('settings.modelAllowList.filter', { count: String(available.length) })}
               aria-label={t('settings.modelAllowList.filter', { count: String(available.length) })}
               data-testid="model-allow-list-filter"
-              className={cn(
-                'h-8 flex-1 rounded-md border border-border bg-background px-2',
-                'text-[11px] text-foreground placeholder:text-muted-foreground',
-                'focus:border-border-strong focus:outline-none',
-              )}
+              className="h-8 text-[11px]"
             />
             {allowList.length > 0 ? (
               <Button
@@ -175,7 +179,41 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
             </div>
           )}
 
-          {groups.length === 0 && query.trim() ? (
+          {showProviderBrowse ? (
+            <div className="flex flex-wrap gap-1.5" data-testid="model-allow-list-providers">
+              {providers.map((provider) => (
+                <Button
+                  key={provider}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-[11px]"
+                  data-testid={`model-allow-list-provider-${provider}`}
+                  onClick={() => setProviderFilter(provider)}
+                >
+                  {provider}
+                </Button>
+              ))}
+            </div>
+          ) : null}
+
+          {browsingProvider && providerFilter ? (
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-[11px]"
+                data-testid="model-allow-list-providers-back"
+                onClick={() => setProviderFilter(null)}
+              >
+                All providers
+              </Button>
+              <span className="text-[11px] text-muted-foreground">{providerFilter}</span>
+            </div>
+          ) : null}
+
+          {groups.length === 0 && trimmedQuery ? (
             <div
               className="text-[11px] text-muted-foreground"
               data-testid="model-allow-list-no-matches"
