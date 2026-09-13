@@ -4,7 +4,8 @@
  * Prime Agent is a distribution of Pi. Packages on npm tagged `pi-package`
  * are extensions, skills, prompt templates, and themes. Prime's own
  * `packages.md` is the source for install commands and the full-system-access
- * warning. Install is CLI-only: the daemon has no package command.
+ * warning. Rhizome runs `prime-agent package install`, then reloads the
+ * live session. Chat is only the fallback when that CLI is missing.
  */
 
 export interface PrimePackageHit {
@@ -43,20 +44,79 @@ export function catalogSearchUrl(query: string, kind: PrimePackageKind = 'all'):
   return url.toString()
 }
 
-export function primePackageInstallCommand(source: string): string {
+export function primePackageInstallSpec(source: string): string {
   const trimmed = source.trim()
-  if (trimmed.length === 0) return 'prime-agent package install'
+  if (trimmed.length === 0) return ''
   if (
     trimmed.startsWith('npm:')
     || trimmed.startsWith('git:')
     || trimmed.startsWith('http://')
     || trimmed.startsWith('https://')
+    || trimmed.startsWith('ssh://')
+    || trimmed.startsWith('git://')
     || trimmed.startsWith('/')
     || trimmed.startsWith('.')
   ) {
-    return `prime-agent package install ${trimmed}`
+    return trimmed
   }
-  return `prime-agent package install npm:${trimmed}`
+  return `npm:${trimmed}`
+}
+
+export function primePackageInstallCommand(source: string): string {
+  const spec = primePackageInstallSpec(source)
+  if (spec.length === 0) return 'prime-agent package install'
+  return `prime-agent package install ${spec}`
+}
+
+export function primePackageAskAgentPrompt(source: string): string {
+  return [
+    'Install this Prime package by running:',
+    '',
+    primePackageInstallCommand(source),
+    '',
+    'Packages have full system access. After it finishes, reload or start a new chat.',
+  ].join('\n')
+}
+
+export function isPrimePackageInstalled(
+  source: string,
+  installed: InstalledPrimePackage[],
+): boolean {
+  const key = packageSourceKey(source)
+  if (!key) return false
+  return installed.some((pkg) => packageSourceKey(pkg.source) === key)
+}
+
+export function isPrimeCliMissing(error: string): boolean {
+  return error.includes('Prime is not installed') || error.includes('Prime Agent not found')
+}
+
+function packageSourceKey(source: string): string {
+  let spec = primePackageInstallSpec(source)
+  if (spec.startsWith('npm:')) spec = spec.slice(4)
+  if (
+    spec.startsWith('git:')
+    || spec.startsWith('http://')
+    || spec.startsWith('https://')
+    || spec.startsWith('ssh://')
+    || spec.startsWith('git://')
+    || spec.startsWith('/')
+    || spec.startsWith('.')
+  ) {
+    return spec
+  }
+  return stripNpmVersion(spec)
+}
+
+function stripNpmVersion(name: string): string {
+  if (name.startsWith('@')) {
+    const slash = name.indexOf('/')
+    if (slash === -1) return name
+    const versionAt = name.indexOf('@', slash)
+    return versionAt === -1 ? name : name.slice(0, versionAt)
+  }
+  const versionAt = name.indexOf('@')
+  return versionAt === -1 ? name : name.slice(0, versionAt)
 }
 
 export function parseInstalledPrimePackages(settings: unknown): InstalledPrimePackage[] {

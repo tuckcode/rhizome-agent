@@ -992,10 +992,20 @@ pub fn get_prime_provider_status() -> Vec<crate::preflight::ProviderStatus> {
 }
 
 /// Packages listed in Prime's global settings. Catalog search is the public
-/// npm `pi-package` index; install stays CLI-only.
+/// npm `pi-package` index.
 #[tauri::command]
 pub fn list_prime_packages() -> Vec<crate::prime_settings::InstalledPrimePackage> {
     crate::prime_settings::list_packages()
+}
+
+/// Run `prime-agent package install`, then reload the attached session.
+#[tauri::command]
+pub async fn install_prime_package(
+    source: String,
+) -> Result<crate::prime_packages::InstallPrimePackageResult, String> {
+    tokio::task::spawn_blocking(move || crate::prime_packages::install(&source))
+        .await
+        .map_err(|error| format!("Install task failed: {error}"))?
 }
 
 /// Providers the engine holds credentials for.

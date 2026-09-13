@@ -531,3 +531,11 @@ export function trackPrimePackageCatalogOpened(): void {
 export function trackPrimePackageInstallCopied(origin: 'catalog' | 'installed'): void {
   trackEvent('prime_package_install_copied', { origin })
 }
+
+export function trackPrimePackageInstalled(origin: 'catalog' | 'installed'): void {
+  trackEvent('prime_package_installed', { origin })
+}
+
+export function trackPrimePackageInstallFailed(reason: 'cli_missing' | 'error'): void {
+  trackEvent('prime_package_install_failed', { reason })
+}

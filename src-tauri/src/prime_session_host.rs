@@ -1099,6 +1099,27 @@ pub fn new_session() -> Result<String, String> {
     })
 }
 
+/// Reload extensions after a package install. Same job as `/reload`.
+///
+/// No session and a stopped host both mean "nothing to reload" — the next
+/// chat will load the new package on startup. Never creates a session.
+pub fn reload_attached_session() -> bool {
+    try_reload_attached_session().unwrap_or(false)
+}
+
+fn try_reload_attached_session() -> Result<bool, String> {
+    let slot = host_slot();
+    let mut guard = slot.host.lock().map_err(poison)?;
+    let Some(host) = guard.as_mut() else {
+        return Ok(false);
+    };
+    if !host.is_alive() || !host.has_session() {
+        return Ok(false);
+    }
+    host.call(serde_json::json!({ "type": "reload" }))?;
+    Ok(true)
+}
+
 /// Token / cost / context usage for the live session.
 pub fn get_session_stats() -> Result<PrimeSessionStats, String> {
     with_host_mut(|host| {
