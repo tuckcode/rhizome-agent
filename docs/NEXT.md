@@ -96,7 +96,7 @@ status chrome (Contribute/Docs → About; idle on composer).
 - **Goal leftover closed:** native Chat glance **PASS** on that build
   ([2245](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md) + PNG).
 - **Parked (not blocking north star):** C72 side panels; Prime list-import route;
-  #51 Tab; C64 full verify; #47 close; Grokbot audits; C9; packaging/Windows;
+  #51 Case 2; C64 full verify; #47 close; Grokbot audits; C9; packaging/Windows;
   vault/app kanban + Chat briefing + scheduled lint report (see parked row below).
 
 **Parked — vault/app kanban (not blocking north star)**
@@ -346,7 +346,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | #35 | Verbose modifier reachable from the composer — **closed 2026-08-29** (`1a1bfa9`, one-click thinking toggle) |
 | #21 | Argument hints for commands that take arguments — **closed 2026-08-29** (`6037490`) |
 | #41 | Typing while Prime is working: steer/queue — **native dogfood confirmed 2026-09-06** (“Waiting in this session” / `MIDTURN_QUEUE_PROBE` on DeepSeek · Rhizome Vault). Code path C43/C44. |
-| #51 | Tab to fill in the reply you were going to type — **partial.** Options pills shipped (`replySuggestions` / `ComposerReplySuggestions`); `completion` kind + Tab ghost text **not** wired. Research: vault `projects/rhizome-agent/sub-agents/2026-09-01-tab-completion-ux-research.md` (rules-first v1; model-backed opt-in later). **Related:** ~~C71~~ up-arrow history shipped 2026-09-06. |
+| #51 | Tab to fill in the reply you were going to type — **Case 1 in tree 2026-09-12** (`5c04828`): rules-first `completion` + Tab ghost text. Case 2 (model-backed) still deferred. Research: vault `projects/rhizome-agent/sub-agents/2026-09-01-tab-completion-ux-research.md`. **Related:** ~~C71~~ up-arrow history shipped 2026-09-06. |
 | C70 | Per-message timestamps on Chat bubbles — **RESOLVED 2026-09-06** (`3:35p` under ask). |
 | C71 | Composer up-arrow previous-prompt history — **RESOLVED 2026-09-06** (in-memory; caret at start / empty). |
 
@@ -507,7 +507,8 @@ composition stays discuss-only until Atticus wants a graft.
    needs the graph. Then **session import** UI once Atticus green-lights.
 2. **Chat reliability** — #41 steer/queue (mostly proven), failure
    leftovers (#47 / #54). ~~C57~~ settled 2026-09-06.
-3. **Composer remainder** — #51 Tab ghost text (research done; rules-first).
+3. **Composer remainder** — #51 Case 2 (model-backed Tab). Case 1 ghost text
+   shipped 2026-09-12 (`5c04828`).
    ~~Up-arrow Ask-box history~~ shipped as C71 2026-09-06.
 4. **First-run** — #55 / C11 starter vault; C9 Welcome + import offer; **C66**
    agent profile once one-vs-per-agent and app-vs-vault are picked.
