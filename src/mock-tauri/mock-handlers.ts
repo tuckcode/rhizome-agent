@@ -153,6 +153,7 @@ let mockSettings: Settings = {
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
 const mockArchivedSessions = new Set<string>()
 let mockPrimeModelAllowList: string[] = ['mock/mock-model']
+const mockPrimePackages: string[] = []
 
 const mockSessionNames = new Map<string, string>()
 
@@ -811,7 +812,16 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   // "hidden by your list" disclosure — the uncurated case is the one that
   // looks identical to having no feature at all.
   get_prime_model_allow_list: () => [...mockPrimeModelAllowList],
-  list_prime_packages: () => [],
+  list_prime_packages: () => mockPrimePackages,
+  install_prime_package: (args: { source?: string }) => {
+    const source = String(args?.source ?? '').trim()
+    if (!source) throw new Error('Choose a package to install.')
+    const spec = source.startsWith('npm:') || source.startsWith('git:') || source.startsWith('http') || source.startsWith('/')
+      ? source
+      : `npm:${source}`
+    if (!mockPrimePackages.includes(spec)) mockPrimePackages.push(spec)
+    return { source: spec, reloaded: true }
+  },
   set_prime_model_allow_list: (args: { models?: string[] }) => {
     mockPrimeModelAllowList = (args?.models ?? []).map((key) => key.trim()).filter(Boolean)
     return null

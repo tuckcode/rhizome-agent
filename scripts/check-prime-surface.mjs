@@ -27,11 +27,11 @@ const GITHUB_LATEST =
   'https://api.github.com/repos/PrimeIntellect-ai/prime-agent/releases/latest'
 const USER_AGENT = 'rhizome-agent-prime-surface'
 
-/** Commands a desktop client should never send. ADR-0163: the daemon is not ours to stop. */
+/** Commands a desktop client should never send. ADR-0163: the daemon is not ours to stop.
+ *  `reload` is spoken after Settings → Packages install. Do not send it from Chat. */
 export const NEVER_CALL = [
   'ack_result',
   'prepare_update_restart',
-  'reload',
   'restart',
   'restore_actions',
   'retry_worker',

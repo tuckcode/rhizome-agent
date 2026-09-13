@@ -143,6 +143,7 @@
     "new_session",
     "promote_owned_session",
     "prompt",
+    "reload",
     "rename_saved_session",
     "resume_queue",
     "set_auto_compaction",
@@ -155,7 +156,6 @@
   "neverCall": [
     "ack_result",
     "prepare_update_restart",
-    "reload",
     "restart",
     "restore_actions",
     "retry_worker",

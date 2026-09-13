@@ -2,10 +2,21 @@ import { useCallback, useEffect, useState } from 'react'
 import { PuzzlePiece } from '@phosphor-icons/react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog'
 import { SectionHeading, SettingsGroup, SettingsGroupItem } from './SettingsControls'
 import { callHost } from '../lib/callHost'
 import {
+  isPrimeCliMissing,
+  isPrimePackageInstalled,
   parseInstalledPrimePackages,
+  primePackageAskAgentPrompt,
   primePackageInstallCommand,
   searchPrimePackageCatalog,
   type InstalledPrimePackage,
@@ -15,7 +26,10 @@ import {
 import {
   trackPrimePackageCatalogOpened,
   trackPrimePackageInstallCopied,
+  trackPrimePackageInstallFailed,
+  trackPrimePackageInstalled,
 } from '../lib/productAnalytics'
+import { queueAiPrompt, requestOpenAiChat } from '../utils/aiPromptBridge'
 import { writeClipboardText } from '../utils/clipboardText'
 import { openExternalUrl } from '../utils/url'
 
@@ -27,14 +41,24 @@ const KIND_TABS: ReadonlyArray<{ id: PrimePackageKind; label: string }> = [
   { id: 'theme', label: 'Themes' },
 ]
 
+interface InstallPrimePackageResult {
+  source: string
+  reloaded: boolean
+}
+
 /**
  * Pi package hub — catalog plus what is already on this machine.
  *
- * Prime's daemon cannot install them. This section searches the public
- * catalog and copies `prime-agent package install …` the same way provider
- * sign-in copies a Terminal command.
+ * Install runs `prime-agent package install` in the background, then reloads
+ * Prime. Chat is only the fallback when that CLI is missing.
  */
-export function PrimeExtensionsSection({ active = true }: { active?: boolean }) {
+export function PrimeExtensionsSection({
+  active = true,
+  onClose,
+}: {
+  active?: boolean
+  onClose?: () => void
+}) {
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState<PrimePackageKind>('all')
   const [hits, setHits] = useState<PrimePackageHit[]>([])
@@ -42,8 +66,22 @@ export function PrimeExtensionsSection({ active = true }: { active?: boolean }) 
   const [searchError, setSearchError] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
   const [installed, setInstalled] = useState<InstalledPrimePackage[] | null>(null)
-  const [copied, setCopied] = useState<string | null>(null)
-  const [copyError, setCopyError] = useState<string | null>(null)
+  const [pendingSource, setPendingSource] = useState<string | null>(null)
+  const [installing, setInstalling] = useState(false)
+  const [status, setStatus] = useState<string | null>(null)
+  const [installError, setInstallError] = useState<string | null>(null)
+  const [cliMissingSource, setCliMissingSource] = useState<string | null>(null)
+
+  const refreshInstalled = useCallback(async () => {
+    try {
+      const raw = await callHost<unknown>('list_prime_packages')
+      setInstalled(Array.isArray(raw)
+        ? parseInstalledPrimePackages({ packages: raw })
+        : parseInstalledPrimePackages(raw))
+    } catch {
+      setInstalled([])
+    }
+  }, [])
 
   useEffect(() => {
     if (!active) return
@@ -94,17 +132,54 @@ export function PrimeExtensionsSection({ active = true }: { active?: boolean }) 
     }
   }, [active, kind, query])
 
-  const copyInstall = useCallback(async (source: string, origin: 'catalog' | 'installed') => {
-    setCopyError(null)
-    const command = primePackageInstallCommand(source)
+  const confirmInstall = useCallback(async () => {
+    if (!pendingSource) return
+    const source = pendingSource
+    setInstalling(true)
+    setInstallError(null)
+    setCliMissingSource(null)
+    setStatus(null)
     try {
-      await writeClipboardText(command)
-      setCopied(command)
-      trackPrimePackageInstallCopied(origin)
+      const result = await callHost<InstallPrimePackageResult>('install_prime_package', { source })
+      setPendingSource(null)
+      trackPrimePackageInstalled('catalog')
+      await refreshInstalled()
+      setStatus(result.reloaded
+        ? 'Installed. Prime reloaded this chat.'
+        : 'Installed. Start a new chat to load it.')
     } catch (error) {
-      setCopyError(error instanceof Error ? error.message : String(error))
+      const message = error instanceof Error ? error.message : String(error)
+      setPendingSource(null)
+      if (isPrimeCliMissing(message)) {
+        trackPrimePackageInstallFailed('cli_missing')
+        setCliMissingSource(source)
+        setInstallError(message)
+      } else {
+        trackPrimePackageInstallFailed('error')
+        setInstallError(message)
+      }
+    } finally {
+      setInstalling(false)
+    }
+  }, [pendingSource, refreshInstalled])
+
+  const copyInstall = useCallback(async (source: string) => {
+    try {
+      await writeClipboardText(primePackageInstallCommand(source))
+      trackPrimePackageInstallCopied('catalog')
+      setStatus(`Copied. Paste in Terminal: ${primePackageInstallCommand(source)}`)
+    } catch (error) {
+      setInstallError(error instanceof Error ? error.message : String(error))
     }
   }, [])
+
+  const askChatToInstall = useCallback((source: string) => {
+    queueAiPrompt(primePackageAskAgentPrompt(source), [])
+    requestOpenAiChat()
+    onClose?.()
+  }, [onClose])
+
+  const listed = installed ?? []
 
   return (
     <div className="space-y-3" data-testid="prime-extensions-section">
@@ -115,25 +190,17 @@ export function PrimeExtensionsSection({ active = true }: { active?: boolean }) 
       />
       {active ? (
         <>
-      {installed && installed.length > 0 ? (
+      {listed.length > 0 ? (
         <div className="space-y-2">
           <div className="text-sm font-medium text-foreground">On this machine</div>
           <SettingsGroup>
-            {installed.map((pkg) => (
+            {listed.map((pkg) => (
               <SettingsGroupItem key={pkg.source}>
                 <div className="flex min-w-0 items-center justify-between gap-3">
                   <div className="min-w-0">
                     <div className="truncate text-sm text-foreground">{pkg.source}</div>
                     <div className="text-xs text-muted-foreground">Installed</div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void copyInstall(pkg.source, 'installed')}
-                  >
-                    Copy install
-                  </Button>
                 </div>
               </SettingsGroupItem>
             ))}
@@ -176,32 +243,44 @@ export function PrimeExtensionsSection({ active = true }: { active?: boolean }) 
 
       {hits.length > 0 ? (
         <SettingsGroup>
-          {hits.map((hit) => (
-            <SettingsGroupItem key={hit.name}>
-              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-foreground">{hit.name}</div>
-                  {hit.description ? (
-                    <p className="mt-0.5 text-xs text-muted-foreground">{hit.description}</p>
-                  ) : null}
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {[hit.publisher, hit.kinds.length > 0 ? hit.kinds.join(', ') : null]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </p>
+          {hits.map((hit) => {
+            const already = isPrimePackageInstalled(hit.name, listed)
+            return (
+              <SettingsGroupItem key={hit.name}>
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-foreground">{hit.name}</div>
+                    {hit.description ? (
+                      <p className="mt-0.5 text-xs text-muted-foreground">{hit.description}</p>
+                    ) : null}
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {[hit.publisher, hit.kinds.length > 0 ? hit.kinds.join(', ') : null]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  </div>
+                  {already ? (
+                    <p className="shrink-0 text-xs text-muted-foreground">Installed</p>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      disabled={installing}
+                      onClick={() => {
+                        setCliMissingSource(null)
+                        setInstallError(null)
+                        setPendingSource(hit.name)
+                      }}
+                    >
+                      Install
+                    </Button>
+                  )}
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => void copyInstall(hit.name, 'catalog')}
-                >
-                  Copy install
-                </Button>
-              </div>
-            </SettingsGroupItem>
-          ))}
+              </SettingsGroupItem>
+            )
+          })}
         </SettingsGroup>
       ) : null}
 
@@ -212,14 +291,32 @@ export function PrimeExtensionsSection({ active = true }: { active?: boolean }) 
         </p>
       ) : null}
 
-      {copied ? (
-        <p className="text-xs text-muted-foreground" data-testid="prime-extensions-copied">
-          Copied. Paste in Terminal:{' '}
-          <code className="break-all">{copied}</code>
+      {status ? (
+        <p className="text-xs text-muted-foreground" data-testid="prime-extensions-installed-status">
+          {status}
         </p>
       ) : null}
-      {copyError ? (
-        <p className="text-xs text-destructive">{copyError}</p>
+      {installError ? (
+        <p className="text-xs text-destructive">{installError}</p>
+      ) : null}
+      {cliMissingSource ? (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => askChatToInstall(cliMissingSource)}
+          >
+            Ask Chat to install
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void copyInstall(cliMissingSource)}
+          >
+            Copy install
+          </Button>
+        </div>
       ) : null}
 
       <Button
@@ -233,6 +330,42 @@ export function PrimeExtensionsSection({ active = true }: { active?: boolean }) 
       </Button>
         </>
       ) : null}
+
+      <Dialog
+        open={pendingSource !== null}
+        onOpenChange={(open) => {
+          if (!open && !installing) setPendingSource(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Install this package?</DialogTitle>
+            <DialogDescription>
+              Prime packages run with full system access. Review the source before you install.
+            </DialogDescription>
+          </DialogHeader>
+          {pendingSource ? (
+            <p className="truncate text-sm text-foreground">{pendingSource}</p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={installing}
+              onClick={() => setPendingSource(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={installing}
+              onClick={() => void confirmInstall()}
+            >
+              {installing ? 'Installing…' : 'Install package'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

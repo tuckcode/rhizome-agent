@@ -232,6 +232,7 @@ interface SettingsBodyProps {
   initialSectionId?: string | null
   loadModelCatalog?: boolean
   loadExtensionCatalog?: boolean
+  onClose?: () => void
 }
 
 const PULL_INTERVAL_OPTIONS = [1, 2, 5, 10, 15, 30] as const
@@ -609,6 +610,7 @@ function SettingsPanelInner({
           setHideGitignoredFiles={handleGitignoredVisibilityChange}
           setAllNotesFileVisibility={handleAllNotesFileVisibilityChange}
           initialSectionId={initialSectionId}
+          onClose={onClose}
         />
         <SettingsFooter onClose={onClose} onSave={handleSave} t={t} />
       </div>
@@ -669,6 +671,7 @@ interface SettingsBodyFromDraftProps {
   setHideGitignoredFiles: (value: boolean) => void
   setAllNotesFileVisibility: (value: AllNotesFileVisibility) => void
   initialSectionId?: string | null
+  onClose?: () => void
 }
 
 function SettingsBodyFromDraft({
@@ -693,6 +696,7 @@ function SettingsBodyFromDraft({
   setHideGitignoredFiles,
   setAllNotesFileVisibility,
   initialSectionId,
+  onClose,
 }: SettingsBodyFromDraftProps) {
   return (
     <SettingsBody
@@ -748,6 +752,7 @@ function SettingsBodyFromDraft({
       allNotesFileVisibility={draft.allNotesFileVisibility}
       setAllNotesFileVisibility={setAllNotesFileVisibility}
       initialSectionId={initialSectionId}
+      onClose={onClose}
       multiWorkspaceEnabled={draft.multiWorkspaceEnabled}
       setMultiWorkspaceEnabled={(value) => updateDraft('multiWorkspaceEnabled', value)}
       vaults={vaults}
@@ -995,6 +1000,7 @@ function SettingsAgentWorkflowSections({
   activeVaultPath,
   loadModelCatalog = false,
   loadExtensionCatalog = false,
+  onClose,
 }: SettingsBodyProps) {
   return (
     <>
@@ -1019,7 +1025,7 @@ function SettingsAgentWorkflowSections({
       </SettingsSection>
 
       <SettingsSection id={SETTINGS_SECTION_IDS.extensions}>
-        <PrimeExtensionsSection active={loadExtensionCatalog} />
+        <PrimeExtensionsSection active={loadExtensionCatalog} onClose={onClose} />
       </SettingsSection>
 
       <SettingsSection id={SETTINGS_SECTION_IDS.workflow}>
