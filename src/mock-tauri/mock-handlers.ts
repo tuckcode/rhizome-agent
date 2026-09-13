@@ -811,6 +811,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   // "hidden by your list" disclosure — the uncurated case is the one that
   // looks identical to having no feature at all.
   get_prime_model_allow_list: () => [...mockPrimeModelAllowList],
+  list_prime_packages: () => [],
   set_prime_model_allow_list: (args: { models?: string[] }) => {
     mockPrimeModelAllowList = (args?.models ?? []).map((key) => key.trim()).filter(Boolean)
     return null

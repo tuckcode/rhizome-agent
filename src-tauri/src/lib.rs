@@ -655,6 +655,7 @@ macro_rules! app_invoke_handler {
             commands::list_prime_sessions,
             commands::get_connected_providers,
             commands::get_prime_provider_status,
+            commands::list_prime_packages,
             commands::preflight_chat,
             commands::start_mindwalk_sidecar,
             commands::stop_mindwalk_sidecar,

@@ -991,6 +991,13 @@ pub fn get_prime_provider_status() -> Vec<crate::preflight::ProviderStatus> {
     crate::preflight::provider_statuses()
 }
 
+/// Packages listed in Prime's global settings. Catalog search is the public
+/// npm `pi-package` index; install stays CLI-only.
+#[tauri::command]
+pub fn list_prime_packages() -> Vec<crate::prime_settings::InstalledPrimePackage> {
+    crate::prime_settings::list_packages()
+}
+
 /// Providers the engine holds credentials for.
 ///
 /// Powers the picker's split between models this account can use and models it

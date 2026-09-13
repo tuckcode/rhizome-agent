@@ -165,6 +165,28 @@ describe('SettingsPanel', () => {
     }
   })
 
+  it('does not search the Prime package catalog until Extensions is opened', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ objects: [], total: 0 }),
+    } as Response)
+    try {
+      renderOpenSettings()
+      expect(screen.getByTestId('settings-nav-settings-section-extensions')).toHaveTextContent(
+        'Extensions',
+      )
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 30))
+      })
+      expect(fetchSpy).not.toHaveBeenCalled()
+
+      fireEvent.click(screen.getByTestId(`settings-nav-${SETTINGS_SECTION_IDS.extensions}`))
+      expect(await screen.findByTestId('prime-extensions-search')).toBeInTheDocument()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('loads the Prime catalog when Settings opens on Agents', async () => {
     resetPrimeModelCatalog()
     render(
