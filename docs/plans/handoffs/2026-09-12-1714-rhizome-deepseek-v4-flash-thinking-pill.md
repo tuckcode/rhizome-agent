@@ -5,7 +5,7 @@ description: >-
   The composer thinking pill now offers only the levels the attached model can
   run, and says so when the list is short. deepseek-v4-flash has no medium, so
   picking Medium silently landed back on High.
-commits: none yet — uncommitted in the working tree
+commits: f58611f
 ---
 
 # Thinking pill offers only the levels the model can run — 2026-09-12
@@ -80,15 +80,20 @@ Docs corrected in the same pass, since all three had become false:
 - `cargo clippy -- -D warnings`, `cargo fmt -- --check`, `pnpm lint`, `pnpm typecheck`
 - `pnpm handoff:check`
 
-Not run: `pnpm build`, Playwright smoke, coverage shards. Nothing was committed
-or pushed, so the pre-push gate has not seen this tree.
+`pnpm build` was run after the first full suite and passed; the numbers above
+come from the earlier, pre-comment-only run. Playwright smoke and coverage
+shards did not run.
+
+Landed as **`f58611f`** ("fix: offer only thinking levels the model can run"),
+committed from another session's daily-drive batch and merged to `main` in
+`c9d7776`. The committed message and its `Co-Authored-By` lines are that
+session's, not this one's.
 
 ## Open
 
-- `pnpm prime:surface` still fails: installed Prime is **0.9.3** (106 daemon
-  commands) against a snapshot written for **0.8.0**. New commands
-  `get_direct_worker_transport`, `list_agent_peers`, `roster_subscribe`,
-  `roster_unsubscribe`; `resume_queue` is newly spoken. `HANDOFF.md` and
-  `YOU-SHOULD-KNOW.md` both still say 0.8.0.
+- ~~`pnpm prime:surface` fails against 0.9.3~~ **closed by `316e119`** in the
+  same batch, which refreshed `docs/prime-adapter-surface.json` for installed
+  0.9.3 and noted the new daemon names without wiring them. `pnpm prime:surface`
+  now reports "unchanged" on both sides.
 - The same class of defect is worth a second look elsewhere: any control whose
   list comes from the host's *scale* rather than the model's *capabilities*.

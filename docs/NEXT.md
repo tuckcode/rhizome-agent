@@ -4,7 +4,8 @@
 tagged in place. This file is a palimpsest — several models have edited it;
 `rg` cannot tell whose voice a heading is.
 
-**Coming in cold:** read [`docs/HANDOFF.md`](HANDOFF.md),
+**Coming in cold:** read [`docs/BOARD.md`](BOARD.md) for tonight’s
+picture, then [`docs/HANDOFF.md`](HANDOFF.md),
 [`docs/IDENTITY.md`](IDENTITY.md), and
 [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) before claiming a row. This
 file stays the unclaimed-work index.
