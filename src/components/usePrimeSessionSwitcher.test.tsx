@@ -20,13 +20,14 @@ vi.mock('../mock-tauri', () => ({
 }))
 
 describe('usePrimeSessionSwitcher', () => {
-  const agent = { replaceMessages: vi.fn() }
+  const agent = { replaceMessages: vi.fn(), messages: [] as unknown[] }
   const refreshSessionTree = vi.fn()
 
   beforeEach(() => {
     invoked.calls = []
     invoked.switchImpl = null
     agent.replaceMessages.mockReset()
+    agent.messages = []
     refreshSessionTree.mockReset()
   })
 
@@ -78,6 +79,7 @@ describe('usePrimeSessionSwitcher', () => {
       await Promise.resolve()
     })
     expect(result.current.activeSessionPath).toBe('/past.jsonl')
+    expect(agent.replaceMessages).toHaveBeenCalledWith([])
 
     await act(async () => {
       finishSwitch?.()
@@ -87,6 +89,8 @@ describe('usePrimeSessionSwitcher', () => {
 
   it('rolls the highlight back when the host refuses the switch', async () => {
     invoked.switchImpl = () => Promise.reject(new Error('still streaming'))
+    const stale = [{ role: 'assistant', content: 'stale turn' }]
+    agent.messages = stale
 
     const { result } = renderHook(() => usePrimeSessionSwitcher({
       agent: agent as never,
@@ -104,7 +108,8 @@ describe('usePrimeSessionSwitcher', () => {
 
     expect(result.current.activeSessionPath).toBeNull()
     expect(result.current.switchError).toContain('still streaming')
-    expect(agent.replaceMessages).not.toHaveBeenCalled()
+    expect(agent.replaceMessages).toHaveBeenNthCalledWith(1, [])
+    expect(agent.replaceMessages).toHaveBeenLastCalledWith(stale)
   })
 
   it('still ensures the host when Chat has not connected yet', async () => {

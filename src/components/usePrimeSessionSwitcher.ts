@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { startTransition, useCallback, useState } from 'react'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import {
   chatSessionsOpenDefault,
@@ -104,18 +104,20 @@ export function usePrimeSessionSwitcher({
   /**
    * Switch the live host to a past session and rehydrate the transcript.
    *
-   * The host switch still goes before the transcript replace: if the host
-   * refuses (it will not switch mid-turn), we must not paint another session's
-   * messages. The row highlight moves immediately so the list does not look
-   * stuck for the whole round trip; a failed switch rolls the highlight back.
+   * The row highlight and the transcript both move immediately so the list
+   * does not look stuck for the whole round trip. The host switch still
+   * runs before the final transcript replace: if the host refuses (it will
+   * not switch mid-turn), we restore the previous messages and path.
    */
   const handleSelectSession = useCallback(async (session: PrimeSessionSummary) => {
     setSwitchError(null)
     const previousPath = activeSessionPath
-    // Highlight the row immediately. The host switch and transcript read still
-    // run in order below — painting the selection first stops the list from
-    // looking stuck for the whole round trip (session-switch beachball).
+    const previousMessages = [...agent.messages]
+    // Highlight the row immediately. Clear the stale transcript in the same
+    // click so the old conversation does not linger while the host round-trip
+    // runs (session-switch beachball).
     setActiveSessionPath(session.path)
+    agent.replaceMessages([])
     try {
       if (vaultPath && !hostRunning) {
         await callHost('ensure_prime_session_host', { vaultPath })
@@ -124,7 +126,9 @@ export function usePrimeSessionSwitcher({
       const transcript = await callHost<PrimeTranscriptItem[]>('read_prime_session_transcript', {
         path: session.path,
       })
-      agent.replaceMessages(primeTranscriptToConversation(transcript))
+      startTransition(() => {
+        agent.replaceMessages(primeTranscriptToConversation(transcript))
+      })
       refreshSessionTree()
       // The column deliberately stays open. Closing it made sense when this
       // list was an overlay covering the conversation — dismissing it was how
@@ -133,6 +137,7 @@ export function usePrimeSessionSwitcher({
       // makes you reopen it to pick a second session.
     } catch (e) {
       setActiveSessionPath(previousPath)
+      agent.replaceMessages(previousMessages)
       reportSwitchError(e)
     }
   }, [activeSessionPath, agent, hostRunning, refreshSessionTree, reportSwitchError, vaultPath])
