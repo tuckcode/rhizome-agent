@@ -3,8 +3,8 @@ session: 2026-09-12T20:18-05:00
 model: Cursor Grok 4.6
 description: >-
   Tonight's daily-drive batch plus Settings → Packages in-app install.
-  Pushing to main and rebuilding /Applications. C64/#47 still need the new app.
-commits: 1ebfdc8..9328bc3
+  On origin and in /Applications as 6908554. C64/#47 still need a look.
+commits: e65b9f7..6908554
 ---
 
 # Daily-drive + Packages install — 2026-09-12 evening
@@ -31,10 +31,11 @@ Packages:
 - Full-system-access confirm once per install
 - Chat / copy-command only if the CLI is missing
 
-## Not in this binary until rebuild
+## Packaged
 
-Last packaged app is still **`3a21f9f`**. Rebuild is the next step in the
-same session.
+`/Applications/Rhizome Agent.app` installed **2026-09-12 20:31** from
+**`6908554`**. Project leftover `.app` deleted. Open that copy for daily
+drive.
 
 ## Left out
 
@@ -45,6 +46,6 @@ same session.
 
 ## Next
 
-1. After `/Applications` lands: open it, try Packages → Install
+1. Open `/Applications/Rhizome Agent.app`. Try Settings → Packages → Install.
 2. Optional: C64 first-2s ×3; #47 native confirm
 3. Do not start portfolio / kanban / Windows
