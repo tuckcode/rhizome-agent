@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
     kinds: string[]
   }>,
   total: 0,
+  lastKind: 'all' as string,
 }))
 
 vi.mock('../lib/callHost', () => ({
@@ -26,7 +27,10 @@ vi.mock('../lib/primePackages', async () => {
   const actual = await vi.importActual<typeof import('../lib/primePackages')>('../lib/primePackages')
   return {
     ...actual,
-    searchPrimePackageCatalog: async () => ({ hits: state.hits, total: state.total }),
+    searchPrimePackageCatalog: async (_query: string, kind = 'all') => {
+      state.lastKind = kind
+      return { hits: state.hits, total: state.total }
+    },
   }
 })
 
@@ -50,6 +54,7 @@ describe('PrimeExtensionsSection', () => {
     state.installed = []
     state.hits = []
     state.total = 0
+    state.lastKind = 'all'
     vi.mocked(writeClipboardText).mockClear()
   })
 
@@ -71,6 +76,8 @@ describe('PrimeExtensionsSection', () => {
     state.total = 9724
     render(<PrimeExtensionsSection />)
     expect(await screen.findByText('pi-mcp-adapter')).toBeInTheDocument()
+    expect(screen.getByText('Packages')).toBeInTheDocument()
+    expect(screen.getByTestId('prime-packages-kind-tabs')).toBeInTheDocument()
     expect(screen.getByText(/9,724 packages/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Copy install' }))
     await waitFor(() => {
@@ -88,5 +95,15 @@ describe('PrimeExtensionsSection', () => {
     render(<PrimeExtensionsSection />)
     expect(await screen.findByText('pi-skills')).toBeInTheDocument()
     expect(screen.getByText('Installed')).toBeInTheDocument()
+    expect(screen.getByText('On this machine')).toBeInTheDocument()
+  })
+
+  it('searches skills when that catalog tab is chosen', async () => {
+    render(<PrimeExtensionsSection />)
+    expect(await screen.findByTestId('prime-packages-kind-tabs')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Skills' }))
+    await waitFor(() => {
+      expect(state.lastKind).toBe('skill')
+    })
   })
 })

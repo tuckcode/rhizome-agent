@@ -20,16 +20,25 @@ export interface InstalledPrimePackage {
   source: string
 }
 
+export type PrimePackageKind = 'all' | 'extension' | 'skill' | 'prompt' | 'theme'
+
+const KIND_SEARCH_KEYWORD: Record<Exclude<PrimePackageKind, 'all'>, string> = {
+  extension: 'extension',
+  skill: 'skill',
+  prompt: 'prompt',
+  theme: 'theme',
+}
+
 const NPM_SEARCH = 'https://registry.npmjs.org/-/v1/search'
 const CATALOG_SIZE = 20
 
-export function catalogSearchUrl(query: string): string {
+export function catalogSearchUrl(query: string, kind: PrimePackageKind = 'all'): string {
   const trimmed = query.trim()
-  const text = trimmed.length > 0
-    ? `keywords:pi-package ${trimmed}`
-    : 'keywords:pi-package'
+  const parts = ['keywords:pi-package']
+  if (kind !== 'all') parts.push(`keywords:${KIND_SEARCH_KEYWORD[kind]}`)
+  if (trimmed.length > 0) parts.push(trimmed)
   const url = new URL(NPM_SEARCH)
-  url.searchParams.set('text', text)
+  url.searchParams.set('text', parts.join(' '))
   url.searchParams.set('size', String(CATALOG_SIZE))
   return url.toString()
 }
@@ -146,8 +155,9 @@ function packageKinds(keywords: string[]): string[] {
 
 export async function searchPrimePackageCatalog(
   query: string,
+  kind: PrimePackageKind = 'all',
 ): Promise<{ hits: PrimePackageHit[]; total: number }> {
-  const response = await fetch(catalogSearchUrl(query))
+  const response = await fetch(catalogSearchUrl(query, kind))
   if (!response.ok) {
     throw new Error(`Catalog search failed (${response.status})`)
   }

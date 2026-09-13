@@ -165,7 +165,7 @@ describe('SettingsPanel', () => {
     }
   })
 
-  it('does not search the Prime package catalog until Extensions is opened', async () => {
+  it('does not search the Prime package catalog until Packages is opened', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({ objects: [], total: 0 }),
@@ -173,7 +173,7 @@ describe('SettingsPanel', () => {
     try {
       renderOpenSettings()
       expect(screen.getByTestId('settings-nav-settings-section-extensions')).toHaveTextContent(
-        'Extensions',
+        'Packages',
       )
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 30))

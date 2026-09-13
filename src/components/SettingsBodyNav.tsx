@@ -23,7 +23,7 @@ export function SettingsBodyNav({ t, onVisit }: SettingsBodyNavProps) {
     { id: SETTINGS_SECTION_IDS.appearance, label: t('settings.appearance.title'), Icon: Palette },
     { id: SETTINGS_SECTION_IDS.content, label: t('settings.vaultContent.title'), Icon: Article },
     { id: SETTINGS_SECTION_IDS.ai, label: t('settings.aiAgents.title'), Icon: Bot },
-    { id: SETTINGS_SECTION_IDS.extensions, label: 'Extensions', Icon: PuzzlePiece },
+    { id: SETTINGS_SECTION_IDS.extensions, label: 'Packages', Icon: PuzzlePiece },
     { id: SETTINGS_SECTION_IDS.workflow, label: t('settings.workflow.title'), Icon: ListChecks },
     { id: SETTINGS_SECTION_IDS.privacy, label: t('settings.privacy.title'), Icon: ShieldCheck },
     { id: SETTINGS_SECTION_IDS.about, label: t('settings.about.title'), Icon: Info },
