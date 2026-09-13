@@ -390,7 +390,11 @@ rhizome-agent/
 | `src/components/aiWorkspaceSizing.ts` | AI workspace sizing, localStorage persistence, class names, and layout style helpers. |
 | `src/components/AiPanel.tsx` | Reusable AI transcript/composer surface — selected target with tool execution, reasoning, actions, and per-vault permission mode. |
 | `src/components/PrimeThinkingToggle.tsx` | Composer thinking-level menu. Levels come from the host and are filtered to the model's own set; no hardcoded list. |
-| `src/components/usePrimeSessionSwitcher.ts` | Session list switch / fork / branch. Skips `ensure_prime_session_host` when the host is already running. |
+| `src/components/usePrimeSessionSwitcher.ts` | Session list switch / fork / branch. Skips `ensure_prime_session_host` when the host is already running. Clears the transcript on the same click as the row highlight. |
+| `src/lib/replySuggestions.ts` | Rules-first reply pills and Tab ghost-text (#51 Case 1). Options win over completion. Model-backed suggestions are not built. |
+| `src/components/chatNoteSplit.ts` | On top / Beside for an open note over Chat. Beside forces compact Sessions/Notes. |
+| `src/components/PrimeExtensionsSection.tsx` | Settings → Packages hub. Catalog is npm `pi-package`; install is the Prime CLI, not a daemon command. |
+| `src/lib/primePackages.ts` | Catalog search URL, install spec (`npm:` prefix), and Ask-Chat fallback prompt. |
 | `src/hooks/useViewMode.ts` | Persisted `editor-only` / `editor-list` / `all`. Fresh default is Notes open (`editor-list`). |
 | `src/components/ConnectionsPanel.tsx` | Graph/Mycelium cell. Chat-centered shell mounts this only on Changes. |
 | `src/utils/openAiWorkspaceWindow.ts` | Native Tauri AI workspace window creation, focus, and dock-back traffic-light handling. |
@@ -468,7 +472,7 @@ That browser harness is a deterministic desktop command bridge, not real native 
 
 ## Developer pitfalls (current tree)
 
-Verified against source 2026-09-08. Longer landmine list:
+Verified against source 2026-09-13. Longer landmine list:
 [`CROSS-MODEL-HANDOFF.md`](CROSS-MODEL-HANDOFF.md).
 
 - **One Rhizome at a time.** Debug bundle and `/Applications/Rhizome Agent.app`
@@ -476,7 +480,9 @@ Verified against source 2026-09-08. Longer landmine list:
   first. Quit the installed app before `pnpm tauri dev`.
 - **Notes default open.** `useViewMode` returns `editor-list` when nothing is
   stored. Chat must not force `editor-only`. Shut Notes leaves
-  `VaultPanelRestoreButton` (46px). Inbox toggles; it does not mount Graph.
+  `VaultPanelRestoreButton` (46px rail, 32px hit target). Inbox toggles; it
+  does not mount Graph. Beside an open note folds Sessions/Notes — do not
+  restore hover-collapse on that pane.
 - **Graph/Mycelium only on Changes.** `ConnectionsPanel` is gated on
   `isChangesSelection`. Do not remount it under Inbox to “make Graph findable.”
 - **Thinking levels come from the host.** Call `get_prime_thinking_levels`
@@ -485,7 +491,20 @@ Verified against source 2026-09-08. Longer landmine list:
   offer a level the model refuses — Prime clamps it and the click looks dead.
 - **Session switch skip-ensure.** `usePrimeSessionSwitcher` skips
   `ensure_prime_session_host` when `hostRunning` is true. Status-poll retry
-  of ensure is still required when the host is down.
+  of ensure is still required when the host is down. The click must clear
+  the transcript immediately; leaving the old messages up is the beachball.
+- **Settings catalog is lazy.** Do not fetch `get_available_prime_models` or
+  `get_prime_provider_status` until Agents is visible. Do not search the
+  Packages catalog until that section is opened. Do not cache a failed
+  “host is not running” catalog.
+- **Hide stops helpers.** Red-button close hides (C22) and
+  `release_helpers_for_hidden_window` stops the spawned Prime supervisor,
+  MCP bridge, and Mindwalk sidecar unless Keep working left a resident
+  session. Never send Prime `shutdown`. Cmd+Q is the real quit.
+- **Packages install is CLI, not the daemon.** `install_prime_package` runs
+  `prime-agent package install` (180s). Confirm full system access once.
+- **Tab completion is rules-first.** `suggestReply` only. Do not add
+  model-backed ghost text (#51 Case 2) without a separate decision.
 - **MCP wiki verbs are gone.** `listTools` must not include
   `rhizome_grok_import`, `rhizome_generate_wiki`, or `rhizome_repo_research`.
   Graph queries need `RHIZOME_TOOL_PATH` / packaged `cli-call.mjs`.

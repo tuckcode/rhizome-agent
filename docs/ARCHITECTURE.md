@@ -218,7 +218,9 @@ flowchart TD
 
 **Origin:** Cursor Grok 4.6 · 2026-09-08 — corrected against `App.tsx`,
 `useViewMode.ts`, `VaultPanel.tsx`, and `ConnectionsPanel.tsx` (C72 +
-Graph-on-Changes). Do not restore Graph as a center-canvas destination.
+Graph-on-Changes). Daily-drive chrome (On top / Beside, Show Notes hit
+target, latest-reply marker) verified 2026-09-13. Do not restore Graph
+as a center-canvas destination.
 
 The **network-shell** product map (ADR-0166, refined by ADR-0170 / ADR-0171) is:
 
@@ -258,7 +260,34 @@ you can leave; it does not replace Chat. The Connections edge strip is gone
 (`GraphControls`, collapsed until focus or an active filter) — not a large
 overlay. `useChatCenteredShellLayout` owns `notesOpen`, the restore strip,
 compact/Beside fold, and rail pressed state so App does not recombine view
-mode with compact flags. The diagram below is the inherited Desktop notes-app
+mode with compact flags.
+
+#### Open-note split, Copy, and the latest-reply marker
+
+An open note can sit **On top** of Chat (`stacked`) or **Beside** it
+(`side-by-side`). The toggle is on the Notes header (`ChatNoteSplitToggle`),
+never by the traffic lights. The pick lives in localStorage
+(`APP_STORAGE_KEYS.chatNoteSplit`). Beside forces the compact shell
+(`shouldForceChatShellCompact`) so Sessions/Notes fold and Chat keeps a
+usable column. Hover must not collapse that note pane.
+
+The Show Notes restore strip is a **32px** hit target (`VaultPanelRestoreButton`);
+the visible rail stays 46px. Open Notes keeps an inner `--sidebar-border`
+against Chat. Do not cover Chat’s pulsing green working strip
+(`ai-border-pulse` on the panel’s left edge) with a stronger Sessions border.
+
+Highlight in Chat or in the open note, then right-click **Copy**. Chat text
+uses the native WebKit menu via `NATIVE_CONTEXT_MENU_ALLOWLIST`
+(`[data-testid="ai-message"]` and the composer). An open-note highlight also
+offers **Ask Chat about this** (`AskChatExcerptMenu`): it fills the current
+composer with `formatAskChatExcerpt` and does not start a new thread.
+
+The newest assistant turn shows a green start marker
+(`latestAssistantMessageIndex` / `latest-assistant-reply-marker`) left of
+its first line. Compact/local system markers are not replies. The marker
+moves when a newer assistant turn starts streaming or lands.
+
+The diagram below is the inherited Desktop notes-app
 map (classic shell / note windows / editor internals); do not treat it as the
 Agent main-window layout.
 
@@ -483,7 +512,10 @@ Each answers "nothing", which is true of a host with no session.
   #17 — this conversation, not the sessions drawer),
   `usePrimeSessionSwitcher` (list switch / fork / branch; **skips**
   `ensure_prime_session_host` when Chat already reports the host running —
-  a redundant ensure on every click was the session-switch beachball),
+  a redundant ensure on every click was the session-switch beachball.
+  A row click highlights immediately and **clears the transcript in the
+  same click** so the old conversation does not linger during the host
+  round-trip; a refused mid-turn switch restores the previous messages),
   `AiMessage` (turn rendering; successful `get_note` actions become deduplicated,
   one-click `From your vault` source links beneath the answer, while searches,
   writes, pending calls, and failed calls never claim provenance),
@@ -538,6 +570,22 @@ Assistant actions on `AiMessage` are icon-only (`size="icon"`) with hover
 tooltips: regenerate, copy, save to vault, fork. Accessible names stay on
 the buttons (`ai.message.*`). Do not restore text labels.
 
+#### Reply pills and Tab ghost-text (#51 Case 1)
+
+`suggestReply` (`src/lib/replySuggestions.ts`) reads the last assistant
+message and offers **at most one** of:
+
+- **`options`** — 2–4 pills when the agent asked a closed question
+  (numbered, bullets, “X or Y”, or an action yes/no). Labels must name
+  the action. Pills win when both shapes could apply.
+- **`completion`** — one obvious continuation, accepted with Tab
+  (`composer-reply-completion` in `AiPanelChrome`). Rules-first only:
+  “ready”, “want me to” / “shall I”, or a last-sentence “next I will…”
+  echo. Never a bare “yes”. Most turns offer nothing.
+
+Case 2 (model-backed or app-state suggestions) is **not** built. Do not
+fire both mechanisms on the same turn.
+
 #### The chat model menu (#45)
 
 Prime publishes its whole catalog regardless of auth state — **501 models** on
@@ -564,17 +612,44 @@ keeps whatever is running listed, since the picker only ever receives a label.
 
 #### Prime packages (Pi catalog)
 
-Settings → **Packages** is the Pi catalog hub. Prime is a
-distribution of Pi, so the catalog is npm's `pi-package` keyword — the same
-index as [pi.dev/packages](https://pi.dev/packages). Installed entries come
-from `~/.prime/agent/settings.json` via `list_prime_packages`. Install runs
-`prime-agent package install` in the background (`install_prime_package`), then
-reloads the attached Prime session (`reload`). Prime's own docs warn that
-packages run with full system access; Settings confirms that once per install.
-If the CLI is missing, Settings copies the command or asks Chat to run it.
+Settings → **Packages** is the Pi catalog hub (`PrimeExtensionsSection`).
+Prime is a distribution of Pi, so the catalog is npm's `pi-package`
+keyword — the same index as [pi.dev/packages](https://pi.dev/packages).
+Kind tabs (extension / skill / prompt / theme) add a second keyword.
+Search hits the public npm registry from the renderer
+(`catalogSearchUrl`); installed entries come from
+`~/.prime/agent/settings.json` via `list_prime_packages`.
+
+Prime's **daemon has no install command**. Install runs
+`prime-agent package install <source>` in a 180s background process
+(`prime_packages.rs` / `install_prime_package`), then reloads the
+attached session. Bare names become `npm:{name}`. Sources that start
+with `-` or contain whitespace are refused. Packages run with **full
+system access**; Settings confirms that once per install. If the CLI
+is missing, Settings copies the command or asks Chat to run it
+(`primePackageAskAgentPrompt`). Opening Settings does **not** search
+the catalog until Packages is visited or that section scrolls into view.
 
 The allow-list is Rhizome's view of Prime's catalog, in the same sense as
 archiving below: Prime's CLI and every other client still see all 501.
+
+#### Hide-on-close and Settings catalog cost
+
+The red traffic light **hides** the main window (C22); Cmd+Q quits.
+Idle hide settles the owned session as **Stop**, then
+`release_helpers_for_hidden_window` stops the spawned Prime supervisor,
+the MCP WebSocket bridge, and the Mindwalk sidecar so they do not leave
+a Dock “running” mark. A Keep-working (`resident`) session is the
+exception — that daemon stays. Rhizome never sends Prime’s `shutdown`
+RPC (other clients share the machine). Active hide asks first
+(`prime-active-close-requested`); `settle_prime_session` also releases
+helpers because `window.hide()` does not raise `CloseRequested` again.
+
+Settings and Chat share one Prime model catalog (`loadPrimeModelCatalog`).
+A failed “host is not running” answer is **not** cached. Settings must
+not fetch that catalog — or `get_prime_provider_status` — until the
+Agents section is opened or scrolled into view. Fetching 501 models on
+every Settings open was the pinwheel.
 
 #### What Rhizome does not own
 
@@ -1619,6 +1694,10 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `copy_text_to_clipboard` | Copy setup snippets through the native desktop clipboard command path |
 | `read_text_from_clipboard` | Read current desktop clipboard text for command-driven plain-text paste |
 | `sync_mcp_bridge_vault` | Sync the desktop WebSocket bridge process to the selected vault, or stop it when no vault is selected |
+| `list_prime_packages` | Installed Prime packages from `~/.prime/agent/settings.json` |
+| `install_prime_package` | Run `prime-agent package install`, then reload the attached session |
+| `get_prime_provider_status` | Read-only connection status per provider (no keys). Settings waits until Agents is visible |
+| `settle_prime_session` | Settle the owned session on hide, then release helpers this process started |
 
 The desktop MCP WebSocket bridge is intentionally local-only. `mcp-server/ws-bridge.js` binds both bridge ports to loopback, rejects non-loopback clients, accepts browser/Tauri origins only on the UI bridge, and rejects browser-origin requests on the tool bridge so remote pages cannot drive vault tools directly.
 
@@ -1714,8 +1793,10 @@ Data flows unidirectionally: `App` passes data and callbacks as props to child c
 | Cmd+Shift+M | Toggle Markdown highlight on selected rich-editor text |
 | Cmd+[ / Cmd+] | Navigate back / forward (replaces tabs) |
 | Cmd+Z / Cmd+Shift+Z | Undo / Redo |
-| Cmd+1–9 | Switch to tab N |
-| Cmd+[ / Cmd+] | Navigate back / forward |
+| Cmd+1 | Chat only (`editor-only`) |
+| Cmd+2 | Notes open, Browse collapsed (`editor-list`) |
+| Cmd+3 | Notes open, Browse expanded (`all`) |
+| Tab (composer, idle) | Accept the ghost-text completion when `suggestReply` offers one |
 | `[[` in editor | Open wikilink suggestion menu |
 
 Selection-dependent actions are wired through the command palette and the native menus. For example, a deleted file opened from Changes view becomes a read-only diff preview, and that state enables the "Restore Deleted Note" menu/command while normal note mutation actions stay disabled. Folder selection follows the same pattern: when `selection.kind === 'folder'`, the command palette exposes "Reveal Folder in Finder", "Copy Folder Path", "Rename Folder", and "Delete Folder", and the sidebar row can launch the same flows directly through inline rename or the folder context menu. Active files also expose "Reveal in Finder" and "Copy File Path" through the command palette; non-Markdown file tabs additionally expose "Open in Default App", matching the `FilePreview` header controls. Markdown notes expose "Export note as PDF" from Cmd+K, the native Note menu, the breadcrumb overflow menu, and the note-list context menu, all routed through the same editor export hook. Remote-backed notes expose "Copy git URL" from the breadcrumb overflow and note-list context menu; the renderer gates the action per note workspace via `git_remote_status`, then asks `git_file_url` to build the copied URL from the primary remote, current branch, and vault-relative path. Active notes now follow the same shared-action model for retargeting: Cmd+K can open "Change Note Type…" and "Move Note to Folder…", and the sidebar drop targets call the same hook-backed implementations instead of maintaining separate mutation paths.

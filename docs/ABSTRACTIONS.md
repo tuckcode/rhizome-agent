@@ -995,6 +995,10 @@ Tolaria delegates remote auth to the user's system git setup:
 The core abstraction of the Prime harness, and the one most likely to be
 modelled wrongly. Full detail in `ARCHITECTURE.md` → *Prime Agent*.
 
+**Origin:** Prime Session body is older; reply / packages / hide notes
+added 2026-09-13 against `replySuggestions.ts`, `prime_packages.rs`,
+and `lib.rs::release_helpers_for_hidden_window`.
+
 **A Prime session is not a subprocess.** It lives in a daemon that Rhizome
 connects to over a Unix socket (ADR-0163). The daemon may outlive the window;
 the *session* does not, unless the user granted background residency
@@ -1054,6 +1058,25 @@ Mutate and steering-mode remain unspoken.
 Schedules: see/pause/cancel already lived on the activity band (#14). Create is
 `heartbeat_set` / `cron_add` from `PrimeScheduleDialog` next to Goal — not on
 the idle strip, which must stay quiet when nothing is scheduled.
+
+### Reply suggestions
+
+`suggestReply` is a pure read of the last assistant string. It returns
+pills, one Tab completion, or `null`. Pills and completion never ship
+together. Nothing here talks to Prime.
+
+### Packages
+
+Installed packages are Prime settings (`list_prime_packages`). The
+catalog is the public npm `pi-package` index. Install is a CLI spawn
+(`install_prime_package`), then `reload` on the attached session. The
+daemon has no package-install verb.
+
+### Hide vs quit
+
+Main-window close hides (C22) and `release_helpers_for_hidden_window`
+stops helpers this process started, unless Keep working left a resident
+session. Quit is Cmd+Q / `ExitRequested`. Never Prime `shutdown`.
 
 ## Settings
 

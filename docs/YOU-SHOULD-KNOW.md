@@ -13,7 +13,7 @@ re-litigate.
 Last Claude-owned session on this repo: **2026-08-24**
 ([shell dock + ADR-0166 + NEXT.md](plans/handoffs/2026-08-24-2122-claude-opus-5-shell-dock-and-next-index.md)).
 Claude’s last *code* was **2026-08-22** (right-dock + ADR-0166).
-`origin/main` at writing was **`80fa720`**. **Corrected 2026-09-08:**
+`origin/main` at writing was **`80fa720`**. **Corrected 2026-09-13:**
 confirm with `git log origin/main -1` (this briefing is not the daily
 index — `HANDOFF.md` holds the tip). Do not treat the shell map below as
 current without reading §2’s correction block.
@@ -42,7 +42,8 @@ with `pnpm prime:surface` / `pnpm prime:surface:github`. Snapshot:
 ## 2. The shell, as shipped (not as ADR-0166 first drafted it)
 
 **Origin:** Cursor Grok 4.6 · 2026-09-08 — §2 corrected against `App.tsx`
-/ ADR-0170 / ADR-0171. The 2026-08-26 “Graph replaces Chat” map is stale.
+/ ADR-0170 / ADR-0171. Daily-drive chrome restated 2026-09-13. The
+2026-08-26 “Graph replaces Chat” map is stale.
 
 ```
 rail | sessions | CHAT | Notes (default open; 46px rail when shut)
@@ -59,6 +60,11 @@ longer open the way the ADR text still sounds.
 | ⌘1 / ⌘2 / ⌘3 | **Settled 2026-08-25.** ⌘1 Chat only. ⌘2 Notes panel, Browse collapsed. ⌘3 Notes panel, Browse expanded. Stored `viewMode` values unchanged (`editor-only` / `editor-list` / `all`). Fresh vaults default to `editor-list` (C72). |
 | Right panel | **Settled 2026-08-25, refined 2026-09-07.** One Notes panel. Compact nav above the selected list. Rail **Inbox** toggles it. Shut Notes leaves a 46px restore rail. No Inbox/Notes tabs, no second right column. |
 | Canvas destinations | **Corrected 2026-09-07.** Chat stays the centre. Graph/Mycelium are a Changes-only cell under Notes (ADR-0171), not a place you go instead of chatting. Research is still a centre pane. #39 (graph as an *agent tool*) is still open. |
+| Open note vs Chat | **Shipped 2026-09-12.** Notes header **On top / Beside**. Beside folds Sessions/Notes. Hover must not collapse the note. Highlight → Copy, or **Ask Chat about this** (same thread). |
+| Latest reply | Green start marker on the newest assistant turn. Moves when a newer reply starts. |
+| Session click | Transcript **clears on the click**, then rehydrates. Leaving the old chat up is the switch beachball. |
+| Settings cost | Model catalog and provider status wait until **Agents** is visible. Packages catalog waits until **Packages**. |
+| Hide vs quit | Red button hides (C22) and stops helpers this process started, unless Keep working. Cmd+Q quits. Never Prime `shutdown`. |
 
 **Do not** make nav and the note list exclusive. Claude tried; it broke
 Cmd+N, inbox auto-advance, and note selection. Keep them mounted
@@ -140,9 +146,19 @@ Do not redesign the strip again.
   High / X-High, and the menu says "Limited by this model" when it is short).
   Do not restore a binary quiet/loud toggle. The model picker lists the same
   set.
+- **#51 Case 1 shipped:** Tab ghost-text and reply pills are rules-first
+  (`suggestReply`). Options win over completion. Case 2 (model-backed) is
+  not built.
 - Assistant message actions are icon-only with hover tooltips (regenerate,
   copy, save to vault, fork).
 - Command argument hints were already in the slash menu.
+
+### Packages hub (2026-09-12)
+
+Settings → **Packages** (nav label, not “Extensions”) is the Pi catalog.
+Install is `prime-agent package install`, then reload. The daemon has no
+install command. Confirm full system access once. Chat is the fallback
+when the CLI is missing.
 
 ### Prime verbs that landed in Chat
 
@@ -244,7 +260,8 @@ issue.** Check `main` and the handoff first.
 #25 (retrieval provenance), #37 (Save as custom), #39 (graph as tool),
 #26 (update Prime in-app), #32 (Windows daemon — pipes exist in Prime
 0.7.4+; see `WINDOWS-DEV.md`), #13 (menu-bar roster), #36 (timezone),
-#23 (sessions as searchable knowledge), #41 (steer path).
+#23 (sessions as searchable knowledge), #41 (steer path),
+#51 Case 2 (model-backed Tab). Case 1 is on main.
 
 ⚠️ **C-numbers and issue numbers collide.** C40 ≠ #40. C34 ≠ #34.
 Always write `C40` or `#40`.

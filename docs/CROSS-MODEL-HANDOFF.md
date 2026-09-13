@@ -566,3 +566,33 @@ cannot see this; it needs a rebuilt `.app` / `pnpm tauri dev`.
 Related: the breadcrumb control that looks like a sidebar collapse opens
 Properties (`editor.toolbar.openProperties`). Closing the note is the
 trailing **X** (`editor.toolbar.closeNote`).
+
+## 20. Session switch and Settings catalog look “stuck” for different reasons
+
+Verified 2026-09-12 against `usePrimeSessionSwitcher.ts` and
+`SettingsPanel.tsx`.
+
+**Session click.** The old transcript used to stay on screen for the
+whole `switch_prime_session` + `read_prime_session_transcript` round
+trip. That is the session-switch beachball. The click now highlights
+the row and `replaceMessages([])` in the same turn. If the host refuses
+(mid-turn), the previous messages come back. Do not “restore” the old
+chat until the new one arrives — that is the bug.
+
+**Settings pinwheel.** `get_available_prime_models` is hundreds of
+models. Opening Settings used to fetch it immediately, plus
+`get_prime_provider_status`. Both wait until Agents is visible
+(`loadModelCatalog`). Packages search waits until Packages
+(`loadExtensionCatalog`). Chat and Settings share
+`loadPrimeModelCatalog`; a failed “host is not running” answer is not
+cached.
+
+## 21. Hide-on-close must stop helpers this process started
+
+C22 hides the main window; it does not quit. Leaving the spawned Prime
+supervisor, MCP WebSocket bridge, and Mindwalk sidecar running after
+hide kept a Dock indicator. `release_helpers_for_hidden_window`
+(`lib.rs`) stops those unless Keep working left a resident session.
+`settle_prime_session` does the same, because `window.hide()` does not
+raise `CloseRequested` again. Never send Prime `shutdown` — other
+clients share the daemon. Cmd+Q is the quit path.
