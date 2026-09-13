@@ -18,6 +18,8 @@ const TRAFFIC_LIGHT_CLEARANCE_PX = 16
 
 /** Collapsed command rail and matching Notes restore rail. */
 export const COMMAND_RAIL_WIDTH_PX = 46
+/** Expanded Sessions rail and matching open Notes column. */
+export const COMMAND_RAIL_EXPANDED_WIDTH_PX = 240
 
 export const MACOS_TRAFFIC_LIGHT_SAFE_PADDING =
   MACOS_TRAFFIC_LIGHT_POSITION.x +

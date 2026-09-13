@@ -242,10 +242,12 @@ list. Browse and the whole panel collapse independently (⌘1 Chat only /
 opens the editor beside Chat rather than replacing it.
 
 Shutting Notes leaves a **46px restore rail** (`VaultPanelRestoreButton`,
-same width as the collapsed command rail in `COMMAND_RAIL_WIDTH_PX`). Inbox
-still toggles the column; Chat no longer forces `editor-only`. Inbox and
-other Notes filters keep a tall notes list — they do **not** mount Graph or
-Mycelium under the list.
+same width and sidebar surface as the collapsed command rail in
+`COMMAND_RAIL_WIDTH_PX` — not a tinted strip). Open Notes uses the same
+default width as the expanded Sessions rail (`COMMAND_RAIL_EXPANDED_WIDTH_PX`,
+240). Inbox still toggles the column; Chat no longer forces `editor-only`.
+Inbox and other Notes filters keep a tall notes list — they do **not** mount
+Graph or Mycelium under the list.
 
 Graph and Mycelium mount only while Changes is selected
 (`ConnectionsPanel` inside `showVaultPanel && isChangesSelection`). A Graph

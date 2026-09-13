@@ -1622,7 +1622,11 @@ describe('App', () => {
     })
     const restore = await screen.findByTestId('vault-panel-restore')
     expect(restore).toBeVisible()
-    expect(restore).toHaveStyle({ width: '46px' })
+    expect(restore.closest('.app__notes-rail')).toHaveStyle({
+      width: '46px',
+      minWidth: '46px',
+      maxWidth: '46px',
+    })
     fireEvent.click(restore)
     await waitFor(() => {
       expect(document.querySelector('.app__vault-panel')).toBeInTheDocument()
@@ -1647,7 +1651,7 @@ describe('App', () => {
     render(<App />)
     const handle = await screen.findByTestId('vault-panel-resize', {}, { timeout: 5000 })
     const panel = document.querySelector('.app__vault-panel') as HTMLElement
-    expect(panel).toHaveStyle({ width: '300px' })
+    expect(panel).toHaveStyle({ width: '240px' })
 
     act(() => {
       fireEvent.mouseDown(handle, { clientX: 1000, clientY: 300 })
@@ -1656,9 +1660,9 @@ describe('App', () => {
     })
 
     await waitFor(() => {
-      expect(panel).toHaveStyle({ width: '400px' })
+      expect(panel).toHaveStyle({ width: '340px' })
     })
-    expect(JSON.parse(localStorage.getItem('rhizome:layout-panels') ?? '{}').noteList).toBe(400)
+    expect(JSON.parse(localStorage.getItem('rhizome:layout-panels') ?? '{}').noteList).toBe(340)
   })
 
   it('Cmd+3 opens the vault panel with Browse above the note list after Cmd+1', async () => {

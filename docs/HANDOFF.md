@@ -97,6 +97,7 @@ yours to choose.
 
 ## Recent sessions
 
+- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-1705-cursor-grok-4-6-notes-rail-width.md) — right Notes mirrors left Sessions: 240px open, 46px shut, same color.
 - [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-1059-cursor-grok-4-6-architecture-deepen.md) — Chat shell layout + launch restore modules. App no longer derives Notes-open. AiPanel no longer mutexes rehydrate vs resume. C64 still weak.
 - [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-0845-cursor-grok-4-6-ux-visual-pass.md) — visual pass on Applications `3a21f9f`; Inbox no longer hides Notes; Show Notes strip. C64 still weak.
 - [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-1551-cursor-grok-4-6-area-d-rebase.md) — **#61** Tolaria `site/` / Desktop archive gone; `YOU-SHOULD-KNOW.md` kept. Squash-merged as #61.

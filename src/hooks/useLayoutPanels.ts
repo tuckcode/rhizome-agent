@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { APP_STORAGE_KEYS, LEGACY_APP_STORAGE_KEYS, getAppStorageItem } from '../constants/appStorage'
+import { COMMAND_RAIL_EXPANDED_WIDTH_PX } from '../utils/trafficLights'
 
 export const COLUMN_MIN_WIDTHS = {
   // 250px floor keeps the sidebar brand lockup (mark + wordmark) from
@@ -20,10 +21,13 @@ const COLUMN_MAX_WIDTHS = {
 
 const DEFAULT_PANEL_WIDTHS = {
   sidebar: 250,
-  noteList: 300,
+  noteList: COMMAND_RAIL_EXPANDED_WIDTH_PX,
   inspector: 280,
   graphPreview: 340,
 } as const
+
+/** Previous Notes default before the column mirrored the Sessions rail. */
+const LEGACY_NOTE_LIST_DEFAULT_WIDTH = 300
 
 type PanelWidthKey = keyof typeof DEFAULT_PANEL_WIDTHS
 type PanelWidths = Record<PanelWidthKey, number>
@@ -44,9 +48,13 @@ function isPanelWidthRecord(value: unknown): value is Partial<Record<PanelWidthK
 
 function readPanelWidth(source: Partial<Record<PanelWidthKey, unknown>>, key: PanelWidthKey): number {
   const value = Reflect.get(source, key)
-  return typeof value === 'number' && Number.isFinite(value)
-    ? clampPanelWidth(key, value)
-    : Reflect.get(DEFAULT_PANEL_WIDTHS, key) as number
+  const fallback = Reflect.get(DEFAULT_PANEL_WIDTHS, key) as number
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  const width = clampPanelWidth(key, value)
+  if (key === 'noteList' && width === LEGACY_NOTE_LIST_DEFAULT_WIDTH) {
+    return DEFAULT_PANEL_WIDTHS.noteList
+  }
+  return width
 }
 
 function normalizePanelWidths(value: unknown): PanelWidths {

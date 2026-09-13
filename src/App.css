@@ -69,7 +69,8 @@
   position: relative;
   z-index: 20;
   background: var(--surface-sidebar);
-  border-left: 1px solid var(--sidebar-border);
+  /* Same inner rule as CommandRail's border-right --border-subtle. */
+  border-left: 1px solid var(--border-subtle);
 }
 
 .vault-panel {
@@ -121,22 +122,22 @@
 }
 
 .app__notes-rail {
-  flex: 0 0 auto;
+  box-sizing: border-box;
+  flex: 0 0 46px;
   align-self: stretch;
+  width: 46px;
+  min-width: 46px;
+  max-width: 46px;
   height: 100%;
   display: flex;
   align-items: flex-start;
   justify-content: center;
+  overflow: hidden;
+  padding-top: 8px;
   z-index: 40;
   background: var(--surface-sidebar);
-  border-left: 1px solid var(--sidebar-border);
+  border-left: 1px solid var(--border-subtle);
   border-right: 0;
-}
-
-.app__notes-rail--restore {
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--accent-blue, #3d6b8a) 14%, var(--surface-sidebar));
-  border-left: 1px solid color-mix(in srgb, var(--accent-blue, #3d6b8a) 35%, var(--sidebar-border));
 }
 
 .vault-panel__content {
