@@ -47,11 +47,10 @@ file.
 ---
 
 ## State
-`main` carries tonight's daily-drive batch and Settings → Packages install
-(`9328bc3`). Last **app** was **`3a21f9f`** at **2026-09-12 08:32**. Rebuild
-`/Applications` after this lands. C64 first-2s is still weak. Native Chat
-glance **PASSED** (2026-09-06). Quit the daily app, uninstall it, then install.
-Do not launch leftovers. After install, delete leftover `.app` copies.
+`main` is **`6908554`**. Last **app** is **`6908554`** at **2026-09-12 20:31**.
+Tonight's daily-drive batch and Settings → Packages install are in
+`/Applications`. C64 first-2s is still weak. Native Chat glance **PASSED**
+(2026-09-06). After future installs, delete leftover `.app` copies.
 
 Still open / parked: **C72** Inbox rename; Prime list-import; **#51** Case 2
 (model-backed Tab); **C64** full verify; **#47** confirm-close; Grokbot PRs
@@ -290,7 +289,7 @@ push is not a release — releases are tagged builds with signed installers.
 
 - ~~**C71-OPEN (2026-09-06): composer up-arrow previous-prompt history.**~~ **RESOLVED 2026-09-06.** Session-scoped in-memory recall (cap 50); Up/Down when empty or caret at start; suggestion menus keep Arrow keys. See `composerPromptHistory` + `useComposerPromptHistory`.
 
-- **C72 (2026-09-06/07): side-panel discoverability.** **PARTIAL 2026-09-12 polish:** rail control is **Notes** (Inbox stays a folder in the list); Chat stays the canvas; last idle conversation resumes on native relaunch; composer Prime/skills are labels. Still open: Inbox rename inside the list (deferred). `/Applications` needs rebuild. Detail: [2026-09-12-0845](plans/handoffs/2026-09-12-0845-cursor-grok-4-6-ux-visual-pass.md).
+- **C72 (2026-09-06/07): side-panel discoverability.** **PARTIAL 2026-09-12 polish:** rail control is **Notes** (Inbox stays a folder in the list); Chat stays the canvas; last idle conversation resumes on native relaunch; composer Prime/skills are labels. Still open: Inbox rename inside the list (deferred). In `/Applications` as of **`6908554`**. Detail: [2026-09-12-0845](plans/handoffs/2026-09-12-0845-cursor-grok-4-6-ux-visual-pass.md).
 
 - **#50 (2026-08-29): let the agent see the running app — plan ready, not built.**
   Three answers proposed: show `pnpm dev` (not native), read + steer through
