@@ -81,4 +81,10 @@ describe('catalogSearchUrl', () => {
     expect(catalogSearchUrl('memory')).toContain('memory')
     expect(catalogSearchUrl('memory')).toContain('keywords%3Api-package')
   })
+
+  it('narrows the catalog by kind', () => {
+    expect(catalogSearchUrl('', 'skill')).toContain('keywords%3Askill')
+    expect(catalogSearchUrl('memory', 'extension')).toContain('keywords%3Aextension')
+    expect(catalogSearchUrl('', 'all')).not.toContain('keywords%3Askill')
+  })
 })

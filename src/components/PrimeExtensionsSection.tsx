@@ -10,6 +10,7 @@ import {
   searchPrimePackageCatalog,
   type InstalledPrimePackage,
   type PrimePackageHit,
+  type PrimePackageKind,
 } from '../lib/primePackages'
 import {
   trackPrimePackageCatalogOpened,
@@ -18,8 +19,16 @@ import {
 import { writeClipboardText } from '../utils/clipboardText'
 import { openExternalUrl } from '../utils/url'
 
+const KIND_TABS: ReadonlyArray<{ id: PrimePackageKind; label: string }> = [
+  { id: 'all', label: 'All' },
+  { id: 'extension', label: 'Extensions' },
+  { id: 'skill', label: 'Skills' },
+  { id: 'prompt', label: 'Prompts' },
+  { id: 'theme', label: 'Themes' },
+]
+
 /**
- * Find Prime packages (Pi extensions, skills, prompts, themes).
+ * Pi package hub — catalog plus what is already on this machine.
  *
  * Prime's daemon cannot install them. This section searches the public
  * catalog and copies `prime-agent package install …` the same way provider
@@ -27,6 +36,7 @@ import { openExternalUrl } from '../utils/url'
  */
 export function PrimeExtensionsSection({ active = true }: { active?: boolean }) {
   const [query, setQuery] = useState('')
+  const [kind, setKind] = useState<PrimePackageKind>('all')
   const [hits, setHits] = useState<PrimePackageHit[]>([])
   const [total, setTotal] = useState<number | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
@@ -64,7 +74,7 @@ export function PrimeExtensionsSection({ active = true }: { active?: boolean }) 
       setSearchError(null)
       void (async () => {
         try {
-          const result = await searchPrimePackageCatalog(query)
+          const result = await searchPrimePackageCatalog(query, kind)
           if (cancelled) return
           setHits(result.hits)
           setTotal(result.total)
@@ -82,7 +92,7 @@ export function PrimeExtensionsSection({ active = true }: { active?: boolean }) 
       cancelled = true
       window.clearTimeout(idle)
     }
-  }, [active, query])
+  }, [active, kind, query])
 
   const copyInstall = useCallback(async (source: string, origin: 'catalog' | 'installed') => {
     setCopyError(null)
@@ -100,41 +110,62 @@ export function PrimeExtensionsSection({ active = true }: { active?: boolean }) 
     <div className="space-y-3" data-testid="prime-extensions-section">
       <SectionHeading
         icon={<PuzzlePiece size={16} aria-hidden="true" />}
-        title="Extensions"
-        description="Search Prime packages — extensions, skills, prompt templates, and themes from the Pi catalog. They run with full system access. Review the source before you install."
+        title="Packages"
+        description="The Pi catalog: extensions, skills, prompts, and themes. They run with full system access. Review the source before you install."
       />
       {active ? (
         <>
       {installed && installed.length > 0 ? (
-        <SettingsGroup>
-          {installed.map((pkg) => (
-            <SettingsGroupItem key={pkg.source}>
-              <div className="flex min-w-0 items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="truncate text-sm text-foreground">{pkg.source}</div>
-                  <div className="text-xs text-muted-foreground">Installed</div>
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-foreground">On this machine</div>
+          <SettingsGroup>
+            {installed.map((pkg) => (
+              <SettingsGroupItem key={pkg.source}>
+                <div className="flex min-w-0 items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm text-foreground">{pkg.source}</div>
+                    <div className="text-xs text-muted-foreground">Installed</div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void copyInstall(pkg.source, 'installed')}
+                  >
+                    Copy install
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void copyInstall(pkg.source, 'installed')}
-                >
-                  Copy install
-                </Button>
-              </div>
-            </SettingsGroupItem>
-          ))}
-        </SettingsGroup>
+              </SettingsGroupItem>
+            ))}
+          </SettingsGroup>
+        </div>
       ) : null}
 
-      <Input
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search packages"
-        aria-label="Search Prime packages"
-        data-testid="prime-extensions-search"
-      />
+      <div className="space-y-2">
+        <div className="text-sm font-medium text-foreground">Catalog</div>
+        <div className="flex flex-wrap gap-1" data-testid="prime-packages-kind-tabs" role="tablist" aria-label="Package kind">
+          {KIND_TABS.map((tab) => (
+            <Button
+              key={tab.id}
+              type="button"
+              size="sm"
+              variant={kind === tab.id ? 'secondary' : 'ghost'}
+              role="tab"
+              aria-selected={kind === tab.id}
+              onClick={() => setKind(tab.id)}
+            >
+              {tab.label}
+            </Button>
+          ))}
+        </div>
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search the catalog"
+          aria-label="Search Prime packages"
+          data-testid="prime-extensions-search"
+        />
+      </div>
 
       {searching ? (
         <p className="text-xs text-muted-foreground">Searching the catalog…</p>
@@ -198,7 +229,7 @@ export function PrimeExtensionsSection({ active = true }: { active?: boolean }) 
         className="h-auto px-0 text-xs text-muted-foreground"
         onClick={() => void openExternalUrl('https://pi.dev/packages')}
       >
-        Open pi.dev/packages
+        Browse the full catalog
       </Button>
         </>
       ) : null}

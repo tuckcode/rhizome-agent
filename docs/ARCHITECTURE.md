@@ -564,7 +564,7 @@ keeps whatever is running listed, since the picker only ever receives a label.
 
 #### Prime packages (Pi catalog)
 
-Settings → **Extensions** is how you find Prime packages. Prime is a
+Settings → **Packages** is the Pi catalog hub. Prime is a
 distribution of Pi, so the catalog is npm's `pi-package` keyword — the same
 index as [pi.dev/packages](https://pi.dev/packages). Installed entries come
 from `~/.prime/agent/settings.json` via `list_prime_packages`. Install stays
