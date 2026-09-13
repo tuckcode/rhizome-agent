@@ -576,16 +576,26 @@ If the CLI is missing, Settings copies the command or asks Chat to run it.
 The allow-list is Rhizome's view of Prime's catalog, in the same sense as
 archiving below: Prime's CLI and every other client still see all 501.
 
+**Origin:** Cursor Grok 4.6 · 2026-09-12 · Nous Portal Add to Chat list
+
+Nous Portal is OpenAI-compatible and is **not** a built-in Prime host. Chat
+only lists it after Settings → **Add to Chat list** merges the public
+`/v1/models` catalog into `~/.prime/agent/models.json` (`ensure_nous_portal_models`),
+then reloads the attached session. Rhizome writes the environment variable
+*name* `NOUS_API_KEY`, never the key, and never `auth.json`.
+
 #### What Rhizome does not own
 
 `~/.prime/agent/` is Prime's, and it is shared with the `prime-agent` CLI and any
-other client on the machine. Rhizome reads from it and never rewrites it to suit
-its own view — archiving a session records an id in Rhizome's `settings.json`
-rather than moving a log (ADR-0165), curating the model menu records keys in
-the same file rather than touching Prime's catalog (#45), and quitting detaches
-rather than stopping the daemon (ADR-0163). The session log format carries no field identifying which
-client wrote it, so "which app made this session" is not a question the data can
-answer.
+other client on the machine. Rhizome reads from it and does not rewrite session
+logs or `auth.json` to suit its own view — archiving a session records an id in
+Rhizome's `settings.json` rather than moving a log (ADR-0165), curating the
+model menu records keys in the same file rather than touching Prime's catalog
+(#45), and quitting detaches rather than stopping the daemon (ADR-0163). The
+one user-asked write is Settings → Add to Chat list for Nous Portal, which
+merges that provider into `models.json` without storing a key. The session log
+format carries no field identifying which client wrote it, so "which app made
+this session" is not a question the data can answer.
 
 ### Context Building
 

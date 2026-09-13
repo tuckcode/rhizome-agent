@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { createTranslator } from '../lib/i18n'
-import { isTauri, mockInvoke } from '../mock-tauri'
-import { invoke } from '@tauri-apps/api/core'
+import { callHost } from '../lib/callHost'
+import { resetPrimeModelCatalog } from '../lib/primeModelCatalog'
+import { trackNousPortalAddedToChat } from '../lib/productAnalytics'
 import { Button } from './ui/button'
 import { writeClipboardText } from '../utils/clipboardText'
 
@@ -19,8 +20,9 @@ import { writeClipboardText } from '../utils/clipboardText'
  * connected and hand the user the one terminal command that starts sign-in.
  *
  * API-key hosts (DeepSeek) and custom OpenAI-compatible hosts (Nous Portal)
- * use the same Terminal handoff: copy a command / setup snippet, never write
- * Prime's auth.json from the desktop.
+ * use the same Terminal handoff for *keys*: copy a command, never write
+ * Prime's auth.json from the desktop. Nous models themselves are merged into
+ * Prime's `models.json` when the user clicks Add to Chat list.
  */
 
 interface ProviderStatus {
@@ -44,9 +46,10 @@ const ALWAYS_SHOW_PROVIDERS: ReadonlyArray<{ name: string; authKind: string }> =
   { name: 'nous-portal', authKind: 'api_key' },
 ]
 
-async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  if (isTauri()) return invoke<T>(cmd, args)
-  return mockInvoke<T>(cmd, args)
+interface EnsureNousPortalResult {
+  provider: string
+  modelCount: number
+  reloaded: boolean
 }
 
 /**
@@ -83,22 +86,9 @@ function authKindLabel(kind: string): string {
 
 function primeProviderLoginCommand(provider: string): string {
   if (provider === 'nous-portal') {
-    // Nous is OpenAI-compatible, not a built-in Prime OAuth host. The desktop
-    // copies a paste-ready Terminal block; Atticus fills in the key once.
-    return [
-      'export NOUS_API_KEY=\'paste-your-key-here\'',
-      'mkdir -p ~/.prime/agent',
-      'cat >> ~/.prime/agent/models.json <<\'EOF\'',
-      '{',
-      '  "providers": {',
-      '    "nous-portal": {',
-      '      "baseUrl": "https://inference-api.nousresearch.com/v1",',
-      '      "apiKey": "NOUS_API_KEY"',
-      '    }',
-      '  }',
-      '}',
-      'EOF',
-    ].join('\n')
+    // The Chat list is filled by `ensure_nous_portal_models`. This one-liner
+    // is only the key Prime still reads from the environment.
+    return "export NOUS_API_KEY='paste-your-key-here'"
   }
   return `prime-agent --provider ${provider}`
 }
@@ -107,7 +97,7 @@ function setupButtonLabel(provider: ProviderStatus, connected: boolean): string 
   if (provider.authKind === 'oauth') {
     return connected || provider.expired ? 'Reconnect' : 'Sign in'
   }
-  if (provider.name === 'nous-portal') return 'Copy setup'
+  if (provider.name === 'nous-portal') return 'Add to Chat list'
   return 'Add key'
 }
 
@@ -131,12 +121,13 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
   const [providers, setProviders] = useState<ProviderStatus[] | null>(null)
   const [signInNotice, setSignInNotice] = useState<string | null>(null)
   const [signInError, setSignInError] = useState<string | null>(null)
+  const [nousBusy, setNousBusy] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
       try {
-        const listed = await call<ProviderStatus[]>('get_prime_provider_status')
+        const listed = await callHost<ProviderStatus[]>('get_prime_provider_status')
         if (!cancelled) setProviders(Array.isArray(listed) ? listed : [])
       } catch {
         if (!cancelled) setProviders([])
@@ -155,15 +146,31 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
   const startSignIn = useCallback(async (provider: ProviderStatus) => {
     setSignInError(null)
     setSignInNotice(null)
+    if (provider.name === 'nous-portal') {
+      setNousBusy(true)
+      try {
+        const result = await callHost<EnsureNousPortalResult>('ensure_nous_portal_models')
+        resetPrimeModelCatalog()
+        trackNousPortalAddedToChat(result.modelCount)
+        const count = result.modelCount
+        const modelsWord = count === 1 ? 'model' : 'models'
+        setSignInNotice(
+          `Added ${count} Nous Portal ${modelsWord} to the Chat list. Check the ones you want in Chat model menu below. Set NOUS_API_KEY if Chat greys them out.`,
+        )
+      } catch (error) {
+        setSignInError(error instanceof Error ? error.message : String(error))
+      } finally {
+        setNousBusy(false)
+      }
+      return
+    }
     const command = primeProviderLoginCommand(provider.name)
     try {
       await writeClipboardText(command)
       setSignInNotice(
         t('settings.providers.signInCopied', {
           provider: providerLabel(provider.name),
-          command: provider.name === 'nous-portal'
-            ? 'Nous Portal setup (Terminal)'
-            : command,
+          command,
         }),
       )
     } catch (error) {
@@ -171,8 +178,24 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
     }
   }, [t])
 
+  const copyNousKeyCommand = useCallback(async () => {
+    setSignInError(null)
+    try {
+      await writeClipboardText(primeProviderLoginCommand('nous-portal'))
+      setSignInNotice('Copied the NOUS_API_KEY line. Paste it in Terminal, then Add to Chat list.')
+    } catch (error) {
+      setSignInError(error instanceof Error ? error.message : String(error))
+    }
+  }, [])
+
   const showSetup = (provider: ProviderStatus): boolean => {
     const connected = providers?.some((entry) => entry.name === provider.name) ?? false
+    if (provider.name === 'nous-portal') {
+      // A key in the environment used to mark the card Connected while Chat
+      // still had no Nous models. Keep the add button even after the key is
+      // present so the catalog can be filled or refreshed.
+      return true
+    }
     if (provider.authKind === 'oauth') {
       return !connected || provider.expired
     }
@@ -248,17 +271,32 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
                   {authKindLabel(provider.authKind)}
                 </div>
                 {setup ? (
-                  <div className="mt-2">
+                  <div className="mt-2 flex flex-wrap gap-1.5">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       className="h-7 text-[11px]"
                       data-testid={`prime-provider-sign-in-${provider.name}`}
+                      disabled={provider.name === 'nous-portal' && nousBusy}
                       onClick={() => void startSignIn(provider)}
                     >
-                      {setupButtonLabel(provider, connected)}
+                      {provider.name === 'nous-portal' && nousBusy
+                        ? 'Adding…'
+                        : setupButtonLabel(provider, connected)}
                     </Button>
+                    {provider.name === 'nous-portal' ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-[11px]"
+                        data-testid="prime-provider-copy-nous-key"
+                        onClick={() => void copyNousKeyCommand()}
+                      >
+                        Copy key command
+                      </Button>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

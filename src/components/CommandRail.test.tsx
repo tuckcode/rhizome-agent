@@ -116,6 +116,29 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
     expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).toBeNull()
   })
 
+  it('keeps Settings as a gear when the rail is expanded, pin on the left', async () => {
+    renderRail()
+
+    fireEvent.mouseEnter(screen.getByTestId('command-rail'))
+    await waitFor(() => expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'true'))
+
+    expect(screen.getByText('Notes')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
+    expect(screen.getByTestId('command-rail-settings')).not.toHaveTextContent('Settings')
+
+    const pin = screen.getByTestId('command-rail-toggle')
+    const settings = screen.getByTestId('command-rail-settings')
+    expect(pin.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('keeps Settings above the pin when the rail is collapsed', () => {
+    renderRail()
+
+    const settings = screen.getByTestId('command-rail-settings')
+    const pin = screen.getByTestId('command-rail-toggle')
+    expect(settings.compareDocumentPosition(pin) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('returns to compact mode when the pointer leaves an unpinned rail', async () => {
     renderRail()
 

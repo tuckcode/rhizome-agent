@@ -286,7 +286,8 @@ active hazard, but the folder names (`rhizome` / `rhizome-old`) are recent
 ## 10. LARA / `l10n:*` invitation is gone (C18)
 
 The `l10n:*` scripts, `lara.yaml`, and `@translated/lara-cli` were removed
-in area D. Do not re-add them. English only for v0.
+in area D. `lara.lock` was an unused fingerprint map from the Desktop
+bootstrap (gitleaks noise). It is gone. Do not re-add it. English only for v0.
 
 ## 11. Status-bar/shell work is mid-migration behind `shell_command_rail` — check HANDOFF before assuming spec fidelity
 

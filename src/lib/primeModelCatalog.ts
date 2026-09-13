@@ -4,6 +4,7 @@ import type { PrimeModel } from './primeModels'
 let catalog: PrimeModel[] | null = null
 let inflight: Promise<PrimeModel[]> | null = null
 let epoch = 0
+const resetListeners = new Set<() => void>()
 
 export function peekPrimeModelCatalog(): PrimeModel[] | null {
   return catalog
@@ -13,6 +14,15 @@ export function resetPrimeModelCatalog(): void {
   catalog = null
   inflight = null
   epoch += 1
+  for (const listener of resetListeners) listener()
+}
+
+/** Settings surfaces that already loaded the catalog re-fetch after a reset. */
+export function onPrimeModelCatalogReset(listener: () => void): () => void {
+  resetListeners.add(listener)
+  return () => {
+    resetListeners.delete(listener)
+  }
 }
 
 /**

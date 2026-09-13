@@ -140,7 +140,13 @@ briefing. Do not expand two big overlays at once.
 
 Do not buy cloud minutes, Chunk, Codacy cloud, or CodeScene. The only
 paid thing Atticus may buy later is the **Apple Developer Program**
-(about $99 per year) for Mac distribution. Not now.
+(about $99 per year) for Mac distribution. Not now. A friend can run an
+ad-hoc build. On Sequoia and later, unsigned apps need **Open Anyway**
+in Privacy & Security, or strip quarantine before you hand the file over.
+Right-click → Open is gone. Pay the $99 when someone will not do that.
+
+Keep the repo private. License confirm, CONTRIBUTING, Packages
+no-sandbox README, and a fresh Trivy run wait until a real public flip.
 
 Commit, push, and rebuild stay **three separate jobs**. Rebuild only
 when he will use the packaged app.

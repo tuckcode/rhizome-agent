@@ -539,3 +539,11 @@ export function trackPrimePackageInstalled(origin: 'catalog' | 'installed'): voi
 export function trackPrimePackageInstallFailed(reason: 'cli_missing' | 'error'): void {
   trackEvent('prime_package_install_failed', { reason })
 }
+
+/**
+ * Settings added Nous Portal into Prime's catalog so Chat can list it with
+ * the other providers. Count only — never model ids.
+ */
+export function trackNousPortalAddedToChat(modelCount: number): void {
+  trackEvent('nous_portal_added_to_chat', { model_count: modelCount })
+}

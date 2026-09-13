@@ -1,0 +1,23 @@
+# Translation fingerprint hashes in the removed Desktop bootstrap
+# file `lara.lock`. Not credentials. Deleting the file does not rewrite
+# history, so --log-opts="--all" still sees these 20 hits without this list.
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:297
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:302
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:303
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:305
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:313
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:314
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:326
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:329
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:330
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:331
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:332
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:333
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:334
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:338
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:345
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:346
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:454
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:458
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:464
+11e1315353acbed65cc411b8215a62800f18c114:lara.lock:generic-api-key:917
