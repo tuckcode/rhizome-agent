@@ -101,6 +101,13 @@ interface InlineWikilinkInputProps {
       suggestionsOpen: boolean
     },
   ) => boolean
+  placeholderTestId?: string
+  /**
+   * Tab ghost-text accept (#51). Return true when the composer consumed Tab.
+   * Slash/wikilink menus keep Tab while they are open.
+   */
+  onAcceptCompletion?: () => boolean
+  onDismissCompletion?: () => boolean
 }
 
 function collapseSelectionRange(nextSelectionIndex: number) {
@@ -263,6 +270,9 @@ export function InlineWikilinkInput({
   commandInstantLabel = 'Command',
   onCommandAction,
   onBrowsePromptHistory,
+  placeholderTestId,
+  onAcceptCompletion,
+  onDismissCompletion,
 }: InlineWikilinkInputProps) {
   const [renderVersion, forceRender] = useState(0)
   const isComposingRef = useRef(false)
@@ -689,6 +699,25 @@ export function InlineWikilinkInput({
       }
     }
 
+    if (
+      !disabled
+      && !isComposingRef.current
+      && !event.nativeEvent.isComposing
+      && !event.altKey
+      && !event.ctrlKey
+      && !event.metaKey
+      && !suggestionsOpen
+    ) {
+      if (event.key === 'Tab' && !event.shiftKey && onAcceptCompletion?.()) {
+        event.preventDefault()
+        return
+      }
+      if (event.key === 'Escape' && onDismissCompletion?.()) {
+        event.preventDefault()
+        return
+      }
+    }
+
     handleInlineWikilinkKeyDown({
       event,
       disabled,
@@ -727,6 +756,7 @@ export function InlineWikilinkInput({
       inputRef={setCombinedRef}
       dataTestId={dataTestId}
       placeholderClassName={placeholderClassName}
+      placeholderTestId={placeholderTestId}
       editorClassName={editorClassName}
       editorStyle={editorStyle}
       onCompositionEnd={handleCompositionEnd}

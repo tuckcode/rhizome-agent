@@ -32,6 +32,9 @@ interface WikilinkChatInputProps {
       suggestionsOpen: boolean
     },
   ) => boolean
+  placeholderTestId?: string
+  onAcceptCompletion?: () => boolean
+  onDismissCompletion?: () => boolean
 }
 
 export function WikilinkChatInput({
@@ -54,6 +57,9 @@ export function WikilinkChatInput({
   commandInstantLabel,
   onCommandAction,
   onBrowsePromptHistory,
+  placeholderTestId,
+  onAcceptCompletion,
+  onDismissCompletion,
 }: WikilinkChatInputProps) {
   return (
     <InlineWikilinkInput
@@ -76,6 +82,9 @@ export function WikilinkChatInput({
       commandInstantLabel={commandInstantLabel}
       onCommandAction={onCommandAction}
       onBrowsePromptHistory={onBrowsePromptHistory}
+      placeholderTestId={placeholderTestId}
+      onAcceptCompletion={onAcceptCompletion}
+      onDismissCompletion={onDismissCompletion}
     />
   )
 }

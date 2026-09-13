@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Sparkle, X, PaperPlaneRight, Plus, Stop, ImageSquare } from '@phosphor-icons/react'
 import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
@@ -25,6 +25,11 @@ import { suggestReply } from '../lib/replySuggestions'
 import { latestAssistantMessageIndex } from '../lib/latestAssistantMessage'
 import { useDragRegion } from '../hooks/useDragRegion'
 import { useComposerPromptHistory } from '../hooks/useComposerPromptHistory'
+import {
+  trackComposerReplyCompletionAccepted,
+  trackComposerReplyCompletionDismissed,
+  trackComposerReplyCompletionShown,
+} from '../lib/productAnalytics'
 
 interface AiPanelHeaderProps {
   agentLabel: string
@@ -147,6 +152,9 @@ function ComposerInput({
   onImagePaste,
   unsupportedPasteMessage,
   placeholder,
+  completion,
+  onAcceptCompletion,
+  onDismissCompletion,
   commandEntries,
   commandDisabled,
   commandSkillLabel,
@@ -165,6 +173,9 @@ function ComposerInput({
   onImagePaste?: (files: File[]) => void
   unsupportedPasteMessage: string
   placeholder: string
+  completion?: string | null
+  onAcceptCompletion?: () => boolean
+  onDismissCompletion?: () => boolean
   commandEntries?: CommandMenuEntry[]
   commandDisabled?: Record<string, string>
   commandSkillLabel?: string
@@ -180,6 +191,7 @@ function ComposerInput({
     },
   ) => boolean
 }) {
+  const shownPlaceholder = completion ?? placeholder
   return (
     <WikilinkChatInput
       entries={entries}
@@ -190,8 +202,20 @@ function ComposerInput({
       onImagePaste={onImagePaste}
       unsupportedPasteMessage={unsupportedPasteMessage}
       disabled={disabled}
-      placeholder={placeholder}
-      placeholderClassName={hasControls ? 'px-2 py-1.5 text-[12px] leading-5' : undefined}
+      placeholder={shownPlaceholder}
+      placeholderClassName={
+        completion
+          ? cn(
+              hasControls ? 'px-2 py-1.5 text-[12px] leading-5' : 'flex items-center px-[10px] py-[8px] text-[13px]',
+              'italic',
+            )
+          : hasControls
+            ? 'px-2 py-1.5 text-[12px] leading-5'
+            : undefined
+      }
+      placeholderTestId={completion ? 'composer-reply-completion' : undefined}
+      onAcceptCompletion={onAcceptCompletion}
+      onDismissCompletion={onDismissCompletion}
       inputRef={inputRef}
       commandEntries={commandEntries}
       commandDisabled={commandDisabled}
@@ -737,6 +761,34 @@ export function AiPanelComposer({
 }: AiPanelComposerProps) {
   const t = createTranslator(locale)
   const { recordSent, browse } = useComposerPromptHistory(onChange)
+  const [dismissedCompletionFor, setDismissedCompletionFor] = useState<string | null>(null)
+  const replySuggestion = !isActive && lastAgentMessage ? suggestReply(lastAgentMessage) : null
+  const completionText =
+    replySuggestion?.kind === 'completion'
+    && input.trim().length === 0
+    && dismissedCompletionFor !== lastAgentMessage
+      ? replySuggestion.text
+      : null
+
+  useEffect(() => {
+    if (!completionText) return
+    trackComposerReplyCompletionShown()
+  }, [completionText, lastAgentMessage])
+
+  const handleAcceptCompletion = useCallback(() => {
+    if (!completionText) return false
+    onChange(completionText)
+    trackComposerReplyCompletionAccepted()
+    return true
+  }, [completionText, onChange])
+
+  const handleDismissCompletion = useCallback(() => {
+    if (!completionText || !lastAgentMessage) return false
+    setDismissedCompletionFor(lastAgentMessage)
+    trackComposerReplyCompletionDismissed()
+    return true
+  }, [completionText, lastAgentMessage])
+
   const handleSend = useCallback((text: string, references: NoteReference[]) => {
     recordSent(text)
     onSend(text, references)
@@ -897,6 +949,9 @@ export function AiPanelComposer({
             onImagePaste={onAttachImages}
             unsupportedPasteMessage={t('ai.composer.pasteTextOnly')}
             placeholder={placeholder}
+            completion={completionText}
+            onAcceptCompletion={handleAcceptCompletion}
+            onDismissCompletion={handleDismissCompletion}
             commandEntries={commandEntries}
             commandDisabled={commandDisabled}
             commandSkillLabel={commandSkillLabel}

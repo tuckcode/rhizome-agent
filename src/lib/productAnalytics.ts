@@ -503,3 +503,31 @@ export function trackPrimeModelAllowListChanged(selected: number, available: num
 export function trackComposerImagesAttached(count: number): void {
   trackEvent('composer_images_attached', { count })
 }
+
+/**
+ * Tab ghost-text completion (#51). Enums only — never the suggested text,
+ * which is a paraphrase of the agent's last message.
+ */
+export function trackComposerReplyCompletionShown(): void {
+  trackEvent('composer_reply_completion_shown')
+}
+
+export function trackComposerReplyCompletionAccepted(): void {
+  trackEvent('composer_reply_completion_accepted')
+}
+
+export function trackComposerReplyCompletionDismissed(): void {
+  trackEvent('composer_reply_completion_dismissed')
+}
+
+/**
+ * Settings → Extensions opened the Pi package catalog.
+ * No query text — that can name a private package path.
+ */
+export function trackPrimePackageCatalogOpened(): void {
+  trackEvent('prime_package_catalog_opened')
+}
+
+export function trackPrimePackageInstallCopied(origin: 'catalog' | 'installed'): void {
+  trackEvent('prime_package_install_copied', { origin })
+}
