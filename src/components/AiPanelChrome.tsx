@@ -861,11 +861,11 @@ export function AiPanelComposer({
       />
       {queue && !primeQueueIsEmpty(queue) ? (
         <div
-          className="mb-1.5 flex min-w-0 flex-col gap-0.5"
+          className="mb-2 flex min-w-0 flex-col gap-1"
           data-testid="composer-queued-follow-ups"
         >
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <span className="min-w-0 flex-1 font-mono text-[11px] tracking-[0.02em]">
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 font-mono text-[12px] font-medium tracking-[0.02em] text-foreground">
               {t('ai.panel.queuedLabel')}
             </span>
             {onClearQueue ? (
@@ -882,19 +882,21 @@ export function AiPanelComposer({
             ) : null}
           </div>
           <ul
-            className="flex min-w-0 flex-col gap-0.5"
+            className="flex min-w-0 flex-col gap-1"
             aria-label={t('ai.panel.queuedLabel')}
           >
             {primeQueueItems(queue).map((item) => (
               <li
                 key={`${item.lane}-${item.index}-${item.text}`}
-                className="flex min-w-0 items-center gap-1.5 font-mono text-[11px] text-muted-foreground"
+                className="flex min-w-0 items-center gap-1.5 font-mono text-[12px]"
                 data-testid={item.lane === 'steer' ? 'composer-queued-steer' : 'composer-queued-follow-up'}
               >
-                <span className="truncate">
-                  {item.lane === 'steer' ? t('ai.panel.queuedSteer') : t('ai.panel.queuedFollowUp')}
-                  {' · '}
-                  {item.text}
+                <span className="min-w-0 truncate">
+                  <span className="text-muted-foreground">
+                    {item.lane === 'steer' ? t('ai.panel.queuedSteer') : t('ai.panel.queuedFollowUp')}
+                    {' · '}
+                  </span>
+                  <span className="text-foreground">{item.text}</span>
                 </span>
               </li>
             ))}

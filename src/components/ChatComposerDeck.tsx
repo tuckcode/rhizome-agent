@@ -31,7 +31,7 @@ interface ChatComposerDeckProps {
 
 function pillClass(accent = false) {
   return cn(
-    'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5',
+    'inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border px-2 py-0.5',
     'font-mono text-[11px] transition-colors',
     'border-[var(--border-default,var(--border))]',
     'hover:bg-[var(--state-hover,var(--accent))] hover:text-foreground',
@@ -43,10 +43,12 @@ function Chip({
   children,
   title,
   testId,
+  className,
 }: {
   children: ReactNode
   title?: string
   testId?: string
+  className?: string
 }) {
   return (
     <span
@@ -55,6 +57,7 @@ function Chip({
       className={cn(
         'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5',
         'font-mono text-[11px] text-muted-foreground border-border',
+        className,
       )}
     >
       {children}
@@ -122,9 +125,12 @@ export function ChatComposerDeck({
               className={pillClass()}
               aria-label={t('ai.composer.context', { note: contextLabel })}
               data-testid="composer-context-pill"
+              title={t('ai.composer.context', { note: contextLabel })}
             >
-              {t('ai.composer.context', { note: contextLabel })}
-              <CaretDown size={9} weight="bold" className="text-[var(--text-faint,var(--muted-foreground))]" aria-hidden="true" />
+              <span className="min-w-0 truncate">
+                {t('ai.composer.context', { note: contextLabel })}
+              </span>
+              <CaretDown size={9} weight="bold" className="shrink-0 text-[var(--text-faint,var(--muted-foreground))]" aria-hidden="true" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="w-56">
@@ -146,7 +152,14 @@ export function ChatComposerDeck({
           </DropdownMenuContent>
         </DropdownMenu>
       ) : contextLabel ? (
-        <Chip>{t('ai.composer.context', { note: contextLabel })}</Chip>
+        <Chip
+          className="min-w-0 max-w-full shrink"
+          title={t('ai.composer.context', { note: contextLabel })}
+        >
+          <span className="min-w-0 truncate">
+            {t('ai.composer.context', { note: contextLabel })}
+          </span>
+        </Chip>
       ) : null}
 
       {skillsLabel ? (

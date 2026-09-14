@@ -30,6 +30,16 @@ describe('ChatComposerFoot', () => {
     expect(foot).not.toHaveTextContent('⌘')
   })
 
+  it('keeps status at 12px and key chips at 10px', () => {
+    render(<ChatComposerFoot />)
+
+    const foot = screen.getByTestId('chat-composer-foot')
+    expect(foot).toHaveClass('text-[12px]')
+    for (const chip of foot.querySelectorAll('kbd')) {
+      expect(chip).toHaveClass('text-[10px]')
+    }
+  })
+
   it('does not claim Escape stops a running turn', () => {
     render(<ChatComposerFoot working lastToolName="get_note" />)
 

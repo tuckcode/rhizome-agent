@@ -90,19 +90,23 @@ export function ChatPreflightBanner({
 
   return (
     <div
-      className="mb-1.5 flex min-w-0 items-start gap-2 rounded-md border border-border bg-muted px-3 py-2"
+      className="mb-2 flex min-w-0 items-start gap-2 rounded-md border border-border bg-muted px-3 py-2"
       data-testid="chat-preflight-banner"
       role="status"
     >
-      <Warning size={14} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <Warning
+        size={16}
+        className="mt-0.5 shrink-0 text-[var(--accent-amber,var(--foreground))]"
+        aria-hidden="true"
+      />
       <div className="min-w-0 flex-1">
-        <div className="text-[11px] font-medium text-foreground" data-testid="chat-preflight-title">
+        <div className="text-[12px] font-medium text-foreground" data-testid="chat-preflight-title">
           {t('ai.preflight.title')}
         </div>
-        <ul className="mt-0.5 flex flex-col gap-1">
+        <ul className="mt-1 flex flex-col gap-1">
           {blockers.map((blocker) => (
-            <li key={blocker.reason} className="min-w-0 text-[11px] text-muted-foreground">
-              <span className="text-foreground" data-testid="chat-preflight-reason">
+            <li key={blocker.reason} className="min-w-0 text-[12px] text-foreground">
+              <span data-testid="chat-preflight-reason">
                 {blocker.reason}
               </span>
               {' — '}
