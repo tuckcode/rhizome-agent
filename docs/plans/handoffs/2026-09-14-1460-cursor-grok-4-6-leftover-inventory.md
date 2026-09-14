@@ -119,6 +119,7 @@ HEAD `c44ee2b`. Origin `5c629a0`. App `476756c`. D6 landed. No push.
 - Human name beats placeholder ([1556](2026-09-14-1556-cursor-grok-4-6-name-beats-placeholder.md))
 - Burn close stamp ([1557](2026-09-14-1557-cursor-grok-4-6-burn-close.md))
 - Five-hour burn closed ([1558](2026-09-14-1558-cursor-grok-4-6-burn-closed.md))
+- Crunch leftover pin/gear/Untitled/Cmd+1 ([1559](2026-09-14-1559-cursor-grok-4-6-crunch-leftover.md))
 
 ## Still parked (do not do)
 
