@@ -161,3 +161,6 @@ Source-only reconfirm. Full write-up: [2026-09-14-1120-cursor-grok-4-6-w4-source
 A mid-turn send failure still has **no error banner**. That is a W4
 behavior gap, not a design label. Do not invent “Stopped” or
 “Connection unknown.” [1225](2026-09-14-1225-cursor-grok-4-6-d3-status.md).
+
+**Stamped 16:05:** five native cases still **NOT RUN**. App still
+`476756c`. Leftover wrap `1eb0398`. Do not launch `/Applications`.

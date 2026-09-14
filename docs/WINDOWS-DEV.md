@@ -11,7 +11,7 @@
 > Windows". No one had checked any of that. It was written from what the
 > code is *meant* to do. See C42.
 >
-> **Stamped 15:30:** still no Windows work this window. C42 stays skip.
+> **Stamped 16:05:** still no Windows work this window. C42 stays skip.
 
 Rhizome Agent **targets** Windows (Tauri + WebView2). Prime chat/sessions
 need the **`prime-agent` daemon** running on the same machine; the named-pipe

@@ -5,7 +5,7 @@
 > — local **`4416411`**, origin **`5c629a0`**, app **`476756c`**. Hard
 > nos in this file still stand.
 >
-> **Stamped 15:47:** D6 landed at `c44ee2b`. Do not merge #66. No push. No rebuild.
+> **Stamped 16:04:** D6 landed. Leftover wrap `1eb0398`. Do not merge #66. No push. No rebuild.
 > Do not rebuild `/Applications`. Import waits for `1`.
 
 **Origin:** Astra · Codex · 2026-09-13 · task `01a09de9-425c-7972-9dcc-2bbabf7e7a95`.
