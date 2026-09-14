@@ -1,4 +1,5 @@
 import { BookOpen, Megaphone } from '@phosphor-icons/react'
+import rhizomeOrganicHero from '../assets/brand/rhizome-organic-hero.png'
 import type { createTranslator } from '../lib/i18n'
 import { rememberFeedbackDialogOpener } from '../lib/feedbackDialogOpener'
 import { Button } from './ui/button'
@@ -22,6 +23,15 @@ export function AboutSettingsSection({
       <SectionHeading
         title={t('settings.about.title')}
         description={t('settings.about.description')}
+      />
+      <img
+        src={rhizomeOrganicHero}
+        alt="Rhizome Agent. Your work. Your memory. Chat with Prime. Keep what matters."
+        width={1774}
+        height={887}
+        loading="lazy"
+        decoding="async"
+        className="mb-4 block h-auto w-full rounded-lg"
       />
       <SettingsGroup>
         {onOpenFeedback ? (

@@ -541,7 +541,7 @@ export function AiPanelView({
         controls={composerControls}
         onChange={setInput}
         onSend={handleComposerSend}
-        onSteer={isPrimeTarget ? handleSteer : undefined}
+        onSteer={isPrimeTarget ? handleSteer : undefined} // #41: wired. GitHub body is stale.
         queue={isPrimeTarget ? queue : undefined}
         onClearQueue={isPrimeTarget ? () => void clearQueue() : undefined}
         onStop={handleStop}

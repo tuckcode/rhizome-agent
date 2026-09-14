@@ -1,61 +1,59 @@
 ---
 session: 2026-09-06-2151
 model: Composer
-description: C72 ready brief — side-panel layout session for Atticus (defaults, Inbox label, right icon rail)
+description: >-
+  C72 remainder — Inbox rename / discoverability. Notes panel shipped;
+  do not edit ADR-0166 or ADR-0170 for rail polish.
 ---
 
-# C72 ready brief — side-panel layout
+# C72 remainder — Inbox rename / discoverability
 
-**Origin:** Composer · 2026-09-06 · planning only (no product code)
+**Origin:** Composer · 2026-09-06 · **remainder corrected 2026-09-13** against HANDOFF/BOARD.  
+Settled stack: [ADR-0170](../../adr/0170-notes-heavy-right-panel.md). Graph on Changes: ADR-0171.  
+Park detail: [2026-09-06-1814](2026-09-06-1814-composer-c72-side-panel-session.md).
 
-Use this to start a dedicated ~1–2 hour layout session. Detail park:
-[2026-09-06-1814](2026-09-06-1814-composer-c72-side-panel-session.md).
-Settled stack: [ADR-0170](../../adr/0170-notes-heavy-right-panel.md).
+---
 
-## Current behavior (plain language)
+## Done / now / next
 
-- Chat stays in the middle. Sessions sit on the left.
-- The right column (Notes list on top, Graph/Mycelium below) is optional.
-- Rail **Inbox** shows or hides that right column (`editor-only` = hidden;
-  `all` / `editor-list` = open). Click Chat → column hides.
-- Opening a note puts the note body beside Chat in the center — that is not
-  the same as opening the right Notes column.
-- Opening Graph (or a session footprint) forces the right column open.
-- Narrow windows turn the vault column into an overlay that is easy to lose.
-- ADR-0170 left a matching **right-hand icon rail** undecided.
+**Shipped (do not re-open as “panel gone”):**
 
-Default on launch is often Chat-only (`editor-only`), so the right stack can
-feel “gone” until someone hits Inbox or opens Notes another way.
+- Right Notes **default open** (`editor-list` on fresh vaults).
+- Shut Notes = **46px** restore rail, **Show Notes** strip (32px hit).
+- Rail control is **Notes**. Inbox is a **folder inside** the list, not the rail destination.
+- Chat stays the canvas. Graph/Mycelium only on Changes.
+- On top / Beside for the open note.
 
-## Open decisions (Atticus)
+**Now:** Inbox **inside the list** is still easy to misread. Rail polish leftovers belong in a **new ADR**, not edits to ADR-0166 or ADR-0170.
 
-1. **Default on launch** — Chat-only vs Notes column already open.
-2. **Inbox label** — keep “Inbox” as the toggle, or rename (e.g. Notes / Vault)
-   so it reads as “show the right column.”
-3. **Right icon rail** — icons for Notes / Graph / Mycelium on the right edge,
-   Inbox-only toggle, or always-on strip.
-4. One coherent map of left / center / right (Sessions, Chat, note editor,
-   VaultPanel, Graph, Mycelium, Changes, Research) — then ship that map, not
-   three half-states.
+**Next:** one rename/discoverability pass, then stop.
 
-## Suggested acceptance tests
+**Done when:** Atticus can find Notes without a scavenger hunt, and “Inbox” means the folder (or has a new name everywhere it still appears).
 
-- Fresh launch: right column matches the chosen default; Atticus can find Notes
-  without opening something from “the left” first.
-- Inbox (or new label) toggles the ADR-0170 stack open/closed; Chat still works.
-- Selecting a note opens the body in center; right list can stay or hide per
-  decided rule — both paths are taught by the UI.
-- Graph / Mycelium open under Notes without replacing Chat; leave overlay works.
-- Narrow window: compact overlay restore is obvious (not a blank right edge).
-- If right icon rail ships: each icon reaches the right surface; no dead icons.
+---
 
-## Risks if drive-by fixed
+## Current map (plain)
 
-- Flipping the default mid daily-drive confuses muscle memory and stored
-  `view_mode` without a product call.
-- Renaming Inbox without updating Settings / org workflow / badges creates
-  two “Inboxes.”
-- Adding a right rail without killing half-states leaves three ways to show
-  the same panel.
-- Do not touch layout code until defaults + labels + rail are decided; then
-  one ADR (new or superseding) + one coherent layout pass.
+- Chat middle. Sessions left.
+- Right column: Notes list on top; Graph/Mycelium below **only on Changes**.
+- Opening a note puts the **body** beside/on Chat — that is not the right column.
+- Narrow windows: vault becomes an overlay.
+
+## Remainder (Atticus)
+
+1. **Inbox rename inside the list** — keep as a folder name, or rename so it is not confused with the old rail toggle.
+2. **Discoverability** of shut Notes (Show Notes strip is the current answer; only change it with a new ADR).
+3. **Right icon rail** — still undecided in ADR-0170. Do not add icons in a drive-by.
+
+Do not flip launch default again mid daily-drive.
+
+## Acceptance
+
+- Fresh launch: Notes column matches the shipped default; Show Notes restores it.
+- Inbox (folder) does not steal Chat or hide Notes.
+- No third way to show the same panel.
+
+## Risks
+
+- Renaming Inbox without Settings / org / badges creates two Inboxes.
+- Editing ADR-0166 or ADR-0170 for rail polish — BOARD forbids that; write a **new** ADR.

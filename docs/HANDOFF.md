@@ -47,18 +47,25 @@ file.
 ---
 
 ## State
-`main` on origin is **`476756c`** (Nous Chat list + Settings gear). Last
-**app** is **`476756c`** at **2026-09-12 22:43**. Unified picture:
-[`docs/BOARD.md`](BOARD.md). C64 first-2s is still weak. Native Chat glance
-**PASSED** (2026-09-06). After future installs, delete leftover `.app`
-copies.
+`main` on origin is **`5c629a0`** (AGENTS prefs + Notes seam). Last
+**app** is still **`476756c`** at **2026-09-12 22:43**. Unified picture:
+[`docs/BOARD.md`](BOARD.md). **God plan (Astra, source of truth):**
+[`/Users/dtc/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/ASTRA_GOD_PLAN.md`](file:///Users/dtc/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/ASTRA_GOD_PLAN.md)
+(Cursor index:
+[`s-plans/README.md`](file:///Users/dtc/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/s-plans/README.md)).
+Inventory that fed it:
+[`docs/ASTRA_PACKET.md`](ASTRA_PACKET.md) (longer:
+[`PLAN_FOR_A_PLAN.md`](PLAN_FOR_A_PLAN.md)). C64 first-2s is still weak.
+Native Chat glance **PASSED** (2026-09-06). W4 native cases tonight are **NOT RUN**
+([2235 evidence](plans/handoffs/2026-09-13-2235-cursor-grok-4-6-w4-reliability-evidence.md)).
+Installed candidate **`476756c`** is **not** daily-driver ready. After future installs, delete
+leftover `.app` copies.
 
 Still open / parked: **C72** Inbox rename; Prime list-import; **#51** Case 2
-(model-backed Tab); **C64** full verify; **#47** confirm-close; Grokbot PRs
-**#60/#61/#62** landed; Rhizome in-app updater stub. Evening design dump
-(portfolio, vault-as-skills, no CC Switch):
-[2208](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md).
-[`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own date first).
+(model-backed Tab); **C64** full verify; Grokbot leftover review; Rhizome
+in-app updater stub. **#47 closed tonight** (confirm). Evening-dump **cards**
+(not UI): BOARD W11. Live `gh` **17** open issues (ASTRA §5 was 26). Prefer `gh`. [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own
+date first).
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Inverted Dock icon is
@@ -92,10 +99,13 @@ critical path at ~120s, coverage 85s of it).
 `docs/NEXT.md` — unclaimed work in one place: open issues by theme, the
 decisions that block some of them, the open C-numbers, and where the design
 docs need filling. Read it when a handoff task is finished and the next one is
-yours to choose.
+yours to choose. **God plan:** `/Users/dtc/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/ASTRA_GOD_PLAN.md`. Priority: W7 HOME-vault + W4 Chat reliability. Inventory: [`ASTRA_PACKET.md`](ASTRA_PACKET.md).
 
 ## Recent sessions
 
+- [2026-09-13 · Cursor Grok 4.6](plans/handoffs/2026-09-13-2235-cursor-grok-4-6-w4-reliability-evidence.md) — W4: all five God-plan native cases **NOT RUN**. Source tests 98/98 are not a native pass. App stamp `476756c`. Not daily-driver ready.
+- [2026-09-13 · Cursor Grok 4.6](plans/handoffs/2026-09-13-2225-cursor-grok-4-6-home-vault-and-import-jsonl.md) — #46 already guarded on main (`e90e37c`); import decision at `docs/plans/import-jsonl-decision.md` (recommend route 1). No list-import code.
+- [2026-09-13 · Cursor Grok 4.6](plans/handoffs/2026-09-13-2215-cursor-grok-4-6-living-docs-truth.md) — W1 living-docs: BOARD/HANDOFF/NEXT/YOU-SHOULD-KNOW match git tip `5c629a0` + live `gh` (17 open).
 - [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-2145-cursor-grok-4-6-nous-chat-list.md) — Nous Portal in the Chat model list; Settings ticks unused models; expanded rail keeps the Settings gear (pin left).
 - [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-2100-cursor-grok-4-6-session-board.md) — one STE board of tonight: finished, found, pile, ideas. Detail: [`docs/BOARD.md`](BOARD.md).
 - [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-2018-cursor-grok-4-6-packages-install-rebuild.md) — Packages **Install** runs the Prime CLI then reloads. Tonight's daily-drive batch goes to main + `/Applications`.
@@ -292,7 +302,8 @@ push is not a release — releases are tagged builds with signed installers.
 
 - ~~**C71-OPEN (2026-09-06): composer up-arrow previous-prompt history.**~~ **RESOLVED 2026-09-06.** Session-scoped in-memory recall (cap 50); Up/Down when empty or caret at start; suggestion menus keep Arrow keys. See `composerPromptHistory` + `useComposerPromptHistory`.
 
-- **C72 (2026-09-06/07): side-panel discoverability.** **PARTIAL 2026-09-12 polish:** rail control is **Notes** (Inbox stays a folder in the list); Chat stays the canvas; last idle conversation resumes on native relaunch; composer Prime/skills are labels. Still open: Inbox rename inside the list (deferred). In `/Applications` as of **`6908554`**. Detail: [2026-09-12-0845](plans/handoffs/2026-09-12-0845-cursor-grok-4-6-ux-visual-pass.md).
+- **C72 (2026-09-06/07): side-panel discoverability.** **PARTIAL 2026-09-12 polish:** rail control is **Notes** (Inbox stays a folder in the list); Chat stays the canvas; last idle conversation resumes on native relaunch; composer Prime/skills are labels. Still open: Inbox rename inside the list (deferred). Notes rail polish is
+  in `/Applications` as of **`476756c`**. Detail: [2026-09-12-0845](plans/handoffs/2026-09-12-0845-cursor-grok-4-6-ux-visual-pass.md).
 
 - **#50 (2026-08-29): let the agent see the running app — plan ready, not built.**
   Three answers proposed: show `pnpm dev` (not native), read + steer through
