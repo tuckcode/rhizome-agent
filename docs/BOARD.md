@@ -13,23 +13,22 @@ Unclaimed work: `NEXT.md`.
 
 ## Status
 
-- **Done:** Five-hour burn closed at 16:30. Local HEAD **`7565fd5`**.
-  Report [1522](plans/handoffs/2026-09-14-1522-cursor-grok-4-6-d6-report.md).
-  App still **`476756c`**.
-- **Now:** Burn is over. Origin still **`5c629a0`**. Seventeen local
-  commits not pushed. Leftover through [1557](plans/handoffs/2026-09-14-1557-cursor-grok-4-6-burn-close.md).
+- **Done:** Crunch leftover through [1559](plans/handoffs/2026-09-14-1559-cursor-grok-4-6-crunch-leftover.md).
+  Local HEAD **`690712e`**. App still **`476756c`**.
+- **Now:** Extra 40 minutes until ~17:29. Origin still **`5c629a0`**.
+  Eighteen local commits not pushed. parked-organs 86/86.
   Do not rebuild `/Applications`.
 - **Next:** Say push. Native C64 ×3. #46 live Chat-without-vault.
   Import stays vault-only until `1`.
 
-**Origin:** Cursor Grok 4.6 · 2026-09-14 16:30 · leftover wrap `7565fd5`. App `476756c`. Not pushed.
+**Origin:** Cursor Grok 4.6 · 2026-09-14 16:55 · crunch leftover. App `476756c`. Not pushed.
 
 ---
 
 ## True right now
 
-- **Git tip (local):** **`7565fd5`**. **Origin `main`:** **`5c629a0`**.
-  Seventeen commits not pushed.
+- **Git tip (local):** **`690712e`**. **Origin `main`:** **`5c629a0`**.
+  Eighteen commits not pushed.
 - **Last stamped app:** **`476756c`**, **2026-09-12 22:43**,
   `/Applications/Rhizome Agent.app`. Vite / mock-tauri is not that vault.
 - **Prime on this machine:** **0.9.3**.

@@ -1026,4 +1026,182 @@ describe('parked organs leftover', () => {
     expect(menu).toContain("label: 'Archive'")
     expect(roster).toContain('const named = collapseWhitespace(session.sessionName ?? \'\')')
   })
+
+  it('pins left and puts the Settings gear right when the rail is open', () => {
+    const rail = readFileSync(
+      `${process.cwd()}/src/components/CommandRail.tsx`,
+      'utf8',
+    )
+    expect(rail).toContain('{pinButton}')
+    expect(rail).toContain('<span className="ml-auto">{settingsButton}</span>')
+    expect(rail).toContain("aria-label={pinnedExpanded ? 'Unpin sidebar' : 'Pin sidebar'}")
+    expect(rail).toContain('data-testid="command-rail-toggle"')
+    expect(rail).toContain('Conversations sit below the places a person can go')
+  })
+
+  it('falls unnamed session logs back to Untitled session', () => {
+    const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
+    const list = readFileSync(
+      `${process.cwd()}/src/components/PrimeSessionList.tsx`,
+      'utf8',
+    )
+    const titles = readFileSync(
+      `${process.cwd()}/src/lib/primeSessionMeta.ts`,
+      'utf8',
+    )
+    expect(en).toContain('"ai.sessions.untitled": "Untitled session"')
+    expect(list).toContain("const untitled = t('ai.sessions.untitled')")
+    expect(list).toContain('titles[index] ?? untitled')
+    expect(titles).toContain('title: session.title?.trim() || untitled')
+  })
+
+  it('keeps Cmd+1 as Chat only and Cmd+2 / Cmd+3 as Notes views', () => {
+    const manifest = readFileSync(
+      `${process.cwd()}/src/shared/appCommandManifest.json`,
+      'utf8',
+    )
+    const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
+    expect(manifest).toContain('"viewEditorOnly"')
+    expect(manifest).toContain('"accelerator": "CmdOrCtrl+1"')
+    expect(manifest).toContain('"accelerator": "CmdOrCtrl+2"')
+    expect(manifest).toContain('"accelerator": "CmdOrCtrl+3"')
+    expect(en).toContain('"command.view.editorOnly": "Chat only"')
+  })
+
+  it('keeps Restore on archived session rows', () => {
+    const menu = readFileSync(
+      `${process.cwd()}/src/components/PrimeSessionListContextMenu.tsx`,
+      'utf8',
+    )
+    expect(menu).toContain("label: 'Restore'")
+    expect(menu).toContain('onSetArchived(session, false)')
+    expect(menu).toContain("label: 'Archive'")
+    expect(menu).toContain('onSetArchived(session, true)')
+  })
+
+  it('hides the window on close and still quits on Cmd+Q', () => {
+    const rust = readFileSync(`${process.cwd()}/src-tauri/src/lib.rs`, 'utf8')
+    expect(rust).toContain('fn window_hides_instead_of_closing')
+    expect(rust).toContain('Cmd+Q raises `ExitRequested`, not `CloseRequested`')
+    expect(rust).toContain('fn focus_main_window')
+    expect(rust).toContain('app_handle.show()')
+    expect(rust).toContain('window.unminimize()')
+  })
+
+  it('keeps the vault dropdown on the bottom-left status bar', () => {
+    const bar = readFileSync(
+      `${process.cwd()}/src/components/status-bar/StatusBarSections.tsx`,
+      'utf8',
+    )
+    expect(bar).toContain('<VaultMenu')
+    expect(bar).toContain('vaultPath={vaultPath}')
+    expect(bar).toContain('export function StatusBarPrimarySection')
+  })
+
+  it('renames from the list through rename_saved_session, not a new session', () => {
+    const rust = readFileSync(
+      `${process.cwd()}/src-tauri/src/commands/ai.rs`,
+      'utf8',
+    )
+    const host = readFileSync(
+      `${process.cwd()}/src-tauri/src/prime_session_host.rs`,
+      'utf8',
+    )
+    expect(rust).toContain('Speaks `rename_saved_session`')
+    expect(rust).toContain('crate::prime_session_host::rename_saved_session(&path, &name)')
+    expect(host).toContain('"type": "rename_saved_session"')
+  })
+
+  it('adds Nous models into Prime models.json from Add to Chat list', () => {
+    const providers = readFileSync(
+      `${process.cwd()}/src/components/PrimeProviderStatusSection.tsx`,
+      'utf8',
+    )
+    expect(providers).toContain("Prime's `models.json` when the user clicks Add to Chat list")
+    expect(providers).toContain("await callHost<EnsureNousPortalResult>('ensure_nous_portal_models')")
+    expect(providers).toContain('Added ${count} Nous Portal ${modelsWord} to the Chat list')
+  })
+
+  it('keeps Rhizome in-app updates on the green status-bar control', () => {
+    const indicator = readFileSync(
+      `${process.cwd()}/src/components/VersionUpdateIndicator.tsx`,
+      'utf8',
+    )
+    expect(indicator).toContain("background: 'var(--accent-green)'")
+    expect(indicator).toContain('data-testid="status-version-update"')
+    expect(indicator).toContain('rhizomeActions.startDownload()')
+    expect(indicator).toContain('testId="version-update-rhizome"')
+  })
+
+  it('clears traffic lights on the Sessions rail and keeps Cmd+1 out of Notes chrome', () => {
+    const lights = readFileSync(
+      `${process.cwd()}/src/utils/trafficLights.ts`,
+      'utf8',
+    )
+    const rail = readFileSync(
+      `${process.cwd()}/src/components/CommandRail.tsx`,
+      'utf8',
+    )
+    expect(lights).toContain('export const COMMAND_RAIL_TRAFFIC_LIGHT_INSET')
+    expect(lights).toContain('MACOS_TRAFFIC_LIGHT_POSITION.y + 43')
+    expect(rail).toContain('paddingTop: trafficLightRoom ? COMMAND_RAIL_TRAFFIC_LIGHT_INSET')
+  })
+
+  it('keeps Ask-the-agent-about-this-note on the note list', () => {
+    const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
+    const menu = readFileSync(
+      `${process.cwd()}/src/components/note-list/NoteListContextMenuView.tsx`,
+      'utf8',
+    )
+    const home = readFileSync(
+      `${process.cwd()}/src/components/ChatHome.tsx`,
+      'utf8',
+    )
+    expect(en).toContain(
+      '"command.note.askAgent": "Ask the agent about this note"',
+    )
+    expect(menu).toContain("label: translate(locale, 'command.note.askAgent')")
+    expect(home).toContain('the vault\'s "Ask the agent about this')
+  })
+
+  it('redacts credential-shaped tokens only, not a bare password= leftover', () => {
+    const redaction = readFileSync(
+      `${process.cwd()}/src/lib/sensitiveTextRedaction.ts`,
+      'utf8',
+    )
+    const coverage = readFileSync(
+      `${process.cwd()}/src/lib/sensitiveTextRedaction.test.ts`,
+      'utf8',
+    )
+    expect(redaction).toContain('Replace credential-shaped tokens only')
+    expect(coverage).toContain('redactCredentialTokens coverage limit')
+    expect(coverage).toContain('password=${OPAQUE_MARKER}')
+  })
+
+  it('hides the Prime permission toggle and keeps Copy file path on notes', () => {
+    const panel = readFileSync(`${process.cwd()}/src/components/AiPanel.tsx`, 'utf8')
+    const chrome = readFileSync(
+      `${process.cwd()}/src/components/AiPanelChrome.tsx`,
+      'utf8',
+    )
+    const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
+    const menu = readFileSync(
+      `${process.cwd()}/src/components/note-list/NoteListContextMenuView.tsx`,
+      'utf8',
+    )
+    expect(panel).toContain('hidePermissionMode={isPrimeTarget}')
+    expect(chrome).toContain('{hidePermissionMode ? (')
+    expect(en).toContain('"editor.toolbar.copyFilePath": "Copy file path"')
+    expect(menu).toContain("label: translate(locale, 'editor.toolbar.copyFilePath')")
+  })
+
+  it('names new Prime sessions at creation with set_session_name', () => {
+    const host = readFileSync(
+      `${process.cwd()}/src-tauri/src/prime_session_host.rs`,
+      'utf8',
+    )
+    expect(host).toContain('Rhizome seeded a placeholder with `set_session_name` at creation')
+    expect(host).toContain('"type": "set_session_name"')
+    expect(host).toContain('Prime\'s `set_session_name` only addresses the attached session')
+  })
 })
