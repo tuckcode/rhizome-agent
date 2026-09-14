@@ -1,17 +1,12 @@
-import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { vaultContext } from './vault.js'
+import { readContainedVaultText, vaultContext } from './vault.js'
 
 export async function readAgentInstructions(vaultPath) {
-  const instructionsPath = path.join(vaultPath, 'AGENTS.md')
-  try {
-    return {
-      path: instructionsPath,
-      content: await readFile(instructionsPath, 'utf8'),
-    }
-  } catch (error) {
-    if (error?.code === 'ENOENT') return null
-    throw error
+  const content = await readContainedVaultText(vaultPath, 'AGENTS.md')
+  if (content === null) return null
+  return {
+    path: path.join(vaultPath, 'AGENTS.md'),
+    content,
   }
 }
 

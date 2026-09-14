@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/react'
 import { resolveFrontendTelemetryConfig } from './telemetryConfig'
-import { sanitizeDiagnosticText } from './sensitiveTextRedaction'
+import { TOKEN_REDACTION, isSensitiveDiagnosticKey, sanitizeDiagnosticText } from './sensitiveTextRedaction'
 import {
   hasActiveWhiteboardPlatformPermissionGuard,
   isWhiteboardPlatformPermissionRejection,
@@ -147,15 +147,26 @@ function scrubBreadcrumbMessages(event: Sentry.ErrorEvent): void {
   }
 }
 
+function scrubUnknown(value: unknown): unknown {
+  if (typeof value === 'string') return scrubPaths(value)
+  if (typeof value === 'object' && value !== null) return scrubRecord(value)
+  return value
+}
+
 function scrubRecord<T>(record: T): T {
+  if (Array.isArray(record)) {
+    return record.map((item) => scrubUnknown(item)) as T
+  }
+  if (typeof record !== 'object' || record === null) {
+    return record
+  }
   const scrubbed: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(record as Record<string, unknown>)) {
-    if (typeof value === 'string') scrubbed[key] = scrubPaths(value)
-    else if (typeof value === 'object' && value !== null) {
-      scrubbed[key] = scrubRecord(value)
-    } else {
-      scrubbed[key] = value
+    if (isSensitiveDiagnosticKey({ text: key })) {
+      scrubbed[key] = TOKEN_REDACTION
+      continue
     }
+    scrubbed[key] = scrubUnknown(value)
   }
   return scrubbed as T
 }

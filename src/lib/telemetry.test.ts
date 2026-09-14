@@ -293,6 +293,50 @@ describe('initSentry', () => {
     })).toBeNull()
     expect(beforeSend(unrelatedObserverEvent)).toBe(unrelatedObserverEvent)
   })
+
+  it('scrubs sensitive fields and credential text without sending a network event', () => {
+    const beforeSend = initSentryBeforeSend()
+    const opaque = ['ASTRA_SYNTHETIC', 'Q'.repeat(28)].join('_')
+    const event = {
+      message: `login password=${opaque}`,
+      extra: {
+        api_key: { nested: opaque },
+        apiKey: opaque,
+        password: 99,
+        token: [opaque],
+        buildNumber: 'b281',
+      },
+      request: {
+        headers: {
+          Authorization: `Bearer ${opaque}`,
+          Cookie: opaque,
+          Accept: 'application/json',
+        },
+        url: `https://service.invalid/?api_key=${opaque}`,
+      },
+      tags: {
+        release: 'alpha',
+      },
+      breadcrumbs: [{
+        message: `API_KEY=${opaque}`,
+        data: {
+          Cookie: opaque,
+          view: 'chat',
+        },
+      }],
+    }
+
+    const result = beforeSend(event) as typeof event
+
+    expect(result).toBe(event)
+    expect(JSON.stringify(result)).not.toContain(opaque)
+    expect(result.extra.buildNumber).toBe('b281')
+    expect(result.request.headers.Accept).toBe('application/json')
+    expect(result.tags.release).toBe('alpha')
+    expect(result.breadcrumbs[0]?.data.view).toBe('chat')
+    expect(result.message).not.toContain(opaque)
+    expect(result.request.url).not.toContain(opaque)
+  })
 })
 
 describe('isFeatureEnabled', () => {
