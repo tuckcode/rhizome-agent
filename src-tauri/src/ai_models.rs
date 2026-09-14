@@ -390,28 +390,8 @@ fn write_secrets_at(path: &Path, secrets: &AiProviderSecrets) -> Result<(), Stri
     write_secret_file(path, json)
 }
 
-#[cfg(unix)]
 fn write_secret_file(path: &Path, content: String) -> Result<(), String> {
-    use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
-    use std::os::unix::fs::PermissionsExt;
-
-    let mut file = fs::OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .mode(0o600)
-        .open(path)
-        .map_err(|error| format!("Failed to open AI provider secrets file: {error}"))?;
-    file.write_all(content.as_bytes())
-        .map_err(|error| format!("Failed to write AI provider secrets: {error}"))?;
-    fs::set_permissions(path, fs::Permissions::from_mode(0o600))
-        .map_err(|error| format!("Failed to secure AI provider secrets file: {error}"))
-}
-
-#[cfg(not(unix))]
-fn write_secret_file(path: &Path, content: String) -> Result<(), String> {
-    fs::write(path, content)
+    crate::secure_fs::write_owner_only_atomic(path, &content)
         .map_err(|error| format!("Failed to write AI provider secrets: {error}"))
 }
 
@@ -774,6 +754,53 @@ mod tests {
             let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
             assert_eq!(mode, 0o600);
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn secret_write_does_not_follow_a_symlink() {
+        use std::os::unix::fs::symlink;
+
+        let dir = tempfile::tempdir().unwrap();
+        let outside = dir.path().join("outside-secrets.json");
+        let path = dir.path().join("secrets.json");
+        fs::write(&outside, "{\"marker\":\"RHIZOME_R3_OUTSIDE\"}\n").unwrap();
+        symlink(&outside, &path).unwrap();
+
+        let secrets = AiProviderSecrets {
+            provider_api_keys: BTreeMap::from([("demo".into(), "fixture-only".into())]),
+        };
+        write_secrets_at(&path, &secrets).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(&outside).unwrap(),
+            "{\"marker\":\"RHIZOME_R3_OUTSIDE\"}\n"
+        );
+        assert!(!path.symlink_metadata().unwrap().file_type().is_symlink());
+        assert_eq!(read_secrets_at(&path).unwrap(), secrets);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn secret_write_tightens_a_permissive_file_and_keeps_complete_json() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("secrets.json");
+        fs::write(&path, "{}").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+
+        let secrets = AiProviderSecrets {
+            provider_api_keys: BTreeMap::from([("demo".into(), "fixture-only".into())]),
+        };
+        write_secrets_at(&path, &secrets).unwrap();
+
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        let raw = fs::read_to_string(&path).unwrap();
+        assert!(raw.contains("fixture-only"));
+        assert!(serde_json::from_str::<AiProviderSecrets>(&raw).is_ok());
+        assert_eq!(read_secrets_at(&path).unwrap(), secrets);
     }
 
     #[test]

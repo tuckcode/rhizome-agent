@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::ai_models::{normalize_ai_model_providers, AiModelProvider};
 
@@ -433,7 +433,7 @@ fn get_settings_at(path: &PathBuf) -> Result<Settings, String> {
     Ok(normalize_settings(settings))
 }
 
-fn save_settings_at(path: &PathBuf, settings: Settings) -> Result<(), String> {
+fn save_settings_at(path: &Path, settings: Settings) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .map_err(|e| format!("Failed to create config directory: {}", e))?;
@@ -443,7 +443,8 @@ fn save_settings_at(path: &PathBuf, settings: Settings) -> Result<(), String> {
 
     let json = serde_json::to_string_pretty(&cleaned)
         .map_err(|e| format!("Failed to serialize settings: {}", e))?;
-    fs::write(path, json).map_err(|e| format!("Failed to write settings: {}", e))
+    crate::secure_fs::write_owner_only_atomic(path, &json)
+        .map_err(|e| format!("Failed to write settings: {}", e))
 }
 
 /// The picker's allow-list, from a settings file that may not exist yet.
@@ -1314,5 +1315,87 @@ mod tests {
         let (_dir, path) = create_last_vault_path(&["last-vault.txt"]);
         write_and_assert_last_vault(&path, "/Users/test/OldVault");
         write_and_assert_last_vault(&path, "/Users/test/NewVault");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_settings_creates_an_owner_only_file() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        save_settings_at(
+            &path,
+            Settings {
+                bridge_token: Some("fixture-bridge-token-32chars!!".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        assert_eq!(
+            get_settings_at(&path).unwrap().bridge_token.as_deref(),
+            Some("fixture-bridge-token-32chars!!")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_settings_tightens_an_existing_permissive_file() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        fs::write(&path, "{}").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+
+        save_settings_at(
+            &path,
+            Settings {
+                anonymous_id: Some("fixture-anon".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        assert_eq!(
+            get_settings_at(&path).unwrap().anonymous_id.as_deref(),
+            Some("fixture-anon")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_settings_replaces_a_symlink_instead_of_writing_through_it() {
+        use std::os::unix::fs::symlink;
+
+        let dir = tempfile::TempDir::new().unwrap();
+        let outside = dir.path().join("outside.json");
+        let path = dir.path().join("settings.json");
+        fs::write(&outside, "{\"marker\":\"RHIZOME_R2_OUTSIDE\"}\n").unwrap();
+        symlink(&outside, &path).unwrap();
+
+        save_settings_at(
+            &path,
+            Settings {
+                anonymous_id: Some("inside-fixture".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            fs::read_to_string(&outside).unwrap(),
+            "{\"marker\":\"RHIZOME_R2_OUTSIDE\"}\n"
+        );
+        assert!(!path.symlink_metadata().unwrap().file_type().is_symlink());
+        assert_eq!(
+            get_settings_at(&path).unwrap().anonymous_id.as_deref(),
+            Some("inside-fixture")
+        );
     }
 }

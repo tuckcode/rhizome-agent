@@ -3968,6 +3968,26 @@ mod tests {
         );
     }
 
+    /// Chat-without-vault uses $HOME as cwd. The placeholder still leads
+    /// with the local clock and the home folder name — it does not become
+    /// a second "vault" fallback.
+    #[test]
+    fn created_session_names_use_the_home_folder_when_cwd_is_home() {
+        use chrono::TimeZone;
+        let noon = chrono::Local
+            .with_ymd_and_hms(2026, 9, 6, 15, 35, 0)
+            .single()
+            .expect("fixed local noon");
+        assert_eq!(
+            rhizome_created_session_name_at(
+                Path::new("/Users/dtc"),
+                "01a0252e-b9d5-71e9-83de-2bce32f65c06",
+                noon,
+            ),
+            "Rhizome · Sep 6 · 3:35p · dtc · f65c06"
+        );
+    }
+
     /// Probed on installed 0.8.0 `ensureDaemonRunning`. The public binary is
     /// the CLI entrypoint; these are the flags it passes to itself.
     #[test]
