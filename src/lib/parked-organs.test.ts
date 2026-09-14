@@ -875,4 +875,43 @@ describe('parked organs leftover', () => {
     expect(app).toContain('<ChatHome')
     expect(rail).toContain('active={notesOpen}')
   })
+
+  it('keeps #41 steer wired, hide-spawned daemon, and no Connections edge strip', () => {
+    const panel = readFileSync(
+      `${process.cwd()}/src/components/AiPanel.tsx`,
+      'utf8',
+    )
+    const rust = readFileSync(
+      `${process.cwd()}/src-tauri/src/prime_session_host.rs`,
+      'utf8',
+    )
+    const status = readFileSync(
+      `${process.cwd()}/src/components/status-bar/StatusBarSections.tsx`,
+      'utf8',
+    )
+    const connections = readFileSync(
+      `${process.cwd()}/src/components/ConnectionsPanel.tsx`,
+      'utf8',
+    )
+    expect(panel).toContain('onSteer={isPrimeTarget ? handleSteer : undefined}')
+    expect(rust).toContain('pub fn stop_spawned_daemon()')
+    expect(status).toContain('export function StatusBarPrimarySection')
+    expect(status).toContain('vaultPath')
+    expect(connections).not.toContain('connections-edge')
+  })
+
+  it('clips Graph to its pane and does not invent Connection unknown', () => {
+    const connections = readFileSync(
+      `${process.cwd()}/src/components/ConnectionsPanel.tsx`,
+      'utf8',
+    )
+    const d3 = readFileSync(
+      `${process.cwd()}/docs/plans/handoffs/2026-09-14-1225-cursor-grok-4-6-d3-status.md`,
+      'utf8',
+    )
+    expect(connections).toContain("style={{ clipPath: 'inset(0)' }}")
+    expect(connections).toContain('overflow-hidden isolate')
+    expect(d3).toContain('`Connection unknown`')
+    expect(d3).toContain('no Chat error banner')
+  })
 })

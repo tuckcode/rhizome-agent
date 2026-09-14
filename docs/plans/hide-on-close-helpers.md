@@ -10,7 +10,7 @@
 ## Done / now / next
 
 - **Done:** red button **hides**. **Cmd+Q** quits. Dock click / tray restores (C22). On hide, `release_helpers_for_hidden_window` stops Mindwalk sidecar, ws-bridge child, and a Prime daemon **this process spawned** (`stop_spawned_daemon`). Keep-working sessions are the exception.
-- **Now:** name-list test exists in `lib.rs`. Native live-check still **NOT RUN** (15:59). D6 already landed `secure_fs` + hide names. Do not recode. Do not launch `/Applications`.
+- **Now:** name-list test exists in `lib.rs`. Native live-check still **NOT RUN** (16:08). D6 already landed `secure_fs` + hide names. Do not recode. Do not launch `/Applications`.
 - **Next:** gray zone only — a user-started background Prime service must still outlive hide (ADR-0163). Do not invent a new daemon-ownership model.
 
 **Done when:** hide leaves Rhizome in the Dock, Chat can come back, and no extra Prime/MCP/Mindwalk helper processes stay as a second Dock story. Cmd+Q still full-quits.

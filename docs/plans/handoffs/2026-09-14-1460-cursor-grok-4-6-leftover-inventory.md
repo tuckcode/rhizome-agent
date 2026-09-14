@@ -109,6 +109,8 @@ HEAD `c44ee2b`. Origin `5c629a0`. App `476756c`. D6 landed. No push.
 - Welcome offline / Sessions drag ([1546](2026-09-14-1546-cursor-grok-4-6-welcome-sessions-drag.md))
 - Unspoken extras leftover ([1547](2026-09-14-1547-cursor-grok-4-6-unspoken-extras.md))
 - Chat stays when Notes open ([1548](2026-09-14-1548-cursor-grok-4-6-chat-stays.md))
+- #41 steer / hide daemon / no edge strip ([1549](2026-09-14-1549-cursor-grok-4-6-steer-hide-edge.md))
+- Graph clip / no Connection unknown ([1550](2026-09-14-1550-cursor-grok-4-6-graph-clip-d3.md))
 
 ## Still parked (do not do)
 
