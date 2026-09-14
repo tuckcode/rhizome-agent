@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LinuxTitlebar } from './LinuxTitlebar'
@@ -48,6 +49,12 @@ describe('LinuxTitlebar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(shouldUseCustomWindowChrome).mockReturnValue(true)
+  })
+
+  it('uses useDragRegion and never data-tauri-drag-region', () => {
+    const source = readFileSync(`${process.cwd()}/src/components/LinuxTitlebar.tsx`, 'utf8')
+    expect(source).toContain('useDragRegion')
+    expect(source).not.toContain('data-tauri-drag-region')
   })
 
   it('does not render when custom desktop chrome is disabled', () => {

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { usePrimeSessionRestore, resetPrimeSessionRestoreForTests } from './usePrimeSessionRestore'
@@ -225,6 +226,11 @@ describe('usePrimeSessionRestore', () => {
     const [, properties] = trackEventMock.mock.calls[0]
     expect(JSON.stringify(properties)).not.toContain('hi')
     expect(JSON.stringify(properties)).not.toContain('.jsonl')
+  })
+
+  it('does not require a vault path — last conversation lives on Prime disk', () => {
+    const source = readFileSync(`${process.cwd()}/src/hooks/usePrimeSessionRestore.ts`, 'utf8')
+    expect(source).not.toContain('vaultPath')
   })
 
   it('does nothing when Chat is not on Prime', async () => {

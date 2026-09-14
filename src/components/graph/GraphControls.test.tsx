@@ -32,6 +32,15 @@ describe('GraphControls', () => {
     expect(screen.queryByTestId('graph-type-filters')).not.toBeInTheDocument()
   })
 
+  it('labels the compact field Find a note, not a large overlay', () => {
+    renderControls()
+    const field = screen.getByTestId('graph-search')
+    expect(field).toHaveAccessibleName('Find a note…')
+    expect(field).toHaveAttribute('placeholder', 'Find a note…')
+    expect(field.className).toContain('text-[12px]')
+    expect(field.className).toContain('h-7')
+  })
+
   it('reports typing straight through', () => {
     const props = renderControls()
     fireEvent.change(screen.getByTestId('graph-search'), { target: { value: 'alpha' } })

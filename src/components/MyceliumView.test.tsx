@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
@@ -33,6 +34,11 @@ describe('MyceliumView', () => {
     await waitFor(() => {
       expect(screen.getByTestId('mycelium-embed')).toHaveAttribute('src', 'http://127.0.0.1:18765')
     })
+    expect(screen.getByTestId('mycelium-embed').tagName).toBe('IFRAME')
+    expect(screen.queryByRole('link', { name: /mindwalk/i })).not.toBeInTheDocument()
+    const source = readFileSync(`${process.cwd()}/src/components/MyceliumView.tsx`, 'utf8')
+    expect(source).not.toContain('window.open')
+    expect(source).not.toContain('openUrl')
     expect(screen.getByTestId('mycelium-attribution')).toHaveTextContent('Mindwalk (MIT)')
     expect(screen.queryByText(/PATH/i)).not.toBeInTheDocument()
     expect(screen.queryByTestId('mycelium-missing-binary')).not.toBeInTheDocument()

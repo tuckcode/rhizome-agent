@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useNoteLockMode } from './useNoteLockMode'
@@ -73,5 +74,12 @@ describe('useNoteLockMode', () => {
 
     expect(result.current.noteLocked).toBe(true)
     expect(trackNoteLockToggled).toHaveBeenCalledExactlyOnceWith(true)
+  })
+
+  it('stays ephemeral view state — not vault editor_mode', () => {
+    const source = readFileSync(`${process.cwd()}/src/hooks/useNoteLockMode.ts`, 'utf8')
+    expect(source).toContain('Not vault `editor_mode`')
+    expect(source).not.toMatch(/invoke\(/)
+    expect(source).not.toMatch(/localStorage/)
   })
 })

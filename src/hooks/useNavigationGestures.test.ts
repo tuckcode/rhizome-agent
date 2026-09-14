@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useNavigationGestures } from './useNavigationGestures'
@@ -57,5 +58,11 @@ describe('useNavigationGestures', () => {
     fireMouse('mousedown', 2)
     expect(onGoBack).not.toHaveBeenCalled()
     expect(onGoForward).not.toHaveBeenCalled()
+  })
+
+  it('walks the note trail only — no Prime session stack this window', () => {
+    const source = readFileSync(`${process.cwd()}/src/hooks/useNavigationGestures.ts`, 'utf8')
+    expect(source).toContain('walk the note trail')
+    expect(source).not.toMatch(/switch_prime_session|sessionPath|primeSession/)
   })
 })

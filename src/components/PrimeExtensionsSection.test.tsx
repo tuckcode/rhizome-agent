@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PrimeExtensionsSection } from './PrimeExtensionsSection'
@@ -15,6 +16,7 @@ const state = vi.hoisted(() => ({
   total: 0,
   lastKind: 'all' as string,
   installError: null as string | null,
+  searchCalls: 0,
 }))
 
 vi.mock('../lib/callHost', () => ({
@@ -35,6 +37,7 @@ vi.mock('../lib/primePackages', async () => {
   return {
     ...actual,
     searchPrimePackageCatalog: async (_query: string, kind = 'all') => {
+      state.searchCalls += 1
       state.lastKind = kind
       return { hits: state.hits, total: state.total }
     },
@@ -61,6 +64,7 @@ vi.mock('../utils/aiPromptBridge', () => ({
   requestOpenAiChat: vi.fn(),
 }))
 
+import { trackPrimePackageCatalogOpened } from '../lib/productAnalytics'
 import { writeClipboardText } from '../utils/clipboardText'
 import { queueAiPrompt, requestOpenAiChat } from '../utils/aiPromptBridge'
 
@@ -71,6 +75,8 @@ describe('PrimeExtensionsSection', () => {
     state.total = 0
     state.lastKind = 'all'
     state.installError = null
+    state.searchCalls = 0
+    vi.mocked(trackPrimePackageCatalogOpened).mockClear()
     vi.mocked(writeClipboardText).mockClear()
     vi.mocked(queueAiPrompt).mockClear()
     vi.mocked(requestOpenAiChat).mockClear()
@@ -80,6 +86,10 @@ describe('PrimeExtensionsSection', () => {
     render(<PrimeExtensionsSection active={false} />)
     expect(screen.getByTestId('prime-extensions-section')).toBeInTheDocument()
     expect(screen.queryByText('pi-mcp-adapter')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(state.searchCalls).toBe(0)
+    })
+    expect(trackPrimePackageCatalogOpened).not.toHaveBeenCalled()
   })
 
   it('lists catalog hits and installs after a full-access warning', async () => {
@@ -146,5 +156,12 @@ describe('PrimeExtensionsSection', () => {
     await waitFor(() => {
       expect(state.lastKind).toBe('skill')
     })
+  })
+
+  it('installs through Prime packages, not a second plugin kernel', () => {
+    const source = readFileSync(`${process.cwd()}/src/components/PrimeExtensionsSection.tsx`, 'utf8')
+    expect(source).toContain("install_prime_package")
+    expect(source).toContain('prime-agent package install')
+    expect(source).not.toMatch(/cordis|plugin kernel/i)
   })
 })

@@ -177,6 +177,28 @@ describe('streamAiAgent', () => {
     expect(callbacks.onDone).toHaveBeenCalled()
   })
 
+  it('does not send Limited tools to Prime — prompt text only', async () => {
+    isTauriState.value = true
+    listenMock.mockResolvedValue(vi.fn())
+    invokeMock.mockResolvedValue('prime-session')
+
+    await streamAiAgent({
+      agent: 'prime',
+      message: 'Hello',
+      vaultPath: '',
+      permissionMode: 'safe',
+      callbacks: createCallbacks(),
+    })
+
+    const payload = invokeMock.mock.calls.find(([cmd]) => cmd === 'stream_prime_session')?.[1] as {
+      request?: Record<string, unknown>
+    }
+    expect(payload?.request).toBeTruthy()
+    expect(payload.request).not.toHaveProperty('permission_mode')
+    expect(payload.request).not.toHaveProperty('permissionMode')
+    expect(JSON.stringify(payload.request)).not.toMatch(/limited|permission/i)
+  })
+
   it('surfaces backend invocation failures and still closes the stream', async () => {
     isTauriState.value = true
     const unlistenMock = vi.fn()

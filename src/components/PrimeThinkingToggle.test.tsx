@@ -88,7 +88,9 @@ describe('PrimeThinkingToggle', () => {
     openPill()
 
     await waitFor(() => {
-      expect(screen.getByTestId('prime-thinking-pill-model-limited')).toBeInTheDocument()
+      expect(screen.getByTestId('prime-thinking-pill-model-limited')).toHaveTextContent(
+        'Limited by this model',
+      )
     })
   })
 
@@ -103,6 +105,17 @@ describe('PrimeThinkingToggle', () => {
       expect(screen.getByTestId('prime-thinking-pill-medium')).toBeInTheDocument()
     })
     expect(screen.queryByTestId('prime-thinking-pill-model-limited')).not.toBeInTheDocument()
+  })
+
+  it('loads thinking levels without starting Prime from an empty vault', async () => {
+    render(<PrimeThinkingToggle thinkingLevel="off" />)
+    openPill()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('prime-thinking-pill-medium')).toBeInTheDocument()
+    })
+    expect(invoked.calls.map((call) => call.cmd)).toContain('get_prime_thinking_levels')
+    expect(invoked.calls.map((call) => call.cmd)).not.toContain('ensure_prime_session_host')
   })
 
   it('sets the chosen level from the pill menu', async () => {

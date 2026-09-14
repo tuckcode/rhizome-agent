@@ -942,4 +942,24 @@ describe('BreadcrumbBar — close note', () => {
 
     expect(onCloseNote).toHaveBeenCalledOnce()
   })
+
+  it('keeps the sidebar-looking control as Properties, not Close', () => {
+    const onToggleInspector = vi.fn()
+    const onCloseNote = vi.fn()
+    render(
+      <BreadcrumbBar
+        entry={baseEntry}
+        {...defaultProps}
+        inspectorCollapsed
+        onToggleInspector={onToggleInspector}
+        onCloseNote={onCloseNote}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('breadcrumb-properties-button'))
+    expect(onToggleInspector).toHaveBeenCalledOnce()
+    expect(onCloseNote).not.toHaveBeenCalled()
+    expect(screen.getByTestId('breadcrumb-close-note')).toHaveAccessibleName('Close note')
+    expect(screen.getByTestId('breadcrumb-properties-button')).toHaveAccessibleName(/properties/i)
+  })
 })

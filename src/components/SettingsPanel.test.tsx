@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { SettingsPanel } from './SettingsPanel'
 import type { Settings } from '../types'
 import { THEME_MODE_STORAGE_KEY } from '../lib/themeMode'
@@ -182,6 +182,10 @@ describe('SettingsPanel', () => {
 
       fireEvent.click(screen.getByTestId(`settings-nav-${SETTINGS_SECTION_IDS.extensions}`))
       expect(await screen.findByTestId('prime-extensions-search')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalled()
+      })
+      expect(String(fetchSpy.mock.calls[0]?.[0])).toContain('keywords%3Api-package')
     } finally {
       fetchSpy.mockRestore()
     }
@@ -809,6 +813,54 @@ describe('SettingsPanel', () => {
 
     expect(document.querySelector('[data-anchor-strategy="popper"]')).toBeInTheDocument()
     expect(screen.getByRole('option', { name: /Prime Agent/i })).toBeInTheDocument()
+  })
+
+  it('tells daily-drive Chat to stay on Prime, not a disposable API default', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    expect(screen.getByText(/Keep this on Prime for Chat with vault tools/)).toBeInTheDocument()
+    expect(screen.queryByText(/skips Prime sessions and vault tools/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/optional local agent/i)).not.toBeInTheDocument()
+  })
+
+  it('warns when the Settings default is a direct API model', () => {
+    render(
+      <SettingsPanel
+        open={true}
+        settings={{
+          ...emptySettings,
+          default_ai_target: 'model:anthropic-test/claude-sonnet',
+          ai_model_providers: [
+            {
+              id: 'anthropic-test',
+              name: 'My Anthropic',
+              kind: 'anthropic',
+              models: [
+                {
+                  id: 'claude-sonnet',
+                  display_name: 'Claude Sonnet',
+                  capabilities: {
+                    streaming: true,
+                    tools: true,
+                    vision: true,
+                    json_mode: true,
+                    reasoning: false,
+                  },
+                },
+              ],
+            },
+          ],
+        }}
+        onSave={onSave}
+        onClose={onClose}
+      />,
+    )
+
+    expect(screen.getByText(/skips Prime sessions and vault tools/)).toBeInTheDocument()
+    expect(screen.getByText(/Switch back to Prime Agent for daily Chat/)).toBeInTheDocument()
+    expect(screen.queryByText(/Keep this on Prime for Chat with vault tools/)).not.toBeInTheDocument()
   })
 
   it('treats a legacy beta release channel as stable', () => {

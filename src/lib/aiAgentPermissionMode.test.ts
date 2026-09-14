@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import en from './locales/en.json'
 import {
   AI_AGENT_PERMISSION_MODE_LABELS,
   DEFAULT_AI_AGENT_PERMISSION_MODE,
@@ -58,6 +59,14 @@ describe('aiAgentPermissionMode', () => {
       control: 'Full tools',
     })
     expect(aiAgentPermissionModeLabels('safe', 'en', 'claude_code').control).toBe('Limited tools')
+  })
+
+  it('English Prime copy says instruction, not a sandbox or Vault Safe', () => {
+    expect(en['ai.permission.safe.control']).toBe('Limited tools')
+    expect(en['ai.permission.safe.control']).not.toBe('Vault Safe')
+    expect(en['ai.permission.prime.safe.tooltip']).toMatch(/not a lock/)
+    expect(en['ai.permission.prime.safe.tooltip']).toMatch(/no sandbox/)
+    expect(en['ai.permission.prime.powerUser.tooltip']).toMatch(/not a sandbox/)
   })
 
   it('formats a local transcript marker for mode changes', () => {

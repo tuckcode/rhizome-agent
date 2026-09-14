@@ -130,6 +130,7 @@ describe('StatusBar', () => {
     render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} onOpenResearch={vi.fn()} onOpenSettings={vi.fn()} commandRailActive />)
     expect(screen.queryByTestId('status-research')).not.toBeInTheDocument()
     expect(screen.queryByTestId('status-settings')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Switch vault' })).toBeInTheDocument()
   })
 
   it('shows a theme toggle instead of the notifications placeholder', () => {

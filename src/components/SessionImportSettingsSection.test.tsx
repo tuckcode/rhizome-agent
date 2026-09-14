@@ -69,4 +69,28 @@ describe('SessionImportSettingsSection', () => {
       vaultPath: '/Users/mock/vault',
     })
   })
+
+  it('writes vault notes only and does not offer session-list rows', async () => {
+    mockInvoke.mockResolvedValue({
+      source: 'claude_code',
+      found: 1,
+      willImport: 1,
+      vaultOnly: 1,
+      withSessionRowPlanned: 1,
+      skippedDuplicate: 0,
+      needsConfirmation: 0,
+      sessionListNotYetWired: true,
+    })
+
+    render(<SessionImportSettingsSection vaultPath="/Users/mock/vault" />)
+
+    expect(screen.getByTestId('session-import-run')).toHaveTextContent('Import to vault')
+    expect(screen.queryByText(/import_jsonl/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /session list/i })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('session-import-preview'))
+    await waitFor(() => {
+      expect(screen.getByText(/Chat list row once that path ships/i)).toBeInTheDocument()
+    })
+  })
 })

@@ -80,6 +80,40 @@ describe('usePrimeSessionSwitcher', () => {
     })
     expect(result.current.activeSessionPath).toBe('/past.jsonl')
     expect(agent.replaceMessages).toHaveBeenCalledWith([])
+    expect(invoked.calls.map((call) => call.cmd)).not.toContain('read_prime_session_transcript')
+
+    await act(async () => {
+      finishSwitch?.()
+      await pending
+    })
+  })
+
+  it('clears the stale transcript on the same click as the row highlight', async () => {
+    let finishSwitch: (() => void) | undefined
+    const switchGate = new Promise<string>((resolve) => {
+      finishSwitch = () => resolve('ok')
+    })
+    invoked.switchImpl = () => switchGate
+    agent.messages = [{ role: 'assistant', content: 'previous session' }]
+
+    const { result } = renderHook(() => usePrimeSessionSwitcher({
+      agent: agent as never,
+      locale: 'en',
+      vaultPath: '/vault',
+      sessionsAutoCollapsed: false,
+      refreshSessionTree,
+      primeHostSessionPath: '/live.jsonl',
+      hostRunning: true,
+    }))
+
+    let pending: Promise<void> | undefined
+    act(() => {
+      pending = result.current.handleSelectSession({ id: 'past', path: '/past.jsonl' })
+    })
+
+    expect(result.current.activeSessionPath).toBe('/past.jsonl')
+    expect(agent.replaceMessages).toHaveBeenCalledTimes(1)
+    expect(agent.replaceMessages).toHaveBeenCalledWith([])
 
     await act(async () => {
       finishSwitch?.()
@@ -110,6 +144,28 @@ describe('usePrimeSessionSwitcher', () => {
     expect(result.current.switchError).toContain('still streaming')
     expect(agent.replaceMessages).toHaveBeenNthCalledWith(1, [])
     expect(agent.replaceMessages).toHaveBeenLastCalledWith(stale)
+  })
+
+  it('switches a past session without starting Prime when Chat has no vault', async () => {
+    const { result } = renderHook(() => usePrimeSessionSwitcher({
+      agent: agent as never,
+      locale: 'en',
+      vaultPath: '',
+      sessionsAutoCollapsed: false,
+      refreshSessionTree,
+      primeHostSessionPath: null,
+      hostRunning: false,
+    }))
+
+    await act(async () => {
+      await result.current.handleSelectSession({ id: 'past', path: '/past.jsonl' })
+    })
+
+    expect(invoked.calls.map((call) => call.cmd)).toEqual([
+      'switch_prime_session',
+      'read_prime_session_transcript',
+    ])
+    expect(result.current.activeSessionPath).toBe('/past.jsonl')
   })
 
   it('still ensures the host when Chat has not connected yet', async () => {

@@ -19,4 +19,17 @@ describe('messageTimestamp', () => {
     expect(normalizeMessageTimestampMs(seconds)).toBe(seconds * 1000)
     expect(formatMessageClock(seconds)).toBe('9:01a')
   })
+
+  it('rejects non-finite and missing timestamps', () => {
+    expect(normalizeMessageTimestampMs(undefined)).toBeUndefined()
+    expect(normalizeMessageTimestampMs(null)).toBeUndefined()
+    expect(normalizeMessageTimestampMs(Number.NaN)).toBeUndefined()
+    expect(normalizeMessageTimestampMs(Number.POSITIVE_INFINITY)).toBeUndefined()
+    expect(formatMessageClock(Number.NaN)).toBe('')
+  })
+
+  it('passes through millisecond timestamps unchanged', () => {
+    const ms = new Date(2026, 8, 6, 15, 35, 0).getTime()
+    expect(normalizeMessageTimestampMs(ms)).toBe(ms)
+  })
 })

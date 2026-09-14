@@ -236,4 +236,11 @@ describe('NoteList context menu — ask the agent', () => {
     fireEvent.contextMenu(screen.getByText('Build Laputa App'))
     expect(screen.queryByText('Ask the agent about this note')).not.toBeInTheDocument()
   })
+
+  it('keeps Copy file path, not a selected-text Copy path leftover', () => {
+    renderNoteListWithFullActionMenu()
+    fireEvent.contextMenu(screen.getByText('Build Laputa App'))
+    expect(screen.getByText('Copy file path')).toBeInTheDocument()
+    expect(screen.queryByText('Copy path')).not.toBeInTheDocument()
+  })
 })

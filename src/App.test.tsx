@@ -32,6 +32,10 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 // Mock @tauri-apps/api/core before importing App
+vi.mock('./components/ResearchPanel', () => ({
+  ResearchPanel: () => <div data-testid="research-panel-stub">Research</div>,
+}))
+
 vi.mock('./components/graph/GraphView', () => ({
   default: ({ onOpenNote }: { onOpenNote: (path: string) => void }) => (
     <div data-testid="graph-view">
@@ -754,6 +758,39 @@ describe('App', () => {
     expect(list).not.toContainElement(graph)
     expect(graph).toHaveClass('overflow-hidden')
     expect(screen.getByRole('region', { name: 'Connections' })).toHaveStyle({ maxHeight: '50%' })
+  })
+
+  it('opens Research as the center canvas, without a Chat overlay', async () => {
+    localStorage.setItem('rhizome:command-rail-expanded', '1')
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('command-rail-research'))
+
+    expect(await screen.findByTestId('research-destination')).toBeInTheDocument()
+    expect(screen.getByTestId('research-panel-stub')).toBeInTheDocument()
+    expect(screen.getByTestId('chat-center')).toHaveStyle({ display: 'none' })
+    expect(screen.getByTestId('research-destination')).not.toContainElement(
+      screen.getByTestId('chat-home'),
+    )
+  })
+
+  it('Ask the agent about this note keeps Chat and opens that note', async () => {
+    localStorage.setItem('rhizome:command-rail-expanded', '1')
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    const noteList = await screen.findByTestId('note-list-container')
+    await waitFor(() => {
+      expect(within(noteList).getByText('Test Project')).toBeInTheDocument()
+    })
+
+    fireEvent.contextMenu(within(noteList).getByText('Test Project'))
+    fireEvent.click(await screen.findByText('Ask the agent about this note'))
+
+    expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('chat-center')).not.toHaveStyle({ display: 'none' })
+    const pane = await screen.findByTestId('chat-note-pane')
+    expect(pane).toHaveTextContent('Test Project')
   })
 
   it('opens Notes and Mycelium from the session-footprint chip when Notes is closed', async () => {
@@ -1603,6 +1640,7 @@ describe('App', () => {
     const shell = document.querySelector('.app') as HTMLElement
     const vaultPanel = shell.querySelector('.app__vault-panel') as HTMLElement
     expect(vaultPanel).toBeInTheDocument()
+    expect(screen.getByTestId('chat-center')).toBeInTheDocument()
     expect(chat.compareDocumentPosition(vaultPanel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByTestId('vault-panel-navigation')).toContainElement(screen.getByTestId('sidebar-top-nav'))
     expect(screen.getByTestId('vault-panel-note-list')).toContainElement(screen.getByTestId('note-list-container'))

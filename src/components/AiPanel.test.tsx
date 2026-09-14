@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render as rtlRender, screen, fireEvent, act, waitFor, within } from '@testing-library/react'
@@ -484,6 +485,20 @@ describe('AiPanel', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
+  it('leaves Chat on Escape while a turn is running, and does not Stop', () => {
+    mockStatus = 'thinking'
+    const onClose = vi.fn()
+    render(<AiPanel onClose={onClose} vaultPath="/tmp/vault" />)
+    expect(screen.getByRole('button', { name: 'Stop response' })).toBeInTheDocument()
+
+    const panel = screen.getByTestId('ai-panel')
+    panel.focus()
+    fireEvent.keyDown(panel, { key: 'Escape' })
+
+    expect(onClose).toHaveBeenCalledOnce()
+    expect(mockStopMessage).not.toHaveBeenCalled()
+  })
+
   it('clicking a wikilink in AI response calls onOpenNote with the target', () => {
     mockMessages = [{
       userMessage: 'Tell me about notes',
@@ -753,6 +768,25 @@ describe('talking to a turn that is already running', () => {
     expect(screen.getByRole('button', { name: 'Stop response' })).toBeInTheDocument()
   })
 
+  /**
+   * Composer tests already lock when `onSteer` is omitted. This is the
+   * panel gate those tests cannot see: Codex must not receive the handler.
+   */
+  it('keeps Stop-only for a non-Prime agent even with typed text', () => {
+    render(
+      <AiPanelView
+        controller={primeController({ isActive: true, input: 'redirect please' })}
+        onClose={vi.fn()}
+        showHeader={false}
+        defaultAiAgent="codex"
+        defaultAiAgentReady
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Stop response' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Steer response' })).toBeNull()
+  })
+
   it('sends a declined follow-up as a new turn after the running turn ends', async () => {
     let resolveFollowUp: (result: 'not-running') => void = () => {}
     sendToRunningTurnMock.mockReturnValue(new Promise((resolve) => {
@@ -840,5 +874,56 @@ describe('talking to a turn that is already running', () => {
     expect(handleSend).not.toHaveBeenCalled()
     expect(setInput).not.toHaveBeenCalled()
     expect(screen.getByTestId('agent-input')).toHaveTextContent('still worth keeping')
+  })
+})
+
+describe('AiPanel sessions title-bar gutter', () => {
+  const aiPanelSource = readFileSync(`${process.cwd()}/src/components/AiPanel.tsx`, 'utf8')
+
+  it('gives the Sessions header traffic-light space only when Prime chrome is not above it', () => {
+    expect(aiPanelSource).toContain('titleBarGutter={!isPrimeTarget}')
+  })
+
+  it('does not put a second gutter on the Prime rail portal list', () => {
+    const portalBlock = aiPanelSource.slice(aiPanelSource.indexOf('usesRailSessions && sessionsRailSlot && isPrimeTarget'))
+    expect(portalBlock).toContain('<PrimeSessionList')
+    expect(portalBlock).not.toContain('titleBarGutter')
+  })
+})
+
+describe('AiPanel Prime permission toggle', () => {
+  const aiPanelSource = readFileSync(`${process.cwd()}/src/components/AiPanel.tsx`, 'utf8')
+
+  it('hides the Limited tools toggle on Prime — prompt text only', () => {
+    expect(aiPanelSource).toContain('hidePermissionMode={isPrimeTarget}')
+  })
+})
+
+describe('AiPanel last-conversation restore', () => {
+  const aiPanelSource = readFileSync(`${process.cwd()}/src/components/AiPanel.tsx`, 'utf8')
+
+  it('restores the last Prime conversation only on the Prime path', () => {
+    expect(aiPanelSource).toContain('usePrimeSessionRestore({')
+    expect(aiPanelSource).toContain('enabled: isPrimeTarget')
+    expect(aiPanelSource).toContain('onOpen: handleSelectSession')
+  })
+
+  it('does not gate the Prime panel on an empty vault path', () => {
+    expect(aiPanelSource).not.toMatch(/if\s*\(\s*!vaultPath/)
+    expect(aiPanelSource).not.toMatch(/if\s*\(\s*!vaultPath\?\.trim/)
+  })
+
+  it('starts a new Prime session without a vault path', () => {
+    const controller = readFileSync(`${process.cwd()}/src/components/useAiPanelController.ts`, 'utf8')
+    expect(controller).toContain("invoke<string>('prime_session_new_session')")
+    expect(controller).not.toMatch(/prime_session_new_session['"`]\s*,\s*\{[^}]*vaultPath/)
+  })
+
+  it('does not pass a vault path into last-conversation restore', () => {
+    const block = aiPanelSource.slice(
+      aiPanelSource.indexOf('usePrimeSessionRestore({'),
+      aiPanelSource.indexOf('onOpen: handleSelectSession'),
+    )
+    expect(block).not.toContain('vaultPath')
   })
 })

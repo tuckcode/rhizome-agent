@@ -123,6 +123,8 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
     await waitFor(() => expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'true'))
 
     expect(screen.getByText('Notes')).toBeInTheDocument()
+    expect(screen.getByTestId('command-rail-inbox')).toHaveTextContent('Notes')
+    expect(screen.getByTestId('command-rail-inbox')).not.toHaveTextContent('Inbox')
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-settings')).not.toHaveTextContent('Settings')
 

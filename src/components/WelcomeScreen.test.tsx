@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { WelcomeScreen } from './WelcomeScreen'
 import { RHIZOME_FIRST_LAUNCH_DOCS_URL } from '@/constants/feedback'
+import en from '../lib/locales/en.json'
 
 const dragRegionMouseDown = vi.fn()
 const openExternalUrl = vi.fn()
@@ -64,10 +65,20 @@ describe('WelcomeScreen', () => {
       expect(screen.queryByText(/~\/Documents\/Laputa/)).not.toBeInTheDocument()
     })
 
-    it('shows offline guidance and disables the template option when offline', () => {
-      render(<WelcomeScreen {...defaultProps} isOffline={true} />)
-      expect(screen.getByTestId('welcome-create-vault')).toBeDisabled()
-      expect(screen.getByText(/Requires internet - clone later/)).toBeInTheDocument()
+    it('keeps those Download words in en.json — C18, do not migrate this window', () => {
+      expect(en['onboarding.welcome.templateDescription']).toBe(
+        'Download the Getting Started vault',
+      )
+    })
+
+    it('keeps Getting Started available offline because the default is a local scaffold', () => {
+      const onCreateVault = vi.fn()
+      render(<WelcomeScreen {...defaultProps} isOffline={true} onCreateVault={onCreateVault} />)
+      const create = screen.getByTestId('welcome-create-vault')
+      expect(create).not.toBeDisabled()
+      expect(screen.queryByText(/Requires internet - clone later/)).not.toBeInTheDocument()
+      fireEvent.click(create)
+      expect(onCreateVault).toHaveBeenCalledOnce()
     })
 
     it('opens the naming dialog instead of calling onCreateEmptyVault directly when create empty is clicked', () => {

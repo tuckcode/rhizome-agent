@@ -1,10 +1,10 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   GETTING_STARTED_VAULT_NAME,
   RHIZOME_VAULT_DEFAULT_NAME,
   buildEmptyVaultPath,
   buildGettingStartedVaultPath,
-  RHIZOME_VAULT_DEFAULT_NAME,
   sanitizeVaultFolderName,
   formatGettingStartedCloneError,
   labelFromPath,
@@ -61,6 +61,34 @@ describe('gettingStartedVault', () => {
   it('preserves unexpected clone failure details', () => {
     expect(formatGettingStartedCloneError('git clone failed: fatal: unable to access'))
       .toBe('Could not download Getting Started vault: git clone failed: fatal: unable to access')
+  })
+
+  it('first-run rust still seeds folders only — no personal notes', () => {
+    const source = readFileSync(
+      `${process.cwd()}/src-tauri/src/vault/getting_started.rs`,
+      'utf8',
+    )
+    expect(source).toContain('structure only, no personal notes')
+    expect(source).toContain('"inbox"')
+    expect(source).toContain('"projects"')
+    expect(source).toContain('"Imports"')
+    expect(source).toContain('welcome.md')
+  })
+
+  it('names a local scaffold failure as create, not download', () => {
+    expect(
+      formatGettingStartedCloneError(
+        "Failed to create Getting Started folder '/tmp/Getting Started': Permission denied",
+      ),
+    ).toBe(
+      "Could not create Getting Started vault: Failed to create Getting Started folder '/tmp/Getting Started': Permission denied",
+    )
+  })
+
+  it('keeps git permission-denied clone failures as a GitHub access message', () => {
+    expect(formatGettingStartedCloneError('git clone failed: Permission denied (publickey)')).toBe(
+      'Could not download Getting Started vault. Check your GitHub access and try again.',
+    )
   })
 })
 

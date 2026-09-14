@@ -18,7 +18,9 @@ vi.mock('../ConflictNoteBanner', () => ({
 }))
 
 vi.mock('../RawEditorView', () => ({
-  RawEditorView: () => <div data-testid="raw-editor-view" />,
+  RawEditorView: ({ readOnly }: { readOnly?: boolean }) => (
+    <div data-testid="raw-editor-view" data-readonly={readOnly ? 'true' : 'false'} />
+  ),
 }))
 
 vi.mock('../SheetEditor', () => ({
@@ -26,22 +28,30 @@ vi.mock('../SheetEditor', () => ({
     content,
     flushContentRef,
     path,
+    readOnly,
+    editable,
   }: {
     content: string
     flushContentRef?: React.MutableRefObject<((path: string) => void) | null>
     path: string
+    readOnly?: boolean
+    editable?: boolean
   }) => (
     <div
       data-testid="sheet-editor"
       data-content={content}
       data-has-flush-ref={String(Boolean(flushContentRef))}
       data-path={path}
+      data-readonly={readOnly === undefined ? 'unset' : String(readOnly)}
+      data-editable={editable === undefined ? 'unset' : String(editable)}
     />
   ),
 }))
 
 vi.mock('../SingleEditorView', () => ({
-  SingleEditorView: () => <div data-testid="single-editor-view" />,
+  SingleEditorView: ({ editable }: { editable?: boolean }) => (
+    <div data-testid="single-editor-view" data-editable={editable !== false ? 'true' : 'false'} />
+  ),
 }))
 
 vi.mock('../DiffView', () => ({
@@ -215,5 +225,46 @@ describe('EditorContentLayout', () => {
       'editor-scroll-area--sheet',
     )
     expect(findScope).toHaveStyle({ '--editor-accent': '#155dff' })
+  })
+
+  it('does not invent a sheet lock — C68 is BlockNote and raw only', async () => {
+    render(<EditorContentLayout {...createModel({
+      isSheet: true,
+      noteLocked: true,
+      activeTab: {
+        entry: {
+          path: '/vault/project/budget.md',
+          filename: 'budget.md',
+          title: 'Budget',
+        },
+        content: 'Metric,January\nRevenue,1200',
+      },
+    })} />)
+
+    const sheetEditor = await screen.findByTestId('sheet-editor')
+    expect(sheetEditor).toHaveAttribute('data-readonly', 'unset')
+    expect(sheetEditor).toHaveAttribute('data-editable', 'unset')
+  })
+
+  it('makes a locked note read-only in the rich editor', () => {
+    render(<EditorContentLayout {...createModel({ noteLocked: true })} />)
+
+    expect(screen.getByTestId('single-editor-view')).toHaveAttribute('data-editable', 'false')
+  })
+
+  it('makes a locked note read-only in raw mode', () => {
+    render(<EditorContentLayout {...createModel({
+      noteLocked: true,
+      effectiveRawMode: true,
+      showEditor: false,
+    })} />)
+
+    expect(screen.getByTestId('raw-editor-view')).toHaveAttribute('data-readonly', 'true')
+  })
+
+  it('keeps an unlocked note editable', () => {
+    render(<EditorContentLayout {...createModel({ noteLocked: false })} />)
+
+    expect(screen.getByTestId('single-editor-view')).toHaveAttribute('data-editable', 'true')
   })
 })
