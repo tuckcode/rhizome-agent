@@ -552,7 +552,7 @@ Verified against source 2026-09-14. Longer landmine list:
   from units. Welcome Download words stay in `en.json` (C18).
   Chat history shows the C70 clock when a turn has `createdAtMs`.
   Linux titlebar uses `useDragRegion`. #51 Case 2 and #36 timezone
-  stay unbuilt. D6 named commits wait ~15:45. Do not `git add -A`.
+  stay unbuilt. D6 landed `c44ee2b`. Do not `git add -A`.
   Nous Portal models share the Chat picker when the
   catalog includes them. Packaged MCP stays generated/gitignored.
 - **First-run Getting Started** is a local folder scaffold (no clone)

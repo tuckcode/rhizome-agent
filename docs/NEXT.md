@@ -60,10 +60,9 @@ Board cards: [`BOARD.md`](BOARD.md) W11.
 Chat ↔ Prime still first. Do not replace Chat. Do not add `kanban.db`.
 Do not invent the briefing. Do not expand two big overlays at once.
 
-**Stamped 15:39:** leftover units do not change this order. Session-list
-import still waits for **`1`**. #51 Case 2 and #36 stay parked.
-TokenJuice / `kanban.db` still unbuilt. D6 commits wait ~15:45.
-Chat stays Prime. Settings catalogs wait until Agents / Packages.
+**Stamped 15:52:** D6 landed at `c44ee2b`. Session-list import still
+waits for **`1`**. #51 Case 2 and #36 stay parked. TokenJuice /
+`kanban.db` still unbuilt. Leftover through 1530. No push. No rebuild.
 
 ---
 

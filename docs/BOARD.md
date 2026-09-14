@@ -13,17 +13,16 @@ Unclaimed work: `NEXT.md`.
 
 ## Status
 
-- **Done:** nightly docs + W7 harden committed locally (`e64a283`,
-  `4416411`). Astra S1–S4 + R1–R4 **source PASS** in the dirty tree.
-  `js-yaml` / `fast-uri` pins landed. Packaged app still **`476756c`**.
-- **Now:** Leftover paper until D6 ~15:45. Origin still **`5c629a0`**. Dirty
-  count **253+**. Do not declare daily-driver ready. Do not rebuild
-  `/Applications`. C68 sheet lock stays out of scope. D6 path check
-  ([1487](plans/handoffs/2026-09-14-1487-cursor-grok-4-6-d6-paths-ok.md)).
-- **Next:** D6 named commits. Push is docked. Native C64 ×3. #46 live
-  Chat-without-vault. Import stays vault-only until `1`. No second God plan.
+- **Done:** D6 seven commits on local HEAD **`c44ee2b`**. Report
+  [1522](plans/handoffs/2026-09-14-1522-cursor-grok-4-6-d6-report.md).
+  App still **`476756c`**.
+- **Now:** Leftover paper until ~16:30. Origin still **`5c629a0`**.
+  Nine local commits not pushed. Leftover through [1530](plans/handoffs/2026-09-14-1530-cursor-grok-4-6-updates-theme.md).
+  Do not rebuild `/Applications`.
+- **Next:** Say push. Native C64 ×3. #46 live Chat-without-vault.
+  Import stays vault-only until `1`.
 
-**Origin:** Cursor Grok 4.6 · 2026-09-14 15:43 · leftover paper + D6 start. C57 / queue leftover locked.
+**Origin:** Cursor Grok 4.6 · 2026-09-14 15:52 · leftover after D6. HEAD `c44ee2b`. App `476756c`. Not pushed.
 
 ---
 

@@ -646,6 +646,6 @@ Chat still mounts, polls host status, lists sessions, offers New chat,
 and restores the last conversation with an empty `vaultPath`. Those
 are source locks. They are not a live pass.
 
-**Stamped 15:28:** leftover units still do not close #46. `lib.rs`
-still has two hunks — one Rust commit at D6 (~15:45). Do not
-`git add -A`. Identity leftover is Agent, not Desktop.
+**Stamped 15:47:** leftover units still do not close #46. D6 landed
+`c44ee2b` (`lib.rs` once in `188745d`). Do not `git add -A`. Identity
+leftover is Agent, not Desktop.
