@@ -738,12 +738,12 @@
         {
           "kind": "command",
           "command": "viewEditorList",
-          "label": "Chat + Inbox"
+          "label": "Notes, Browse closed"
         },
         {
           "kind": "command",
           "command": "viewAll",
-          "label": "Chat + Notes"
+          "label": "Notes, Browse open"
         },
         {
           "kind": "separator"
