@@ -135,8 +135,8 @@ export function buildViewCommands(config: ViewCommandsConfig): CommandAction[] {
 
   return [
     { id: 'view-editor', label: 'Chat only', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewEditorOnly), keywords: ['layout', 'focus', 'chat'], enabled: true, execute: () => onSetViewMode('editor-only') },
-    { id: 'view-editor-list', label: 'Chat + Inbox', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewEditorList), keywords: ['layout', 'inbox', 'list'], enabled: true, execute: () => onSetViewMode('editor-list') },
-    { id: 'view-all', label: 'Chat + Notes', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewAll), keywords: ['layout', 'sidebar', 'notes'], enabled: true, execute: () => onSetViewMode('all') },
+    { id: 'view-editor-list', label: 'Notes, Browse closed', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewEditorList), keywords: ['layout', 'inbox', 'list', 'notes', 'browse'], enabled: true, execute: () => onSetViewMode('editor-list') },
+    { id: 'view-all', label: 'Notes, Browse open', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewAll), keywords: ['layout', 'sidebar', 'notes', 'browse'], enabled: true, execute: () => onSetViewMode('all') },
     { id: 'toggle-inspector', label: 'Toggle Properties Panel', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewToggleProperties), keywords: ['properties', 'inspector', 'panel', 'right', 'sidebar'], enabled: true, execute: onToggleInspector },
     { id: 'toggle-diff', label: 'Toggle Diff Mode', group: 'View', keywords: ['diff', 'changes', 'git', 'compare', 'version'], enabled: hasActiveNote && activeNoteModified, execute: () => onToggleDiff?.() },
     { id: 'toggle-raw-editor', label: 'Toggle Raw Editor', group: 'View', keywords: ['raw', 'source', 'markdown', 'frontmatter', 'code', 'textarea'], enabled: hasActiveNote && !!onToggleRawEditor, execute: () => onToggleRawEditor?.() },

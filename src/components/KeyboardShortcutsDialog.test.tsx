@@ -17,6 +17,19 @@ describe('KeyboardShortcutsDialog', () => {
     expect(within(dialog).getByText(formatShortcutDisplay({ display: '⌘/' }))).toBeTruthy()
   })
 
+  it('names ⌘2 and ⌘3 the same way the View menu does', () => {
+    render(
+      <KeyboardShortcutsDialog open onOpenChange={vi.fn()} locale="en" />,
+    )
+
+    const dialog = screen.getByTestId('keyboard-shortcuts-dialog')
+    expect(within(dialog).getByText('Notes, Browse closed')).toBeTruthy()
+    expect(within(dialog).getByText('Notes, Browse open')).toBeTruthy()
+    expect(within(dialog).queryByText('Editor + notes')).toBeNull()
+    expect(within(dialog).queryByText('All panels')).toBeNull()
+    expect(within(dialog).queryByText('Chat + Inbox')).toBeNull()
+  })
+
   it('notifies parent when dismissed', () => {
     const onOpenChange = vi.fn()
     render(
