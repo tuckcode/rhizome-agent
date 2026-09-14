@@ -991,4 +991,13 @@ describe('parked organs leftover', () => {
     expect(sheet).not.toContain('noteLocked')
     expect(sheet).not.toContain('readOnly')
   })
+
+  it('keeps Browse and the note list as two independent panels', () => {
+    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    expect(app).toContain('const showSidebarTree = classicSidebarVisible')
+    expect(app).toContain('const showNoteListPanel = classicNoteListVisible')
+    expect(app).toContain('showInbox={explicitOrganizationEnabled}')
+    expect(app).toContain('<NoteList entries={visibleEntries}')
+    expect(app).toContain('<Sidebar entries={visibleEntries}')
+  })
 })

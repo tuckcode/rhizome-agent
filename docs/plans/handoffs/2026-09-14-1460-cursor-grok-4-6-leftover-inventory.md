@@ -115,6 +115,7 @@ HEAD `c44ee2b`. Origin `5c629a0`. App `476756c`. D6 landed. No push.
 - Empty-vault host poll ([1552](2026-09-14-1552-cursor-grok-4-6-empty-vault-host.md))
 - Chat without vault ([1553](2026-09-14-1553-cursor-grok-4-6-chat-no-vault.md))
 - Composer optional vault / no sheet lock ([1554](2026-09-14-1554-cursor-grok-4-6-composer-sheet.md))
+- Browse + note list independent ([1555](2026-09-14-1555-cursor-grok-4-6-browse-notelist.md))
 
 ## Still parked (do not do)
 
