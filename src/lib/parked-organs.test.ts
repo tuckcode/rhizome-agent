@@ -1000,4 +1000,30 @@ describe('parked organs leftover', () => {
     expect(app).toContain('<NoteList entries={visibleEntries}')
     expect(app).toContain('<Sidebar entries={visibleEntries}')
   })
+
+  it('lets a human name beat a placeholder, and keeps Open / Rename / Archive', () => {
+    const rust = readFileSync(
+      `${process.cwd()}/src-tauri/src/prime_sessions.rs`,
+      'utf8',
+    )
+    const host = readFileSync(
+      `${process.cwd()}/src-tauri/src/prime_session_host.rs`,
+      'utf8',
+    )
+    const menu = readFileSync(
+      `${process.cwd()}/src/components/PrimeSessionListContextMenu.tsx`,
+      'utf8',
+    )
+    const roster = readFileSync(
+      `${process.cwd()}/src/lib/primeRunningSessions.ts`,
+      'utf8',
+    )
+    expect(rust).toContain('is_rhizome_placeholder_name')
+    expect(rust).toContain('A deliberate name beats a derived one')
+    expect(host).toContain('fn is_rhizome_placeholder_name')
+    expect(menu).toContain("label: 'Open'")
+    expect(menu).toContain("label: 'Rename'")
+    expect(menu).toContain("label: 'Archive'")
+    expect(roster).toContain('const named = collapseWhitespace(session.sessionName ?? \'\')')
+  })
 })

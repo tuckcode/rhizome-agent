@@ -116,6 +116,7 @@ HEAD `c44ee2b`. Origin `5c629a0`. App `476756c`. D6 landed. No push.
 - Chat without vault ([1553](2026-09-14-1553-cursor-grok-4-6-chat-no-vault.md))
 - Composer optional vault / no sheet lock ([1554](2026-09-14-1554-cursor-grok-4-6-composer-sheet.md))
 - Browse + note list independent ([1555](2026-09-14-1555-cursor-grok-4-6-browse-notelist.md))
+- Human name beats placeholder ([1556](2026-09-14-1556-cursor-grok-4-6-name-beats-placeholder.md))
 
 ## Still parked (do not do)
 

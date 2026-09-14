@@ -13,23 +13,23 @@ Unclaimed work: `NEXT.md`.
 
 ## Status
 
-- **Done:** D6 plus leftover wraps on local HEAD **`f984e4a`**. Report
+- **Done:** D6 plus leftover wraps on local HEAD **`7c7da1d`**. Report
   [1522](plans/handoffs/2026-09-14-1522-cursor-grok-4-6-d6-report.md).
   App still **`476756c`**.
 - **Now:** Leftover paper until ~16:30. Origin still **`5c629a0`**.
-  Fourteen local commits not pushed. Leftover through [1555](plans/handoffs/2026-09-14-1555-cursor-grok-4-6-browse-notelist.md).
+  Fifteen local commits not pushed. Leftover through [1556](plans/handoffs/2026-09-14-1556-cursor-grok-4-6-name-beats-placeholder.md).
   Do not rebuild `/Applications`.
 - **Next:** Say push. Native C64 ×3. #46 live Chat-without-vault.
   Import stays vault-only until `1`.
 
-**Origin:** Cursor Grok 4.6 · 2026-09-14 16:14 · leftover wrap `f984e4a`. App `476756c`. Not pushed.
+**Origin:** Cursor Grok 4.6 · 2026-09-14 16:20 · leftover wrap `7c7da1d`. App `476756c`. Not pushed.
 
 ---
 
 ## True right now
 
-- **Git tip (local):** **`f984e4a`**. **Origin `main`:** **`5c629a0`**.
-  Fourteen commits not pushed.
+- **Git tip (local):** **`7c7da1d`**. **Origin `main`:** **`5c629a0`**.
+  Fifteen commits not pushed.
 - **Last stamped app:** **`476756c`**, **2026-09-12 22:43**,
   `/Applications/Rhizome Agent.app`. Vite / mock-tauri is not that vault.
 - **Prime on this machine:** **0.9.3**.

@@ -39,7 +39,7 @@ Astra plans. Cursor implements. No competing God plan.
 | D3 status/recovery copy | **Done** — [1225](../handoffs/2026-09-14-1225-cursor-grok-4-6-d3-status.md) | 45m |
 | D4 supporting art + provenance | **Done (docs)** — [1221](../handoffs/2026-09-14-1221-cursor-grok-4-6-d4-gallery.md) | 35m |
 | D5 Dock/website spec | **Done (spec)** — [D5-DOCK-AND-SITE.md](../../design/brand/2026-09-14-handoff/D5-DOCK-AND-SITE.md) | 35m |
-| D6 validate / report | Landed 15:47. Leftover wrap `f984e4a`. Report [1522](../handoffs/2026-09-14-1522-cursor-grok-4-6-d6-report.md). Leftover through [1555](../handoffs/2026-09-14-1555-cursor-grok-4-6-browse-notelist.md). No push. App `476756c`. Native NOT RUN | 45m |
+| D6 validate / report | Landed 15:47. Leftover wrap `7c7da1d`. Report [1522](../handoffs/2026-09-14-1522-cursor-grok-4-6-d6-report.md). Leftover through [1556](../handoffs/2026-09-14-1556-cursor-grok-4-6-name-beats-placeholder.md). No push. App `476756c`. Native NOT RUN | 45m |
 | Astra S1–S4 | **Source PASS** — [1255](../handoffs/2026-09-14-1255-cursor-grok-4-6-s1-s2-mcp-boundary.md) · [1246](../handoffs/2026-09-14-1246-cursor-grok-4-6-s3-s4-redaction.md). Native / #46 live **NOT RUN** | — |
 | Astra R1–R4 | **Source PASS** — [1258](../handoffs/2026-09-14-1258-cursor-grok-4-6-r1-env-ignore.md) · [1305](../handoffs/2026-09-14-1305-cursor-grok-4-6-r2-r4-secure-fs.md). Live Sentry **NOT RUN** | — |
 | Dep pins | **Landed** — [1308](../handoffs/2026-09-14-1308-cursor-grok-4-6-dep-patch.md). Tiptap parked ([1310](../handoffs/2026-09-14-1310-cursor-grok-4-6-tiptap-reachability.md)) | — |

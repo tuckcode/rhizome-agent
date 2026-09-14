@@ -19,7 +19,7 @@ Prime’s `import_jsonl` command **moves the chat you have open** onto the impor
 **Recommendation: route 1** — make a new saved session, then import, once per selected thread. Put the chat you had open back when the batch ends.
 
 Atticus has not said `1`. This page does not treat that as decided.
-**Stamped 16:14:** still vault-only. Silence is not `1`.
+**Stamped 16:20:** still vault-only. Silence is not `1`.
 
 ---
 
