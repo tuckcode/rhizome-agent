@@ -914,4 +914,81 @@ describe('parked organs leftover', () => {
     expect(d3).toContain('`Connection unknown`')
     expect(d3).toContain('no Chat error banner')
   })
+
+  it('keeps preflight 12px amber, chip truncate, Copy icon, and catalog wait', () => {
+    const preflight = readFileSync(
+      `${process.cwd()}/src/components/ChatPreflightBanner.tsx`,
+      'utf8',
+    )
+    const deck = readFileSync(
+      `${process.cwd()}/src/components/ChatComposerDeck.tsx`,
+      'utf8',
+    )
+    const message = readFileSync(
+      `${process.cwd()}/src/components/AiMessage.tsx`,
+      'utf8',
+    )
+    const settings = readFileSync(
+      `${process.cwd()}/src/components/SettingsPanel.tsx`,
+      'utf8',
+    )
+    expect(preflight).toContain('text-[12px] font-medium text-foreground')
+    expect(preflight).toContain('text-[var(--accent-amber,var(--foreground))]')
+    expect(deck).toContain('min-w-0 truncate')
+    expect(message).toContain('data-testid="ai-message-copy"')
+    expect(message).toContain('<Copy size={14}')
+    expect(settings).toContain('skip provider IPC until then')
+    expect(settings).toContain('{loadModelCatalog ? <PrimeProviderStatusSection t={t} /> : null}')
+  })
+
+  it('still polls Prime with an empty vault and wires ChatHome to that host', () => {
+    const host = readFileSync(
+      `${process.cwd()}/src/hooks/usePrimeHostStatus.ts`,
+      'utf8',
+    )
+    const home = readFileSync(
+      `${process.cwd()}/src/components/ChatHome.tsx`,
+      'utf8',
+    )
+    const sessions = readFileSync(
+      `${process.cwd()}/src/components/PrimeSessionList.tsx`,
+      'utf8',
+    )
+    expect(host).toContain('return subscribe(vaultPath ?? \'\', setStatus)')
+    expect(host).toContain("callHost<PrimeHostStatus>('get_prime_session_host_status')")
+    expect(home).toContain('usePrimeHostStatus(isPrimeTarget, vaultPath)')
+    expect(sessions).toContain('if (vaultPath) {')
+    expect(sessions).toContain("await call('rename_prime_session', { path: session.path, name })")
+  })
+
+  it('lets New Chat, thinking, and the model picker run without a vault', () => {
+    const home = readFileSync(
+      `${process.cwd()}/src/components/ChatHome.tsx`,
+      'utf8',
+    )
+    const picker = readFileSync(
+      `${process.cwd()}/src/components/PrimeModelPicker.tsx`,
+      'utf8',
+    )
+    expect(home).toContain('onNewChat={() => newChatRef.current?.()}')
+    expect(home).toContain('thinkingLevel={primeHost?.thinkingLevel ?? null}')
+    expect(home).not.toMatch(/if \(!vaultPath\) return/)
+    expect(picker).toContain('if (!hostReady && vaultPath)')
+    expect(picker).toContain("await callHost('ensure_prime_session_host', { vaultPath })")
+  })
+
+  it('keeps the composer deck optional-vault and does not invent a sheet lock', () => {
+    const deck = readFileSync(
+      `${process.cwd()}/src/components/ChatComposerDeck.tsx`,
+      'utf8',
+    )
+    const sheet = readFileSync(
+      `${process.cwd()}/src/components/SheetEditor.tsx`,
+      'utf8',
+    )
+    expect(deck).toContain('vaultPath?: string')
+    expect(deck).not.toMatch(/if \(!vaultPath\)/)
+    expect(sheet).not.toContain('noteLocked')
+    expect(sheet).not.toContain('readOnly')
+  })
 })
