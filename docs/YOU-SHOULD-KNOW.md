@@ -10,6 +10,10 @@ shipped after Claude last owned a session, what GitHub still says is
 open that is already built, and the decisions you will otherwise
 re-litigate.
 
+**Living-docs stamp 2026-09-13:** origin **`5c629a0`**, app **`476756c`**.
+God-plan input: [`ASTRA_PACKET.md`](ASTRA_PACKET.md). Tonight’s picture:
+[`BOARD.md`](BOARD.md). Confirm tip with `git log origin/main -1`.
+
 Last Claude-owned session on this repo: **2026-08-24**
 ([shell dock + ADR-0166 + NEXT.md](plans/handoffs/2026-08-24-2122-claude-opus-5-shell-dock-and-next-index.md)).
 Claude’s last *code* was **2026-08-22** (right-dock + ADR-0166).
@@ -57,7 +61,7 @@ longer open the way the ADR text still sounds.
 | Question | Now |
 |---|---|
 | ⌘1 / ⌘2 / ⌘3 | **Settled 2026-08-25.** ⌘1 Chat only. ⌘2 Notes panel, Browse collapsed. ⌘3 Notes panel, Browse expanded. Stored `viewMode` values unchanged (`editor-only` / `editor-list` / `all`). Fresh vaults default to `editor-list` (C72). |
-| Right panel | **Settled 2026-08-25, refined 2026-09-07.** One Notes panel. Compact nav above the selected list. Rail **Inbox** toggles it. Shut Notes leaves a 46px restore rail. No Inbox/Notes tabs, no second right column. |
+| Right panel | **Settled 2026-08-25, refined 2026-09-12.** One Notes panel. Compact nav above the selected list. Rail control is **Notes** (Inbox is a folder in the list). Shut Notes leaves a 46px restore rail. No Inbox/Notes tabs, no second right column. |
 | Canvas destinations | **Corrected 2026-09-07.** Chat stays the centre. Graph/Mycelium are a Changes-only cell under Notes (ADR-0171), not a place you go instead of chatting. Research is still a centre pane. #39 (graph as an *agent tool*) is still open. |
 
 **Do not** make nav and the note list exclusive. Claude tried; it broke
@@ -129,8 +133,7 @@ unless a row below is the task.
 ### Composer strip (one surface, four issues)
 
 `ChatComposerDeck` is the live control strip. **#38 / #9 / #35 / #21**
-are implemented on main. GitHub still open (no live Prime demo; C18).
-Do not redesign the strip again.
+are **closed** on GitHub (2026-08-29). Do not redesign the strip again.
 
 - Pills are live, not inert.
 - Model + thinking live on the strip (moved off the Prime subhead).
@@ -146,7 +149,7 @@ Do not redesign the strip again.
 
 ### Prime verbs that landed in Chat
 
-Implemented on main; GitHub still open until a live Prime demo:
+Implemented on main. **#14 / #17 / #18 closed tonight** (2026-09-13):
 
 | Issue | What landed |
 |---|---|
@@ -164,16 +167,16 @@ Implemented on main; GitHub still open until a live Prime demo:
 - **#29 closed** (`a8f83de`): tokens-only `redactCredentialTokens` before
   distill; Save-to-vault refuses. Detector was telemetry-only. Prime
   session jsonl is out of scope.
-- **#24 implemented on main, live check leftover.** Promote writes
+- **#24 closed 2026-08-28.** Promote writes
   `raw/inbox/{YYYYMMDD}-{slug}.md`. Title from first `#`/`##` or first
   sentence, never a raw timestamp. Frontmatter: `title`, `is_a: Note`,
   `created`, `source: prime-chat-promote`, plus `session` when Chat can
   pass Prime session id/path. Existing `[[wikilinks]]` kept; none
   invented. Same-path refuse + toast
   (`ai.message.saveToVaultDuplicate`). #29 check still runs first.
-- **#25** retrieval provenance: still `needs-triage`. Thinnest design
-  coverage of the product thesis. There is no memory-loop design doc
-  yet (`automatic-memory-consolidation.md` is consolidation only).
+- **#25 closed 2026-09-04.** Retrieval provenance on main. Index:
+  [`design/memory-loop.md`](design/memory-loop.md). Consolidation sketch
+  remains [`automatic-memory-consolidation.md`](design/automatic-memory-consolidation.md).
 
 ### Research as canvas
 
@@ -185,7 +188,7 @@ wiki page; does not vendor the upstream repo.
 
 ### Mycelium (#11 / #22) — in-app, not a browser
 
-On main. GitHub open until live check.
+On main. **#11 / #22 closed** 2026-08-27. M4 restyle not started.
 
 - Mindwalk runs as a local sidecar (`serve` / `open --no-open`).
 - View is an iframe at `127.0.0.1`. CSP `frame-src` allows loopback.
@@ -226,25 +229,24 @@ shows the recovered command, not “ipython” five times.
 Close-on-live-check is the house rule. **Do not re-implement an open
 issue.** Check `main` and the handoff first.
 
-**Closed on GitHub 2026-08-26:** #27, #29, #31, #34, #42.
-(Earlier that window: #28, #30, #33.)
+**Closed (do not reopen):** #9 #11 #14 #17 #18 #21 #22 #24 #25 #27 #29
+#31 #34 #35 #37 #38 #42 #43 #44 #47 #55, plus earlier #1–#8, #10, #12,
+#15 #16 #19 #20 #28 #30 #33.
 
-**Implemented on `main`, issue still OPEN:**
+**Still OPEN (live `gh` 2026-09-13 night, 17 issues):**
+#5 #13 #23 #26 #32 #36 #39 #40 #41 #45 #46 #48 #50 #51 #52 #56 #57.
 
-| Issue | Why it is still open |
+| Still open | Honest read |
 |---|---|
-| #11 / #22 | Mycelium live sidecar + real session leftover |
-| #24 | Promote one real Chat turn leftover |
-| #38 / #9 / #35 / #21 | Composer strip; no live Prime demo |
-| #17 / #14 / #18 | Branches / schedules / markers; no live Prime demo |
-| #43 | Guard built; issue not closed |
 | #40 | Filter answered (ADR-0168); composition not ratified |
+| #41 | Queue display exists; **steer UX** still the gap |
+| #5 | Spec skeleton: [`design/prime-agent-surface.md`](design/prime-agent-surface.md) |
+| #46 | **Security** — HOME vault / wide MCP |
+| #51 | Case 1 shipped; Case 2 deferred |
+| #55 | **Closed tonight** — local starter scaffold; C11 remote still deferred |
 
-**Still actually unbuilt / undecided:** #5 (harness surface spec),
-#25 (retrieval provenance), #37 (Save as custom), #39 (graph as tool),
-#26 (update Prime in-app), #32 (Windows daemon — pipes exist in Prime
-0.7.4+; see `WINDOWS-DEV.md`), #13 (menu-bar roster), #36 (timezone),
-#23 (sessions as searchable knowledge), #41 (steer path).
+**Unbuilt / blocked, not “GitHub forgot”:** #32/C42 Windows never launched;
+#50 plan awaiting surface; #56 doctrine honesty.
 
 ⚠️ **C-numbers and issue numbers collide.** C40 ≠ #40. C34 ≠ #34.
 Always write `C40` or `#40`.
@@ -317,13 +319,11 @@ These are the ones this week added or re-proved:
 
 User leftover, in this order:
 
-1. **Live-check** promote one Chat turn; Research rail then ⌘1;
-   Mycelium rail + This run (needs Mindwalk installed). Then close
-   #11 / #22 / #24 if they hold.
+1. Execute tonight from [`ASTRA_PACKET.md`](ASTRA_PACKET.md) §11 +
+   [`BOARD.md`](BOARD.md). Morning is last hours, not kickoff.
 2. **Do not** start TokenJuice, Switchyard, or harness composition.
-3. If choosing freely: ratify composition (§1 of `NEXT.md`), or
-   #25 retrieval, or close GitHub issues that are already built
-   after a live Prime demo (composer / #17 / #14 / #18 / #43).
+3. If choosing freely: **#46** (security), C64 verify, hide-on-close
+   helpers, #41 steer honesty. Do not re-close #11 / #22 / #24 / #47.
 4. C28 / C31 whenever the push gate flakes — re-run-and-move-on is
    how they stay unfixed.
 
@@ -334,6 +334,8 @@ User leftover, in this order:
 | Want | Open |
 |---|---|
 | What is true right now | [`HANDOFF.md`](HANDOFF.md) |
+| Tonight’s board | [`BOARD.md`](BOARD.md) |
+| God-plan input | [`ASTRA_PACKET.md`](ASTRA_PACKET.md) |
 | Unclaimed work | [`NEXT.md`](NEXT.md) |
 | Traps | [`CROSS-MODEL-HANDOFF.md`](CROSS-MODEL-HANDOFF.md) |
 | Identity / Prime-first | [`IDENTITY.md`](IDENTITY.md) |

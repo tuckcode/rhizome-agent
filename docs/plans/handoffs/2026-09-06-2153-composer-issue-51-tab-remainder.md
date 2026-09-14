@@ -1,54 +1,61 @@
 ---
 session: 2026-09-06-2153
 model: Composer
-description: #51 reply pills shipped; Tab ghost-text completion + rules emitter still open
+description: >-
+  #51 Case 1 Tab ghost-text shipped 2026-09-12; Case 2 model-backed
+  remainder stays deferred.
 ---
 
-# #51 — Tab remainder (planning only)
+# #51 — Tab remainder (Case 2)
 
-**Origin:** Composer · 2026-09-06 · research only (no product code)
+**Origin:** Composer · 2026-09-06, **status corrected 2026-09-13** against the tree.  
+Issue: [#51](https://github.com/tuckcode/rhizome-agent/issues/51).
 
-Issue: [#51](https://github.com/tuckcode/rhizome-agent/issues/51) open, `ready-for-agent`.
-Owner comments split **pills** (forks) vs **Tab ghost text** (one continuation);
-pills win when both apply; never both; action labels must name the action.
+Pills (forks) vs Tab ghost text (one continuation): pills win when both apply; never both; action labels must name the action.
 
-## Status
+---
+
+## Done / now / next
 
 | Piece | State |
 |---|---|
-| Case 1 — closed-question **options pills** | **Shipped** |
-| `completion` type + Tab ghost text | **Planned only** — type exists; nothing emits or renders it |
-| Case 2 — state-derived suggestions | Explicitly deferred in code comments / #51 |
-| Model-backed phrasing | Research: opt-in later (v2) |
+| Closed-question **options pills** | **Shipped** (pre-2026-09-12) |
+| Case 1 — rules-first `completion` + Tab ghost text | **Shipped 2026-09-12** (`5c04828`). `suggestReply()` emits `{ kind: 'completion'; text }`; composer ghost text; Tab accept. |
+| Case 2 — model-backed / state-derived suggestions | **Deferred.** This is the remainder. |
+| Settings toggle for v2 | Not started |
 
-`suggestReply()` only returns `options` or `null` (numbered / bullet / `or` /
-imperative yes-no). UI drops any non-`options` result.
+Related: ~~C71~~ up-arrow history shipped 2026-09-06.
 
-Related (not this slice): ~~C71~~ up-arrow history already shipped.
+**Done when (Case 2):** Tab ghost text can come from a model or from session/git/gate state, still idle+empty only, still loses to pills, still names the action. Not required for daily-drive.
 
-## Files
+---
 
-- `src/lib/replySuggestions.ts` (+ `.test.ts`) — parser; `completion` union unused
-- `src/components/AiPanelChrome.tsx` — `ComposerReplySuggestions` (`kind === 'options'` only)
-- `src/components/AiPanelChrome.replySuggestions.test.tsx`
+## Files (Case 1 — do not re-implement)
+
+- `src/lib/replySuggestions.ts` (+ `.test.ts`)
+- `src/components/AiPanelChrome.tsx` — `ComposerReplySuggestions` + completion placeholder
+- `src/lib/productAnalytics.ts` — shown/accepted/dismissed (enums only, never the text)
 - Research (vault): `projects/rhizome-agent/sub-agents/2026-09-01-tab-completion-ux-research.md`
 
-## Recommended next slice (~1–2h)
+---
 
-1. Rules-first emitters that return `{ kind: 'completion'; text }` when pills
-   do not match (research table: soft “want me to…”, “ready”, next-step echo;
-   **null** on open questions).
-2. Composer ghost text (gray italic after cursor); **Tab** accept, Esc/typing
-   dismiss; idle + empty input only.
-3. Keep precedence: if `options`, never show ghost text.
-4. Unit + chrome tests; PostHog shown/accepted/dismissed if meaningful.
+## Case 2 (when claimed)
+
+State-derived or model-backed phrasing. Research called this opt-in later (v2). Code comments still say deferred.
+
+Suggested bound (from research, not a new system):
+
+1. Only when Case 1 rules return null and pills do not match.
+2. Idle + empty input only.
+3. If `options`, never show ghost text.
+4. No autofill of bare `"yes"`.
+5. No second suggestion system that fights pills.
+6. No menu-bar companion Tab in the same slice.
+
+---
 
 ## Do-not-scope
 
-- Case 2 (git status / gate / session state → suggestions)
-- Model-backed completion or Settings toggle for v2
-- Menu-bar companion Tab
-- A second suggestion system that fights pills
-- Autofill bare `"yes"` for ghost text (safety: name the action)
-- Push-agent paths: `getting_started.rs`, `aiAgentSession*.test.ts`,
-  `SettingsPanel.test.tsx`, `HANDOFF.md`, `NEXT.md`
+- Rebuilding Case 1
+- Fighting pills
+- Push-agent paths unless this slice lands product code
