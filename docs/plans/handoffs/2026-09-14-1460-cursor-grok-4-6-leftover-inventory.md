@@ -11,7 +11,7 @@ commits: uncommitted
 
 **Origin:** Cursor Grok 4.6 · 2026-09-14 14:32 · paper.
 
-HEAD still `4416411`. Origin `5c629a0`. App `476756c`. D6 ~15:45.
+HEAD `c44ee2b`. Origin `5c629a0`. App `476756c`. D6 landed. No push.
 
 ## This slice (uncommitted)
 
@@ -82,6 +82,16 @@ HEAD still `4416411`. Origin `5c629a0`. App `476756c`. D6 ~15:45.
 - Rename does not create ([1519](2026-09-14-1519-cursor-grok-4-6-rename-no-create.md))
 - D6 start ([1520](2026-09-14-1520-cursor-grok-4-6-d6-start.md))
 - HANDOFF prune ([1521](2026-09-14-1521-cursor-grok-4-6-handoff-prune.md))
+- D6 report ([1522](2026-09-14-1522-cursor-grok-4-6-d6-report.md))
+- Mouse note-trail leftover ([1523](2026-09-14-1523-cursor-grok-4-6-mouse-note-trail.md))
+- Create Getting Started + Inbox folder ([1524](2026-09-14-1524-cursor-grok-4-6-gs-inbox-leftover.md))
+- Hover / green marker / chat drag vs select ([1525](2026-09-14-1525-cursor-grok-4-6-hover-marker-drag.md))
+- Narrow window + created toast ([1526](2026-09-14-1526-cursor-grok-4-6-narrow-created.md))
+- Tab ghost + #51 Case 2 parked ([1527](2026-09-14-1527-cursor-grok-4-6-tab-case2.md))
+- Packages CLI leftover ([1528](2026-09-14-1528-cursor-grok-4-6-packages-cli.md))
+- C70 clock leftover ([1529](2026-09-14-1529-cursor-grok-4-6-c70-clock.md))
+- Updates next to theme ([1530](2026-09-14-1530-cursor-grok-4-6-updates-theme.md))
+- Create vs download leftover ([1531](2026-09-14-1531-cursor-grok-4-6-gs-create-download.md))
 
 ## Still parked (do not do)
 

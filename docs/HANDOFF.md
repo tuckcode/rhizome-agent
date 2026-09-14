@@ -47,16 +47,13 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Grok 4.6 · 2026-09-14 15:45 · D6 commits in progress.
+**Origin:** Cursor Grok 4.6 · 2026-09-14 15:51 · leftover after D6. Tab ghost / created toast locked.
 
-Local HEAD **`188745d`** (native secure_fs). Also local: `db6f74a`
-(leftover tests), `3bf045c` (D2/D3), `ce450ab` (C72), `4416411` (W7),
-`e64a283` (God plan). Origin `main` still **`5c629a0`** — **not pushed**.
-App leftover **`476756c`**. Import waits for **`1`**. Do not merge #66.
-C64 / W4 / hide / last-idle still **NOT RUN**. God plan:
-[`docs/ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md). Board: [`docs/BOARD.md`](BOARD.md).
-Leftover index:
-[1460](plans/handoffs/2026-09-14-1460-cursor-grok-4-6-leftover-inventory.md).
+Local HEAD **`c44ee2b`**. Origin `main` **`5c629a0`** — **nine commits
+not pushed**. App leftover **`476756c`** (2026-09-12 22:43). Import
+waits for **`1`**. Do not merge #66. C64 / W4 / hide / last-idle still
+**NOT RUN**. Not daily-driver ready. Report:
+[1522](plans/handoffs/2026-09-14-1522-cursor-grok-4-6-d6-report.md).
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Inverted Dock icon is

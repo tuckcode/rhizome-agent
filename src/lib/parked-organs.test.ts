@@ -395,4 +395,117 @@ describe('parked organs leftover', () => {
     expect(list).toContain('if (vaultPath) {')
     expect(list).not.toMatch(/create_prime_session|new_prime_session/)
   })
+
+  it('keeps mouse back/forward on the note trail only', () => {
+    const gestures = readFileSync(
+      `${process.cwd()}/src/hooks/useNavigationGestures.ts`,
+      'utf8',
+    )
+    expect(gestures).toContain(
+      'Mouse back/forward buttons walk the note trail: note → wikilink → note.',
+    )
+    expect(gestures).not.toMatch(/switchPrimeSession|onSelectSession/)
+  })
+
+  it('keeps Create Getting Started Vault and Inbox as a Notes folder mode', () => {
+    const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
+    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    expect(en).toContain(
+      '"status.vault.cloneGettingStarted": "Create Getting Started Vault"',
+    )
+    expect(app).toContain('showInbox: explicitOrganizationEnabled')
+  })
+
+  it('keeps Notes click-to-close, green latest-reply mark, and chat drag vs select', () => {
+    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const message = readFileSync(
+      `${process.cwd()}/src/components/AiMessage.tsx`,
+      'utf8',
+    )
+    const drag = readFileSync(
+      `${process.cwd()}/src/hooks/useDragRegion.ts`,
+      'utf8',
+    )
+    expect(app).not.toContain('onMouseEnter={collapseNotes}')
+    expect(app).not.toContain('onMouseLeave={collapseNotes}')
+    expect(message).toContain('data-testid="latest-assistant-reply-marker"')
+    expect(message).toContain('bg-[var(--accent-green)]')
+    expect(message).toContain('data-no-drag')
+    expect(drag).toContain('Drag starts only after the pointer moves')
+    expect(drag).toContain('const DRAG_DISTANCE_PX = 4')
+  })
+
+  it('does not hide Notes just because the window is narrow', () => {
+    const layout = readFileSync(`${process.cwd()}/src/lib/shellLayout.ts`, 'utf8')
+    expect(layout).toContain('Window width must not hide Notes.')
+    expect(layout).toContain('C72 policy lives here: Inbox opens Notes and does not close them.')
+  })
+
+  it('toasts Getting Started as created, not cloned', () => {
+    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    expect(app).toContain('Getting Started vault created and opened at')
+    expect(app).not.toContain('Getting Started vault cloned and opened')
+  })
+
+  it('keeps Tab ghost-text and leaves #51 Case 2 unbuilt', () => {
+    const input = readFileSync(
+      `${process.cwd()}/src/components/InlineWikilinkInput.tsx`,
+      'utf8',
+    )
+    const suggestions = readFileSync(
+      `${process.cwd()}/src/lib/replySuggestions.ts`,
+      'utf8',
+    )
+    expect(input).toContain('Tab ghost-text accept (#51)')
+    expect(input).toContain('if (event.key === \'Tab\' && !event.shiftKey && onAcceptCompletion?.())')
+    expect(suggestions).toContain('That is case 2 in #51')
+    expect(suggestions).toContain('Deliberately not built here')
+  })
+
+  it('installs Prime packages via CLI, with Chat as fallback', () => {
+    const packages = readFileSync(
+      `${process.cwd()}/src/components/PrimeExtensionsSection.tsx`,
+      'utf8',
+    )
+    expect(packages).toContain(
+      'Install runs `prime-agent package install` in the background, then reloads',
+    )
+    expect(packages).toContain('They run with full system access.')
+    expect(packages).toContain('askChatToInstall')
+    expect(packages).toContain('queueAiPrompt(primePackageAskAgentPrompt(source), [])')
+  })
+
+  it('keeps Chat per-message clocks in the C70 local style', () => {
+    const clock = readFileSync(
+      `${process.cwd()}/src/utils/messageTimestamp.ts`,
+      'utf8',
+    )
+    expect(clock).toContain("Matches new-session naming style (`3:35p`)")
+    expect(clock).toContain('Local clock like `3:35p` / `12:05a`')
+  })
+
+  it('keeps check-for-updates next to the theme toggle, not Contribute', () => {
+    const bar = readFileSync(
+      `${process.cwd()}/src/components/status-bar/StatusBarSections.tsx`,
+      'utf8',
+    )
+    expect(bar).toContain(
+      '<BuildNumberButton buildNumber={buildNumber} onCheckForUpdates={onCheckForUpdates} compact={compact} locale={locale} />',
+    )
+    expect(bar).toContain('contentTestId="status-theme-mode-tooltip"')
+    expect(bar).not.toMatch(/Contribute/)
+  })
+
+  it('keeps local Getting Started errors on create, git clone on download', () => {
+    const gs = readFileSync(
+      `${process.cwd()}/src/utils/gettingStartedVault.ts`,
+      'utf8',
+    )
+    expect(gs).toContain(
+      'return `Could not create Getting Started vault: ${firstCloneErrorLine(message)}`',
+    )
+    expect(gs).toContain(
+      "'Could not download Getting Started vault. Check your connection and try again.'",
+    )
+  })
 })
