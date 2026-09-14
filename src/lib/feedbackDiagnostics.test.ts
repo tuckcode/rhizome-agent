@@ -46,4 +46,42 @@ describe('feedbackDiagnostics', () => {
 
     expect(bundle).toContain('No safe recent diagnostics were available.')
   })
+
+  it('redacts nested and non-string credential fields in the optional bundle', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const stopCapture = startFeedbackDiagnosticsCapture()
+    const opaque = ['ASTRA_SYNTHETIC', 'Q'.repeat(28)].join('_')
+
+    console.error({
+      api_key: { nested: opaque },
+      retryCount: 3,
+    })
+    console.error({
+      apiKey: opaque,
+      Authorization: `Bearer ${opaque}`,
+      Cookie: opaque,
+      password: opaque,
+    })
+    console.error({
+      api_key: 99,
+      token: [opaque],
+      note: 'benign metadata',
+      allowedModels: ['alpha', 'beta'],
+    })
+    console.error(`lookup https://service.invalid/?api_key=${opaque}`)
+
+    const bundle = buildSanitizedDiagnosticBundle({
+      buildNumber: 'b281',
+      releaseChannel: 'alpha',
+    })
+
+    expect(bundle).toContain('Build: b281')
+    expect(bundle).toContain('benign metadata')
+    expect(bundle).toContain('retryCount')
+    expect(bundle).toContain('allowedModels')
+    expect(bundle).not.toContain(opaque)
+
+    stopCapture()
+    errorSpy.mockRestore()
+  })
 })

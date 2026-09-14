@@ -46,8 +46,11 @@ function safeSerialize(value: unknown): string {
 
   try {
     return JSON.stringify(value, (key, nestedValue) => {
+      if (key && isSensitiveDiagnosticKey({ text: key })) {
+        return TOKEN_REDACTION
+      }
       if (typeof nestedValue === 'string') {
-        return isSensitiveDiagnosticKey({ text: key }) ? TOKEN_REDACTION : truncate(nestedValue, 120)
+        return truncate(nestedValue, 120)
       }
       return nestedValue
     })

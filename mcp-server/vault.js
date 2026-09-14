@@ -4,9 +4,18 @@
  * permission profile and native file-edit tools; createNote is intentionally
  * narrow so read-only agents can create a new Markdown file without overwrite.
  */
-import { mkdir, open, opendir, realpath } from 'node:fs/promises'
+import { lstat, mkdir, open, opendir, realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
-import matter from 'gray-matter'
+
+const YAML_FRONTMATTER_LANGUAGES = new Set(['', 'yaml', 'yml'])
+const JSON_FRONTMATTER_LANGUAGES = new Set(['json'])
+const EXECUTABLE_FRONTMATTER_LANGUAGES = new Set([
+  'javascript',
+  'js',
+  'coffee',
+  'coffeescript',
+  'cson',
+])
 
 const ACTIVE_VAULT_ERROR = 'Note path must stay inside the active vault'
 
@@ -16,10 +25,20 @@ const ACTIVE_VAULT_ERROR = 'Note path must stay inside the active vault'
  * @returns {Promise<string[]>}
  */
 export async function findMarkdownFiles(dir) {
+  const vaultRoot = await realpath(dir)
+  return collectMarkdownFilesUnder(vaultRoot, vaultRoot)
+}
+
+async function collectMarkdownFilesUnder(vaultRoot, dir) {
   const results = []
-  const items = await opendir(dir)
+  let items
+  try {
+    items = await opendir(dir)
+  } catch {
+    return results
+  }
   for await (const item of items) {
-    await collectMarkdownFile(results, dir, item)
+    await collectMarkdownFile(results, vaultRoot, dir, item)
   }
   return results
 }
@@ -27,17 +46,21 @@ export async function findMarkdownFiles(dir) {
 async function resolveVaultNotePath(vaultPath, notePath) {
   const vaultRoot = await realpath(vaultPath)
   const requestedPath = resolveRequestedNotePath(vaultRoot, notePath)
-  const noteRealPath = await realpath(requestedPath)
-  const relativePath = path.relative(vaultRoot, noteRealPath)
-
-  if (!isVaultRelativePath(relativePath)) {
+  const noteRealPath = await resolveContainedRegularFile(vaultRoot, requestedPath)
+  if (!noteRealPath) {
+    try {
+      await lstat(requestedPath)
+    } catch (error) {
+      if (error?.code === 'ENOENT') throw error
+      throw error
+    }
     throw new Error(ACTIVE_VAULT_ERROR)
   }
 
   return {
     vaultRoot,
     noteRealPath,
-    relativePath,
+    relativePath: path.relative(vaultRoot, noteRealPath),
   }
 }
 
@@ -85,20 +108,22 @@ export async function createNote(vaultPath, notePath, content) {
  * @returns {Promise<Array<{path: string, title: string, snippet: string}>>}
  */
 export async function searchNotes(vaultPath, query, limit = 10) {
-  const files = await findMarkdownFiles(vaultPath)
+  const vaultRoot = await realpath(vaultPath)
+  const files = await findMarkdownFiles(vaultRoot)
   const q = query.toLowerCase()
   const results = []
 
   for (const filePath of files) {
     if (results.length >= limit) break
-    const content = await readUtf8File(filePath)
+    const content = await readContainedUtf8(vaultRoot, filePath)
+    if (content === null) continue
     const filename = path.basename(filePath, '.md')
     const titleMatch = extractTitle(content, filename)
     if (!matchesSearchQuery(titleMatch, content, q)) continue
 
     const snippet = extractSnippet(content, q)
     results.push({
-      path: path.relative(vaultPath, filePath),
+      path: path.relative(vaultRoot, filePath),
       title: titleMatch,
       snippet,
     })
@@ -113,16 +138,18 @@ export async function searchNotes(vaultPath, query, limit = 10) {
  * @returns {Promise<{types: string[], noteCount: number, folders: string[], recentNotes: Array<{path: string, title: string, type: string|null}>, vaultPath: string}>}
  */
 export async function vaultContext(vaultPath) {
-  const files = await findMarkdownFiles(vaultPath)
+  const vaultRoot = await realpath(vaultPath)
+  const files = await findMarkdownFiles(vaultRoot)
   const typesSet = new Set()
   const foldersSet = new Set()
   const notesWithMtime = []
 
   for (const filePath of files) {
-    const { topFolder, note, type } = await readVaultContextNote(vaultPath, filePath)
-    if (type) typesSet.add(type)
-    if (topFolder) foldersSet.add(topFolder)
-    notesWithMtime.push(note)
+    const entry = await readVaultContextNote(vaultRoot, filePath)
+    if (!entry) continue
+    if (entry.type) typesSet.add(entry.type)
+    if (entry.topFolder) foldersSet.add(entry.topFolder)
+    notesWithMtime.push(entry.note)
   }
 
   notesWithMtime.sort((a, b) => b.mtime - a.mtime)
@@ -130,29 +157,51 @@ export async function vaultContext(vaultPath) {
 
   return {
     types: [...typesSet].sort(),
-    noteCount: files.length,
+    noteCount: notesWithMtime.length,
     folders: [...foldersSet].sort(),
     recentNotes,
-    configFiles: await readConfigFiles(vaultPath),
+    configFiles: await readConfigFiles(vaultRoot),
     vaultPath,
   }
 }
 
 // --- Helpers ---
 
-async function collectMarkdownFile(results, dir, item) {
+async function collectMarkdownFile(results, vaultRoot, dir, item) {
   if (item.name.startsWith('.')) return
 
   const full = resolveInside(dir, item.name)
   if (!full) return
+
   if (item.isDirectory()) {
-    results.push(...await findMarkdownFiles(full))
+    const contained = await resolveContainedPath(vaultRoot, full)
+    if (!contained) return
+    results.push(...await collectMarkdownFilesUnder(vaultRoot, contained))
     return
   }
 
-  if (item.name.endsWith('.md')) {
-    results.push(full)
+  if (item.isSymbolicLink()) {
+    const contained = await resolveContainedPath(vaultRoot, full)
+    if (!contained) return
+    let st
+    try {
+      st = await stat(contained)
+    } catch {
+      return
+    }
+    if (st.isDirectory()) {
+      results.push(...await collectMarkdownFilesUnder(vaultRoot, contained))
+      return
+    }
+    if (st.isFile() && item.name.endsWith('.md')) {
+      results.push(full)
+    }
+    return
   }
+
+  if (!item.name.endsWith('.md')) return
+  const regular = await resolveContainedRegularFile(vaultRoot, full)
+  if (regular) results.push(full)
 }
 
 function resolveRequestedNotePath(vaultRoot, notePath) {
@@ -240,12 +289,14 @@ function contextNoteWithoutMtime(note) {
   }
 }
 
-async function readVaultContextNote(vaultPath, filePath) {
-  const raw = await readUtf8File(filePath)
+async function readVaultContextNote(vaultRoot, filePath) {
+  const raw = await readContainedUtf8(vaultRoot, filePath)
+  if (raw === null) return null
   const parsed = parseMarkdownNote(raw)
-  const rel = path.relative(vaultPath, filePath)
+  const rel = path.relative(vaultRoot, filePath)
   const topFolder = extractTopFolder(rel)
-  const stat = await statFile(filePath)
+  const fileStat = await statContainedRegularFile(vaultRoot, filePath)
+  if (!fileStat) return null
   const type = parsed.data.type || parsed.data.is_a || null
 
   return {
@@ -255,26 +306,33 @@ async function readVaultContextNote(vaultPath, filePath) {
       path: rel,
       title: parsed.data.title || extractTitle(raw, path.basename(filePath, '.md')),
       type,
-      mtime: stat.mtimeMs,
+      mtime: fileStat.mtimeMs,
     },
   }
 }
 
 function parseMarkdownNote(raw) {
-  try {
-    const parsed = matter(raw)
-    const fallback = parseFrontmatterFallback(raw)
-    return shouldUseFallbackFrontmatter(parsed, fallback) ? fallback : parsed
-  } catch {
-    return parseFrontmatterFallback(raw)
+  const language = detectFrontmatterLanguage(raw)
+  if (language === null) return { data: {}, content: raw }
+  if (EXECUTABLE_FRONTMATTER_LANGUAGES.has(language)) {
+    return { data: {}, content: raw }
   }
+  if (JSON_FRONTMATTER_LANGUAGES.has(language)) {
+    return parseJsonFrontmatter(raw)
+  }
+  if (YAML_FRONTMATTER_LANGUAGES.has(language)) {
+    return parseYamlFrontmatter(raw)
+  }
+  return { data: {}, content: raw }
 }
 
-function shouldUseFallbackFrontmatter(parsed, fallback) {
-  return Object.keys(parsed.data).length === 0 && Object.keys(fallback.data).length > 0
+function detectFrontmatterLanguage(raw) {
+  const match = String(raw ?? '').match(/^---([A-Za-z0-9_-]*)[ \t]*\r?\n/)
+  if (!match) return null
+  return match[1].toLowerCase()
 }
 
-function parseFrontmatterFallback(raw) {
+function parseYamlFrontmatter(raw) {
   const split = splitFrontmatter(raw)
   if (!split) return { data: {}, content: raw }
 
@@ -284,8 +342,24 @@ function parseFrontmatterFallback(raw) {
   }
 }
 
+function parseJsonFrontmatter(raw) {
+  const match = String(raw ?? '').match(
+    /^---json[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)([\s\S]*)$/i,
+  )
+  if (!match) return { data: {}, content: raw }
+  try {
+    const data = JSON.parse(match[1])
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return { data: {}, content: raw }
+    }
+    return { data, content: match[2] }
+  } catch {
+    return { data: {}, content: raw }
+  }
+}
+
 function splitFrontmatter(raw) {
-  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)([\s\S]*)$/)
+  const match = raw.match(/^---(?:yaml|yml)?[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)([\s\S]*)$/i)
   if (!match) return null
   return { frontmatter: match[1], content: match[2] }
 }
@@ -389,16 +463,80 @@ function extractTopFolder(relativePath) {
 }
 
 async function readConfigFiles(vaultPath) {
-  const configFiles = {}
+  const agents = await readContainedVaultText(vaultPath, 'config/agents.md')
+  return agents === null ? {} : { agents }
+}
 
+function isInsideResolvedVault(vaultRoot, targetPath) {
+  const relative = path.relative(vaultRoot, targetPath)
+  return relative === '' || isVaultRelativePath(relative)
+}
+
+async function resolveContainedPath(vaultRoot, lexicalPath) {
+  let real
   try {
-    const agentsPath = resolveInside(vaultPath, 'config/agents.md')
-    if (agentsPath) configFiles.agents = await readUtf8File(agentsPath)
+    real = await realpath(lexicalPath)
   } catch {
-    // config/agents.md may not exist yet
+    return null
+  }
+  if (!isInsideResolvedVault(vaultRoot, real)) return null
+  return real
+}
+
+async function resolveContainedRegularFile(vaultRoot, lexicalPath) {
+  try {
+    const lst = await lstat(lexicalPath)
+    if (
+      lst.isDirectory()
+      || lst.isFIFO()
+      || lst.isSocket()
+      || lst.isCharacterDevice()
+      || lst.isBlockDevice()
+    ) {
+      return null
+    }
+  } catch {
+    return null
   }
 
-  return configFiles
+  const real = await resolveContainedPath(vaultRoot, lexicalPath)
+  if (!real) return null
+
+  try {
+    const st = await stat(real)
+    if (!st.isFile()) return null
+  } catch {
+    return null
+  }
+  return real
+}
+
+async function statContainedRegularFile(vaultRoot, lexicalPath) {
+  const real = await resolveContainedRegularFile(vaultRoot, lexicalPath)
+  if (!real) return null
+  try {
+    return await stat(real)
+  } catch {
+    return null
+  }
+}
+
+export async function readContainedVaultText(vaultPath, relativePath) {
+  let vaultRoot
+  try {
+    vaultRoot = await realpath(vaultPath)
+  } catch {
+    return null
+  }
+  const lexical = resolveInside(vaultRoot, relativePath)
+  if (!lexical) return null
+  return readContainedUtf8(vaultRoot, lexical)
+}
+
+async function readContainedUtf8(vaultRoot, lexicalPath) {
+  const real = await resolveContainedRegularFile(vaultRoot, lexicalPath)
+  if (!real) return null
+  return readUtf8File(real)
 }
 
 async function readUtf8File(filePath) {
@@ -419,14 +557,6 @@ async function writeNewUtf8File(filePath, content) {
   }
 }
 
-async function statFile(filePath) {
-  const handle = await open(filePath, 'r')
-  try {
-    return await handle.stat()
-  } finally {
-    await handle.close()
-  }
-}
 
 /**
  * Extract title from markdown content (first H1 or frontmatter title).

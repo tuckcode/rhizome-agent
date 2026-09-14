@@ -2,7 +2,7 @@ export const PATH_REDACTION = '[redacted-path]'
 export const TOKEN_REDACTION = '[redacted-token]'
 
 const LEADING_TOKEN_WRAPPERS = new Set(['"', "'", '`', '(', '[', '{'])
-const SENSITIVE_KEYS = ['token', 'secret', 'password', 'authorization', 'cookie', 'session']
+const SENSITIVE_KEYS = ['token', 'secret', 'password', 'authorization', 'cookie', 'session', 'apikey']
 const TOKEN_PREFIXES = [
   'ghp_', 'gho_', 'ghr_', 'ghs_', 'ghu_', 'github_pat_', 'glpat-',
   'sk-', 'sk_live_', 'sk_test_', 'xai-', 'gsk_', 'hf_', 'npm_',
@@ -47,7 +47,10 @@ export function redactPathText({ text }: RedactTextInput): string {
 }
 
 export function sanitizeDiagnosticText({ text }: RedactTextInput): string {
-  return collapseWhitespace({ text: redactTextSegments({ text, redactTokens: true }) }).trim()
+  const withSecrets = redactSensitiveDiagnosticSecrets({ text })
+  return collapseWhitespace({
+    text: redactTextSegments({ text: withSecrets, redactTokens: true }),
+  }).trim()
 }
 
 /**
@@ -75,8 +78,82 @@ export function redactCredentialTokens(text: string): { text: string; count: num
 }
 
 export function isSensitiveDiagnosticKey({ text }: RedactTextInput): boolean {
-  const lowerText = text.toLowerCase()
-  return SENSITIVE_KEYS.some((sensitiveKey) => lowerText.includes(sensitiveKey))
+  const normalized = normalizeDiagnosticKey({ text })
+  return SENSITIVE_KEYS.some((sensitiveKey) => normalized.includes(sensitiveKey))
+}
+
+function normalizeDiagnosticKey({ text }: RedactTextInput): string {
+  return text.toLowerCase().replace(/[_-]/g, '')
+}
+
+function redactSensitiveDiagnosticSecrets({ text }: RedactTextInput): string {
+  return redactSensitiveAssignments({
+    text: redactSensitiveHeaders({
+      text: redactSensitiveUrls({ text }),
+    }),
+  })
+}
+
+function redactSensitiveUrls({ text }: RedactTextInput): string {
+  let redacted = ''
+  let cursor = 0
+  for (const match of text.matchAll(/\bhttps?:\/\/[^\s]+/gi)) {
+    const start = match.index ?? 0
+    redacted += text.slice(cursor, start)
+    redacted += redactOneUrl({ text: match[0] })
+    cursor = start + match[0].length
+  }
+  return redacted + text.slice(cursor)
+}
+
+function redactOneUrl({ text }: RedactTextInput): string {
+  try {
+    const parsed = new URL(text)
+    let redacted = text
+    if (parsed.username || parsed.password) {
+      const userinfo = parsed.password
+        ? `${parsed.username}:${parsed.password}@`
+        : `${parsed.username}@`
+      if (redacted.includes(userinfo)) {
+        redacted = redacted.replace(userinfo, `${TOKEN_REDACTION}@`)
+      }
+    }
+    for (const [key, value] of parsed.searchParams.entries()) {
+      if (!value || !isSensitiveDiagnosticKey({ text: key })) continue
+      const assignment = `${key}=${value}`
+      if (redacted.includes(assignment)) {
+        redacted = redacted.replace(assignment, `${key}=${TOKEN_REDACTION}`)
+      }
+    }
+    return redacted
+  } catch {
+    return text
+  }
+}
+
+function redactSensitiveHeaders({ text }: RedactTextInput): string {
+  return text.replace(
+    /(^|[\s])((?:Authorization|Cookie)\s*:\s*)(\S.*)/gim,
+    (_full, lead: string, prefix: string) => `${lead}${prefix}${TOKEN_REDACTION}`,
+  )
+}
+
+function redactSensitiveAssignments({ text }: RedactTextInput): string {
+  return text.replace(
+    /([A-Za-z_][A-Za-z0-9_-]*)(\s*[=:]\s*)(?:Bearer\s+)?(\S+)/g,
+    (full, key: string, _sep: string, rawValue: string) => {
+      if (!isSensitiveDiagnosticKey({ text: key })) return full
+      let suffix = ''
+      let value = rawValue
+      while (value.length > 0 && TRAILING_TOKEN_WRAPPERS.has(value.at(-1) ?? '')) {
+        suffix = `${value.at(-1) ?? ''}${suffix}`
+        value = value.slice(0, -1)
+      }
+      if (!value) return full
+      const prefixLength = full.length - rawValue.length
+      return `${full.slice(0, prefixLength)}${TOKEN_REDACTION}${suffix}`
+    },
+  )
 }
 
 function redactTextSegments({ text, redactTokens = false }: RedactTextInput): string {
@@ -98,7 +175,10 @@ function redactToken({ token, redactTokens }: RedactTokenInput): string {
 
   const parts = tokenParts({ token })
   if (isAbsolutePath({ value: parts.core })) return `${parts.prefix}${PATH_REDACTION}${parts.suffix}`
-  if (redactTokens && isTokenLike({ value: parts.core })) return `${parts.prefix}${TOKEN_REDACTION}${parts.suffix}`
+  if (redactTokens) {
+    const replaced = replaceCredentialToken(token)
+    if (replaced.count > 0) return replaced.token
+  }
   return token
 }
 
@@ -125,16 +205,22 @@ function replaceCredentialToken(token: string): { token: string; count: number }
 function findCredentialSpan(value: string, searchFrom = 0): { start: number; end: number } | null {
   let found: { start: number; end: number } | null = null
   for (const prefix of TOKEN_PREFIXES) {
-    const idx = value.indexOf(prefix, searchFrom)
-    if (idx === -1) continue
-    const bodyStart = idx + prefix.length
-    let bodyEnd = bodyStart
-    while (bodyEnd < value.length && CREDENTIAL_BODY_CHAR_RE.test(value.charAt(bodyEnd))) {
-      bodyEnd += 1
-    }
-    if (bodyEnd - bodyStart < MIN_CREDENTIAL_BODY_LENGTH) continue
-    if (!found || idx < found.start || (idx === found.start && bodyEnd > found.end)) {
-      found = { start: idx, end: bodyEnd }
+    let idx = value.indexOf(prefix, searchFrom)
+    while (idx !== -1) {
+      const bodyStart = idx + prefix.length
+      let bodyEnd = bodyStart
+      while (bodyEnd < value.length && CREDENTIAL_BODY_CHAR_RE.test(value.charAt(bodyEnd))) {
+        bodyEnd += 1
+      }
+      if (bodyEnd - bodyStart >= MIN_CREDENTIAL_BODY_LENGTH) {
+        if (!found || idx < found.start || (idx === found.start && bodyEnd > found.end)) {
+          found = { start: idx, end: bodyEnd }
+        }
+        break
+      }
+      const nextFrom = idx + 1
+      if (nextFrom <= idx) break
+      idx = value.indexOf(prefix, nextFrom)
     }
   }
   return found
@@ -175,10 +261,6 @@ function isWindowsDriveSegment({ segment }: SegmentInput): boolean {
     && letter !== undefined
     && letter.toLowerCase() !== letter.toUpperCase()
     && segment.at(1) === ':'
-}
-
-function isTokenLike({ value }: TextValueInput): boolean {
-  return findCredentialSpan(value) !== null
 }
 
 function collapseWhitespace({ text }: RedactTextInput): string {
