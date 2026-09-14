@@ -47,9 +47,9 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Grok 4.6 · 2026-09-14 16:26 · leftover wrap `29a4073`.
+**Origin:** Cursor Grok 4.6 · 2026-09-14 16:30 · leftover wrap `7565fd5`.
 
-Local HEAD **`29a4073`**. Origin `main` **`5c629a0`** — **sixteen commits
+Local HEAD **`7565fd5`**. Origin `main` **`5c629a0`** — **seventeen commits
 not pushed**. App leftover **`476756c`** (2026-09-12 22:43). Import
 waits for **`1`**. Do not merge #66. C64 / W4 / hide / last-idle still
 **NOT RUN**. Not daily-driver ready. Report:
