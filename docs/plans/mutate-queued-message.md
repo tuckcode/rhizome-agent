@@ -1,7 +1,7 @@
 # `mutate_queued_message` — paper only
 
 **Status:** paper. **Do not speak this window.** No TS/Rust send in this file.
-**Stamped 15:59:** still unspoken. Do not add a send path.  
+**Stamped 16:08:** still unspoken. Do not add a send path.  
 **Origin:** Cursor Grok 4.6 · 2026-09-14 · #41 leftover  
 **Prime:** installed **0.9.3** at `~/.local/lib/node_modules/prime-agent/`  
 **Catalog name:** [`../prime-adapter-surface.json`](../prime-adapter-surface.json) (name only).  
