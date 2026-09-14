@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ChatComposerDeck } from './ChatComposerDeck'
@@ -59,6 +60,15 @@ describe('ChatComposerDeck — the context pill', () => {
     expect(onCloseContext).toHaveBeenCalledTimes(1)
   })
 
+  it('truncates a long note name so the composer strip does not clip', () => {
+    const long = 'a-very-long-imported-session-title-that-would-overflow-the-composer.md'
+    renderDeck({ contextLabel: long })
+    const pill = screen.getByTestId('composer-context-pill')
+    expect(pill).toHaveClass('max-w-full')
+    expect(pill.querySelector('span')).toHaveClass('truncate')
+    expect(pill).toHaveAccessibleName(`ctx · ${long}`)
+  })
+
   /** No way to act on it, no affordance suggesting there is. */
   it('stays a plain label when nothing can be done about it', () => {
     render(
@@ -68,5 +78,24 @@ describe('ChatComposerDeck — the context pill', () => {
     )
     expect(screen.queryByTestId('composer-context-pill')).not.toBeInTheDocument()
     expect(screen.getByText(/memory-loop\.md/)).toBeInTheDocument()
+  })
+
+  it('truncates a long static chip and keeps the full name on hover', () => {
+    const long = 'a-very-long-imported-session-title-that-would-overflow-the-composer.md'
+    render(
+      <TooltipProvider>
+        <ChatComposerDeck locale="en" contextLabel={long} />
+      </TooltipProvider>,
+    )
+
+    const label = screen.getByText(`ctx · ${long}`)
+    expect(label).toHaveClass('truncate')
+    expect(label.parentElement).toHaveAttribute('title', `ctx · ${long}`)
+  })
+
+  it('does not put a vault switcher on the composer', () => {
+    const source = readFileSync(`${process.cwd()}/src/components/ChatComposerDeck.tsx`, 'utf8')
+    expect(source).not.toContain('composer-vault-pill')
+    expect(source).not.toMatch(/Switch vault/)
   })
 })

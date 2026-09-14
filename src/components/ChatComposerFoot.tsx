@@ -37,7 +37,7 @@ export function ChatComposerFoot({
     <div
       data-testid="chat-composer-foot"
       className={cn(
-        'mt-[7px] flex items-center justify-between font-mono text-[10px] tracking-[0.03em] text-muted-foreground',
+        'mt-2 flex items-center justify-between font-mono text-[12px] tracking-[0.03em] text-muted-foreground',
         working && 'text-primary',
       )}
     >

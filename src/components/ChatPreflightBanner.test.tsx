@@ -49,6 +49,11 @@ describe('ChatPreflightBanner', () => {
     })
     expect(screen.getByTestId('chat-preflight-reason')).toHaveTextContent('macOS is blocking access')
     expect(screen.getByTestId('chat-preflight-remedy')).toHaveTextContent('Privacy & Security')
+    expect(screen.getByTestId('chat-preflight-title')).toHaveClass('text-[12px]')
+    expect(screen.getByTestId('chat-preflight-reason').parentElement).toHaveClass('text-[12px]')
+    expect(screen.getByTestId('chat-preflight-banner').querySelector('svg')).toHaveClass(
+      'text-[var(--accent-amber,var(--foreground))]',
+    )
   })
 
   it('lists the vault before the provider', async () => {
@@ -80,5 +85,29 @@ describe('ChatPreflightBanner', () => {
     rerender(<ChatPreflightBanner vaultPath="/two" provider="opencode" />)
     await waitFor(() => expect(calls).toHaveLength(2))
     expect(calls[1]?.vaultPath).toBe('/two')
+  })
+
+  it('still preflights when no vault is attached', async () => {
+    response = { vault: ok, provider: ok }
+    render(<ChatPreflightBanner vaultPath="" provider="xai" />)
+    await waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0]?.vaultPath).toBe('')
+    expect(screen.queryByTestId('chat-preflight-banner')).not.toBeInTheDocument()
+  })
+
+  it('can warn about the provider when no vault is attached', async () => {
+    response = {
+      vault: ok,
+      provider: {
+        status: 'failed',
+        reason: 'xAI is not connected',
+        remedy: 'Sign in from Terminal',
+      },
+    }
+    render(<ChatPreflightBanner vaultPath="" provider="xai" />)
+    await waitFor(() => {
+      expect(screen.getByTestId('chat-preflight-banner')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('chat-preflight-reason')).toHaveTextContent('xAI is not connected')
   })
 })
