@@ -2,6 +2,9 @@
 
 **This repository is not Rhizome Desktop.**
 
+**Stamped 15:20:** still `tuckcode/rhizome-agent` / `ai.rhizome.agent`.
+Do not push to Desktop. Do not “fix branding back to Desktop.”
+
 | | Rhizome Desktop | Rhizome Agent (this repo) |
 |---|---|---|
 | Purpose | Personal knowledge / vault / wiki app | Chat shell on the **Prime Agent** harness |

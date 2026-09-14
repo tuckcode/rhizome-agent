@@ -1,7 +1,7 @@
 # Session board — 2026-09-13 night
 
-**Origin:** Cursor Grok 4.6 · 2026-09-12 picture, **stamped 2026-09-13**
-against `origin/main` + live `gh`.
+**Origin:** Cursor Grok 4.6 · 2026-09-12 picture, **stamped 2026-09-14**
+against local `4416411` + `origin/main` `5c629a0` + live `gh`.
 
 Tonight is the work window. Morning is the last hours to land, not kickoff.
 
@@ -13,23 +13,30 @@ Unclaimed work: `NEXT.md`.
 
 ## Status
 
-- **Done:** daily-drive batch in `/Applications` as **`476756c`**. Origin
-  tip is newer docs: **`5c629a0`**.
-- **Now:** living-docs truth (this file + HANDOFF / NEXT / YOU-SHOULD-KNOW).
-- **Next:** execute claimed W-lanes. Do not wait for morning.
+- **Done:** nightly docs + W7 harden committed locally (`e64a283`,
+  `4416411`). Astra S1–S4 + R1–R4 **source PASS** in the dirty tree.
+  `js-yaml` / `fast-uri` pins landed. Packaged app still **`476756c`**.
+- **Now:** Leftover paper until D6 ~15:45. Origin still **`5c629a0`**. Dirty
+  count **253+**. Do not declare daily-driver ready. Do not rebuild
+  `/Applications`. C68 sheet lock stays out of scope. D6 path check
+  ([1487](plans/handoffs/2026-09-14-1487-cursor-grok-4-6-d6-paths-ok.md)).
+- **Next:** D6 named commits. Push is docked. Native C64 ×3. #46 live
+  Chat-without-vault. Import stays vault-only until `1`. No second God plan.
+
+**Origin:** Cursor Grok 4.6 · 2026-09-14 15:43 · leftover paper + D6 start. C57 / queue leftover locked.
 
 ---
 
 ## True right now
 
-- **Git tip / origin `main`:** **`5c629a0`** (`docs: sync AGENTS
-  preferences with Nous Chat list and Notes seam`).
+- **Git tip (local):** **`4416411`**. **Origin `main`:** **`5c629a0`**.
+  Two commits not pushed.
 - **Last stamped app:** **`476756c`**, **2026-09-12 22:43**,
   `/Applications/Rhizome Agent.app`. Vite / mock-tauri is not that vault.
 - **Prime on this machine:** **0.9.3**.
-- **Open GitHub issues:** **17** (live `gh` 2026-09-13 night): #5 #13
+- **Open GitHub issues:** **17** (live `gh` 2026-09-14): #5 #13
   #23 #26 #32 #36 #39 #40 #41 #45 #46 #48 #50 #51 #52 #56 #57. Closed
-  tonight include **#14 #17 #18 #43 #47 #49 #53 #54 #55**. Prefer `gh`.
+  include **#14 #17 #18 #43 #47 #49 #53 #54 #55**. Prefer `gh`.
 - **Open PR:** [#66](https://github.com/tuckcode/rhizome-agent/pull/66)
   (draft docs). Do not clobber that body.
 
@@ -70,8 +77,8 @@ Also on origin (tree `5c629a0`, not necessarily `/Applications`):
 
 ## Finished here, not in `/Applications` yet
 
-Docs/tree after `476756c` (including `5c629a0`). Rebuild only if Atticus
-will launch the new app.
+Docs/tree after `476756c`: origin `5c629a0`, local `4416411` unpushed.
+Rebuild only if Atticus will launch the new app.
 
 ---
 
@@ -79,8 +86,9 @@ will launch the new app.
 
 - Matching Notes color to Sessions **dropped the visible inner line**.
   Keep the seam on Notes. Do not cover the left pulse.
-- Close (red) **hides**. **Cmd+Q** quits. C22. Helpers should stop after
-  hide: [`plans/hide-on-close-helpers.md`](plans/hide-on-close-helpers.md).
+- Close (red) **hides**. **Cmd+Q** quits. C22. Helpers **stop** after
+  hide on main (`43059e3e`); native leftover:
+  [`plans/hide-on-close-helpers.md`](plans/hide-on-close-helpers.md).
 - Agent `git push` can fail on a sandbox Playwright cache. Retry outside
   the sandbox. Never `--no-verify`.
 - Thinking-pill filter is in the packaged app.
@@ -94,16 +102,17 @@ will launch the new app.
 | 1 | **C64** first 2s Chat subhead ×3 | Weak verify | [2156](plans/handoffs/2026-09-06-2156-composer-c64-native-verify-checklist.md) | 3× no install copy in first 2s |
 | 2 | **#47** confirm-close | **CLOSED** tonight | [2157](plans/handoffs/2026-09-06-2157-composer-issue-47-close-checklist.md) | Do not reopen |
 | 3 | **#51 Case 2** model-backed Tab | Case 1 enough | [2153](plans/handoffs/2026-09-06-2153-composer-issue-51-tab-remainder.md) | Optional; not daily-drive |
-| 4 | **C72** Inbox rename / find Notes | Partial | [2151](plans/handoffs/2026-09-06-2151-composer-c72-ready-brief.md) | Inbox means the folder; **new** ADR for rail polish |
-| 5 | Prime **session-list import** | Vault yes; rows **blocked** | [2152](plans/handoffs/2026-09-06-2152-composer-prime-session-list-import-brief.md) | Atticus picks `import_jsonl` route |
-| 6 | Hide-on-close stop helpers | Found, not built | [`plans/hide-on-close-helpers.md`](plans/hide-on-close-helpers.md) | Hide leaves no extra Prime/MCP/Mindwalk helper |
-| 7 | Grokbot leftover review | Parked; PRs #60–#63 landed | [1819](plans/handoffs/2026-09-06-1819-composer-park-grokbot-audits-tonight.md) | Accept/defer leftover findings |
+| 4 | **C72** find Notes | tree labeled; leftover `476756c` | [`plans/c72-notes-delta.md`](plans/c72-notes-delta.md) | Inbox = folder; packaged View names old until rebuild |
+| 5 | Prime **session-list import** | Vault yes; rows **blocked** until **`1`** | [2152](plans/handoffs/2026-09-06-2152-composer-prime-session-list-import-brief.md) | Atticus types **`1`**. Silence is not yes. Do not speak `import_jsonl`. |
+| 6 | Hide-on-close stop helpers | On main `43059e3e`; native leftover | [`plans/hide-on-close-helpers.md`](plans/hide-on-close-helpers.md) | Native hide leaves no extra app-owned helper |
+| 7 | Grokbot leftover review | Reviewed 2026-09-14; 0 Accept | [1155](plans/handoffs/2026-09-14-1155-cursor-grokbot-leftover-review.md) | rhizome-agent leftovers deferred; CodexGPT lob stays out |
 | 8 | Windows first boot **C42** / **#32** | Never launched | `WINDOWS-DEV.md` | **Blocked** — no Windows box |
 | 9 | Dirty file | Leave alone | `docs/plans/handoffs/2026-09-12-1714-rhizome-deepseek-v4-flash-thinking-pill.md` | Do not touch |
 
 Live open issues that are **not** on this pile (still real): **#5** spec,
-**#46** HOME vault/MCP (security), **#41** steer honesty, **#56** second
-provider path. See NEXT. Prefer live `gh` over ASTRA §5.
+**#46** source refuse HOME (`4416411`); leftover is live Chat-without-vault,
+**#41** source `onSteer` wired; leftover is native + unspoken mutate-one,
+**#56** second provider path. See NEXT. Prefer live `gh` over ASTRA §5.
 
 ---
 
@@ -111,12 +120,13 @@ provider path. See NEXT. Prefer live `gh` over ASTRA §5.
 
 Source dump:
 [2208](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md).
+Index: [`plans/w11-card-status.md`](plans/w11-card-status.md).
 Chat ↔ Prime still first. **Hard no:** do not replace Chat; do not invent
 the briefing; do not expand two big overlays at once.
 
 | Card | Status | Pointer |
 |---|---|---|
-| `rhizome-ship` (commit / push / rebuild) | Idea | [`plans/rhizome-ship-skill.md`](plans/rhizome-ship-skill.md) |
+| `rhizome-ship` (commit / push / rebuild) | Authored | [`.cursor/skills/rhizome-ship/`](../.cursor/skills/rhizome-ship/SKILL.md) · spec [`plans/rhizome-ship-skill.md`](plans/rhizome-ship-skill.md) |
 | Portfolio + Today strip + launcher + vault board | Parked | [`design/idle-chat-overview.md`](design/idle-chat-overview.md) |
 | Vault as skill/memory home; no CC Switch | Parked | [`design/vault-skill-home.md`](design/vault-skill-home.md) |
 | Memory loop index (promote / recall / import) | Index | [`design/memory-loop.md`](design/memory-loop.md) |

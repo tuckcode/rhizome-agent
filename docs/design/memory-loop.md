@@ -10,7 +10,9 @@
 
 - **Done:** write path audited (2026-08-02). Promote (#24) closed. Retrieval provenance (#25) closed. Vault `Imports/` writer shipped (Claude Code). Distill exists. `trigger` has a reader.
 - **Now:** the loop is still not one picture an agent can execute. Blank-wiki save-loop test **(a)** is still open.
-- **Next:** keep promote/search honest; finish session-list import; do not auto-wiki.
+- **Next:** keep promote/search honest. Session-list import stays **blocked**
+  until Atticus types **`1`**. Vault `Imports/` writer already exists.
+  Do not auto-wiki. Do not speak `import_jsonl`.
 
 **Done when:** chat → work → promote → recall is named in one place, each hop has an owner, and a blank vault can be tested by a human.
 
@@ -33,6 +35,14 @@ Chat with Prime
 | Promote | explicit tool and/or UI | auto-wiki from every turn |
 
 `IDENTITY.md`: if Prime has a mechanism, use Prime’s **design** (refine, versioning). Durable knowledge still lands in the vault.
+
+---
+
+## Archive artwork
+
+**Origin:** Cursor Grok 4.6 · 2026-09-14 · Astra D4.
+
+The [memory-archive picture](brand/2026-09-13/hero-memory-archive.png) is a concept illustration, not a shipped memory-state screen. Proposed vocabulary and later criteria live in [`MEMORY-DIRECTION.md`](brand/2026-09-14-handoff/MEMORY-DIRECTION.md). Do not add memory-state badges or a second store.
 
 ---
 
@@ -61,9 +71,12 @@ Chat with Prime
 
 ## Session import (onboarding half of the same thesis)
 
-Always a Prime session-list row (intent). Also a vault note under `Imports/` when a vault is open.
+Always a Prime session-list row **after Atticus types `1`**. Also a vault note under `Imports/` when a vault is open.
 
-Vault writer: shipped. List rows: not. Blocker: Prime `import_jsonl` **replaces the active session**. Routes: [`../plans/handoffs/2026-09-06-2152-composer-prime-session-list-import-brief.md`](../plans/handoffs/2026-09-06-2152-composer-prime-session-list-import-brief.md).
+Vault writer: shipped. List rows: **blocked** (silence is not `1`).
+Blocker: Prime `import_jsonl` **replaces the active session**. Decision:
+[`../plans/import-jsonl-decision.md`](../plans/import-jsonl-decision.md).
+Routes: [`../plans/handoffs/2026-09-06-2152-composer-prime-session-list-import-brief.md`](../plans/handoffs/2026-09-06-2152-composer-prime-session-list-import-brief.md).
 
 Do not treat vault-only import as “import done.”
 

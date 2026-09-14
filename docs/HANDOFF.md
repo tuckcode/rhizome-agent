@@ -47,25 +47,16 @@ file.
 ---
 
 ## State
-`main` on origin is **`5c629a0`** (AGENTS prefs + Notes seam). Last
-**app** is still **`476756c`** at **2026-09-12 22:43**. Unified picture:
-[`docs/BOARD.md`](BOARD.md). **God plan (Astra, source of truth):**
-[`/Users/dtc/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/ASTRA_GOD_PLAN.md`](file:///Users/dtc/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/ASTRA_GOD_PLAN.md)
-(Cursor index:
-[`s-plans/README.md`](file:///Users/dtc/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/s-plans/README.md)).
-Inventory that fed it:
-[`docs/ASTRA_PACKET.md`](ASTRA_PACKET.md) (longer:
-[`PLAN_FOR_A_PLAN.md`](PLAN_FOR_A_PLAN.md)). C64 first-2s is still weak.
-Native Chat glance **PASSED** (2026-09-06). W4 native cases tonight are **NOT RUN**
-([2235 evidence](plans/handoffs/2026-09-13-2235-cursor-grok-4-6-w4-reliability-evidence.md)).
-Installed candidate **`476756c`** is **not** daily-driver ready. After future installs, delete
-leftover `.app` copies.
+**Origin:** Cursor Grok 4.6 · 2026-09-14 15:45 · D6 commits in progress.
 
-Still open / parked: **C72** Inbox rename; Prime list-import; **#51** Case 2
-(model-backed Tab); **C64** full verify; Grokbot leftover review; Rhizome
-in-app updater stub. **#47 closed tonight** (confirm). Evening-dump **cards**
-(not UI): BOARD W11. Live `gh` **17** open issues (ASTRA §5 was 26). Prefer `gh`. [`docs/YOU-SHOULD-KNOW.md`](YOU-SHOULD-KNOW.md) (check its own
-date first).
+Local HEAD **`188745d`** (native secure_fs). Also local: `db6f74a`
+(leftover tests), `3bf045c` (D2/D3), `ce450ab` (C72), `4416411` (W7),
+`e64a283` (God plan). Origin `main` still **`5c629a0`** — **not pushed**.
+App leftover **`476756c`**. Import waits for **`1`**. Do not merge #66.
+C64 / W4 / hide / last-idle still **NOT RUN**. God plan:
+[`docs/ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md). Board: [`docs/BOARD.md`](BOARD.md).
+Leftover index:
+[1460](plans/handoffs/2026-09-14-1460-cursor-grok-4-6-leftover-inventory.md).
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Inverted Dock icon is
@@ -99,45 +90,23 @@ critical path at ~120s, coverage 85s of it).
 `docs/NEXT.md` — unclaimed work in one place: open issues by theme, the
 decisions that block some of them, the open C-numbers, and where the design
 docs need filling. Read it when a handoff task is finished and the next one is
-yours to choose. **God plan:** `/Users/dtc/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/ASTRA_GOD_PLAN.md`. Priority: W7 HOME-vault + W4 Chat reliability. Inventory: [`ASTRA_PACKET.md`](ASTRA_PACKET.md).
+yours to choose. **God plan:** [`docs/ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md).
+Morning detail:
+[`2026-09-14-1115`](plans/handoffs/2026-09-14-1115-cursor-grok-4-6-morning-pickup.md).
+Priority: push `4416411`/`e64a283`, C64 ×3, W4 native evidence. Inventory:
+[`ASTRA_PACKET.md`](ASTRA_PACKET.md).
 
 ## Recent sessions
 
-- [2026-09-13 · Cursor Grok 4.6](plans/handoffs/2026-09-13-2235-cursor-grok-4-6-w4-reliability-evidence.md) — W4: all five God-plan native cases **NOT RUN**. Source tests 98/98 are not a native pass. App stamp `476756c`. Not daily-driver ready.
-- [2026-09-13 · Cursor Grok 4.6](plans/handoffs/2026-09-13-2225-cursor-grok-4-6-home-vault-and-import-jsonl.md) — #46 already guarded on main (`e90e37c`); import decision at `docs/plans/import-jsonl-decision.md` (recommend route 1). No list-import code.
-- [2026-09-13 · Cursor Grok 4.6](plans/handoffs/2026-09-13-2215-cursor-grok-4-6-living-docs-truth.md) — W1 living-docs: BOARD/HANDOFF/NEXT/YOU-SHOULD-KNOW match git tip `5c629a0` + live `gh` (17 open).
-- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-2145-cursor-grok-4-6-nous-chat-list.md) — Nous Portal in the Chat model list; Settings ticks unused models; expanded rail keeps the Settings gear (pin left).
-- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-2100-cursor-grok-4-6-session-board.md) — one STE board of tonight: finished, found, pile, ideas. Detail: [`docs/BOARD.md`](BOARD.md).
-- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-2018-cursor-grok-4-6-packages-install-rebuild.md) — Packages **Install** runs the Prime CLI then reloads. Tonight's daily-drive batch goes to main + `/Applications`.
-- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-13-0048-cursor-grok-4-6-lag-audit-evidence.md) — session switch clears the transcript immediately; Settings provider status waits until Agents is visible.
-- [2026-09-12 · Cursor Composer](plans/handoffs/2026-09-12-1725-cursor-daily-drive-followups.md) — note hover-collapse gone; green latest-reply marker; note highlight Copy.
-- [2026-09-12 · Cursor Composer](plans/handoffs/2026-09-12-1721-cursor-daily-drive-batch.md) — thinking-pill model filter landed; Notes list uses sidebar color; session row highlights on click.
-- [2026-09-12 · DeepSeek V4 Flash (Rhizome Chat)](plans/handoffs/2026-09-12-1714-rhizome-deepseek-v4-flash-thinking-pill.md) — thinking pill offers only the model's own levels; `deepseek-v4-flash` has no Medium, so Medium snapped back to High.
-- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-1705-cursor-grok-4-6-notes-rail-width.md) — right Notes mirrors left Sessions: 240px open, 46px shut, same color.
-- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-1059-cursor-grok-4-6-architecture-deepen.md) — Chat shell layout + launch restore modules. App no longer derives Notes-open. AiPanel no longer mutexes rehydrate vs resume. C64 still weak.
-- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-0845-cursor-grok-4-6-ux-visual-pass.md) — visual pass on Applications `3a21f9f`; Inbox no longer hides Notes; Show Notes strip. C64 still weak.
-- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-1551-cursor-grok-4-6-area-d-rebase.md) — **#61** Tolaria `site/` / Desktop archive gone; `YOU-SHOULD-KNOW.md` kept. Squash-merged as #61.
-- [2026-09-12 · Grok 4.6](plans/handoffs/2026-09-12-1051-grok-4-6-area-c-rebase.md) — **PR #60 Area C** rebased onto `origin/main` after #62; unused onboarding prompt stayed deleted.
-- [2026-09-12 · Cursor Grok 4.6](plans/handoffs/2026-09-12-0018-cursor-grok-4-6-chat-note-split.md) — Chat note **On top / Beside**; Beside folds Sessions/Notes; Ask Chat about highlight. Not in `/Applications` until a rebuild.
-- [2026-09-11 · Cursor Grok 4.6](plans/handoffs/2026-09-11-2045-cursor-grok-4-6-applications-rebuild.md) — `/Applications` rebuilt 18:39 then 21:59; extra `.app` copies gone. C64 still not first-2s; #47 open.
-- [2026-09-08 · Cursor Grok 4.6](plans/handoffs/2026-09-08-1918-cursor-grok-4-6-c64-stamp.md) — stamped origin **`457ee96`** vs last app **`0fa00a2`**. C64 first-2s verify blocked (Documents sheet, then blank chrome).
-- [2026-09-08 · Cursor Grok 4.6](plans/handoffs/2026-09-08-0335-cursor-grok-4-6-docs-refresh.md) — living docs catch-up: shell/Prime/MCP/first-run match the tree; ADR-0171.
-- [2026-09-07 · Cursor Grok 4.6](plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md) — **parked evening dump (no UI):** portfolio-on-boot, vault as skill/memory home, STE must not drift, no CC Switch in product. Chat ↔ Prime still first.
-- [2026-09-07 · Composer](plans/handoffs/2026-09-07-0324-composer-graph-on-changes.md) — **Graph/Mycelium only on Changes;** Inbox keeps the full notes list; collapsed Notes leaves a 46px right rail (same as left command rail).
-- [2026-09-07 · Composer](plans/handoffs/2026-09-07-0308-composer-lag-audit-pickup.md) — **lag/pinwheel audit pickup** for a fresh session (start / page switch / Settings); prior beachball diagnosis linked; only one Rhizome process; Apps was `.bak` at write time.
-- [2026-09-07 · Composer](plans/handoffs/2026-09-07-0003-composer-beachball-lag.md) — **beachball diagnosis (docs only):** session switch = 3 sync Prime awaits + full chat `messages.map`; Settings = full remount; cold start = ensure daemon + vault + Graph if Inbox open; Applications smoother but same shapes; quit Applications before `tauri:dev` (same bundle id).
-- [2026-09-06 · Cursor Grok 4.6](plans/handoffs/2026-09-06-2236-cursor-grok-4-6-area-f.md) — **Area F:** MCP no longer advertises `rhizome_grok_import` / `rhizome_generate_wiki` / `rhizome_repo_research`; deleted `rhizome_grok_import.rs` and parked smoke junk. **Merged as #63**.
-- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2230-grok-4-6-area-e-dead-ipc.md) — **Area E:** deleted unused Tauri IPC (messages/compaction/owned-session/shutdown/conflict-mode/title-sync/migrate/archive/clone_repo/mindwalk-open/bridge/toggle-tray) and `src-tauri/gen/apple` + `mobile.json`. Launch no longer migrates `~/Laputa`. **Merged as #62**.
-- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2145-grok-4-6-area-b-orphan-hooks.md) — **Area B subtraction:** deleted unused hooks (`useMcpBridge`, `useClaudeCodeOnboarding`, `useClaudeCodeStatus`, `useNoteLayout`), the TS Mindwalk duplicate, unused Claude CLI wrappers, and confirmed-dead app-core exports. Claude onboarding/badge UI files left for area C. **Merged as #59**.
-- [2026-09-06 · Composer](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md) — **native Chat glance PASS** on `f76b46c`/`ac36e10`; daily-drive north-star leftover closed. Parked: C72, Prime list-import, #51 Tab, C64 full verify, #47, Grokbot.
-- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2215-grok-4-6-area-d-docs-archive.md) — **Area D subtraction:** killed Tolaria `site/`, Desktop `release-notes/`, stale vision/wiki/podcast/plans/design one-shots, 50 `.pen` mocks, Laputa Claude commands, empty `.mcp.json`, Desktop `trademarks.md`, and C18 l10n invitation scripts. `YOU-SHOULD-KNOW.md` stays (living briefing). `CONTRIBUTING.md` is now a private-repo stub.
-- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-2155-grok-4-6-area-c-orphan-ui.md) — **Area C:** deleted orphan UI under `src/components/` (onboarding/create-note/autocomplete/NoteIcon), unused exports, and dead dialog/docked/right-panel-chat branches.
-- [2026-09-06 · Grok 4.6](plans/handoffs/2026-09-06-0405-grok-4-6-status-bar-pills.md) — status-bar chrome: Contribute/Docs → Settings → About; build/update next to theme; composer lost the duplicate vault pill and hosts agent idle. Vault dropdown stays bottom-left.
-- Everything from 2026-09-05 and earlier: individual files still in
-  `docs/plans/handoffs/` (search by date), or for anything before
-  2026-08-21, [the archive](plans/handoffs/archive-through-2026-08-20.md) —
-  not in date order, search by date or issue number. Pruned from this index
-  2026-09-02 per this section's own rule; nothing was deleted from disk.
+Per-session files live in `docs/plans/handoffs/`. Newest by filename.
+Do not paste leftover paper here.
+
+- [2026-09-14 · D6 start](plans/handoffs/2026-09-14-1520-cursor-grok-4-6-d6-start.md) — named-path commits. No push. No rebuild.
+- [2026-09-14 · leftover inventory](plans/handoffs/2026-09-14-1460-cursor-grok-4-6-leftover-inventory.md) — parked items and leftover locks through 1519.
+- [2026-09-14 · docked questions](plans/handoffs/2026-09-14-1145-cursor-grok-4-6-docked-questions.md) — still unanswered.
+- [2026-09-14 · morning pickup](plans/handoffs/2026-09-14-1115-cursor-grok-4-6-morning-pickup.md) — three SHAs. Import waits for `1`.
+- [2026-09-13 · W4 evidence](plans/handoffs/2026-09-13-2235-cursor-grok-4-6-w4-reliability-evidence.md) — five native cases **NOT RUN**.
+- Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)
 
@@ -289,7 +258,7 @@ push is not a release — releases are tagged builds with signed installers.
   one memory store, the vault). Still open: one profile vs per-agent; app-wide
   vs per-vault; new Settings section vs under the existing AI agents page.
 - ~~**C67-OPEN (2026-09-06): sessions list needs a right-click menu**~~ **RESOLVED 2026-09-06.** Right-click Open / Rename / Archive·Restore / View in Mycelium / Copy path via `PrimeSessionListContextMenu`; Mycelium uses `handleOpenSessionFootprint`.
-- ~~**C68-OPEN (2026-09-06): restore note lock/view.**~~ **RESOLVED 2026-09-06.** Ephemeral per-note lock (default editable); breadcrumb + Cmd+K; BlockNote/CodeMirror read-only when locked. Not vault `editor_mode`.
+- ~~**C68-OPEN (2026-09-06): restore note lock/view.**~~ **RESOLVED 2026-09-06.** Ephemeral per-note lock (default editable); breadcrumb + Cmd+K; BlockNote/CodeMirror read-only when locked. Not vault `editor_mode`. Layout lock 2026-09-14: `EditorContentLayout.test.tsx`.
 - ~~**C69-OPEN (2026-09-06): Linux CI Clippy (`-D warnings`) fails on macOS-only
   `src-tauri`.**~~ **RESOLVED 2026-09-12 on main (`f4b8b60`).**
   Capture helpers and `should_reopen_main_window` are `cfg(any(macos, test))`;
@@ -302,8 +271,7 @@ push is not a release — releases are tagged builds with signed installers.
 
 - ~~**C71-OPEN (2026-09-06): composer up-arrow previous-prompt history.**~~ **RESOLVED 2026-09-06.** Session-scoped in-memory recall (cap 50); Up/Down when empty or caret at start; suggestion menus keep Arrow keys. See `composerPromptHistory` + `useComposerPromptHistory`.
 
-- **C72 (2026-09-06/07): side-panel discoverability.** **PARTIAL 2026-09-12 polish:** rail control is **Notes** (Inbox stays a folder in the list); Chat stays the canvas; last idle conversation resumes on native relaunch; composer Prime/skills are labels. Still open: Inbox rename inside the list (deferred). Notes rail polish is
-  in `/Applications` as of **`476756c`**. Detail: [2026-09-12-0845](plans/handoffs/2026-09-12-0845-cursor-grok-4-6-ux-visual-pass.md).
+- **C72 (2026-09-06/07): side-panel discoverability.** **PARTIAL 2026-09-12 polish:** rail control is **Notes** (Inbox stays a folder in the list); Chat stays the canvas; last idle conversation resumes on native relaunch; composer Prime/skills are labels. **Origin:** Cursor Grok 4.6 · 2026-09-14 14:16 — leftover is packaged **`476756c`**. Tree already ⌘2 `Notes, Browse closed` / ⌘3 `Notes, Browse open` (View menu + shortcuts sheet). Inbox stays the folder. Detail: [2026-09-12-0845](plans/handoffs/2026-09-12-0845-cursor-grok-4-6-ux-visual-pass.md).
 
 - **#50 (2026-08-29): let the agent see the running app — plan ready, not built.**
   Three answers proposed: show `pnpm dev` (not native), read + steer through

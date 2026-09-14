@@ -1,0 +1,70 @@
+[
+  {
+    "path": "assets/banner-ascii.png",
+    "bytes": 1233133,
+    "sha256": "8784eea214b03bdbd01673032281c470b3712c2adc67f40c1d1441acb726ff71",
+    "width": 2172,
+    "height": 724,
+    "bit_depth": 8,
+    "color_type": "RGB, opaque"
+  },
+  {
+    "path": "assets/banner-dither.png",
+    "bytes": 1232852,
+    "sha256": "9a946a12d28aa74d0511d237e6df2b2b00f6d9665f631392b24131b14814db8a",
+    "width": 2172,
+    "height": 724,
+    "bit_depth": 8,
+    "color_type": "RGB, opaque"
+  },
+  {
+    "path": "assets/dock-icon-directions.png",
+    "bytes": 1348286,
+    "sha256": "d24a2c2764d10bcbc08a5c27f6ace6929abaeac22041a094d6dbc94f80f54c85",
+    "width": 1536,
+    "height": 1024,
+    "bit_depth": 8,
+    "color_type": "RGB, opaque"
+  },
+  {
+    "path": "assets/dock-signal-concept.png",
+    "bytes": 1160329,
+    "sha256": "6c173e7fa4188931a704f58cb956322da816ac179f85d8ed3dab8a339b025136",
+    "width": 1254,
+    "height": 1254,
+    "bit_depth": 8,
+    "color_type": "RGB, opaque"
+  },
+  {
+    "path": "assets/hero-memory-archive.png",
+    "bytes": 1951164,
+    "sha256": "c5bde047149325922fe05da9963455d667491d1476f0c76bfabca618c8092706",
+    "width": 1774,
+    "height": 887,
+    "bit_depth": 8,
+    "color_type": "RGB, opaque"
+  },
+  {
+    "path": "assets/hero-organic-network.png",
+    "bytes": 1730759,
+    "sha256": "1f629c870950af12de7c59e4b50bec1c21401a71d2c32b979da665e459389643",
+    "width": 1774,
+    "height": 887,
+    "bit_depth": 8,
+    "color_type": "RGB, opaque"
+  },
+  {
+    "path": "assets/logo-lockup-dark.png",
+    "bytes": 984179,
+    "sha256": "b35265823bfc6a7838399292a2b75f4bbb2232a5e31d97ed21ff2e3543ad747d",
+    "width": 2172,
+    "height": 724,
+    "bit_depth": 8,
+    "color_type": "RGB, opaque"
+  },
+  {
+    "path": "assets/rhizome-ascii.txt",
+    "bytes": 740,
+    "sha256": "2150d8ac75e50ee2b281662e8df56f8fb53bfb41c734a9278423daacb5ca287a"
+  }
+]

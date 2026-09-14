@@ -1055,9 +1055,44 @@ Schedules: see/pause/cancel already lived on the activity band (#14). Create is
 `heartbeat_set` / `cron_add` from `PrimeScheduleDialog` next to Goal — not on
 the idle strip, which must stay quiet when nothing is scheduled.
 
+**Origin:** Prime Session body is older; reply / packages / hide notes
+added 2026-09-13 against `replySuggestions.ts`, `prime_packages.rs`,
+and `lib.rs::release_helpers_for_hidden_window`.
+
+### Reply suggestions
+
+`suggestReply` is a pure read of the last assistant string. It returns
+pills, one Tab completion, or `null`. Pills and completion never ship
+together. Nothing here talks to Prime.
+
+### Open note in Chat
+
+Chat already has the open note (`activeEntry` / `activeNoteContent`).
+Right-click **Ask the agent about this note** stays on Chat and opens
+that note (`App.test.tsx`). A highlight uses **Ask Chat about this**
+in the same thread (`App.layout-edges.test.ts`) — not a new chat.
+Note lock is ephemeral and per-note: locked notes make BlockNote and
+CodeMirror read-only (`EditorContentLayout.test.tsx`). Not vault
+`editor_mode`. Sheet lock is out of scope.
+
+**Origin:** Cursor Grok 4.6 · 2026-09-14 14:08 · leftover stamp.
+
+### Packages
+
+Installed packages are Prime settings (`list_prime_packages`). The
+catalog is the public npm `pi-package` index. Install is a CLI spawn
+(`install_prime_package`), then `reload` on the attached session. The
+daemon has no package-install verb.
+
+### Hide vs quit
+
+Main-window close hides (C22) and `release_helpers_for_hidden_window`
+stops helpers this process started, unless Keep working left a resident
+session. Quit is Cmd+Q / `ExitRequested`. Never Prime `shutdown`.
+
 ## Settings
 
-App-level settings persisted at `$XDG_CONFIG_HOME/com.tolaria.app/settings.json`, defaulting to `$HOME/.config/com.tolaria.app/settings.json` on Unix platforms (reads legacy `com.laputa.app` and the previous platform config directory on upgrade):
+App-level settings persisted at `$XDG_CONFIG_HOME/com.tolaria.app/settings.json`, defaulting to `$HOME/.config/com.tolaria.app/settings.json` on Unix platforms (reads legacy `com.laputa.app` and the previous platform config directory on upgrade). Writes go through `secure_fs::write_owner_only_atomic` (Unix owner-only, atomic replace; a symlink at the dest is replaced, not followed):
 
 ```typescript
 interface AiWorkspaceConversationSetting {

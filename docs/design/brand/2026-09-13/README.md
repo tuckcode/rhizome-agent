@@ -2,6 +2,9 @@
 
 **Origin:** Astra · Codex · Atticus's image exploration and selection.
 
+Implementation queue (2026-09-14):
+[`../2026-09-14-handoff/START-HERE.md`](../2026-09-14-handoff/START-HERE.md).
+
 Atticus selected the organic network banner as his favorite. It is the lead artwork in the repository README and Settings → About.
 The same local PNG serves both surfaces. Chat, runtime status, and native Dock resources keep their current behavior.
 
@@ -26,7 +29,30 @@ They use Rhizome's own symbol and product name. They do not reproduce Nous artwo
 ![Rhizome ASCII-style banner](banner-ascii.png)
 
 **ASCII:** a raster identity study for developer-facing documentation. The characters in this PNG are not selectable text.
-The companion [plain-text mark](rhizome-ascii.txt) provides a real ASCII alternative for Markdown or terminal output.
+The companion [plain-text mark](rhizome-ascii.txt) provides a real ASCII alternative for Markdown or terminal output. Copyable:
+
+```text
+                            .ooo.
+                            ooooo
+                            'ooo'
+                              |
+             .ooo.            |            .ooo.
+             ooooo            |            ooooo
+             'ooo'\           |           /'ooo'
+                   \       .@@@@@.       /
+                    \     @@@@@@@@@     /
+                     +----@@@@@@@@@----+
+                          '@@@@@@@'
+                         /         \
+                        /           \
+                   .ooo.             .ooo.
+                   ooooo             ooooo
+                   'ooo'             'ooo'
+
+                 r h i z o m e   /   A G E N T
+
+                    Your work. Your memory.
+```
 
 ## Dock studies
 

@@ -1,7 +1,24 @@
 # W1 — living truth
 
-**Owner:** existing Cursor docs sibling. Grok judges truth. Composer stamps decided facts.
-**Start:** now. Follow the [parent contract](README.md).
+**Owner:** Cursor Composer (W1 living-docs subagent).
+**State:** complete (2026-09-14 morning stamp; not committed).
+**Start:** 2026-09-14 ~11:16 CT. Follow the [parent contract](README.md).
+
+```text
+Owner: Cursor Composer (W1 living-docs subagent)
+State: complete
+Starting revision: 4416411
+Owned paths: docs/HANDOFF.md, docs/NEXT.md, docs/YOU-SHOULD-KNOW.md, docs/plans/s-plans/2026-09-13-astra/W1-living-truth.md
+Sibling overlap: parent owns BOARD/MORNING; no overlap on W1 paths
+One bounded change: narrow-replace stale living-docs claims for morning pickup
+Acceptance: local HEAD / origin / app recorded separately; morning handoff + ASTRA_GOD_PLAN linked; no invented native PASS
+Evidence: git log origin/main..HEAD; read HANDOFF/NEXT/YSK/MORNING pickup section
+Commit: none (parent instruction)
+Pushed: no — origin still 5c629a0
+Installed build tested: no — still 476756c
+Unverified: W4 five native cases; C64 first-2s ×3 on /Applications
+Blocker / next: Atticus C64 launches; push when pre-push allowed; import blocked until `1`. Later same day: Astra S1–S4 + R1–R4 + pins are **dirty, not committed**. C72 leftover is packaged `476756c`.
+```
 
 Read current BOARD, HANDOFF, NEXT, YOU-SHOULD-KNOW, and MORNING. Read the current W-lane results before changing their status.
 
