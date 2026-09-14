@@ -20,6 +20,17 @@ describe('redactCredentialTokens', () => {
     expect(result.text).not.toContain(SLACK_BOT)
   })
 
+  it('redacts Hugging Face, GitLab, and npm tokens', () => {
+    const hf = ['hf', 'D'.repeat(32)].join('_')
+    const gitlab = ['glpat', 'E'.repeat(24)].join('-')
+    const npm = ['npm', 'F'.repeat(36)].join('_')
+    const result = redactCredentialTokens(`keys ${hf} ${gitlab} ${npm}`)
+    expect(result.count).toBe(3)
+    expect(result.text).not.toContain(hf)
+    expect(result.text).not.toContain(gitlab)
+    expect(result.text).not.toContain(npm)
+  })
+
   it('preserves whitespace, markdown, and absolute paths', () => {
     const input = `See /Users/luca/vault/note.md\n\n  keep  indent`
     const result = redactCredentialTokens(input)

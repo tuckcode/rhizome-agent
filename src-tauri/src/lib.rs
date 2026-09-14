@@ -153,7 +153,12 @@ fn push_unique_mcp_bridge_vault_path(paths: &mut Vec<PathBuf>, path: &str) {
     if trimmed.is_empty() {
         return;
     }
-    let path = PathBuf::from(trimmed);
+    let expanded = crate::commands::expand_tilde(trimmed);
+    let path = PathBuf::from(expanded.as_ref());
+    if crate::commands::is_home_directory(&path) {
+        log::warn!("#46: refusing to expose $HOME as an MCP vault root");
+        return;
+    }
     if paths.iter().any(|existing| existing == &path) {
         return;
     }
@@ -174,6 +179,13 @@ fn validate_mcp_bridge_vault_path(vault_path: &Path) -> Result<PathBuf, String> 
             "MCP bridge vault is not available: {} is not a directory",
             vault_path.display()
         ));
+    }
+
+    if crate::commands::is_home_directory(&resolved) {
+        return Err(
+            "MCP bridge will not use $HOME as a vault — that scopes tools to the whole home directory (#46)"
+                .into(),
+        );
     }
 
     Ok(resolved)
@@ -339,6 +351,17 @@ pub(crate) fn idle_main_window_close_intent() -> crate::prime_session_host::Sess
     crate::prime_session_host::SessionCloseIntent::Stop
 }
 
+/// Helpers hide must stop. Keep-working leaves the spawned Prime daemon
+/// (ADR-0167 grant). Rhizome-owned MCP is the ws-bridge child, not Prime's
+/// own tool processes on a user-started daemon.
+pub(crate) fn hidden_window_helper_stops(keep_prime_daemon: bool) -> &'static [&'static str] {
+    if keep_prime_daemon {
+        &["ws_bridge", "mindwalk"]
+    } else {
+        &["spawned_prime_daemon", "ws_bridge", "mindwalk"]
+    }
+}
+
 /// Prime and MCP helpers this process started. They keep a Dock "running"
 /// mark after the window hides if we leave them. A Keep-working session is the
 /// exception: that daemon must stay.
@@ -349,6 +372,10 @@ pub(crate) fn release_helpers_for_hidden_window(
 ) {
     use tauri::Manager;
 
+    log::info!(
+        "hide stopping helpers: {:?}",
+        hidden_window_helper_stops(keep_prime_daemon)
+    );
     crate::prime_session_host::set_host_suspended(true);
     if !keep_prime_daemon {
         crate::prime_session_host::stop_spawned_daemon();
@@ -883,6 +910,21 @@ mod tests {
         );
     }
 
+    /// Board pile 6 / hide-on-close-helpers.md: hide stops Rhizome-owned
+    /// helpers. Keep-working leaves the spawned Prime daemon; everything
+    /// else (ws-bridge MCP child, Mindwalk) still stops.
+    #[test]
+    fn hide_stops_owned_helpers_except_keep_working_prime() {
+        assert_eq!(
+            super::hidden_window_helper_stops(false),
+            ["spawned_prime_daemon", "ws_bridge", "mindwalk"]
+        );
+        assert_eq!(
+            super::hidden_window_helper_stops(true),
+            ["ws_bridge", "mindwalk"]
+        );
+    }
+
     /// A dock click with a window already up must not steal focus.
     #[test]
     fn reopen_restores_only_when_nothing_is_on_screen() {
@@ -972,6 +1014,38 @@ mod tests {
 
     #[cfg(desktop)]
     #[test]
+    fn selected_mcp_bridge_vault_paths_skips_the_home_directory() {
+        let Some(home) = dirs::home_dir() else {
+            return;
+        };
+        let list = VaultList {
+            vaults: vec![
+                VaultEntry {
+                    label: "Home".to_string(),
+                    path: home.to_string_lossy().into_owned(),
+                    mounted: Some(true),
+                    ..VaultEntry::default()
+                },
+                VaultEntry {
+                    label: "Real".to_string(),
+                    path: "/tmp/Real Vault".to_string(),
+                    mounted: Some(true),
+                    ..VaultEntry::default()
+                },
+            ],
+            active_vault: Some(home.to_string_lossy().into_owned()),
+            default_workspace_path: None,
+            hidden_defaults: Vec::new(),
+        };
+
+        assert_eq!(
+            selected_mcp_bridge_vault_paths(&list),
+            vec![PathBuf::from("/tmp/Real Vault")]
+        );
+    }
+
+    #[cfg(desktop)]
+    #[test]
     fn validate_mcp_bridge_vault_path_requires_existing_directory() {
         let dir = tempfile::tempdir().unwrap();
         let vault = dir.path().join("Vault With Spaces");
@@ -983,6 +1057,16 @@ mod tests {
         let missing = dir.path().join("Missing Vault");
         let err = validate_mcp_bridge_vault_path(&missing).unwrap_err();
         assert!(err.contains("MCP bridge vault is not available"));
+    }
+
+    #[cfg(desktop)]
+    #[test]
+    fn validate_mcp_bridge_vault_path_refuses_the_home_directory() {
+        let Some(home) = dirs::home_dir() else {
+            return;
+        };
+        let err = validate_mcp_bridge_vault_path(&home).unwrap_err();
+        assert!(err.contains("#46"));
     }
 
     #[cfg(all(desktop, unix))]

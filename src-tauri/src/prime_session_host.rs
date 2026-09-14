@@ -3127,6 +3127,9 @@ impl PrimeHost {
 
         // Seed Rhizome vault skill + optional mcpServers entry when cwd is a vault.
         // Failures are non-fatal so chat still works without vault tools.
+        // Chat-without-vault uses $HOME as cwd and never seeds; still scrub a
+        // leftover global rhizome-vault skill from before #46's guard.
+        crate::prime_vault_skill::scrub_poisoned_global_home_vault_skill();
         match crate::prime_vault_skill::seed_vault_skill(&cwd) {
             Ok(seed) => {
                 log::info!(
