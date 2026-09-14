@@ -10,8 +10,8 @@ shipped after Claude last owned a session, what GitHub still says is
 open that is already built, and the decisions you will otherwise
 re-litigate.
 
-**Living-docs stamp 2026-09-14 16:12:** local HEAD **`e216313`**, origin **`5c629a0`**
-(thirteen unpushed), app **`476756c`**. D6 landed. Leftover through 1554. No push. No rebuild. God plan: [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md).
+**Living-docs stamp 2026-09-14 16:14:** local HEAD **`f984e4a`**, origin **`5c629a0`**
+(fourteen unpushed), app **`476756c`**. D6 landed. Leftover through 1555. No push. No rebuild. God plan: [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md).
 Morning pickup:
 [`2026-09-14-1115`](plans/handoffs/2026-09-14-1115-cursor-grok-4-6-morning-pickup.md).
 Tonight’s picture: [`BOARD.md`](BOARD.md). Confirm with `git log -1` and

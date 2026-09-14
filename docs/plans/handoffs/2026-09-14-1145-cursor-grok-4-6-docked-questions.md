@@ -9,8 +9,8 @@ description: >-
 
 **Origin:** Cursor Grok 4.6 · five-hour burn. Do not wait on these.
 
-**Stamped 16:12:** still unanswered. Silence is still not yes. D6
-landed. Leftover wrap `e216313`. Leftover through 1554. Do not push. Do not type `1`. Do not merge #66. Do not encode C66.
+**Stamped 16:14:** still unanswered. Silence is still not yes. D6
+landed. Leftover wrap `f984e4a`. Leftover through 1555. Do not push. Do not type `1`. Do not merge #66. Do not encode C66.
 
 Silence is **not** yes. Especially not on import.
 
@@ -19,7 +19,7 @@ Silence is **not** yes. Especially not on import.
 1. **Import list-rows.** Type **`1`** if route 1 is the pick
    (`docs/plans/import-jsonl-decision.md`). Until then: vault writer
    only. No Chat session-list rows.
-2. **Push the thirteen local commits?** Tip `e216313`. Origin is still
+2. **Push the fourteen local commits?** Tip `f984e4a`. Origin is still
    `5c629a0`. I will not push until you say push.
 3. **Native C64 ×3** — first 2s Chat subhead. Fail = Prime
    `install copy` text. Sheet:

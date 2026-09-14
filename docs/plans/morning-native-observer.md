@@ -106,7 +106,7 @@ Packaged app only. Vite / `mock-tauri` is not this path.
 Source already restores without a vault path
 (`usePrimeSessionRestore.test.ts`). That is **not** this check.
 
-**Stamped 16:08:** still **NOT RUN**. App still `476756c`. Do not launch
+**Stamped 16:14:** still **NOT RUN**. App still `476756c`. Do not launch
 from an agent. Source last-idle needs no vault path. That is not this
 check.
 
