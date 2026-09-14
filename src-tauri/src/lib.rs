@@ -63,6 +63,7 @@ pub mod rhizome_search;
 pub mod rhizome_vault_seed;
 pub mod rhizome_write_location;
 pub mod search;
+mod secure_fs;
 pub mod session_import;
 pub mod settings;
 pub mod telemetry;
@@ -915,14 +916,25 @@ mod tests {
     /// else (ws-bridge MCP child, Mindwalk) still stops.
     #[test]
     fn hide_stops_owned_helpers_except_keep_working_prime() {
-        assert_eq!(
-            super::hidden_window_helper_stops(false),
-            ["spawned_prime_daemon", "ws_bridge", "mindwalk"]
+        let hide = super::hidden_window_helper_stops(false);
+        let keep_working = super::hidden_window_helper_stops(true);
+        assert_eq!(hide, ["spawned_prime_daemon", "ws_bridge", "mindwalk"]);
+        assert_eq!(keep_working, ["ws_bridge", "mindwalk"]);
+        assert!(
+            hide.contains(&"spawned_prime_daemon"),
+            "hide without Keep working must stop the spawned Prime daemon"
         );
-        assert_eq!(
-            super::hidden_window_helper_stops(true),
-            ["ws_bridge", "mindwalk"]
+        assert!(
+            !keep_working.contains(&"spawned_prime_daemon"),
+            "Keep working leaves the spawned Prime daemon"
         );
+        for name in ["ws_bridge", "mindwalk"] {
+            assert!(hide.contains(&name), "{name} still stops on hide");
+            assert!(
+                keep_working.contains(&name),
+                "{name} still stops when Keep working"
+            );
+        }
     }
 
     /// A dock click with a window already up must not steal focus.

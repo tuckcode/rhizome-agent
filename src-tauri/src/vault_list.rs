@@ -310,6 +310,71 @@ mod tests {
     }
 
     #[test]
+    fn save_refuses_tilde_home_as_a_vault() {
+        let list = VaultList {
+            vaults: vec![VaultEntry {
+                label: "Home".to_string(),
+                path: "~".to_string(),
+                ..Default::default()
+            }],
+            active_vault: Some("~".to_string()),
+            default_workspace_path: None,
+            hidden_defaults: Vec::new(),
+        };
+        let err = reject_home_vault_list(&list).unwrap_err();
+        assert!(err.contains("#46"));
+    }
+
+    #[test]
+    fn save_refuses_tilde_slash_and_home_with_a_trailing_slash() {
+        let Some(home) = dirs::home_dir() else {
+            return;
+        };
+        let slashed = format!("{}/", home.to_string_lossy());
+        for path in ["~/", slashed.as_str()] {
+            let list = VaultList {
+                vaults: vec![VaultEntry {
+                    label: "Home".to_string(),
+                    path: path.to_string(),
+                    ..Default::default()
+                }],
+                active_vault: Some(path.to_string()),
+                default_workspace_path: None,
+                hidden_defaults: Vec::new(),
+            };
+            let err = reject_home_vault_list(&list).unwrap_err();
+            assert!(err.contains("#46"), "path {path} should be HOME");
+        }
+    }
+
+    /// Path comparison only. The temp symlink points at `$HOME` but this
+    /// test never writes or deletes under the real home directory.
+    #[cfg(unix)]
+    #[test]
+    fn save_refuses_a_symlink_to_home_as_a_vault() {
+        let Some(home) = dirs::home_dir() else {
+            return;
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let link = dir.path().join("home-alias");
+        if std::os::unix::fs::symlink(&home, &link).is_err() {
+            return;
+        }
+        let list = VaultList {
+            vaults: vec![VaultEntry {
+                label: "Home alias".to_string(),
+                path: link.to_string_lossy().into_owned(),
+                ..Default::default()
+            }],
+            active_vault: None,
+            default_workspace_path: None,
+            hidden_defaults: Vec::new(),
+        };
+        let err = reject_home_vault_list(&list).unwrap_err();
+        assert!(err.contains("#46"));
+    }
+
+    #[test]
     fn load_legacy_format_without_hidden_defaults() {
         let dir = tempfile::TempDir::new().unwrap();
         let path = dir.path().join("legacy.json");

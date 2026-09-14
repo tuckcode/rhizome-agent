@@ -567,6 +567,11 @@ mod tests {
             "$HOME must never be treated as a vault: seeding it would rewrite \
              Prime's global settings.json and scope vault tools to all of $HOME"
         );
+        let slashed = std::path::PathBuf::from(format!("{}/", home.display()));
+        assert!(
+            !looks_like_vault(&slashed),
+            "HOME with a trailing slash is still HOME"
+        );
     }
 
     #[test]
@@ -575,6 +580,28 @@ mod tests {
             return;
         };
         assert!(seed_vault_skill(&home).is_err());
+    }
+
+    /// #46 leftover: lexical `$HOME` is already refused. A symlink that
+    /// resolves to the same directory must not look like a vault either.
+    /// `looks_like_vault` only compares paths — it does not scrub. Do not
+    /// call `seed_vault_skill` on this link; that helper always scrubs the
+    /// real global skill dir.
+    #[cfg(unix)]
+    #[test]
+    fn a_symlink_to_the_home_directory_is_never_a_vault() {
+        let Some(home) = dirs::home_dir() else {
+            return;
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let link = dir.path().join("home-alias");
+        if std::os::unix::fs::symlink(&home, &link).is_err() {
+            return;
+        }
+        assert!(
+            !looks_like_vault(&link),
+            "a HOME symlink must not pass the vault marker check"
+        );
     }
 
     #[test]
