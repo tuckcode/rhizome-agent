@@ -107,6 +107,17 @@ describe('usePrimeHostStatus', () => {
    * starting. Showing that instructs the user to install software they already
    * have, seconds before the strip corrects itself.
    */
+  it('still reads host status when no vault is attached', async () => {
+    renderHook(() => usePrimeHostStatus(true, ''))
+
+    await waitFor(() => {
+      expect(invoked.calls.some((call) => call.cmd === 'get_prime_session_host_status')).toBe(true)
+    })
+    expect(
+      invoked.calls.filter((call) => call.cmd === 'ensure_prime_session_host'),
+    ).toHaveLength(0)
+  })
+
   it('withholds a first problem report while the engine may still be starting', async () => {
     invoked.running = false
     invoked.problem = { code: 'not_installed' }

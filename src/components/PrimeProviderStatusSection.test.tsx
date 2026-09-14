@@ -87,6 +87,25 @@ describe('PrimeProviderStatusSection', () => {
     })
   })
 
+  it('offers Reconnect for expired Anthropic OAuth the same way as Grok', async () => {
+    state.providers = [{ name: 'anthropic', authKind: 'oauth', expiresAt: 1, expired: true }]
+    render(<PrimeProviderStatusSection t={t} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('prime-provider-expired')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('prime-provider-sign-in-anthropic')).toHaveTextContent('Reconnect')
+  })
+
+  it('keeps DeepSeek as Add key, not Reconnect', async () => {
+    state.providers = []
+    render(<PrimeProviderStatusSection t={t} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('prime-provider-sign-in-deepseek')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('prime-provider-sign-in-deepseek')).toHaveTextContent('Add key')
+    expect(screen.getByTestId('prime-provider-sign-in-deepseek')).not.toHaveTextContent('Reconnect')
+  })
+
   it('flags an expired token and offers reconnect', async () => {
     state.providers = [{ name: 'xai', authKind: 'oauth', expiresAt: 1, expired: true }]
     render(<PrimeProviderStatusSection t={t} />)

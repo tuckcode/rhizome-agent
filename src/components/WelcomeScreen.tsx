@@ -285,8 +285,6 @@ function OptionButton({
 
 function getWelcomeScreenPresentation(
   mode: WelcomeScreenProps['mode'],
-  defaultVaultPath: string,
-  isOffline: boolean,
   locale: AppLocale,
 ): WelcomeScreenPresentation {
   if (mode === 'welcome') {
@@ -295,9 +293,7 @@ function getWelcomeScreenPresentation(
       heroIcon: <BrandMark size={64} style={BRAND_ICON_STYLE} />,
       openFolderLabel: translate(locale, 'onboarding.welcome.openExisting'),
       subtitle: translate(locale, 'onboarding.welcome.subtitle'),
-      templateDescription: isOffline
-        ? translate(locale, 'onboarding.welcome.templateOffline', { path: defaultVaultPath })
-        : translate(locale, 'onboarding.welcome.templateDescription'),
+      templateDescription: translate(locale, 'onboarding.welcome.templateDescription'),
       title: translate(locale, 'onboarding.welcome.title'),
     }
   }
@@ -307,9 +303,7 @@ function getWelcomeScreenPresentation(
     heroIcon: <BrandMark size={64} style={BRAND_ICON_STYLE} />,
     openFolderLabel: translate(locale, 'onboarding.welcome.openExisting'),
     subtitle: translate(locale, 'onboarding.welcome.missingSubtitle'),
-    templateDescription: isOffline
-      ? translate(locale, 'onboarding.welcome.templateOffline', { path: defaultVaultPath })
-      : translate(locale, 'onboarding.welcome.templateDescription'),
+    templateDescription: translate(locale, 'onboarding.welcome.templateDescription'),
     title: translate(locale, 'onboarding.welcome.title'),
   }
 }
@@ -317,13 +311,12 @@ function getWelcomeScreenPresentation(
 function useWelcomeActionButtons({
   mode,
   busy,
-  isOffline,
   onCreateEmptyVault,
   onOpenFolder,
   onCreateVault,
 }: Pick<
   WelcomeScreenProps,
-  'mode' | 'isOffline' | 'onCreateEmptyVault' | 'onOpenFolder' | 'onCreateVault'
+  'mode' | 'onCreateEmptyVault' | 'onOpenFolder' | 'onCreateVault'
 > & {
   busy: boolean
 }) {
@@ -336,11 +329,11 @@ function useWelcomeActionButtons({
   )
   const actions = useMemo<WelcomeAction[]>(
     () => ([
-      { disabled: isOffline, run: onCreateVault },
+      { disabled: false, run: onCreateVault },
       { disabled: false, run: onCreateEmptyVault },
       { disabled: false, run: onOpenFolder },
     ]),
-    [isOffline, onCreateEmptyVault, onCreateVault, onOpenFolder],
+    [onCreateEmptyVault, onCreateVault, onOpenFolder],
   )
 
   useEffect(() => {
@@ -416,7 +409,6 @@ function WelcomeActions({
   busy,
   createEmptyActionRef,
   creatingAction,
-  isOffline,
   locale,
   onCreateEmptyVault,
   onCreateVault,
@@ -426,7 +418,7 @@ function WelcomeActions({
   templateActionRef,
 }: Pick<
   WelcomeScreenProps,
-  'creatingAction' | 'isOffline' | 'onCreateEmptyVault' | 'onCreateVault' | 'onOpenFolder'
+  'creatingAction' | 'onCreateEmptyVault' | 'onCreateVault' | 'onOpenFolder'
 > & {
   busy: boolean
   createEmptyActionRef: WelcomeActionButtonRef
@@ -445,7 +437,7 @@ function WelcomeActions({
         loadingLabel={translate(locale, 'onboarding.welcome.templateLoading')}
         loadingDescription={translate(locale, 'onboarding.welcome.templateLoadingDescription')}
         onClick={onCreateVault}
-        disabled={busy || isOffline}
+        disabled={busy}
         loading={creatingAction === 'template'}
         testId="welcome-create-vault"
         autoFocus
@@ -546,18 +538,16 @@ function WelcomeDocsLink({ locale }: { locale: AppLocale }) {
 export function WelcomeScreen({
   mode,
   locale = 'en',
-  defaultVaultPath,
   onCreateVault,
   onRetryCreateVault,
   onCreateEmptyVault,
   onOpenFolder,
-  isOffline,
   creatingAction,
   error,
   canRetryTemplate,
 }: WelcomeScreenProps) {
   const busy = creatingAction !== null
-  const presentation = getWelcomeScreenPresentation(mode, defaultVaultPath, isOffline, locale)
+  const presentation = getWelcomeScreenPresentation(mode, locale)
   const [namingVault, setNamingVault] = useState(false)
   // The button opens the naming dialog; the dialog's confirm is what actually
   // starts vault creation (which then opens the parent-folder picker).
@@ -569,7 +559,6 @@ export function WelcomeScreen({
   const { templateActionRef, createEmptyActionRef, openFolderActionRef } = useWelcomeActionButtons({
     mode,
     busy,
-    isOffline,
     onCreateEmptyVault: openNameVaultDialog,
     onOpenFolder,
     onCreateVault,
@@ -588,7 +577,6 @@ export function WelcomeScreen({
           busy={busy}
           createEmptyActionRef={createEmptyActionRef}
           creatingAction={creatingAction}
-          isOffline={isOffline}
           locale={locale}
           onCreateEmptyVault={openNameVaultDialog}
           onCreateVault={onCreateVault}

@@ -23,6 +23,39 @@ describe('shouldAllowNativeContextMenu', () => {
     input.remove()
   })
 
+  it('allows a marked surface so the note editor can keep Paste and Select All', () => {
+    const root = document.createElement('div')
+    root.setAttribute('data-allow-native-context-menu', '')
+    const child = document.createElement('p')
+    child.textContent = 'note body'
+    root.appendChild(child)
+    document.body.appendChild(root)
+
+    expect(shouldAllowNativeContextMenu(child)).toBe(true)
+    root.remove()
+  })
+
+  it('allows the assistant reply block so Copy works on selected answer text', () => {
+    const block = document.createElement('div')
+    block.setAttribute('data-testid', 'ai-response-block')
+    const span = document.createElement('span')
+    span.textContent = 'selected answer'
+    block.appendChild(span)
+    document.body.appendChild(block)
+
+    expect(shouldAllowNativeContextMenu(span)).toBe(true)
+    block.remove()
+  })
+
+  it('allows the latest-reply marker so Copy still works on that strip', () => {
+    const marker = document.createElement('div')
+    marker.setAttribute('data-testid', 'ai-local-marker')
+    document.body.appendChild(marker)
+
+    expect(shouldAllowNativeContextMenu(marker)).toBe(true)
+    marker.remove()
+  })
+
   it('blocks unrelated chrome so custom menus keep ownership', () => {
     const chrome = document.createElement('button')
     chrome.textContent = 'Sessions'

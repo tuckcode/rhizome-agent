@@ -83,6 +83,17 @@ describe('PrimeModelPicker', () => {
     expect(cmds()).not.toContain('ensure_prime_session_host')
   })
 
+  it('lists models without starting Prime when Chat has no vault', async () => {
+    render(<PrimeModelPicker label={null} />)
+    fireEvent.pointerDown(
+      screen.getByTestId('prime-model-chip'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+
+    await waitFor(() => expect(cmds()).toContain('get_available_prime_models'))
+    expect(cmds()).not.toContain('ensure_prime_session_host')
+  })
+
   it('starts the Prime host before listing when the menu opens without a live host', async () => {
     render(<PrimeModelPicker label={null} vaultPath="/Users/dtc/Documents/Rhizome Vault" />)
     fireEvent.pointerDown(
@@ -137,6 +148,22 @@ describe('PrimeModelPicker', () => {
     }
   })
 
+  it('lists Nous Portal models in the same picker when the catalog includes them', async () => {
+    invoked.models = [
+      ...MODELS,
+      { id: 'hermes-4-405b', name: 'Hermes 4 405B', provider: 'nous-portal' },
+    ]
+    render(<PrimeModelPicker label="Grok 4.5" hostReady />)
+    fireEvent.pointerDown(
+      screen.getByTestId('prime-model-chip'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+
+    expect(await screen.findByText('Hermes 4 405B')).toBeInTheDocument()
+    const labels = screen.getAllByTestId('prime-model-provider')
+    expect(labels.map((label) => label.textContent)).toContain('nous-portal')
+  })
+
   /** A fresh host reports no model; the chip must still be usable. */
   it('falls back to a generic label when no model is known', () => {
     render(<PrimeModelPicker label={null} />)
@@ -148,6 +175,21 @@ describe('PrimeModelPicker', () => {
     render(<PrimeModelPicker label="Grok 4.5" disabled />)
 
     expect(screen.getByTestId('prime-model-chip')).toBeDisabled()
+  })
+
+  it('changes the model without starting Prime when Chat has no vault', async () => {
+    render(<PrimeModelPicker label="Grok 4.5" />)
+    fireEvent.pointerDown(
+      screen.getByTestId('prime-model-chip'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+
+    fireEvent.click(await screen.findByText('Claude Fable 5'))
+
+    await waitFor(() => {
+      expect(cmds()).toContain('set_prime_model')
+    })
+    expect(cmds()).not.toContain('ensure_prime_session_host')
   })
 
   it('sends both provider and modelId, which set_model requires', async () => {
@@ -181,6 +223,23 @@ describe('PrimeModelPicker', () => {
     fireEvent.click(high)
     await waitFor(() => expect(cmds()).toContain('set_prime_thinking_level'))
     expect(tracked.levels).toContain('high')
+  })
+
+  it('offers X-High when the host lists that thinking level', async () => {
+    invoked.levels = ['off', 'low', 'medium', 'high', 'xhigh']
+    render(<PrimeModelPicker variant="strip" label="Grok 4.5" thinkingLevel="high" />)
+    fireEvent.pointerDown(
+      screen.getByTestId('prime-model-thinking-control'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('prime-thinking-level-xhigh')).toHaveTextContent('X-High')
+    })
+    expect(screen.getByTestId('prime-thinking-level-off')).toBeInTheDocument()
+    expect(screen.getByTestId('prime-thinking-level-low')).toBeInTheDocument()
+    expect(screen.getByTestId('prime-thinking-level-medium')).toBeInTheDocument()
+    expect(screen.getByTestId('prime-thinking-level-high')).toBeInTheDocument()
   })
 
   it('takes the level list from the host rather than a hardcoded copy', async () => {

@@ -222,6 +222,31 @@ describe('AiMessage', () => {
     expect(screen.getByRole('button', { name: 'Fork chat from here' })).toBeTruthy()
   })
 
+  it('keeps those actions as named icons, not visible text labels', () => {
+    render(<AiMessage userMessage="Ask" actions={[]} response="Done" />)
+    const ids = [
+      'ai-message-regenerate',
+      'ai-message-copy',
+      'ai-message-save-to-vault',
+      'ai-message-fork',
+    ] as const
+    for (const id of ids) {
+      const button = screen.getByTestId(id)
+      expect(button.querySelector('svg')).toBeTruthy()
+      expect(button.textContent?.trim()).toBe('')
+    }
+  })
+
+  it('shows the full hover tooltip on each action icon', async () => {
+    render(<AiMessage userMessage="Ask" actions={[]} response="Done" />)
+    fireEvent.focus(screen.getByTestId('ai-message-regenerate'))
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Regenerate response')
+    fireEvent.blur(screen.getByTestId('ai-message-regenerate'))
+
+    fireEvent.focus(screen.getByTestId('ai-message-copy'))
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Copy response')
+  })
+
   it('localizes reasoning and tool use chrome', () => {
     render(
       <AiMessage

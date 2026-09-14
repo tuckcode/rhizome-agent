@@ -32,6 +32,16 @@ const AUTH_ERRORS = [
   '403',
 ]
 
+const LOCAL_SCAFFOLD_ERRORS = [
+  'Failed to create Getting Started folder',
+  'Failed to create scaffold folder',
+  'Failed to write welcome.md',
+  'Failed to write views/',
+  'Failed to write imported-session.md',
+  'Failed to write AGENTS.md',
+  'Failed to inspect Getting Started folder',
+]
+
 function appendVaultFolderName(parentPath: string, name: string): string {
   const trimmed = parentPath.trim().replace(/[\\/]+$/g, '')
   if (!trimmed) {
@@ -88,6 +98,10 @@ export function formatGettingStartedCloneError(err: unknown): string {
     return message
   }
 
+  if (LOCAL_SCAFFOLD_ERRORS.some(fragment => message.includes(fragment))) {
+    return `Could not create Getting Started vault: ${firstCloneErrorLine(message)}`
+  }
+
   const lower = message.toLowerCase()
   if (GIT_NOT_FOUND_ERRORS.some(fragment => lower.includes(fragment))) {
     return 'Git is required to download the Getting Started vault. Install Git and try again.'
@@ -99,7 +113,11 @@ export function formatGettingStartedCloneError(err: unknown): string {
     return 'Could not download Getting Started vault. Check your connection and try again.'
   }
 
-  return `Could not download Getting Started vault: ${firstCloneErrorLine(message)}`
+  if (lower.includes('git clone') || lower.includes('git reported')) {
+    return `Could not download Getting Started vault: ${firstCloneErrorLine(message)}`
+  }
+
+  return `Could not create Getting Started vault: ${firstCloneErrorLine(message)}`
 }
 
 function firstCloneErrorLine(message: string): string {

@@ -141,6 +141,24 @@ describe('AiPanelMessageHistory text selection vs window drag', () => {
   })
 })
 
+describe('AiPanelMessageHistory C70 clock', () => {
+  it('shows the clock when a turn carries createdAtMs', () => {
+    const createdAtMs = new Date(2026, 8, 6, 15, 35, 0).getTime()
+    render(<AiPanelMessageHistory {...historyProps([{
+      ...message('Hello AI', 'ok'),
+      createdAtMs,
+    }])} />)
+
+    expect(screen.getByTestId('message-timestamp')).toHaveTextContent('3:35p')
+  })
+
+  it('omits the clock when the turn has no createdAtMs', () => {
+    render(<AiPanelMessageHistory {...historyProps([message('Hello AI', 'ok')])} />)
+
+    expect(screen.queryByTestId('message-timestamp')).not.toBeInTheDocument()
+  })
+})
+
 describe('AiPanelMessageHistory latest-reply marker', () => {
   it('marks only the newest assistant reply, then moves when a newer one lands', () => {
     const messages = [

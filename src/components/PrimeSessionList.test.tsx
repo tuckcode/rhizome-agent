@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PrimeSessionList from './PrimeSessionList'
@@ -321,6 +322,23 @@ describe('PrimeSessionList', () => {
       expect(tracked.renamed).toBe(1)
     })
 
+    it('does not create a session when renaming with no vault', async () => {
+      invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: 'File me' })]
+
+      render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+      fireEvent.click(await screen.findByRole('button', { name: 'Rename File me' }))
+      fireEvent.change(screen.getByTestId('prime-session-rename'), {
+        target: { value: 'Inbox triage' },
+      })
+      fireEvent.keyDown(screen.getByTestId('prime-session-rename'), { key: 'Enter' })
+
+      await screen.findByText('Inbox triage')
+      expect(invoked.calls).toContain('rename_prime_session')
+      expect(invoked.calls).not.toContain('ensure_prime_session_host')
+      expect(invoked.calls).not.toContain('prime_session_new_session')
+      expect(invoked.calls).not.toContain('set_prime_session_name')
+    })
+
     it('does not send a blank name, and unnamed sessions still fall back', async () => {
       invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: null })]
 
@@ -379,6 +397,13 @@ describe('PrimeSessionList', () => {
 
     await waitFor(() => expect(invoked.calls).toContain('list_prime_session_summaries'))
     expect(invoked.calls).not.toContain('read_prime_session_transcript')
+  })
+
+  it('lists sessions without starting Prime from an empty vault', async () => {
+    render(<PrimeSessionList now={NOW} />)
+
+    await waitFor(() => expect(invoked.calls).toContain('list_prime_session_summaries'))
+    expect(invoked.calls).not.toContain('ensure_prime_session_host')
   })
 
   /** Frame F: a flat list where each row carries its own day in the meta. */
@@ -486,6 +511,52 @@ describe('PrimeSessionList', () => {
     expect(screen.queryByRole('button', { name: /Open session/ })).not.toBeInTheDocument()
   })
 
+  it('finds a row by folder or git branch, not only the title', async () => {
+    invoked.result = [
+      summary({
+        id: 'a',
+        title: 'Watch the inbox',
+        cwd: '/Users/dtc/code/projects/rhizome-agent',
+        gitBranch: 'shell-harden',
+      }),
+      summary({ id: 'b', title: 'Release notes', cwd: '/private/tmp', gitBranch: 'main' }),
+    ]
+
+    render(<PrimeSessionList now={NOW} />)
+    const search = await screen.findByRole('textbox', { name: 'Filter sessions' })
+
+    fireEvent.change(search, { target: { value: 'rhizome-agent' } })
+    expect(screen.getByRole('button', { name: 'Open session Watch the inbox' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Open session Release notes' })).not.toBeInTheDocument()
+
+    fireEvent.change(search, { target: { value: 'shell-harden' } })
+    expect(screen.getByRole('button', { name: 'Open session Watch the inbox' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Open session Release notes' })).not.toBeInTheDocument()
+  })
+
+  it('opens the archived section when a branch hit lives there', async () => {
+    invoked.result = [
+      summary({ id: 'a', title: 'Live vault work', gitBranch: 'main' }),
+      summary({
+        id: 'b',
+        title: 'Old vault watcher',
+        archived: true,
+        gitBranch: 'shell-harden',
+      }),
+    ]
+
+    render(<PrimeSessionList now={NOW} />)
+    await screen.findByText('Live vault work')
+    expect(screen.queryByText('Old vault watcher')).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Filter sessions' }), {
+      target: { value: 'shell-harden' },
+    })
+
+    expect(await screen.findByText('Old vault watcher')).toBeInTheDocument()
+    expect(screen.queryByText('Live vault work')).not.toBeInTheDocument()
+  })
+
   it('searches archived rows instead of silently hiding them', async () => {
     invoked.result = [
       summary({ id: 'a', title: 'Live vault work' }),
@@ -568,6 +639,14 @@ describe('PrimeSessionList — macOS title bar gutter', () => {
     const header = screen.getByTestId('prime-session-list-header')
     expect(header.className).toContain('pl-[var(--subhead-traffic-light-inset')
     expect(header).not.toHaveClass('h-10')
+  })
+
+  it('makes that top-band header a window-drag surface, not a click-to-maximize race', () => {
+    const source = readFileSync(`${process.cwd()}/src/components/PrimeSessionList.tsx`, 'utf8')
+    expect(source).toContain('useDragRegion')
+    expect(source).toContain('onMouseDown={titleBarGutter ? onTitleBarMouseDown : undefined}')
+    expect(source).not.toContain('data-tauri-drag-region')
+    expect(source).not.toContain('startDragging()')
   })
 })
 

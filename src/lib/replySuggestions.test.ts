@@ -1,7 +1,15 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { suggestReply } from './replySuggestions'
 
 describe('suggestReply', () => {
+  it('takes only the last agent message — #51 Case 2 stays deferred', () => {
+    expect(suggestReply.length).toBe(1)
+    const source = readFileSync(`${process.cwd()}/src/lib/replySuggestions.ts`, 'utf8')
+    expect(source).toContain('case 2 in #51')
+    expect(source).not.toMatch(/\binvoke\(|get_git|list_sessions|unpushedCommits/)
+  })
+
   describe('Real cases from production that broke the old parser', () => {
     /**
      * Old parser split on commas and turned the lead-in into an option.
@@ -128,6 +136,18 @@ describe('suggestReply', () => {
         expect(result.options).toHaveLength(4)
       }
     })
+
+    /**
+     * Five "or"-separated options is a menu, not pills — same cap as numbered lists.
+     */
+    it('five_or_separated_options_returns_null', () => {
+      expect(suggestReply('A or B or C or D or E?')).toBeNull()
+    })
+
+    it('empty_and_whitespace_only_return_null', () => {
+      expect(suggestReply('')).toBeNull()
+      expect(suggestReply('   ')).toBeNull()
+    })
   })
 
   describe('Cases that should return null', () => {
@@ -164,6 +184,16 @@ describe('suggestReply', () => {
       const msg = 'Should I implement a very long and complicated feature that takes many words, or skip it?'
       expect(suggestReply(msg)).toBeNull()
     })
+
+    /**
+     * " or " in the trailing question is not enough when the first segment
+     * after splitting is still too long to become a pill.
+     */
+    it('or_pattern_with_long_lead_in_returns_null', () => {
+      expect(
+        suggestReply('I can run the tests if you would like. Fix it or skip it?'),
+      ).toBeNull()
+    })
   })
 
   describe('Whitespace and normalization', () => {
@@ -193,6 +223,9 @@ describe('suggestReply', () => {
       expect(result?.kind).toBe('options')
       if (result?.kind === 'options') {
         expect(result.options).toHaveLength(2)
+        for (const option of result.options) {
+          expect(option.text).toBe(option.label)
+        }
       }
     })
 
@@ -236,6 +269,23 @@ describe('suggestReply', () => {
         expect(result.options[1].label).toBe('No')
       }
     })
+
+    it('action_no_option_uses_no_for_label_and_text', () => {
+      const result = suggestReply('Run the build?')
+      expect(result?.kind).toBe('options')
+      if (result?.kind === 'options') {
+        expect(result.options[1]).toEqual({ label: 'No', text: 'No' })
+      }
+    })
+
+    /**
+     * Open-question prefixes must not become a yes/no action pill pair.
+     */
+    it('rejects_open_question_prefixes_for_action_yes_no', () => {
+      expect(suggestReply('Should I push?')).toBeNull()
+      expect(suggestReply('Can you fix it?')).toBeNull()
+      expect(suggestReply('Would you like me to deploy?')).toBeNull()
+    })
   })
 
   describe('Tab completions', () => {
@@ -272,6 +322,39 @@ describe('suggestReply', () => {
     it('options_win_when_a_closed_choice_is_also_a_consent_offer', () => {
       const result = suggestReply('Want me to keep it or cut it?')
       expect(result?.kind).toBe('options')
+      if (result?.kind === 'options') {
+        expect(result.options).toHaveLength(2)
+        expect(result.options[0].label).toBe('keep it')
+        expect(result.options[1].label).toBe('cut it')
+      }
+    })
+
+    it('options_beat_shall_i_completion_when_closed_choice_present', () => {
+      const result = suggestReply('Shall I keep it or cut it?')
+      expect(result?.kind).toBe('options')
+      expect(result).not.toEqual({ kind: 'completion', text: 'Yes, go ahead' })
+    })
+
+    it('numbered_options_beat_consent_completion_in_same_message', () => {
+      const result = suggestReply(
+        'I can run the tests if you would like. 1. Keep 2. Cut — which?',
+      )
+      expect(result?.kind).toBe('options')
+      if (result?.kind === 'options') {
+        expect(result.options).toHaveLength(2)
+        expect(result.options[0].label).toBe('Keep')
+        expect(result.options[1].label).toBe('Cut')
+      }
+    })
+
+    it('want_me_to_or_pattern_returns_options_not_completion', () => {
+      const result = suggestReply('Want me to run tests or skip them?')
+      expect(result?.kind).toBe('options')
+      expect(result).not.toEqual({ kind: 'completion', text: 'Yes, go ahead' })
+      if (result?.kind === 'options') {
+        expect(result.options[0].label).toBe('run tests')
+        expect(result.options[1].label).toBe('skip them')
+      }
     })
   })
 })

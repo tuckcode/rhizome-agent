@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   canBrowseComposerPromptHistory,
@@ -81,5 +82,46 @@ describe('composerPromptHistory', () => {
     const result = navigateComposerPromptHistory(state, 'down', 'live')
     expect(result.handled).toBe(false)
     expect(result.text).toBe('live')
+  })
+
+  it('ignores blank sends without adding an entry', () => {
+    let state = pushComposerPrompt(emptyComposerPromptHistory(), 'saved')
+    state = pushComposerPrompt(state, '   ')
+    expect(state.entries).toEqual(['saved'])
+    expect(state.index).toBe(-1)
+    expect(state.draftBeforeBrowse).toBe('')
+  })
+
+  it('does not browse when the caret spans a selection', () => {
+    expect(canBrowseComposerPromptHistory({
+      value: 'hello',
+      selectionStart: 0,
+      selectionEnd: 3,
+      suggestionsOpen: false,
+    })).toBe(false)
+  })
+
+  it('does nothing when history is empty', () => {
+    const state = emptyComposerPromptHistory()
+    expect(navigateComposerPromptHistory(state, 'up', 'draft')).toEqual({
+      state,
+      text: 'draft',
+      handled: false,
+    })
+  })
+
+  it('stays on the oldest entry when ArrowUp cannot go further', () => {
+    let state = pushComposerPrompt(emptyComposerPromptHistory(), 'only')
+    const up = navigateComposerPromptHistory(state, 'up', 'draft')
+    state = up.state
+    const again = navigateComposerPromptHistory(state, 'up', up.text)
+    expect(again.handled).toBe(true)
+    expect(again.text).toBe('only')
+    expect(again.state.index).toBe(0)
+  })
+
+  it('does not take a vault path — history is in-memory only', () => {
+    const source = readFileSync(`${process.cwd()}/src/lib/composerPromptHistory.ts`, 'utf8')
+    expect(source).not.toMatch(/vaultPath/)
   })
 })

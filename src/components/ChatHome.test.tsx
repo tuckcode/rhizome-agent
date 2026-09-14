@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MutableRefObject } from 'react'
@@ -338,5 +339,112 @@ describe('ChatHome — a note handed in from the vault', () => {
       expect(screen.getByTestId('agent-note-body')).toHaveTextContent('Promote is explicit')
     })
     expect(screen.getByTestId('chat-note-pane')).toBeInTheDocument()
+  })
+})
+
+describe('ChatHome composer wiring', () => {
+  const chatHomeSource = readFileSync(`${process.cwd()}/src/components/ChatHome.tsx`, 'utf8')
+
+  it('puts the Agents idle/working pill on the composer next to thinking', () => {
+    expect(chatHomeSource).toContain('activity={')
+    expect(chatHomeSource).toContain('<AgentsPill')
+    expect(chatHomeSource).toContain('jobs={rhizomeJobs.activeJobs}')
+  })
+
+  it('keeps the skills pill as rhizome-vault, not a vault switcher', () => {
+    expect(chatHomeSource).toContain('skillsLabel="rhizome-vault"')
+    expect(chatHomeSource).not.toContain('composer-vault-pill')
+  })
+
+  it('forwards a width-folded Sessions column into the panel', () => {
+    expect(chatHomeSource).toContain('sessionsAutoCollapsed={sessionsAutoCollapsed}')
+  })
+
+  it('wires Escape leave-Chat to onExit, not Stop', () => {
+    expect(chatHomeSource).toContain('onClose={onExit}')
+    expect(chatHomeSource).not.toMatch(/onClose=\{[^}]*stop/i)
+  })
+
+  it('shows Chat preflight on the composer, not a vault gate', () => {
+    expect(chatHomeSource).toContain('<ChatPreflightBanner')
+    expect(chatHomeSource).toContain('vaultPath={vaultPath}')
+    expect(chatHomeSource).toContain('provider={primeHost?.modelProvider ?? null}')
+  })
+
+  it('keeps a Settings API default on the Prime harness', () => {
+    expect(chatHomeSource).toContain("if (defaultAiTarget?.kind === 'api_model')")
+    expect(chatHomeSource).toContain("target.kind === 'agent' && target.agent === 'prime'")
+  })
+
+  it('polls Prime host status from whatever vaultPath Chat has, including empty', () => {
+    expect(chatHomeSource).toContain('usePrimeHostStatus(isPrimeTarget, vaultPath)')
+    expect(chatHomeSource).not.toMatch(/usePrimeHostStatus\([^)]*vaultPath\s*&&/)
+    expect(chatHomeSource).not.toMatch(/usePrimeHostStatus\([^)]*vaultPath\s*\?/)
+  })
+
+  it('does not bail out of Chat when vaultPath is empty', () => {
+    expect(chatHomeSource).not.toMatch(/if\s*\(\s*!vaultPath/)
+    expect(chatHomeSource).not.toMatch(/if\s*\(\s*!vaultPath\.trim/)
+  })
+
+  it('still mounts the Prime composer deck without a vault gate', () => {
+    expect(chatHomeSource).toContain('<ChatComposerDeck')
+    expect(chatHomeSource).not.toMatch(/vaultPath\s*&&\s*\(?\s*<ChatComposerDeck/)
+    expect(chatHomeSource).not.toMatch(/vaultPath\s*\?\s*\(?\s*<ChatComposerDeck/)
+  })
+})
+
+describe('ChatHome without a vault', () => {
+  it('still mounts Chat when no vault is attached', () => {
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath=""
+        vaultPaths={[]}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('ai-panel-stub')).toBeInTheDocument()
+  })
+
+  it('still offers New chat when no vault is attached', () => {
+    startNewChat.mockClear()
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath=""
+        vaultPaths={[]}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    expect(startNewChat).toHaveBeenCalledTimes(1)
+  })
+
+  it('still mounts Prime composer chrome when no vault is attached', () => {
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath=""
+        vaultPaths={[]}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('composer-controls')).toHaveTextContent('yes')
   })
 })
