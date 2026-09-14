@@ -349,6 +349,10 @@ fn push_unique_bridge_vault_path(paths: &mut Vec<String>, path: &Path) {
     if value.is_empty() || paths.iter().any(|existing| existing == &value) {
         return;
     }
+    if crate::commands::is_home_directory(path) {
+        log::warn!("#46: dropping $HOME from MCP VAULT_PATHS");
+        return;
+    }
     paths.push(value);
 }
 

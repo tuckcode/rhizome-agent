@@ -1,9 +1,11 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { homedir, platform } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
-const APP_CONFIG_DIR = 'com.tolaria.app'
-const LEGACY_APP_CONFIG_DIR = 'com.laputa.app'
+const APP_CONFIG_DIR = 'com.rhizome.app'
+const LEGACY_APP_CONFIG_DIRS = ['com.tolaria.app', 'com.laputa.app']
+const HOME_VAULT_ERROR =
+  'VAULT_PATH cannot be the home directory. Open a vault in Rhizome before starting MCP tools (#46).'
 
 function parseVaultPathList(rawValue) {
   if (!rawValue?.trim()) return []
@@ -40,9 +42,30 @@ function appConfigBaseDir(env = process.env) {
 export function vaultsJsonPath({ configDir = appConfigBaseDir() } = {}) {
   const preferred = join(configDir, APP_CONFIG_DIR, 'vaults.json')
   if (existsSync(preferred)) return preferred
+  for (const legacyDir of LEGACY_APP_CONFIG_DIRS) {
+    const legacy = join(configDir, legacyDir, 'vaults.json')
+    if (existsSync(legacy)) return legacy
+  }
+  return preferred
+}
 
-  const legacy = join(configDir, LEGACY_APP_CONFIG_DIR, 'vaults.json')
-  return existsSync(legacy) ? legacy : preferred
+function canonicalPath(value) {
+  const resolved = resolve(value)
+  try {
+    return realpathSync(resolved)
+  } catch {
+    return resolved
+  }
+}
+
+/** `$HOME` is never a vault. MCP tools must not see the whole home tree (#46). */
+export function isHomeVaultPath(vaultPath, home = homedir()) {
+  if (typeof vaultPath !== 'string' || !vaultPath.trim() || !home) return false
+  try {
+    return canonicalPath(vaultPath.trim()) === canonicalPath(home)
+  } catch {
+    return false
+  }
 }
 
 function pushUniquePath(paths, value) {
@@ -75,12 +98,16 @@ export function requireVaultPaths(env = process.env, options = {}) {
     env.VAULT_PATH?.trim() ?? '',
     ...parseVaultPathList(env.VAULT_PATHS),
   ])
-  if (vaultPaths.length === 0) {
-    const configuredPaths = configuredVaultPaths(options)
+  const scoped = vaultPaths.filter((path) => !isHomeVaultPath(path))
+  if (vaultPaths.length > 0 && scoped.length === 0) {
+    throw new Error(HOME_VAULT_ERROR)
+  }
+  if (scoped.length === 0) {
+    const configuredPaths = configuredVaultPaths(options).filter((path) => !isHomeVaultPath(path))
     if (configuredPaths.length > 0) return configuredPaths
     throw new Error('VAULT_PATH is required. Open a vault in Rhizome before starting MCP tools.')
   }
-  return vaultPaths
+  return scoped
 }
 
 export function requireVaultPath(env = process.env, options = {}) {

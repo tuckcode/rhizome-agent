@@ -16,6 +16,7 @@ mod vault;
 mod version;
 
 use std::borrow::Cow;
+use std::path::Path;
 
 pub use ai::*;
 pub use app_icon::*;
@@ -48,6 +49,18 @@ pub fn expand_tilde(path: &str) -> Cow<'_, str> {
             .map(|rest| Cow::Owned(home.join(rest).to_string_lossy().into_owned()))
             .unwrap_or(Cow::Borrowed(path)),
     }
+}
+
+/// `$HOME` is never a vault. Treating it as one writes into Prime's global
+/// `~/.prime/agent/settings.json` and scopes MCP tools to the whole home
+/// directory (#46).
+pub(crate) fn is_home_directory(path: &Path) -> bool {
+    let Some(home) = dirs::home_dir() else {
+        return false;
+    };
+    let home = home.canonicalize().unwrap_or(home);
+    let path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    home == path
 }
 
 fn is_numeric_version_part(part: &str) -> bool {
@@ -88,6 +101,13 @@ mod tests {
     fn expand_tilde_noop_for_absolute_path() {
         let result = expand_tilde("/usr/local/bin");
         assert_eq!(result, "/usr/local/bin");
+    }
+
+    #[test]
+    fn the_home_directory_is_detected_and_a_subdir_is_not() {
+        let home = dirs::home_dir().unwrap();
+        assert!(is_home_directory(&home));
+        assert!(!is_home_directory(&home.join("Documents")));
     }
 
     #[test]

@@ -3,7 +3,11 @@ export const TOKEN_REDACTION = '[redacted-token]'
 
 const LEADING_TOKEN_WRAPPERS = new Set(['"', "'", '`', '(', '[', '{'])
 const SENSITIVE_KEYS = ['token', 'secret', 'password', 'authorization', 'cookie', 'session']
-const TOKEN_PREFIXES = ['ghp_', 'gho_', 'ghr_', 'ghs_', 'ghu_', 'github_pat_', 'sk-', 'xoxa-', 'xoxb-', 'xoxp-', 'xoxr-', 'xoxs-']
+const TOKEN_PREFIXES = [
+  'ghp_', 'gho_', 'ghr_', 'ghs_', 'ghu_', 'github_pat_', 'glpat-',
+  'sk-', 'sk_live_', 'sk_test_', 'xai-', 'gsk_', 'hf_', 'npm_',
+  'xoxa-', 'xoxb-', 'xoxp-', 'xoxr-', 'xoxs-', 'xoxe-',
+]
 const TRAILING_TOKEN_WRAPPERS = new Set(['"', "'", '`', ')', ']', '}', '.', ',', ';'])
 const WHITESPACE = new Set([' ', '\t', '\n', '\r'])
 /** Short CSS class names like `sk-circle` are not keys. Real tokens are longer. */

@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import { isHomeVaultPath } from './vault-path.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const toolName = process.argv[2]
@@ -37,6 +38,10 @@ try {
 const vaultPath = process.env.VAULT_PATH?.trim()
 if (!vaultPath) {
   console.error('VAULT_PATH is required')
+  process.exit(2)
+}
+if (isHomeVaultPath(vaultPath)) {
+  console.error('VAULT_PATH cannot be the home directory (#46)')
   process.exit(2)
 }
 

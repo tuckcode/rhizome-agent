@@ -1,6 +1,7 @@
 import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { symlinkSync } from 'node:fs'
 import {
   access, mkdtemp, mkdir, open, readFile, rm, writeFile,
 } from 'node:fs/promises'
@@ -14,7 +15,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import {
   createNote, findMarkdownFiles, getNote, searchNotes, vaultContext,
 } from './vault.js'
-import { requireVaultPath, requireVaultPaths } from './vault-path.js'
+import { isHomeVaultPath, requireVaultPath, requireVaultPaths } from './vault-path.js'
 import { vaultContextWithInstructions } from './agent-instructions.js'
 import {
   BRIDGE_AUTH_TOOL, buildSaveCaptureArgs, evaluateBridgeRequest, evaluateToolMessage,
@@ -485,6 +486,59 @@ describe('requireVaultPath', () => {
       }),
       ['/tmp/Default Vault', '/tmp/Second Vault'],
     )
+  })
+
+  it('prefers com.rhizome.app vaults.json over leftover Tolaria config', async () => {
+    const configDir = await mkdtemp(path.join(os.tmpdir(), 'rhizome-mcp-config-'))
+    const rhizomeVault = path.join(configDir, 'Rhizome Vault')
+    const staleVault = path.join(configDir, 'Stale Vault')
+    await mkdir(path.join(configDir, 'com.rhizome.app'), { recursive: true })
+    await mkdir(path.join(configDir, 'com.tolaria.app'), { recursive: true })
+    await writeFile(path.join(configDir, 'com.rhizome.app', 'vaults.json'), JSON.stringify({
+      active_vault: rhizomeVault,
+      vaults: [{ label: 'Rhizome', path: rhizomeVault, mounted: true }],
+    }), 'utf-8')
+    await writeFile(path.join(configDir, 'com.tolaria.app', 'vaults.json'), JSON.stringify({
+      active_vault: staleVault,
+      vaults: [{ label: 'Stale', path: staleVault, mounted: true }],
+    }), 'utf-8')
+
+    try {
+      assert.deepEqual(requireVaultPaths({}, { configDir }), [rhizomeVault])
+    } finally {
+      await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses $HOME as a vault path', () => {
+    const home = os.homedir()
+    assert.equal(isHomeVaultPath(home), true)
+    assert.equal(isHomeVaultPath(path.join(home, 'Documents')), false)
+    assert.throws(
+      () => requireVaultPaths({ VAULT_PATH: home }),
+      /home directory/,
+    )
+  })
+
+  it('refuses a symlink that resolves to $HOME', async () => {
+    const home = os.homedir()
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'home-link-'))
+    const link = path.join(dir, 'home-alias')
+    try {
+      symlinkSync(home, link)
+    } catch {
+      await rm(dir, { recursive: true, force: true })
+      return
+    }
+    try {
+      assert.equal(isHomeVaultPath(link), true)
+      assert.throws(
+        () => requireVaultPaths({ VAULT_PATH: link }),
+        /home directory/,
+      )
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   it('loads active mounted vault paths from Tolaria config when env is vault-neutral', async () => {

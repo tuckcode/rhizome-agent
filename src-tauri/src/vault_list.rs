@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::app_config::{preferred_app_config_path, resolve_existing_or_preferred_app_config_path};
-use crate::commands::expand_tilde;
+use crate::commands::{expand_tilde, is_home_directory};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct VaultEntry {
@@ -78,7 +78,29 @@ pub fn load_vault_list() -> Result<VaultList, String> {
 }
 
 pub fn save_vault_list(list: &VaultList) -> Result<(), String> {
+    reject_home_vault_list(list)?;
     save_at(&preferred_app_config_path("vaults.json")?, list)
+}
+
+fn path_is_home(path: &str) -> bool {
+    let expanded = expand_tilde(path.trim());
+    is_home_directory(Path::new(expanded.as_ref()))
+}
+
+fn reject_home_vault_list(list: &VaultList) -> Result<(), String> {
+    if list.active_vault.as_deref().is_some_and(path_is_home)
+        || list.vaults.iter().any(|vault| path_is_home(&vault.path))
+        || list
+            .default_workspace_path
+            .as_deref()
+            .is_some_and(path_is_home)
+    {
+        return Err(
+            "The home directory cannot be a vault. That scopes MCP tools to all of $HOME and writes into Prime's global settings (#46)."
+                .into(),
+        );
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -265,6 +287,26 @@ mod tests {
             expected_vault.to_str()
         );
         assert_eq!(loaded.hidden_defaults[0], expected_hidden.to_string_lossy());
+    }
+
+    #[test]
+    fn save_refuses_the_home_directory_as_a_vault() {
+        let Some(home) = dirs::home_dir() else {
+            return;
+        };
+        let list = VaultList {
+            vaults: vec![VaultEntry {
+                label: "Home".to_string(),
+                path: home.to_string_lossy().into_owned(),
+                ..Default::default()
+            }],
+            active_vault: Some(home.to_string_lossy().into_owned()),
+            default_workspace_path: None,
+            hidden_defaults: Vec::new(),
+        };
+        let err = reject_home_vault_list(&list).unwrap_err();
+        assert!(err.contains("#46"));
+        assert!(reject_home_vault_list(&VaultList::default()).is_ok());
     }
 
     #[test]

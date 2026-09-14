@@ -23,6 +23,11 @@ pub(crate) fn seed_vault_skill(vault_cwd: &Path) -> Result<VaultSkillSeed, Strin
         .unwrap_or_else(|_| vault_cwd.to_path_buf());
     let vault_path_str = vault_path.to_string_lossy().into_owned();
 
+    // Leftover from before this guard: a skill in Prime's *global* skills dir
+    // told every session the vault was $HOME. The guard stops new writes;
+    // this removes an already-poisoned copy on connect (#46).
+    scrub_poisoned_global_home_vault_skill();
+
     if !looks_like_vault(&vault_path) {
         return Err(format!(
             "cwd is not a Rhizome vault (missing notes/wiki markers): {}",
@@ -74,11 +79,7 @@ fn looks_like_vault(path: &Path) -> bool {
     // MCP server to the user's whole home directory. The marker heuristic
     // below cannot catch this: a stray `CLAUDE.md` or a `.rhizome` directory
     // in $HOME is enough to satisfy it. #46.
-    if dirs::home_dir().is_some_and(|home| {
-        let home = home.canonicalize().unwrap_or(home);
-        let path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-        home == path
-    }) {
+    if crate::commands::is_home_directory(path) {
         return false;
     }
     if path.join(".obsidian").is_dir()
@@ -193,6 +194,8 @@ description: Search, read, and write notes in the attached Rhizome vault, and as
 
 # Rhizome vault tools
 
+This skill is a **command-line tool**, not an importable Python module. Do not `import rhizome_vault` or `from rhizome_vault import …`. Run the `node … cli-call.mjs` commands below.
+
 Default toolkit for this vault. Prefer these over IPython/`find` crawls of Obsidian or vault paths. Install more Prime skills when you need broader tooling — there is no separate Safe/Power product mode.
 
 The active vault root is:
@@ -297,6 +300,70 @@ fn shell_single_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
 
+fn is_prime_global_settings_path(path: &Path) -> bool {
+    let Some(home) = dirs::home_dir() else {
+        return false;
+    };
+    let global = home.join(".prime").join("agent").join("settings.json");
+    match (path.canonicalize(), global.canonicalize()) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => path == global,
+    }
+}
+
+/// Prime's global skills live at `$HOME/.prime/agent/skills/`. A
+/// Rhizome-generated `rhizome-vault` skill there is leftover from treating
+/// $HOME as a vault (#46). Vault copies belong under
+/// `<vault>/.prime/agent/skills/`. User-authored content with that folder
+/// name is left in place.
+pub(crate) fn scrub_poisoned_global_home_vault_skill() {
+    if let Some(home) = dirs::home_dir() {
+        if let Err(error) = scrub_global_rhizome_vault_skill_at(&home) {
+            log::warn!("#46: {error}");
+        }
+    }
+}
+
+fn global_rhizome_vault_skill_dir(home: &Path) -> PathBuf {
+    home.join(".prime")
+        .join("agent")
+        .join("skills")
+        .join(SKILL_DIR_NAME)
+}
+
+fn skill_looks_like_rhizome_generated(skill_dir: &Path) -> bool {
+    let skill_md = skill_dir.join("SKILL.md");
+    let Ok(text) = std::fs::read_to_string(&skill_md) else {
+        return false;
+    };
+    text.contains("cli-call.mjs") && text.contains("rhizome-vault")
+}
+
+fn scrub_global_rhizome_vault_skill_at(home: &Path) -> Result<bool, String> {
+    let skill_dir = global_rhizome_vault_skill_dir(home);
+    if !skill_dir.exists() {
+        return Ok(false);
+    }
+    if !skill_looks_like_rhizome_generated(&skill_dir) {
+        log::warn!(
+            "#46: left global rhizome-vault skill in place; content is not identifiable as Rhizome-generated {}",
+            skill_dir.display()
+        );
+        return Ok(false);
+    }
+    std::fs::remove_dir_all(&skill_dir).map_err(|error| {
+        format!(
+            "Failed to remove poisoned global rhizome-vault skill {}: {error}",
+            skill_dir.display()
+        )
+    })?;
+    log::warn!(
+        "#46: removed rhizome-vault skill from Prime's global skills directory {}",
+        skill_dir.display()
+    );
+    Ok(true)
+}
+
 fn write_if_changed(path: &Path, contents: &str) -> Result<(), String> {
     if path.is_file() {
         if let Ok(existing) = std::fs::read_to_string(path) {
@@ -314,6 +381,9 @@ fn write_mcp_stdio_settings(
     cli_call: &Path,
     vault_path: &str,
 ) -> Result<(), String> {
+    if is_prime_global_settings_path(settings_path) {
+        return Err("Refusing to write vault MCP settings into Prime's global config (#46)".into());
+    }
     // Prefer pointing at index.js stdio server (true MCP) for future kernel support.
     let index_js = cli_call
         .parent()
@@ -462,6 +532,8 @@ mod tests {
         assert!(skill.contains("/vault"));
         assert!(!skill.contains("Power User"));
         assert!(!skill.contains("Safe tools"));
+        assert!(skill.contains("not an importable Python module"));
+        assert!(skill.contains("cli-call.mjs"));
     }
 
     #[test]
@@ -503,6 +575,54 @@ mod tests {
             return;
         };
         assert!(seed_vault_skill(&home).is_err());
+    }
+
+    #[test]
+    fn a_rhizome_vault_skill_in_prime_global_skills_is_removed() {
+        let home = tempfile::tempdir().unwrap();
+        let skill_dir = global_rhizome_vault_skill_dir(home.path());
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(
+            skill_dir.join("SKILL.md"),
+            "The active vault root is:\n/Users/dtc\nUse `node …/cli-call.mjs`.\n# rhizome-vault\n",
+        )
+        .unwrap();
+        let other = home
+            .path()
+            .join(".prime")
+            .join("agent")
+            .join("skills")
+            .join("keep-me");
+        std::fs::create_dir_all(&other).unwrap();
+
+        assert!(scrub_global_rhizome_vault_skill_at(home.path()).unwrap());
+        assert!(!skill_dir.exists());
+        assert!(other.exists());
+        assert!(!scrub_global_rhizome_vault_skill_at(home.path()).unwrap());
+    }
+
+    #[test]
+    fn a_user_authored_global_skill_named_rhizome_vault_is_left_in_place() {
+        let home = tempfile::tempdir().unwrap();
+        let skill_dir = global_rhizome_vault_skill_dir(home.path());
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(skill_dir.join("SKILL.md"), "My personal notes skill.\n").unwrap();
+
+        assert!(!scrub_global_rhizome_vault_skill_at(home.path()).unwrap());
+        assert!(skill_dir.exists());
+    }
+
+    #[test]
+    fn vault_mcp_settings_are_not_written_into_prime_global_config() {
+        let Some(home) = dirs::home_dir() else {
+            return;
+        };
+        let global = home.join(".prime").join("agent").join("settings.json");
+        assert!(is_prime_global_settings_path(&global));
+        let dir = tempfile::tempdir().unwrap();
+        assert!(!is_prime_global_settings_path(
+            &dir.path().join(".prime/agent/settings.json")
+        ));
     }
 
     #[test]
