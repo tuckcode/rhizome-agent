@@ -1204,4 +1204,70 @@ describe('parked organs leftover', () => {
     expect(host).toContain('"type": "set_session_name"')
     expect(host).toContain('Prime\'s `set_session_name` only addresses the attached session')
   })
+
+  it('embeds Mycelium in an iframe, not a browser tab', () => {
+    const mycelium = readFileSync(
+      `${process.cwd()}/src/components/MyceliumView.tsx`,
+      'utf8',
+    )
+    expect(mycelium).toContain('<iframe')
+    expect(mycelium).toContain('src={sidecar.url}')
+    expect(mycelium).toContain('data-testid="mycelium-embed"')
+    expect(mycelium).not.toContain('window.open')
+  })
+
+  it('offers the full thinking-level set, including Off and X-High', () => {
+    const levels = readFileSync(
+      `${process.cwd()}/src/lib/primeThinkingLevels.ts`,
+      'utf8',
+    )
+    expect(levels).toContain("off: 'Off'")
+    expect(levels).toContain("minimal: 'Minimal'")
+    expect(levels).toContain("low: 'Low'")
+    expect(levels).toContain("medium: 'Medium'")
+    expect(levels).toContain("high: 'High'")
+    expect(levels).toContain("xhigh: 'X-High'")
+    expect(levels).toContain("max: 'Max'")
+  })
+
+  it('promotes on Keep working, then hides', () => {
+    const close = readFileSync(
+      `${process.cwd()}/src/hooks/usePrimeActiveClose.ts`,
+      'utf8',
+    )
+    const rust = readFileSync(
+      `${process.cwd()}/src-tauri/src/prime_session_host.rs`,
+      'utf8',
+    )
+    expect(close).toContain("void settleAndHide('keep_working')")
+    expect(close).toContain("await callHost('settle_prime_session', { intent })")
+    expect(rust).toContain('"type": "promote_owned_session"')
+    expect(rust).toContain('fn keep_working_promotes_then_detaches')
+  })
+
+  it('keeps regenerate, save-to-vault, and fork as Chat action icons', () => {
+    const message = readFileSync(
+      `${process.cwd()}/src/components/AiMessage.tsx`,
+      'utf8',
+    )
+    expect(message).toContain('data-testid="ai-message-regenerate"')
+    expect(message).toContain('data-testid="ai-message-save-to-vault"')
+    expect(message).toContain('data-testid="ai-message-fork"')
+    expect(message).toContain('data-testid="ai-message-copy"')
+  })
+
+  it('writes settings owner-only and keeps the D6 dep pins', () => {
+    const fs = readFileSync(
+      `${process.cwd()}/src-tauri/src/secure_fs.rs`,
+      'utf8',
+    )
+    const workspace = readFileSync(
+      `${process.cwd()}/pnpm-workspace.yaml`,
+      'utf8',
+    )
+    expect(fs).toContain('owner-only (`0o600`)')
+    expect(fs).toContain('.mode(0o600)')
+    expect(workspace).toContain('js-yaml@3: 3.15.2')
+    expect(workspace).toContain('fast-uri: 3.1.6')
+  })
 })

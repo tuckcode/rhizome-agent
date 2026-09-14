@@ -47,13 +47,14 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Grok 4.6 · 2026-09-14 16:55 · crunch leftover `690712e`.
+**Origin:** Cursor Grok 4.6 · 2026-09-14 17:29 · leftover crunch audit.
 
-Local HEAD **`690712e`**. Origin `main` **`5c629a0`** — **eighteen commits
-not pushed**. App leftover **`476756c`** (2026-09-12 22:43). Import
-waits for **`1`**. Do not merge #66. C64 / W4 / hide / last-idle still
-**NOT RUN**. Not daily-driver ready. Report:
-[1522](plans/handoffs/2026-09-14-1522-cursor-grok-4-6-d6-report.md).
+Local HEAD **`057f227`**. Origin `main` **`5c629a0`** — **19 commits
+not pushed**. App leftover **`476756c`** (2026-09-12 22:43). Leftover
+glob 173 files / 271 tests passed. Import waits for **`1`**. Do not
+merge #66. C64 / W4 / hide / last-idle still **NOT RUN**. Not
+daily-driver ready. Audit:
+[1729](plans/handoffs/2026-09-14-1729-cursor-grok-4-6-crunch-audit.md).
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Inverted Dock icon is
@@ -98,6 +99,7 @@ Priority: push `4416411`/`e64a283`, C64 ×3, W4 native evidence. Inventory:
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-14 · leftover crunch audit](plans/handoffs/2026-09-14-1729-cursor-grok-4-6-crunch-audit.md) — leftover glob green. Hard nos held. No push.
 - [2026-09-14 · D6 start](plans/handoffs/2026-09-14-1520-cursor-grok-4-6-d6-start.md) — named-path commits. No push. No rebuild.
 - [2026-09-14 · leftover inventory](plans/handoffs/2026-09-14-1460-cursor-grok-4-6-leftover-inventory.md) — parked items and leftover locks through 1519.
 - [2026-09-14 · docked questions](plans/handoffs/2026-09-14-1145-cursor-grok-4-6-docked-questions.md) — still unanswered.
