@@ -567,3 +567,85 @@ cannot see this; it needs a rebuilt `.app` / `pnpm tauri dev`.
 Related: the breadcrumb control that looks like a sidebar collapse opens
 Properties (`editor.toolbar.openProperties`). Closing the note is the
 trailing **X** (`editor.toolbar.closeNote`).
+
+## 20. Session switch and Settings catalog look “stuck” for different reasons
+
+**Origin:** PR #66 KEEP · 2026-09-14 · not a merge of the draft.
+
+Verified 2026-09-12 against `usePrimeSessionSwitcher.ts` and
+`SettingsPanel.tsx`.
+
+**Session click.** The old transcript used to stay on screen for the
+whole `switch_prime_session` + `read_prime_session_transcript` round
+trip. That is the session-switch beachball. The click now highlights
+the row and `replaceMessages([])` in the same turn. If the host refuses
+(mid-turn), the previous messages come back. Do not “restore” the old
+chat until the new one arrives — that is the bug.
+
+**Settings pinwheel.** `get_available_prime_models` is hundreds of
+models. Opening Settings used to fetch it immediately, plus
+`get_prime_provider_status`. Both wait until Agents is visible
+(`loadModelCatalog`). Packages search waits until Packages
+(`loadExtensionCatalog`). Chat and Settings share
+`loadPrimeModelCatalog`; a failed “host is not running” answer is not
+cached.
+
+## 21. Hide-on-close must stop helpers this process started
+
+C22 hides the main window; it does not quit. Leaving the spawned Prime
+supervisor, MCP WebSocket bridge, and Mindwalk sidecar running after
+hide kept a Dock indicator. `release_helpers_for_hidden_window`
+(`lib.rs`) stops those unless Keep working left a resident session.
+`settle_prime_session` does the same, because `window.hide()` does not
+raise `CloseRequested` again. Never send Prime `shutdown` — other
+clients share the daemon. Cmd+Q is the quit path.
+
+Remainder: native live-check. See `docs/plans/hide-on-close-helpers.md`.
+Do not recode the helper stop.
+
+## 22. Astra security traps (2026-09-14) — do not rediscover
+
+**S1.** Do not call `gray-matter` from `mcp-server/vault.js`. Its default JS
+engine evaluates `---javascript`. Parser is data-only now. Root Vite still
+uses `gray-matter`; MCP must not.
+
+**S2.** Node `Stats` is `isFIFO()`, not `isFifo()`. The wrong name threw,
+`catch` swallowed it, and **every** in-vault note looked rejected.
+
+**R2.** `save_settings_at` takes `&Path`, not `&PathBuf` (`clippy::ptr_arg`).
+Writes go through `secure_fs::write_owner_only_atomic`. Do not write the
+real `~/Library/Application Support` settings or secrets in tests.
+
+**Ignore.** `.cursor/skills/` must re-ignore `*` then allow only
+`rhizome-ship`. `!.cursor/skills/` alone un-ignores Impeccable.
+
+**Trivy.** `codacy-cli analyze --tool trivy` also walks stale
+`.worktrees/` and `.claude/worktrees/`. Count High on **live**
+`pnpm-lock.yaml` + `Cargo.lock` only. After the 3.15.2 / 3.1.6 pins,
+live High is Tiptap. Do not “fix” old worktree locks from this tree.
+
+Do not close #46 from fixtures. Do not bump Tiptap this window.
+
+**D6 Rust dirt.** `lib.rs` has two hunks. `+mod secure_fs;` is product
+(group 7). Hide-on-close test body is test-only (group 4). Do not
+`git add lib.rs` into both commits. Prefer one Rust commit that names
+both reasons.
+
+## 23. Chat without a vault is a supported flow — do not “fix” cwd
+
+**Origin:** Cursor Grok 4.6 · 2026-09-14 14:48 · leftover trap.
+
+#46 leftover is **live** Chat-without-vault, not units. Do not close
+the issue from tests.
+
+`normalize_cwd("")` falling back to `$HOME` is Chat-without-vault, not
+MCP scope. Do **not** change that function. HOME aliases as a *vault*
+(`~/`, `$HOME/`, symlink-to-HOME) stay refused.
+
+Chat still mounts, polls host status, lists sessions, offers New chat,
+and restores the last conversation with an empty `vaultPath`. Those
+are source locks. They are not a live pass.
+
+**Stamped 15:28:** leftover units still do not close #46. `lib.rs`
+still has two hunks — one Rust commit at D6 (~15:45). Do not
+`git add -A`. Identity leftover is Agent, not Desktop.

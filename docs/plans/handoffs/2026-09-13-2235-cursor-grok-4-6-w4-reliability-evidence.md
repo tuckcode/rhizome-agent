@@ -143,3 +143,21 @@ No promoted-note recall ran. No vault-tool live read against a test vault. W7 st
 5. Memory path stays behind an isolated test vault. Do not use the daily Rhizome Vault.
 
 **Installed app remains `476756c`.**
+
+## 2026-09-14 morning (source remainder)
+
+**Origin:** Cursor Grok 4.6 · 2026-09-14 ~11:20 CT
+
+Source-only reconfirm. Full write-up: [2026-09-14-1120-cursor-grok-4-6-w4-source-remainder.md](2026-09-14-1120-cursor-grok-4-6-w4-source-remainder.md).
+
+- `#41` still **OPEN**. `AiPanel.tsx:544` still passes `onSteer={isPrimeTarget ? handleSteer : undefined}`. Do not close.
+- Leftover remains **`mutate_queued_message`**: catalog `docs/prime-adapter-surface.json:74`; named at `docs/design/prime-spoken-surface.md:33` and `:61`. No `src/` call site. No Rust host wrapper.
+- Sister unspoken extras (not original #41): `abort_and_clear_queue` (`prime-adapter-surface.json:9`), `set_follow_up_mode` (`:98`; comment only `prime_session_host.rs:37`), `set_steering_mode` (`:105`).
+- Same eight vitest files: **98/98 passed** (~11:18 CT, HEAD `4416411`). Not native.
+- All five God-plan native cases still **NOT RUN**. Atticus has not recorded them. App still **`476756c`**. Not daily-driver ready.
+- Did not launch `/Applications`. Did not quit Rhizome. Did not commit.
+
+**D3 presentation (2026-09-14 ~12:00):** queue + preflight type is 12px.
+A mid-turn send failure still has **no error banner**. That is a W4
+behavior gap, not a design label. Do not invent “Stopped” or
+“Connection unknown.” [1225](2026-09-14-1225-cursor-grok-4-6-d3-status.md).

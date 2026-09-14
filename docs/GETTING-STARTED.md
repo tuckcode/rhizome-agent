@@ -280,7 +280,8 @@ rhizome-agent/
 │   │   ├── git/                  # Git module
 │   │   │   ├── mod.rs, command.rs, remote_config.rs, commit.rs, status.rs
 │   │   │   ├── history.rs, clone.rs, connect.rs, conflict.rs, remote.rs, pulse.rs
-│   │   ├── telemetry.rs          # Sentry init + path scrubber
+│   │   ├── telemetry.rs          # Sentry init + path/token scrubber
+│   │   ├── secure_fs.rs          # Owner-only atomic writes (settings + secrets)
 │   │   ├── search.rs             # Keyword search (walkdir-based)
 │   │   ├── ai_agents.rs          # CLI-agent request normalization + adapter dispatch
 │   │   ├── cli_agent_runtime.rs  # Shared CLI-agent runtime process/prompt/MCP helpers
@@ -302,7 +303,7 @@ rhizome-agent/
 │
 ├── mcp-server/                   # MCP bridge (Node.js or Bun)
 │   ├── index.js                  # MCP server entry (stdio tools)
-│   ├── vault.js                  # Vault file operations
+│   ├── vault.js                  # Vault file ops — data-only frontmatter (no gray-matter)
 │   ├── ws-bridge.js              # WebSocket bridge (ports 9710, 9711)
 │   ├── test.js                   # MCP server tests
 │   └── package.json
@@ -390,7 +391,13 @@ rhizome-agent/
 | `src/components/aiWorkspaceSizing.ts` | AI workspace sizing, localStorage persistence, class names, and layout style helpers. |
 | `src/components/AiPanel.tsx` | Reusable AI transcript/composer surface — selected target with tool execution, reasoning, actions, and per-vault permission mode. |
 | `src/components/PrimeThinkingToggle.tsx` | Composer thinking-level menu. Levels come from the host and are filtered to the model's own set; no hardcoded list. |
-| `src/components/usePrimeSessionSwitcher.ts` | Session list switch / fork / branch. Skips `ensure_prime_session_host` when the host is already running. |
+| `src/components/usePrimeSessionSwitcher.ts` | Session list switch / fork / branch. Skips `ensure_prime_session_host` when the host is already running. Clears the transcript on the same click as the row highlight. |
+| `src/lib/replySuggestions.ts` | Rules-first reply pills and Tab ghost-text (#51 Case 1). Options win over completion. Model-backed suggestions are not built. |
+| `src/components/chatNoteSplit.ts` | On top / Beside for an open note over Chat. Beside forces compact Sessions/Notes. |
+| `src/App.tsx` `handleAskAgentAboutNote` | Right-click a list row → Ask the agent about this note. Keeps Chat and opens that note (`App.test.tsx`). |
+| `src/hooks/useNoteLockMode.ts` | Ephemeral per-note lock. Locked notes make BlockNote/raw read-only (`EditorContentLayout.test.tsx`). Not vault `editor_mode`. |
+| `src/components/PrimeExtensionsSection.tsx` | Settings → Packages hub. Catalog is npm `pi-package`; install is the Prime CLI, not a daemon command. |
+| `src/lib/primePackages.ts` | Catalog search URL, install spec (`npm:` prefix), and Ask-Chat fallback prompt. |
 | `src/hooks/useViewMode.ts` | Persisted `editor-only` / `editor-list` / `all`. Fresh default is Notes open (`editor-list`). |
 | `src/components/ConnectionsPanel.tsx` | Graph/Mycelium cell. Chat-centered shell mounts this only on Changes. |
 | `src/utils/openAiWorkspaceWindow.ts` | Native Tauri AI workspace window creation, focus, and dock-back traffic-light handling. |
@@ -468,7 +475,9 @@ That browser harness is a deterministic desktop command bridge, not real native 
 
 ## Developer pitfalls (current tree)
 
-Verified against source 2026-09-08. Longer landmine list:
+**Origin:** PR #66 KEEP · 2026-09-14 · not a merge.
+
+Verified against source 2026-09-14. Longer landmine list:
 [`CROSS-MODEL-HANDOFF.md`](CROSS-MODEL-HANDOFF.md).
 
 - **One Rhizome at a time.** Debug bundle and `/Applications/Rhizome Agent.app`
@@ -476,21 +485,86 @@ Verified against source 2026-09-08. Longer landmine list:
   first. Quit the installed app before `pnpm tauri dev`.
 - **Notes default open.** `useViewMode` returns `editor-list` when nothing is
   stored. Chat must not force `editor-only`. Shut Notes leaves
-  `VaultPanelRestoreButton` (46px). Inbox toggles; it does not mount Graph.
+  `VaultPanelRestoreButton` (46px rail, 32px hit target). Inbox toggles; it does
+  not mount Graph. Beside an open note folds Sessions/Notes — do not restore
+  hover-collapse on that pane (`App.layout-edges.test.ts`).
 - **Graph/Mycelium only on Changes.** `ConnectionsPanel` is gated on
-  `isChangesSelection`. Do not remount it under Inbox to “make Graph findable.”
+  `isChangesSelection` (`App.layout-edges.test.ts`). Inbox rail is a
+  Notes filter. Do not remount Graph under Inbox.
 - **Thinking levels come from the host.** Call `get_prime_thinking_levels`
   for the scale and `get_prime_supported_thinking_levels` for the attached
   model's subset of it. Do not hardcode Off → Max in the frontend, and do not
   offer a level the model refuses — Prime clamps it and the click looks dead.
 - **Session switch skip-ensure.** `usePrimeSessionSwitcher` skips
   `ensure_prime_session_host` when `hostRunning` is true. Status-poll retry
-  of ensure is still required when the host is down.
+  of ensure is still required when the host is down. The click must clear the
+  transcript immediately; leaving the old messages up is the beachball.
+- **Settings catalog is lazy.** Do not fetch `get_available_prime_models` or
+  `get_prime_provider_status` until Agents is visible. Do not search the
+  Packages catalog until that section is opened. Do not cache a failed
+  “host is not running” catalog.
+- **Chat default stays Prime.** Settings must not present Prime as an
+  optional local-agent alternative. An API-model default must say it
+  skips Prime sessions and vault tools.
+- **Hide stops helpers.** Red-button close hides (C22) and
+  `release_helpers_for_hidden_window` stops the spawned Prime supervisor,
+  MCP bridge, and Mindwalk sidecar unless Keep working left a resident
+  session. Never send Prime `shutdown`. Cmd+Q is the real quit.
+- **Packages install is CLI, not the daemon.** `install_prime_package` runs
+  `prime-agent package install` (180s). Confirm full system access once.
+- **Tab completion is rules-first.** `suggestReply` only. Do not add
+  model-backed ghost text (#51 Case 2) without a separate decision.
 - **MCP wiki verbs are gone.** `listTools` must not include
   `rhizome_grok_import`, `rhizome_generate_wiki`, or `rhizome_repo_research`.
   Graph queries need `RHIZOME_TOOL_PATH` / packaged `cli-call.mjs`.
+- **MCP frontmatter is data-only.** `mcp-server/vault.js` must not call
+  `gray-matter` (its default JS engine evaluates `---javascript`).
+  Coffee / coffeescript / cson / `searchNotes` stay data-only too
+  (`vault.security.test.js`). The packaged MCP bundle is generated
+  (`src-tauri/.gitignore`) — `/Applications` `476756c` will not pick
+  S1/S2 until rebuild.
+- **Ask the agent about this note** keeps Chat and opens that note
+  (`App.test.tsx`). Locked notes are read-only in BlockNote and raw
+  (`EditorContentLayout.test.tsx`). Not vault `editor_mode`. Sheets do
+  not get a lock this window.
+- **Agents idle/working** sits on the Chat composer next to thinking
+  (`ChatHome.test.tsx`). The skills pill stays `rhizome-vault` — not a
+  vault switcher. A Settings API default remaps to the Prime harness
+  (`ChatHome.test.tsx`). Inbox shows in the Notes list only when folder
+  mode is on (`App.layout-edges.test.ts`). A long context chip
+  truncates and keeps the full name on hover; queued follow-up text
+  stays 12px.
+- **S3 leftover prefixes** in JS: `ghr_` / `ghu_` / `sk_test_` plus Slack
+  `xoxa-` / `xoxr-` / `xoxs-` / `xoxe-` (`sensitiveTextRedaction.test.ts`).
+  Native Sentry also scrubs those Slack prefixes plus `hf_` / `npm_` /
+  `glpat-`. It still does not scrub `ghr_` or `sk_test_` / `sk_live_` —
+  do not widen rust this window.
+- **Settings and secrets writes** go through `secure_fs::write_owner_only_atomic`.
+  Do not write the real app-support settings or key file in tests.
+- **Session-list import** stays blocked until Atticus types **`1`**.
+  Do not speak `import_jsonl`. Vault `Imports/` writer already exists.
+- **Chat still mounts with no vault** (`ChatHome.test.tsx`). Preflight
+  still runs with an empty vault (`ChatPreflightBanner.test.tsx`). Host
+  status still polls with an empty path (`usePrimeHostStatus.test.ts`).
+  Last-conversation restore needs no vault path. Sessions list still
+  loads without `ensure_prime_session_host`. New chat still works with
+  no vault. Live Chat-without-vault is **NOT RUN**. Do not close #46
+  from units. Welcome Download words stay in `en.json` (C18).
+  Chat history shows the C70 clock when a turn has `createdAtMs`.
+  Linux titlebar uses `useDragRegion`. #51 Case 2 and #36 timezone
+  stay unbuilt. D6 named commits wait ~15:45. Do not `git add -A`.
+  Nous Portal models share the Chat picker when the
+  catalog includes them. Packaged MCP stays generated/gitignored.
+- **First-run Getting Started** is a local folder scaffold (no clone)
+  unless `RHIZOME_GETTING_STARTED_REPO_URL` is set. Welcome stays
+  clickable offline (`WelcomeScreen.test.tsx`). The ready toast says
+  **created and opened**, not cloned (`App.layout-edges.test.ts`).
+  Welcome still says Download — leftover words. Do not rewrite `en.json`
+  this window (C18). Local scaffold failures say **create**; git-clone
+  failures (C11) still say **download** (`gettingStartedVault.test.ts`).
 - **`pnpm typecheck` is `tsc -b`.** `npx tsc --noEmit` compiles zero files.
 - **English only.** Do not add `en.json` keys or run `pnpm l10n:translate`.
+- **ASCII mark.** Copyable fence: [`docs/design/brand/2026-09-13/README.md`](design/brand/2026-09-13/README.md) — the PNG is not selectable text.
 
 ## Running Tests
 

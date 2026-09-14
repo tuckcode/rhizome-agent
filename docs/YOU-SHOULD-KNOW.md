@@ -10,9 +10,12 @@ shipped after Claude last owned a session, what GitHub still says is
 open that is already built, and the decisions you will otherwise
 re-litigate.
 
-**Living-docs stamp 2026-09-13:** origin **`5c629a0`**, app **`476756c`**.
-God-plan input: [`ASTRA_PACKET.md`](ASTRA_PACKET.md). Tonight’s picture:
-[`BOARD.md`](BOARD.md). Confirm tip with `git log origin/main -1`.
+**Living-docs stamp 2026-09-14 15:43:** local HEAD **`4416411`**, origin **`5c629a0`**
+(two unpushed), app **`476756c`**. Dirty **290+**. D6 ~15:45. God plan: [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md).
+Morning pickup:
+[`2026-09-14-1115`](plans/handoffs/2026-09-14-1115-cursor-grok-4-6-morning-pickup.md).
+Tonight’s picture: [`BOARD.md`](BOARD.md). Confirm with `git log -1` and
+`git log origin/main..HEAD`.
 
 Last Claude-owned session on this repo: **2026-08-24**
 ([shell dock + ADR-0166 + NEXT.md](plans/handoffs/2026-08-24-2122-claude-opus-5-shell-dock-and-next-index.md)).
@@ -60,9 +63,14 @@ longer open the way the ADR text still sounds.
 
 | Question | Now |
 |---|---|
-| ⌘1 / ⌘2 / ⌘3 | **Settled 2026-08-25.** ⌘1 Chat only. ⌘2 Notes panel, Browse collapsed. ⌘3 Notes panel, Browse expanded. Stored `viewMode` values unchanged (`editor-only` / `editor-list` / `all`). Fresh vaults default to `editor-list` (C72). |
+| ⌘1 / ⌘2 / ⌘3 | **Settled 2026-08-25.** Labels in tree 2026-09-14: ⌘1 Chat only. ⌘2 **Notes, Browse closed**. ⌘3 **Notes, Browse open**. Stored `viewMode` values unchanged (`editor-only` / `editor-list` / `all`). Fresh vaults default to `editor-list` (C72). Inbox stays the folder. Packaged leftover still **`476756c`**. |
 | Right panel | **Settled 2026-08-25, refined 2026-09-12.** One Notes panel. Compact nav above the selected list. Rail control is **Notes** (Inbox is a folder in the list). Shut Notes leaves a 46px restore rail. No Inbox/Notes tabs, no second right column. |
-| Canvas destinations | **Corrected 2026-09-07.** Chat stays the centre. Graph/Mycelium are a Changes-only cell under Notes (ADR-0171), not a place you go instead of chatting. Research is still a centre pane. #39 (graph as an *agent tool*) is still open. |
+| Canvas destinations | **Corrected 2026-09-07.** Chat stays the centre. Graph/Mycelium are a Changes-only cell under Notes (ADR-0171), not a place you go instead of chatting (`App.layout-edges.test.ts` 14:33). Research is still a centre pane (Chat `display: none`, not an overlay). #39 (graph as an *agent tool*) is still open. |
+| Open note vs Chat | **Shipped 2026-09-12.** Notes header **On top / Beside**. Beside folds Sessions/Notes. Hover must not collapse the note. Highlight → Copy, or **Ask Chat about this** (same thread; `App.layout-edges.test.ts` 14:00). Right-click a list row → **Ask the agent about this note** keeps Chat and opens that note (`App.test.tsx` 13:50). Note lock is ephemeral and per-note — locked notes are read-only (`EditorContentLayout.test.tsx` 13:51). Not vault `editor_mode`. |
+| Latest reply | Green start marker on the newest assistant turn. Moves when a newer reply starts. |
+| Session click | Transcript **clears on the click**, then rehydrates. Leaving the old chat up is the switch beachball. |
+| Settings cost | Model catalog and provider status wait until **Agents** is visible. Packages catalog waits until **Packages**. |
+| Hide vs quit | Red button hides (C22) and stops helpers this process started, unless Keep working. Cmd+Q quits. Never Prime `shutdown`. |
 
 **Do not** make nav and the note list exclusive. Claude tried; it broke
 Cmd+N, inbox auto-advance, and note selection. Keep them mounted
@@ -105,12 +113,17 @@ unless a row below is the task.
   stays reject-as-backend. DeepSeek Cordis is reject-as-kernel; take
   the *idea* (hook a turn / block a tool) on Prime’s existing seams.
 - Prime has no security sandbox. Do not invent one. Kern is Linux/WSL2
-  only.
+  only. C57: CLI default **Limited tools**; Prime toggle stays hidden
+  (always Power User). English tooltips say instruction, not a lock.
+  Do not restore “Vault Safe.”
 - **Do not start grafting** until option 2 + first slice are ratified.
 
 ### Sessions are furniture, not an overlay
 
 - Left column of Chat. Always on in the chat-centered shell. **#27 closed.**
+  When this column is the top band (no Prime subhead), the header clears
+  the traffic lights and is a `useDragRegion` drag surface
+  (`PrimeSessionList.test.tsx` / `AiPanel.test.tsx`). Native drag NOT RUN.
 - Filter matches **title / cwd / git branch**, not transcript. Archived
   rows included; a hit expands that section. **#34 closed.**
 - Named at creation: `Rhizome · {Mon D} · {h:mm}{a|p} · {vault} · {id-tail}`
@@ -143,9 +156,19 @@ are **closed** on GitHub (2026-08-29). Do not redesign the strip again.
   High / X-High, and the menu says "Limited by this model" when it is short).
   Do not restore a binary quiet/loud toggle. The model picker lists the same
   set.
+- **#51 Case 1 shipped:** Tab ghost-text and reply pills are rules-first
+  (`suggestReply`). Options win over completion. Case 2 (model-backed) is
+  not built.
 - Assistant message actions are icon-only with hover tooltips (regenerate,
   copy, save to vault, fork).
 - Command argument hints were already in the slash menu.
+
+### Packages hub (2026-09-12)
+
+Settings → **Packages** (nav label, not "Extensions") is the Pi catalog.
+Install is `prime-agent package install`, then reload. The daemon has no
+install command. Confirm full system access once. Chat is the fallback
+when the CLI is missing.
 
 ### Prime verbs that landed in Chat
 
@@ -177,6 +200,9 @@ Implemented on main. **#14 / #17 / #18 closed tonight** (2026-09-13):
 - **#25 closed 2026-09-04.** Retrieval provenance on main. Index:
   [`design/memory-loop.md`](design/memory-loop.md). Consolidation sketch
   remains [`automatic-memory-consolidation.md`](design/automatic-memory-consolidation.md).
+- Vault `Imports/` writer shipped. Prime **session-list rows stay blocked**
+  until Atticus types **`1`**. Do not speak `import_jsonl`. Silence is not
+  approval.
 
 ### Research as canvas
 
@@ -216,7 +242,8 @@ shows the recovered command, not “ipython” five times.
 - Folder mutations stay inside registered vaults (`2d12ca5`).
 - #43 window-level navigation guard: off-origin links go to the
   system browser; the webview never leaves. Built on Tauri 2.10
-  `on_navigation`. **GitHub #43 still open.**
+  `on_navigation`. **GitHub #43 closed** 2026-09-13 / confirmed
+  2026-09-14 (`gh issue view 43`). Do not reopen.
 - Traffic-light clearance native-verified (Sol). Mycelium “white
   screen” was a Suspense flash, not a blank view (C49).
 - On macOS, restoring a hidden main window: `app.show()` first, then
@@ -233,17 +260,16 @@ issue.** Check `main` and the handoff first.
 #31 #34 #35 #37 #38 #42 #43 #44 #47 #55, plus earlier #1–#8, #10, #12,
 #15 #16 #19 #20 #28 #30 #33.
 
-**Still OPEN (live `gh` 2026-09-13 night, 17 issues):**
+**Still OPEN (live `gh` 2026-09-14, 17 issues):**
 #5 #13 #23 #26 #32 #36 #39 #40 #41 #45 #46 #48 #50 #51 #52 #56 #57.
 
 | Still open | Honest read |
 |---|---|
 | #40 | Filter answered (ADR-0168); composition not ratified |
-| #41 | Queue display exists; **steer UX** still the gap |
+| #41 | Source `onSteer` is wired. Leftover is native Enter-queue / Steer plus unspoken `mutate_queued_message`. Do not close from units. |
 | #5 | Spec skeleton: [`design/prime-agent-surface.md`](design/prime-agent-surface.md) |
-| #46 | **Security** — HOME vault / wide MCP |
+| #46 | Source refuses HOME as a vault (`4416411`). Leftover is live Chat-without-vault. Do not close from units. |
 | #51 | Case 1 shipped; Case 2 deferred |
-| #55 | **Closed tonight** — local starter scaffold; C11 remote still deferred |
 
 **Unbuilt / blocked, not “GitHub forgot”:** #32/C42 Windows never launched;
 #50 plan awaiting surface; #56 doctrine honesty.
@@ -319,8 +345,9 @@ These are the ones this week added or re-proved:
 
 User leftover, in this order:
 
-1. Execute tonight from [`ASTRA_PACKET.md`](ASTRA_PACKET.md) §11 +
-   [`BOARD.md`](BOARD.md). Morning is last hours, not kickoff.
+1. Morning pickup landed — read
+   [`2026-09-14-1115`](plans/handoffs/2026-09-14-1115-cursor-grok-4-6-morning-pickup.md)
+   then [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md) and [`BOARD.md`](BOARD.md).
 2. **Do not** start TokenJuice, Switchyard, or harness composition.
 3. If choosing freely: **#46** (security), C64 verify, hide-on-close
    helpers, #41 steer honesty. Do not re-close #11 / #22 / #24 / #47.
@@ -335,7 +362,9 @@ User leftover, in this order:
 |---|---|
 | What is true right now | [`HANDOFF.md`](HANDOFF.md) |
 | Tonight’s board | [`BOARD.md`](BOARD.md) |
+| God plan (execute) | [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md) |
 | God-plan input | [`ASTRA_PACKET.md`](ASTRA_PACKET.md) |
+| Morning pickup | [`2026-09-14-1115`](plans/handoffs/2026-09-14-1115-cursor-grok-4-6-morning-pickup.md) |
 | Unclaimed work | [`NEXT.md`](NEXT.md) |
 | Traps | [`CROSS-MODEL-HANDOFF.md`](CROSS-MODEL-HANDOFF.md) |
 | Identity / Prime-first | [`IDENTITY.md`](IDENTITY.md) |

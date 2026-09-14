@@ -1,5 +1,127 @@
 # ASTRA PACKET — God-plan input (2026-09-13 night)
 
+> **Superseded git snapshot.** This packet still says origin = local and
+> “no commits ahead.” Morning truth is `docs/MORNING.md`: local
+> **`4416411`**, origin **`5c629a0`**, app **`476756c`**. Do not rewrite
+> the rest of this Codex-era packet.
+>
+> **2026-09-14 15:26 stamp:** Tiptap / Medium deps still parked. Note
+> Copy path leftover locked. D6 named paths written. Packaged leftover
+> still `476756c`.
+>
+> **2026-09-14 14:59 stamp:** Picker still offers X-High. C66 / #52
+> still parked. Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:58 stamp:** Chat pulse stays with Notes open.
+> Packages stay Prime. Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:57 stamp:** List rename does not create a session.
+> Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:56 stamp:** Prime omits Limited tools. Mouse-back
+> note-only. Rust leaves `ghr_` / Stripe. Packaged leftover still
+> `476756c`.
+>
+> **2026-09-14 14:55 stamp:** Reply-block Copy + no composer vault
+> pill. Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:54 stamp:** HOME-cwd session names + composer
+> history leftover locked. Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:52 stamp:** Anthropic Reconnect / DeepSeek Add key
+> leftover locked. Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:51 stamp:** Composer deck still mounts with no
+> vault. Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:50 stamp:** Model picker and session switch work
+> with no vault. Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:49 stamp:** Thinking pill loads levels with no
+> vault. Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:48 stamp:** CROSS-MODEL §23 — do not change
+> `normalize_cwd("")`. Chat does not bail on empty vault. Packaged
+> leftover still `476756c`.
+>
+> **2026-09-14 14:47 stamp:** New chat still works with no vault.
+> Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:46 stamp:** Sessions list loads with no vault.
+> Does not ensure Prime. Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:45 stamp:** Last-conversation restore needs no
+> vault. C18 keeps Download words. Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:44 stamp:** ChatHome still polls host from
+> vaultPath, including empty. D6 orphan W4 2235 rides group 5.
+> Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:43 stamp:** Empty vault still polls Prime host
+> status. Do not close #46. Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:42 stamp:** C68 does not invent a sheet lock. C57
+> Prime toggle stays hidden. Preflight mark stays amber. Packaged
+> leftover still `476756c`.
+>
+> **2026-09-14 14:40 stamp:** Static context chip truncates. Queue text
+> stays 12px. Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:35 stamp:** Settings API default remaps to Prime.
+> Inbox is Notes-list folder mode. Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:32 stamp:** Leftover inventory before D6
+> ([1460](plans/handoffs/2026-09-14-1460-cursor-grok-4-6-leftover-inventory.md)).
+> Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:30 stamp:** First-run rust already seeds folders +
+> welcome with no personal notes. Do not dirty `getting_started.rs`
+> this window. Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:28 stamp:** Preflight still runs with no vault.
+> Provider warn can show. Do not close #46. Packaged leftover still
+> `476756c`.
+>
+> **2026-09-14 14:26 stamp:** Notes do not collapse on hover. Chat
+> does not speak `mutate_queued_message`. Packaged leftover still
+> `476756c`.
+>
+> **2026-09-14 14:24 stamp:** Chat still mounts with no vault
+> (`ChatHome.test.tsx`). Preflight sits on the composer. Do not close
+> #46. Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:22 stamp:** Graph/Mycelium mounts only on Changes.
+> Inbox rail is a Notes filter. ChatHome Escape is onExit. Packaged
+> leftover still `476756c`.
+>
+> **2026-09-14 14:20 stamp:** Local Getting Started failures say
+> create, not download. C11 git-clone failures still say download.
+> Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:16 stamp:** Welcome Getting Started stays clickable
+> offline (local scaffold). Notes hide only for Graph / Mycelium /
+> Research. Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:12 stamp:** leftover Slack prefixes `xoxa-` / `xoxr-` /
+> `xoxs-` / `xoxe-` (JS + native). Native also locks `hf_` / `npm_` /
+> `glpat-`. Sessions top-band header is a `useDragRegion` drag surface.
+> Packaged leftover still `476756c`.
+>
+> **2026-09-14 14:10 stamp:** leftover S3 prefixes `ghr_` / `ghu_` /
+> `sk_test_` (`sensitiveTextRedaction.test.ts`). ChatHome wires the
+> Agents pill next to thinking (`ChatHome.test.tsx`). `sk_live_` /
+> `sk_test_` / `ghr_` stay JS-only on native Sentry. Packaged leftover
+> still `476756c`.
+>
+> **2026-09-14 14:14 stamp:** C72 tree leftover (shortcuts sheet
+> `Editor + notes`) is now labeled. `YOU-SHOULD-KNOW.md` §4 open table
+> is restamped. Packet §2 “C72 remainder / closed issues still listed”
+> is historical.
+>
+> **2026-09-14 13:51 stamp:** leftover chrome locks — Ask-the-agent App
+> wiring (`App.test.tsx`) and note-lock read-only
+> (`EditorContentLayout.test.tsx`). Packaged leftover still `476756c`.
+
 **Copy this file into Astra.** It is self-contained. Open the linked
 paths only if you need the source paragraph.
 

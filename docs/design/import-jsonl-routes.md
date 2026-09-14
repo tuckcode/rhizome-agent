@@ -1,7 +1,8 @@
 # `import_jsonl` — three routes (do not code list-import)
 
 **Status:** decision paper. Atticus picks. **Do not ship Prime session-list rows until then.**  
-**Canonical packet path:** [`../plans/import-jsonl-decision.md`](../plans/import-jsonl-decision.md).  
+**Canonical packet path:** [`../plans/import-jsonl-decision.md`](../plans/import-jsonl-decision.md) — obligations (restore, cancel, dedup, vault-less, handle vs file) live there.  
+**Origin:** Cursor Grok 4.6 · 2026-09-13; obligations pointer 2026-09-14.  
 **Vault half:** already shipped (Settings → Import chat history → `Imports/claude-code/`).  
 **Plans:** [`../plans/2026-09-01-session-import-plan.md`](../plans/2026-09-01-session-import-plan.md), brief [`../plans/handoffs/2026-09-06-2152-composer-prime-session-list-import-brief.md`](../plans/handoffs/2026-09-06-2152-composer-prime-session-list-import-brief.md).  
 **Doctrine:** ADR-0163 (client, not owner of `~/.prime`). ADR-0168 (artifacts, not organs).
@@ -63,3 +64,9 @@ Leave the Settings button as **Import to vault**. Keep `sessionListNotYetWired: 
 ## Assumption
 
 Overnight default if he has not spoken: **paper only**. This file is the decision. Coding list-import is blocked.
+
+---
+
+## Obligations live on the decision page
+
+Do not implement from this short copy. Displacement, restore failure, cancel, partial failure, cross-source dedup, vault-less acceptance, and handle-vs-file identity are specified on [`../plans/import-jsonl-decision.md`](../plans/import-jsonl-decision.md). Route 1 remains a recommendation. Silence is not `1`.

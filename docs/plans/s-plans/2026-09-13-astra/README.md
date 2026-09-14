@@ -68,6 +68,7 @@ Other lanes provide the facts below with their source links:
 
 W1 adds the God-plan pointer and one Astra session link without replacing another author's content.
 Use the new [Astra handoff](../../handoffs/2026-09-13-2220-astra-god-plan.md) for the planning provenance.
+Morning pickup: [2026-09-14-1115](../../handoffs/2026-09-14-1115-cursor-grok-4-6-morning-pickup.md).
 
 Read the [Codex reserve](codex.md) or [Claude reserve](claude.md) only for an explicitly assigned later leftover.
 Neither reserve absorbs this night's workload.

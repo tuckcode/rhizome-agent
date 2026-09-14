@@ -1,5 +1,13 @@
 # God plan — tonight into the last morning hours
 
+> **Superseded git snapshot.** Repository rows below that say “no local
+> commits ahead” are 2026-09-13 night. Morning truth: `docs/MORNING.md`
+> — local **`4416411`**, origin **`5c629a0`**, app **`476756c`**. Hard
+> nos in this file still stand.
+>
+> **Stamped 15:20:** D6 named commits wait ~15:45. Do not merge #66.
+> Do not rebuild `/Applications`. Import waits for `1`.
+
 **Origin:** Astra · Codex · 2026-09-13 · task `01a09de9-425c-7972-9dcc-2bbabf7e7a95`.
 **Project:** `/Users/dtc/code/projects/rhizome-agent` · private `tuckcode/rhizome-agent`.
 **Planning snapshot:** September 13, approximately 22:18 CT. Recheck moving state before each claim.

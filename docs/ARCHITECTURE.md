@@ -258,7 +258,45 @@ you can leave; it does not replace Chat. The Connections edge strip is gone
 (`GraphControls`, collapsed until focus or an active filter) — not a large
 overlay. `useChatCenteredShellLayout` owns `notesOpen`, the restore strip,
 compact/Beside fold, and rail pressed state so App does not recombine view
-mode with compact flags. The diagram below is the inherited Desktop notes-app
+mode with compact flags.
+
+#### Open-note split, Copy, and the latest-reply marker
+
+**Origin:** PR #66 KEEP · 2026-09-14 · not a merge of the draft.
+
+An open note can sit **On top** of Chat (`stacked`) or **Beside** it
+(`side-by-side`). The toggle is on the Notes header (`ChatNoteSplitToggle`),
+never by the traffic lights. The pick lives in localStorage
+(`APP_STORAGE_KEYS.chatNoteSplit`). Beside forces the compact shell
+(`shouldForceChatShellCompact`) so Sessions/Notes fold and Chat keeps a
+usable column. Hover must not collapse that note pane.
+
+The Show Notes restore strip is a **32px** hit target (`VaultPanelRestoreButton`);
+the visible rail stays 46px. Open Notes keeps an inner `--sidebar-border`
+against Chat. Do not cover Chat’s pulsing green working strip
+(`ai-border-pulse` on the panel’s left edge) with a stronger Sessions border.
+
+Highlight in Chat or in the open note, then right-click **Copy**. Chat text
+uses the native WebKit menu via `NATIVE_CONTEXT_MENU_ALLOWLIST`
+(`[data-testid="ai-message"]` and the composer). An open-note highlight also
+offers **Ask Chat about this** (`AskChatExcerptMenu`): it fills the current
+composer with `formatAskChatExcerpt` and does not start a new thread
+(`App.layout-edges.test.ts`). Right-click a list row → **Ask the agent
+about this note** keeps Chat and opens that note (`App.test.tsx`).
+Locked notes make BlockNote/raw read-only (`EditorContentLayout.test.tsx`).
+Not vault `editor_mode`.
+
+When the Sessions column is the top band (no Prime subhead above), its
+header clears the traffic lights (`titleBarGutter`) and is a window-drag
+surface via `useDragRegion` — not `data-tauri-drag-region`
+(`PrimeSessionList.test.tsx`). Native QA only for the actual drag.
+
+The newest assistant turn shows a green start marker
+(`latestAssistantMessageIndex` / `latest-assistant-reply-marker`) left of
+its first line. Compact/local system markers are not replies. The marker
+moves when a newer assistant turn starts streaming or lands.
+
+The diagram below is the inherited Desktop notes-app
 map (classic shell / note windows / editor internals); do not treat it as the
 Agent main-window layout.
 
@@ -292,7 +330,7 @@ Agent main-window layout.
   Note PDF export stays renderer-owned for layout: `useEditorPdfExport` exits diff/raw views, applies a print-only stylesheet to the rendered note root, and checks the native PDF capability before choosing a platform path. On macOS, the renderer asks for a filesystem PDF destination before the Tauri `export_current_webview_pdf` command saves the current `WKWebView` print operation directly; on Windows/Linux Tauri builds and in browser mode, the same export action falls back to the native/browser print dialog. The export reuses rendered BlockNote output so frontmatter is omitted, while math, images, Mermaid diagrams, tldraw blocks, code, tables, and links degrade through their existing DOM rather than a second Markdown-to-PDF renderer, and the source Markdown is never modified. Markdown notes expose the same export action from Cmd+K, the native Note menu, the breadcrumb overflow menu, and each Markdown row's note-list context menu.
 - **Right side panels** (200-500px or hidden): Properties and Table of Contents are mutually exclusive panels mounted by `EditorRightPanel` and coordinated by `useRightPanelExclusion`. Properties shows frontmatter, relationships, instances, backlinks, and git history; Table of Contents is lazy-mounted only while open, derives a title-rooted H1/H2/H3 hierarchy through a debounced Web Worker per ADR-0109, and reuses folder-tree indentation/guide geometry with heading icons while resolving live BlockNote block IDs at click time for navigation. The breadcrumb bar toggles Table of Contents and Properties actions. Per-note `icon` is a suggested Properties field and the command palette's "Set Note Icon" action opens that field directly. When viewing a Type note, Properties shows an **Instances** section listing all notes of that type (sorted by modified_at desc, capped at 50).
 
-- **Status bar** (30px footer): two shells, chosen by the `shell_command_rail` flag. The **legacy** shell is the pipe-separated badge strip — vault switcher, build number, and the git/MCP/graph/jobs badges from `status-bar/StatusBarBadges.tsx`. The **pill** shell collapses always-on git into a **vault·git pill** (`● <vault> · <branch> · <n>△`, green when clean / orange when dirty, behind, or in conflict) whose dropdown is the existing `VaultMenu` extended with sync/commit/history/conflict entries via its `extraActions` prop. Agent idle/working (`status-bar/AgentsPill.tsx`) sits on the composer next to thinking, reading the same `useRhizomeJobs` store the command rail's agent-avatar dot uses. Check-for-updates / build number sits next to the theme toggle on the right; Contribute and Docs live in Settings → About. In pill mode the rail owns Graph/Research/Settings and the status bar hides its duplicates; the exceptional badges (offline, vault reloading, no remote, missing git, MCP) survive in both shells because they only render in abnormal states.
+- **Status bar** (30px footer): two shells, chosen by the `shell_command_rail` flag. The **legacy** shell is the pipe-separated badge strip — vault switcher, build number, and the git/MCP/graph/jobs badges from `status-bar/StatusBarBadges.tsx`. The **pill** shell collapses always-on git into a **vault·git pill** (`● <vault> · <branch> · <n>△`, green when clean / orange when dirty, behind, or in conflict) whose dropdown is the existing `VaultMenu` extended with sync/commit/history/conflict entries via its `extraActions` prop. Agent idle/working (`status-bar/AgentsPill.tsx`) sits on the composer next to thinking (`ChatHome.test.tsx` wires `<AgentsPill>` into `ChatComposerDeck` activity), reading the same `useRhizomeJobs` store the command rail's agent-avatar dot uses. Check-for-updates / build number sits next to the theme toggle on the right; Contribute and Docs live in Settings → About. In pill mode the rail owns Graph/Research/Settings and the status bar hides its duplicates; the exceptional badges (offline, vault reloading, no remote, missing git, MCP) survive in both shells because they only render in abnormal states.
 - **AI workspace** (docked panel or native window): `AiWorkspace` owns the multi-chat orchestration, sidebar tabs, installed-only target picker, permission-mode picker, and dock/pop-out controls. Header/guidance chrome lives in `AiWorkspaceChrome`, edge-resize handles in `AiWorkspaceResizeHandles`, conversation metadata/settings persistence in `aiWorkspaceConversations`, and sizing/class/style helpers in `aiWorkspaceSizing`. The status-bar AI affordance opens this workspace instead of changing the default target inline. Docked workspace mode renders as a compact bounded desktop tool inside the main app; users resize the anchored panel from its left/top edges and resize the chat-list sidebar separately from the transcript area. Pop-out mode opens a dedicated undecorated transparent Tauri webview window labeled `ai-workspace` and boots the lightweight `AiWorkspaceWindowApp` route instead of the full vault shell. The chat header and sidebar header are draggable in native-window mode; closing the pop-out only closes that window, while the dock control emits a dock request back to the main window before closing the pop-out. Chat sessions reuse `AiPanelView` for transcript/composer rendering with the old panel header disabled; target and permission controls live in the composer toolbar so there is one workspace header per active chat. AI workspace cross-window localStorage, BroadcastChannel, storage-event, and subscriber-set plumbing is owned by `createCrossWindowPersistedStore`; domain stores keep only sanitization, mutation, and native persistence behavior.
 
 Panels are separated by `ResizeHandle` components that support drag-to-resize. `useLayoutPanels` clamps the sidebar, note-list, and inspector widths before applying them, keeps the side panes from flex-shrinking below their protected widths, and persists the last chosen widths in installation-local localStorage under `rhizome:layout-panels`. The chat-centered Notes panel uses the same `noteList` width (220–500px) with a 12px trailing handle that stays on the overlay in compact mode; window-width collapse (`useShellCompactLayout`) does not hide or override the drag. Mycelium's session list persists separately under `rhizome:mycelium-sessions-width` (180–420px) via `usePanelWidth`. In the Command-Rail shell, the rail starts icon-first and expands as a whole on hover, mounting `PrimeSessionList` into its open middle below every destination and above Settings. `Keep rail open` persists the expanded state; `Collapse rail` returns it to hover mode. Its right edge drag-resizes the remembered open width from 180–360px and pins the rail at drag start so it cannot collapse under the cursor. The classic shell retains the older resizable Chat sessions column.
@@ -483,7 +521,10 @@ Each answers "nothing", which is true of a host with no session.
   #17 — this conversation, not the sessions drawer),
   `usePrimeSessionSwitcher` (list switch / fork / branch; **skips**
   `ensure_prime_session_host` when Chat already reports the host running —
-  a redundant ensure on every click was the session-switch beachball),
+  a redundant ensure on every click was the session-switch beachball.
+  A row click highlights immediately and **clears the transcript in the
+  same click** so the old conversation does not linger during the host
+  round-trip; a refused mid-turn switch restores the previous messages),
   `AiMessage` (turn rendering; successful `get_note` actions become deduplicated,
   one-click `From your vault` source links beneath the answer, while searches,
   writes, pending calls, and failed calls never claim provenance),
@@ -538,6 +579,24 @@ Assistant actions on `AiMessage` are icon-only (`size="icon"`) with hover
 tooltips: regenerate, copy, save to vault, fork. Accessible names stay on
 the buttons (`ai.message.*`). Do not restore text labels.
 
+#### Reply pills and Tab ghost-text (#51 Case 1)
+
+**Origin:** PR #66 KEEP · 2026-09-14 · not a merge of the draft.
+
+`suggestReply` (`src/lib/replySuggestions.ts`) reads the last assistant
+message and offers **at most one** of:
+
+- **`options`** — 2–4 pills when the agent asked a closed question
+  (numbered, bullets, “X or Y”, or an action yes/no). Labels must name
+  the action. Pills win when both shapes could apply.
+- **`completion`** — one obvious continuation, accepted with Tab
+  (`composer-reply-completion` in `AiPanelChrome`). Rules-first only:
+  “ready”, “want me to” / “shall I”, or a last-sentence “next I will…”
+  echo. Never a bare “yes”. Most turns offer nothing.
+
+Case 2 (model-backed or app-state suggestions) is **not** built. Do not
+fire both mechanisms on the same turn.
+
 #### The chat model menu (#45)
 
 Prime publishes its whole catalog regardless of auth state — **501 models** on
@@ -571,7 +630,14 @@ from `~/.prime/agent/settings.json` via `list_prime_packages`. Install runs
 `prime-agent package install` in the background (`install_prime_package`), then
 reloads the attached Prime session (`reload`). Prime's own docs warn that
 packages run with full system access; Settings confirms that once per install.
-If the CLI is missing, Settings copies the command or asks Chat to run it.
+If the CLI is missing, Settings copies the command or asks Chat to run it
+(`primePackageAskAgentPrompt`). Kind tabs (extension / skill / prompt / theme)
+add a second keyword. Search hits the public npm registry from the renderer
+(`catalogSearchUrl`). Prime's **daemon has no install command**. Install is a
+180s background process (`prime_packages.rs`). Bare names become `npm:{name}`.
+Sources that start with `-` or contain whitespace are refused. Opening Settings
+does **not** search the catalog until Packages is visited or that section
+scrolls into view.
 
 The allow-list is Rhizome's view of Prime's catalog, in the same sense as
 archiving below: Prime's CLI and every other client still see all 501.
@@ -583,6 +649,29 @@ only lists it after Settings → **Add to Chat list** merges the public
 `/v1/models` catalog into `~/.prime/agent/models.json` (`ensure_nous_portal_models`),
 then reloads the attached session. Rhizome writes the environment variable
 *name* `NOUS_API_KEY`, never the key, and never `auth.json`.
+
+#### Hide-on-close and Settings catalog cost
+
+**Origin:** PR #66 KEEP · 2026-09-14 · not a merge of the draft.
+
+The red traffic light **hides** the main window (C22); Cmd+Q quits.
+Idle hide settles the owned session as **Stop**, then
+`release_helpers_for_hidden_window` stops the spawned Prime supervisor,
+the MCP WebSocket bridge, and the Mindwalk sidecar so they do not leave
+a Dock “running” mark. A Keep-working (`resident`) session is the
+exception — that daemon stays. Rhizome never sends Prime’s `shutdown`
+RPC (other clients share the machine). Active hide asks first
+(`prime-active-close-requested`); `settle_prime_session` also releases
+helpers because `window.hide()` does not raise `CloseRequested` again.
+
+Settings and Chat share one Prime model catalog (`loadPrimeModelCatalog`).
+A failed “host is not running” answer is **not** cached. Settings must
+not fetch that catalog — or `get_prime_provider_status` — until the
+Agents section is opened or scrolled into view. Fetching 501 models on
+every Settings open was the pinwheel.
+
+Native hide/reopen live-check is still **NOT RUN**. Do not mass-kill
+Prime-spawned `mcp-server/index.js` (ADR-0163).
 
 #### What Rhizome does not own
 
@@ -617,7 +706,7 @@ Large active notes are compacted into a head/tail body snapshot before they ente
 
 Tolaria also supports direct model targets for local servers and API providers. These targets are stored as app-level provider metadata and can be selected in Settings or the status bar alongside coding agents. `src/shared/aiModelProviderCatalog.json` is the shared source for provider defaults, local/API grouping, API-key environment placeholders, and runtime fallback base URLs; the renderer imports it through `aiTargets.ts`, and Tauri includes the same JSON in `ai_models.rs`. Direct model targets run in Chat mode: they receive the same note-context snapshot and conversation history, but they do not receive shell access. OpenAI-compatible direct targets can use Tolaria's narrow native `create_note` tool when an active vault is loaded; the tool calls the same create-only, active-vault-bounded note write command as the UI and emits tool events so the renderer refreshes and opens the created note. The backend `stream_ai_model` command supports OpenAI-compatible chat completions and Anthropic Messages-compatible calls, including Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, Gemini, and custom compatible endpoints.
 
-Provider secrets are not written to `settings.json`. Hosted API targets can use Tolaria's local app-data secrets file (`ai-provider-secrets.json`, outside vaults/worktrees and owner-only on Unix) or reference an environment variable name. Env-backed provider keys are resolved from the app process first, then from exported values in the user's zsh/bash startup files on Unix so GUI-launched sessions can still use shell-managed secrets. Local endpoints can omit authentication.
+Provider secrets are not written to `settings.json`. Hosted API targets can use Tolaria's local app-data secrets file (`ai-provider-secrets.json`, outside vaults/worktrees and owner-only on Unix) or reference an environment variable name. Both that secrets file and `settings.json` (bridge token) are written through `secure_fs::write_owner_only_atomic` — Unix `0o600`, replace a symlink, do not follow it. Env-backed provider keys are resolved from the app process first, then from exported values in the user's zsh/bash startup files on Unix so GUI-launched sessions can still use shell-managed secrets. Local endpoints can omit authentication.
 
 ### Authentication
 
@@ -753,6 +842,10 @@ flowchart LR
 |----------|---------|
 | `spawn_ws_bridge(vault_path)` | Spawns `ws-bridge.js` as child process with `VAULT_PATH`/`VAULT_PATHS` env |
 | `sync_mcp_bridge_vault(vault_path?)` | Starts, restarts, or stops the desktop WebSocket bridge as the selected vault changes |
+| `list_prime_packages` | Installed Prime packages from `~/.prime/agent/settings.json` |
+| `install_prime_package` | Run `prime-agent package install`, then reload the attached session |
+| `get_prime_provider_status` | Read-only connection status per provider (no keys). Settings waits until Agents is visible |
+| `settle_prime_session` | Settle the owned session on hide, then release helpers this process started |
 | `extract_mcp_server_to_stable_dir(app_version)` | On Linux AppImage launches, copies bundled MCP files to `~/.local/share/rhizome/mcp-server/` with version-gated replacement so external clients can keep a stable `index.js` path |
 | `register_mcp(vault_path)` | Resolves an MCP runtime (Node.js 18+ preferred, Bun 1+ fallback), resolves the packaged or stable extracted `mcp-server/`, and writes Tolaria's vault-neutral entry to Claude Code, Antigravity CLI, Cursor, OpenCode, and generic MCP configs on user request |
 | `mcp_config_snippet(vault_path)` | Builds the exact vault-neutral `mcpServers.rhizome` JSON users can copy into any compatible client without writing third-party config files |
@@ -1724,8 +1817,10 @@ Data flows unidirectionally: `App` passes data and callbacks as props to child c
 | Cmd+Shift+M | Toggle Markdown highlight on selected rich-editor text |
 | Cmd+[ / Cmd+] | Navigate back / forward (replaces tabs) |
 | Cmd+Z / Cmd+Shift+Z | Undo / Redo |
-| Cmd+1–9 | Switch to tab N |
-| Cmd+[ / Cmd+] | Navigate back / forward |
+| Cmd+1 | Chat only (`editor-only`) |
+| Cmd+2 | Notes open, Browse collapsed (`editor-list`) |
+| Cmd+3 | Notes open, Browse expanded (`all`) |
+| Tab (composer, idle) | Accept the ghost-text completion when `suggestReply` offers one |
 | `[[` in editor | Open wikilink suggestion menu |
 
 Selection-dependent actions are wired through the command palette and the native menus. For example, a deleted file opened from Changes view becomes a read-only diff preview, and that state enables the "Restore Deleted Note" menu/command while normal note mutation actions stay disabled. Folder selection follows the same pattern: when `selection.kind === 'folder'`, the command palette exposes "Reveal Folder in Finder", "Copy Folder Path", "Rename Folder", and "Delete Folder", and the sidebar row can launch the same flows directly through inline rename or the folder context menu. Active files also expose "Reveal in Finder" and "Copy File Path" through the command palette; non-Markdown file tabs additionally expose "Open in Default App", matching the `FilePreview` header controls. Markdown notes expose "Export note as PDF" from Cmd+K, the native Note menu, the breadcrumb overflow menu, and the note-list context menu, all routed through the same editor export hook. Remote-backed notes expose "Copy git URL" from the breadcrumb overflow and note-list context menu; the renderer gates the action per note workspace via `git_remote_status`, then asks `git_file_url` to build the copied URL from the primary remote, current branch, and vault-relative path. Active notes now follow the same shared-action model for retargeting: Cmd+K can open "Change Note Type…" and "Move Note to Folder…", and the sidebar drop targets call the same hook-backed implementations instead of maintaining separate mutation paths.

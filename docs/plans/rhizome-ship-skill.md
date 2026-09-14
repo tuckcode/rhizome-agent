@@ -1,6 +1,8 @@
 # `rhizome-ship` skill — three verbs
 
-**Status:** idea from 2026-09-12 board. Not built. Not auto-commit.  
+**Status:** authored 2026-09-14 as `.cursor/skills/rhizome-ship/SKILL.md`.
+`.gitignore` allow-lists that folder (was swallowed by `.cursor/*`).
+Not auto-commit. Three verbs only.  
 **Origin:** Atticus · BOARD “Ideas in the ring” + `AGENTS.md` Learned User Preferences.  
 **Pickup:** [`BOARD.md`](../BOARD.md).
 
@@ -9,10 +11,13 @@
 ## Done / now / next
 
 - **Done:** ship rules written (private, solo, local pre-push is CI).
-- **Now:** this file is the spec. Do not invent a fourth verb.
-- **Next:** author the skill after the God plan. Three commands a human (or agent) runs on purpose.
+- **Now:** skill exists. Invoke by saying `commit`, `push`, or `rebuild`.
+- **Next:** use it. Do not invent a fourth verb.
 
 **Done when:** `commit`, `push`, and `rebuild` are three separate invocations, each with a checkable stop.
+
+**Stamped 15:32:** skill still three verbs. `git add -n .cursor` still
+ship-skill only. Do not rebuild `/Applications` this window.
 
 ---
 

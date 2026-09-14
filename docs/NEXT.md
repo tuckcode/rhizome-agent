@@ -19,8 +19,12 @@ It indexes, it does not restate. Every row points at the issue, ADR, or C-number
 that owns the detail. If you find yourself copying a paragraph out of one of
 those into here, link it instead — the same rule `HANDOFF.md` runs on.
 
-Snapshot: **2026-09-13** vs origin **`5c629a0`**. Live `gh` **17** open
-issues. C-number counts below are stale — re-derive both before trusting:
+Snapshot: **2026-09-14** — local HEAD **`4416411`**, origin **`5c629a0`**
+(two unpushed), app **`476756c`**. Astra S1–S4 + R1–R4 + dep pins are
+**in the dirty tree, not committed**. God plan: [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md). Morning:
+[`2026-09-14-1115`](plans/handoffs/2026-09-14-1115-cursor-grok-4-6-morning-pickup.md).
+Live `gh` **17** open issues. C-number counts below are stale — re-derive both
+before trusting:
 
 ```bash
 gh issue list --state open --limit 60 | wc -l
@@ -44,7 +48,7 @@ Board cards: [`BOARD.md`](BOARD.md) W11.
 
 | Card | Status | Pointer |
 |---|---|---|
-| `rhizome-ship` commit / push / rebuild | Idea | [`plans/rhizome-ship-skill.md`](plans/rhizome-ship-skill.md) |
+| `rhizome-ship` commit / push / rebuild | Authored | [`.cursor/skills/rhizome-ship/`](../.cursor/skills/rhizome-ship/SKILL.md) · [`plans/rhizome-ship-skill.md`](plans/rhizome-ship-skill.md) |
 | Portfolio + Today + launcher + vault board | Parked | [`design/idle-chat-overview.md`](design/idle-chat-overview.md) |
 | Vault skill/memory home; no CC Switch | Parked | [`design/vault-skill-home.md`](design/vault-skill-home.md) |
 | Memory loop index | Index | [`design/memory-loop.md`](design/memory-loop.md) |
@@ -55,6 +59,11 @@ Board cards: [`BOARD.md`](BOARD.md) W11.
 
 Chat ↔ Prime still first. Do not replace Chat. Do not add `kanban.db`.
 Do not invent the briefing. Do not expand two big overlays at once.
+
+**Stamped 15:39:** leftover units do not change this order. Session-list
+import still waits for **`1`**. #51 Case 2 and #36 stay parked.
+TokenJuice / `kanban.db` still unbuilt. D6 commits wait ~15:45.
+Chat stays Prime. Settings catalogs wait until Agents / Packages.
 
 ---
 
@@ -84,16 +93,22 @@ trustworthy. Verify on a **real vault + live agent turn**, not unit tests alone.
      Chat now treats Expired as not connected (banner).
    - ~~First-run default vault = cleaned Rhizome Vault scaffold (structure kept).~~
      **Shipped 2026-09-06 18:16:** local scaffold (no Tolaria clone). C11 remote
-     URL still deferred for env override / published starter.
+     URL still deferred for env override / published starter. Welcome stays
+     clickable offline (2026-09-14). Ready toast says created, not cloned.
+     Download words in `en.json` stay (C18). Local scaffold errors say
+     create; C11 clone errors still say download.
 4. ~~**C57** — Atticus answers on Limited tools / CLI defaults.~~ **Closed 2026-09-06:** CLI default Limited tools; Prime toggle hidden; keep Limited tools / Power User names.
 5. ~~**Session import UI**~~ — **Settings + vault writer shipped 2026-09-06 18:16**
-   (Claude Code → `Imports/`). Still open: Prime session-list rows; other
-   source adapters; first-run Welcome import step (C9).
+   (Claude Code → `Imports/`). Prime session-list rows stay **blocked** until
+   Atticus types **`1`**. Other source adapters and first-run Welcome (C9) wait.
 6. **C72 side-panel layout session** — ~~right Notes open by default~~ and
    ~~Graph/Mycelium only on Changes + 46px Notes restore rail~~ on origin
    `0fa00a2`. Later: expand the Changes split instead of a second side panel.
-   Still open: Inbox rename / discoverability.
-7. **Tonight (Atticus):** review **Grokbot full audits** — rhizome-agent **and** CodexGPT lob. See [1819 handoff](plans/handoffs/2026-09-06-1819-composer-park-grokbot-audits-tonight.md). ~~Thinking-pill full level menu~~ and Graph-on-Changes were in `/Applications` as of **2026-09-11**. Chat note **On top / Beside** is in this tree; rebuild Applications to pick it up.
+   ⌘2 **Notes, Browse closed**. ⌘3 **Notes, Browse open** (`c72-notes-delta.md`).
+   Shortcuts sheet matches. Inbox stays the folder. Packaged app still old until rebuild.
+7. **Grokbot leftover review (2026-09-14):** rhizome-agent **done** — [1155](plans/handoffs/2026-09-14-1155-cursor-grokbot-leftover-review.md) 0 Accept. CodexGPT lob stays out. Old park note: [1819](plans/handoffs/2026-09-06-1819-composer-park-grokbot-audits-tonight.md). ~~Thinking-pill full level menu~~ and Graph-on-Changes were in `/Applications` as of **2026-09-11**. Chat note **On top / Beside** is in this tree; rebuild Applications to pick it up.
+
+**Origin:** Cursor Grok 4.6 · 2026-09-14 12:17 · §0 leftover + Grokbot restamp.
 
 **Already shipped (do not re-claim):** #25 provenance · C23 rehydration ·
 C67 sessions context menu · C68 note lock · ADR-0170 right-panel stack ·
@@ -105,8 +120,8 @@ status chrome (Contribute/Docs → About; idle on composer).
   [2241](plans/handoffs/2026-09-06-2241-composer-push-landed.md).
 - **Goal leftover closed:** native Chat glance **PASS** on that build
   ([2245](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md) + PNG).
-- **Parked (not blocking north star):** C72 side panels; Prime list-import route;
-  #51 Case 2; C64 full verify; ~~#47~~ closed tonight; Grokbot audits; C9; packaging/Windows;
+- **Parked (not blocking north star):** C72 leftover is packaged `476756c` (not tree labels); Prime list-import route;
+  #51 Case 2; C64 full verify; ~~#47~~ closed tonight; ~~Grokbot audits~~ reviewed [1155](plans/handoffs/2026-09-14-1155-cursor-grokbot-leftover-review.md) (0 Accept; CodexGPT stays out); C9; packaging/Windows;
   vault/app kanban + Chat briefing + scheduled lint (W11 cards above).
 
 **W11 parked (cards only — not north star)**
@@ -198,12 +213,12 @@ composition doc — do not restate them here.
 | **Session import destinations** | first-run + Settings import build | **Vault half shipped 2026-09-06** (Settings → Import chat history; Claude Code → `Imports/`). Prime session-list half still blocked on `import_jsonl` semantics (Atticus decision). Decision page: [`plans/import-jsonl-decision.md`](plans/import-jsonl-decision.md) (recommend **route 1**). Plan: [`plans/2026-09-01-session-import-plan.md`](plans/2026-09-01-session-import-plan.md). Relates to #23, C9. |
 | **C57 permission naming / defaults** | honest Limited-tools UX | **Settled 2026-09-06 (Atticus).** CLI default Limited tools; Prime toggle stays hidden (always Power User); keep Limited tools / Power User — no Vault Safe. Code already matched. |
 | **#50 live app view: which surface** | agent QA of the drawn UI | Answers proposed 2026-08-29, awaiting Atticus. Browser `pnpm dev`, read + test-bridge steer, `pnpm live-ui` not an in-app pane. [plan](plans/2026-08-29-live-app-view-plan.md). |
-| **What ⌘1/⌘2/⌘3 and "Full Layout" mean once Chat is the centre** | — | **Settled 2026-08-25.** ⌘1 Chat only, ⌘2 opens the Notes panel with Browse collapsed, ⌘3 opens it with Browse expanded. Stored `viewMode` values unchanged. |
+| **What ⌘1/⌘2/⌘3 and "Full Layout" mean once Chat is the centre** | — | **Settled 2026-08-25.** Labels in tree 2026-09-14: ⌘1 Chat only, ⌘2 **Notes, Browse closed**, ⌘3 **Notes, Browse open** (not Chat + Notes). Stored `viewMode` values unchanged. |
 | **Does Wiki Graph replace the canvas or feed a side panel** | #39 | **Settled 2026-09-06 (ADR-0170).** Graph and Mycelium sit under Notes in the right column. They no longer replace Chat. #39 (graph as an agent tool vs a place) is still open for the *agent* interface. |
-| **Right panel composition** | — | **ADR-0170 settled the stack** (Notes heavy + Graph/Mycelium below). **C72 (2026-09-06):** Atticus still can’t find/keep the column — needs a layout session on defaults, Inbox label, and right icon rail (still undecided). |
+| **Right panel composition** | — | **ADR-0170 settled the stack** (Notes heavy + Graph/Mycelium below). **C72 leftover 2026-09-14:** packaged **`476756c`** still has old View names. Tree already labeled. Inbox stays the folder. Right icon rail still undecided — not this leftover. |
 | **C66 agent profile / instructions in Settings** | chat personality UX | **Agreed, not built 2026-09-06.** How the agent should respond, rules, for whichever agent. Not vault `AGENTS.md`, not the model picker, not tool-allowlist profiles. Awaiting: one vs per-agent; app vs vault. |
 | **C67 sessions-list context menu** | session row actions | **Shipped 2026-09-06** (`a309a17`). Open / Rename / Archive·Restore / View in Mycelium / Copy path. |
-| **C68 restore note lock** | accidental edits while reading | **Shipped 2026-09-06** (`a309a17`). Default editable; breadcrumb + Cmd+K; not vault `editor_mode`. |
+| **C68 restore note lock** | accidental edits while reading | **Shipped 2026-09-06** (`a309a17`). Default editable; breadcrumb + Cmd+K; not vault `editor_mode`. Layout lock 2026-09-14: `EditorContentLayout.test.tsx` (rich + raw read-only). |
 | **TokenJuice + Switchyard** | later stacked system; not a Rhizome organ | **Wanted 2026-08-26, not started.** Discuss/plan only. TokenJuice-shaped tool-output shrink first (Prime owns what the model sees). Switchyard-shaped model hop second (sidecar behind Prime; halfway house is `set_scoped_models`). Write-up: [`token-routing-and-compression.md`](design/token-routing-and-compression.md). Do not vendor either in this tree. |
 
 **#40** can close against ADR-0168 (Rhizome is a client of Prime, not a second
@@ -288,7 +303,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 |---|---|
 | #45 | Model settings: connect providers and curate the model dropdown — allow-list step shipped; remainder open |
 | #48 | OmniRoute as a managed local gateway |
-| #46 | **Security — still open.** `$HOME` as a vault writes Prime global `~/.prime/agent/settings.json` and scopes MCP to the whole home tree. Seed guard (`looks_like_vault`) already refuses HOME. **Tonight:** MCP/ws-bridge drop HOME roots; `save_vault_list` refuses HOME; MCP `vault-path.js` prefers `com.rhizome.app` and rejects HOME; connect scrubs a leftover `~/.prime/agent/skills/rhizome-vault`; skill says it is a CLI not a Python import. **Leftover for Atticus / God plan:** close #46 after a live connect with no vault (confirm no global skill returns); do not invent a Prime sandbox. `normalize_cwd("")` still uses `$HOME` for Chat-without-vault — that is cwd only, not MCP scope. |
+| #46 | **Security — still open.** Local **`4416411`** refuses HOME aliases (`~/`, `$HOME/`, symlink-to-HOME). Seed / MCP / `save_vault_list` already drop HOME roots. Connect scrubs only a Rhizome-authored global `rhizome-vault`. **Leftover:** live Chat-without-vault (no global skill returns). Source lock: ChatHome still mounts with empty vault ([1456](plans/handoffs/2026-09-14-1456-cursor-grok-4-6-chat-no-vault.md)). Host status still polls with empty path ([1466](plans/handoffs/2026-09-14-1466-cursor-grok-4-6-host-no-vault.md)). Do not close from units. Do not invent a Prime sandbox. Do not change `normalize_cwd("")` — empty vault → Prime cwd `$HOME` is Chat-without-vault, not MCP scope. |
 
 **First-run and cleanup**
 | | |
@@ -374,13 +389,14 @@ Worth doing, in order:
 3. **Memory-loop index exists:** [`design/memory-loop.md`](design/memory-loop.md).
    #24 / #25 are **closed** on GitHub. Consolidation sketch is still
    [`automatic-memory-consolidation.md`](design/automatic-memory-consolidation.md)
-   (not built). Session import
-   ([plan](plans/2026-09-01-session-import-plan.md)) is the onboarding half.
+   (not built). Session-list import stays **blocked** until Atticus types
+   **`1`**. Vault `Imports/` writer already exists.
+   ([plan](plans/2026-09-01-session-import-plan.md))
 4. **Spec the composer control strip.** #38, #9, #35 and #21 reshaped the
    same strip. Built as one surface 2026-08-25 rather than four redesigns.
    The contract lives on `ChatComposerDeck`. Closed on GitHub 2026-08-29.
-   **#51 Tab completion** research is done (rules-first); implement when
-   claimed — do not invent a second suggestion system that fights pills.
+   **#51 Case 1 shipped** (rules-first Tab + pills). Case 2 (model-backed)
+   stays parked. Do not invent a second suggestion system that fights pills.
 5. Shell region map is ADR-0166 / ADR-0170, not a separate design spec.
 
 The harness *filter* is settled (ADR-0168). Composition working
@@ -397,11 +413,12 @@ composer cluster. Item 1 below was Grok's later insertion (`2b5daba`).
 **Origin:** Cursor · 2026-09-02 — order below matches §0 pre-public focus;
 composition stays discuss-only until Atticus wants a graft.
 
-1. **Agent tooling path** — re-seed `rhizome-vault` (vault skill still dated
-   2026-08-21 without `RHIZOME_TOOL_PATH` / graph verbs); live Chat ask that
-   needs the graph. Then **session import** UI once Atticus green-lights.
-2. **Chat reliability** — #41 steer UX (queue display proven). ~~#54~~
-   closed tonight. ~~#47~~ closed tonight. ~~C57~~ settled 2026-09-06.
+1. **Agent tooling path** — ~~C69 `cli-call.mjs` / graph verbs~~ shipped.
+   Graph Find locked [1354](plans/handoffs/2026-09-14-1354-cursor-grok-4-6-graph-find-label.md).
+   Session-list import waits for Atticus to type **`1`**.
+2. **Chat reliability** — #41 source `onSteer` is wired. Leftover is native
+   Enter-queue / Steer plus unspoken `mutate_queued_message`. Do not close
+   from units. ~~#54~~ ~~#47~~ closed. ~~C57~~ settled 2026-09-06.
 3. **Composer remainder** — #51 Case 2 (model-backed Tab). Case 1 ghost text
    shipped 2026-09-12 (`5c04828`).
    ~~Up-arrow Ask-box history~~ shipped as C71 2026-09-06.

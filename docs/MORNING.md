@@ -2,15 +2,23 @@
 
 ## Morning pickup (2026-09-14)
 
-**Origin:** Cursor Grok 4.6 · 2026-09-13 23:33. Nothing committed. Installed app still **`476756c`**.
+**Origin:** Cursor Grok 4.6 · 2026-09-14 11:14. Local HEAD **`4416411`**. Origin still **`5c629a0`**. Installed app still **`476756c`**.
 
-Read this file, then [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md). Do not rebuild `/Applications` unless Atticus will launch.
+Read this file, then [`BOARD.md`](BOARD.md), then [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md). Do not rebuild `/Applications` unless Atticus will launch.
+
+Astra design pack **received** — [`design/brand/2026-09-14-handoff/`](design/brand/2026-09-14-handoff/START-HERE.md).
+In the existing five-hour burn. Do not start a second God plan.
+
+**Origin:** Cursor Grok 4.6 · 2026-09-14 11:56 · Astra pack integrated.
+
+**Stamped 15:25:** leftover paper + D6 named paths. Commits wait ~15:45.
+No push. No rebuild. Import waits for `1`. Do not merge #66.
 
 **Pick up here**
 
-1. Finish W7: focused Rust tests, then commit **named** W7 files only. Close #46 only after live Chat-without-vault (no global skill returns).
-2. One native observer on `/Applications/Rhizome Agent.app`: C64 ×3 first-2s, then send/recover, steer/queue, hide/reopen. Until then W4 stays **NOT RUN**.
-3. Integrate that candidate. Local pre-push. Push only a finished batch. Commit / push / install stay three jobs.
+1. **You (2 min):** three cold launches of `/Applications/Rhizome Agent.app`. Watch the Chat subhead for the first 2 seconds. Sheet: [`src/hooks/C64.md`](../src/hooks/C64.md). Fail = install copy (`npm i -g prime-agent`).
+2. Push the two local commits when pre-push is allowed (`e64a283` docs, `4416411` W7). Commit / push / install stay three jobs.
+3. Close #46 only after live Chat-without-vault (no global skill returns).
 4. Import list-rows stay blocked until Atticus says **`1`**. Daily-driver **not** declared.
 
 **God-plan lanes**
@@ -21,14 +29,15 @@ Read this file, then [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md). Do not rebuild `/
 - **W4 Chat reliability** — added paper. Evidence: [`plans/handoffs/2026-09-13-2235-cursor-grok-4-6-w4-reliability-evidence.md`](plans/handoffs/2026-09-13-2235-cursor-grok-4-6-w4-reliability-evidence.md). Five native cases **NOT RUN**.
 - **W5 Prime surface** — added/reviewed papers. [`design/prime-agent-surface.md`](design/prime-agent-surface.md) + [`design/prime-spoken-surface.md`](design/prime-spoken-surface.md). #5 stays open.
 - **W6 import** — added decision page. Recommend route **1**. No list-import code.
-- **W7 HOME / MCP** — added harden, **uncommitted**. Symlink HOME refuse + skill-provenance scrub. First guard already on main (`e90e37c`). #46 still OPEN.
-- **W8 Notes** — not started. Optional.
+- **W7 HOME / MCP** — committed locally **`4416411`**. Not pushed. First guard already on main (`e90e37c`). #46 still OPEN.
+- **W8 Notes** — spec + tree label. ⌘2 is `Notes, Browse closed`. Tests 2/2. Packaged app still old.
+- **Five-hour burn** — KEEP 1–14 landed. `rhizome-ship` authored. Astra S1–S4 + R1–R4 source PASS (uncommitted). Leftover tests continue. D6 ~15:45. Docked questions: [1145](plans/handoffs/2026-09-14-1145-cursor-grok-4-6-docked-questions.md).
 - **W9 tray / #53** — closed on GitHub. Native leftover only.
 - **W10 bridge / #54** — closed on GitHub. Native leftover only.
 - **W11 parked cards** — added links on BOARD/NEXT. No product code.
 - **W13 ADHD+status** — done. Cursor User Rules + `~/.claude/CLAUDE.md`.
 
-Honest count: God plan + docs + issue closes + W7 defense-in-depth in the dirty tree. No new daily-drive build.
+Honest count: God plan + docs + issue closes + W7 harden are **committed locally**, not on origin, not in `/Applications`. No new daily-drive build.
 
 ---
 
@@ -42,8 +51,8 @@ Project: `/Users/dtc/code/projects/rhizome-agent`
 **Priority:** W7 HOME-vault / MCP, then W4 Chat reliability. Broader ENV/key audit is reserve. Morning = integration + native evidence. Do not declare daily-driver ready without native checks. Do not rebuild `/Applications` unless Atticus will launch.
 
 **Done:** ADHD+status. Packet + plan-for-a-plan. W1 2151/2153 frontmatter. W7 symlink HOME + skill provenance. W4 evidence: five native cases **NOT RUN**.
-**Now:** W7 still owns shared Rust. Daily-driver **not** declared.
-**Next:** When you can spare `/Applications/Rhizome Agent.app`, one owner runs three 2-second C64 launches. Import stays vault-only.
+**Now:** Leftover tests + living-docs stamps continue. D6 named-path commits ~15:45. Daily-driver **not** declared.
+**Next:** When `/Applications` is free: C64 ×3. Import stays vault-only until **`1`**.
 
 ## This pass (NEXT stamps + leftover specs)
 
@@ -62,12 +71,11 @@ Project: `/Users/dtc/code/projects/rhizome-agent`
 
 ## Docs
 
-**Done:** W1 living-docs truth. `BOARD.md` / `HANDOFF.md` / `NEXT.md` /
-`YOU-SHOULD-KNOW.md` match origin **`5c629a0`**, packaged app **`476756c`**,
-and live `gh` (**17** open). ASTRA_PACKET pointer on HANDOFF. Evening dump
-is BOARD/NEXT **W11 cards** only. Closed tonight include #14 #17 #18
-#43 #47 #49 #53 #54 #55. Did not overwrite `ASTRA_PACKET.md` /
-`PLAN_FOR_A_PLAN.md`.
+**Done:** W1 living-docs truth. Local **`4416411`** + morning dirty tree.
+Origin **`5c629a0`**. Packaged app **`476756c`**. Live `gh` **17** open.
+ASTRA_PACKET pointer on HANDOFF. Evening dump is BOARD/NEXT **W11 cards**.
+Closed 2026-09-13: #14 #17 #18 #43 #47 #49 #53 #54 #55. Did not overwrite
+`ASTRA_PACKET.md` / `PLAN_FOR_A_PLAN.md`.
 
 **Now:** other Cursor W-lanes. Docs lane is stamped.
 
@@ -110,7 +118,7 @@ W2 close-on-live-check (`main` `5c629a0`). No re-implement. No commit. No merge 
 
 **Leftover**
 
-- Draft [PR #66](https://github.com/tuckcode/rhizome-agent/pull/66) is `CONFLICTING` / `DIRTY`. Do **not** merge. Conflicts vs `origin/main`: `docs/ARCHITECTURE.md`, `docs/CROSS-MODEL-HANDOFF.md`, `docs/HANDOFF.md`. Overnight filler is also dirty on `docs/HANDOFF.md` + `docs/BOARD.md`. Rebase after doc lanes land.
+- Draft [PR #66](https://github.com/tuckcode/rhizome-agent/pull/66) is `CONFLICTING` / `DIRTY`. Do **not** merge. Conflicts vs `origin/main`: `docs/ARCHITECTURE.md`, `docs/CROSS-MODEL-HANDOFF.md`, `docs/HANDOFF.md`. W1 stamped HANDOFF + BOARD this morning (local `4416411` + dirty tree). Rebase after those land on origin.
 - Still open and **not** this close-set: #5 #13 #23 #26 #32 #36 #39 #40 #41 #45 #46 #48 #50 #51 #52 #56 #57.
 - C64 first-2s native ×3 still a verify, not a recode.
 
@@ -155,9 +163,11 @@ W2 close-on-live-check (`main` `5c629a0`). No re-implement. No commit. No merge 
 **Project:** `/Users/dtc/code/projects/rhizome-agent`  
 **Issue:** [#46](https://github.com/tuckcode/rhizome-agent/issues/46) HOME-vault / MCP scope.
 
-**Grok judgment:** the dangerous path is **already guarded on main** (`e90e37c`, 2026-08-27). `looks_like_vault` / `is_home_directory` refuse `$HOME`. `preflight.rs` only **reads** Prime `auth.json`. This machine has no leftover `~/.prime/agent/skills/rhizome-vault` and no `mcpServers.rhizome` in global settings. Tonight’s uncommitted work is defense in depth, not the first fix.
+**Grok judgment:** the dangerous path is **already guarded on main** (`e90e37c`, 2026-08-27). `looks_like_vault` / `is_home_directory` refuse `$HOME`. `preflight.rs` only **reads** Prime `auth.json`. This machine has no leftover `~/.prime/agent/skills/rhizome-vault` and no `mcpServers.rhizome` in global settings. Tonight’s W7 harden is committed locally **`4416411`** (not pushed) — defense in depth, not the first fix.
 
-**Done tonight (uncommitted)**
+**Origin:** Cursor Grok 4.6 · 2026-09-14 12:17 · leftover restamp (W7 is committed locally).
+
+**Done tonight (local `4416411`, not pushed)**
 
 - MCP/ws-bridge will not take `$HOME` as a vault root (`selected_mcp_bridge_vault_paths`, `validate_mcp_bridge_vault_path`, `VAULT_PATHS` filter).
 - `save_vault_list` refuses HOME / `~`.
