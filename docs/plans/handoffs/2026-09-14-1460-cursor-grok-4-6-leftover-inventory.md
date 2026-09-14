@@ -111,6 +111,10 @@ HEAD `c44ee2b`. Origin `5c629a0`. App `476756c`. D6 landed. No push.
 - Chat stays when Notes open ([1548](2026-09-14-1548-cursor-grok-4-6-chat-stays.md))
 - #41 steer / hide daemon / no edge strip ([1549](2026-09-14-1549-cursor-grok-4-6-steer-hide-edge.md))
 - Graph clip / no Connection unknown ([1550](2026-09-14-1550-cursor-grok-4-6-graph-clip-d3.md))
+- Preflight 12px / Copy / catalog wait ([1551](2026-09-14-1551-cursor-grok-4-6-preflight-copy-catalog.md))
+- Empty-vault host poll ([1552](2026-09-14-1552-cursor-grok-4-6-empty-vault-host.md))
+- Chat without vault ([1553](2026-09-14-1553-cursor-grok-4-6-chat-no-vault.md))
+- Composer optional vault / no sheet lock ([1554](2026-09-14-1554-cursor-grok-4-6-composer-sheet.md))
 
 ## Still parked (do not do)
 
