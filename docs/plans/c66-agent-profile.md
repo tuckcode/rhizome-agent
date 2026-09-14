@@ -9,7 +9,7 @@
 ## Done / now / next
 
 - **Done:** named as a Settings need. Distinguished from three lookalikes.
-- **Now:** still docked (15:29). Do not encode a store this window (C66).
+- **Now:** still docked (15:59). Do not encode a store this window (C66).
 - **Next:** Settings page after those two calls. No Prime `USER.md`.
 
 **Done when:** Chat uses the profile Atticus typed, for the agent he meant, and it is stored in the vault (or an explicit app store if he picks app-wide).

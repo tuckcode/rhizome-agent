@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 describe('parked organs leftover', () => {
@@ -507,5 +507,245 @@ describe('parked organs leftover', () => {
     expect(gs).toContain(
       "'Could not download Getting Started vault. Check your connection and try again.'",
     )
+  })
+
+  it('keeps #36 timezone parked and rhizome-ship as three verbs', () => {
+    const dates = readFileSync(
+      `${process.cwd()}/src/components/VaultContentSettingsSection.tsx`,
+      'utf8',
+    )
+    const skill = readFileSync(
+      `${process.cwd()}/.cursor/skills/rhizome-ship/SKILL.md`,
+      'utf8',
+    )
+    const ignore = readFileSync(`${process.cwd()}/.gitignore`, 'utf8')
+    expect(dates).toContain('dateDisplayFormat')
+    expect(dates).not.toMatch(/timezone|timeZone|America\/Chicago/)
+    expect(skill).toMatch(/## 1\. commit/)
+    expect(skill).toMatch(/## 2\. push/)
+    expect(skill).toMatch(/## 3\. rebuild/)
+    expect(skill).toContain('Never invent a fourth verb')
+    expect(ignore).toContain('!.cursor/skills/rhizome-ship/')
+  })
+
+  it('keeps this tree as Rhizome Agent, not Desktop', () => {
+    const identity = readFileSync(`${process.cwd()}/docs/IDENTITY.md`, 'utf8')
+    expect(identity).toContain('tuckcode/rhizome-agent')
+    expect(identity).toContain('ai.rhizome.agent')
+    expect(identity).toContain('ai.rhizome.desktop')
+    expect(identity).toContain('knispo/rhizome')
+  })
+
+  it('keeps Graph Find as a bottom-right compact box', () => {
+    const controls = readFileSync(
+      `${process.cwd()}/src/components/graph/GraphControls.tsx`,
+      'utf8',
+    )
+    expect(controls).toContain(
+      'Lives bottom-right as a small Find box so the canvas stays readable.',
+    )
+    expect(controls).toContain("placeholder={t('graph.controls.searchPlaceholder')}")
+  })
+
+  it('keeps C42 Windows skip this window', () => {
+    const win = readFileSync(`${process.cwd()}/docs/WINDOWS-DEV.md`, 'utf8')
+    expect(win).toContain('still no Windows work this window. C42 stays skip.')
+  })
+
+  it('keeps first-run scaffold folders-only, without editing rust this window', () => {
+    const rust = readFileSync(
+      `${process.cwd()}/src-tauri/src/vault/getting_started.rs`,
+      'utf8',
+    )
+    expect(rust).toContain('structure only, no personal notes')
+    expect(rust).toContain('"inbox"')
+    expect(rust).toContain('"projects"')
+    expect(rust).toContain('"Imports"')
+  })
+
+  it('keeps PR #66 KEEP copied and unmerged', () => {
+    const paper = readFileSync(
+      `${process.cwd()}/docs/plans/pr-66-supersession.md`,
+      'utf8',
+    )
+    expect(paper).toContain('Still do not merge')
+    expect(paper).toContain('not a merge')
+  })
+
+  it('keeps session mouse-back without a winner and mutate unspoken', () => {
+    const mouse = readFileSync(
+      `${process.cwd()}/docs/plans/session-mouse-back.md`,
+      'utf8',
+    )
+    const mutate = readFileSync(
+      `${process.cwd()}/docs/plans/mutate-queued-message.md`,
+      'utf8',
+    )
+    expect(mouse).toContain('still no winner')
+    expect(mutate).toContain('still unspoken')
+  })
+
+  it('clears the transcript on session click and withholds the first Prime problem', () => {
+    const switcher = readFileSync(
+      `${process.cwd()}/src/components/usePrimeSessionSwitcher.ts`,
+      'utf8',
+    )
+    const host = readFileSync(
+      `${process.cwd()}/src/hooks/usePrimeHostStatus.ts`,
+      'utf8',
+    )
+    const menu = readFileSync(
+      `${process.cwd()}/src/components/PrimeSessionListContextMenu.tsx`,
+      'utf8',
+    )
+    const restore = readFileSync(
+      `${process.cwd()}/src/hooks/usePrimeSessionRestore.ts`,
+      'utf8',
+    )
+    expect(switcher).toContain('agent.replaceMessages([])')
+    expect(switcher).toContain('Clear the stale transcript in the same')
+    expect(host).toContain('function withCorroboratedProblem')
+    expect(host).toContain('status: corroborated || code === null ? next : { ...next, problem: null }')
+    expect(menu).toContain("label: 'Copy path'")
+    expect(restore).not.toMatch(/vaultPath/)
+    expect(restore).toContain('idleDiskRestoreEligible')
+  })
+
+  it('keeps Nous Add to Chat list, width-folded Sessions, and About Contribute/Docs', () => {
+    const providers = readFileSync(
+      `${process.cwd()}/src/components/PrimeProviderStatusSection.tsx`,
+      'utf8',
+    )
+    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const about = readFileSync(
+      `${process.cwd()}/src/components/AboutSettingsSection.tsx`,
+      'utf8',
+    )
+    const status = readFileSync(
+      `${process.cwd()}/src/components/StatusBar.test.tsx`,
+      'utf8',
+    )
+    const close = readFileSync(
+      `${process.cwd()}/src/components/PrimeActiveCloseDialog.tsx`,
+      'utf8',
+    )
+    const host = readFileSync(
+      `${process.cwd()}/src-tauri/src/prime_session_host.rs`,
+      'utf8',
+    )
+    expect(providers).toContain("if (provider.name === 'nous-portal') return 'Add to Chat list'")
+    expect(providers).toContain('return `prime-agent --provider ${provider}`')
+    expect(app).toContain('sessionsAutoCollapsed={compactSessions}')
+    expect(about).toContain('settings-about-docs')
+    expect(status).toContain("keeps Contribute and Docs out of the status bar")
+    expect(close).toContain("t('ai.close.keepWorking')")
+    expect(host).toContain('"lifecycle": "client_owned"')
+  })
+
+  it('keeps Close-note X, ephemeral note lock, and archived session hits', () => {
+    const breadcrumb = readFileSync(
+      `${process.cwd()}/src/components/BreadcrumbBar.tsx`,
+      'utf8',
+    )
+    const lock = readFileSync(
+      `${process.cwd()}/src/hooks/useNoteLockMode.ts`,
+      'utf8',
+    )
+    const sessions = readFileSync(
+      `${process.cwd()}/src/components/PrimeSessionList.tsx`,
+      'utf8',
+    )
+    const roster = readFileSync(
+      `${process.cwd()}/src/lib/primeRunningSessions.ts`,
+      'utf8',
+    )
+    const arch = readFileSync(
+      `${process.cwd()}/docs/ARCHITECTURE.md`,
+      'utf8',
+    )
+    expect(breadcrumb).toContain('testId="breadcrumb-close-note"')
+    expect(lock).toContain('Not vault `editor_mode`')
+    expect(sessions).toContain(
+      'const showArchived = archiveOpen || (searching && visibleArchived.length > 0)',
+    )
+    expect(roster).toContain('`firstMessage` is the prompt Rhizome *sent*')
+    expect(arch).toContain('Grok wiki is out of')
+    expect(existsSync(`${process.cwd()}/docs/grok-wiki-index.md`)).toBe(false)
+  })
+
+  it('does not spawn onto an overridden socket or cache a failed catalog', () => {
+    const rust = readFileSync(
+      `${process.cwd()}/src-tauri/src/prime_session_host.rs`,
+      'utf8',
+    )
+    const catalog = readFileSync(
+      `${process.cwd()}/src/lib/primeModelCatalog.ts`,
+      'utf8',
+    )
+    const host = readFileSync(
+      `${process.cwd()}/src/hooks/usePrimeHostStatus.ts`,
+      'utf8',
+    )
+    expect(rust).toContain('const DAEMON_SOCKET_ENV: &str = "RHIZOME_PRIME_DAEMON_SOCKET"')
+    expect(rust).toContain('fn daemon_socket_is_overridden()')
+    expect(catalog).toContain('A failure is not cached.')
+    expect(host).toContain("if (!next.running && vaultPath)")
+    expect(host).toContain("await callHost('ensure_prime_session_host', { vaultPath })")
+  })
+
+  it('keeps Chat model allow-list, rhizome-vault skill pill, and Welcome create-empty', () => {
+    const allow = readFileSync(
+      `${process.cwd()}/src/components/PrimeModelAllowListSection.tsx`,
+      'utf8',
+    )
+    const home = readFileSync(
+      `${process.cwd()}/src/components/ChatHome.tsx`,
+      'utf8',
+    )
+    const welcome = readFileSync(
+      `${process.cwd()}/src/components/WelcomeScreen.tsx`,
+      'utf8',
+    )
+    expect(allow).toContain('Chat model menu')
+    expect(allow).toContain("Choose which of Prime's models appear in the chat model menu")
+    expect(home).toContain('skillsLabel="rhizome-vault"')
+    expect(welcome).toContain("onboarding.welcome.createEmpty")
+  })
+
+  it('keeps On top / Beside on the notes header and expandable thinking', () => {
+    const toggle = readFileSync(
+      `${process.cwd()}/src/components/ChatNoteSplitToggle.tsx`,
+      'utf8',
+    )
+    const breadcrumb = readFileSync(
+      `${process.cwd()}/src/components/BreadcrumbBar.tsx`,
+      'utf8',
+    )
+    const message = readFileSync(
+      `${process.cwd()}/src/components/AiMessage.tsx`,
+      'utf8',
+    )
+    expect(toggle).toContain("label: 'On top'")
+    expect(toggle).toContain("label: 'Beside'")
+    expect(breadcrumb).toContain('Chat note layout (On top / Beside)')
+    expect(breadcrumb).toContain('not the window chrome')
+    expect(message).toContain('data-testid="reasoning-toggle"')
+    expect(message).toContain('normalizeReasoningDisplay(text)')
+  })
+
+  it('keeps reply option pills and waits 4px before titlebar drag', () => {
+    const chrome = readFileSync(
+      `${process.cwd()}/src/components/AiPanelChrome.tsx`,
+      'utf8',
+    )
+    const drag = readFileSync(
+      `${process.cwd()}/src/hooks/useDragRegion.ts`,
+      'utf8',
+    )
+    expect(chrome).toContain("suggestion.kind !== 'options'")
+    expect(chrome).toContain('data-testid="composer-reply-suggestions"')
+    expect(drag).toContain('const DRAG_DISTANCE_PX = 4')
+    expect(drag).toContain('Drag starts only after the pointer moves')
+    expect(drag).toContain('More reliable than data-tauri-drag-region')
   })
 })

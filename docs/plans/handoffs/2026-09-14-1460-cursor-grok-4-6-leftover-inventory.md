@@ -92,6 +92,18 @@ HEAD `c44ee2b`. Origin `5c629a0`. App `476756c`. D6 landed. No push.
 - C70 clock leftover ([1529](2026-09-14-1529-cursor-grok-4-6-c70-clock.md))
 - Updates next to theme ([1530](2026-09-14-1530-cursor-grok-4-6-updates-theme.md))
 - Create vs download leftover ([1531](2026-09-14-1531-cursor-grok-4-6-gs-create-download.md))
+- #36 / ship three verbs / Identity ([1532](2026-09-14-1532-cursor-grok-4-6-36-ship-identity.md))
+- Graph Find + C42 skip ([1533](2026-09-14-1533-cursor-grok-4-6-graph-find-c42.md))
+- First-run folders only ([1534](2026-09-14-1534-cursor-grok-4-6-gs-folders-only.md))
+- PR #66 KEEP unmerged ([1535](2026-09-14-1535-cursor-grok-4-6-pr66-unmerged.md))
+- Mouse-back no winner + mutate unspoken ([1536](2026-09-14-1536-cursor-grok-4-6-mouse-mutate-parked.md))
+- Session click / C64 withhold / Copy path ([1537](2026-09-14-1537-cursor-grok-4-6-switch-c64-copy.md))
+- Nous / fold / About / Keep working ([1538](2026-09-14-1538-cursor-grok-4-6-nous-fold-about.md))
+- Close X / ephemeral lock / archived hits ([1539](2026-09-14-1539-cursor-grok-4-6-close-lock-archive.md))
+- Socket override / catalog fail / ensure retry ([1540](2026-09-14-1540-cursor-grok-4-6-socket-catalog.md))
+- Allow-list / rhizome-vault / Welcome create-empty ([1541](2026-09-14-1541-cursor-grok-4-6-allow-skill-welcome.md))
+- On top / Beside + expandable thinking ([1542](2026-09-14-1542-cursor-grok-4-6-split-thinking.md))
+- Reply pills + 4px drag wait ([1543](2026-09-14-1543-cursor-grok-4-6-pills-drag.md))
 
 ## Still parked (do not do)
 
