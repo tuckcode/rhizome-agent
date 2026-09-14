@@ -10,15 +10,14 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "gray-matter": "^4.0.3",
     "ws": "^8.20.1"
   },
   "overrides": {
     "@hono/node-server": "1.19.15",
     "express-rate-limit": "8.2.2",
-    "fast-uri": "3.1.5",
+    "fast-uri": "3.1.6",
     "hono": "4.12.34",
-    "js-yaml": "3.15.1",
+    "js-yaml": "3.15.2",
     "qs": "6.15.2",
     "ip-address": "10.3.1",
     "path-to-regexp": "8.4.0"
