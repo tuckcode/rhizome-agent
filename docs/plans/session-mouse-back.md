@@ -32,7 +32,7 @@ Guessing a dual stack in a 5-hour burn would fight the note trail.
 
 **Stop:** no new keyboard chord. No browser `history.pushState`.
 
-**Stamped 15:29:** still no winner. Source lock only — mouse-back still
+**Stamped 15:59:** still no winner. Source lock only — mouse-back still
 walks the note trail. Do not add a session stack this window.
 
 ## Docked

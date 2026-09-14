@@ -1,7 +1,7 @@
 # #52 — Menu bar “agent is done”
 
 **Status:** leftover only. Job 1 **running list is in the tree.** Do not recode it. Do not add a Done TTL this window.  
-**Stamped 15:30:** still no TTL. Do not recode.  
+**Stamped 15:59:** still no TTL. Do not recode.  
 **Origin:** Cursor Grok 4.6 · 2026-09-13 · GitHub [#52](https://github.com/tuckcode/rhizome-agent/issues/52), sibling [#13](https://github.com/tuckcode/rhizome-agent/issues/13)  
 **Code:** `src-tauri/src/menu_bar_companion.rs`
 

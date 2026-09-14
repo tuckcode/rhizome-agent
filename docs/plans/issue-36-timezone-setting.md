@@ -1,7 +1,7 @@
 # #36 — Timezone setting
 
 **Status:** spec. Do not build tonight. Not small.
-**Stamped 15:30:** Settings still has date-format only. Source lock in
+**Stamped 15:59:** Settings still has date-format only. Source lock in
 `VaultContentSettingsSection.test.ts`. Do not add a timezone picker.  
 **Origin:** Cursor Grok 4.6 · 2026-09-13 · GitHub [#36](https://github.com/tuckcode/rhizome-agent/issues/36)  
 **Pickup:** [`NEXT.md`](../NEXT.md) Platform table.

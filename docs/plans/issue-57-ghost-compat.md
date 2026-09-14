@@ -1,7 +1,7 @@
 # #57 — Delete code for users who do not exist
 
 **Status:** spec. Do not mass-delete tonight.
-**Stamped 15:30:** still no mass-delete. Live `~/Laputa` is data, not a ghost.  
+**Stamped 15:59:** still no mass-delete. Live `~/Laputa` is data, not a ghost.  
 **Origin:** Cursor Grok 4.6 · 2026-09-13 · GitHub [#57](https://github.com/tuckcode/rhizome-agent/issues/57)  
 **Pickup:** [`NEXT.md`](../NEXT.md) First-run table. Issue body is 2026-08-29; some of it already landed.
 
