@@ -104,6 +104,11 @@ HEAD `c44ee2b`. Origin `5c629a0`. App `476756c`. D6 landed. No push.
 - Allow-list / rhizome-vault / Welcome create-empty ([1541](2026-09-14-1541-cursor-grok-4-6-allow-skill-welcome.md))
 - On top / Beside + expandable thinking ([1542](2026-09-14-1542-cursor-grok-4-6-split-thinking.md))
 - Reply pills + 4px drag wait ([1543](2026-09-14-1543-cursor-grok-4-6-pills-drag.md))
+- Agents / Notes rail / Enter / Mycelium ([1544](2026-09-14-1544-cursor-grok-4-6-agents-notes-enter.md))
+- New Note / Identity / blank-cwd ([1545](2026-09-14-1545-cursor-grok-4-6-newnote-identity.md))
+- Welcome offline / Sessions drag ([1546](2026-09-14-1546-cursor-grok-4-6-welcome-sessions-drag.md))
+- Unspoken extras leftover ([1547](2026-09-14-1547-cursor-grok-4-6-unspoken-extras.md))
+- Chat stays when Notes open ([1548](2026-09-14-1548-cursor-grok-4-6-chat-stays.md))
 
 ## Still parked (do not do)
 

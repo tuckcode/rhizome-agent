@@ -2,7 +2,7 @@
 
 **This repository is not Rhizome Desktop.**
 
-**Stamped 15:48:** still `tuckcode/rhizome-agent` / `ai.rhizome.agent`. D6 landed `c44ee2b`. Not Desktop.
+**Stamped 16:04:** still `tuckcode/rhizome-agent` / `ai.rhizome.agent`. Leftover wrap `1eb0398`. Not Desktop.
 Do not push to Desktop. Do not “fix branding back to Desktop.”
 
 | | Rhizome Desktop | Rhizome Agent (this repo) |

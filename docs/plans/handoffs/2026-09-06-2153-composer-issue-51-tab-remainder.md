@@ -10,6 +10,7 @@ description: >-
 
 **Origin:** Composer · 2026-09-06, **status corrected 2026-09-13** against the tree.  
 Issue: [#51](https://github.com/tuckcode/rhizome-agent/issues/51).
+**Stamped 16:06:** Case 2 still unbuilt. Do not add model-backed ghost.
 
 Pills (forks) vs Tab ghost text (one continuation): pills win when both apply; never both; action labels must name the action.
 

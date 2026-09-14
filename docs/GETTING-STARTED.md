@@ -3,6 +3,8 @@
 How to navigate the **Rhizome Agent** codebase, run the app, and find what you need.
 
 > This is Rhizome Agent (`ai.rhizome.agent`, `tuckcode/rhizome-agent`), not Rhizome Desktop (`knispo/rhizome`, `ai.rhizome.desktop`) — see `docs/IDENTITY.md`. Product overview and roadmap: [README.md](../README.md). Some filenames and sidecar labels still use older internal names (`tolaria_*`, etc.) — treat those as implementation identifiers, not the product name.
+>
+> **Stamped 16:06:** leftover wrap `1eb0398`. Still Agent, not Desktop. No push. No rebuild.
 
 ## Prerequisites
 

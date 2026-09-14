@@ -748,4 +748,131 @@ describe('parked organs leftover', () => {
     expect(drag).toContain('Drag starts only after the pointer moves')
     expect(drag).toContain('More reliable than data-tauri-drag-region')
   })
+
+  it('keeps Agents next to thinking, Notes rail label, and Enter send', () => {
+    const home = readFileSync(
+      `${process.cwd()}/src/components/ChatHome.tsx`,
+      'utf8',
+    )
+    const rail = readFileSync(
+      `${process.cwd()}/src/components/CommandRail.tsx`,
+      'utf8',
+    )
+    const keys = readFileSync(
+      `${process.cwd()}/src/components/inlineWikilinkKeydown.ts`,
+      'utf8',
+    )
+    const menu = readFileSync(
+      `${process.cwd()}/src/components/PrimeSessionListContextMenu.tsx`,
+      'utf8',
+    )
+    const rust = readFileSync(
+      `${process.cwd()}/src-tauri/src/lib.rs`,
+      'utf8',
+    )
+    expect(home).toContain('thinkingLevel={primeHost?.thinkingLevel ?? null}')
+    expect(home).toContain('<AgentsPill')
+    expect(home).toContain('activeEntry={openNoteEntry}')
+    expect(rail).toContain("label={t('rail.notes')}")
+    expect(rail).not.toContain("label={t('rail.inbox')}")
+    expect(keys).toContain("if (event.key !== 'Enter' || event.shiftKey) return false")
+    expect(menu).toContain("label: 'View in Mycelium'")
+    expect(menu).toContain("label: 'Archive'")
+    expect(rust).toContain('fn release_helpers_for_hidden_window')
+  })
+
+  it('keeps New Note, Identity Agent, and blank-cwd leftover', () => {
+    const notes = readFileSync(
+      `${process.cwd()}/src/hooks/commands/noteCommands.ts`,
+      'utf8',
+    )
+    const identity = readFileSync(
+      `${process.cwd()}/docs/IDENTITY.md`,
+      'utf8',
+    )
+    const cross = readFileSync(
+      `${process.cwd()}/docs/CROSS-MODEL-HANDOFF.md`,
+      'utf8',
+    )
+    const workflow = readFileSync(
+      `${process.cwd()}/src/components/SettingsPanel.tsx`,
+      'utf8',
+    )
+    expect(notes).toContain("id: 'create-note'")
+    expect(notes).toContain("label: 'New Note'")
+    expect(notes).toContain('APP_COMMAND_IDS.fileNewNote')
+    expect(identity).toContain('This repository is not Rhizome Desktop.')
+    expect(cross).toContain('normalize_cwd("")')
+    expect(cross).toContain('Do **not** change that function.')
+    expect(workflow).toContain('autoAdvanceInboxAfterOrganize')
+  })
+
+  it('keeps Cmd+N as New Note and the Chat working pulse', () => {
+    const manifest = readFileSync(
+      `${process.cwd()}/src/shared/appCommandManifest.json`,
+      'utf8',
+    )
+    const pulse = readFileSync(
+      `${process.cwd()}/src/components/aiPanelPulse.ts`,
+      'utf8',
+    )
+    const layout = readFileSync(
+      `${process.cwd()}/src/App.layout-edges.test.ts`,
+      'utf8',
+    )
+    expect(manifest).toContain('"fileNewNote"')
+    expect(manifest).toContain('"accelerator": "CmdOrCtrl+N"')
+    expect(pulse).toContain('ai-border-pulse 2s ease-in-out infinite')
+    expect(layout).toContain('notesOpen')
+    expect(layout).toContain('ai-border-pulse')
+  })
+
+  it('keeps Welcome clickable offline and Sessions header drag', () => {
+    const welcome = readFileSync(
+      `${process.cwd()}/src/components/WelcomeScreen.tsx`,
+      'utf8',
+    )
+    const sessions = readFileSync(
+      `${process.cwd()}/src/components/PrimeSessionList.tsx`,
+      'utf8',
+    )
+    expect(welcome).toContain('isOffline: boolean')
+    expect(welcome).not.toMatch(/isOffline,/)
+    expect(welcome).toContain('{ disabled: false, run: onCreateVault }')
+    expect(sessions).toContain('useDragRegion<HTMLDivElement>()')
+  })
+
+  it('does not speak abort_and_clear_queue, set_follow_up_mode, or set_steering_mode', () => {
+    const host = readFileSync(
+      `${process.cwd()}/src-tauri/src/prime_session_host.rs`,
+      'utf8',
+    )
+    const spoken = readFileSync(
+      `${process.cwd()}/docs/plans/mutate-queued-message.md`,
+      'utf8',
+    )
+    const panel = readFileSync(
+      `${process.cwd()}/src/components/AiPanel.tsx`,
+      'utf8',
+    )
+    expect(host).toContain('set_follow_up_mode')
+    expect(host).not.toMatch(/"abort_and_clear_queue"/)
+    expect(host).not.toMatch(/"set_steering_mode"/)
+    expect(panel).not.toContain('abort_and_clear_queue')
+    expect(panel).not.toContain('set_follow_up_mode')
+    expect(panel).not.toContain('set_steering_mode')
+    expect(spoken).toContain('still unspoken')
+  })
+
+  it('keeps Chat on screen when Notes is open', () => {
+    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const rail = readFileSync(
+      `${process.cwd()}/src/components/CommandRail.tsx`,
+      'utf8',
+    )
+    expect(app).toContain('const showVaultPanel = chatCentered && notesOpen')
+    expect(app).toContain('const chatHomeSurface = (')
+    expect(app).toContain('<ChatHome')
+    expect(rail).toContain('active={notesOpen}')
+  })
 })
