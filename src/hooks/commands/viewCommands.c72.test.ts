@@ -14,6 +14,7 @@ describe('C72 view labels', () => {
       onZoomIn: vi.fn(),
       onZoomOut: vi.fn(),
       onZoomReset: vi.fn(),
+      noteListColumnsLabel: 'Customize note list columns',
     })
     const list = commands.find((command) => command.id === 'view-editor-list')
     expect(list?.label).toBe('Notes, Browse closed')
@@ -31,6 +32,7 @@ describe('C72 view labels', () => {
       onZoomIn: vi.fn(),
       onZoomOut: vi.fn(),
       onZoomReset: vi.fn(),
+      noteListColumnsLabel: 'Customize note list columns',
     })
     const all = commands.find((command) => command.id === 'view-all')
     expect(all?.label).toBe('Notes, Browse open')

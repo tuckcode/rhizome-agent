@@ -7,9 +7,13 @@ function commandByKey(key: keyof typeof appCommandManifest.commands): ManifestCo
   return appCommandManifest.commands[key]
 }
 
+function commandShortcutAccelerator(command: ManifestCommand): string | undefined {
+  return 'shortcut' in command ? command.shortcut?.accelerator : undefined
+}
+
 function commandsWithAccelerator(accelerator: string): Array<[string, ManifestCommand]> {
   return Object.entries(appCommandManifest.commands).filter(
-    ([, command]) => command.shortcut?.accelerator === accelerator,
+    ([, command]) => commandShortcutAccelerator(command) === accelerator,
   )
 }
 
@@ -33,7 +37,7 @@ describe('appCommandManifest leftover shortcuts', () => {
   it('maps CmdOrCtrl+1 to Chat only (viewEditorOnly)', () => {
     const command = commandByKey('viewEditorOnly')
     expect(command.id).toBe('view-editor-only')
-    expect(command.shortcut?.accelerator).toBe('CmdOrCtrl+1')
+    expect(commandShortcutAccelerator(command)).toBe('CmdOrCtrl+1')
     expect(command.route).toEqual({ kind: 'view-mode', value: 'editor-only' })
     expect(viewMenuLabel('viewEditorOnly')).toBe('Chat only')
     expect(commandsWithAccelerator('CmdOrCtrl+1')).toEqual([['viewEditorOnly', command]])
@@ -42,7 +46,7 @@ describe('appCommandManifest leftover shortcuts', () => {
   it('maps CmdOrCtrl+2 to Notes, Browse closed (viewEditorList)', () => {
     const command = commandByKey('viewEditorList')
     expect(command.id).toBe('view-editor-list')
-    expect(command.shortcut?.accelerator).toBe('CmdOrCtrl+2')
+    expect(commandShortcutAccelerator(command)).toBe('CmdOrCtrl+2')
     expect(command.route).toEqual({ kind: 'view-mode', value: 'editor-list' })
     expect(viewMenuLabel('viewEditorList')).toBe('Notes, Browse closed')
     expect(commandsWithAccelerator('CmdOrCtrl+2')).toEqual([['viewEditorList', command]])
@@ -51,7 +55,7 @@ describe('appCommandManifest leftover shortcuts', () => {
   it('maps CmdOrCtrl+3 to Notes, Browse open (viewAll)', () => {
     const command = commandByKey('viewAll')
     expect(command.id).toBe('view-all')
-    expect(command.shortcut?.accelerator).toBe('CmdOrCtrl+3')
+    expect(commandShortcutAccelerator(command)).toBe('CmdOrCtrl+3')
     expect(command.route).toEqual({ kind: 'view-mode', value: 'all' })
     expect(viewMenuLabel('viewAll')).toBe('Notes, Browse open')
     expect(commandsWithAccelerator('CmdOrCtrl+3')).toEqual([['viewAll', command]])
@@ -60,7 +64,7 @@ describe('appCommandManifest leftover shortcuts', () => {
   it('maps CmdOrCtrl+N to New Note (fileNewNote)', () => {
     const command = commandByKey('fileNewNote')
     expect(command.id).toBe('file-new-note')
-    expect(command.shortcut?.accelerator).toBe('CmdOrCtrl+N')
+    expect(commandShortcutAccelerator(command)).toBe('CmdOrCtrl+N')
     expect(command.route).toEqual({ kind: 'handler', handler: 'onCreateNote' })
     expect(fileMenuLabel('fileNewNote')).toBe('New Note')
     expect(commandsWithAccelerator('CmdOrCtrl+N')).toEqual([['fileNewNote', command]])
