@@ -2,9 +2,16 @@
 type: ADR
 id: "0157"
 title: "Canonical Rhizome brand mark: 5-satellite asymmetric geometry, cyber teal-green"
-status: active
+status: superseded
 date: 2026-07-18
+superseded_by: "0172"
 ---
+
+> **Superseded for the OS / Dock icon master** by [ADR-0172](0172-dock-icon-signal.md)
+> (Signal direction, 2026-09-15). Topology (core + five satellites) is
+> affirmed; the grayscale/mint SVG→`tauri icon` path and “identical teal
+> OS SVGs” claim here are no longer the shipping Dock source. In-app
+> BrandMark reconciliation remains a follow-up.
 
 ## Context
 

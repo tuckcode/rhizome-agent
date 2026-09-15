@@ -1,7 +1,7 @@
 # D5 — Dock direction and website arrangement
 
 **Origin:** Cursor Grok 4.6 · 2026-09-14 · Astra D5 review only.
-**Status:** spec for review. No Dock install. No platform icon replace. No website project.
+**Status:** Atticus selected **Signal** (2026-09-15). OS icon master replaced per ADR-0172. Website still deferred.
 
 This file is the D5 deliverable from `CURSOR-FIVE-HOUR-PLAN.md`. It compares sources that already exist. It does not choose a new identity. It does not supersede [ADR-0157](../../../adr/0157-canonical-brand-mark.md).
 
@@ -13,14 +13,13 @@ Hard nos observed this session: no `.icns`, no `npx tauri icon`, no `/Applicatio
 
 **Astra recommends Signal:** one core plus five asymmetric satellites (four diagonals and one vertical spoke). That is a continuity recommendation, not a product decision.
 
-**Atticus has not selected a Dock design.** He selected the organic network banner for README and Settings → About. The Dock board (Signal / Rootwork / Thread) remains an identity study.
+**Atticus selected Signal** (far-left board column) on 2026-09-15. Organic banner remains the About/README art. Rootwork / Thread stay gallery-only.
 
-Until Atticus picks a Dock direction:
+Shipping notes:
 
-- Keep the shipped OS icon sources as they are.
-- Do not install `dock-signal-concept.png` or `dock-icon-directions.png`.
+- OS master: processed `dock-signal-concept.png` → `src-tauri/icons/icon-source.png` → `pnpm tauri icon` (ADR-0172).
 - Do not adopt Rootwork or Thread.
-- Do not rewrite ADR-0157 as if Signal (or any new geometry/color) were already decided.
+- `/Applications` Dock updates only after an explicit rebuild.
 
 ---
 
