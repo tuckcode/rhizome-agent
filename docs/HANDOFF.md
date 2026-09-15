@@ -47,16 +47,16 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Grok 4.6 · 2026-09-15 12:58 · Applications rebuild (Signal Dock).
+**Origin:** Cursor Composer · 2026-09-15 14:08 · CPR (Signal + C75).
 
-Local and origin tip **`66c3cb0`**. Packaged app installed **2026-09-15 12:58**
-from that tip **plus uncommitted Signal icon set** (ADR-0172; old
-`/Applications` deleted first). Import waits for **`1`**. Do not merge #66.
-Native W4 / #46 live checks next. Not yet daily-driver ready.
+Local and origin **`cb74b28`**. Packaged app **`cb74b28`** installed
+2026-09-15 14:08 (`/Applications/Rhizome Agent.app`; old app deleted first).
+Signal Dock + boot splash / warm daemon / fast idle restore. Import waits
+for **`1`**. Do not merge #66. Native W4 / #46 still open. Not yet
+daily-driver ready.
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
-(`373ee1f`). Dock direction is **Signal** (tree + this app); inverted-icon
-stash is obsolete for the daily Dock.
+(`373ee1f`). Dock direction is **Signal** (ADR-0172).
 
 Mycelium now renders with a Rhizome skin (`6377b04`): a loopback proxy
 fronts the Mindwalk sidecar and injects one stylesheet, so the engine
@@ -97,6 +97,7 @@ Priority: push `4416411`/`e64a283`, C64 ×3, W4 native evidence. Inventory:
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-15 · CPR Signal + C75](plans/handoffs/2026-09-15-1408-cursor-composer-cpr.md) — `cb74b28` in `/Applications` 14:08.
 - [2026-09-15 · rebuild + Signal Dock](plans/handoffs/2026-09-15-1258-cursor-grok-4-6-rebuild-signal.md) — deleted old app; Signal `icon.icns` installed 12:58.
 - [2026-09-14 · AGENTS Learned reset](plans/handoffs/2026-09-14-2148-cursor-grok-4-6-agents-learned-reset.md) — clean slate + continual-learning guard.
 - [2026-09-14 · leftover crunch audit](plans/handoffs/2026-09-14-1729-cursor-grok-4-6-crunch-audit.md) — leftover glob green. Hard nos held. No push.
