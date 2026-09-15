@@ -535,6 +535,19 @@ Commit, push, and rebuild `/Applications` are **three verbs**. Skill:
 Never combine them. Never `--no-verify`. Do not rebuild unless the user
 said rebuild and will launch.
 
+## Standing product holds
+
+Durable Rhizome Agent rules. Kept here on purpose so
+**Learned** stays empty and continual-learning cannot bury them in
+mega-bullets. Do not move these into Learned.
+
+- List-row import (`import_jsonl` into the Prime session list)
+  stays blocked until Atticus says `1`. Silence is not approval.
+- **Selective harness doctrine (ADR-0168) is design intent, not settled fact**,
+  and the code still disagrees with it until #56 is resolved.
+  **Do not cite it as decided when arguing to adopt or reject a tool until #56 is resolved.**
+  Kern (getkern/kern) is Linux/WSL2 only.
+
 ## Continual-learning (Cursor plugin)
 
 **Clean slate 2026-09-14.** The Learned sections below start empty on
