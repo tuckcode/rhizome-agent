@@ -1,0 +1,18 @@
+---
+description: >-
+  Strict continual-learning / AGENTS.md Learned-section rules for
+  rhizome-agent. Prefer writing nothing over weak or stale memory.
+alwaysApply: true
+---
+
+# Continual-learning guard (rhizome-agent)
+
+When running `continual-learning` or `agents-memory-updater` in this repo:
+
+1. Read `AGENTS.md` → **Continual-learning (Cursor plugin)** first. Obey it.
+2. **Default: write nothing.** Reply exactly `No high-signal memory updates.` unless a bullet clearly passes the bar.
+3. Touch **only** `## Learned User Preferences` and `## Learned Workspace Facts`. Never edit process rules, product rules, or the Continual-learning guard block itself.
+4. A new bullet must be all of: durable next month, Rhizome Agent–specific, recurring or explicitly “always remember,” and actionable. One topic. ~2 short lines max. ≤12 bullets per section.
+5. **Refuse:** SHAs, clocks, burn windows, usage meters, billing/subscriptions, secrets, ENV, one-offs, today’s chore list, docked answers that belong in HANDOFF/BOARD, Cursor/xAI account chatter, mega-paragraphs.
+6. Session / ship / issue / native status → `docs/HANDOFF.md`, `docs/BOARD.md`, `docs/NEXT.md`, `docs/plans/handoffs/` — not Learned.
+7. Still refresh the incremental transcript index (mtimes + delete missing paths) even when AGENTS.md is unchanged.

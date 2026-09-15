@@ -160,4 +160,5 @@ Do not buy cloud minutes, Chunk, Codacy cloud, or CodeScene. Apple
 Developer Program (~$99/year) later, not now. Commit, push, and rebuild
 are **three jobs**. Rebuild only when he will use the packaged app.
 
-Detail: `AGENTS.md` Learned User Preferences.
+Detail: `AGENTS.md` Continual-learning guard + rhizome-ship skill (Learned
+sections are clean-slate; ship verbs are not stored there).
