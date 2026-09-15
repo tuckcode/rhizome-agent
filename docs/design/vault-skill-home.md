@@ -43,22 +43,21 @@ STE stays in the vault. **Do not copy voice skills into this tree.**
 
 ---
 
-## Learned memory (not the Prime harness)
+## Learned memory (Cursor continual-learning)
 
-Keep the **job** Cursor’s `continual-learning` plugin does (durable prefs vs facts). Do not keep it writing into this repo’s `AGENTS.md`.
+Keep the **job** (durable prefs vs facts, incremental transcript index).
+In this repo it may write **only** the empty-by-default Learned
+sections in `AGENTS.md`, under the **Continual-learning** guard there
+and [`.cursor/rules/continual-learning.mdc`](../../.cursor/rules/continual-learning.mdc).
 
-Steal from the plugin, not the plugin:
+Default is write nothing. No mega-bullets. No SHAs, clocks, billing, or
+session chore lists. Session truth stays in HANDOFF / BOARD / handoffs.
 
-- trigger after a Session, not every turn
-- incremental transcript index (mtime)
-- two buckets only (prefs vs facts)
-- cap + update-in-place + dedupe
-- skip secrets and one-offs
-- do not write voice or process notes
+STE / voice stays in the vault (`agents/shared/`), then sync. Do not
+copy voice skills into this tree.
 
-Writer target: vault `agents/shared/`, then sync.
-
-Live bug recorded 2026-09-07: vault `mode` was `ste` but `sync-voice.sh` only accepted `adhd`/`normal`. That class of silent skip must not return.
+Live bug recorded 2026-09-07: vault `mode` was `ste` but `sync-voice.sh`
+only accepted `adhd`/`normal`. That class of silent skip must not return.
 
 ---
 
