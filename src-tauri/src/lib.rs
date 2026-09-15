@@ -352,35 +352,29 @@ pub(crate) fn idle_main_window_close_intent() -> crate::prime_session_host::Sess
     crate::prime_session_host::SessionCloseIntent::Stop
 }
 
-/// Helpers hide must stop. Keep-working leaves the spawned Prime daemon
-/// (ADR-0167 grant). Rhizome-owned MCP is the ws-bridge child, not Prime's
-/// own tool processes on a user-started daemon.
-pub(crate) fn hidden_window_helper_stops(keep_prime_daemon: bool) -> &'static [&'static str] {
-    if keep_prime_daemon {
-        &["ws_bridge", "mindwalk"]
-    } else {
-        &["spawned_prime_daemon", "ws_bridge", "mindwalk"]
-    }
+/// Helpers hide must stop — except the spawned Prime daemon, which stays warm
+/// so reopen does not pay a multi-second daemon spawn. Keep-working still
+/// matters for session intent; the daemon itself is left running either way.
+/// Rhizome-owned MCP is the ws-bridge child, not Prime's own tool processes.
+pub(crate) fn hidden_window_helper_stops(_keep_prime_daemon: bool) -> &'static [&'static str] {
+    &["ws_bridge", "mindwalk"]
 }
 
 /// Prime and MCP helpers this process started. They keep a Dock "running"
-/// mark after the window hides if we leave them. A Keep-working session is the
-/// exception: that daemon must stay.
+/// mark after the window hides if we leave them. The spawned Prime daemon
+/// stays warm for fast reopen; ws-bridge and Mindwalk still stop.
 #[cfg(desktop)]
 pub(crate) fn release_helpers_for_hidden_window(
     app_handle: &tauri::AppHandle,
-    keep_prime_daemon: bool,
+    _keep_prime_daemon: bool,
 ) {
     use tauri::Manager;
 
     log::info!(
         "hide stopping helpers: {:?}",
-        hidden_window_helper_stops(keep_prime_daemon)
+        hidden_window_helper_stops(_keep_prime_daemon)
     );
     crate::prime_session_host::set_host_suspended(true);
-    if !keep_prime_daemon {
-        crate::prime_session_host::stop_spawned_daemon();
-    }
 
     let state: tauri::State<'_, WsBridgeChild> = app_handle.state();
     if let Ok(mut guard) = state.0.lock() {
@@ -540,6 +534,7 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(desktop)]
     {
         spawn_initial_ws_bridge_sync(app);
+        crate::prime_session_host::warm_daemon_in_background();
     }
 
     Ok(())
@@ -649,6 +644,7 @@ macro_rules! app_invoke_handler {
             commands::list_prime_running_sessions,
             commands::get_prime_session_stats,
             commands::list_prime_session_summaries,
+            commands::latest_prime_session_for_restore,
             commands::set_prime_session_archived,
             commands::get_prime_model_allow_list,
             commands::set_prime_model_allow_list,
@@ -918,15 +914,15 @@ mod tests {
     fn hide_stops_owned_helpers_except_keep_working_prime() {
         let hide = super::hidden_window_helper_stops(false);
         let keep_working = super::hidden_window_helper_stops(true);
-        assert_eq!(hide, ["spawned_prime_daemon", "ws_bridge", "mindwalk"]);
+        assert_eq!(hide, ["ws_bridge", "mindwalk"]);
         assert_eq!(keep_working, ["ws_bridge", "mindwalk"]);
         assert!(
-            hide.contains(&"spawned_prime_daemon"),
-            "hide without Keep working must stop the spawned Prime daemon"
+            !hide.contains(&"spawned_prime_daemon"),
+            "hide must leave the spawned Prime daemon warm for fast reopen"
         );
         assert!(
             !keep_working.contains(&"spawned_prime_daemon"),
-            "Keep working leaves the spawned Prime daemon"
+            "Keep working also leaves the spawned Prime daemon"
         );
         for name in ["ws_bridge", "mindwalk"] {
             assert!(hide.contains(&name), "{name} still stops on hide");

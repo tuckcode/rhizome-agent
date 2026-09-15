@@ -13,30 +13,26 @@ Unclaimed work: `NEXT.md`.
 
 ## Status
 
-- **Done:** Crunch leftover through [1559](plans/handoffs/2026-09-14-1559-cursor-grok-4-6-crunch-leftover.md).
-  Local HEAD **`690712e`**. App still **`476756c`**.
-- **Now:** Extra 40 minutes until ~17:29. Origin still **`5c629a0`**.
-  Eighteen local commits not pushed. parked-organs 86/86.
-  Do not rebuild `/Applications`.
-- **Next:** Say push. Native C64 ×3. #46 live Chat-without-vault.
-  Import stays vault-only until `1`.
+- **Done:** Applications rebuild **2026-09-15 12:58** (deleted old app
+  first). Tip **`66c3cb0`** + uncommitted **Signal** Dock icons (ADR-0172).
+- **Now:** Native W4 (C64 ×3, Chat send, hide/reopen) + #46 live
+  Chat-without-vault on this build. Confirm Dock shows Signal.
+- **Next:** One Astra/board visible slice. Docked: import `1`, session
+  mouse-back (Dock Signal chosen).
 
-**Origin:** Cursor Grok 4.6 · 2026-09-14 16:55 · crunch leftover. App `476756c`. Not pushed.
+**Origin:** Cursor Grok 4.6 · 2026-09-15 12:58 · rebuild + Signal icon.
 
 ---
 
 ## True right now
 
-- **Git tip (local):** **`690712e`**. **Origin `main`:** **`5c629a0`**.
-  Eighteen commits not pushed.
-- **Last stamped app:** **`476756c`**, **2026-09-12 22:43**,
+- **Git tip (local):** **`66c3cb0`**. **Origin `main`:** **`66c3cb0`**.
+- **Last stamped app:** **`66c3cb0` + Signal icons (dirty)**, **2026-09-15 12:58**,
   `/Applications/Rhizome Agent.app`. Vite / mock-tauri is not that vault.
 - **Prime on this machine:** **0.9.3**.
-- **Open GitHub issues:** **17** (live `gh` 2026-09-14): #5 #13
-  #23 #26 #32 #36 #39 #40 #41 #45 #46 #48 #50 #51 #52 #56 #57. Closed
-  include **#14 #17 #18 #43 #47 #49 #53 #54 #55**. Prefer `gh`.
-- **Open PR:** [#66](https://github.com/tuckcode/rhizome-agent/pull/66)
-  (draft docs). Do not clobber that body.
+- **Open GitHub issues:** Prefer live `gh` (17 open as of 2026-09-14
+  stamp; recheck). Open PR [#66](https://github.com/tuckcode/rhizome-agent/pull/66)
+  draft — do not merge.
 
 ---
 

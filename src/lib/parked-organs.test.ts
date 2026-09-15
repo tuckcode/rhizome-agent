@@ -71,7 +71,7 @@ describe('parked organs leftover', () => {
 
   it('keeps hide-on-close helper names', () => {
     const lib = readFileSync(`${process.cwd()}/src-tauri/src/lib.rs`, 'utf8')
-    expect(lib).toContain('["spawned_prime_daemon", "ws_bridge", "mindwalk"]')
+    expect(lib).not.toContain('["spawned_prime_daemon", "ws_bridge", "mindwalk"]')
     expect(lib).toContain('["ws_bridge", "mindwalk"]')
   })
 

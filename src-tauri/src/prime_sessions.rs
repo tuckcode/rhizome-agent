@@ -377,6 +377,53 @@ pub fn list_sessions() -> Result<Vec<PrimeSessionSummary>, String> {
     Ok(summaries)
 }
 
+/// One session for Chat's idle restore — without summarising every log.
+///
+/// Cold launch used to call [`list_sessions`] just to pick the newest eligible
+/// row. With ~100 logs that is tens of megabytes of head scans before Chat
+/// shows anything. Walk newest-mtime first, stop at the first conversation
+/// that is not scratch, then apply archive flags. The full list still loads
+/// when the Sessions rail needs it.
+pub fn latest_session_for_restore(
+    archived_ids: &[String],
+) -> Result<Option<PrimeSessionSummary>, String> {
+    let mut examined = 0usize;
+    for path in session_files()? {
+        examined += 1;
+        if let Ok(summary) = summarize_file(&path) {
+            if let Some(hit) = first_resumable_summary(std::iter::once(summary), archived_ids) {
+                return Ok(Some(hit));
+            }
+        }
+        // Cap pathological directories (thousands of scratch probes) so restore
+        // cannot block cold launch for tens of seconds.
+        if examined >= 64 {
+            break;
+        }
+    }
+    Ok(None)
+}
+
+/// Pure pick used by [`latest_session_for_restore`]. Prefers the first
+/// (newest-mtime) conversation that is not scratch and not archived.
+pub(crate) fn first_resumable_summary(
+    summaries_newest_first: impl IntoIterator<Item = PrimeSessionSummary>,
+    archived_ids: &[String],
+) -> Option<PrimeSessionSummary> {
+    let archived: std::collections::HashSet<&str> =
+        archived_ids.iter().map(String::as_str).collect();
+    summaries_newest_first.into_iter().find_map(|mut summary| {
+        if !summary.has_conversation || summary.scratch {
+            return None;
+        }
+        summary.archived = archived.contains(summary.id.as_str());
+        if summary.archived {
+            return None;
+        }
+        Some(summary)
+    })
+}
+
 /// Order the list by when each conversation actually happened.
 ///
 /// `session_files` can only sort by file mtime, because it sorts paths before
@@ -695,6 +742,42 @@ mod tests {
     }
 
     use super::*;
+
+    #[test]
+    fn first_resumable_skips_scratch_empty_and_archived() {
+        let scratch = PrimeSessionSummary {
+            id: "scratch".into(),
+            path: "/tmp/a.jsonl".into(),
+            has_conversation: true,
+            scratch: true,
+            ..PrimeSessionSummary::default()
+        };
+        let empty = PrimeSessionSummary {
+            id: "empty".into(),
+            path: "/x/b.jsonl".into(),
+            has_conversation: false,
+            ..PrimeSessionSummary::default()
+        };
+        let archived = PrimeSessionSummary {
+            id: "old".into(),
+            path: "/x/c.jsonl".into(),
+            has_conversation: true,
+            ..PrimeSessionSummary::default()
+        };
+        let keep = PrimeSessionSummary {
+            id: "keep".into(),
+            path: "/x/d.jsonl".into(),
+            has_conversation: true,
+            title: Some("hello".into()),
+            ..PrimeSessionSummary::default()
+        };
+        let hit = first_resumable_summary(
+            vec![scratch, empty, archived, keep.clone()],
+            &["old".into()],
+        );
+        assert_eq!(hit.as_ref().map(|s| s.id.as_str()), Some("keep"));
+        assert_eq!(hit.as_ref().and_then(|s| s.title.as_deref()), Some("hello"));
+    }
 
     /// A live session can carry an id with no path, because the daemon sends
     /// `sessionFile` on only some state payloads. The id names the log.

@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import './index.css'
 import './themes.css'
+import { BootSplash } from './components/BootSplash'
 import { FrontendReadyMarker } from './components/FrontendReadyMarker'
 import { LinuxTitlebar } from './components/LinuxTitlebar'
 import { applyStoredThemeMode } from './lib/themeMode'
@@ -189,7 +190,7 @@ createRoot(document.getElementById('root')!, {
   <StrictMode>
     <TooltipProvider>
       <LinuxTitlebar />
-      <Suspense fallback={null}>
+      <Suspense fallback={<BootSplash />}>
         <RootApp />
         <FrontendReadyMarker />
       </Suspense>

@@ -47,17 +47,16 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Grok 4.6 · 2026-09-14 21:48 · AGENTS Learned clean slate.
+**Origin:** Cursor Grok 4.6 · 2026-09-15 12:58 · Applications rebuild (Signal Dock).
 
-Local and origin **`8694072`**. App leftover **`476756c`** (2026-09-12
-22:43). `AGENTS.md` Learned sections wiped; continual-learning guard
-tightened. Import waits for **`1`**. Do not merge #66. Not daily-driver
-ready. Reset:
-[2148](plans/handoffs/2026-09-14-2148-cursor-grok-4-6-agents-learned-reset.md).
+Local and origin tip **`66c3cb0`**. Packaged app installed **2026-09-15 12:58**
+from that tip **plus uncommitted Signal icon set** (ADR-0172; old
+`/Applications` deleted first). Import waits for **`1`**. Do not merge #66.
+Native W4 / #46 live checks next. Not yet daily-driver ready.
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
-(`373ee1f`). Inverted Dock icon is
-`stash@{4}` (`wip: inverted dock icon`), not in the tree.
+(`373ee1f`). Dock direction is **Signal** (tree + this app); inverted-icon
+stash is obsolete for the daily Dock.
 
 Mycelium now renders with a Rhizome skin (`6377b04`): a loopback proxy
 fronts the Mindwalk sidecar and injects one stylesheet, so the engine
@@ -98,13 +97,13 @@ Priority: push `4416411`/`e64a283`, C64 ×3, W4 native evidence. Inventory:
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-15 · rebuild + Signal Dock](plans/handoffs/2026-09-15-1258-cursor-grok-4-6-rebuild-signal.md) — deleted old app; Signal `icon.icns` installed 12:58.
 - [2026-09-14 · AGENTS Learned reset](plans/handoffs/2026-09-14-2148-cursor-grok-4-6-agents-learned-reset.md) — clean slate + continual-learning guard.
 - [2026-09-14 · leftover crunch audit](plans/handoffs/2026-09-14-1729-cursor-grok-4-6-crunch-audit.md) — leftover glob green. Hard nos held. No push.
 - [2026-09-14 · D6 start](plans/handoffs/2026-09-14-1520-cursor-grok-4-6-d6-start.md) — named-path commits. No push. No rebuild.
 - [2026-09-14 · leftover inventory](plans/handoffs/2026-09-14-1460-cursor-grok-4-6-leftover-inventory.md) — parked items and leftover locks through 1519.
 - [2026-09-14 · docked questions](plans/handoffs/2026-09-14-1145-cursor-grok-4-6-docked-questions.md) — still unanswered.
 - [2026-09-14 · morning pickup](plans/handoffs/2026-09-14-1115-cursor-grok-4-6-morning-pickup.md) — three SHAs. Import waits for `1`.
-- [2026-09-13 · W4 evidence](plans/handoffs/2026-09-13-2235-cursor-grok-4-6-w4-reliability-evidence.md) — five native cases **NOT RUN**.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)
@@ -228,6 +227,7 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 
 ## Open threads
+- **C75-MITIGATED (2026-09-15): cold launch felt blank ~2s and “ready” ~10s+.** Blank shell was `Suspense fallback={null}` + huge lazy `App` chunk; slow ready was Prime daemon spawn after hide/quit plus full session-list scan for idle restore. Tree now: HTML + `BootSplash`, non-blocking Google Fonts, `warm_daemon_in_background` at setup, hide leaves spawned Prime daemon warm, idle restore uses `latest_prime_session_for_restore` (not full list). **Needs rebuild** to feel it in `/Applications`. Full transcript remount and Sessions-rail list are still separate costs.
 - **C65-RESOLVED (2026-09-05): the debug bundle can't run natively while the installed app is open — diagnosed, not a defect to fix.** `tauri-plugin-single-instance` enforces one process per bundle identifier, and the debug bundle and `/Applications/Rhizome Agent.app` both carry `ai.rhizome.agent`. Launching the debug bundle (via `open -n` or its raw executable) while the installed app is running silently forwards to the installed instance and the new process exits instantly with no log output — it never stays alive to attach to. This is the actual mechanism behind two prior sessions' "Codex native controls select the wrong app by bundle ID" observations; it's not an attachment/selection quirk, the debug process is genuinely not there. **Workaround, verified working:** quit the installed app first (`osascript -e 'tell application id "ai.rhizome.agent" to quit'`), then launch the debug `.app` — it runs as its own process, confirmed by executable path (`ps aux`), and cua-driver attaches by pid normally. Always ask before quitting the installed app — it may hold unsaved chat/note state. Not filing this as a product bug to fix: single-instance-per-identifier is standard, intentional behavior; the fix is procedural (quit-then-launch), not code. Detail: [2026-09-05-0620](plans/handoffs/2026-09-05-0620-claude-sonnet-5-a1-connections-routing.md).
 - **C61-RESOLVED (2026-09-05): native Graph navigation discarded unsent drafts and hid current chat.** Originally reproduced twice by the GPT-6 audit; fixed by keeping the inactive view mounted. **Native verification done 2026-09-05** on the release build: typed `VERIFY_DRAFT_C61_KEEP_ME`, opened Connections → Graph, and the draft was still in the composer afterwards. The audit's own "do not claim native verification" caveat is now discharged.
 - **C62-FIXED-NATIVE-VERIFIED (2026-09-05): Inbox retained an old untitled row after automatic rename.** Protection stayed on the old path after rename, so reload restored a ghost untitled row. `replaceEntry` now moves the protection. First source-only fix was wrong; native create→rename→reload is what caught it. Detail: [2026-09-05-0920](plans/handoffs/2026-09-05-0920-claude-opus-5-audit-findings.md).

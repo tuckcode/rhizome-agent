@@ -721,6 +721,23 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       },
     ])
   },
+  latest_prime_session_for_restore: () => {
+    const rows = (
+      mockHandlers.list_prime_session_summaries as (args?: unknown) => Array<{
+        id: string
+        path: string
+        archived?: boolean
+        scratch?: boolean
+        hasConversation?: boolean
+      }>
+    )(undefined)
+    return (
+      rows.find(
+        (row) =>
+          row.hasConversation !== false && !row.archived && !row.scratch,
+      ) ?? null
+    )
+  },
   // A real transcript, not `[]`. Returning nothing meant selecting a session
   // in `pnpm dev` looked broken — the conversation stayed on its empty state —
   // so a genuine bug in that path (the column collapsing on select) was
