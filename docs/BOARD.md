@@ -13,21 +13,20 @@ Unclaimed work: `NEXT.md`.
 
 ## Status
 
-- **Done:** Applications rebuild **2026-09-15 12:58** (deleted old app
-  first). Tip **`66c3cb0`** + uncommitted **Signal** Dock icons (ADR-0172).
-- **Now:** Native W4 (C64 ×3, Chat send, hide/reopen) + #46 live
-  Chat-without-vault on this build. Confirm Dock shows Signal.
-- **Next:** One Astra/board visible slice. Docked: import `1`, session
-  mouse-back (Dock Signal chosen).
+- **Done:** CPR **`cb74b28`** — Signal Dock + C75 splash/speed. App installed
+  **2026-09-15 14:08** (old `/Applications` deleted first). Local = origin = app.
+- **Now:** Native W4 (C64 ×3, Chat send, hide/reopen) + #46 live on this build.
+  Confirm Dock Signal + faster cold start.
+- **Next:** One Astra/board visible slice. Docked: import `1`, session mouse-back.
 
-**Origin:** Cursor Grok 4.6 · 2026-09-15 12:58 · rebuild + Signal icon.
+**Origin:** Cursor Composer · 2026-09-15 14:08 · CPR rebuild.
 
 ---
 
 ## True right now
 
-- **Git tip (local):** **`66c3cb0`**. **Origin `main`:** **`66c3cb0`**.
-- **Last stamped app:** **`66c3cb0` + Signal icons (dirty)**, **2026-09-15 12:58**,
+- **Git tip (local):** **`cb74b28`**. **Origin `main`:** **`cb74b28`**.
+- **Last stamped app:** **`cb74b28`**, **2026-09-15 14:08**,
   `/Applications/Rhizome Agent.app`. Vite / mock-tauri is not that vault.
 - **Prime on this machine:** **0.9.3**.
 - **Open GitHub issues:** Prefer live `gh` (17 open as of 2026-09-14
