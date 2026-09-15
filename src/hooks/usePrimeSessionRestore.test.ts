@@ -47,10 +47,10 @@ describe('usePrimeSessionRestore', () => {
   it('shows the rejoined transcript and does not also open the last disk conversation', async () => {
     mockInvokeMock.mockImplementation(async (command: string) => {
       if (command === 'read_prime_session_transcript') return transcript
-      if (command === 'list_prime_session_summaries') {
-        return [{ id: 'disk', path: '/sessions/disk.jsonl', mtimeMs: 99, hasConversation: true }]
+      if (command === 'latest_prime_session_for_restore') {
+        return { id: 'disk', path: '/sessions/disk.jsonl', mtimeMs: 99, hasConversation: true }
       }
-      return []
+      return null
     })
     const onTranscript = vi.fn()
     const onOpen = vi.fn()
@@ -68,14 +68,17 @@ describe('usePrimeSessionRestore', () => {
     })
     expect(onTranscript.mock.calls[0][0]).toHaveLength(1)
     expect(onOpen).not.toHaveBeenCalled()
+    expect(mockInvokeMock).not.toHaveBeenCalledWith('latest_prime_session_for_restore')
     expect(mockInvokeMock).not.toHaveBeenCalledWith('list_prime_session_summaries')
   })
 
   it('opens the last disk conversation when the host is up with no session', async () => {
-    mockInvokeMock.mockResolvedValue([
-      { id: 'old', path: '/sessions/old.jsonl', mtimeMs: 1, hasConversation: true },
-      { id: 'new', path: '/sessions/new.jsonl', mtimeMs: 9, hasConversation: true },
-    ])
+    mockInvokeMock.mockImplementation(async (command: string) => {
+      if (command === 'latest_prime_session_for_restore') {
+        return { id: 'new', path: '/sessions/new.jsonl', mtimeMs: 9, hasConversation: true }
+      }
+      return null
+    })
     const onOpen = vi.fn()
     renderHook(() => usePrimeSessionRestore({
       enabled: true,
@@ -86,11 +89,12 @@ describe('usePrimeSessionRestore', () => {
     }))
 
     await waitFor(() => expect(onOpen).toHaveBeenCalledTimes(1))
+    expect(mockInvokeMock).toHaveBeenCalledWith('latest_prime_session_for_restore')
     expect(onOpen.mock.calls[0][0]).toMatchObject({ id: 'new', path: '/sessions/new.jsonl' })
   })
 
   it('does not treat a running host with no session as a live conversation', async () => {
-    mockInvokeMock.mockResolvedValue([])
+    mockInvokeMock.mockResolvedValue(null)
     const onTranscript = vi.fn()
     const onOpen = vi.fn()
     renderHook(() => usePrimeSessionRestore({
@@ -101,7 +105,7 @@ describe('usePrimeSessionRestore', () => {
       native: true,
     }))
 
-    await waitFor(() => expect(mockInvokeMock).toHaveBeenCalledWith('list_prime_session_summaries'))
+    await waitFor(() => expect(mockInvokeMock).toHaveBeenCalledWith('latest_prime_session_for_restore'))
     expect(onTranscript).not.toHaveBeenCalled()
     expect(onOpen).not.toHaveBeenCalled()
   })

@@ -99,16 +99,16 @@ export function usePrimeSessionRestore({
     idleResumeConsumedThisRuntime = true
 
     let cancelled = false
-    void callHost<PrimeSessionSummary[]>('list_prime_session_summaries')
-      .then((sessions) => {
-        if (cancelled) return
+    void callHost<PrimeSessionSummary | null>('latest_prime_session_for_restore')
+      .then((session) => {
+        if (cancelled || !session) return
         const action = decidePrimeSessionRestore({
           enabled,
           native,
           hostRunning,
           hostReattached,
           hostSessionPath,
-          summaries: sessions,
+          summaries: [session],
           idleResumeConsumed: false,
         })
         if (action.type !== 'idle-disk') return

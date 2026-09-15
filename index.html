@@ -6,7 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet" />
+    <!-- media=print + onload → non-blocking; cold launch must not wait on fonts.googleapis.com -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet" />
+    </noscript>
     <script>
       (function () {
         function isResizeObserverLoopMessage(message) {
@@ -51,6 +60,29 @@
       body {
         background: inherit;
         color: inherit;
+        margin: 0;
+      }
+      /* Static splash before React mounts (Suspense covers the lazy App gap). */
+      #rhizome-boot-splash {
+        align-items: center;
+        display: flex;
+        flex-direction: column;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        gap: 8px;
+        height: 100vh;
+        justify-content: center;
+        letter-spacing: 0.04em;
+        user-select: none;
+        width: 100%;
+      }
+      #rhizome-boot-splash .mark {
+        font-size: 15px;
+        font-weight: 600;
+        opacity: 0.92;
+      }
+      #rhizome-boot-splash .sub {
+        font-size: 12px;
+        opacity: 0.55;
       }
       :root.ai-workspace-native-window,
       :root.ai-workspace-native-window body {
@@ -197,7 +229,12 @@
         }, startupTimeoutMs);
       })();
     </script>
-    <div id="root"></div>
+    <div id="root">
+      <div id="rhizome-boot-splash" aria-busy="true" aria-label="Loading Rhizome" role="status">
+        <div class="mark">rhizome</div>
+        <div class="sub">Starting…</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

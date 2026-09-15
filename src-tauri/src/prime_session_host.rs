@@ -776,6 +776,25 @@ fn ensure_daemon_listening(socket_path: &Path) -> Result<(), String> {
     wait_for_daemon(socket_path)
 }
 
+/// Start Prime's daemon while the frontend is still loading JS.
+///
+/// Cold launch otherwise waits on `ensure_host` after React mounts — often
+/// several seconds of blank-or-splash shell with no Chat. Best-effort: a
+/// failed warm does not abort setup; the next `ensure_host` retries.
+pub fn warm_daemon_in_background() {
+    std::thread::Builder::new()
+        .name("prime-daemon-warmup".into())
+        .spawn(|| {
+            let Ok(socket_path) = daemon_socket_path() else {
+                return;
+            };
+            if let Err(error) = ensure_daemon_listening(&socket_path) {
+                log::info!("Prime daemon warmup deferred: {error}");
+            }
+        })
+        .ok();
+}
+
 fn spawn_prime_daemon(socket_path: &Path) -> Result<(), String> {
     if let Some(dir) = socket_path.parent() {
         std::fs::create_dir_all(dir).map_err(|error| {

@@ -785,6 +785,18 @@ pub fn list_prime_session_summaries(
     Ok(crate::prime_sessions::mark_archived(summaries, &archived))
 }
 
+/// Newest resumable session for Chat idle restore (not the full list).
+#[cfg(desktop)]
+#[tauri::command]
+pub fn latest_prime_session_for_restore(
+) -> Result<Option<crate::prime_sessions::PrimeSessionSummary>, String> {
+    let archived = crate::settings::get_settings()
+        .ok()
+        .and_then(|settings| settings.archived_prime_sessions)
+        .unwrap_or_default();
+    crate::prime_sessions::latest_session_for_restore(&archived)
+}
+
 /// File a session out of the main list, or put it back.
 ///
 /// Rhizome's own state. Nothing under `~/.prime/agent/sessions` is touched:
