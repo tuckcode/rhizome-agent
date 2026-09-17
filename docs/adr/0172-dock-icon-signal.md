@@ -28,9 +28,10 @@ coordinates and brand-fixed teal-green hex). This ADR decides only the
    `icon-source.svg` uses the **original OS node geometry** (ADR-0157
    coordinates, `translate(102) scale(8.2)`, original radii) with the
    **Signal / teal-green palette** (tile `#0F1B14`, core `#E4E7E5`,
-   satellites `#1FCFA8` / `#4CEFCB`, links `#4A5850`, stroke 5). Full-bleed
-   opaque tile (no transparent margin) so Dock does not show an ivory/white
-   fringe. Rasterize with `rsvg-convert`, then
+   satellites `#1FCFA8` / `#4CEFCB`, links `#8FB5A6` for contrast on the
+   tile — ADR-0157’s `#4A5850` blended into the background at Dock size —
+   stroke 5.5). Soft drop-shadows on nodes. Full-bleed opaque tile (no
+   transparent margin) so Dock does not show an ivory/white fringe. Rasterize with `rsvg-convert`, then
    `pnpm tauri icon src-tauri/icons/icon-source.png`, then refresh
    `512x512.png` / `512x512-dark.png` / `256x256.png` from that master
    (Tauri’s icon CLI does not write those three; `app_icon.rs` embeds the
