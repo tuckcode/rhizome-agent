@@ -47,13 +47,12 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Composer · 2026-09-17 16:26 · CPR (icon contrast).
+**Origin:** Cursor Composer · 2026-09-17 17:23 · CPR (traffic lights).
 
-Local and origin **`bfe406b`**. Packaged app **`bfe406b`** installed
-2026-09-17 16:26 (`/Applications/Rhizome Agent.app`; old app deleted first).
-Signal Dock links `#8FB5A6` + node shadows; C75 splash/speed still in tree.
-Import waits for **`1`**. Do not merge #66. Native W4 / #46 still open. Not
-yet daily-driver ready.
+Local and origin **`712024d`**. Packaged app **`712024d`** installed
+2026-09-17 17:23 (`/Applications/Rhizome Agent.app`; old app deleted first).
+Traffic lights at left corner (`x: 14`). Import waits for **`1`**. Do not
+merge #66. Native W4 / #46 still open. Not yet daily-driver ready.
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Dock direction is **Signal** (ADR-0172).
@@ -97,6 +96,7 @@ Priority: push `4416411`/`e64a283`, C64 ×3, W4 native evidence. Inventory:
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-17 · CPR traffic lights](plans/handoffs/2026-09-17-1723-cursor-composer-cpr-traffic-lights.md) — `712024d` in `/Applications` 17:23.
 - [2026-09-17 · CPR icon contrast](plans/handoffs/2026-09-17-1626-cursor-composer-cpr-icon-contrast.md) — `bfe406b` in `/Applications` 16:26.
 - [2026-09-15 · CPR Signal + C75](plans/handoffs/2026-09-15-1408-cursor-composer-cpr.md) — `cb74b28` in `/Applications` 14:08.
 - [2026-09-15 · rebuild + Signal Dock](plans/handoffs/2026-09-15-1258-cursor-grok-4-6-rebuild-signal.md) — deleted old app; Signal `icon.icns` installed 12:58.
