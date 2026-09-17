@@ -43,15 +43,11 @@ const RAIL_HOVER_CLOSE_DELAY_MS = 180
 /**
  * Room for the macOS traffic lights, in both rail states.
  *
- * `tauri.conf.json` puts them at x=58, y=16. Expanded, the 240px rail runs
- * underneath them. Collapsed, the 46px rail clears them horizontally — but the
- * lights then sit level with the first destination, close enough to read as
- * part of it. The visual audit's words: "the lights themselves still look
- * parked on the first destination."
- *
- * So the inset applies whenever the lights exist, and content starts below
- * them the way it does in every macOS sidebar. Off-Mac there are no lights to
- * make room for, and the space would just be a dent in the top of the rail.
+ * `tauri.conf.json` puts them at the left corner (x=14, y=16) — standard
+ * macOS chrome. Both collapsed (46px) and expanded (240px) rails sit under
+ * them, so content starts below the lights the way it does in every macOS
+ * sidebar. Off-Mac there are no lights to make room for, and the space would
+ * just be a dent in the top of the rail.
  */
 function RailButton({
   active,

@@ -50,26 +50,25 @@ describe('CommandRail vs macOS traffic lights', () => {
   })
 
   // The window uses titleBarStyle "Overlay", so the system buttons float over
-  // the webview. They were configured at x=18 and overlapped this 46px rail —
-  // first vertically (worked around by pushing the rail's content down), then
-  // still horizontally, straddling the rail/sidebar divider. Moving the lights
-  // clear of the rail solves both, so the vertical workaround is gone.
-  it('positions the traffic lights fully clear of the rail', () => {
-    expect(configuredTrafficLightX()).toBeGreaterThanOrEqual(RAIL_WIDTH)
+  // the webview. They live in the left corner (x=14) like every macOS app —
+  // under the rail — and the rail clears them vertically. Do not park them
+  // mid-sidebar to dodge the rail horizontally; that looked wrong (Atticus
+  // 2026-09-17).
+  it('parks the traffic lights in the left corner under the rail', () => {
+    expect(configuredTrafficLightX()).toBeLessThan(RAIL_WIDTH)
+    expect(configuredTrafficLightX()).toBeGreaterThanOrEqual(12)
   })
 
-  it('leaves the lights room beside the rail without reaching sidebar controls', () => {
-    // They land in the sidebar's top band; the sidebar's own leftmost control
-    // sits at roughly x136, so the lights must finish well before that.
+  it('keeps the light run inside the expanded sessions band', () => {
+    // Collapsed rail is only 46px; lights spill past it into the next column.
+    // Expanded 240px rail owns the top band — lights must finish well before
+    // the first labeled control (~x136).
     expect(configuredTrafficLightX() + TRAFFIC_LIGHT_SPAN).toBeLessThan(136)
   })
 
   /**
-   * A collapsed rail clears the lights horizontally — x=58 is past its 46px —
-   * but that only means they are *beside* the first destination rather than on
-   * it, close enough that the audit read them as belonging to it. Content
-   * starts below the lights in both states now, as it does in every macOS
-   * sidebar.
+   * Left-corner lights sit on the collapsed rail; content starts below them
+   * so nothing shares a row with the buttons.
    */
   it('offsets a collapsed rail too, so nothing sits level with the lights', () => {
     localStorage.setItem(APP_STORAGE_KEYS.commandRailExpanded, '0')
@@ -93,11 +92,8 @@ describe('CommandRail vs macOS traffic lights', () => {
   })
 
   /**
-   * Expanding the rail (2026-08-20, to label the destinations) put it back
-   * under the lights: 240px of rail against lights that start at x=58. The
-   * horizontal escape the config bought only holds while the rail is narrow,
-   * so the wide state makes room vertically instead — which is what every
-   * macOS sidebar does with the lights sitting in its top band.
+   * Expanded rail (240px) always runs under left-corner lights. Vertical
+   * inset is the macOS pattern — same as Finder's sidebar.
    */
   it('offsets an expanded rail, which reaches under the lights', () => {
     localStorage.setItem(APP_STORAGE_KEYS.commandRailExpanded, '1')
@@ -108,7 +104,7 @@ describe('CommandRail vs macOS traffic lights', () => {
     expect(configuredTrafficLightX()).toBeLessThan(RAIL_EXPANDED_WIDTH)
 
     const inset = Number.parseInt(rail.style.paddingTop, 10)
-    // Clear of the lights themselves: they are drawn ~16px tall from y=24.
+    // Clear of the lights themselves: they are drawn ~16px tall from y=16.
     expect(inset).toBeGreaterThanOrEqual(40)
   })
 })
