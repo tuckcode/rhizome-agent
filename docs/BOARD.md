@@ -13,20 +13,21 @@ Unclaimed work: `NEXT.md`.
 
 ## Status
 
-- **Done:** CPR **`cb74b28`** — Signal Dock + C75 splash/speed. App installed
-  **2026-09-15 14:08** (old `/Applications` deleted first). Local = origin = app.
+- **Done:** CPR **`bfe406b`** — Signal Dock link contrast + node shadows.
+  App installed **2026-09-17 16:26** (old `/Applications` deleted first).
+  Local = origin = app.
 - **Now:** Native W4 (C64 ×3, Chat send, hide/reopen) + #46 live on this build.
-  Confirm Dock Signal + faster cold start.
+  Confirm Dock links stand out.
 - **Next:** One Astra/board visible slice. Docked: import `1`, session mouse-back.
 
-**Origin:** Cursor Composer · 2026-09-15 14:08 · CPR rebuild.
+**Origin:** Cursor Composer · 2026-09-17 16:26 · CPR rebuild.
 
 ---
 
 ## True right now
 
-- **Git tip (local):** **`cb74b28`**. **Origin `main`:** **`cb74b28`**.
-- **Last stamped app:** **`cb74b28`**, **2026-09-15 14:08**,
+- **Git tip (local):** **`bfe406b`**. **Origin `main`:** **`bfe406b`**.
+- **Last stamped app:** **`bfe406b`**, **2026-09-17 16:26**,
   `/Applications/Rhizome Agent.app`. Vite / mock-tauri is not that vault.
 - **Prime on this machine:** **0.9.3**.
 - **Open GitHub issues:** Prefer live `gh` (17 open as of 2026-09-14
