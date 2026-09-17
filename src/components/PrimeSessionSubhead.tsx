@@ -116,7 +116,7 @@ export function PrimeSessionSubhead({
         // sweeps a text selection and the window never moves, which leaves a
         // maximised window with no obvious way to grab it.
         'select-none',
-        // macOS paints overlay traffic lights at x=58 (tauri.conf.json).
+        // macOS paints overlay traffic lights at x=14 (tauri.conf.json).
         // This strip is ChatHome's title bar, so the inset has to clear
         // them; the 46px rail is already to our left and comes off it.
         'pl-[var(--subhead-traffic-light-inset,0.75rem)]',

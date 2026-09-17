@@ -7,7 +7,7 @@ import { isMac } from './platform'
  * painted *over* whatever renders at the top of the window.
  */
 export const MACOS_TRAFFIC_LIGHT_POSITION = {
-  x: 58,
+  x: 14,
   y: 16,
 } as const
 
