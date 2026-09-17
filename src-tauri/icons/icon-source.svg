@@ -1,22 +1,28 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   <!-- Rhizome OS icon — Signal color on original geometry (ADR-0172).
-       Node positions/angles/radii match the pre-Signal OS drawing
-       (translate 102, scale 8.2, ADR-0157 coordinates). Palette is
-       Signal / ADR teal-green. Full-bleed opaque tile — no transparent
-       margin (avoids Dock white fringe from ivory AA). macOS applies
-       its own squircle mask. -->
+       Links use a lighter jade so they read on #0F1B14 (ADR #4A5850 was
+       too close to the tile). Soft drop-shadows lift the nodes. -->
+  <defs>
+    <filter id="node-shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="1.4" stdDeviation="1.8" flood-color="#000000" flood-opacity="0.65"/>
+    </filter>
+    <filter id="core-shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+  </defs>
   <rect x="0" y="0" width="1024" height="1024" fill="#0F1B14"/>
   <g transform="translate(102 102) scale(8.2)">
-    <path d="M50 52 L27 33" stroke="#4A5850" stroke-width="5" stroke-linecap="round"/>
-    <path d="M50 52 L74 30" stroke="#4A5850" stroke-width="5" stroke-linecap="round"/>
-    <path d="M50 52 L30 73" stroke="#4A5850" stroke-width="5" stroke-linecap="round"/>
-    <path d="M50 52 L71 70" stroke="#4A5850" stroke-width="5" stroke-linecap="round"/>
-    <path d="M50 52 L50 22" stroke="#4A5850" stroke-width="5" stroke-linecap="round"/>
-    <circle cx="50" cy="52" r="12" fill="#E4E7E5"/>
-    <circle cx="27" cy="33" r="7" fill="#1FCFA8"/>
-    <circle cx="74" cy="30" r="8" fill="#4CEFCB"/>
-    <circle cx="30" cy="73" r="6.5" fill="#1FCFA8"/>
-    <circle cx="71" cy="70" r="7.5" fill="#4CEFCB"/>
-    <circle cx="50" cy="22" r="5" fill="#1FCFA8"/>
+    <!-- Links under nodes; jade-gray for contrast on evergreen tile -->
+    <path d="M50 52 L27 33" stroke="#8FB5A6" stroke-width="5.5" stroke-linecap="round"/>
+    <path d="M50 52 L74 30" stroke="#8FB5A6" stroke-width="5.5" stroke-linecap="round"/>
+    <path d="M50 52 L30 73" stroke="#8FB5A6" stroke-width="5.5" stroke-linecap="round"/>
+    <path d="M50 52 L71 70" stroke="#8FB5A6" stroke-width="5.5" stroke-linecap="round"/>
+    <path d="M50 52 L50 22" stroke="#8FB5A6" stroke-width="5.5" stroke-linecap="round"/>
+    <circle cx="50" cy="52" r="12" fill="#E4E7E5" filter="url(#core-shadow)"/>
+    <circle cx="27" cy="33" r="7" fill="#1FCFA8" filter="url(#node-shadow)"/>
+    <circle cx="74" cy="30" r="8" fill="#4CEFCB" filter="url(#node-shadow)"/>
+    <circle cx="30" cy="73" r="6.5" fill="#1FCFA8" filter="url(#node-shadow)"/>
+    <circle cx="71" cy="70" r="7.5" fill="#4CEFCB" filter="url(#node-shadow)"/>
+    <circle cx="50" cy="22" r="5" fill="#1FCFA8" filter="url(#node-shadow)"/>
   </g>
 </svg>
