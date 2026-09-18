@@ -89,7 +89,10 @@ fn same_directory(left: &Path, right: &Path) -> bool {
 }
 
 fn copy_agent_entry(source: &Path, target: &Path) -> Result<(), String> {
-    let metadata = match std::fs::metadata(source) {
+    // `metadata` follows links. A skill that points at itself
+    // (`hyperframes` → `hyperframes`) then fails the whole Pi run.
+    // Look at the link first and skip one we cannot follow.
+    let listed = match std::fs::symlink_metadata(source) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
         Err(error) => {
@@ -100,10 +103,26 @@ fn copy_agent_entry(source: &Path, target: &Path) -> Result<(), String> {
         }
     };
 
+    if listed.file_type().is_symlink() {
+        let followed = match std::fs::metadata(source) {
+            Ok(metadata) => metadata,
+            Err(_) => return Ok(()),
+        };
+        return copy_followed_entry(source, target, &followed);
+    }
+
+    copy_followed_entry(source, target, &listed)
+}
+
+fn copy_followed_entry(
+    source: &Path,
+    target: &Path,
+    metadata: &std::fs::Metadata,
+) -> Result<(), String> {
     if metadata.is_dir() {
         seed_agent_dir(source, target)
     } else if metadata.is_file() {
-        copy_agent_file(source, target, metadata)
+        copy_agent_file(source, target, metadata.clone())
     } else {
         Ok(())
     }
@@ -426,6 +445,26 @@ mod tests {
         assert_eq!(config_dir, agent_dir.path().as_os_str());
         assert_seeded_pi_config_files(agent_dir.path());
         assert_seeded_pi_mcp_config(read_mcp_config_value(agent_dir.path()));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn command_skips_a_skill_symlink_that_points_at_itself() {
+        use std::os::unix::fs::symlink;
+
+        let _env_lock = PI_AGENT_ENV_LOCK.lock().unwrap();
+        let source_agent_dir = tempfile::tempdir().unwrap();
+        let skills = source_agent_dir.path().join("skills");
+        std::fs::create_dir(&skills).unwrap();
+        symlink("hyperframes", skills.join("hyperframes")).unwrap();
+        std::fs::write(source_agent_dir.path().join("auth.json"), "{}").unwrap();
+        let agent_dir = tempfile::tempdir().unwrap();
+        let _guard = EnvGuard::set("PI_CODING_AGENT_DIR", source_agent_dir.path());
+
+        build_command(&PathBuf::from("pi"), &request(), agent_dir.path()).unwrap();
+
+        assert!(agent_dir.path().join("auth.json").is_file());
+        assert!(!agent_dir.path().join("skills").join("hyperframes").exists());
     }
 
     fn write_existing_pi_config(source_agent_dir: &Path) {

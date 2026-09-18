@@ -21,12 +21,8 @@
 //!
 //! The row-shaping logic (`session_title`, `running_session_rows`,
 //! `tray_tooltip`, …) is a deliberately simplified mirror of
-//! `src/lib/primeRunningSessions.ts`'s `rosterSessionTitle` /
-//! `toRunningSessionRows` — same field names, same fallback order, no RLM
-//! subagent-family bookkeeping. It is pure (no `tauri::App`), so it is
-//! tested directly; only the `tauri::menu::Menu` construction around it
-//! needs a live app and is exercised by hand (native QA, see the commit's
-//! completion comment).
+//! `src/lib/primeRunningSessions.ts` — same field names, same fallback
+//! order, activity phrase and subagent count squeezed onto one menu line.
 
 use serde_json::Value;
 
@@ -175,9 +171,8 @@ pub fn count_running_top_level_sessions(roster: &[Value]) -> usize {
 }
 
 /// Running top-level sessions, newest/busiest first, capped for the tray
-/// menu. Mirrors `toRunningSessionRows` in `primeRunningSessions.ts` minus
-/// the RLM subagent-count bookkeeping — the tray shows what is running, not
-/// how deep its subagent tree goes.
+/// menu. The title carries the same activity and subagent count the popover
+/// shows, squeezed onto one native menu line.
 pub fn running_session_rows(
     roster: &[Value],
     limit: usize,
@@ -200,18 +195,108 @@ pub fn running_session_rows(
         right_activity.cmp(left_activity)
     });
 
+    let counts = subagent_counts(roster);
+
     sessions
         .into_iter()
         .take(limit)
         .filter_map(|session| {
             let id = session_handle(session)?;
+            let detail = tray_row_detail(session, *counts.get(&id).unwrap_or(&0));
+            let budget = title_max_len
+                .saturating_sub(detail.chars().count() + 3)
+                .max(8);
+            let base = session_title(session, budget);
             Some(SessionMenuRow {
-                title: session_title(session, title_max_len),
+                title: truncate_title(&format!("{base} · {detail}"), title_max_len),
                 session_file: session["sessionFile"].as_str().map(str::to_string),
                 id,
             })
         })
         .collect()
+}
+
+fn tray_row_detail(session: &Value, subagent_count: usize) -> String {
+    let activity = tray_activity_phrase(session);
+    match subagent_count {
+        0 => activity,
+        1 => format!("{activity} · 1 subagent"),
+        n => format!("{activity} · {n} subagents"),
+    }
+}
+
+/// Same order as `activityFor` in `primeRunningSessions.ts`. English matches
+/// the menu-bar popover. The tray is a single native menu line, so this is
+/// the whole status.
+fn tray_activity_phrase(session: &Value) -> String {
+    let summary = collapse_whitespace(session["summary"].as_str().unwrap_or(""));
+    if !summary.is_empty() {
+        return truncate_title(&summary, 60);
+    }
+    if session["isCompacting"].as_bool() == Some(true) {
+        return "Compacting".to_string();
+    }
+    if session["isBashRunning"].as_bool() == Some(true) {
+        return "Running a command".to_string();
+    }
+    if session["isRunningTools"].as_bool() == Some(true) {
+        return "Running tools".to_string();
+    }
+    if session["isStreaming"].as_bool() == Some(true) {
+        return "Replying".to_string();
+    }
+    if session["activity"].as_str() == Some("working") {
+        return "Working".to_string();
+    }
+    if session["hasRunningRlmChildren"].as_bool() == Some(true) {
+        return "Waiting on subagents".to_string();
+    }
+    if session["hasActiveHeartbeat"].as_bool() == Some(true) {
+        return "Waiting on a heartbeat".to_string();
+    }
+    if session["taskState"].as_str() == Some("needs_input") {
+        return "Waiting for you".to_string();
+    }
+    "Working".to_string()
+}
+
+fn subagent_counts(roster: &[Value]) -> std::collections::HashMap<String, usize> {
+    let mut by_handle: std::collections::HashMap<String, &Value> = std::collections::HashMap::new();
+    for session in roster {
+        if let Some(handle) = session_handle(session) {
+            by_handle.insert(handle, session);
+        }
+    }
+
+    let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for session in roster {
+        if !is_subagent(session) {
+            continue;
+        }
+        let Some(root) = root_handle_of(session, &by_handle) else {
+            continue;
+        };
+        *counts.entry(root).or_insert(0) += 1;
+    }
+    counts
+}
+
+fn root_handle_of(
+    session: &Value,
+    by_handle: &std::collections::HashMap<String, &Value>,
+) -> Option<String> {
+    let mut current = session;
+    let mut seen = std::collections::HashSet::new();
+    while is_subagent(current) {
+        if let Some(handle) = session_handle(current) {
+            if !seen.insert(handle) {
+                return None;
+            }
+        }
+        let parent_handle = current["parentActiveSessionId"].as_str()?;
+        current = by_handle.get(parent_handle).copied()?;
+    }
+    session_handle(current)
 }
 
 /// The tray tooltip's text — reflects the running-session count (#52).
@@ -221,6 +306,93 @@ pub fn tray_tooltip(running_count: usize) -> String {
         1 => "Rhizome — 1 session running".to_string(),
         n => format!("Rhizome — {n} sessions running"),
     }
+}
+
+/// How long a chat that just stopped stays on the tray (#52 leftover).
+/// The poll is 15s; 45s is three polls, long enough to notice, short
+/// enough that a finished chat does not sit there all afternoon.
+pub const FINISHED_ROW_KEEP_MS: u64 = 45_000;
+
+/// A session that was running on the previous poll and is not running now.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FinishedSession {
+    pub row: SessionMenuRow,
+    pub finished_at_ms: u64,
+}
+
+/// Menu label for a chat that just stopped. Same click path as a running row.
+pub fn finished_menu_label(title: &str) -> String {
+    format!("Done: {title}")
+}
+
+/// Running count wins. A finished chat only changes the tooltip when
+/// nothing is still running — otherwise the count is the useful fact.
+pub fn tray_status_tooltip(running_count: usize, finished_count: usize) -> String {
+    if running_count > 0 {
+        return tray_tooltip(running_count);
+    }
+    if finished_count > 0 {
+        return "Rhizome — session finished".to_string();
+    }
+    tray_tooltip(0)
+}
+
+/// Remember chats that dropped off the running roster.
+///
+/// `previous_running` is the last poll's rows. An id in that list and not
+/// in `current_running` is newly finished. `remembered` rows stay until
+/// `keep_ms` has passed, or until that chat is running again. Newest first,
+/// capped like the running list so the menu cannot grow without bound.
+pub fn reconcile_finished_sessions(
+    previous_running: &[SessionMenuRow],
+    current_running: &[SessionMenuRow],
+    remembered: &[FinishedSession],
+    now_ms: u64,
+    keep_ms: u64,
+) -> Vec<FinishedSession> {
+    use std::collections::HashSet;
+
+    let current_ids: HashSet<&str> = current_running.iter().map(|row| row.id.as_str()).collect();
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut out: Vec<FinishedSession> = Vec::new();
+
+    for previous in previous_running {
+        if current_ids.contains(previous.id.as_str()) {
+            continue;
+        }
+        if seen.insert(previous.id.clone()) {
+            out.push(FinishedSession {
+                row: previous.clone(),
+                finished_at_ms: now_ms,
+            });
+        }
+    }
+
+    for old in remembered {
+        if current_ids.contains(old.row.id.as_str()) {
+            continue;
+        }
+        if now_ms.saturating_sub(old.finished_at_ms) >= keep_ms {
+            continue;
+        }
+        if seen.insert(old.row.id.clone()) {
+            out.push(old.clone());
+        }
+    }
+
+    out.sort_by_key(|item| std::cmp::Reverse(item.finished_at_ms));
+    out.truncate(TRAY_SESSION_ROW_LIMIT);
+    out
+}
+
+/// Drop one finished chat after the user opens it. The next poll must not
+/// put it back: it is already absent from the running list.
+pub fn without_finished_session(finished: &[FinishedSession], id: &str) -> Vec<FinishedSession> {
+    finished
+        .iter()
+        .filter(|item| item.row.id != id)
+        .cloned()
+        .collect()
 }
 
 /// The menu-item id a session row gets. Exposed so the click handler and the
@@ -233,16 +405,18 @@ fn session_item_id(row: &SessionMenuRow) -> String {
 #[cfg(desktop)]
 mod desktop {
     use super::{
-        count_running_top_level_sessions, running_session_rows, session_item_id, tray_tooltip,
-        SessionMenuRow, NO_SESSIONS_ITEM_ID, SESSION_ITEM_PREFIX, TRAY_SESSION_ROW_LIMIT,
-        TRAY_TITLE_MAX_LEN, WINDOW_LABEL,
+        count_running_top_level_sessions, finished_menu_label, reconcile_finished_sessions,
+        running_session_rows, session_item_id, tray_status_tooltip, tray_tooltip,
+        without_finished_session, FinishedSession, SessionMenuRow, FINISHED_ROW_KEEP_MS,
+        NO_SESSIONS_ITEM_ID, SESSION_ITEM_PREFIX, TRAY_SESSION_ROW_LIMIT, TRAY_TITLE_MAX_LEN,
+        WINDOW_LABEL,
     };
     use crate::menu_bar_capture::{self, CaptureKind};
     use std::{
         collections::HashMap,
         sync::{Mutex, OnceLock},
         thread,
-        time::Duration,
+        time::{Duration, SystemTime, UNIX_EPOCH},
     };
     use tauri::{
         image::Image,
@@ -314,10 +488,40 @@ mod desktop {
     /// Build the full tray menu for one roster snapshot: running-session rows
     /// (or a disabled placeholder) above a separator, then the existing
     /// capture / quick-note / open / quit items unchanged.
-    fn build_menu(app: &AppHandle, rows: &[SessionMenuRow]) -> tauri::Result<Menu<tauri::Wry>> {
+    /// Last poll's running rows, plus chats that dropped off and are still
+    /// inside the keep window. A failed roster read must not touch this —
+    /// an empty error is not "every chat finished".
+    struct TrayFinishMemory {
+        previous_running: Vec<SessionMenuRow>,
+        finished: Vec<FinishedSession>,
+    }
+
+    static TRAY_FINISH_MEMORY: OnceLock<Mutex<TrayFinishMemory>> = OnceLock::new();
+
+    fn tray_finish_memory() -> &'static Mutex<TrayFinishMemory> {
+        TRAY_FINISH_MEMORY.get_or_init(|| {
+            Mutex::new(TrayFinishMemory {
+                previous_running: Vec::new(),
+                finished: Vec::new(),
+            })
+        })
+    }
+
+    fn now_ms() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|elapsed| u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX))
+            .unwrap_or(0)
+    }
+
+    fn build_menu(
+        app: &AppHandle,
+        rows: &[SessionMenuRow],
+        finished: &[FinishedSession],
+    ) -> tauri::Result<Menu<tauri::Wry>> {
         let mut items: Vec<Box<dyn tauri::menu::IsMenuItem<tauri::Wry>>> = Vec::new();
 
-        if rows.is_empty() {
+        if rows.is_empty() && finished.is_empty() {
             let placeholder = MenuItem::with_id(
                 app,
                 NO_SESSIONS_ITEM_ID,
@@ -330,6 +534,16 @@ mod desktop {
             for row in rows {
                 let item =
                     MenuItem::with_id(app, session_item_id(row), &row.title, true, None::<&str>)?;
+                items.push(Box::new(item));
+            }
+            for done in finished {
+                let item = MenuItem::with_id(
+                    app,
+                    session_item_id(&done.row),
+                    finished_menu_label(&done.row.title),
+                    true,
+                    None::<&str>,
+                )?;
                 items.push(Box::new(item));
             }
         }
@@ -371,7 +585,7 @@ mod desktop {
     }
 
     fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-        let menu = build_menu(app.handle(), &[])?;
+        let menu = build_menu(app.handle(), &[], &[])?;
         let icon = tray_icon().map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
 
         let tray = TrayIconBuilder::with_id(TRAY_ID)
@@ -456,16 +670,35 @@ mod desktop {
             Ok(roster) => roster,
             Err(err) => {
                 log::warn!("menu-bar tray roster read failed: {err}");
-                Vec::new()
+                return;
             }
         };
 
         let rows = running_session_rows(&roster, TRAY_SESSION_ROW_LIMIT, TRAY_TITLE_MAX_LEN);
         let running_count = count_running_top_level_sessions(&roster);
+        let finished = {
+            let mut memory = match tray_finish_memory().lock() {
+                Ok(memory) => memory,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            let next = reconcile_finished_sessions(
+                &memory.previous_running,
+                &rows,
+                &memory.finished,
+                now_ms(),
+                FINISHED_ROW_KEEP_MS,
+            );
+            memory.previous_running = rows.clone();
+            memory.finished = next.clone();
+            next
+        };
 
         let mut files = HashMap::new();
         for row in &rows {
             files.insert(session_item_id(row), row.session_file.clone());
+        }
+        for done in &finished {
+            files.insert(session_item_id(&done.row), done.row.session_file.clone());
         }
         if let Ok(mut guard) = session_row_files().lock() {
             *guard = files;
@@ -474,7 +707,7 @@ mod desktop {
         let Some(state) = app.try_state::<MenuBarTrayState>() else {
             return;
         };
-        match build_menu(app, &rows) {
+        match build_menu(app, &rows, &finished) {
             Ok(menu) => {
                 if let Err(err) = state.0.set_menu(Some(menu)) {
                     log::warn!("menu-bar tray menu rebuild failed: {err}");
@@ -482,12 +715,22 @@ mod desktop {
             }
             Err(err) => log::warn!("menu-bar tray menu build failed: {err}"),
         }
-        if let Err(err) = state.0.set_tooltip(Some(tray_tooltip(running_count))) {
+        if let Err(err) = state
+            .0
+            .set_tooltip(Some(tray_status_tooltip(running_count, finished.len())))
+        {
             log::warn!("menu-bar tray tooltip update failed: {err}");
         }
     }
 
     fn open_session_row(app: &AppHandle, session_id: &str) {
+        {
+            let mut memory = match tray_finish_memory().lock() {
+                Ok(memory) => memory,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            memory.finished = without_finished_session(&memory.finished, session_id);
+        }
         let session_file = session_row_files()
             .lock()
             .ok()
@@ -498,6 +741,8 @@ mod desktop {
             })
             .flatten();
         open_session(app, session_file);
+        let app = app.clone();
+        thread::spawn(move || refresh_tray(&app));
     }
 
     fn spawn_capture(app: &AppHandle, kind: CaptureKind) {
@@ -748,6 +993,41 @@ mod tests {
     }
 
     #[test]
+    fn running_session_rows_names_what_the_chat_is_doing() {
+        let roster = vec![json!({
+            "activeSessionId": "s1",
+            "activity": "working",
+            "isBashRunning": true,
+            "sessionName": "Fix login"
+        })];
+        let rows = running_session_rows(&roster, 5, 80);
+        assert_eq!(rows[0].title, "Fix login · Running a command");
+    }
+
+    #[test]
+    fn running_session_rows_counts_helpers_including_grandchildren() {
+        let roster = vec![
+            working_session("root"),
+            json!({
+                "activeSessionId": "child",
+                "runtimeKind": "subagent",
+                "parentActiveSessionId": "root",
+                "activity": "working"
+            }),
+            json!({
+                "activeSessionId": "grand",
+                "runtimeKind": "subagent",
+                "parentActiveSessionId": "child",
+                "rlmDepth": 2,
+                "activity": "working"
+            }),
+        ];
+        let rows = running_session_rows(&roster, 5, 80);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].title, "root · Working · 2 subagents");
+    }
+
+    #[test]
     fn running_session_rows_excludes_subagents() {
         let roster = vec![
             working_session("root"),
@@ -826,5 +1106,87 @@ mod tests {
             json!({ "activeSessionId": "child", "activity": "working", "runtimeKind": "subagent" }),
         ];
         assert_eq!(count_running_top_level_sessions(&roster), 1);
+    }
+
+    fn row(id: &str, title: &str) -> SessionMenuRow {
+        SessionMenuRow {
+            id: id.to_string(),
+            title: title.to_string(),
+            session_file: Some(format!("/tmp/{id}.jsonl")),
+        }
+    }
+
+    #[test]
+    fn a_chat_that_drops_off_the_roster_becomes_a_done_row() {
+        let previous = vec![row("s1", "Fix login")];
+        let finished = reconcile_finished_sessions(&previous, &[], &[], 1_000, 45_000);
+        assert_eq!(finished.len(), 1);
+        assert_eq!(finished[0].row.id, "s1");
+        assert_eq!(finished[0].finished_at_ms, 1_000);
+        assert_eq!(
+            finished_menu_label(&finished[0].row.title),
+            "Done: Fix login"
+        );
+    }
+
+    #[test]
+    fn a_chat_that_is_still_running_is_not_finished() {
+        let previous = vec![row("s1", "Fix login")];
+        let current = vec![row("s1", "Fix login")];
+        assert!(reconcile_finished_sessions(&previous, &current, &[], 1_000, 45_000).is_empty());
+    }
+
+    #[test]
+    fn a_finished_chat_stays_until_the_keep_window_ends() {
+        let remembered = vec![FinishedSession {
+            row: row("s1", "Fix login"),
+            finished_at_ms: 1_000,
+        }];
+        let still = reconcile_finished_sessions(&[], &[], &remembered, 10_000, 45_000);
+        assert_eq!(still.len(), 1);
+        let gone = reconcile_finished_sessions(&[], &[], &remembered, 46_000, 45_000);
+        assert!(gone.is_empty());
+    }
+
+    #[test]
+    fn a_chat_that_starts_again_leaves_the_done_list() {
+        let remembered = vec![FinishedSession {
+            row: row("s1", "Fix login"),
+            finished_at_ms: 1_000,
+        }];
+        let current = vec![row("s1", "Fix login")];
+        assert!(reconcile_finished_sessions(&[], &current, &remembered, 2_000, 45_000).is_empty());
+    }
+
+    #[test]
+    fn opening_a_finished_chat_removes_only_that_row() {
+        let finished = vec![
+            FinishedSession {
+                row: row("s1", "Fix login"),
+                finished_at_ms: 1_000,
+            },
+            FinishedSession {
+                row: row("s2", "Other"),
+                finished_at_ms: 1_000,
+            },
+        ];
+        let left = without_finished_session(&finished, "s1");
+        assert_eq!(left.len(), 1);
+        assert_eq!(left[0].row.id, "s2");
+    }
+
+    #[test]
+    fn finished_rows_are_newest_first_and_capped() {
+        let previous: Vec<SessionMenuRow> = (0..8).map(|i| row(&format!("s{i}"), "chat")).collect();
+        let finished = reconcile_finished_sessions(&previous, &[], &[], 5_000, 45_000);
+        assert_eq!(finished.len(), TRAY_SESSION_ROW_LIMIT);
+        assert!(finished.iter().all(|item| item.finished_at_ms == 5_000));
+    }
+
+    #[test]
+    fn tooltip_names_a_finish_only_when_nothing_is_still_running() {
+        assert_eq!(tray_status_tooltip(0, 0), "Rhizome");
+        assert_eq!(tray_status_tooltip(0, 1), "Rhizome — session finished");
+        assert_eq!(tray_status_tooltip(2, 1), "Rhizome — 2 sessions running");
     }
 }

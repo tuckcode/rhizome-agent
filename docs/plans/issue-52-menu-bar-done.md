@@ -1,9 +1,9 @@
 # #52 — Menu bar “agent is done”
 
-**Status:** leftover only. Job 1 **running list is in the tree.** Do not recode it. Do not add a Done TTL this window.  
-**Stamped 16:26:** still no TTL. Do not recode.  
+**Status:** job 1 finish row is in source (`reconcile_finished_sessions`, keep 45s, label `Done: {title}`). No system notification. Do not recode the running list. Native glance still open — do not close #52 from tests.  
 **Origin:** Cursor Grok 4.6 · 2026-09-13 · GitHub [#52](https://github.com/tuckcode/rhizome-agent/issues/52), sibling [#13](https://github.com/tuckcode/rhizome-agent/issues/13)  
-**Code:** `src-tauri/src/menu_bar_companion.rs`
+**Code:** `src-tauri/src/menu_bar_companion.rs`  
+**Updated:** Cursor Composer · 2026-09-18 · helper wired; packaged app still the prior build until rebuild.
 
 ---
 

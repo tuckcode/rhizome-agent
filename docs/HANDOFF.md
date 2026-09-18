@@ -96,6 +96,7 @@ Priority: push `4416411`/`e64a283`, C64 ×3, W4 native evidence. Inventory:
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-18 · store trip](plans/handoffs/2026-09-18-1653-cursor-composer-store-trip.md) — Done row, Pi symlink skip, Getting Started env aliases. Local only.
 - [2026-09-17 · CPR traffic lights](plans/handoffs/2026-09-17-1723-cursor-composer-cpr-traffic-lights.md) — `712024d` in `/Applications` 17:23.
 - [2026-09-17 · CPR icon contrast](plans/handoffs/2026-09-17-1626-cursor-composer-cpr-icon-contrast.md) — `bfe406b` in `/Applications` 16:26.
 - [2026-09-15 · CPR Signal + C75](plans/handoffs/2026-09-15-1408-cursor-composer-cpr.md) — `cb74b28` in `/Applications` 14:08.
@@ -242,14 +243,11 @@ push is not a release — releases are tagged builds with signed installers.
   `frame_needs_applying` now skips a restore that would not move the window, removing the redundant second resize. **This is a mitigation for an unproven cause, not a confirmed fix.** Do not close this on the strength of a few clean launches — the bug was always intermittent, so absence of a repro is weak evidence. Two things also worth knowing before re-investigating: prior sessions' guesses were wrong, and **"reload didn't fix it" may never have tested a real page reload** — no `Cmd+R` binding was found in `useAppKeyboard.ts`, `lib.rs`, or `menu.rs`; the only in-app "reload" is `reload-vault`, which refetches files rather than reloading the document. Persisted zoom was investigated and ruled out (`useZoom.ts:11-26` clamps to 80–150 and falls back to 100).
 - **C59-RESOLVED (2026-09-03, uncommitted): the 448px Chat note pane was almost entirely clipped at an 834px app width while Sessions occupied its own Chat column.** Atticus rejected the column: in Command-Rail mode, `PrimeSessionList` mounts into the rail's blank middle, below Chat/Inbox/Wiki Graph/Mycelium/Research/Changes and above rail controls. The rail starts compact and opens as a whole on hover; `Keep rail open` pins it, `Collapse rail` returns it to hover mode, and dragging its right edge resizes the remembered 180–360px open width. Classic-shell fallback keeps its prior column. Focused Playwright and visible-browser checks pass.
 
-- **C58-OPEN (2026-09-02): 3 Rust tests fail from a broken symlink on this
-  machine, not the repo.** `pi_cli::tests::run_agent_stream_*` `.unwrap()`
-  on inspecting `~/.pi/agent/skills/hyperframes`, which resolves through
-  `~/.claude/skills/hyperframes` to a **self-referential symlink** at
-  `/Users/dtc/code/mods-plugins/agent-skills/claude/hyperframes` (points to
-  itself, dated 2026-08-31 — pre-existing). Blocked a push for a docs-only
-  commit. **Awaiting Atticus:** OK to delete that symlink, and should these
-  tests stop depending on real `~/.pi/agent/` state?
+- **C58-OPEN (2026-09-02): a self-symlink under `~/.pi/agent/skills/hyperframes`
+  used to fail Pi startup and three `pi_cli` tests.** The link is still on
+  this machine (do not delete it without asking). `pi_config` now skips a
+  skill link it cannot follow and keeps copying the rest. Regression:
+  `command_skips_a_skill_symlink_that_points_at_itself`.
 - **C66-OPEN (2026-09-06): Settings needs a profile page for agent
   instructions.** Atticus: how the agent should respond, rules, the usual
   custom instructions — for whichever agent. **Not building this session.**

@@ -1,8 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Optional remote starter when `RHIZOME_GETTING_STARTED_REPO_URL` (or a
-/// legacy alias) is set.
+/// Optional remote starter when `RHIZOME_GETTING_STARTED_REPO_URL` is set.
 ///
 /// **Default Getting Started no longer clones this.** As of 2026-09-06 the
 /// first-run / Restore path builds a local Rhizome scaffold (folders + type
@@ -613,9 +612,8 @@ Do not modify app configuration files — those are local to each installation.
 /// Create the Getting Started vault at the requested path.
 ///
 /// Default: local Rhizome scaffold (no network). If
-/// `RHIZOME_GETTING_STARTED_REPO_URL` (or a legacy alias) is set, clone that
-/// remote instead — used for C11 experiments and machines that still want the
-/// old Tolaria starter until a Rhizome-owned repo exists.
+/// `RHIZOME_GETTING_STARTED_REPO_URL` is set, clone that remote instead —
+/// used for C11 experiments until a Rhizome-owned starter exists.
 pub fn create_getting_started_vault(target_path: &str) -> Result<String, String> {
     let target = Path::new(target_path);
     let vault_path = match optional_getting_started_repo_url() {
@@ -743,8 +741,9 @@ fn create_getting_started_vault_from_repo(
 }
 
 /// Optional remote starter URL. When unset, Getting Started builds a local
-/// Rhizome scaffold instead of cloning. Env names keep the Laputa/Tolaria
-/// aliases so an old machine config still opts into a remote clone. C11, C21.
+/// Rhizome scaffold instead of cloning. Only `RHIZOME_GETTING_STARTED_REPO_URL`
+/// counts. The old Laputa and Tolaria names are not read (#57 — no machine
+/// here still sets them).
 fn optional_getting_started_repo_url() -> Option<String> {
     // Keep the C11 pin reachable from non-test code. Default path is still
     // local scaffold; only a non-empty env override clones.
@@ -752,8 +751,6 @@ fn optional_getting_started_repo_url() -> Option<String> {
     debug_assert!(!_c11_pin.is_empty());
 
     std::env::var("RHIZOME_GETTING_STARTED_REPO_URL")
-        .or_else(|_| std::env::var("TOLARIA_GETTING_STARTED_REPO_URL"))
-        .or_else(|_| std::env::var("LAPUTA_GETTING_STARTED_REPO_URL"))
         .ok()
         .map(|url| url.trim().to_string())
         .filter(|url| !url.is_empty())
@@ -943,6 +940,23 @@ mod tests {
         let empty = optional_getting_started_repo_url()
             .filter(|url| url == "___rhizome_test_sentinel_that_does_not_exist___");
         assert!(empty.is_none());
+    }
+
+    #[test]
+    fn old_getting_started_env_names_do_not_opt_into_a_clone() {
+        std::env::set_var(
+            "TOLARIA_GETTING_STARTED_REPO_URL",
+            "https://example.invalid/tolaria.git",
+        );
+        std::env::set_var(
+            "LAPUTA_GETTING_STARTED_REPO_URL",
+            "https://example.invalid/laputa.git",
+        );
+        let url = optional_getting_started_repo_url();
+        std::env::remove_var("TOLARIA_GETTING_STARTED_REPO_URL");
+        std::env::remove_var("LAPUTA_GETTING_STARTED_REPO_URL");
+        assert_ne!(url.as_deref(), Some("https://example.invalid/tolaria.git"));
+        assert_ne!(url.as_deref(), Some("https://example.invalid/laputa.git"));
     }
 
     #[test]

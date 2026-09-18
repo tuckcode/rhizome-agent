@@ -30,12 +30,14 @@ describe('parked organs leftover', () => {
     expect(skill).toMatch(/Never invent a fourth verb/)
   })
 
-  it('does not add a #52 Done TTL on the tray', () => {
+  it('keeps the #52 finished-session tray helper', () => {
     const tray = readFileSync(
       `${process.cwd()}/src-tauri/src/menu_bar_companion.rs`,
       'utf8',
     )
-    expect(tray).not.toMatch(/Done TTL|done_ttl|just_finished|just finished/)
+    expect(tray).toContain('fn reconcile_finished_sessions')
+    expect(tray).toContain('Done: {title}')
+    expect(tray).not.toMatch(/UNUserNotification|NSUserNotification/)
   })
 
   it('does not encode a C66 agent-profile store', () => {

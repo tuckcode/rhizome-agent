@@ -292,7 +292,7 @@ mod tests {
             r#"{
                 "provider": {
                     "anthropic": { "options": { "apiKey": "{env:ANTHROPIC_API_KEY}" } },
-                    "custom": { "options": { "apiKey": "{env:TOLARIA_CUSTOM_KEY}" } },
+                    "custom": { "options": { "apiKey": "{env:RHIZOME_CUSTOM_KEY}" } },
                     "bad": "{env:bad-name}"
                 }
             }"#,
@@ -305,7 +305,7 @@ mod tests {
             names,
             BTreeSet::from([
                 "ANTHROPIC_API_KEY".to_string(),
-                "TOLARIA_CUSTOM_KEY".to_string(),
+                "RHIZOME_CUSTOM_KEY".to_string(),
             ])
         );
     }

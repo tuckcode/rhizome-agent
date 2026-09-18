@@ -43,34 +43,63 @@ where
 /// rewritten: the provider's own words name the account, model or limit at
 /// fault, and we cannot say it better.
 ///
-/// Returns `None` when the turn produced text, or when nothing errored — a
-/// genuinely empty turn keeps the placeholder.
+/// Returns `None` when the turn produced text, or when nothing errored and
+/// the provider did record input tokens — a genuinely empty turn keeps the
+/// placeholder. An empty assistant message with `usage.input == 0` never
+/// reached the model (OpenRouter and others write refusals this way, with
+/// no `errorMessage`). That is a rejection, not a quiet answer.
 pub(crate) fn provider_error_from_agent_end(json: &serde_json::Value) -> Option<String> {
     let messages = json["messages"].as_array()?;
-    messages.iter().rev().find_map(|entry| {
-        // Prime sends the message bare in some shapes and wrapped in others.
+    let message = messages.iter().rev().find_map(|entry| {
         let message = if entry["message"].is_object() {
             &entry["message"]
         } else {
             entry
         };
-        if message["role"].as_str()? != "assistant" {
-            return None;
-        }
-        if message["stopReason"].as_str()? != "error" {
-            return None;
-        }
-        // A late failure after partial output is not an empty turn; the user
-        // already has the text, so do not replace it with an error.
-        if message["content"]
-            .as_array()
-            .is_some_and(|content| !content.is_empty())
+        (message["role"].as_str()? == "assistant").then_some(message)
+    })?;
+
+    if !assistant_content_is_empty(message) {
+        return None;
+    }
+
+    if message["stopReason"].as_str() == Some("error") {
+        if let Some(reason) = message["errorMessage"]
+            .as_str()
+            .map(str::trim)
+            .filter(|reason| !reason.is_empty())
         {
-            return None;
+            return Some(reason.to_string());
         }
-        let reason = message["errorMessage"].as_str()?.trim();
-        (!reason.is_empty()).then(|| reason.to_string())
-    })
+    }
+
+    let input_tokens = message["usage"]["input"].as_u64().or_else(|| {
+        message["usage"]["input"]
+            .as_f64()
+            .and_then(|n| u64::try_from(n as i64).ok())
+    });
+    if input_tokens == Some(0) {
+        return Some(
+            match message["provider"].as_str().filter(|name| !name.is_empty()) {
+                Some(provider) => {
+                    format!("{provider} rejected this request before it ran (no input tokens).")
+                }
+                None => "The provider rejected this request before it ran (no input tokens)."
+                    .to_string(),
+            },
+        );
+    }
+
+    None
+}
+
+fn assistant_content_is_empty(message: &serde_json::Value) -> bool {
+    match &message["content"] {
+        serde_json::Value::Array(items) => items.is_empty(),
+        serde_json::Value::String(text) => text.trim().is_empty(),
+        serde_json::Value::Null => true,
+        _ => false,
+    }
 }
 
 pub(crate) fn session_id_from_state(data: &serde_json::Value) -> Option<&str> {
@@ -589,6 +618,37 @@ mod tests {
             "type": "agent_end",
             "messages": [{
                 "role": "assistant", "content": [], "stopReason": "error", "errorMessage": "   "
+            }]
+        });
+        assert!(provider_error_from_agent_end(&end).is_none());
+    }
+
+    #[test]
+    fn zero_input_tokens_on_an_empty_turn_is_a_provider_rejection() {
+        let end = serde_json::json!({
+            "type": "agent_end",
+            "messages": [{
+                "role": "assistant",
+                "content": [],
+                "provider": "openrouter",
+                "model": "openrouter/auto-beta",
+                "usage": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0}
+            }]
+        });
+        assert_eq!(
+            provider_error_from_agent_end(&end).as_deref(),
+            Some("openrouter rejected this request before it ran (no input tokens).")
+        );
+    }
+
+    #[test]
+    fn empty_turn_that_did_use_input_tokens_stays_a_quiet_answer() {
+        let end = serde_json::json!({
+            "type": "agent_end",
+            "messages": [{
+                "role": "assistant",
+                "content": [],
+                "usage": {"input": 12, "output": 0}
             }]
         });
         assert!(provider_error_from_agent_end(&end).is_none());

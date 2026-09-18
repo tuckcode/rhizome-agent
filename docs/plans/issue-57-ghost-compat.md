@@ -36,9 +36,9 @@ Do not rename those in the same commit as deletions.
 
 ## Still live — safe to delete after a disk check
 
-1. **`LAPUTA_` / `TOLARIA_` Getting Started env aliases** in `getting_started.rs` (C11 pin). Keep `RHIZOME_GETTING_STARTED_REPO_URL`.
-2. **Test-only `TOLARIA_*` env names** (`shell_env.rs`, stdin probes, `TOLARIA_CUSTOM_KEY`). Cosmetic; closes C21 residue. One commit, tests retargeted.
-3. **Settings shape migrations** — check `settings.json` on this machine first: `gemini` → antigravity, `release_channel: "beta"` drop, `zh-Hans` alias, ignored `gho_` GitHub token. Keep any that his file still needs.
+1. **`LAPUTA_` / `TOLARIA_` Getting Started env aliases** — dropped 2026-09-18. Only `RHIZOME_GETTING_STARTED_REPO_URL` is read. Neither old name was set on this machine.
+2. **Test-only `TOLARIA_*` env names** — renamed 2026-09-18 in `shell_env.rs`, Claude/Codex stdin probes, and the OpenCode config fixture. Note tokens (`@@TOLARIA_`) and the live cache path were not touched.
+3. **Settings shape migrations** — disk check 2026-09-18: `~/.config/com.tolaria.app/settings.json` **exists** (agent `hermes`, no `release_channel`, no `ui_language`). `~/.config/com.rhizome.app/settings.json` also exists, so the preferred path wins when both are present. **Do not drop** `LEGACY_APP_CONFIG_DIRS` (`com.tolaria.app`, `com.laputa.app`). `gemini` → `antigravity` stays (ADR-0147). `beta` is already ignored by `normalize_release_channel`. `zh-Hans` is localization (C18). `gho_` is redaction, not a settings migration.
 
 ---
 
