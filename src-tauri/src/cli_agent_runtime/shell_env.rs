@@ -2,7 +2,7 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-const OUTPUT_PREFIX: &str = "__TOLARIA_ENV__:";
+const OUTPUT_PREFIX: &str = "__RHIZOME_ENV__:";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct EnvName<'a>(&'a str);
@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     fn env_value_uses_trimmed_process_value() {
-        let key = "TOLARIA_TEST_SHELL_ENV_PROCESS_VALUE";
+        let key = "RHIZOME_TEST_SHELL_ENV_PROCESS_VALUE";
         std::env::set_var(key, "  process-secret  ");
 
         let value = env_value_from_process_or_user_shell(EnvName::trusted(key));
@@ -206,18 +206,18 @@ mod tests {
     #[test]
     fn command_value_marks_name_as_already_available() {
         let mut command = Command::new("demo");
-        command.env("TOLARIA_TEST_COMMAND_VALUE", "command-secret");
+        command.env("RHIZOME_TEST_COMMAND_VALUE", "command-secret");
 
         apply_user_shell_env_vars_if_missing(
             &mut command,
-            &[EnvName::trusted("TOLARIA_TEST_COMMAND_VALUE")],
+            &[EnvName::trusted("RHIZOME_TEST_COMMAND_VALUE")],
         );
 
         let values = command
             .get_envs()
             .map(|(key, value)| (key.to_string_lossy().to_string(), value.is_some()))
             .collect::<Vec<_>>();
-        assert_eq!(values, vec![("TOLARIA_TEST_COMMAND_VALUE".into(), true)]);
+        assert_eq!(values, vec![("RHIZOME_TEST_COMMAND_VALUE".into(), true)]);
     }
 
     #[test]
@@ -228,11 +228,11 @@ mod tests {
         ];
 
         let bindings = parse_probe_output(
-            "__TOLARIA_ENV__:GOOD_VALUE=kept\n\
+            "__RHIZOME_ENV__:GOOD_VALUE=kept\n\
              ignored\n\
-             __TOLARIA_ENV__:BAD-NAME=bad\n\
-             __TOLARIA_ENV__:OTHER_VALUE=   \n\
-             __TOLARIA_ENV__:UNEXPECTED=value\n",
+             __RHIZOME_ENV__:BAD-NAME=bad\n\
+             __RHIZOME_ENV__:OTHER_VALUE=   \n\
+             __RHIZOME_ENV__:UNEXPECTED=value\n",
             &names,
         );
 

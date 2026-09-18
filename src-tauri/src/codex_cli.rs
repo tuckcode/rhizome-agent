@@ -860,7 +860,7 @@ exit 2
             .arg("codex_stdin_probe_parent_child")
             .arg("--ignored")
             .arg("--nocapture")
-            .env("TOLARIA_CODEX_STDIN_PROBE_PARENT_CHILD", "1")
+            .env("RHIZOME_CODEX_STDIN_PROBE_PARENT_CHILD", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -899,7 +899,7 @@ exit 2
     #[ignore = "spawned by run_codex_agent_stream_closes_stdin_even_when_parent_stdin_pipe_is_open"]
     #[test]
     fn codex_stdin_probe_parent_child() {
-        if std::env::var_os("TOLARIA_CODEX_STDIN_PROBE_PARENT_CHILD").is_none() {
+        if std::env::var_os("RHIZOME_CODEX_STDIN_PROBE_PARENT_CHILD").is_none() {
             return;
         }
 
