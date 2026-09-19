@@ -4,7 +4,9 @@ How to navigate the **Rhizome Agent** codebase, run the app, and find what you n
 
 > This is Rhizome Agent (`ai.rhizome.agent`, `tuckcode/rhizome-agent`), not Rhizome Desktop (`knispo/rhizome`, `ai.rhizome.desktop`) — see `docs/IDENTITY.md`. Product overview and roadmap: [README.md](../README.md). Some filenames and sidecar labels still use older internal names (`tolaria_*`, etc.) — treat those as implementation identifiers, not the product name.
 >
-> **Stamped 16:06:** leftover wrap `1eb0398`. Still Agent, not Desktop. No push. No rebuild.
+> **Stamped 2026-09-19:** living docs vs `35f217f` (C75 hide/restore,
+> tray Done, traffic lights, Getting Started env). Packaged app still
+> `712024d`. Still Agent, not Desktop.
 
 ## Prerequisites
 
@@ -125,8 +127,9 @@ The sidecar is Linux-based, so keep native macOS Tauri QA and app-focus screensh
 type documents only, no personal notes, no network
 (`create_local_rhizome_scaffold` in `src-tauri/src/vault/getting_started.rs`).
 It does **not** clone `refactoringhq/tolaria-getting-started` unless
-`RHIZOME_GETTING_STARTED_REPO_URL` (or a legacy alias) is set. C11’s
-Rhizome-owned remote starter is still deferred.
+`RHIZOME_GETTING_STARTED_REPO_URL` is set. The old `TOLARIA_*` /
+`LAPUTA_*` names are not read (#57). C11’s Rhizome-owned remote starter
+is still deferred.
 
 When a remote URL *is* set, `create_getting_started_vault` clones that repo
 and then removes every git remote from the new local copy, so the vault
@@ -508,10 +511,25 @@ Verified against source 2026-09-14. Longer landmine list:
 - **Chat default stays Prime.** Settings must not present Prime as an
   optional local-agent alternative. An API-model default must say it
   skips Prime sessions and vault tools.
-- **Hide stops helpers.** Red-button close hides (C22) and
-  `release_helpers_for_hidden_window` stops the spawned Prime supervisor,
-  MCP bridge, and Mindwalk sidecar unless Keep working left a resident
-  session. Never send Prime `shutdown`. Cmd+Q is the real quit.
+- **Hide stops MCP and Mindwalk, not Prime.** Red-button close hides
+  (C22). `release_helpers_for_hidden_window` stops the ws-bridge child
+  and Mindwalk sidecar. The spawned Prime daemon stays warm so reopen
+  does not pay a multi-second spawn (C75). Keep-working still settles
+  the session as `resident`; it does not change whether the daemon
+  stays. Never send Prime `shutdown`. Cmd+Q is the real quit.
+- **Cold launch shows Starting…** `main.tsx` lazy-loads `App` behind
+  `BootSplash`. A blank dark window is a regression, not a theme.
+  Setup also calls `warm_daemon_in_background`. Idle Chat restore
+  speaks `latest_prime_session_for_restore` (newest eligible log,
+  64-file cap), not `list_prime_session_summaries`.
+- **macOS traffic lights sit at x:14, y:16** (`tauri.conf.json` /
+  `MACOS_TRAFFIC_LIGHT_POSITION`). Overlay title bar paints them over
+  the first band. Clearance lives in `src/utils/trafficLights.ts`.
+  Do not hardcode a second inset.
+- **Tray keeps a Done row.** A chat that leaves the running roster
+  stays as `Done: {title}` for 45s or until opened
+  (`menu_bar_companion.rs`). A failed roster read must not invent
+  finishes. Native glance still open — do not close #52 from units.
 - **Packages install is CLI, not the daemon.** `install_prime_package` runs
   `prime-agent package install` (180s). Confirm full system access once.
 - **Tab completion is rules-first.** `suggestReply` only. Do not add

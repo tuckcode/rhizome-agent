@@ -10,12 +10,12 @@ shipped after Claude last owned a session, what GitHub still says is
 open that is already built, and the decisions you will otherwise
 re-litigate.
 
-**Living-docs stamp 2026-09-14 16:55:** local HEAD **`690712e`**, origin **`5c629a0`**
-(eighteen unpushed), app **`476756c`**. Crunch leftover through 1559. No push. No rebuild. God plan: [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md).
-Morning pickup:
-[`2026-09-14-1115`](plans/handoffs/2026-09-14-1115-cursor-grok-4-6-morning-pickup.md).
-Tonight’s picture: [`BOARD.md`](BOARD.md). Confirm with `git log -1` and
-`git log origin/main..HEAD`.
+**Living-docs stamp 2026-09-19:** local and origin **`35f217f`**. Packaged
+app still **`712024d`** (2026-09-17 17:23). C75 hide/restore, tray Done,
+traffic lights at `x: 14`, Getting Started env names. Confirm with
+`git log -1` and `git log origin/main..HEAD`. God plan:
+[`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md). Tonight’s picture:
+[`BOARD.md`](BOARD.md).
 
 Last Claude-owned session on this repo: **2026-08-24**
 ([shell dock + ADR-0166 + NEXT.md](plans/handoffs/2026-08-24-2122-claude-opus-5-shell-dock-and-next-index.md)).
@@ -70,7 +70,9 @@ longer open the way the ADR text still sounds.
 | Latest reply | Green start marker on the newest assistant turn. Moves when a newer reply starts. |
 | Session click | Transcript **clears on the click**, then rehydrates. Leaving the old chat up is the switch beachball. |
 | Settings cost | Model catalog and provider status wait until **Agents** is visible. Packages catalog waits until **Packages**. |
-| Hide vs quit | Red button hides (C22) and stops helpers this process started, unless Keep working. Cmd+Q quits. Never Prime `shutdown`. |
+| Hide vs quit | Red button hides (C22). Stops ws-bridge + Mindwalk. Spawned Prime stays warm (C75). Cmd+Q quits. Never Prime `shutdown`. |
+| Traffic lights | macOS overlay at `{ x: 14, y: 16 }`. Clearance is `src/utils/trafficLights.ts`. Do not hardcode a second inset. |
+| Tray Done | A finished chat stays as `Done: {title}` for 45s or until opened. Failed roster reads must not invent finishes. Do not close #52 from units. |
 
 **Do not** make nav and the note list exclusive. Claude tried; it broke
 Cmd+N, inbox auto-advance, and note selection. Keep them mounted
@@ -244,10 +246,16 @@ shows the recovered command, not “ipython” five times.
   system browser; the webview never leaves. Built on Tauri 2.10
   `on_navigation`. **GitHub #43 closed** 2026-09-13 / confirmed
   2026-09-14 (`gh issue view 43`). Do not reopen.
-- Traffic-light clearance native-verified (Sol). Mycelium “white
-  screen” was a Suspense flash, not a blank view (C49).
+- Traffic-light clearance native-verified (Sol); lights now park at
+  `x: 14` (`712024d`). Mycelium “white screen” was a Suspense flash,
+  not a blank view (C49). Cold launch uses `BootSplash`, not a blank
+  window (C75).
 - On macOS, restoring a hidden main window: `app.show()` first, then
   unminimize / show / focus. `lib.rs::focus_main_window` is the path.
+  Hide leaves the spawned Prime daemon warm; do not restore
+  `stop_spawned_daemon` on hide.
+- Dock mark is **Signal** (ADR-0172, `c68058d`). The inverted-icon
+  stash is not the current install.
 
 ---
 
@@ -336,8 +344,12 @@ These are the ones this week added or re-proved:
 - **Notes nav + list exclusivity** — see §2. Do not retry it.
 - **Mycelium iframe** is Mindwalk’s UI. Restyle is M4 (JSON client),
   not CSS-on-iframe.
-- **Inverted Dock icon** is `stash@{0}`, parked. Do not pop it into
-  an unrelated commit.
+- **Hide does not stop the spawned Prime daemon.** C75 left it warm.
+  Do not “restore” `stop_spawned_daemon` on hide.
+- **Idle restore is one latest log.** `latest_prime_session_for_restore`,
+  not a full `list_prime_session_summaries` scan.
+- **Getting Started env** is only `RHIZOME_GETTING_STARTED_REPO_URL`.
+  `TOLARIA_*` / `LAPUTA_*` names are not read (#57).
 
 ---
 

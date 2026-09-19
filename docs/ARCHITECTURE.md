@@ -290,6 +290,10 @@ When the Sessions column is the top band (no Prime subhead above), its
 header clears the traffic lights (`titleBarGutter`) and is a window-drag
 surface via `useDragRegion` — not `data-tauri-drag-region`
 (`PrimeSessionList.test.tsx`). Native QA only for the actual drag.
+macOS paints those lights at `trafficLightPosition` `{ x: 14, y: 16 }`
+(`tauri.conf.json` / `MACOS_TRAFFIC_LIGHT_POSITION`). The overlay title
+bar draws them over the first band; clearance math lives in
+`src/utils/trafficLights.ts`. Do not invent a second inset.
 
 The newest assistant turn shows a green start marker
 (`latestAssistantMessageIndex` / `latest-assistant-reply-marker`) left of
@@ -496,6 +500,32 @@ anyone is talking to the agent and would otherwise be what creates the session:
 (on mount), `get_queue` (composer), and `get_session_tree` (branch band).
 Each answers "nothing", which is true of a host with no session.
 
+#### Cold launch and idle restore (C75)
+
+`main.tsx` lazy-loads `App` behind `BootSplash` (“rhizome / Starting…”).
+A blank dark window is a regression (`Suspense fallback={null}` used to
+leave one for ~2s). Setup also calls
+`prime_session_host::warm_daemon_in_background` so Chat does not wait
+for the first `ensure_host` after React mounts.
+
+Idle Chat restore is `usePrimeSessionRestore`. A live reattached host
+reads that session’s transcript. An idle host with no attached session
+speaks `latest_prime_session_for_restore` — newest eligible log, skip
+scratch and archived, stop after 64 probes — not
+`list_prime_session_summaries`. The Sessions rail still loads the full
+list when it needs it.
+
+#### Menu-bar tray (running + Done)
+
+`menu_bar_companion.rs` polls `list_running_sessions` every 15s. Running
+rows stay on the tray menu. A chat that drops off the roster stays as
+`Done: {title}` for `FINISHED_ROW_KEEP_MS` (45s) or until the user
+opens it. Tooltip: running count wins; if nothing is running and a Done
+row remains, `Rhizome — session finished`. A failed roster read must
+not invent finishes. Tray setup is independent of the quick-note window
+(#53). Native glance of the Done row is still open — do not close #52
+from units.
+
 #### Where the pieces live
 
 - **`prime_session_host.rs`** — socket transport, handshake, attach, session
@@ -519,6 +549,7 @@ Each answers "nothing", which is true of a host with no session.
   `usePrimeQueue` (composer queue from `get_queue`; Clear → `clear_queue`),
   `usePrimeSessionTree` / `SessionBranchBand` (`get_session_tree` / `navigate_tree`,
   #17 — this conversation, not the sessions drawer),
+  `usePrimeSessionRestore` (live attach or one latest idle log — C75),
   `usePrimeSessionSwitcher` (list switch / fork / branch; **skips**
   `ensure_prime_session_host` when Chat already reports the host running —
   a redundant ensure on every click was the session-switch beachball.
@@ -655,14 +686,16 @@ then reloads the attached session. Rhizome writes the environment variable
 **Origin:** PR #66 KEEP · 2026-09-14 · not a merge of the draft.
 
 The red traffic light **hides** the main window (C22); Cmd+Q quits.
-Idle hide settles the owned session as **Stop**, then
-`release_helpers_for_hidden_window` stops the spawned Prime supervisor,
-the MCP WebSocket bridge, and the Mindwalk sidecar so they do not leave
-a Dock “running” mark. A Keep-working (`resident`) session is the
-exception — that daemon stays. Rhizome never sends Prime’s `shutdown`
-RPC (other clients share the machine). Active hide asks first
-(`prime-active-close-requested`); `settle_prime_session` also releases
-helpers because `window.hide()` does not raise `CloseRequested` again.
+Idle hide settles the owned session as **Stop**.
+`release_helpers_for_hidden_window` then stops the MCP WebSocket bridge
+and the Mindwalk sidecar so they do not leave a Dock “running” mark.
+The spawned Prime daemon **stays warm** (`hidden_window_helper_stops`
+is `ws_bridge` + `mindwalk` only — C75). Keep-working still matters
+for session intent (`resident`); the daemon itself is left running
+either way. Rhizome never sends Prime’s `shutdown` RPC (other clients
+share the machine). Active hide asks first
+(`prime-active-close-requested`). Do not restore `stop_spawned_daemon`
+on hide — that is the multi-second cold reopen C75 removed.
 
 Settings and Chat share one Prime model catalog (`loadPrimeModelCatalog`).
 A failed “host is not running” answer is **not** cached. Settings must
@@ -1491,7 +1524,8 @@ sequenceDiagram
     T->>T: apply Linux WebKit env safeguards<br/>(Wayland/AppImage)
     T->>T: start background legacy vault housekeeping<br/>(does not block setup)
     T->>MCP: start background initial ws-bridge sync<br/>(if active vault exists)
-    T->>A: App mounts
+    T->>T: warm_daemon_in_background (C75, non-blocking)
+    T->>A: BootSplash then lazy App mounts
 
     A->>A: useOnboarding — vault exists?
     alt Vault missing
@@ -1657,7 +1691,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `start_vault_watcher` / `stop_vault_watcher` | Start or stop native active-vault filesystem change events |
 | `check_vault_exists` | Check if vault path exists |
 | `create_empty_vault` | Create a git-backed vault, then seed root `AGENTS.md`, `CLAUDE.md`, `type.md`, and `note.md` defaults |
-| `create_getting_started_vault` | Clone the public Getting Started vault, refresh Tolaria-managed guidance/config defaults, and keep the cloned repo clean |
+| `create_getting_started_vault` | Local Rhizome scaffold by default; clone only when `RHIZOME_GETTING_STARTED_REPO_URL` is set, then drop remotes |
 | `get_vault_ai_guidance_status` | Report whether `AGENTS.md`, `CLAUDE.md`, and optional `GEMINI.md` guidance are managed, missing, broken, or custom |
 | `restore_vault_ai_guidance` | Restore any missing/broken Tolaria-managed guidance files without overwriting custom ones |
 
@@ -1722,6 +1756,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `copy_text_to_clipboard` | Copy setup snippets through the native desktop clipboard command path |
 | `read_text_from_clipboard` | Read current desktop clipboard text for command-driven plain-text paste |
 | `sync_mcp_bridge_vault` | Sync the desktop WebSocket bridge process to the selected vault, or stop it when no vault is selected |
+| `latest_prime_session_for_restore` | Newest resumable Prime log for idle Chat restore (not the full list; C75) |
 
 The desktop MCP WebSocket bridge is intentionally local-only. `mcp-server/ws-bridge.js` binds both bridge ports to loopback, rejects non-loopback clients, accepts browser/Tauri origins only on the UI bridge, and rejects browser-origin requests on the tool bridge so remote pages cannot drive vault tools directly.
 

@@ -47,12 +47,13 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Composer · 2026-09-17 17:23 · CPR (traffic lights).
+**Origin:** Cursor Grok 4.6 · 2026-09-19 · docs automation.
 
-Local and origin **`712024d`**. Packaged app **`712024d`** installed
-2026-09-17 17:23 (`/Applications/Rhizome Agent.app`; old app deleted first).
-Traffic lights at left corner (`x: 14`). Import waits for **`1`**. Do not
-merge #66. Native W4 / #46 still open. Not yet daily-driver ready.
+Local and origin **`35f217f`**. Packaged app **`712024d`** installed
+2026-09-17 17:23 (`/Applications/Rhizome Agent.app`). Traffic lights at
+left corner (`x: 14`). Tray Done + empty-rejection labels are in source,
+not in that package. Import waits for **`1`**. Do not merge #66. Native
+W4 / #46 still open. Not yet daily-driver ready.
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Dock direction is **Signal** (ADR-0172).
@@ -96,6 +97,7 @@ Priority: push `4416411`/`e64a283`, C64 ×3, W4 native evidence. Inventory:
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-19 · docs automation](plans/handoffs/2026-09-19-1836-cursor-grok-4-6-docs-automation.md) — living docs vs C75 hide/restore, tray Done, traffic lights, Getting Started env.
 - [2026-09-18 · store trip](plans/handoffs/2026-09-18-1653-cursor-composer-store-trip.md) — Done row, Pi symlink skip, Getting Started env aliases. Local only.
 - [2026-09-17 · CPR traffic lights](plans/handoffs/2026-09-17-1723-cursor-composer-cpr-traffic-lights.md) — `712024d` in `/Applications` 17:23.
 - [2026-09-17 · CPR icon contrast](plans/handoffs/2026-09-17-1626-cursor-composer-cpr-icon-contrast.md) — `bfe406b` in `/Applications` 16:26.

@@ -590,15 +590,18 @@ models. Opening Settings used to fetch it immediately, plus
 `loadPrimeModelCatalog`; a failed “host is not running” answer is not
 cached.
 
-## 21. Hide-on-close must stop helpers this process started
+## 21. Hide-on-close stops MCP and Mindwalk, not the Prime daemon
 
-C22 hides the main window; it does not quit. Leaving the spawned Prime
-supervisor, MCP WebSocket bridge, and Mindwalk sidecar running after
-hide kept a Dock indicator. `release_helpers_for_hidden_window`
-(`lib.rs`) stops those unless Keep working left a resident session.
-`settle_prime_session` does the same, because `window.hide()` does not
-raise `CloseRequested` again. Never send Prime `shutdown` — other
+C22 hides the main window; it does not quit. `release_helpers_for_hidden_window`
+(`lib.rs`) stops the ws-bridge child and Mindwalk sidecar so they do
+not leave a Dock indicator. The spawned Prime daemon **stays warm**
+(`hidden_window_helper_stops` is `ws_bridge` + `mindwalk` only — C75).
+Keep-working still settles the session as `resident`; it does not
+change whether the daemon stays. Never send Prime `shutdown` — other
 clients share the daemon. Cmd+Q is the quit path.
+
+Do **not** restore `stop_spawned_daemon` on hide. That is the
+multi-second cold reopen C75 removed.
 
 Remainder: native live-check. See `docs/plans/hide-on-close-helpers.md`.
 Do not recode the helper stop.
@@ -649,3 +652,25 @@ are source locks. They are not a live pass.
 **Stamped 16:05:** leftover units still do not close #46. Leftover wrap `1eb0398`. D6 landed
 `c44ee2b` (`lib.rs` once in `188745d`). Do not `git add -A`. Identity
 leftover is Agent, not Desktop.
+
+## 24. C75 boot, traffic lights, tray Done (2026-09-19)
+
+**Origin:** Cursor Grok 4.6 · docs automation · verified against
+`35f217f` / `cb74b28` / `712024d`.
+
+**Blank window.** `main.tsx` lazy-loads `App` behind `BootSplash`.
+`Suspense fallback={null}` is the defect C75 removed. Do not restore it.
+
+**Idle restore.** Chat speaks `latest_prime_session_for_restore` (newest
+eligible log, skip scratch/archived, 64-file cap). Do not put the full
+`list_prime_session_summaries` scan back on the cold path.
+
+**Traffic lights.** Overlay position is `{ x: 14, y: 16 }`. Clearance is
+`src/utils/trafficLights.ts`. A second hardcoded inset will collide.
+
+**Tray Done.** `reconcile_finished_sessions` keeps `Done: {title}` for
+45s. A failed roster read must not clear `TrayFinishMemory` into
+“every chat finished”. Do not close #52 from units.
+
+**Getting Started env.** Only `RHIZOME_GETTING_STARTED_REPO_URL` opts
+into a clone. `TOLARIA_*` / `LAPUTA_*` names are not read (#57).
