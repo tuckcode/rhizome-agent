@@ -50,6 +50,20 @@ export function subheadTrafficLightInset(): Record<string, string> {
 }
 
 /**
+ * One title band across Chat, Notes, and the command rail so overlay
+ * traffic lights sit on `--surface-sidebar`, not straddling two panel
+ * colors. Height matches the rail's vertical inset. Off Mac this is empty.
+ */
+export function overlayTitleBarBandStyle(): Record<string, string | number> {
+  if (!hasNativeMacosTrafficLights()) return {}
+  return {
+    ...subheadTrafficLightInset(),
+    minHeight: COMMAND_RAIL_TRAFFIC_LIGHT_INSET,
+    '--overlay-titlebar-height': `${COMMAND_RAIL_TRAFFIC_LIGHT_INSET}px`,
+  }
+}
+
+/**
  * When the sessions column is the topmost band — no Prime subhead above it —
  * its header must clear the overlay traffic lights vertically and horizontally.
  * Same horizontal math as the subhead; vertical matches the command rail.
@@ -57,7 +71,7 @@ export function subheadTrafficLightInset(): Record<string, string> {
 export function sessionsColumnTitleBarStyle(): Record<string, string | number> {
   if (!hasNativeMacosTrafficLights()) return {}
   return {
-    ...subheadTrafficLightInset(),
+    ...overlayTitleBarBandStyle(),
     paddingTop: COMMAND_RAIL_TRAFFIC_LIGHT_INSET,
     minHeight: COMMAND_RAIL_TRAFFIC_LIGHT_INSET + 40,
   }

@@ -2,6 +2,10 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultPanel, VaultPanelRestoreButton } from './VaultPanel'
 
+vi.mock('./ui/action-tooltip', () => ({
+  ActionTooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
+
 describe('VaultPanel', () => {
   it('keeps navigation above the note list and collapses from one stable header', () => {
     const onBrowseToggle = vi.fn()
@@ -28,6 +32,46 @@ describe('VaultPanel', () => {
     expect(onCollapse).toHaveBeenCalledTimes(1)
   })
 
+  it('offers a Hide Chat control next to Browse and Collapse', () => {
+    const onFocusToggle = vi.fn()
+    render(
+      <VaultPanel
+        browseOpen={false}
+        locale="en"
+        navigation={<div />}
+        noteList={<div />}
+        onBrowseToggle={vi.fn()}
+        onCollapse={vi.fn()}
+        onFocusToggle={onFocusToggle}
+      />,
+    )
+
+    const focus = screen.getByTestId('vault-panel-focus')
+    expect(focus).toHaveAccessibleName('Hide Chat')
+    expect(focus).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(focus)
+    expect(onFocusToggle).toHaveBeenCalledOnce()
+  })
+
+  it('labels the control Show Chat while Notes already fill the window', () => {
+    render(
+      <VaultPanel
+        browseOpen={false}
+        focused
+        locale="en"
+        navigation={<div />}
+        noteList={<div />}
+        onBrowseToggle={vi.fn()}
+        onCollapse={vi.fn()}
+        onFocusToggle={vi.fn()}
+      />,
+    )
+
+    const focus = screen.getByTestId('vault-panel-focus')
+    expect(focus).toHaveAccessibleName('Show Chat')
+    expect(focus).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('keeps every shell control at least 32px high', () => {
     render(
       <VaultPanel
@@ -42,6 +86,7 @@ describe('VaultPanel', () => {
 
     expect(screen.getByTestId('vault-panel-browse-toggle')).toHaveClass('vault-panel__browse-toggle')
     expect(screen.getByTestId('vault-panel-collapse')).toHaveClass('vault-panel__collapse')
+    expect(screen.queryByTestId('vault-panel-focus')).not.toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel-navigation')).not.toBeInTheDocument()
   })
 

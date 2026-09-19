@@ -27,7 +27,7 @@
           "y": 16
         },
         "hiddenTitle": true,
-        "backgroundColor": "#F7F6F3",
+        "backgroundColor": "#00000000",
         "dragDropEnabled": false
       }
     ],

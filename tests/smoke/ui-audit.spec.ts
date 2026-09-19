@@ -40,7 +40,7 @@ const SHARED = BASELINE._shared ?? []
 const SCREENS = [
   { name: 'chat', testId: 'command-rail-chat' },
   { name: 'research', testId: 'command-rail-research' },
-  { name: 'changes', testId: 'command-rail-changes' },
+  { name: 'changes', testId: 'sidebar-top-nav', buttonName: 'Changes' },
 ] as const
 
 /** `rule: label`, which is what the baseline stores — stable across runs in a
@@ -70,7 +70,9 @@ test.describe('UI audit', () => {
 
   for (const screen of SCREENS) {
     test(`${screen.name} has no new UI defects`, async ({ page }) => {
-      const rail = page.getByTestId(screen.testId)
+      const rail = 'buttonName' in screen
+        ? page.getByTestId(screen.testId).getByRole('button', { name: screen.buttonName, exact: true })
+        : page.getByTestId(screen.testId)
       if (await rail.count()) {
         await rail.first().click()
         // Let the destination settle before measuring; a half-rendered screen

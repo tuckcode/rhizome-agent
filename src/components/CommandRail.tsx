@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChatCircle, GearSix, GitBranch, MagnifyingGlass, PushPin } from '@phosphor-icons/react'
+import { ChatCircle, GearSix, MagnifyingGlass, PushPin } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { ActionTooltip } from './ui/action-tooltip'
 import { Button } from './ui/button'
 import { createTranslator, type AppLocale } from '../lib/i18n'
-import { trackRailDestinationClicked } from '../lib/productAnalytics'
+import { trackCommandRailPinChanged, trackRailDestinationClicked } from '../lib/productAnalytics'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import { readStoredBooleanPreference, writeStoredBooleanPreference } from '../lib/uiPreference'
 import { usePanelWidth } from '../hooks/usePanelWidth'
@@ -15,7 +15,7 @@ import {
   hasNativeMacosTrafficLights,
 } from '../utils/trafficLights'
 
-export type CommandRailDestination = 'chat' | 'research' | 'changes'
+export type CommandRailDestination = 'chat' | 'research'
 
 interface CommandRailProps {
   locale: AppLocale
@@ -27,7 +27,6 @@ interface CommandRailProps {
   onWidthChange?: (delta: number) => void
   onSelectChat: () => void
   onSelectResearch: () => void
-  onSelectChanges: () => void
   onOpenSettings: () => void
   /** Expanded rail's open middle, where Chat mounts its session list. */
   onSessionsSlotReady?: (slot: HTMLDivElement | null) => void
@@ -124,8 +123,8 @@ function RailButton({
  * Wave 5.3 icon command rail — behind `shell_command_rail`. See
  * docs/design/shell-final-direction.md §2.2. Fixed 46px, not resizable;
  * destinations reuse the exact handlers the legacy status-bar buttons
- * already call (same Graph toggle history semantics, same Research canvas,
- * same Changes filter) so behavior is identical, only the entry point moves.
+ * already call (same Research canvas) so behavior is identical, only the
+ * entry point moves. Changes lives on the notes panel, not this rail.
  */
 export function CommandRail({
   locale,
@@ -133,7 +132,6 @@ export function CommandRail({
   pinned, autoCollapsed = false, onPinnedChange, width, onWidthChange,
   onSelectChat,
   onSelectResearch,
-  onSelectChanges,
   onOpenSettings,
   onSessionsSlotReady,
 }: CommandRailProps) {
@@ -141,8 +139,11 @@ export function CommandRail({
   const [storedPinned, setPinnedExpanded] = useState(() =>
     readStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, false),
   )
+  const [compactLocked, setCompactLocked] = useState(() =>
+    readStoredBooleanPreference(APP_STORAGE_KEYS.commandRailCompactLocked, false),
+  )
   const pinRequested = pinned ?? storedPinned
-  const pinnedExpanded = pinRequested && !autoCollapsed
+  const pinnedExpanded = pinRequested && !autoCollapsed && !compactLocked
   const [hoverExpanded, setHoverExpanded] = useState(false)
   const railWidth = usePanelWidth(
     APP_STORAGE_KEYS.commandRailWidth,
@@ -157,7 +158,7 @@ export function CommandRail({
   const openFromHover = () => {
     if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current)
     hoverCloseTimer.current = null
-    if (pinnedExpanded || hoverExpanded || hoverOpenTimer.current) return
+    if (compactLocked || pinnedExpanded || hoverExpanded || hoverOpenTimer.current) return
     hoverOpenTimer.current = setTimeout(() => {
       setHoverExpanded(true)
       hoverOpenTimer.current = null
@@ -198,17 +199,41 @@ export function CommandRail({
     if (hoverOpenTimer.current) clearTimeout(hoverOpenTimer.current)
     if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current)
   }, [])
-  const togglePinnedExpanded = () => {
-    const next = !pinRequested
+  const writeExpandedPin = (next: boolean) => {
     setPinnedExpanded(next)
     onPinnedChange?.(next)
     writeStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, next)
-    if (!next) setHoverExpanded(false)
   }
+  const writeCompactLock = (next: boolean) => {
+    setCompactLocked(next)
+    writeStoredBooleanPreference(APP_STORAGE_KEYS.commandRailCompactLocked, next)
+  }
+  const togglePin = () => {
+    if (expanded && !compactLocked) {
+      const next = !pinnedExpanded
+      writeCompactLock(false)
+      writeExpandedPin(next)
+      trackCommandRailPinChanged(next ? 'expanded' : 'hover')
+      if (!next) setHoverExpanded(false)
+      return
+    }
+    const next = !compactLocked
+    writeExpandedPin(false)
+    writeCompactLock(next)
+    setHoverExpanded(false)
+    cancelPendingHoverOpen()
+    trackCommandRailPinChanged(next ? 'compact' : 'hover')
+  }
+  const pinLabel = compactLocked
+    ? 'Allow sidebar to expand'
+    : pinnedExpanded
+      ? 'Unpin sidebar'
+      : expanded
+        ? 'Pin sidebar'
+        : 'Keep as rail'
   const beginResize = (event: React.MouseEvent) => {
-    setPinnedExpanded(true)
-    onPinnedChange?.(true)
-    writeStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, true)
+    writeCompactLock(false)
+    writeExpandedPin(true)
     startResizeDrag(event, 'col-resize', (deltaX) => onWidthChange ? onWidthChange(deltaX) : railWidth.resizeBy(-deltaX))
   }
   // Read once per render rather than memoised: the platform does not change,
@@ -229,25 +254,26 @@ export function CommandRail({
       testId="command-rail-settings"
     />
   )
+  const pinLocked = compactLocked || pinnedExpanded
   const pinButton = (
-    <ActionTooltip copy={{ label: pinRequested ? 'Unpin sidebar' : 'Pin sidebar' }} side="right">
+    <ActionTooltip copy={{ label: pinLabel }} side="right">
       <Button
         type="button"
         variant="ghost"
         size="icon-sm"
-        onClick={togglePinnedExpanded}
-        aria-label={pinRequested ? 'Unpin sidebar' : 'Pin sidebar'}
-        aria-pressed={pinRequested}
+        onClick={togglePin}
+        aria-label={pinLabel}
+        aria-pressed={pinLocked}
         data-testid="command-rail-toggle"
         className="rounded-[var(--radius)] p-0 hover:bg-[var(--state-hover,var(--accent))]"
         style={{
           width: RAIL_BUTTON_SIZE,
           height: RAIL_BUTTON_SIZE,
-          color: pinnedExpanded ? 'var(--accent-blue)' : 'var(--text-muted)',
-          backgroundColor: pinnedExpanded ? 'var(--accent-blue-bg)' : undefined,
+          color: pinLocked ? 'var(--accent-blue)' : 'var(--text-muted)',
+          backgroundColor: pinLocked ? 'var(--accent-blue-bg)' : undefined,
         }}
       >
-        <PushPin size={RAIL_ICON_SIZE} weight={pinnedExpanded ? 'fill' : 'regular'} />
+        <PushPin size={RAIL_ICON_SIZE} weight={pinLocked ? 'fill' : 'regular'} />
       </Button>
     </ActionTooltip>
   )
@@ -259,7 +285,15 @@ export function CommandRail({
       data-testid="command-rail"
       data-expanded={expanded ? 'true' : 'false'}
       data-pinned={pinnedExpanded ? 'true' : 'false'}
-      onMouseEnter={openFromHover}
+      data-compact-locked={compactLocked ? 'true' : 'false'}
+      onMouseEnter={(event) => {
+        const footer = event.currentTarget.querySelector('[data-testid="command-rail-footer"]')
+        if (footer instanceof Element && event.target instanceof Node && footer.contains(event.target)) {
+          cancelPendingHoverOpen()
+          return
+        }
+        openFromHover()
+      }}
       onMouseLeave={cancelPendingHoverOpen}
       style={{
         width: expanded ? (width ?? railWidth.width) : RAIL_COLLAPSED_WIDTH,
@@ -296,14 +330,6 @@ export function CommandRail({
         onClick={() => handleSelect('research', onSelectResearch)}
         testId="command-rail-research"
       />
-      <RailButton
-        active={activeDestination === 'changes'}
-        expanded={expanded}
-        icon={GitBranch}
-        label={t('rail.changes')}
-        onClick={() => handleSelect('changes', onSelectChanges)}
-        testId="command-rail-changes"
-      />
 
       {/* Conversations sit below the places a person can go — not as a child
           of Chat and not beside the transcript. Compact mode keeps this
@@ -318,7 +344,11 @@ export function CommandRail({
         ) : null}
       </div>
 
-      <div className={expanded ? 'flex items-center gap-1' : 'flex flex-col items-center gap-1'}>
+      <div
+        className={expanded ? 'flex items-center gap-1' : 'flex flex-col items-center gap-1'}
+        data-testid="command-rail-footer"
+        onMouseEnter={cancelPendingHoverOpen}
+      >
         {expanded ? (
           <>
             {pinButton}

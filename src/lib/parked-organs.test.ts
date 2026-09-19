@@ -876,6 +876,7 @@ describe('parked organs leftover', () => {
     expect(app).toContain('const chatHomeSurface = (')
     expect(app).toContain('<ChatHome')
     expect(rail).not.toContain('command-rail-inbox')
+    expect(rail).not.toContain('command-rail-changes')
   })
 
   it('keeps #41 steer wired, hide-spawned daemon, and no Connections edge strip', () => {
@@ -1036,7 +1037,8 @@ describe('parked organs leftover', () => {
     )
     expect(rail).toContain('{pinButton}')
     expect(rail).toContain('<span className="ml-auto">{settingsButton}</span>')
-    expect(rail).toContain("aria-label={pinRequested ? 'Unpin sidebar' : 'Pin sidebar'}")
+    expect(rail).toContain('data-testid="command-rail-footer"')
+    expect(rail).toContain("aria-label={pinLabel}")
     expect(rail).toContain('data-testid="command-rail-toggle"')
     expect(rail).toContain('Conversations sit below the places a person can go')
   })

@@ -50,6 +50,7 @@ describe('leftover chrome 1616', () => {
       'utf8',
     )
     expect(lights).toContain('export function sessionsColumnTitleBarStyle')
+    expect(lights).toContain('export function overlayTitleBarBandStyle')
     expect(lights).toContain('When the sessions column is the topmost band')
     expect(sessions).toContain('sessionsColumnTitleBarStyle()')
   })
@@ -66,6 +67,8 @@ describe('leftover chrome 1616', () => {
     )
     expect(panel).toContain('data-testid="vault-panel-collapse"')
     expect(panel).toContain('data-testid="vault-panel-browse-toggle"')
+    expect(panel).toContain('data-testid="vault-panel-focus"')
+    expect(panel).toContain('Hide Chat so Notes can fill the window')
     expect(en).toContain('"sidebar.action.collapse": "Collapse sidebar"')
     expect(en).toContain('"sidebar.browse": "Browse"')
     expect(breadcrumb).toContain(

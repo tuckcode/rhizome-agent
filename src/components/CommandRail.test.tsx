@@ -6,6 +6,7 @@ import { APP_STORAGE_KEYS } from '../constants/appStorage'
 const trackRailDestinationClicked = vi.fn()
 vi.mock('../lib/productAnalytics', () => ({
   trackRailDestinationClicked: (destination: string) => trackRailDestinationClicked(destination),
+  trackCommandRailPinChanged: () => {},
 }))
 
 // ActionTooltip wraps its trigger in a Radix Tooltip; render children directly
@@ -20,7 +21,6 @@ function renderRail(overrides: Partial<React.ComponentProps<typeof CommandRail>>
     activeDestination: 'chat',
     onSelectChat: vi.fn(),
     onSelectResearch: vi.fn(),
-    onSelectChanges: vi.fn(),
     onOpenSettings: vi.fn(),
     ...overrides,
   }
@@ -38,7 +38,7 @@ describe('CommandRail', () => {
     expect(screen.getByTestId('command-rail')).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-chat')).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-research')).toBeInTheDocument()
-    expect(screen.getByTestId('command-rail-changes')).toBeInTheDocument()
+    expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
     expect(screen.getByTestId('command-rail-settings')).toBeInTheDocument()
   })
 
@@ -48,10 +48,7 @@ describe('CommandRail', () => {
     fireEvent.click(screen.getByTestId('command-rail-research'))
     expect(props.onSelectResearch).toHaveBeenCalledOnce()
     expect(trackRailDestinationClicked).toHaveBeenCalledWith('research')
-
-    fireEvent.click(screen.getByTestId('command-rail-changes'))
-    expect(props.onSelectChanges).toHaveBeenCalledOnce()
-    expect(trackRailDestinationClicked).toHaveBeenCalledWith('changes')
+    expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
   })
 
   it('marks the active destination with aria-pressed', () => {
@@ -64,6 +61,7 @@ describe('CommandRail', () => {
     renderRail({ activeDestination: 'chat' })
     expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByTestId('command-rail-inbox')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
     expect(screen.getByTestId('command-rail-research')).toHaveAttribute('aria-pressed', 'false')
   })
 
@@ -93,9 +91,10 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
     renderRail()
 
     expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'false')
-    for (const label of ['Chat', 'Research', 'Changes', 'Settings']) {
+    for (const label of ['Chat', 'Research', 'Settings']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
     }
+    expect(screen.queryByRole('button', { name: 'Changes' })).not.toBeInTheDocument()
   })
 
   it('expands to show labels and mounts Sessions below all destinations', async () => {
@@ -118,6 +117,7 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
 
     expect(screen.getByTestId('command-rail-chat')).toHaveTextContent('Chat')
     expect(screen.queryByTestId('command-rail-inbox')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-settings')).not.toHaveTextContent('Settings')
 
@@ -140,6 +140,7 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
     const rail = screen.getByTestId('command-rail')
     fireEvent.mouseEnter(rail)
     await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'true'))
+    await new Promise((resolve) => setTimeout(resolve, 30))
 
     fireEvent.mouseMove(window, { clientX: 500, clientY: 220 })
     await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'false'))
@@ -182,6 +183,36 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
     expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).toBe('1')
   })
 
+  it('lets Settings and Pin work on the collapsed rail without expanding it', async () => {
+    const props = renderRail()
+    const rail = screen.getByTestId('command-rail')
+    const footer = screen.getByTestId('command-rail-footer')
+
+    fireEvent.mouseEnter(footer)
+    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    expect(rail).toHaveAttribute('data-expanded', 'false')
+    fireEvent.click(screen.getByTestId('command-rail-settings'))
+    expect(props.onOpenSettings).toHaveBeenCalledOnce()
+    expect(rail).toHaveAttribute('data-expanded', 'false')
+  })
+
+  it('can pin the collapsed rail so hover no longer expands it', async () => {
+    renderRail()
+    const rail = screen.getByTestId('command-rail')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Keep as rail' }))
+    expect(rail).toHaveAttribute('data-compact-locked', 'true')
+    expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailCompactLocked)).toBe('1')
+
+    fireEvent.mouseEnter(rail)
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(rail).toHaveAttribute('data-expanded', 'false')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Allow sidebar to expand' }))
+    expect(rail).toHaveAttribute('data-compact-locked', 'false')
+  })
+
   it('widens from its right edge and remembers the chosen width', async () => {
     renderRail()
 
@@ -205,6 +236,6 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
     renderRail()
 
     expect(screen.queryByText('Research')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Pin sidebar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Keep as rail' })).toBeInTheDocument()
   })
 })

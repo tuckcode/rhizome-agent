@@ -20,7 +20,7 @@ type AiAgentResponseText = string
 type AiAgentToolCount = number
 type AiAgentResponseTextFlag = 'had_text' | 'had_partial_response'
 type SheetFormulaFunctionName = string
-type RailDestination = 'chat' | 'inbox' | 'graph' | 'mycelium' | 'research' | 'changes'
+type RailDestination = 'chat' | 'research'
 type StatusBarPill = 'vault' | 'agents'
 
 const ALL_NOTES_VISIBILITY_CATEGORIES: ReadonlyArray<keyof AllNotesFileVisibility> = [
@@ -204,6 +204,11 @@ export function trackNoteLockToggled(locked: boolean): void {
   trackEvent('note_lock_toggled', { locked: numericFlag(locked) })
 }
 
+/** Notes-header Hide Chat / fill-window toggle. Session-only; not a pane preset. */
+export function trackNotesFocusToggled(focused: boolean): void {
+  trackEvent('notes_focus_toggled', { focused: numericFlag(focused) })
+}
+
 export function trackChatNoteSplitChanged(split: 'stacked' | 'side-by-side'): void {
   trackEvent('chat_note_split_changed', { split })
 }
@@ -361,6 +366,10 @@ export function trackRailDestinationClicked(destination: RailDestination): void 
   trackEvent('rail_destination_clicked', { destination })
 }
 
+export function trackCommandRailPinChanged(mode: 'hover' | 'expanded' | 'compact'): void {
+  trackEvent('command_rail_pin_changed', { mode })
+}
+
 export function trackStatusBarPillOpened(pill: StatusBarPill): void {
   trackEvent('statusbar_pill_opened', { pill })
 }
@@ -423,6 +432,16 @@ export function trackPrimeSessionListFiltered(matchCount: number): void {
   trackEvent('prime_session_list_filtered', {
     match_count: sessionCountBucket(matchCount),
   })
+}
+
+/** Someone picked a session-list scope (vault / running / today). Key only. */
+export function trackPrimeSessionListScoped(scope: string): void {
+  trackEvent('prime_session_list_scoped', { scope })
+}
+
+/** Someone changed session-list sort order. Key only. */
+export function trackPrimeSessionListSorted(order: string): void {
+  trackEvent('prime_session_list_sorted', { order })
 }
 
 /**

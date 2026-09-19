@@ -62,8 +62,8 @@ convention — confirmed in `~/code/projects/rhizome/docs/REPO_COMPILER.md:30-34
 and `grok_import.py`/`repo_wiki.py`, not incidental.
 
 **Effect: the Library tab currently shows zero "Repo Wiki" entries**, despite
-the real vault having 5 fully-generated repo wikis (`rhizome`,
-`notasithlord-peerd`, `asyncfuncai-deepwiki-open`, `StevenBlack-hosts`,
+the real vault having fully-generated repo wikis (`rhizome`,
+`notasithlord-peerd`, `StevenBlack-hosts`,
 `AsyncFuncAI-grok-wiki` — the last one alone has 27 pages).
 
 Fix shape (not applied): `scan_dir_items` for the `sources/repos` category

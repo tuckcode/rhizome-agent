@@ -468,10 +468,11 @@
     box-sizing: border-box;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
     margin: 0;
     padding: 0;
     overflow: hidden;
+    background: var(--surface-sidebar);
   }
   body.custom-window-chrome {
     padding-top: 32px;

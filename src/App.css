@@ -5,6 +5,7 @@
   height: 100%;
   width: 100%;
   overflow: hidden;
+  background: var(--surface-sidebar);
   box-shadow: inset 0 0 0 1px var(--border-primary);
 }
 
@@ -14,6 +15,16 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  background: var(--surface-sidebar);
+}
+
+/* Overlay traffic lights sit on this band — same paint as the command rail,
+   so Chat/Notes/Workbench do not flash a second color under the buttons. */
+.app-titlebar-band {
+  box-sizing: border-box;
+  background: var(--surface-sidebar);
+  border-bottom: 1px solid var(--sidebar-border);
+  min-height: max(30px, var(--overlay-titlebar-height, 0px));
 }
 
 .app__sidebar {
@@ -82,7 +93,7 @@
 }
 
 .vault-panel__header {
-  height: 44px;
+  min-height: max(44px, var(--overlay-titlebar-height, 44px));
   padding: 0 8px 0 10px;
   flex: 0 0 auto;
   display: flex;
@@ -112,11 +123,22 @@
   font-size: 11px;
 }
 
-.vault-panel__collapse {
+.vault-panel__collapse,
+.vault-panel__focus {
   flex: 0 0 auto;
   width: 32px;
   height: 32px;
   padding: 0;
+}
+
+.app__vault-panel--focus {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+}
+
+.app__vault-panel--focus .vault-panel__note-list {
+  flex: 1 1 auto;
 }
 
 .app__notes-rail {
@@ -191,6 +213,7 @@
   flex-direction: column;
   container-type: inline-size;
   container-name: editor;
+  background: var(--surface-app);
 }
 
 .app__editor > * {
@@ -199,6 +222,10 @@
 
 .app:has([data-testid='chat-center']) .app__editor {
   min-width: 0;
+}
+
+.app__editor--notes-focus {
+  display: none;
 }
 
 .app__chat-center {

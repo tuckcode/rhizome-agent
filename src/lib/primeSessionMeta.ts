@@ -121,7 +121,8 @@ export function primeSessionPlace(
  * where it ran appended when that is somewhere other than the open vault —
  * `Today · 14:08 · rhizome-agent`. Time leads because it is the sort key, so
  * the leftmost thing on every row lines up; the place truncates first when the
- * column runs out, which is the right thing to lose.
+ * column runs out, which is the right thing to lose. The git branch follows
+ * when the session has one, so a glance names the worktree without opening it.
  *
  * A session mid-turn reads `Working · tools` and nothing else — what it is
  * doing now matters more than when or where, and it is the session already on
@@ -135,10 +136,14 @@ export function primeSessionMetaLabel(
   if (options.working) return 'Working · tools'
 
   const place = primeSessionPlace(session, options.vaultPath)
+  const branch = session.gitBranch?.trim() || null
   const timestamp = session.mtimeMs
   // No timestamp used to mean no meta line at all. Where it ran is still worth
   // saying: a row with a place beats a row with nothing under its title.
-  if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) return place
+  if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) {
+    if (place && branch) return `${place} · ${branch}`
+    return place ?? branch
+  }
 
   const when = (() => {
     switch (primeSessionAge(session, now)) {
@@ -155,7 +160,7 @@ export function primeSessionMetaLabel(
     }
   })()
 
-  return place ? `${when} · ${place}` : when
+  return [when, place, branch].filter(Boolean).join(' · ')
 }
 
 /**
@@ -225,9 +230,28 @@ export function primeSessionStatus(
   return workingHere ? 'working' : 'running'
 }
 
-/** Newest first. Sessions with no timestamp sink to the bottom. */
-export function sortPrimeSessions(sessions: PrimeSessionSummary[]): PrimeSessionSummary[] {
-  return [...sessions].sort((a, b) => (b.mtimeMs ?? -Infinity) - (a.mtimeMs ?? -Infinity))
+/** Newest first by default. Sessions with no timestamp sink to the bottom. */
+export type PrimeSessionSortKey = 'newest' | 'oldest' | 'title-asc' | 'title-desc'
+
+export function sortPrimeSessions(
+  sessions: PrimeSessionSummary[],
+  key: PrimeSessionSortKey = 'newest',
+): PrimeSessionSummary[] {
+  const copy = [...sessions]
+  const titleOf = (session: PrimeSessionSummary) => session.title?.trim().toLowerCase() ?? ''
+  const newestDelta = (a: PrimeSessionSummary, b: PrimeSessionSummary) =>
+    (b.mtimeMs ?? -Infinity) - (a.mtimeMs ?? -Infinity)
+
+  switch (key) {
+    case 'oldest':
+      return copy.sort((a, b) => (a.mtimeMs ?? Infinity) - (b.mtimeMs ?? Infinity))
+    case 'title-asc':
+      return copy.sort((a, b) => titleOf(a).localeCompare(titleOf(b)) || newestDelta(a, b))
+    case 'title-desc':
+      return copy.sort((a, b) => titleOf(b).localeCompare(titleOf(a)) || newestDelta(a, b))
+    default:
+      return copy.sort(newestDelta)
+  }
 }
 
 /**
@@ -261,4 +285,43 @@ export function primeSessionMatchesQuery(
 
   const fields = [displayTitle, session.title, session.cwd, session.gitBranch]
   return fields.some((field) => field?.toLowerCase().includes(needle))
+}
+
+/** Scope chips on the session list, beside the existing text search. */
+export type PrimeSessionFilterKey = 'all' | 'vault' | 'running' | 'today'
+
+function samePath(left: string, right: string): boolean {
+  const strip = (path: string) => path.replace(/\/+$/, '') || '/'
+  return strip(left) === strip(right)
+}
+
+/**
+ * Whether a session belongs in a scope filter (vault / running / today).
+ *
+ * Text search stays in `primeSessionMatchesQuery`. This is the other axis:
+ * place, live roster, or calendar day. Missing cwd cannot match the vault.
+ */
+export function primeSessionMatchesFilter(
+  session: PrimeSessionSummary,
+  key: PrimeSessionFilterKey,
+  options: {
+    now: number
+    vaultPath?: string | null
+    running?: ReadonlyMap<string, boolean>
+  },
+): boolean {
+  switch (key) {
+    case 'all':
+      return true
+    case 'vault': {
+      const cwd = session.cwd?.trim()
+      const vault = options.vaultPath?.trim()
+      if (!cwd || !vault) return false
+      return samePath(cwd, vault)
+    }
+    case 'running':
+      return primeSessionStatus(session, options.running ?? new Map()) !== 'saved'
+    case 'today':
+      return primeSessionAge(session, options.now) === 'today'
+  }
 }

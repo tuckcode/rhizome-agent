@@ -34,4 +34,9 @@ describe('PrimeSessionSubhead window dragging', () => {
 
     expect(dragRegionMouseDown).toHaveBeenCalled()
   })
+
+  it('paints the Chat status strip as the overlay title band', () => {
+    renderSubhead()
+    expect(screen.getByTestId('prime-session-subhead')).toHaveClass('app-titlebar-band')
+  })
 })

@@ -8,19 +8,37 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from 'react'
-import { Archive, ArrowCounterClockwise, CaretRight, PencilSimple, Plus } from '@phosphor-icons/react'
+import {
+  Archive,
+  ArrowCounterClockwise,
+  ArrowsDownUp,
+  CaretRight,
+  FunnelSimple,
+  PencilSimple,
+  Plus,
+} from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import {
   primeSessionAge,
+  primeSessionMatchesFilter,
   primeSessionMatchesQuery,
   primeSessionMetaLabel,
   primeSessionRowTitles,
   primeSessionStatus,
   sortPrimeSessions,
+  type PrimeSessionFilterKey,
+  type PrimeSessionSortKey,
   type PrimeSessionStatus,
   type PrimeSessionSummary,
 } from '../lib/primeSessionMeta'
@@ -28,6 +46,8 @@ import {
   trackPrimeSessionArchived,
   trackPrimeSessionListFiltered,
   trackPrimeSessionListOpened,
+  trackPrimeSessionListScoped,
+  trackPrimeSessionListSorted,
   trackPrimeSessionOpened,
   trackPrimeSessionRenamed,
 } from '../lib/productAnalytics'
@@ -154,6 +174,69 @@ function SessionRowAction({
   )
 }
 
+const SESSION_FILTER_OPTIONS: { value: PrimeSessionFilterKey; label: string }[] = [
+  { value: 'all', label: 'All sessions' },
+  { value: 'vault', label: 'This vault' },
+  { value: 'running', label: 'Running' },
+  { value: 'today', label: 'Today' },
+]
+
+const SESSION_SORT_OPTIONS: { value: PrimeSessionSortKey; label: string }[] = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
+  { value: 'title-asc', label: 'Title A to Z' },
+  { value: 'title-desc', label: 'Title Z to A' },
+]
+
+function SessionListRadioMenu<T extends string>({
+  label,
+  icon,
+  value,
+  options,
+  testId,
+  onChange,
+}: {
+  label: string
+  icon: ReactNode
+  value: T
+  options: readonly { value: T; label: string }[]
+  testId: string
+  onChange: (value: T) => void
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="h-7 w-7 p-0"
+          aria-label={label}
+          title={label}
+          data-testid={testId}
+        >
+          {icon}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[9rem]">
+        <DropdownMenuRadioGroup
+          value={value}
+          onValueChange={(next) => {
+            const match = options.find((option) => option.value === next)
+            if (match) onChange(match.value)
+          }}
+        >
+          {options.map((option) => (
+            <DropdownMenuRadioItem key={option.value} value={option.value}>
+              {option.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 function SessionNameInput({
   initialValue,
   onCommit,
@@ -175,8 +258,8 @@ function SessionNameInput({
   }
 
   return (
-    <div className="grid w-full grid-cols-[6px_1fr] items-start gap-2 rounded-sm px-2 py-[9px] pr-2">
-      <span aria-hidden="true" className="mt-[5px] size-1.5 rounded-full border border-muted-foreground/50 bg-transparent" />
+    <div className="grid w-full grid-cols-[6px_1fr] items-start gap-1.5 rounded-sm px-1.5 py-1 pr-2">
+      <span aria-hidden="true" className="mt-[3px] size-1.5 rounded-full border border-muted-foreground/50 bg-transparent" />
       <Input
         autoFocus
         value={value}
@@ -224,14 +307,14 @@ function SessionRowButton({
       aria-label={label}
       aria-current={active ? 'true' : undefined}
       className={cn(
-        'grid w-full grid-cols-[6px_1fr] items-start gap-2 rounded-sm',
-        'px-2 py-[9px] pr-14 text-left',
+        'grid w-full grid-cols-[6px_1fr] items-start gap-1.5 rounded-sm',
+        'px-1.5 py-1 pr-12 text-left',
       )}
     >
       <span
         aria-hidden="true"
         className={cn(
-          'mt-[5px] size-1.5 rounded-full border',
+          'mt-[3px] size-1.5 rounded-full border',
           // Three states, not two. Filled with a ring: turning right now.
           // Filled, no ring: the daemon still holds it, sitting idle — a
           // session outlives the window (ADR-0163), so that is a real and
@@ -243,9 +326,9 @@ function SessionRowButton({
         )}
       />
       <span className="min-w-0">
-        <span className="block truncate text-[12px] leading-[1.35] text-foreground">{title}</span>
+        <span className="block truncate text-[11px] leading-tight text-foreground">{title}</span>
         {meta ? (
-          <span className="mt-[3px] block truncate font-mono text-[10px] tracking-[0.02em] text-muted-foreground">
+          <span className="mt-px block truncate font-mono text-[10px] tracking-[0.02em] text-muted-foreground">
             {meta}
           </span>
         ) : null}
@@ -382,6 +465,8 @@ export default function PrimeSessionList({
   const [error, setError] = useState<{ kind: 'list' | 'action'; message: string } | null>(null)
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [filterKey, setFilterKey] = useState<PrimeSessionFilterKey>('all')
+  const [sortKey, setSortKey] = useState<PrimeSessionSortKey>('newest')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [ctxMenu, setCtxMenu] = useState<PrimeSessionContextMenuState | null>(null)
   const ctxMenuRef = useRef<HTMLDivElement>(null)
@@ -465,7 +550,10 @@ export default function PrimeSessionList({
     }
   }, [])
 
-  const ordered = useMemo(() => sortPrimeSessions(sessions ?? []), [sessions])
+  const ordered = useMemo(
+    () => sortPrimeSessions(sessions ?? [], sortKey),
+    [sessions, sortKey],
+  )
   const at = now ?? loadedAt
   const untitled = t('ai.sessions.untitled')
   // Computed across the whole list rather than per row: whether a title needs
@@ -516,13 +604,20 @@ export default function PrimeSessionList({
   const live = ordered.filter((session) => !session.archived && !session.scratch)
   const archived = ordered.filter((session) => session.archived || session.scratch)
   const searching = query.trim().length > 0
-  const visibleLive = live.filter((session) =>
-    primeSessionMatchesQuery(session, query, titleFor.get(session.id)),
+  const inScope = (session: PrimeSessionSummary) =>
+    primeSessionMatchesFilter(session, filterKey, { now: at, vaultPath, running })
+  const visibleLive = live.filter(
+    (session) =>
+      inScope(session) && primeSessionMatchesQuery(session, query, titleFor.get(session.id)),
   )
-  const visibleArchived = archived.filter((session) =>
-    primeSessionMatchesQuery(session, query, titleFor.get(session.id)),
+  const visibleArchived = archived.filter(
+    (session) =>
+      inScope(session) && primeSessionMatchesQuery(session, query, titleFor.get(session.id)),
   )
-  const noMatches = searching && visibleLive.length === 0 && visibleArchived.length === 0
+  const noMatches =
+    (searching || filterKey !== 'all') &&
+    visibleLive.length === 0 &&
+    visibleArchived.length === 0
   const showArchived = archiveOpen || (searching && visibleArchived.length > 0)
 
   useEffect(() => {
@@ -636,19 +731,47 @@ export default function PrimeSessionList({
         <span className="font-mono-overline uppercase text-muted-foreground">
           {t('ai.sessions.title')}
         </span>
-        {onNewChat ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            className="h-7 w-7 p-0"
-            onClick={onNewChat}
-            aria-label={t('ai.sessions.newChat')}
-            title={t('ai.sessions.newChat')}
-          >
-            <Plus size={14} />
-          </Button>
-        ) : null}
+        <div className="flex items-center gap-0.5">
+          {sessions !== null && ordered.length > 0 ? (
+            <>
+              <SessionListRadioMenu
+                label="Filter"
+                icon={<FunnelSimple size={14} />}
+                value={filterKey}
+                options={SESSION_FILTER_OPTIONS}
+                testId="prime-session-filter"
+                onChange={(next) => {
+                  setFilterKey(next)
+                  trackPrimeSessionListScoped(next)
+                }}
+              />
+              <SessionListRadioMenu
+                label="Sort"
+                icon={<ArrowsDownUp size={14} />}
+                value={sortKey}
+                options={SESSION_SORT_OPTIONS}
+                testId="prime-session-sort"
+                onChange={(next) => {
+                  setSortKey(next)
+                  trackPrimeSessionListSorted(next)
+                }}
+              />
+            </>
+          ) : null}
+          {onNewChat ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="h-7 w-7 p-0"
+              onClick={onNewChat}
+              aria-label={t('ai.sessions.newChat')}
+              title={t('ai.sessions.newChat')}
+            >
+              <Plus size={14} />
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {error ? (
@@ -660,7 +783,7 @@ export default function PrimeSessionList({
       ) : null}
 
       {sessions !== null && ordered.length > 0 ? (
-        <div className="px-2 pb-1.5 pt-1.5">
+        <div className="px-1.5 py-1">
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -690,7 +813,7 @@ export default function PrimeSessionList({
       ) : null}
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="flex flex-col gap-0.5 p-1.5">
+        <div className="flex flex-col gap-0 p-1">
           {visibleLive.map((session) => {
             const title = titleFor.get(session.id) ?? untitled
             const active = Boolean(activeSessionPath) && session.path === activeSessionPath

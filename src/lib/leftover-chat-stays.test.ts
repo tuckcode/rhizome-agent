@@ -17,8 +17,13 @@ describe('leftover chat stays', () => {
     expect(rail).not.toContain('active={notesOpen}')
   })
 
-  it('does not hide Chat when Notes is open', () => {
-    expect(app).toContain('{chatHomeSurface}')
+  it('does not put Changes on the command rail', () => {
+    expect(rail).not.toContain('command-rail-changes')
+    expect(rail).not.toContain('onSelectChanges')
+  })
+
+  it('does not hide Chat just because Notes is open', () => {
+    expect(app).toContain('hideChatForNotesFocus ? null : chatHomeSurface')
     expect(app).not.toMatch(/notesOpen \? null[\s\S]{0,80}chatHomeSurface/)
   })
 })
