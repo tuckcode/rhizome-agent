@@ -16,7 +16,10 @@ async function expectMinimumTarget(locator: Locator, size = 32): Promise<void> {
 }
 
 async function openAlphaProject(page: Page): Promise<void> {
-  await page.getByTestId('vault-panel-restore').click()
+  const restore = page.getByTestId('vault-panel-restore')
+  if (await restore.isVisible().catch(() => false)) {
+    await restore.click()
+  }
   const noteList = page.getByTestId('note-list-container')
   await noteList.getByText('Alpha Project', { exact: true }).click()
   await expect(page.locator('.app__note-editor:not(.app__note-editor--idle)')).toBeVisible()
@@ -43,8 +46,7 @@ test.describe('Unified shell geometry', () => {
     await expect(page.getByTestId('vault-panel-navigation')).toHaveCount(0)
 
     await openFixtureVault(page, tempVaultDir)
-
-    await page.getByTestId('vault-panel-restore').click()
+    // openFixtureVault already opens Notes so the list is ready.
     const vaultPanel = page.getByTestId('vault-panel')
     const browse = page.getByTestId('vault-panel-browse-toggle')
     const collapse = page.getByTestId('vault-panel-collapse')
