@@ -542,9 +542,9 @@ async function waitForFixtureVaultReady({
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => Boolean(window.__mockHandlers?.list_vault))
 
-  // C72: fresh launch defaults to editor-list (Notes open, Browse collapsed).
-  // Rail Inbox is a toggle — clicking it while Notes is already open closes the
-  // panel. Wait for the default panel first; only click Inbox if it never appears.
+  // Fresh launch is Chat (ADR-0173). Tests that need the list open it from
+  // Show Notes. Wait for Chat chrome first; only click restore if Notes never
+  // appears (stored editor-list still wins when one exists).
   const vaultPanel = page.getByTestId('vault-panel')
   try {
     await vaultPanel.waitFor({ state: 'visible', timeout: 5_000 })
