@@ -47,16 +47,14 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Grok 4.6 · 2026-09-19 · CPR (pane presets, hybrid skill, Notes off rail).
+**Origin:** Cursor Grok 4.6 · 2026-09-19 11:27 · CPR.
 
-Notes is a right panel opened from **Show Notes** (or View / Cmd+2), not a
-left-rail button. ADR-0173 names Chat / Notes / Read / Workbench; fresh
-launch is Chat. The seeded rhizome-vault skill uses a resolved Node binary
-and a GUI-safe PATH. Packaged `/Applications` still **`35f217f`** until
-this CPR rebuild finishes.
-
-Local source is ahead of origin and the packaged app. Traffic lights stay
-at the left corner (`x: 14`). Import waits for **`1`**. Do not merge #66.
+Local and origin **`6860762`**. Packaged app **`6860762`** installed
+2026-09-19 11:27 (`/Applications/Rhizome Agent.app`; old app deleted first).
+Notes is a right panel from **Show Notes** (or View / Cmd+2), not a left-rail
+button. ADR-0173: Chat / Notes / Read / Workbench; fresh launch is Chat.
+Vault skill uses a resolved Node binary and a GUI-safe PATH. Traffic lights
+stay at the left corner (`x: 14`). Import waits for **`1`**. Do not merge #66.
 Native W4 / #46 still open. Not yet daily-driver ready.
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
@@ -101,7 +99,7 @@ Priority: push `4416411`/`e64a283`, C64 ×3, W4 native evidence. Inventory:
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
-- [2026-09-19 · Notes off the rail](plans/handoffs/2026-09-19-1041-cursor-grok-4-6-notes-off-rail.md) — Notebook button gone. Show Notes strip stays. No commit or rebuild.
+- [2026-09-19 · CPR](plans/handoffs/2026-09-19-1127-cursor-grok-4-6-cpr.md) — pane presets, hybrid skill PATH, Notes off rail. `6860762` in `/Applications` 11:27.
 - [2026-09-19 · hybrid runtime](plans/handoffs/2026-09-19-0431-cursor-grok-4-6-hybrid-runtime.md) — Prime stays; skill PATH/node + short-reply manners. Live SKILL.md locked 444. No commit or rebuild.
 - [2026-09-19 · pane presets finish](plans/handoffs/2026-09-19-0148-cursor-grok-4-6-pane-presets-finish.md) — leftover locks, ADR-0173, docs. Source only. No commit or rebuild.
 - [2026-09-19 · pane presets](plans/handoffs/2026-09-19-0130-codex-pane-presets-cursor-finish.md) — Codex source slice. Cursor finish followed.
@@ -285,7 +283,7 @@ push is not a release — releases are tagged builds with signed installers.
   panel**, opened from **Show Notes** (and View / Cmd+2). It is **not** on
   the left command rail. Inbox stays a folder inside that panel. **ADR-0173**
   names Chat / Notes / Read / Workbench and defaults a fresh launch to Chat.
-  Packaged `/Applications` is unchanged until rebuild.
+  In `/Applications` as **`6860762`** (2026-09-19 11:27).
 
 - **#50 (2026-08-29): let the agent see the running app — plan ready, not built.**
   Three answers proposed: show `pnpm dev` (not native), read + steer through
