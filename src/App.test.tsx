@@ -296,18 +296,26 @@ function getHeaderForNoteList(noteListContainer: HTMLElement) {
   return within(noteListContainer.parentElement as HTMLElement).getByRole('heading', { level: 3 })
 }
 
-async function selectInboxInVaultPanel() {
+async function selectFilterInVaultPanel(label: 'Inbox' | 'Changes') {
   if (!screen.queryByTestId('vault-panel')) {
     fireEvent.click(await screen.findByTestId('vault-panel-restore'))
   }
   if (!screen.queryByTestId('vault-panel-navigation')) {
     fireEvent.click(await screen.findByTestId('vault-panel-browse-toggle'))
   }
-  const trigger = within(await screen.findByTestId('sidebar-top-nav')).getByText('Inbox', { exact: true })
+  const trigger = within(await screen.findByTestId('sidebar-top-nav')).getByText(label, { exact: true })
   await act(async () => {
     fireEvent.click(trigger)
     await Promise.resolve()
   })
+}
+
+async function selectInboxInVaultPanel() {
+  await selectFilterInVaultPanel('Inbox')
+}
+
+async function selectChangesInVaultPanel() {
+  await selectFilterInVaultPanel('Changes')
 }
 
 async function clickNoteListItem(noteListContainer: HTMLElement, title: string, options?: MouseEventInit) {
@@ -690,7 +698,7 @@ describe('App', () => {
     const input = await screen.findByTestId('agent-input')
     input.textContent = 'Keep this unsent draft'
     fireEvent.input(input)
-    fireEvent.click(await screen.findByTestId('command-rail-changes'))
+    await selectChangesInVaultPanel()
     fireEvent.click(await screen.findByRole('button', { name: 'Expand connections' }))
     await screen.findByTestId('graph-view')
     fireEvent.click(screen.getByRole('button', { name: 'Return to side panel' }))
@@ -701,7 +709,7 @@ describe('App', () => {
     localStorage.setItem('rhizome:command-rail-expanded', '1')
     render(<App />)
     await screen.findByTestId('chat-home')
-    fireEvent.click(await screen.findByTestId('command-rail-changes'))
+    await selectChangesInVaultPanel()
     fireEvent.click(await screen.findByRole('button', { name: 'Expand connections' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Open note' }))
     await waitFor(() => expect(screen.getByTestId('connections-panel')).toHaveAttribute('data-expanded', 'false'))
@@ -741,7 +749,7 @@ describe('App', () => {
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
     expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
     expect(screen.queryByTestId('graph-view')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByTestId('command-rail-changes'))
+    await selectChangesInVaultPanel()
     expect(await screen.findByTestId('connections-panel')).toBeInTheDocument()
     expect(await screen.findByTestId('graph-view')).toBeInTheDocument()
   })
@@ -750,7 +758,7 @@ describe('App', () => {
     render(<App />)
     const notes = await screen.findByTestId('vault-panel')
     expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
-    fireEvent.click(await screen.findByTestId('command-rail-changes'))
+    await selectChangesInVaultPanel()
     const graph = await screen.findByTestId('connections-panel')
     expect(screen.queryByTestId('connections-edge')).not.toBeInTheDocument()
     expect(notes.compareDocumentPosition(graph) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -825,6 +833,7 @@ describe('App', () => {
 
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByTestId('command-rail-inbox')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     expect(screen.getByTestId('vault-panel-restore')).toBeVisible()
   })
@@ -851,6 +860,22 @@ describe('App', () => {
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId('vault-panel-restore'))
     expect(screen.getByTestId('vault-panel')).toBeInTheDocument()
+  })
+
+  it('hides Chat when Notes fills the window, then brings Chat back', async () => {
+    render(<App />)
+    expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('chat-home')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('vault-panel-focus'))
+    expect(screen.getByTestId('vault-panel-focus')).toHaveAccessibleName('Show Chat')
+    expect(screen.getByTestId('vault-panel-focus')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByTestId('chat-home')).not.toBeInTheDocument()
+    expect(screen.getByTestId('vault-panel')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('vault-panel-focus'))
+    expect(screen.getByTestId('vault-panel-focus')).toHaveAccessibleName('Hide Chat')
+    expect(await screen.findByTestId('chat-home')).toBeInTheDocument()
   })
 
   it('opens a note window after loading the active vault graph', async () => {

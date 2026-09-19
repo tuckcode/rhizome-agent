@@ -27,7 +27,7 @@ test('a large graph key stays compact and never overlaps the type filters', asyn
     })
   })
   await page.getByTestId('agent-input').fill('Keep my graph audit draft')
-  await page.getByTestId('command-rail-changes').click()
+  await page.getByTestId('sidebar-top-nav').getByRole('button', { name: 'Changes', exact: true }).click()
   await expect(page.getByTestId('graph-view')).toBeVisible()
   await page.getByRole('button', { name: 'Expand connections' }).click()
   const toggle = page.getByTestId('graph-legend-toggle')

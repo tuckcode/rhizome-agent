@@ -292,9 +292,9 @@ describe('Sidebar', () => {
     expect(screen.queryByTitle('New Project')).not.toBeInTheDocument()
   })
 
-  it('does not render Changes or Pulse in sidebar', () => {
+  it('does not render Pulse or Commit in sidebar', () => {
     render(<Sidebar entries={[]} selection={defaultSelection} onSelect={() => {}} />)
-    expect(screen.queryByText('Changes')).not.toBeInTheDocument()
+    expect(screen.getByText('Changes')).toBeInTheDocument()
     expect(screen.queryByText('Pulse')).not.toBeInTheDocument()
     expect(screen.queryByText('Commit & Push')).not.toBeInTheDocument()
   })
@@ -1003,6 +1003,8 @@ describe('Sidebar', () => {
     const items = topNav.children
     expect(items[0].textContent).toContain('Inbox')
     expect(items[1].textContent).toContain('All Notes')
+    expect(items[2].textContent).toContain('Changes')
+    expect(items[3].textContent).toContain('Archive')
   })
 
   it('displays inbox count badge', () => {
@@ -1017,11 +1019,19 @@ describe('Sidebar', () => {
     expect(onSelect).toHaveBeenCalledWith({ kind: 'filter', filter: 'inbox' })
   })
 
+  it('calls onSelect with changes filter when clicking Changes', () => {
+    const onSelect = vi.fn()
+    render(<Sidebar entries={[]} selection={defaultSelection} onSelect={onSelect} />)
+    fireEvent.click(screen.getByText('Changes'))
+    expect(onSelect).toHaveBeenCalledWith({ kind: 'filter', filter: 'changes' })
+  })
+
   it('hides Inbox when explicit organization is disabled', () => {
     render(<Sidebar entries={[]} selection={defaultSelection} onSelect={() => {}} showInbox={false} inboxCount={3} />)
     expect(screen.queryByText('Inbox')).not.toBeInTheDocument()
     const topNav = screen.getByTestId('sidebar-top-nav')
     expect(topNav.children[0].textContent).toContain('All Notes')
+    expect(topNav.children[1].textContent).toContain('Changes')
   })
 
   it('excludes attachments-folder markdown from top-nav note totals', () => {
@@ -1103,7 +1113,8 @@ describe('Sidebar', () => {
 
     const topNav = screen.getByTestId('sidebar-top-nav')
     expect(topNav.children[1].textContent).toContain('All Notes1')
-    expect(topNav.children[2].textContent).toContain('Archive1')
+    expect(topNav.children[2].textContent).toContain('Changes')
+    expect(topNav.children[3].textContent).toContain('Archive1')
   })
 
   it('does not show inline entries — no child items in type sections', () => {

@@ -2,7 +2,10 @@ import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-vi.mock('../lib/productAnalytics', () => ({ trackRailDestinationClicked: vi.fn() }))
+vi.mock('../lib/productAnalytics', () => ({
+  trackRailDestinationClicked: vi.fn(),
+  trackCommandRailPinChanged: vi.fn(),
+}))
 vi.mock('../mock-tauri', () => ({ isTauri: () => true }))
 const platform = vi.hoisted(() => ({ mac: true }))
 vi.mock('../utils/platform', () => ({ isMac: () => platform.mac }))
@@ -25,7 +28,6 @@ function renderRail() {
       activeDestination="chat"
       onSelectChat={vi.fn()}
       onSelectResearch={vi.fn()}
-      onSelectChanges={vi.fn()}
       onOpenSettings={vi.fn()}
     />
   )

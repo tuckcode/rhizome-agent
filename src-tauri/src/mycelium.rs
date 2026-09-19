@@ -222,9 +222,10 @@ pub fn start_mindwalk_sidecar(
     };
     *slot = Some(child);
     // Hand the view the skinned URL, not the sidecar's. The proxy passes every
-    // byte through untouched except the HTML document, so engine upgrades keep
-    // arriving for free — see `mycelium_skin`. A proxy that fails to bind is
-    // cosmetic, not fatal: fall back to the raw engine rather than a dead view.
+    // byte through untouched except the HTML document and Evaluate JSON, so
+    // engine upgrades keep arriving for free — see `mycelium_skin`. A proxy
+    // that fails to bind is cosmetic, not fatal: fall back to the raw engine
+    // rather than a dead view.
     let url = match crate::mycelium_skin::start_skin_proxy(&url, theme.unwrap_or("dark")) {
         Ok(skinned) => skinned,
         Err(error) => {

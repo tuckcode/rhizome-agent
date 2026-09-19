@@ -19,10 +19,9 @@ UNASSIGNED   126
 PROJECTS      12      across 4 projects
 ```
 
-Three of those four projects (`asyncfuncai-deepwiki-open`,
-`notasithlord-peerd`, `rhizome`) are named after clones in
-`.rhizome/repo-cache/`. **Projects only get created as a side effect of repo
-research.** Nothing else ever creates one.
+Two of those four projects (`notasithlord-peerd`, `rhizome`) are named after
+clones in `.rhizome/repo-cache/`. **Projects only get created as a side effect
+of repo research.** Nothing else ever creates one.
 
 ## What is actually missing
 

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { callHost } from '../lib/callHost'
+import { compactSessionFacts, readableSessionLabel } from '../lib/myceliumCompactSummary'
 import type { PrimeTranscriptItem, PrimeTranscriptTool } from '../lib/primeTranscriptToConversation'
 import type { AppLocale } from '../lib/i18n'
 import { trackEvent } from '../lib/telemetry'
@@ -77,16 +78,29 @@ export function SessionActivityHistory({ expanded, locale, vaultPath, canOpenNot
   }
   const touchedPaths = [...new Set(actions.map(a => a.tool.path).filter((p): p is string => Boolean(p)))]
   const selectedPath = selected === null ? undefined : actions[selected]?.tool.path
+  const currentName = sessions.find(session => session.path === path)?.name ?? path
+  const facts = compactSessionFacts(actions.map(action => action.tool.path))
+  const toolLabel = facts.toolCount === 1 ? '1 tool' : `${facts.toolCount} tools`
+  const fileLabel = facts.fileCount === 1 ? '1 file' : `${facts.fileCount} files`
+  const filePreview = facts.fileNames.slice(0, 4).join(', ')
+  const extraFiles = facts.fileNames.length > 4 ? ` +${facts.fileNames.length - 4}` : ''
   return <div className={`flex min-h-0 min-w-0 flex-1 ${expanded ? 'flex-row' : 'flex-col'}`}>
     <div className={`flex min-h-0 flex-col ${expanded ? 'w-80 shrink-0 border-r border-border' : 'flex-1'}`}>
       <div className="flex shrink-0 gap-1 p-2">
         <select aria-label="Activity session" className="min-w-0 flex-1 rounded border border-border bg-background p-1 text-xs" value={path} onChange={e => { setPath(e.target.value); setItems([]); setSelected(null); setError(''); setLoading(true) }}>
           {!sessions.length && <option value="">No saved sessions</option>}
-          {sessions.map(s => <option key={s.path} value={s.path}>{s.name}</option>)}
+          {sessions.map(s => <option key={s.path} value={s.path}>{readableSessionLabel(s.name, s.name)}</option>)}
         </select>
         <button type="button" className="px-1 text-xs" onClick={() => { setError(''); setLoading(true); setRevision(v => v + 1) }}>Refresh</button>
       </div>
-      <div ref={actionListRef} className="min-h-0 flex-1 overflow-y-auto" onScroll={event => setScrollTop(event.currentTarget.scrollTop)}>
+      {!expanded ? <div className="min-h-0 flex-1 overflow-y-auto p-3" data-testid="mycelium-compact-summary">
+        {error ? <p role="alert" className="text-xs">Could not load activity: {error}</p> : loading ? <p className="text-xs">Loading session…</p> : <>
+          <p className="text-sm font-medium text-foreground" data-testid="mycelium-compact-title">{readableSessionLabel(currentName)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{toolLabel} · {fileLabel}</p>
+          {facts.fileNames.length > 0 ? <p className="mt-2 truncate text-xs text-muted-foreground">{filePreview}{extraFiles}</p> : <p className="mt-2 text-xs text-muted-foreground">No recorded tool actions in this session.</p>}
+          <p className="mt-3 text-[11px] text-muted-foreground">Expand to open the city for this session.</p>
+        </>}
+      </div> : <div ref={actionListRef} className="min-h-0 flex-1 overflow-y-auto" onScroll={event => setScrollTop(event.currentTarget.scrollTop)}>
         {error ? <p role="alert" className="p-3 text-xs">Could not load activity: {error}</p> : loading ? <p className="p-3 text-xs">Loading actions…</p> : !actions.length ? <p className="p-3 text-xs text-muted-foreground">No recorded tool actions in this session.</p> : <ol className="divide-y divide-border">
           {actions.map(({ tool, prompt: request }, index) => {
             const openPath = openable(tool.path) ? tool.path : ''
@@ -106,7 +120,7 @@ export function SessionActivityHistory({ expanded, locale, vaultPath, canOpenNot
             </li>
           })}
         </ol>}
-      </div>
+      </div>}
     </div>
     {expanded && path && <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {touchedPaths.length > 0 && <div className="shrink-0 border-b border-border p-2" data-testid="touched-files">

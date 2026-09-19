@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import { useDragRegion } from '../hooks/useDragRegion'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import type { PrimeConnectionProblem } from '../hooks/usePrimeHostStatus'
-import { subheadTrafficLightInset } from '../utils/trafficLights'
+import { overlayTitleBarBandStyle } from '../utils/trafficLights'
 import {
   primeSessionUptime,
   shortPrimeSessionId,
@@ -92,7 +92,7 @@ export function PrimeSessionSubhead({
   onOpenFootprint,
 }: PrimeSessionSubheadProps) {
   const t = createTranslator(locale)
-  const trafficLightInset = subheadTrafficLightInset() as CSSProperties
+  const titleBarBand = overlayTitleBarBandStyle() as CSSProperties
   // On Chat this strip is the topmost band, so it *is* the title bar. Without
   // a drag region the window cannot be moved at all from here — Notes has one
   // on the breadcrumb bar, Chat had none.
@@ -109,7 +109,7 @@ export function PrimeSessionSubhead({
   return (
     <div
       className={cn(
-        'flex min-h-[30px] shrink-0 items-center gap-2.5 border-b border-border pr-3',
+        'app-titlebar-band flex min-h-[30px] shrink-0 items-center gap-2.5 pr-3',
         'font-mono text-[11px] tracking-[0.03em] text-muted-foreground',
         // This strip is the window's title bar, so a drag on it has to move
         // the window. Selectable text wins the gesture instead: the pointer
@@ -121,7 +121,7 @@ export function PrimeSessionSubhead({
         // them; the 46px rail is already to our left and comes off it.
         'pl-[var(--subhead-traffic-light-inset,0.75rem)]',
       )}
-      style={trafficLightInset}
+      style={titleBarBand}
       data-testid="prime-session-subhead"
       onMouseDown={onDragRegionMouseDown}
     >

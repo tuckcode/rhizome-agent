@@ -7,6 +7,7 @@ import {
   primeSessionRowTitles,
   primeSessionStatus,
   pickLastConversation,
+  primeSessionMatchesFilter,
   sortPrimeSessions,
   type PrimeSessionSummary,
 } from './primeSessionMeta'
@@ -94,6 +95,32 @@ describe('sortPrimeSessions', () => {
     sortPrimeSessions(input)
 
     expect(input.map((s) => s.id)).toEqual(['a', 'b'])
+  })
+
+  it('can reverse to oldest first and still sink undated rows', () => {
+    const sorted = sortPrimeSessions(
+      [
+        session({ id: 'newer', mtimeMs: NOW - HOUR }),
+        session({ id: 'older', mtimeMs: NOW - 5 * HOUR }),
+        session({ id: 'undated' }),
+      ],
+      'oldest',
+    )
+
+    expect(sorted.map((s) => s.id)).toEqual(['older', 'newer', 'undated'])
+  })
+
+  it('can order by title', () => {
+    const sorted = sortPrimeSessions(
+      [
+        session({ id: 'b', title: 'Release notes', mtimeMs: NOW }),
+        session({ id: 'a', title: 'Audit session', mtimeMs: NOW - HOUR }),
+      ],
+      'title-asc',
+    )
+
+    expect(sorted.map((s) => s.id)).toEqual(['a', 'b'])
+    expect(sortPrimeSessions(sorted, 'title-desc').map((s) => s.id)).toEqual(['b', 'a'])
   })
 })
 
@@ -321,6 +348,16 @@ describe('primeSessionMetaLabel with a place', () => {
     expect(label).toBe('Today · 14:08')
   })
 
+  it('appends the git branch so a glance names the worktree', () => {
+    const label = primeSessionMetaLabel(
+      session({ mtimeMs: at(14, 8), cwd: VAULT, gitBranch: 'shell-harden' }),
+      NOW,
+      { vaultPath: VAULT },
+    )
+
+    expect(label).toBe('Today · 14:08 · shell-harden')
+  })
+
   it('carries the place on older rows too', () => {
     expect(
       primeSessionMetaLabel(session({ mtimeMs: NOW - DAY - HOUR, cwd: '/private/tmp' }), NOW, {
@@ -412,5 +449,42 @@ describe('primeSessionMatchesQuery', () => {
     expect(primeSessionMatchesQuery(row, 'rhizome-agent')).toBe(true)
     expect(primeSessionMatchesQuery(row, 'shell-harden')).toBe(true)
     expect(primeSessionMatchesQuery(row, 'desktop')).toBe(false)
+  })
+})
+
+describe('primeSessionMatchesFilter', () => {
+  const vault = '/Users/dtc/Documents/Rhizome Vault'
+
+  it('keeps every row when the scope is all', () => {
+    expect(
+      primeSessionMatchesFilter(session({ cwd: '/tmp' }), 'all', { now: NOW, vaultPath: vault }),
+    ).toBe(true)
+  })
+
+  it('keeps only sessions whose cwd is the open vault', () => {
+    const here = session({ id: 'here', cwd: `${vault}/` })
+    const elsewhere = session({ id: 'else', cwd: '/tmp/other' })
+    const nowhere = session({ id: 'none' })
+
+    expect(primeSessionMatchesFilter(here, 'vault', { now: NOW, vaultPath: vault })).toBe(true)
+    expect(primeSessionMatchesFilter(elsewhere, 'vault', { now: NOW, vaultPath: vault })).toBe(false)
+    expect(primeSessionMatchesFilter(nowhere, 'vault', { now: NOW, vaultPath: vault })).toBe(false)
+  })
+
+  it('keeps live roster sessions, not saved logs', () => {
+    const live = session({ id: 'live', path: '/sessions/live.jsonl' })
+    const saved = session({ id: 'saved', path: '/sessions/saved.jsonl' })
+    const running = new Map<string, boolean>([['/sessions/live.jsonl', false]])
+
+    expect(primeSessionMatchesFilter(live, 'running', { now: NOW, running })).toBe(true)
+    expect(primeSessionMatchesFilter(saved, 'running', { now: NOW, running })).toBe(false)
+  })
+
+  it('keeps calendar-today rows only', () => {
+    const today = session({ mtimeMs: NOW - HOUR })
+    const yesterday = session({ mtimeMs: NOW - DAY - HOUR })
+
+    expect(primeSessionMatchesFilter(today, 'today', { now: NOW })).toBe(true)
+    expect(primeSessionMatchesFilter(yesterday, 'today', { now: NOW })).toBe(false)
   })
 })

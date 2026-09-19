@@ -4,6 +4,7 @@ import { isTauri } from '../mock-tauri'
 import {
   COMMAND_RAIL_TRAFFIC_LIGHT_INSET,
   MACOS_TRAFFIC_LIGHT_POSITION,
+  overlayTitleBarBandStyle,
   sessionsColumnTitleBarStyle,
   subheadTrafficLightInset,
 } from './trafficLights'
@@ -93,5 +94,22 @@ describe('subheadTrafficLightInset', () => {
     const style = sessionsColumnTitleBarStyle()
     expect(style.paddingTop).toBe(COMMAND_RAIL_TRAFFIC_LIGHT_INSET)
     expect(style['--subhead-traffic-light-inset']).toBeTruthy()
+  })
+
+  it('makes the Chat/Notes title band as tall as the rail traffic-light inset', () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    Object.defineProperty(navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0) AppleWebKit/605.1.15',
+    })
+
+    const style = overlayTitleBarBandStyle()
+    expect(style.minHeight).toBe(COMMAND_RAIL_TRAFFIC_LIGHT_INSET)
+    expect(style['--overlay-titlebar-height']).toBe(`${COMMAND_RAIL_TRAFFIC_LIGHT_INSET}px`)
+    expect(style['--subhead-traffic-light-inset']).toBeTruthy()
+  })
+
+  it('leaves the overlay title band unset off Mac', () => {
+    expect(overlayTitleBarBandStyle()).toEqual({})
   })
 })

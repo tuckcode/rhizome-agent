@@ -65,9 +65,9 @@ describe('shell column edges', () => {
     expect(appSource).not.toMatch(/onMouseLeave=\{[^}]*collapseNotes/)
   })
 
-  it('hides the Chat center for Graph, Mycelium, and Research — not an overlay', () => {
+  it('hides the Chat center for Graph, Mycelium, Research, and Notes fill', () => {
     expect(appSource).toContain(
-      "isGraphDestination || isMyceliumDestination || isResearchDestination ? { display: 'none' }",
+      "isGraphDestination || isMyceliumDestination || isResearchDestination || hideEditorColumn ? { display: 'none' }",
     )
   })
 
@@ -78,8 +78,8 @@ describe('shell column edges', () => {
     expect(appSource).not.toMatch(/notesOpen[\s\S]{0,80}ai-border-pulse/)
   })
 
-  it('keeps Chat mounted when Notes is open', () => {
-    expect(appSource).toContain('{chatHomeSurface}')
+  it('keeps Chat mounted when Notes is open unless Notes fills the window', () => {
+    expect(appSource).toContain('hideChatForNotesFocus ? null : chatHomeSurface')
     expect(appSource).not.toMatch(/notesOpen \? null[\s\S]{0,80}chatHomeSurface/)
   })
 

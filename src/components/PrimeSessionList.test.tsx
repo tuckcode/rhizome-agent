@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PrimeSessionList from './PrimeSessionList'
 import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
@@ -33,6 +33,8 @@ const tracked = vi.hoisted(() => ({
   selected: [] as string[],
   archived: [] as boolean[],
   filtered: [] as number[],
+  scoped: [] as string[],
+  sorted: [] as string[],
   renamed: 0,
 }))
 vi.mock('../lib/productAnalytics', () => ({
@@ -40,6 +42,8 @@ vi.mock('../lib/productAnalytics', () => ({
   trackPrimeSessionOpened: (age: string) => tracked.selected.push(age),
   trackPrimeSessionArchived: (archived: boolean) => tracked.archived.push(archived),
   trackPrimeSessionListFiltered: (count: number) => tracked.filtered.push(count),
+  trackPrimeSessionListScoped: (scope: string) => tracked.scoped.push(scope),
+  trackPrimeSessionListSorted: (order: string) => tracked.sorted.push(order),
   trackPrimeSessionRenamed: () => {
     tracked.renamed += 1
   },
@@ -78,6 +82,8 @@ beforeEach(() => {
   tracked.selected = []
   tracked.archived = []
   tracked.filtered = []
+  tracked.scoped = []
+  tracked.sorted = []
   tracked.renamed = 0
   clipboard.copied = []
 })
@@ -629,6 +635,63 @@ describe('PrimeSessionList — scratch sessions', () => {
     })
 
     expect(await screen.findByText('Rhizome · .tmpwkDuS · a1b2c3')).toBeInTheDocument()
+  })
+})
+
+describe('PrimeSessionList — filter, sort, and compact rows', () => {
+  it('filters to this vault from the Filter menu', async () => {
+    invoked.result = [
+      summary({ id: 'a', title: 'Here', cwd: '/vault' }),
+      summary({ id: 'b', title: 'Away', cwd: '/tmp' }),
+    ]
+
+    render(<PrimeSessionList locale="en" now={NOW} vaultPath="/vault" />)
+    await screen.findByRole('button', { name: 'Open session Here' })
+
+    const filter = screen.getByRole('button', { name: 'Filter' })
+    filter.focus()
+    fireEvent.keyDown(filter, { key: 'ArrowDown' })
+    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitemradio', { name: 'This vault' }))
+
+    expect(screen.getByRole('button', { name: 'Open session Here' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Open session Away' })).not.toBeInTheDocument()
+    expect(tracked.scoped).toEqual(['vault'])
+  })
+
+  it('sorts by title from the Sort menu', async () => {
+    invoked.result = [
+      summary({ id: 'z', title: 'Zebra', mtimeMs: NOW }),
+      summary({ id: 'a', title: 'Apple', mtimeMs: NOW - HOUR }),
+    ]
+
+    render(<PrimeSessionList locale="en" now={NOW} />)
+    const newest = await screen.findAllByRole('button', { name: /Open session/ })
+    expect(newest.map((row) => row.getAttribute('aria-label'))).toEqual([
+      'Open session Zebra',
+      'Open session Apple',
+    ])
+
+    const sort = screen.getByRole('button', { name: 'Sort' })
+    sort.focus()
+    fireEvent.keyDown(sort, { key: 'ArrowDown' })
+    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitemradio', { name: 'Title A to Z' }))
+
+    const titled = screen.getAllByRole('button', { name: /Open session/ })
+    expect(titled.map((row) => row.getAttribute('aria-label'))).toEqual([
+      'Open session Apple',
+      'Open session Zebra',
+    ])
+    expect(tracked.sorted).toEqual(['title-asc'])
+  })
+
+  it('shows the git branch on the meta line', async () => {
+    invoked.result = [
+      summary({ title: 'Watch the inbox', gitBranch: 'shell-harden', mtimeMs: NOW }),
+    ]
+
+    render(<PrimeSessionList locale="en" now={NOW} />)
+
+    expect(await screen.findByText(/shell-harden/)).toBeInTheDocument()
   })
 })
 

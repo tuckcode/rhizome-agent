@@ -1,7 +1,8 @@
-import { CaretDown, CaretUp, SidebarSimple } from '@phosphor-icons/react'
+import { CaretDown, CaretUp, CornersIn, CornersOut, SidebarSimple } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
 import { translate, type AppLocale } from '../lib/i18n'
 import { COMMAND_RAIL_WIDTH_PX } from '../utils/trafficLights'
+import { ActionTooltip } from './ui/action-tooltip'
 import { ResizeHandle } from './ResizeHandle'
 import { Button } from './ui/button'
 
@@ -15,6 +16,8 @@ interface VaultPanelProps {
   noteList: ReactNode
   onBrowseToggle: () => void
   onCollapse: () => void
+  focused?: boolean
+  onFocusToggle?: () => void
 }
 
 export function VaultPanel({
@@ -25,6 +28,8 @@ export function VaultPanel({
   noteList,
   onBrowseToggle,
   onCollapse,
+  focused = false,
+  onFocusToggle,
 }: VaultPanelProps) {
   const collapseLabel = translate(locale, 'sidebar.action.collapse')
   const browseLabel = translate(
@@ -50,6 +55,29 @@ export function VaultPanel({
           {browseOpen ? <CaretUp size={14} /> : <CaretDown size={14} />}
           {translate(locale, 'sidebar.browse')}
         </Button>
+        {onFocusToggle ? (
+          <ActionTooltip
+            copy={{
+              label: focused
+                ? 'Show Chat beside Notes'
+                : 'Hide Chat so Notes can fill the window',
+            }}
+            side="bottom"
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="vault-panel__focus"
+              onClick={onFocusToggle}
+              aria-pressed={focused}
+              aria-label={focused ? 'Show Chat' : 'Hide Chat'}
+              data-testid="vault-panel-focus"
+            >
+              {focused ? <CornersIn size={16} weight="regular" /> : <CornersOut size={16} weight="regular" />}
+            </Button>
+          </ActionTooltip>
+        ) : null}
         <Button
           type="button"
           variant="ghost"

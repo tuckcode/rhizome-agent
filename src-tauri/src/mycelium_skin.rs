@@ -6,7 +6,9 @@
 //! its `index.html` therefore survives an engine upgrade, which is the whole
 //! point: Rhizome fronts the sidecar with a loopback proxy that passes every
 //! byte through untouched *except* the HTML document, where it appends one
-//! `<style>` block and renames the wordmark.
+//! `<style>` block and renames the wordmark, and Evaluate JSON (`/report`,
+//! `/analyze`), where it replaces a raw CLI dump with the useful sentence
+//! and offers both Mindwalk judges.
 //!
 //! Deliberately **not** a fork (ADR-0168: absorb contracts and artifacts,
 //! never runtimes). The citymap engine stays Mindwalk's, upstream fixes
@@ -18,6 +20,9 @@
 //! Mindwalk's palette. `missing_skin_variables` reports that drift so it
 //! shows up as a log line instead of a mystery.
 
+use crate::mycelium_judge::{
+    detect_mindwalk_judges, inject_evaluate_chrome, is_evaluate_json_path, rewrite_evaluate_payload,
+};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::Mutex;
@@ -43,10 +48,9 @@ pub const EXPECTED_MINDWALK_VARS: &[&str] = &[
     "--font-display",
 ];
 
-/// The skin. Dark is the default; light is opt-in via `data-rhizome-theme`,
-/// which the injected script sets from the `rzTheme` query parameter.
-const SKIN_CSS: &str = r#"
-/* Rhizome skin — engine is Mindwalk (MIT), only these tokens are ours. */
+/// Dark city tokens. The 3D canvas samples `:root` at startup, so these must
+/// live on `:root` itself — not on a later `html[data-rhizome-theme]` rule.
+const DARK_TOKENS: &str = r#"
 :root {
   --sky: #0E120C;
   --panel: #151A12;
@@ -72,8 +76,10 @@ const SKIN_CSS: &str = r#"
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
+"#;
 
-html[data-rhizome-theme="light"] {
+const LIGHT_TOKENS: &str = r#"
+:root {
   --sky: #EFF1EC;
   --panel: #F7F8F5;
   --panel-raised: #FBFCFA;
@@ -85,15 +91,23 @@ html[data-rhizome-theme="light"] {
   --moss: #2E6B4F;
   --pine: #38A169;
   --moon: #245741;
+  --amber: #9A7B1F;
+  --ember: #C07A3A;
+  --alarm: #C03D30;
   --act-read: #3A6BA5;
   --act-edit: #9A7B1F;
   --act-exec: #77806E;
   --act-search: #1F7E8A;
   --act-verify: #2E6B4F;
-  --alarm: #C03D30;
+  --mark-compaction: #C07A3A;
+  --mark-subagent: #6B4FA5;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
+"#;
 
-/* The wordmark is plain text in a semantic element, so it renames in CSS. */
+/// Wordmark rename. Shared across themes.
+const SKIN_CHROME: &str = r#"
 h1.wordmark { font-size: 0; letter-spacing: 0; }
 h1.wordmark::after {
   content: "Mycelium";
@@ -104,6 +118,15 @@ h1.wordmark::after {
 }
 "#;
 
+fn skin_css(theme: &str) -> String {
+    let tokens = if theme == "light" {
+        LIGHT_TOKENS
+    } else {
+        DARK_TOKENS
+    };
+    format!("/* Rhizome skin — engine is Mindwalk (MIT), only these tokens are ours. */{tokens}{SKIN_CHROME}")
+}
+
 /// Append the Rhizome skin to a Mindwalk HTML document.
 ///
 /// Appends before `</head>` so it wins the cascade over the bundled
@@ -111,8 +134,9 @@ h1.wordmark::after {
 /// than silently rendering unstyled.
 pub fn inject_skin(html: &str, theme: &str) -> String {
     let theme_attr = if theme == "light" { "light" } else { "dark" };
+    let css = skin_css(theme_attr);
     let block = format!(
-        "<style data-rhizome-skin=\"1\">{SKIN_CSS}</style>\
+        "<style data-rhizome-skin=\"1\">{css}</style>\
          <script data-rhizome-skin=\"1\">\
          document.documentElement.setAttribute('data-rhizome-theme','{theme_attr}');\
          document.title='Mycelium';\
@@ -252,7 +276,10 @@ fn serve_one(
 
     let payload: Vec<u8> = if content_type.starts_with("text/html") {
         let html = String::from_utf8_lossy(&bytes);
-        inject_skin(&html, theme).into_bytes()
+        let skinned = inject_skin(&html, theme);
+        inject_evaluate_chrome(&skinned, &detect_mindwalk_judges()).into_bytes()
+    } else if is_evaluate_json_path(&target) {
+        rewrite_evaluate_payload(&bytes, &detect_mindwalk_judges())
     } else {
         bytes.to_vec()
     };
@@ -299,6 +326,16 @@ mod tests {
     fn light_theme_sets_the_attribute() {
         let out = inject_skin("<head></head>", "light");
         assert!(out.contains("'data-rhizome-theme','light'"));
+    }
+
+    #[test]
+    fn light_theme_paints_root_tokens_not_dark_defaults() {
+        let out = inject_skin("<head></head>", "light");
+        assert!(out.contains("--sky: #EFF1EC"));
+        assert!(
+            !out.contains("--sky: #0E120C"),
+            "light skin must not leave the dark sky on :root; the city samples :root"
+        );
     }
 
     #[test]

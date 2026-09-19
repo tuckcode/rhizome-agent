@@ -5,7 +5,7 @@ import { readStoredBooleanPreference, writeStoredBooleanPreference } from './lib
 import { APP_STORAGE_KEYS } from './constants/appStorage'
 import { usePanelWidth } from './hooks/usePanelWidth'
 import { startResizeDrag } from './utils/startResizeDrag'
-import { subheadTrafficLightInset } from './utils/trafficLights'
+import { overlayTitleBarBandStyle, subheadTrafficLightInset } from './utils/trafficLights'
 import { Sidebar } from './components/Sidebar'
 import { CommandRail, type CommandRailDestination } from './components/CommandRail'
 import { NoteList } from './components/NoteList'
@@ -124,7 +124,7 @@ import { openNoteListPropertiesPicker } from './components/note-list/noteListPro
 import type { NoteListMultiSelectionCommands } from './components/note-list/multiSelectionCommands'
 import { focusNoteIconPropertyEditor } from './components/noteIconPropertyEvents'
 import { trackEvent } from './lib/telemetry'
-import { trackVaultCredentialsHandled } from './lib/productAnalytics'
+import { trackNotesFocusToggled, trackVaultCredentialsHandled } from './lib/productAnalytics'
 import { redactCredentialTokens } from './lib/sensitiveTextRedaction'
 import { areAutomaticUpdateChecksEnabled } from './lib/automaticUpdateChecks'
 import { aiTargetReady, type AiTarget } from './lib/aiTargets'
@@ -1324,9 +1324,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   }, [handleRailSelectChat, handleSetViewMode])
   const railActiveDestination = useMemo((): CommandRailDestination => {
     if (isResearchDestination) return 'research'
-    if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'changes') return 'changes'
     return 'chat'
-  }, [effectiveSelection, isResearchDestination])
+  }, [isResearchDestination])
 
 
 
@@ -1577,6 +1576,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   }, [activeTabEntry])
   const [, setChatNotePaneOpen] = useState(false)
   const [sessionRailSlot, setSessionRailSlot] = useState<HTMLDivElement | null>(null)
+  const [notesFocus, setNotesFocus] = useState(false)
   const hideNotesForCanvas = isGraphDestination || isMyceliumDestination || isResearchDestination
   const {
     shellRef,
@@ -1605,6 +1605,20 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     hideNotesForCanvas,
     chatDestination: isChatDestination,
   })
+  if ((!notesOpen || hideNotesForCanvas) && notesFocus) {
+    setNotesFocus(false)
+  }
+  const handleNotesFocusToggle = useCallback(() => {
+    setNotesFocus(current => {
+      const next = !current
+      trackNotesFocusToggled(next)
+      return next
+    })
+  }, [])
+  const handleCollapseNotes = useCallback(() => {
+    setNotesFocus(false)
+    collapseNotes()
+  }, [collapseNotes])
   const handleRailSelectGraph = useCallback(() => {
     if (chatCentered) {
       ensureNotesOpen()
@@ -1938,6 +1952,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const showVaultPanelRestore = showRestoreStrip
 
   const handleVaultTreeSelect = (nextSelection: SidebarSelection) => {
+    if (nextSelection.kind === 'filter' && nextSelection.filter === 'changes') {
+      ensureNotesOpen()
+    }
     handleSetSelection(nextSelection)
   }
 
@@ -1971,11 +1988,15 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     </>
   ) : null
 
+  const hideChatForNotesFocus = notesFocus && !hideNotesForCanvas
+  const hideEditorColumn = hideChatForNotesFocus && !activeTab
   const vaultPanel = showVaultPanel ? (
     <div
-      className={`app__vault-panel${aiActivity.highlightElement === 'notelist' ? ' ai-highlight' : ''}`}
-      style={{ width: paneWidths.notes + (vaultBrowseOpen ? paneWidths.browse : 0) }}
+      className={`app__vault-panel${hideEditorColumn ? ' app__vault-panel--focus' : ''}${aiActivity.highlightElement === 'notelist' ? ' ai-highlight' : ''}`}
+      style={hideEditorColumn ? undefined : { width: paneWidths.notes + (vaultBrowseOpen ? paneWidths.browse : 0) }}
+      data-notes-focus={notesFocus ? 'true' : 'false'}
     >
+      {hideEditorColumn ? null : (
       <ResizeHandle
         onResize={delta => resizeColumn('notes', delta)}
         edge="trailing"
@@ -1983,16 +2004,19 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         label={translate(appLocale, 'notes.panel.resize')}
         testId="vault-panel-resize"
       />
+      )}
       <VaultPanel
         browseOpen={vaultBrowseOpen}
-        notesWidth={paneWidths.notes}
+        notesWidth={hideEditorColumn ? undefined : paneWidths.notes}
         browseWidth={paneWidths.browse}
         onBrowseResize={delta => resizeColumn('browse', delta)}
         locale={appLocale}
         navigation={sidebarSurface(true)}
         noteList={noteListSurface}
         onBrowseToggle={toggleBrowse}
-        onCollapse={collapseNotes}
+        onCollapse={handleCollapseNotes}
+        focused={notesFocus}
+        onFocusToggle={handleNotesFocusToggle}
       />
       {chatCentered && isChangesSelection ? (
         <ConnectionsPanel
@@ -2052,6 +2076,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           data-pane-preset={panePreset.id}
           data-compact-sessions={compactSessions ? 'true' : 'false'}
           data-compact-vault={compactVaultPanel ? 'true' : 'false'}
+          style={overlayTitleBarBandStyle()}
         >
           {commandRailEnabled && (
             <CommandRail
@@ -2064,34 +2089,31 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               onWidthChange={chatCentered ? delta => resizeColumn('rail', delta) : undefined}
               onSelectChat={() => {
                 // C72: selecting Chat must not wipe the right Notes column.
+                setNotesFocus(false)
                 handleRailSelectChat()
               }}
               onSelectResearch={handleRailSelectResearch}
-              onSelectChanges={() => {
-                handleRailSelectChanges()
-                if (chatCentered) ensureNotesOpen()
-              }}
               onOpenSettings={handleOpenSettings}
               onSessionsSlotReady={setSessionRailSlot}
             />
           )}
           {sidebarDock === 'left' && sidebarPanel}
           {!chatCentered && noteListPanel}
-          <div className={`app__editor${aiActivity.highlightElement === 'editor' || aiActivity.highlightElement === 'tab' ? ' ai-highlight' : ''}`}>
+          <div className={`app__editor${aiActivity.highlightElement === 'editor' || aiActivity.highlightElement === 'tab' ? ' ai-highlight' : ''}${hideEditorColumn ? ' app__editor--notes-focus' : ''}`}>
             {chatCentered ? (
               <div
                 className="app__chat-center"
                 data-testid="chat-center"
                 data-split={activeTab ? chatNoteSplitMode : 'stacked'}
                 style={{
-                  ...(isGraphDestination || isMyceliumDestination || isResearchDestination ? { display: 'none' } : {}),
+                  ...(isGraphDestination || isMyceliumDestination || isResearchDestination || hideEditorColumn ? { display: 'none' } : {}),
                   ...subheadTrafficLightInset(),
                 }}
               >
                 <div className="app__chat-center-body">
                 <div
                   className={activeTab ? 'app__note-editor' : 'app__note-editor app__note-editor--idle'}
-                  style={activeTab ? { flex: `0 0 ${chatNoteSplitMode === 'side-by-side' ? paneWidths.note : chatNoteEditorHeight.width}px` } : undefined}
+                  style={activeTab && !hideChatForNotesFocus ? { flex: `0 0 ${chatNoteSplitMode === 'side-by-side' ? paneWidths.note : chatNoteEditorHeight.width}px` } : undefined}
                 >
                   <AskChatExcerptMenu onAsk={handleAskChatAboutExcerpt}>
                     <Editor
@@ -2176,7 +2198,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                     />
                   </AskChatExcerptMenu>
                 </div>
-                {activeTab ? (
+                {activeTab && !hideChatForNotesFocus ? (
                   <div
                     role="separator"
                     aria-orientation={chatNoteSplitMode === 'side-by-side' ? 'vertical' : 'horizontal'}
@@ -2193,7 +2215,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                     )}
                   />
                 ) : null}
-                {chatHomeSurface}
+                {hideChatForNotesFocus ? null : chatHomeSurface}
                 </div>
               </div>
             ) : null}

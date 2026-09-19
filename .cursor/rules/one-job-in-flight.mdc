@@ -1,0 +1,63 @@
+---
+description: >-
+  One job in flight. Spoken ideas queue. A tally does not replace finishing.
+alwaysApply: true
+---
+
+# One job in flight (rhizome-agent)
+
+Atticus rattles ideas by speech-to-text. He does not cue "do this now" vs "log that." Infer. Do not ask him to classify.
+
+## The mechanism
+
+Cursor todos are the queue. At most one item is `in_progress`.
+
+| Todo status | Means |
+|---|---|
+| `in_progress` | Doing. Exactly one. |
+| `pending` | Queued. Arrival order. Next up is the oldest pending product item. |
+| `cancelled` | Parked. He said later, maybe, or stop that item. |
+| `completed` | Done in the tree this session. Commit still waits for CPR. |
+
+A new product bug, screenshot, or "we need X" becomes `pending`. It does not steal `in_progress`.
+
+A how-does-it-work question gets a short answer. Then return to `in_progress`.
+
+An opinion, a maybe, or "decide later" is `cancelled` (Parked). No code.
+
+"Stop" stops Doing. "Now" moves that item to `in_progress` and the old Doing back to `pending`. Those words are optional.
+
+Do not start a second product change until the current slice is finished or parked.
+
+## Failure mode this rule exists to stop
+
+Wrong: the newest line becomes the job. The old job sits half-done. A footer list claims we are tracking it.
+
+Right: finish the slice, or park it, then start the oldest pending item.
+
+The Open / Parked / Done footer is a read of the todos. It is not the work.
+
+## When two or more items exist, end the turn with
+
+- Doing (the `in_progress` title)
+- Queued (pending titles, oldest first)
+- Parked
+- Done
+
+## After that list, offer to delegate
+
+If two or more queued items are still open, ask whether to send some to subagents. Do not spawn until he picks. This chat keeps at most one `in_progress` job.
+
+For each candidate, name four facts in one line: title, difficulty (S/M/L), urgency (now / soon / later), and whether it is independent of Doing (different files, no product call).
+
+Good to offer: well-specified, independent of Doing, can finish without him. Writers use a git worktree. Do not write in the shared tree in parallel.
+
+Do not offer: the current Doing, Parked items, CPR, or anything that still needs a product call from him.
+
+Use the structured question UI when more than one item is a candidate. Silence after the offer means no. He can also say "now" on one item and leave the rest queued.
+
+## Chimed-in work while subagents are already running
+
+He will add notes while this chat is mid-slice. If the note is an agreed product change and its files do not overlap Doing, append it to a running subagent (`resume`) or start one. Do not wait for another pick round.
+
+Keep this chat on Doing. Do not give two writers the same files. A steer on the current panel stays here.
