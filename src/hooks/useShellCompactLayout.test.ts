@@ -1,32 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getShellCompactState,
-  SHELL_COLLAPSE_SESSIONS_WIDTH,
-  SHELL_COLLAPSE_VAULT_PANEL_WIDTH,
-} from './useShellCompactLayout'
+import { getShellCompactState } from './useShellCompactLayout'
 
-describe('getShellCompactState', () => {
-  it('does not collapse user panels until a note editor is open', () => {
-    expect(getShellCompactState(700, false)).toEqual({
-      collapseSessions: false,
-      collapseVaultPanel: false,
-    })
+describe('compact shell budget', () => {
+  it('folds Notes before the pinned rail', () => {
+    expect(getShellCompactState(740, true)).toEqual({ collapseSessions: false, collapseVaultPanel: true })
+    expect(getShellCompactState(639, true)).toEqual({ collapseSessions: true, collapseVaultPanel: true })
   })
-
-  it('collapses Sessions before the vault panel as width decreases', () => {
-    expect(getShellCompactState(SHELL_COLLAPSE_SESSIONS_WIDTH - 1, true)).toEqual({
-      collapseSessions: true,
-      collapseVaultPanel: false,
-    })
-    expect(getShellCompactState(SHELL_COLLAPSE_VAULT_PANEL_WIDTH - 1, true)).toEqual({
-      collapseSessions: true,
-      collapseVaultPanel: true,
-    })
+  it('also protects Chat when no note is open', () => {
+    expect(getShellCompactState(639, false)).toEqual({ collapseSessions: true, collapseVaultPanel: true })
   })
-
-  it('reserves more room when the editor inspector is open', () => {
-    const width = SHELL_COLLAPSE_VAULT_PANEL_WIDTH + 100
-    expect(getShellCompactState(width, true, false).collapseVaultPanel).toBe(false)
-    expect(getShellCompactState(width, true, true).collapseVaultPanel).toBe(true)
+  it('does not invent a threshold before measurement', () => {
+    expect(getShellCompactState(null, true)).toEqual({ collapseSessions: false, collapseVaultPanel: false })
   })
 })

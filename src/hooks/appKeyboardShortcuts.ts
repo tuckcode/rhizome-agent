@@ -26,6 +26,8 @@ export type KeyboardActions = Pick<
   | 'onDeleteNote'
   | 'onArchiveNote'
   | 'onSetViewMode'
+  | 'onReadLayout'
+  | 'onResetLayout'
   | 'onZoomIn'
   | 'onZoomOut'
   | 'onZoomReset'

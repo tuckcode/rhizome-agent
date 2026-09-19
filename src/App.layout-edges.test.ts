@@ -55,9 +55,7 @@ describe('shell column edges', () => {
   })
 
   it('opens Inbox as a Notes filter, not a Graph host', () => {
-    expect(appSource).toContain(
-      "handleSetSelection({ kind: 'filter', filter: explicitOrganizationEnabled ? 'inbox' : 'all' })",
-    )
+    expect(appSource).toContain("filter: explicitOrganizationEnabled ? 'inbox' : 'all'")
   })
 
   it('does not collapse Notes on hover', () => {

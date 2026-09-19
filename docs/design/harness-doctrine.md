@@ -164,6 +164,7 @@ UI.
 | Item | Onto |
 |---|---|
 | Hermes desktop observability | Prime status, tools, queue, subagent tree, failure cards — in Rhizome's visual language. |
+| Hermes/Pi short-reply manners | `rhizome-vault` skill: answer in chat first, vault CLI not IPython, stop after one environment error. Not a second runtime. |
 | Hermes memory approval queue | Vault promotion review with diff, source, and undo. |
 | Hermes skill provenance | Prime skill catalog + Rhizome discovery/consent. |
 | Hermes schedule state machine | Explicit background grant with cadence, scope, cost, stop. |

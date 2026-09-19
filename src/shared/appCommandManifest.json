@@ -626,6 +626,28 @@
         "handler": "onCreateFolder"
       },
       "menuOwned": true
+    },
+    "viewRead": {
+      "id": "view-read",
+      "route": {
+        "kind": "handler",
+        "handler": "onReadLayout"
+      },
+      "menuOwned": true,
+      "shortcut": {
+        "combo": "command-or-ctrl",
+        "key": "4",
+        "display": "\u23184",
+        "accelerator": "CmdOrCtrl+4"
+      }
+    },
+    "viewResetLayout": {
+      "id": "view-reset-layout",
+      "route": {
+        "kind": "handler",
+        "handler": "onResetLayout"
+      },
+      "menuOwned": true
     }
   },
   "menus": [
@@ -733,17 +755,27 @@
         {
           "kind": "command",
           "command": "viewEditorOnly",
-          "label": "Chat only"
+          "label": "Chat"
         },
         {
           "kind": "command",
           "command": "viewEditorList",
-          "label": "Notes, Browse closed"
+          "label": "Notes"
+        },
+        {
+          "kind": "command",
+          "command": "viewRead",
+          "label": "Read"
         },
         {
           "kind": "command",
           "command": "viewAll",
-          "label": "Notes, Browse open"
+          "label": "Workbench"
+        },
+        {
+          "kind": "command",
+          "command": "viewResetLayout",
+          "label": "Reset layout"
         },
         {
           "kind": "separator"

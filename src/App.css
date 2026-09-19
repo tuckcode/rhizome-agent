@@ -59,10 +59,8 @@
 
 .app__vault-panel {
   flex: 0 0 auto;
-  /* Match useLayoutPanels noteList clamp so a drag is not silently capped
-     by CSS after the JS width already accepted it. */
-  min-width: 220px;
-  max-width: 500px;
+  min-width: 200px;
+  max-width: 680px;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -145,18 +143,15 @@
   min-height: 0;
   flex: 1;
   display: flex;
-  flex-direction: column;
-  overflow: hidden;
 }
 
 .vault-panel__navigation {
-  min-width: 0;
-  min-height: 120px;
-  max-height: 42%;
-  flex: 0 1 42%;
+  position: relative;
+  min-width: 200px;
+  min-height: 0;
+  flex: 0 0 auto;
   display: flex;
-  overflow: hidden;
-  border-bottom: 1px solid var(--sidebar-border);
+  border-left: 1px solid var(--sidebar-border);
 }
 
 .vault-panel__navigation > aside {
@@ -169,7 +164,7 @@
 .vault-panel__note-list {
   min-width: 0;
   min-height: 0;
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
   overflow: hidden;
 }
@@ -235,7 +230,7 @@
 
 .app__chat-center[data-split='side-by-side'] .app__chat-center-body > [data-testid="chat-home"] {
   min-height: 0;
-  min-width: 240px;
+  min-width: 420px;
 }
 
 .app__note-editor {
@@ -250,7 +245,7 @@
 
 .app__chat-center[data-split='side-by-side'] .app__note-editor {
   min-height: 0;
-  min-width: 220px;
+  min-width: 280px;
   border-bottom: none;
   border-left: 1px solid var(--border-subtle);
 }

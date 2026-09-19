@@ -1,6 +1,7 @@
 import { noteExistsOnDisk, persistNewNote } from './hooks/useNoteCreation'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ConnectionsPanel, type ConnectionsPanelHandle, type ConnectionsViewRequest } from './components/ConnectionsPanel'
+import { readStoredBooleanPreference, writeStoredBooleanPreference } from './lib/uiPreference'
 import { APP_STORAGE_KEYS } from './constants/appStorage'
 import { usePanelWidth } from './hooks/usePanelWidth'
 import { startResizeDrag } from './utils/startResizeDrag'
@@ -556,9 +557,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const handleRailSelectResearch = useCallback(() => {
     handleSetSelection({ kind: 'filter', filter: 'research' })
   }, [handleSetSelection])
-  const handleRailSelectInbox = useCallback(() => {
-    handleSetSelection({ kind: 'filter', filter: explicitOrganizationEnabled ? 'inbox' : 'all' })
-  }, [handleSetSelection, explicitOrganizationEnabled])
   // Graph and Mycelium live under Notes on the Changes tab only. Inbox
   // keeps the full notes list. Classic shell still uses the old toggle.
   const connectionsPanelRef = useRef<ConnectionsPanelHandle>(null)
@@ -566,7 +564,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const [connectionsRequest, setConnectionsRequest] = useState<ConnectionsViewRequest | null>(null)
   // Note sits on top of Chat by default. Side-by-side reuses width.
   // Bounds leave a usable note and a usable composer in both layouts.
-  const chatNoteEditorWidth = usePanelWidth(APP_STORAGE_KEYS.chatNoteEditorWidth, 560, 220, 900)
+  const [railPinned, setRailPinned] = useState(() => readStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, false))
+  const handleRailPinned = useCallback((pinned: boolean) => {
+    setRailPinned(pinned)
+    writeStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, pinned)
+  }, [])
   const chatNoteEditorHeight = usePanelWidth(APP_STORAGE_KEYS.chatNoteEditorHeight, 320, 140, 720)
   const handleRailSelectChanges = useCallback(() => {
     handleSetSelection({ kind: 'filter', filter: 'changes' })
@@ -1305,10 +1307,15 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     sidebarVisible,
     tableOfContentsToggleRef,
     viewMode,
+    panePreset,
+    setPanePreset,
+    updatePanePreset,
+    resetPaneLayout,
     zoom,
   } = useAppWindowControls({
     layout,
     unifiedVaultPanel: chatCentered,
+    storageScope: resolvedPath ?? '',
     windowMode: Boolean(noteWindowParams),
   })
   const handleChatViewMode = useCallback((mode: typeof viewMode) => {
@@ -1573,6 +1580,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const hideNotesForCanvas = isGraphDestination || isMyceliumDestination || isResearchDestination
   const {
     shellRef,
+    widths: paneWidths,
+    fittedRailPinned,
+    resizeColumn,
     split: chatNoteSplitMode,
     compactSessions,
     compactVaultPanel,
@@ -1587,6 +1597,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     setSplit: handleChatNoteSplit,
   } = useChatCenteredShellLayout({
     kind: chatCentered ? 'chat-centered' : 'classic',
+    panePreset, setPanePreset, updatePanePreset, railPinned,
     viewMode,
     setViewMode: handleSetViewMode,
     noteOpen: Boolean(activeTab),
@@ -1724,6 +1735,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     onPullRepository: handlePullRepository,
     onResolveConflicts: conflictFlow.handleOpenConflictResolver,
     onSetViewMode: handleChatViewMode,
+    onReadLayout: () => { handleRailSelectChat(); setPanePreset('read') },
+    onResetLayout: () => { handleRailSelectChat(); resetPaneLayout(); handleRailPinned(false) },
     onToggleInspector: handleToggleInspector,
     onToggleDiff: toggleDiffCommand,
     onToggleRawEditor: toggleRawEditorCommand,
@@ -1961,10 +1974,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const vaultPanel = showVaultPanel ? (
     <div
       className={`app__vault-panel${aiActivity.highlightElement === 'notelist' ? ' ai-highlight' : ''}`}
-      style={{ width: layout.noteListWidth }}
+      style={{ width: paneWidths.notes + (vaultBrowseOpen ? paneWidths.browse : 0) }}
     >
       <ResizeHandle
-        onResize={layout.handleNoteListResize}
+        onResize={delta => resizeColumn('notes', delta)}
         edge="trailing"
         placement="absolute"
         label={translate(appLocale, 'notes.panel.resize')}
@@ -1972,6 +1985,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       />
       <VaultPanel
         browseOpen={vaultBrowseOpen}
+        notesWidth={paneWidths.notes}
+        browseWidth={paneWidths.browse}
+        onBrowseResize={delta => resizeColumn('browse', delta)}
         locale={appLocale}
         navigation={sidebarSurface(true)}
         noteList={noteListSurface}
@@ -2033,6 +2049,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         <div
           ref={shellRef}
           className="app"
+          data-pane-preset={panePreset.id}
           data-compact-sessions={compactSessions ? 'true' : 'false'}
           data-compact-vault={compactVaultPanel ? 'true' : 'false'}
         >
@@ -2040,15 +2057,14 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
             <CommandRail
               locale={appLocale}
               activeDestination={railActiveDestination}
-              notesOpen={notesOpen}
-              inboxCount={inboxCount}
+              pinned={chatCentered ? railPinned : undefined}
+              autoCollapsed={chatCentered && railPinned && !fittedRailPinned}
+              onPinnedChange={handleRailPinned}
+              width={chatCentered ? paneWidths.rail : undefined}
+              onWidthChange={chatCentered ? delta => resizeColumn('rail', delta) : undefined}
               onSelectChat={() => {
                 // C72: selecting Chat must not wipe the right Notes column.
                 handleRailSelectChat()
-              }}
-              onSelectInbox={() => {
-                handleRailSelectInbox()
-                if (chatCentered) ensureNotesOpen()
               }}
               onSelectResearch={handleRailSelectResearch}
               onSelectChanges={() => {
@@ -2075,7 +2091,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                 <div className="app__chat-center-body">
                 <div
                   className={activeTab ? 'app__note-editor' : 'app__note-editor app__note-editor--idle'}
-                  style={activeTab ? { flex: `0 0 ${chatNoteSplitMode === 'side-by-side' ? chatNoteEditorWidth.width : chatNoteEditorHeight.width}px` } : undefined}
+                  style={activeTab ? { flex: `0 0 ${chatNoteSplitMode === 'side-by-side' ? paneWidths.note : chatNoteEditorHeight.width}px` } : undefined}
                 >
                   <AskChatExcerptMenu onAsk={handleAskChatAboutExcerpt}>
                     <Editor
@@ -2171,7 +2187,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                       event,
                       chatNoteSplitMode === 'side-by-side' ? 'col-resize' : 'row-resize',
                       (deltaX, deltaY) => {
-                        if (chatNoteSplitMode === 'side-by-side') chatNoteEditorWidth.resizeBy(deltaX)
+                        if (chatNoteSplitMode === 'side-by-side') resizeColumn('note', -deltaX)
                         else chatNoteEditorHeight.resizeBy(-deltaY)
                       },
                     )}

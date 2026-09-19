@@ -10,7 +10,7 @@ describe('leftover pin rail', () => {
     expect(rail).toContain('{pinButton}')
     expect(rail).toContain('<span className="ml-auto">{settingsButton}</span>')
     expect(rail).toContain(
-      "aria-label={pinnedExpanded ? 'Unpin sidebar' : 'Pin sidebar'}",
+      "aria-label={pinRequested ? 'Unpin sidebar' : 'Pin sidebar'}",
     )
   })
 })

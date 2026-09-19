@@ -219,8 +219,11 @@ flowchart TD
 **Origin:** Cursor Grok 4.6 · 2026-09-08 — corrected against `App.tsx`,
 `useViewMode.ts`, `VaultPanel.tsx`, and `ConnectionsPanel.tsx` (C72 +
 Graph-on-Changes). Do not restore Graph as a center-canvas destination.
+**Origin:** Cursor Grok 4.6 · 2026-09-19 — pane presets (ADR-0173). Fresh
+launch is Chat. Four legal layouts: Chat, Notes, Read, Workbench.
 
-The **network-shell** product map (ADR-0166, refined by ADR-0170 / ADR-0171) is:
+The **network-shell** product map (ADR-0166, refined by ADR-0170 / ADR-0171 /
+ADR-0173) is:
 
 ```
 rail (Inbox toggle) | sessions | CHAT | Notes (nav over list)
@@ -234,18 +237,19 @@ width calculation: below the established compact-session threshold, Sessions
 temporarily auto-collapses and returns when the window widens, without changing
 the person's stored open/closed preference.
 
-The right Notes panel **starts open** on a fresh vault (`editor-list` —
-Browse collapsed). Stored `view_mode` still wins when one exists. Compact
+The right Notes panel **starts closed** on a fresh vault (`chat` /
+`editor-only`). Stored pane-preset state still wins when one exists. Compact
 Inbox/All Notes/Archive/type/folder navigation sits above the selected note
-list. Browse and the whole panel collapse independently (⌘1 Chat only /
-⌘2 Notes, Browse collapsed / ⌘3 Notes, Browse expanded). Selecting a note
+list. Browse and the whole panel collapse independently (⌘1 Chat /
+⌘2 Notes / ⌘3 Workbench / ⌘4 Read). Selecting a note
 opens the editor beside Chat rather than replacing it.
 
 Shutting Notes leaves a **46px restore rail** (`VaultPanelRestoreButton`,
 same width and sidebar surface as the collapsed command rail in
 `COMMAND_RAIL_WIDTH_PX` — not a tinted strip). Open Notes uses the same
 default width as the expanded Sessions rail (`COMMAND_RAIL_EXPANDED_WIDTH_PX`,
-240). Inbox still toggles the column; Chat no longer forces `editor-only`.
+240). The Show Notes restore strip opens the column; Chat no longer
+forces `editor-only`. Notes is not a left-rail destination.
 Inbox and other Notes filters keep a tall notes list — they do **not** mount
 Graph or Mycelium under the list.
 
@@ -257,8 +261,8 @@ you can leave; it does not replace Chat. The Connections edge strip is gone
 (ADR-0170). Graph “Find a note” is a compact bottom-right box
 (`GraphControls`, collapsed until focus or an active filter) — not a large
 overlay. `useChatCenteredShellLayout` owns `notesOpen`, the restore strip,
-compact/Beside fold, and rail pressed state so App does not recombine view
-mode with compact flags.
+compact/Beside fold, and Chat/Research/Changes rail pressed state so App
+does not recombine view mode with compact flags.
 
 #### Open-note split, Copy, and the latest-reply marker
 
@@ -511,6 +515,9 @@ Each answers "nothing", which is true of a host with no session.
   event stream into the shared `AiAgentStreamEvent` shape
 - **`prime_discovery.rs`**, **`prime_update.rs`**, **`prime_vault_skill.rs`** —
   locating the binary, updating it, and seeding the Rhizome vault skill.
+  The skill bakes `find_node()`'s absolute binary plus a GUI-safe `PATH`
+  (`$HOME/.local/bin`, Homebrew, `/usr/local/bin`) and short chat manners
+  (answer first, CLI not IPython, stop after one environment error).
   Adapter command-set snapshot: `docs/prime-adapter-surface.json`
   (`pnpm prime:surface`).
 - Frontend: `usePrimeHostStatus` (status poll), `usePrimeAgentActivity` (app-level,
@@ -1416,7 +1423,7 @@ Managed by `useVaultSwitcher` hook. Switching vaults resets sidebar and clears t
 
 Per-vault UI settings stored locally per vault path (currently in browser/Tauri localStorage, not synced via git):
 - `zoom`: Float zoom level (0.8–1.5)
-- `view_mode`: "all" | "editor-list" | "editor-only"
+- `view_mode`: compatibility mirror of the pane preset ("all" | "editor-list" | "editor-only"). Runtime source of truth is `PanePresetState` (ADR-0173).
 - `editor_mode`: "raw" | "preview" (persists across note switches and sessions)
 - `tag_colors`, `status_colors`: Custom color overrides
 - `property_display_modes`: Property display preferences
@@ -1817,9 +1824,10 @@ Data flows unidirectionally: `App` passes data and callbacks as props to child c
 | Cmd+Shift+M | Toggle Markdown highlight on selected rich-editor text |
 | Cmd+[ / Cmd+] | Navigate back / forward (replaces tabs) |
 | Cmd+Z / Cmd+Shift+Z | Undo / Redo |
-| Cmd+1 | Chat only (`editor-only`) |
-| Cmd+2 | Notes open, Browse collapsed (`editor-list`) |
-| Cmd+3 | Notes open, Browse expanded (`all`) |
+| Cmd+1 | Chat (`editor-only`) |
+| Cmd+2 | Notes (`editor-list`) |
+| Cmd+3 | Workbench (`all`) |
+| Cmd+4 | Read (note beside Chat) |
 | Tab (composer, idle) | Accept the ghost-text completion when `suggestReply` offers one |
 | `[[` in editor | Open wikilink suggestion menu |
 

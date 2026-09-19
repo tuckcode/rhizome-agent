@@ -298,7 +298,7 @@ function getHeaderForNoteList(noteListContainer: HTMLElement) {
 
 async function selectInboxInVaultPanel() {
   if (!screen.queryByTestId('vault-panel')) {
-    fireEvent.click(await screen.findByTestId('command-rail-inbox'))
+    fireEvent.click(await screen.findByTestId('vault-panel-restore'))
   }
   if (!screen.queryByTestId('vault-panel-navigation')) {
     fireEvent.click(await screen.findByTestId('vault-panel-browse-toggle'))
@@ -819,13 +819,14 @@ describe('App', () => {
     expect(screen.getByRole('tab', { name: 'Mycelium', selected: true })).toBeInTheDocument()
   })
 
-  it('starts with the vault panel open when no view preference is stored (C72)', async () => {
+  it('starts with Chat and the restore strip when no view preference is stored', async () => {
     localStorage.removeItem('rhizome-view-mode')
     render(<App />)
 
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
-    expect(screen.getByTestId('command-rail-inbox')).toHaveAccessibleName('Notes')
-    expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
+    expect(screen.queryByTestId('command-rail-inbox')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
+    expect(screen.getByTestId('vault-panel-restore')).toBeVisible()
   })
 
   it('keeps Chat as the canvas while Notes is open, and Inbox only opens the list', async () => {
@@ -833,22 +834,22 @@ describe('App', () => {
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('command-rail-inbox')).toHaveAttribute('aria-pressed', 'true')
 
     fireEvent.keyDown(window, { key: '1', metaKey: true })
     await waitFor(() => {
       expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     })
     expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('command-rail-inbox')).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByTestId('vault-panel-restore')).toHaveAccessibleName('Show Notes')
 
-    fireEvent.click(screen.getByTestId('command-rail-inbox'))
+    fireEvent.click(screen.getByTestId('vault-panel-restore'))
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel-navigation')).not.toBeInTheDocument()
     expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'true')
 
-    fireEvent.click(screen.getByTestId('command-rail-inbox'))
+    fireEvent.click(await screen.findByTestId('vault-panel-collapse'))
+    expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('vault-panel-restore'))
     expect(screen.getByTestId('vault-panel')).toBeInTheDocument()
   })
 
@@ -1632,7 +1633,7 @@ describe('App', () => {
     expect(vaultPanel).not.toHaveClass('app__vault-panel--overlay')
   })
 
-  it('puts compact navigation above the selected note list in one right panel', async () => {
+  it('puts Browse beside the selected note list in Workbench', async () => {
     render(<App />)
     const chat = await screen.findByTestId('chat-home', {}, { timeout: 5000 })
     await screen.findByText('All Notes')
@@ -1686,6 +1687,7 @@ describe('App', () => {
   })
 
   it('lets you drag the Notes panel wider, and remembers it', async () => {
+    localStorage.setItem('rhizome-view-mode', 'editor-list')
     render(<App />)
     const handle = await screen.findByTestId('vault-panel-resize', {}, { timeout: 5000 })
     const panel = document.querySelector('.app__vault-panel') as HTMLElement
@@ -1700,10 +1702,10 @@ describe('App', () => {
     await waitFor(() => {
       expect(panel).toHaveStyle({ width: '340px' })
     })
-    expect(JSON.parse(localStorage.getItem('rhizome:layout-panels') ?? '{}').noteList).toBe(340)
+    expect(JSON.parse(localStorage.getItem('rhizome:pane-presets:v1:/vault') ?? '{}').active.widths.notes).toBe(340)
   })
 
-  it('Cmd+3 opens the vault panel with Browse above the note list after Cmd+1', async () => {
+  it('Cmd+3 opens the vault panel with Browse beside the note list after Cmd+1', async () => {
     render(<App />)
     await waitFor(() => {
       expect(screen.getByText('All Notes')).toBeInTheDocument()
@@ -1735,7 +1737,7 @@ describe('App', () => {
     fireEvent.keyDown(window, { key: '1', metaKey: true })
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith('update_current_window_min_size', {
-        minWidth: 760,
+        minWidth: 512,
         minHeight: 400,
         growToFit: true,
       })
@@ -1746,7 +1748,7 @@ describe('App', () => {
     fireEvent.keyDown(window, { key: '3', metaKey: true })
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith('update_current_window_min_size', {
-        minWidth: 760,
+        minWidth: 512,
         minHeight: 400,
         growToFit: true,
       })

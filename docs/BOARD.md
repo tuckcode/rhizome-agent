@@ -13,21 +13,19 @@ Unclaimed work: `NEXT.md`.
 
 ## Status
 
-- **Done:** CPR **`712024d`** — traffic lights left corner (`x: 14`).
-  App installed **2026-09-17 17:23** (old `/Applications` deleted first).
-  Local = origin = app.
-- **Now:** Native W4 (C64 ×3, Chat send, hide/reopen) + #46 live on this build.
-  Confirm lights sit flush left.
+- **Done:** Source for pane presets, hybrid skill PATH, and Notes off
+  the left rail is ready to CPR.
+- **Now:** Commit, push, rebuild `/Applications`.
 - **Next:** One Astra/board visible slice. Docked: import `1`, session mouse-back.
 
-**Origin:** Cursor Composer · 2026-09-17 17:23 · CPR rebuild.
+**Origin:** Cursor Composer · 2026-09-18 19:44 · rebuild.
 
 ---
 
 ## True right now
 
-- **Git tip (local):** **`712024d`**. **Origin `main`:** **`712024d`**.
-- **Last stamped app:** **`712024d`**, **2026-09-17 17:23**,
+- **Git tip (local):** **`35f217f`**. **Origin `main`:** **`35f217f`**.
+- **Last stamped app:** **`35f217f`**, **2026-09-18 19:44**,
   `/Applications/Rhizome Agent.app`. Vite / mock-tauri is not that vault.
 - **Prime on this machine:** **0.9.3**.
 - **Open GitHub issues:** Prefer live `gh` (17 open as of 2026-09-14

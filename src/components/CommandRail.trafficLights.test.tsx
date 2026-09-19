@@ -22,10 +22,8 @@ function renderRail() {
   render(
     <CommandRail
       locale="en"
-      activeDestination="inbox"
-      onSelectInbox={vi.fn()}
-      onSelectGraph={vi.fn()}
-      onSelectMycelium={vi.fn()}
+      activeDestination="chat"
+      onSelectChat={vi.fn()}
       onSelectResearch={vi.fn()}
       onSelectChanges={vi.fn()}
       onOpenSettings={vi.fn()}

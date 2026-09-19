@@ -1,104 +1,56 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useChatCenteredShellLayout } from './useChatCenteredShellLayout'
-import { APP_STORAGE_KEYS } from '../constants/appStorage'
-import type { ViewMode } from './useViewMode'
+import { useViewMode } from './useViewMode'
+import { resetVaultConfigStore } from '../utils/vaultConfigStore'
 
-vi.mock('../lib/productAnalytics', () => ({
-  trackChatNoteSplitChanged: vi.fn(),
-}))
+vi.mock('../lib/telemetry', () => ({ trackEvent: vi.fn() }))
+vi.mock('../lib/productAnalytics', () => ({ trackChatNoteSplitChanged: vi.fn() }))
 
-function renderShell(viewMode: ViewMode, overrides: Partial<Parameters<typeof useChatCenteredShellLayout>[0]> = {}) {
-  const setViewMode = vi.fn()
-  const hook = renderHook(
-    (props: { viewMode: ViewMode }) => useChatCenteredShellLayout({
-      kind: 'chat-centered',
-      viewMode: props.viewMode,
-      setViewMode,
-      noteOpen: false,
-      inspectorOpen: false,
-      hideNotesForCanvas: false,
-      ...overrides,
-    }),
-    { initialProps: { viewMode } },
-  )
-  return { ...hook, setViewMode }
+function renderShell() {
+  return renderHook(() => {
+    const controls = useViewMode()
+    return { controls, layout: useChatCenteredShellLayout({
+      ...controls, kind: 'chat-centered', noteOpen: true, inspectorOpen: false,
+      railPinned: false, hideNotesForCanvas: false,
+    }) }
+  })
 }
 
-describe('useChatCenteredShellLayout', () => {
-  it('reports notesOpen from the persisted view mode, not a derived flag soup', () => {
-    const { result } = renderShell('editor-list')
-    expect(result.current.notesOpen).toBe(true)
-    expect(result.current.browseOpen).toBe(false)
-    expect(result.current.showRestoreStrip).toBe(false)
+beforeEach(() => { localStorage.clear(); resetVaultConfigStore() })
+
+describe('preset shell controls', () => {
+  it('opens Notes, opens Browse, and collapses to Chat through one preset', () => {
+    const { result } = renderShell()
+    expect(result.current.layout.showRestoreStrip).toBe(true)
+    act(() => result.current.layout.ensureNotesOpen())
+    expect(result.current.controls.panePreset.id).toBe('notes')
+    expect(result.current.layout.notesOpen).toBe(true)
+    act(() => result.current.layout.toggleBrowse())
+    expect(result.current.controls.panePreset.id).toBe('workbench')
+    expect(result.current.layout.browseOpen).toBe(true)
+    act(() => result.current.layout.collapseNotes())
+    expect(result.current.controls.panePreset.id).toBe('chat')
+    expect(result.current.layout.showRestoreStrip).toBe(true)
   })
 
-  it('ensureNotesOpen bumps editor-only without closing an already-open column', () => {
-    const { result, setViewMode, rerender } = renderShell('editor-only')
-    expect(result.current.notesOpen).toBe(false)
-    expect(result.current.showRestoreStrip).toBe(true)
-
-    act(() => {
-      result.current.ensureNotesOpen()
-    })
-    expect(setViewMode).toHaveBeenCalledWith('editor-list')
-
-    rerender({ viewMode: 'editor-list' })
-    expect(result.current.notesOpen).toBe(true)
-
-    setViewMode.mockClear()
-    act(() => {
-      result.current.ensureNotesOpen()
-    })
-    expect(setViewMode).not.toHaveBeenCalled()
-    expect(result.current.notesOpen).toBe(true)
+  it('maps the split control to Read and Notes', () => {
+    const { result } = renderShell()
+    act(() => result.current.layout.setSplit('side-by-side'))
+    expect(result.current.controls.panePreset.id).toBe('read')
+    expect(result.current.layout.split).toBe('side-by-side')
+    expect(result.current.layout.notesOpen).toBe(false)
+    act(() => result.current.layout.setSplit('stacked'))
+    expect(result.current.controls.panePreset.id).toBe('notes')
+    expect(result.current.layout.notesOpen).toBe(true)
   })
 
-  it('collapseNotes persists editor-only and shows the restore strip', () => {
-    const { result, setViewMode, rerender } = renderShell('editor-list')
-    act(() => {
-      result.current.collapseNotes()
-    })
-    expect(setViewMode).toHaveBeenCalledWith('editor-only')
-    rerender({ viewMode: 'editor-only' })
-    expect(result.current.notesOpen).toBe(false)
-    expect(result.current.showRestoreStrip).toBe(true)
-  })
-
-  it('toggleBrowse switches all and editor-list without hiding Notes', () => {
-    const { result, setViewMode } = renderShell('editor-list')
-    act(() => {
-      result.current.toggleBrowse()
-    })
-    expect(setViewMode).toHaveBeenCalledWith('all')
-  })
-
-  it('Beside with an open note folds Notes until ensureNotesOpen', () => {
-    window.localStorage.setItem(APP_STORAGE_KEYS.chatNoteSplit, 'stacked')
-    const setViewMode = vi.fn()
-    const { result, rerender } = renderHook(
-      (props: { noteOpen: boolean }) => useChatCenteredShellLayout({
-        kind: 'chat-centered',
-        viewMode: 'editor-list',
-        setViewMode,
-        noteOpen: props.noteOpen,
-        inspectorOpen: false,
-        hideNotesForCanvas: false,
-      }),
-      { initialProps: { noteOpen: true } },
-    )
-
-    act(() => {
-      result.current.setSplit('side-by-side')
-    })
-    rerender({ noteOpen: true })
-    expect(result.current.notesOpen).toBe(false)
-    expect(result.current.showRestoreStrip).toBe(true)
-
-    act(() => {
-      result.current.ensureNotesOpen()
-    })
-    expect(result.current.notesOpen).toBe(true)
-    window.localStorage.removeItem(APP_STORAGE_KEYS.chatNoteSplit)
+  it('keeps Workbench when ensureNotesOpen runs', () => {
+    const { result } = renderShell()
+    act(() => result.current.controls.setPanePreset('workbench'))
+    expect(result.current.controls.panePreset.id).toBe('workbench')
+    act(() => result.current.layout.ensureNotesOpen())
+    expect(result.current.controls.panePreset.id).toBe('workbench')
+    expect(result.current.layout.browseOpen).toBe(true)
   })
 })

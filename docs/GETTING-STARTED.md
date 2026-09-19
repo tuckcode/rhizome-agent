@@ -400,7 +400,7 @@ rhizome-agent/
 | `src/hooks/useNoteLockMode.ts` | Ephemeral per-note lock. Locked notes make BlockNote/raw read-only (`EditorContentLayout.test.tsx`). Not vault `editor_mode`. |
 | `src/components/PrimeExtensionsSection.tsx` | Settings → Packages hub. Catalog is npm `pi-package`; install is the Prime CLI, not a daemon command. |
 | `src/lib/primePackages.ts` | Catalog search URL, install spec (`npm:` prefix), and Ask-Chat fallback prompt. |
-| `src/hooks/useViewMode.ts` | Persisted `editor-only` / `editor-list` / `all`. Fresh default is Notes open (`editor-list`). |
+| `src/hooks/useViewMode.ts` | Runtime pane preset (`chat` / `notes` / `read` / `workbench`). Legacy `editor-only` / `editor-list` / `all` remain compatibility mirrors. Fresh default is Chat. |
 | `src/components/ConnectionsPanel.tsx` | Graph/Mycelium cell. Chat-centered shell mounts this only on Changes. |
 | `src/utils/openAiWorkspaceWindow.ts` | Native Tauri AI workspace window creation, focus, and dock-back traffic-light handling. |
 | `src/hooks/useCliAiAgent.ts` | Thin React owner for the selected CLI agent session state. |
@@ -485,11 +485,11 @@ Verified against source 2026-09-14. Longer landmine list:
 - **One Rhizome at a time.** Debug bundle and `/Applications/Rhizome Agent.app`
   share `ai.rhizome.agent`. Launching a second copy silently forwards to the
   first. Quit the installed app before `pnpm tauri dev`.
-- **Notes default open.** `useViewMode` returns `editor-list` when nothing is
-  stored. Chat must not force `editor-only`. Shut Notes leaves
-  `VaultPanelRestoreButton` (46px rail, 32px hit target). Inbox toggles; it does
-  not mount Graph. Beside an open note folds Sessions/Notes — do not restore
-  hover-collapse on that pane (`App.layout-edges.test.ts`).
+- **Chat default.** `useViewMode` returns the Chat preset (`editor-only`) when
+  nothing is stored. Notes shut leaves `VaultPanelRestoreButton` (46px rail,
+  32px hit target). Inbox toggles; it does not mount Graph. Beside an open
+  note folds Sessions/Notes — do not restore hover-collapse on that pane
+  (`App.layout-edges.test.ts`). ADR-0173.
 - **Graph/Mycelium only on Changes.** `ConnectionsPanel` is gated on
   `isChangesSelection` (`App.layout-edges.test.ts`). Inbox rail is a
   Notes filter. Do not remount Graph under Inbox.
@@ -519,6 +519,9 @@ Verified against source 2026-09-14. Longer landmine list:
 - **MCP wiki verbs are gone.** `listTools` must not include
   `rhizome_grok_import`, `rhizome_generate_wiki`, or `rhizome_repo_research`.
   Graph queries need `RHIZOME_TOOL_PATH` / packaged `cli-call.mjs`.
+  Skill examples must carry a resolved `node` binary and a GUI-safe `PATH`
+  (`$HOME/.local/bin` is a `find_node` fallback). Do not tell the in-app
+  agent to `import rhizome_vault` or to open `agents/claude/vault-context.md`.
 - **MCP frontmatter is data-only.** `mcp-server/vault.js` must not call
   `gray-matter` (its default JS engine evaluates `---javascript`).
   Coffee / coffeescript / cson / `searchNotes` stay data-only too

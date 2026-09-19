@@ -72,17 +72,17 @@ describe('getMainWindowMinWidth', () => {
         inspectorCollapsed: true,
         unifiedVaultPanel: true,
       },
-      expectedWidth: 760,
+      expectedWidth: 512,
     },
     {
-      name: 'still reserves inspector room in the unified shell',
+      name: 'keeps the nested inspector out of the adaptive shell minimum',
       visibility: {
         sidebarVisible: true,
         noteListVisible: true,
         inspectorCollapsed: false,
         unifiedVaultPanel: true,
       },
-      expectedWidth: 1000,
+      expectedWidth: 512,
     },
   ] as const
 

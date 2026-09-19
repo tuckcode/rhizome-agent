@@ -34,30 +34,30 @@ function fileMenuLabel(commandKey: keyof typeof appCommandManifest.commands): st
 }
 
 describe('appCommandManifest leftover shortcuts', () => {
-  it('maps CmdOrCtrl+1 to Chat only (viewEditorOnly)', () => {
+  it('maps CmdOrCtrl+1 to Chat (viewEditorOnly)', () => {
     const command = commandByKey('viewEditorOnly')
     expect(command.id).toBe('view-editor-only')
     expect(commandShortcutAccelerator(command)).toBe('CmdOrCtrl+1')
     expect(command.route).toEqual({ kind: 'view-mode', value: 'editor-only' })
-    expect(viewMenuLabel('viewEditorOnly')).toBe('Chat only')
+    expect(viewMenuLabel('viewEditorOnly')).toBe('Chat')
     expect(commandsWithAccelerator('CmdOrCtrl+1')).toEqual([['viewEditorOnly', command]])
   })
 
-  it('maps CmdOrCtrl+2 to Notes, Browse closed (viewEditorList)', () => {
+  it('maps CmdOrCtrl+2 to Notes (viewEditorList)', () => {
     const command = commandByKey('viewEditorList')
     expect(command.id).toBe('view-editor-list')
     expect(commandShortcutAccelerator(command)).toBe('CmdOrCtrl+2')
     expect(command.route).toEqual({ kind: 'view-mode', value: 'editor-list' })
-    expect(viewMenuLabel('viewEditorList')).toBe('Notes, Browse closed')
+    expect(viewMenuLabel('viewEditorList')).toBe('Notes')
     expect(commandsWithAccelerator('CmdOrCtrl+2')).toEqual([['viewEditorList', command]])
   })
 
-  it('maps CmdOrCtrl+3 to Notes, Browse open (viewAll)', () => {
+  it('maps CmdOrCtrl+3 to Workbench (viewAll)', () => {
     const command = commandByKey('viewAll')
     expect(command.id).toBe('view-all')
     expect(commandShortcutAccelerator(command)).toBe('CmdOrCtrl+3')
     expect(command.route).toEqual({ kind: 'view-mode', value: 'all' })
-    expect(viewMenuLabel('viewAll')).toBe('Notes, Browse open')
+    expect(viewMenuLabel('viewAll')).toBe('Workbench')
     expect(commandsWithAccelerator('CmdOrCtrl+3')).toEqual([['viewAll', command]])
   })
 

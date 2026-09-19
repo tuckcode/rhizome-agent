@@ -52,6 +52,8 @@ interface AppCommandsConfig {
   onPullRepository?: (path: string) => void
   onResolveConflicts?: () => void
   onSetViewMode: (mode: ViewMode) => void
+  onReadLayout?: () => void
+  onResetLayout?: () => void
   onToggleInspector: () => void
   onToggleDiff?: () => void
   onToggleRawEditor?: () => void
@@ -188,6 +190,8 @@ type CommandRegistryCoreActions = Pick<
   | 'onPullRepository'
   | 'onResolveConflicts'
   | 'onSetViewMode'
+  | 'onReadLayout'
+  | 'onResetLayout'
   | 'onToggleInspector'
   | 'onToggleDiff'
   | 'onToggleRawEditor'
@@ -289,6 +293,8 @@ function createKeyboardActions(
     onOpenSettings: config.onOpenSettings,
     onDeleteNote: config.onDeleteNote,
     onSetViewMode: config.onSetViewMode,
+    onReadLayout: config.onReadLayout,
+    onResetLayout: config.onResetLayout,
     onZoomIn: config.onZoomIn,
     onZoomOut: config.onZoomOut,
     onZoomReset: config.onZoomReset,
@@ -324,6 +330,8 @@ function createMenuEventActionHandlers(
 ): Pick<
   Omit<Parameters<typeof useMenuEvents>[0], 'onArchiveNote'>,
   | 'onSetViewMode'
+  | 'onReadLayout'
+  | 'onResetLayout'
   | 'onCreateNote'
   | 'onCreateType'
   | 'onQuickOpen'
@@ -355,6 +363,8 @@ function createMenuEventActionHandlers(
 > {
   return {
     onSetViewMode: config.onSetViewMode,
+    onReadLayout: config.onReadLayout,
+    onResetLayout: config.onResetLayout,
     onCreateNote: config.onCreateNote,
     onCreateType: config.onCreateType,
     onQuickOpen: config.onQuickOpen,
@@ -494,6 +504,8 @@ function createCommandRegistryCoreConfig(
     onPullRepository: config.onPullRepository,
     onResolveConflicts: config.onResolveConflicts,
     onSetViewMode: config.onSetViewMode,
+    onReadLayout: config.onReadLayout,
+    onResetLayout: config.onResetLayout,
     onToggleInspector: config.onToggleInspector,
     onToggleDiff: config.onToggleDiff,
     onToggleRawEditor: config.onToggleRawEditor,

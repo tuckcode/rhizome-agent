@@ -18,15 +18,17 @@ describe('appCommandCatalog', () => {
     ]))
   })
 
-  it('keeps Chat + Inbox as a catalog alias for Notes, Browse closed', () => {
+  it('keeps Chat + Inbox as a catalog alias for Notes', () => {
     expect(catalogSource).toContain("'Chat + Inbox': 'command.view.editorNoteList'")
     expect(catalogSource).toContain("'Notes, Browse closed': 'command.view.editorNoteList'")
+    expect(catalogSource).toContain("Notes: 'command.view.editorNoteList'")
+    expect(catalogSource).toContain("Chat: 'command.view.editorOnly'")
 
     const viewMenu = getAppCommandMenuSections(createTranslator('en')).find(section => section.label === 'View')
     expect(viewMenu?.items).toEqual(expect.arrayContaining([
       expect.objectContaining({
         commandId: APP_COMMAND_IDS.viewEditorList,
-        label: 'Notes, Browse closed',
+        label: 'Notes',
       }),
     ]))
     expect(
@@ -34,15 +36,16 @@ describe('appCommandCatalog', () => {
     ).toBe(false)
   })
 
-  it('keeps Chat + Notes as a catalog alias for Notes, Browse open', () => {
+  it('keeps Chat + Notes as a catalog alias for Workbench', () => {
     expect(catalogSource).toContain("'Chat + Notes': 'command.view.fullLayout'")
     expect(catalogSource).toContain("'Notes, Browse open': 'command.view.fullLayout'")
+    expect(catalogSource).toContain("Workbench: 'command.view.fullLayout'")
 
     const viewMenu = getAppCommandMenuSections(createTranslator('en')).find(section => section.label === 'View')
     expect(viewMenu?.items).toEqual(expect.arrayContaining([
       expect.objectContaining({
         commandId: APP_COMMAND_IDS.viewAll,
-        label: 'Notes, Browse open',
+        label: 'Workbench',
       }),
     ]))
     expect(

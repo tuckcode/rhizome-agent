@@ -79,6 +79,10 @@ trustworthy. Verify on a **real vault + live agent turn**, not unit tests alone.
 **Do now (when free to choose):**
 1. **Agent tooling path** — ~~**C69** packaged `cli-call.mjs`~~ fixed; live graph
    tools proven on vault. Graph Find bottom-right shipped.
+   **2026-09-19:** hybrid skill (PATH + absolute node + short-reply manners)
+   is in source and live `SKILL.md` (444 so the old app cannot clobber).
+   Rebuild to make seed stick without that lock. Thinking Off is still the
+   right picker for Flash; do not globally force it.
 2. **Chat reliability leftovers** — mid-turn live-proven; suspend-retry; DOM
    composer send; selection Copy allowlist. ~~#54 dual sync~~ on origin
    `f76b46c`. ~~Native Chat glance~~ **PASS** ([2245](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md)).
@@ -102,9 +106,9 @@ trustworthy. Verify on a **real vault + live agent turn**, not unit tests alone.
    Atticus types **`1`**. Other source adapters and first-run Welcome (C9) wait.
 6. **C72 side-panel layout session** — ~~right Notes open by default~~ and
    ~~Graph/Mycelium only on Changes + 46px Notes restore rail~~ on origin
-   `0fa00a2`. Later: expand the Changes split instead of a second side panel.
-   ⌘2 **Notes, Browse closed**. ⌘3 **Notes, Browse open** (`c72-notes-delta.md`).
-   Shortcuts sheet matches. Inbox stays the folder. Packaged app still old until rebuild.
+   `0fa00a2`. **ADR-0173** names Chat / Notes / Read / Workbench and defaults
+   a fresh launch to Chat. Notes is the Show Notes strip, not a left-rail
+   button. Inbox stays the folder. Source only until rebuild.
 7. **Grokbot leftover review (2026-09-14):** rhizome-agent **done** — [1155](plans/handoffs/2026-09-14-1155-cursor-grokbot-leftover-review.md) 0 Accept. CodexGPT lob stays out. Old park note: [1819](plans/handoffs/2026-09-06-1819-composer-park-grokbot-audits-tonight.md). ~~Thinking-pill full level menu~~ and Graph-on-Changes were in `/Applications` as of **2026-09-11**. Chat note **On top / Beside** is in this tree; rebuild Applications to pick it up.
 
 **Origin:** Cursor Grok 4.6 · 2026-09-14 12:17 · §0 leftover + Grokbot restamp.
@@ -212,9 +216,9 @@ composition doc — do not restate them here.
 | **Session import destinations** | first-run + Settings import build | **Vault half shipped 2026-09-06** (Settings → Import chat history; Claude Code → `Imports/`). Prime session-list half still blocked on `import_jsonl` semantics (Atticus decision). Decision page: [`plans/import-jsonl-decision.md`](plans/import-jsonl-decision.md) (recommend **route 1**). Plan: [`plans/2026-09-01-session-import-plan.md`](plans/2026-09-01-session-import-plan.md). Relates to #23, C9. |
 | **C57 permission naming / defaults** | honest Limited-tools UX | **Settled 2026-09-06 (Atticus).** CLI default Limited tools; Prime toggle stays hidden (always Power User); keep Limited tools / Power User — no Vault Safe. Code already matched. |
 | **#50 live app view: which surface** | agent QA of the drawn UI | Answers proposed 2026-08-29, awaiting Atticus. Browser `pnpm dev`, read + test-bridge steer, `pnpm live-ui` not an in-app pane. [plan](plans/2026-08-29-live-app-view-plan.md). |
-| **What ⌘1/⌘2/⌘3 and "Full Layout" mean once Chat is the centre** | — | **Settled 2026-08-25.** Labels in tree 2026-09-14: ⌘1 Chat only, ⌘2 **Notes, Browse closed**, ⌘3 **Notes, Browse open** (not Chat + Notes). Stored `viewMode` values unchanged. |
+| **What ⌘1/⌘2/⌘3 and "Full Layout" mean once Chat is the centre** | — | **Settled 2026-09-19 (ADR-0173).** ⌘1 Chat, ⌘2 Notes, ⌘3 Workbench, ⌘4 Read. Reset layout returns to Chat. Fresh launch is Chat. Stored `viewMode` values remain compatibility mirrors. |
 | **Does Wiki Graph replace the canvas or feed a side panel** | #39 | **Settled 2026-09-06 (ADR-0170).** Graph and Mycelium sit under Notes in the right column. They no longer replace Chat. #39 (graph as an agent tool vs a place) is still open for the *agent* interface. |
-| **Right panel composition** | — | **ADR-0170 settled the stack** (Notes heavy + Graph/Mycelium below). **C72 leftover 2026-09-14:** packaged **`476756c`** still has old View names. Tree already labeled. Inbox stays the folder. Right icon rail still undecided — not this leftover. |
+| **Right panel composition** | — | **ADR-0170 settled the stack** (Notes heavy + Graph/Mycelium below). **ADR-0173** names the four layouts. Inbox stays the folder. Right icon rail still undecided. Source only until rebuild. |
 | **C66 agent profile / instructions in Settings** | chat personality UX | **Agreed, not built 2026-09-06.** How the agent should respond, rules, for whichever agent. Not vault `AGENTS.md`, not the model picker, not tool-allowlist profiles. Awaiting: one vs per-agent; app vs vault. |
 | **C67 sessions-list context menu** | session row actions | **Shipped 2026-09-06** (`a309a17`). Open / Rename / Archive·Restore / View in Mycelium / Copy path. |
 | **C68 restore note lock** | accidental edits while reading | **Shipped 2026-09-06** (`a309a17`). Default editable; breadcrumb + Cmd+K; not vault `editor_mode`. Layout lock 2026-09-14: `EditorContentLayout.test.tsx` (rich + raw read-only). |

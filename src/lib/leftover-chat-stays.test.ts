@@ -12,8 +12,9 @@ describe('leftover chat stays', () => {
     expect(app).toContain('<ChatHome')
   })
 
-  it('marks Notes pressed from notesOpen', () => {
-    expect(rail).toContain('active={notesOpen}')
+  it('does not put Notes on the command rail', () => {
+    expect(rail).not.toContain('command-rail-inbox')
+    expect(rail).not.toContain('active={notesOpen}')
   })
 
   it('does not hide Chat when Notes is open', () => {

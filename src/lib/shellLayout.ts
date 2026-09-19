@@ -12,14 +12,15 @@
  */
 
 import type { ChatNoteSplit } from '../components/chatNoteSplit'
-import { shouldForceChatShellCompact } from '../components/chatNoteSplit'
-import { getShellCompactState } from '../hooks/useShellCompactLayout'
+import { fitPanePreset, presetFromLegacy, presetToLegacy, type PanePresetState } from './panePresets'
 import type { ViewMode } from '../hooks/useViewMode'
 
 export type ShellKind = 'chat-centered' | 'classic'
 
 export type ShellLayoutInput = {
   kind: ShellKind
+  preset?: PanePresetState
+  railPinned?: boolean
   viewMode: ViewMode
   split: ChatNoteSplit
   noteOpen: boolean
@@ -42,30 +43,7 @@ export type ShellLayoutState = {
   classicNoteListVisible: boolean
 }
 
-/**
- * Window width must not hide Notes. Beside still folds the columns so Chat
- * keeps a usable centre. The compact observer still measures width for the
- * Sessions column when a future caller turns that path on; Notes stay until
- * the user closes them or chooses Beside.
- */
-function widthCompactState(
-  kind: ShellKind,
-  shellWidth: number | null,
-  inspectorOpen: boolean,
-) {
-  if (kind !== 'chat-centered') {
-    return { collapseSessions: false, collapseVaultPanel: false }
-  }
-  return getShellCompactState(shellWidth, false, inspectorOpen)
-}
-
 export function resolveShellLayout(input: ShellLayoutInput): ShellLayoutState {
-  const forceCompact = input.kind === 'chat-centered'
-    && shouldForceChatShellCompact(input.split, input.noteOpen)
-  const widthCompact = widthCompactState(input.kind, input.shellWidth, input.inspectorOpen)
-  const compactSessions = forceCompact || widthCompact.collapseSessions
-  const compactVaultPanel = forceCompact || widthCompact.collapseVaultPanel
-
   if (input.kind === 'classic') {
     const chatDestination = input.chatDestination === true
     const notesOpen = !chatDestination && !input.hideNotesForCanvas && input.viewMode !== 'editor-only'
@@ -83,18 +61,16 @@ export function resolveShellLayout(input: ShellLayoutInput): ShellLayoutState {
     }
   }
 
-  const persistedOpen = input.viewMode !== 'editor-only'
-  const notesOpen = persistedOpen && !input.hideNotesForCanvas && (!compactVaultPanel || input.compactVaultPanelOpen)
-  const browseOpen = persistedOpen && input.viewMode === 'all'
-
+  const preset = input.preset ?? presetFromLegacy(input.viewMode, input.split)
+  const fit = fitPanePreset(preset, { shellWidth: input.shellWidth, noteOpen: input.noteOpen, railPinned: input.railPinned, hideNotesForCanvas: input.hideNotesForCanvas })
   return {
     canvas: 'chat-centered',
-    notesOpen,
-    browseOpen,
-    split: input.split,
-    showRestoreStrip: !notesOpen && !input.hideNotesForCanvas,
-    compactSessions,
-    compactVaultPanel,
+    notesOpen: fit.notesOpen,
+    browseOpen: fit.browseOpen,
+    split: fit.split,
+    showRestoreStrip: fit.showRestoreStrip,
+    compactSessions: input.railPinned === true && !fit.railPinned,
+    compactVaultPanel: presetToLegacy(preset).viewMode !== 'editor-only' && !fit.notesOpen,
     classicSidebarVisible: false,
     classicNoteListVisible: false,
   }
@@ -102,13 +78,13 @@ export function resolveShellLayout(input: ShellLayoutInput): ShellLayoutState {
 
 /** Inbox / Show Notes / Changes: open the column without collapsing Browse. */
 export function bumpViewModeToOpenNotes(viewMode: ViewMode): ViewMode {
-  return viewMode === 'editor-only' ? 'editor-list' : viewMode
+  return presetToLegacy({ id: viewMode === 'all' ? 'workbench' : 'notes', widths: {} }).viewMode
 }
 
 export function viewModeAfterCollapseNotes(): ViewMode {
-  return 'editor-only'
+  return presetToLegacy({ id: 'chat', widths: {} }).viewMode
 }
 
 export function viewModeAfterToggleBrowse(browseOpen: boolean): ViewMode {
-  return browseOpen ? 'editor-list' : 'all'
+  return presetToLegacy({ id: browseOpen ? 'notes' : 'workbench', widths: {} }).viewMode
 }

@@ -29,6 +29,8 @@ type SuppressedShortcutSource = Extract<AppCommandDispatchSource, 'renderer-keyb
 
 export interface AppCommandHandlers {
   onSetViewMode: (mode: ViewMode) => void
+  onReadLayout?: () => void
+  onResetLayout?: () => void
   onCreateNote: () => void
   onCreateType?: () => void
   onCreateFolder?: () => void
@@ -95,6 +97,8 @@ type SimpleHandlerKey = keyof Pick<
   | 'onToggleRawEditor'
   | 'onToggleDiff'
   | 'onToggleInspector'
+  | 'onReadLayout'
+  | 'onResetLayout'
   | 'onToggleAIChat'
   | 'onToggleTableOfContents'
   | 'onExportNoteAsPdf'
@@ -144,6 +148,8 @@ const SIMPLE_HANDLER_EXECUTORS: readonly [SimpleHandlerKey, SimpleHandlerExecuto
   ['onSearch', (handlers) => handlers.onSearch()],
   ['onToggleRawEditor', (handlers) => handlers.onToggleRawEditor?.()],
   ['onToggleDiff', (handlers) => handlers.onToggleDiff?.()],
+  ['onReadLayout', (handlers) => handlers.onReadLayout?.()],
+  ['onResetLayout', (handlers) => handlers.onResetLayout?.()],
   ['onToggleInspector', (handlers) => handlers.onToggleInspector()],
   ['onToggleAIChat', (handlers) => handlers.onToggleAIChat?.()],
   ['onToggleTableOfContents', (handlers) => handlers.onToggleTableOfContents?.()],

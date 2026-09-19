@@ -1,106 +1,37 @@
-import { useCallback, useMemo, useState, type RefObject } from 'react'
-import { useChatNoteSplit, type ChatNoteSplit } from '../components/chatNoteSplit'
-import {
-  bumpViewModeToOpenNotes,
-  resolveShellLayout,
-  viewModeAfterCollapseNotes,
-  viewModeAfterToggleBrowse,
-  type ShellKind,
-  type ShellLayoutState,
-} from '../lib/shellLayout'
+import { useCallback } from 'react'
+import { useChatNoteSplit } from '../components/chatNoteSplit'
+import { bumpViewModeToOpenNotes, viewModeAfterCollapseNotes, viewModeAfterToggleBrowse, resolveShellLayout, type ShellKind } from '../lib/shellLayout'
+import { fitPanePreset, resizePresetWidth, type PaneColumn } from '../lib/panePresets'
 import { useShellCompactLayout } from './useShellCompactLayout'
-import type { ViewMode } from './useViewMode'
+import type { useViewMode } from './useViewMode'
 
-export type ChatCenteredShellLayout = ShellLayoutState & {
-  shellRef: RefObject<HTMLDivElement | null>
-  openNotes: () => void
-  collapseNotes: () => void
-  toggleBrowse: () => void
-  ensureNotesOpen: () => void
-  setSplit: (next: ChatNoteSplit) => void
-}
-
-interface UseChatCenteredShellLayoutArgs {
+type PaneControls = Pick<ReturnType<typeof useViewMode>, 'viewMode' | 'setViewMode' | 'panePreset' | 'setPanePreset' | 'updatePanePreset'>
+interface UseChatCenteredShellLayoutArgs extends PaneControls {
   kind: ShellKind
-  viewMode: ViewMode
-  setViewMode: (mode: ViewMode) => void
   noteOpen: boolean
   inspectorOpen: boolean
   hideNotesForCanvas: boolean
   chatDestination?: boolean
+  railPinned: boolean
 }
 
-/**
- * Owns persistence remaps, compact, the restore strip, and rail pressed state
- * for the Chat-centered shell. Classic shell uses the same discriminant.
- */
-export function useChatCenteredShellLayout({
-  kind,
-  viewMode,
-  setViewMode,
-  noteOpen,
-  inspectorOpen,
-  hideNotesForCanvas,
-  chatDestination = false,
-}: UseChatCenteredShellLayoutArgs): ChatCenteredShellLayout {
-  const { split, setSplit: persistSplit } = useChatNoteSplit()
-  const { shellRef, width } = useShellCompactLayout(kind === 'chat-centered', false, inspectorOpen)
-  const [compactVaultPanelOpen, setCompactVaultPanelOpen] = useState(false)
-
-  const layout = useMemo(
-    () => resolveShellLayout({
-      kind,
-      viewMode,
-      split,
-      noteOpen,
-      shellWidth: width,
-      inspectorOpen,
-      compactVaultPanelOpen,
-      hideNotesForCanvas,
-      chatDestination,
-    }),
-    [
-      chatDestination,
-      compactVaultPanelOpen,
-      hideNotesForCanvas,
-      inspectorOpen,
-      kind,
-      noteOpen,
-      split,
-      viewMode,
-      width,
-    ],
-  )
-
+/** Derive geometry from the one preset. Temporary folds never change persistence. */
+export function useChatCenteredShellLayout(args: UseChatCenteredShellLayoutArgs) {
+  const { kind, panePreset, setViewMode, updatePanePreset, noteOpen, railPinned, hideNotesForCanvas } = args
+  const { shellRef, width } = useShellCompactLayout(kind === 'chat-centered', noteOpen)
+  const context = { shellWidth: width, noteOpen, railPinned, hideNotesForCanvas }
+  const fit = fitPanePreset(panePreset, context)
+  const layout = resolveShellLayout({
+    ...args, preset: panePreset, split: fit.split, shellWidth: width, compactVaultPanelOpen: false,
+  })
   const ensureNotesOpen = useCallback(() => {
-    const nextMode = bumpViewModeToOpenNotes(viewMode)
-    if (nextMode !== viewMode) setViewMode(nextMode)
-    setCompactVaultPanelOpen(true)
-  }, [setViewMode, viewMode])
-
-  const openNotes = ensureNotesOpen
-
-  const collapseNotes = useCallback(() => {
-    setCompactVaultPanelOpen(false)
-    setViewMode(viewModeAfterCollapseNotes())
-  }, [setViewMode])
-
-  const toggleBrowse = useCallback(() => {
-    setViewMode(viewModeAfterToggleBrowse(viewMode === 'all'))
-  }, [setViewMode, viewMode])
-
-  const setSplit = useCallback((next: ChatNoteSplit) => {
-    persistSplit(next)
-    if (next === 'side-by-side') setCompactVaultPanelOpen(false)
-  }, [persistSplit])
-
-  return {
-    ...layout,
-    shellRef,
-    openNotes,
-    collapseNotes,
-    toggleBrowse,
-    ensureNotesOpen,
-    setSplit,
+    if (panePreset.id !== 'workbench' && panePreset.id !== 'notes') setViewMode(bumpViewModeToOpenNotes(args.viewMode))
+  }, [panePreset.id, args.viewMode, setViewMode])
+  const collapseNotes = useCallback(() => setViewMode(viewModeAfterCollapseNotes()), [setViewMode])
+  const toggleBrowse = useCallback(() => setViewMode(viewModeAfterToggleBrowse(panePreset.id === 'workbench')), [panePreset.id, setViewMode])
+  const { setSplit } = useChatNoteSplit(args)
+  const resizeColumn = (column: PaneColumn, delta: number) => {
+    updatePanePreset(resizePresetWidth(panePreset, column, fit.widths[column] + delta, context))
   }
+  return { ...layout, shellRef, widths: fit.widths, fittedRailPinned: fit.railPinned, resizeColumn, openNotes: ensureNotesOpen, ensureNotesOpen, collapseNotes, toggleBrowse, setSplit }
 }

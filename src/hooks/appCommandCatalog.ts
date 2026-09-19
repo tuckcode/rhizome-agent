@@ -31,6 +31,8 @@ export type AppCommandShortcutEventInit = Pick<
 >
 
 type SimpleHandlerKey =
+  | 'onReadLayout'
+  | 'onResetLayout'
   | 'onOpenSettings'
   | 'onCheckForUpdates'
   | 'onCreateNote'
@@ -190,10 +192,13 @@ const MENU_LABEL_KEYS = {
   'Editor + Notes': 'command.view.editorNoteList',
   'All Panels': 'menu.view.allPanels',
   'Chat only': 'command.view.editorOnly',
+  Chat: 'command.view.editorOnly',
   'Chat + Inbox': 'command.view.editorNoteList',
   'Notes, Browse closed': 'command.view.editorNoteList',
+  Notes: 'command.view.editorNoteList',
   'Chat + Notes': 'command.view.fullLayout',
   'Notes, Browse open': 'command.view.fullLayout',
+  Workbench: 'command.view.fullLayout',
   'Toggle Properties Panel': 'command.view.toggleProperties',
   'Toggle AI Panel': 'command.view.toggleAiPanel',
   'Zoom In': 'menu.view.zoomIn',

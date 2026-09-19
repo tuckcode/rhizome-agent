@@ -16,6 +16,7 @@ async function expectMinimumTarget(locator: Locator, size = 32): Promise<void> {
 }
 
 async function openAlphaProject(page: Page): Promise<void> {
+  await page.getByTestId('vault-panel-restore').click()
   const noteList = page.getByTestId('note-list-container')
   await noteList.getByText('Alpha Project', { exact: true }).click()
   await expect(page.locator('.app__note-editor:not(.app__note-editor--idle)')).toBeVisible()
@@ -30,17 +31,20 @@ test.describe('Unified shell geometry', () => {
     removeFixtureVaultCopy(tempVaultDir)
   })
 
-  test('opens one Notes panel from the left Inbox rail item @smoke', async ({ page }) => {
+  test('opens Notes from the Show Notes strip @smoke', async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 900 })
     await page.goto('/', { waitUntil: 'domcontentloaded' })
     await page.getByTestId('command-rail').hover()
-    await expect(page.getByTestId('command-rail-inbox')).toContainText('Notes')
-    // C72: fresh launch defaults to Notes open (editor-list), Browse collapsed
-    await expect(page.getByTestId('vault-panel')).toBeVisible()
+    await expect(page.getByTestId('command-rail-chat')).toBeVisible()
+    await expect(page.getByTestId('command-rail-inbox')).toHaveCount(0)
+    // Fresh launch is Chat with the existing Show Notes restore strip.
+    await expect(page.getByTestId('vault-panel')).toHaveCount(0)
+    await expect(page.getByTestId('vault-panel-restore')).toBeVisible()
     await expect(page.getByTestId('vault-panel-navigation')).toHaveCount(0)
 
     await openFixtureVault(page, tempVaultDir)
 
+    await page.getByTestId('vault-panel-restore').click()
     const vaultPanel = page.getByTestId('vault-panel')
     const browse = page.getByTestId('vault-panel-browse-toggle')
     const collapse = page.getByTestId('vault-panel-collapse')
@@ -65,7 +69,7 @@ test.describe('Unified shell geometry', () => {
     await collapse.click({ position: { x: collapseBox.width - 1, y: collapseBox.height / 2 } })
     await expect(vaultPanel).toHaveCount(0)
 
-    await page.getByTestId('command-rail-inbox').click()
+    await page.getByTestId('vault-panel-restore').click()
     await expect(page.getByTestId('vault-panel')).toBeVisible()
     await expect(page.getByTestId('vault-panel-navigation')).toHaveCount(0)
     await expect(page.getByTestId('note-list-container')).toBeVisible()
@@ -134,8 +138,8 @@ test.describe('Unified shell geometry', () => {
     await page.getByRole('radio', { name: 'Note beside Chat' }).click()
 
     const shell = page.locator('.app')
-    await expect(shell).toHaveAttribute('data-compact-sessions', 'true')
-    await expect(shell).toHaveAttribute('data-compact-vault', 'true')
+    await expect(shell).toHaveAttribute('data-pane-preset', 'read')
+    await expect(shell).toHaveAttribute('data-compact-vault', 'false')
     await expect(page.getByTestId('chat-note-editor-resize')).toHaveAttribute('aria-orientation', 'vertical')
     await expect(page.getByTestId('vault-panel')).toHaveCount(0)
     await expectMinimumTarget(page.getByTestId('vault-panel-restore'))
@@ -152,4 +156,55 @@ test.describe('Unified shell geometry', () => {
     await expect(page.getByTestId('vault-panel')).toBeVisible()
     await expect(page.getByTestId('chat-note-editor-resize')).toHaveAttribute('aria-orientation', 'horizontal')
   })
+  test('remembers preset widths, clamps drags, folds narrow columns, and resets', async ({ page }) => {
+    await page.setViewportSize({ width: 1400, height: 900 })
+    await openFixtureVault(page, tempVaultDir)
+    await openAlphaProject(page)
+    await waitForKeyboardShortcutsReady(page)
+    const shell = page.locator('.app')
+    const chat = page.getByTestId('chat-home')
+    const notes = page.getByTestId('vault-panel-note-list')
+    const drag = async (testId: string, delta: number) => {
+      const box = await page.getByTestId(testId).boundingBox()
+      if (!box) throw new Error(`Missing divider: ${testId}`)
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(box.x + box.width / 2 + delta, box.y + box.height / 2, { steps: 10 })
+      await page.mouse.up()
+    }
+    await drag('vault-panel-resize', -100)
+    await expect.poll(async () => (await notes.boundingBox())?.width).toBe(340)
+    await sendShortcut(page, '3', ['Control'])
+    await expect(shell).toHaveAttribute('data-pane-preset', 'workbench')
+    await expect.poll(async () => (await notes.boundingBox())?.width).toBe(240)
+    await drag('browse-panel-resize', -40)
+    await expect.poll(async () => (await page.getByTestId('vault-panel-navigation').boundingBox())?.width).toBe(280)
+    await sendShortcut(page, '2', ['Control'])
+    await expect.poll(async () => (await notes.boundingBox())?.width).toBe(340)
+    await page.setViewportSize({ width: 720, height: 800 })
+    await drag('vault-panel-resize', -400)
+    expect((await chat.boundingBox())!.width).toBeGreaterThanOrEqual(420)
+    expect(await shell.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
+    await page.setViewportSize({ width: 639, height: 800 })
+    await expect(page.getByTestId('vault-panel')).toHaveCount(0)
+    expect((await chat.boundingBox())!.width).toBeGreaterThanOrEqual(420)
+    await sendShortcut(page, '4', ['Control'])
+    await expect(shell).toHaveAttribute('data-pane-preset', 'read')
+    await expect(page.getByTestId('chat-center')).toHaveAttribute('data-split', 'stacked')
+    await page.screenshot({ path: '/tmp/pane-presets-narrow.png' })
+    await page.setViewportSize({ width: 1400, height: 900 })
+    await expect(page.getByTestId('chat-center')).toHaveAttribute('data-split', 'side-by-side')
+    await drag('chat-note-editor-resize', -100)
+    expect((await chat.boundingBox())!.width).toBeGreaterThanOrEqual(420)
+    await sendShortcut(page, '3', ['Control'])
+    await expect.poll(async () => (await page.getByTestId('vault-panel-navigation').boundingBox())?.width).toBe(280)
+    await page.screenshot({ path: '/tmp/pane-presets-workbench.png' })
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('laputa:dispatch-command', { detail: 'view-reset-layout' })))
+    await expect(shell).toHaveAttribute('data-pane-preset', 'chat')
+    await expect(page.getByTestId('vault-panel-restore')).toBeVisible()
+    await sendShortcut(page, '3', ['Control'])
+    await expect.poll(async () => (await notes.boundingBox())?.width).toBe(240)
+    await expect.poll(async () => (await page.getByTestId('vault-panel-navigation').boundingBox())?.width).toBe(240)
+  })
+
 })

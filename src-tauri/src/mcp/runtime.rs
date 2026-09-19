@@ -244,6 +244,7 @@ fn fallback_node_paths() -> Vec<PathBuf> {
 
 fn node_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
     let mut candidates = vec![
+        home.join(".local").join("bin").join(node_binary_name()),
         home.join(".local/share/mise/shims")
             .join(node_binary_name()),
         home.join(".mise").join("shims").join(node_binary_name()),
@@ -440,6 +441,7 @@ mod tests {
             (
                 node_binary_candidates_for_home(&home),
                 &[
+                    ".local/bin/node",
                     ".local/share/mise/shims/node",
                     ".asdf/shims/node",
                     ".volta/bin/node",

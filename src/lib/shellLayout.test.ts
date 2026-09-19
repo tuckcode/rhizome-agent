@@ -52,24 +52,11 @@ describe('resolveShellLayout (chat-centered)', () => {
     expect(next.compactSessions).toBe(false)
   })
 
-  it('folds Notes when a note sits beside Chat, until the compact override opens them', () => {
-    const folded = layout({
-      split: 'side-by-side',
-      noteOpen: true,
-      compactVaultPanelOpen: false,
-    })
-    expect(folded.compactVaultPanel).toBe(true)
-    expect(folded.compactSessions).toBe(true)
-    expect(folded.notesOpen).toBe(false)
-    expect(folded.showRestoreStrip).toBe(true)
-
-    const restored = layout({
-      split: 'side-by-side',
-      noteOpen: true,
-      compactVaultPanelOpen: true,
-    })
-    expect(restored.notesOpen).toBe(true)
-    expect(restored.showRestoreStrip).toBe(false)
+  it('retains a migrated Read list when all columns fit', () => {
+    const next = layout({ split: 'side-by-side', noteOpen: true })
+    expect(next.notesOpen).toBe(true)
+    expect(next.split).toBe('side-by-side')
+    expect(next.compactSessions).toBe(false)
   })
 
   it('does not fold Notes for Beside when Chat has no open note', () => {

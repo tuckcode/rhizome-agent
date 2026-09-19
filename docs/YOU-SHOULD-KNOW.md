@@ -38,7 +38,9 @@ Chat first, vault on purpose. Memory is gated; execution is not.
 
 If Prime already has a mechanism, use Prime’s. Do not build a Rhizome
 twin beside it. Vault knowledge still lands as markdown — Prime’s
-`~/.prime/agent` is harness state, not the memory store.
+`~/.prime/agent` is harness state, not the memory store. In-app Chat
+gets Hermes/Pi *manners* from the vault skill (answer first, CLI not
+IPython), not a second runtime.
 
 This machine’s Prime is **0.9.3** (106 public daemon commands). Recheck
 with `pnpm prime:surface` / `pnpm prime:surface:github`. Snapshot:
@@ -63,7 +65,7 @@ longer open the way the ADR text still sounds.
 
 | Question | Now |
 |---|---|
-| ⌘1 / ⌘2 / ⌘3 | **Settled 2026-08-25.** Labels in tree 2026-09-14: ⌘1 Chat only. ⌘2 **Notes, Browse closed**. ⌘3 **Notes, Browse open**. Stored `viewMode` values unchanged (`editor-only` / `editor-list` / `all`). Fresh vaults default to `editor-list` (C72). Inbox stays the folder. Packaged leftover still **`476756c`**. |
+| ⌘1 / ⌘2 / ⌘3 / ⌘4 | **Settled 2026-09-19 (ADR-0173).** ⌘1 Chat. ⌘2 Notes. ⌘3 Workbench. ⌘4 Read. Reset layout returns to Chat and default widths. Stored `viewMode` values remain compatibility mirrors (`editor-only` / `editor-list` / `all`). Fresh vaults default to Chat. Inbox stays the folder. Source only until rebuild; packaged app is still **`35f217f`**. |
 | Right panel | **Settled 2026-08-25, refined 2026-09-12.** One Notes panel. Compact nav above the selected list. Rail control is **Notes** (Inbox is a folder in the list). Shut Notes leaves a 46px restore rail. No Inbox/Notes tabs, no second right column. |
 | Canvas destinations | **Corrected 2026-09-07.** Chat stays the centre. Graph/Mycelium are a Changes-only cell under Notes (ADR-0171), not a place you go instead of chatting (`App.layout-edges.test.ts` 14:33). Research is still a centre pane (Chat `display: none`, not an overlay). #39 (graph as an *agent tool*) is still open. |
 | Open note vs Chat | **Shipped 2026-09-12.** Notes header **On top / Beside**. Beside folds Sessions/Notes. Hover must not collapse the note. Highlight → Copy, or **Ask Chat about this** (same thread; `App.layout-edges.test.ts` 14:00). Right-click a list row → **Ask the agent about this note** keeps Chat and opens that note (`App.test.tsx` 13:50). Note lock is ephemeral and per-note — locked notes are read-only (`EditorContentLayout.test.tsx` 13:51). Not vault `editor_mode`. |

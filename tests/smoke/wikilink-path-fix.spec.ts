@@ -121,7 +121,7 @@ test.describe('Wikilink insertion and navigation', () => {
       if (await restore.isVisible().catch(() => false)) {
         await restore.click()
       } else {
-        await page.getByTestId('command-rail-inbox').click()
+        await page.getByTestId('vault-panel-restore').click()
       }
       await vaultPanel.waitFor({ state: 'visible', timeout: 15_000 })
     }

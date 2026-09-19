@@ -1,34 +1,15 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 
-/**
- * Compact mode is about the *window*, not the panel the user just dragged.
- * Narrowing Notes does not hide the column, and widening it does not force
- * Notes back. Those thresholds exist so Chat keeps a usable centre when a
- * note is open. Notes that are open always stay in the flex row so they
- * cannot cover Chat or the editor.
- */
-export const SHELL_COLLAPSE_SESSIONS_WIDTH = 1420
-export const SHELL_COLLAPSE_VAULT_PANEL_WIDTH = 1180
+import { fitPanePreset } from '../lib/panePresets'
 
 export type ShellCompactState = {
   collapseSessions: boolean
   collapseVaultPanel: boolean
 }
 
-export function getShellCompactState(
-  width: number | null,
-  noteOpen: boolean,
-  inspectorOpen = false,
-): ShellCompactState {
-  if (!noteOpen || width === null || width <= 0) {
-    return { collapseSessions: false, collapseVaultPanel: false }
-  }
-
-  const inspectorAllowance = inspectorOpen ? 240 : 0
-  return {
-    collapseSessions: width < SHELL_COLLAPSE_SESSIONS_WIDTH + inspectorAllowance,
-    collapseVaultPanel: width < SHELL_COLLAPSE_VAULT_PANEL_WIDTH + inspectorAllowance,
-  }
+export function getShellCompactState(width: number | null, noteOpen: boolean, inspectorOpen = false): ShellCompactState {
+  const fit = fitPanePreset({ id: 'notes', widths: {} }, { shellWidth: width, noteOpen: noteOpen || inspectorOpen, railPinned: true })
+  return { collapseSessions: !fit.railPinned, collapseVaultPanel: !fit.notesOpen }
 }
 
 export function useShellCompactLayout(

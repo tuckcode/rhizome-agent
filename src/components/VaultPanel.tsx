@@ -2,10 +2,14 @@ import { CaretDown, CaretUp, SidebarSimple } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
 import { translate, type AppLocale } from '../lib/i18n'
 import { COMMAND_RAIL_WIDTH_PX } from '../utils/trafficLights'
+import { ResizeHandle } from './ResizeHandle'
 import { Button } from './ui/button'
 
 interface VaultPanelProps {
   browseOpen: boolean
+  notesWidth?: number
+  browseWidth?: number
+  onBrowseResize?: (delta: number) => void
   locale: AppLocale
   navigation: ReactNode
   noteList: ReactNode
@@ -15,6 +19,7 @@ interface VaultPanelProps {
 
 export function VaultPanel({
   browseOpen,
+  notesWidth, browseWidth, onBrowseResize,
   locale,
   navigation,
   noteList,
@@ -59,14 +64,15 @@ export function VaultPanel({
         </Button>
       </header>
       <div className="vault-panel__content">
+        <div className="vault-panel__note-list" data-testid="vault-panel-note-list" style={{ width: notesWidth }}>
+          {noteList}
+        </div>
         {browseOpen ? (
-          <div className="vault-panel__navigation" data-testid="vault-panel-navigation">
+          <div className="vault-panel__navigation" data-testid="vault-panel-navigation" style={{ width: browseWidth }}>
+            {onBrowseResize && <ResizeHandle onResize={onBrowseResize} edge="trailing" placement="absolute" label="Resize Browse" testId="browse-panel-resize" />}
             {navigation}
           </div>
         ) : null}
-        <div className="vault-panel__note-list" data-testid="vault-panel-note-list">
-          {noteList}
-        </div>
       </div>
     </section>
   )
