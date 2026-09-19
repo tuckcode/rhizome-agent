@@ -4,7 +4,8 @@ How to navigate the **Rhizome Agent** codebase, run the app, and find what you n
 
 > This is Rhizome Agent (`ai.rhizome.agent`, `tuckcode/rhizome-agent`), not Rhizome Desktop (`knispo/rhizome`, `ai.rhizome.desktop`) — see `docs/IDENTITY.md`. Product overview and roadmap: [README.md](../README.md). Some filenames and sidecar labels still use older internal names (`tolaria_*`, etc.) — treat those as implementation identifiers, not the product name.
 >
-> **Stamped 16:06:** leftover wrap `1eb0398`. Still Agent, not Desktop. No push. No rebuild.
+> **Stamped 2026-09-19:** living docs vs origin `35f217f`. Packaged app
+> still `712024d`. Still Agent, not Desktop.
 
 ## Prerequisites
 
@@ -125,8 +126,9 @@ The sidecar is Linux-based, so keep native macOS Tauri QA and app-focus screensh
 type documents only, no personal notes, no network
 (`create_local_rhizome_scaffold` in `src-tauri/src/vault/getting_started.rs`).
 It does **not** clone `refactoringhq/tolaria-getting-started` unless
-`RHIZOME_GETTING_STARTED_REPO_URL` (or a legacy alias) is set. C11’s
-Rhizome-owned remote starter is still deferred.
+`RHIZOME_GETTING_STARTED_REPO_URL` is set. The old `TOLARIA_*` and
+`LAPUTA_*` names are not read (#57). C11’s Rhizome-owned remote starter
+is still deferred.
 
 When a remote URL *is* set, `create_getting_started_vault` clones that repo
 and then removes every git remote from the new local copy, so the vault
@@ -508,10 +510,18 @@ Verified against source 2026-09-14. Longer landmine list:
 - **Chat default stays Prime.** Settings must not present Prime as an
   optional local-agent alternative. An API-model default must say it
   skips Prime sessions and vault tools.
-- **Hide stops helpers.** Red-button close hides (C22) and
-  `release_helpers_for_hidden_window` stops the spawned Prime supervisor,
-  MCP bridge, and Mindwalk sidecar unless Keep working left a resident
-  session. Never send Prime `shutdown`. Cmd+Q is the real quit.
+- **Hide stops ws-bridge and Mindwalk, not spawned Prime.** Red-button
+  close hides (C22). `release_helpers_for_hidden_window` stops the MCP
+  bridge and Mindwalk sidecar. **C75:** a Prime daemon this process
+  spawned stays warm for fast reopen. Never send Prime `shutdown`.
+  Cmd+Q is the real quit.
+- **Tray Done is 45 seconds.** A chat that leaves the running roster
+  stays `Done: {title}` (`FINISHED_ROW_KEEP_MS`). A failed roster read
+  must not invent finishes. Do not close #52 from units. Tree
+  `35f217f`; not in `/Applications` yet.
+- **Empty rejection.** `usage.input == 0` on an empty assistant turn is
+  `{provider} rejected this request before it ran (no input tokens).`
+  Do not restore the old placeholder for that case.
 - **Packages install is CLI, not the daemon.** `install_prime_package` runs
   `prime-agent package install` (180s). Confirm full system access once.
 - **Tab completion is rules-first.** `suggestReply` only. Do not add
@@ -523,8 +533,7 @@ Verified against source 2026-09-14. Longer landmine list:
   `gray-matter` (its default JS engine evaluates `---javascript`).
   Coffee / coffeescript / cson / `searchNotes` stay data-only too
   (`vault.security.test.js`). The packaged MCP bundle is generated
-  (`src-tauri/.gitignore`) — `/Applications` `476756c` will not pick
-  S1/S2 until rebuild.
+  (`src-tauri/.gitignore`); S1/S2 are in stamped app `712024d`.
 - **Ask the agent about this note** keeps Chat and opens that note
   (`App.test.tsx`). Locked notes are read-only in BlockNote and raw
   (`EditorContentLayout.test.tsx`). Not vault `editor_mode`. Sheets do

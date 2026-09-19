@@ -10,8 +10,10 @@ shipped after Claude last owned a session, what GitHub still says is
 open that is already built, and the decisions you will otherwise
 re-litigate.
 
-**Living-docs stamp 2026-09-14 16:55:** local HEAD **`690712e`**, origin **`5c629a0`**
-(eighteen unpushed), app **`476756c`**. Crunch leftover through 1559. No push. No rebuild. God plan: [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md).
+**Living-docs stamp 2026-09-19:** local = origin **`35f217f`**. Packaged
+app **`712024d`** (2026-09-17 17:23) — C75 boot + traffic lights `x: 14`
+are in that `.app`. Tray Done / empty-rejection labels are tree-only
+until rebuild. God plan: [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md).
 Morning pickup:
 [`2026-09-14-1115`](plans/handoffs/2026-09-14-1115-cursor-grok-4-6-morning-pickup.md).
 Tonight’s picture: [`BOARD.md`](BOARD.md). Confirm with `git log -1` and
@@ -63,14 +65,19 @@ longer open the way the ADR text still sounds.
 
 | Question | Now |
 |---|---|
-| ⌘1 / ⌘2 / ⌘3 | **Settled 2026-08-25.** Labels in tree 2026-09-14: ⌘1 Chat only. ⌘2 **Notes, Browse closed**. ⌘3 **Notes, Browse open**. Stored `viewMode` values unchanged (`editor-only` / `editor-list` / `all`). Fresh vaults default to `editor-list` (C72). Inbox stays the folder. Packaged leftover still **`476756c`**. |
+| ⌘1 / ⌘2 / ⌘3 | **Settled 2026-08-25.** Labels in tree 2026-09-14: ⌘1 Chat only. ⌘2 **Notes, Browse closed**. ⌘3 **Notes, Browse open**. Stored `viewMode` values unchanged (`editor-only` / `editor-list` / `all`). Fresh vaults default to `editor-list` (C72). Inbox stays the folder. Packaged app **`712024d`**. |
 | Right panel | **Settled 2026-08-25, refined 2026-09-12.** One Notes panel. Compact nav above the selected list. Rail control is **Notes** (Inbox is a folder in the list). Shut Notes leaves a 46px restore rail. No Inbox/Notes tabs, no second right column. |
 | Canvas destinations | **Corrected 2026-09-07.** Chat stays the centre. Graph/Mycelium are a Changes-only cell under Notes (ADR-0171), not a place you go instead of chatting (`App.layout-edges.test.ts` 14:33). Research is still a centre pane (Chat `display: none`, not an overlay). #39 (graph as an *agent tool*) is still open. |
 | Open note vs Chat | **Shipped 2026-09-12.** Notes header **On top / Beside**. Beside folds Sessions/Notes. Hover must not collapse the note. Highlight → Copy, or **Ask Chat about this** (same thread; `App.layout-edges.test.ts` 14:00). Right-click a list row → **Ask the agent about this note** keeps Chat and opens that note (`App.test.tsx` 13:50). Note lock is ephemeral and per-note — locked notes are read-only (`EditorContentLayout.test.tsx` 13:51). Not vault `editor_mode`. |
 | Latest reply | Green start marker on the newest assistant turn. Moves when a newer reply starts. |
 | Session click | Transcript **clears on the click**, then rehydrates. Leaving the old chat up is the switch beachball. |
 | Settings cost | Model catalog and provider status wait until **Agents** is visible. Packages catalog waits until **Packages**. |
-| Hide vs quit | Red button hides (C22) and stops helpers this process started, unless Keep working. Cmd+Q quits. Never Prime `shutdown`. |
+| Hide vs quit | Red button hides (C22) and stops **ws-bridge + Mindwalk**. Spawned Prime stays warm (C75). Cmd+Q quits. Never Prime `shutdown`. |
+| Tray finish | Running rows say `{title} · {activity}` (same words as the popover, plus helper count). A drop-off stays `Done: {title}` for 45s. Tooltip `Rhizome — session finished` only when nothing is running. Failed roster read does not invent finishes. Click clears that Done row. Do not close #52 from units. Tree `35f217f`; not in `/Applications` yet. |
+| Empty rejection | Empty assistant turn with `usage.input == 0` → `{provider} rejected this request before it ran (no input tokens).` Input tokens > 0 still use the old placeholder. |
+| Traffic lights | Overlay `{ x: 14, y: 16 }` (`trafficLights.ts` / `tauri.conf.json`). Insets come from that constant. |
+| First-run vault | Local scaffold. Only `RHIZOME_GETTING_STARTED_REPO_URL` clones. `TOLARIA_*` / `LAPUTA_*` env names do nothing. |
+| Cold restore | `BootSplash` while `App` lazy-loads. Idle Chat uses `latest_prime_session_for_restore`, not the full list. |
 
 **Do not** make nav and the note list exclusive. Claude tried; it broke
 Cmd+N, inbox auto-advance, and note selection. Keep them mounted

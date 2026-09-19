@@ -47,12 +47,14 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Composer · 2026-09-17 17:23 · CPR (traffic lights).
+**Origin:** Cursor Grok 4.6 · 2026-09-19 · docs sync vs `35f217f`.
 
-Local and origin **`712024d`**. Packaged app **`712024d`** installed
+Local and origin **`35f217f`**. Packaged app **`712024d`** installed
 2026-09-17 17:23 (`/Applications/Rhizome Agent.app`; old app deleted first).
-Traffic lights at left corner (`x: 14`). Import waits for **`1`**. Do not
-merge #66. Native W4 / #46 still open. Not yet daily-driver ready.
+C75 boot + traffic lights (`x: 14`) are in that `.app`. Tray Done and
+empty-rejection labels are on origin, not yet rebuilt. Import waits for
+**`1`**. Do not merge #66. Native W4 / #46 still open. Not yet
+daily-driver ready.
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Dock direction is **Signal** (ADR-0172).
@@ -96,7 +98,8 @@ Priority: push `4416411`/`e64a283`, C64 ×3, W4 native evidence. Inventory:
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
-- [2026-09-18 · store trip](plans/handoffs/2026-09-18-1653-cursor-composer-store-trip.md) — Done row, Pi symlink skip, Getting Started env aliases. Local only.
+- [2026-09-19 · living docs vs 35f217f](plans/handoffs/2026-09-19-1916-cursor-grok-4-6-docs-tray-c75.md) — tray Done, C75 hide, Getting Started env, traffic lights.
+- [2026-09-18 · store trip](plans/handoffs/2026-09-18-1653-cursor-composer-store-trip.md) — Done row, Pi symlink skip, Getting Started env. On origin as `35f217f`. Not rebuilt.
 - [2026-09-17 · CPR traffic lights](plans/handoffs/2026-09-17-1723-cursor-composer-cpr-traffic-lights.md) — `712024d` in `/Applications` 17:23.
 - [2026-09-17 · CPR icon contrast](plans/handoffs/2026-09-17-1626-cursor-composer-cpr-icon-contrast.md) — `bfe406b` in `/Applications` 16:26.
 - [2026-09-15 · CPR Signal + C75](plans/handoffs/2026-09-15-1408-cursor-composer-cpr.md) — `cb74b28` in `/Applications` 14:08.
@@ -230,7 +233,7 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 
 ## Open threads
-- **C75-MITIGATED (2026-09-15): cold launch felt blank ~2s and “ready” ~10s+.** Blank shell was `Suspense fallback={null}` + huge lazy `App` chunk; slow ready was Prime daemon spawn after hide/quit plus full session-list scan for idle restore. Tree now: HTML + `BootSplash`, non-blocking Google Fonts, `warm_daemon_in_background` at setup, hide leaves spawned Prime daemon warm, idle restore uses `latest_prime_session_for_restore` (not full list). **Needs rebuild** to feel it in `/Applications`. Full transcript remount and Sessions-rail list are still separate costs.
+- **C75-MITIGATED (2026-09-15): cold launch felt blank ~2s and “ready” ~10s+.** Blank shell was `Suspense fallback={null}` + huge lazy `App` chunk; slow ready was Prime daemon spawn after hide/quit plus full session-list scan for idle restore. Tree now: HTML + `BootSplash`, non-blocking Google Fonts, `warm_daemon_in_background` at setup, hide leaves spawned Prime daemon warm, idle restore uses `latest_prime_session_for_restore` (not full list). **In packaged `712024d`.** Full transcript remount and Sessions-rail list are still separate costs.
 - **C65-RESOLVED (2026-09-05): the debug bundle can't run natively while the installed app is open — diagnosed, not a defect to fix.** `tauri-plugin-single-instance` enforces one process per bundle identifier, and the debug bundle and `/Applications/Rhizome Agent.app` both carry `ai.rhizome.agent`. Launching the debug bundle (via `open -n` or its raw executable) while the installed app is running silently forwards to the installed instance and the new process exits instantly with no log output — it never stays alive to attach to. This is the actual mechanism behind two prior sessions' "Codex native controls select the wrong app by bundle ID" observations; it's not an attachment/selection quirk, the debug process is genuinely not there. **Workaround, verified working:** quit the installed app first (`osascript -e 'tell application id "ai.rhizome.agent" to quit'`), then launch the debug `.app` — it runs as its own process, confirmed by executable path (`ps aux`), and cua-driver attaches by pid normally. Always ask before quitting the installed app — it may hold unsaved chat/note state. Not filing this as a product bug to fix: single-instance-per-identifier is standard, intentional behavior; the fix is procedural (quit-then-launch), not code. Detail: [2026-09-05-0620](plans/handoffs/2026-09-05-0620-claude-sonnet-5-a1-connections-routing.md).
 - **C61-RESOLVED (2026-09-05): native Graph navigation discarded unsent drafts and hid current chat.** Originally reproduced twice by the GPT-6 audit; fixed by keeping the inactive view mounted. **Native verification done 2026-09-05** on the release build: typed `VERIFY_DRAFT_C61_KEEP_ME`, opened Connections → Graph, and the draft was still in the composer afterwards. The audit's own "do not claim native verification" caveat is now discharged.
 - **C62-FIXED-NATIVE-VERIFIED (2026-09-05): Inbox retained an old untitled row after automatic rename.** Protection stayed on the old path after rename, so reload restored a ghost untitled row. `replaceEntry` now moves the protection. First source-only fix was wrong; native create→rename→reload is what caught it. Detail: [2026-09-05-0920](plans/handoffs/2026-09-05-0920-claude-opus-5-audit-findings.md).

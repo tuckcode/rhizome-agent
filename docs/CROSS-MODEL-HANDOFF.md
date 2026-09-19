@@ -590,18 +590,20 @@ models. Opening Settings used to fetch it immediately, plus
 `loadPrimeModelCatalog`; a failed “host is not running” answer is not
 cached.
 
-## 21. Hide-on-close must stop helpers this process started
+## 21. Hide-on-close stops ws-bridge and Mindwalk — not spawned Prime
 
-C22 hides the main window; it does not quit. Leaving the spawned Prime
-supervisor, MCP WebSocket bridge, and Mindwalk sidecar running after
-hide kept a Dock indicator. `release_helpers_for_hidden_window`
-(`lib.rs`) stops those unless Keep working left a resident session.
-`settle_prime_session` does the same, because `window.hide()` does not
-raise `CloseRequested` again. Never send Prime `shutdown` — other
+C22 hides the main window; it does not quit. `release_helpers_for_hidden_window`
+(`lib.rs`) stops the MCP WebSocket bridge and the Mindwalk sidecar.
+**C75:** a Prime daemon this process spawned stays warm so reopen does
+not pay spawn cost again. `hidden_window_helper_stops` is
+`["ws_bridge", "mindwalk"]` whether or not Keep working left a resident
+session. `settle_prime_session` still runs, because `window.hide()` does
+not raise `CloseRequested` again. Never send Prime `shutdown` — other
 clients share the daemon. Cmd+Q is the quit path.
 
+Do not “restore” a hide that also calls `stop_spawned_daemon`. That
+string is the leftover lock in `leftover-hide-close-names.test.ts`.
 Remainder: native live-check. See `docs/plans/hide-on-close-helpers.md`.
-Do not recode the helper stop.
 
 ## 22. Astra security traps (2026-09-14) — do not rediscover
 
@@ -649,3 +651,34 @@ are source locks. They are not a live pass.
 **Stamped 16:05:** leftover units still do not close #46. Leftover wrap `1eb0398`. D6 landed
 `c44ee2b` (`lib.rs` once in `188745d`). Do not `git add -A`. Identity
 leftover is Agent, not Desktop.
+
+## 24. C75 boot, tray Done, empty rejections, traffic lights, Getting Started env
+
+**Origin:** Cursor Grok 4.6 · 2026-09-19 · verified against `35f217f`
+
+These look like “small leftovers” and are easy to undo if you trust an
+older briefing:
+
+- **Hide vs spawn.** Hide leaves spawned Prime warm (C75). See §21.
+  Cold launch uses `BootSplash` + `warm_daemon_in_background`. Idle
+  restore is `latest_prime_session_for_restore`, not `list` then pick.
+- **Tray Done.** A chat that leaves the running roster stays
+  `Done: {title}` for 45s (`FINISHED_ROW_KEEP_MS`). Tooltip
+  `Rhizome — session finished` only when the running count is 0. A
+  failed roster read must not invent finishes. Clicking Done removes
+  that row. Do not close #52 from units. Packaged app is still
+  `712024d` — this tray work is tree-only until rebuild.
+- **Empty rejection.** `usage.input == 0` on an empty assistant turn
+  is `{provider} rejected this request before it ran (no input tokens).`
+  Do not restore “finished without returning a reply” for that case.
+  Input tokens > 0 still use the old placeholder.
+- **Traffic lights.** Overlay position is `{ x: 14, y: 16 }` in
+  `tauri.conf.json` and `MACOS_TRAFFIC_LIGHT_POSITION`. Do not move `x`
+  to clear the Sessions header — the header insets from that constant.
+- **Getting Started clone.** Only `RHIZOME_GETTING_STARTED_REPO_URL`
+  opts into a remote. `TOLARIA_GETTING_STARTED_REPO_URL` and
+  `LAPUTA_GETTING_STARTED_REPO_URL` do nothing (#57). Unset = local
+  scaffold.
+- **Pi self-symlink.** `pi_config::copy_agent_entry` skips a skill
+  symlink it cannot follow (C58). Do not delete the machine’s
+  `hyperframes` link to “fix” Pi.

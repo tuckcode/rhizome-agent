@@ -656,13 +656,22 @@ then reloads the attached session. Rhizome writes the environment variable
 
 The red traffic light **hides** the main window (C22); Cmd+Q quits.
 Idle hide settles the owned session as **Stop**, then
-`release_helpers_for_hidden_window` stops the spawned Prime supervisor,
-the MCP WebSocket bridge, and the Mindwalk sidecar so they do not leave
-a Dock “running” mark. A Keep-working (`resident`) session is the
-exception — that daemon stays. Rhizome never sends Prime’s `shutdown`
-RPC (other clients share the machine). Active hide asks first
-(`prime-active-close-requested`); `settle_prime_session` also releases
-helpers because `window.hide()` does not raise `CloseRequested` again.
+`release_helpers_for_hidden_window` stops the MCP WebSocket bridge and
+the Mindwalk sidecar so they do not leave a Dock “running” mark.
+**C75:** a Prime daemon this process spawned stays warm for fast reopen
+(`hidden_window_helper_stops` is `["ws_bridge", "mindwalk"]` only).
+Keep-working (`resident`) also leaves that daemon. Rhizome never sends
+Prime’s `shutdown` RPC (other clients share the machine). Active hide
+asks first (`prime-active-close-requested`); `settle_prime_session`
+also releases helpers because `window.hide()` does not raise
+`CloseRequested` again.
+
+Cold launch shows `BootSplash` while the lazy `App` chunk loads
+(`src/main.tsx` — not `Suspense fallback={null}`). Setup calls
+`warm_daemon_in_background`. Idle Chat restore speaks
+`latest_prime_session_for_restore` (newest resumable session), not the
+full list. Full transcript remount and the Sessions-rail list are
+separate costs.
 
 Settings and Chat share one Prime model catalog (`loadPrimeModelCatalog`).
 A failed “host is not running” answer is **not** cached. Settings must
@@ -671,7 +680,41 @@ Agents section is opened or scrolled into view. Fetching 501 models on
 every Settings open was the pinwheel.
 
 Native hide/reopen live-check is still **NOT RUN**. Do not mass-kill
-Prime-spawned `mcp-server/index.js` (ADR-0163).
+Prime-spawned `mcp-server/index.js` (ADR-0163). Do not recode hide to
+stop `spawned_prime_daemon`.
+
+#### Tray roster, Done rows, and empty-turn labels
+
+**Origin:** Cursor Grok 4.6 · 2026-09-19 · verified against `35f217f`
+
+`menu_bar_companion.rs` rebuilds the tray from Prime’s running roster
+(poll 15s, cap `TRAY_SESSION_ROW_LIMIT` = 5). A running row is
+`{title} · {activity}` using the same English as the menu-bar popover
+(`Working`, `Running a command`, `Replying`, …) plus helper count,
+including grandchildren.
+
+When a chat drops off that roster it stays as `Done: {title}` for
+`FINISHED_ROW_KEEP_MS` (45s, three polls). Tooltip is
+`Rhizome — session finished` only when nothing else is running;
+otherwise the running count wins. A failed roster read returns without
+touching finish memory — an empty error is not “every chat finished.”
+Opening a Done row removes that id; the next refresh does not put it
+back. Do not close #52 from units; native glance is still not run.
+No system notification.
+
+An empty assistant turn with `usage.input == 0` is a provider rejection
+(`prime_events::provider_error_from_agent_end`):
+`{provider} rejected this request before it ran (no input tokens).`
+A quiet turn that did use input tokens still uses the old
+“finished without returning a reply” placeholder. `stopReason: "error"`
+with a non-empty `errorMessage` is surfaced verbatim.
+
+#### macOS traffic lights
+
+The overlay title bar paints native lights at `{ x: 14, y: 16 }`
+(`tauri.conf.json` `trafficLightPosition`, mirrored in
+`src/utils/trafficLights.ts` as `MACOS_TRAFFIC_LIGHT_POSITION`).
+Chat chrome uses that constant for clearance. Do not guess a new `x`.
 
 #### What Rhizome does not own
 
@@ -845,7 +888,8 @@ flowchart LR
 | `list_prime_packages` | Installed Prime packages from `~/.prime/agent/settings.json` |
 | `install_prime_package` | Run `prime-agent package install`, then reload the attached session |
 | `get_prime_provider_status` | Read-only connection status per provider (no keys). Settings waits until Agents is visible |
-| `settle_prime_session` | Settle the owned session on hide, then release helpers this process started |
+| `settle_prime_session` | Settle the owned session on hide, then stop ws-bridge + Mindwalk. Spawned Prime stays warm (C75) |
+| `latest_prime_session_for_restore` | Newest resumable session for idle Chat restore — not the full list |
 | `extract_mcp_server_to_stable_dir(app_version)` | On Linux AppImage launches, copies bundled MCP files to `~/.local/share/rhizome/mcp-server/` with version-gated replacement so external clients can keep a stable `index.js` path |
 | `register_mcp(vault_path)` | Resolves an MCP runtime (Node.js 18+ preferred, Bun 1+ fallback), resolves the packaged or stable extracted `mcp-server/`, and writes Tolaria's vault-neutral entry to Claude Code, Antigravity CLI, Cursor, OpenCode, and generic MCP configs on user request |
 | `mcp_config_snippet(vault_path)` | Builds the exact vault-neutral `mcpServers.rhizome` JSON users can copy into any compatible client without writing third-party config files |
@@ -1430,7 +1474,7 @@ Per-vault UI settings stored locally per vault path (currently in browser/Tauri 
 On first launch, `useOnboarding` checks if the default vault exists. If not, it shows `WelcomeScreen` with three options:
 - **Create a new vault** → creates an empty git repo in a folder the user chooses
 - **Open an existing folder** → system file picker; plain Markdown folders without `.git` open immediately in supported non-git mode
-- **Get started with a template** → pick a parent folder, then call `create_getting_started_vault()` with the derived `.../Getting Started` child path so the cloned vault opens into the populated repo root immediately
+- **Get started with a template** → pick a parent folder, then call `create_getting_started_vault()` with the derived `.../Getting Started` child path. **Default is a local Rhizome scaffold** (folders + type documents, no network). A clone happens only when `RHIZOME_GETTING_STARTED_REPO_URL` is set.
 
 If the selected vault disappears after startup, `useVaultLoader` re-checks `check_vault_exists` when reloads or vault-derived surfaces fail. A confirmed missing path clears cached entries, folders, views, modified-file state, and prefetched note content, then `App` reuses the `vault-missing` `WelcomeScreen` state so note and view actions cannot keep targeting the stale active vault.
 
@@ -1442,9 +1486,34 @@ Once a vault is ready, `useAiAgentsOnboarding` can show a one-time `AiAgentsOnbo
 
 `useGettingStartedClone` reuses the same parent-folder semantics for the status-bar / command-palette clone action, and `Toast` is rendered through the AI-agents onboarding gate so the resolved destination path stays visible right after a successful clone.
 
-The starter content no longer lives in the app repo. `src-tauri/src/vault/getting_started.rs` holds the public starter repo URL (`refactoringhq/tolaria-getting-started`), delegates the clone to the git backend, then normalizes Tolaria-managed root guidance and type scaffolding (`AGENTS.md`, `CLAUDE.md`, `type.md`, `note.md`) so fresh starter vaults pick up the current defaults even when the remote starter repo still carries a legacy copy or an older pre-`type:` `is_a`-era template. `AGENTS.md` stays the canonical vault guidance file; `CLAUDE.md` is a compatibility shim that imports it for Claude Code without duplicating the instructions, and Tolaria seeds it as an organized `Note` so it stays out of the way in a fresh vault. Optional `GEMINI.md` guidance is created only by the explicit AI guidance restore action. Once a user edits a usable `AGENTS.md`, including changing its frontmatter `type`, the status command treats it as custom guidance instead of broken; repair remains reserved for missing, empty, frontmatter-only, unreadable, or exact replaceable managed templates/stubs. The clone helper still accepts the legacy `LAPUTA_GETTING_STARTED_REPO_URL` environment override so older automation can continue to redirect the starter source during the transition.
+The starter content no longer lives in the app repo. Default first-run
+builds `create_local_rhizome_scaffold` (welcome, views, type docs,
+`inbox` / `Imports` / `projects`, a local git repo). The C11 pin
+`getting_started_repo_url()` still names
+`refactoringhq/tolaria-getting-started`, but that URL is **not** cloned
+unless `RHIZOME_GETTING_STARTED_REPO_URL` is a non-empty override
+(`optional_getting_started_repo_url`). `TOLARIA_GETTING_STARTED_REPO_URL`
+and `LAPUTA_GETTING_STARTED_REPO_URL` are not read (#57).
 
-After the clone completes, Tolaria removes every configured git remote from the new starter vault. Getting Started vaults therefore open as local-only by default, and users opt into a remote later with the explicit Add Remote flow.
+When a remote URL *is* set, the helper clones it, then normalizes
+Tolaria-managed root guidance and type scaffolding (`AGENTS.md`,
+`CLAUDE.md`, `type.md`, `note.md`) so fresh starter vaults pick up the
+current defaults even when the remote still carries a legacy copy or an
+older pre-`type:` `is_a`-era template. `AGENTS.md` stays the canonical
+vault guidance file; `CLAUDE.md` is a compatibility shim that imports it
+for Claude Code without duplicating the instructions, and Tolaria seeds
+it as an organized `Note` so it stays out of the way in a fresh vault.
+Optional `GEMINI.md` guidance is created only by the explicit AI
+guidance restore action. Once a user edits a usable `AGENTS.md`,
+including changing its frontmatter `type`, the status command treats it
+as custom guidance instead of broken; repair remains reserved for
+missing, empty, frontmatter-only, unreadable, or exact replaceable
+managed templates/stubs.
+
+After a clone completes, Tolaria removes every configured git remote
+from the new starter vault. Getting Started vaults therefore open as
+local-only, and users opt into a remote later with the explicit Add
+Remote flow. The local scaffold is already local-only.
 
 ### Remote Clone & Auth Model
 
@@ -1611,7 +1680,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `image.rs` | `save_image` / `copy_image_to_vault` — save editor image attachments with sanitized filenames |
 | `migration.rs` | `flatten_vault`, `vault_health_check`, `migrate_is_a_to_type` |
 | `config_seed.rs` | Maintains vault AI guidance (`AGENTS.md`, `CLAUDE.md`, and optional `GEMINI.md` shims), migrates legacy `config/agents.md`, and repairs missing root type scaffolding such as `type.md` and `note.md` |
-| `getting_started.rs` | Clones and normalizes the public Getting Started starter vault |
+| `getting_started.rs` | Local Rhizome scaffold by default; clones only when `RHIZOME_GETTING_STARTED_REPO_URL` is set |
 
 ## Rust Backend Modules
 
@@ -1657,7 +1726,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `start_vault_watcher` / `stop_vault_watcher` | Start or stop native active-vault filesystem change events |
 | `check_vault_exists` | Check if vault path exists |
 | `create_empty_vault` | Create a git-backed vault, then seed root `AGENTS.md`, `CLAUDE.md`, `type.md`, and `note.md` defaults |
-| `create_getting_started_vault` | Clone the public Getting Started vault, refresh Tolaria-managed guidance/config defaults, and keep the cloned repo clean |
+| `create_getting_started_vault` | Local scaffold by default; clone only if `RHIZOME_GETTING_STARTED_REPO_URL` is set, then strip remotes |
 | `get_vault_ai_guidance_status` | Report whether `AGENTS.md`, `CLAUDE.md`, and optional `GEMINI.md` guidance are managed, missing, broken, or custom |
 | `restore_vault_ai_guidance` | Restore any missing/broken Tolaria-managed guidance files without overwriting custom ones |
 

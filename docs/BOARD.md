@@ -13,20 +13,21 @@ Unclaimed work: `NEXT.md`.
 
 ## Status
 
-- **Done:** CPR **`712024d`** — traffic lights left corner (`x: 14`).
-  App installed **2026-09-17 17:23** (old `/Applications` deleted first).
-  Local = origin = app.
-- **Now:** Native W4 (C64 ×3, Chat send, hide/reopen) + #46 live on this build.
-  Confirm lights sit flush left.
+- **Done:** CPR **`712024d`** — traffic lights left corner (`x: 14`) and
+  C75 boot/hide-warm Prime. App installed **2026-09-17 17:23**.
+  Origin tip **`35f217f`** (tray Done, empty rejection, Getting Started
+  env) is **not** in that `.app`.
+- **Now:** Native W4 (C64 ×3, Chat send, hide/reopen) + #46 live on the
+  stamped app. Tray glance for #52 still not run.
 - **Next:** One Astra/board visible slice. Docked: import `1`, session mouse-back.
 
-**Origin:** Cursor Composer · 2026-09-17 17:23 · CPR rebuild.
+**Origin:** Cursor Grok 4.6 · 2026-09-19 · living-docs sync.
 
 ---
 
 ## True right now
 
-- **Git tip (local):** **`712024d`**. **Origin `main`:** **`712024d`**.
+- **Git tip (local):** **`35f217f`**. **Origin `main`:** **`35f217f`**.
 - **Last stamped app:** **`712024d`**, **2026-09-17 17:23**,
   `/Applications/Rhizome Agent.app`. Vite / mock-tauri is not that vault.
 - **Prime on this machine:** **0.9.3**.
@@ -80,8 +81,8 @@ Rebuild only if Atticus will launch the new app.
 
 - Matching Notes color to Sessions **dropped the visible inner line**.
   Keep the seam on Notes. Do not cover the left pulse.
-- Close (red) **hides**. **Cmd+Q** quits. C22. Helpers **stop** after
-  hide on main (`43059e3e`); native leftover:
+- Close (red) **hides**. **Cmd+Q** quits. C22. Hide stops **ws-bridge +
+  Mindwalk**; spawned Prime stays warm (C75). Native leftover:
   [`plans/hide-on-close-helpers.md`](plans/hide-on-close-helpers.md).
 - Agent `git push` can fail on a sandbox Playwright cache. Retry outside
   the sandbox. Never `--no-verify`.
@@ -98,7 +99,7 @@ Rebuild only if Atticus will launch the new app.
 | 3 | **#51 Case 2** model-backed Tab | Case 1 enough | [2153](plans/handoffs/2026-09-06-2153-composer-issue-51-tab-remainder.md) | Optional; not daily-drive |
 | 4 | **C72** find Notes | tree labeled; leftover `476756c` | [`plans/c72-notes-delta.md`](plans/c72-notes-delta.md) | Inbox = folder; packaged View names old until rebuild |
 | 5 | Prime **session-list import** | Vault yes; rows **blocked** until **`1`** | [2152](plans/handoffs/2026-09-06-2152-composer-prime-session-list-import-brief.md) | Atticus types **`1`**. Silence is not yes. Do not speak `import_jsonl`. |
-| 6 | Hide-on-close stop helpers | On main `43059e3e`; native leftover | [`plans/hide-on-close-helpers.md`](plans/hide-on-close-helpers.md) | Native hide leaves no extra app-owned helper |
+| 6 | Hide-on-close stop helpers | C75 in `712024d`: Prime stays warm; ws-bridge + Mindwalk stop. Native leftover | [`plans/hide-on-close-helpers.md`](plans/hide-on-close-helpers.md) | Native hide leaves no extra Mindwalk / ws-bridge child; spawned Prime still listening |
 | 7 | Grokbot leftover review | Reviewed 2026-09-14; 0 Accept | [1155](plans/handoffs/2026-09-14-1155-cursor-grokbot-leftover-review.md) | rhizome-agent leftovers deferred; CodexGPT lob stays out |
 | 8 | Windows first boot **C42** / **#32** | Never launched | `WINDOWS-DEV.md` | **Blocked** — no Windows box |
 | 9 | Dirty file | Leave alone | `docs/plans/handoffs/2026-09-12-1714-rhizome-deepseek-v4-flash-thinking-pill.md` | Do not touch |
