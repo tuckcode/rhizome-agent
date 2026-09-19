@@ -412,3 +412,14 @@ describe('keyboard shortcuts and reload vault commands', () => {
   })
 })
 
+
+
+describe('pane preset commands', () => {
+  it('routes Read and Reset layout through the shared menu dispatcher', () => {
+    const handlers = { ...makeHandlers(), onReadLayout: vi.fn(), onResetLayout: vi.fn() }
+    executeAppCommand('view-read', handlers)
+    executeAppCommand('view-reset-layout', handlers)
+    expect(handlers.onReadLayout).toHaveBeenCalledOnce()
+    expect(handlers.onResetLayout).toHaveBeenCalledOnce()
+  })
+})

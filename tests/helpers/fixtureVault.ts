@@ -549,7 +549,7 @@ async function waitForFixtureVaultReady({
   try {
     await vaultPanel.waitFor({ state: 'visible', timeout: 5_000 })
   } catch {
-    await page.getByTestId('command-rail-inbox').click()
+    await page.getByTestId('vault-panel-restore').click()
     await vaultPanel.waitFor({ state: 'visible', timeout: FIXTURE_VAULT_READY_TIMEOUT })
   }
 

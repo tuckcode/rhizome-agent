@@ -96,10 +96,10 @@ describe('leftover chrome 1616', () => {
     expect(en).toContain('"status.update.check": "Check for updates"')
   })
 
-  it('stops work on idle hide and opens Notes on a fresh launch', () => {
+  it('stops work on idle hide and opens Chat on a fresh launch', () => {
     const rust = readFileSync(`${process.cwd()}/src-tauri/src/lib.rs`, 'utf8')
     const view = readFileSync(
-      `${process.cwd()}/src/hooks/useViewMode.ts`,
+      `${process.cwd()}/src/lib/panePresetStorage.ts`,
       'utf8',
     )
     const meta = readFileSync(
@@ -109,9 +109,8 @@ describe('leftover chrome 1616', () => {
     expect(rust).toContain('fn idle_main_window_close_intent')
     expect(rust).toContain('SessionCloseIntent::Stop')
     expect(view).toContain(
-      'C72: open the right Notes stack on fresh launch (Browse collapsed).',
+      "const viewMode = stored === 'editor-list' || stored === 'all' ? stored : 'editor-only'",
     )
-    expect(view).toContain("return 'editor-list'")
     expect(meta).toContain("if (options.working) return 'Working · tools'")
   })
 })

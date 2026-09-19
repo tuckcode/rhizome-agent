@@ -17,9 +17,8 @@ vi.mock('./ui/action-tooltip', () => ({
 function renderRail(overrides: Partial<React.ComponentProps<typeof CommandRail>> = {}) {
   const props: React.ComponentProps<typeof CommandRail> = {
     locale: 'en',
-    activeDestination: 'inbox',
+    activeDestination: 'chat',
     onSelectChat: vi.fn(),
-    onSelectInbox: vi.fn(),
     onSelectResearch: vi.fn(),
     onSelectChanges: vi.fn(),
     onOpenSettings: vi.fn(),
@@ -37,7 +36,7 @@ describe('CommandRail', () => {
   it('renders the destinations, Sessions space, and settings gear', () => {
     renderRail()
     expect(screen.getByTestId('command-rail')).toBeInTheDocument()
-    expect(screen.getByTestId('command-rail-inbox')).toBeInTheDocument()
+    expect(screen.getByTestId('command-rail-chat')).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-research')).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-changes')).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-settings')).toBeInTheDocument()
@@ -53,23 +52,18 @@ describe('CommandRail', () => {
     fireEvent.click(screen.getByTestId('command-rail-changes'))
     expect(props.onSelectChanges).toHaveBeenCalledOnce()
     expect(trackRailDestinationClicked).toHaveBeenCalledWith('changes')
-
-    fireEvent.click(screen.getByTestId('command-rail-inbox'))
-    expect(props.onSelectInbox).toHaveBeenCalledOnce()
-    expect(trackRailDestinationClicked).toHaveBeenCalledWith('inbox')
   })
 
   it('marks the active destination with aria-pressed', () => {
     renderRail({ activeDestination: 'research' })
     expect(screen.getByTestId('command-rail-research')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('command-rail-inbox')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('keeps Chat pressed while Notes is open, without treating Inbox as the canvas', () => {
-    renderRail({ activeDestination: 'chat', notesOpen: true })
+  it('keeps Chat pressed without a Notes destination on the rail', () => {
+    renderRail({ activeDestination: 'chat' })
     expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('command-rail-inbox')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('command-rail-inbox')).toHaveAccessibleName('Notes')
+    expect(screen.queryByTestId('command-rail-inbox')).not.toBeInTheDocument()
     expect(screen.getByTestId('command-rail-research')).toHaveAttribute('aria-pressed', 'false')
   })
 
@@ -99,7 +93,7 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
     renderRail()
 
     expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'false')
-    for (const label of ['Chat', 'Notes', 'Research', 'Changes', 'Settings']) {
+    for (const label of ['Chat', 'Research', 'Changes', 'Settings']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
     }
   })
@@ -122,9 +116,8 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
     fireEvent.mouseEnter(screen.getByTestId('command-rail'))
     await waitFor(() => expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'true'))
 
-    expect(screen.getByText('Notes')).toBeInTheDocument()
-    expect(screen.getByTestId('command-rail-inbox')).toHaveTextContent('Notes')
-    expect(screen.getByTestId('command-rail-inbox')).not.toHaveTextContent('Inbox')
+    expect(screen.getByTestId('command-rail-chat')).toHaveTextContent('Chat')
+    expect(screen.queryByTestId('command-rail-inbox')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-settings')).not.toHaveTextContent('Settings')
 
@@ -211,7 +204,7 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
 
     renderRail()
 
-    expect(screen.queryByText('Notes')).not.toBeInTheDocument()
+    expect(screen.queryByText('Research')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Pin sidebar' })).toBeInTheDocument()
   })
 })

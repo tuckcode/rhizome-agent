@@ -47,12 +47,17 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Composer · 2026-09-17 17:23 · CPR (traffic lights).
+**Origin:** Cursor Grok 4.6 · 2026-09-19 · CPR (pane presets, hybrid skill, Notes off rail).
 
-Local and origin **`712024d`**. Packaged app **`712024d`** installed
-2026-09-17 17:23 (`/Applications/Rhizome Agent.app`; old app deleted first).
-Traffic lights at left corner (`x: 14`). Import waits for **`1`**. Do not
-merge #66. Native W4 / #46 still open. Not yet daily-driver ready.
+Notes is a right panel opened from **Show Notes** (or View / Cmd+2), not a
+left-rail button. ADR-0173 names Chat / Notes / Read / Workbench; fresh
+launch is Chat. The seeded rhizome-vault skill uses a resolved Node binary
+and a GUI-safe PATH. Packaged `/Applications` still **`35f217f`** until
+this CPR rebuild finishes.
+
+Local source is ahead of origin and the packaged app. Traffic lights stay
+at the left corner (`x: 14`). Import waits for **`1`**. Do not merge #66.
+Native W4 / #46 still open. Not yet daily-driver ready.
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Dock direction is **Signal** (ADR-0172).
@@ -96,7 +101,13 @@ Priority: push `4416411`/`e64a283`, C64 ×3, W4 native evidence. Inventory:
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
-- [2026-09-18 · store trip](plans/handoffs/2026-09-18-1653-cursor-composer-store-trip.md) — Done row, Pi symlink skip, Getting Started env aliases. Local only.
+- [2026-09-19 · Notes off the rail](plans/handoffs/2026-09-19-1041-cursor-grok-4-6-notes-off-rail.md) — Notebook button gone. Show Notes strip stays. No commit or rebuild.
+- [2026-09-19 · hybrid runtime](plans/handoffs/2026-09-19-0431-cursor-grok-4-6-hybrid-runtime.md) — Prime stays; skill PATH/node + short-reply manners. Live SKILL.md locked 444. No commit or rebuild.
+- [2026-09-19 · pane presets finish](plans/handoffs/2026-09-19-0148-cursor-grok-4-6-pane-presets-finish.md) — leftover locks, ADR-0173, docs. Source only. No commit or rebuild.
+- [2026-09-19 · pane presets](plans/handoffs/2026-09-19-0130-codex-pane-presets-cursor-finish.md) — Codex source slice. Cursor finish followed.
+
+- [2026-09-18 · rebuild](plans/handoffs/2026-09-18-1944-cursor-composer-rebuild.md) — `35f217f` in `/Applications` 19:44.
+- [2026-09-18 · store trip](plans/handoffs/2026-09-18-1653-cursor-composer-store-trip.md) — Done row, Pi symlink skip, Getting Started env aliases. Pushed as `35f217f`.
 - [2026-09-17 · CPR traffic lights](plans/handoffs/2026-09-17-1723-cursor-composer-cpr-traffic-lights.md) — `712024d` in `/Applications` 17:23.
 - [2026-09-17 · CPR icon contrast](plans/handoffs/2026-09-17-1626-cursor-composer-cpr-icon-contrast.md) — `bfe406b` in `/Applications` 16:26.
 - [2026-09-15 · CPR Signal + C75](plans/handoffs/2026-09-15-1408-cursor-composer-cpr.md) — `cb74b28` in `/Applications` 14:08.
@@ -270,7 +281,11 @@ push is not a release — releases are tagged builds with signed installers.
 
 - ~~**C71-OPEN (2026-09-06): composer up-arrow previous-prompt history.**~~ **RESOLVED 2026-09-06.** Session-scoped in-memory recall (cap 50); Up/Down when empty or caret at start; suggestion menus keep Arrow keys. See `composerPromptHistory` + `useComposerPromptHistory`.
 
-- **C72 (2026-09-06/07): side-panel discoverability.** **PARTIAL 2026-09-12 polish:** rail control is **Notes** (Inbox stays a folder in the list); Chat stays the canvas; last idle conversation resumes on native relaunch; composer Prime/skills are labels. **Origin:** Cursor Grok 4.6 · 2026-09-14 14:16 — leftover is packaged **`476756c`**. Tree already ⌘2 `Notes, Browse closed` / ⌘3 `Notes, Browse open` (View menu + shortcuts sheet). Inbox stays the folder. Detail: [2026-09-12-0845](plans/handoffs/2026-09-12-0845-cursor-grok-4-6-ux-visual-pass.md).
+- **C72 (2026-09-06/07): side-panel discoverability.** Notes is a **right
+  panel**, opened from **Show Notes** (and View / Cmd+2). It is **not** on
+  the left command rail. Inbox stays a folder inside that panel. **ADR-0173**
+  names Chat / Notes / Read / Workbench and defaults a fresh launch to Chat.
+  Packaged `/Applications` is unchanged until rebuild.
 
 - **#50 (2026-08-29): let the agent see the running app — plan ready, not built.**
   Three answers proposed: show `pnpm dev` (not native), read + steer through
@@ -350,6 +365,9 @@ push is not a release — releases are tagged builds with signed installers.
   (`docs/design/token-routing-and-compression.md`); full stack still unread.
   Composition (option 2) is written but unratified:
   `docs/design/harness-composition.md`, pickup in `docs/NEXT.md` §1.
+  **2026-09-19 metabolite (source + live skill, not a new runtime):**
+  Hermes/Pi short-reply manners and a GUI-safe Node `PATH` live in
+  `prime_vault_skill.rs`. Do not cite this as swapping Prime for Hermes.
 
 - **C49-RESOLVED (2026-08-23): Mycelium did not white-screen.** The original
   native audit clicked the wrong rail coordinate: its before/after screenshots

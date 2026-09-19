@@ -24,6 +24,7 @@ interface UseAppWindowControlsParams {
   layout: ReturnType<typeof useLayoutPanels>
   unifiedVaultPanel?: boolean
   windowMode: boolean
+  storageScope?: string
 }
 
 interface AppWindowActionRefs {
@@ -35,7 +36,7 @@ interface AppWindowActionRefs {
   tableOfContentsToggleRef: MutableRefObject<() => void>
 }
 
-interface AppWindowControls {
+interface AppWindowControls extends Pick<ReturnType<typeof useViewMode>, 'panePreset' | 'setPanePreset' | 'updatePanePreset' | 'resetPaneLayout'> {
   buildNumber: string | undefined
   diffToggleRef: MutableRefObject<() => void>
   findInNoteRef: MutableRefObject<FindInNoteHandler | null>
@@ -101,6 +102,7 @@ export function useAppWindowControls({
   layout,
   unifiedVaultPanel = false,
   windowMode,
+  storageScope,
 }: UseAppWindowControlsParams): AppWindowControls {
   const {
     diffToggleRef,
@@ -111,8 +113,8 @@ export function useAppWindowControls({
     tableOfContentsToggleRef,
   } = useAppWindowActionRefs()
 
-  const { viewMode, setViewMode, sidebarVisible, noteListVisible } = useViewMode(
-    windowMode ? 'editor-only' : undefined,
+  const { viewMode, setViewMode, sidebarVisible, noteListVisible, ...paneControls } = useViewMode(
+    windowMode ? 'editor-only' : undefined, storageScope,
   )
   const zoom = useZoom()
   const buildNumber = useBuildNumber()
@@ -150,6 +152,7 @@ export function useAppWindowControls({
   })
 
   return {
+    ...paneControls,
     buildNumber,
     diffToggleRef,
     findInNoteRef,

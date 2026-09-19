@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChatCircle, GearSix, GitBranch, MagnifyingGlass, Notebook, PushPin } from '@phosphor-icons/react'
+import { ChatCircle, GearSix, GitBranch, MagnifyingGlass, PushPin } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { ActionTooltip } from './ui/action-tooltip'
 import { Button } from './ui/button'
@@ -15,16 +15,17 @@ import {
   hasNativeMacosTrafficLights,
 } from '../utils/trafficLights'
 
-export type CommandRailDestination = 'chat' | 'inbox' | 'research' | 'changes'
+export type CommandRailDestination = 'chat' | 'research' | 'changes'
 
 interface CommandRailProps {
   locale: AppLocale
   activeDestination: CommandRailDestination
-  /** Notes column is open. Independent of Chat / Research / Changes. */
-  notesOpen?: boolean
-  inboxCount?: number
+  pinned?: boolean
+  autoCollapsed?: boolean
+  onPinnedChange?: (pinned: boolean) => void
+  width?: number
+  onWidthChange?: (delta: number) => void
   onSelectChat: () => void
-  onSelectInbox: () => void
   onSelectResearch: () => void
   onSelectChanges: () => void
   onOpenSettings: () => void
@@ -129,19 +130,19 @@ function RailButton({
 export function CommandRail({
   locale,
   activeDestination,
-  notesOpen = false,
-  inboxCount = 0,
+  pinned, autoCollapsed = false, onPinnedChange, width, onWidthChange,
   onSelectChat,
-  onSelectInbox,
   onSelectResearch,
   onSelectChanges,
   onOpenSettings,
   onSessionsSlotReady,
 }: CommandRailProps) {
   const t = createTranslator(locale)
-  const [pinnedExpanded, setPinnedExpanded] = useState(() =>
+  const [storedPinned, setPinnedExpanded] = useState(() =>
     readStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, false),
   )
+  const pinRequested = pinned ?? storedPinned
+  const pinnedExpanded = pinRequested && !autoCollapsed
   const [hoverExpanded, setHoverExpanded] = useState(false)
   const railWidth = usePanelWidth(
     APP_STORAGE_KEYS.commandRailWidth,
@@ -198,15 +199,17 @@ export function CommandRail({
     if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current)
   }, [])
   const togglePinnedExpanded = () => {
-    const next = !pinnedExpanded
+    const next = !pinRequested
     setPinnedExpanded(next)
+    onPinnedChange?.(next)
     writeStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, next)
     if (!next) setHoverExpanded(false)
   }
   const beginResize = (event: React.MouseEvent) => {
     setPinnedExpanded(true)
+    onPinnedChange?.(true)
     writeStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, true)
-    startResizeDrag(event, 'col-resize', (deltaX) => railWidth.resizeBy(-deltaX))
+    startResizeDrag(event, 'col-resize', (deltaX) => onWidthChange ? onWidthChange(deltaX) : railWidth.resizeBy(-deltaX))
   }
   // Read once per render rather than memoised: the platform does not change,
   // and a stale memo here would be a dent in the wrong place.
@@ -227,14 +230,14 @@ export function CommandRail({
     />
   )
   const pinButton = (
-    <ActionTooltip copy={{ label: pinnedExpanded ? 'Unpin sidebar' : 'Pin sidebar' }} side="right">
+    <ActionTooltip copy={{ label: pinRequested ? 'Unpin sidebar' : 'Pin sidebar' }} side="right">
       <Button
         type="button"
         variant="ghost"
         size="icon-sm"
         onClick={togglePinnedExpanded}
-        aria-label={pinnedExpanded ? 'Unpin sidebar' : 'Pin sidebar'}
-        aria-pressed={pinnedExpanded}
+        aria-label={pinRequested ? 'Unpin sidebar' : 'Pin sidebar'}
+        aria-pressed={pinRequested}
         data-testid="command-rail-toggle"
         className="rounded-[var(--radius)] p-0 hover:bg-[var(--state-hover,var(--accent))]"
         style={{
@@ -259,7 +262,9 @@ export function CommandRail({
       onMouseEnter={openFromHover}
       onMouseLeave={cancelPendingHoverOpen}
       style={{
-        width: expanded ? railWidth.width : RAIL_COLLAPSED_WIDTH,
+        width: expanded ? (width ?? railWidth.width) : RAIL_COLLAPSED_WIDTH,
+        marginRight: expanded && !pinnedExpanded ? -((width ?? railWidth.width) - RAIL_COLLAPSED_WIDTH) : undefined,
+        zIndex: expanded && !pinnedExpanded ? 50 : undefined,
         paddingTop: trafficLightRoom ? COMMAND_RAIL_TRAFFIC_LIGHT_INSET : undefined,
         background: 'var(--surface-sidebar)',
         borderRight: '1px solid var(--border-subtle)',
@@ -282,15 +287,6 @@ export function CommandRail({
         label={t('rail.chat')}
         onClick={() => handleSelect('chat', onSelectChat)}
         testId="command-rail-chat"
-      />
-      <RailButton
-        active={notesOpen}
-        badge={inboxCount}
-        expanded={expanded}
-        icon={Notebook}
-        label={t('rail.notes')}
-        onClick={() => handleSelect('inbox', onSelectInbox)}
-        testId="command-rail-inbox"
       />
       <RailButton
         active={activeDestination === 'research'}

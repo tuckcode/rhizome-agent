@@ -151,7 +151,7 @@ export async function ensureNotesPanelOpen(page: Page) {
   if (await restore.isVisible().catch(() => false)) {
     await restore.click()
   } else if (!(await page.getByTestId('vault-panel').isVisible().catch(() => false))) {
-    await page.getByTestId('command-rail-inbox').click()
+    await page.getByTestId('vault-panel-restore').click()
   }
   await expect(noteList).toBeVisible({ timeout: 10_000 })
   return noteList

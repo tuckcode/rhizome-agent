@@ -125,6 +125,7 @@ fn resolve_cli_call_path() -> Result<PathBuf, String> {
 
 /// The environment prefix the skill's shell examples carry.
 ///
+/// `PATH` always (GUI-spawned Prime bash does not inherit a login shell);
 /// `VAULT_PATH` always; `RHIZOME_TOOL_PATH` only when the sidecar is really
 /// there. The graph tools shell out to that binary and fail closed without it —
 /// an agent following this skill would get "Graph queries need the Rhizome
@@ -132,14 +133,58 @@ fn resolve_cli_call_path() -> Result<PathBuf, String> {
 /// environment the app gives its own MCP server. Omitted rather than guessed
 /// when it is missing, so a build without the sidecar says so instead of
 /// silently routing through `index.js`'s deprecated Python fallback.
-fn shell_env_prefix(vault_path: &str, rhizome_tool: Option<&Path>) -> String {
+fn shell_env_prefix(vault_path: &str, rhizome_tool: Option<&Path>, node: Option<&Path>) -> String {
+    let path = shell_path_assignment(node);
     let vault = format!("VAULT_PATH={}", shell_single_quote(vault_path));
     match rhizome_tool {
         Some(tool) => format!(
-            "{vault} RHIZOME_TOOL_PATH={}",
+            "{path} {vault} RHIZOME_TOOL_PATH={}",
             shell_single_quote(&tool.display().to_string()),
         ),
-        None => vault,
+        None => format!("{path} {vault}"),
+    }
+}
+
+fn shell_path_assignment(node: Option<&Path>) -> String {
+    let mut dirs: Vec<String> = Vec::new();
+    if let Some(parent) = node.and_then(Path::parent) {
+        let rendered = parent.display().to_string();
+        if !rendered.is_empty() {
+            dirs.push(rendered);
+        }
+    }
+    dirs.push("$HOME/.local/bin".into());
+    dirs.push("/opt/homebrew/bin".into());
+    dirs.push("/usr/local/bin".into());
+    format!("PATH={}:$PATH", dirs.join(":"))
+}
+
+fn node_command(node: Option<&Path>) -> String {
+    match node {
+        Some(path) => shell_single_quote(&path.display().to_string()),
+        None => "node".into(),
+    }
+}
+
+fn stdio_path_value(node: Option<&Path>) -> String {
+    let sep = if cfg!(windows) { ";" } else { ":" };
+    let mut dirs: Vec<String> = Vec::new();
+    if let Some(parent) = node.and_then(Path::parent) {
+        let rendered = parent.display().to_string();
+        if !rendered.is_empty() {
+            dirs.push(rendered);
+        }
+    }
+    if let Some(home) = dirs::home_dir() {
+        dirs.push(home.join(".local").join("bin").display().to_string());
+    }
+    dirs.push("/opt/homebrew/bin".into());
+    dirs.push("/usr/local/bin".into());
+    match std::env::var("PATH") {
+        Ok(existing) if !existing.is_empty() => {
+            format!("{}{sep}{existing}", dirs.join(sep))
+        }
+        _ => dirs.join(sep),
     }
 }
 
@@ -147,9 +192,15 @@ fn shell_env_prefix(vault_path: &str, rhizome_tool: Option<&Path>) -> String {
 ///
 /// Same reasoning as [`shell_env_prefix`]: the sidecar path is included only
 /// when the binary exists, so a build without it fails loudly rather than
-/// pointing at nothing.
-fn mcp_stdio_env(vault_path: &str, rhizome_tool: Option<&Path>) -> serde_json::Value {
+/// pointing at nothing. `PATH` is always set so a GUI-spawned stdio server
+/// still finds Node.
+fn mcp_stdio_env(
+    vault_path: &str,
+    rhizome_tool: Option<&Path>,
+    node: Option<&Path>,
+) -> serde_json::Value {
     let mut env = serde_json::Map::new();
+    env.insert("PATH".into(), serde_json::json!(stdio_path_value(node)));
     env.insert("VAULT_PATH".into(), serde_json::json!(vault_path));
     env.insert(
         "VAULT_PATHS".into(),
@@ -166,7 +217,16 @@ fn mcp_stdio_env(vault_path: &str, rhizome_tool: Option<&Path>) -> serde_json::V
 }
 
 fn skill_markdown(cli_call: &Path, vault_path: &str) -> String {
-    skill_markdown_with_tool(cli_call, vault_path, rhizome_tool_for_seed().as_deref())
+    skill_markdown_with_runtime(
+        cli_call,
+        vault_path,
+        rhizome_tool_for_seed().as_deref(),
+        node_for_seed().as_deref(),
+    )
+}
+
+fn node_for_seed() -> Option<PathBuf> {
+    crate::mcp::find_node().ok()
 }
 
 /// Sidecar path for skill/MCP seed: honor `RHIZOME_TOOL_PATH` when it points at
@@ -178,13 +238,23 @@ fn rhizome_tool_for_seed() -> Option<PathBuf> {
         .or_else(crate::mcp::rhizome_tool_path)
 }
 
+#[cfg(test)]
 fn skill_markdown_with_tool(
     cli_call: &Path,
     vault_path: &str,
     rhizome_tool: Option<&Path>,
 ) -> String {
-    let cli = cli_call.display();
-    let env_prefix = shell_env_prefix(vault_path, rhizome_tool);
+    skill_markdown_with_runtime(cli_call, vault_path, rhizome_tool, None)
+}
+
+fn skill_markdown_with_runtime(
+    cli_call: &Path,
+    vault_path: &str,
+    rhizome_tool: Option<&Path>,
+    node: Option<&Path>,
+) -> String {
+    let env_prefix = shell_env_prefix(vault_path, rhizome_tool, node);
+    let node_cmd = node_command(node);
     // r## so embedded "# Idea" / .md" examples do not terminate the raw string.
     format!(
         r##"---
@@ -198,6 +268,16 @@ This skill is a **command-line tool**, not an importable Python module. Do not `
 
 Default toolkit for this vault. Prefer these over IPython/`find` crawls of Obsidian or vault paths. Install more Prime skills when you need broader tooling — there is no separate Safe/Power product mode.
 
+## How to work in this chat
+
+Prime runs this turn. Answer like a short chat agent, not a lab notebook.
+
+- **Answer in the chat first.** One short reply. Call tools only when the user asked, or when the vault is required to answer.
+- **Do not use ipython to call vault tools.** The CLI below is the only vault API. IPython cannot import this toolkit.
+- **Stdout is text.** Read it as text. Do not parse stdout with json.loads.
+- **Stop after one environment error.** `FileNotFoundError`, `ModuleNotFoundError`, `JSONDecodeError`, or `node: command not found` means that approach failed. Switch to the CLI with the PATH prefix, or say what failed. Do not retry the same missing import or the same missing binary.
+- **This vault is already attached.** Do not look for `agents/claude/vault-context.md` or a Claude start-chain. Those files are for Cursor/Claude Code, not this chat.
+
 The active vault root is:
 
 ```
@@ -207,7 +287,7 @@ The active vault root is:
 Call tools with the one-shot CLI (keep the environment prefix — the graph tools need it):
 
 ```bash
-{env_prefix} node {cli_q} <toolName> '<jsonArgs>'
+{env_prefix} {node_cmd} {cli_q} <toolName> '<jsonArgs>'
 ```
 
 ## Tools
@@ -276,8 +356,8 @@ When the user wants to **keep** something from chat, write a vault note with `cr
 Example:
 
 ```bash
-{env_prefix} node {cli_q} create_note '{{"path":"inbox/20260809-example.md","content":"---\ntitle: Example\nis_a: Note\n---\n\n# Example\n\nBody here.\n"}}'
-{env_prefix} node {cli_q} open_note '{{"path":"inbox/20260809-example.md"}}'
+{env_prefix} {node_cmd} {cli_q} create_note '{{"path":"inbox/20260809-example.md","content":"---\ntitle: Example\nis_a: Note\n---\n\n# Example\n\nBody here.\n"}}'
+{env_prefix} {node_cmd} {cli_q} open_note '{{"path":"inbox/20260809-example.md"}}'
 ```
 
 ## Rules
@@ -292,10 +372,10 @@ Example:
 "##,
         vault_path = vault_path,
         env_prefix = env_prefix,
-        cli_q = shell_single_quote(&cli.to_string()),
+        node_cmd = node_cmd,
+        cli_q = shell_single_quote(&cli_call.display().to_string()),
     )
 }
-
 fn shell_single_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
@@ -410,14 +490,20 @@ fn write_mcp_stdio_settings(
         .as_object_mut()
         .ok_or_else(|| "mcpServers must be an object".to_string())?;
 
+    let node = crate::mcp::find_node().ok();
+    let command = node
+        .as_ref()
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|| "node".into());
+
     // Array form also appears in some Prime schemas; settings.json uses object map
     // in docs. Write object form matching pi/codex style.
     servers_obj.insert(
         "rhizome".into(),
         serde_json::json!({
-            "command": "node",
+            "command": command,
             "args": [index_js.to_string_lossy()],
-            "env": mcp_stdio_env(vault_path, rhizome_tool_for_seed().as_deref())
+            "env": mcp_stdio_env(vault_path, rhizome_tool_for_seed().as_deref(), node.as_deref())
         }),
     );
 
@@ -489,13 +575,18 @@ mod tests {
 
     #[test]
     fn stdio_settings_env_matches_the_same_rule() {
-        let with_tool = mcp_stdio_env("/vault", Some(Path::new("/opt/rhizome-tool")));
+        let with_tool = mcp_stdio_env("/vault", Some(Path::new("/opt/rhizome-tool")), None);
         assert_eq!(with_tool["RHIZOME_TOOL_PATH"], "/opt/rhizome-tool");
         assert_eq!(with_tool["VAULT_PATH"], "/vault");
+        assert!(with_tool["PATH"].as_str().unwrap().contains(".local"));
 
-        let without = mcp_stdio_env("/vault", None);
+        let without = mcp_stdio_env("/vault", None, None);
         assert!(without.get("RHIZOME_TOOL_PATH").is_none());
         assert_eq!(without["VAULT_PATH"], "/vault");
+        assert!(without["PATH"]
+            .as_str()
+            .unwrap()
+            .contains("/opt/homebrew/bin"));
     }
 
     /// A path with a space is the normal case on macOS
@@ -508,9 +599,66 @@ mod tests {
             Some(Path::new(
                 "/Applications/Rhizome Agent.app/Contents/MacOS/rhizome-tool",
             )),
+            None,
         );
 
         assert!(prefix.contains("'/Applications/Rhizome Agent.app/Contents/MacOS/rhizome-tool'"));
+    }
+
+    #[test]
+    fn skill_command_uses_the_resolved_node_binary_not_bare_node() {
+        let skill = skill_markdown_with_runtime(
+            Path::new("/opt/rhizome/mcp-server/cli-call.mjs"),
+            "/vault",
+            None,
+            Some(Path::new("/opt/homebrew/bin/node")),
+        );
+        assert!(skill.contains("'/opt/homebrew/bin/node'"));
+        assert!(!skill.contains(" node '/opt/rhizome/mcp-server/cli-call.mjs'"));
+    }
+
+    #[test]
+    fn skill_command_puts_the_node_directory_on_path() {
+        let skill = skill_markdown_with_runtime(
+            Path::new("/opt/rhizome/mcp-server/cli-call.mjs"),
+            "/vault",
+            None,
+            Some(Path::new("/opt/homebrew/bin/node")),
+        );
+        assert!(skill.contains("PATH="));
+        assert!(skill.contains("/opt/homebrew/bin"));
+        assert!(skill.contains("$HOME/.local/bin"));
+    }
+
+    #[test]
+    fn skill_tells_the_agent_stdout_is_text_not_json() {
+        let skill = skill_markdown(Path::new("/opt/rhizome/mcp-server/cli-call.mjs"), "/vault");
+        assert!(skill.contains("Do not parse stdout with json.loads"));
+    }
+
+    #[test]
+    fn skill_stops_after_one_environment_error() {
+        let skill = skill_markdown(Path::new("/opt/rhizome/mcp-server/cli-call.mjs"), "/vault");
+        assert!(skill.contains("FileNotFoundError"));
+        assert!(skill.contains("Stop after one"));
+    }
+
+    #[test]
+    fn skill_does_not_send_the_agent_to_claude_start_chain_files() {
+        let skill = skill_markdown(Path::new("/opt/rhizome/mcp-server/cli-call.mjs"), "/vault");
+        assert!(skill.contains("Do not look for `agents/claude/"));
+    }
+
+    #[test]
+    fn skill_prefers_cli_over_ipython_for_vault_tools() {
+        let skill = skill_markdown(Path::new("/opt/rhizome/mcp-server/cli-call.mjs"), "/vault");
+        assert!(skill.contains("Do not use ipython to call vault tools"));
+    }
+
+    #[test]
+    fn skill_answers_in_chat_before_more_tools() {
+        let skill = skill_markdown(Path::new("/opt/rhizome/mcp-server/cli-call.mjs"), "/vault");
+        assert!(skill.contains("Answer in the chat first"));
     }
 
     #[test]

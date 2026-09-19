@@ -6,8 +6,9 @@ const source = readFileSync(
   'utf8',
 )
 
-describe('leftover Chat only en string', () => {
-  it('locks command.view.editorOnly as Chat only', () => {
-    expect(source).toContain('"command.view.editorOnly": "Chat only"')
+describe('leftover Chat en string', () => {
+  it('locks command.view.editorOnly as Chat', () => {
+    expect(source).toContain('"command.view.editorOnly": "Chat"')
+    expect(source).not.toContain('"command.view.editorOnly": "Chat only"')
   })
 })

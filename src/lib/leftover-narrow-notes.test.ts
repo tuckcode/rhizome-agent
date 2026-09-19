@@ -7,7 +7,7 @@ const source = readFileSync(
 )
 
 describe('leftover narrow notes', () => {
-  it('locks that window width must not hide Notes', () => {
-    expect(source).toContain('Window width must not hide Notes.')
+  it('fits the preset columns to preserve Chat', () => {
+    expect(source).toContain('fitPanePreset(preset,')
   })
 })

@@ -11,11 +11,11 @@ import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 test.describe('Command Palette smoke tests', () => {
   test.beforeEach(async ({ page }) => {
-    // The Notes panel now starts closed. The Inbox rail item is the stable
+    // The Notes panel now starts closed. Chat on the rail is the stable
     // shell-ready marker; these command tests do not need the panel open.
     await pinNotesShellLaunch(page)
     await page.goto('/', { waitUntil: 'domcontentloaded' })
-    await expect(page.getByTestId('command-rail-inbox')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByTestId('command-rail-chat')).toBeVisible({ timeout: 10_000 })
   })
 
   test('Cmd+K opens the command palette @smoke', async ({ page }) => {
@@ -57,7 +57,7 @@ test.describe('Keyboard shortcuts smoke tests', () => {
     // See the shell-ready marker comment in the block above.
     await pinNotesShellLaunch(page)
     await page.goto('/', { waitUntil: 'domcontentloaded' })
-    await expect(page.getByTestId('command-rail-inbox')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByTestId('command-rail-chat')).toBeVisible({ timeout: 10_000 })
   })
 
   test('Cmd+P opens quick open palette @smoke', async ({ page }) => {

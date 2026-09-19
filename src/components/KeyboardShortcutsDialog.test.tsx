@@ -23,8 +23,10 @@ describe('KeyboardShortcutsDialog', () => {
     )
 
     const dialog = screen.getByTestId('keyboard-shortcuts-dialog')
-    expect(within(dialog).getByText('Notes, Browse closed')).toBeTruthy()
-    expect(within(dialog).getByText('Notes, Browse open')).toBeTruthy()
+    expect(within(dialog).getByText('Chat')).toBeTruthy()
+    expect(within(dialog).getByText('Notes')).toBeTruthy()
+    expect(within(dialog).getByText('Read')).toBeTruthy()
+    expect(within(dialog).getByText('Workbench')).toBeTruthy()
     expect(within(dialog).queryByText('Editor + notes')).toBeNull()
     expect(within(dialog).queryByText('All panels')).toBeNull()
     expect(within(dialog).queryByText('Chat + Inbox')).toBeNull()

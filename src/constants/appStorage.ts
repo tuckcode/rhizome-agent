@@ -2,6 +2,7 @@ export const APP_STORAGE_KEYS = {
   theme: 'rhizome-theme',
   zoom: 'rhizome:zoom-level',
   viewMode: 'rhizome-view-mode',
+  panePresets: 'rhizome:pane-presets:v1',
   tagColors: 'rhizome:tag-color-overrides',
   statusColors: 'rhizome:status-color-overrides',
   propertyModes: 'rhizome:display-mode-overrides',

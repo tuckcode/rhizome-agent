@@ -649,3 +649,17 @@ are source locks. They are not a live pass.
 **Stamped 16:05:** leftover units still do not close #46. Leftover wrap `1eb0398`. D6 landed
 `c44ee2b` (`lib.rs` once in `188745d`). Do not `git add -A`. Identity
 leftover is Agent, not Desktop.
+
+## 24. In-app Chat has no login PATH — do not send it to IPython or Claude's start chain
+
+**Origin:** Cursor Grok 4.6 · 2026-09-19 · live DeepSeek probe.
+
+Prime's bash from the GUI app does not inherit a login-shell `PATH`.
+Bare `node` fails with `node: command not found`. IPython cannot
+`import rhizome_vault`. `json.loads` on CLI stdout is wrong (stdout is
+text). `agents/claude/vault-context.md` is Cursor/Claude Code, not this
+chat — the vault is already attached.
+
+Fix is the seeded `rhizome-vault` skill (`prime_vault_skill.rs`) plus
+`~/.local/bin/node` in `find_node` fallbacks. Do not add Hermes or DSH
+as a second runtime. Do not globally force thinking Off.

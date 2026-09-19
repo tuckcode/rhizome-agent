@@ -21,6 +21,8 @@ interface ViewCommandsConfig {
   hasActiveNote: boolean
   activeNoteModified: boolean
   onSetViewMode: (mode: ViewMode) => void
+  onReadLayout?: () => void
+  onResetLayout?: () => void
   onToggleInspector: () => void
   onToggleDiff?: () => void
   onToggleRawEditor?: () => void
@@ -122,7 +124,7 @@ function buildAiViewCommands(
 export function buildViewCommands(config: ViewCommandsConfig): CommandAction[] {
   const {
     hasActiveNote, activeNoteModified,
-    onSetViewMode, onToggleInspector, onToggleDiff, onToggleRawEditor, onToggleNoteLock,
+    onSetViewMode, onReadLayout, onResetLayout, onToggleInspector, onToggleDiff, onToggleRawEditor, onToggleNoteLock,
     noteWidth = DEFAULT_NOTE_WIDTH_MODE, defaultNoteWidth = DEFAULT_NOTE_WIDTH_MODE,
     onSetNoteWidth, onSetDefaultNoteWidth, onToggleAIChat, onToggleTableOfContents, onKeyboardShortcuts,
     zoomLevel, onZoomIn, onZoomOut, onZoomReset,
@@ -134,9 +136,11 @@ export function buildViewCommands(config: ViewCommandsConfig): CommandAction[] {
   const aiCommands = buildAiViewCommands(onToggleAIChat)
 
   return [
-    { id: 'view-editor', label: 'Chat only', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewEditorOnly), keywords: ['layout', 'focus', 'chat'], enabled: true, execute: () => onSetViewMode('editor-only') },
-    { id: 'view-editor-list', label: 'Notes, Browse closed', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewEditorList), keywords: ['layout', 'inbox', 'list', 'notes', 'browse'], enabled: true, execute: () => onSetViewMode('editor-list') },
-    { id: 'view-all', label: 'Notes, Browse open', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewAll), keywords: ['layout', 'sidebar', 'notes', 'browse'], enabled: true, execute: () => onSetViewMode('all') },
+    { id: 'view-editor', label: 'Chat', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewEditorOnly), keywords: ['layout', 'focus', 'chat'], enabled: true, execute: () => onSetViewMode('editor-only') },
+    { id: 'view-editor-list', label: 'Notes', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewEditorList), keywords: ['layout', 'inbox', 'list', 'notes', 'browse'], enabled: true, execute: () => onSetViewMode('editor-list') },
+    { id: 'view-all', label: 'Workbench', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewAll), keywords: ['layout', 'sidebar', 'notes', 'browse'], enabled: true, execute: () => onSetViewMode('all') },
+    { id: 'view-read', label: 'Read', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewRead), keywords: ['layout', 'note', 'beside'], enabled: Boolean(onReadLayout), execute: () => onReadLayout?.() },
+    { id: 'view-reset-layout', label: 'Reset layout', group: 'View', keywords: ['layout', 'reset', 'widths'], enabled: Boolean(onResetLayout), execute: () => onResetLayout?.() },
     { id: 'toggle-inspector', label: 'Toggle Properties Panel', group: 'View', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewToggleProperties), keywords: ['properties', 'inspector', 'panel', 'right', 'sidebar'], enabled: true, execute: onToggleInspector },
     { id: 'toggle-diff', label: 'Toggle Diff Mode', group: 'View', keywords: ['diff', 'changes', 'git', 'compare', 'version'], enabled: hasActiveNote && activeNoteModified, execute: () => onToggleDiff?.() },
     { id: 'toggle-raw-editor', label: 'Toggle Raw Editor', group: 'View', keywords: ['raw', 'source', 'markdown', 'frontmatter', 'code', 'textarea'], enabled: hasActiveNote && !!onToggleRawEditor, execute: () => onToggleRawEditor?.() },

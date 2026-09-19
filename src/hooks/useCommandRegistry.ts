@@ -98,6 +98,8 @@ interface CommandRegistryConfig {
   onPullRepository?: (path: string) => void
   onResolveConflicts?: () => void
   onSetViewMode: (mode: ViewMode) => void
+  onReadLayout?: () => void
+  onResetLayout?: () => void
   onToggleInspector: () => void
   onToggleDiff?: () => void
   onToggleRawEditor?: () => void
@@ -156,7 +158,7 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
     onQuickOpen, onCreateNote, onCreateNoteOfType, onSave, onUndo, onRedo, canUndo, canRedo, undoLabel, redoLabel,
     onPastePlainText, onOpenSettings, onOpenFeedback, onOpenResearch,
     onDeleteNote, onArchiveNote, onUnarchiveNote,
-    onCommitPush, onPull, onResolveConflicts, onSetViewMode, onToggleInspector, onToggleDiff, onToggleRawEditor, onToggleNoteLock, onFindInNote, onReplaceInNote,
+    onCommitPush, onPull, onResolveConflicts, onSetViewMode, onReadLayout, onResetLayout, onToggleInspector, onToggleDiff, onToggleRawEditor, onToggleNoteLock, onFindInNote, onReplaceInNote,
     noteWidth, defaultNoteWidth, onSetNoteWidth, onSetDefaultNoteWidth, onToggleAIChat,
     onKeyboardShortcuts, onToggleTableOfContents, onOpenVault, onCreateEmptyVault,
     selectedViewName, onMoveSelectedViewUp, onMoveSelectedViewDown, canMoveSelectedViewUp, canMoveSelectedViewDown,
@@ -261,12 +263,12 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
   ])
 
   const viewCommands = useMemo(() => buildViewCommands({
-    hasActiveNote, activeNoteModified, onSetViewMode, onToggleInspector,
+    hasActiveNote, activeNoteModified, onSetViewMode, onReadLayout, onResetLayout, onToggleInspector,
     onToggleDiff, onToggleRawEditor, onToggleNoteLock, noteWidth, defaultNoteWidth, onSetNoteWidth, onSetDefaultNoteWidth, onToggleAIChat, onToggleTableOfContents, onKeyboardShortcuts, zoomLevel, onZoomIn, onZoomOut, onZoomReset,
     onCustomizeNoteListColumns, canCustomizeNoteListColumns, noteListColumnsLabel,
     selectedViewName, onMoveSelectedViewUp, onMoveSelectedViewDown, canMoveSelectedViewUp, canMoveSelectedViewDown,
   }), [
-    hasActiveNote, activeNoteModified, onSetViewMode, onToggleInspector,
+    hasActiveNote, activeNoteModified, onSetViewMode, onReadLayout, onResetLayout, onToggleInspector,
     onToggleDiff, onToggleRawEditor, onToggleNoteLock, noteWidth, defaultNoteWidth, onSetNoteWidth, onSetDefaultNoteWidth, onToggleAIChat, onToggleTableOfContents, onKeyboardShortcuts,
     zoomLevel, onZoomIn, onZoomOut, onZoomReset,
     onCustomizeNoteListColumns, canCustomizeNoteListColumns, noteListColumnsLabel,

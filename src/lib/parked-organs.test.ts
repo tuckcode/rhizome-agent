@@ -129,10 +129,10 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/CommandRail.tsx`,
       'utf8',
     )
-    expect(en).toContain('"command.view.editorNoteList": "Notes, Browse closed"')
-    expect(en).toContain('"command.view.fullLayout": "Notes, Browse open"')
+    expect(en).toContain('"command.view.editorNoteList": "Notes"')
+    expect(en).toContain('"command.view.fullLayout": "Workbench"')
     expect(en).toContain('"rail.notes": "Notes"')
-    expect(rail).toContain("label={t('rail.notes')}")
+    expect(rail).not.toContain("label={t('rail.notes')}")
     expect(rail).not.toMatch(/label=\{t\('rail\.inbox'\)\}/)
   })
 
@@ -437,9 +437,9 @@ describe('parked organs leftover', () => {
     expect(drag).toContain('const DRAG_DISTANCE_PX = 4')
   })
 
-  it('does not hide Notes just because the window is narrow', () => {
+  it('fits Notes from the preset column budget', () => {
     const layout = readFileSync(`${process.cwd()}/src/lib/shellLayout.ts`, 'utf8')
-    expect(layout).toContain('Window width must not hide Notes.')
+    expect(layout).toContain('fitPanePreset(preset,')
     expect(layout).toContain('C72 policy lives here: Inbox opens Notes and does not close them.')
   })
 
@@ -775,7 +775,7 @@ describe('parked organs leftover', () => {
     expect(home).toContain('thinkingLevel={primeHost?.thinkingLevel ?? null}')
     expect(home).toContain('<AgentsPill')
     expect(home).toContain('activeEntry={openNoteEntry}')
-    expect(rail).toContain("label={t('rail.notes')}")
+    expect(rail).not.toContain("label={t('rail.notes')}")
     expect(rail).not.toContain("label={t('rail.inbox')}")
     expect(keys).toContain("if (event.key !== 'Enter' || event.shiftKey) return false")
     expect(menu).toContain("label: 'View in Mycelium'")
@@ -875,7 +875,7 @@ describe('parked organs leftover', () => {
     expect(app).toContain('const showVaultPanel = chatCentered && notesOpen')
     expect(app).toContain('const chatHomeSurface = (')
     expect(app).toContain('<ChatHome')
-    expect(rail).toContain('active={notesOpen}')
+    expect(rail).not.toContain('command-rail-inbox')
   })
 
   it('keeps #41 steer wired, hide-spawned daemon, and no Connections edge strip', () => {
@@ -1036,7 +1036,7 @@ describe('parked organs leftover', () => {
     )
     expect(rail).toContain('{pinButton}')
     expect(rail).toContain('<span className="ml-auto">{settingsButton}</span>')
-    expect(rail).toContain("aria-label={pinnedExpanded ? 'Unpin sidebar' : 'Pin sidebar'}")
+    expect(rail).toContain("aria-label={pinRequested ? 'Unpin sidebar' : 'Pin sidebar'}")
     expect(rail).toContain('data-testid="command-rail-toggle"')
     expect(rail).toContain('Conversations sit below the places a person can go')
   })
@@ -1057,7 +1057,7 @@ describe('parked organs leftover', () => {
     expect(titles).toContain('title: session.title?.trim() || untitled')
   })
 
-  it('keeps Cmd+1 as Chat only and Cmd+2 / Cmd+3 as Notes views', () => {
+  it('keeps Cmd+1 as Chat and Cmd+2 / Cmd+3 as Notes and Workbench', () => {
     const manifest = readFileSync(
       `${process.cwd()}/src/shared/appCommandManifest.json`,
       'utf8',
@@ -1067,7 +1067,7 @@ describe('parked organs leftover', () => {
     expect(manifest).toContain('"accelerator": "CmdOrCtrl+1"')
     expect(manifest).toContain('"accelerator": "CmdOrCtrl+2"')
     expect(manifest).toContain('"accelerator": "CmdOrCtrl+3"')
-    expect(en).toContain('"command.view.editorOnly": "Chat only"')
+    expect(en).toContain('"command.view.editorOnly": "Chat"')
   })
 
   it('keeps Restore on archived session rows', () => {

@@ -1,10 +1,11 @@
 import { useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { CHAT_MIN_WIDTH, RAIL_WIDTH, RESTORE_WIDTH } from '../lib/panePresets'
 import { isWindows } from '../utils/platform'
 
 const MAIN_WINDOW_MIN_HEIGHT = 400
 const EDITOR_ONLY_MAIN_WINDOW_MIN_WIDTH = 480
-const CHAT_CENTERED_MAIN_WINDOW_MIN_WIDTH = 760
+const CHAT_CENTERED_MAIN_WINDOW_MIN_WIDTH = CHAT_MIN_WIDTH + RAIL_WIDTH + RESTORE_WIDTH
 const MAIN_WINDOW_SIDEBAR_MIN_WIDTH = 220
 const MAIN_WINDOW_NOTE_LIST_MIN_WIDTH = 220
 const MAIN_WINDOW_INSPECTOR_MIN_WIDTH = 240
@@ -39,7 +40,7 @@ export function getMainWindowMinWidth({
     if (sidebarVisible) minWidth += getPaneWidth(sidebarWidth, MAIN_WINDOW_SIDEBAR_MIN_WIDTH)
     if (noteListVisible) minWidth += getPaneWidth(noteListWidth, MAIN_WINDOW_NOTE_LIST_MIN_WIDTH)
   }
-  if (!inspectorCollapsed) minWidth += getPaneWidth(inspectorWidth, MAIN_WINDOW_INSPECTOR_MIN_WIDTH)
+  if (!unifiedVaultPanel && !inspectorCollapsed) minWidth += getPaneWidth(inspectorWidth, MAIN_WINDOW_INSPECTOR_MIN_WIDTH)
 
   return minWidth
 }
