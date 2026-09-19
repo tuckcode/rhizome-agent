@@ -13,19 +13,21 @@ Unclaimed work: `NEXT.md`.
 
 ## Status
 
-- **Done:** Source for pane presets, hybrid skill PATH, and Notes off
-  the left rail is ready to CPR.
-- **Now:** Commit, push, rebuild `/Applications`.
+- **Done:** CPR **`6860762`** — Chat default, Notes off the left rail,
+  vault skill GUI PATH. App installed **2026-09-19 11:27** (old
+  `/Applications` deleted first). Local = origin = app.
+- **Now:** Native W4 (C64 ×3, Chat send, hide/reopen) + #46 live on this build.
+  Confirm launch is Chat and Notes opens from Show Notes.
 - **Next:** One Astra/board visible slice. Docked: import `1`, session mouse-back.
 
-**Origin:** Cursor Composer · 2026-09-18 19:44 · rebuild.
+**Origin:** Cursor Grok 4.6 · 2026-09-19 11:27 · CPR rebuild.
 
 ---
 
 ## True right now
 
-- **Git tip (local):** **`35f217f`**. **Origin `main`:** **`35f217f`**.
-- **Last stamped app:** **`35f217f`**, **2026-09-18 19:44**,
+- **Git tip (local):** **`6860762`**. **Origin `main`:** **`6860762`**.
+- **Last stamped app:** **`6860762`**, **2026-09-19 11:27**,
   `/Applications/Rhizome Agent.app`. Vite / mock-tauri is not that vault.
 - **Prime on this machine:** **0.9.3**.
 - **Open GitHub issues:** Prefer live `gh` (17 open as of 2026-09-14
