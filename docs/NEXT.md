@@ -4,6 +4,31 @@
 tagged in place. This file is a palimpsest — several models have edited it;
 `rg` cannot tell whose voice a heading is.
 
+## Pickup now (2026-09-20)
+
+**Planning update — GPT-6 / Codex · 2026-09-20:** Atticus requested a public-readiness
+assessment and a Cursor execution plan. Start with the
+[assessment and stages](plans/2026-09-20-public-readiness-plan.md), then the
+[Cursor swarm brief](plans/2026-09-20-cursor-public-readiness-swarm.md).
+The [inventory](plans/2026-09-20-public-readiness-inventory.md) preserves all
+17 live open issues, draft PRs #66–#68, latest design papers, and parked ideas.
+The product and planning commits were pushed together. Rebuild remains separate.
+
+**Origin:** Composer · Cursor · 2026-09-20 04:38.
+
+Read the session file first:
+[`plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
+
+| Priority | What | Notes |
+|---|---|---|
+| 1 | **CPR rebuild** | Only if Atticus will launch. App is still `6860762`; source includes `4f9b4c4` plus planning. |
+| 3 | **Live thinking / no-answer** | Reproduce High/loud thinking that never answers; keep clickable Reasoning; disable = thinking **Off**. Do not force Off globally. |
+| 4 | **Public-install dogfood** | Honest Prime-missing first minute (C64); one live turn + note; #46 live; stranger install note. Windows out. |
+| 5 | **Harness leftovers** | #41 live steer/queue; human session titles (unwrap history blobs on list); Packages rail shortcut only if claimed. |
+| Parked | Import `1`, #56 sentence, W11 cards, TraderAlice patterns, kanban/automations on rail | Do not invent. |
+
+**Hard nos:** wrong tree; merge #66; `import_jsonl` without `1`; cite ADR-0168 as settled; ADHD packing; English-only churn (C18).
+
 **Coming in cold:** read [`docs/BOARD.md`](BOARD.md) for tonight’s
 picture, then [`docs/HANDOFF.md`](HANDOFF.md),
 [`docs/ASTRA_PACKET.md`](ASTRA_PACKET.md) (God-plan input),
@@ -19,12 +44,10 @@ It indexes, it does not restate. Every row points at the issue, ADR, or C-number
 that owns the detail. If you find yourself copying a paragraph out of one of
 those into here, link it instead — the same rule `HANDOFF.md` runs on.
 
-Snapshot: **2026-09-14** — local HEAD **`4416411`**, origin **`5c629a0`**
-(two unpushed), app **`476756c`**. Astra S1–S4 + R1–R4 + dep pins are
-**in the dirty tree, not committed**. God plan: [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md). Morning:
-[`2026-09-14-1115`](plans/handoffs/2026-09-14-1115-cursor-grok-4-6-morning-pickup.md).
-Live `gh` **17** open issues. C-number counts below are stale — re-derive both
-before trusting:
+Snapshot: **2026-09-20** — product commit **`4f9b4c4`** plus planning,
+app **`6860762`**. God plan: [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md).
+Pickup handoff: [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
+Live `gh` open-issue count is stale here — re-derive:
 
 ```bash
 gh issue list --state open --limit 60 | wc -l
@@ -51,11 +74,15 @@ Board cards: [`BOARD.md`](BOARD.md) W11.
 | `rhizome-ship` commit / push / rebuild | Authored | [`.cursor/skills/rhizome-ship/`](../.cursor/skills/rhizome-ship/SKILL.md) · [`plans/rhizome-ship-skill.md`](plans/rhizome-ship-skill.md) |
 | Portfolio + Today + launcher + vault board | Parked | [`design/idle-chat-overview.md`](design/idle-chat-overview.md) |
 | Vault skill/memory home; no CC Switch | Parked | [`design/vault-skill-home.md`](design/vault-skill-home.md) |
+| Auto-Prediction (TraderAlice) — steal the *patterns*, not the organs | Parked | pattern: prove → verify → shadow; content-addressed provenance; CLI `allowedNextActions`. No license — copy shapes only. |
 | Memory loop index | Index | [`design/memory-loop.md`](design/memory-loop.md) |
 | TokenJuice / Switchyard | Notes only | [`design/token-routing-and-compression.md`](design/token-routing-and-compression.md) |
 | Living-docs audit | In progress | [`plans/living-docs-audit.md`](plans/living-docs-audit.md) |
 | C66 agent profile | Agreed, not built | [`plans/c66-agent-profile.md`](plans/c66-agent-profile.md) |
 | #5 Prime surface skeleton | Structured talk | [`design/prime-agent-surface.md`](design/prime-agent-surface.md) |
+| Sessions-only rail + Research on status bar | **Dirty tree 2026-09-20** | [0438](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md) |
+| Packages shortcut on rail | Parked brainstorm | Settings → Packages already exists |
+| Rail automations / kanban icons | Later | Empty icons no |
 
 Chat ↔ Prime still first. Do not replace Chat. Do not add `kanban.db`.
 Do not invent the briefing. Do not expand two big overlays at once.
@@ -83,6 +110,8 @@ trustworthy. Verify on a **real vault + live agent turn**, not unit tests alone.
    is in `/Applications` as **`6860762`**. Live `SKILL.md` may still be 444
    from the old app; a new seed should stick now. Thinking Off is still the
    right picker for Flash; do not globally force it.
+   **2026-09-20:** Reasoning fold strips echoed `<conversation_history>`
+   (dirty tree). Click-to-expand real thinking stays; Off disables thinking.
 2. **Chat reliability leftovers** — mid-turn live-proven; suspend-retry; DOM
    composer send; selection Copy allowlist. ~~#54 dual sync~~ on origin
    `f76b46c`. ~~Native Chat glance~~ **PASS** ([2245](plans/handoffs/2026-09-06-2245-composer-native-chat-glance.md)).

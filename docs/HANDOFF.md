@@ -47,15 +47,19 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Grok 4.6 · 2026-09-19 11:27 · CPR.
+**Origin:** Composer · Cursor · 2026-09-20 · rail + reasoning landed.
 
-Local and origin **`6860762`**. Packaged app **`6860762`** installed
-2026-09-19 11:27 (`/Applications/Rhizome Agent.app`; old app deleted first).
+Sessions-only rail + reasoning history strip committed as **`4f9b4c4`**.
+The public-readiness planning commit follows it. Both were pushed together.
+Packaged app remains **`6860762`** (2026-09-19 11:27) — **behind** `main`. Detail:
+[`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
 Notes is a right panel from **Show Notes** (or View / Cmd+2), not a left-rail
-button. ADR-0173: Chat / Notes / Read / Workbench; fresh launch is Chat.
-Vault skill uses a resolved Node binary and a GUI-safe PATH. Traffic lights
-stay at the left corner (`x: 14`). Import waits for **`1`**. Do not merge #66.
-Native W4 / #46 still open. Not yet daily-driver ready.
+button. Left rail is **sessions + Settings + pin** (Chat/Research destinations
+removed; Research stays on the status bar). ADR-0173: Chat / Notes /
+Read / Workbench; fresh launch is Chat. Vault skill uses a resolved Node binary
+and a GUI-safe PATH. Traffic lights stay at the left corner (`x: 14`). Import
+waits for **`1`**. Do not merge #66. Native W4 / #46 still open. Windows ship
+out. Not yet daily-driver / stranger-ready.
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
 (`373ee1f`). Dock direction is **Signal** (ADR-0172).
@@ -64,7 +68,8 @@ Mycelium now renders with a Rhizome skin (`6377b04`): a loopback proxy
 fronts the Mindwalk sidecar and injects one stylesheet, so the engine
 stays upstream's and its updates keep arriving. M4 (a native client on
 Mindwalk's `/api/sessions/{key}/snapshot`) is still unstarted and is
-unblocked, not replaced, by this.
+unblocked, not replaced, by this. Evaluate login sentence + judge CLIs
+(claude/codex) landed in `dc44d84`.
 
 This machine's installed Prime is **0.9.3** (106 public daemon commands —
 `docs/prime-adapter-surface.json`). Snapshot refreshed 2026-09-12; new names
@@ -85,20 +90,27 @@ critical path at ~120s, coverage 85s of it).
 
 ## What to pick up next
 
-`docs/NEXT.md` — unclaimed work in one place: open issues by theme, the
-decisions that block some of them, the open C-numbers, and where the design
-docs need filling. Read it when a handoff task is finished and the next one is
-yours to choose. **God plan:** [`docs/ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md).
-Morning detail:
-[`2026-09-14-1115`](plans/handoffs/2026-09-14-1115-cursor-grok-4-6-morning-pickup.md).
-Priority: push `4416411`/`e64a283`, C64 ×3, W4 native evidence. Inventory:
-[`ASTRA_PACKET.md`](ASTRA_PACKET.md).
+**2026-09-20 assessment — GPT-6 / Codex:** Atticus requested a Cursor-focused
+public-readiness plan with parallel agents. Read the
+[assessment](plans/2026-09-20-public-readiness-plan.md),
+[Cursor swarm brief](plans/2026-09-20-cursor-public-readiness-swarm.md), and
+[issue/design/parked inventory](plans/2026-09-20-public-readiness-inventory.md).
+Typecheck and 292 focused tests pass. Native readiness is not established.
+No rebuild or issue closure occurred.
+
+`docs/NEXT.md` § **Pickup now (2026-09-20)** — commit dirty rail/reasoning,
+then CPR only if Atticus will launch, then thinking/no-answer live sample,
+then public-install dogfood. God plan:
+[`docs/ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md). Session detail:
+[`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
 
 ## Recent sessions
 
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-20 · public readiness plan](plans/handoffs/2026-09-20-0506-gpt-6-public-readiness-plan.md) — assessment, Cursor swarm, parked inventory, and low-context Handy skill.
+- [2026-09-20 · rail + reasoning pickup](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md) — dirty sessions-only rail; history strip; harness stand; next plan.
 - [2026-09-19 · CPR](plans/handoffs/2026-09-19-1127-cursor-grok-4-6-cpr.md) — pane presets, hybrid skill PATH, Notes off rail. `6860762` in `/Applications` 11:27.
 - [2026-09-19 · hybrid runtime](plans/handoffs/2026-09-19-0431-cursor-grok-4-6-hybrid-runtime.md) — Prime stays; skill PATH/node + short-reply manners. Live SKILL.md locked 444. No commit or rebuild.
 - [2026-09-19 · pane presets finish](plans/handoffs/2026-09-19-0148-cursor-grok-4-6-pane-presets-finish.md) — leftover locks, ADR-0173, docs. Source only. No commit or rebuild.
@@ -239,6 +251,7 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 
 ## Open threads
+- **C76-OPEN (2026-09-20): incomplete reasoning history remains visible.** The dirty `normalizeReasoningDisplay` removes complete `<conversation_history>…</conversation_history>` blocks only. A direct function probe leaves an opening tag and unfinished history unchanged. Add a streaming/truncation regression before the fix. This display defect does not establish the cause of the live no-answer report. [Readiness plan P0/P1](plans/2026-09-20-public-readiness-plan.md).
 - **C75-MITIGATED (2026-09-15): cold launch felt blank ~2s and “ready” ~10s+.** Blank shell was `Suspense fallback={null}` + huge lazy `App` chunk; slow ready was Prime daemon spawn after hide/quit plus full session-list scan for idle restore. Tree now: HTML + `BootSplash`, non-blocking Google Fonts, `warm_daemon_in_background` at setup, hide leaves spawned Prime daemon warm, idle restore uses `latest_prime_session_for_restore` (not full list). **Needs rebuild** to feel it in `/Applications`. Full transcript remount and Sessions-rail list are still separate costs.
 - **C65-RESOLVED (2026-09-05): the debug bundle can't run natively while the installed app is open — diagnosed, not a defect to fix.** `tauri-plugin-single-instance` enforces one process per bundle identifier, and the debug bundle and `/Applications/Rhizome Agent.app` both carry `ai.rhizome.agent`. Launching the debug bundle (via `open -n` or its raw executable) while the installed app is running silently forwards to the installed instance and the new process exits instantly with no log output — it never stays alive to attach to. This is the actual mechanism behind two prior sessions' "Codex native controls select the wrong app by bundle ID" observations; it's not an attachment/selection quirk, the debug process is genuinely not there. **Workaround, verified working:** quit the installed app first (`osascript -e 'tell application id "ai.rhizome.agent" to quit'`), then launch the debug `.app` — it runs as its own process, confirmed by executable path (`ps aux`), and cua-driver attaches by pid normally. Always ask before quitting the installed app — it may hold unsaved chat/note state. Not filing this as a product bug to fix: single-instance-per-identifier is standard, intentional behavior; the fix is procedural (quit-then-launch), not code. Detail: [2026-09-05-0620](plans/handoffs/2026-09-05-0620-claude-sonnet-5-a1-connections-routing.md).
 - **C61-RESOLVED (2026-09-05): native Graph navigation discarded unsent drafts and hid current chat.** Originally reproduced twice by the GPT-6 audit; fixed by keeping the inactive view mounted. **Native verification done 2026-09-05** on the release build: typed `VERIFY_DRAFT_C61_KEEP_ME`, opened Connections → Graph, and the draft was still in the composer afterwards. The audit's own "do not claim native verification" caveat is now discharged.
