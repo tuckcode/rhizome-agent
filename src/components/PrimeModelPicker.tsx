@@ -19,6 +19,7 @@ import {
   partitionModelsByConnection,
   partitionModelsByFree,
   modelKey,
+  providerSelectionState,
   type PrimeModel,
 } from '../lib/primeModels'
 import { modelThinkingLabel, offeredThinkingLevels, thinkingLevelLabel } from '../lib/primeThinkingLevels'
@@ -274,7 +275,15 @@ export function PrimeModelPicker({
           <CaretDown size={9} weight="bold" aria-hidden="true" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side={side} align="start" className="max-h-[320px] w-64 overflow-y-auto">
+      <DropdownMenuContent
+        side={side}
+        align="start"
+        data-testid="prime-model-menu"
+        className={cn(
+          'overflow-y-auto',
+          editingList ? 'max-h-[min(70vh,32rem)] w-80' : 'max-h-[320px] w-64',
+        )}
+      >
         {error ? (
           <div className="px-2 py-1.5 text-xs text-destructive" role="alert">
             {error}
@@ -318,7 +327,9 @@ export function PrimeModelPicker({
             {t('ai.composer.modelsLoading')}
           </div>
         ) : null}
-        {models !== null && !error && groups.length === 0 && matchingHidden.length === 0 ? (
+        {models !== null &&
+        !error &&
+        (editingList ? editGroups.length === 0 : groups.length === 0 && matchingHidden.length === 0) ? (
           <div className="px-2 py-1.5 text-xs text-muted-foreground" data-testid="prime-models-empty">
             {freeOnly ? 'No free models in this catalog.' : t('ai.composer.modelsEmpty')}
           </div>
@@ -326,15 +337,15 @@ export function PrimeModelPicker({
         {editingList ? (
           <div className="px-1.5 pb-1" data-testid="prime-model-edit-list">
             {editGroups.map((group) => {
-              const providerChecked = group.models.every((model) => effectiveSelection.has(modelKey(model)))
+              const providerModels = editCatalog.filter((model) => model.provider === group.provider)
+              const providerChecked = providerSelectionState(providerModels, effectiveSelection)
               return (
                 <div key={`edit-${group.provider}`} className="border-t border-border first:border-t-0">
-                  <label className="flex w-full cursor-pointer items-center gap-2 px-1 py-1.5 text-left">
+                  <label className="flex w-full cursor-pointer items-center gap-2 px-1 py-2 text-left">
                     <Checkbox
                       checked={providerChecked}
                       data-testid={`prime-model-edit-provider-${group.provider}`}
                       onCheckedChange={() => {
-                        const providerModels = editCatalog.filter((model) => model.provider === group.provider)
                         toggleEditModels(providerModels)
                       }}
                     />
@@ -344,7 +355,10 @@ export function PrimeModelPicker({
                     const key = modelKey(model)
                     const checked = effectiveSelection.has(key)
                     return (
-                      <label key={`edit-${key}`} className="flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-accent">
+                      <label
+                        key={`edit-${key}`}
+                        className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-accent"
+                      >
                         <Checkbox
                           checked={checked}
                           data-testid={`prime-model-edit-item-${key}`}

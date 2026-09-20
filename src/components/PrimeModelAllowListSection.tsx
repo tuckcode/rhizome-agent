@@ -6,6 +6,7 @@ import {
   groupModelsByProvider,
   modelKey,
   partitionModelsByFree,
+  providerSelectionState,
   type PrimeModel,
 } from '../lib/primeModels'
 import { loadPrimeModelCatalog, onPrimeModelCatalogReset } from '../lib/primeModelCatalog'
@@ -154,9 +155,10 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
     : browsingProvider && providerFilter
       ? catalog.filter((model) => model.provider === providerFilter)
       : catalog.filter((model) => selected.has(modelKey(model)))
-  const groups = groupModelsByProvider(matches.slice(0, MAX_VISIBLE_MATCHES))
+  const visibleMatches = editingList ? matches : matches.slice(0, MAX_VISIBLE_MATCHES)
+  const groups = groupModelsByProvider(visibleMatches)
   const selectedInCatalog = catalog.filter((model) => selected.has(modelKey(model))).length
-  const truncated = matches.length - Math.min(matches.length, MAX_VISIBLE_MATCHES)
+  const truncated = editingList ? 0 : matches.length - Math.min(matches.length, MAX_VISIBLE_MATCHES)
   const showProviderBrowse = browsingProvider && !providerFilter
 
   return (
@@ -294,20 +296,24 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
           ) : null}
 
           {groups.length > 0 ? (
-            <ul className={cn(
-              'flex flex-col divide-y divide-border overflow-y-auto rounded-md border border-border',
-              editingList ? 'max-h-[28rem]' : 'max-h-64',
-            )}>
-              {groups.map((group) =>
-                [
+            <ul
+              data-testid="model-allow-list-rows"
+              data-editing={editingList ? 'true' : undefined}
+              className={cn(
+                'flex flex-col divide-y divide-border rounded-md border border-border',
+                editingList ? undefined : 'max-h-64 overflow-y-auto',
+              )}
+            >
+              {groups.map((group) => {
+                const providerModels = catalog.filter((model) => model.provider === group.provider)
+                return [
                   editingList ? (
                     <li key={`provider-${group.provider}`}>
-                      <label className="flex w-full cursor-pointer items-center gap-2 bg-muted/40 px-2 py-1.5 text-left text-[11px] font-medium">
+                      <label className="flex w-full cursor-pointer items-center gap-2 bg-muted/40 px-2 py-2 text-left text-[11px] font-medium">
                         <Checkbox
-                          checked={group.models.every((model) => effectiveSelection.has(modelKey(model)))}
+                          checked={providerSelectionState(providerModels, effectiveSelection)}
                           data-testid={`model-allow-list-group-${group.provider}`}
                           onCheckedChange={() => {
-                            const providerModels = catalog.filter((model) => model.provider === group.provider)
                             toggleProvider(providerModels)
                           }}
                         />
@@ -316,31 +322,34 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
                     </li>
                   ) : null,
                   ...group.models.map((model) => {
-                  const key = modelKey(model)
-                  const checked = editingList ? effectiveSelection.has(key) : selected.has(key)
-                  return (
-                    <li key={key}>
-                      <label
-                        className={cn(
-                          'flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left',
-                          'text-[11px] text-foreground hover:bg-accent',
-                        )}
-                      >
-                        <Checkbox
-                          checked={checked}
-                          data-testid={`model-allow-list-item-${key}`}
-                          onCheckedChange={() => toggle(model)}
-                        />
-                        <span className="truncate">{model.name || model.id}</span>
-                        <span className="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground">
-                          {group.provider}
-                        </span>
-                      </label>
-                    </li>
-                  )
-                }),
-                ],
-              )}
+                    const key = modelKey(model)
+                    const checked = editingList ? effectiveSelection.has(key) : selected.has(key)
+                    return (
+                      <li key={key}>
+                        <label
+                          className={cn(
+                            'flex w-full cursor-pointer items-center gap-2 px-2 text-left',
+                            'text-[11px] text-foreground hover:bg-accent',
+                            editingList ? 'py-2' : 'py-1.5',
+                          )}
+                        >
+                          <Checkbox
+                            checked={checked}
+                            data-testid={`model-allow-list-item-${key}`}
+                            onCheckedChange={() => toggle(model)}
+                          />
+                          <span className="truncate">{model.name || model.id}</span>
+                          {editingList ? null : (
+                            <span className="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground">
+                              {group.provider}
+                            </span>
+                          )}
+                        </label>
+                      </li>
+                    )
+                  }),
+                ]
+              })}
             </ul>
           ) : null}
 

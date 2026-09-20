@@ -240,3 +240,24 @@ export function partitionModelsByFree(
   }
   return { shown, hidden }
 }
+
+/**
+ * Checkbox state for a provider check-all over the current catalog slice.
+ *
+ * The click toggles every model of that provider in the Free-only-aware
+ * catalog, not the search hits. The box must describe that same set, or a
+ * narrowed query looks fully selected when a sibling is still off.
+ */
+export function providerSelectionState(
+  models: PrimeModel[],
+  selection: ReadonlySet<string>,
+): boolean | 'indeterminate' {
+  if (models.length === 0) return false
+  let selected = 0
+  for (const model of models) {
+    if (selection.has(modelKey(model))) selected += 1
+  }
+  if (selected === 0) return false
+  if (selected === models.length) return true
+  return 'indeterminate'
+}
