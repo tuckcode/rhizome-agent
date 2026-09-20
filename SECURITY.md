@@ -16,7 +16,11 @@ We currently support security fixes for:
 
 ## Reporting a vulnerability
 
-Please use GitHub's private vulnerability reporting flow for this repository.
+Please use GitHub's private vulnerability reporting flow for this repository
+when that setting is enabled. A Lane I `gh` read on 2026-09-20 saw
+`security_and_analysis: null` on this private repo. If private reporting is
+unavailable, contact a repository admin instead of opening a public issue.
+This is an operational note, not a legal determination.
 
 Include as much of the following as you can:
 
