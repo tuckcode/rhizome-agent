@@ -881,8 +881,6 @@
   "versionUpdate.modalTitle": "Update available",
   "versionUpdate.modalDescription": "An update is available. Review what's changed before you update.",
   "versionUpdate.rhizomeHeading": "Rhizome {version}",
-  "versionUpdate.primeHeading": "Prime {version}",
-  "versionUpdate.primeNeverAutoUpdates": "Prime never updates automatically. \"Update now\" opens the real release page so you can update it yourself, on your own schedule.",
   "versionUpdate.maybeLater": "Maybe later",
   "versionUpdate.noNotes": "No release notes provided.",
   "status.update.check": "Check for updates",

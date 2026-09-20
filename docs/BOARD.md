@@ -22,12 +22,12 @@ roadmap row in the inventory is not implementation approval.
 
 ## Status
 
-- **Done on origin:** `dc44d84` — denser sessions, Filter/Sort, rail pin lock,
-  Changes on Notes panel, Mycelium Evaluate copy, Hide Chat, one-job rule.
+- **Done on origin:** `b5dd7a1` — sessions-only rail, C76, titles, HOME
+  vault guard, preview stamps, HOME-skip test. App still `6860762`.
 - **Landed:** sessions-only left rail; Research on status bar; “Back to chat”
   exits; reasoning fold strips history echo (`4f9b4c4`).
-- **Now (for the next agent):** CPR only if he will launch → live
-  thinking/no-answer sample → public-install dogfood (#46, C64).
+- **Now (for the next agent):** #26 apply is committed (host streaming
+  guard). Live native click still unverified until rebuild + launch.
 - **Next:** human session titles; #41 live; Packages shortcut only if claimed.
 
 **Origin:** Composer · 2026-09-20 04:38.
@@ -36,9 +36,8 @@ roadmap row in the inventory is not implementation approval.
 
 ## True right now
 
-- **Git:** local product checkpoint `4f9b4c4` is **unpushed**.
-  `origin/main` is still `dc44d84`. Planning also sits locally as
-  **`bcd4b87`** and is **unpushed**. C76 source is in this commit series.
+- **Git:** `origin/main` is **`b5dd7a1`**. #26 apply is the local HEAD
+  until push. App remains `6860762`.
 - **Last stamped app:** **`6860762`**, **2026-09-19 11:27**,
   `/Applications/Rhizome Agent.app` — behind local source.
 - **Prime on this machine:** **0.9.3**.

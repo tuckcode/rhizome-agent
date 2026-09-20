@@ -1140,6 +1140,7 @@ describe('parked organs leftover', () => {
     expect(indicator).toContain('data-testid="status-version-update"')
     expect(indicator).toContain('rhizomeActions.startDownload()')
     expect(indicator).toContain('testId="version-update-rhizome"')
+    expect(indicator).toContain('primeActions.applyEngineUpdate()')
   })
 
   it('clears traffic lights on the Sessions rail and keeps Cmd+1 out of Notes chrome', () => {

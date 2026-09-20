@@ -18,6 +18,7 @@ function makePrimeActions(overrides?: Partial<PrimeUpdateActions>): PrimeUpdateA
   return {
     checkForPrimeUpdate: vi.fn(),
     openPrimeReleasePage: vi.fn(),
+    applyEngineUpdate: vi.fn(),
     ...overrides,
   }
 }
@@ -106,12 +107,13 @@ describe('VersionUpdateIndicator', () => {
     expect(screen.queryByText(/^Prime /)).not.toBeInTheDocument()
   })
 
-  it('clicking the badge opens a modal naming Prime as the one updating, with its real changelog', () => {
+  it('clicking the badge opens a modal naming the Chat engine, with its real changelog', () => {
     renderIndicator({ primeStatus: primeAvailable({ version: '0.7.2', notes: '- Fixed a focus bug' }) })
 
     fireEvent.click(screen.getByTestId('status-version-update'))
 
-    expect(screen.getByText('Prime 0.7.2')).toBeInTheDocument()
+    expect(screen.getByText('Chat engine 0.7.2')).toBeInTheDocument()
+    expect(screen.queryByText('Prime 0.7.2')).not.toBeInTheDocument()
     expect(screen.getByTestId('version-update-prime-notes')).toHaveTextContent('- Fixed a focus bug')
   })
 
@@ -121,7 +123,8 @@ describe('VersionUpdateIndicator', () => {
     fireEvent.click(screen.getByTestId('status-version-update'))
 
     expect(screen.getByText('Rhizome 2026.4.16')).toBeInTheDocument()
-    expect(screen.getByText('Prime 0.7.2')).toBeInTheDocument()
+    expect(screen.getByText('Chat engine 0.7.2')).toBeInTheDocument()
+    expect(screen.queryByText('Prime 0.7.2')).not.toBeInTheDocument()
   })
 
   it('Rhizome "Update now" starts the real download flow and closes the modal', () => {
@@ -134,19 +137,95 @@ describe('VersionUpdateIndicator', () => {
     expect(screen.queryByTestId('version-update-modal')).not.toBeInTheDocument()
   })
 
-  it('Prime "Update now" opens the real release page rather than updating unattended', () => {
-    const { primeActions } = renderIndicator({ primeStatus: primeAvailable() })
+  it('Chat-engine "Update now" applies in-app and does not open the release page', () => {
+    const { primeActions, rhizomeActions } = renderIndicator({ primeStatus: primeAvailable() })
 
     fireEvent.click(screen.getByTestId('status-version-update'))
     fireEvent.click(screen.getByTestId('version-update-prime-update-now'))
 
-    expect(primeActions.openPrimeReleasePage).toHaveBeenCalledOnce()
-    // Prime is never touched directly -- confirm nothing resembling an
-    // in-app install/update action exists for it.
-    expect(screen.getByText(/never updates automatically/)).toBeInTheDocument()
+    expect(primeActions.applyEngineUpdate).toHaveBeenCalledOnce()
+    expect(primeActions.openPrimeReleasePage).not.toHaveBeenCalled()
+    expect(rhizomeActions.startDownload).not.toHaveBeenCalled()
+    expect(screen.getByTestId('version-update-modal')).toBeInTheDocument()
+    expect(screen.getByText(/never updates the Chat engine unattended/)).toBeInTheDocument()
   })
 
-  it('Maybe later closes the modal without triggering either update', () => {
+  it('keeps the Chat-engine Update now button disabled while applying', () => {
+    renderIndicator({
+      primeStatus: {
+        state: 'applying',
+        version: '0.7.2',
+        notes: '- Fixed a focus bug',
+        url: 'https://github.com/PrimeIntellect-ai/prime-agent/releases/tag/v0.7.2',
+      },
+    })
+
+    fireEvent.click(screen.getByTestId('status-version-update'))
+
+    expect(screen.getByTestId('version-update-prime-update-now')).toBeDisabled()
+    expect(screen.getByTestId('version-update-modal')).toBeInTheDocument()
+    expect(screen.getByText(/Applying the Chat engine update/)).toBeInTheDocument()
+  })
+
+  it('shows the installed Chat engine version after a successful apply', () => {
+    renderIndicator({
+      primeStatus: {
+        state: 'applied',
+        version: '0.7.2',
+        notes: '- Fixed a focus bug',
+        url: 'https://github.com/PrimeIntellect-ai/prime-agent/releases/tag/v0.7.2',
+        previousVersion: '0.7.0',
+        installedVersion: '0.7.2',
+        method: 'npm',
+      },
+    })
+
+    fireEvent.click(screen.getByTestId('status-version-update'))
+
+    expect(screen.getByText('Chat engine 0.7.2')).toBeInTheDocument()
+    expect(screen.queryByText('Prime 0.7.2')).not.toBeInTheDocument()
+    expect(screen.getByTestId('version-update-prime-update-now')).toBeDisabled()
+  })
+
+  it('offers the release page when the host only names the release page', () => {
+    const { primeActions } = renderIndicator({
+      primeStatus: {
+        state: 'failed',
+        version: '0.7.2',
+        notes: '- Fixed a focus bug',
+        url: 'https://github.com/PrimeIntellect-ai/prime-agent/releases/tag/v0.7.2',
+        message: 'Could not update the Chat engine. Try again, or update it from the release page.',
+        reason: 'failed',
+      },
+    })
+
+    fireEvent.click(screen.getByTestId('status-version-update'))
+    fireEvent.click(screen.getByTestId('version-update-prime-open-release'))
+    expect(primeActions.openPrimeReleasePage).toHaveBeenCalledOnce()
+  })
+
+  it('surfaces Chat-engine failure wording and a release-page fallback for unknown methods', () => {
+    const { primeActions } = renderIndicator({
+      primeStatus: {
+        state: 'failed',
+        version: '0.7.2',
+        notes: '- Fixed a focus bug',
+        url: 'https://github.com/PrimeIntellect-ai/prime-agent/releases/tag/v0.7.2',
+        message: 'The Chat engine update failed.',
+        reason: 'unknown',
+        method: 'unknown',
+      },
+    })
+
+    fireEvent.click(screen.getByTestId('status-version-update'))
+
+    expect(screen.getByText('The Chat engine update failed.')).toBeInTheDocument()
+    expect(screen.queryByText('Prime 0.7.2')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('version-update-prime-open-release'))
+    expect(primeActions.openPrimeReleasePage).toHaveBeenCalledOnce()
+  })
+
+  it('Maybe later closes the modal without applying either update', () => {
     const { rhizomeActions, primeActions } = renderIndicator({
       rhizomeStatus: rhizomeAvailable(),
       primeStatus: primeAvailable(),
@@ -157,6 +236,23 @@ describe('VersionUpdateIndicator', () => {
 
     expect(screen.queryByTestId('version-update-modal')).not.toBeInTheDocument()
     expect(rhizomeActions.startDownload).not.toHaveBeenCalled()
+    expect(primeActions.applyEngineUpdate).not.toHaveBeenCalled()
     expect(primeActions.openPrimeReleasePage).not.toHaveBeenCalled()
+  })
+
+  it('Chat-engine Update now does not start the Rhizome app download when both exist', () => {
+    const { rhizomeActions, primeActions } = renderIndicator({
+      rhizomeStatus: rhizomeAvailable(),
+      primeStatus: primeAvailable(),
+    })
+
+    fireEvent.click(screen.getByTestId('status-version-update'))
+    fireEvent.click(screen.getByTestId('version-update-prime-update-now'))
+
+    expect(screen.getByText('Rhizome 2026.4.16')).toBeInTheDocument()
+    expect(screen.getByText('Chat engine 0.7.2')).toBeInTheDocument()
+    expect(primeActions.applyEngineUpdate).toHaveBeenCalledOnce()
+    expect(rhizomeActions.startDownload).not.toHaveBeenCalled()
+    expect(screen.getByTestId('version-update-modal')).toBeInTheDocument()
   })
 })

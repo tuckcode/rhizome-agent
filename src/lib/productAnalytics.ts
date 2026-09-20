@@ -561,3 +561,28 @@ export function trackPrimePackageInstallFailed(reason: 'cli_missing' | 'error'):
 export function trackNousPortalAddedToChat(modelCount: number): void {
   trackEvent('nous_portal_added_to_chat', { model_count: modelCount })
 }
+
+export type EngineUpdateFailReason = 'busy' | 'stale' | 'missing' | 'failed' | 'unknown'
+
+/**
+ * A Chat-engine update is available (#26). Version only — never notes,
+ * paths, or session ids.
+ */
+export function trackEngineUpdateOffered(version: string): void {
+  trackEvent('engine_update_offered', { version })
+}
+
+/**
+ * The user clicked Update now for the Chat engine (#26).
+ * The expected version is the release they accepted, not user content.
+ */
+export function trackEngineUpdateAccepted(expectedVersion: string): void {
+  trackEvent('engine_update_accepted', { expected_version: expectedVersion })
+}
+
+/**
+ * A Chat-engine apply failed (#26). Safe reason enum only.
+ */
+export function trackEngineUpdateFailed(reason: EngineUpdateFailReason): void {
+  trackEvent('engine_update_failed', { reason })
+}

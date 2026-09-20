@@ -708,6 +708,7 @@ macro_rules! app_invoke_handler {
             commands::get_ai_workspace_sessions,
             commands::check_for_app_update,
             commands::check_prime_update,
+            commands::apply_prime_update,
             commands::update_menu_state,
             commands::update_app_icon,
             commands::trigger_menu_command,
