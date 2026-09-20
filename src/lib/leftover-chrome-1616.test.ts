@@ -111,9 +111,8 @@ describe('leftover chrome 1616', () => {
     )
     expect(rust).toContain('fn idle_main_window_close_intent')
     expect(rust).toContain('SessionCloseIntent::Stop')
-    expect(view).toContain(
-      "const viewMode = stored === 'editor-list' || stored === 'all' ? stored : 'editor-only'",
-    )
+    expect(view).toContain("return { version: 1, active: { id: 'chat', widths: {} }, savedWidths: {} }")
+    expect(view).not.toContain("getAppStorageItem('viewMode')")
     expect(meta).toContain("if (options.working) return 'Working · tools'")
   })
 })
