@@ -1,7 +1,5 @@
-import { APP_STORAGE_KEYS, getAppStorageItem } from '../constants/appStorage'
-import { loadFromStorage } from '../hooks/useVaultConfig'
-import { getVaultConfig } from '../utils/vaultConfigStore'
-import { normalizedWidths, PANE_PRESET_IDS, presetFromLegacy, type PanePresetId, type PanePresetState } from './panePresets'
+import { APP_STORAGE_KEYS } from '../constants/appStorage'
+import { normalizedWidths, PANE_PRESET_IDS, type PanePresetId, type PanePresetState } from './panePresets'
 
 export type PanePresetPreferences = {
   version: 1
@@ -29,14 +27,8 @@ export function loadPanePreferences(scope: string): PanePresetPreferences {
         return { version: 1, active, savedWidths }
       }
     }
-  } catch { /* Storage may be unavailable or malformed. Use the compatibility values. */ }
-  const stored = (scope ? loadFromStorage(scope).view_mode : getVaultConfig().view_mode) ?? getAppStorageItem('viewMode')
-  const viewMode = stored === 'editor-list' || stored === 'all' ? stored : 'editor-only'
-  let split: 'stacked' | 'side-by-side' = 'stacked'
-  try {
-    if (stored && localStorage.getItem(APP_STORAGE_KEYS.chatNoteSplit) === 'side-by-side') split = 'side-by-side'
-  } catch { /* A fresh launch remains Chat. */ }
-  return { version: 1, active: presetFromLegacy(viewMode, split), savedWidths: {} }
+  } catch { /* Missing or damaged storage is a Chat launch. Leftover view_mode is not a preset. */ }
+  return { version: 1, active: { id: 'chat', widths: {} }, savedWidths: {} }
 }
 
 function parsePreset(raw: unknown): PanePresetState | null {
