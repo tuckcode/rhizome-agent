@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
-import { getVaultConfig, updateVaultConfigField, subscribeVaultConfig } from '../utils/vaultConfigStore'
+import { updateVaultConfigField } from '../utils/vaultConfigStore'
 import { presetFromLegacy, presetToLegacy, type PanePresetId, type PanePresetState } from '../lib/panePresets'
 import { loadPanePreferences, savePanePreferences, type PanePresetPreferences } from '../lib/panePresetStorage'
 import { trackEvent } from '../lib/telemetry'
@@ -21,7 +21,6 @@ export function useViewMode(initialOverride?: ViewMode, storageScope = '') {
   )
   const preferences = edited?.scope === storageScope ? edited.prefs : stored
   const current = useRef(preferences)
-  const lastMode = useRef(getVaultConfig().view_mode)
   useEffect(() => { current.current = preferences }, [preferences])
   const apply = useCallback((next: PanePresetPreferences) => {
     current.current = next
@@ -29,25 +28,11 @@ export function useViewMode(initialOverride?: ViewMode, storageScope = '') {
     if (!initialOverride) savePanePreferences(storageScope, next)
   }, [initialOverride, storageScope])
 
-  useEffect(() => {
-    lastMode.current = getVaultConfig().view_mode
-    return subscribeVaultConfig(() => {
-      const mode = getVaultConfig().view_mode
-      // Null is also the store's transient reset during a vault switch.
-      if (initialOverride || mode == null || mode === lastMode.current) return
-      lastMode.current = mode
-      if (mode === presetToLegacy(current.current.active).viewMode) return
-      const next = presetFromLegacy(mode === 'all' || mode === 'editor-list' ? mode : 'editor-only', 'stacked')
-      apply({ ...current.current, active: { ...next, widths: current.current.savedWidths[next.id] ?? {} } })
-    })
-  }, [apply, initialOverride, storageScope])
-
   const setPanePreset = useCallback((id: PanePresetId) => {
     const previous = current.current
     const active: PanePresetState = { id, widths: previous.savedWidths[id] ?? {} }
     apply({ ...previous, active })
     const legacy = presetToLegacy(active)
-    lastMode.current = legacy.viewMode
     if (!initialOverride) {
       updateVaultConfigField('view_mode', legacy.viewMode)
       try { localStorage.setItem(APP_STORAGE_KEYS.chatNoteSplit, legacy.split) } catch { /* Optional compatibility mirror. */ }
@@ -65,7 +50,6 @@ export function useViewMode(initialOverride?: ViewMode, storageScope = '') {
 
   const resetPaneLayout = useCallback(() => {
     apply({ version: 1, active: { id: 'chat', widths: {} }, savedWidths: {} })
-    lastMode.current = 'editor-only'
     if (!initialOverride) {
       updateVaultConfigField('view_mode', 'editor-only')
       try { localStorage.setItem(APP_STORAGE_KEYS.chatNoteSplit, 'stacked') } catch { /* Optional compatibility mirror. */ }
