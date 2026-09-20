@@ -156,8 +156,9 @@ test.describe('Unified shell geometry', () => {
     expect(noteBox!.x).toBeGreaterThanOrEqual(chatBox!.x + chatBox!.width - 2)
 
     await page.getByRole('radio', { name: 'Note on top of Chat' }).click()
+    await expect(shell).toHaveAttribute('data-pane-preset', 'chat')
     await expect(shell).toHaveAttribute('data-compact-vault', 'false')
-    await expect(page.getByTestId('vault-panel')).toBeVisible()
+    await expect(page.getByTestId('vault-panel')).toHaveCount(0)
     await expect(page.getByTestId('chat-note-editor-resize')).toHaveAttribute('aria-orientation', 'horizontal')
   })
   test('remembers preset widths, clamps drags, folds narrow columns, and resets', async ({ page }) => {
