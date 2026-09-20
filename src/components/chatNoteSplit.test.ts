@@ -10,11 +10,20 @@ describe('chat note split compatibility', () => {
     expect(parseChatNoteSplit('vertical')).toBe('stacked')
     expect(parseChatNoteSplit('side-by-side')).toBe('side-by-side')
   })
-  it('reads and changes the preset without independent state', () => {
+  it('maps Note on top of Chat to the Chat canvas, not the Notes column', () => {
     const setPanePreset = vi.fn()
     const { result } = renderHook(() => useChatNoteSplit({ panePreset: { id: 'read', widths: {} }, setPanePreset }))
     expect(result.current.split).toBe('side-by-side')
     act(() => result.current.setSplit('stacked'))
-    expect(setPanePreset).toHaveBeenCalledWith('notes')
+    expect(setPanePreset).toHaveBeenCalledWith('chat')
+    expect(setPanePreset).not.toHaveBeenCalledWith('notes')
+  })
+
+  it('maps Note beside Chat to Read', () => {
+    const setPanePreset = vi.fn()
+    const { result } = renderHook(() => useChatNoteSplit({ panePreset: { id: 'chat', widths: {} }, setPanePreset }))
+    expect(result.current.split).toBe('stacked')
+    act(() => result.current.setSplit('side-by-side'))
+    expect(setPanePreset).toHaveBeenCalledWith('read')
   })
 })
