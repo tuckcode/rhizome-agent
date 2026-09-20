@@ -1,18 +1,14 @@
 import { Copy, Cube, Monitor, Moon, Stack, Sun, X } from '@phosphor-icons/react'
 import {
   PRODUCT_AI_AGENT_DEFINITIONS,
+  DEFAULT_AI_AGENT,
   createMissingAiAgentsStatus,
   getAiAgentAvailability,
-  getAiAgentDefinition,
-  resolveDefaultAiAgent,
-  type AiAgentId,
   type AiAgentsStatus,
 } from '../lib/aiAgents'
 import {
   agentTargetId,
-  configuredModelTargets,
   normalizeAiModelProviders,
-  resolveAiTarget,
   type AiModelProvider,
 } from '../lib/aiTargets'
 import {
@@ -139,8 +135,6 @@ interface SettingsDraft {
   autoGitInactiveThresholdSeconds: number
   autoAdvanceInboxAfterOrganize: boolean
   celebrationsEnabled: boolean
-  defaultAiAgent: AiAgentId
-  defaultAiTarget: string
   aiModelProviders: AiModelProvider[]
   releaseChannel: ReleaseChannel
   automaticUpdateChecksEnabled: boolean
@@ -179,10 +173,6 @@ interface SettingsBodyProps {
   celebrationsEnabled: boolean
   setCelebrationsEnabled: (value: boolean) => void
   aiAgentsStatus: AiAgentsStatus
-  defaultAiAgent: AiAgentId
-  setDefaultAiAgent: (value: AiAgentId) => void
-  defaultAiTarget: string
-  setDefaultAiTarget: (value: string) => void
   aiModelProviders: AiModelProvider[]
   setAiModelProviders: (value: AiModelProvider[]) => void
   onCopyMcpConfig?: () => void
@@ -264,8 +254,6 @@ function createSettingsDraft(
     autoAdvanceInboxAfterOrganize: settings.auto_advance_inbox_after_organize ?? false,
     // Absent means never chosen, which is on: the effect is opt-out.
     celebrationsEnabled: readCelebrationsEnabled(settings.celebrations_enabled),
-    defaultAiAgent: resolveDefaultAiAgent(settings.default_ai_agent),
-    defaultAiTarget: resolveAiTarget(settings).id,
     aiModelProviders: normalizeAiModelProviders(settings.ai_model_providers),
     releaseChannel: normalizeReleaseChannel(settings.release_channel),
     automaticUpdateChecksEnabled: areAutomaticUpdateChecksEnabled(settings),
@@ -341,8 +329,8 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     sidebar_type_pluralization_enabled: draft.sidebarTypePluralizationEnabled,
     initial_h1_auto_rename_enabled: draft.initialH1AutoRename,
     celebrations_enabled: draft.celebrationsEnabled,
-    default_ai_agent: draft.defaultAiAgent,
-    default_ai_target: draft.defaultAiTarget,
+    default_ai_agent: DEFAULT_AI_AGENT,
+    default_ai_target: agentTargetId(DEFAULT_AI_AGENT),
     ai_model_providers: draft.aiModelProviders.length > 0 ? draft.aiModelProviders : null,
     hide_gitignored_files: draft.hideGitignoredFiles,
     multi_workspace_enabled: draft.multiWorkspaceEnabled,
@@ -719,10 +707,6 @@ function SettingsBodyFromDraft({
       celebrationsEnabled={draft.celebrationsEnabled}
       setCelebrationsEnabled={(value) => updateDraft('celebrationsEnabled', value)}
       aiAgentsStatus={aiAgentsStatus}
-      defaultAiAgent={draft.defaultAiAgent}
-      setDefaultAiAgent={(value) => updateDraft('defaultAiAgent', value)}
-      defaultAiTarget={draft.defaultAiTarget}
-      setDefaultAiTarget={(value) => updateDraft('defaultAiTarget', value)}
       aiModelProviders={draft.aiModelProviders}
       setAiModelProviders={(value) => updateDraft('aiModelProviders', value)}
       onCopyMcpConfig={onCopyMcpConfig}
@@ -979,10 +963,6 @@ function SettingsAgentWorkflowSections({
   celebrationsEnabled,
   setCelebrationsEnabled,
   aiAgentsStatus,
-  defaultAiAgent,
-  setDefaultAiAgent,
-  defaultAiTarget,
-  setDefaultAiTarget,
   aiModelProviders,
   setAiModelProviders,
   onCopyMcpConfig,
@@ -1010,10 +990,6 @@ function SettingsAgentWorkflowSections({
           celebrationsEnabled={celebrationsEnabled}
           setCelebrationsEnabled={setCelebrationsEnabled}
           aiAgentsStatus={aiAgentsStatus}
-          defaultAiAgent={defaultAiAgent}
-          setDefaultAiAgent={setDefaultAiAgent}
-          defaultAiTarget={defaultAiTarget}
-          setDefaultAiTarget={setDefaultAiTarget}
           aiModelProviders={aiModelProviders}
           setAiModelProviders={setAiModelProviders}
           onCopyMcpConfig={onCopyMcpConfig}
@@ -1325,37 +1301,11 @@ function LanguageSettingsSection({
   )
 }
 
-function buildDefaultAiTargetOptions(
-  aiAgentsStatus: AiAgentsStatus,
-  providers: AiModelProvider[],
-  t: Translate,
-): Array<{ value: string; label: string }> {
-  const agentOptions = PRODUCT_AI_AGENT_DEFINITIONS.map((definition) => {
-    const status = getAiAgentAvailability(aiAgentsStatus, definition.id)
-    const suffix = status.status === 'installed'
-      ? ` (${t('settings.aiAgents.installed')}${status.version ? ` ${status.version}` : ''})`
-      : ` (${t('settings.aiAgents.missing')})`
-    return {
-      value: agentTargetId(definition.id),
-      label: `${t('settings.aiAgents.agentGroup')}: ${definition.label}${suffix}`,
-    }
-  })
-  const modelOptions = configuredModelTargets(providers).map((target) => ({
-    value: target.id,
-    label: `${target.provider.kind === 'ollama' || target.provider.kind === 'lm_studio' ? t('settings.aiAgents.localGroup') : t('settings.aiAgents.apiGroup')}: ${target.label}`,
-  }))
-  return [...agentOptions, ...modelOptions]
-}
-
 function AiAgentSettingsSection({
   t,
   celebrationsEnabled,
   setCelebrationsEnabled,
   aiAgentsStatus,
-  defaultAiAgent,
-  setDefaultAiAgent,
-  defaultAiTarget,
-  setDefaultAiTarget,
   aiModelProviders,
   setAiModelProviders,
   onCopyMcpConfig,
@@ -1366,20 +1316,12 @@ function AiAgentSettingsSection({
   | 'celebrationsEnabled'
   | 'setCelebrationsEnabled'
   | 'aiAgentsStatus'
-  | 'defaultAiAgent'
-  | 'setDefaultAiAgent'
-  | 'defaultAiTarget'
-  | 'setDefaultAiTarget'
   | 'aiModelProviders'
   | 'setAiModelProviders'
   | 'onCopyMcpConfig'
   | 'loadModelCatalog'
 >) {
-  const selectedTarget = resolveAiTarget({
-    default_ai_agent: defaultAiAgent,
-    default_ai_target: defaultAiTarget,
-    ai_model_providers: aiModelProviders,
-  } as Settings)
+  const primeStatus = getAiAgentAvailability(aiAgentsStatus, DEFAULT_AI_AGENT)
   const vaultConfig = useSyncExternalStore(subscribeVaultConfig, getVaultConfig, getVaultConfig)
   const sessionAutoDistillEnabled = vaultConfig.session_auto_distill_enabled === true
 
@@ -1409,29 +1351,19 @@ function AiAgentSettingsSection({
 
       <SettingsGroup>
         <SettingsRow
-          label={t('settings.aiAgents.defaultTarget')}
-          description={
-            // Daily-drive: Prime is the engine. API models in this menu are a
-            // legacy direct path that skips Prime tools — say that up front.
-            selectedTarget.kind === 'agent' && selectedTarget.agent === 'prime'
-              ? `${renderDefaultAiTargetSummary(selectedTarget, aiAgentsStatus, t)} Keep this on Prime for Chat with vault tools. Pick Claude/Grok/DeepSeek in the Chat model menu — not by switching this to an API model.`
-              : `${renderDefaultAiTargetSummary(selectedTarget, aiAgentsStatus, t)} This API model path skips Prime sessions and vault tools. Switch back to Prime Agent for daily Chat.`
-          }
+          label="Chat engine"
+          description="Prime Agent runs Chat with vault tools. Choose Claude, Grok, DeepSeek, and Nous in Chat's model menu."
           controlWidth="wide"
         >
-          <SelectControl
-            ariaLabel={t('settings.aiAgents.defaultTarget')}
-            value={defaultAiTarget}
-            onValueChange={(value) => {
-              setDefaultAiTarget(value)
-              if (value.startsWith('agent:')) {
-                const agent = value.replace('agent:', '') as AiAgentId
-                setDefaultAiAgent(agent)
-              }
-            }}
-            options={buildDefaultAiTargetOptions(aiAgentsStatus, aiModelProviders, t)}
-            testId="settings-default-ai-agent"
-          />
+          <div className="flex min-h-10 items-center gap-2 rounded-md border border-border bg-muted px-3 text-sm text-foreground" data-testid="settings-prime-chat-engine">
+            <AiAgentIcon agent={DEFAULT_AI_AGENT} size={18} />
+            <span className="font-medium">Prime Agent</span>
+            <span className="text-muted-foreground">
+              {primeStatus.status === 'installed'
+                ? `(${t('settings.aiAgents.installed')}${primeStatus.version ? ` ${primeStatus.version}` : ''})`
+                : `(${t('settings.aiAgents.missing')})`}
+            </span>
+          </div>
         </SettingsRow>
       </SettingsGroup>
 
@@ -1545,30 +1477,6 @@ function AiAgentsInstalledSection({
       </div>
     </div>
   )
-}
-
-function renderDefaultAiAgentSummary(defaultAiAgent: AiAgentId, aiAgentsStatus: AiAgentsStatus, t: Translate): string {
-  const definition = getAiAgentDefinition(defaultAiAgent)
-  const status = getAiAgentAvailability(aiAgentsStatus, defaultAiAgent)
-  if (status.status === 'installed') {
-    return t('settings.aiAgents.ready', {
-      agent: definition.label,
-      version: status.version ? ` ${status.version}` : '',
-    })
-  }
-  return t('settings.aiAgents.notInstalled', { agent: definition.label })
-}
-
-function renderDefaultAiTargetSummary(target: ReturnType<typeof resolveAiTarget>, aiAgentsStatus: AiAgentsStatus, t: Translate): string {
-  if (target.kind === 'api_model') {
-    const storage = target.provider.api_key_storage === 'local_file'
-      ? t('settings.aiAgents.apiLocalKey')
-      : target.provider.api_key_env_var
-      ? t('settings.aiAgents.apiEnv', { env: target.provider.api_key_env_var })
-      : t('settings.aiAgents.apiNoKey')
-    return t('settings.aiAgents.apiReady', { target: target.label, storage })
-  }
-  return renderDefaultAiAgentSummary(target.agent, aiAgentsStatus, t)
 }
 
 function OrganizationWorkflowSection({
