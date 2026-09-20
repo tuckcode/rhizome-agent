@@ -1,20 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { createTranslator } from '../lib/i18n'
-import { filterModels, groupModelsByProvider, modelKey, type PrimeModel } from '../lib/primeModels'
+import {
+  filterModels,
+  groupModelsByProvider,
+  modelKey,
+  partitionModelsByFree,
+  type PrimeModel,
+} from '../lib/primeModels'
 import { loadPrimeModelCatalog, onPrimeModelCatalogReset } from '../lib/primeModelCatalog'
-import { trackPrimeModelAllowListChanged } from '../lib/productAnalytics'
+import { trackPrimeModelAllowListChanged, trackPrimeModelsFreeOnly } from '../lib/productAnalytics'
 import { callHost } from '../lib/callHost'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
+import { Switch } from './ui/switch'
+import { Checkbox } from './ui/checkbox'
+import { usePrimeModelsFreeOnly } from '../hooks/usePrimeModelsFreeOnly'
 
 /**
  * Choose which of Prime's models appear in the chat model menu (#45).
  *
- * Prime publishes its whole catalog — 501 models on one measured machine —
- * and exposes no price, so "show me only the free ones" cannot be a computed
- * filter. A hand-picked list is the mechanism that actually holds.
+ * Prime publishes its whole catalog — 501 models on one measured machine.
+ * Free only is a second cut on that catalog: an explicit host flag, then
+ * provider-marked suffixes. The hand-picked list is still the shortlist.
  *
  * The editor therefore must not be the same wall it is fixing: it opens on
  * the shortlist (or, when nothing is curated yet, on provider names — not
@@ -43,6 +51,8 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
   const [allowList, setAllowList] = useState<string[]>([])
   const [query, setQuery] = useState('')
   const [providerFilter, setProviderFilter] = useState<string | null>(null)
+  const [freeOnly, setFreeOnly] = usePrimeModelsFreeOnly()
+  const [editingList, setEditingList] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const loadCatalog = useCallback(async (cancelled: () => boolean) => {
@@ -78,7 +88,12 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
   }, [loadCatalog])
 
   const available = useMemo(() => models ?? [], [models])
+  const catalog = useMemo(() => partitionModelsByFree(available, freeOnly).shown, [available, freeOnly])
   const selected = useMemo(() => new Set(allowList), [allowList])
+  const effectiveSelection = useMemo(
+    () => new Set(allowList.length > 0 ? allowList : available.map(modelKey)),
+    [allowList, available],
+  )
 
   const persist = useCallback(
     async (next: string[]) => {
@@ -101,22 +116,46 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
   const toggle = useCallback(
     (model: PrimeModel) => {
       const key = modelKey(model)
+      if (editingList) {
+        const next = new Set(effectiveSelection)
+        if (next.has(key)) next.delete(key)
+        else next.add(key)
+        void persist([...next])
+        return
+      }
       void persist(
         selected.has(key) ? allowList.filter((entry) => entry !== key) : [...allowList, key],
       )
     },
-    [allowList, persist, selected],
+    [allowList, editingList, effectiveSelection, persist, selected],
   )
 
-  const providers = useMemo(() => groupModelsByProvider(available).map((group) => group.provider), [available])
+  const toggleProvider = useCallback(
+    (modelsForProvider: PrimeModel[]) => {
+      const keys = modelsForProvider.map(modelKey)
+      const shouldSelect = keys.some((key) => !effectiveSelection.has(key))
+      const next = new Set(effectiveSelection)
+      for (const key of keys) {
+        if (shouldSelect) next.add(key)
+        else next.delete(key)
+      }
+      void persist([...next])
+    },
+    [effectiveSelection, persist],
+  )
+
+  const providers = useMemo(() => groupModelsByProvider(catalog).map((group) => group.provider), [catalog])
   const trimmedQuery = query.trim()
-  const browsingProvider = !trimmedQuery && allowList.length === 0
+  const browsingProvider = !editingList && !trimmedQuery && allowList.length === 0
   const matches = trimmedQuery
-    ? filterModels(available, query)
+    ? filterModels(catalog, query)
+    : editingList
+      ? catalog
     : browsingProvider && providerFilter
-      ? available.filter((model) => model.provider === providerFilter)
-      : available.filter((model) => selected.has(modelKey(model)))
+      ? catalog.filter((model) => model.provider === providerFilter)
+      : catalog.filter((model) => selected.has(modelKey(model)))
   const groups = groupModelsByProvider(matches.slice(0, MAX_VISIBLE_MATCHES))
+  const selectedInCatalog = catalog.filter((model) => selected.has(modelKey(model))).length
   const truncated = matches.length - Math.min(matches.length, MAX_VISIBLE_MATCHES)
   const showProviderBrowse = browsingProvider && !providerFilter
 
@@ -144,11 +183,24 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={t('settings.modelAllowList.filter', { count: String(available.length) })}
-              aria-label={t('settings.modelAllowList.filter', { count: String(available.length) })}
+              placeholder={t('settings.modelAllowList.filter', { count: String(catalog.length) })}
+              aria-label={t('settings.modelAllowList.filter', { count: String(catalog.length) })}
               data-testid="model-allow-list-filter"
               className="h-8 text-[11px]"
             />
+            <div className="flex shrink-0 items-center gap-1.5">
+              <span className="text-[11px] text-foreground">Free only</span>
+              <Switch
+                checked={freeOnly}
+                aria-label="Free only"
+                data-testid="model-allow-list-free-only"
+                onCheckedChange={(on) => {
+                  setFreeOnly(on)
+                  trackPrimeModelsFreeOnly(on)
+                  setProviderFilter(null)
+                }}
+              />
+            </div>
             {allowList.length > 0 ? (
               <Button
                 type="button"
@@ -161,6 +213,19 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
                 {t('settings.modelAllowList.showAll')}
               </Button>
             ) : null}
+            <Button
+              type="button"
+              variant={editingList ? 'secondary' : 'outline'}
+              size="sm"
+              className="h-8 text-[11px]"
+              onClick={() => {
+                setEditingList((editing) => !editing)
+                setProviderFilter(null)
+              }}
+              data-testid="model-allow-list-edit-toggle"
+            >
+              {editingList ? 'Done' : 'Edit list'}
+            </Button>
           </div>
 
           {allowList.length === 0 ? (
@@ -168,13 +233,13 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
               className="text-[11px] text-muted-foreground"
               data-testid="model-allow-list-uncurated"
             >
-              {t('settings.modelAllowList.uncurated', { count: String(available.length) })}
+              {t('settings.modelAllowList.uncurated', { count: String(catalog.length) })}
             </div>
           ) : (
             <div className="text-[11px] text-muted-foreground">
               {t('settings.modelAllowList.summary', {
-                selected: String(allowList.length),
-                available: String(available.length),
+                selected: String(selectedInCatalog),
+                available: String(catalog.length),
               })}
             </div>
           )}
@@ -213,53 +278,68 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
             </div>
           ) : null}
 
-          {groups.length === 0 && trimmedQuery ? (
+          {groups.length === 0 && (trimmedQuery || (freeOnly && catalog.length === 0)) ? (
             <div
               className="text-[11px] text-muted-foreground"
-              data-testid="model-allow-list-no-matches"
+              data-testid={
+                freeOnly && catalog.length === 0
+                  ? 'model-allow-list-no-free'
+                  : 'model-allow-list-no-matches'
+              }
             >
-              {t('settings.modelAllowList.noMatches')}
+              {freeOnly && catalog.length === 0
+                ? 'No free models in this catalog.'
+                : t('settings.modelAllowList.noMatches')}
             </div>
           ) : null}
 
           {groups.length > 0 ? (
-            <ul className="flex max-h-64 flex-col divide-y divide-border overflow-y-auto rounded-md border border-border">
+            <ul className={cn(
+              'flex flex-col divide-y divide-border overflow-y-auto rounded-md border border-border',
+              editingList ? 'max-h-[28rem]' : 'max-h-64',
+            )}>
               {groups.map((group) =>
-                group.models.map((model) => {
+                [
+                  editingList ? (
+                    <li key={`provider-${group.provider}`}>
+                      <label className="flex w-full cursor-pointer items-center gap-2 bg-muted/40 px-2 py-1.5 text-left text-[11px] font-medium">
+                        <Checkbox
+                          checked={group.models.every((model) => effectiveSelection.has(modelKey(model)))}
+                          data-testid={`model-allow-list-group-${group.provider}`}
+                          onCheckedChange={() => {
+                            const providerModels = catalog.filter((model) => model.provider === group.provider)
+                            toggleProvider(providerModels)
+                          }}
+                        />
+                        <span>{group.provider}</span>
+                      </label>
+                    </li>
+                  ) : null,
+                  ...group.models.map((model) => {
                   const key = modelKey(model)
-                  const checked = selected.has(key)
+                  const checked = editingList ? effectiveSelection.has(key) : selected.has(key)
                   return (
                     <li key={key}>
-                      <button
-                        type="button"
-                        role="checkbox"
-                        aria-checked={checked}
-                        onClick={() => toggle(model)}
-                        data-testid={`model-allow-list-item-${key}`}
+                      <label
                         className={cn(
-                          'flex w-full items-center gap-2 px-2 py-1.5 text-left',
+                          'flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left',
                           'text-[11px] text-foreground hover:bg-accent',
                         )}
                       >
-                        <span
-                          aria-hidden="true"
-                          className={cn(
-                            'flex size-3.5 shrink-0 items-center justify-center rounded-[3px] border',
-                            checked
-                              ? 'border-transparent bg-foreground text-background'
-                              : 'border-border',
-                          )}
-                        >
-                          {checked ? <Check size={10} weight="bold" /> : null}
-                        </span>
+                        <Checkbox
+                          checked={checked}
+                          data-testid={`model-allow-list-item-${key}`}
+                          onCheckedChange={() => toggle(model)}
+                        />
                         <span className="truncate">{model.name || model.id}</span>
                         <span className="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground">
                           {group.provider}
                         </span>
-                      </button>
+                      </label>
                     </li>
                   )
                 }),
+                ],
               )}
             </ul>
           ) : null}

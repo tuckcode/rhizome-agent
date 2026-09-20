@@ -25,10 +25,14 @@ vi.mock('../mock-tauri', () => ({
   },
 }))
 
-const tracked = vi.hoisted(() => ({ changes: [] as Array<[number, number]> }))
+const tracked = vi.hoisted(() => ({
+  changes: [] as Array<[number, number]>,
+  freeOnly: [] as boolean[],
+}))
 vi.mock('../lib/productAnalytics', () => ({
   trackPrimeModelAllowListChanged: (selected: number, available: number) =>
     tracked.changes.push([selected, available]),
+  trackPrimeModelsFreeOnly: (on: boolean) => tracked.freeOnly.push(on),
 }))
 
 const MODELS = [
@@ -51,6 +55,8 @@ beforeEach(() => {
   invoked.allowList = []
   invoked.failList = false
   tracked.changes = []
+  tracked.freeOnly = []
+  localStorage.clear()
   resetPrimeModelCatalog()
 })
 
@@ -135,5 +141,47 @@ describe('PrimeModelAllowListSection (#45)', () => {
     await renderSection()
     fireEvent.change(screen.getByTestId('model-allow-list-filter'), { target: { value: 'zzz' } })
     expect(await screen.findByTestId('model-allow-list-no-matches')).toBeInTheDocument()
+  })
+
+  it('keeps only provider-marked free models when Free only is on', async () => {
+    await renderSection()
+    fireEvent.click(screen.getByTestId('model-allow-list-free-only'))
+    await waitFor(() => expect(screen.queryByTestId('model-allow-list-provider-xai')).not.toBeInTheDocument())
+    expect(screen.getByTestId('model-allow-list-provider-opencode')).toBeInTheDocument()
+    expect(tracked.freeOnly).toEqual([true])
+  })
+
+  it('opens the full Edit list with provider and model checks', async () => {
+    invoked.allowList = ['xai/grok-4.5']
+    await renderSection()
+
+    fireEvent.click(screen.getByTestId('model-allow-list-edit-toggle'))
+    expect(screen.getByTestId('model-allow-list-group-xai')).toBeInTheDocument()
+    expect(screen.getByTestId('model-allow-list-group-anthropic')).toBeInTheDocument()
+    expect(screen.getByTestId('model-allow-list-item-anthropic/claude-opus-5')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    )
+
+    fireEvent.click(screen.getByTestId('model-allow-list-group-anthropic'))
+    await waitFor(() => {
+      expect(saved()).toContainEqual(['xai/grok-4.5', 'anthropic/claude-opus-5'])
+    })
+    expect(screen.getByTestId('model-allow-list-edit-toggle')).toHaveTextContent('Done')
+  })
+
+  it('provider checks include rows beyond the visible cap', async () => {
+    invoked.models = [
+      ...Array.from({ length: 45 }, (_, index) => ({
+        id: `model-${index}`,
+        name: `Model ${index}`,
+        provider: 'many',
+      })),
+      { id: 'keep', name: 'Keep', provider: 'xai' },
+    ]
+    await renderSection()
+    fireEvent.click(screen.getByTestId('model-allow-list-edit-toggle'))
+    fireEvent.click(screen.getByTestId('model-allow-list-group-many'))
+    await waitFor(() => expect(saved().at(-1)).toEqual(['xai/keep']))
   })
 })

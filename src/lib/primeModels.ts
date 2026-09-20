@@ -113,9 +113,13 @@ export function modelKey(model: Pick<PrimeModel, 'provider' | 'id'>): string {
  * Split the catalog by the user's curated allow-list (#45).
  *
  * The motivating case is a user who wants their menu to be OpenRouter's free
- * models and nothing else. Prime publishes 501 models and no price field, so a
- * hand-picked list is the only mechanism that is actually reliable — a
- * "free only" filter can be nothing better than a guess at naming conventions.
+ * models and nothing else. The allow-list is still the curated shortlist. A
+ * free-only cut sits on top of it: an explicit host `free` flag when Prime
+ * sends one, then the marks Prime actually prints: `:free` or `/free` on
+ * OpenRouter, `-free` on OpenCode. NVIDIA NIM is its own key. It is absent
+ * from this machine's catalog when `NVIDIA_API_KEY` is not in auth. NIM ids
+ * do not use `:free`. OpenRouter still has a paid/free twin for some Nemotron
+ * rows.
  *
  * Hidden models are separated, not dropped, the way
  * {@link partitionModelsByConnection} separates unconnected ones: they render
@@ -196,4 +200,43 @@ export function findModel(
   return (
     models.find((model) => model.provider === wantedProvider && model.id === wantedId) ?? null
   )
+}
+
+/**
+ * True when the catalog row is a no-cost model. Only the marks Prime prints on this machine count:
+ * OpenRouter `:free` / `free`, OpenCode `-free`. A paid model whose display
+ * name mentions "free" is still paid. NVIDIA NIM (`provider: nvidia`) has
+ * no `:free` suffix. Free Nemotron twins on OpenRouter still use `:free`.
+ */
+export function isFreeCatalogModel(model: PrimeModel): boolean {
+  const provider = model.provider.trim().toLowerCase()
+  const id = model.id.trim().toLowerCase()
+  if (provider === 'openrouter' && (id.endsWith(':free') || id === 'free' || id.endsWith('/free'))) {
+    return true
+  }
+  if (provider === 'opencode' && id.endsWith('-free')) return true
+  return false
+}
+
+/**
+ * Second cut after the allow-list. `keepKey` is the running `provider/id` so
+ * a paid model that is already selected stays visible when Free only is on.
+ */
+export function partitionModelsByFree(
+  models: PrimeModel[],
+  freeOnly: boolean,
+  keepKey?: string | null,
+): { shown: PrimeModel[]; hidden: PrimeModel[] } {
+  if (!freeOnly) return { shown: models, hidden: [] }
+  const keep = keepKey?.trim() ?? ''
+  const shown: PrimeModel[] = []
+  const hidden: PrimeModel[] = []
+  for (const model of models) {
+    if (isFreeCatalogModel(model) || (keep && modelKey(model) === keep)) {
+      shown.push(model)
+    } else {
+      hidden.push(model)
+    }
+  }
+  return { shown, hidden }
 }
