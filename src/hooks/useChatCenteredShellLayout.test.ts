@@ -34,15 +34,15 @@ describe('preset shell controls', () => {
     expect(result.current.layout.showRestoreStrip).toBe(true)
   })
 
-  it('maps the split control to Read and Notes', () => {
+  it('maps the split control to Read and Chat', () => {
     const { result } = renderShell()
     act(() => result.current.layout.setSplit('side-by-side'))
     expect(result.current.controls.panePreset.id).toBe('read')
     expect(result.current.layout.split).toBe('side-by-side')
     expect(result.current.layout.notesOpen).toBe(false)
     act(() => result.current.layout.setSplit('stacked'))
-    expect(result.current.controls.panePreset.id).toBe('notes')
-    expect(result.current.layout.notesOpen).toBe(true)
+    expect(result.current.controls.panePreset.id).toBe('chat')
+    expect(result.current.layout.notesOpen).toBe(false)
   })
 
   it('keeps Workbench when ensureNotesOpen runs', () => {
