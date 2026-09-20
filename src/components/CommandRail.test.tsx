@@ -205,3 +205,164 @@ describe('the rail puts sessions in its open middle', () => {
     expect(screen.getByRole('button', { name: 'Keep as rail' })).toBeInTheDocument()
   })
 })
+
+/**
+ * D1 — compact rail had Settings and Keep as rail only. Hover is the mouse
+ * expand, and Keep as rail turns that off, so a keyboard user could not
+ * reach Sessions at all.
+ */
+describe('the compact rail has a keyboard path to Sessions', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('offers Expand sidebar in the compact tab order', () => {
+    renderRail()
+
+    const expand = screen.getByRole('button', { name: 'Expand sidebar' })
+    const settings = screen.getByRole('button', { name: 'Settings' })
+    const pin = screen.getByRole('button', { name: 'Keep as rail' })
+
+    expect(expand.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(settings.compareDocumentPosition(pin) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByTestId('command-rail-sessions')).not.toBeInTheDocument()
+  })
+
+  it('moves focus into Sessions after Expand so Tab can reach the list', async () => {
+    const onSessionsSlotReady = (slot: HTMLDivElement | null) => {
+      if (!slot || slot.querySelector('input')) return
+      const input = document.createElement('input')
+      input.setAttribute('aria-label', 'Search sessions')
+      slot.append(input)
+    }
+    renderRail({ onSessionsSlotReady })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
+
+    const search = await screen.findByLabelText('Search sessions')
+    await waitFor(() => expect(search).toHaveFocus())
+  })
+
+  it('opens Sessions from Expand without pinning the rail', async () => {
+    const onSessionsSlotReady = vi.fn()
+    renderRail({ onSessionsSlotReady })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
+
+    const sessions = await screen.findByTestId('command-rail-sessions')
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'true')
+    expect(onSessionsSlotReady).toHaveBeenCalledWith(sessions)
+    expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).toBeNull()
+    expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailCompactLocked)).toBeNull()
+  })
+
+  it('still opens Sessions from Expand when Keep as rail is on', async () => {
+    renderRail()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Keep as rail' }))
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-compact-locked', 'true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
+
+    expect(await screen.findByTestId('command-rail-sessions')).toBeInTheDocument()
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'true')
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-compact-locked', 'true')
+    expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).not.toBe('1')
+  })
+
+  it('collapses Sessions again from the keyboard without clearing Keep as rail', async () => {
+    renderRail()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Keep as rail' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
+    await screen.findByTestId('command-rail-sessions')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
+
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'false')
+    expect(screen.queryByTestId('command-rail-sessions')).not.toBeInTheDocument()
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-compact-locked', 'true')
+    expect(screen.getByRole('button', { name: 'Allow sidebar to expand' })).toBeInTheDocument()
+  })
+})
+
+/**
+ * D2 — hover expand overlays ~194px of Chat. The overlay must not steal
+ * clicks, and leaving while a session search or rename still has focus
+ * must not drop that work.
+ */
+describe('a hover-expanded rail does not steal Chat clicks', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('turns off pointer events on the overlay so Chat under it stays clickable', async () => {
+    renderRail()
+    const rail = screen.getByTestId('command-rail')
+
+    fireEvent.mouseEnter(rail)
+    await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'true'))
+
+    expect(rail).toHaveAttribute('data-overlay', 'true')
+    expect(rail).toHaveStyle({ pointerEvents: 'none' })
+    expect(screen.getByTestId('command-rail-footer')).toHaveStyle({ pointerEvents: 'auto' })
+    expect(screen.getByTestId('command-rail-sessions')).toHaveStyle({ pointerEvents: 'none' })
+  })
+
+  it('keeps a pinned rail in flow so it is not an overlay', () => {
+    localStorage.setItem(APP_STORAGE_KEYS.commandRailExpanded, '1')
+    renderRail()
+
+    const rail = screen.getByTestId('command-rail')
+    expect(rail).toHaveAttribute('data-overlay', 'false')
+    expect(rail).toHaveAttribute('data-expanded', 'true')
+    expect(rail.style.pointerEvents).not.toBe('none')
+  })
+
+  it('closes the overlay when the pointer is over Chat rather than rail chrome', async () => {
+    renderRail()
+    const rail = screen.getByTestId('command-rail')
+    vi.spyOn(rail, 'getBoundingClientRect').mockReturnValue({
+      bottom: 600,
+      height: 600,
+      left: 0,
+      right: 240,
+      top: 0,
+      width: 240,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+
+    fireEvent.mouseEnter(rail)
+    await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'true'))
+    fireEvent.mouseMove(window, { clientX: 120, clientY: 220 })
+
+    await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'false'))
+    expect(screen.queryByTestId('command-rail-sessions')).not.toBeInTheDocument()
+  })
+
+  it('keeps Sessions mounted while a control inside it still has focus', async () => {
+    const onSessionsSlotReady = (slot: HTMLDivElement | null) => {
+      if (!slot || slot.querySelector('input')) return
+      const input = document.createElement('input')
+      input.setAttribute('aria-label', 'Search sessions')
+      slot.append(input)
+    }
+    renderRail({ onSessionsSlotReady })
+    const rail = screen.getByTestId('command-rail')
+
+    fireEvent.mouseEnter(rail)
+    const sessions = await screen.findByTestId('command-rail-sessions')
+    const search = sessions.querySelector('input')
+    expect(search).not.toBeNull()
+    search?.focus()
+
+    fireEvent.mouseMove(window, { clientX: 500, clientY: 220 })
+    await new Promise((resolve) => setTimeout(resolve, 220))
+
+    expect(rail).toHaveAttribute('data-expanded', 'true')
+    expect(screen.getByTestId('command-rail-sessions')).toBeInTheDocument()
+    expect(search).toHaveFocus()
+  })
+})
