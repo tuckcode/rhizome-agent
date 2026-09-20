@@ -180,3 +180,12 @@ describe('AiPanelMessageHistory latest-reply marker', () => {
     expect(screen.getByTestId('latest-assistant-reply-marker').parentElement).toHaveTextContent('third')
   })
 })
+
+describe('AiPanelMessageHistory first-run contrast (C77)', () => {
+  it('does not stack extra opacity on the first-run description', () => {
+    render(<AiPanelMessageHistory {...historyProps([])} isActive={false} />)
+
+    const description = screen.getByText(/Chat works without a note/)
+    expect(description).not.toHaveStyle({ opacity: '0.6' })
+  })
+})

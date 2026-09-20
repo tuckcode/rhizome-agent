@@ -481,7 +481,7 @@ function AiPanelEmptyState({
           : t('ai.panel.empty.noContextTitle', { agent: agentLabel })
         }
       </p>
-      <p style={{ fontSize: 11, margin: 0, opacity: 0.6 }}>
+      <p style={{ fontSize: 11, margin: 0 }}>
         {hasContext
           ? t('ai.panel.empty.withContextDescription')
           : t('ai.panel.empty.noContextDescription')
