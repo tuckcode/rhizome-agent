@@ -47,13 +47,12 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Grok 4.6 · 2026-09-20 · #26 audit r3.
+**Origin:** Cursor Grok 4.6 · 2026-09-20 · #26 CPR.
 
-Local product checkpoint is the **#26** Chat-engine apply commit (audit
-r3: host `is_streaming()` guard, inline Chat-engine copy, seeded mock).
-Wave 1 remains **`b5dd7a1`** on origin until this commit is pushed.
-Packaged app
-remains **`6860762`** (2026-09-19 11:27) — behind local source. Detail:
+Local, origin, and `/Applications` are **`b7264d6`** (Chat-engine apply
++ footer Update now + Clippy busy helper). Installed
+**2026-09-20 07:23 CDT**. Live native Update now is still unverified.
+Detail:
 [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
 Install/claims: [`GETTING-STARTED.md`](GETTING-STARTED.md) § Public preview
 quick start. Inventory:
@@ -114,6 +113,7 @@ sample, then public-install dogfood. God plan:
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-20 · #26 CPR](plans/handoffs/2026-09-20-0723-cursor-grok-4-6-issue-26-cpr.md) — origin and app `b7264d6`; live Update now still Q.
 - [2026-09-20 · #26 audit r3](plans/handoffs/2026-09-20-0711-cursor-grok-4-6-issue-26-audit-r3.md) — host streaming guard; C18 keys inlined; mock seeded.
 - [2026-09-20 · Wave 1 audit reply](plans/handoffs/2026-09-20-0610-cursor-grok-4-6-wave1-audit-reply.md) — coverage 6692; unused classifier deleted; C77/C78 opened.
 - [2026-09-20 · Lane B chat reliability](plans/2026-09-20-lane-b-chat-reliability-recipe.md) — session titles unwrap history blobs; thinking-only stays empty completion; #41 live still Q.

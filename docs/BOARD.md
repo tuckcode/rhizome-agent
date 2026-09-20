@@ -22,12 +22,12 @@ roadmap row in the inventory is not implementation approval.
 
 ## Status
 
-- **Done on origin:** `b5dd7a1` — sessions-only rail, C76, titles, HOME
-  vault guard, preview stamps, HOME-skip test. App still `6860762`.
+- **Done on origin:** `b7264d6` — #26 Chat-engine apply. App stamped
+  **2026-09-20 07:23**. Live Update now still unverified.
 - **Landed:** sessions-only left rail; Research on status bar; “Back to chat”
   exits; reasoning fold strips history echo (`4f9b4c4`).
-- **Now (for the next agent):** #26 apply is committed (host streaming
-  guard). Live native click still unverified until rebuild + launch.
+- **Now (for the next agent):** launch `/Applications` at `b7264d6` and
+  click Update now on a real Chat-engine offer. Then D1.
 - **Next:** human session titles; #41 live; Packages shortcut only if claimed.
 
 **Origin:** Composer · 2026-09-20 04:38.
@@ -36,10 +36,9 @@ roadmap row in the inventory is not implementation approval.
 
 ## True right now
 
-- **Git:** `origin/main` is **`b5dd7a1`**. #26 apply is the local HEAD
-  until push. App remains `6860762`.
-- **Last stamped app:** **`6860762`**, **2026-09-19 11:27**,
-  `/Applications/Rhizome Agent.app` — behind local source.
+- **Git:** `origin/main` is **`b7264d6`**. Local HEAD matches.
+- **Last stamped app:** **`b7264d6`**, **2026-09-20 07:23**,
+  `/Applications/Rhizome Agent.app`.
 - **Prime on this machine:** **0.9.3**.
 - **Open GitHub issues:** Prefer live `gh`. Open PR [#66](https://github.com/tuckcode/rhizome-agent/pull/66)
   draft — do not merge.
