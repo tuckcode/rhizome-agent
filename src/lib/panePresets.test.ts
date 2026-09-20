@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { loadPanePreferences, panePresetStorageKey } from './panePresetStorage'
 import { fitPanePreset, presetFromLegacy, presetToLegacy, resizePresetWidth } from './panePresets'
 
 describe('pane presets', () => {
@@ -45,5 +46,59 @@ describe('pane presets', () => {
 
   it('stacks Read temporarily when the note cannot fit beside Chat', () => {
     expect(fitPanePreset({ id: 'read', widths: {} }, { shellWidth: 639, noteOpen: true })).toMatchObject({ split: 'stacked', chatWidth: 547 })
+  })
+})
+
+describe('loadPanePreferences', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('returns Chat on a clean store', () => {
+    expect(loadPanePreferences('/Vault').active.id).toBe('chat')
+  })
+
+  it('ignores leftover vault view_mode when the v1 key is missing', () => {
+    localStorage.setItem('rhizome:vault-config:/Vault', JSON.stringify({ view_mode: 'editor-list' }))
+    expect(loadPanePreferences('/Vault')).toEqual({
+      version: 1,
+      active: { id: 'chat', widths: {} },
+      savedWidths: {},
+    })
+  })
+
+  it('ignores leftover rhizome-view-mode when the v1 key is missing', () => {
+    localStorage.setItem('rhizome-view-mode', 'editor-list')
+    expect(loadPanePreferences('/Vault').active.id).toBe('chat')
+  })
+
+  it('ignores leftover chatNoteSplit when the v1 key is missing', () => {
+    localStorage.setItem('rhizome:chat-note-split', 'side-by-side')
+    expect(loadPanePreferences('/Vault').active.id).toBe('chat')
+  })
+
+  it('ignores leftover editor-list plus side-by-side when the v1 key is missing', () => {
+    localStorage.setItem('rhizome:vault-config:/Vault', JSON.stringify({ view_mode: 'editor-list' }))
+    localStorage.setItem('rhizome:chat-note-split', 'side-by-side')
+    expect(loadPanePreferences('/Vault').active.id).toBe('chat')
+  })
+
+  it('restores a stored v1 Notes preset', () => {
+    localStorage.setItem(panePresetStorageKey('/Vault'), JSON.stringify({
+      version: 1,
+      active: { id: 'notes', widths: { notes: 280 } },
+      savedWidths: { notes: { notes: 280 } },
+    }))
+    expect(loadPanePreferences('/Vault').active.id).toBe('notes')
+    expect(loadPanePreferences('/Vault').active.widths.notes).toBe(280)
+  })
+
+  it('restores readNotes from a stored v1 Read preset', () => {
+    localStorage.setItem(panePresetStorageKey('/Vault'), JSON.stringify({
+      version: 1,
+      active: { id: 'read', widths: {}, readNotes: true },
+      savedWidths: {},
+    }))
+    expect(loadPanePreferences('/Vault').active).toMatchObject({ id: 'read', readNotes: true })
   })
 })
