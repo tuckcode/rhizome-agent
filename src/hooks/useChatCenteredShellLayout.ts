@@ -1,7 +1,7 @@
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import { useChatNoteSplit } from '../components/chatNoteSplit'
 import { bumpViewModeToOpenNotes, viewModeAfterCollapseNotes, viewModeAfterToggleBrowse, resolveShellLayout, type ShellKind } from '../lib/shellLayout'
-import { fitPanePreset, resizePresetWidth, type PaneColumn } from '../lib/panePresets'
+import { fitPanePreset, normalizedWidths, resizePresetWidth, type PaneColumn } from '../lib/panePresets'
 import { useShellCompactLayout } from './useShellCompactLayout'
 import type { useViewMode } from './useViewMode'
 
@@ -30,8 +30,12 @@ export function useChatCenteredShellLayout(args: UseChatCenteredShellLayoutArgs)
   const collapseNotes = useCallback(() => setViewMode(viewModeAfterCollapseNotes()), [setViewMode])
   const toggleBrowse = useCallback(() => setViewMode(viewModeAfterToggleBrowse(panePreset.id === 'workbench')), [panePreset.id, setViewMode])
   const { setSplit } = useChatNoteSplit(args)
-  const resizeColumn = (column: PaneColumn, delta: number) => {
-    updatePanePreset(resizePresetWidth(panePreset, column, fit.widths[column] + delta, context))
-  }
+  const liveResize = useRef({ panePreset, context, updatePanePreset })
+  liveResize.current = { panePreset, context, updatePanePreset }
+  const resizeColumn = useCallback((column: PaneColumn, delta: number) => {
+    const live = liveResize.current
+    const requested = normalizedWidths(live.panePreset.widths)[column] + delta
+    live.updatePanePreset(resizePresetWidth(live.panePreset, column, requested, live.context))
+  }, [])
   return { ...layout, shellRef, widths: fit.widths, fittedRailPinned: fit.railPinned, resizeColumn, openNotes: ensureNotesOpen, ensureNotesOpen, collapseNotes, toggleBrowse, setSplit }
 }

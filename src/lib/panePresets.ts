@@ -79,10 +79,15 @@ export function fitPanePreset(preset: PanePresetState, context: PaneFitContext) 
   }
 }
 
+/** Room for one column if it takes as much as Chat and the other columns allow. */
+function columnResizeRoom(preset: PanePresetState, column: PaneColumn, context: PaneFitContext): number {
+  const greedy = { ...preset, widths: { ...preset.widths, [column]: PANE_LIMITS[column].max } }
+  const fit = fitPanePreset(greedy, context)
+  return fit.widths[column] + Math.max(0, fit.chatWidth - CHAT_MIN_WIDTH)
+}
+
 /** A drag cannot steal the space occupied by another column or Chat. */
 export function resizePresetWidth(preset: PanePresetState, column: PaneColumn, requested: number, context: PaneFitContext): PanePresetState {
-  const fit = fitPanePreset(preset, context)
-  const available = fit.widths[column] + Math.max(0, fit.chatWidth - CHAT_MIN_WIDTH)
-  const width = normalizedWidths({ [column]: Math.min(requested, available) })[column]
+  const width = normalizedWidths({ [column]: Math.min(requested, columnResizeRoom(preset, column, context)) })[column]
   return { ...preset, widths: { ...preset.widths, [column]: width } }
 }
