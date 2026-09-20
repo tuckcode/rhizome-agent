@@ -187,6 +187,8 @@ describe('VersionUpdateIndicator', () => {
     expect(screen.getByText('Chat engine is now 0.7.2.')).toBeInTheDocument()
     expect(screen.getByTestId('version-update-prime-update-now')).toBeDisabled()
     expect(screen.getByTestId('version-update-prime-update-now')).toHaveTextContent('Updated')
+    expect(screen.getByTestId('version-update-maybe-later')).toHaveTextContent('Close')
+    expect(screen.queryByText('Maybe later')).not.toBeInTheDocument()
   })
 
   it('puts Chat-engine Update now in the footer next to Maybe later', () => {
