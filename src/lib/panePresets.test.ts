@@ -44,6 +44,31 @@ describe('pane presets', () => {
     expect(fitPanePreset(next, { shellWidth: 720 }).chatWidth).toBe(420)
   })
 
+  it('does not let siblings keep leftover from a beside-note shrink', () => {
+    const context = { shellWidth: 1000, noteOpen: true }
+    const start = resizePresetWidth({ id: 'read', widths: { note: 360 }, readNotes: true }, 'note', 360, context)
+    const shrunk = resizePresetWidth(start, 'note', (start.widths.note ?? 360) - 24, context)
+    const restored = resizePresetWidth(shrunk, 'note', (shrunk.widths.note ?? 0) + 24, context)
+    expect(start.widths.note).toBe(330)
+    expect(shrunk.widths.note).toBe(306)
+    expect(restored.widths.note).toBe(330)
+  })
+
+  it('does not ratchet a tight beside-note through +N then -N repeats', () => {
+    const context = { shellWidth: 1000, noteOpen: true }
+    let preset = resizePresetWidth({ id: 'read', widths: { note: 360 }, readNotes: true }, 'note', 360, context)
+    const grown = resizePresetWidth(preset, 'note', (preset.widths.note ?? 360) + 12, context)
+    const afterFirstMinus = resizePresetWidth(grown, 'note', (grown.widths.note ?? 360) - 12, context)
+    preset = afterFirstMinus
+    for (let i = 0; i < 8; i += 1) {
+      const base = preset.widths.note ?? 0
+      preset = resizePresetWidth(preset, 'note', base + 12, context)
+      preset = resizePresetWidth(preset, 'note', (preset.widths.note ?? 0) - 12, context)
+    }
+    expect(preset.widths.note).toBe(afterFirstMinus.widths.note)
+    expect(preset.widths.note).toBeGreaterThan(300)
+  })
+
   it('stacks Read temporarily when the note cannot fit beside Chat', () => {
     expect(fitPanePreset({ id: 'read', widths: {} }, { shellWidth: 639, noteOpen: true })).toMatchObject({ split: 'stacked', chatWidth: 547 })
   })
