@@ -224,6 +224,37 @@ describe('NoteItem', () => {
     expect(screen.queryByTestId('change-status-icon')).not.toBeInTheDocument()
   })
 
+  /**
+   * D5. NoteTitleRow truncates. The row's native title is only for image/PDF
+   * previews and unavailable binaries, so a long note name had no pointer
+   * tooltip of its own.
+   */
+  it('exposes the full note name as a pointer tooltip on the title row', () => {
+    const entry = makeEntry({
+      filename: 'long-note.md',
+      title: 'A note title that will truncate in a narrow list',
+    })
+
+    render(<NoteItem entry={entry} isSelected={false} typeEntryMap={{}} onClickNote={vi.fn()} />)
+
+    expect(screen.getByTestId('note-title-row')).toHaveAttribute('title', entry.title)
+    expect(screen.getByText(entry.title).closest('[data-note-path]')).not.toHaveAttribute('title')
+  })
+
+  it('keeps the preview title on the row and still names the file on the title row', () => {
+    const imageEntry = makeEntry({
+      path: '/vault/photo.png',
+      filename: 'photo.png',
+      title: 'photo.png',
+      fileKind: 'binary',
+    })
+
+    render(<NoteItem entry={imageEntry} isSelected={false} typeEntryMap={{}} onClickNote={vi.fn()} />)
+
+    expect(screen.getByTestId('image-file-item')).toHaveAttribute('title', 'Open image preview')
+    expect(screen.getByTestId('note-title-row')).toHaveAttribute('title', 'photo.png')
+  })
+
   it('adds more breathing room between note sections', () => {
     const entry = makeEntry({
       title: 'Spaced note',
