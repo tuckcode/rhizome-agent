@@ -235,7 +235,10 @@ fn summarize_lines<I: Iterator<Item = String>>(lines: I) -> PrimeSessionSummary 
             // appends one of these per rename and the last wins, so this
             // overwrites rather than taking the first.
             "session_info" => {
-                let name = normalize_whitespace(event["name"].as_str().unwrap_or_default());
+                let name =
+                    normalize_whitespace(&crate::cli_agent_runtime::unwrap_conversation_history(
+                        event["name"].as_str().unwrap_or_default(),
+                    ));
                 if !name.is_empty() {
                     session_name = Some(truncate_title(&name));
                 }
@@ -262,9 +265,8 @@ fn summarize_lines<I: Iterator<Item = String>>(lines: I) -> PrimeSessionSummary 
                 // Naming a session after that gives every session in the list
                 // the same title (C26) — the user's own words are the title.
                 let raw = joined_text(&message["content"]);
-                let request =
-                    crate::cli_agent_runtime::user_request_from_prompt(&raw).unwrap_or(&raw);
-                let preview = normalize_whitespace(request);
+                let request = crate::cli_agent_runtime::spoken_user_request(&raw);
+                let preview = normalize_whitespace(&request);
                 if !preview.is_empty() {
                     summary.title = Some(truncate_title(&preview));
                 }
@@ -1207,6 +1209,46 @@ mod tests {
         );
 
         assert_eq!(summary.title.as_deref(), Some("how do I link two notes?"));
+    }
+
+    /// A stored first user turn can be `formatMessageWithHistory`'s wrapper.
+    /// The list used that blob as the title. Unwrap to the latest user ask.
+    #[test]
+    fn a_title_unwraps_a_conversation_history_blob() {
+        let open = concat!("<", "conversation_history", ">");
+        let close = concat!("</", "conversation_history", ">");
+        let blob = format!(
+            "{open}\n[user]: hi\n\n[assistant]: Hello.\n\n[user]: hide chat on notes\n{close}\n\n\
+             Continue the conversation. Respond only to the latest [user] message."
+        );
+        let summary = summarize_lines(
+            [serde_json::json!({
+                "type": "message",
+                "message": {"role": "user", "content": [{"type": "text", "text": blob}]}
+            })
+            .to_string()]
+            .into_iter(),
+        );
+
+        assert_eq!(summary.title.as_deref(), Some("hide chat on notes"));
+    }
+
+    /// `set_session_name` can persist the same wrapper. A stored name that is
+    /// a history blob is not a human rename. Unwrap it before it wins.
+    #[test]
+    fn a_session_info_history_blob_does_not_beat_a_readable_name() {
+        let open = concat!("<", "conversation_history", ">");
+        let close = concat!("</", "conversation_history", ">");
+        let blob = format!("{open}\n[user]: hide chat on notes\n{close}");
+        let summary = summarize_lines(
+            [
+                serde_json::json!({"type": "session", "id": "s1"}).to_string(),
+                serde_json::json!({"type": "session_info", "name": blob}).to_string(),
+            ]
+            .into_iter(),
+        );
+
+        assert_eq!(summary.title.as_deref(), Some("hide chat on notes"));
     }
 
     /// A multi-line user message still collapses to one list row — stripping

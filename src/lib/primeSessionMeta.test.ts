@@ -164,6 +164,30 @@ describe('primeSessionRowTitles', () => {
   })
 
   /**
+   * Mycelium already unwraps a stored `<conversation_history>` blob. The
+   * session list did not, so rail rows showed the tag instead of the ask.
+   * Display-only: a human rename that is not a history blob stays intact.
+   */
+  it('unwraps a conversation-history blob to the latest user turn', () => {
+    const historyOpen = ['<', 'conversation_history', '>'].join('')
+    const historyClose = ['</', 'conversation_history', '>'].join('')
+    const blob = `${historyOpen}
+[user]: hi
+
+[assistant]: Hello.
+
+[user]: hide chat on notes
+${historyClose}
+
+Continue the conversation. Respond only to the latest [user] message.`
+
+    expect(primeSessionRowTitles([session({ title: blob })], UNTITLED))
+      .toEqual(['hide chat on notes'])
+    expect(primeSessionRowTitles([session({ title: 'Audit session' })], UNTITLED))
+      .toEqual(['Audit session'])
+  })
+
+  /**
    * The defect #28 named and #30 carried: two untitled rows stacked on top of
    * each other, impossible to tell apart. A session with messages but no
    * *user* message has no title, so this survives the empty-session filter.

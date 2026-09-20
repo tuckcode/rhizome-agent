@@ -1994,7 +1994,8 @@ fn first_sentence_of(text: &str) -> &str {
 }
 
 fn title_candidate(text: &str) -> Option<String> {
-    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let unwrapped = crate::cli_agent_runtime::unwrap_conversation_history(text);
+    let collapsed = unwrapped.split_whitespace().collect::<Vec<_>>().join(" ");
     let unprefixed = collapsed.strip_prefix('/').unwrap_or(&collapsed);
     let first_sentence = first_sentence_of(unprefixed);
 
@@ -6730,6 +6731,25 @@ mod tests {
             title.starts_with("investigate why the chat transcript grows"),
             "{title}"
         );
+    }
+
+    /// A later first-name attempt can see `formatMessageWithHistory`'s wrapper.
+    /// Naming from the opening tag printed `<conversation_history>` in the list.
+    #[test]
+    fn a_history_wrapped_prompt_names_the_latest_user_turn() {
+        let open = concat!("<", "conversation_history", ">");
+        let close = concat!("</", "conversation_history", ">");
+        let blob = format!(
+            "{open}\n[user]: hi\n\n[assistant]: Hello.\n\n[user]: hide chat on notes\n{close}\n\n\
+             Continue the conversation. Respond only to the latest [user] message."
+        );
+        assert_eq!(
+            session_title_from_exchange(Some(&blob), None).as_deref(),
+            Some("hide chat on notes")
+        );
+        // A greeting inside the blob is still too short to be a name.
+        let greeting = format!("{open}\n[user]: hi\n{close}");
+        assert_eq!(session_title_from_exchange(Some(&greeting), None), None);
     }
 
     /// A name someone chose must never be overwritten — that is what rename

@@ -1061,7 +1061,7 @@ describe('parked organs leftover', () => {
     expect(en).toContain('"ai.sessions.untitled": "Untitled session"')
     expect(list).toContain("const untitled = t('ai.sessions.untitled')")
     expect(list).toContain('titles[index] ?? untitled')
-    expect(titles).toContain('title: session.title?.trim() || untitled')
+    expect(titles).toContain("readableSessionLabel(session.title ?? '', untitled)")
   })
 
   it('keeps Cmd+1 as Chat and Cmd+2 / Cmd+3 as Notes and Workbench', () => {
