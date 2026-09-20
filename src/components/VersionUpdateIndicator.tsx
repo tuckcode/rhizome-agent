@@ -76,6 +76,7 @@ function UpdateSection({
   errorLine,
   fallbackLabel,
   onFallback,
+  hideInlineAction = false,
 }: {
   heading: string
   notes: string
@@ -89,20 +90,23 @@ function UpdateSection({
   errorLine?: string
   fallbackLabel?: string
   onFallback?: () => void
+  hideInlineAction?: boolean
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <span style={{ fontWeight: 600, fontSize: 13 }}>{heading}</span>
-        <Button
-          type="button"
-          size="xs"
-          onClick={onUpdateNow}
-          disabled={disabled}
-          data-testid={`${testId}-update-now`}
-        >
-          {updateNowLabel}
-        </Button>
+        {!hideInlineAction && (
+          <Button
+            type="button"
+            size="xs"
+            onClick={onUpdateNow}
+            disabled={disabled}
+            data-testid={`${testId}-update-now`}
+          >
+            {updateNowLabel}
+          </Button>
+        )}
       </div>
       <pre
         data-testid={`${testId}-notes`}
@@ -224,8 +228,15 @@ export function VersionUpdateIndicator({
                 footnote="Rhizome Agent never updates the Chat engine unattended. Update now applies it here after you click."
                 locale={locale}
                 testId="version-update-prime"
+                hideInlineAction
                 disabled={primeApplying || primeApplied}
-                statusLine={primeApplying ? 'Applying the Chat engine update…' : undefined}
+                statusLine={
+                  primeApplying
+                    ? 'Applying the Chat engine update…'
+                    : primeApplied
+                      ? `Chat engine is now ${primeHeadingVersion}.`
+                      : undefined
+                }
                 errorLine={primeSection.state === 'failed' ? primeSection.message : undefined}
                 fallbackLabel={showsReleasePageFallback(primeSection) ? 'Open release page' : undefined}
                 onFallback={
@@ -248,6 +259,22 @@ export function VersionUpdateIndicator({
             >
               {translate(locale, 'versionUpdate.maybeLater')}
             </Button>
+            {primeSection && (
+              <Button
+                type="button"
+                onClick={() => {
+                  void primeActions.applyEngineUpdate()
+                }}
+                disabled={primeApplying || primeApplied}
+                data-testid="version-update-prime-update-now"
+              >
+                {primeApplied
+                  ? 'Updated'
+                  : primeApplying
+                    ? 'Applying…'
+                    : translate(locale, 'update.updateNow')}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
