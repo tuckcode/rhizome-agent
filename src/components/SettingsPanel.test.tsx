@@ -231,7 +231,7 @@ describe('SettingsPanel', () => {
     )
 
     expect(screen.getByText('Recognized local agents')).toBeInTheDocument()
-    expect(screen.getByText('Prime Agent')).toBeInTheDocument()
+    expect(screen.getAllByText('Prime Agent').length).toBeGreaterThan(0)
     expect(screen.getByText('2.1.18')).toBeInTheDocument()
     // Claude Code is import-source copy (SessionImportSettingsSection), not a
     // listed local agent. Probe status must still stay off the agents list.
@@ -792,40 +792,25 @@ describe('SettingsPanel', () => {
     })
   })
 
-  it('anchors the default agent dropdown with the popper strategy', () => {
+  it('keeps Prime as the fixed Chat engine', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
-    fireEvent.pointerDown(screen.getByTestId('settings-default-ai-agent'), { button: 0, pointerType: 'mouse' })
-
-    expect(document.querySelector('[data-anchor-strategy="popper"]')).toBeInTheDocument()
+    expect(screen.getByTestId('settings-prime-chat-engine')).toHaveTextContent('Prime Agent')
+    expect(screen.queryByTestId('settings-default-ai-agent')).not.toBeInTheDocument()
   })
 
-  it('keeps keyboard opening enabled for the default agent dropdown', () => {
+  it('explains that Chat models are selected inside Prime', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
-    const trigger = screen.getByTestId('settings-default-ai-agent')
-    trigger.focus()
-    fireEvent.keyDown(trigger, { key: 'ArrowDown', code: 'ArrowDown' })
-
-    expect(document.querySelector('[data-anchor-strategy="popper"]')).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: /Prime Agent/i })).toBeInTheDocument()
-  })
-
-  it('tells daily-drive Chat to stay on Prime, not a disposable API default', () => {
-    render(
-      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
-    )
-
-    expect(screen.getByText(/Keep this on Prime for Chat with vault tools/)).toBeInTheDocument()
+    expect(screen.getByText(/Choose Claude, Grok, DeepSeek, and Nous in Chat's model menu/)).toBeInTheDocument()
     expect(screen.queryByText(/skips Prime sessions and vault tools/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/optional local agent/i)).not.toBeInTheDocument()
   })
 
-  it('warns when the Settings default is a direct API model', () => {
+  it('replaces a stored direct-model default with Prime when Settings saves', () => {
     render(
       <SettingsPanel
         open={true}
@@ -858,9 +843,13 @@ describe('SettingsPanel', () => {
       />,
     )
 
-    expect(screen.getByText(/skips Prime sessions and vault tools/)).toBeInTheDocument()
-    expect(screen.getByText(/Switch back to Prime Agent for daily Chat/)).toBeInTheDocument()
-    expect(screen.queryByText(/Keep this on Prime for Chat with vault tools/)).not.toBeInTheDocument()
+    expect(screen.getByTestId('settings-prime-chat-engine')).toHaveTextContent('Prime Agent')
+    expect(screen.queryByText(/My Anthropic.*Claude Sonnet/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('settings-save'))
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      default_ai_agent: 'prime',
+      default_ai_target: 'agent:prime',
+    }))
   })
 
   it('treats a legacy beta release channel as stable', () => {
@@ -1155,15 +1144,15 @@ describe('SettingsPanel', () => {
     expect(closeButton).toHaveFocus()
   })
 
-  it('does not trap focus away from a portaled settings dropdown', () => {
+  it('does not trap focus away from a portaled settings select', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
     act(() => {
-      fireEvent.pointerDown(screen.getByTestId('settings-default-ai-agent'), { button: 0, pointerType: 'mouse' })
+      fireEvent.pointerDown(screen.getByTestId('settings-release-channel'), { button: 0, pointerType: 'mouse' })
     })
-    const option = screen.getByRole('option', { name: /Prime Agent/i })
+    const option = screen.getByRole('option', { name: 'Stable' })
     act(() => {
       option.focus()
     })
