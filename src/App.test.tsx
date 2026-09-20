@@ -504,10 +504,19 @@ import { useUpdater } from './hooks/useUpdater'
 import { isTauri, mockInvoke } from './mock-tauri'
 import { resetPrimeHostStatus } from './hooks/usePrimeHostStatus'
 import { streamAiAgent } from './utils/streamAiAgent'
+import { panePresetStorageKey } from './lib/panePresetStorage'
 
 const AI_AGENTS_ONBOARDING_DISMISSED_STORAGE_NAME = 'rhizome:ai-agents-onboarding-dismissed'
 const CLAUDE_CODE_ONBOARDING_DISMISSED_STORAGE_NAME = 'tolaria:claude-code-onboarding-dismissed'
 const SLOW_APP_READY_TIMEOUT_MS = 10_000
+
+function setPanePreset(id: 'chat' | 'notes' | 'read' | 'workbench', scope = '/vault'): void {
+  localStorage.setItem(panePresetStorageKey(scope), JSON.stringify({
+    version: 1,
+    active: { id, widths: {} },
+    savedWidths: {},
+  }))
+}
 
 function render(ui: ReactElement, options?: Parameters<typeof testingLibraryRender>[1]) {
   return testingLibraryRender(ui, {
@@ -539,7 +548,8 @@ describe('App', () => {
     vi.mocked(isTauri).mockReturnValue(false)
     vi.mocked(useUpdater).mockReturnValue(createMockUpdaterResult())
     localStorage.clear()
-    localStorage.setItem('rhizome-view-mode', 'all')
+    setPanePreset('workbench')
+    setPanePreset('workbench', '')
     sessionStorage.clear()
     // App tests assert the notes shell. Launch now opens ChatHome once per
     // session — mark it done so these stay on the four-panel layout.
@@ -801,7 +811,7 @@ describe('App', () => {
   })
 
   it('opens Notes and Mycelium from the session-footprint chip when Notes is closed', async () => {
-    localStorage.setItem('rhizome-view-mode', 'editor-only')
+    setPanePreset('chat')
     localStorage.setItem('rhizome:command-rail-expanded', '1')
     mockCommandResults.get_prime_session_host_status = {
       installed: true,
@@ -827,7 +837,8 @@ describe('App', () => {
   })
 
   it('starts with Chat and the restore strip when no view preference is stored', async () => {
-    localStorage.removeItem('rhizome-view-mode')
+    localStorage.removeItem(panePresetStorageKey('/vault'))
+    localStorage.removeItem(panePresetStorageKey(''))
     render(<App />)
 
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
@@ -1198,6 +1209,8 @@ describe('App', () => {
 
   it('uses the app shell loading state while the last vault is still resolving', async () => {
     localStorage.setItem('tolaria_welcome_dismissed', '1')
+    setPanePreset('workbench', expectedDefaultVaultPath)
+    setPanePreset('workbench', '/work')
 
     let resolveVaultList: ((value: typeof mockVaultList) => void) | null = null
 
@@ -1471,6 +1484,7 @@ describe('App', () => {
       inbox: { noteListProperties: null, explicitOrganization: false },
     })
     localStorage.setItem(`laputa:vault-config:${workVaultPath}`, disabledWorkflowConfig)
+    setPanePreset('workbench', workVaultPath)
 
     render(<App />)
 
@@ -1711,7 +1725,7 @@ describe('App', () => {
   })
 
   it('lets you drag the Notes panel wider, and remembers it', async () => {
-    localStorage.setItem('rhizome-view-mode', 'editor-list')
+    setPanePreset('notes')
     render(<App />)
     const handle = await screen.findByTestId('vault-panel-resize', {}, { timeout: 5000 })
     const panel = document.querySelector('.app__vault-panel') as HTMLElement
