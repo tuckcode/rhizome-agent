@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { normalizeReasoningDisplay } from './normalizeReasoningDisplay'
 
+const HISTORY_OPEN = ['<', 'conversation_history', '>'].join('')
+const HISTORY_CLOSE = ['</', 'conversation_history', '>'].join('')
+
 describe('normalizeReasoningDisplay', () => {
   it('inserts a space after a glued sentence join', () => {
     expect(normalizeReasoningDisplay('The path is blocked.Next I will try another route.')).toBe(
@@ -31,5 +34,23 @@ describe('normalizeReasoningDisplay', () => {
     expect(normalizeReasoningDisplay('See notes.md for the plan.')).toBe(
       'See notes.md for the plan.',
     )
+  })
+
+  it('strips echoed conversation_history blocks from the reasoning fold', () => {
+    const dumped = [
+      HISTORY_OPEN,
+      '[user]: first turn',
+      '',
+      '[user]: latest turn',
+      HISTORY_CLOSE,
+      '',
+      'I will answer the latest turn.',
+    ].join('\n')
+    expect(normalizeReasoningDisplay(dumped)).toBe('I will answer the latest turn.')
+  })
+
+  it('collapses to empty when reasoning is only a history dump', () => {
+    const dumped = `${HISTORY_OPEN}\n[user]: only history\n${HISTORY_CLOSE}`
+    expect(normalizeReasoningDisplay(dumped).trim()).toBe('')
   })
 })

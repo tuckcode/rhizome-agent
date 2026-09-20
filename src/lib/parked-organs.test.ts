@@ -226,13 +226,18 @@ describe('parked organs leftover', () => {
     expect(breadcrumb).toContain('testId="breadcrumb-close-note"')
   })
 
-  it('keeps Research as a rail destination, not a Chat overlay', () => {
+  it('keeps Research off the command rail and reachable from the status bar', () => {
     const rail = readFileSync(
       `${process.cwd()}/src/components/CommandRail.tsx`,
       'utf8',
     )
-    expect(rail).toContain("label={t('rail.research')}")
-    expect(rail).toContain('testId="command-rail-research"')
+    expect(rail).not.toContain("label={t('rail.research')}")
+    expect(rail).not.toContain('testId="command-rail-research"')
+    const status = readFileSync(
+      `${process.cwd()}/src/components/status-bar/StatusBarSections.tsx`,
+      'utf8',
+    )
+    expect(status).toContain('testId="status-research"')
   })
 
   it('keeps Chat on Prime when Settings default is an API model', () => {
@@ -1040,7 +1045,7 @@ describe('parked organs leftover', () => {
     expect(rail).toContain('data-testid="command-rail-footer"')
     expect(rail).toContain("aria-label={pinLabel}")
     expect(rail).toContain('data-testid="command-rail-toggle"')
-    expect(rail).toContain('Conversations sit below the places a person can go')
+    expect(rail).toContain('Sessions are the rail. Destinations like Research live elsewhere.')
   })
 
   it('falls unnamed session logs back to Untitled session', () => {

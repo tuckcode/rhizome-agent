@@ -3,9 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommandRail } from './CommandRail'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 
-const trackRailDestinationClicked = vi.fn()
 vi.mock('../lib/productAnalytics', () => ({
-  trackRailDestinationClicked: (destination: string) => trackRailDestinationClicked(destination),
   trackCommandRailPinChanged: () => {},
 }))
 
@@ -18,9 +16,6 @@ vi.mock('./ui/action-tooltip', () => ({
 function renderRail(overrides: Partial<React.ComponentProps<typeof CommandRail>> = {}) {
   const props: React.ComponentProps<typeof CommandRail> = {
     locale: 'en',
-    activeDestination: 'chat',
-    onSelectChat: vi.fn(),
-    onSelectResearch: vi.fn(),
     onOpenSettings: vi.fn(),
     ...overrides,
   }
@@ -29,50 +24,21 @@ function renderRail(overrides: Partial<React.ComponentProps<typeof CommandRail>>
 }
 
 describe('CommandRail', () => {
-  beforeEach(() => {
-    trackRailDestinationClicked.mockClear()
-  })
-
-  it('renders the destinations, Sessions space, and settings gear', () => {
+  it('renders Sessions space and settings gear without Chat or Research destinations', () => {
     renderRail()
     expect(screen.getByTestId('command-rail')).toBeInTheDocument()
-    expect(screen.getByTestId('command-rail-chat')).toBeInTheDocument()
-    expect(screen.getByTestId('command-rail-research')).toBeInTheDocument()
+    expect(screen.queryByTestId('command-rail-chat')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('command-rail-research')).not.toBeInTheDocument()
     expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
     expect(screen.getByTestId('command-rail-settings')).toBeInTheDocument()
   })
 
-  it('fires the matching handler and tracks the destination when a rail button is clicked', () => {
-    const props = renderRail()
-
-    fireEvent.click(screen.getByTestId('command-rail-research'))
-    expect(props.onSelectResearch).toHaveBeenCalledOnce()
-    expect(trackRailDestinationClicked).toHaveBeenCalledWith('research')
-    expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
-  })
-
-  it('marks the active destination with aria-pressed', () => {
-    renderRail({ activeDestination: 'research' })
-    expect(screen.getByTestId('command-rail-research')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'false')
-  })
-
-  it('keeps Chat pressed without a Notes destination on the rail', () => {
-    renderRail({ activeDestination: 'chat' })
-    expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.queryByTestId('command-rail-inbox')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
-    expect(screen.getByTestId('command-rail-research')).toHaveAttribute('aria-pressed', 'false')
-  })
-
-  it('opens settings from the gear without tracking a destination', () => {
+  it('opens settings from the gear', () => {
     const props = renderRail()
 
     fireEvent.click(screen.getByTestId('command-rail-settings'))
 
     expect(props.onOpenSettings).toHaveBeenCalledOnce()
-    // The gear is not a rail "destination".
-    expect(trackRailDestinationClicked).not.toHaveBeenCalled()
   })
 })
 
@@ -82,22 +48,22 @@ describe('CommandRail', () => {
  * icons save room, while a readable hover label says what each one is and an
  * explicit expand action reveals the persistent Sessions area.
  */
-describe('the rail puts navigation first and sessions in its empty middle', () => {
+describe('the rail puts sessions in its open middle', () => {
   beforeEach(() => {
     localStorage.clear()
   })
 
-  it('starts compact but keeps every destination discoverable by its accessible label', () => {
+  it('starts compact with Settings discoverable by its accessible label', () => {
     renderRail()
 
     expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'false')
-    for (const label of ['Chat', 'Research', 'Settings']) {
-      expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
-    }
+    expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Chat' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Research' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Changes' })).not.toBeInTheDocument()
   })
 
-  it('expands to show labels and mounts Sessions below all destinations', async () => {
+  it('expands to mount Sessions above Settings', async () => {
     const onSessionsSlotReady = vi.fn()
     renderRail({ onSessionsSlotReady })
 
@@ -115,7 +81,7 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
     fireEvent.mouseEnter(screen.getByTestId('command-rail'))
     await waitFor(() => expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'true'))
 
-    expect(screen.getByTestId('command-rail-chat')).toHaveTextContent('Chat')
+    expect(screen.queryByTestId('command-rail-chat')).not.toBeInTheDocument()
     expect(screen.queryByTestId('command-rail-inbox')).not.toBeInTheDocument()
     expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
@@ -235,7 +201,7 @@ describe('the rail puts navigation first and sessions in its empty middle', () =
 
     renderRail()
 
-    expect(screen.queryByText('Research')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('command-rail-sessions')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Keep as rail' })).toBeInTheDocument()
   })
 })

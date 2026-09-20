@@ -126,9 +126,9 @@ describe('StatusBar', () => {
     expect(screen.getByTestId('status-settings')).toBeInTheDocument()
   })
 
-  it('hides the duplicate Research and Settings entries when the command rail owns them', () => {
+  it('hides only the duplicate Settings entry when the command rail owns Settings', () => {
     render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} onOpenResearch={vi.fn()} onOpenSettings={vi.fn()} commandRailActive />)
-    expect(screen.queryByTestId('status-research')).not.toBeInTheDocument()
+    expect(screen.getByTestId('status-research')).toBeInTheDocument()
     expect(screen.queryByTestId('status-settings')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Switch vault' })).toBeInTheDocument()
   })

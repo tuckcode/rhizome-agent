@@ -106,8 +106,9 @@ interface StatusBarSecondarySectionProps {
   versionUpdateIndicator?: ReactNode
   onOpenResearch?: () => void
   onOpenSettings?: () => void
-  /** When the command rail is active it owns Research + Settings, so the
-   *  duplicate status-bar entries are hidden (wave 5.3 §2.6.3). */
+  /** When the command rail is active it owns Settings, so the duplicate
+   *  status-bar Settings entry is hidden. Research stays on the status bar
+   *  because the rail is sessions-only. */
   commandRailActive?: boolean
   stacked?: boolean
   compact?: boolean
@@ -632,7 +633,7 @@ export function StatusBarSecondarySection({
           </Button>
         </ActionTooltip>
       )}
-      {onOpenResearch && !commandRailActive && <ResearchButton compact={compact} locale={locale} onOpenResearch={onOpenResearch} />}
+      {onOpenResearch ? <ResearchButton compact={compact} locale={locale} onOpenResearch={onOpenResearch} /> : null}
       <BuildNumberButton buildNumber={buildNumber} onCheckForUpdates={onCheckForUpdates} compact={compact} locale={locale} />
       {versionUpdateIndicator}
       <ActionTooltip copy={themeTooltip} side="top" align="end" contentTestId="status-theme-mode-tooltip">

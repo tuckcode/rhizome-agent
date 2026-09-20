@@ -773,7 +773,7 @@ describe('App', () => {
     render(<App />)
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByTestId('command-rail-research'))
+    fireEvent.click(screen.getByTestId('status-research'))
 
     expect(await screen.findByTestId('research-destination')).toBeInTheDocument()
     expect(screen.getByTestId('research-panel-stub')).toBeInTheDocument()
@@ -795,7 +795,6 @@ describe('App', () => {
     fireEvent.contextMenu(within(noteList).getByText('Test Project'))
     fireEvent.click(await screen.findByText('Ask the agent about this note'))
 
-    expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByTestId('chat-center')).not.toHaveStyle({ display: 'none' })
     const pane = await screen.findByTestId('chat-note-pane')
     expect(pane).toHaveTextContent('Test Project')
@@ -842,19 +841,19 @@ describe('App', () => {
     render(<App />)
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
-    expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('chat-center')).not.toHaveStyle({ display: 'none' })
 
     fireEvent.keyDown(window, { key: '1', metaKey: true })
     await waitFor(() => {
       expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     })
-    expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('chat-center')).not.toHaveStyle({ display: 'none' })
     expect(screen.getByTestId('vault-panel-restore')).toHaveAccessibleName('Show Notes')
 
     fireEvent.click(screen.getByTestId('vault-panel-restore'))
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel-navigation')).not.toBeInTheDocument()
-    expect(screen.getByTestId('command-rail-chat')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('chat-center')).not.toHaveStyle({ display: 'none' })
 
     fireEvent.click(await screen.findByTestId('vault-panel-collapse'))
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()

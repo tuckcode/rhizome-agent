@@ -548,6 +548,7 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
   // streaming re-opened itself the moment reasoningDone flipped.
   const autoExpanded = !reasoningDone
   const reasoningExpanded = userOverride ?? autoExpanded
+  const reasoningVisible = Boolean(reasoning && normalizeReasoningDisplay(reasoning).trim())
 
   const toggleAction = useCallback((toolId: string) => {
     setExpandedActions(prev => {
@@ -571,14 +572,14 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
         onOpenNote={onOpenNote}
         createdAtMs={createdAtMs}
       />
-      {reasoning && (
+      {reasoningVisible && reasoning ? (
         <ReasoningBlock
           locale={locale}
           text={reasoning}
           expanded={reasoningExpanded}
           onToggle={() => setUserOverride(prev => !(prev ?? autoExpanded))}
         />
-      )}
+      ) : null}
       {actions.length > 0 && (
         <ToolUseBlock
           actions={actions}

@@ -7,7 +7,7 @@ import { usePanelWidth } from './hooks/usePanelWidth'
 import { startResizeDrag } from './utils/startResizeDrag'
 import { overlayTitleBarBandStyle, subheadTrafficLightInset } from './utils/trafficLights'
 import { Sidebar } from './components/Sidebar'
-import { CommandRail, type CommandRailDestination } from './components/CommandRail'
+import { CommandRail } from './components/CommandRail'
 import { NoteList } from './components/NoteList'
 import {
   VaultPanel,
@@ -1322,13 +1322,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     if (mode === 'editor-only') handleRailSelectChat()
     handleSetViewMode(mode)
   }, [handleRailSelectChat, handleSetViewMode])
-  const railActiveDestination = useMemo((): CommandRailDestination => {
-    if (isResearchDestination) return 'research'
-    return 'chat'
-  }, [isResearchDestination])
-
-
-
   const { status: updateStatus, actions: updateActions } = useUpdater(
     settings.release_channel,
     areAutomaticUpdateChecksEnabled(settings),
@@ -2081,18 +2074,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           {commandRailEnabled && (
             <CommandRail
               locale={appLocale}
-              activeDestination={railActiveDestination}
               pinned={chatCentered ? railPinned : undefined}
               autoCollapsed={chatCentered && railPinned && !fittedRailPinned}
               onPinnedChange={handleRailPinned}
               width={chatCentered ? paneWidths.rail : undefined}
               onWidthChange={chatCentered ? delta => resizeColumn('rail', delta) : undefined}
-              onSelectChat={() => {
-                // C72: selecting Chat must not wipe the right Notes column.
-                setNotesFocus(false)
-                handleRailSelectChat()
-              }}
-              onSelectResearch={handleRailSelectResearch}
               onOpenSettings={handleOpenSettings}
               onSessionsSlotReady={setSessionRailSlot}
             />
@@ -2229,7 +2215,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                   <GraphView vaultPath={resolvedPath} onOpenNote={(path) => {
                     vaultBridge.openNoteByPath(path)
                     handleRailSelectChat()
-                  }} locale={appLocale} onExit={handleRailSelectGraph} />
+                  }} locale={appLocale} onExit={handleRailSelectChat} />
                 </Suspense>
                 {effectiveShowAIChat && aiWorkspaceSurface}
               </div>

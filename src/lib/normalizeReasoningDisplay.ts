@@ -5,10 +5,23 @@
  * still emit real line breaks. Keep the breaks. Split only the glued join.
  * Single newlines become markdown hard breaks so MarkdownContent shows
  * them instead of flattening the stream into one paragraph.
+ *
+ * Some turns echo the client-owned `<conversation_history>` prompt into
+ * thinking. That dump is not reasoning — strip it before the fold opens.
  */
 export function normalizeReasoningDisplay(text: string): string {
-  const withSentenceGaps = text.replace(/\.([A-Z])/g, '. $1')
+  const withoutHistory = stripConversationHistoryEcho(text)
+  const withSentenceGaps = withoutHistory.replace(/\.([A-Z])/g, '. $1')
   return preserveNewlinesAsMarkdownBreaks(withSentenceGaps)
+}
+
+function stripConversationHistoryEcho(text: string): string {
+  const open = ['<', 'conversation_history', '>'].join('')
+  const close = ['</', 'conversation_history', '>'].join('')
+  const escapedOpen = open.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const escapedClose = close.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const block = new RegExp(`${escapedOpen}[\\s\\S]*?${escapedClose}`, 'g')
+  return text.replace(block, '').replace(/^\s+|\s+$/g, '').replace(/\n{3,}/g, '\n\n')
 }
 
 function preserveNewlinesAsMarkdownBreaks(text: string): string {

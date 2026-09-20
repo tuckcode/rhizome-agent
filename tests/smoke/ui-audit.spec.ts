@@ -38,8 +38,8 @@ const BASELINE: Record<string, string[]> = JSON.parse(
 const SHARED = BASELINE._shared ?? []
 
 const SCREENS = [
-  { name: 'chat', testId: 'command-rail-chat' },
-  { name: 'research', testId: 'command-rail-research' },
+  { name: 'chat', testId: 'chat-center' },
+  { name: 'research', testId: 'status-research' },
   { name: 'changes', testId: 'sidebar-top-nav', buttonName: 'Changes' },
 ] as const
 
