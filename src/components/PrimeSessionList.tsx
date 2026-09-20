@@ -301,14 +301,16 @@ function SessionRowButton({
   onSelect: () => void
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       onClick={onSelect}
       aria-label={label}
       aria-current={active ? 'true' : undefined}
       className={cn(
-        'grid w-full grid-cols-[6px_1fr] items-start gap-1.5 rounded-sm',
-        'px-1.5 py-1 pr-12 text-left',
+        'grid h-auto w-full min-w-0 grid-cols-[6px_1fr] items-start justify-start gap-1.5 rounded-sm',
+        'px-1.5 py-1 pr-12 text-left font-normal whitespace-normal shadow-none',
+        'hover:bg-transparent hover:text-foreground dark:hover:bg-transparent',
       )}
     >
       <span
@@ -326,14 +328,16 @@ function SessionRowButton({
         )}
       />
       <span className="min-w-0">
-        <span className="block truncate text-[11px] leading-tight text-foreground">{title}</span>
+        <span className="block truncate text-[11px] leading-tight text-foreground" title={title}>
+          {title}
+        </span>
         {meta ? (
           <span className="mt-px block truncate font-mono text-[10px] tracking-[0.02em] text-muted-foreground">
             {meta}
           </span>
         ) : null}
       </span>
-    </button>
+    </Button>
   )
 }
 
