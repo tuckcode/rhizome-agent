@@ -184,7 +184,19 @@ describe('VersionUpdateIndicator', () => {
 
     expect(screen.getByText('Chat engine 0.7.2')).toBeInTheDocument()
     expect(screen.queryByText('Prime 0.7.2')).not.toBeInTheDocument()
+    expect(screen.getByText('Chat engine is now 0.7.2.')).toBeInTheDocument()
     expect(screen.getByTestId('version-update-prime-update-now')).toBeDisabled()
+    expect(screen.getByTestId('version-update-prime-update-now')).toHaveTextContent('Updated')
+  })
+
+  it('puts Chat-engine Update now in the footer next to Maybe later', () => {
+    renderIndicator({ primeStatus: primeAvailable() })
+
+    fireEvent.click(screen.getByTestId('status-version-update'))
+
+    const footer = screen.getByTestId('version-update-maybe-later').parentElement
+    expect(footer).toContainElement(screen.getByTestId('version-update-prime-update-now'))
+    expect(screen.getByTestId('version-update-prime-update-now')).not.toBeDisabled()
   })
 
   it('offers the release page when the host only names the release page', () => {
