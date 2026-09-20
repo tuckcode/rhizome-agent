@@ -59,3 +59,27 @@ describe('NoteListHeader expand sidebar button', () => {
     }
   })
 })
+
+describe('NoteListHeader Inbox title (C78)', () => {
+  it('keeps a min-width that can show Inbox beside a row of fixed 32px icons', () => {
+    renderHeader({ title: 'Inbox' })
+
+    const title = screen.getByRole('heading', { name: 'Inbox' })
+    expect(title).not.toHaveClass('min-w-0')
+    expect(title.className).toMatch(/min-w-\[3\.25rem\]/)
+
+    const search = screen.getByRole('button', { name: 'Search notes' })
+    expect(search.className).toMatch(/!w-\[32px\]/)
+  })
+
+  it('groups Research, Settings, Mycelium, and Wiki Graph as icon shortcuts', () => {
+    renderHeader({ title: 'Inbox' })
+
+    const group = screen.getByTestId('notes-chrome-shortcuts')
+    expect(group).toHaveAttribute('aria-label', 'Workspace shortcuts')
+    expect(screen.getByRole('button', { name: 'Open the Research panel' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open settings' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Mycelium' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Wiki Graph' })).toBeInTheDocument()
+  })
+})

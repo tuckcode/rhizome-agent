@@ -133,6 +133,29 @@ describe('StatusBar', () => {
     expect(screen.getByRole('button', { name: 'Switch vault' })).toBeInTheDocument()
   })
 
+  it('opens Research and Wiki Graph from the notes-chrome shortcut events', () => {
+    const onOpenResearch = vi.fn()
+    const onClickGraph = vi.fn()
+    render(
+      <StatusBar
+        noteCount={100}
+        vaultPath="/Users/luca/Laputa"
+        vaults={vaults}
+        onSwitchVault={vi.fn()}
+        onOpenResearch={onOpenResearch}
+        onClickGraph={onClickGraph}
+      />,
+    )
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('rhizome:notes-chrome', { detail: 'research' }))
+      window.dispatchEvent(new CustomEvent('rhizome:notes-chrome', { detail: 'graph' }))
+    })
+
+    expect(onOpenResearch).toHaveBeenCalledOnce()
+    expect(onClickGraph).toHaveBeenCalledOnce()
+  })
+
   it('shows a theme toggle instead of the notifications placeholder', () => {
     render(
       <StatusBar

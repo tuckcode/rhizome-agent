@@ -107,12 +107,21 @@ it('shrinks when its top edge is dragged downward', async () => {
 })
 
 it('persists independent view preferences and retains a way to re-enable views', () => {
-  const first = render(<ConnectionsPanel vaultPath="/vault" />)
-  fireEvent.click(screen.getByText('Connections settings'))
-  fireEvent.change(screen.getByLabelText('Graph placement'), { target: { value: 'off' } })
-  fireEvent.change(screen.getByLabelText('Mycelium placement'), { target: { value: 'off' } })
-  first.unmount()
+  localStorage.setItem('rhizome:connections-placement:v1', JSON.stringify({ graph: 'off', mycelium: 'off' }))
   render(<ConnectionsPanel vaultPath="/vault" />)
   expect(screen.getByText('Enable a view in Connections settings.')).toBeVisible()
   expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Enable Graph' }))
+  expect(screen.getByRole('tab', { name: 'Graph' })).toBeInTheDocument()
+})
+
+it('opens Mycelium from the notes-chrome shortcut and turns the view back on', async () => {
+  localStorage.setItem('rhizome:connections-placement:v1', JSON.stringify({ graph: 'sidebar', mycelium: 'off' }))
+  render(<ConnectionsPanel vaultPath="/vault" />)
+  expect(screen.queryByRole('tab', { name: 'Mycelium' })).not.toBeInTheDocument()
+  act(() => {
+    window.dispatchEvent(new CustomEvent('rhizome:notes-chrome', { detail: 'mycelium' }))
+  })
+  expect(await screen.findByRole('tab', { name: 'Mycelium' })).toBeInTheDocument()
+  expect(await screen.findByText('Recorded actions')).toBeVisible()
 })
