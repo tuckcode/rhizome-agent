@@ -21,14 +21,35 @@ Brand artwork and the dither/ASCII variants: [Rhizome visual identity](docs/desi
 
 ## Setup
 
+This is a **macOS developer preview**, not a self-contained public install.
+Prime Agent and Node are prerequisites. They are not bundled.
+
+Stranger / first-run path, supported scope, recovery, permissions,
+telemetry, and the license inventory:
+[`docs/PUBLIC-PREVIEW.md`](docs/PUBLIC-PREVIEW.md).
+
+Developer path (ports, tests, landmines):
+[`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md).
+
 ```bash
+# Node ^20.19.0 or >=22.12.0 — Vite 7 rejects Node 18
 pnpm install
-# Rust/Tauri toolchain same as desktop
+# Rust/Tauri toolchain. Quit /Applications/Rhizome Agent.app first (C65).
 pnpm tauri dev
 ```
 
-Requires a normal Tauri/macOS dev environment. Prime Agent CLI is expected on the machine for harness integration work (`prime-agent`); it is not vendored in this repo yet.
+Browser mock (no live Prime): `pnpm dev` then http://localhost:5202.
+Requires a normal Tauri/macOS environment. Install Prime separately:
+`npm i -g prime-agent`.
+
+Parked ideas:
+[`docs/plans/2026-09-20-public-readiness-inventory.md`](docs/plans/2026-09-20-public-readiness-inventory.md).
+A roadmap row is not implementation approval. Do not merge
+[PR #66](https://github.com/tuckcode/rhizome-agent/pull/66).
 
 ## License
 
 AGPL-3.0-or-later (inherited from the desktop snapshot). Confirm before any public release under `tuckcode`.
+That confirmation has not happened. The check in
+[`docs/PUBLIC-PREVIEW.md`](docs/PUBLIC-PREVIEW.md) is an inventory, not a
+legal determination.

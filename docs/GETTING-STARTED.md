@@ -4,13 +4,21 @@ How to navigate the **Rhizome Agent** codebase, run the app, and find what you n
 
 > This is Rhizome Agent (`ai.rhizome.agent`, `tuckcode/rhizome-agent`), not Rhizome Desktop (`knispo/rhizome`, `ai.rhizome.desktop`) — see `docs/IDENTITY.md`. Product overview and roadmap: [README.md](../README.md). Some filenames and sidecar labels still use older internal names (`tolaria_*`, etc.) — treat those as implementation identifiers, not the product name.
 >
-> **Stamped 16:06:** leftover wrap `1eb0398`. Still Agent, not Desktop. No push. No rebuild.
+> **Stamped 2026-09-20 Lane I:** local product checkpoint `4f9b4c4`
+> (**unpushed**); `origin/main` `dc44d84`; planning local `bcd4b87`
+> (**unpushed**); installed app still `6860762`. C76 source is in this
+> commit series. Still Agent, not Desktop. No push. No rebuild.
+>
+> Stranger / first-run path:
+> [`PUBLIC-PREVIEW.md`](PUBLIC-PREVIEW.md). This page is the developer
+> path.
 
 ## Prerequisites
 
-- **Node.js** 18+ and **pnpm**
+- **Node.js** `^20.19.0` or `>=22.12.0` (Vite 7) and **pnpm**
 - **Rust** 1.77.2+ (for the Tauri backend)
 - **git** CLI (required by the git integration features)
+- **Prime Agent** on `PATH` for live Chat (`npm i -g prime-agent`). Not vendored.
 
 ### Linux system dependencies
 
@@ -67,7 +75,9 @@ pnpm install
 
 # Run in browser (no Rust needed — uses mock data)
 pnpm dev
-# Open http://localhost:5173
+# Open http://localhost:5202
+# Vite pins 5202. 5173 is wrong. Playwright's config default is 5201
+# when BASE_URL is unset.
 
 # Run with Tauri (full app, requires Rust)
 pnpm tauri dev
@@ -125,8 +135,9 @@ The sidecar is Linux-based, so keep native macOS Tauri QA and app-focus screensh
 type documents only, no personal notes, no network
 (`create_local_rhizome_scaffold` in `src-tauri/src/vault/getting_started.rs`).
 It does **not** clone `refactoringhq/tolaria-getting-started` unless
-`RHIZOME_GETTING_STARTED_REPO_URL` (or a legacy alias) is set. C11’s
-Rhizome-owned remote starter is still deferred.
+`RHIZOME_GETTING_STARTED_REPO_URL` is set. The old `TOLARIA_*` /
+`LAPUTA_*` names are not read. C11’s Rhizome-owned remote starter is
+still deferred.
 
 When a remote URL *is* set, `create_getting_started_vault` clones that repo
 and then removes every git remote from the new local copy, so the vault
@@ -508,10 +519,12 @@ Verified against source 2026-09-14. Longer landmine list:
 - **Chat default stays Prime.** Settings must not present Prime as an
   optional local-agent alternative. An API-model default must say it
   skips Prime sessions and vault tools.
-- **Hide stops helpers.** Red-button close hides (C22) and
-  `release_helpers_for_hidden_window` stops the spawned Prime supervisor,
-  MCP bridge, and Mindwalk sidecar unless Keep working left a resident
-  session. Never send Prime `shutdown`. Cmd+Q is the real quit.
+- **Hide stops ws-bridge and Mindwalk, not spawned Prime.** Red-button
+  close hides (C22). `release_helpers_for_hidden_window` stops the
+  app-owned MCP bridge and Mindwalk sidecar. **C75:** a Prime daemon
+  this process spawned stays warm for fast reopen. Keep-working still
+  settles the session as `resident`; it does not change whether the
+  daemon stays. Never send Prime `shutdown`. Cmd+Q is the real quit.
 - **Packages install is CLI, not the daemon.** `install_prime_package` runs
   `prime-agent package install` (180s). Confirm full system access once.
 - **Tab completion is rules-first.** `suggestReply` only. Do not add
@@ -526,8 +539,9 @@ Verified against source 2026-09-14. Longer landmine list:
   `gray-matter` (its default JS engine evaluates `---javascript`).
   Coffee / coffeescript / cson / `searchNotes` stay data-only too
   (`vault.security.test.js`). The packaged MCP bundle is generated
-  (`src-tauri/.gitignore`) — `/Applications` `476756c` will not pick
-  S1/S2 until rebuild.
+  (`src-tauri/.gitignore`) — the stamped `/Applications` app `6860762`
+  will not pick later MCP bundle work until a separately authorized
+  rebuild.
 - **Ask the agent about this note** keeps Chat and opens that note
   (`App.test.tsx`). Locked notes are read-only in BlockNote and raw
   (`EditorContentLayout.test.tsx`). Not vault `editor_mode`. Sheets do
@@ -587,13 +601,13 @@ cargo test
 cargo llvm-cov --manifest-path src-tauri/Cargo.toml --no-clean --ignore-filename-regex "lib\.rs|main\.rs|menu\.rs" --fail-under-lines 85
 
 # Playwright core smoke lane (requires dev server)
-BASE_URL="http://localhost:5173" pnpm playwright:smoke
+BASE_URL="http://localhost:5202" pnpm playwright:smoke
 
 # Full Playwright regression suite
-BASE_URL="http://localhost:5173" pnpm playwright:regression
+BASE_URL="http://localhost:5202" pnpm playwright:regression
 
 # Single Playwright test
-BASE_URL="http://localhost:5173" npx playwright test tests/smoke/<slug>.spec.ts
+BASE_URL="http://localhost:5202" npx playwright test tests/smoke/<slug>.spec.ts
 ```
 
 ## Common Tasks

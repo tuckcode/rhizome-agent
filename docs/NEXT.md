@@ -12,7 +12,10 @@ assessment and a Cursor execution plan. Start with the
 [Cursor swarm brief](plans/2026-09-20-cursor-public-readiness-swarm.md).
 The [inventory](plans/2026-09-20-public-readiness-inventory.md) preserves all
 17 live open issues, draft PRs #66–#68, latest design papers, and parked ideas.
-The product and planning commits were pushed together. Rebuild remains separate.
+Local product checkpoint is `4f9b4c4` and is **unpushed**. `origin/main`
+is still `dc44d84`. Planning also sits locally as **`bcd4b87`** and is
+**unpushed**. **C76** source is in this commit series. Rebuild remains
+separate.
 
 **Origin:** Composer · Cursor · 2026-09-20 04:38.
 
@@ -21,11 +24,11 @@ Read the session file first:
 
 | Priority | What | Notes |
 |---|---|---|
-| 1 | **CPR rebuild** | Only if Atticus will launch. App is still `6860762`; source includes `4f9b4c4` plus planning. |
+| 1 | **CPR rebuild** | Only if Atticus will launch. App is still `6860762`. Local source includes unpushed `4f9b4c4` plus this Wave 1 series. |
 | 3 | **Live thinking / no-answer** | Reproduce High/loud thinking that never answers; keep clickable Reasoning; disable = thinking **Off**. Do not force Off globally. |
-| 4 | **Public-install dogfood** | Honest Prime-missing first minute (C64); one live turn + note; #46 live; stranger install note. Windows out. |
+| 4 | **Public-install dogfood** | Draft: [`PUBLIC-PREVIEW.md`](PUBLIC-PREVIEW.md). Still needs a clean-account run. Honest Prime-missing first minute (C64); one live turn + note; #46 live. Windows out. |
 | 5 | **Harness leftovers** | #41 live steer/queue; human session titles (unwrap history blobs on list); Packages rail shortcut only if claimed. |
-| Parked | Import `1`, #56 sentence, W11 cards, TraderAlice patterns, kanban/automations on rail | Do not invent. |
+| Parked | Import `1`, #56 keep/remove, W11 cards, TraderAlice patterns, kanban/automations on rail | Ledger: [inventory](plans/2026-09-20-public-readiness-inventory.md). A row is not approval. |
 
 **Hard nos:** wrong tree; merge #66; `import_jsonl` without `1`; cite ADR-0168 as settled; ADHD packing; English-only churn (C18).
 
@@ -44,8 +47,9 @@ It indexes, it does not restate. Every row points at the issue, ADR, or C-number
 that owns the detail. If you find yourself copying a paragraph out of one of
 those into here, link it instead — the same rule `HANDOFF.md` runs on.
 
-Snapshot: **2026-09-20** — product commit **`4f9b4c4`** plus planning,
-app **`6860762`**. God plan: [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md).
+Snapshot: **2026-09-20** — local product checkpoint **`4f9b4c4` (unpushed)**,
+`origin/main` **`dc44d84`**, planning **uncommitted**, app **`6860762`**.
+God plan: [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md).
 Pickup handoff: [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
 Live `gh` open-issue count is stale here — re-derive:
 
@@ -80,7 +84,8 @@ Board cards: [`BOARD.md`](BOARD.md) W11.
 | Living-docs audit | In progress | [`plans/living-docs-audit.md`](plans/living-docs-audit.md) |
 | C66 agent profile | Agreed, not built | [`plans/c66-agent-profile.md`](plans/c66-agent-profile.md) |
 | #5 Prime surface skeleton | Structured talk | [`design/prime-agent-surface.md`](design/prime-agent-surface.md) |
-| Sessions-only rail + Research on status bar | **Dirty tree 2026-09-20** | [0438](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md) |
+| Sessions-only rail + Research on status bar | Local `4f9b4c4`, **unpushed** | [0438](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md) |
+| Public preview install claims | Draft, not dogfooded | [`PUBLIC-PREVIEW.md`](PUBLIC-PREVIEW.md) · [inventory](plans/2026-09-20-public-readiness-inventory.md) |
 | Packages shortcut on rail | Parked brainstorm | Settings → Packages already exists |
 | Rail automations / kanban icons | Later | Empty icons no |
 

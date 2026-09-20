@@ -1,7 +1,9 @@
 # Session board — 2026-09-20 morning
 
-**Origin:** Composer · Cursor · 2026-09-20 04:38 · stamped against
-product commit `4f9b4c4` + public-readiness planning + app `6860762`.
+**Origin:** Cursor Grok 4.6 · Lane I · 2026-09-20 · stamped against
+local product checkpoint `4f9b4c4` (**unpushed**), `origin/main` `dc44d84`,
+planning local `bcd4b87` (**unpushed**), app `6860762`. C76 source is in
+this commit series.
 
 God-plan input: [`ASTRA_PACKET.md`](ASTRA_PACKET.md). Inventory:
 [`PLAN_FOR_A_PLAN.md`](PLAN_FOR_A_PLAN.md). Daily index: `HANDOFF.md`.
@@ -13,6 +15,8 @@ Session: [`plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.
 [Cursor swarm brief](plans/2026-09-20-cursor-public-readiness-swarm.md) ·
 [live issues and parked ideas](plans/2026-09-20-public-readiness-inventory.md).
 Planning only. Source and installed-app stamps above remain separate.
+Preview install draft: [`PUBLIC-PREVIEW.md`](PUBLIC-PREVIEW.md). A
+roadmap row in the inventory is not implementation approval.
 
 ---
 
@@ -32,9 +36,11 @@ Planning only. Source and installed-app stamps above remain separate.
 
 ## True right now
 
-- **Git:** `4f9b4c4` product commit plus the following planning commit.
+- **Git:** local product checkpoint `4f9b4c4` is **unpushed**.
+  `origin/main` is still `dc44d84`. Planning also sits locally as
+  **`bcd4b87`** and is **unpushed**. C76 source is in this commit series.
 - **Last stamped app:** **`6860762`**, **2026-09-19 11:27**,
-  `/Applications/Rhizome Agent.app` — behind `main` and behind the dirty tree.
+  `/Applications/Rhizome Agent.app` — behind local source.
 - **Prime on this machine:** **0.9.3**.
 - **Open GitHub issues:** Prefer live `gh`. Open PR [#66](https://github.com/tuckcode/rhizome-agent/pull/66)
   draft — do not merge.

@@ -47,12 +47,18 @@ file.
 ---
 
 ## State
-**Origin:** Composer · Cursor · 2026-09-20 · rail + reasoning landed.
+**Origin:** Cursor Grok 4.6 · Lane I · 2026-09-20 · install/docs stamps.
 
-Sessions-only rail + reasoning history strip committed as **`4f9b4c4`**.
-The public-readiness planning commit follows it. Both were pushed together.
-Packaged app remains **`6860762`** (2026-09-19 11:27) — **behind** `main`. Detail:
+Local product checkpoint is **`4f9b4c4`** (sessions-only rail + reasoning
+history strip). It is **unpushed**. `origin/main` is still **`dc44d84`**.
+Planning also sits locally as **`bcd4b87`** and is **unpushed**. That
+commit’s “pushed together” sentences are wrong; these stamps replace them.
+**C76** incomplete-history strip is in this commit series. Packaged app
+remains **`6860762`** (2026-09-19 11:27) — behind local source. Detail:
 [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
+Install/claims: [`GETTING-STARTED.md`](GETTING-STARTED.md) § Public preview
+quick start. Inventory:
+[`plans/2026-09-20-public-readiness-inventory.md`](plans/2026-09-20-public-readiness-inventory.md).
 Notes is a right panel from **Show Notes** (or View / Cmd+2), not a left-rail
 button. Left rail is **sessions + Settings + pin** (Chat/Research destinations
 removed; Research stays on the status bar). ADR-0173: Chat / Notes /
@@ -98,9 +104,9 @@ public-readiness plan with parallel agents. Read the
 Typecheck and 292 focused tests pass. Native readiness is not established.
 No rebuild or issue closure occurred.
 
-`docs/NEXT.md` § **Pickup now (2026-09-20)** — commit dirty rail/reasoning,
-then CPR only if Atticus will launch, then thinking/no-answer live sample,
-then public-install dogfood. God plan:
+`docs/NEXT.md` § **Pickup now (2026-09-20)** — C76 source is in this
+series. CPR only if Atticus will launch, then thinking/no-answer live
+sample, then public-install dogfood. God plan:
 [`docs/ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md). Session detail:
 [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
 
@@ -109,25 +115,22 @@ then public-install dogfood. God plan:
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-20 · Wave 1 audit reply](plans/handoffs/2026-09-20-0610-cursor-grok-4-6-wave1-audit-reply.md) — coverage 6703; unused classifier deleted; C77/C78 opened.
+- [2026-09-20 · Lane B chat reliability](plans/2026-09-20-lane-b-chat-reliability-recipe.md) — session titles unwrap history blobs; thinking-only stays empty completion; #41 live still Q.
+- [2026-09-20 · Lane S vault safety](plans/handoffs/2026-09-20-0545-cursor-grok-4-6-lane-s-vault-safety.md) — JS refuses `~`/`~/` as HOME vault; nested vaults stay; #46 open until live no-vault Chat.
+- [2026-09-20 · Lane I install docs](plans/handoffs/2026-09-20-0548-cursor-grok-4-6-lane-i-install-docs.md) — public preview quick start; #66 unmerged.
+- [2026-09-20 · rail slice review](plans/handoffs/2026-09-20-0538-cursor-grok-4-6-rail-slice-review.md) — coordinator review of `4f9b4c4`; C76 source fix; Q/D/I intake.
 - [2026-09-20 · public readiness plan](plans/handoffs/2026-09-20-0506-gpt-6-public-readiness-plan.md) — assessment, Cursor swarm, parked inventory, and low-context Handy skill.
 - [2026-09-20 · rail + reasoning pickup](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md) — dirty sessions-only rail; history strip; harness stand; next plan.
 - [2026-09-19 · CPR](plans/handoffs/2026-09-19-1127-cursor-grok-4-6-cpr.md) — pane presets, hybrid skill PATH, Notes off rail. `6860762` in `/Applications` 11:27.
 - [2026-09-19 · hybrid runtime](plans/handoffs/2026-09-19-0431-cursor-grok-4-6-hybrid-runtime.md) — Prime stays; skill PATH/node + short-reply manners. Live SKILL.md locked 444. No commit or rebuild.
 - [2026-09-19 · pane presets finish](plans/handoffs/2026-09-19-0148-cursor-grok-4-6-pane-presets-finish.md) — leftover locks, ADR-0173, docs. Source only. No commit or rebuild.
 - [2026-09-19 · pane presets](plans/handoffs/2026-09-19-0130-codex-pane-presets-cursor-finish.md) — Codex source slice. Cursor finish followed.
-
 - [2026-09-18 · rebuild](plans/handoffs/2026-09-18-1944-cursor-composer-rebuild.md) — `35f217f` in `/Applications` 19:44.
 - [2026-09-18 · store trip](plans/handoffs/2026-09-18-1653-cursor-composer-store-trip.md) — Done row, Pi symlink skip, Getting Started env aliases. Pushed as `35f217f`.
 - [2026-09-17 · CPR traffic lights](plans/handoffs/2026-09-17-1723-cursor-composer-cpr-traffic-lights.md) — `712024d` in `/Applications` 17:23.
-- [2026-09-17 · CPR icon contrast](plans/handoffs/2026-09-17-1626-cursor-composer-cpr-icon-contrast.md) — `bfe406b` in `/Applications` 16:26.
 - [2026-09-15 · CPR Signal + C75](plans/handoffs/2026-09-15-1408-cursor-composer-cpr.md) — `cb74b28` in `/Applications` 14:08.
-- [2026-09-15 · rebuild + Signal Dock](plans/handoffs/2026-09-15-1258-cursor-grok-4-6-rebuild-signal.md) — deleted old app; Signal `icon.icns` installed 12:58.
 - [2026-09-14 · AGENTS Learned reset](plans/handoffs/2026-09-14-2148-cursor-grok-4-6-agents-learned-reset.md) — clean slate + continual-learning guard.
-- [2026-09-14 · leftover crunch audit](plans/handoffs/2026-09-14-1729-cursor-grok-4-6-crunch-audit.md) — leftover glob green. Hard nos held. No push.
-- [2026-09-14 · D6 start](plans/handoffs/2026-09-14-1520-cursor-grok-4-6-d6-start.md) — named-path commits. No push. No rebuild.
-- [2026-09-14 · leftover inventory](plans/handoffs/2026-09-14-1460-cursor-grok-4-6-leftover-inventory.md) — parked items and leftover locks through 1519.
-- [2026-09-14 · docked questions](plans/handoffs/2026-09-14-1145-cursor-grok-4-6-docked-questions.md) — still unanswered.
-- [2026-09-14 · morning pickup](plans/handoffs/2026-09-14-1115-cursor-grok-4-6-morning-pickup.md) — three SHAs. Import waits for `1`.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)
@@ -251,7 +254,9 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 
 ## Open threads
-- **C76-OPEN (2026-09-20): incomplete reasoning history remains visible.** The dirty `normalizeReasoningDisplay` removes complete `<conversation_history>…</conversation_history>` blocks only. A direct function probe leaves an opening tag and unfinished history unchanged. Add a streaming/truncation regression before the fix. This display defect does not establish the cause of the live no-answer report. [Readiness plan P0/P1](plans/2026-09-20-public-readiness-plan.md).
+- **C78-OPEN (2026-09-20): Inbox header renders as “I…” at every width.** `NoteListHeader.tsx` gives the title `flex-1 truncate` while four icon buttons keep their width. At 1440px the word Inbox still has about 21px. Pre-existing (`39fc511`). Visual audit 2026-09-20, `pnpm preview` on 5202.
+- **C77-OPEN (2026-09-20): first-run Chat guidance fails contrast.** `AiPanelChrome.tsx:484` stacks `opacity: 0.6` on `text-muted-foreground` at 11px. Measured 2.76:1 light and 3.93:1 dark. AA ordinary text is 4.5:1. It is the only contrast miss on the visible first-run surface. Pre-existing (`3bf045c`). Visual audit 2026-09-20.
+- **C76-FIXED-SOURCE (2026-09-20): incomplete streamed history is stripped from the reasoning fold.** After complete `<conversation_history>` blocks are removed, an leftover opening tag drops through the end of the display string. Persisted reasoning is unchanged. Tests: `normalizeReasoningDisplay.test.ts`, `AiMessage.test.tsx`. Not in `/Applications` until a rebuild. This display fix does not name the live no-answer cause.
 - **C75-MITIGATED (2026-09-15): cold launch felt blank ~2s and “ready” ~10s+.** Blank shell was `Suspense fallback={null}` + huge lazy `App` chunk; slow ready was Prime daemon spawn after hide/quit plus full session-list scan for idle restore. Tree now: HTML + `BootSplash`, non-blocking Google Fonts, `warm_daemon_in_background` at setup, hide leaves spawned Prime daemon warm, idle restore uses `latest_prime_session_for_restore` (not full list). **Needs rebuild** to feel it in `/Applications`. Full transcript remount and Sessions-rail list are still separate costs.
 - **C65-RESOLVED (2026-09-05): the debug bundle can't run natively while the installed app is open — diagnosed, not a defect to fix.** `tauri-plugin-single-instance` enforces one process per bundle identifier, and the debug bundle and `/Applications/Rhizome Agent.app` both carry `ai.rhizome.agent`. Launching the debug bundle (via `open -n` or its raw executable) while the installed app is running silently forwards to the installed instance and the new process exits instantly with no log output — it never stays alive to attach to. This is the actual mechanism behind two prior sessions' "Codex native controls select the wrong app by bundle ID" observations; it's not an attachment/selection quirk, the debug process is genuinely not there. **Workaround, verified working:** quit the installed app first (`osascript -e 'tell application id "ai.rhizome.agent" to quit'`), then launch the debug `.app` — it runs as its own process, confirmed by executable path (`ps aux`), and cua-driver attaches by pid normally. Always ask before quitting the installed app — it may hold unsaved chat/note state. Not filing this as a product bug to fix: single-instance-per-identifier is standard, intentional behavior; the fix is procedural (quit-then-launch), not code. Detail: [2026-09-05-0620](plans/handoffs/2026-09-05-0620-claude-sonnet-5-a1-connections-routing.md).
 - **C61-RESOLVED (2026-09-05): native Graph navigation discarded unsent drafts and hid current chat.** Originally reproduced twice by the GPT-6 audit; fixed by keeping the inactive view mounted. **Native verification done 2026-09-05** on the release build: typed `VERIFY_DRAFT_C61_KEEP_ME`, opened Connections → Graph, and the draft was still in the composer afterwards. The audit's own "do not claim native verification" caveat is now discharged.
