@@ -491,4 +491,57 @@ describe('PrimeModelPicker — allow-list freshness (#45)', () => {
       })
     })
   })
+
+  it('provider check-all toggles only that provider in the Free-only catalog', async () => {
+    invoked.models = [
+      { id: 'claude-opus', name: 'Claude Opus', provider: 'openrouter' },
+      { id: 'gemini-flash:free', name: 'Gemini Flash', provider: 'openrouter' },
+      { id: 'hy3-free', name: 'HY3 Free', provider: 'opencode' },
+    ]
+    invoked.allowList = ['opencode/hy3-free']
+    render(<PrimeModelPicker label="HY3 Free" vaultPath="/v" />)
+    open()
+    await waitFor(() => expect(screen.getByTestId('prime-models-free-only')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('prime-models-free-only'))
+    fireEvent.click(screen.getByTestId('prime-model-edit-toggle'))
+
+    expect(screen.queryByTestId('prime-model-edit-item-openrouter/claude-opus')).not.toBeInTheDocument()
+    expect(screen.getByTestId('prime-model-edit-item-openrouter/gemini-flash:free')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('prime-model-edit-provider-openrouter'))
+    await waitFor(() => {
+      const saved = invoked.calls.filter((call) => call.cmd === 'set_prime_model_allow_list').at(-1)
+      expect(saved?.args?.models).toEqual(['opencode/hy3-free', 'openrouter/gemini-flash:free'])
+    })
+  })
+
+  it('provider checkboxes describe the Free-only catalog, not the search hits', async () => {
+    invoked.models = [
+      ...MODELS,
+      { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'anthropic' },
+    ]
+    invoked.allowList = ['xai/grok-4.5', 'anthropic/claude-fable-5']
+    render(<PrimeModelPicker label="Grok 4.5" vaultPath="/v" />)
+    open()
+    await waitFor(() => expect(screen.getByTestId('prime-model-edit-toggle')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('prime-model-edit-toggle'))
+    fireEvent.change(screen.getByTestId('prime-model-filter'), { target: { value: 'fable' } })
+
+    expect(screen.getByTestId('prime-model-edit-provider-anthropic')).toHaveAttribute(
+      'aria-checked',
+      'mixed',
+    )
+  })
+
+  it('gives the Edit list a wider menu than the picker', async () => {
+    render(<PrimeModelPicker label="Grok 4.5" vaultPath="/v" />)
+    open()
+    await waitFor(() => expect(screen.getByTestId('prime-model-edit-toggle')).toBeInTheDocument())
+    const menu = screen.getByTestId('prime-model-menu')
+    expect(menu).toHaveClass('w-64')
+
+    fireEvent.click(screen.getByTestId('prime-model-edit-toggle'))
+    expect(screen.getByTestId('prime-model-menu')).toHaveClass('w-80')
+    expect(screen.getByTestId('prime-model-edit-list')).toBeInTheDocument()
+  })
 })

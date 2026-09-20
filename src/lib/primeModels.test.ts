@@ -10,6 +10,7 @@ import {
   partitionModelsByAllowList,
   partitionModelsByConnection,
   partitionModelsByFree,
+  providerSelectionState,
   type PrimeModel,
 } from './primeModels'
 
@@ -293,6 +294,29 @@ describe('partitionModelsByFree', () => {
       'grok-4.5',
       'hy3-free',
     ])
+  })
+})
+
+describe('providerSelectionState', () => {
+  const anthropic = [
+    model({ id: 'claude-fable-5', name: 'Claude Fable 5', provider: 'anthropic' }),
+    model({ id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'anthropic' }),
+  ]
+
+  it('is checked only when every model in the slice is selected', () => {
+    expect(
+      providerSelectionState(anthropic, new Set(['anthropic/claude-fable-5', 'anthropic/claude-sonnet-5'])),
+    ).toBe(true)
+  })
+
+  it('is mixed when the slice is only partly selected', () => {
+    expect(providerSelectionState(anthropic, new Set(['anthropic/claude-fable-5']))).toBe(
+      'indeterminate',
+    )
+  })
+
+  it('is unchecked when none of the slice is selected', () => {
+    expect(providerSelectionState(anthropic, new Set(['xai/grok-4.5']))).toBe(false)
   })
 })
 

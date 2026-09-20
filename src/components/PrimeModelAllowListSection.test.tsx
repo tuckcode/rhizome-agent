@@ -184,4 +184,59 @@ describe('PrimeModelAllowListSection (#45)', () => {
     fireEvent.click(screen.getByTestId('model-allow-list-group-many'))
     await waitFor(() => expect(saved().at(-1)).toEqual(['xai/keep']))
   })
+
+  it('shows every current catalog row while Edit list is on', async () => {
+    invoked.models = [
+      ...Array.from({ length: 45 }, (_, index) => ({
+        id: `model-${index}`,
+        name: `Model ${index}`,
+        provider: 'many',
+      })),
+      { id: 'keep', name: 'Keep', provider: 'xai' },
+    ]
+    await renderSection()
+    fireEvent.click(screen.getByTestId('model-allow-list-edit-toggle'))
+
+    const rows = screen.getByTestId('model-allow-list-rows')
+    expect(rows).toHaveAttribute('data-editing', 'true')
+    expect(rows).not.toHaveClass('max-h-64')
+    expect(rows).not.toHaveClass('overflow-y-auto')
+    expect(screen.getAllByTestId(/model-allow-list-item-/)).toHaveLength(46)
+    expect(screen.queryByTestId('model-allow-list-more')).not.toBeInTheDocument()
+  })
+
+  it('provider check-all toggles only that provider in the Free-only catalog', async () => {
+    invoked.models = [
+      { id: 'claude-opus', name: 'Claude Opus', provider: 'openrouter' },
+      { id: 'gemini-flash:free', name: 'Gemini Flash', provider: 'openrouter' },
+      { id: 'hy3-free', name: 'HY3 Free', provider: 'opencode' },
+    ]
+    invoked.allowList = ['opencode/hy3-free']
+    await renderSection()
+    fireEvent.click(screen.getByTestId('model-allow-list-free-only'))
+    fireEvent.click(screen.getByTestId('model-allow-list-edit-toggle'))
+
+    expect(screen.queryByTestId('model-allow-list-item-openrouter/claude-opus')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('model-allow-list-group-openrouter'))
+    await waitFor(() => {
+      expect(saved().at(-1)).toEqual(['opencode/hy3-free', 'openrouter/gemini-flash:free'])
+    })
+  })
+
+  it('provider checkboxes describe the Free-only catalog, not the search hits', async () => {
+    invoked.models = [
+      { id: 'claude-fable-5', name: 'Claude Fable 5', provider: 'anthropic' },
+      { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'anthropic' },
+      { id: 'grok-4.5', name: 'Grok 4.5', provider: 'xai' },
+    ]
+    invoked.allowList = ['xai/grok-4.5', 'anthropic/claude-fable-5']
+    await renderSection()
+    fireEvent.click(screen.getByTestId('model-allow-list-edit-toggle'))
+    fireEvent.change(screen.getByTestId('model-allow-list-filter'), { target: { value: 'fable' } })
+
+    expect(screen.getByTestId('model-allow-list-group-anthropic')).toHaveAttribute(
+      'aria-checked',
+      'mixed',
+    )
+  })
 })
