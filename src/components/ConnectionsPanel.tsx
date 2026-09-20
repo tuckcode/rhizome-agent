@@ -13,7 +13,7 @@ import {
   consumePendingConnectionsView,
   type ConnectionsChromeView,
   type NotesChromeDestination,
-} from './NotesChromeShortcuts'
+} from '../lib/notesChrome'
 const GraphView = lazy(() => import('./graph/GraphView'))
 type View = 'graph' | 'mycelium'
 type Placement = 'sidebar' | 'full' | 'off'
@@ -87,7 +87,9 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
     }
   }
   const applyRequestRef = useRef(applyRequest)
-  applyRequestRef.current = applyRequest
+  useEffect(() => {
+    applyRequestRef.current = applyRequest
+  })
   useEffect(() => {
     const pending = consumePendingConnectionsView()
     if (pending) applyRequestRef.current(pending)
