@@ -22,9 +22,15 @@ env:
   NODE_OPTIONS: --max-old-space-size=4096
 
 jobs:
+  # The two frontend lanes run on Linux, not macOS. They only execute Node
+  # via pnpm (tsc, vite, eslint, vitest), which behaves identically on both,
+  # and GitHub bills macOS at 10x the Linux minute rate. Measured on the
+  # 2026-09-06 run, the pair cost ~120 of the ~196 billed minutes per PR;
+  # on Linux they cost ~12. rust-quality below stays on macOS on purpose --
+  # it is the only lane that compiles the 49 `target_os = "macos"` blocks.
   frontend-static-quality:
     name: Frontend Static Quality Checks
-    runs-on: macos-15
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +51,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Keep frontend and Rust quality gates in separate macOS jobs so the
+      # Keep frontend and Rust quality gates in separate jobs so the
       # expensive Rust target cache restore no longer blocks the frontend lane.
       # ── 0. Build check (catches type errors and bundler failures) ─────────
       - name: TypeScript type check
@@ -100,7 +106,7 @@ jobs:
 
   frontend-tests:
     name: Frontend Tests & Coverage
-    runs-on: macos-15
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
@@ -138,10 +144,10 @@ jobs:
           flags: frontend
           verbose: true
         # OIDC avoids long-lived CODECOV_TOKEN secrets.
-        # fail_ci_if_error: false -- macOS runners hit a gpg-detection quirk
-        # in the action's dependency check (gnupg reports installed but the
-        # check still fails); a reporting hiccup here shouldn't redden CI
-        # over an otherwise-passing build/lint/test/coverage-threshold run.
+        # fail_ci_if_error: false -- kept from the macOS runner era, where a
+        # gpg-detection quirk in the action's dependency check reddened CI
+        # over an otherwise-passing run. Linux may not hit it. Left as-is
+        # because a coverage-upload hiccup still should not fail the lane.
 
   rust-quality:
     name: Rust Tests & Quality Checks
