@@ -566,15 +566,21 @@ export function AiPanelView({
       </AiPanelFrame>
       {usesRailSessions && sessionsRailSlot && isPrimeTarget
         ? createPortal(
-            <PrimeSessionList
-              locale={locale}
-              onSelectSession={(session) => void handleSelectSession(session)}
-              onNewChat={handleNewChat}
-              onOpenMycelium={onOpenMycelium}
-              activeSessionPath={activeSessionPath}
-              working={isActive}
-              vaultPath={vaultPath}
-            />,
+            <div
+              data-testid="command-rail-session-hits"
+              className="h-full min-h-0 [&_a]:pointer-events-auto [&_button]:pointer-events-auto [&_input]:pointer-events-auto [&_textarea]:pointer-events-auto [&_[data-slot=button]]:pointer-events-auto [&_[role='button']]:pointer-events-auto"
+              style={{ pointerEvents: 'none' }}
+            >
+              <PrimeSessionList
+                locale={locale}
+                onSelectSession={(session) => void handleSelectSession(session)}
+                onNewChat={handleNewChat}
+                onOpenMycelium={onOpenMycelium}
+                activeSessionPath={activeSessionPath}
+                working={isActive}
+                vaultPath={vaultPath}
+              />
+            </div>,
             sessionsRailSlot,
           )
         : null}
