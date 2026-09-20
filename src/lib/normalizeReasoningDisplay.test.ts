@@ -53,4 +53,18 @@ describe('normalizeReasoningDisplay', () => {
     const dumped = `${HISTORY_OPEN}\n[user]: only history\n${HISTORY_CLOSE}`
     expect(normalizeReasoningDisplay(dumped).trim()).toBe('')
   })
+
+  it('strips an incomplete streamed history block that never closed', () => {
+    expect(normalizeReasoningDisplay(`${HISTORY_OPEN}old exchange`).trim()).toBe('')
+  })
+
+  it('keeps real reasoning that appears before an unclosed history tag', () => {
+    const dumped = ['I considered the vault path.', HISTORY_OPEN, 'old exchange'].join('\n')
+    expect(normalizeReasoningDisplay(dumped)).toBe('I considered the vault path.')
+  })
+
+  it('hides unfinished history plus any text after the unclosed tag', () => {
+    const dumped = `${HISTORY_OPEN}old exchange\nI am thinking`
+    expect(normalizeReasoningDisplay(dumped).trim()).toBe('')
+  })
 })

@@ -508,6 +508,19 @@ describe('AiMessage', () => {
     expect(screen.queryByTestId('reasoning-toggle')).toBeNull()
   })
 
+  it('hides a reasoning fold that is only an incomplete streamed history dump', () => {
+    const historyOpen = ['<', 'conversation_history', '>'].join('')
+    render(
+      <AiMessage
+        userMessage="Ask"
+        reasoning={`${historyOpen}old exchange`}
+        reasoningDone
+        actions={[]}
+      />,
+    )
+    expect(screen.queryByTestId('reasoning-toggle')).toBeNull()
+  })
+
   it('does not render actions when empty array', () => {
     render(<AiMessage userMessage="Ask" actions={[]} />)
     expect(screen.queryByTestId('ai-action-card')).toBeNull()

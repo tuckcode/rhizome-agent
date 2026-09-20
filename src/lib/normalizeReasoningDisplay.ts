@@ -21,7 +21,12 @@ function stripConversationHistoryEcho(text: string): string {
   const escapedOpen = open.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const escapedClose = close.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const block = new RegExp(`${escapedOpen}[\\s\\S]*?${escapedClose}`, 'g')
-  return text.replace(block, '').replace(/^\s+|\s+$/g, '').replace(/\n{3,}/g, '\n\n')
+  let next = text.replace(block, '')
+  const leftover = next.indexOf(open)
+  if (leftover !== -1) {
+    next = next.slice(0, leftover)
+  }
+  return next.replace(/^\s+|\s+$/g, '').replace(/\n{3,}/g, '\n\n')
 }
 
 function preserveNewlinesAsMarkdownBreaks(text: string): string {
