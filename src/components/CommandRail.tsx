@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { GearSix, PushPin } from '@phosphor-icons/react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { GearSix, PushPin, Sidebar } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { ActionTooltip } from './ui/action-tooltip'
 import { Button } from './ui/button'
@@ -135,6 +135,7 @@ export function CommandRail({
   const pinRequested = pinned ?? storedPinned
   const pinnedExpanded = pinRequested && !autoCollapsed && !compactLocked
   const [hoverExpanded, setHoverExpanded] = useState(false)
+  const [keyboardExpanded, setKeyboardExpanded] = useState(false)
   const railWidth = usePanelWidth(
     APP_STORAGE_KEYS.commandRailWidth,
     RAIL_EXPANDED_DEFAULT_WIDTH,
@@ -142,13 +143,21 @@ export function CommandRail({
     RAIL_EXPANDED_MAX_WIDTH,
   )
   const railRef = useRef<HTMLDivElement>(null)
+  const sessionsSlotRef = useRef<HTMLDivElement | null>(null)
+  const onSessionsSlotReadyRef = useRef(onSessionsSlotReady)
+  onSessionsSlotReadyRef.current = onSessionsSlotReady
   const hoverOpenTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const expanded = pinnedExpanded || hoverExpanded
+  const bindSessionsSlot = useCallback((slot: HTMLDivElement | null) => {
+    sessionsSlotRef.current = slot
+    onSessionsSlotReadyRef.current?.(slot)
+  }, [])
+  const expanded = pinnedExpanded || hoverExpanded || keyboardExpanded
+  const overlaying = expanded && !pinnedExpanded
   const openFromHover = () => {
     if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current)
     hoverCloseTimer.current = null
-    if (compactLocked || pinnedExpanded || hoverExpanded || hoverOpenTimer.current) return
+    if (compactLocked || pinnedExpanded || hoverExpanded || keyboardExpanded || hoverOpenTimer.current) return
     hoverOpenTimer.current = setTimeout(() => {
       setHoverExpanded(true)
       hoverOpenTimer.current = null
@@ -162,12 +171,20 @@ export function CommandRail({
     if (!hoverExpanded || pinnedExpanded) return
 
     const trackPointer = (event: MouseEvent) => {
-      const bounds = railRef.current?.getBoundingClientRect()
-      const pointerInside = bounds
+      const rail = railRef.current
+      const bounds = rail?.getBoundingClientRect()
+      const overCollapsedStrip = Boolean(
+        bounds
         && event.clientX >= bounds.left
-        && event.clientX <= bounds.right
+        && event.clientX <= bounds.left + RAIL_COLLAPSED_WIDTH
         && event.clientY >= bounds.top
-        && event.clientY <= bounds.bottom
+        && event.clientY <= bounds.bottom,
+      )
+      const overRailChrome = Boolean(event.target instanceof Node && rail?.contains(event.target))
+      const focusHeld = Boolean(
+        document.activeElement instanceof Node && rail?.contains(document.activeElement),
+      )
+      const pointerInside = overCollapsedStrip || overRailChrome || focusHeld
 
       if (pointerInside) {
         if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current)
@@ -189,6 +206,29 @@ export function CommandRail({
     if (hoverOpenTimer.current) clearTimeout(hoverOpenTimer.current)
     if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current)
   }, [])
+  useEffect(() => {
+    if (!keyboardExpanded) return
+    let frames = 0
+    let raf = 0
+    let cancelled = false
+    const focusSessions = () => {
+      if (cancelled) return
+      const focusable = sessionsSlotRef.current?.querySelector<HTMLElement>(
+        'button, input, textarea, [href], [tabindex]:not([tabindex="-1"])',
+      )
+      if (focusable) {
+        focusable.focus()
+        return
+      }
+      frames += 1
+      if (frames < 12) raf = requestAnimationFrame(focusSessions)
+    }
+    focusSessions()
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(raf)
+    }
+  }, [keyboardExpanded])
   const writeExpandedPin = (next: boolean) => {
     setPinnedExpanded(next)
     onPinnedChange?.(next)
@@ -205,14 +245,26 @@ export function CommandRail({
       writeExpandedPin(next)
       trackCommandRailPinChanged(next ? 'expanded' : 'hover')
       if (!next) setHoverExpanded(false)
+      setKeyboardExpanded(false)
       return
     }
     const next = !compactLocked
     writeExpandedPin(false)
     writeCompactLock(next)
     setHoverExpanded(false)
+    setKeyboardExpanded(false)
     cancelPendingHoverOpen()
     trackCommandRailPinChanged(next ? 'compact' : 'hover')
+  }
+  const toggleKeyboardExpand = () => {
+    cancelPendingHoverOpen()
+    setKeyboardExpanded((open) => {
+      if (open) {
+        setHoverExpanded(false)
+        return false
+      }
+      return true
+    })
   }
   const pinLabel = compactLocked
     ? 'Allow sidebar to expand'
@@ -224,6 +276,7 @@ export function CommandRail({
   const beginResize = (event: React.MouseEvent) => {
     writeCompactLock(false)
     writeExpandedPin(true)
+    setKeyboardExpanded(false)
     startResizeDrag(event, 'col-resize', (deltaX) => onWidthChange ? onWidthChange(deltaX) : railWidth.resizeBy(-deltaX))
   }
   // Read once per render rather than memoised: the platform does not change,
@@ -241,6 +294,30 @@ export function CommandRail({
     />
   )
   const pinLocked = compactLocked || pinnedExpanded
+  const showExpandControl = !pinnedExpanded && (!expanded || keyboardExpanded)
+  const expandLabel = keyboardExpanded ? 'Collapse sidebar' : 'Expand sidebar'
+  const expandButton = showExpandControl ? (
+    <ActionTooltip copy={{ label: expandLabel }} side="right">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={toggleKeyboardExpand}
+        aria-label={expandLabel}
+        aria-expanded={keyboardExpanded}
+        data-testid="command-rail-expand"
+        className="rounded-[var(--radius)] p-0 hover:bg-[var(--state-hover,var(--accent))]"
+        style={{
+          width: RAIL_BUTTON_SIZE,
+          height: RAIL_BUTTON_SIZE,
+          color: keyboardExpanded ? 'var(--accent-blue)' : 'var(--text-muted)',
+          backgroundColor: keyboardExpanded ? 'var(--accent-blue-bg)' : undefined,
+        }}
+      >
+        <Sidebar size={RAIL_ICON_SIZE} weight={keyboardExpanded ? 'fill' : 'regular'} />
+      </Button>
+    </ActionTooltip>
+  ) : null
   const pinButton = (
     <ActionTooltip copy={{ label: pinLabel }} side="right">
       <Button
@@ -272,6 +349,7 @@ export function CommandRail({
       data-expanded={expanded ? 'true' : 'false'}
       data-pinned={pinnedExpanded ? 'true' : 'false'}
       data-compact-locked={compactLocked ? 'true' : 'false'}
+      data-overlay={overlaying ? 'true' : 'false'}
       onMouseEnter={(event) => {
         const footer = event.currentTarget.querySelector('[data-testid="command-rail-footer"]')
         if (footer instanceof Element && event.target instanceof Node && footer.contains(event.target)) {
@@ -283,13 +361,23 @@ export function CommandRail({
       onMouseLeave={cancelPendingHoverOpen}
       style={{
         width: expanded ? (width ?? railWidth.width) : RAIL_COLLAPSED_WIDTH,
-        marginRight: expanded && !pinnedExpanded ? -((width ?? railWidth.width) - RAIL_COLLAPSED_WIDTH) : undefined,
-        zIndex: expanded && !pinnedExpanded ? 50 : undefined,
+        marginRight: overlaying ? -((width ?? railWidth.width) - RAIL_COLLAPSED_WIDTH) : undefined,
+        zIndex: overlaying ? 50 : undefined,
+        pointerEvents: overlaying ? 'none' : undefined,
         paddingTop: trafficLightRoom ? COMMAND_RAIL_TRAFFIC_LIGHT_INSET : undefined,
         background: 'var(--surface-sidebar)',
         borderRight: '1px solid var(--border-subtle)',
       }}
     >
+      {overlaying ? (
+        <div
+          aria-hidden="true"
+          data-testid="command-rail-hover-hit"
+          className="absolute inset-y-0 left-0 z-0"
+          style={{ width: RAIL_COLLAPSED_WIDTH, pointerEvents: 'auto' }}
+        />
+      ) : null}
+
       {expanded ? (
         <div
           role="separator"
@@ -297,6 +385,7 @@ export function CommandRail({
           aria-label="Resize Sessions sidebar"
           data-testid="command-rail-resize"
           className="absolute inset-y-0 -right-[10px] z-30 w-4 cursor-col-resize bg-transparent transition-colors hover:bg-[var(--border)]"
+          style={{ pointerEvents: overlaying ? 'auto' : undefined }}
           onMouseDown={beginResize}
         />
       ) : null}
@@ -305,9 +394,10 @@ export function CommandRail({
       <div className="min-h-0 flex-1">
         {expanded ? (
           <div
-            ref={onSessionsSlotReady}
+            ref={bindSessionsSlot}
             data-testid="command-rail-sessions"
             className="h-full min-h-0"
+            style={{ pointerEvents: overlaying ? 'none' : undefined }}
           />
         ) : null}
       </div>
@@ -315,15 +405,18 @@ export function CommandRail({
       <div
         className={expanded ? 'flex items-center gap-1' : 'flex flex-col items-center gap-1'}
         data-testid="command-rail-footer"
+        style={{ pointerEvents: overlaying ? 'auto' : undefined }}
         onMouseEnter={cancelPendingHoverOpen}
       >
         {expanded ? (
           <>
             {pinButton}
+            {expandButton}
             <span className="ml-auto">{settingsButton}</span>
           </>
         ) : (
           <>
+            {expandButton}
             {settingsButton}
             {pinButton}
           </>
