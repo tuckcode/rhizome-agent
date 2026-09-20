@@ -326,6 +326,28 @@ mod tests {
     }
 
     #[test]
+    fn save_accepts_a_nested_vault_under_home() {
+        let Some(home) = dirs::home_dir() else {
+            return;
+        };
+        let nested = VaultList {
+            vaults: vec![VaultEntry {
+                label: "Nested".to_string(),
+                path: home
+                    .join("Documents")
+                    .join("Synthetic Vault")
+                    .to_string_lossy()
+                    .into_owned(),
+                ..Default::default()
+            }],
+            active_vault: Some("~/Documents/Synthetic Vault".to_string()),
+            default_workspace_path: None,
+            hidden_defaults: Vec::new(),
+        };
+        assert!(reject_home_vault_list(&nested).is_ok());
+    }
+
+    #[test]
     fn save_refuses_tilde_slash_and_home_with_a_trailing_slash() {
         let Some(home) = dirs::home_dir() else {
             return;

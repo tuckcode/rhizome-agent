@@ -21,14 +21,27 @@ function parseVaultPathList(rawValue) {
   return []
 }
 
+function expandLeadingTilde(vaultPath, home = homedir()) {
+  if (vaultPath === '~') return home
+  if (vaultPath.startsWith('~/')) return join(home, vaultPath.slice(2))
+  return vaultPath
+}
+
+function normalizeVaultPath(vaultPath, home = homedir()) {
+  if (typeof vaultPath !== 'string') return ''
+  const trimmed = vaultPath.trim()
+  if (!trimmed) return ''
+  return expandLeadingTilde(trimmed, home)
+}
+
 function uniqueVaultPaths(paths) {
   const seen = new Set()
   const unique = []
   for (const path of paths) {
-    const trimmed = path.trim()
-    if (!trimmed || seen.has(trimmed)) continue
-    seen.add(trimmed)
-    unique.push(trimmed)
+    const normalized = normalizeVaultPath(path)
+    if (!normalized || seen.has(normalized)) continue
+    seen.add(normalized)
+    unique.push(normalized)
   }
   return unique
 }
@@ -62,14 +75,14 @@ function canonicalPath(value) {
 export function isHomeVaultPath(vaultPath, home = homedir()) {
   if (typeof vaultPath !== 'string' || !vaultPath.trim() || !home) return false
   try {
-    return canonicalPath(vaultPath.trim()) === canonicalPath(home)
+    return canonicalPath(normalizeVaultPath(vaultPath, home)) === canonicalPath(home)
   } catch {
     return false
   }
 }
 
 function pushUniquePath(paths, value) {
-  const path = typeof value === 'string' ? value.trim() : ''
+  const path = normalizeVaultPath(value)
   if (!path || paths.includes(path)) return
   paths.push(path)
 }

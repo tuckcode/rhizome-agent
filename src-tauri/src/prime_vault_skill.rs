@@ -752,6 +752,25 @@ mod tests {
         );
     }
 
+    /// Intended nested vaults stay vaults. HOME itself is refused; a child
+    /// folder with markers must still seed.
+    #[test]
+    fn a_nested_directory_under_home_can_still_be_a_vault() {
+        let Some(home) = dirs::home_dir() else {
+            return;
+        };
+        let dir = tempfile::Builder::new()
+            .prefix("rhizome-lane-s-nested-")
+            .tempdir_in(&home)
+            .expect("temp vault under HOME");
+        std::fs::write(dir.path().join("AGENTS.md"), "# vault\n").unwrap();
+        assert!(
+            looks_like_vault(dir.path()),
+            "a nested folder under HOME with vault markers must still be a vault"
+        );
+        assert!(!crate::commands::is_home_directory(dir.path()));
+    }
+
     #[test]
     fn a_rhizome_vault_skill_in_prime_global_skills_is_removed() {
         let home = tempfile::tempdir().unwrap();
@@ -828,6 +847,29 @@ mod tests {
         let raw = std::fs::read_to_string(settings).unwrap();
         assert!(raw.contains("rhizome"));
         assert!(raw.contains("VAULT_PATH"));
+    }
+
+    #[test]
+    fn seed_keeps_unrelated_vault_local_settings_keys() {
+        let Ok(_) = resolve_cli_call_path() else {
+            return;
+        };
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("AGENTS.md"), "# vault\n").unwrap();
+        let settings = dir.path().join(".prime/agent/settings.json");
+        std::fs::create_dir_all(settings.parent().unwrap()).unwrap();
+        std::fs::write(
+            &settings,
+            r#"{"defaultModel":"synthetic-model","telemetry":false,"customKeep":true}"#,
+        )
+        .unwrap();
+        seed_vault_skill(dir.path()).expect("seed");
+        let raw = std::fs::read_to_string(settings).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        assert_eq!(value["defaultModel"], "synthetic-model");
+        assert_eq!(value["telemetry"], false);
+        assert_eq!(value["customKeep"], true);
+        assert!(value["mcpServers"]["rhizome"]["env"]["VAULT_PATH"].is_string());
     }
 
     /// Manual reseed for a real vault when the installed skill is stale.

@@ -520,6 +520,25 @@ describe('requireVaultPath', () => {
     )
   })
 
+  it('refuses a tilde alias of $HOME as a vault path', () => {
+    const home = os.homedir()
+    assert.equal(isHomeVaultPath('~'), true)
+    assert.equal(isHomeVaultPath('~/'), true)
+    assert.equal(isHomeVaultPath('~/Documents'), false)
+    assert.throws(
+      () => requireVaultPaths({ VAULT_PATH: '~' }),
+      /home directory/,
+    )
+    assert.throws(
+      () => requireVaultPaths({ VAULT_PATH: '~/' }),
+      /home directory/,
+    )
+    assert.deepEqual(
+      requireVaultPaths({ VAULT_PATH: '~/Documents' }),
+      [path.join(home, 'Documents')],
+    )
+  })
+
   it('refuses a symlink that resolves to $HOME', async () => {
     const home = os.homedir()
     const dir = await mkdtemp(path.join(os.tmpdir(), 'home-link-'))
