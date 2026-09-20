@@ -4,10 +4,10 @@ import { APP_COMMAND_EVENT_NAME, APP_COMMAND_IDS } from '../hooks/appCommandDisp
 import { trackEvent } from '../lib/telemetry'
 import {
   NOTES_CHROME_EVENT,
-  NotesChromeShortcuts,
   consumePendingConnectionsView,
   resetNotesChromePendingForTests,
-} from './NotesChromeShortcuts'
+} from '../lib/notesChrome'
+import { NotesChromeShortcuts } from './NotesChromeShortcuts'
 
 vi.mock('../lib/telemetry', () => ({
   trackEvent: vi.fn(),

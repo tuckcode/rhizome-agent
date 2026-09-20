@@ -5,7 +5,7 @@ import type { AppLocale } from '../lib/i18n'
 import type { GitRemoteStatus, SyncStatus } from '../types'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { GitRepositoryOption } from '../utils/gitRepositories'
-import { useNotesChromeStatusBridge } from './NotesChromeShortcuts'
+import { useNotesChromeStatusBridge } from '../hooks/useNotesChromeStatusBridge'
 import {
   StatusBarPrimarySection,
   StatusBarSecondarySection,
