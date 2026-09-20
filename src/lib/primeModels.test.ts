@@ -4,10 +4,12 @@ import {
   groupModelsByProvider,
   activeModelKey,
   findModel,
+  isFreeCatalogModel,
   modelAcceptsImages,
   modelKey,
   partitionModelsByAllowList,
   partitionModelsByConnection,
+  partitionModelsByFree,
   type PrimeModel,
 } from './primeModels'
 
@@ -222,6 +224,75 @@ describe('modelAcceptsImages', () => {
     expect(modelAcceptsImages(model({ input: undefined }))).toBeNull()
     expect(modelAcceptsImages(model({ input: [] }))).toBeNull()
     expect(modelAcceptsImages(null)).toBeNull()
+  })
+})
+
+describe('isFreeCatalogModel', () => {
+  it('treats OpenRouter :free ids as free', () => {
+    expect(
+      isFreeCatalogModel(model({ provider: 'openrouter', id: 'google/gemma-4-31b-it:free' })),
+    ).toBe(true)
+    expect(isFreeCatalogModel(model({ provider: 'openrouter', id: 'openai/gpt-4o' }))).toBe(false)
+  })
+
+  it('treats OpenCode -free ids as free', () => {
+    expect(isFreeCatalogModel(model({ provider: 'opencode', id: 'nemotron-3.5-lightning-free' }))).toBe(
+      true,
+    )
+    expect(isFreeCatalogModel(model({ provider: 'opencode', id: 'big-pickle' }))).toBe(false)
+  })
+
+  it('treats OpenRouter NVIDIA :free ids as free; NIM ids without a mark stay unpaid', () => {
+    expect(
+      isFreeCatalogModel(
+        model({ provider: 'openrouter', id: 'nvidia/nemotron-3-super-120b-a12b:free' }),
+      ),
+    ).toBe(true)
+    expect(
+      isFreeCatalogModel(model({ provider: 'openrouter', id: 'nvidia/nemotron-3-super-120b-a12b' })),
+    ).toBe(false)
+    expect(
+      isFreeCatalogModel(model({ provider: 'nvidia', id: 'nvidia/nemotron-3-super-120b-a12b' })),
+    ).toBe(false)
+  })
+
+  it('treats OpenRouter free router as free', () => {
+    expect(isFreeCatalogModel(model({ provider: 'openrouter', id: 'openrouter/free' }))).toBe(true)
+  })
+
+  it('does not guess from a paid model whose name mentions free', () => {
+    expect(
+      isFreeCatalogModel(model({ provider: 'anthropic', id: 'claude-opus-5', name: 'Freeform Claude' })),
+    ).toBe(false)
+  })
+})
+
+describe('partitionModelsByFree', () => {
+  const catalog = [
+    model({ provider: 'openrouter', id: 'google/gemma-4-31b-it:free', name: 'Gemma free' }),
+    model({ provider: 'xai', id: 'grok-4.5', name: 'Grok 4.5' }),
+    model({ provider: 'opencode', id: 'hy3-free', name: 'HY3 Free' }),
+  ]
+
+  it('shows the whole catalog when the filter is off', () => {
+    const { shown, hidden } = partitionModelsByFree(catalog, false)
+    expect(shown).toHaveLength(3)
+    expect(hidden).toHaveLength(0)
+  })
+
+  it('keeps only provider-marked free models when the filter is on', () => {
+    const { shown, hidden } = partitionModelsByFree(catalog, true)
+    expect(shown.map((item) => item.id)).toEqual(['google/gemma-4-31b-it:free', 'hy3-free'])
+    expect(hidden.map((item) => item.id)).toEqual(['grok-4.5'])
+  })
+
+  it('keeps the running model visible even when it is not free', () => {
+    const { shown } = partitionModelsByFree(catalog, true, 'xai/grok-4.5')
+    expect(shown.map((item) => item.id)).toEqual([
+      'google/gemma-4-31b-it:free',
+      'grok-4.5',
+      'hy3-free',
+    ])
   })
 })
 

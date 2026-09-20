@@ -17,11 +17,22 @@ import {
   groupModelsByProvider,
   partitionModelsByAllowList,
   partitionModelsByConnection,
+  partitionModelsByFree,
+  modelKey,
   type PrimeModel,
 } from '../lib/primeModels'
 import { modelThinkingLabel, offeredThinkingLevels, thinkingLevelLabel } from '../lib/primeThinkingLevels'
 import { loadPrimeModelCatalog } from '../lib/primeModelCatalog'
-import { trackPrimeModelChanged, trackPrimeThinkingLevelChanged } from '../lib/productAnalytics'
+import {
+  trackPrimeModelAllowListChanged,
+  trackPrimeModelChanged,
+  trackPrimeModelsFreeOnly,
+  trackPrimeThinkingLevelChanged,
+} from '../lib/productAnalytics'
+import { Switch } from './ui/switch'
+import { Button } from './ui/button'
+import { Checkbox } from './ui/checkbox'
+import { usePrimeModelsFreeOnly } from '../hooks/usePrimeModelsFreeOnly'
 
 
 const PROVIDER_LABEL_CLASS = 'font-mono text-[10px] uppercase tracking-[0.1em] text-primary'
@@ -77,6 +88,8 @@ export function PrimeModelPicker({
   const [query, setQuery] = useState('')
   const [showUnavailable, setShowUnavailable] = useState(false)
   const [showHidden, setShowHidden] = useState(false)
+  const [freeOnly, setFreeOnly] = usePrimeModelsFreeOnly()
+  const [editingList, setEditingList] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Chat starts the host. Prefetch once it is live so the menu is ready.
@@ -181,6 +194,22 @@ export function PrimeModelPicker({
     [vaultPath],
   )
 
+  const persistAllowList = useCallback(
+    async (next: string[]) => {
+      const previous = allowList
+      setAllowList(next)
+      setError(null)
+      try {
+        await callHost('set_prime_model_allow_list', { models: next })
+        trackPrimeModelAllowListChanged(next.length, models?.length ?? 0)
+      } catch (e) {
+        setAllowList(previous)
+        setError(e instanceof Error ? e.message : String(e))
+      }
+    },
+    [allowList, models],
+  )
+
   const listed = models ?? []
   // Curation is applied to the whole catalog, before the query. Both of
   // `partitionModelsByAllowList`'s refusals are about the saved list going
@@ -188,22 +217,35 @@ export function PrimeModelPicker({
   // read every narrow query as a stale list and silently drop the curation.
   // The query then narrows each bucket, so typing still reaches a hidden
   // model in one click.
-  const { shown, hidden } = partitionModelsByAllowList(
-    listed,
-    allowList,
-    activeModelKey(listed, label),
-  )
+  const runningKey = activeModelKey(listed, label)
+  const { shown, hidden } = partitionModelsByAllowList(listed, allowList, runningKey)
+  const { shown: freeShown } = partitionModelsByFree(shown, freeOnly)
+  const { shown: freeHidden } = partitionModelsByFree(hidden, freeOnly)
   // Credentials second: the allow-list is the user's explicit choice, so a
   // model they filed away is counted there rather than again under
   // "not connected".
-  const matchingHidden = filterModels(hidden, query)
+  const matchingHidden = filterModels(freeHidden, query)
   const { available, unavailable } = partitionModelsByConnection(
-    filterModels(shown, query),
+    filterModels(freeShown, query),
     connected,
   )
   const groups = groupModelsByProvider(available)
   const unavailableGroups = groupModelsByProvider(unavailable)
   const hiddenGroups = groupModelsByProvider(matchingHidden)
+  const editCatalog = partitionModelsByFree(listed, freeOnly).shown
+  const editModels = filterModels(editCatalog, query)
+  const editGroups = groupModelsByProvider(editModels)
+  const effectiveSelection = new Set(allowList.length > 0 ? allowList : listed.map(modelKey))
+  const toggleEditModels = (modelsToToggle: PrimeModel[]) => {
+    const keys = modelsToToggle.map(modelKey)
+    const shouldSelect = keys.some((key) => !effectiveSelection.has(key))
+    const next = new Set(effectiveSelection)
+    for (const key of keys) {
+      if (shouldSelect) next.add(key)
+      else next.delete(key)
+    }
+    void persistAllowList([...next])
+  }
   const strip = variant === 'strip'
   const triggerLabel = strip
     ? (modelThinkingLabel(label, thinkingLevel) ?? t('ai.composer.modelUnknown'))
@@ -256,6 +298,19 @@ export function PrimeModelPicker({
               data-testid="prime-model-filter"
               aria-label={t('ai.composer.modelsFilter')}
             />
+            <div className="mt-1.5 flex items-center justify-between gap-2 px-0.5">
+              <span className="font-mono text-[11px] text-foreground">Free only</span>
+              <Switch
+                checked={freeOnly}
+                aria-label="Free only"
+                data-testid="prime-models-free-only"
+                onKeyDown={(event) => event.stopPropagation()}
+                onCheckedChange={(on) => {
+                  setFreeOnly(on)
+                  trackPrimeModelsFreeOnly(on)
+                }}
+              />
+            </div>
           </div>
         ) : null}
         {models === null && !error ? (
@@ -264,11 +319,46 @@ export function PrimeModelPicker({
           </div>
         ) : null}
         {models !== null && !error && groups.length === 0 && matchingHidden.length === 0 ? (
-          <div className="px-2 py-1.5 text-xs text-muted-foreground">
-            {t('ai.composer.modelsEmpty')}
+          <div className="px-2 py-1.5 text-xs text-muted-foreground" data-testid="prime-models-empty">
+            {freeOnly ? 'No free models in this catalog.' : t('ai.composer.modelsEmpty')}
           </div>
         ) : null}
-        {levels.length > 0 ? (
+        {editingList ? (
+          <div className="px-1.5 pb-1" data-testid="prime-model-edit-list">
+            {editGroups.map((group) => {
+              const providerChecked = group.models.every((model) => effectiveSelection.has(modelKey(model)))
+              return (
+                <div key={`edit-${group.provider}`} className="border-t border-border first:border-t-0">
+                  <label className="flex w-full cursor-pointer items-center gap-2 px-1 py-1.5 text-left">
+                    <Checkbox
+                      checked={providerChecked}
+                      data-testid={`prime-model-edit-provider-${group.provider}`}
+                      onCheckedChange={() => {
+                        const providerModels = editCatalog.filter((model) => model.provider === group.provider)
+                        toggleEditModels(providerModels)
+                      }}
+                    />
+                    <span className={PROVIDER_LABEL_CLASS}>{group.provider}</span>
+                  </label>
+                  {group.models.map((model) => {
+                    const key = modelKey(model)
+                    const checked = effectiveSelection.has(key)
+                    return (
+                      <label key={`edit-${key}`} className="flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-accent">
+                        <Checkbox
+                          checked={checked}
+                          data-testid={`prime-model-edit-item-${key}`}
+                          onCheckedChange={() => toggleEditModels([model])}
+                        />
+                        <span className="truncate">{model.name || model.id}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+        ) : levels.length > 0 ? (
           <div data-testid="prime-thinking-levels">
             <DropdownMenuLabel className={MUTED_SECTION_LABEL_CLASS}>
               {t('ai.subhead.thinking')}
@@ -287,7 +377,7 @@ export function PrimeModelPicker({
             <DropdownMenuSeparator />
           </div>
         ) : null}
-        {groups.map((group, index) => (
+        {!editingList ? groups.map((group, index) => (
           <div key={group.provider}>
             {index > 0 ? <DropdownMenuSeparator /> : null}
             <DropdownMenuLabel className={PROVIDER_LABEL_CLASS} data-testid="prime-model-provider">
@@ -303,16 +393,18 @@ export function PrimeModelPicker({
               </DropdownMenuItem>
             ))}
           </div>
-        ))}
+        )) : null}
         {/* Models whose provider has no credentials. Separated rather than
             hidden — "why can't I find X?" should stay answerable — and still
             selectable, because credential detection is best-effort and being
             wrong must not lock a user out of a model that works. */}
-        {unavailable.length > 0 ? (
+        {!editingList && unavailable.length > 0 ? (
           <div data-testid="prime-models-unavailable">
             <DropdownMenuSeparator />
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={(event) => {
                 event.preventDefault()
                 setShowUnavailable((shown) => !shown)
@@ -325,7 +417,7 @@ export function PrimeModelPicker({
               data-testid="prime-models-unavailable-toggle"
             >
               {t('ai.composer.modelsNotConnected', { count: String(unavailable.length) })}
-            </button>
+            </Button>
             {showUnavailable
               ? unavailableGroups.map((group) => (
                   <div key={`unavailable-${group.provider}`}>
@@ -349,11 +441,13 @@ export function PrimeModelPicker({
         {/* Models the user curated out of this menu (#45). Same shape as the
             block above and for the same reason: a shortlist is a default view,
             not a deletion, and the filter box still reaches through it. */}
-        {matchingHidden.length > 0 ? (
+        {!editingList && matchingHidden.length > 0 ? (
           <div data-testid="prime-models-hidden">
             <DropdownMenuSeparator />
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={(event) => {
                 event.preventDefault()
                 setShowHidden((shown) => !shown)
@@ -366,7 +460,7 @@ export function PrimeModelPicker({
               data-testid="prime-models-hidden-toggle"
             >
               {t('ai.composer.modelsHidden', { count: String(matchingHidden.length) })}
-            </button>
+            </Button>
             {showHidden
               ? hiddenGroups.map((group) => (
                   <div key={`hidden-${group.provider}`}>
@@ -385,6 +479,25 @@ export function PrimeModelPicker({
                   </div>
                 ))
               : null}
+          </div>
+        ) : null}
+        {models !== null && !error ? (
+          <div className="sticky bottom-0 border-t border-border bg-popover px-1.5 py-1.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              data-testid="prime-model-edit-toggle"
+              onClick={(event) => {
+                event.preventDefault()
+                setEditingList((editing) => !editing)
+                setShowHidden(false)
+                setShowUnavailable(false)
+              }}
+              className="h-7 w-full justify-start rounded-sm px-2 font-mono text-[11px] text-primary"
+            >
+              {editingList ? 'Done' : 'Edit list'}
+            </Button>
           </div>
         ) : null}
       </DropdownMenuContent>

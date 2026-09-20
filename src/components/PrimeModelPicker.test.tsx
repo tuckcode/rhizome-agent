@@ -29,10 +29,16 @@ vi.mock('../mock-tauri', () => ({
   },
 }))
 
-const tracked = vi.hoisted(() => ({ providers: [] as string[], levels: [] as string[] }))
+const tracked = vi.hoisted(() => ({
+  providers: [] as string[],
+  levels: [] as string[],
+  freeOnly: [] as boolean[],
+}))
 vi.mock('../lib/productAnalytics', () => ({
+  trackPrimeModelAllowListChanged: vi.fn(),
   trackPrimeModelChanged: (provider: string) => tracked.providers.push(provider),
   trackPrimeThinkingLevelChanged: (level: string) => tracked.levels.push(level),
+  trackPrimeModelsFreeOnly: (on: boolean) => tracked.freeOnly.push(on),
 }))
 
 const MODELS = [
@@ -52,6 +58,8 @@ beforeEach(() => {
   invoked.fail = ''
   invoked.failList = ''
   tracked.providers = []
+  tracked.freeOnly = []
+  localStorage.clear()
   resetPrimeModelCatalog()
 })
 
@@ -413,5 +421,74 @@ describe('PrimeModelPicker — allow-list freshness (#45)', () => {
     await waitFor(() => expect(cmds()).toContain('get_prime_model_allow_list'))
 
     expect(cmds().filter((cmd) => cmd === 'get_available_prime_models')).toHaveLength(1)
+  })
+
+  it('hides paid models when Free only is on, and keeps the running model', async () => {
+    invoked.models = [
+      ...MODELS,
+      { id: 'hy3-free', name: 'HY3 Free', provider: 'opencode' },
+    ]
+    render(<PrimeModelPicker label="Grok 4.5" vaultPath="/v" />)
+    open()
+    await waitFor(() => expect(screen.getByTestId('prime-models-free-only')).toBeInTheDocument())
+    expect(screen.getByText('HY3 Free')).toBeInTheDocument()
+    expect(screen.getByText('Claude Fable 5')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('prime-models-free-only'))
+    await waitFor(() => expect(screen.queryByText('Claude Fable 5')).not.toBeInTheDocument())
+    expect(screen.getByText('HY3 Free')).toBeInTheDocument()
+    expect(screen.getAllByText('Grok 4.5')).toHaveLength(1)
+    expect(tracked.freeOnly).toEqual([true])
+  })
+
+  it('edits the shortlist by provider and model without closing the picker', async () => {
+    invoked.allowList = ['xai/grok-4.5']
+    render(<PrimeModelPicker label="Grok 4.5" vaultPath="/v" />)
+    open()
+    await waitFor(() => expect(screen.getByTestId('prime-model-edit-toggle')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByTestId('prime-model-edit-toggle'))
+    expect(screen.getByTestId('prime-model-edit-list')).toBeInTheDocument()
+    expect(screen.getByTestId('prime-model-edit-provider-anthropic')).toBeInTheDocument()
+    expect(screen.getByTestId('prime-model-edit-item-anthropic/claude-fable-5')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    )
+
+    fireEvent.click(screen.getByTestId('prime-model-edit-item-anthropic/claude-fable-5'))
+    await waitFor(() => {
+      expect(invoked.calls).toContainEqual({
+        cmd: 'set_prime_model_allow_list',
+        args: { models: ['xai/grok-4.5', 'anthropic/claude-fable-5'] },
+      })
+    })
+    expect(screen.getByTestId('prime-model-edit-toggle')).toHaveTextContent('Done')
+  })
+
+  it('provider checks apply beyond the current search result', async () => {
+    invoked.models = [
+      ...MODELS,
+      { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'anthropic' },
+    ]
+    invoked.allowList = ['xai/grok-4.5']
+    render(<PrimeModelPicker label="Grok 4.5" vaultPath="/v" />)
+    open()
+    await waitFor(() => expect(screen.getByTestId('prime-model-edit-toggle')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('prime-model-edit-toggle'))
+    fireEvent.change(screen.getByTestId('prime-model-filter'), { target: { value: 'fable' } })
+    fireEvent.click(screen.getByTestId('prime-model-edit-provider-anthropic'))
+
+    await waitFor(() => {
+      expect(invoked.calls).toContainEqual({
+        cmd: 'set_prime_model_allow_list',
+        args: {
+          models: [
+            'xai/grok-4.5',
+            'anthropic/claude-fable-5',
+            'anthropic/claude-sonnet-5',
+          ],
+        },
+      })
+    })
   })
 })

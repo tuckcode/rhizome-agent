@@ -507,6 +507,13 @@ export function trackPrimeModelAllowListChanged(selected: number, available: num
 }
 
 /**
+ * The Free only catalog cut was toggled. On/off only — never model ids.
+ */
+export function trackPrimeModelsFreeOnly(on: boolean): void {
+  trackEvent('prime_models_free_only', { on: on ? 'yes' : 'no' })
+}
+
+/**
  * Images were attached to a chat message.
  *
  * The count only — never the image, its name, or its bytes. The question is

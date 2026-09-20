@@ -26,6 +26,7 @@ export const APP_STORAGE_KEYS = {
   commandRailExpanded: 'rhizome:command-rail-expanded',
   commandRailCompactLocked: 'rhizome:command-rail-compact-locked',
   commandRailWidth: 'rhizome:command-rail-width',
+  primeModelsFreeOnly: 'rhizome:prime-models-free-only',
   welcomeDismissed: 'rhizome_welcome_dismissed',
 } as const
 

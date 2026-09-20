@@ -621,21 +621,25 @@ fire both mechanisms on the same turn.
 
 Prime publishes its whole catalog regardless of auth state — **501 models** on
 one measured machine, a fifth of them from a provider that account had never
-signed into — and exposes no price field. Three passes narrow it, in this
+signed into — and exposes no price field. Four passes narrow it, in this
 order, and the order is load-bearing:
 
 1. **Curation** — `partitionModelsByAllowList` against the user's shortlist in
-   `settings.prime_model_allow_list` (`"provider/id"` keys, edited in
-   Settings → AI agents by `PrimeModelAllowListSection`). Applied to the whole
+   `settings.prime_model_allow_list` (`"provider/id"` keys, edited from the
+   picker or Settings → AI agents). Applied to the whole
    catalog *before* the query, because the partition's stale-list refusal would
    otherwise read every narrow search as a stale list and drop the curation.
-2. **The search box** — `filterModels`, applied to each bucket separately, so
+2. **Free only** — `partitionModelsByFree`, a shared live preference on the
+   picker and Settings. It accepts Prime's provider marks: OpenRouter `:free`
+   or `/free`, and OpenCode `-free`. It does not infer price from display copy.
+3. **The search box** — `filterModels`, applied to each bucket separately, so
    typing reaches a curated-out model in one click.
-3. **Credentials** — `partitionModelsByConnection` against
+4. **Credentials** — `partitionModelsByConnection` against
    `get_connected_providers`.
 
-Each pass **separates rather than hides**: curated-out and unconnected models
-render under their own disclosure and stay selectable. Two states are refused
+The curation and credential passes **separate rather than hide**: curated-out
+and unconnected models render under their own disclosure and stay selectable.
+Free only is a live catalog cut. Two states are refused
 outright, both being the same failure — an empty menu with no way out of
 itself: an empty allow-list means *never curated* (normalized to `None` in
 Rust), and a list matching no live model shows everything. `activeModelKey`
