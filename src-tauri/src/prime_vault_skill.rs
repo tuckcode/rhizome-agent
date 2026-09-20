@@ -759,10 +759,13 @@ mod tests {
         let Some(home) = dirs::home_dir() else {
             return;
         };
-        let dir = tempfile::Builder::new()
+        let Ok(dir) = tempfile::Builder::new()
             .prefix("rhizome-lane-s-nested-")
             .tempdir_in(&home)
-            .expect("temp vault under HOME");
+        else {
+            eprintln!("skip: $HOME not writable");
+            return;
+        };
         std::fs::write(dir.path().join("AGENTS.md"), "# vault\n").unwrap();
         assert!(
             looks_like_vault(dir.path()),

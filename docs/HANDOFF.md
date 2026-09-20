@@ -49,11 +49,10 @@ file.
 ## State
 **Origin:** Cursor Grok 4.6 · Lane I · 2026-09-20 · install/docs stamps.
 
-Local product checkpoint is **`4f9b4c4`** (sessions-only rail + reasoning
-history strip). It is **unpushed**. `origin/main` is still **`dc44d84`**.
-Planning also sits locally as **`bcd4b87`** and is **unpushed**. That
-commit’s “pushed together” sentences are wrong; these stamps replace them.
-**C76** incomplete-history strip is in this commit series. Packaged app
+Local product checkpoint is **`4ac0759`** (Wave 1 + preview stamps) plus
+the HOME-skip test in this follow-up. The series is **unpushed**.
+`origin/main` is still **`dc44d84`**. **C76** incomplete-history strip
+is in this series. Packaged app
 remains **`6860762`** (2026-09-19 11:27) — behind local source. Detail:
 [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
 Install/claims: [`GETTING-STARTED.md`](GETTING-STARTED.md) § Public preview
@@ -115,7 +114,7 @@ sample, then public-install dogfood. God plan:
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
-- [2026-09-20 · Wave 1 audit reply](plans/handoffs/2026-09-20-0610-cursor-grok-4-6-wave1-audit-reply.md) — coverage 6703; unused classifier deleted; C77/C78 opened.
+- [2026-09-20 · Wave 1 audit reply](plans/handoffs/2026-09-20-0610-cursor-grok-4-6-wave1-audit-reply.md) — coverage 6692; unused classifier deleted; C77/C78 opened.
 - [2026-09-20 · Lane B chat reliability](plans/2026-09-20-lane-b-chat-reliability-recipe.md) — session titles unwrap history blobs; thinking-only stays empty completion; #41 live still Q.
 - [2026-09-20 · Lane S vault safety](plans/handoffs/2026-09-20-0545-cursor-grok-4-6-lane-s-vault-safety.md) — JS refuses `~`/`~/` as HOME vault; nested vaults stay; #46 open until live no-vault Chat.
 - [2026-09-20 · Lane I install docs](plans/handoffs/2026-09-20-0548-cursor-grok-4-6-lane-i-install-docs.md) — public preview quick start; #66 unmerged.
@@ -125,7 +124,6 @@ Do not paste leftover paper here.
 - [2026-09-19 · CPR](plans/handoffs/2026-09-19-1127-cursor-grok-4-6-cpr.md) — pane presets, hybrid skill PATH, Notes off rail. `6860762` in `/Applications` 11:27.
 - [2026-09-19 · hybrid runtime](plans/handoffs/2026-09-19-0431-cursor-grok-4-6-hybrid-runtime.md) — Prime stays; skill PATH/node + short-reply manners. Live SKILL.md locked 444. No commit or rebuild.
 - [2026-09-19 · pane presets finish](plans/handoffs/2026-09-19-0148-cursor-grok-4-6-pane-presets-finish.md) — leftover locks, ADR-0173, docs. Source only. No commit or rebuild.
-- [2026-09-19 · pane presets](plans/handoffs/2026-09-19-0130-codex-pane-presets-cursor-finish.md) — Codex source slice. Cursor finish followed.
 - [2026-09-18 · rebuild](plans/handoffs/2026-09-18-1944-cursor-composer-rebuild.md) — `35f217f` in `/Applications` 19:44.
 - [2026-09-18 · store trip](plans/handoffs/2026-09-18-1653-cursor-composer-store-trip.md) — Done row, Pi symlink skip, Getting Started env aliases. Pushed as `35f217f`.
 - [2026-09-17 · CPR traffic lights](plans/handoffs/2026-09-17-1723-cursor-composer-cpr-traffic-lights.md) — `712024d` in `/Applications` 17:23.
@@ -283,7 +281,6 @@ push is not a release — releases are tagged builds with signed installers.
   allow-lists). Do not store it as Prime `USER.md` / Hermes `SOUL.md` (ADR-0168:
   one memory store, the vault). Still open: one profile vs per-agent; app-wide
   vs per-vault; new Settings section vs under the existing AI agents page.
-- ~~**C67-OPEN (2026-09-06): sessions list needs a right-click menu**~~ **RESOLVED 2026-09-06.** Right-click Open / Rename / Archive·Restore / View in Mycelium / Copy path via `PrimeSessionListContextMenu`; Mycelium uses `handleOpenSessionFootprint`.
 - ~~**C68-OPEN (2026-09-06): restore note lock/view.**~~ **RESOLVED 2026-09-06.** Ephemeral per-note lock (default editable); breadcrumb + Cmd+K; BlockNote/CodeMirror read-only when locked. Not vault `editor_mode`. Layout lock 2026-09-14: `EditorContentLayout.test.tsx`.
 - ~~**C69-OPEN (2026-09-06): Linux CI Clippy (`-D warnings`) fails on macOS-only
   `src-tauri`.**~~ **RESOLVED 2026-09-12 on main (`f4b8b60`).**
