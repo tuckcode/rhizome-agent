@@ -145,7 +145,9 @@ export function CommandRail({
   const railRef = useRef<HTMLDivElement>(null)
   const sessionsSlotRef = useRef<HTMLDivElement | null>(null)
   const onSessionsSlotReadyRef = useRef(onSessionsSlotReady)
-  onSessionsSlotReadyRef.current = onSessionsSlotReady
+  useEffect(() => {
+    onSessionsSlotReadyRef.current = onSessionsSlotReady
+  }, [onSessionsSlotReady])
   const hoverOpenTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const bindSessionsSlot = useCallback((slot: HTMLDivElement | null) => {
