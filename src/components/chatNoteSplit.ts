@@ -12,7 +12,8 @@ export function parseChatNoteSplit(value: string | null): ChatNoteSplit {
 /** Compatibility control. The preset owns the split and its persistence. */
 export function useChatNoteSplit({ panePreset, setPanePreset }: Pick<ReturnType<typeof useViewMode>, 'panePreset' | 'setPanePreset'>) {
   const setSplit = useCallback((next: ChatNoteSplit) => {
-    setPanePreset(next === 'side-by-side' ? 'read' : 'notes')
+    // On top keeps Chat as the canvas. Show Notes is the way to open the Notes column.
+    setPanePreset(next === 'side-by-side' ? 'read' : 'chat')
     trackChatNoteSplitChanged(next)
   }, [setPanePreset])
   return { split: presetToLegacy(panePreset).split, setSplit }
