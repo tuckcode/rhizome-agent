@@ -116,6 +116,72 @@ pub(crate) fn user_request_from_prompt(prompt: &str) -> Option<&str> {
     Some(&rest[marker + USER_REQUEST_MARKER.len()..])
 }
 
+const CONVERSATION_HISTORY_OPEN: &str = concat!("<", "conversation_history", ">");
+const CONVERSATION_HISTORY_CLOSE: &str = concat!("</", "conversation_history", ">");
+
+/// Recover the latest user ask from a `formatMessageWithHistory` wrapper.
+///
+/// The first turn is a bare message. Later turns wrap the transcript in
+/// `<conversation_history>`. Naming or listing from the opening tag printed
+/// that tag in the session list. Incomplete wrappers still yield the last
+/// `[user]:` turn when one exists.
+pub(crate) fn unwrap_conversation_history(raw: &str) -> String {
+    let text = raw.trim();
+    let Some(start) = text.find(CONVERSATION_HISTORY_OPEN) else {
+        return text.to_string();
+    };
+    let inner_start = start + CONVERSATION_HISTORY_OPEN.len();
+    let inner = match text[inner_start..].find(CONVERSATION_HISTORY_CLOSE) {
+        Some(rel) => text[inner_start..inner_start + rel].trim(),
+        None => text[inner_start..].trim(),
+    };
+    last_user_turn(inner).unwrap_or_else(|| strip_role_prefixes(inner))
+}
+
+fn last_user_turn(inner: &str) -> Option<String> {
+    let mut last = None;
+    let hay = inner.as_bytes();
+    let mut index = 0;
+    while index < hay.len() {
+        let rest = &inner[index..];
+        let Some(rel) = find_ignore_ascii_case(rest, "[user]:") else {
+            break;
+        };
+        let after = rest[rel + "[user]:".len()..].trim_start();
+        let cut = find_ignore_ascii_case(after, "[assistant]:").unwrap_or(after.len());
+        let turn = after[..cut].trim();
+        if !turn.is_empty() {
+            last = Some(turn.to_string());
+        }
+        index += rel + 1;
+    }
+    last
+}
+
+fn strip_role_prefixes(inner: &str) -> String {
+    let mut out = inner.to_string();
+    for marker in ["[user]:", "[assistant]:", "[User]:", "[Assistant]:"] {
+        out = out.replace(marker, "");
+    }
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn find_ignore_ascii_case(haystack: &str, needle: &str) -> Option<usize> {
+    let hay = haystack.as_bytes();
+    let needle = needle.as_bytes();
+    if needle.is_empty() || hay.len() < needle.len() {
+        return None;
+    }
+    hay.windows(needle.len())
+        .position(|window| window.eq_ignore_ascii_case(needle))
+}
+
+/// The user's own words after both composition wrappers are removed.
+pub(crate) fn spoken_user_request(prompt: &str) -> String {
+    let after_system = user_request_from_prompt(prompt).unwrap_or(prompt);
+    unwrap_conversation_history(after_system)
+}
+
 pub(crate) fn mcp_server_path_string() -> Result<String, String> {
     crate::mcp::mcp_server_index_js_path_string()
 }
@@ -656,6 +722,35 @@ mod tests {
 
         assert!(paths.contains(&PathBuf::from("/opt/homebrew/bin")));
         assert!(paths.contains(&PathBuf::from("/usr/local/bin")));
+    }
+
+    #[test]
+    fn unwraps_a_conversation_history_blob_to_the_latest_user_turn() {
+        let open = concat!("<", "conversation_history", ">");
+        let close = concat!("</", "conversation_history", ">");
+        let blob = format!(
+            "{open}\n[user]: hi\n\n[assistant]: Hello.\n\n[user]: hide chat on notes\n{close}\n\n\
+             Continue the conversation. Respond only to the latest [user] message."
+        );
+        assert_eq!(unwrap_conversation_history(&blob), "hide chat on notes");
+        assert_eq!(
+            unwrap_conversation_history("Audit session"),
+            "Audit session"
+        );
+        let incomplete = format!("{open}\n[user]: hide chat on notes\n");
+        assert_eq!(
+            unwrap_conversation_history(&incomplete),
+            "hide chat on notes"
+        );
+    }
+
+    #[test]
+    fn spoken_user_request_strips_system_block_then_history() {
+        let open = concat!("<", "conversation_history", ">");
+        let close = concat!("</", "conversation_history", ">");
+        let inner = format!("{open}\n[user]: hide chat on notes\n{close}");
+        let composed = build_prompt(&inner, Some("Be concise"));
+        assert_eq!(spoken_user_request(&composed), "hide chat on notes");
     }
 
     #[test]

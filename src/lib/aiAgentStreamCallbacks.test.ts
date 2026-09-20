@@ -386,6 +386,106 @@ describe('aiAgentStreamCallbacks', () => {
     ])
   })
 
+  /**
+   * Thinking-only then Done is an empty completion, not a provider rejection.
+   * The host never treats thinking_delta as assistant text. The frontend must
+   * not rewrite that into a refusal. Thinking Off is a user control, not this
+   * path's default.
+   */
+  it('keeps thinking-only completion as a generic empty reply', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'What is 2+2?',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const status = createStatusStore('thinking')
+    const responseAccRef = { current: '' }
+
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: status.setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef,
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+
+    callbacks.onThinking('The user asked a simple arithmetic question. ')
+    callbacks.onThinking('I should add two and two.')
+    callbacks.onDone()
+
+    expect(status.getStatus()).toBe('done')
+    expect(messages.getMessages()[0].reasoning).toContain('simple arithmetic')
+    expect(messages.getMessages()[0].response).toBe(
+      'Prime Agent finished without returning a reply.',
+    )
+    expect(messages.getMessages()[0].response).not.toContain('rejected this request')
+  })
+
+  it('surfaces a provider rejection instead of the generic empty reply', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'hello',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+
+    callbacks.onError('openrouter rejected this request before it ran (no input tokens).')
+
+    expect(messages.getMessages()[0].response).toBe(
+      'Error: openrouter rejected this request before it ran (no input tokens).',
+    )
+    expect(messages.getMessages()[0].response).not.toContain('finished without returning a reply')
+  })
+
+  it('surfaces a worker-startup error instead of the generic empty reply', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'hello',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+
+    callbacks.onError(
+      'Prime Agent is not authenticated. Run `prime-agent` once in a terminal and complete login (including xAI OAuth if needed), then retry.',
+    )
+
+    expect(messages.getMessages()[0].response).toContain('Prime Agent is not authenticated')
+    expect(messages.getMessages()[0].response).not.toContain('finished without returning a reply')
+  })
+
   it('gives OpenCode an actionable empty-response message', () => {
     const messages = createMessageStore([
       {

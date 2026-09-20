@@ -126,6 +126,28 @@ describe('PrimeSessionList', () => {
     expect(screen.getByText('Untitled session · e521f9')).toBeInTheDocument()
   })
 
+  /**
+   * #49 named sessions. The leftover is display: a stored first prompt can
+   * still be a `<conversation_history>` blob. Mycelium unwraps it. The list
+   * must show the same readable ask, not the tag.
+   */
+  it('shows the latest user turn instead of a conversation-history blob', async () => {
+    const historyOpen = ['<', 'conversation_history', '>'].join('')
+    const historyClose = ['</', 'conversation_history', '>'].join('')
+    invoked.result = [
+      summary({
+        id: 'hist-1',
+        path: '/sessions/hist.jsonl',
+        title: `${historyOpen}\n[user]: hi\n\n[assistant]: Hello.\n\n[user]: hide chat on notes\n${historyClose}`,
+      }),
+    ]
+
+    render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+
+    expect(await screen.findByText('hide chat on notes')).toBeInTheDocument()
+    expect(screen.queryByText(historyOpen, { exact: false })).not.toBeInTheDocument()
+  })
+
   it('leaves a titled session alone while its untitled neighbours are suffixed', async () => {
     invoked.result = [
       summary({ id: 'aaaaaa', path: '/sessions/a.jsonl', title: 'Release notes' }),

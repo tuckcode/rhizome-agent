@@ -11,6 +11,7 @@
  */
 
 import { disambiguateTitles } from './disambiguateTitles'
+import { readableSessionLabel } from './myceliumCompactSummary'
 import { inferHomeDir } from './primeSubheadLabels'
 
 export interface PrimeSessionSummary {
@@ -199,7 +200,7 @@ export function primeSessionRowTitles(
   // repeat — same title *and* same meta. #33.
   const rows = sessions.map((session, index) => ({
     id: session.id,
-    title: session.title?.trim() || untitled,
+    title: readableSessionLabel(session.title ?? '', untitled),
     meta: metas[index] ?? '',
   }))
   return disambiguateTitles(rows, (row) => row.id.slice(-6), (row) => `${row.title}\u0000${row.meta}`)
@@ -238,7 +239,8 @@ export function sortPrimeSessions(
   key: PrimeSessionSortKey = 'newest',
 ): PrimeSessionSummary[] {
   const copy = [...sessions]
-  const titleOf = (session: PrimeSessionSummary) => session.title?.trim().toLowerCase() ?? ''
+  const titleOf = (session: PrimeSessionSummary) =>
+    readableSessionLabel(session.title ?? '', '').toLowerCase()
   const newestDelta = (a: PrimeSessionSummary, b: PrimeSessionSummary) =>
     (b.mtimeMs ?? -Infinity) - (a.mtimeMs ?? -Infinity)
 
