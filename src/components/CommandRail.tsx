@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChatCircle, GearSix, MagnifyingGlass, PushPin } from '@phosphor-icons/react'
+import { GearSix, PushPin } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { ActionTooltip } from './ui/action-tooltip'
 import { Button } from './ui/button'
 import { createTranslator, type AppLocale } from '../lib/i18n'
-import { trackCommandRailPinChanged, trackRailDestinationClicked } from '../lib/productAnalytics'
+import { trackCommandRailPinChanged } from '../lib/productAnalytics'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import { readStoredBooleanPreference, writeStoredBooleanPreference } from '../lib/uiPreference'
 import { usePanelWidth } from '../hooks/usePanelWidth'
@@ -15,18 +15,13 @@ import {
   hasNativeMacosTrafficLights,
 } from '../utils/trafficLights'
 
-export type CommandRailDestination = 'chat' | 'research'
-
 interface CommandRailProps {
   locale: AppLocale
-  activeDestination: CommandRailDestination
   pinned?: boolean
   autoCollapsed?: boolean
   onPinnedChange?: (pinned: boolean) => void
   width?: number
   onWidthChange?: (delta: number) => void
-  onSelectChat: () => void
-  onSelectResearch: () => void
   onOpenSettings: () => void
   /** Expanded rail's open middle, where Chat mounts its session list. */
   onSessionsSlotReady?: (slot: HTMLDivElement | null) => void
@@ -120,18 +115,13 @@ function RailButton({
 }
 
 /**
- * Wave 5.3 icon command rail — behind `shell_command_rail`. See
- * docs/design/shell-final-direction.md §2.2. Fixed 46px, not resizable;
- * destinations reuse the exact handlers the legacy status-bar buttons
- * already call (same Research canvas) so behavior is identical, only the
- * entry point moves. Changes lives on the notes panel, not this rail.
+ * Sessions rail — behind `shell_command_rail`. Settings and pin live in the
+ * footer. Research opens from the status bar and command palette. Chat is
+ * the conversation itself; leave Research/Graph/Mycelium with "Back to chat".
  */
 export function CommandRail({
   locale,
-  activeDestination,
   pinned, autoCollapsed = false, onPinnedChange, width, onWidthChange,
-  onSelectChat,
-  onSelectResearch,
   onOpenSettings,
   onSessionsSlotReady,
 }: CommandRailProps) {
@@ -239,10 +229,6 @@ export function CommandRail({
   // Read once per render rather than memoised: the platform does not change,
   // and a stale memo here would be a dent in the wrong place.
   const trafficLightRoom = hasNativeMacosTrafficLights()
-  const handleSelect = (destination: CommandRailDestination, action: () => void) => {
-    trackRailDestinationClicked(destination)
-    action()
-  }
   const settingsButton = (
     <RailButton
       active={false}
@@ -314,27 +300,9 @@ export function CommandRail({
           onMouseDown={beginResize}
         />
       ) : null}
-      <RailButton
-        active={activeDestination === 'chat'}
-        expanded={expanded}
-        icon={ChatCircle}
-        label={t('rail.chat')}
-        onClick={() => handleSelect('chat', onSelectChat)}
-        testId="command-rail-chat"
-      />
-      <RailButton
-        active={activeDestination === 'research'}
-        expanded={expanded}
-        icon={MagnifyingGlass}
-        label={t('rail.research')}
-        onClick={() => handleSelect('research', onSelectResearch)}
-        testId="command-rail-research"
-      />
 
-      {/* Conversations sit below the places a person can go — not as a child
-          of Chat and not beside the transcript. Compact mode keeps this
-          quiet, while the expanded rail gives Sessions the open middle. */}
-      <div className="mt-3 min-h-0 flex-1">
+      {/* Sessions are the rail. Destinations like Research live elsewhere. */}
+      <div className="min-h-0 flex-1">
         {expanded ? (
           <div
             ref={onSessionsSlotReady}

@@ -494,6 +494,20 @@ describe('AiMessage', () => {
     expect(screen.queryByTestId('reasoning-toggle')).toBeNull()
   })
 
+  it('hides a reasoning fold that is only an echoed conversation_history dump', () => {
+    const historyOpen = ['<', 'conversation_history', '>'].join('')
+    const historyClose = ['</', 'conversation_history', '>'].join('')
+    render(
+      <AiMessage
+        userMessage="Ask"
+        reasoning={`${historyOpen}\n[user]: prior\n${historyClose}`}
+        reasoningDone
+        actions={[]}
+      />,
+    )
+    expect(screen.queryByTestId('reasoning-toggle')).toBeNull()
+  })
+
   it('does not render actions when empty array', () => {
     render(<AiMessage userMessage="Ask" actions={[]} />)
     expect(screen.queryByTestId('ai-action-card')).toBeNull()

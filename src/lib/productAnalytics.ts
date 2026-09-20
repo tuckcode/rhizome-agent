@@ -20,7 +20,6 @@ type AiAgentResponseText = string
 type AiAgentToolCount = number
 type AiAgentResponseTextFlag = 'had_text' | 'had_partial_response'
 type SheetFormulaFunctionName = string
-type RailDestination = 'chat' | 'research'
 type StatusBarPill = 'vault' | 'agents'
 
 const ALL_NOTES_VISIBILITY_CATEGORIES: ReadonlyArray<keyof AllNotesFileVisibility> = [
@@ -360,10 +359,6 @@ export function trackAiWorkspaceSidebarToggled(collapsed: AnalyticsBoolean, mode
 
 export function trackAiWorkspaceChatTitled(source: AiWorkspaceTitleSource): void {
   trackEvent('ai_workspace_chat_titled', { source })
-}
-
-export function trackRailDestinationClicked(destination: RailDestination): void {
-  trackEvent('rail_destination_clicked', { destination })
 }
 
 export function trackCommandRailPinChanged(mode: 'hover' | 'expanded' | 'compact'): void {

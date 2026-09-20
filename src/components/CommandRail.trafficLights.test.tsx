@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 
 vi.mock('../lib/productAnalytics', () => ({
-  trackRailDestinationClicked: vi.fn(),
   trackCommandRailPinChanged: vi.fn(),
 }))
 vi.mock('../mock-tauri', () => ({ isTauri: () => true }))
@@ -25,9 +24,6 @@ function renderRail() {
   render(
     <CommandRail
       locale="en"
-      activeDestination="chat"
-      onSelectChat={vi.fn()}
-      onSelectResearch={vi.fn()}
       onOpenSettings={vi.fn()}
     />
   )
