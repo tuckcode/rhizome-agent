@@ -1,38 +1,45 @@
-# Session board — 2026-09-13 night
+# Session board — 2026-09-20 morning
 
-**Origin:** Cursor Grok 4.6 · 2026-09-12 picture, **stamped 2026-09-14**
-against local `4416411` + `origin/main` `5c629a0` + live `gh`.
-
-Tonight is the work window. Morning is the last hours to land, not kickoff.
+**Origin:** Composer · Cursor · 2026-09-20 04:38 · stamped against
+product commit `4f9b4c4` + public-readiness planning + app `6860762`.
 
 God-plan input: [`ASTRA_PACKET.md`](ASTRA_PACKET.md). Inventory:
 [`PLAN_FOR_A_PLAN.md`](PLAN_FOR_A_PLAN.md). Daily index: `HANDOFF.md`.
-Unclaimed work: `NEXT.md`.
+Unclaimed work: `NEXT.md` § Pickup now.
+Session: [`plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
+
+**Public-readiness planning update (GPT-6 / Codex, 2026-09-20):**
+[Assessment and stages](plans/2026-09-20-public-readiness-plan.md) ·
+[Cursor swarm brief](plans/2026-09-20-cursor-public-readiness-swarm.md) ·
+[live issues and parked ideas](plans/2026-09-20-public-readiness-inventory.md).
+Planning only. Source and installed-app stamps above remain separate.
 
 ---
 
 ## Status
 
-- **Done:** CPR **`6860762`** — Chat default, Notes off the left rail,
-  vault skill GUI PATH. App installed **2026-09-19 11:27** (old
-  `/Applications` deleted first). Local = origin = app.
-- **Now:** Native W4 (C64 ×3, Chat send, hide/reopen) + #46 live on this build.
-  Confirm launch is Chat and Notes opens from Show Notes.
-- **Next:** One Astra/board visible slice. Docked: import `1`, session mouse-back.
+- **Done on origin:** `dc44d84` — denser sessions, Filter/Sort, rail pin lock,
+  Changes on Notes panel, Mycelium Evaluate copy, Hide Chat, one-job rule.
+- **Landed:** sessions-only left rail; Research on status bar; “Back to chat”
+  exits; reasoning fold strips history echo (`4f9b4c4`).
+- **Now (for the next agent):** CPR only if he will launch → live
+  thinking/no-answer sample → public-install dogfood (#46, C64).
+- **Next:** human session titles; #41 live; Packages shortcut only if claimed.
 
-**Origin:** Cursor Grok 4.6 · 2026-09-19 11:27 · CPR rebuild.
+**Origin:** Composer · 2026-09-20 04:38.
 
 ---
 
 ## True right now
 
-- **Git tip (local):** **`6860762`**. **Origin `main`:** **`6860762`**.
+- **Git:** `4f9b4c4` product commit plus the following planning commit.
 - **Last stamped app:** **`6860762`**, **2026-09-19 11:27**,
-  `/Applications/Rhizome Agent.app`. Vite / mock-tauri is not that vault.
+  `/Applications/Rhizome Agent.app` — behind `main` and behind the dirty tree.
 - **Prime on this machine:** **0.9.3**.
-- **Open GitHub issues:** Prefer live `gh` (17 open as of 2026-09-14
-  stamp; recheck). Open PR [#66](https://github.com/tuckcode/rhizome-agent/pull/66)
+- **Open GitHub issues:** Prefer live `gh`. Open PR [#66](https://github.com/tuckcode/rhizome-agent/pull/66)
   draft — do not merge.
+- **Windows:** do not build or push a Windows app.
+- **Import:** list `import_jsonl` waits for **`1`**.
 
 ---
 
