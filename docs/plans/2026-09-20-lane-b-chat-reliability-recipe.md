@@ -62,7 +62,14 @@ Mycelium already unwrapped `<conversation_history>` blobs. The session list did 
 This lane unwraps at the list display (`primeSessionRowTitles`) and at naming (`session_title_from_exchange`, `summarize_lines`).
 Model-generated naming is unchanged. A human rename that is not a history blob stays intact.
 
-## 6. What this lane did not run
+## 6. C76 display truncate (do not tighten)
+
+`normalizeReasoningDisplay` drops from an leftover unterminated
+`<conversation_history>` open tag through the end of the string.
+Reasoning that names that tag mid-sentence loses the rest. Display-only.
+Low risk. Do not tighten the matcher from this recipe.
+
+## 7. What this lane did not run
 
 - Native QA on the installed `6860762` app or a debug bundle.
 - Full coverage, Playwright smoke, commit, push, rebuild.
