@@ -298,6 +298,7 @@ function NoteTitleRow({
     <div
       className={cn('truncate pr-5 text-[13px]', isBinary ? 'text-muted-foreground' : 'text-foreground', isSelected && !isBinary ? 'font-semibold' : 'font-medium')}
       data-testid="note-title-row"
+      title={entry.title}
     >
       {hasStatusDot(noteStatus) && !isBinary && <StatusDot noteStatus={noteStatus} />}
       <NoteTitleIcon icon={entry.icon} size={15} className="mr-1" testId="note-title-icon" />

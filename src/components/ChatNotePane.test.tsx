@@ -21,6 +21,17 @@ describe('ChatNotePane', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  /**
+   * D5. The header label truncates. Close and Back already have titles.
+   * The note name did not, so a long path vanished on hover.
+   */
+  it('exposes the full header label as a pointer tooltip', () => {
+    const label = 'wiki/decisions/a-very-long-note-name-that-will-truncate.md'
+    render(<ChatNotePane label={label} onClose={vi.fn()} />)
+
+    expect(screen.getByText(label)).toHaveAttribute('title', label)
+  })
+
   it('returns to the Notes workspace', () => {
     const onBackToNotes = vi.fn()
     render(

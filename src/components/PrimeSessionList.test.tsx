@@ -846,3 +846,45 @@ describe('PrimeSessionList — context menu (C67)', () => {
     expect(clipboard.copied).toEqual(['/sessions/a.jsonl'])
   })
 })
+
+/**
+ * D5. The title is 11px and `truncate`. `aria-label` already has the full
+ * name for a screen reader. A pointer user who hovered a clipped row had
+ * no native title and no tooltip, so the rest of the name was gone.
+ *
+ * D6. The row control was a raw `<button>` with Tailwind's outline removed
+ * and no `focus-visible` ring. Tabbing a pinned rail then moved focus
+ * with nothing a sighted keyboard user could see.
+ */
+describe('PrimeSessionList — truncated names and keyboard focus', () => {
+  it('exposes the full session name as a pointer tooltip on the title', async () => {
+    const title = 'A session name that will truncate in the pinned rail'
+    invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title })]
+
+    render(<PrimeSessionList locale="en" now={NOW} />)
+
+    expect(await screen.findByText(title)).toHaveAttribute('title', title)
+    expect(screen.getByRole('button', { name: `Open session ${title}` })).not.toHaveAttribute(
+      'title',
+    )
+  })
+
+  it('exposes the full archived session name as a pointer tooltip', async () => {
+    const title = 'An archived name that also truncates'
+    invoked.result = [summary({ id: 'b', path: '/sessions/b.jsonl', title, archived: true })]
+
+    render(<PrimeSessionList locale="en" now={NOW} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Archived/ }))
+
+    expect(await screen.findByText(title)).toHaveAttribute('title', title)
+  })
+
+  it('shows a focus-visible ring on the session row so tabbing is visible', async () => {
+    invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: 'Focus me' })]
+
+    render(<PrimeSessionList locale="en" now={NOW} />)
+
+    const row = await screen.findByRole('button', { name: 'Open session Focus me' })
+    expect(row.className).toMatch(/focus-visible:ring/)
+  })
+})
