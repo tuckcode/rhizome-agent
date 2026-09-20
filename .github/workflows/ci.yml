@@ -54,8 +54,14 @@ jobs:
       # Keep frontend and Rust quality gates in separate jobs so the
       # expensive Rust target cache restore no longer blocks the frontend lane.
       # ── 0. Build check (catches type errors and bundler failures) ─────────
+      # `tsc --noEmit` compiled ZERO files here. The root tsconfig.json is
+      # `"files": []` plus project references, and --noEmit does not follow
+      # references, so this step passed unconditionally and never caught a
+      # type error. `pnpm typecheck` is `tsc -b`, which does follow them and
+      # covers app, node and test projects. AGENTS.md documents the same trap
+      # for local use. Verified 2026-09-20: --listFiles printed 0 lines.
       - name: TypeScript type check
-        run: pnpm exec tsc --noEmit
+        run: pnpm typecheck
 
       - name: Vite build check
         # TypeScript is checked explicitly above; run Vite directly here to avoid
