@@ -5,6 +5,7 @@ import type { AppLocale } from '../lib/i18n'
 import type { GitRemoteStatus, SyncStatus } from '../types'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { GitRepositoryOption } from '../utils/gitRepositories'
+import { useNotesChromeStatusBridge } from './NotesChromeShortcuts'
 import {
   StatusBarPrimarySection,
   StatusBarSecondarySection,
@@ -271,6 +272,10 @@ function StatusBarFooter(props: StatusBarFooterProps) {
 
 export function StatusBar(props: StatusBarProps) {
   useStatusBarTicker()
+  useNotesChromeStatusBridge({
+    onOpenResearch: props.onOpenResearch,
+    onClickGraph: props.onClickGraph,
+  })
   const { compact, stacked } = useStatusBarLayout()
 
   return (

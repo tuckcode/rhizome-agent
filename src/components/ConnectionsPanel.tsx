@@ -1,5 +1,6 @@
-import { forwardRef, lazy, Suspense, useImperativeHandle, useState } from 'react'
-import { ArrowsIn, ArrowsOut, DotsThree } from '@phosphor-icons/react'
+import { forwardRef, lazy, Suspense, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { ArrowsIn, ArrowsOut } from '@phosphor-icons/react'
+import { Button } from '@/components/ui/button'
 import { trackEvent } from '../lib/telemetry'
 import type { AppLocale } from '../lib/i18n'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
@@ -7,6 +8,12 @@ import { usePanelWidth } from '../hooks/usePanelWidth'
 import { startResizeDrag } from '../utils/startResizeDrag'
 import { SessionActivityHistory, type SessionActivityRetainedState } from './SessionActivityHistory'
 import type { GraphViewRetainedState } from './graph/GraphView'
+import {
+  NOTES_CHROME_EVENT,
+  consumePendingConnectionsView,
+  type ConnectionsChromeView,
+  type NotesChromeDestination,
+} from './NotesChromeShortcuts'
 const GraphView = lazy(() => import('./graph/GraphView'))
 type View = 'graph' | 'mycelium'
 type Placement = 'sidebar' | 'full' | 'off'
@@ -72,12 +79,27 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
     trackEvent('connections_view_selected', { view: target })
   }
   function applyRequest(target: View, options?: { focusPath?: string }) {
+    if (placements[target] === 'off') changePlacement(target, 'sidebar')
     select(target)
     if (target === 'mycelium' && options?.focusPath) {
       setMyceliumState({ path: options.focusPath, selected: null, scrollTop: 0 })
       setMyceliumFocusToken(token => token + 1)
     }
   }
+  const applyRequestRef = useRef(applyRequest)
+  applyRequestRef.current = applyRequest
+  useEffect(() => {
+    const pending = consumePendingConnectionsView()
+    if (pending) applyRequestRef.current(pending)
+    const onChrome = (event: Event) => {
+      const destination = (event as CustomEvent<NotesChromeDestination>).detail
+      if (destination === 'graph' || destination === 'mycelium') {
+        applyRequestRef.current(destination as ConnectionsChromeView)
+      }
+    }
+    window.addEventListener(NOTES_CHROME_EVENT, onChrome)
+    return () => window.removeEventListener(NOTES_CHROME_EVENT, onChrome)
+  }, [])
   // Both views open notes the same way: hand the path up, then get out of the
   // editor's way. Overlay collapses; the docked sub-panel stays so Notes and
   // Graph are still both there after you open a file.
@@ -117,23 +139,18 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
         <div role="tablist" aria-label="Connection views" className="flex min-w-0 flex-1">
           {available.map(target => <button type="button" role="tab" aria-selected={selected === target} key={target} className={`min-h-8 px-2 text-xs ${selected === target ? 'bg-muted text-foreground' : 'text-muted-foreground'}`} onClick={() => select(target)}>{target === 'graph' ? 'Graph' : 'Mycelium'}</button>)}
         </div>
-        {selected && <button type="button" className="p-2" aria-label={full ? 'Return to side panel' : 'Expand connections'} onClick={() => {
+        {selected && <Button type="button" variant="ghost" size="icon-xs" className="p-2 text-muted-foreground" aria-label={full ? 'Return to side panel' : 'Expand connections'} onClick={() => {
           setExpanded(!full)
           trackEvent('connections_expanded', { expanded: full ? 0 : 1 })
-        }}>{full ? <ArrowsIn size={14} /> : <ArrowsOut size={14} />}</button>}
-        <details className="relative">
-          <summary aria-label="Connections settings" className="cursor-pointer px-2 py-2 text-xs"><DotsThree size={16} aria-hidden="true" /><span className="sr-only">Connections settings</span></summary>
-          <div className="absolute right-0 z-50 w-56 space-y-3 rounded border border-border bg-background p-3 text-xs shadow-md">
-            {(['graph', 'mycelium'] as const).map(target => <label className="flex flex-col gap-1" key={target}>
-              {target === 'graph' ? 'Graph' : 'Mycelium'} placement
-              <select aria-label={`${target === 'graph' ? 'Graph' : 'Mycelium'} placement`} className="rounded border border-border bg-background p-1" value={placements[target]} onChange={e => changePlacement(target, e.target.value as Placement)}>
-                <option value="sidebar">Under Notes</option><option value="full">Full view only</option><option value="off">Off</option>
-              </select>
-            </label>)}
-          </div>
-        </details>
+        }}>{full ? <ArrowsIn size={14} /> : <ArrowsOut size={14} />}</Button>}
       </div>
-      {!selected && <p className="p-3 text-xs text-muted-foreground">Enable a view in Connections settings.</p>}
+      {!selected && <div className="space-y-2 p-3">
+        <p className="text-xs text-muted-foreground">Enable a view in Connections settings.</p>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" size="xs" onClick={() => applyRequest('graph')}>Enable Graph</Button>
+          <Button type="button" variant="outline" size="xs" onClick={() => applyRequest('mycelium')}>Enable Mycelium</Button>
+        </div>
+      </div>}
       {selected && <div
         role="tabpanel"
         className="flex min-h-0 flex-1 overflow-hidden isolate"

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { APP_COMMAND_EVENT_NAME, APP_COMMAND_IDS } from '../../hooks/appCommandDispatcher'
 import { trackEvent } from '../../lib/telemetry'
 import { useDragRegion } from '../../hooks/useDragRegion'
+import { NotesChromeShortcuts } from '../NotesChromeShortcuts'
 import { SortDropdown } from '../SortDropdown'
 import { ListPropertiesPopover, type ListPropertiesPopoverProps } from './ListPropertiesPopover'
 import { GitRepositorySelect } from '../GitRepositorySelect'
@@ -99,7 +100,7 @@ function HeaderTitle({
     return (
       <button
         type="button"
-        className="m-0 min-w-0 flex-1 truncate border-0 bg-transparent p-0 text-left text-[14px] font-semibold"
+        className="m-0 min-w-[3.25rem] flex-1 truncate border-0 bg-transparent p-0 text-left text-[14px] font-semibold"
         onClick={handleClick}
         data-testid="type-header-link"
       >
@@ -110,7 +111,7 @@ function HeaderTitle({
 
   return (
     <h3
-      className="m-0 min-w-0 flex-1 truncate text-[14px] font-semibold"
+      className="m-0 min-w-[3.25rem] flex-1 truncate text-[14px] font-semibold"
     >
       {title}
     </h3>
@@ -318,6 +319,7 @@ export function NoteListHeader({
           locale={locale}
           onOpenType={onOpenType}
         />
+        <NotesChromeShortcuts locale={locale} />
         <HeaderActions
           isEntityView={isEntityView}
           listSort={listSort}
