@@ -227,6 +227,15 @@ fn path_for_method(binary: &Path) -> PathBuf {
     std::fs::canonicalize(binary).unwrap_or_else(|_| binary.to_path_buf())
 }
 
+/// Refuse when Chat is mid-turn. The host streaming flag is the guard.
+/// The client `chat_busy` flag is only an early hint.
+fn refuse_busy_chat(chat_busy: bool, host_streaming: bool) -> Result<(), String> {
+    if chat_busy || host_streaming {
+        return Err(CHAT_BUSY_ERR.to_string());
+    }
+    Ok(())
+}
+
 /// Apply a Chat-engine update after the UI collects consent.
 ///
 /// Never runs on its own. The Tauri command calls this only after a click.
@@ -236,10 +245,10 @@ pub fn apply_prime_update(
     expected_version: &str,
     chat_busy: bool,
 ) -> Result<ApplyPrimeUpdateResult, String> {
+    refuse_busy_chat(chat_busy, crate::prime_session_host::is_streaming())?;
     apply_prime_update_with(
         expected_version,
-        chat_busy,
-        crate::prime_session_host::is_streaming(),
+        false,
         fetch_latest_prime_release,
         crate::prime_discovery::find_binary,
         run_prime_update_cli,
@@ -253,7 +262,6 @@ pub fn apply_prime_update(
 fn apply_prime_update_with<Fetch, Find, Run, ReadVer, Reload>(
     expected_version: &str,
     chat_busy: bool,
-    host_streaming: bool,
     fetch_latest: Fetch,
     find_binary: Find,
     mut run_update: Run,
@@ -267,9 +275,7 @@ where
     ReadVer: FnMut(&Path) -> Option<String>,
     Reload: FnOnce(),
 {
-    if chat_busy || host_streaming {
-        return Err(CHAT_BUSY_ERR.to_string());
-    }
+    refuse_busy_chat(chat_busy, false)?;
 
     let expected_version = expected_version.trim();
     if expected_version.is_empty() {
@@ -545,7 +551,6 @@ mod tests {
         apply_prime_update_with(
             expected_version,
             chat_busy,
-            false,
             || Ok(latest),
             || binary,
             run_update,
@@ -559,7 +564,6 @@ mod tests {
         let error = apply_prime_update_with(
             "0.9.4",
             true,
-            false,
             || panic!("must not fetch when chat is busy"),
             || panic!("must not look up the binary when chat is busy"),
             |_binary, _args| panic!("must not spawn the CLI when chat is busy"),
@@ -573,19 +577,9 @@ mod tests {
 
     #[test]
     fn apply_refuses_when_the_host_is_streaming_even_if_the_client_says_idle() {
-        let error = apply_prime_update_with(
-            "0.9.4",
-            false,
-            true,
-            || panic!("must not fetch when the host is streaming"),
-            || panic!("must not look up the binary when the host is streaming"),
-            |_binary, _args| panic!("must not spawn the CLI when the host is streaming"),
-            |_binary| panic!("must not read a version when the host is streaming"),
-            || panic!("must not reload when the host is streaming"),
-        )
-        .expect_err("host streaming must refuse");
-
+        let error = refuse_busy_chat(false, true).expect_err("host streaming must refuse");
         assert_eq!(error, CHAT_BUSY_ERR);
+        assert!(refuse_busy_chat(false, false).is_ok());
     }
 
     #[test]
@@ -593,7 +587,6 @@ mod tests {
         for expected in ["", "   ", "\n"] {
             let error = apply_prime_update_with(
                 expected,
-                false,
                 false,
                 || panic!("must not fetch without an expected version"),
                 || panic!("must not look up the binary without an expected version"),
@@ -636,7 +629,6 @@ mod tests {
     fn apply_refuses_when_the_chat_engine_is_missing() {
         let error = apply_prime_update_with(
             "0.9.4",
-            false,
             false,
             || panic!("must not fetch when the Chat engine is missing"),
             || Err("missing".into()),

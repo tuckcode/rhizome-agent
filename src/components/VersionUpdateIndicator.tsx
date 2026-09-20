@@ -257,7 +257,7 @@ export function VersionUpdateIndicator({
               onClick={() => setOpen(false)}
               data-testid="version-update-maybe-later"
             >
-              {translate(locale, 'versionUpdate.maybeLater')}
+              {primeApplied ? 'Close' : translate(locale, 'versionUpdate.maybeLater')}
             </Button>
             {primeSection && (
               <Button
