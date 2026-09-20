@@ -326,7 +326,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | | |
 |---|---|
 | #32 | Prime harness does not run on Windows — see also C42 |
-| #26 | Update Prime from inside Rhizome |
+| #26 | Update Chat engine from inside Rhizome — source committed; live native apply unverified until rebuild + click |
 | #14 | Schedules and heartbeats: see, pause, cancel — **closed 2026-09-13** |
 | #13 | Menu bar dropdown shows what is running — see also C34-RESOLVED, #52 |
 | #52 | Menu bar should tell you when the agent is done — **partial.** Running list + tooltip shipped with #13. Leftover: [`plans/issue-52-menu-bar-done.md`](plans/issue-52-menu-bar-done.md) |

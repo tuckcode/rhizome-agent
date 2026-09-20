@@ -41,8 +41,26 @@ function isRhizomeAvailable(status: UpdateStatus): status is Extract<UpdateStatu
   return status.state === 'available'
 }
 
-function isPrimeAvailable(status: PrimeUpdateStatus): status is Extract<PrimeUpdateStatus, { state: 'available' }> {
-  return status.state === 'available'
+function primeUpdateSection(status: PrimeUpdateStatus) {
+  if (
+    status.state === 'available' ||
+    status.state === 'applying' ||
+    status.state === 'applied' ||
+    status.state === 'failed'
+  ) {
+    return status
+  }
+  return null
+}
+
+function showsReleasePageFallback(
+  status: NonNullable<ReturnType<typeof primeUpdateSection>>,
+): boolean {
+  if (status.state !== 'failed') return false
+  if (status.method === 'unknown' || status.method === 'mise' || status.method === 'asdf') {
+    return true
+  }
+  return status.message.toLowerCase().includes('release page')
 }
 
 function UpdateSection({
@@ -53,6 +71,11 @@ function UpdateSection({
   footnote,
   locale,
   testId,
+  disabled,
+  statusLine,
+  errorLine,
+  fallbackLabel,
+  onFallback,
 }: {
   heading: string
   notes: string
@@ -61,12 +84,23 @@ function UpdateSection({
   footnote?: string
   locale: AppLocale
   testId: string
+  disabled?: boolean
+  statusLine?: string
+  errorLine?: string
+  fallbackLabel?: string
+  onFallback?: () => void
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <span style={{ fontWeight: 600, fontSize: 13 }}>{heading}</span>
-        <Button type="button" size="xs" onClick={onUpdateNow} data-testid={`${testId}-update-now`}>
+        <Button
+          type="button"
+          size="xs"
+          onClick={onUpdateNow}
+          disabled={disabled}
+          data-testid={`${testId}-update-now`}
+        >
           {updateNowLabel}
         </Button>
       </div>
@@ -87,6 +121,27 @@ function UpdateSection({
       >
         {notes.trim() || translate(locale, 'versionUpdate.noNotes')}
       </pre>
+      {statusLine && (
+        <p data-testid={`${testId}-applying`} style={{ fontSize: 11, color: 'var(--muted-foreground)', margin: 0 }}>
+          {statusLine}
+        </p>
+      )}
+      {errorLine && (
+        <p data-testid={`${testId}-error`} style={{ fontSize: 11, color: 'var(--muted-foreground)', margin: 0 }}>
+          {errorLine}
+        </p>
+      )}
+      {onFallback && fallbackLabel && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          onClick={onFallback}
+          data-testid={`${testId}-open-release`}
+        >
+          {fallbackLabel}
+        </Button>
+      )}
       {footnote && (
         <p style={{ fontSize: 11, color: 'var(--muted-foreground)', margin: 0 }}>{footnote}</p>
       )}
@@ -105,13 +160,18 @@ export function VersionUpdateIndicator({
   const [open, setOpen] = useState(false)
 
   const rhizomeAvailable = isRhizomeAvailable(rhizomeStatus)
-  const primeAvailable = isPrimeAvailable(primeStatus)
+  const primeSection = primeUpdateSection(primeStatus)
 
-  if (!rhizomeAvailable && !primeAvailable) return null
+  if (!rhizomeAvailable && !primeSection) return null
 
   const className = compact
     ? 'h-6 min-w-0 gap-1 rounded-sm px-1 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground'
     : 'h-auto gap-1 rounded-sm px-1 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground'
+
+  const primeHeadingVersion =
+    primeSection?.state === 'applied' ? primeSection.installedVersion : primeSection?.version
+  const primeApplying = primeSection?.state === 'applying'
+  const primeApplied = primeSection?.state === 'applied'
 
   return (
     <>
@@ -153,17 +213,28 @@ export function VersionUpdateIndicator({
                 testId="version-update-rhizome"
               />
             )}
-            {primeAvailable && (
+            {primeSection && primeHeadingVersion && (
               <UpdateSection
-                heading={translate(locale, 'versionUpdate.primeHeading', { version: primeStatus.version })}
-                notes={primeStatus.notes}
+                heading={`Chat engine ${primeHeadingVersion}`}
+                notes={primeSection.notes}
                 onUpdateNow={() => {
-                  primeActions.openPrimeReleasePage()
+                  void primeActions.applyEngineUpdate()
                 }}
                 updateNowLabel={translate(locale, 'update.updateNow')}
-                footnote={translate(locale, 'versionUpdate.primeNeverAutoUpdates')}
+                footnote="Rhizome Agent never updates the Chat engine unattended. Update now applies it here after you click."
                 locale={locale}
                 testId="version-update-prime"
+                disabled={primeApplying || primeApplied}
+                statusLine={primeApplying ? 'Applying the Chat engine update…' : undefined}
+                errorLine={primeSection.state === 'failed' ? primeSection.message : undefined}
+                fallbackLabel={showsReleasePageFallback(primeSection) ? 'Open release page' : undefined}
+                onFallback={
+                  showsReleasePageFallback(primeSection)
+                    ? () => {
+                        primeActions.openPrimeReleasePage()
+                      }
+                    : undefined
+                }
               />
             )}
           </div>

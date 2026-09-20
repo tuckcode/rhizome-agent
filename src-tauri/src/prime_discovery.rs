@@ -24,6 +24,10 @@ pub(crate) fn check_cli() -> AiAgentAvailability {
 /// Kept as a fallback rather than a replacement: a future install layout that
 /// is a real binary would have no `package.json`, and `--version` is the
 /// answer there.
+pub(crate) fn installed_version_for(binary: &Path) -> Option<String> {
+    version_from_package(binary).or_else(|| crate::cli_agent_runtime::version_for_binary(binary))
+}
+
 fn version_from_package(binary: &Path) -> Option<String> {
     let resolved = std::fs::canonicalize(binary).ok()?;
     let manifest = resolved

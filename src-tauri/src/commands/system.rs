@@ -454,9 +454,8 @@ pub async fn download_and_install_app_update(
     Err("App updates are not available on mobile".into())
 }
 
-/// Checks GitHub's real release feed for a Prime version newer than what's
-/// currently connected. Never installs anything — see `prime_update.rs` for
-/// why Prime can't be auto-updated by Rhizome at all.
+/// Checks GitHub's real release feed for a Chat-engine version newer than
+/// what's currently connected. Never installs anything on its own.
 #[tauri::command]
 pub async fn check_prime_update(
     installed_version: Option<String>,
@@ -465,7 +464,20 @@ pub async fn check_prime_update(
         crate::prime_update::check_prime_update(installed_version.as_deref())
     })
     .await
-    .map_err(|error| format!("Prime update check panicked: {error}"))?
+    .map_err(|error| format!("Chat engine update check panicked: {error}"))?
+}
+
+/// Apply a Chat-engine CLI update after the user clicks. Never auto-runs.
+#[tauri::command]
+pub async fn apply_prime_update(
+    expected_version: String,
+    chat_busy: bool,
+) -> Result<crate::prime_update::ApplyPrimeUpdateResult, String> {
+    tokio::task::spawn_blocking(move || {
+        crate::prime_update::apply_prime_update(&expected_version, chat_busy)
+    })
+    .await
+    .map_err(|error| format!("Chat engine update panicked: {error}"))?
 }
 
 #[tauri::command]

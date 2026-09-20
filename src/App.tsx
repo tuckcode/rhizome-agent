@@ -1337,6 +1337,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   // shape already broke App.test.tsx once via primeModelLabel(null).
   const { status: primeUpdateStatus, actions: primeUpdateActions } = usePrimeUpdate(
     primeHostStatusForUpdates?.version,
+    primeHostStatusForUpdates?.isStreaming ?? false,
   )
   const versionUpdateIndicator = (
     <VersionUpdateIndicator

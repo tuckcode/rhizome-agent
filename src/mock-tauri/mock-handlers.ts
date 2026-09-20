@@ -599,12 +599,43 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     modelId: 'mock-model',
     modelName: 'Mock model',
   }),
-  check_prime_update: () => null,
+  check_prime_update: () => ({
+    version: '0.9.4',
+    notes: '- Mock Chat engine release so Update now can be clicked in the browser.',
+    url: 'https://github.com/PrimeIntellect-ai/prime-agent/releases/tag/v0.9.4',
+  }),
+  apply_prime_update: (args?: { chatBusy?: boolean }) => {
+    if (args?.chatBusy) {
+      throw new Error('Chat is still answering. Wait until the reply finishes, then update.')
+    }
+    return { previousVersion: '0.9.3', installedVersion: '0.9.4', method: 'npm' }
+  },
   ensure_prime_session_host: () => 'mock-session',
   prime_session_new_session: () => 'mock-session',
   abort_prime_session_turn: () => false,
   stream_prime_session: () => 'mock-session',
-  list_prime_sessions: () => [],
+  list_prime_sessions: () => [
+    {
+      name: [
+        '<conversation_history>',
+        '[user]: hi',
+        '',
+        '[assistant]: Hello.',
+        '',
+        '[user]: hide chat on notes',
+        '</conversation_history>',
+        '',
+        'Continue the conversation. Respond only to the latest [user] message.',
+      ].join('\n'),
+      path: '/mock/sessions/01a0252e-b9d5-71e9-83de-2bce32f65c06.jsonl',
+      mtimeMs: Date.now() - 4 * 60_000,
+    },
+    {
+      name: 'Draft the release notes',
+      path: '/mock/sessions/01a0208e-3494-73a9-a6a2-2b890838d7a5.jsonl',
+      mtimeMs: Date.now() - 60 * 24 * 5 * 60_000,
+    },
+  ],
   // Archived ids live here rather than in the fixture list so the dev loop
   // round-trips: file a row, and the next read still has it filed. In memory
   // only — a reload starts clean, which is what a mock host should do.
@@ -695,6 +726,24 @@ export const mockHandlers: Record<string, (args: any) => any> = {
         title: 'Where does the vault watcher debounce?',
         cwd: DEFAULT_MOCK_VAULT_PATH,
         mtimeMs: minutes(4),
+        hasConversation: true,
+      },
+      {
+        id: '01a0252e-d8e3-71c0-9a44-1f6e0b2c91aa',
+        path: '/mock/sessions/01a0252e-d8e3-71c0-9a44-1f6e0b2c91aa.jsonl',
+        title: [
+          '<conversation_history>',
+          '[user]: hi',
+          '',
+          '[assistant]: Hello.',
+          '',
+          '[user]: hide chat on notes',
+          '</conversation_history>',
+          '',
+          'Continue the conversation. Respond only to the latest [user] message.',
+        ].join('\n'),
+        cwd: DEFAULT_MOCK_VAULT_PATH,
+        mtimeMs: minutes(12),
         hasConversation: true,
       },
       {

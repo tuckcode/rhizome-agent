@@ -10,5 +10,6 @@ describe('leftover green Rhizome update bar', () => {
     expect(source).toContain("background: 'var(--accent-green)'")
     expect(source).toContain('data-testid="status-version-update"')
     expect(source).toContain('rhizomeActions.startDownload()')
+    expect(source).toContain('primeActions.applyEngineUpdate()')
   })
 })

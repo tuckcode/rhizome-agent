@@ -519,7 +519,15 @@ Each answers "nothing", which is true of a host with no session.
 - **`prime_events.rs`**, **`prime_tool_unwrap.rs`** — normalising the daemon's
   event stream into the shared `AiAgentStreamEvent` shape
 - **`prime_discovery.rs`**, **`prime_update.rs`**, **`prime_vault_skill.rs`** —
-  locating the binary, updating it, and seeding the Rhizome vault skill.
+  locating the binary, checking GitHub for a newer Chat-engine release
+  (`check_prime_update`), applying it only after a click
+  (`apply_prime_update({ expectedVersion, chatBusy })`), and seeding the
+  Rhizome vault skill.   Apply refuses a busy chat (host `is_streaming()` is the guard; the
+  client `chatBusy` flag is only a hint), a stale offer, or a
+  missing binary. It runs `prime-agent update` (one `--force` retry when
+  the CLI says it is already latest), then reloads the attached session.
+  It does not create a session. User-facing copy says Chat engine, not
+  Prime as a second product.
   The skill bakes `find_node()`'s absolute binary plus a GUI-safe `PATH`
   (`$HOME/.local/bin`, Homebrew, `/usr/local/bin`) and short chat manners
   (answer first, CLI not IPython, stop after one environment error).
@@ -1987,13 +1995,22 @@ sequenceDiagram
 
 ### Updates
 
-Tolaria uses the Tauri updater plugin for automatic updates:
+**Origin:** Cursor Grok 4.6 · 2026-09-20 · #26 Chat-engine apply
 
-- `src-tauri/tauri.conf.json` points the default desktop feed at `stable/latest.json`
-- `useUpdater(releaseChannel, automaticChecksEnabled)` waits 3 seconds after launch when automatic checks are enabled, then calls Rust commands instead of hard-coding one updater endpoint in the frontend
-- `automatic_update_checks_enabled` is an installation-local Settings flag that defaults to enabled; disabling it skips only the startup/background probe, not manual status-bar update checks
-- `src-tauri/src/app_updater.rs` maps the selected channel to `alpha/latest.json` or `stable/latest.json`
-- `download_and_install_app_update` streams progress events back into `UpdateBanner`
+Rhizome Agent has two update paths. The **app** path (`app_updater.rs`,
+`useUpdater`, `UpdateBanner`) is still a stub: `check_for_app_update`
+returns none, and `download_and_install_app_update` errors, because there
+is no signed Rhizome feed yet (`tauri.conf.json` `endpoints` is empty).
+The **Chat-engine** path (`prime_update.rs`, `usePrimeUpdate`) checks
+GitHub, then `apply_prime_update` runs the resolved `prime-agent update`
+only after Update now. The host refuses when `is_streaming()` is true.
+The client `chatBusy` flag is only a hint. It does not start a new session.
+
+The app-update chrome is still wired for a future signed feed:
+
+- `useUpdater(releaseChannel, automaticChecksEnabled)` waits 3 seconds after launch when automatic checks are enabled, then calls the Rust commands
+- `automatic_update_checks_enabled` is an installation-local Settings flag that defaults to enabled; disabling it skips only the startup probe, not a manual status-bar check
+- `download_and_install_app_update` would stream progress into `UpdateBanner` once a feed exists. Today it returns the stub error.
 
 ### Feature Flags (PostHog + Release Channels)
 

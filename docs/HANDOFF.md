@@ -47,12 +47,12 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Grok 4.6 · Lane I · 2026-09-20 · install/docs stamps.
+**Origin:** Cursor Grok 4.6 · 2026-09-20 · #26 audit r3.
 
-Local product checkpoint is **`4ac0759`** (Wave 1 + preview stamps) plus
-the HOME-skip test in this follow-up. The series is **unpushed**.
-`origin/main` is still **`dc44d84`**. **C76** incomplete-history strip
-is in this series. Packaged app
+Local product checkpoint is the **#26** Chat-engine apply commit (audit
+r3: host `is_streaming()` guard, inline Chat-engine copy, seeded mock).
+Wave 1 remains **`b5dd7a1`** on origin until this commit is pushed.
+Packaged app
 remains **`6860762`** (2026-09-19 11:27) — behind local source. Detail:
 [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
 Install/claims: [`GETTING-STARTED.md`](GETTING-STARTED.md) § Public preview
@@ -114,6 +114,7 @@ sample, then public-install dogfood. God plan:
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-20 · #26 audit r3](plans/handoffs/2026-09-20-0711-cursor-grok-4-6-issue-26-audit-r3.md) — host streaming guard; C18 keys inlined; mock seeded.
 - [2026-09-20 · Wave 1 audit reply](plans/handoffs/2026-09-20-0610-cursor-grok-4-6-wave1-audit-reply.md) — coverage 6692; unused classifier deleted; C77/C78 opened.
 - [2026-09-20 · Lane B chat reliability](plans/2026-09-20-lane-b-chat-reliability-recipe.md) — session titles unwrap history blobs; thinking-only stays empty completion; #41 live still Q.
 - [2026-09-20 · Lane S vault safety](plans/handoffs/2026-09-20-0545-cursor-grok-4-6-lane-s-vault-safety.md) — JS refuses `~`/`~/` as HOME vault; nested vaults stay; #46 open until live no-vault Chat.
