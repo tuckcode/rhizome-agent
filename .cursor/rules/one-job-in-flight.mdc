@@ -35,12 +35,13 @@ Wrong: the newest line becomes the job. The old job sits half-done. A footer lis
 
 Right: finish the slice, or park it, then start the oldest pending item.
 
-The Open / Parked / Done footer is a read of the todos. It is not the work.
+The Doing / Queued / Wanted / Parked / Done footer is a read of the todos. It is not the work. Keep the list when Doing is empty.
 
-## When two or more items exist, end the turn with
+## When any bucket has an item, end the turn with
 
-- Doing (the `in_progress` title)
+- Doing (the `in_progress` title, or `none`)
 - Queued (pending titles, oldest first)
+- Wanted (keep this idea, not started)
 - Parked
 - Done
 

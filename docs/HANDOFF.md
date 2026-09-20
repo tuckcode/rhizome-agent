@@ -47,11 +47,12 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Grok 4.6 · 2026-09-20 · #26 CPR.
+**Origin:** GPT-6 Codex · 2026-09-20 · reviewed Astra landing.
 
-Local, origin, and `/Applications` are **`b7264d6`** (Chat-engine apply
-+ footer Update now + Clippy busy helper). Installed
-**2026-09-20 07:23 CDT**. Live native Update now is still unverified.
+Source through **`6ce3782`** plus this handoff is on `origin/main`.
+`/Applications` remains **`b7264d6`** 07:23. Free only and Edit list landed.
+Handy: [`2026-09-20-1230`](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md).
+Recap: [`2026-09-20-1228`](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md).
 Detail:
 [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
 Install/claims: [`GETTING-STARTED.md`](GETTING-STARTED.md) § Public preview
@@ -102,17 +103,18 @@ public-readiness plan with parallel agents. Read the
 Typecheck and 292 focused tests pass. Native readiness is not established.
 No rebuild or issue closure occurred.
 
-`docs/NEXT.md` § **Pickup now (2026-09-20)** — C76 source is in this
-series. CPR only if Atticus will launch, then thinking/no-answer live
-sample, then public-install dogfood. God plan:
-[`docs/ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md). Session detail:
-[`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
+Current next work is live verification and the audit findings in the combined
+handoff. Detail:
+[`2026-09-20-1234`](plans/handoffs/2026-09-20-1234-claude-opus-5-astra-combined-handoff.md).
 
 ## Recent sessions
 
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-20 · handy wrap](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md) — `ffc135f` 11 ahead; app `b7264d6`; Edit list next.
+- [2026-09-20 · Astra combined handoff](plans/handoffs/2026-09-20-1234-claude-opus-5-astra-combined-handoff.md) — D1–D7 audit, plugin rescope, ADR findings, and the Edit-list completion contract.
+- [2026-09-20 · Astra ↔ Cursor recap](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md) — plan through #26 CPR, D1–D7 local, Free-only dirt.
 - [2026-09-20 · #26 CPR](plans/handoffs/2026-09-20-0723-cursor-grok-4-6-issue-26-cpr.md) — origin and app `b7264d6`; live Update now still Q.
 - [2026-09-20 · #26 audit r3](plans/handoffs/2026-09-20-0711-cursor-grok-4-6-issue-26-audit-r3.md) — host streaming guard; C18 keys inlined; mock seeded.
 - [2026-09-20 · Wave 1 audit reply](plans/handoffs/2026-09-20-0610-cursor-grok-4-6-wave1-audit-reply.md) — coverage 6692; unused classifier deleted; C77/C78 opened.

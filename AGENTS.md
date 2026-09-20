@@ -588,9 +588,10 @@ Handoff:
   old plan called it out of scope. Those files are context. Atticus's current
   ask wins. Cite a doc as evidence, never as a stop. Safety still stands
   (wrong tree, English-only, `import_jsonl` waits for `1`).
-- An interrupt or steer does not cancel the original task. Do both: handle the
-  new message, then return, or finish the slice first. Name unfinished work
-  until he explicitly parks or drops it.
+- An interrupt or steer does not cancel the original task. He replies as he
+  reads, so a follow-up often has not seen the rest of your last message. Do
+  both: handle the new line, then return. Name unfinished work until he parks
+  or drops it.
 
 ## Learned Workspace Facts
 
