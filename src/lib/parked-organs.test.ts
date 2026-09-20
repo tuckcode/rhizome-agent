@@ -292,7 +292,7 @@ describe('parked organs leftover', () => {
       "if (id === SETTINGS_SECTION_IDS.extensions) setLoadExtensionCatalog(true)",
     )
     expect(settings).toContain(
-      'Keep this on Prime for Chat with vault tools.',
+      'Prime Agent runs Chat with vault tools. Choose Claude, Grok, DeepSeek, and Nous in Chat\'s model menu.',
     )
   })
 
