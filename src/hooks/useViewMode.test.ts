@@ -24,6 +24,17 @@ describe('useViewMode', () => {
     expect(result.current.noteListVisible).toBe(false)
   })
 
+  it('launches Chat when leftover store view_mode is editor-list and the v1 key is missing', () => {
+    resetVaultConfigStore()
+    bindVaultConfigStore(
+      { zoom: null, view_mode: 'editor-list', editor_mode: null, tag_colors: null, status_colors: null, property_display_modes: null },
+      vi.fn(),
+    )
+    const { result } = renderHook(() => useViewMode())
+    expect(result.current.panePreset.id).toBe('chat')
+    expect(result.current.noteListVisible).toBe(false)
+  })
+
   it('loads persisted view mode from vault config', () => {
     resetVaultConfigStore()
     bindVaultConfigStore(
@@ -33,6 +44,30 @@ describe('useViewMode', () => {
     const { result } = renderHook(() => useViewMode())
     expect(result.current.viewMode).toBe('editor-only')
     expect(result.current.sidebarVisible).toBe(false)
+    expect(result.current.noteListVisible).toBe(false)
+  })
+
+  it('launches Chat when leftover vault view_mode is editor-list and the v1 key is missing', () => {
+    localStorage.setItem('rhizome:vault-config:/Vault', JSON.stringify({ view_mode: 'editor-list' }))
+    resetVaultConfigStore()
+    bindVaultConfigStore(
+      { zoom: null, view_mode: 'editor-list', editor_mode: null, tag_colors: null, status_colors: null, property_display_modes: null },
+      vi.fn(),
+    )
+    const { result } = renderHook(() => useViewMode(undefined, '/Vault'))
+    expect(result.current.panePreset.id).toBe('chat')
+    expect(result.current.viewMode).toBe('editor-only')
+    expect(result.current.noteListVisible).toBe(false)
+  })
+
+  it('keeps Chat when leftover view_mode hydrates after launch', () => {
+    const { result } = renderHook(() => useViewMode(undefined, '/Vault'))
+    expect(result.current.panePreset.id).toBe('chat')
+    act(() => bindVaultConfigStore(
+      { zoom: null, view_mode: 'editor-list', editor_mode: null, tag_colors: null, status_colors: null, property_display_modes: null },
+      vi.fn(),
+    ))
+    expect(result.current.panePreset.id).toBe('chat')
     expect(result.current.noteListVisible).toBe(false)
   })
 
