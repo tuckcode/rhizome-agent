@@ -40,8 +40,7 @@ roadmap row in the inventory is not implementation approval.
 - **Last stamped app:** **`b7264d6`**, **2026-09-20 07:23**,
   `/Applications/Rhizome Agent.app`.
 - **Prime on this machine:** **0.9.3**.
-- **Open GitHub issues:** Prefer live `gh`. Open PR [#66](https://github.com/tuckcode/rhizome-agent/pull/66)
-  draft — do not merge.
+- **Open GitHub issues:** Prefer live `gh`. Docs drafts [#66](https://github.com/tuckcode/rhizome-agent/pull/66)–[#68](https://github.com/tuckcode/rhizome-agent/pull/68) are closed.
 - **Windows:** do not build or push a Windows app.
 - **Import:** list `import_jsonl` waits for **`1`**.
 

@@ -677,16 +677,30 @@ then reloads the attached session. Rhizome writes the environment variable
 #### Hide-on-close and Settings catalog cost
 
 **Origin:** PR #66 KEEP · 2026-09-14 · not a merge of the draft.
+**Origin:** Cursor Grok 4.6 · 2026-09-21 · C75 — hide leaves spawned Prime warm.
 
 The red traffic light **hides** the main window (C22); Cmd+Q quits.
 Idle hide settles the owned session as **Stop**, then
-`release_helpers_for_hidden_window` stops the spawned Prime supervisor,
-the MCP WebSocket bridge, and the Mindwalk sidecar so they do not leave
-a Dock “running” mark. A Keep-working (`resident`) session is the
-exception — that daemon stays. Rhizome never sends Prime’s `shutdown`
-RPC (other clients share the machine). Active hide asks first
+`release_helpers_for_hidden_window` stops the MCP WebSocket bridge and
+the Mindwalk sidecar so they do not leave a Dock “running” mark.
+**C75:** a Prime daemon this process spawned stays warm for fast reopen
+(`hidden_window_helper_stops` is `["ws_bridge", "mindwalk"]` only).
+Keep-working (`resident`) also leaves that daemon; it changes session
+intent, not whether the process stays. Rhizome never sends Prime’s
+`shutdown` RPC (other clients share the machine). Active hide asks first
 (`prime-active-close-requested`); `settle_prime_session` also releases
 helpers because `window.hide()` does not raise `CloseRequested` again.
+
+Cold launch shows `BootSplash` while the lazy `App` chunk loads
+(`src/main.tsx` — not `Suspense fallback={null}`). Setup calls
+`warm_daemon_in_background`. Idle Chat restore speaks
+`latest_prime_session_for_restore` (newest resumable session), not the
+full list. Full transcript remount and the Sessions-rail list are
+separate costs.
+
+`menu_bar_companion.rs` keeps a chat that leaves the running roster as
+`Done: {title}` for `FINISHED_ROW_KEEP_MS` (45s). A failed roster read
+must not invent finishes. Do not close #52 from units.
 
 Settings and Chat share one Prime model catalog (`loadPrimeModelCatalog`).
 A failed “host is not running” answer is **not** cached. Settings must
@@ -695,7 +709,8 @@ Agents section is opened or scrolled into view. Fetching 501 models on
 every Settings open was the pinwheel.
 
 Native hide/reopen live-check is still **NOT RUN**. Do not mass-kill
-Prime-spawned `mcp-server/index.js` (ADR-0163).
+Prime-spawned `mcp-server/index.js` (ADR-0163). Do not recode hide to
+stop `spawned_prime_daemon`.
 
 #### What Rhizome does not own
 
@@ -869,7 +884,8 @@ flowchart LR
 | `list_prime_packages` | Installed Prime packages from `~/.prime/agent/settings.json` |
 | `install_prime_package` | Run `prime-agent package install`, then reload the attached session |
 | `get_prime_provider_status` | Read-only connection status per provider (no keys). Settings waits until Agents is visible |
-| `settle_prime_session` | Settle the owned session on hide, then release helpers this process started |
+| `settle_prime_session` | Settle the owned session on hide, then stop ws-bridge + Mindwalk. Spawned Prime stays warm (C75) |
+| `latest_prime_session_for_restore` | Newest resumable session for idle Chat restore — not the full list |
 | `extract_mcp_server_to_stable_dir(app_version)` | On Linux AppImage launches, copies bundled MCP files to `~/.local/share/rhizome/mcp-server/` with version-gated replacement so external clients can keep a stable `index.js` path |
 | `register_mcp(vault_path)` | Resolves an MCP runtime (Node.js 18+ preferred, Bun 1+ fallback), resolves the packaged or stable extracted `mcp-server/`, and writes Tolaria's vault-neutral entry to Claude Code, Antigravity CLI, Cursor, OpenCode, and generic MCP configs on user request |
 | `mcp_config_snippet(vault_path)` | Builds the exact vault-neutral `mcpServers.rhizome` JSON users can copy into any compatible client without writing third-party config files |

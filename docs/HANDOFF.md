@@ -48,6 +48,7 @@ file.
 
 ## State
 **Origin:** GPT-6 Codex · 2026-09-20 · reviewed Astra landing.
+**Origin:** Cursor Grok 4.6 · 2026-09-21 · C75 living-docs; #66–#68 closed.
 
 Source through **`6ce3782`** plus this handoff is on `origin/main`.
 `/Applications` remains **`b7264d6`** 07:23. Free only and Edit list landed.
@@ -63,7 +64,7 @@ button. Left rail is **sessions + Settings + pin** (Chat/Research destinations
 removed; Research stays on the status bar). ADR-0173: Chat / Notes /
 Read / Workbench; fresh launch is Chat. Vault skill uses a resolved Node binary
 and a GUI-safe PATH. Traffic lights stay at the left corner (`x: 14`). Import
-waits for **`1`**. Do not merge #66. Native W4 / #46 still open. Windows ship
+waits for **`1`**. Drafts **#66–#68** are closed. Native W4 / #46 still open. Windows ship
 out. Not yet daily-driver / stranger-ready.
 
 GitHub #27 #29 #31 #34 #42 closed 2026-08-26. **#11, #22, #24 and #25 closed** — C51 blocked #24 and is fixed
@@ -112,6 +113,7 @@ handoff. Detail:
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-21 · C75 living docs](plans/handoffs/2026-09-21-0215-cursor-grok-4-6-c75-docs.md) — hide leaves spawned Prime warm; #66–#68 closed.
 - [2026-09-20 · handy wrap](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md) — `ffc135f` 11 ahead; app `b7264d6`; Edit list next.
 - [2026-09-20 · Astra combined handoff](plans/handoffs/2026-09-20-1234-claude-opus-5-astra-combined-handoff.md) — D1–D7 audit, plugin rescope, ADR findings, and the Edit-list completion contract.
 - [2026-09-20 · Astra ↔ Cursor recap](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md) — plan through #26 CPR, D1–D7 local, Free-only dirt.
@@ -125,8 +127,6 @@ Do not paste leftover paper here.
 - [2026-09-20 · public readiness plan](plans/handoffs/2026-09-20-0506-gpt-6-public-readiness-plan.md) — assessment, Cursor swarm, parked inventory, and low-context Handy skill.
 - [2026-09-20 · rail + reasoning pickup](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md) — dirty sessions-only rail; history strip; harness stand; next plan.
 - [2026-09-19 · CPR](plans/handoffs/2026-09-19-1127-cursor-grok-4-6-cpr.md) — pane presets, hybrid skill PATH, Notes off rail. `6860762` in `/Applications` 11:27.
-- [2026-09-19 · hybrid runtime](plans/handoffs/2026-09-19-0431-cursor-grok-4-6-hybrid-runtime.md) — Prime stays; skill PATH/node + short-reply manners. Live SKILL.md locked 444. No commit or rebuild.
-- [2026-09-19 · pane presets finish](plans/handoffs/2026-09-19-0148-cursor-grok-4-6-pane-presets-finish.md) — leftover locks, ADR-0173, docs. Source only. No commit or rebuild.
 - [2026-09-18 · rebuild](plans/handoffs/2026-09-18-1944-cursor-composer-rebuild.md) — `35f217f` in `/Applications` 19:44.
 - [2026-09-18 · store trip](plans/handoffs/2026-09-18-1653-cursor-composer-store-trip.md) — Done row, Pi symlink skip, Getting Started env aliases. Pushed as `35f217f`.
 - [2026-09-17 · CPR traffic lights](plans/handoffs/2026-09-17-1723-cursor-composer-cpr-traffic-lights.md) — `712024d` in `/Applications` 17:23.
