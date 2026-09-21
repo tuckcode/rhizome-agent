@@ -590,18 +590,20 @@ models. Opening Settings used to fetch it immediately, plus
 `loadPrimeModelCatalog`; a failed “host is not running” answer is not
 cached.
 
-## 21. Hide-on-close must stop helpers this process started
+## 21. Hide-on-close stops ws-bridge and Mindwalk, not spawned Prime
 
-C22 hides the main window; it does not quit. Leaving the spawned Prime
-supervisor, MCP WebSocket bridge, and Mindwalk sidecar running after
-hide kept a Dock indicator. `release_helpers_for_hidden_window`
-(`lib.rs`) stops those unless Keep working left a resident session.
-`settle_prime_session` does the same, because `window.hide()` does not
-raise `CloseRequested` again. Never send Prime `shutdown` — other
-clients share the daemon. Cmd+Q is the quit path.
+C22 hides the main window; it does not quit. `release_helpers_for_hidden_window`
+(`lib.rs`) stops the MCP WebSocket bridge and Mindwalk sidecar.
+**C75:** a Prime daemon this process spawned stays warm
+(`hidden_window_helper_stops` is `["ws_bridge", "mindwalk"]` only).
+Keep-working still settles the session as `resident`; it does not change
+whether that daemon stays. `settle_prime_session` also releases those
+helpers, because `window.hide()` does not raise `CloseRequested` again.
+Never send Prime `shutdown` — other clients share the daemon. Cmd+Q is
+the quit path.
 
 Remainder: native live-check. See `docs/plans/hide-on-close-helpers.md`.
-Do not recode the helper stop.
+Do not recode hide to stop `spawned_prime_daemon`.
 
 ## 22. Astra security traps (2026-09-14) — do not rediscover
 
@@ -663,3 +665,20 @@ chat — the vault is already attached.
 Fix is the seeded `rhizome-vault` skill (`prime_vault_skill.rs`) plus
 `~/.local/bin/node` in `find_node` fallbacks. Do not add Hermes or DSH
 as a second runtime. Do not globally force thinking Off.
+
+## 25. C75 boot, tray Done, and idle restore (2026-09-21)
+
+**Origin:** Cursor Grok 4.6 · 2026-09-21 · verified against `lib.rs`,
+`main.tsx`, `menu_bar_companion.rs`.
+
+These look like small leftovers and are easy to undo if you trust an
+older briefing (including closed drafts #66–#68):
+
+- **Hide vs spawn.** Hide leaves spawned Prime warm (C75). See §21.
+  Cold launch uses `BootSplash` + `warm_daemon_in_background`. Idle
+  restore is `latest_prime_session_for_restore`, not `list` then pick.
+- **Tray Done.** A chat that leaves the running roster stays
+  `Done: {title}` for 45s (`FINISHED_ROW_KEEP_MS`). A failed roster
+  read must not invent finishes. Do not close #52 from units.
+- **Blank window.** `main.tsx` lazy-loads `App` behind `BootSplash`.
+  `Suspense fallback={null}` is the defect C75 removed. Do not restore it.
