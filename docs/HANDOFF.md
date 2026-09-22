@@ -52,7 +52,7 @@ file.
 **Origin:** Cursor Grok 4.7 · 2026-09-21 · evening wrap. Local main unpushed.
 
 `origin/main` is **`93fae73`**. Local `main` is **`9b019d3`**, **7 ahead, unpushed**.
-Checkout is `cursor/c75-hide-docs-3cfb` at **`d3d6d25`** (draft #69, pushed).
+Checkout is `cursor/c75-hide-docs-3cfb`. Docs **`d3d6d25`** (draft #69). Evening wrap **`2d73e7e`**. Use `git log -1` for the tip.
 `/Applications` remains **`b7264d6`** 07:23. Rebuild waits until he will launch.
 Handy: [`2026-09-20-1230`](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md).
 Recap: [`2026-09-20-1228`](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md).

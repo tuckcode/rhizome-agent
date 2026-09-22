@@ -5,7 +5,7 @@ also: [Grok 4.6 (Cursor)]
 description: >-
   Evening wrap. Draft #69 is pushed. Local main is 7 commits ahead of
   origin/main and unpushed. App stays b7264d6. Rebuild waits until launch.
-commits: d3d6d25
+commits: d3d6d25..2d73e7e
 ---
 
 # Evening wrap — branches, C75 docs, unpushed main
@@ -14,7 +14,7 @@ commits: d3d6d25
 
 ## Git (verified this session)
 
-- Checkout: `cursor/c75-hide-docs-3cfb` at `d3d6d25`, clean, matches origin.
+- Checkout: `cursor/c75-hide-docs-3cfb`. Docs commit `d3d6d25`. Evening wrap `2d73e7e`. Use `git log -1` on this branch for the tip. The Mac pre-push hook refuses a non-`main` branch, so a new session on this machine should stay on the local branch.
 - Draft PR [#69](https://github.com/tuckcode/rhizome-agent/pull/69) is the only open PR.
 - `origin/main` is `93fae73`.
 - Local `main` is `9b019d3`, **7 ahead of origin, unpushed**:
