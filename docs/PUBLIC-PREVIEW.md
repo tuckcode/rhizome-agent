@@ -197,16 +197,13 @@ Do not treat this table as permission to publish.
 
 ## Draft documentation PRs
 
-Live `gh` on 2026-09-20 (America/Chicago, this session):
-
 - 17 open issues, same set as the inventory (`#5` `#13` `#23` `#26`
   `#32` `#36` `#39` `#40` `#41` `#45` `#46` `#48` `#50` `#51` `#52`
   `#56` `#57`).
-- Draft PRs **#66**, **#67**, **#68** remain open drafts.
-- **Do not merge #66.** Its hide sentence predates C75.
-- #67 / #68 GETTING-STARTED hide and env-alias corrections were
-  compared with current `lib.rs` and `getting_started.rs` and reused
-  here. Their living-doc stamps (`35f217f` / `712024d`) were not reused.
+- Drafts **#66**, **#67**, **#68** were closed 2026-09-21. Their hide
+  sentences that stop spawned Prime predate C75. Do not reopen them
+  to merge. C75 wording now lives in `ARCHITECTURE.md` and
+  `CROSS-MODEL-HANDOFF.md` §21 / §25.
 
 ## Still unverified
 
