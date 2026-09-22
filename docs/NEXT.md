@@ -11,7 +11,8 @@ assessment and a Cursor execution plan. Start with the
 [assessment and stages](plans/2026-09-20-public-readiness-plan.md), then the
 [Cursor swarm brief](plans/2026-09-20-cursor-public-readiness-swarm.md).
 The [inventory](plans/2026-09-20-public-readiness-inventory.md) preserves all
-17 live open issues, draft PRs #66–#68, latest design papers, and parked ideas.
+17 live open issues, latest design papers, and parked ideas. Drafts #66–#68
+are closed.
 Local product checkpoint is `4f9b4c4` and is **unpushed**. `origin/main`
 is still `dc44d84`. Planning also sits locally as **`bcd4b87`** and is
 **unpushed**. **C76** source is in this commit series. Rebuild remains
@@ -30,7 +31,7 @@ Read the session file first:
 | 5 | **Harness leftovers** | #41 live steer/queue; human session titles (unwrap history blobs on list); Packages rail shortcut only if claimed. |
 | Parked | Import `1`, #56 keep/remove, W11 cards, TraderAlice patterns, kanban/automations on rail | Ledger: [inventory](plans/2026-09-20-public-readiness-inventory.md). A row is not approval. |
 
-**Hard nos:** wrong tree; merge #66; `import_jsonl` without `1`; cite ADR-0168 as settled; ADHD packing; English-only churn (C18).
+**Hard nos:** wrong tree; reopen/merge closed drafts #66–#68; `import_jsonl` without `1`; cite ADR-0168 as settled; ADHD packing; English-only churn (C18).
 
 **Coming in cold:** read [`docs/BOARD.md`](BOARD.md) for tonight’s
 picture, then [`docs/HANDOFF.md`](HANDOFF.md),
