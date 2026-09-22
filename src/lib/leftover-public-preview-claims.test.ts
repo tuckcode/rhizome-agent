@@ -28,14 +28,15 @@ describe('leftover public-preview install claims', () => {
     expect(gettingStarted).not.toContain('BASE_URL="http://localhost:5173"')
   })
 
-  it('reuses the C75 hide correction and keeps #66 unmerged', () => {
+  it('reuses the C75 hide correction and keeps #66 closed', () => {
     expect(preview).toContain('ws-bridge')
     expect(preview).toContain('Mindwalk')
     expect(preview).toMatch(/Prime daemon stays warm/)
     expect(gettingStarted).toContain(
       'Hide stops ws-bridge and Mindwalk, not spawned Prime',
     )
-    expect(preview).toContain('Do not merge #66')
+    expect(preview).toContain('Do not reopen them')
+    expect(preview).toContain('to merge')
     expect(readme).toContain('PR #66')
   })
 
