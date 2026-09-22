@@ -49,9 +49,11 @@ file.
 ## State
 **Origin:** GPT-6 Codex · 2026-09-20 · reviewed Astra landing.
 **Origin:** Cursor Grok 4.6 · 2026-09-21 · C75 living-docs; #66–#68 closed.
+**Origin:** Cursor Grok 4.7 · 2026-09-21 · evening wrap. Local main unpushed.
 
-Source through **`6ce3782`** plus this handoff is on `origin/main`.
-`/Applications` remains **`b7264d6`** 07:23. Free only and Edit list landed.
+`origin/main` is **`93fae73`**. Local `main` is **`9b019d3`**, **7 ahead, unpushed**.
+Checkout is `cursor/c75-hide-docs-3cfb` at **`d3d6d25`** (draft #69, pushed).
+`/Applications` remains **`b7264d6`** 07:23. Rebuild waits until he will launch.
 Handy: [`2026-09-20-1230`](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md).
 Recap: [`2026-09-20-1228`](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md).
 Detail:
@@ -104,15 +106,16 @@ public-readiness plan with parallel agents. Read the
 Typecheck and 292 focused tests pass. Native readiness is not established.
 No rebuild or issue closure occurred.
 
-Current next work is live verification and the audit findings in the combined
-handoff. Detail:
-[`2026-09-20-1234`](plans/handoffs/2026-09-20-1234-claude-opus-5-astra-combined-handoff.md).
+**2026-09-21 evening:** do not rebuild tonight. First, the 7 unpushed commits
+on local `main` (`9b019d3`). Then launch-day glances: #26, #46, #52.
+Detail: [`2026-09-21-2021`](plans/handoffs/2026-09-21-2021-cursor-grok-4-7-handy.md).
 
 ## Recent sessions
 
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-21 · evening wrap](plans/handoffs/2026-09-21-2021-cursor-grok-4-7-handy.md) — local `main` `9b019d3` unpushed; app `b7264d6`; #69 pushed.
 - [2026-09-21 · C75 living docs](plans/handoffs/2026-09-21-0215-cursor-grok-4-6-c75-docs.md) — hide leaves spawned Prime warm; #66–#68 closed.
 - [2026-09-20 · handy wrap](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md) — `ffc135f` 11 ahead; app `b7264d6`; Edit list next.
 - [2026-09-20 · Astra combined handoff](plans/handoffs/2026-09-20-1234-claude-opus-5-astra-combined-handoff.md) — D1–D7 audit, plugin rescope, ADR findings, and the Edit-list completion contract.
@@ -127,11 +130,7 @@ Do not paste leftover paper here.
 - [2026-09-20 · public readiness plan](plans/handoffs/2026-09-20-0506-gpt-6-public-readiness-plan.md) — assessment, Cursor swarm, parked inventory, and low-context Handy skill.
 - [2026-09-20 · rail + reasoning pickup](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md) — dirty sessions-only rail; history strip; harness stand; next plan.
 - [2026-09-19 · CPR](plans/handoffs/2026-09-19-1127-cursor-grok-4-6-cpr.md) — pane presets, hybrid skill PATH, Notes off rail. `6860762` in `/Applications` 11:27.
-- [2026-09-18 · rebuild](plans/handoffs/2026-09-18-1944-cursor-composer-rebuild.md) — `35f217f` in `/Applications` 19:44.
-- [2026-09-18 · store trip](plans/handoffs/2026-09-18-1653-cursor-composer-store-trip.md) — Done row, Pi symlink skip, Getting Started env aliases. Pushed as `35f217f`.
-- [2026-09-17 · CPR traffic lights](plans/handoffs/2026-09-17-1723-cursor-composer-cpr-traffic-lights.md) — `712024d` in `/Applications` 17:23.
 - [2026-09-15 · CPR Signal + C75](plans/handoffs/2026-09-15-1408-cursor-composer-cpr.md) — `cb74b28` in `/Applications` 14:08.
-- [2026-09-14 · AGENTS Learned reset](plans/handoffs/2026-09-14-2148-cursor-grok-4-6-agents-learned-reset.md) — clean slate + continual-learning guard.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)
