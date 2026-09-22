@@ -51,7 +51,7 @@ file.
 **Origin:** Cursor Grok 4.6 · 2026-09-21 · C75 living-docs; #66–#68 closed.
 **Origin:** Cursor Grok 4.7 · 2026-09-21 · evening wrap. Local main unpushed.
 
-This `main` is the merge of the seven product commits and the C75/evening docs (`f75528c`). `origin/main` is still **`93fae73`** until this `main` is pushed. Use `git log -1` for the tip.
+`origin/main` is **`4ec3832`**. That push includes the seven product commits, the C75 docs, and the evening wrap. Use `git log -1` for the tip.
 `/Applications` remains **`b7264d6`** 07:23. Rebuild waits until he will launch.
 Handy: [`2026-09-20-1230`](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md).
 Recap: [`2026-09-20-1228`](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md).
@@ -105,7 +105,7 @@ public-readiness plan with parallel agents. Read the
 Typecheck and 292 focused tests pass. Native readiness is not established.
 No rebuild or issue closure occurred.
 
-**2026-09-21 evening:** merged onto local `main` (`f75528c`). Push this `main`. Do not rebuild until he will launch. Then glance #26, #46, #52.
+**2026-09-21 evening:** `origin/main` is `4ec3832`. Do not rebuild until he will launch. Then glance #26, #46, #52.
 Detail: [`2026-09-21-2021`](plans/handoffs/2026-09-21-2021-cursor-grok-4-7-handy.md).
 
 ## Recent sessions
