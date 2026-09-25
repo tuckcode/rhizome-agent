@@ -229,7 +229,7 @@ push is not a release — releases are tagged builds with signed installers.
 **BLOCKER — GitHub account suspended (2026-07-27):**
 - `gh` API + `git push` → `Sorry. Your account was suspended` / SSH fatal.
 - Public pages for `knispo` / `knispo/rhizome` return 404 while suspended (expected hide).
-- Likely security hold after new phone/device; login email is **`knispo13@gmail.com`** (not the leftover git `user.email` `tuckchamlies13@gmail.com`).
+- Likely security hold after new phone/device; login is the knispo GitHub account (not the leftover local git user.email).
 - Unblock path: browser login + security challenge → `gh auth login` → `git push origin main` → Actions → **Release (Alpha)** → Run workflow for Win+Mac installers.
 
 **Onboarding (diagnosed, no product change yet):**
@@ -625,7 +625,7 @@ push is not a release — releases are tagged builds with signed installers.
 - ~~C4-OPEN: tolaria MCP server path mismatch across live configs~~ **RESOLVED `2fa620a5`**
 - ~~C6-OPEN: inbox automation default~~ **RESOLVED 2026-07-31.** Default ON for new vaults, plus a one-time per-vault migration for existing ones. See "Investigation done" item 1 above.
 - C7-OPEN: native QA for shell waves — requires a real `.app` bundle or Accessibility permission. Do not graduate shell flags without it.
-- **C8-NOT-APPLICABLE-HERE: GitHub account suspended** — this is the **`knispo`** account, inherited from the pre-fork Desktop history. This repo pushes to **`tuckcode/rhizome-agent`**, which works (verified 2026-08-15, two successful pushes). Left in the list rather than deleted because it is still the origin of the stale "do not push until asked" rule corrected at the top of this file. Original entry: GitHub account suspended — blocks push + Windows CI release for friend build. Unblock tonight from home device/`knispo13@gmail.com`.
+- **C8-NOT-APPLICABLE-HERE: GitHub account suspended** — this is the **`knispo`** account, inherited from the pre-fork Desktop history. This repo pushes to **`tuckcode/rhizome-agent`**, which works (verified 2026-08-15, two successful pushes). Left in the list rather than deleted because it is still the origin of the stale "do not push until asked" rule corrected at the top of this file. Original entry: GitHub account suspended — blocks push + Windows CI release for friend build. Unblock tonight from the home device and the knispo GitHub account.
 - **C11-OPEN (mitigated 2026-09-06):** default Getting Started **no longer clones**
   `refactoringhq/tolaria-getting-started.git` — it builds a local Rhizome
   scaffold (`create_local_rhizome_scaffold`). `GETTING_STARTED_REPO_URL` remains
