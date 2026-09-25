@@ -50,6 +50,7 @@ vi.mock('../hooks/useCliAiAgent', () => ({
 
 vi.mock('../utils/ai-chat', () => ({
   nextMessageId: () => `msg-${Date.now()}`,
+  visibleUserText: (text: string) => text,
 }))
 
 const makeEntry = (overrides: Partial<VaultEntry> = {}): VaultEntry => ({
