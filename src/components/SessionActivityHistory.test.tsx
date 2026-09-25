@@ -28,6 +28,20 @@ it('shows a readable session card in the compact pane, not the prompt dump', asy
   expect(screen.queryByRole('button', { name: /1. ipython/ })).not.toBeInTheDocument()
   expect(screen.queryByText('Mycelium canvas')).not.toBeInTheDocument()
 })
+it('shows the typed line for an expanded action, not the history prompt', async () => {
+  const historyOpen = ['<', 'conversation_history', '>'].join('')
+  const historyClose = ['</', 'conversation_history', '>'].join('')
+  vi.mocked(callHost).mockImplementation(async command => command === 'list_prime_sessions'
+    ? [{ path: '/sessions/test', name: 'Audit session' }]
+    : [{ kind: 'message', message: { role: 'user', text: `${historyOpen}\n[user]: hi\n${historyClose}`, content: [] } },
+      { kind: 'message', message: { role: 'assistant', text: '', content: [] }, tools: [
+        { id: 'one', tool: 'read_file', path: '/vault/editor.md' },
+      ] }])
+  render(<SessionActivityHistory expanded locale="en" vaultPath="/vault" onOpenNote={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: /1. read_file/ }))
+  expect(screen.getByText('hi')).toBeVisible()
+  expect(screen.queryByText(historyOpen)).not.toBeInTheDocument()
+})
 it('reveals the request and command for a recorded action and opens its file', async () => {
   mockTranscript([{ id: 'one', tool: 'read_file', path: '/vault/editor.md', detail: 'Read editor source' }])
   const open = vi.fn()
