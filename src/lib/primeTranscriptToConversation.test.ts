@@ -37,6 +37,27 @@ describe('primeTranscriptToConversation', () => {
     expect(turns[1].response).toBe('second answer')
   })
 
+  it('shows the latest typed line when the log stored a conversation_history prompt', () => {
+    const open = ['<', 'conversation_history', '>'].join('')
+    const close = ['</', 'conversation_history', '>'].join('')
+    const blob = [
+      open,
+      '[user]: first question',
+      '',
+      '[assistant]: first answer',
+      '',
+      '[user]: forget about it',
+      close,
+      '',
+      'Continue the conversation. Respond only to the latest [user] message.',
+    ].join('\n')
+
+    const turns = primeTranscriptToConversation([userMessage(blob)])
+
+    expect(turns[0].userMessage).toBe('forget about it')
+    expect(turns[0].userMessage).not.toContain('conversation_history')
+  })
+
   it('carries Prime message timestamps onto turns as createdAtMs (C70)', () => {
     const ms = new Date(2026, 8, 6, 15, 35, 0).getTime()
     const turns = primeTranscriptToConversation([

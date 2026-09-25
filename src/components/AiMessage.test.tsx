@@ -489,6 +489,19 @@ describe('AiMessage', () => {
     expect(screen.getByTestId('ai-message-actions')).not.toHaveClass('opacity-0')
   })
 
+  it('shows only the latest typed line when the user bubble stored a history prompt', () => {
+    const open = ['<', 'conversation_history', '>'].join('')
+    const close = ['</', 'conversation_history', '>'].join('')
+    render(
+      <AiMessage
+        userMessage={`${open}\n[user]: earlier\n\n[assistant]: reply\n\n[user]: forget about it\n${close}\n\nContinue the conversation.`}
+        actions={[]}
+      />,
+    )
+    expect(screen.getByText('forget about it')).toBeTruthy()
+    expect(screen.queryByText(/conversation_history/)).toBeNull()
+  })
+
   it('does not render reasoning block when no reasoning', () => {
     render(<AiMessage userMessage="Ask" actions={[]} />)
     expect(screen.queryByTestId('reasoning-toggle')).toBeNull()

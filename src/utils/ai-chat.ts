@@ -51,3 +51,15 @@ export function formatMessageWithHistory(history: ChatMessage[], newMessage: str
 
   return `${CONVERSATION_HISTORY_OPEN_MARKER}\n${lines.join('\n\n')}\n${CONVERSATION_HISTORY_CLOSE_MARKER}\n\nContinue the conversation. Respond only to the latest [user] message.`
 }
+
+/** The line the person typed, when a log stored the whole history prompt. */
+export function visibleUserText(text: string): string {
+  const start = text.indexOf(CONVERSATION_HISTORY_OPEN_MARKER)
+  if (start < 0) return text
+  const innerStart = start + CONVERSATION_HISTORY_OPEN_MARKER.length
+  const end = text.indexOf(CONVERSATION_HISTORY_CLOSE_MARKER, innerStart)
+  const inner = (end < 0 ? text.slice(innerStart) : text.slice(innerStart, end)).trim()
+  const parts = inner.split(/\[user]:\s*/i).slice(1)
+  const last = (parts.at(-1) ?? '').split(/\[assistant]:/i)[0].trim()
+  return last || text
+}
