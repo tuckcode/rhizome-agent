@@ -61,5 +61,5 @@ export function visibleUserText(text: string): string {
   const inner = (end < 0 ? text.slice(innerStart) : text.slice(innerStart, end)).trim()
   const parts = inner.split(/\[user]:\s*/i).slice(1)
   const last = (parts.at(-1) ?? '').split(/\[assistant]:/i)[0].trim()
-  return last || text
+  return last
 }

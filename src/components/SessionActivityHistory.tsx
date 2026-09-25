@@ -4,6 +4,7 @@ import { compactSessionFacts, readableSessionLabel } from '../lib/myceliumCompac
 import type { PrimeTranscriptItem, PrimeTranscriptTool } from '../lib/primeTranscriptToConversation'
 import type { AppLocale } from '../lib/i18n'
 import { trackEvent } from '../lib/telemetry'
+import { visibleUserText } from '../utils/ai-chat'
 const MyceliumView = lazy(() => import('./MyceliumView'))
 interface Session { path: string; name: string }
 export interface SessionActivityRetainedState { path: string; selected: number | null; scrollTop: number }
@@ -73,7 +74,7 @@ export function SessionActivityHistory({ expanded, locale, vaultPath, canOpenNot
   let prompt = ''
   for (const item of items) {
     if (item.kind !== 'message') continue
-    if (item.message.role === 'user') prompt = item.message.text
+    if (item.message.role === 'user') prompt = visibleUserText(item.message.text)
     for (const tool of item.tools ?? []) actions.push({ tool, prompt })
   }
   const touchedPaths = [...new Set(actions.map(a => a.tool.path).filter((p): p is string => Boolean(p)))]

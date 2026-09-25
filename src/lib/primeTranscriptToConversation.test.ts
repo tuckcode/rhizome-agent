@@ -58,6 +58,13 @@ describe('primeTranscriptToConversation', () => {
     expect(turns[0].userMessage).not.toContain('conversation_history')
   })
 
+  it('drops a history prompt that has no user line instead of showing the tags', () => {
+    const open = ['<', 'conversation_history', '>'].join('')
+    const close = ['</', 'conversation_history', '>'].join('')
+    const turns = primeTranscriptToConversation([userMessage(`${open}\nno turns\n${close}`)])
+    expect(turns[0].userMessage).toBe('')
+  })
+
   it('carries Prime message timestamps onto turns as createdAtMs (C70)', () => {
     const ms = new Date(2026, 8, 6, 15, 35, 0).getTime()
     const turns = primeTranscriptToConversation([
