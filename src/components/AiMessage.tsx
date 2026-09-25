@@ -16,6 +16,7 @@ import { AiActionCard, type AiActionStatus } from './AiActionCard'
 import { MarkdownContent } from './MarkdownContent'
 import { translate, type AppLocale } from '../lib/i18n'
 import { normalizeReasoningDisplay } from '../lib/normalizeReasoningDisplay'
+import { visibleUserText } from '../utils/ai-chat'
 import type { NoteReference } from '../utils/ai-context'
 import { writeClipboardText } from '../utils/clipboardText'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
@@ -148,7 +149,7 @@ function UserBubble({ content, references, onOpenNote, createdAtMs }: {
             ))}
           </div>
         )}
-        {content}
+        {visibleUserText(content)}
       </div>
       {clock ? (
         <time

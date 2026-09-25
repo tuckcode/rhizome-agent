@@ -14,6 +14,7 @@
 
 import type { AiAction } from '../components/AiMessage'
 import type { AiAgentMessage } from './aiAgentConversation'
+import { visibleUserText } from '../utils/ai-chat'
 import { normalizeMessageTimestampMs } from '../utils/messageTimestamp'
 
 /** Mirrors `PrimeTranscriptItem` in `src-tauri/src/prime_sessions.rs`. */
@@ -184,7 +185,7 @@ export function primeTranscriptToConversation(items: PrimeTranscriptItem[]): AiA
     switch (message.role) {
       case 'user':
         turns.push({
-          ...emptyTurn(message.text, item.id ?? `replay-${index++}`),
+          ...emptyTurn(visibleUserText(message.text), item.id ?? `replay-${index++}`),
           // What `fork` branches from. Absent on live turns by necessity.
           primeEntryId: item.id,
           createdAtMs: normalizeMessageTimestampMs(message.timestamp),
