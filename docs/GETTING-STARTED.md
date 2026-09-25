@@ -65,7 +65,7 @@ Linux release CI currently uses Tauri's stock linuxdeploy AppImage output plugin
 pnpm tauri build --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
 ```
 
-Release validation verifies that the Linux job produced an AppImage, at least one installer bundle, and updater signature artifacts. Windows release jobs always require Tauri updater signatures; when Authenticode certificate secrets are configured, they also import the CI code-signing certificate, build NSIS with a generated Tauri Authenticode signing config, and verify the app executable plus installer signatures before upload.
+Release validation verifies that the Linux job produced an AppImage and at least one installer bundle. There is no in-app update feed: `createUpdaterArtifacts` is false and the updater endpoint list is empty, so updater signature files are not required.
 
 ## Quick Start
 
@@ -378,7 +378,7 @@ rhizome-agent/
 | `src-tauri/src/ai_agents.rs` | CLI-agent request normalization, availability aggregation, adapter dispatch, and Claude event mapping. |
 | `src-tauri/src/cli_agent_runtime.rs` | Shared CLI-agent request shape, prompt wrapping, JSON subprocess lifecycle, version probing, and MCP path helpers. |
 | `src-tauri/src/claude_cli.rs`, `src-tauri/src/codex_cli.rs`, `src-tauri/src/opencode_cli.rs`, `src-tauri/src/pi_cli.rs`, `src-tauri/src/antigravity_cli.rs`, `src-tauri/src/kiro_cli.rs` | Per-agent command, config, discovery, and event adapters. |
-| `src-tauri/src/app_updater.rs` | Desktop updater bridge — resolves alpha/stable manifests and streams install progress. |
+| `src-tauri/src/app_updater.rs` | App-update stub. It reports that no release feed is configured. |
 
 ### Editor
 
@@ -438,7 +438,7 @@ rhizome-agent/
 | `src/hooks/useMainWindowSizeConstraints.ts` | Derives the main-window minimum width from the visible panes and asks Tauri to grow back to fit wider layouts. |
 | `src/hooks/useVaultConfig.ts` | Per-vault local UI preferences (zoom, view mode, colors, Inbox columns, explicit organization workflow, Git setup prompt preference, AI permission mode). |
 | `src/components/SettingsPanel.tsx` | Settings UI for telemetry, release channel, Git visibility, sync interval, UI language, content display preferences, default AI agent, and the vault-level explicit organization toggle. |
-| `src/hooks/useUpdater.ts` | In-app updates using the selected alpha/stable feed. |
+| `src/hooks/useUpdater.ts` | App-update UI. The host currently reports that no feed is configured. |
 
 ## Architecture Patterns
 
@@ -658,7 +658,7 @@ BASE_URL="http://localhost:5202" npx playwright test tests/smoke/<slug>.spec.ts
 
 ### Work with external MCP setup
 
-1. **Backend registration/status/snippets**: Edit `src-tauri/src/mcp.rs` and its `src-tauri/src/mcp/` helpers; registration and manual config generation must resolve an MCP runtime via `find_mcp_runtime` (Node.js 18+ preferred, Bun 1+ fallback) first, resolve the packaged `mcp-server/` for macOS, Windows executable-adjacent installs such as `%LOCALAPPDATA%\Tolaria`, Linux package roots (`/usr/local/Tolaria`, `/usr/local/lib/tolaria`, `/usr/lib/tolaria`, `/usr/lib/tolaria/resources`), and AppImage installs, and use a vault-neutral entry with `WS_UI_PORT=9711`. Client-facing Node script paths strip Windows extended-length `\\?\` prefixes before Rhizome writes durable config or transient agent entries, because stdio MCP clients pass that argument back to Node as the main module path. Linux AppImage startup must extract `mcp-server/` to `~/.local/share/tolaria/mcp-server/` before durable registration uses that stable path. App-owned bridge launches still pass `VAULT_PATH`/`VAULT_PATHS`; durable external registrations rely on the MCP server reading `vaults.json` at tool-call time.
+1. **Backend registration/status/snippets**: Edit `src-tauri/src/mcp.rs` and its `src-tauri/src/mcp/` helpers; registration and manual config generation must resolve an MCP runtime via `find_mcp_runtime` (Node.js 18+ preferred, Bun 1+ fallback) first, resolve the packaged `mcp-server/` for macOS, Windows executable-adjacent installs such as `%LOCALAPPDATA%\Rhizome` (legacy `%LOCALAPPDATA%\Tolaria` is still accepted), Linux package roots under `usr/lib/rhizome` (legacy `tolaria` dirs are still accepted), and AppImage installs, and use a vault-neutral entry with `WS_UI_PORT=9711`. Client-facing Node script paths strip Windows extended-length `\\?\` prefixes before Rhizome writes durable config or transient agent entries, because stdio MCP clients pass that argument back to Node as the main module path. Linux AppImage startup must extract `mcp-server/` to the app data dir `rhizome/mcp-server` (on Linux, `~/.local/share/rhizome/mcp-server/`) before durable registration uses that stable path. App-owned bridge launches still pass `VAULT_PATH`/`VAULT_PATHS`; durable external registrations rely on the MCP server reading `vaults.json` at tool-call time.
 2. **Setup dialog copy/actions**: Edit `src/components/McpSetupDialog.tsx` and `src/hooks/useMcpStatus.ts`; users should see the runtime prerequisite (Node.js 18+ or Bun 1+), the exact generated standard `mcpServers` manual config, the exact generated OpenCode top-level `mcp` config, and copy actions before Rhizome writes third-party config files
 3. **Status hook/toasts**: Edit `src/hooks/useMcpStatus.ts` when setup, reconnect, disconnect, or failure messaging changes
 4. **Antigravity CLI compatibility**: Keep `~/.gemini/config/mcp_config.json` in the registration path list and keep optional `GEMINI.md` generation behind `restore_vault_ai_guidance`; app-managed Antigravity sessions still require the user to install and sign in to `agy`, but Rhizome supplies workspace MCP config when Antigravity is selected as the default AI agent
