@@ -2052,6 +2052,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         onNotePaneOpenChange={setChatNotePaneOpen}
         onOpenSessionFootprint={handleOpenSessionFootprint}
         requestedNote={chatNoteRequest}
+        chatEngineUpdate={primeUpdateStatus}
+        onApplyChatEngineUpdate={() => { void primeUpdateActions.applyEngineUpdate() }}
       />
     </Suspense>
   )

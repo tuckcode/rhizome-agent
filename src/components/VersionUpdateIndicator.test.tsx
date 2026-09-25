@@ -89,7 +89,8 @@ describe('VersionUpdateIndicator', () => {
 
   it('shows the same single badge when only Prime has an update', () => {
     renderIndicator({ primeStatus: primeAvailable() })
-    expect(screen.getByTestId('status-version-update')).toBeInTheDocument()
+    expect(screen.getByTestId('status-version-update')).toHaveTextContent('Update')
+    expect(screen.getByTestId('status-version-update')).not.toHaveTextContent('dev')
   })
 
   it('does not render two separate badges when both Rhizome and Prime have updates', () => {
