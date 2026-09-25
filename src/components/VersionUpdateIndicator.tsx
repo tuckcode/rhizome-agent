@@ -192,6 +192,7 @@ export function VersionUpdateIndicator({
           <span style={badgeStyle}>
             <Package size={13} weight="regular" />
             <span data-testid="status-version-update-dot" style={dotStyle} aria-hidden="true" />
+            {compact ? null : 'Update'}
           </span>
         </Button>
       </ActionTooltip>

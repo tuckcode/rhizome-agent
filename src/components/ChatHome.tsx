@@ -5,6 +5,8 @@ import { AgentActivityBand } from './AgentActivityBand'
 import { RlmFamilyBand } from './RlmFamilyBand'
 import { ChatComposerDeck } from './ChatComposerDeck'
 import { ChatPreflightBanner } from './ChatPreflightBanner'
+import { ChatEngineUpdateBanner } from './ChatEngineUpdateBanner'
+import type { PrimeUpdateStatus } from '../hooks/usePrimeUpdate'
 import { AgentsPill } from './status-bar/AgentsPill'
 import { useRhizomeJobs } from '../hooks/useRhizomeJobs'
 import { ChatNotePane } from './ChatNotePane'
@@ -50,6 +52,9 @@ interface ChatHomeProps {
    * it after the user has closed the pane.
    */
   requestedNote?: { path: string; label: string; requestId: number } | null
+  /** Chat engine offer. The banner is the visible control. */
+  chatEngineUpdate?: PrimeUpdateStatus
+  onApplyChatEngineUpdate?: () => void
 }
 
 /**
@@ -78,6 +83,8 @@ export default function ChatHome({
   onOpenSessionFootprint,
   onNotePaneOpenChange,
   requestedNote,
+  chatEngineUpdate,
+  onApplyChatEngineUpdate,
 }: ChatHomeProps) {
   // Chat is Prime's home canvas (ADR-0166). A direct API model chosen as the
   // global default must not strip Prime chrome or route chat away from Prime.
@@ -209,6 +216,10 @@ export default function ChatHome({
               <>
               {/* Above the pills, not below: a reason the turn will fail is
                   worth more than the controls it sits over. */}
+              <ChatEngineUpdateBanner
+                status={chatEngineUpdate}
+                onUpdate={() => onApplyChatEngineUpdate?.()}
+              />
               <ChatPreflightBanner
                 locale={locale}
                 vaultPath={vaultPath}

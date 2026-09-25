@@ -53,7 +53,7 @@ fn parse_semver_build_label(version: &str) -> Option<String> {
     match prerelease {
         Some(suffix) if suffix.starts_with("alpha.") => Some(format!("Alpha {}", semver)),
         Some(_) => Some(format!("v{}", semver)),
-        None if semver == "0.1.0" || semver == "0.0.0" => Some("dev".to_string()),
+        None if semver == "0.1.0" || semver == "0.0.0" => Some(semver.to_string()),
         None => Some(format!("v{}", semver)),
     }
 }
@@ -108,9 +108,9 @@ mod tests {
     }
 
     #[test]
-    fn parse_build_label_dev_version() {
-        assert_eq!(parse_build_label("0.1.0"), "dev");
-        assert_eq!(parse_build_label("0.0.0"), "dev");
+    fn parse_build_label_placeholder_version() {
+        assert_eq!(parse_build_label("0.1.0"), "0.1.0");
+        assert_eq!(parse_build_label("0.0.0"), "0.0.0");
     }
 
     #[test]
