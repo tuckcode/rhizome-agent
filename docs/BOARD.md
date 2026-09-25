@@ -22,12 +22,14 @@ roadmap row in the inventory is not implementation approval.
 
 ## Status
 
-- **Done on origin:** `b7264d6` — #26 Chat-engine apply. App stamped
-  **2026-09-20 07:23**. Live Update now still unverified.
+- **Done on origin:** `2a24eed` (product push `4ec3832`). #26 Chat-engine
+  apply is in that tree. Live Update now is still **NOT RUN**.
 - **Landed:** sessions-only left rail; Research on status bar; “Back to chat”
   exits; reasoning fold strips history echo (`4f9b4c4`).
-- **Now (for the next agent):** launch `/Applications` at `b7264d6` and
-  click Update now on a real Chat-engine offer. Then D1.
+- **Now (for the next agent):** Atticus launches `/Applications` from the
+  **22:43** install and clicks the Chat engine banner **Update now**.
+  GitHub latest Prime is **v0.9.5**. This machine’s Prime is **0.9.3**.
+  Do not downgrade Prime to invent an update.
 - **Next:** human session titles; #41 live; Packages shortcut only if claimed.
 
 **Origin:** Composer · 2026-09-20 04:38.
@@ -36,9 +38,12 @@ roadmap row in the inventory is not implementation approval.
 
 ## True right now
 
-- **Git:** `origin/main` is **`b7264d6`**. Local HEAD matches.
-- **Last stamped app:** **`b7264d6`**, **2026-09-20 07:23**,
-  `/Applications/Rhizome Agent.app`.
+- **Git:** `origin/main` and local HEAD are **`2a24eed`**. Product push
+  inside that tip is **`4ec3832`**.
+- **Last stamped app:** **`2a24eed` plus local banner fix**, **2026-09-21 22:43 CDT**,
+  `/Applications/Rhizome Agent.app`. Recoverable copies:
+  `~/Library/Application Support/rhizome-agent-rebuild/Rhizome-Agent-2a24eed-2026-09-21-2223.zip`
+  and `Rhizome-Agent-b7264d6-2026-09-20.zip`.
 - **Prime on this machine:** **0.9.3**.
 - **Open GitHub issues:** Prefer live `gh`. Docs drafts [#66](https://github.com/tuckcode/rhizome-agent/pull/66)–[#68](https://github.com/tuckcode/rhizome-agent/pull/68) are closed.
 - **Windows:** do not build or push a Windows app.

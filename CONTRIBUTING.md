@@ -1,5 +1,7 @@
 # Contributing
 
-This is the private **Rhizome Agent** repo (`tuckcode/rhizome-agent`). It is not a public contribution project.
+If you like Rhizome Agent, contributions are welcome.
 
-Internal work follows [AGENTS.md](AGENTS.md) for TDD, coverage gates, and commit style. Issues live on this GitHub repo. Security reports: [SECURITY.md](SECURITY.md).
+A small pull request is the useful kind. Open an issue first if you are not sure the change is wanted. Issues live on [tuckcode/rhizome-agent](https://github.com/tuckcode/rhizome-agent).
+
+Local work follows [AGENTS.md](AGENTS.md) for tests and commit style. Security reports: [SECURITY.md](SECURITY.md).

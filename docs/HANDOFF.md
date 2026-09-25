@@ -50,9 +50,12 @@ file.
 **Origin:** GPT-6 Codex · 2026-09-20 · reviewed Astra landing.
 **Origin:** Cursor Grok 4.6 · 2026-09-21 · C75 living-docs; #66–#68 closed.
 **Origin:** Cursor Grok 4.7 · 2026-09-21 · evening wrap. Local main unpushed.
+**Origin:** Cursor Grok 4.7 · 2026-09-21 · Astra next-phase input.
+**Origin:** Cursor Grok 4.7 · 2026-09-21 · launch slice. He will open the new app.
+**Origin:** Cursor Grok 4.7 · 2026-09-21 22:23 CDT · `/Applications` rebuilt from `2a24eed`.
 
-`origin/main` is **`4ec3832`**. That push includes the seven product commits, the C75 docs, and the evening wrap. Use `git log -1` for the tip.
-`/Applications` remains **`b7264d6`** 07:23. Rebuild waits until he will launch.
+`origin/main` and `HEAD` are **`2a24eed`**. The product push inside that is **`4ec3832`**. Use `git log -1` for the tip.
+`/Applications/Rhizome Agent.app` was rebuilt **2026-09-21 22:43 CDT** from `2a24eed` plus a local banner fix. The corner label is `0.1.0`. A Chat engine banner with **Update now** sits above the composer. The 22:23 install is zipped. Apply is still **NOT RUN**.
 Handy: [`2026-09-20-1230`](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md).
 Recap: [`2026-09-20-1228`](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md).
 Detail:
@@ -105,14 +108,17 @@ public-readiness plan with parallel agents. Read the
 Typecheck and 292 focused tests pass. Native readiness is not established.
 No rebuild or issue closure occurred.
 
-**2026-09-21 evening:** `origin/main` is `4ec3832`. Do not rebuild until he will launch. Then glance #26, #46, #52.
-Detail: [`2026-09-21-2021`](plans/handoffs/2026-09-21-2021-cursor-grok-4-7-handy.md).
+**2026-09-21 rebuild:** `/Applications` is the 22:43 banner build. Update now apply is **NOT RUN**. [`2026-09-21-2223`](plans/handoffs/2026-09-21-2223-cursor-grok-4-7-applications-rebuild.md).
 
 ## Recent sessions
 
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-21 · Applications rebuild](plans/handoffs/2026-09-21-2223-cursor-grok-4-7-applications-rebuild.md) — 22:43 banner install. Update now apply **NOT RUN**. First look was **FAIL** (`dev`, no banner).
+- [2026-09-21 · swarm launch](plans/handoffs/2026-09-21-2208-cursor-grok-4-7-swarm-launch.md) — thorough plan local; rebuild then Update now; swarm only after.
+- [2026-09-21 · launch slice](plans/handoffs/2026-09-21-2140-cursor-grok-4-7-launch-slice.md) — rebuild from `2a24eed`, then #26. App still `b7264d6`.
+- [2026-09-21 · Astra next phase](plans/handoffs/2026-09-21-2104-cursor-grok-4-7-astra-next-phase.md) — origin `2a24eed`; app `b7264d6`; planning only.
 - [2026-09-21 · evening wrap](plans/handoffs/2026-09-21-2021-cursor-grok-4-7-handy.md) — local `main` `9b019d3` unpushed; app `b7264d6`; #69 pushed.
 - [2026-09-21 · C75 living docs](plans/handoffs/2026-09-21-0215-cursor-grok-4-6-c75-docs.md) — hide leaves spawned Prime warm; #66–#68 closed.
 - [2026-09-20 · handy wrap](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md) — `ffc135f` 11 ahead; app `b7264d6`; Edit list next.
@@ -126,9 +132,6 @@ Do not paste leftover paper here.
 - [2026-09-20 · Lane I install docs](plans/handoffs/2026-09-20-0548-cursor-grok-4-6-lane-i-install-docs.md) — public preview quick start; #66 unmerged.
 - [2026-09-20 · rail slice review](plans/handoffs/2026-09-20-0538-cursor-grok-4-6-rail-slice-review.md) — coordinator review of `4f9b4c4`; C76 source fix; Q/D/I intake.
 - [2026-09-20 · public readiness plan](plans/handoffs/2026-09-20-0506-gpt-6-public-readiness-plan.md) — assessment, Cursor swarm, parked inventory, and low-context Handy skill.
-- [2026-09-20 · rail + reasoning pickup](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md) — dirty sessions-only rail; history strip; harness stand; next plan.
-- [2026-09-19 · CPR](plans/handoffs/2026-09-19-1127-cursor-grok-4-6-cpr.md) — pane presets, hybrid skill PATH, Notes off rail. `6860762` in `/Applications` 11:27.
-- [2026-09-15 · CPR Signal + C75](plans/handoffs/2026-09-15-1408-cursor-composer-cpr.md) — `cb74b28` in `/Applications` 14:08.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)

@@ -47,6 +47,10 @@ Parked ideas:
 A roadmap row is not implementation approval. Do not merge
 [PR #66](https://github.com/tuckcode/rhizome-agent/pull/66).
 
+## Contributing
+
+If you like the app, contributions are welcome. A small pull request is enough. Open an issue if you are not sure the change is wanted. Details: [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 AGPL-3.0-or-later (inherited from the desktop snapshot). Confirm before any public release under `tuckcode`.
