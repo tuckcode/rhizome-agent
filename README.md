@@ -1,6 +1,6 @@
 # Rhizome Agent
 
-![Rhizome Agent — Your work. Your memory.](src/assets/brand/rhizome-organic-hero.png)
+![Rhizome Agent — Your work. Your memory.](docs/assets/rhizome-hero-animated.webp)
 
 **A macOS chat app for [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) that remembers your work in a plain-markdown vault you own.**
 Bring your own model. Chat, open notes beside the conversation, and keep what matters as notes on disk.

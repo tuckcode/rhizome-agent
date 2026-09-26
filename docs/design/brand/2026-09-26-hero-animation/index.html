@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1600, height=800" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1600px; height: 800px; overflow: hidden; background: #0d1a13; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; }
+      .layer { position: absolute; inset: 0; width: 1600px; height: 800px; }
+      /* Moving background: the full artwork, drifting slowly. */
+      #bg { transform-origin: 70% 50%; will-change: transform; }
+      /* Still wordmark: the text side of the same artwork, feathered out
+         before the first sphere so the seam sits on flat dark green. */
+      #type {
+        -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 49%, transparent 54%);
+        mask-image: linear-gradient(90deg, #000 0%, #000 49%, transparent 54%);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="10" data-width="1600" data-height="800">
+      <img id="bg" class="clip layer" src="assets/hero.png" alt="" data-start="0" data-duration="10" data-track-index="0" />
+      <img id="type" class="clip layer" src="assets/hero-type.png" alt="Rhizome Agent — Your work. Your memory." data-start="0" data-duration="10" data-track-index="1" />
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      // Out and back over 10s so the loop is seamless: slow push-in and drift.
+      tl.fromTo('#bg', { scale: 1.04, x: 0, y: 0 }, { scale: 1.12, x: -36, y: -14, duration: 5, ease: 'sine.inOut' }, 0)
+        .to('#bg', { scale: 1.04, x: 0, y: 0, duration: 5, ease: 'sine.inOut' }, 5);
+      window.__timelines['main'] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>
