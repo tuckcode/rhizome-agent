@@ -757,3 +757,26 @@
     animation: none;
   }
 }
+
+/* --- Chat reading column ---
+ * Native audit 2026-09-26: prompt, reply and composer share one bounded
+ * column on wide windows. Code blocks and tables may grow past it, up to
+ * the transcript width, when their content needs the room. */
+.chat-column {
+  width: 100%;
+  max-width: var(--chat-column-width, 46rem);
+  margin-inline: auto;
+}
+.chat-transcript {
+  container-type: inline-size;
+  container-name: chat-transcript;
+}
+.chat-transcript .ai-markdown pre,
+.chat-transcript .ai-markdown table {
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  min-width: 100%;
+  max-width: min(var(--chat-wide-width, 64rem), calc(100cqi - 24px));
+}

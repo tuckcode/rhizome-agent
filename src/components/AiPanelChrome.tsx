@@ -695,39 +695,41 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
     // nothing however tall the transcript gets.
     <div
       ref={containerRef}
-      className="min-h-0 flex-1 overflow-y-auto"
+      className="chat-transcript min-h-0 flex-1 overflow-y-auto"
       style={{ padding: 12 }}
       onScroll={updateScrollState}
       onMouseDown={onDragRegionMouseDown}
       data-testid="ai-panel-message-history"
     >
-      {messages.length === 0 && !isActive && (
-        <AiPanelEmptyState
-          agentLabel={agentLabel}
-          agentReadiness={agentReadiness}
-          locale={locale}
-          hasContext={hasContext}
-        />
-      )}
-      {messages.map((message, index) => (
-        <AiMessage
-          key={message.id ?? index}
-          {...message}
-          locale={locale}
-          isLatestReply={index === latestReplyIndex}
-          messageId={message.id}
-          // ChatHome forks the Prime session and needs its entry id, which
-          // only replayed turns carry; the AI workspace copies its own
-          // conversation and uses the local id.
-          forkTargetId={forkTargetsPrimeEntry ? message.primeEntryId : message.id}
-          onFork={onForkMessage}
-          onOpenNote={onOpenNote}
-          onNavigateWikilink={onNavigateWikilink}
-          onRegenerate={onRegenerateMessage}
-          onPromoteToVault={onPromoteToVault}
-        />
-      ))}
-      <div ref={endRef} />
+      <div className="chat-column">
+        {messages.length === 0 && !isActive && (
+          <AiPanelEmptyState
+            agentLabel={agentLabel}
+            agentReadiness={agentReadiness}
+            locale={locale}
+            hasContext={hasContext}
+          />
+        )}
+        {messages.map((message, index) => (
+          <AiMessage
+            key={message.id ?? index}
+            {...message}
+            locale={locale}
+            isLatestReply={index === latestReplyIndex}
+            messageId={message.id}
+            // ChatHome forks the Prime session and needs its entry id, which
+            // only replayed turns carry; the AI workspace copies its own
+            // conversation and uses the local id.
+            forkTargetId={forkTargetsPrimeEntry ? message.primeEntryId : message.id}
+            onFork={onForkMessage}
+            onOpenNote={onOpenNote}
+            onNavigateWikilink={onNavigateWikilink}
+            onRegenerate={onRegenerateMessage}
+            onPromoteToVault={onPromoteToVault}
+          />
+        ))}
+        <div ref={endRef} />
+      </div>
     </div>
   )
 })
@@ -845,7 +847,7 @@ export function AiPanelComposer({
 
   return (
     <div
-      className="flex shrink-0 flex-col"
+      className="chat-column flex shrink-0 flex-col"
       style={{ padding: '6px 10px' }}
     >
       {hasControls ? (
