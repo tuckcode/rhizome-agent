@@ -354,7 +354,7 @@ function NoteDateRow({
         <LinkCountChip count={linkCount} />
       </span>
       <span className="flex min-w-0 items-center justify-end gap-1.5 text-right">
-        {createdLabel && <span>{createdLabel}</span>}
+        {createdLabel && <span className="note-item__created-label">{createdLabel}</span>}
         <WorkspaceBadge entry={entry} allEntries={allEntries} />
       </span>
     </div>

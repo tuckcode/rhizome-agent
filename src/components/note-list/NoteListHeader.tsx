@@ -1,4 +1,5 @@
-import { CircleNotch as Loader2, MagnifyingGlass, Plus, SidebarSimple, X } from '@phosphor-icons/react'
+import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { CircleNotch as Loader2, DotsThree, MagnifyingGlass, Plus, SidebarSimple, X } from '@phosphor-icons/react'
 import type { VaultEntry } from '../../types'
 import type { SortOption, SortDirection } from '../../utils/noteListHelpers'
 import { translate, type AppLocale, type TranslationKey } from '../../lib/i18n'
@@ -12,6 +13,11 @@ import { SortDropdown } from '../SortDropdown'
 import { ListPropertiesPopover, type ListPropertiesPopoverProps } from './ListPropertiesPopover'
 import { GitRepositorySelect } from '../GitRepositorySelect'
 import type { GitRepositoryOption } from '../../utils/gitRepositories'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   hasNativeMacosTrafficLights,
   MACOS_TRAFFIC_LIGHT_SAFE_PADDING,
@@ -89,18 +95,34 @@ function ExpandSidebarButton({ locale }: { locale: AppLocale }) {
   )
 }
 
+/**
+ * Truncates with an ellipsis instead of the C78 fixed-width, never-shrink
+ * approach: that kept "Changes" readable but let text spill past its own box
+ * into the space held by the trailing chrome shortcuts / sort / columns
+ * group, which then painted over it (Astra 2026-09-26 repro: shortcuts box
+ * drawn on top of "Notes" at ~520px). `truncate` (overflow-hidden +
+ * ellipsis) plus a `min-w-[5.5rem]` floor keeps the title fully visible for
+ * ordinary titles and cleanly ellipsized instead of overlapped when the row
+ * is genuinely too tight.
+ */
+const HEADER_TITLE_CLASSNAME = 'm-0 min-w-[5.5rem] max-w-full flex-1 truncate text-[14px] font-semibold'
+
 function HeaderTitle({
   title,
   typeDocument,
   onOpenType,
-}: Pick<NoteListHeaderProps, 'title' | 'typeDocument' | 'onOpenType'>) {
+  titleRef,
+}: Pick<NoteListHeaderProps, 'title' | 'typeDocument' | 'onOpenType'> & {
+  titleRef: RefObject<HTMLElement | null>
+}) {
   const handleClick = typeDocument ? () => onOpenType(typeDocument) : undefined
 
   if (typeDocument && handleClick) {
     return (
       <button
+        ref={titleRef as RefObject<HTMLButtonElement>}
         type="button"
-        className="m-0 min-w-[5.5rem] shrink-0 whitespace-nowrap border-0 bg-transparent p-0 text-left text-[14px] font-semibold"
+        className={`${HEADER_TITLE_CLASSNAME} border-0 bg-transparent p-0 text-left`}
         onClick={handleClick}
         data-testid="type-header-link"
       >
@@ -111,7 +133,8 @@ function HeaderTitle({
 
   return (
     <h3
-      className="m-0 min-w-[5.5rem] shrink-0 whitespace-nowrap text-[14px] font-semibold"
+      ref={titleRef as RefObject<HTMLHeadingElement>}
+      className={HEADER_TITLE_CLASSNAME}
     >
       {title}
     </h3>
@@ -124,15 +147,59 @@ function HeaderLeading({
   sidebarCollapsed,
   locale,
   onOpenType,
+  titleRef,
 }: Pick<NoteListHeaderProps, 'title' | 'typeDocument' | 'sidebarCollapsed' | 'locale' | 'onOpenType'> & {
   locale: AppLocale
+  titleRef: RefObject<HTMLElement | null>
 }) {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
       {sidebarCollapsed && <ExpandSidebarButton locale={locale} />}
-      <HeaderTitle title={title} typeDocument={typeDocument} onOpenType={onOpenType} />
+      <HeaderTitle title={title} typeDocument={typeDocument} onOpenType={onOpenType} titleRef={titleRef} />
     </div>
   )
+}
+
+/**
+ * Moves the workspace shortcuts / sort / columns group into the "…" overflow
+ * menu once the title is actually being truncated, rather than letting those
+ * fixed-size, shrink-0 controls crowd it out. Mirrors the pattern in
+ * `BreadcrumbBar`'s `useBreadcrumbOverflow`, simplified to a single
+ * scrollWidth-vs-clientWidth check since this title has no sibling crumbs to
+ * measure around.
+ */
+function useNoteListHeaderOverflow(titleRef: RefObject<HTMLElement | null>) {
+  const [collapsed, setCollapsed] = useState(false)
+
+  useLayoutEffect(() => {
+    const title = titleRef.current
+    if (!title) return undefined
+
+    let frame = 0
+    const measure = () => {
+      const isTruncated = title.scrollWidth > title.clientWidth + 1
+      setCollapsed((current) => (current === isTruncated ? current : isTruncated))
+    }
+    const scheduleMeasure = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(measure)
+    }
+
+    scheduleMeasure()
+    if (typeof ResizeObserver === 'undefined') {
+      return () => cancelAnimationFrame(frame)
+    }
+
+    const resizeObserver = new ResizeObserver(scheduleMeasure)
+    resizeObserver.observe(title)
+
+    return () => {
+      cancelAnimationFrame(frame)
+      resizeObserver.disconnect()
+    }
+  })
+
+  return collapsed
 }
 
 function RepositorySelectorRow({
@@ -164,7 +231,13 @@ function RepositorySelectorRow({
   )
 }
 
-function HeaderActions({
+/**
+ * Renders the sort dropdown and columns popover exactly once — either here,
+ * inline, or inside `HeaderOverflowMenu` — never both at once, so tests that
+ * look up `sort-button-__list__` (a single element) keep working regardless
+ * of which layout is active.
+ */
+function SortAndColumnsTools({
   isEntityView,
   listSort,
   listDirection,
@@ -172,28 +245,15 @@ function HeaderActions({
   propertyPicker,
   locale,
   onSortChange,
-  onCreateNote,
-  onToggleSearch,
 }: Pick<
   NoteListHeaderProps,
-  | 'isEntityView'
-  | 'listSort'
-  | 'listDirection'
-  | 'customProperties'
-  | 'propertyPicker'
-  | 'locale'
-  | 'onSortChange'
-  | 'onCreateNote'
-  | 'onToggleSearch'
+  'isEntityView' | 'listSort' | 'listDirection' | 'customProperties' | 'propertyPicker' | 'onSortChange'
 > & {
   locale: AppLocale
 }) {
   return (
-    <div className="ml-3 flex shrink-0 items-center justify-end gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+    <>
       {!isEntityView && <SortDropdown groupLabel="__list__" current={listSort} direction={listDirection} customProperties={customProperties} locale={locale} onChange={onSortChange} />}
-      <Button type="button" variant="ghost" size="icon-xs" className={NOTE_LIST_ACTION_BUTTON_CLASSNAME} onClick={onToggleSearch} title={translate(locale, 'noteList.searchAction')} aria-label={translate(locale, 'noteList.searchAction')}>
-        <MagnifyingGlass size={16} />
-      </Button>
       {propertyPicker && (
         <ListPropertiesPopover
           {...propertyPicker}
@@ -202,6 +262,74 @@ function HeaderActions({
           locale={locale}
         />
       )}
+    </>
+  )
+}
+
+type OptionalToolsProps = Pick<
+  NoteListHeaderProps,
+  'isEntityView' | 'listSort' | 'listDirection' | 'customProperties' | 'propertyPicker' | 'onSortChange'
+> & {
+  locale: AppLocale
+  collapsed: boolean
+}
+
+/** The workspace shortcuts group plus sort/columns — an "optional tools"
+ * cluster (required-order step 2) that moves into the overflow menu before
+ * the title has to shrink below its floor. */
+function HeaderOptionalTools({ collapsed, locale, ...sortProps }: OptionalToolsProps) {
+  if (collapsed) return null
+  return (
+    <div className="flex shrink-0 items-center gap-2" data-testid="note-list-header-optional-tools">
+      <NotesChromeShortcuts locale={locale} />
+      <SortAndColumnsTools locale={locale} {...sortProps} />
+    </div>
+  )
+}
+
+function HeaderOverflowMenu({ collapsed, locale, ...sortProps }: OptionalToolsProps) {
+  if (!collapsed) return null
+  // Inline English string — this repo does not add new en.json keys (C18).
+  const label = 'More list actions'
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className={NOTE_LIST_ACTION_BUTTON_CLASSNAME}
+          title={label}
+          aria-label={label}
+          data-testid="note-list-header-overflow-trigger"
+        >
+          <DotsThree size={16} weight="bold" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" data-testid="note-list-header-overflow-menu">
+        <div className="flex flex-col gap-1 px-1 py-1" onClick={(event) => event.stopPropagation()}>
+          <NotesChromeShortcuts locale={locale} />
+          <div className="flex items-center gap-2">
+            <SortAndColumnsTools locale={locale} {...sortProps} />
+          </div>
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function HeaderActions({
+  onCreateNote,
+  onToggleSearch,
+  locale,
+}: Pick<NoteListHeaderProps, 'onCreateNote' | 'onToggleSearch'> & {
+  locale: AppLocale
+}) {
+  return (
+    <div className="ml-3 flex shrink-0 items-center justify-end gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+      <Button type="button" variant="ghost" size="icon-xs" className={NOTE_LIST_ACTION_BUTTON_CLASSNAME} onClick={onToggleSearch} title={translate(locale, 'noteList.searchAction')} aria-label={translate(locale, 'noteList.searchAction')}>
+        <MagnifyingGlass size={16} />
+      </Button>
       <Button type="button" variant="ghost" size="icon-xs" className={NOTE_LIST_ACTION_BUTTON_CLASSNAME} onClick={onCreateNote} title={translate(locale, 'noteList.createNote')} aria-label={translate(locale, 'noteList.createNote')}>
         <Plus size={16} />
       </Button>
@@ -305,9 +433,20 @@ export function NoteListHeader({
   onGitRepositoryChange,
 }: NoteListHeaderProps) {
   const { dragRegionRef } = useDragRegion<HTMLDivElement>()
+  const titleRef = useRef<HTMLElement | null>(null)
+  const collapsed = useNoteListHeaderOverflow(titleRef)
   const collapsedSidebarPadding = sidebarCollapsed && hasNativeMacosTrafficLights()
     ? MACOS_TRAFFIC_LIGHT_SAFE_PADDING
     : undefined
+  const optionalToolsProps = {
+    isEntityView,
+    listSort,
+    listDirection,
+    customProperties,
+    propertyPicker,
+    onSortChange,
+    locale,
+  }
 
   return (
     <>
@@ -318,18 +457,14 @@ export function NoteListHeader({
           sidebarCollapsed={sidebarCollapsed}
           locale={locale}
           onOpenType={onOpenType}
+          titleRef={titleRef}
         />
-        <NotesChromeShortcuts locale={locale} />
+        <HeaderOptionalTools collapsed={collapsed} {...optionalToolsProps} />
+        <HeaderOverflowMenu collapsed={collapsed} {...optionalToolsProps} />
         <HeaderActions
-          isEntityView={isEntityView}
-          listSort={listSort}
-          listDirection={listDirection}
-          customProperties={customProperties}
-          propertyPicker={propertyPicker}
-          locale={locale}
-          onSortChange={onSortChange}
           onCreateNote={onCreateNote}
           onToggleSearch={onToggleSearch}
+          locale={locale}
         />
       </div>
       <RepositorySelectorRow

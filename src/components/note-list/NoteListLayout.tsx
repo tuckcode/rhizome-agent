@@ -211,7 +211,7 @@ function NoteListBody({
   return (
     <div
       ref={noteListContainerRef}
-      className="relative flex flex-1 flex-col overflow-hidden outline-none"
+      className="note-list-container relative flex flex-1 flex-col overflow-hidden outline-none"
       style={{ minHeight: 0 }}
       role="listbox"
       aria-label="Notes"
