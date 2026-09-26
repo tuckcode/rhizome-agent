@@ -17,7 +17,7 @@ We currently support security fixes for:
 ## Reporting a vulnerability
 
 Use GitHub private vulnerability reporting for this repository. If that
-channel is unavailable, contact a repository admin. Do not open a public
+channel is unavailable, email rhizome-agent@proton.me. Do not open a public
 issue for a vulnerability.
 
 Include as much of the following as you can:

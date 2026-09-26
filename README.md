@@ -2,6 +2,8 @@
 
 ![Rhizome Agent — Your work. Your memory.](src/assets/brand/rhizome-organic-hero.png)
 
+[Watch the 20 second demo](docs/assets/rhizome-agent-demo.mp4)
+
 **A harness that doesn't forget.**
 Built around [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent), with useful tools from Claude Code, Hermes Agent, and DeepSeek. The built-in vault is your memory, wiki, and second brain, beside a research panel. What you save stays as plain Markdown on your disk, where you and the agent can both read it.
 
