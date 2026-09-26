@@ -140,6 +140,8 @@ pub(crate) fn is_junk_distill_title(title: &str) -> bool {
         || lower.contains("could not be refreshed")
         || lower.contains("invalid args request")
         || lower.contains("missing field vaultpath")
+        || lower.starts_with("not logged in")
+        || lower.contains("please run /login")
         || lower.starts_with("error:")
 }
 
@@ -364,6 +366,15 @@ mod tests {
             "Failed to authenticate: OAuth session expired and could not be refreshed",
         ));
         assert!(!is_junk_distill_title("Event Sourcing"));
+    }
+
+    #[test]
+    fn junk_distill_title_detects_logged_out_agent() {
+        // Native audit 2026-09-25: a logged-out distill agent replied with
+        // this line and it was saved as a concept note.
+        assert!(is_junk_distill_title("Not logged in · Please run /login"));
+        assert!(is_junk_distill_title("Please run /login"));
+        assert!(!is_junk_distill_title("Login flows in OAuth 2.1"));
     }
 
     #[test]
