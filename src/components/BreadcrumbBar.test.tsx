@@ -1088,3 +1088,39 @@ describe('BreadcrumbBar — close note', () => {
     expect(screen.getByTestId('breadcrumb-properties-button')).toHaveAccessibleName(/properties/i)
   })
 })
+
+/**
+ * Browser preview, 2026-09-26: in a 360px desk note pane the actions group
+ * (511px, shrink-0) ran past the pane's right edge. The collapse check
+ * anchored on the actions' own right edge, which had moved off-screen, so it
+ * concluded the title had room: the title showed two letters and Close sat
+ * 320px outside the pane. The check must anchor on the bar's right edge.
+ */
+describe('BreadcrumbBar — actions that overflow the bar still collapse', () => {
+  it('collapses when the actions run past the bar, even with room left of them', async () => {
+    const requestFrame = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0)
+      return 1
+    })
+    const cancelFrame = vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => {})
+    const rects = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('breadcrumb-bar')) return DOMRect.fromRect({ x: 637, y: 0, width: 360, height: 52 })
+      if (this.classList.contains('breadcrumb-bar__actions')) return DOMRect.fromRect({ x: 838, y: 0, width: 511, height: 52 })
+      return DOMRect.fromRect({ x: 697, y: 0, width: 95, height: 52 })
+    })
+    const scrollWidths = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('breadcrumb-bar__actions') ? 511 : 95
+    })
+    try {
+      const { container } = render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
+      await waitFor(() => {
+        expect(container.querySelector('.breadcrumb-bar__actions')).toHaveAttribute('data-overflow-collapsed', 'true')
+      })
+    } finally {
+      requestFrame.mockRestore()
+      cancelFrame.mockRestore()
+      rects.mockRestore()
+      scrollWidths.mockRestore()
+    }
+  })
+})
