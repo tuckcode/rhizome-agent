@@ -1279,7 +1279,7 @@ describe('SettingsPanel', () => {
   describe('Auto-save description', () => {
     it('shows plain description by default and hides technical details', () => {
       renderOpenSettings()
-      const plainDescription = 'After each chat reply, Rhizome saves anything worth keeping as a note in your vault. Sign-in errors and tool failures are never saved.'
+      const plainDescription = 'After each chat reply, Rhizome saves anything worth keeping as a note in your vault. Sign-in errors and tool failures are skipped.'
       expect(screen.getByText(plainDescription)).toBeInTheDocument()
       expect(screen.queryByText(/After each AI chat turn, distill durable/)).not.toBeInTheDocument()
     })
