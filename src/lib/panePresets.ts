@@ -8,7 +8,17 @@ export type PanePresetState = {
   widths: Partial<Record<PaneColumn, number>>
   /** Preserve an imported Read layout with its Notes list open. New Read hides it. */
   readNotes?: boolean
+  /** The user chose On top. Otherwise an open note goes beside Chat when it fits. */
+  stacked?: boolean
 }
+
+/**
+ * Astra's layout directions (native audit 2026-09-26) as states of one
+ * workspace: `conversation` (no note), `desk` (note beside Chat), `stacked`
+ * (the user's On top choice), `focused` (one pane at a time with Chat/Notes
+ * tabs, because both panes cannot meet their minimum widths).
+ */
+export type WorkspaceState = 'conversation' | 'desk' | 'stacked' | 'focused'
 export const PANE_LIMITS = {
   rail: { min: 180, default: 240, max: 360 },
   notes: { min: 200, default: 240, max: 360 },
@@ -71,8 +81,19 @@ export function fitPanePreset(preset: PanePresetState, context: PaneFitContext) 
   if (used() + CHAT_MIN_WIDTH > available) notesOpen = false
   if (used() + CHAT_MIN_WIDTH > available) railPinned = false
   if (used() + CHAT_MIN_WIDTH > available) beside = false
+  // Room left for a note beside Chat without folding anything the preset shows.
+  const besideRoom = () => available - used() - CHAT_MIN_WIDTH - NOTE_DIVIDER_WIDTH
+  const noteFloor = PANE_LIMITS.note.min
+  if (!beside && context.noteOpen === true && preset.stacked !== true && besideRoom() >= noteFloor) {
+    widths.note = Math.min(widths.note, besideRoom())
+    beside = true
+  }
+  const workspace: WorkspaceState = context.noteOpen !== true ? 'conversation'
+    : beside ? 'desk'
+      : besideRoom() >= noteFloor ? 'stacked'
+        : 'focused'
   return {
-    widths, notesOpen, browseOpen, railPinned,
+    widths, notesOpen, browseOpen, railPinned, workspace,
     split: (beside ? 'side-by-side' : 'stacked') as ChatNoteSplit,
     showRestoreStrip: !notesOpen && !context.hideNotesForCanvas,
     chatWidth: available - used(),

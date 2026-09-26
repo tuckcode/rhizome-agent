@@ -92,3 +92,34 @@ describe('preset column drag', () => {
     expect(result.current.layout.widths.note).toBeGreaterThan(300)
   })
 })
+
+describe('workspace state and the sessions drawer', () => {
+  it('reports the desk when a note fits beside Chat', () => {
+    mockedShellWidth = 1400
+    const { result } = renderShell()
+    expect(result.current.layout.workspace).toBe('desk')
+    expect(result.current.layout.railFits).toBe(true)
+  })
+
+  it('reports the focused window and a drawer-only rail when the shell is small', () => {
+    mockedShellWidth = 600
+    const { result } = renderShell()
+    expect(result.current.layout.workspace).toBe('focused')
+    expect(result.current.layout.railFits).toBe(false)
+  })
+
+  it('opens a drawer rather than folding an open Notes column for the rail', () => {
+    // Notes preset at 700: Chat + Notes fit, but a 240px rail would fold Notes.
+    mockedShellWidth = 700
+    const { result } = renderHook(() => {
+      const controls = useViewMode()
+      return useChatCenteredShellLayout({
+        ...controls, kind: 'chat-centered', noteOpen: false, inspectorOpen: false,
+        railPinned: false, hideNotesForCanvas: false,
+      })
+    })
+    act(() => result.current.ensureNotesOpen())
+    expect(result.current.notesOpen).toBe(true)
+    expect(result.current.railFits).toBe(false)
+  })
+})

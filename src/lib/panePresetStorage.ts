@@ -35,7 +35,12 @@ function parsePreset(raw: unknown): PanePresetState | null {
   if (!raw || typeof raw !== 'object' || !('id' in raw) || !PANE_PRESET_IDS.some(id => id === raw.id)) return null
   const id = PANE_PRESET_IDS.find(id => id === raw.id)!
   const widths = 'widths' in raw && raw.widths && typeof raw.widths === 'object' ? normalizedWidths(raw.widths) : {}
-  return { id, widths, readNotes: 'readNotes' in raw && raw.readNotes === true }
+  return {
+    id,
+    widths,
+    readNotes: 'readNotes' in raw && raw.readNotes === true,
+    ...('stacked' in raw && raw.stacked === true ? { stacked: true } : {}),
+  }
 }
 
 export function savePanePreferences(scope: string, preferences: PanePresetPreferences): void {

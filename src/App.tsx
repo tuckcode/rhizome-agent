@@ -16,6 +16,7 @@ import {
 import { Editor } from './components/Editor'
 import { AskChatExcerptMenu } from './components/AskChatExcerptMenu'
 import { ChatNoteSplitToggle } from './components/ChatNoteSplitToggle'
+import { FocusedPaneTabs, type FocusedPane } from './components/FocusedPaneTabs'
 import { formatAskChatExcerpt } from './components/askChatExcerpt'
 import { prefillAiComposer } from './utils/aiPromptBridge'
 import { ResizeHandle } from './components/ResizeHandle'
@@ -124,7 +125,7 @@ import { openNoteListPropertiesPicker } from './components/note-list/noteListPro
 import type { NoteListMultiSelectionCommands } from './components/note-list/multiSelectionCommands'
 import { focusNoteIconPropertyEditor } from './components/noteIconPropertyEvents'
 import { trackEvent } from './lib/telemetry'
-import { trackNotesFocusToggled, trackVaultCredentialsHandled } from './lib/productAnalytics'
+import { trackFocusedPaneSwitched, trackNotesFocusToggled, trackVaultCredentialsHandled } from './lib/productAnalytics'
 import { redactCredentialTokens } from './lib/sensitiveTextRedaction'
 import { areAutomaticUpdateChecksEnabled } from './lib/automaticUpdateChecks'
 import { aiTargetReady, type AiTarget } from './lib/aiTargets'
@@ -1590,6 +1591,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     collapseNotes,
     toggleBrowse,
     setSplit: handleChatNoteSplit,
+    workspace,
+    railFits,
   } = useChatCenteredShellLayout({
     kind: chatCentered ? 'chat-centered' : 'classic',
     panePreset, setPanePreset, updatePanePreset, railPinned: railPinned || railConsumesExpandedWidth(reportedRailWidth),
@@ -1601,6 +1604,22 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     chatDestination: isChatDestination,
   })
   const railOccupiesExpandedWidth = railConsumesExpandedWidth(reportedRailWidth)
+  // Native audit 2026-09-26: in a narrow window the Sessions rail is a
+  // drawer, and picking a conversation closes it.
+  const [railDrawerCloseSignal, setRailDrawerCloseSignal] = useState(0)
+  const handleRailSessionPicked = useCallback(() => setRailDrawerCloseSignal(n => n + 1), [])
+  // Focused window: Chat and the open note cannot both meet their minimum
+  // widths, so one shows at a time behind Chat / Notes tabs. A newly opened
+  // note comes to the front; closing it returns to Chat.
+  const focusedWindow = chatCentered && workspace === 'focused' && Boolean(activeTab)
+  const activeNotePath = notes.activeTabPath ?? null
+  const [focusedPane, setFocusedPane] = useState<FocusedPane>('note')
+  const [focusedNotePath, setFocusedNotePath] = useState(activeNotePath)
+  if (activeNotePath !== focusedNotePath) {
+    setFocusedNotePath(activeNotePath)
+    setFocusedPane(activeNotePath ? 'note' : 'chat')
+  }
+  const showFocusedNote = !focusedWindow || focusedPane === 'note'
   const sessionsRailLayoutWidth = railOccupiesExpandedWidth && !fittedRailPinned
     ? COMMAND_RAIL_WIDTH_PX
     : reportedCommandRailLayoutWidth(commandRailEnabled, reportedRailWidth)
@@ -2054,6 +2073,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         onShowNotes={ensureNotesOpen}
         sessionsAutoCollapsed={compactSessions}
         sessionsRailSlot={commandRailEnabled ? sessionRailSlot : undefined}
+        onRailSessionPicked={handleRailSessionPicked}
         onNotePaneOpenChange={setChatNotePaneOpen}
         onOpenSessionFootprint={handleOpenSessionFootprint}
         onOpenCommandPalette={dialogs.openCommandPalette}
@@ -2086,6 +2106,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               locale={appLocale}
               pinned={chatCentered ? railPinned : undefined}
               autoCollapsed={chatCentered && (railPinned || railOccupiesExpandedWidth) && !fittedRailPinned}
+              drawer={chatCentered && !railFits}
+              drawerCloseSignal={railDrawerCloseSignal}
               onPinnedChange={handleRailPinned}
               onLayoutWidthChange={setReportedRailWidth}
               width={chatCentered ? paneWidths.rail : undefined}
@@ -2102,19 +2124,37 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                 className="app__chat-center"
                 data-testid="chat-center"
                 data-split={activeTab ? chatNoteSplitMode : 'stacked'}
+                data-workspace={workspace}
+                // CSS hides Chat on the Notes tab; it stays mounted so the draft and scroll survive.
+                data-focused-pane={focusedWindow ? focusedPane : undefined}
                 style={{
                   ...(isGraphDestination || isMyceliumDestination || isResearchDestination || hideEditorColumn ? { display: 'none' } : {}),
                   ...subheadTrafficLightInset(sessionsRailLayoutWidth),
                 }}
               >
+                {focusedWindow ? (
+                  <FocusedPaneTabs
+                    value={focusedPane}
+                    noteTitle={activeTabEntry?.title || activeTabEntry?.filename || 'Note'}
+                    onValueChange={(pane) => {
+                      setFocusedPane(pane)
+                      trackFocusedPaneSwitched(pane)
+                    }}
+                  />
+                ) : null}
                 <div className="app__chat-center-body">
                 <div
                   className={activeTab ? 'app__note-editor' : 'app__note-editor app__note-editor--idle'}
-                  style={activeTab && !hideChatForNotesFocus ? { flex: `0 0 ${chatNoteSplitMode === 'side-by-side' ? paneWidths.note : chatNoteEditorHeight.width}px` } : undefined}
+                  style={
+                    !showFocusedNote ? { display: 'none' }
+                      : focusedWindow ? { flex: '1 1 0' }
+                        : activeTab && !hideChatForNotesFocus ? { flex: `0 0 ${chatNoteSplitMode === 'side-by-side' ? paneWidths.note : chatNoteEditorHeight.width}px` }
+                          : undefined
+                  }
                 >
                   <AskChatExcerptMenu onAsk={handleAskChatAboutExcerpt}>
                     <Editor
-                      leadingControl={activeTab ? (
+                      leadingControl={activeTab && !focusedWindow ? (
                         <ChatNoteSplitToggle split={chatNoteSplitMode} onChange={handleChatNoteSplit} />
                       ) : undefined}
                       tabs={notes.tabs}
@@ -2195,7 +2235,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                     />
                   </AskChatExcerptMenu>
                 </div>
-                {activeTab && !hideChatForNotesFocus ? (
+                {activeTab && !hideChatForNotesFocus && !focusedWindow ? (
                   <div
                     role="separator"
                     aria-orientation={chatNoteSplitMode === 'side-by-side' ? 'vertical' : 'horizontal'}

@@ -18,7 +18,7 @@ describe('shell column edges', () => {
   })
 
   it('puts On top / Beside on the notes header, never the traffic-light rail', () => {
-    expect(appSource).toMatch(/leadingControl=\{activeTab \? \(\s*<ChatNoteSplitToggle/)
+    expect(appSource).toMatch(/leadingControl=\{activeTab && !focusedWindow \? \(\s*<ChatNoteSplitToggle/)
     expect(commandRail).not.toContain('ChatNoteSplitToggle')
     expect(commandRail).not.toContain('On top')
     expect(commandRail).not.toContain('Beside')
