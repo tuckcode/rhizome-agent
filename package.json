@@ -114,7 +114,7 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",
     "vite": "^7.3.5",
-    "vitest": "^4.0.18",
+    "vitest": "^4.1.11",
     "ws": "^8.19.0"
   },
   "description": "Rhizome Agent \u2014 desktop chat shell on the Prime Agent harness (not Rhizome Desktop)."
