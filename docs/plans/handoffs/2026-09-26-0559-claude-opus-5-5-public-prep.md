@@ -24,7 +24,7 @@ Follows [`2026-09-26-0425`](2026-09-26-0425-claude-opus-5-5-astra-redesign.md).
   tree, including untracked files. The only hits are the synthetic
   `xox?-` test tokens in `src-tauri/src/telemetry.rs:346-347`, which are
   scrubber fixtures. No env or key file was ever committed.
-- **The Gmail address** `284109516+tuckcode@users.noreply.github.com` authors 530 commits, dated
+- **The Gmail address** A personal Gmail address authors 530 commits, dated
   2026-08-09 to 09-12. Later commits use the noreply address. Undecided:
   accept it, or rewrite history (new SHAs, a force-push, and breaking about
   30 local worktrees).
