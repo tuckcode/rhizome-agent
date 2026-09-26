@@ -262,6 +262,29 @@ describe('a hover-expanded rail does not steal Chat clicks', () => {
     expect(rail.style.marginRight).toBe('')
   })
 
+  it('collapses a pinned rail from the sidebar control', () => {
+    localStorage.setItem(APP_STORAGE_KEYS.commandRailExpanded, '1')
+    const onPinnedChange = vi.fn()
+    renderRail({ onPinnedChange })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
+
+    expect(onPinnedChange).toHaveBeenCalledWith(false)
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-pinned', 'false')
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'false')
+    expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).toBe('0')
+  })
+
+  it('reports collapsed width at rest and the open width while the rail is expanded', async () => {
+    const onLayoutWidthChange = vi.fn()
+    renderRail({ onLayoutWidthChange, width: 240 })
+
+    expect(onLayoutWidthChange).toHaveBeenCalledWith(46)
+
+    fireEvent.mouseEnter(screen.getByTestId('command-rail'))
+    await waitFor(() => expect(onLayoutWidthChange).toHaveBeenCalledWith(240))
+  })
+
   it('keeps a pinned rail in flow so it is not an overlay', () => {
     localStorage.setItem(APP_STORAGE_KEYS.commandRailExpanded, '1')
     renderRail()

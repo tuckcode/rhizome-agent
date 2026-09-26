@@ -54,7 +54,7 @@ interface ChatHomeProps {
    * it after the user has closed the pane.
    */
   requestedNote?: { path: string; label: string; requestId: number } | null
-  /** Layout width of the sessions rail. Hover-open does not change this. */
+  /** Layout width of the sessions rail, including hover and keyboard open. */
   railLayoutWidth?: number
   /** Chat engine offer. The banner is the visible control. */
   chatEngineUpdate?: PrimeUpdateStatus

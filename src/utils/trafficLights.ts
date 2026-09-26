@@ -46,9 +46,21 @@ export function hasNativeMacosTrafficLights(): boolean {
  *
  * The collapsible sidebar's layout width is the left edge of that line.
  * A collapsed rail is narrower than the traffic lights, so the line needs
- * the leftover gap. A pinned open sidebar is wider than the lights, so the
- * line only needs a small pad. Hover-open does not change layout width.
+ * the leftover gap. An open sidebar, including hover and the keyboard
+ * control, is wider than the lights, so the line only needs a small pad.
  */
+/** Width the shell reserves for the sessions rail. Disabled means no rail. */
+export function reportedCommandRailLayoutWidth(enabled: boolean, reportedWidth: number): number {
+  if (!enabled) return 0
+  if (!Number.isFinite(reportedWidth) || reportedWidth <= 0) return COMMAND_RAIL_WIDTH_PX
+  return reportedWidth
+}
+
+/** True when the rail is open wide enough that Chat and the title line must move. */
+export function railConsumesExpandedWidth(reportedWidth: number): boolean {
+  return reportedWidth > COMMAND_RAIL_WIDTH_PX
+}
+
 export function subheadTrafficLightInset(railLayoutWidth = COMMAND_RAIL_WIDTH_PX): Record<string, string> {
   if (!hasNativeMacosTrafficLights()) return {}
   const inset = Math.max(12, MACOS_TRAFFIC_LIGHT_SAFE_PADDING - railLayoutWidth)

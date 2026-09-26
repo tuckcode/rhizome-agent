@@ -5,6 +5,8 @@ import {
   COMMAND_RAIL_TRAFFIC_LIGHT_INSET,
   MACOS_TRAFFIC_LIGHT_POSITION,
   overlayTitleBarBandStyle,
+  railConsumesExpandedWidth,
+  reportedCommandRailLayoutWidth,
   sessionsColumnTitleBarStyle,
   subheadTrafficLightInset,
 } from './trafficLights'
@@ -36,6 +38,16 @@ function configuredTrafficLightPosition(): { x: number; y: number } {
   if (!position) throw new Error('main window has no trafficLightPosition')
   return position
 }
+
+describe('reported command rail layout width', () => {
+  it('uses the open rail width, including hover, and 46 only when the rail is collapsed', () => {
+    expect(reportedCommandRailLayoutWidth(true, 240)).toBe(240)
+    expect(reportedCommandRailLayoutWidth(true, 46)).toBe(46)
+    expect(reportedCommandRailLayoutWidth(false, 240)).toBe(0)
+    expect(railConsumesExpandedWidth(240)).toBe(true)
+    expect(railConsumesExpandedWidth(46)).toBe(false)
+  })
+})
 
 describe('subheadTrafficLightInset', () => {
   it('keeps renderer geometry synchronized with the native config', () => {

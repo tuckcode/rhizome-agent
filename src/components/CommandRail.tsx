@@ -24,6 +24,8 @@ interface CommandRailProps {
   onOpenSettings: () => void
   /** Expanded rail's open middle, where Chat mounts its session list. */
   onSessionsSlotReady?: (slot: HTMLDivElement | null) => void
+  /** Current layout width. Collapsed is 46. Open, including hover, is the wide rail. */
+  onLayoutWidthChange?: (width: number) => void
 }
 
 const RAIL_BUTTON_SIZE = 30
@@ -114,8 +116,8 @@ function RailButton({
 }
 
 /**
- * Sessions rail — behind `shell_command_rail`. Settings and pin live in the
- * footer. Research opens from the status bar and command palette. Chat is
+ * Sessions rail — behind `shell_command_rail`. Settings and the sidebar
+ * control live in the footer. Research opens from the status bar and command palette. Chat is
  * the conversation itself; leave Research/Graph/Mycelium with "Back to chat".
  */
 export function CommandRail({
@@ -123,6 +125,7 @@ export function CommandRail({
   pinned, autoCollapsed = false, onPinnedChange, width, onWidthChange,
   onOpenSettings,
   onSessionsSlotReady,
+  onLayoutWidthChange,
 }: CommandRailProps) {
   const t = createTranslator(locale)
   const [storedPinned, setPinnedExpanded] = useState(() =>
@@ -135,6 +138,16 @@ export function CommandRail({
   const pinnedExpanded = pinRequested && !autoCollapsed && !compactLocked
   const [hoverExpanded, setHoverExpanded] = useState(false)
   const [keyboardExpanded, setKeyboardExpanded] = useState(false)
+  // Close a hover/keyboard-open rail when the shell auto-collapses it.
+  // Adjusted during render, not in an effect, to avoid a cascading render.
+  const [prevAutoCollapsed, setPrevAutoCollapsed] = useState(autoCollapsed)
+  if (autoCollapsed !== prevAutoCollapsed) {
+    setPrevAutoCollapsed(autoCollapsed)
+    if (autoCollapsed) {
+      setHoverExpanded(false)
+      setKeyboardExpanded(false)
+    }
+  }
   const railWidth = usePanelWidth(
     APP_STORAGE_KEYS.commandRailWidth,
     RAIL_EXPANDED_DEFAULT_WIDTH,
@@ -147,6 +160,7 @@ export function CommandRail({
   useEffect(() => {
     onSessionsSlotReadyRef.current = onSessionsSlotReady
   }, [onSessionsSlotReady])
+  const suppressHoverRef = useRef(false)
   const hoverOpenTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const bindSessionsSlot = useCallback((slot: HTMLDivElement | null) => {
@@ -159,7 +173,15 @@ export function CommandRail({
   const openFromHover = () => {
     if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current)
     hoverCloseTimer.current = null
-    if (compactLocked || pinnedExpanded || hoverExpanded || keyboardExpanded || hoverOpenTimer.current) return
+    if (
+      autoCollapsed
+      || suppressHoverRef.current
+      || compactLocked
+      || pinnedExpanded
+      || hoverExpanded
+      || keyboardExpanded
+      || hoverOpenTimer.current
+    ) return
     hoverOpenTimer.current = setTimeout(() => {
       setHoverExpanded(true)
       hoverOpenTimer.current = null
@@ -231,6 +253,13 @@ export function CommandRail({
       cancelAnimationFrame(raf)
     }
   }, [keyboardExpanded])
+  useEffect(() => {
+    if (autoCollapsed) suppressHoverRef.current = true
+  }, [autoCollapsed])
+  const layoutWidth = expanded ? (width ?? railWidth.width) : RAIL_COLLAPSED_WIDTH
+  useEffect(() => {
+    onLayoutWidthChange?.(layoutWidth)
+  }, [layoutWidth, onLayoutWidthChange])
   const writeExpandedPin = (next: boolean) => {
     setPinnedExpanded(next)
     onPinnedChange?.(next)
@@ -249,6 +278,17 @@ export function CommandRail({
       }
       return true
     })
+  }
+  const collapseRail = () => {
+    suppressHoverRef.current = true
+    cancelPendingHoverOpen()
+    setHoverExpanded(false)
+    setKeyboardExpanded(false)
+    if (pinRequested) writeExpandedPin(false)
+  }
+  const onSidebarClick = () => {
+    if (expanded) collapseRail()
+    else toggleKeyboardExpand()
   }
   const beginResize = (event: React.MouseEvent) => {
     writeCompactLock(false)
@@ -270,30 +310,29 @@ export function CommandRail({
       testId="command-rail-settings"
     />
   )
-  const showExpandControl = !pinnedExpanded && (!expanded || keyboardExpanded)
-  const expandLabel = keyboardExpanded ? 'Collapse sidebar' : 'Expand sidebar'
-  const expandButton = showExpandControl ? (
+  const expandLabel = expanded ? 'Collapse sidebar' : 'Expand sidebar'
+  const expandButton = (
     <ActionTooltip copy={{ label: expandLabel }} side="right">
       <Button
         type="button"
         variant="ghost"
         size="icon-sm"
-        onClick={toggleKeyboardExpand}
+        onClick={onSidebarClick}
         aria-label={expandLabel}
-        aria-expanded={keyboardExpanded}
+        aria-expanded={expanded}
         data-testid="command-rail-expand"
         className="rounded-[var(--radius)] p-0 hover:bg-[var(--state-hover,var(--accent))]"
         style={{
           width: RAIL_BUTTON_SIZE,
           height: RAIL_BUTTON_SIZE,
-          color: keyboardExpanded ? 'var(--accent-blue)' : 'var(--text-muted)',
-          backgroundColor: keyboardExpanded ? 'var(--accent-blue-bg)' : undefined,
+          color: expanded ? 'var(--accent-blue)' : 'var(--text-muted)',
+          backgroundColor: expanded ? 'var(--accent-blue-bg)' : undefined,
         }}
       >
-        <Sidebar size={RAIL_ICON_SIZE} weight={keyboardExpanded ? 'fill' : 'regular'} />
+        <Sidebar size={RAIL_ICON_SIZE} weight={expanded ? 'fill' : 'regular'} />
       </Button>
     </ActionTooltip>
-  ) : null
+  )
   return (
     <div
       ref={railRef}
@@ -311,7 +350,10 @@ export function CommandRail({
         }
         openFromHover()
       }}
-      onMouseLeave={cancelPendingHoverOpen}
+      onMouseLeave={() => {
+        suppressHoverRef.current = false
+        cancelPendingHoverOpen()
+      }}
       style={{
         width: expanded ? (width ?? railWidth.width) : RAIL_COLLAPSED_WIDTH,
         marginRight: overlaying ? -((width ?? railWidth.width) - RAIL_COLLAPSED_WIDTH) : undefined,
