@@ -7,6 +7,7 @@ import {
   removeFixtureVaultCopy,
 } from '../helpers/fixtureVault'
 import { executeCommand, openCommandPalette } from './helpers'
+import { clickNoteActionIfOffered } from '../helpers/noteActions'
 import { triggerMenuCommand } from './testBridge'
 
 let tempVaultDir: string
@@ -66,10 +67,8 @@ async function openRawMode(page: Page) {
 }
 
 async function openPropertiesPanel(page: Page) {
-  const openPanelButton = page.getByRole('button', { name: 'Open the properties panel' })
-  if (await openPanelButton.count()) {
-    await openPanelButton.click()
-  }
+  // Offered inline on a wide note, behind "…" on a narrow one; absent once open.
+  await clickNoteActionIfOffered(page, 'Open the properties panel')
 }
 
 async function getRawEditorContent(page: Page): Promise<string> {

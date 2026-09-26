@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { createFixtureVaultCopy, openFixtureVault, removeFixtureVaultCopy } from '../helpers/fixtureVault'
+import { chooseNotePlacement } from '../helpers/noteActions'
 
 let tempVaultDir: string
 
@@ -43,6 +44,9 @@ test.describe('Breadcrumb action icon size regression', () => {
     await selectAlphaProject(page)
 
     await expect(page.locator('.breadcrumb-bar')).toBeVisible({ timeout: 5_000 })
+    // A note opens beside Chat and folds its actions into "…" when that pane
+    // is narrow. On top gives the full width, where the actions sit inline.
+    await chooseNotePlacement(page, 'top')
 
     await expectIconSize('Add to favorites', page)
     await expectIconSize('Set note as organized', page)

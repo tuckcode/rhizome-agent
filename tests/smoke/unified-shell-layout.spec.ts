@@ -5,6 +5,7 @@ import {
   removeFixtureVaultCopy,
 } from '../helpers/fixtureVault'
 import { sendShortcut, waitForKeyboardShortcutsReady } from './helpers'
+import { chooseNotePlacement } from '../helpers/noteActions'
 
 let tempVaultDir: string
 
@@ -79,7 +80,7 @@ test.describe('Unified shell geometry', () => {
     await expect(page.getByTestId('note-list-container')).toBeVisible()
   })
 
-  test('opens a note above Chat and keeps the Notes list @smoke', async ({ page }) => {
+  test('opens a note beside Chat as the research desk and keeps the Notes list @smoke', async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 900 })
     await openFixtureVault(page, tempVaultDir)
     await openAlphaProject(page)
@@ -91,15 +92,16 @@ test.describe('Unified shell geometry', () => {
     const noteEditor = page.locator('.app__note-editor:not(.app__note-editor--idle)')
     await expect(noteEditor).toBeVisible()
     await expect(page.getByTestId('vault-panel')).toBeVisible()
-    await expect(page.getByTestId('chat-note-editor-resize')).toHaveAttribute('aria-orientation', 'horizontal')
-    await expect(page.getByRole('radio', { name: 'Note on top of Chat' })).toBeVisible()
-    await expect(page.getByRole('radio', { name: 'Note beside Chat' })).toBeVisible()
+    // Native audit 2026-09-26: opening a note makes the research desk when both fit.
+    await expect(page.getByTestId('chat-center')).toHaveAttribute('data-workspace', 'desk')
+    await expect(page.getByTestId('chat-note-editor-resize')).toHaveAttribute('aria-orientation', 'vertical')
+    await expect(page.getByTestId('breadcrumb-close-note')).toBeVisible()
 
     const noteBox = await noteEditor.boundingBox()
     const chatBox = await page.getByTestId('chat-home').boundingBox()
     expect(noteBox).toBeTruthy()
     expect(chatBox).toBeTruthy()
-    expect(noteBox!.y + noteBox!.height).toBeLessThanOrEqual(chatBox!.y + 2)
+    expect(noteBox!.x).toBeGreaterThanOrEqual(chatBox!.x + chatBox!.width - 2)
 
     await page.setViewportSize({ width: 1100, height: 800 })
     await expect(shell).toHaveAttribute('data-compact-vault', 'false')
@@ -139,7 +141,7 @@ test.describe('Unified shell geometry', () => {
     await openFixtureVault(page, tempVaultDir)
     await openAlphaProject(page)
 
-    await page.getByRole('radio', { name: 'Note beside Chat' }).click()
+    await chooseNotePlacement(page, 'beside')
 
     const shell = page.locator('.app')
     await expect(shell).toHaveAttribute('data-pane-preset', 'read')
@@ -155,7 +157,7 @@ test.describe('Unified shell geometry', () => {
     expect(chatBox).toBeTruthy()
     expect(noteBox!.x).toBeGreaterThanOrEqual(chatBox!.x + chatBox!.width - 2)
 
-    await page.getByRole('radio', { name: 'Note on top of Chat' }).click()
+    await chooseNotePlacement(page, 'top')
     await expect(shell).toHaveAttribute('data-pane-preset', 'chat')
     await expect(shell).toHaveAttribute('data-compact-vault', 'false')
     await expect(page.getByTestId('vault-panel')).toHaveCount(0)
