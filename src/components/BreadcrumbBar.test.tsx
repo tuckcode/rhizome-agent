@@ -761,6 +761,131 @@ describe('BreadcrumbBar — action buttons always right-aligned', () => {
   })
 })
 
+describe('BreadcrumbBar — narrow layout keeps title, overflow trigger, and close visible', () => {
+  it('gives the title a minimum visible width so it never collapses to a sliver', () => {
+    const { container } = render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
+    expect(container.querySelector('.breadcrumb-bar__title')).toHaveClass('min-w-[6ch]')
+  })
+
+  it('moves the layout control out of the inline row once overflow collapses', async () => {
+    const restoreMeasurement = mockCollapsedBreadcrumbOverflow()
+
+    try {
+      const { container } = render(
+        <BreadcrumbBar
+          entry={baseEntry}
+          {...defaultProps}
+          leadingControl={<div data-testid="note-layout-toggle">On top</div>}
+        />,
+      )
+
+      await waitFor(() => {
+        expect(container.querySelector('.breadcrumb-bar__actions')).toHaveAttribute('data-overflow-collapsed', 'true')
+      })
+      expect(container.querySelector('.breadcrumb-bar__layout-control')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('note-layout-toggle')).not.toBeInTheDocument()
+
+      const menu = await openOverflowMenu()
+      expect(within(menu).getByTestId('note-layout-toggle')).toBeInTheDocument()
+    } finally {
+      restoreMeasurement()
+    }
+  })
+
+  it('keeps the layout control inline when overflow has not collapsed', () => {
+    render(
+      <BreadcrumbBar
+        entry={baseEntry}
+        {...defaultProps}
+        leadingControl={<div data-testid="note-layout-toggle">On top</div>}
+      />,
+    )
+
+    expect(screen.getByTestId('note-layout-toggle').closest('.breadcrumb-bar__layout-control')).toBeInTheDocument()
+  })
+
+  it('always keeps the close button outside the collapsible overflow group', () => {
+    const onCloseNote = vi.fn()
+    const { container } = render(<BreadcrumbBar entry={baseEntry} {...defaultProps} onCloseNote={onCloseNote} />)
+
+    const close = screen.getByTestId('breadcrumb-close-note')
+    expect(close.closest('.breadcrumb-bar__overflowable-action')).toBeNull()
+    expect(container.querySelector('.breadcrumb-bar__actions')?.lastElementChild).toBe(close)
+  })
+
+  it('moves favorite, organized, reload, lock, and reveal-file actions into the overflow menu when collapsed', async () => {
+    const restoreMeasurement = mockCollapsedBreadcrumbOverflow()
+
+    try {
+      const { container } = render(
+        <BreadcrumbBar
+          entry={baseEntry}
+          {...defaultProps}
+          onToggleFavorite={vi.fn()}
+          onToggleOrganized={vi.fn()}
+          onReloadVault={vi.fn()}
+          onToggleNoteLock={vi.fn()}
+          onRevealFile={vi.fn()}
+          onCopyFilePath={vi.fn()}
+        />,
+      )
+
+      await waitFor(() => {
+        expect(container.querySelector('.breadcrumb-bar__actions')).toHaveAttribute('data-overflow-collapsed', 'true')
+      })
+
+      const menu = await openOverflowMenu()
+      expect(within(menu).getByRole('menuitem', { name: 'Add to favorites' })).toBeInTheDocument()
+      expect(within(menu).getByRole('menuitem', { name: 'Set note as organized' })).toBeInTheDocument()
+      expect(within(menu).getByRole('menuitem', { name: 'Reload vault' })).toBeInTheDocument()
+      expect(within(menu).getByRole('menuitem', { name: 'Lock note' })).toBeInTheDocument()
+      expect(within(menu).getByRole('menuitem', { name: 'Reveal in Finder' })).toBeInTheDocument()
+    } finally {
+      restoreMeasurement()
+    }
+  })
+
+  it('clicking the favorite item in the overflow menu calls the same handler as the inline button', async () => {
+    const restoreMeasurement = mockCollapsedBreadcrumbOverflow()
+    const onToggleFavorite = vi.fn()
+
+    try {
+      const { container } = render(
+        <BreadcrumbBar entry={baseEntry} {...defaultProps} onToggleFavorite={onToggleFavorite} />,
+      )
+
+      await waitFor(() => {
+        expect(container.querySelector('.breadcrumb-bar__actions')).toHaveAttribute('data-overflow-collapsed', 'true')
+      })
+
+      const menu = await openOverflowMenu()
+      fireEvent.click(within(menu).getByRole('menuitem', { name: 'Add to favorites' }))
+      expect(onToggleFavorite).toHaveBeenCalledTimes(1)
+    } finally {
+      restoreMeasurement()
+    }
+  })
+
+  it('does not duplicate favorite/organized/reload/lock actions in the permanent overflow menu when not collapsed', async () => {
+    render(
+      <BreadcrumbBar
+        entry={baseEntry}
+        {...defaultProps}
+        onToggleFavorite={vi.fn()}
+        onToggleOrganized={vi.fn()}
+        onReloadVault={vi.fn()}
+        onToggleNoteLock={vi.fn()}
+      />,
+    )
+
+    const menu = await openOverflowMenu()
+    expect(within(menu).queryByRole('menuitem', { name: 'Add to favorites' })).not.toBeInTheDocument()
+    expect(within(menu).queryByRole('menuitem', { name: 'Set note as organized' })).not.toBeInTheDocument()
+    expect(within(menu).queryByRole('menuitem', { name: 'Reload vault' })).not.toBeInTheDocument()
+    expect(within(menu).queryByRole('menuitem', { name: 'Lock note' })).not.toBeInTheDocument()
+  })
+})
+
 describe('BreadcrumbBar — raw editor toggle', () => {
   it('shows Raw editor button with tooltip "Raw editor" when rawMode is off', () => {
     const onToggleRaw = vi.fn()

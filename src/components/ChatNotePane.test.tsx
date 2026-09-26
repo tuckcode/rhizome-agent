@@ -63,6 +63,15 @@ describe('ChatNotePane', () => {
     render(<ChatNotePane label="gone.md" error onClose={vi.fn()} />)
     expect(screen.getByRole('alert')).toBeInTheDocument()
   })
+
+  it('keeps the label a minimum visible width so it never shrinks to nothing beside back/close', () => {
+    const label = 'wiki/decisions/memory-loop.md'
+    render(<ChatNotePane label={label} onBackToNotes={vi.fn()} onClose={vi.fn()} />)
+
+    expect(screen.getByText(label)).toHaveClass('min-w-[6ch]')
+    expect(screen.getByRole('button', { name: 'Back to notes' })).toHaveClass('shrink-0')
+    expect(screen.getByRole('button', { name: 'Close note' })).toHaveClass('shrink-0')
+  })
 })
 
 describe('ChatNotePane — resizing', () => {
