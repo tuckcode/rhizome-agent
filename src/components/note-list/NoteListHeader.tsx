@@ -168,17 +168,42 @@ function HeaderLeading({
  * scrollWidth-vs-clientWidth check since this title has no sibling crumbs to
  * measure around.
  */
+/**
+ * Move optional tools into "…" once the title row cannot hold them.
+ *
+ * Measures the title, its flex wrapper, and the row: the wrapper can be
+ * squeezed to nothing while the title keeps its own minimum width and
+ * spills under the tools, which a title-only check never sees (browser
+ * preview, 2026-09-26). Collapsing frees exactly the room that made the
+ * title fit, so re-expanding waits until the row is as wide as it needed
+ * to be; otherwise the header flips back and forth on every measure.
+ */
 function useNoteListHeaderOverflow(titleRef: RefObject<HTMLElement | null>) {
   const [collapsed, setCollapsed] = useState(false)
+  const neededRowWidth = useRef<number | null>(null)
 
   useLayoutEffect(() => {
     const title = titleRef.current
-    if (!title) return undefined
+    const wrapper = title?.parentElement
+    const row = wrapper?.parentElement
+    if (!title || !wrapper || !row) return undefined
 
     let frame = 0
     const measure = () => {
-      const isTruncated = title.scrollWidth > title.clientWidth + 1
-      setCollapsed((current) => (current === isTruncated ? current : isTruncated))
+      const rowWidth = row.clientWidth
+      if (rowWidth <= 0) return
+      const shortfall = Math.max(
+        title.scrollWidth - title.clientWidth,
+        wrapper.scrollWidth - wrapper.clientWidth,
+        row.scrollWidth - row.clientWidth,
+      )
+      if (!collapsed && shortfall > 1) {
+        neededRowWidth.current = rowWidth + shortfall
+        setCollapsed(true)
+      } else if (collapsed && neededRowWidth.current !== null && rowWidth >= neededRowWidth.current) {
+        neededRowWidth.current = null
+        setCollapsed(false)
+      }
     }
     const scheduleMeasure = () => {
       cancelAnimationFrame(frame)
@@ -191,7 +216,7 @@ function useNoteListHeaderOverflow(titleRef: RefObject<HTMLElement | null>) {
     }
 
     const resizeObserver = new ResizeObserver(scheduleMeasure)
-    resizeObserver.observe(title)
+    resizeObserver.observe(row)
 
     return () => {
       cancelAnimationFrame(frame)
