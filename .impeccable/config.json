@@ -23,6 +23,12 @@
         "value": "inter",
         "createdAt": "2026-08-30T04:06:26.754Z",
         "reason": "Claude, 2026-08-30: Inter is this app's interface font by three independent deliberate acts -- index.html loads it from Google Fonts with weights 400;500;600;700 named explicitly, index.css:22 sets it as the :root family, and index.css:511 documents the label scale as 'Label typography (Inter, sentence case)'. The app also loads IBM Plex Mono for code and bundles JetBrains Mono locally for the wordmark, so the typeface roster is a considered set, not a default."
+      },
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "createdAt": "2026-09-26T19:35:11.826Z",
+        "reason": "Claude: Atticus asked the landing page to match primeintellect.ai, which sets its UI in Geist (captured computed styles, 2026-09-26)"
       }
     ]
   }
