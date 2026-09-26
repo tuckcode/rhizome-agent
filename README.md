@@ -2,9 +2,21 @@
 
 ![Rhizome Agent — Your work. Your memory.](src/assets/brand/rhizome-organic-hero.png)
 
-**Not [Rhizome Desktop](https://github.com/knispo/rhizome).** Separate private app.
+**A macOS chat app for [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) that remembers your work in a plain-markdown vault you own.**
+Bring your own model. Chat, open notes beside the conversation, and keep what matters as notes on disk.
 
-Desktop chat shell whose **harness** is [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) (session, tools, skills, OAuth providers, compaction / RLM). Rhizome’s vault capabilities show up through MCP when you attach a vault — the product center of gravity is **chat + agent harness**, not the full desktop wiki UI.
+<!-- Demo GIF goes here: record the packaged app (Cmd+Shift+5), then
+     ![Rhizome Agent demo](docs/assets/readme-demo.gif) -->
+
+## Install (developer preview, macOS)
+
+```bash
+npm i -g prime-agent && prime-agent          # install Prime and log in once
+git clone https://github.com/tuckcode/rhizome-agent && cd rhizome-agent && pnpm install && pnpm tauri dev
+```
+
+Needs Node ^20.19.0 or >=22.12.0, pnpm, and the Rust/Tauri toolchain.
+Details: [`docs/PUBLIC-PREVIEW.md`](docs/PUBLIC-PREVIEW.md).
 
 | | |
 |---|---|
@@ -12,6 +24,11 @@ Desktop chat shell whose **harness** is [Prime Agent](https://github.com/PrimeIn
 | Product name | Rhizome Agent |
 | Package | `rhizome-agent` |
 | Baseline | Snapshot of Rhizome desktop source, then diverged |
+
+Not [Rhizome Desktop](https://github.com/knispo/rhizome), a separate app.
+The agent **harness** is Prime Agent (session, tools, skills, OAuth
+providers, compaction / RLM). Rhizome’s vault tools reach it through MCP
+when you attach a vault.
 
 ## Identity
 
