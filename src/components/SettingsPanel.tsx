@@ -812,6 +812,7 @@ function SettingsBody(props: SettingsBodyProps) {
           loadModelCatalog={loadModelCatalog}
           loadExtensionCatalog={loadExtensionCatalog}
         />
+        <div data-testid="settings-scroll-end-spacer" style={{ minHeight: 'var(--settings-scroll-container-height, 600px)' }} />
       </div>
     </div>
   )
