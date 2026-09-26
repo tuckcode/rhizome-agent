@@ -52,6 +52,8 @@ interface ChatHomeProps {
    * it after the user has closed the pane.
    */
   requestedNote?: { path: string; label: string; requestId: number } | null
+  /** Layout width of the sessions rail. Hover-open does not change this. */
+  railLayoutWidth?: number
   /** Chat engine offer. The banner is the visible control. */
   chatEngineUpdate?: PrimeUpdateStatus
   onApplyChatEngineUpdate?: () => void
@@ -85,6 +87,7 @@ export default function ChatHome({
   requestedNote,
   chatEngineUpdate,
   onApplyChatEngineUpdate,
+  railLayoutWidth,
 }: ChatHomeProps) {
   // Chat is Prime's home canvas (ADR-0166). A direct API model chosen as the
   // global default must not strip Prime chrome or route chat away from Prime.
@@ -135,6 +138,7 @@ export default function ChatHome({
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="chat-home">
       {isPrimeTarget ? (
         <PrimeSessionSubhead
+          railLayoutWidth={railLayoutWidth}
           locale={locale}
           live={Boolean(primeHost?.running)}
           sessionId={primeHost?.sessionId ?? null}

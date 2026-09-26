@@ -393,7 +393,7 @@ export function CommandRail({
       ) : null}
 
       {/* Sessions are the rail. Destinations like Research live elsewhere. */}
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1 overflow-hidden">
         {expanded ? (
           <div
             ref={bindSessionsSlot}
@@ -405,7 +405,7 @@ export function CommandRail({
       </div>
 
       <div
-        className={expanded ? 'flex items-center gap-1' : 'flex flex-col items-center gap-1'}
+        className={`relative z-10 ${expanded ? 'flex items-center gap-1' : 'flex flex-col items-center gap-1'}`}
         data-testid="command-rail-footer"
         style={{ pointerEvents: overlaying ? 'auto' : undefined }}
         onMouseEnter={cancelPendingHoverOpen}

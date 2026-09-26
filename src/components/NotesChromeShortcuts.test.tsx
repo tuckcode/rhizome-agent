@@ -70,7 +70,7 @@ describe('NotesChromeShortcuts', () => {
     }
   })
 
-  it('switches to Changes then opens Mycelium so the docked panel can mount', () => {
+  it('opens Mycelium without switching the note list to Changes', () => {
     const commandListener = vi.fn()
     const chromeListener = vi.fn()
     window.addEventListener(APP_COMMAND_EVENT_NAME, commandListener)
@@ -79,7 +79,7 @@ describe('NotesChromeShortcuts', () => {
     try {
       render(<NotesChromeShortcuts />)
       fireEvent.click(screen.getByRole('button', { name: 'Mycelium' }))
-      expect((commandListener.mock.calls[0]?.[0] as CustomEvent<string>).detail).toBe(APP_COMMAND_IDS.goChanges)
+      expect(commandListener).not.toHaveBeenCalled()
       expect((chromeListener.mock.calls[0]?.[0] as CustomEvent<string>).detail).toBe('mycelium')
       expect(consumePendingConnectionsView()).toBe('mycelium')
     } finally {

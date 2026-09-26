@@ -29,10 +29,5 @@ export function dispatchNotesChrome(destination: NotesChromeDestination): void {
   if (destination === 'graph' || destination === 'mycelium') {
     pendingConnectionsView = destination
   }
-  if (destination === 'mycelium') {
-    window.dispatchEvent(new CustomEvent(APP_COMMAND_EVENT_NAME, {
-      detail: APP_COMMAND_IDS.goChanges,
-    }))
-  }
   window.dispatchEvent(new CustomEvent(NOTES_CHROME_EVENT, { detail: destination }))
 }

@@ -84,6 +84,20 @@ describe('subheadTrafficLightInset', () => {
     expect(contentStart).toBeGreaterThanOrEqual(lightsEnd)
   })
 
+  it('drops the extra inset when the open sidebar is wider than the lights', () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    Object.defineProperty(navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0) AppleWebKit/605.1.15',
+    })
+
+    const inset = Number.parseInt(
+      subheadTrafficLightInset(240)['--subhead-traffic-light-inset'] ?? '',
+      10,
+    )
+    expect(inset).toBe(12)
+  })
+
   it('clears the sessions column header below the traffic lights when it is topmost', () => {
     vi.mocked(isTauri).mockReturnValue(true)
     Object.defineProperty(navigator, 'userAgent', {

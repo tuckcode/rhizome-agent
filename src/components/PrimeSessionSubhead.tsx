@@ -38,6 +38,8 @@ interface PrimeSessionSubheadProps {
   onNewChat?: () => void
   /** Open this session's footprint in Mycelium (#22). */
   onOpenFootprint?: () => void
+  /** Current sessions-rail layout width. Collapsed and expanded differ. */
+  railLayoutWidth?: number
 }
 
 /**
@@ -90,9 +92,10 @@ export function PrimeSessionSubhead({
   problem,
   onNewChat,
   onOpenFootprint,
+  railLayoutWidth,
 }: PrimeSessionSubheadProps) {
   const t = createTranslator(locale)
-  const titleBarBand = overlayTitleBarBandStyle() as CSSProperties
+  const titleBarBand = overlayTitleBarBandStyle(railLayoutWidth) as CSSProperties
   // On Chat this strip is the topmost band, so it *is* the title bar. Without
   // a drag region the window cannot be moved at all from here — Notes has one
   // on the breadcrumb bar, Chat had none.
@@ -109,7 +112,7 @@ export function PrimeSessionSubhead({
   return (
     <div
       className={cn(
-        'app-titlebar-band flex min-h-[30px] shrink-0 items-center gap-2.5 pr-3',
+        'app-titlebar-band flex min-h-[30px] shrink-0 items-end gap-2.5 pb-1.5 pr-3',
         'font-mono text-[11px] tracking-[0.03em] text-muted-foreground',
         // This strip is the window's title bar, so a drag on it has to move
         // the window. Selectable text wins the gesture instead: the pointer

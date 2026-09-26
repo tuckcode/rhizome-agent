@@ -298,7 +298,8 @@ describe('parked organs leftover', () => {
 
   it('mounts Graph and Mycelium only on Changes, not Inbox', () => {
     const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
-    expect(app).toContain('chatCentered && isChangesSelection ? (')
+    expect(app).toContain('chatCentered ? (')
+    expect(app).not.toContain('chatCentered && isChangesSelection ? (')
     expect(app).not.toMatch(/isInboxSelection[\s\S]{0,80}GraphView/)
   })
 

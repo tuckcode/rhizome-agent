@@ -70,7 +70,8 @@ describe('the rail puts sessions in its open middle', () => {
     fireEvent.mouseEnter(screen.getByTestId('command-rail'))
 
     const sessions = await screen.findByTestId('command-rail-sessions')
-    expect(sessions).toBeInTheDocument()
+    expect(sessions.parentElement).toHaveClass('overflow-hidden')
+    expect(screen.getByTestId('command-rail-footer')).toHaveClass('z-10')
     expect(onSessionsSlotReady).toHaveBeenCalledWith(sessions)
     expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).toBeNull()
   })

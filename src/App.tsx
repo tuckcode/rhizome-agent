@@ -5,7 +5,7 @@ import { readStoredBooleanPreference, writeStoredBooleanPreference } from './lib
 import { APP_STORAGE_KEYS } from './constants/appStorage'
 import { usePanelWidth } from './hooks/usePanelWidth'
 import { startResizeDrag } from './utils/startResizeDrag'
-import { overlayTitleBarBandStyle, subheadTrafficLightInset } from './utils/trafficLights'
+import { COMMAND_RAIL_WIDTH_PX, overlayTitleBarBandStyle, subheadTrafficLightInset } from './utils/trafficLights'
 import { Sidebar } from './components/Sidebar'
 import { CommandRail } from './components/CommandRail'
 import { NoteList } from './components/NoteList'
@@ -1599,6 +1599,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     hideNotesForCanvas,
     chatDestination: isChatDestination,
   })
+  const sessionsRailLayoutWidth = commandRailEnabled && railPinned && fittedRailPinned
+    ? paneWidths.rail
+    : commandRailEnabled
+      ? COMMAND_RAIL_WIDTH_PX
+      : 0
   if ((!notesOpen || hideNotesForCanvas) && notesFocus) {
     setNotesFocus(false)
   }
@@ -2012,7 +2017,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         focused={notesFocus}
         onFocusToggle={handleNotesFocusToggle}
       />
-      {chatCentered && isChangesSelection ? (
+      {chatCentered ? (
         <ConnectionsPanel
           ref={connectionsPanelRef}
           vaultPath={resolvedPath}
@@ -2054,6 +2059,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         requestedNote={chatNoteRequest}
         chatEngineUpdate={primeUpdateStatus}
         onApplyChatEngineUpdate={() => { void primeUpdateActions.applyEngineUpdate() }}
+        railLayoutWidth={sessionsRailLayoutWidth}
       />
     </Suspense>
   )
@@ -2096,7 +2102,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                 data-split={activeTab ? chatNoteSplitMode : 'stacked'}
                 style={{
                   ...(isGraphDestination || isMyceliumDestination || isResearchDestination || hideEditorColumn ? { display: 'none' } : {}),
-                  ...subheadTrafficLightInset(),
+                  ...subheadTrafficLightInset(sessionsRailLayoutWidth),
                 }}
               >
                 <div className="app__chat-center-body">

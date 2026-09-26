@@ -22,7 +22,7 @@ function handleClassName(edge: 'leading' | 'trailing', placement: 'flow' | 'abso
   // w-4 is 14px at this app's 14px root — the 12px floor from the UI audit.
   // w-1 (the old 4px strip) took three attempts to grab.
   const hit =
-    'z-30 w-4 cursor-col-resize bg-transparent transition-colors hover:bg-[var(--border)]'
+    'z-30 w-4 cursor-col-resize bg-transparent transition-colors hover:bg-[var(--border)] before:pointer-events-none before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-[var(--sidebar-border)]'
   if (placement === 'absolute') {
     const inset = edge === 'trailing' ? '-left-[10px]' : '-right-[10px]'
     return `absolute inset-y-0 ${inset} ${hit}`
