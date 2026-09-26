@@ -564,6 +564,14 @@ function shouldCollapseBreadcrumbOverflow(
   actions: HTMLDivElement,
   expandedActionsWidth: number,
 ) {
+  // No real measurement yet (unlaid-out first frame, or an environment with
+  // no layout engine at all) reads as every rect being exactly zero, which
+  // would otherwise satisfy `0 > negative-gap` and report "collapsed" for a
+  // bar nobody has actually measured. Treat that as "don't know yet" rather
+  // than "too narrow" — collapsing now moves the placement toggle and every
+  // optional action into the overflow menu, which is a worse false positive
+  // than briefly under-collapsing a genuinely narrow bar.
+  if (expandedActionsWidth <= 0) return false
   const titleLeft = title.getBoundingClientRect().left
   const availableTitleWidth = expandedActionsLeft(actions, expandedActionsWidth) - titleLeft - TITLE_ACTION_GAP_PX
   return measureNaturalTitleWidth(title) > availableTitleWidth
