@@ -17,8 +17,17 @@ import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
  * flight, or when the matched session has no title (a session before its
  * first user turn) — the caller falls back to its own "New chat" label.
  */
-export function usePrimeActiveSessionTitle(sessionPath: string | null | undefined): string | null {
-  const [title, setTitle] = useState<string | null>(null)
+export function usePrimeActiveSessionTitle(
+  sessionPath: string | null | undefined,
+  /**
+   * Re-read when this changes. ChatHome passes the host's `isStreaming`, so
+   * a new chat picks up the title Prime gives it after its first turn.
+   */
+  refreshKey?: unknown,
+): string | null {
+  // Keyed by path: a title read for one session is never shown for another,
+  // even for the moment between a switch and the next read resolving.
+  const [read, setRead] = useState<{ path: string, title: string | null } | null>(null)
 
   useEffect(() => {
     if (!sessionPath) return
@@ -27,17 +36,13 @@ export function usePrimeActiveSessionTitle(sessionPath: string | null | undefine
     void callHostOr<PrimeSessionSummary[]>('list_prime_session_summaries', []).then((sessions) => {
       if (cancelled) return
       const match = sessions.find((session) => session.path === sessionPath)
-      const trimmed = match?.title?.trim()
-      setTitle(trimmed || null)
+      setRead({ path: sessionPath, title: match?.title?.trim() || null })
     })
 
     return () => {
       cancelled = true
     }
-  }, [sessionPath])
+  }, [sessionPath, refreshKey])
 
-  // No session, no title — the read above only ever runs for an attached
-  // one, so a stale value from a session that just detached is discarded
-  // here rather than by a synchronous setState in the effect body.
-  return sessionPath ? title : null
+  return sessionPath && read?.path === sessionPath ? read.title : null
 }
