@@ -185,8 +185,8 @@ publication clearance.
 
 | Item | Present | Gap |
 |---|---|---|
-| Root `LICENSE` | GNU AGPL v3 text | README still says confirm before a public `tuckcode` release. That confirmation has not happened. |
-| `package.json` / `Cargo.toml` | `AGPL-3.0-or-later` | Cargo `authors` still lists the Desktop snapshot author. |
+| Root `LICENSE` | GNU AGPL v3 text | Atticus confirmed AGPL-3.0-or-later for the public `tuckcode` release on 2026-09-26. README says so. |
+| `package.json` / `Cargo.toml` / `mcp-server/package.json` | `AGPL-3.0-or-later` | Cargo `authors` still lists the Desktop snapshot author. |
 | GitHub license metadata | `agpl-3.0` on the private repo | Repository is private. Visibility change is a separate approval. |
 | Mindwalk / Mycelium | UI footer: Mindwalk (MIT) © 2026 Ricko Yu | No root `NOTICE` / `THIRD_PARTY` file. |
 | Brand / organic artwork | In-repo brand docs | No separate attribution file for inherited Desktop assets. |
