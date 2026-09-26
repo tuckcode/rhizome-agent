@@ -35,6 +35,9 @@ export function isTransientAgentFailureText(text: string): boolean {
   if (/missing field vaultPath/iu.test(t)) return true
   if (/prime.?agent is not available/iu.test(t)) return true
   if (/not authenticated/iu.test(t) && t.length < 400) return true
+  // Logged-out CLI agent (native audit 2026-09-25 saved this as a concept)
+  if (/^Not logged in/iu.test(t)) return true
+  if (/please run \/login/iu.test(t)) return true
   if (/^Request was aborted/iu.test(t)) return true
   return false
 }

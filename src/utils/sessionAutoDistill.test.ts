@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   buildSessionAutoDistillText,
   isSessionAutoDistillEnabled,
+  isTransientAgentFailureText,
   queueSessionAutoDistill,
   turnAlreadyCalledDistill,
 } from './sessionAutoDistill'
@@ -49,6 +50,12 @@ describe('sessionAutoDistill', () => {
         'Error: invalid args request for command stream_prime_session: missing field vaultPath',
       ),
     ).toBeNull()
+  })
+
+  it('skips a logged-out agent reply so it never becomes a wiki concept', () => {
+    expect(isTransientAgentFailureText('Not logged in · Please run /login')).toBe(true)
+    expect(isTransientAgentFailureText('Please run /login to continue.')).toBe(true)
+    expect(isTransientAgentFailureText('Login flows in OAuth 2.1 use PKCE.')).toBe(false)
   })
 
   it('builds a turn payload when the assistant reply is substantial', () => {
