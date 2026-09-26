@@ -313,14 +313,13 @@
   background: var(--border);
 }
 
-@container editor (max-width: 760px) {
-  .prime-subhead__uptime {
-    display: none;
-  }
-}
-
-@container editor (max-width: 620px) {
-  .prime-subhead__session {
+/* The title now owns the strip's space (Astra header audit, 2026-09-26): the
+   command palette button gives up its label and shortcut hint first, before
+   the title has to truncate. Session id, vault path, and uptime moved behind
+   the status popover and are never inline here, so they no longer need a
+   width to hide at. */
+@container editor (max-width: 900px) {
+  .prime-subhead__command-label {
     display: none;
   }
 }

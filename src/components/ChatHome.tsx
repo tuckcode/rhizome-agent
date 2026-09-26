@@ -14,6 +14,7 @@ import { useChatNoteContent } from '../hooks/useChatNoteContent'
 import { usePanelWidth } from '../hooks/usePanelWidth'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
+import { usePrimeActiveSessionTitle } from '../hooks/usePrimeActiveSessionTitle'
 import { resolveChatOpenNote } from '../utils/resolveChatOpenNote'
 import { agentTargets, type AiTarget } from '../lib/aiTargets'
 import type { AiAgentId, AiAgentReadiness } from '../lib/aiAgents'
@@ -104,6 +105,7 @@ export default function ChatHome({
   }, [defaultAiTarget, isPrimeChat])
   const isPrimeTarget = isPrimeChat && chatTarget?.kind !== 'api_model'
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
+  const sessionTitle = usePrimeActiveSessionTitle(primeHost?.sessionPath ?? null)
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
   // One read of the open note, shared by the pane and the agent. Chat used to
@@ -148,6 +150,7 @@ export default function ChatHome({
           vaultPath={vaultPath}
           startedAt={primeHost?.startedAt ?? null}
           problem={primeHost?.problem ?? null}
+          sessionTitle={sessionTitle}
           onNewChat={() => newChatRef.current?.()}
           onOpenFootprint={
             onOpenSessionFootprint && primeHost?.sessionPath

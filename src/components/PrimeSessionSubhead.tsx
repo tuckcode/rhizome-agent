@@ -1,7 +1,8 @@
 import { CirclesThree, MagnifyingGlass, Plus } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../hooks/appCommandCatalog'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import { cn } from '@/lib/utils'
 import { useDragRegion } from '../hooks/useDragRegion'
 import { createTranslator, type AppLocale } from '../lib/i18n'
@@ -35,6 +36,14 @@ interface PrimeSessionSubheadProps {
    * actionable rather than a spinner.
    */
   problem?: PrimeConnectionProblem | null
+  /**
+   * The attached conversation's own title, when one has formed.
+   *
+   * `null`/`undefined` means Prime has not derived one yet — before the first
+   * user turn, or while the read is still in flight — and the strip falls
+   * back to "New chat" rather than showing nothing.
+   */
+  sessionTitle?: string | null
   /** Frame A hides AiPanelHeader — New chat lives here instead. */
   onNewChat?: () => void
   /** Open this session's footprint in Mycelium (#22). */
@@ -75,16 +84,20 @@ function describeProblem(
   }
 }
 
-function Separator() {
-  return <span aria-hidden="true" className="h-3 w-px shrink-0 bg-border" />
+/** Swallow the mousedown so a click on header chrome does not drag the window. */
+function stopHeaderDrag(event: ReactMouseEvent) {
+  event.stopPropagation()
 }
 
 /**
- * Frame A's telemetry strip: what session you are in, against what vault.
+ * Frame A's title strip: what conversation this is, with everything else
+ * behind a status control.
  *
- * Mono and muted on purpose — this is instrumentation, not content. Model,
- * thinking level, and vault switching live on the composer (#38), where the
- * hands already are. Duplicating them here is how the two would disagree.
+ * A session identifier, a vault path, and an uptime clock used to sit inline
+ * next to the connection dot, competing with the one thing a person actually
+ * scans for here — which conversation they are in. That instrumentation is
+ * still one click away, in the status popover; the strip itself now leads
+ * with the title and stays quiet when there is nothing to act on.
  */
 export function PrimeSessionSubhead({
   locale = 'en',
@@ -93,6 +106,7 @@ export function PrimeSessionSubhead({
   vaultPath,
   startedAt,
   problem,
+  sessionTitle,
   onNewChat,
   onOpenFootprint,
   onOpenCommandPalette,
@@ -111,17 +125,19 @@ export function PrimeSessionSubhead({
   // a minute-resolution label — and if polling stops, a frozen uptime is the
   // honest reading, since nothing is confirming the session is alive.
   const uptime = live ? primeSessionUptime(startedAt) : null
-  const problemMessage = describeProblem(problem, t)
+  // Connected is connected — a stale problem from before reconnecting must
+  // not shout over it.
+  const problemMessage = live ? null : describeProblem(problem, t)
+  const connectionLabel = live ? t('ai.subhead.live') : (problemMessage ?? t('ai.subhead.idle'))
+  // The trimmed title reused from `ai.sessions.newChat` (also the New chat
+  // button's own label) rather than a fresh string — one name for "no
+  // conversation yet" everywhere it appears.
+  const displayTitle = sessionTitle?.trim() || t('ai.sessions.newChat')
 
   return (
     <div
       className={cn(
-        'app-titlebar-band flex min-h-[30px] shrink-0 items-end gap-2.5 pb-1.5 pr-3',
-        'font-mono text-[11px] tracking-[0.03em] text-muted-foreground',
-        // This strip is the window's title bar, so a drag on it has to move
-        // the window. Selectable text wins the gesture instead: the pointer
-        // sweeps a text selection and the window never moves, which leaves a
-        // maximised window with no obvious way to grab it.
+        'app-titlebar-band flex min-h-[30px] shrink-0 items-center gap-2.5 pb-1.5 pr-3',
         'select-none',
         // macOS paints overlay traffic lights at x=14 (tauri.conf.json).
         // This strip is ChatHome's title bar, so the inset has to clear
@@ -132,107 +148,132 @@ export function PrimeSessionSubhead({
       data-testid="prime-session-subhead"
       onMouseDown={onDragRegionMouseDown}
     >
-      <span className="inline-flex min-w-0 items-center gap-1.5">
-        <span
-          aria-hidden="true"
-          className={cn(
-            'size-[5px] rounded-full',
-            // Status, not brand: --primary follows the user's accent choice, so
-            // a red accent would make a healthy session read as an error.
-            live ? 'bg-[var(--accent-green)]' : 'bg-muted-foreground/50',
-          )}
-        />
-        <span
-          className={cn(
-            'truncate',
-            live && 'text-[var(--accent-green)]',
-            // A problem is not the same as idle: idle is a resting state, this
-            // is something the user has to act on.
-            !live && problemMessage && 'text-[var(--accent-amber,inherit)] text-foreground',
-          )}
-          title={live ? t('ai.subhead.live') : (problemMessage ?? t('ai.subhead.idle'))}
-        >
-          {live ? t('ai.subhead.live') : (problemMessage ?? t('ai.subhead.idle'))}
-        </span>
+      <span
+        className="min-w-0 flex-1 truncate font-sans text-[13px] font-medium text-foreground"
+        title={displayTitle}
+        data-testid="prime-session-title"
+      >
+        {displayTitle}
       </span>
 
-      {shortId ? (
-        <>
-          <Separator />
-          <span className="prime-subhead__session shrink-0">
-            sess_<strong className="font-medium text-foreground">{shortId}</strong>
-          </span>
-        </>
-      ) : null}
-
-      {vault ? (
-        <>
-          <Separator />
-          <span className="min-w-0 truncate">
-            {t('ai.subhead.vault')} <strong className="font-medium text-foreground">{vault}</strong>
-          </span>
-        </>
-      ) : null}
-
-      {uptime ? (
-        <>
-          <Separator />
-          <span className="prime-subhead__uptime shrink-0">
-            {t('ai.subhead.uptime')}{' '}
-            <strong className="font-medium text-foreground">{uptime}</strong>
-          </span>
-        </>
-      ) : null}
-
-      {onOpenCommandPalette || onOpenFootprint || onNewChat ? (
-        <div className="ml-auto flex shrink-0 items-center gap-1.5">
-          {onOpenCommandPalette ? (
+      <div className="ml-auto flex shrink-0 items-center gap-1.5">
+        <Popover>
+          <PopoverTrigger asChild>
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className="h-[32px] gap-1.5 px-2.5 font-sans text-[12px] font-normal"
-              onClick={onOpenCommandPalette}
-              onMouseDown={(event) => event.stopPropagation()}
-              data-testid="open-command-palette"
+              className={cn(
+                'h-[26px] gap-1.5 px-1.5 font-mono text-[11px] font-normal tracking-[0.03em]',
+                !problemMessage && 'w-[26px] px-0',
+              )}
+              onMouseDown={stopHeaderDrag}
+              aria-label="Session status"
+              data-testid="prime-session-status"
             >
-              <MagnifyingGlass size={14} />
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'size-[5px] shrink-0 rounded-full',
+                  // Status, not brand: --primary follows the user's accent
+                  // choice, so a red accent would make a healthy session
+                  // read as an error.
+                  live ? 'bg-[var(--accent-green)]' : 'bg-muted-foreground/50',
+                )}
+              />
+              {/* Idle and connected are resting states and stay silent but
+                  for the dot — a problem is something to act on, so it stays
+                  legible without opening the popover. */}
+              {problemMessage ? (
+                <span className="truncate text-[var(--accent-amber,inherit)] text-foreground">
+                  {problemMessage}
+                </span>
+              ) : null}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            className="w-64 font-mono text-[11px] tracking-[0.03em] text-muted-foreground"
+            onMouseDown={stopHeaderDrag}
+          >
+            <div className="flex flex-col gap-1.5">
+              <span
+                className={cn(live && 'text-[var(--accent-green)]')}
+                data-testid="prime-subhead-connection"
+              >
+                {connectionLabel}
+              </span>
+              {shortId ? (
+                <span className="prime-subhead__session" data-testid="prime-subhead-session">
+                  sess_<strong className="font-medium text-foreground">{shortId}</strong>
+                </span>
+              ) : null}
+              {vault ? (
+                <span className="prime-subhead__vault" data-testid="prime-subhead-vault">
+                  {t('ai.subhead.vault')}{' '}
+                  <strong className="font-medium text-foreground">{vault}</strong>
+                </span>
+              ) : null}
+              {uptime ? (
+                <span className="prime-subhead__uptime" data-testid="prime-subhead-uptime">
+                  {t('ai.subhead.uptime')}{' '}
+                  <strong className="font-medium text-foreground">{uptime}</strong>
+                </span>
+              ) : null}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {onOpenCommandPalette ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-[32px] gap-1.5 px-2.5 font-sans text-[12px] font-normal"
+            onClick={onOpenCommandPalette}
+            onMouseDown={stopHeaderDrag}
+            aria-label="Command Palette"
+            data-testid="open-command-palette"
+          >
+            <MagnifyingGlass size={14} />
+            <span className="prime-subhead__command-label inline-flex items-center gap-1.5">
               Command Palette
               <kbd className="font-sans text-[11px] text-muted-foreground">
                 {getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewCommandPalette)}
               </kbd>
-            </Button>
-          ) : null}
-          {onOpenFootprint ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="h-[32px] w-[32px] p-0 [&_svg:not([class*=size-])]:size-3.5"
-              onClick={onOpenFootprint}
-              onMouseDown={(event) => event.stopPropagation()}
-              aria-label={t('mycelium.title')}
-              title={t('mycelium.title')}
-              data-testid="prime-session-footprint"
-            >
-              <CirclesThree size={14} />
-            </Button>
-          ) : null}
-          {onNewChat ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="h-[32px] w-[32px] p-0 [&_svg:not([class*=size-])]:size-3.5"
-              onClick={onNewChat}
-              aria-label={t('ai.sessions.newChat')}
-              title={t('ai.sessions.newChat')}
-            >
-              <Plus size={14} />
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
+            </span>
+          </Button>
+        ) : null}
+        {onOpenFootprint ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="h-[32px] w-[32px] p-0 [&_svg:not([class*=size-])]:size-3.5"
+            onClick={onOpenFootprint}
+            onMouseDown={stopHeaderDrag}
+            aria-label={t('mycelium.title')}
+            title={t('mycelium.title')}
+            data-testid="prime-session-footprint"
+          >
+            <CirclesThree size={14} />
+          </Button>
+        ) : null}
+        {onNewChat ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="h-[32px] w-[32px] p-0 [&_svg:not([class*=size-])]:size-3.5"
+            onClick={onNewChat}
+            onMouseDown={stopHeaderDrag}
+            aria-label={t('ai.sessions.newChat')}
+            title={t('ai.sessions.newChat')}
+          >
+            <Plus size={14} />
+          </Button>
+        ) : null}
+      </div>
     </div>
   )
 }
