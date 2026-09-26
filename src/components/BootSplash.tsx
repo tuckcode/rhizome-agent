@@ -1,47 +1,35 @@
-import type { CSSProperties } from 'react'
+import { BrandMark } from './BrandMark'
 
 /**
  * Shown while the lazy `App` chunk loads. Replaces `Suspense fallback={null}`,
- * which left a dead dark window for ~2s on cold launch.
+ * which left a dead dark window for ~2s on cold launch. The HTML bootstrap
+ * loads BootSplash.css so both startup stages share the same layout and motion.
  */
-const splashStyle: CSSProperties = {
-  alignItems: 'center',
-  background: 'inherit',
-  color: 'inherit',
-  display: 'flex',
-  flexDirection: 'column',
-  fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
-  gap: 8,
-  height: '100vh',
-  justifyContent: 'center',
-  letterSpacing: '0.04em',
-  margin: 0,
-  userSelect: 'none',
-  width: '100%',
-}
-
-const markStyle: CSSProperties = {
-  fontSize: 15,
-  fontWeight: 600,
-  opacity: 0.92,
-}
-
-const subStyle: CSSProperties = {
-  fontSize: 12,
-  opacity: 0.55,
-}
-
 export function BootSplash() {
   return (
     <div
       aria-busy="true"
       aria-label="Loading Rhizome"
+      className="boot-splash"
       data-testid="boot-splash"
       role="status"
-      style={splashStyle}
     >
-      <div style={markStyle}>rhizome</div>
-      <div style={subStyle}>Starting…</div>
+      <BrandMark size={80}>
+        <defs>
+          <radialGradient id="boot-node-material" cx="28%" cy="22%" r="78%">
+            <stop offset="0" className="boot-node-highlight" />
+            <stop offset="0.52" className="boot-node-color" />
+            <stop offset="1" className="boot-node-shade" />
+          </radialGradient>
+          <radialGradient id="boot-core-material" cx="28%" cy="22%" r="78%">
+            <stop offset="0" className="boot-core-highlight" />
+            <stop offset="0.52" className="boot-core-color" />
+            <stop offset="1" className="boot-core-shade" />
+          </radialGradient>
+        </defs>
+      </BrandMark>
+      <div className="boot-splash-wordmark">rhizome</div>
+      <div className="boot-splash-status">Starting…</div>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
 /**
  * Rhizome "3c Network" brand mark — one core node + five satellite nodes
@@ -20,7 +20,7 @@ import type { CSSProperties } from 'react'
  * legibility against that theme's background, so this mark is legible
  * everywhere by construction.
  */
-export function BrandMark({ size = 26, style }: { size?: number; style?: CSSProperties }) {
+export function BrandMark({ size = 26, style, children }: { size?: number; style?: CSSProperties; children?: ReactNode }) {
   return (
     <svg
       viewBox="0 0 100 100"
@@ -31,6 +31,7 @@ export function BrandMark({ size = 26, style }: { size?: number; style?: CSSProp
       style={style}
       data-testid="brand-mark"
     >
+      {children}
       <path d="M50 52 L20 27" stroke="var(--text-muted)" strokeWidth="3" strokeLinecap="round" />
       <path d="M50 52 L81 23" stroke="var(--text-muted)" strokeWidth="3" strokeLinecap="round" />
       <path d="M50 52 L24 79" stroke="var(--text-muted)" strokeWidth="3" strokeLinecap="round" />

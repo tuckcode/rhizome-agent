@@ -56,6 +56,7 @@ file.
 **Origin:** Claude Opus 5.5 · 2026-09-26 04:25 CDT · Astra redesign pushed, `/Applications` rebuilt from `d0a55f8`.
 **Origin:** Cursor Grok 4.7 · 2026-09-26 · thin macOS title bar + Command Palette (local, unpushed).
 **Origin:** Cursor Grok 4.7 · 2026-09-26 · retargeted Chunk vcs + release Pages URLs off refactoringhq (local, unpushed).
+**Origin:** GPT-6 Codex · 2026-09-26 · splash grows two branches, then breathes with shaded nodes. Browser checks passed. Installed app unchanged.
 
 `origin/main` is **`835c5bb`**. Local HEAD adds public-prep, the macOS title bar, and the Chunk/release leftover cleanup (unpushed). `/Applications` is still `d0a55f8`, installed **2026-09-26 04:21 CDT**. [`2026-09-26-0425`](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md).
 Handy: [`2026-09-20-1230`](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md).
@@ -114,6 +115,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-26 · animated splash](plans/handoffs/2026-09-26-0818-gpt-6-splash-logo.md) — shaded mark grows two branches, then breathes. Dither artwork and original Codex chat located. Source only.
 - [2026-09-26 · macOS title bar](plans/handoffs/2026-09-26-0635-cursor-grok-4-7-macos-titlebar.md) — 32px MacOSTitlebar, y=9, Command Palette docked; packaged app not checked.
 - [2026-09-26 · public prep](plans/handoffs/2026-09-26-0559-claude-opus-5-5-public-prep.md) — secret scan clean; AGPL confirmed, Tolaria credited; Gmail-in-history open.
 - [2026-09-26 · Astra redesign](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md) — redesign + login-note skip + list markers pushed as `d0a55f8`; app rebuilt; native QA not done.
@@ -251,6 +253,7 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 
 ## Open threads
+- **C79-OPEN (2026-09-26): current dependency scan needs review.** Codacy Trivy reports two High findings for `@tiptap/core` 3.19.0 / 3.22.5 (GHSA-j95f-988m-3j2f), ten Medium and two Low in root `pnpm-lock.yaml`. `src-tauri/Cargo.lock` has one Medium and three Low. The splash change modifies no dependencies. Old worktree locks and synthetic credential fixtures also appear in the whole-repo scan. Review the current lockfiles separately. Details: [splash session](plans/handoffs/2026-09-26-0818-gpt-6-splash-logo.md).
 - **C78-FIXED-SOURCE (2026-09-20): Inbox header title kept a min-width that can show “Inbox” beside the fixed icon row.** `NoteListHeader.tsx` no longer lets `min-w-0 flex-1 truncate` collapse the title to one letter. Tests: `NoteListHeader.expand.test.tsx`. Not in `/Applications` until a rebuild.
 - **C77-FIXED-SOURCE (2026-09-20): first-run Chat guidance fails contrast.** Ready empty-state description no longer stacks `opacity: 0.6` on `text-muted-foreground` at 11px. Copy unchanged. Checking/missing empty states still use the extra opacity. Test: `AiPanelChrome.scroll.test.tsx`. Not in `/Applications` until a rebuild. Pre-existing (`3bf045c`). Visual audit 2026-09-20.
 - **C76-FIXED-SOURCE (2026-09-20): incomplete streamed history is stripped from the reasoning fold.** After complete `<conversation_history>` blocks are removed, an leftover opening tag drops through the end of the display string. Persisted reasoning is unchanged. Tests: `normalizeReasoningDisplay.test.ts`, `AiMessage.test.tsx`. Not in `/Applications` until a rebuild. This display fix does not name the live no-answer cause.

@@ -1,0 +1,109 @@
+/* Loaded from index.html before React. Keep the bootstrap mark's geometry in
+   sync with BrandMark.tsx. Only the final two branches grow, once per mount. */
+.boot-splash {
+  align-items: center;
+  background: inherit;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  gap: 8px;
+  height: 100%;
+  min-height: 100vh;
+  justify-content: center;
+  margin: 0;
+  user-select: none;
+  width: 100%;
+}
+
+.boot-splash > svg {
+  flex: none;
+  margin-bottom: 12px;
+  overflow: visible;
+  filter: drop-shadow(0 3px 2px rgb(0 0 0 / 0.2));
+  transform-origin: 50% 52%;
+}
+
+.boot-splash path {
+  stroke: var(--text-muted, currentColor);
+  opacity: 0.65;
+}
+
+.boot-splash circle {
+  fill: url(#boot-node-material);
+  stroke: color-mix(in srgb, var(--text-primary, currentColor) 72%, black);
+  stroke-width: 0.7px;
+  paint-order: stroke fill;
+}
+
+.boot-splash circle:first-of-type {
+  fill: url(#boot-core-material);
+  stroke: color-mix(in srgb, var(--primary, #3b9e83) 72%, black);
+}
+
+.boot-node-highlight { stop-color: color-mix(in srgb, var(--text-primary, currentColor) 72%, white); }
+.boot-node-color { stop-color: var(--text-primary, currentColor); }
+.boot-node-shade { stop-color: color-mix(in srgb, var(--text-primary, currentColor) 68%, black); }
+.boot-core-highlight { stop-color: color-mix(in srgb, var(--primary, #3b9e83) 58%, white); }
+.boot-core-color { stop-color: var(--primary, #3b9e83); }
+.boot-core-shade { stop-color: color-mix(in srgb, var(--primary, #3b9e83) 62%, black); }
+
+.boot-splash-wordmark {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.3;
+}
+
+.boot-splash-status {
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .boot-splash > svg {
+    animation: boot-breathe 4.8s ease-in-out 1.2s infinite both;
+  }
+
+  .boot-splash path:nth-of-type(4),
+  .boot-splash path:nth-of-type(5) {
+    transform-origin: 50px 52px;
+    animation: boot-branch-grow 650ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .boot-splash circle:nth-of-type(5),
+  .boot-splash circle:nth-of-type(6) {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: boot-node-grow 450ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .boot-splash path:nth-of-type(4) { animation-delay: 120ms; }
+  .boot-splash circle:nth-of-type(5) { animation-delay: 360ms; }
+  .boot-splash path:nth-of-type(5) { animation-delay: 480ms; }
+  .boot-splash circle:nth-of-type(6) { animation-delay: 720ms; }
+}
+
+@keyframes boot-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.055); }
+}
+
+@keyframes boot-branch-grow {
+  from { opacity: 0; transform: scale(0); }
+  to { opacity: 0.65; transform: scale(1); }
+}
+
+@keyframes boot-node-grow {
+  from { opacity: 0; transform: scale(0.35); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* The bootstrap releases this visibility listener when the app is ready. */
+.boot-splash > svg,
+.boot-splash path,
+.boot-splash circle {
+  animation-play-state: var(--boot-motion-state, running);
+}
