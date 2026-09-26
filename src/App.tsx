@@ -5,7 +5,7 @@ import { readStoredBooleanPreference, writeStoredBooleanPreference } from './lib
 import { APP_STORAGE_KEYS } from './constants/appStorage'
 import { usePanelWidth } from './hooks/usePanelWidth'
 import { startResizeDrag } from './utils/startResizeDrag'
-import { COMMAND_RAIL_WIDTH_PX, overlayTitleBarBandStyle, subheadTrafficLightInset } from './utils/trafficLights'
+import { COMMAND_RAIL_WIDTH_PX, overlayTitleBarBandStyle, railConsumesExpandedWidth, reportedCommandRailLayoutWidth, subheadTrafficLightInset } from './utils/trafficLights'
 import { Sidebar } from './components/Sidebar'
 import { CommandRail } from './components/CommandRail'
 import { NoteList } from './components/NoteList'
@@ -565,6 +565,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   // Note sits on top of Chat by default. Side-by-side reuses width.
   // Bounds leave a usable note and a usable composer in both layouts.
   const [railPinned, setRailPinned] = useState(() => readStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, false))
+  const [reportedRailWidth, setReportedRailWidth] = useState(COMMAND_RAIL_WIDTH_PX)
   const handleRailPinned = useCallback((pinned: boolean) => {
     setRailPinned(pinned)
     writeStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, pinned)
@@ -1591,7 +1592,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     setSplit: handleChatNoteSplit,
   } = useChatCenteredShellLayout({
     kind: chatCentered ? 'chat-centered' : 'classic',
-    panePreset, setPanePreset, updatePanePreset, railPinned,
+    panePreset, setPanePreset, updatePanePreset, railPinned: railPinned || railConsumesExpandedWidth(reportedRailWidth),
     viewMode,
     setViewMode: handleSetViewMode,
     noteOpen: Boolean(activeTab),
@@ -1599,11 +1600,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     hideNotesForCanvas,
     chatDestination: isChatDestination,
   })
-  const sessionsRailLayoutWidth = commandRailEnabled && railPinned && fittedRailPinned
-    ? paneWidths.rail
-    : commandRailEnabled
-      ? COMMAND_RAIL_WIDTH_PX
-      : 0
+  const railOccupiesExpandedWidth = railConsumesExpandedWidth(reportedRailWidth)
+  const sessionsRailLayoutWidth = railOccupiesExpandedWidth && !fittedRailPinned
+    ? COMMAND_RAIL_WIDTH_PX
+    : reportedCommandRailLayoutWidth(commandRailEnabled, reportedRailWidth)
   if ((!notesOpen || hideNotesForCanvas) && notesFocus) {
     setNotesFocus(false)
   }
@@ -2085,8 +2085,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
             <CommandRail
               locale={appLocale}
               pinned={chatCentered ? railPinned : undefined}
-              autoCollapsed={chatCentered && railPinned && !fittedRailPinned}
+              autoCollapsed={chatCentered && (railPinned || railOccupiesExpandedWidth) && !fittedRailPinned}
               onPinnedChange={handleRailPinned}
+              onLayoutWidthChange={setReportedRailWidth}
               width={chatCentered ? paneWidths.rail : undefined}
               onWidthChange={chatCentered ? delta => resizeColumn('rail', delta) : undefined}
               onOpenSettings={handleOpenSettings}
