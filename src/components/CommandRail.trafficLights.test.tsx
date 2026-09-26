@@ -30,13 +30,13 @@ function renderRail() {
   return screen.getByTestId('command-rail')
 }
 
-function configuredTrafficLightX(): number {
+function configuredTrafficLightPosition(): { x: number; y: number } {
   const conf = JSON.parse(
     readFileSync(`${process.cwd()}/src-tauri/tauri.conf.json`, 'utf8'),
   ) as { app: { windows: Array<{ trafficLightPosition?: { x: number; y: number } }> } }
   const position = conf.app.windows[0].trafficLightPosition
   if (!position) throw new Error('main window has no trafficLightPosition')
-  return position.x
+  return position
 }
 
 describe('CommandRail vs macOS traffic lights', () => {
@@ -45,39 +45,27 @@ describe('CommandRail vs macOS traffic lights', () => {
     platform.mac = true
   })
 
-  // The window uses titleBarStyle "Overlay", so the system buttons float over
-  // the webview. They live in the left corner (x=14) like every macOS app —
-  // under the rail — and the rail clears them vertically. Do not park them
-  // mid-sidebar to dodge the rail horizontally; that looked wrong (Atticus
-  // 2026-09-17).
-  it('parks the traffic lights in the left corner under the rail', () => {
-    expect(configuredTrafficLightX()).toBeLessThan(RAIL_WIDTH)
-    expect(configuredTrafficLightX()).toBeGreaterThanOrEqual(12)
+  // Lights sit in MacOSTitlebar (y≈9). The rail starts below that band via
+  // body.mac-chrome padding, so its border never crosses the buttons.
+  it('parks the traffic lights in the left corner of the title bar', () => {
+    const { x, y } = configuredTrafficLightPosition()
+    expect(x).toBeLessThan(RAIL_WIDTH)
+    expect(x).toBeGreaterThanOrEqual(12)
+    expect(y).toBe(9)
   })
 
-  it('keeps the light run inside the expanded sessions band', () => {
-    // Collapsed rail is only 46px; lights spill past it into the next column.
-    // Expanded 240px rail owns the top band — lights must finish well before
-    // the first labeled control (~x136).
-    expect(configuredTrafficLightX() + TRAFFIC_LIGHT_SPAN).toBeLessThan(136)
+  it('keeps the light run inside the expanded sessions band width', () => {
+    expect(configuredTrafficLightPosition().x + TRAFFIC_LIGHT_SPAN).toBeLessThan(136)
   })
 
-  /**
-   * Left-corner lights sit on the collapsed rail; content starts below them
-   * so nothing shares a row with the buttons.
-   */
-  it('offsets a collapsed rail too, so nothing sits level with the lights', () => {
+  it('does not pad the rail — MacOSTitlebar + body.mac-chrome clear the lights', () => {
     localStorage.setItem(APP_STORAGE_KEYS.commandRailExpanded, '0')
 
     const rail = renderRail()
 
-    expect(Number.parseInt(rail.style.paddingTop, 10)).toBeGreaterThanOrEqual(40)
+    expect(rail.style.paddingTop).toBe('')
   })
 
-  /**
-   * Off-Mac there are no lights to make room for, and the inset would be a
-   * dent in the top of the rail with nothing in it.
-   */
   it('leaves the rail alone where the window has no traffic lights', () => {
     platform.mac = false
 
@@ -87,20 +75,13 @@ describe('CommandRail vs macOS traffic lights', () => {
     expect(rail.style.paddingTop).toBe('')
   })
 
-  /**
-   * Expanded rail (240px) always runs under left-corner lights. Vertical
-   * inset is the macOS pattern — same as Finder's sidebar.
-   */
-  it('offsets an expanded rail, which reaches under the lights', () => {
+  it('does not pad an expanded rail either — lights live above the shell', () => {
     localStorage.setItem(APP_STORAGE_KEYS.commandRailExpanded, '1')
 
     const rail = renderRail()
 
     expect(Number.parseInt(rail.style.width, 10)).toBe(RAIL_EXPANDED_WIDTH)
-    expect(configuredTrafficLightX()).toBeLessThan(RAIL_EXPANDED_WIDTH)
-
-    const inset = Number.parseInt(rail.style.paddingTop, 10)
-    // Clear of the lights themselves: they are drawn ~16px tall from y=16.
-    expect(inset).toBeGreaterThanOrEqual(40)
+    expect(configuredTrafficLightPosition().x).toBeLessThan(RAIL_EXPANDED_WIDTH)
+    expect(rail.style.paddingTop).toBe('')
   })
 })

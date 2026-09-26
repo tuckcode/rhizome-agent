@@ -1144,7 +1144,7 @@ describe('parked organs leftover', () => {
     expect(indicator).toContain('primeActions.applyEngineUpdate()')
   })
 
-  it('clears traffic lights on the Sessions rail and keeps Cmd+1 out of Notes chrome', () => {
+  it('clears traffic lights via MacOSTitlebar and keeps Cmd+1 out of Notes chrome', () => {
     const lights = readFileSync(
       `${process.cwd()}/src/utils/trafficLights.ts`,
       'utf8',
@@ -1153,9 +1153,13 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/CommandRail.tsx`,
       'utf8',
     )
-    expect(lights).toContain('export const COMMAND_RAIL_TRAFFIC_LIGHT_INSET')
-    expect(lights).toContain('MACOS_TRAFFIC_LIGHT_POSITION.y + 43')
-    expect(rail).toContain('paddingTop: trafficLightRoom ? COMMAND_RAIL_TRAFFIC_LIGHT_INSET')
+    const titlebar = readFileSync(
+      `${process.cwd()}/src/components/MacOSTitlebar.tsx`,
+      'utf8',
+    )
+    expect(lights).toContain('export const COMMAND_RAIL_TRAFFIC_LIGHT_INSET = 0')
+    expect(titlebar).toContain('export const MACOS_TITLEBAR_HEIGHT = 32')
+    expect(rail).not.toContain('paddingTop: trafficLightRoom')
   })
 
   it('keeps Ask-the-agent-about-this-note on the note list', () => {

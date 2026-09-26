@@ -477,6 +477,10 @@
   body.custom-window-chrome {
     padding-top: 32px;
   }
+  /* Matches MacOSTitlebar height; keeps the sessions rail below the lights. */
+  body.mac-chrome {
+    padding-top: 32px;
+  }
   html, body {
     height: 100%;
     width: 100%;

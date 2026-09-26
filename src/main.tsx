@@ -7,6 +7,7 @@ import './themes.css'
 import { BootSplash } from './components/BootSplash'
 import { FrontendReadyMarker } from './components/FrontendReadyMarker'
 import { LinuxTitlebar } from './components/LinuxTitlebar'
+import { MacOSTitlebar } from './components/MacOSTitlebar'
 import { applyStoredThemeMode } from './lib/themeMode'
 import {
   APP_COMMAND_EVENT_NAME,
@@ -190,6 +191,7 @@ createRoot(document.getElementById('root')!, {
   <StrictMode>
     <TooltipProvider>
       <LinuxTitlebar />
+      <MacOSTitlebar />
       <Suspense fallback={<BootSplash />}>
         <RootApp />
         <FrontendReadyMarker />

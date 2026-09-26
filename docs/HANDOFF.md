@@ -52,25 +52,20 @@ file.
 **Origin:** Cursor Grok 4.7 · 2026-09-21 · evening wrap. Local main unpushed.
 **Origin:** Cursor Grok 4.7 · 2026-09-21 · Astra next-phase input.
 **Origin:** Cursor Grok 4.7 · 2026-09-21 · launch slice. He will open the new app.
-**Origin:** Cursor Grok 4.7 · 2026-09-21 22:23 CDT · `/Applications` rebuilt from `2a24eed`.
-**Origin:** Cursor Grok 4.7 · 2026-09-25 23:36 CDT · `/Applications` rebuilt from `18eb5ba`.
-**Origin:** Cursor Grok 4.7 · 2026-09-26 00:28 CDT · handoff for Claude.
 **Origin:** Cursor Grok 4.7 · 2026-09-26 02:27 CDT · handy wrap.
 **Origin:** Claude Opus 5.5 · 2026-09-26 04:25 CDT · Astra redesign pushed, `/Applications` rebuilt from `d0a55f8`.
+**Origin:** Cursor Grok 4.7 · 2026-09-26 · thin macOS title bar + Command Palette (local, unpushed).
 
-`origin/main` and `HEAD` are **`835c5bb`** (docs/metadata after `d0a55f8`). `/Applications` is `d0a55f8`, installed **2026-09-26 04:21 CDT** (adhoc, `ai.rhizome.agent`). [`2026-09-26-0425`](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md).
+`origin/main` is **`835c5bb`**. Local HEAD adds the public-prep handoff and the macOS title-bar commit (unpushed). `/Applications` is still `d0a55f8`, installed **2026-09-26 04:21 CDT**. [`2026-09-26-0425`](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md).
 Handy: [`2026-09-20-1230`](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md).
 Recap: [`2026-09-20-1228`](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md).
-Detail:
-[`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
-Install/claims: [`GETTING-STARTED.md`](GETTING-STARTED.md) § Public preview
-quick start. Inventory:
-[`plans/2026-09-20-public-readiness-inventory.md`](plans/2026-09-20-public-readiness-inventory.md).
+Detail: [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
+Install/claims: [`GETTING-STARTED.md`](GETTING-STARTED.md) § Public preview. Inventory: [`plans/2026-09-20-public-readiness-inventory.md`](plans/2026-09-20-public-readiness-inventory.md).
 Notes is a right panel from **Show Notes** (or View / Cmd+2), not a left-rail
 button. Left rail is **sessions + Settings** (Chat/Research destinations
 removed; Research stays on the status bar). ADR-0173: Chat / Notes /
 Read / Workbench; fresh launch is Chat. Vault skill uses a resolved Node binary
-and a GUI-safe PATH. Traffic lights stay at the left corner (`x: 14`). Import
+and a GUI-safe PATH. Traffic lights sit in a 32px `MacOSTitlebar` (`x: 14`, `y: 9`). Import
 waits for **`1`**. Drafts **#66–#68** are closed. Native W4 / #46 still open. Windows ship
 out. Not yet daily-driver / stranger-ready.
 
@@ -118,7 +113,8 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
-- [2026-09-26 · public prep](plans/handoffs/2026-09-26-0559-claude-opus-5-5-public-prep.md) — secret scan clean; AGPL confirmed, Tolaria credited; Gmail-in-history and macOS title bar open.
+- [2026-09-26 · macOS title bar](plans/handoffs/2026-09-26-0635-cursor-grok-4-7-macos-titlebar.md) — 32px MacOSTitlebar, y=9, Command Palette docked; packaged app not checked.
+- [2026-09-26 · public prep](plans/handoffs/2026-09-26-0559-claude-opus-5-5-public-prep.md) — secret scan clean; AGPL confirmed, Tolaria credited; Gmail-in-history open.
 - [2026-09-26 · Astra redesign](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md) — redesign + login-note skip + list markers pushed as `d0a55f8`; app rebuilt; native QA not done.
 - [2026-09-26 · handy wrap](plans/handoffs/2026-09-26-0227-cursor-grok-4-7-handy.md) — app is `18eb5ba`; rail fix local; staged login skip and list markers are separate.
 - [2026-09-26 · Claude handoff](plans/handoffs/2026-09-26-0028-cursor-grok-4-7-claude-handoff.md) — installed app is `18eb5ba`; rail follow-up is local; audit file is Astra’s corrected report.
@@ -129,8 +125,6 @@ Do not paste leftover paper here.
 - [2026-09-20 · Astra combined handoff](plans/handoffs/2026-09-20-1234-claude-opus-5-astra-combined-handoff.md) — D1–D7 audit, plugin rescope, ADR findings, and the Edit-list completion contract.
 - [2026-09-20 · Astra ↔ Cursor recap](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md) — plan through #26 CPR, D1–D7 local, Free-only dirt.
 - [2026-09-20 · #26 CPR](plans/handoffs/2026-09-20-0723-cursor-grok-4-6-issue-26-cpr.md) — origin and app `b7264d6`; live Update now still Q.
-- [2026-09-20 · #26 audit r3](plans/handoffs/2026-09-20-0711-cursor-grok-4-6-issue-26-audit-r3.md) — host streaming guard; C18 keys inlined; mock seeded.
-- [2026-09-20 · Lane B chat reliability](plans/2026-09-20-lane-b-chat-reliability-recipe.md) — session titles unwrap history blobs; thinking-only stays empty completion; #41 live still Q.
 - [2026-09-20 · Lane S vault safety](plans/handoffs/2026-09-20-0545-cursor-grok-4-6-lane-s-vault-safety.md) — JS refuses `~`/`~/` as HOME vault; nested vaults stay; #46 open until live no-vault Chat.
 - [2026-09-20 · public readiness plan](plans/handoffs/2026-09-20-0506-gpt-6-public-readiness-plan.md) — assessment, Cursor swarm, parked inventory, and low-context Handy skill.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).

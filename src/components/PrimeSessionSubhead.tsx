@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { useDragRegion } from '../hooks/useDragRegion'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import type { PrimeConnectionProblem } from '../hooks/usePrimeHostStatus'
-import { overlayTitleBarBandStyle } from '../utils/trafficLights'
+import { hasNativeMacosTrafficLights, overlayTitleBarBandStyle } from '../utils/trafficLights'
 import {
   primeSessionUptime,
   shortPrimeSessionId,
@@ -114,9 +114,10 @@ export function PrimeSessionSubhead({
 }: PrimeSessionSubheadProps) {
   const t = createTranslator(locale)
   const titleBarBand = overlayTitleBarBandStyle(railLayoutWidth) as CSSProperties
-  // On Chat this strip is the topmost band, so it *is* the title bar. Without
-  // a drag region the window cannot be moved at all from here — Notes has one
-  // on the breadcrumb bar, Chat had none.
+  // Native macOS docks Command Palette on MacOSTitlebar; keep the Chat
+  // affordance for browser preview and Linux/Windows.
+  const showCommandPalette = Boolean(onOpenCommandPalette) && !hasNativeMacosTrafficLights()
+  // On Chat this strip can still drag the window when it is the top band.
   const { onMouseDown: onDragRegionMouseDown } = useDragRegion<HTMLDivElement>()
   const shortId = shortPrimeSessionId(sessionId)
   const vault = tildeVaultPath(vaultPath)
@@ -139,9 +140,6 @@ export function PrimeSessionSubhead({
       className={cn(
         'app-titlebar-band flex min-h-[30px] shrink-0 items-center gap-2.5 pb-1.5 pr-3',
         'select-none',
-        // macOS paints overlay traffic lights at x=14 (tauri.conf.json).
-        // This strip is ChatHome's title bar, so the inset has to clear
-        // them; the 46px rail is already to our left and comes off it.
         'pl-[var(--subhead-traffic-light-inset,0.75rem)]',
       )}
       style={titleBarBand}
@@ -224,7 +222,7 @@ export function PrimeSessionSubhead({
           </PopoverContent>
         </Popover>
 
-        {onOpenCommandPalette ? (
+        {showCommandPalette ? (
           <Button
             type="button"
             variant="outline"

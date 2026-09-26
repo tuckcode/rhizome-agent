@@ -1,7 +1,18 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../hooks/appCommandCatalog'
+import { hasNativeMacosTrafficLights } from '../utils/trafficLights'
 import { PrimeSessionSubhead } from './PrimeSessionSubhead'
+
+vi.mock('../utils/trafficLights', async () => {
+  const actual = await vi.importActual<typeof import('../utils/trafficLights')>(
+    '../utils/trafficLights',
+  )
+  return {
+    ...actual,
+    hasNativeMacosTrafficLights: vi.fn(() => false),
+  }
+})
 
 /** Opens the status popover so its contents can be asserted on. */
 function openStatus() {
@@ -164,6 +175,18 @@ describe('PrimeSessionSubhead — actions', () => {
     expect(screen.getByTestId('open-command-palette')).toHaveTextContent(
       getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewCommandPalette) ?? '',
     )
+  })
+
+  it('hides the Chat command-palette button when native macOS chrome owns it', () => {
+    vi.mocked(hasNativeMacosTrafficLights).mockReturnValue(true)
+
+    render(<PrimeSessionSubhead live onOpenCommandPalette={vi.fn()} />)
+
+    expect(screen.queryByTestId('open-command-palette')).toBeNull()
+  })
+
+  afterEach(() => {
+    vi.mocked(hasNativeMacosTrafficLights).mockReturnValue(false)
   })
 
   it('opens this session footprint from the in-session button', () => {

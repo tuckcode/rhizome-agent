@@ -15,9 +15,8 @@ describe('trafficLights leftover geometry', () => {
     expect(COMMAND_RAIL_EXPANDED_WIDTH_PX).toBe(240)
   })
 
-  it('locks sessions-column vertical inset below macOS traffic lights', () => {
-    expect(COMMAND_RAIL_TRAFFIC_LIGHT_INSET).toBe(
-      MACOS_TRAFFIC_LIGHT_POSITION.y + 43,
-    )
+  it('locks traffic lights at y≈9 and drops rail vertical inset under MacOSTitlebar', () => {
+    expect(MACOS_TRAFFIC_LIGHT_POSITION.y).toBe(9)
+    expect(COMMAND_RAIL_TRAFFIC_LIGHT_INSET).toBe(0)
   })
 })

@@ -9,11 +9,7 @@ import { readStoredBooleanPreference, writeStoredBooleanPreference } from '../li
 import { usePanelWidth } from '../hooks/usePanelWidth'
 import { trackSessionsDrawerOpened } from '../lib/productAnalytics'
 import { startResizeDrag } from '../utils/startResizeDrag'
-import {
-  COMMAND_RAIL_EXPANDED_WIDTH_PX,
-  COMMAND_RAIL_TRAFFIC_LIGHT_INSET,
-  hasNativeMacosTrafficLights,
-} from '../utils/trafficLights'
+import { COMMAND_RAIL_EXPANDED_WIDTH_PX } from '../utils/trafficLights'
 
 interface CommandRailProps {
   locale: AppLocale
@@ -334,9 +330,6 @@ export function CommandRail({
     setKeyboardExpanded(false)
     startResizeDrag(event, 'col-resize', (deltaX) => onWidthChange ? onWidthChange(deltaX) : railWidth.resizeBy(-deltaX))
   }
-  // Read once per render rather than memoised: the platform does not change,
-  // and a stale memo here would be a dent in the wrong place.
-  const trafficLightRoom = hasNativeMacosTrafficLights()
   const settingsButton = (
     <RailButton
       active={false}
@@ -408,7 +401,6 @@ export function CommandRail({
         zIndex: overlaying || drawerOpen ? 50 : undefined,
         boxShadow: drawerOpen ? 'var(--shadow-lg, 0 10px 30px rgb(0 0 0 / 0.25))' : undefined,
         pointerEvents: overlaying ? 'none' : undefined,
-        paddingTop: trafficLightRoom ? COMMAND_RAIL_TRAFFIC_LIGHT_INSET : undefined,
         background: 'var(--surface-sidebar)',
         borderRight: '1px solid var(--border-subtle)',
       }}

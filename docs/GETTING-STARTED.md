@@ -196,6 +196,7 @@ rhizome-agent/
 │   │   ├── BreadcrumbBar.tsx     # Breadcrumb + word count + actions
 │   │   ├── WelcomeScreen.tsx     # Onboarding screen
 │   │   ├── LinuxTitlebar.tsx     # Linux/Windows custom window chrome + controls
+│   │   ├── MacOSTitlebar.tsx     # macOS 32px overlay chrome + Command Palette
 │   │   ├── LinuxMenuButton.tsx   # Linux titlebar menu mirroring app commands
 │   │   ├── CloneVaultModal.tsx   # Clone a vault from any git URL
 │   │   ├── AddRemoteModal.tsx    # Connect a local-only vault to a remote later
