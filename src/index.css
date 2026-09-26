@@ -573,6 +573,10 @@
   margin: 0.4em 0;
   padding-inline-start: 1.5em;
 }
+/* Tailwind preflight sets list-style: none; restore markers for replies. */
+.ai-markdown ul { list-style: disc; }
+.ai-markdown ol { list-style: decimal; }
+.ai-markdown li > ul { list-style: circle; }
 .ai-markdown li { margin: 0.15em 0; }
 .ai-markdown li > ul,
 .ai-markdown li > ol { margin: 0.1em 0; }
