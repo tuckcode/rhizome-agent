@@ -2,80 +2,54 @@
 
 ![Rhizome Agent — Your work. Your memory.](docs/assets/rhizome-hero-animated.webp)
 
-**A macOS chat app for [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) that remembers your work in a plain-markdown vault you own.**
-Bring your own model. Chat, open notes beside the conversation, and keep what matters as notes on disk.
+**A macOS chat app for [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent).**
+Bring your own model. Chat, open a note beside the conversation, and keep what matters as plain Markdown in a vault on your disk.
 
-<!-- Demo GIF goes here: record the packaged app (Cmd+Shift+5), then
-     ![Rhizome Agent demo](docs/assets/readme-demo.gif) -->
+This is a developer preview. Prime Agent and Node are not bundled. There is no signed download.
 
-## Install (developer preview, macOS)
+## Run it
+
+You need macOS, Node `^20.19.0` or `>=22.12.0`, pnpm, Rust, and the Tauri toolchain.
 
 ```bash
-npm i -g prime-agent && prime-agent          # install Prime and log in once
-git clone https://github.com/tuckcode/rhizome-agent && cd rhizome-agent && pnpm install && pnpm tauri dev
+npm i -g prime-agent && prime-agent
+git clone https://github.com/tuckcode/rhizome-agent && cd rhizome-agent
+pnpm install && pnpm tauri dev
 ```
 
-Needs Node ^20.19.0 or >=22.12.0, pnpm, and the Rust/Tauri toolchain.
-Details: [`docs/PUBLIC-PREVIEW.md`](docs/PUBLIC-PREVIEW.md).
+Quit `/Applications/Rhizome Agent.app` first if it is open. The installed app and this dev build share the bundle id `ai.rhizome.agent`.
+
+Browser UI without a live Prime session: `pnpm dev`, then http://localhost:5202.
+
+Setup, scope, and recovery: [`docs/PUBLIC-PREVIEW.md`](docs/PUBLIC-PREVIEW.md).
+Ports and tests: [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md).
+
+## What it is
 
 | | |
 |---|---|
+| Product | Rhizome Agent |
 | Bundle id | `ai.rhizome.agent` |
-| Product name | Rhizome Agent |
 | Package | `rhizome-agent` |
-| Baseline | Snapshot of Rhizome desktop source, then diverged |
+| Harness | Prime Agent |
+| Notes | Plain Markdown, in a local vault you open |
 
-Not [Rhizome Desktop](https://github.com/knispo/rhizome), a separate app.
-The agent **harness** is Prime Agent (session, tools, skills, OAuth
-providers, compaction / RLM). Rhizome’s vault tools reach it through MCP
-when you attach a vault.
+Rhizome Agent is not [Rhizome Desktop](https://github.com/knispo/rhizome). Desktop is a separate app, with a separate bundle id.
 
-## Identity
+Prime Agent runs the chat: session, tools, skills, and provider login. Rhizome reaches your vault through MCP when you attach one.
 
-Read [`docs/IDENTITY.md`](docs/IDENTITY.md) before changing names, bundle ids, or remotes.
-
-Brand artwork and the dither/ASCII variants: [Rhizome visual identity](docs/design/brand/2026-09-13/README.md).
-
-## Setup
-
-This is a **macOS developer preview**, not a self-contained public install.
-Prime Agent and Node are prerequisites. They are not bundled.
-
-Stranger / first-run path, supported scope, recovery, permissions,
-telemetry, and the license inventory:
-[`docs/PUBLIC-PREVIEW.md`](docs/PUBLIC-PREVIEW.md).
-
-Developer path (ports, tests, landmines):
-[`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md).
-
-```bash
-# Node ^20.19.0 or >=22.12.0 — Vite 7 rejects Node 18
-pnpm install
-# Rust/Tauri toolchain. Quit /Applications/Rhizome Agent.app first (C65).
-pnpm tauri dev
-```
-
-Browser mock (no live Prime): `pnpm dev` then http://localhost:5202.
-Requires a normal Tauri/macOS environment. Install Prime separately:
-`npm i -g prime-agent`.
-
-Parked ideas:
-[`docs/plans/2026-09-20-public-readiness-inventory.md`](docs/plans/2026-09-20-public-readiness-inventory.md).
-A roadmap row is not implementation approval. Do not merge
-[PR #66](https://github.com/tuckcode/rhizome-agent/pull/66).
+Names and remotes: [`docs/IDENTITY.md`](docs/IDENTITY.md).
+Brand artwork: [Rhizome visual identity](docs/design/brand/2026-09-13/README.md).
 
 ## Contributing
 
-If you like the app, contributions are welcome. A small pull request is enough. Open an issue if you are not sure the change is wanted. Details: [CONTRIBUTING.md](CONTRIBUTING.md).
+A small pull request is enough. Open an issue if you are not sure the change is wanted. Details: [CONTRIBUTING.md](CONTRIBUTING.md).
+Security reports: [SECURITY.md](SECURITY.md). Do not file a vulnerability as a public issue.
 
 ## License
 
-AGPL-3.0-or-later. See [LICENSE](LICENSE). Atticus confirmed this on
-2026-09-26 as the license for the public `tuckcode` release. It is inherited
-from the Rhizome Desktop snapshot this repo started from.
+AGPL-3.0-or-later. See [LICENSE](LICENSE).
 
 Rhizome Agent is a modified version of Rhizome Desktop, which builds on
 [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi (AGPL-3.0).
-The Mycelium view embeds Mindwalk (MIT) © 2026 Ricko Yu. The check in
-[`docs/PUBLIC-PREVIEW.md`](docs/PUBLIC-PREVIEW.md) is an inventory, not a
-legal determination.
+The Mycelium view embeds Mindwalk (MIT) © 2026 Ricko Yu.

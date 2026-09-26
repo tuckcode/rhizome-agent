@@ -2,13 +2,13 @@
 
 **This repository is not Rhizome Desktop.**
 
-**Stamped 16:55:** still `tuckcode/rhizome-agent` / `ai.rhizome.agent`. Crunch leftover. Not Desktop.
-Do not push to Desktop. Do not “fix branding back to Desktop.”
+GitHub: `tuckcode/rhizome-agent`. Bundle id: `ai.rhizome.agent`.
+Do not push this repo to the Desktop remote. Do not rename the product back to Desktop.
 
 | | Rhizome Desktop | Rhizome Agent (this repo) |
 |---|---|---|
 | Purpose | Personal knowledge / vault / wiki app | Chat shell on the **Prime Agent** harness |
-| GitHub | `knispo/rhizome` (public AGPL desktop) | `tuckcode/rhizome-agent` (private) |
+| GitHub | `knispo/rhizome` (public AGPL desktop) | `tuckcode/rhizome-agent` |
 | Folder (local) | e.g. Grok worktree `code-lens` | `~/code/projects/rhizome-agent` |
 | Bundle id | `ai.rhizome.desktop` | `ai.rhizome.agent` |
 | Product name | Rhizome | Rhizome Agent |

@@ -2,16 +2,9 @@
 
 How to navigate the **Rhizome Agent** codebase, run the app, and find what you need.
 
-> This is Rhizome Agent (`ai.rhizome.agent`, `tuckcode/rhizome-agent`), not Rhizome Desktop (`knispo/rhizome`, `ai.rhizome.desktop`) — see `docs/IDENTITY.md`. Product overview and roadmap: [README.md](../README.md). Some filenames and sidecar labels still use older internal names (`tolaria_*`, etc.) — treat those as implementation identifiers, not the product name.
+> This is Rhizome Agent (`ai.rhizome.agent`, `tuckcode/rhizome-agent`), not Rhizome Desktop (`knispo/rhizome`, `ai.rhizome.desktop`). See [`IDENTITY.md`](IDENTITY.md). Product overview: [README.md](../README.md). Some filenames still use older internal names (`tolaria_*`). Those names are implementation identifiers, not the product name.
 >
-> **Stamped 2026-09-20 Lane I:** local product checkpoint `4f9b4c4`
-> (**unpushed**); `origin/main` `dc44d84`; planning local `bcd4b87`
-> (**unpushed**); installed app still `6860762`. C76 source is in this
-> commit series. Still Agent, not Desktop. No push. No rebuild.
->
-> Stranger / first-run path:
-> [`PUBLIC-PREVIEW.md`](PUBLIC-PREVIEW.md). This page is the developer
-> path.
+> First-run install and recovery: [`PUBLIC-PREVIEW.md`](PUBLIC-PREVIEW.md). This page is the developer path.
 
 ## Prerequisites
 

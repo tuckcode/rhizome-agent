@@ -1,215 +1,107 @@
-# Public preview — install, scope, and recovery
+# Public preview
 
-**Origin:** Cursor Grok 4.6 · Lane I · 2026-09-20.
-**Stamps:** local product checkpoint `4f9b4c4` (**unpushed**); `origin/main`
-`dc44d84`; planning local `bcd4b87` (**unpushed**); installed app still
-documented `6860762`. **C76** source is in this commit series.
-**Not a release.** This file describes the advertised macOS preview. It
-does not authorize repository publication, a signed download, or a
-rebuild.
+Rhizome Agent is a macOS chat app for [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent). You bring your own model. You can open a note beside the chat and save the result as plain Markdown in a vault on your disk.
 
-Developer commands stay in [`GETTING-STARTED.md`](GETTING-STARTED.md).
-Parked ideas stay in
-[`plans/2026-09-20-public-readiness-inventory.md`](plans/2026-09-20-public-readiness-inventory.md).
-A row there is a retained idea, not implementation approval.
+This page is the install and recovery guide. Developer commands live in [`GETTING-STARTED.md`](GETTING-STARTED.md).
 
-## What this preview supports
+## What this preview includes
 
-Claim only this scope until a later native matrix says otherwise:
-
-| Area | Supported now | Not claimed |
+| | Included | Not included |
 |---|---|---|
-| Platform | macOS source or an already-installed `.app` | Windows daily driver (#32). Linux source/build exists; it is not a verified stranger install. |
-| Language | English | Localization (C18) |
-| Chat | Prime Agent harness, optional vault | Self-contained app with Prime/Node bundled (#26) |
-| Notes | Open a local vault, save a note, reopen it | Remote starter vault (C11), list-row `import_jsonl` (waits for `1`) |
-| Layout | Chat on launch. Notes from **Show Notes** / View / Cmd+2. Four presets in ADR-0173 | Portfolio, Today, kanban, vault pop-out, extra rail destinations |
-| Updates | Replace the `.app` or rebuild from source | In-app updater. `createUpdaterArtifacts` is false and updater endpoints are empty. |
+| Platform | macOS, from source or from an app you already built | A signed download. Windows as a daily driver. A verified Linux install for a stranger. |
+| Language | English | Other languages |
+| Chat | Prime Agent. You install Prime yourself. | Prime or Node bundled inside the app |
+| Notes | Open a local vault, save a note, reopen the same file | A remote starter vault |
+| Layout | Chat opens on launch. Notes open from Show Notes, the View menu, or Cmd+2. | Portfolio, Today, kanban, or extra destinations |
+| Updates | Replace the `.app`, or rebuild from source | An in-app updater |
 
-The installed bundle on this machine reports version `0.1.0` and
-`LSMinimumSystemVersion` `10.13`. That is a bundle floor, not a tested
-daily-driver matrix. Record the actual macOS version and CPU when a
-clean-account run happens.
+The app reports version `0.1.0`. That number is the bundle version, not a promise about every macOS release.
 
-Windows remains deferred. Do not ship or document a Windows first launch
-from this preview.
+## Install from source
 
-## Quick start (source preview)
+These tools have to be on the machine before the app will build:
 
-These steps were checked against current source and this machine's
-toolchain on 2026-09-20. They were **not** run in a fresh OS account.
-A stranger-install dogfood is still open (NEXT priority 4).
-
-Checked here: Node `v22.22.3`, pnpm `11.9.0`, Rust `1.98.0`,
-`prime-agent` `0.9.3` on `PATH`, Vite engines `^20.19.0 || >=22.12.0`,
-Vite port `5202` in `vite.config.ts`.
-
-### 1. Prerequisites
-
-1. macOS with Xcode Command Line Tools.
-2. **Node.js** `^20.19.0` or `>=22.12.0`. Vite 7 refuses older Node.
-   `GETTING-STARTED.md` used to say Node 18+; that is wrong for `pnpm
-   dev` / `pnpm tauri dev`.
-3. **pnpm** (this repo has no `packageManager` pin; 11.x works here).
-4. **Rust** `1.77.2` or newer (`src-tauri/Cargo.toml`).
-5. **git**.
-6. **Prime Agent** on `PATH`. The app does not vendor it.
+1. macOS, with Xcode Command Line Tools.
+2. Node.js `^20.19.0` or `>=22.12.0`. Vite 7 refuses older Node.
+3. pnpm.
+4. Rust `1.77.2` or newer.
+5. git.
+6. Prime Agent on `PATH`. The app does not include it.
 
 ```bash
 npm i -g prime-agent
-prime-agent          # first-run login / provider setup
-# On macOS/Linux the daemon dies with the terminal that started it:
-(prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
-```
-
-Missing Prime is a truthful first-minute state. The Chat subhead says
-`Prime is not installed — run npm i -g prime-agent` after a second
-status poll (C64). Do not treat a brief Starting… flash as that copy.
-
-### 2. Run from source
-
-```bash
+prime-agent
 git clone https://github.com/tuckcode/rhizome-agent.git
 cd rhizome-agent
-# This repository is private. Clone fails without access.
 pnpm install
 pnpm tauri dev
 ```
 
-Browser-only UI (mock Tauri, no live Prime chat):
+`prime-agent` on macOS stops when that terminal closes. To leave the daemon running:
+
+```bash
+(prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
+```
+
+Quit `/Applications/Rhizome Agent.app` before `pnpm tauri dev`. Both use the bundle id `ai.rhizome.agent`, and a second launch attaches to the one that is already open.
+
+To look at the interface without a live Prime session:
 
 ```bash
 pnpm dev
-# Open http://localhost:5202
-# Not 5173. Vite pins 5202. Playwright's own default is 5201 if BASE_URL is unset.
 ```
 
-Quit `/Applications/Rhizome Agent.app` before `pnpm tauri dev`. Both
-binaries share `ai.rhizome.agent`. A second launch forwards to the first
-(C65).
+Open http://localhost:5202. The dev server does not use port 5173.
 
-### 3. First minute
+## First minute
 
-1. First launch may ask **Help improve Rhizome**. See Telemetry below.
-2. Chat opens. Notes stay closed (ADR-0173).
-3. Optional: Welcome can create a **local** scaffold vault (folders and
-   type documents only, no network) or open an existing folder. A remote
-   clone happens only when `RHIZOME_GETTING_STARTED_REPO_URL` is set.
-   Old `TOLARIA_*` / `LAPUTA_*` names are not read.
-4. Send one prompt. Expect an answer or an actionable failure (missing
-   Prime, expired provider, transport loss). A thinking fold that never
-   answers is a live P1 sample, not a documented success.
-5. Show Notes, create or open a note, save, quit, reopen the same file.
+1. The first launch may ask **Help improve Rhizome**. Telemetry is explained below.
+2. Chat opens. Notes stay closed until you show them.
+3. You can create a local vault or open a folder you already have. Nothing is cloned from the network unless you set `RHIZOME_GETTING_STARTED_REPO_URL`.
+4. Send one message. You should get an answer, or a clear failure: Prime is missing, the provider login expired, or the connection dropped.
+5. Show Notes, open or create a note, save, quit, and reopen the same file.
 
-Installed-app path, when you already have a build:
+## If something fails
 
-```text
-/Applications/Rhizome Agent.app
-```
-
-Documented stamp: **`6860762`**, 2026-09-19 11:27. That build is behind
-`4f9b4c4`. The bundle itself only reports `0.1.0`. Rebuild is a separate
-verb and waits for Atticus.
-
-## Recovery
-
-| Situation | What to do |
+| What you see | What to do |
 |---|---|
-| Prime missing | Install with `npm i -g prime-agent`, run `prime-agent` once, start the daemon detached, reopen Chat. |
-| Prime installed but Chat says so | Wait one extra poll (~4s). Watch the first two seconds of three launches before calling C64 a regression. |
-| Provider / auth failure | Settings → Agents. Prime owns OAuth/API login for the Chat path. Recover the draft; do not send again until the status is distinct. |
-| Folder permission denied | macOS may ask for Documents, Desktop, or Downloads. Those usage strings are required. A vault in a protected folder can kill the Prime worker with `EPERM` on `cwd` (C53). Move the vault or grant access. |
-| Offline / no model | Notes remain local files. Chat cannot invent a reply. The app must stay usable for existing notes. |
-| Red window button | **Hides.** It does not quit. Cmd+Q quits. |
-| Hide vs helpers | Hide stops the app-owned **ws-bridge** and **Mindwalk**. The spawned Prime daemon stays warm (C75). A warm daemon is not proof that a session is still working. |
-| Keep working | Marks the session resident. It does not change the hide helper list. |
-| Lost window | Click the Dock icon or tray. `focus_main_window` unhides the app, then the window. |
-| Revert the app | Quit, replace `/Applications/Rhizome Agent.app` with the previous bundle, or check out an older commit and rebuild. There is no working in-app updater. |
-| Notes | Live in the vault folder you opened. Git, if you enabled it, is that folder's repository. |
-| Chat transcripts | Prime owns `~/.prime/agent/sessions/<id>.jsonl`. Rhizome archive is a view. It does not rewrite Prime's files. |
-| Rhizome settings | Preferred path `~/.config/com.rhizome.app/settings.json`. Legacy `com.tolaria.app` / `com.laputa.app` are still read if present. |
+| Prime is missing | Run `npm i -g prime-agent`, run `prime-agent` once, start the daemon, then reopen Chat. |
+| Prime is installed and Chat still says it is missing | Wait a few seconds. The status check repeats. |
+| Provider or login failure | Settings → Agents. Prime owns that login. |
+| macOS blocks the vault folder | Grant access to Documents, Desktop, or Downloads, or move the vault. |
+| No network, or no model | Notes on disk still open. Chat cannot answer. |
+| The red window button | It hides the window. It does not quit. Cmd+Q quits. |
+| The window is gone | Click the Dock icon. |
 
-Do not send Prime `shutdown` from hide. Do not use HOME as a vault
-(#46). Chat without a vault is intended.
+Notes live in the vault folder you opened. Chat transcripts live with Prime, under `~/.prime/agent/sessions/`. Rhizome settings prefer `~/.config/com.rhizome.app/settings.json`.
 
 ## Permissions
 
-The macOS Info.plist declares:
+The macOS app asks for:
 
-- **Local network** — connect to local model servers you configure.
-- **Documents / Desktop / Downloads** — open a vault stored there.
+- Local network, so it can reach a model server you configure.
+- Documents, Desktop, and Downloads, so it can open a vault stored there.
 
-The app does not declare microphone, camera, or accessibility usage.
-Global hotkey, screen capture, and voice stay parked (#52 job 2).
+It does not ask for the microphone, the camera, or accessibility.
 
-Prime tools and installed packages can use the machine. Vault scope is
-**not** a general Prime sandbox. Settings → Packages says those
-packages have full system access. Confirm once.
+Prime tools and packages you install can use the machine. A vault is not a sandbox for those tools. Settings → Packages says that those packages have full system access.
 
 ## Telemetry
 
-First-run dialog: **Help improve Rhizome**. Copy talks about anonymous
-crash reports. **Accept also sets `analytics_enabled: true`.** Decline
-sets both crash reporting and analytics off. Change either later in
-Settings → Telemetry.
+**Help improve Rhizome** is the first-run choice.
 
-Runtime gates, from current code:
+- Accept turns on crash reports and usage analytics.
+- Decline turns both off.
+- You can change either one later in Settings → Telemetry.
 
-- Crash reporting starts only when `crash_reporting_enabled === true`
-  **and** a Sentry DSN was baked in at build (`SENTRY_DSN` /
-  `VITE_SENTRY_DSN`).
-- Usage analytics start only when `analytics_enabled === true` **and**
-  `VITE_POSTHOG_KEY` is present. Default host is `https://us.i.posthog.com`.
-- PostHog: `autocapture` off, pageview off, session recording off,
-  memory persistence.
-- Events use an anonymous id. Settings copy says no vault content, note
-  titles, or file paths. Native Sentry scrubs paths and a token list;
-  frontend redaction is separate and not complete for every prefix.
+Crash reports leave the machine only when crash reporting is on and the build contains a Sentry DSN. Usage analytics leave the machine only when analytics are on and the build contains a PostHog key. A build without those keys stores the toggles and sends nothing through those clients.
 
-If the build has no DSN or PostHog key, the toggles save and nothing
-leaves the machine through those clients.
+Analytics do not record the page, do not record the session, and do not use autocapture. The settings copy says the events omit vault content, note titles, and file paths.
 
-## #56 — honest exception
+## License
 
-Chat's default path is Prime. Settings still contains a reachable
-**direct API-model** path (`ai_models.rs`, `api_model` targets,
-Research/Distill fallback). That path can run without Prime. ADR-0168
-must not be cited as settled. Keep / remove / amend waits for Atticus.
-Findings:
-[`plans/handoffs/2026-09-14-1602-issue-56-findings.md`](plans/handoffs/2026-09-14-1602-issue-56-findings.md).
+AGPL-3.0-or-later. See [LICENSE](../LICENSE).
 
-## License and attribution (inventory, not a legal determination)
+Rhizome Agent is a modified version of Rhizome Desktop, which builds on [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi (AGPL-3.0). The Mycelium view embeds Mindwalk (MIT) © 2026 Ricko Yu.
 
-This is a completeness check. It is **not** legal advice and not a
-publication clearance.
-
-| Item | Present | Gap |
-|---|---|---|
-| Root `LICENSE` | GNU AGPL v3 text | Atticus confirmed AGPL-3.0-or-later for the public `tuckcode` release on 2026-09-26. README says so. |
-| `package.json` / `Cargo.toml` / `mcp-server/package.json` | `AGPL-3.0-or-later` | Cargo `authors` still lists the Desktop snapshot author. |
-| GitHub license metadata | `agpl-3.0` on the private repo | Repository is private. Visibility change is a separate approval. |
-| Mindwalk / Mycelium | UI footer: Mindwalk (MIT) © 2026 Ricko Yu | No root `NOTICE` / `THIRD_PARTY` file. |
-| Brand / organic artwork | In-repo brand docs | No separate attribution file for inherited Desktop assets. |
-| Distributed npm / crates | Lockfiles record versions | No generated NOTICE of bundled dependency licenses. |
-| `SECURITY.md` | Asks for GitHub private vulnerability reporting | Live `gh` repo payload has `security_and_analysis: null`. Do not assume the private-report channel is on. |
-
-Do not treat this table as permission to publish.
-
-## Draft documentation PRs
-
-- 17 open issues, same set as the inventory (`#5` `#13` `#23` `#26`
-  `#32` `#36` `#39` `#40` `#41` `#45` `#46` `#48` `#50` `#51` `#52`
-  `#56` `#57`).
-- Drafts **#66**, **#67**, **#68** were closed 2026-09-21. Their hide
-  sentences that stop spawned Prime predate C75. Do not reopen them
-  to merge. C75 wording now lives in `ARCHITECTURE.md` and
-  `CROSS-MODEL-HANDOFF.md` §21 / §25.
-
-## Still unverified
-
-- Clean-account first run.
-- Native matrix on `4f9b4c4` (installed app is still `6860762`).
-- Incomplete streamed history display (C76, coordinator).
-- Live thinking / no-answer sample.
-- #46 aliases and no-vault Chat on a native build.
-- Publication security scan and history secret scan (Lane S).
+This page is a product description, not legal advice.
