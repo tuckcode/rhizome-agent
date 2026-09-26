@@ -63,4 +63,36 @@ describe('usePrimeActiveSessionTitle', () => {
     })
     expect(result.current).toBeNull()
   })
+
+  it('re-reads when a turn ends, so a new chat picks up its first title', async () => {
+    invoked.sessions = [{ id: 'a', path: '/mock/sessions/a.jsonl', title: null }]
+    const { result, rerender } = renderHook(
+      ({ streaming }) => usePrimeActiveSessionTitle('/mock/sessions/a.jsonl', streaming),
+      { initialProps: { streaming: true } },
+    )
+    await waitFor(() => expect(invoked.calls).toHaveLength(1))
+    expect(result.current).toBeNull()
+
+    invoked.sessions = [{ id: 'a', path: '/mock/sessions/a.jsonl', title: 'Plan the launch' }]
+    rerender({ streaming: false })
+
+    await waitFor(() => expect(result.current).toBe('Plan the launch'))
+  })
+
+  it('never shows the previous session title after a switch', async () => {
+    invoked.sessions = [
+      { id: 'a', path: '/mock/sessions/a.jsonl', title: 'Old chat' },
+      { id: 'b', path: '/mock/sessions/b.jsonl', title: 'New chat title' },
+    ]
+    const { result, rerender } = renderHook(
+      ({ path }) => usePrimeActiveSessionTitle(path),
+      { initialProps: { path: '/mock/sessions/a.jsonl' } },
+    )
+    await waitFor(() => expect(result.current).toBe('Old chat'))
+
+    rerender({ path: '/mock/sessions/b.jsonl' })
+    // Synchronously after the switch, before the new read resolves.
+    expect(result.current).not.toBe('Old chat')
+    await waitFor(() => expect(result.current).toBe('New chat title'))
+  })
 })

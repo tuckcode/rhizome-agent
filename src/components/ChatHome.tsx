@@ -105,7 +105,7 @@ export default function ChatHome({
   }, [defaultAiTarget, isPrimeChat])
   const isPrimeTarget = isPrimeChat && chatTarget?.kind !== 'api_model'
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
-  const sessionTitle = usePrimeActiveSessionTitle(primeHost?.sessionPath ?? null)
+  const sessionTitle = usePrimeActiveSessionTitle(primeHost?.sessionPath ?? null, primeHost?.isStreaming)
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
   // One read of the open note, shared by the pane and the agent. Chat used to
