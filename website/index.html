@@ -154,7 +154,7 @@
   </header>
 
   <section class="hero">
-    <img class="art" data-animated src="assets/hero.webp" width="1200" height="600"
+    <img class="art" src="assets/hero.png" width="1774" height="887"
          alt="Rhizome Agent. Your work. Your memory. Chat with Prime. Keep what matters." />
     <div class="fade"></div>
   </section>
@@ -169,7 +169,7 @@
           <a class="btn solid" href="https://github.com/tuckcode/rhizome-agent">View on GitHub <span class="arrow">↗</span></a>
           <a class="btn" href="#demo">Watch the demo</a>
         </div>
-        <div class="term"><b>$</b> npm i -g prime-agent<span class="caret"></span></div>
+        <div class="term"><b>$</b> git clone https://github.com/tuckcode/rhizome-agent.git<span class="caret"></span></div>
       </div>
       <div class="aside">
         <strong>Your work. Your memory.</strong>
@@ -290,15 +290,15 @@
       </div>
       <div class="run">
         <div>
-          You need macOS, Node <code>^20.19.0</code> or <code>&gt;=22.12.0</code>, pnpm, Rust, and the Tauri toolchain. Prime Agent installs separately. There is no signed download yet.
-          <p style="margin:16px 0 0"><a href="https://github.com/tuckcode/rhizome-agent/blob/main/docs/PUBLIC-PREVIEW.md">Setup, scope, and recovery →</a></p>
+          You need macOS, Node <code>^20.19.0</code> or <code>&gt;=22.12.0</code>, pnpm, Rust, and the Tauri toolchain. <code>./install.sh</code> fetches Prime Agent for chat. There is no signed download yet.
+          <p style="margin:16px 0 0"><a href="https://github.com/tuckcode/rhizome-agent/blob/main/docs/start/README.md">Getting started →</a></p>
+          <p style="margin:8px 0 0"><a href="https://github.com/tuckcode/rhizome-agent/blob/main/docs/for-agents/README.md">Agent instructions →</a></p>
         </div>
         <div>
-<pre><span class="c"># install Prime and log in once</span>
-<span class="p">$</span> npm i -g prime-agent &amp;&amp; prime-agent
-<span class="c"># get Rhizome and run it</span>
-<span class="p">$</span> git clone https://github.com/tuckcode/rhizome-agent
-<span class="p">$</span> cd rhizome-agent &amp;&amp; pnpm install &amp;&amp; pnpm tauri dev</pre>
+<pre><span class="c"># install Rhizome. The script fetches Prime for chat.</span>
+<span class="p">$</span> git clone https://github.com/tuckcode/rhizome-agent.git
+<span class="p">$</span> cd rhizome-agent &amp;&amp; ./install.sh
+<span class="p">$</span> pnpm tauri dev</pre>
         </div>
       </div>
     </section>

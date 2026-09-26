@@ -55,9 +55,10 @@ git log -1 --oneline
 
 ```powershell
 pnpm install
-npm i -g prime-agent
 prime-agent --version
 ```
+
+Prime Agent is not the npm package `prime-agent`. That name is not on the public registry. Install Prime from [Prime's install page](https://github.com/PrimeIntellect-ai/prime-agent#install). The published installer is for macOS and Linux.
 
 `0.7.1+` required (`0.7.4` probed in handoff).
 
@@ -97,7 +98,7 @@ Uses `mock-tauri` — session list UI works without Prime.
 
 | Symptom | Fix |
 |--------|-----|
-| “Prime not installed” | `npm i -g prime-agent`, restart terminal |
+| “Prime not installed” | Install Prime from its install page, then restart the terminal |
 | “Service unreachable” | Start daemon (see above); `prime-agent status` |
 | Wrong pipe | `$env:RHIZOME_PRIME_DAEMON_SOCKET='\\.\pipe\prime-agent-daemon'` then retry |
 | App builds but Prime panel empty | Open a vault first; attach creates a session |

@@ -11,7 +11,7 @@ How to navigate the **Rhizome Agent** codebase, run the app, and find what you n
 - **Node.js** `^20.19.0` or `>=22.12.0` (Vite 7) and **pnpm**
 - **Rust** 1.77.2+ (for the Tauri backend)
 - **git** CLI (required by the git integration features)
-- **Prime Agent** on `PATH` for live Chat (`npm i -g prime-agent`). Not vendored.
+- **Prime Agent** on `PATH` for live Chat. `./install.sh` fetches it when it is missing. Not vendored.
 
 ### Linux system dependencies
 

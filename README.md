@@ -2,33 +2,30 @@
 
 ![Rhizome Agent — Your work. Your memory.](src/assets/brand/rhizome-organic-hero.png)
 
-[Watch the 20 second demo](docs/assets/rhizome-agent-demo.mp4)
+https://github.com/user-attachments/assets/c373461f-1dd7-438b-ac89-0f98856be89e
 
 **A harness that doesn't forget.**
 Built around [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent), with useful tools from Claude Code, Hermes Agent, and DeepSeek. The built-in vault is your memory, wiki, and second brain, beside a research panel. What you save stays as plain Markdown on your disk, where you and the agent can both read it.
 
 This is a developer preview. Prime Agent and Node are not bundled. There is no signed download.
 
-## Get started
+| | |
+|---|---|
+| Getting started | [docs/start](docs/start/README.md) |
+| Agent instructions | [docs/agent](docs/for-agents/README.md) — a block you can paste |
 
-This is a macOS developer preview. There is no signed download. Prime Agent and Node are not bundled.
-
-You need:
-
-1. macOS, with Xcode Command Line Tools.
-2. Node.js `^20.19.0` or `>=22.12.0`.
-3. pnpm.
-4. Rust `1.77.2` or newer, and the Tauri toolchain.
-5. git.
+## Getting started
 
 ```bash
-npm i -g prime-agent
-prime-agent
 git clone https://github.com/tuckcode/rhizome-agent.git
 cd rhizome-agent
-pnpm install
+./install.sh
 pnpm tauri dev
 ```
+
+`./install.sh` installs this repo and fetches Prime Agent when that program is not already on the machine. Chat needs Prime. The script downloads the command-line tool Prime publishes. There is no smaller copy inside Rhizome.
+
+The full list of tools, the first minute in the app, and what to do when it fails: [Getting started](docs/start/README.md).
 
 `prime-agent` stops when that terminal closes. To leave it running:
 
@@ -54,16 +51,9 @@ If something fails, the longer recovery page is [`docs/PUBLIC-PREVIEW.md`](docs/
 
 ## Hand this to an agent
 
-Agent instructions for this repo are in [AGENTS.md](AGENTS.md). A new agent should read that file before editing.
+The copy-paste block, and a one-line version, live on their own page: [Agent instructions](docs/for-agents/README.md).
 
-Paste this:
-
-```text
-This is Rhizome Agent, repo tuckcode/rhizome-agent, bundle id ai.rhizome.agent.
-It is not Rhizome Desktop. Do not add knispo/rhizome as a remote.
-Read AGENTS.md before you change code. English only.
-The vault is plain Markdown on disk. You and the person can both read it.
-```
+The full rules for an agent that edits this tree are in [AGENTS.md](AGENTS.md).
 
 Prime Agent runs the chat: session, tools, skills, and provider login. Rhizome reaches the vault through MCP when a vault is attached.
 

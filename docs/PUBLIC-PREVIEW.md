@@ -29,13 +29,13 @@ These tools have to be on the machine before the app will build:
 6. Prime Agent on `PATH`. The app does not include it.
 
 ```bash
-npm i -g prime-agent
-prime-agent
 git clone https://github.com/tuckcode/rhizome-agent.git
 cd rhizome-agent
-pnpm install
+./install.sh
 pnpm tauri dev
 ```
+
+`./install.sh` installs this repo and fetches Prime Agent when that program is not already on the machine. Chat needs Prime. The script downloads the command-line tool Prime publishes.
 
 `prime-agent` on macOS stops when that terminal closes. To leave the daemon running:
 
@@ -65,7 +65,7 @@ Open http://localhost:5202. The dev server does not use port 5173.
 
 | What you see | What to do |
 |---|---|
-| Prime is missing | Run `npm i -g prime-agent`, run `prime-agent` once, start the daemon, then reopen Chat. |
+| Prime is missing | Run Prime's installer, run `prime-agent` once, start the daemon, then reopen Chat. |
 | Prime is installed and Chat still says it is missing | Wait a few seconds. The status check repeats. |
 | Provider or login failure | Settings → Agents. Prime owns that login. |
 | macOS blocks the vault folder | Grant access to Documents, Desktop, or Downloads, or move the vault. |
