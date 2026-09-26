@@ -34,7 +34,7 @@ Ports and tests: [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md).
 | Harness | Prime Agent |
 | Notes | Plain Markdown, in a local vault you open |
 
-Rhizome Agent is not [Rhizome Desktop](https://github.com/knispo/rhizome). Desktop is a separate app, with a separate bundle id.
+Rhizome Agent is not Rhizome Desktop. Desktop is a separate app, with a separate bundle id.
 
 Prime Agent runs the chat: session, tools, skills, and provider login. Rhizome reaches your vault through MCP when you attach one.
 
