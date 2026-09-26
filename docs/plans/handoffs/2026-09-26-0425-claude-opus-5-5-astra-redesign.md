@@ -67,6 +67,13 @@ PostHog: `composer_pill_opened` (`tools`, `context_usage`),
 - VaultPanel "Notes" heading and a list titled "Notes" can stack twice.
   Left alone: product call, not a layout bug.
 - Import and repo research write notes without the junk-title guard.
+- **Jev experiment (after going public).** Test TypeSafe AI's Jev (closed,
+  API-only decision model, released 2026-09-15) as the auto-save gate: label
+  the vault's saved notes as knowledge vs junk (including the 8
+  `Not logged in` notes), then measure Jev against the current regex guards.
+  Adopt only if it clearly wins: opt-in setting, off by default, regex kept
+  as the floor, and an ADR for the new dependency. Later candidates: note
+  destination routing, and classifying tool calls before they run.
 - Grok's `.cursor/rules/one-job-in-flight.mdc`,
   `docs/model-misfires/2026-09-21-cursor-grok-4-7.md`, and `.tmp-look/`
   remain uncommitted, untouched by this session.
