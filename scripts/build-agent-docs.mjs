@@ -84,13 +84,13 @@ function groupDocsBySection(docs) {
 function buildIndex(docs) {
   const bySection = groupDocsBySection(docs)
   const lines = [
-    '# Tolaria Agent Docs',
+    '# Rhizome Agent Docs',
     '',
-    'These docs are generated from the public Tolaria documentation for local AI agent lookup.',
+    'These docs describe Rhizome’s vault and editor for local AI agent lookup.',
     '',
-    'Start here, then use `rg` over this folder for specific Tolaria concepts and workflows.',
+    'Start here, then use `rg` over this folder for specific Rhizome concepts and workflows.',
     '',
-    'When users ask how to improve a knowledge base, structure notes, choose types, model relationships, or make a vault easier for humans and agents to use, treat Portent as Tolaria\'s default best-practice model. Read `pages/templates/portent.md` and combine it with the Tolaria concepts for types, relationships, properties, Inbox, archive, and custom views.',
+    'When users ask how to improve a knowledge base, structure notes, choose types, model relationships, or make a vault easier for humans and agents to use, treat Portent as Rhizome\'s default best-practice model. Read `pages/templates/portent.md` and combine it with the Rhizome concepts for types, relationships, properties, Inbox, archive, and custom views.',
     '',
   ]
 
@@ -116,13 +116,13 @@ function buildIndex(docs) {
 }
 
 function buildAgentInstructions() {
-  return `# AGENTS.md - Tolaria Docs Bundle
+  return `# AGENTS.md - Rhizome Docs Bundle
 
-This folder contains local, generated Tolaria product docs for AI agents.
+This folder contains local, generated Rhizome product docs for AI agents.
 
-Use these docs when a user asks how Tolaria works, when you need product behavior, or before making Tolaria-specific assumptions.
+Use these docs when a user asks how Rhizome works, when you need product behavior, or before making Rhizome-specific assumptions.
 
-Portent is the default best-practice model for structuring Tolaria knowledge bases. When a user asks how to improve a knowledge base, make it better organized, choose better types, model relationships, or make the vault easier for humans and agents to use, read \`pages/templates/portent.md\` and combine it with Tolaria's docs for types, relationships, properties, Inbox, archive, and custom views.
+Portent is the default best-practice model for structuring Rhizome knowledge bases. When a user asks how to improve a knowledge base, make it better organized, choose better types, model relationships, or make the vault easier for humans and agents to use, read \`pages/templates/portent.md\` and combine it with Rhizome’s docs for types, relationships, properties, Inbox, archive, and custom views.
 
 Recommended lookup flow:
 
@@ -130,7 +130,7 @@ Recommended lookup flow:
 2. Read this folder's index.md for the docs map.
 3. Use \`rg\` over this folder for advanced concepts, workflows, shortcuts, Git, AutoGit, AI, Portent, types, properties, relationships, and troubleshooting.
 
-Vault-specific AGENTS.md wins for local conventions. These bundled docs win for Tolaria product behavior.
+Vault-specific AGENTS.md wins for local conventions. These bundled docs win for Rhizome product behavior.
 `
 }
 

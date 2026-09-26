@@ -306,7 +306,7 @@ describe('useUpdater', () => {
     })
 
     expect(mockOpenExternalUrl).toHaveBeenCalledWith(
-      'https://tolaria.md/releases/'
+      'https://github.com/tuckcode/rhizome-agent/releases'
     )
   })
 

@@ -9,7 +9,7 @@ import {
 import { formatCalendarVersionForDisplay } from '../utils/calendarVersion'
 import { openExternalUrl } from '../utils/url'
 
-const RELEASE_NOTES_URL = 'https://tolaria.md/releases/'
+const RELEASE_NOTES_URL = 'https://github.com/tuckcode/rhizome-agent/releases'
 
 interface UpdateVersionInfo {
   version: string

@@ -21,7 +21,7 @@ Use [GitHub Issues](https://github.com/tuckcode/rhizome-agent/issues) for questi
 
 ## Contribute Code
 
-Small, focused pull requests are welcome. Check the product board first so you build the right thing, then open a PR on [GitHub](https://github.com/tuckcode/rhizome-agent/pulls). The [contributing guide](https://github.com/refactoringhq/tolaria/blob/main/CONTRIBUTING.md) explains the local workflow.
+Small, focused pull requests are welcome. Check the product board first so you build the right thing, then open a PR on [GitHub](https://github.com/tuckcode/rhizome-agent/pulls). The [contributing guide](https://github.com/tuckcode/rhizome-agent/blob/main/CONTRIBUTING.md) explains the local workflow.
 
 ## Report A Bug
 

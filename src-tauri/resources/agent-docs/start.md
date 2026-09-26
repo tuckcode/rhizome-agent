@@ -48,7 +48,7 @@ URL: /start/getting-started-vault
 
 # Getting Started Vault
 
-The Getting Started vault is a small public sample vault hosted at [refactoringhq/tolaria-getting-started](https://github.com/refactoringhq/tolaria-getting-started).
+The Getting Started vault is a small sample vault that Rhizome builds locally on first launch. Nothing is cloned from the network by default.
 
 It exists to show Rhizome's conventions without requiring you to restructure your own notes first.
 
@@ -94,9 +94,9 @@ Rhizome publishes desktop builds for macOS, Windows, and Linux. macOS is the pri
 
 Use the latest stable release unless you are intentionally testing pre-release builds:
 
-- <a href="https://tolaria.md/download/" target="_self">Download the latest stable build</a>
+- <a href="https://github.com/tuckcode/rhizome-agent/releases" target="_self">Download the latest build</a>
 - [Browse all GitHub releases](https://github.com/tuckcode/rhizome-agent/releases)
-- <a href="https://tolaria.md/releases/" target="_self">Read the release notes</a>
+- <a href="https://github.com/tuckcode/rhizome-agent/releases" target="_self">Read the release notes</a>
 
 ## Homebrew
 

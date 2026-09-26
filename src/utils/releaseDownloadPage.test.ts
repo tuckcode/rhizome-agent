@@ -199,7 +199,7 @@ describe('buildStableDownloadRedirectPage', () => {
 
     expect(html).toContain('Rhizome Stable Download Unavailable')
     expect(html).toContain('View release history')
-    expect(html).toContain('https://tolaria.md/releases/')
+    expect(html).toContain('https://github.com/tuckcode/rhizome-agent/releases')
     expect(html).not.toContain('https://refactoringhq.github.io/tolaria/')
     expect(html).not.toContain('DOWNLOAD_TARGETS')
   })
