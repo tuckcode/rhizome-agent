@@ -10,140 +10,320 @@
   <meta property="og:image" content="assets/og.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" href="assets/icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #0b1510;
-      --panel: #112019;
-      --line: #1f3a2c;
-      --text: #efe9dd;
-      --muted: #9fb3a6;
-      --green: #7fd1a0;
-      --green-strong: #3fae72;
-      --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
-      --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+      --bg: #070d0a;
+      --bg-2: #0c1611;
+      --ink: #f1ece2;
+      --ink-85: rgb(241 236 226 / 0.85);
+      --ink-60: rgb(241 236 226 / 0.6);
+      --ink-45: rgb(241 236 226 / 0.45);
+      --line: rgb(241 236 226 / 0.1);
+      --line-2: rgb(241 236 226 / 0.16);
+      --fill: rgb(241 236 226 / 0.04);
+      --accent: #86e3a8;
+      --sans: "Geist", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+      --max: 1240px;
     }
     * { box-sizing: border-box; }
-    html { background: var(--bg); }
-    body {
-      margin: 0;
-      color: var(--text);
-      background: var(--bg);
-      font: 17px/1.6 var(--sans);
-      -webkit-font-smoothing: antialiased;
-    }
-    a { color: var(--green); }
-    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
-    header.top {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 18px 0;
-    }
-    .brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-family: var(--mono); letter-spacing: 0.02em; }
-    .brand img { width: 28px; height: 28px; border-radius: 7px; }
-    .top nav a { color: var(--muted); text-decoration: none; margin-left: 20px; font-size: 15px; }
-    .top nav a:hover { color: var(--text); }
-    .hero { margin: 8px 0 0; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: #0d1a13; }
-    .hero img { display: block; width: 100%; height: auto; aspect-ratio: 2 / 1; }
-    .pitch { text-align: center; padding: 56px 0 24px; }
-    .pitch h1 { font-family: var(--mono); font-weight: 500; font-size: clamp(30px, 5vw, 52px); line-height: 1.15; margin: 0 0 16px; letter-spacing: -0.01em; }
-    .pitch p { color: var(--muted); max-width: 680px; margin: 0 auto; font-size: 19px; }
-    .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 28px; }
+    html { background: var(--bg); scroll-behavior: smooth; }
+    body { margin: 0; color: var(--ink); background: var(--bg); font: 16px/1.55 var(--sans); -webkit-font-smoothing: antialiased; }
+    a { color: inherit; }
+    .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+    .eyebrow { font: 500 11.5px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-45); }
     .btn {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 12px 20px; border-radius: 10px; font-weight: 600; font-size: 16px;
-      text-decoration: none; border: 1px solid var(--line); color: var(--text); background: var(--panel);
+      display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px;
+      font: 500 11.5px/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none;
+      border: 1px solid var(--line-2); color: var(--ink); background: var(--fill); border-radius: 2px;
     }
-    .btn.primary { background: var(--green-strong); border-color: var(--green-strong); color: #06120b; }
-    .btn:hover { filter: brightness(1.08); }
-    section { padding: 48px 0; border-top: 1px solid var(--line); }
-    section h2 { font-family: var(--mono); font-weight: 500; font-size: 26px; margin: 0 0 18px; }
-    .demo video { width: 100%; border-radius: 14px; border: 1px solid var(--line); background: #000; display: block; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
-    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
-    .card h3 { margin: 0 0 8px; font-size: 17px; }
-    .card p { margin: 0; color: var(--muted); font-size: 15.5px; }
-    pre {
-      background: #07100b; border: 1px solid var(--line); border-radius: 12px;
-      padding: 18px 20px; overflow-x: auto; font: 14.5px/1.7 var(--mono); color: var(--text); margin: 0 0 14px;
-    }
-    .note { color: var(--muted); font-size: 15px; }
-    footer { padding: 36px 0 56px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
-    footer p { margin: 6px 0; }
-    @media (max-width: 600px) {
-      body { font-size: 16px; }
-      .top nav a { margin-left: 14px; }
-      .pitch { padding-top: 36px; }
-      .pitch p { font-size: 17px; }
+    .btn:hover { border-color: var(--ink-45); }
+    .btn.solid { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    .btn .arrow { opacity: 0.6; }
+
+    /* Top bar */
+    .bar { position: sticky; top: 0; z-index: 10; background: rgb(7 13 10 / 0.72); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+    .bar .wrap { display: flex; align-items: center; justify-content: space-between; height: 56px; }
+    .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 500 15px/1 var(--mono); letter-spacing: 0.02em; }
+    .logo img { width: 22px; height: 22px; border-radius: 5px; }
+    .bar nav { display: flex; align-items: center; gap: 22px; }
+    .bar nav a.link { font: 500 11.5px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-60); text-decoration: none; }
+    .bar nav a.link:hover { color: var(--ink); }
+
+    /* Hero */
+    .hero { position: relative; border-bottom: 1px solid var(--line); }
+    .hero .art { display: block; width: 100%; height: auto; aspect-ratio: 2 / 1; max-height: 78vh; object-fit: cover; object-position: 70% 50%; }
+    .hero .fade { position: absolute; inset: auto 0 0 0; height: 45%; background: linear-gradient(to bottom, transparent, var(--bg)); pointer-events: none; }
+    .intro { display: grid; grid-template-columns: 1.3fr 1fr; gap: 40px; align-items: end; padding: 8px 0 56px; }
+    .intro h1 { margin: 14px 0 16px; font: 500 clamp(38px, 5.6vw, 72px)/1.02 var(--sans); letter-spacing: -0.035em; }
+    .intro p { margin: 0; color: var(--ink-60); font-size: 18px; max-width: 560px; }
+    .intro .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 26px; }
+    .term { margin-top: 18px; font: 14px/1 var(--mono); color: var(--ink-60); }
+    .term b { color: var(--accent); font-weight: 400; }
+    .term .caret { display: inline-block; width: 8px; height: 15px; background: var(--ink-60); vertical-align: -2px; margin-left: 2px; animation: blink 1.1s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .intro .aside { border-left: 1px solid var(--line); padding-left: 24px; color: var(--ink-45); font-size: 14px; }
+    .intro .aside strong { display: block; color: var(--ink-85); font-weight: 500; margin-bottom: 6px; }
+
+    /* Built-with strip */
+    .strip { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); }
+    .strip div { padding: 22px 18px; border-right: 1px solid var(--line); font: 500 14px/1.2 var(--mono); color: var(--ink-85); display: flex; flex-direction: column; gap: 8px; }
+    .strip div:last-child { border-right: 0; }
+    .strip span { font: 11px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-45); }
+
+    /* Section heads */
+    .section { padding: 96px 0 0; }
+    .head { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+    .head h2 { margin: 12px 0 0; font: 400 clamp(28px, 3.4vw, 42px)/1.1 var(--sans); letter-spacing: -0.03em; }
+    .head h2 em { font-style: normal; color: var(--ink-45); }
+
+    /* Numbered feature grid */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); }
+    .cell { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 20px 24px 28px; min-height: 460px; display: flex; flex-direction: column; }
+    .cell:nth-child(2n) { border-right: 0; }
+    .cell:nth-last-child(-n+2) { border-bottom: 0; }
+    .fig { font: 11px/1 var(--mono); letter-spacing: 0.14em; color: var(--ink-45); }
+    .diagram { flex: 1; display: grid; place-items: center; padding: 26px 0; }
+    .diagram svg { width: 100%; max-width: 420px; height: auto; }
+    .cell h3 { margin: 0 0 8px; font: 500 22px/1.2 var(--sans); letter-spacing: -0.02em; }
+    .cell h3 .n { font: 400 14px/1 var(--mono); color: var(--ink-45); margin-right: 8px; }
+    .cell .body { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .cell p { margin: 0; color: var(--ink-60); font-size: 15px; }
+    .cell ol { list-style: none; margin: 0; padding: 0; font-size: 13.5px; color: var(--ink-60); }
+    .cell li { display: flex; gap: 10px; padding: 3px 0; }
+    .cell li span { font-family: var(--mono); color: var(--ink-45); min-width: 26px; }
+
+    /* Demo */
+    .frame { border: 1px solid var(--line); padding: 14px; background: var(--fill); }
+    .frame video { display: block; width: 100%; background: #000; }
+    .frame .fig { display: flex; justify-content: space-between; padding: 12px 2px 0; }
+
+    /* Run it */
+    .run { display: grid; grid-template-columns: 1fr 1.4fr; border: 1px solid var(--line); }
+    .run > div { padding: 28px 24px; }
+    .run > div:first-child { border-right: 1px solid var(--line); color: var(--ink-60); font-size: 15px; }
+    .run pre { margin: 0; font: 14px/1.9 var(--mono); color: var(--ink-85); white-space: pre-wrap; word-break: break-word; }
+    .run pre .c { color: var(--ink-45); }
+    .run pre .p { color: var(--accent); }
+
+    /* Footer */
+    footer { margin-top: 120px; border-top: 1px solid var(--line); }
+    .foot { display: grid; grid-template-columns: 2fr 1fr 1fr; }
+    .foot > div { padding: 32px 24px 40px; border-right: 1px solid var(--line); }
+    .foot > div:last-child { border-right: 0; }
+    .foot p { margin: 0 0 8px; color: var(--ink-45); font-size: 13.5px; }
+    .foot a { display: block; text-decoration: none; color: var(--ink-60); font-size: 14px; padding: 3px 0; }
+    .foot a:hover { color: var(--ink); }
+    .foot .eyebrow { display: block; margin-bottom: 14px; }
+
+    @media (max-width: 860px) {
+      .intro, .run, .foot { grid-template-columns: 1fr; }
+      .intro .aside { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 18px; }
+      .strip { grid-template-columns: 1fr 1fr; }
+      .strip div:nth-child(2) { border-right: 0; }
+      .strip div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+      .grid { grid-template-columns: 1fr; }
+      .cell { border-right: 0 !important; border-bottom: 1px solid var(--line) !important; min-height: 0; }
+      .cell:last-child { border-bottom: 0 !important; }
+      .cell .body { grid-template-columns: 1fr; }
+      .run > div:first-child { border-right: 0; border-bottom: 1px solid var(--line); }
+      .foot > div { border-right: 0; border-bottom: 1px solid var(--line); }
+      .bar nav a.link { display: none; }
+      .hero .art { aspect-ratio: 2 / 1; max-height: none; object-position: 50% 50%; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .hero img[data-animated] { content: url("assets/hero.png"); }
+      .term .caret { animation: none; }
+      .hero .art[data-animated] { content: url("assets/hero.png"); }
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <header class="top">
-      <a class="brand" href="./"><img src="assets/icon.png" alt="" />rhizome agent</a>
+  <header class="bar">
+    <div class="wrap">
+      <a class="logo" href="./"><img src="assets/icon.png" alt="" />rhizome</a>
       <nav>
-        <a href="#demo">Demo</a>
-        <a href="#run">Run it</a>
-        <a href="https://github.com/tuckcode/rhizome-agent">GitHub</a>
+        <a class="link" href="#features">Features</a>
+        <a class="link" href="#demo">Demo</a>
+        <a class="link" href="#run">Run it</a>
+        <a class="btn solid" href="https://github.com/tuckcode/rhizome-agent">GitHub <span class="arrow">↗</span></a>
       </nav>
-    </header>
-
-    <div class="hero">
-      <img data-animated src="assets/hero.webp" width="1200" height="600"
-           alt="Rhizome Agent. Your work. Your memory. Chat with Prime. Keep what matters." />
     </div>
+  </header>
 
-    <div class="pitch">
-      <h1>A harness that doesn't forget.</h1>
-      <p>A macOS chat app built around Prime Agent. The built-in vault is your memory, wiki, and second brain. What you save stays as plain Markdown on your disk, where you and the agent can both read it.</p>
-      <div class="cta">
-        <a class="btn primary" href="https://github.com/tuckcode/rhizome-agent">View on GitHub</a>
-        <a class="btn" href="#run">Run it locally</a>
+  <section class="hero">
+    <img class="art" data-animated src="assets/hero.webp" width="1200" height="600"
+         alt="Rhizome Agent. Your work. Your memory. Chat with Prime. Keep what matters." />
+    <div class="fade"></div>
+  </section>
+
+  <div class="wrap">
+    <div class="intro">
+      <div>
+        <span class="eyebrow">Rhizome Agent · developer preview · macOS</span>
+        <h1>A harness that doesn't forget.</h1>
+        <p>A chat app built around Prime Agent, with a vault that works as your memory, wiki, and second brain. What you keep stays as plain Markdown on your disk.</p>
+        <div class="actions">
+          <a class="btn solid" href="https://github.com/tuckcode/rhizome-agent">View on GitHub <span class="arrow">↗</span></a>
+          <a class="btn" href="#demo">Watch the demo</a>
+        </div>
+        <div class="term"><b>$</b> npm i -g prime-agent<span class="caret"></span></div>
+      </div>
+      <div class="aside">
+        <strong>Your work. Your memory.</strong>
+        Bring your own model through Prime. Open notes beside the conversation. Keep what matters in a folder you own.
       </div>
     </div>
 
-    <section id="demo" class="demo">
-      <h2>20-second demo</h2>
-      <video src="assets/demo.mp4#t=0.5" controls muted playsinline preload="metadata"></video>
-    </section>
+    <div class="strip" aria-label="Built with">
+      <div><span>Harness</span>Prime Agent</div>
+      <div><span>Tools from</span>Claude Code</div>
+      <div><span>Tools from</span>Hermes Agent</div>
+      <div><span>Models</span>DeepSeek and more</div>
+    </div>
 
-    <section>
-      <h2>What it does</h2>
+    <section class="section" id="features">
+      <div class="head">
+        <div>
+          <span class="eyebrow">What it does</span>
+          <h2>Chat that remembers. <em>Notes that stay yours.</em></h2>
+        </div>
+      </div>
       <div class="grid">
-        <div class="card">
-          <h3>Bring your own model</h3>
-          <p>Prime Agent runs the chat: sessions, tools, skills, and provider login. Pick the model you want.</p>
-        </div>
-        <div class="card">
-          <h3>A vault you own</h3>
-          <p>Notes are plain Markdown in a local folder. No database, no lock-in. Open them in any editor.</p>
-        </div>
-        <div class="card">
-          <h3>Notes beside the chat</h3>
-          <p>Open a note next to the conversation, keep what matters, and let the agent read your vault through MCP.</p>
-        </div>
-        <div class="card">
-          <h3>Research panel</h3>
-          <p>Look things up and bring findings into your notes without leaving the app.</p>
-        </div>
+        <article class="cell">
+          <span class="fig">FIG. 01</span>
+          <div class="diagram" aria-hidden="true">
+            <svg viewBox="0 0 420 220" fill="none" stroke="rgb(241 236 226 / 0.55)" stroke-width="1">
+              <rect x="40" y="30" width="230" height="44" rx="3" /><rect x="150" y="96" width="230" height="44" rx="3" stroke="#86e3a8" />
+              <rect x="40" y="162" width="190" height="30" rx="3" stroke-dasharray="3 4" />
+              <text x="54" y="57" fill="rgb(241 236 226 / 0.6)" stroke="none" font-family="Geist Mono" font-size="12">you › what did we decide?</text>
+              <text x="164" y="123" fill="#86e3a8" stroke="none" font-family="Geist Mono" font-size="12">prime › from notes/launch.md …</text>
+              <text x="54" y="182" fill="rgb(241 236 226 / 0.45)" stroke="none" font-family="Geist Mono" font-size="12">model ▾  think  tools ▾</text>
+            </svg>
+          </div>
+          <h3><span class="n">01</span>Chat with Prime</h3>
+          <div class="body">
+            <p>Prime Agent runs the session: tools, skills, and provider login. Pick the model you want.</p>
+            <ol><li><span>1.1</span>Bring your own model</li><li><span>1.2</span>One compact composer</li><li><span>1.3</span>Sessions in a sidebar</li></ol>
+          </div>
+        </article>
+        <article class="cell">
+          <span class="fig">FIG. 02</span>
+          <div class="diagram" aria-hidden="true">
+            <svg viewBox="0 0 420 220" fill="none" font-family="Geist Mono" font-size="12.5">
+              <g fill="rgb(241 236 226 / 0.6)">
+                <text x="70" y="48">~/vault/</text>
+                <text x="94" y="78">concepts/</text>
+                <text x="118" y="104" fill="#86e3a8">event-sourcing.md</text>
+                <text x="94" y="134">projects/</text>
+                <text x="118" y="160">launch.md</text>
+                <text x="94" y="190">inbox/</text>
+              </g>
+              <path d="M78 58v128M78 74h12M78 130h12M78 186h12M102 88v68M102 100h12M102 156h12" stroke="rgb(241 236 226 / 0.3)" />
+            </svg>
+          </div>
+          <h3><span class="n">02</span>A vault you own</h3>
+          <div class="body">
+            <p>Notes are plain Markdown in a local folder. No database and no lock-in. Open them in any editor.</p>
+            <ol><li><span>2.1</span>Plain files on disk</li><li><span>2.2</span>Agent reads it through MCP</li><li><span>2.3</span>Git-friendly by design</li></ol>
+          </div>
+        </article>
+        <article class="cell">
+          <span class="fig">FIG. 03</span>
+          <div class="diagram" aria-hidden="true">
+            <svg viewBox="0 0 420 220" fill="none" stroke="rgb(241 236 226 / 0.5)">
+              <rect x="30" y="20" width="360" height="180" rx="4" />
+              <path d="M76 20v180M232 20v180" />
+              <path d="M44 44h20M44 60h20M44 76h20" stroke="rgb(241 236 226 / 0.3)" />
+              <path d="M92 50h120M92 68h96M110 150h104M92 168h120" stroke="rgb(241 236 226 / 0.35)" />
+              <rect x="92" y="176" width="126" height="16" rx="2" stroke="#86e3a8" />
+              <path d="M248 50h80M248 72h124M248 88h110M248 104h124M248 120h90" stroke="rgb(241 236 226 / 0.35)" />
+              <text x="248" y="40" fill="#86e3a8" stroke="none" font-family="Geist Mono" font-size="11">launch.md</text>
+            </svg>
+          </div>
+          <h3><span class="n">03</span>Notes beside the chat</h3>
+          <div class="body">
+            <p>Open a note next to the conversation. In a small window, Chat and Notes become tabs instead of squeezing both.</p>
+            <ol><li><span>3.1</span>Side-by-side research desk</li><li><span>3.2</span>Focused tabs when narrow</li><li><span>3.3</span>Save a reply as a note</li></ol>
+          </div>
+        </article>
+        <article class="cell">
+          <span class="fig">FIG. 04</span>
+          <div class="diagram" aria-hidden="true">
+            <svg viewBox="0 0 420 220" fill="none" stroke="rgb(241 236 226 / 0.5)">
+              <circle cx="210" cy="110" r="14" stroke="#86e3a8" />
+              <circle cx="110" cy="60" r="7" /><circle cx="320" cy="56" r="7" /><circle cx="96" cy="170" r="7" /><circle cx="318" cy="168" r="7" /><circle cx="210" cy="30" r="7" />
+              <path d="M198 102L116 64M222 101l91-41M199 119l-96 46M222 119l89 44M210 96V37" />
+              <path d="M110 60l-40-22M320 56l46-18M96 170l-44 26M318 168l50 24" stroke="rgb(241 236 226 / 0.25)" stroke-dasharray="3 4" />
+            </svg>
+          </div>
+          <h3><span class="n">04</span>Research and links</h3>
+          <div class="body">
+            <p>A research panel and a graph of how your notes connect, so findings land next to what you already know.</p>
+            <ol><li><span>4.1</span>Research panel</li><li><span>4.2</span>Note graph</li><li><span>4.3</span>Wikilinks in chat</li></ol>
+          </div>
+        </article>
       </div>
     </section>
 
-    <section id="run">
-      <h2>Run it</h2>
-      <p class="note">Developer preview for macOS. You need Node <code>^20.19.0</code> or <code>&gt;=22.12.0</code>, pnpm, Rust, and the Tauri toolchain. Prime Agent is installed separately, and there is no signed download yet.</p>
-      <pre><code>npm i -g prime-agent &amp;&amp; prime-agent
-git clone https://github.com/tuckcode/rhizome-agent &amp;&amp; cd rhizome-agent
-pnpm install &amp;&amp; pnpm tauri dev</code></pre>
-      <p class="note">Setup, scope, and recovery: <a href="https://github.com/tuckcode/rhizome-agent/blob/main/docs/PUBLIC-PREVIEW.md">PUBLIC-PREVIEW.md</a>.</p>
+    <section class="section" id="demo">
+      <div class="head">
+        <div>
+          <span class="eyebrow">Demo</span>
+          <h2>Twenty seconds. <em>The whole loop.</em></h2>
+        </div>
+      </div>
+      <div class="frame">
+        <video src="assets/demo.mp4#t=0.5" controls muted playsinline preload="metadata"></video>
+        <div class="fig"><span>FIG. 05 — RHIZOME AGENT, MACOS</span><span>0:20</span></div>
+      </div>
     </section>
 
-    <footer>
-      <p>AGPL-3.0-or-later. Rhizome Agent is a modified version of <a href="https://github.com/refactoringhq/tolaria">Tolaria</a> by Luca Rossi. The Mycelium view embeds Mindwalk (MIT) © 2026 Ricko Yu.</p>
-      <p><a href="https://github.com/tuckcode/rhizome-agent/issues">Issues</a> · <a href="https://github.com/tuckcode/rhizome-agent/blob/main/SECURITY.md">Security</a> · <a href="https://github.com/tuckcode/rhizome-agent/blob/main/CONTRIBUTING.md">Contributing</a></p>
-    </footer>
+    <section class="section" id="run">
+      <div class="head">
+        <div>
+          <span class="eyebrow">Run it</span>
+          <h2>Three commands. <em>Developer preview.</em></h2>
+        </div>
+      </div>
+      <div class="run">
+        <div>
+          You need macOS, Node <code>^20.19.0</code> or <code>&gt;=22.12.0</code>, pnpm, Rust, and the Tauri toolchain. Prime Agent installs separately. There is no signed download yet.
+          <p style="margin:16px 0 0"><a href="https://github.com/tuckcode/rhizome-agent/blob/main/docs/PUBLIC-PREVIEW.md">Setup, scope, and recovery →</a></p>
+        </div>
+        <div>
+<pre><span class="c"># install Prime and log in once</span>
+<span class="p">$</span> npm i -g prime-agent &amp;&amp; prime-agent
+<span class="c"># get Rhizome and run it</span>
+<span class="p">$</span> git clone https://github.com/tuckcode/rhizome-agent
+<span class="p">$</span> cd rhizome-agent &amp;&amp; pnpm install &amp;&amp; pnpm tauri dev</pre>
+        </div>
+      </div>
+    </section>
   </div>
+
+  <footer>
+    <div class="wrap foot">
+      <div>
+        <span class="eyebrow">Rhizome Agent</span>
+        <p>AGPL-3.0-or-later. A modified version of <a style="display:inline" href="https://github.com/refactoringhq/tolaria">Tolaria</a> by Luca Rossi.</p>
+        <p>The Mycelium view embeds Mindwalk (MIT) © 2026 Ricko Yu.</p>
+      </div>
+      <div>
+        <span class="eyebrow">Project</span>
+        <a href="https://github.com/tuckcode/rhizome-agent">GitHub</a>
+        <a href="https://github.com/tuckcode/rhizome-agent/issues">Issues</a>
+        <a href="https://github.com/tuckcode/rhizome-agent/blob/main/CONTRIBUTING.md">Contributing</a>
+      </div>
+      <div>
+        <span class="eyebrow">Trust</span>
+        <a href="https://github.com/tuckcode/rhizome-agent/blob/main/SECURITY.md">Security</a>
+        <a href="https://github.com/tuckcode/rhizome-agent/blob/main/LICENSE">License</a>
+        <a href="https://github.com/PrimeIntellect-ai/prime-agent">Prime Agent ↗</a>
+      </div>
+    </div>
+  </footer>
 </body>
 </html>
