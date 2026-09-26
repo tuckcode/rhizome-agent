@@ -15,6 +15,35 @@ interface SettingsNavItem {
   Icon: ComponentType<IconProps>
 }
 
+const FOLLOW_MS = 2000
+const STOP_EVENTS = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const
+let stopFollowing: (() => void) | null = null
+
+/**
+ * Scroll a section's heading to the top and keep it there while content
+ * settles. Packages loads its catalog lazily as the scroll passes it, which
+ * pushed later sections (About) down mid-scroll (browser preview,
+ * 2026-09-26). Stops on the user's own scroll or input, or after 2s.
+ */
+function scrollSectionToTop(section: HTMLElement) {
+  stopFollowing?.()
+  section.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  const container = section.closest('.overflow-auto')
+  if (!(container instanceof HTMLElement) || typeof ResizeObserver === 'undefined') return
+
+  const observer = new ResizeObserver(() => section.scrollIntoView({ block: 'start' }))
+  for (const child of Array.from(container.children)) observer.observe(child)
+  const timer = window.setTimeout(() => stop(), FOLLOW_MS)
+  const stop = () => {
+    observer.disconnect()
+    window.clearTimeout(timer)
+    for (const type of STOP_EVENTS) container.removeEventListener(type, stop)
+    if (stopFollowing === stop) stopFollowing = null
+  }
+  for (const type of STOP_EVENTS) container.addEventListener(type, stop, { passive: true })
+  stopFollowing = stop
+}
+
 export function SettingsBodyNav({ t, onVisit }: SettingsBodyNavProps) {
   const items: SettingsNavItem[] = [
     { id: SETTINGS_SECTION_IDS.sync, label: t('settings.sync.title'), Icon: RefreshCw },
@@ -42,7 +71,8 @@ export function SettingsBodyNav({ t, onVisit }: SettingsBodyNavProps) {
             data-testid={`settings-nav-${item.id}`}
             onClick={() => {
               onVisit?.(item.id)
-              document.getElementById(item.id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+              const section = document.getElementById(item.id)
+              if (section) scrollSectionToTop(section)
             }}
           >
             <item.Icon size={16} weight="regular" className="shrink-0" />
