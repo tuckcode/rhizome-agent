@@ -211,7 +211,7 @@ describe('parked organs leftover', () => {
     expect(mycelium).not.toContain('window.open')
     expect(subhead).toContain('data-testid="prime-session-footprint"')
     expect(subhead).toContain("title={t('mycelium.title')}")
-    expect(chatHome).toContain('skillsLabel="rhizome-vault"')
+    expect(chatHome).toContain('composerSkillsLabel="rhizome-vault"')
     expect(chatHome).toContain('<AgentsPill')
     expect(chrome).toContain('isLatestReply={index === latestReplyIndex}')
   })
@@ -716,7 +716,7 @@ describe('parked organs leftover', () => {
     )
     expect(allow).toContain('Chat model menu')
     expect(allow).toContain("Choose which of Prime's models appear in the chat model menu")
-    expect(home).toContain('skillsLabel="rhizome-vault"')
+    expect(home).toContain('composerSkillsLabel="rhizome-vault"')
     expect(welcome).toContain("onboarding.welcome.createEmpty")
   })
 
