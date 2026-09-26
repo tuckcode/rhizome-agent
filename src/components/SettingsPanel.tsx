@@ -814,7 +814,9 @@ function SettingsBody(props: SettingsBodyProps) {
           loadModelCatalog={loadModelCatalog}
           loadExtensionCatalog={loadExtensionCatalog}
         />
-        <div data-testid="settings-scroll-end-spacer" style={{ minHeight: 'var(--settings-scroll-container-height, 600px)' }} />
+        {/* Lets the last sections scroll their heading to the top when picked
+            in the nav (native audit 2026-09-26). Sized to the scroll box. */}
+        <div data-testid="settings-scroll-end-spacer" aria-hidden="true" style={{ minHeight: 'calc(100% - 4rem)' }} />
       </div>
     </div>
   )
@@ -1318,7 +1320,7 @@ function AutoSaveSettingRow({
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false)
   const generatedId = useId()
   const switchId = testId ?? generatedId
-  const plainDescription = 'After each chat reply, Rhizome saves anything worth keeping as a note in your vault. Sign-in errors and tool failures are never saved.'
+  const plainDescription = 'After each chat reply, Rhizome saves anything worth keeping as a note in your vault. Sign-in errors and tool failures are skipped.'
   const technicalDescription = 'After each AI chat turn, distill durable decisions into the vault. Off by default — turn on only if you want silent saves. Prefer explicit promote/save for trusted knowledge. Skips error/OAuth/tooling failures and turns that already called distill.'
 
   return (
@@ -1341,7 +1343,7 @@ function AutoSaveSettingRow({
           className="h-auto px-0 py-1 text-xs text-muted-foreground hover:text-foreground"
           onClick={(e) => {
             e.preventDefault()
-            setShowTechnicalDetails(!showTechnicalDetails)
+            setShowTechnicalDetails(open => !open)
           }}
           aria-expanded={showTechnicalDetails}
         >
