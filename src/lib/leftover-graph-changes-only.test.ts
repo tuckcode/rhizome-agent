@@ -4,8 +4,9 @@ import { describe, expect, it } from 'vitest'
 describe('leftover graph changes only', () => {
   const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
 
-  it('locks Graph/Mycelium Connections on Changes', () => {
-    expect(app).toContain('chatCentered && isChangesSelection ? (')
+  it('mounts Graph/Mycelium with Notes, not only on Changes', () => {
+    expect(app).toContain('chatCentered ? (')
+    expect(app).not.toContain('chatCentered && isChangesSelection ? (')
   })
 
   it('does not mount GraphView from Inbox', () => {

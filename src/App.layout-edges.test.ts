@@ -48,8 +48,9 @@ describe('shell column edges', () => {
     expect(appSource).not.toContain('Getting Started vault cloned and opened')
   })
 
-  it('mounts Graph/Mycelium only on Changes, not Inbox', () => {
-    expect(appSource).toContain('chatCentered && isChangesSelection ? (')
+  it('mounts Graph/Mycelium with Notes, not only on Changes', () => {
+    expect(appSource).toContain('chatCentered ? (')
+    expect(appSource).not.toContain('chatCentered && isChangesSelection ? (')
     expect(appSource).toContain('<ConnectionsPanel')
     expect(appSource).not.toMatch(/isInboxSelection[\s\S]{0,80}<ConnectionsPanel/)
   })

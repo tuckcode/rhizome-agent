@@ -13,8 +13,8 @@ export const MACOS_TRAFFIC_LIGHT_POSITION = {
 
 /** Three 12px lights with 8px gaps, plus breathing room before content. */
 const TRAFFIC_LIGHT_RUN_PX = 70
-/** Extra gap after the last light. 70px ends flush with the status text. */
-const TRAFFIC_LIGHT_CLEARANCE_PX = 16
+/** Extra gap after the last light, so status text is not flush with the green button. */
+const TRAFFIC_LIGHT_CLEARANCE_PX = 32
 
 /** Collapsed command rail and matching Notes restore rail. */
 export const COMMAND_RAIL_WIDTH_PX = 46
@@ -41,11 +41,17 @@ export function hasNativeMacosTrafficLights(): boolean {
  * preview has no window controls at all. Returned as a CSS variable so the
  * component keeps its padding in one class and simply gets a bigger value here.
  */
-export function subheadTrafficLightInset(): Record<string, string> {
+/**
+ * Left padding for Chat's status line.
+ *
+ * The collapsible sidebar's layout width is the left edge of that line.
+ * A collapsed rail is narrower than the traffic lights, so the line needs
+ * the leftover gap. A pinned open sidebar is wider than the lights, so the
+ * line only needs a small pad. Hover-open does not change layout width.
+ */
+export function subheadTrafficLightInset(railLayoutWidth = COMMAND_RAIL_WIDTH_PX): Record<string, string> {
   if (!hasNativeMacosTrafficLights()) return {}
-  const inset =
-    MACOS_TRAFFIC_LIGHT_SAFE_PADDING -
-    COMMAND_RAIL_WIDTH_PX
+  const inset = Math.max(12, MACOS_TRAFFIC_LIGHT_SAFE_PADDING - railLayoutWidth)
   return { '--subhead-traffic-light-inset': `${inset}px` }
 }
 
@@ -54,10 +60,10 @@ export function subheadTrafficLightInset(): Record<string, string> {
  * traffic lights sit on `--surface-sidebar`, not straddling two panel
  * colors. Height matches the rail's vertical inset. Off Mac this is empty.
  */
-export function overlayTitleBarBandStyle(): Record<string, string | number> {
+export function overlayTitleBarBandStyle(railLayoutWidth = COMMAND_RAIL_WIDTH_PX): Record<string, string | number> {
   if (!hasNativeMacosTrafficLights()) return {}
   return {
-    ...subheadTrafficLightInset(),
+    ...subheadTrafficLightInset(railLayoutWidth),
     minHeight: COMMAND_RAIL_TRAFFIC_LIGHT_INSET,
     '--overlay-titlebar-height': `${COMMAND_RAIL_TRAFFIC_LIGHT_INSET}px`,
   }

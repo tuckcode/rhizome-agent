@@ -100,7 +100,7 @@ function HeaderTitle({
     return (
       <button
         type="button"
-        className="m-0 min-w-[3.25rem] flex-1 truncate border-0 bg-transparent p-0 text-left text-[14px] font-semibold"
+        className="m-0 min-w-[5.5rem] shrink-0 whitespace-nowrap border-0 bg-transparent p-0 text-left text-[14px] font-semibold"
         onClick={handleClick}
         data-testid="type-header-link"
       >
@@ -111,7 +111,7 @@ function HeaderTitle({
 
   return (
     <h3
-      className="m-0 min-w-[3.25rem] flex-1 truncate text-[14px] font-semibold"
+      className="m-0 min-w-[5.5rem] shrink-0 whitespace-nowrap text-[14px] font-semibold"
     >
       {title}
     </h3>

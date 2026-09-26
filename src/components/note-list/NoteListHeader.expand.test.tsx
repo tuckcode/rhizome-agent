@@ -61,12 +61,12 @@ describe('NoteListHeader expand sidebar button', () => {
 })
 
 describe('NoteListHeader Inbox title (C78)', () => {
-  it('keeps a min-width that can show Inbox beside a row of fixed 32px icons', () => {
-    renderHeader({ title: 'Inbox' })
+  it('keeps Changes readable beside a row of fixed 32px icons', () => {
+    renderHeader({ title: 'Changes' })
 
-    const title = screen.getByRole('heading', { name: 'Inbox' })
-    expect(title).not.toHaveClass('min-w-0')
-    expect(title.className).toMatch(/min-w-\[3\.25rem\]/)
+    const title = screen.getByRole('heading', { name: 'Changes' })
+    expect(title).not.toHaveClass('truncate')
+    expect(title.className).toMatch(/min-w-\[5\.5rem\]/)
 
     const search = screen.getByRole('button', { name: 'Search notes' })
     expect(search.className).toMatch(/!w-\[32px\]/)
