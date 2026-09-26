@@ -34,8 +34,6 @@ Ports and tests: [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md).
 | Harness | Prime Agent |
 | Notes | Plain Markdown, in a local vault you open |
 
-Rhizome Agent is not Rhizome Desktop. Desktop is a separate app, with a separate bundle id.
-
 Prime Agent runs the chat: session, tools, skills, and provider login. Rhizome reaches your vault through MCP when you attach one.
 
 Names and remotes: [`docs/IDENTITY.md`](docs/IDENTITY.md).
@@ -50,6 +48,6 @@ Security reports: [SECURITY.md](SECURITY.md). Do not file a vulnerability as a p
 
 AGPL-3.0-or-later. See [LICENSE](LICENSE).
 
-Rhizome Agent is a modified version of Rhizome Desktop, which builds on
+Rhizome Agent is a modified version of
 [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi (AGPL-3.0).
 The Mycelium view embeds Mindwalk (MIT) © 2026 Ricko Yu.
