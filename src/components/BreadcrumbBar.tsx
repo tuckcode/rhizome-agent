@@ -554,8 +554,11 @@ function measureNaturalTitleWidth(title: HTMLDivElement): number {
   return width
 }
 
-function expandedActionsLeft(actions: HTMLDivElement, expandedActionsWidth: number): number {
-  const actionsRight = actions.getBoundingClientRect().right
+function expandedActionsLeft(actions: HTMLDivElement, expandedActionsWidth: number, bar: HTMLDivElement): number {
+  // Anchor on the bar's right edge when the actions already run past it:
+  // their own right edge has moved off-screen, which made a too-narrow bar
+  // look roomy (desk note pane, browser preview 2026-09-26).
+  const actionsRight = Math.min(actions.getBoundingClientRect().right, bar.getBoundingClientRect().right)
   return actionsRight - expandedActionsWidth
 }
 
@@ -563,6 +566,7 @@ function shouldCollapseBreadcrumbOverflow(
   title: HTMLDivElement,
   actions: HTMLDivElement,
   expandedActionsWidth: number,
+  bar: HTMLDivElement,
 ) {
   // No real measurement yet (unlaid-out first frame, or an environment with
   // no layout engine at all) reads as every rect being exactly zero, which
@@ -573,7 +577,7 @@ function shouldCollapseBreadcrumbOverflow(
   // than briefly under-collapsing a genuinely narrow bar.
   if (expandedActionsWidth <= 0) return false
   const titleLeft = title.getBoundingClientRect().left
-  const availableTitleWidth = expandedActionsLeft(actions, expandedActionsWidth) - titleLeft - TITLE_ACTION_GAP_PX
+  const availableTitleWidth = expandedActionsLeft(actions, expandedActionsWidth, bar) - titleLeft - TITLE_ACTION_GAP_PX
   return measureNaturalTitleWidth(title) > availableTitleWidth
 }
 
@@ -616,7 +620,7 @@ function useBreadcrumbOverflow(
       const nextCollapsed = withExpandedActionMeasurement(actions, collapsed, () => {
         const expandedActionsWidth = actions.scrollWidth || expandedActionsWidthRef.current
         expandedActionsWidthRef.current = expandedActionsWidth
-        return shouldCollapseBreadcrumbOverflow(title, actions, expandedActionsWidth)
+        return shouldCollapseBreadcrumbOverflow(title, actions, expandedActionsWidth, bar)
       })
       setCollapsed((current) => current === nextCollapsed ? current : nextCollapsed)
     }
