@@ -1275,4 +1275,36 @@ describe('SettingsPanel', () => {
       scrollIntoViewSpy.mockRestore()
     })
   })
+
+  describe('Auto-save description', () => {
+    it('shows plain description by default and hides technical details', () => {
+      renderOpenSettings()
+      const plainDescription = 'After each chat reply, Rhizome saves anything worth keeping as a note in your vault. Sign-in errors and tool failures are never saved.'
+      expect(screen.getByText(plainDescription)).toBeInTheDocument()
+      expect(screen.queryByText(/After each AI chat turn, distill durable/)).not.toBeInTheDocument()
+    })
+
+    it('reveals technical details when Technical details button is clicked', () => {
+      renderOpenSettings()
+      const technicalDetailsButton = screen.getByRole('button', { name: 'Technical details' })
+      expect(technicalDetailsButton).toBeInTheDocument()
+
+      fireEvent.click(technicalDetailsButton)
+
+      const technicalDescription = 'After each AI chat turn, distill durable decisions into the vault. Off by default — turn on only if you want silent saves. Prefer explicit promote/save for trusted knowledge. Skips error/OAuth/tooling failures and turns that already called distill.'
+      expect(screen.getByText(technicalDescription)).toBeInTheDocument()
+    })
+
+    it('toggles technical details visibility on repeated clicks', () => {
+      renderOpenSettings()
+      const technicalDetailsButton = screen.getByRole('button', { name: 'Technical details' })
+      const technicalDescription = 'After each AI chat turn, distill durable decisions into the vault. Off by default — turn on only if you want silent saves. Prefer explicit promote/save for trusted knowledge. Skips error/OAuth/tooling failures and turns that already called distill.'
+
+      fireEvent.click(technicalDetailsButton)
+      expect(screen.getByText(technicalDescription)).toBeInTheDocument()
+
+      fireEvent.click(technicalDetailsButton)
+      expect(screen.queryByText(/After each AI chat turn, distill durable/)).not.toBeInTheDocument()
+    })
+  })
 })

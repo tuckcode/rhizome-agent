@@ -14,6 +14,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
   useSyncExternalStore,
@@ -71,6 +72,7 @@ import {
   SettingsRow,
   SettingsSection,
   SettingsSwitchRow,
+  SettingsSwitchControl,
 } from './SettingsControls'
 import { SettingsFooter } from './SettingsFooter'
 import { VaultContentSettingsSection } from './VaultContentSettingsSection'
@@ -1302,6 +1304,57 @@ function LanguageSettingsSection({
   )
 }
 
+function AutoSaveSettingRow({
+  label,
+  checked,
+  onChange,
+  testId,
+}: {
+  label: string
+  checked: boolean
+  onChange: (value: boolean) => void
+  testId?: string
+}) {
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false)
+  const generatedId = useId()
+  const switchId = testId ?? generatedId
+  const plainDescription = 'After each chat reply, Rhizome saves anything worth keeping as a note in your vault. Sign-in errors and tool failures are never saved.'
+  const technicalDescription = 'After each AI chat turn, distill durable decisions into the vault. Off by default — turn on only if you want silent saves. Prefer explicit promote/save for trusted knowledge. Skips error/OAuth/tooling failures and turns that already called distill.'
+
+  return (
+    <label
+      htmlFor={switchId}
+      className="border-b border-border px-4 py-3 last:border-b-0 flex flex-col gap-3 lg:flex-row lg:items-center"
+      style={{ cursor: 'pointer', opacity: 1 }}
+      data-testid={testId}
+    >
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="text-sm font-medium text-foreground">{label}</div>
+        <div className="text-xs leading-5 text-muted-foreground">{plainDescription}</div>
+        {showTechnicalDetails && (
+          <div className="mt-2 text-xs leading-5 text-muted-foreground">{technicalDescription}</div>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-auto px-0 py-1 text-xs text-muted-foreground hover:text-foreground"
+          onClick={(e) => {
+            e.preventDefault()
+            setShowTechnicalDetails(!showTechnicalDetails)
+          }}
+          aria-expanded={showTechnicalDetails}
+        >
+          Technical details
+        </Button>
+      </div>
+      <div className="flex justify-start lg:shrink-0 lg:justify-end">
+        <SettingsSwitchControl id={switchId} label={label} checked={checked} onChange={onChange} disabled={false} />
+      </div>
+    </label>
+  )
+}
+
 function AiAgentSettingsSection({
   t,
   celebrationsEnabled,
@@ -1334,9 +1387,8 @@ function AiAgentSettingsSection({
       />
 
       <SettingsGroup>
-        <SettingsSwitchRow
+        <AutoSaveSettingRow
           label={t('settings.aiAgents.sessionAutoDistill')}
-          description={t('settings.aiAgents.sessionAutoDistillDescription')}
           checked={sessionAutoDistillEnabled}
           onChange={(value) => updateVaultConfigField('session_auto_distill_enabled', value)}
           testId="settings-session-auto-distill-enabled"
