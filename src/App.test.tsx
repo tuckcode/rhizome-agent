@@ -752,23 +752,18 @@ describe('App', () => {
     expect(await screen.findByLabelText('Activity session')).toHaveValue('/prime/sessions/session-1.jsonl')
   })
 
-  it('routes Graph under Notes only on Changes, not Inbox', async () => {
+  it('shows Graph under Notes without switching the list to Changes', async () => {
     localStorage.setItem('rhizome:command-rail-expanded', '1')
     render(<App />)
     await screen.findByTestId('chat-home')
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
-    expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('graph-view')).not.toBeInTheDocument()
-    await selectChangesInVaultPanel()
     expect(await screen.findByTestId('connections-panel')).toBeInTheDocument()
     expect(await screen.findByTestId('graph-view')).toBeInTheDocument()
   })
 
-  it('stacks Graph under Notes on Changes, with no Connections strip', async () => {
+  it('stacks Graph under Notes, with no Connections strip', async () => {
     render(<App />)
     const notes = await screen.findByTestId('vault-panel')
-    expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
-    await selectChangesInVaultPanel()
     const graph = await screen.findByTestId('connections-panel')
     expect(screen.queryByTestId('connections-edge')).not.toBeInTheDocument()
     expect(notes.compareDocumentPosition(graph) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
