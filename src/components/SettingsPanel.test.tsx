@@ -1254,4 +1254,25 @@ describe('SettingsPanel', () => {
       expect(onOpenDocs).toHaveBeenCalledOnce()
     })
   })
+
+  describe('Scroll container', () => {
+    it('includes a scroll-end-spacer element to allow last sections to reach the top', () => {
+      renderOpenSettings()
+      const spacer = screen.getByTestId('settings-scroll-end-spacer')
+      expect(spacer).toBeInTheDocument()
+    })
+
+    it('scrolls to section heading with block=start when nav item is clicked', () => {
+      renderOpenSettings()
+      const aiNavButton = screen.getByTestId(`settings-nav-${SETTINGS_SECTION_IDS.ai}`)
+      const scrollIntoViewSpy = vi.spyOn(Element.prototype, 'scrollIntoView')
+
+      fireEvent.click(aiNavButton)
+
+      expect(scrollIntoViewSpy).toHaveBeenCalledWith(expect.objectContaining({
+        block: 'start',
+      }))
+      scrollIntoViewSpy.mockRestore()
+    })
+  })
 })
