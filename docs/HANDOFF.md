@@ -53,9 +53,12 @@ file.
 **Origin:** Cursor Grok 4.7 · 2026-09-21 · Astra next-phase input.
 **Origin:** Cursor Grok 4.7 · 2026-09-21 · launch slice. He will open the new app.
 **Origin:** Cursor Grok 4.7 · 2026-09-21 22:23 CDT · `/Applications` rebuilt from `2a24eed`.
+**Origin:** Cursor Grok 4.7 · 2026-09-25 23:36 CDT · `/Applications` rebuilt from `18eb5ba`.
+**Origin:** Cursor Grok 4.7 · 2026-09-26 00:28 CDT · handoff for Claude.
+**Origin:** Cursor Grok 4.7 · 2026-09-26 02:27 CDT · handy wrap.
+**Origin:** Claude Opus 5.5 · 2026-09-26 04:25 CDT · Astra redesign pushed, `/Applications` rebuilt from `d0a55f8`.
 
-`origin/main` and `HEAD` are **`2a24eed`**. The product push inside that is **`4ec3832`**. Use `git log -1` for the tip.
-`/Applications/Rhizome Agent.app` was rebuilt **2026-09-21 22:43 CDT** from `2a24eed` plus a local banner fix. The corner label is `0.1.0`. A Chat engine banner with **Update now** sits above the composer. The 22:23 install is zipped. Apply is still **NOT RUN**.
+`origin/main` and `HEAD` are **`d0a55f8`**. `/Applications` is that commit, installed **2026-09-26 04:21 CDT** (adhoc, `ai.rhizome.agent`). [`2026-09-26-0425`](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md).
 Handy: [`2026-09-20-1230`](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md).
 Recap: [`2026-09-20-1228`](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md).
 Detail:
@@ -64,7 +67,7 @@ Install/claims: [`GETTING-STARTED.md`](GETTING-STARTED.md) § Public preview
 quick start. Inventory:
 [`plans/2026-09-20-public-readiness-inventory.md`](plans/2026-09-20-public-readiness-inventory.md).
 Notes is a right panel from **Show Notes** (or View / Cmd+2), not a left-rail
-button. Left rail is **sessions + Settings + pin** (Chat/Research destinations
+button. Left rail is **sessions + Settings** (Chat/Research destinations
 removed; Research stays on the status bar). ADR-0173: Chat / Notes /
 Read / Workbench; fresh launch is Chat. Vault skill uses a resolved Node binary
 and a GUI-safe PATH. Traffic lights stay at the left corner (`x: 14`). Import
@@ -100,7 +103,7 @@ critical path at ~120s, coverage 85s of it).
 
 ## What to pick up next
 
-**2026-09-25 Astra native frontend audit:** Atticus reports that the collapsible sidebar chops off chat text. The app is running. Use the [audit brief](plans/2026-09-25-astra-native-frontend-audit.md) to reproduce this first and audit the native first-use experience. Existing command rail edits remain in the working tree; identify the running build before attributing behavior to source.
+**2026-09-26:** Pick up [`2026-09-26-0425`](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md). Installed app is `d0a55f8` with Astra's full redesign. First job: native QA of the redesign — nothing in it has been checked in the packaged app.
 
 **2026-09-20 assessment — GPT-6 / Codex:** Atticus requested a Cursor-focused
 public-readiness plan with parallel agents. Read the
@@ -110,20 +113,17 @@ public-readiness plan with parallel agents. Read the
 Typecheck and 292 focused tests pass. Native readiness is not established.
 No rebuild or issue closure occurred.
 
-**2026-09-21 rebuild:** `/Applications` is the 22:43 banner build. Update now apply is **NOT RUN**. [`2026-09-21-2223`](plans/handoffs/2026-09-21-2223-cursor-grok-4-7-applications-rebuild.md).
-
 ## Recent sessions
 
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-26 · Astra redesign](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md) — redesign + login-note skip + list markers pushed as `d0a55f8`; app rebuilt; native QA not done.
+- [2026-09-26 · handy wrap](plans/handoffs/2026-09-26-0227-cursor-grok-4-7-handy.md) — app is `18eb5ba`; rail fix local; staged login skip and list markers are separate.
+- [2026-09-26 · Claude handoff](plans/handoffs/2026-09-26-0028-cursor-grok-4-7-claude-handoff.md) — installed app is `18eb5ba`; rail follow-up is local; audit file is Astra’s corrected report.
+- [2026-09-25 · Applications rebuild](plans/handoffs/2026-09-25-2336-cursor-grok-4-7-applications-rebuild.md) — `/Applications` is `18eb5ba` at 23:36 CDT.
 - [2026-09-25 · Astra frontend audit brief](plans/handoffs/2026-09-25-1926-gpt-6-codex-astra-frontend-audit-brief.md) — native audit instructions and the sidebar clipping report.
-
-- [2026-09-21 · Applications rebuild](plans/handoffs/2026-09-21-2223-cursor-grok-4-7-applications-rebuild.md) — 22:43 banner install. Update now apply **NOT RUN**. First look was **FAIL** (`dev`, no banner).
-- [2026-09-21 · swarm launch](plans/handoffs/2026-09-21-2208-cursor-grok-4-7-swarm-launch.md) — thorough plan local; rebuild then Update now; swarm only after.
-- [2026-09-21 · launch slice](plans/handoffs/2026-09-21-2140-cursor-grok-4-7-launch-slice.md) — rebuild from `2a24eed`, then #26. App still `b7264d6`.
 - [2026-09-21 · Astra next phase](plans/handoffs/2026-09-21-2104-cursor-grok-4-7-astra-next-phase.md) — origin `2a24eed`; app `b7264d6`; planning only.
-- [2026-09-21 · evening wrap](plans/handoffs/2026-09-21-2021-cursor-grok-4-7-handy.md) — local `main` `9b019d3` unpushed; app `b7264d6`; #69 pushed.
 - [2026-09-21 · C75 living docs](plans/handoffs/2026-09-21-0215-cursor-grok-4-6-c75-docs.md) — hide leaves spawned Prime warm; #66–#68 closed.
 - [2026-09-20 · handy wrap](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md) — `ffc135f` 11 ahead; app `b7264d6`; Edit list next.
 - [2026-09-20 · Astra combined handoff](plans/handoffs/2026-09-20-1234-claude-opus-5-astra-combined-handoff.md) — D1–D7 audit, plugin rescope, ADR findings, and the Edit-list completion contract.

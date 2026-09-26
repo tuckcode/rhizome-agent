@@ -22,14 +22,16 @@ roadmap row in the inventory is not implementation approval.
 
 ## Status
 
-- **Done on origin:** `2a24eed` (product push `4ec3832`). #26 Chat-engine
-  apply is in that tree. Live Update now is still **NOT RUN**.
+- **Done on origin:** `d0a55f8`. Astra's native-audit redesign: reading
+  column, compact composer, Chat title first, note headers fold tools before
+  the title, Settings lands on the picked section, research desk / focused
+  window / Sessions drawer. Also the login-error note skip and list markers.
 - **Landed:** sessions-only left rail; Research on status bar; “Back to chat”
   exits; reasoning fold strips history echo (`4f9b4c4`).
-- **Now (for the next agent):** Atticus launches `/Applications` from the
-  **22:43** install and clicks the Chat engine banner **Update now**.
-  GitHub latest Prime is **v0.9.5**. This machine’s Prime is **0.9.3**.
-  Do not downgrade Prime to invent an update.
+- **Now (for the next agent):** Read
+  [`2026-09-26-0425`](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md).
+  The 04:21 app is `d0a55f8`. Native QA of the redesign is not done.
+  Prime here is **0.9.3**. Do not downgrade it.
 - **Next:** human session titles; #41 live; Packages shortcut only if claimed.
 
 **Origin:** Composer · 2026-09-20 04:38.
@@ -38,9 +40,8 @@ roadmap row in the inventory is not implementation approval.
 
 ## True right now
 
-- **Git:** `origin/main` and local HEAD are **`2a24eed`**. Product push
-  inside that tip is **`4ec3832`**.
-- **Last stamped app:** **`2a24eed` plus local banner fix**, **2026-09-21 22:43 CDT**,
+- **Git:** `origin/main` and local HEAD are **`d0a55f8`**.
+- **Last stamped app:** **`d0a55f8`**, **2026-09-26 04:21 CDT**,
   `/Applications/Rhizome Agent.app`. Recoverable copies:
   `~/Library/Application Support/rhizome-agent-rebuild/Rhizome-Agent-2a24eed-2026-09-21-2223.zip`
   and `Rhizome-Agent-b7264d6-2026-09-20.zip`.
