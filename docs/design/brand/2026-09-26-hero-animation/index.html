@@ -10,7 +10,8 @@
       #root { position: relative; width: 100%; height: 100%; overflow: hidden; }
       .layer { position: absolute; inset: 0; width: 1600px; height: 800px; }
       /* Moving background: the full artwork, drifting slowly. */
-      #bg { transform-origin: 70% 50%; will-change: transform; }
+      #bg { transform-origin: 70% 50%; will-change: transform; filter: url(#grow); }
+      #fx { position: absolute; width: 0; height: 0; }
       /* Still wordmark: the text side of the same artwork, feathered out
          before the first sphere so the seam sits on flat dark green. */
       #type {
@@ -20,6 +21,17 @@
     </style>
   </head>
   <body>
+    <!-- Radial warps centred on the hub: one pushes the spheres out along
+         their arms, one creeps the outer roots outward. Both maps fade to
+         zero before the text mask, so the seam never moves. -->
+    <svg id="fx" aria-hidden="true">
+      <filter id="grow" x="0" y="0" width="1600" height="800" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+        <feImage href="assets/warp-nodes.png" x="0" y="0" width="1600" height="800" preserveAspectRatio="none" result="mapNodes" />
+        <feImage href="assets/warp-fibers.png" x="0" y="0" width="1600" height="800" preserveAspectRatio="none" result="mapFibers" />
+        <feDisplacementMap id="warpNodes" in="SourceGraphic" in2="mapNodes" scale="0" xChannelSelector="R" yChannelSelector="G" result="nodes" />
+        <feDisplacementMap id="warpFibers" in="nodes" in2="mapFibers" scale="0" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
     <div id="root" data-composition-id="main" data-start="0" data-duration="10" data-width="1600" data-height="800">
       <img id="bg" class="clip layer" src="assets/hero.png" alt="" data-start="0" data-duration="10" data-track-index="0" />
       <img id="type" class="clip layer" src="assets/hero-type.png" alt="Rhizome Agent — Your work. Your memory." data-start="0" data-duration="10" data-track-index="1" />
@@ -27,9 +39,14 @@
     <script>
       window.__timelines = window.__timelines || {};
       const tl = gsap.timeline({ paused: true });
-      // Out and back over 10s so the loop is seamless: slow push-in and drift.
-      tl.fromTo('#bg', { scale: 1.04, x: 0, y: 0 }, { scale: 1.12, x: -36, y: -14, duration: 5, ease: 'sine.inOut' }, 0)
-        .to('#bg', { scale: 1.04, x: 0, y: 0, duration: 5, ease: 'sine.inOut' }, 5);
+      // Everything returns to its start at 10s, so the loop is seamless.
+      // Slow drift of the whole artwork.
+      tl.fromTo('#bg', { scale: 1.03, x: 0, y: 0 }, { scale: 1.07, x: -18, y: -6, duration: 5, ease: 'sine.inOut' }, 0)
+        .to('#bg', { scale: 1.03, x: 0, y: 0, duration: 5, ease: 'sine.inOut' }, 5);
+      // Nodes stretch out along their arms and pull back, twice per loop.
+      tl.fromTo('#warpNodes', { attr: { scale: 0 } }, { attr: { scale: 38 }, duration: 2.5, ease: 'sine.inOut', yoyo: true, repeat: 3 }, 0);
+      // Roots creep outward and settle, once per loop, out of step with the nodes.
+      tl.fromTo('#warpFibers', { attr: { scale: 0 } }, { attr: { scale: 64 }, duration: 5, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0);
       window.__timelines['main'] = tl;
       tl.seek(0);
     </script>
