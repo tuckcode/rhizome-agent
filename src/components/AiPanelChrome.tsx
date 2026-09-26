@@ -263,7 +263,7 @@ function ComposerSendButton({
       }}
       disabled={!canSend}
       aria-label={label}
-      title={label}
+      title={`${label} (↵) · New line (⇧↵)`}
       data-testid="agent-send"
     >
       <PaperPlaneRight size={16} />

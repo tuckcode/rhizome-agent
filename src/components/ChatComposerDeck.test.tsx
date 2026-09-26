@@ -13,7 +13,6 @@ describe('ChatComposerDeck', () => {
   it('names the open note as context when Frame B has a split', () => {
     render(
       <ChatComposerDeck
-        skillsLabel="rhizome-vault"
         contextLabel="memory-loop.md"
       />,
     )
@@ -24,7 +23,6 @@ describe('ChatComposerDeck', () => {
   it('puts model and thinking on the composer strip (#38 / #9 / #35)', () => {
     render(
       <ChatComposerDeck
-        skillsLabel="rhizome-vault"
         model="Grok 4.5"
         thinkingLevel="off"
       />,
@@ -34,21 +32,20 @@ describe('ChatComposerDeck', () => {
     expect(screen.getByTestId('prime-thinking-toggle')).toHaveTextContent('Off')
   })
 
-  it('names Prime and the skill as labels, not fake menus', () => {
-    render(<ChatComposerDeck skillsLabel="rhizome-vault" />)
+  it('drops the Prime label chip and the skills chip (native audit 2026-09-26)', () => {
+    // Chat is Prime-only and the header status says whether it is live. The
+    // skill label lives in ChatComposerBar's Tools menu.
+    render(<ChatComposerDeck />)
 
-    expect(screen.getByTestId('composer-agent-pill').tagName).toBe('SPAN')
-    expect(screen.getByTestId('composer-skills-pill').tagName).toBe('SPAN')
-    expect(screen.getByTestId('composer-agent-pill')).toHaveTextContent('Prime')
-    expect(screen.getByTestId('composer-skills-pill')).toHaveTextContent('rhizome-vault')
+    expect(screen.queryByTestId('composer-agent-pill')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('composer-skills-pill')).not.toBeInTheDocument()
   })
 
   it('does not duplicate the vault switcher on the composer strip', () => {
-    render(<ChatComposerDeck skillsLabel="rhizome-vault" />)
+    render(<ChatComposerDeck />)
 
     expect(screen.queryByTestId('composer-vault-pill')).not.toBeInTheDocument()
     expect(screen.getByTestId('chat-composer-deck')).not.toHaveTextContent('Laputa')
-    expect(screen.getByTestId('chat-composer-deck')).toHaveTextContent('rhizome-vault')
   })
 
   it('hosts the agent activity pill next to thinking', () => {

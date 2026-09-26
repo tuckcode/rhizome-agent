@@ -85,7 +85,7 @@ export function trackPrimeThinkingLevelChanged(
  * vault path, skill name, or model id — those are user content.
  */
 export function trackComposerPillOpened(
-  pill: 'agent' | 'model' | 'skills' | 'context',
+  pill: 'agent' | 'model' | 'skills' | 'context' | 'tools' | 'context_usage',
 ): void {
   trackEvent('composer_pill_opened', { pill })
 }

@@ -352,7 +352,7 @@ describe('ChatHome composer wiring', () => {
   })
 
   it('keeps the skills pill as rhizome-vault, not a vault switcher', () => {
-    expect(chatHomeSource).toContain('skillsLabel="rhizome-vault"')
+    expect(chatHomeSource).toContain('composerSkillsLabel="rhizome-vault"')
     expect(chatHomeSource).not.toContain('composer-vault-pill')
   })
 
