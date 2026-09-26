@@ -198,3 +198,91 @@ describe('NoteListHeader — optional tools move into overflow when the title is
     }
   })
 })
+
+/**
+ * Live repro (browser preview, 2026-09-26): the title kept its own minimum
+ * width and was not truncated inside itself, but its flex wrapper was
+ * squeezed to 0px, so "Inbox" spilled under the shortcuts. Measuring only
+ * the title missed it. Also: once the tools collapse the title has room
+ * again — the header must not flip straight back and oscillate.
+ */
+describe('NoteListHeader — overflow measures the squeezed row, without flicker', () => {
+  function mockWidths(widthFor: (el: HTMLElement) => { scroll: number, client: number }) {
+    const requestFrame = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0)
+      return 1
+    })
+    const cancelFrame = vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => {})
+    const scroll = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return widthFor(this).scroll
+    })
+    const client = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return widthFor(this).client
+    })
+    return () => {
+      requestFrame.mockRestore()
+      cancelFrame.mockRestore()
+      scroll.mockRestore()
+      client.mockRestore()
+    }
+  }
+
+  it('collapses when the title wrapper is squeezed even though the title itself fits', async () => {
+    const restore = mockWidths((el) => {
+      if (el.tagName === 'H3') return { scroll: 77, client: 77 }
+      if (el.querySelector(':scope > h3')) return { scroll: 77, client: 0 }
+      return { scroll: 263, client: 263 }
+    })
+    try {
+      renderHeader({ title: 'Inbox' })
+      await waitFor(() => {
+        expect(screen.queryByTestId('note-list-header-optional-tools')).not.toBeInTheDocument()
+      })
+    } finally {
+      restore()
+    }
+  })
+
+  it('stays collapsed when the freed space only fits the title', async () => {
+    let squeezed = true
+    const restore = mockWidths((el) => {
+      if (el.tagName === 'H3') return { scroll: 77, client: 77 }
+      if (el.querySelector(':scope > h3')) return squeezed ? { scroll: 77, client: 0 } : { scroll: 90, client: 90 }
+      return { scroll: 263, client: 263 }
+    })
+    try {
+      const { rerender } = renderHeader({ title: 'Inbox' })
+      await waitFor(() => {
+        expect(screen.queryByTestId('note-list-header-optional-tools')).not.toBeInTheDocument()
+      })
+      // Tools are in the menu now, so the wrapper has room. The row did not grow.
+      squeezed = false
+      rerender(<NoteListHeader {...baseProps} title="Inbox" />)
+      expect(screen.queryByTestId('note-list-header-optional-tools')).not.toBeInTheDocument()
+    } finally {
+      restore()
+    }
+  })
+
+  it('brings the tools back inline once the row grows by what it was short', async () => {
+    let rowWidth = 263
+    const restore = mockWidths((el) => {
+      if (el.tagName === 'H3') return { scroll: 77, client: 77 }
+      if (el.querySelector(':scope > h3')) return rowWidth < 400 ? { scroll: 77, client: 0 } : { scroll: 77, client: 77 }
+      return { scroll: rowWidth, client: rowWidth }
+    })
+    try {
+      const { rerender } = renderHeader({ title: 'Inbox' })
+      await waitFor(() => {
+        expect(screen.queryByTestId('note-list-header-optional-tools')).not.toBeInTheDocument()
+      })
+      rowWidth = 400
+      rerender(<NoteListHeader {...baseProps} title="Inbox" />)
+      await waitFor(() => {
+        expect(screen.getByTestId('note-list-header-optional-tools')).toBeInTheDocument()
+      })
+    } finally {
+      restore()
+    }
+  })
+})
