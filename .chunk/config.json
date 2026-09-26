@@ -115,8 +115,8 @@
   ],
   "stopHookMaxAttempts": 2,
   "vcs": {
-    "org": "refactoringhq",
-    "repo": "tolaria"
+    "org": "tuckcode",
+    "repo": "rhizome-agent"
   },
   "orgID": "39f93336-5295-4c6c-845f-e692c1d3f968",
   "environment": {

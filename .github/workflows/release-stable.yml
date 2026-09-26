@@ -169,8 +169,9 @@ jobs:
           VERSION="${{ needs.version.outputs.version }}"
           TAG="${{ needs.version.outputs.tag }}"
           REPO="${GITHUB_REPOSITORY}"
+          OWNER="${REPO%/*}"
           REPO_NAME="${REPO#*/}"
-          PAGES_URL="https://refactoringhq.github.io/${REPO_NAME}/"
+          PAGES_URL="https://${OWNER}.github.io/${REPO_NAME}/"
 
           # .sig is optional — unsigned builds publish download URLs only.
           # updater.endpoints is [] so nothing in-app consumes signatures.

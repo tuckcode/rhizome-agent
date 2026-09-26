@@ -55,8 +55,9 @@ file.
 **Origin:** Cursor Grok 4.7 · 2026-09-26 02:27 CDT · handy wrap.
 **Origin:** Claude Opus 5.5 · 2026-09-26 04:25 CDT · Astra redesign pushed, `/Applications` rebuilt from `d0a55f8`.
 **Origin:** Cursor Grok 4.7 · 2026-09-26 · thin macOS title bar + Command Palette (local, unpushed).
+**Origin:** Cursor Grok 4.7 · 2026-09-26 · retargeted Chunk vcs + release Pages URLs off refactoringhq (local, unpushed).
 
-`origin/main` is **`835c5bb`**. Local HEAD adds the public-prep handoff and the macOS title-bar commit (unpushed). `/Applications` is still `d0a55f8`, installed **2026-09-26 04:21 CDT**. [`2026-09-26-0425`](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md).
+`origin/main` is **`835c5bb`**. Local HEAD adds public-prep, the macOS title bar, and the Chunk/release leftover cleanup (unpushed). `/Applications` is still `d0a55f8`, installed **2026-09-26 04:21 CDT**. [`2026-09-26-0425`](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md).
 Handy: [`2026-09-20-1230`](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md).
 Recap: [`2026-09-20-1228`](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md).
 Detail: [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
@@ -560,12 +561,11 @@ push is not a release — releases are tagged builds with signed installers.
      falls back. Install is `brew install CircleCI-Public/circleci/chunk`
      plus `chunk auth set circleci`, which needs a CircleCI account — **a
      decision for Atticus, not something an agent should do.**
-  2. **`.chunk/config.json` still points at the pre-fork project.** `vcs` is
-     `refactoringhq/tolaria` and `orgID` is `39f93336-…`, from before this
-     repo existed. Even with the CLI, remote sidecars would target an org this
-     repo is not in. Same family as C11's `GETTING_STARTED_REPO_URL`. The
-     correct org id for `tuckcode/rhizome-agent` is not known here, so it is
-     recorded rather than guessed.
+  2. **`.chunk/config.json` `vcs` is retargeted** to `tuckcode/rhizome-agent`
+     (2026-09-26). `orgID` is still `39f93336-…` from the pre-fork CircleCI
+     project — the correct org id for this repo is not known here, so it stays
+     until Atticus supplies one. Release workflow Pages URLs now derive from
+     `GITHUB_REPOSITORY` instead of hardcoding `refactoringhq.github.io`.
 
   **Fixed locally instead:** the fallback now runs its three independent lanes
   — frontend (lint, build, coverage, mcp), Rust (clippy, fmt, coverage), and
