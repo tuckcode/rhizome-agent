@@ -23,7 +23,7 @@ Claim only this scope until a later native matrix says otherwise:
 | Language | English | Localization (C18) |
 | Chat | Prime Agent harness, optional vault | Self-contained app with Prime/Node bundled (#26) |
 | Notes | Open a local vault, save a note, reopen it | Remote starter vault (C11), list-row `import_jsonl` (waits for `1`) |
-| Layout | Chat on launch. Notes from **Show Notes** / View / Cmd+2. Four presets in ADR-0173 | Portfolio, Today, kanban, vault pop-out, extra rail destinations |
+| Layout | Chat on launch. Notes from **Show Notes** / View / Cmd+2. Four presets in ADR-0173. An open note is a desk, stacked On top, or a focused Chat/Notes tab when both floors cannot fit | Portfolio, Today, kanban, vault pop-out, extra rail destinations |
 | Updates | Replace the `.app` or rebuild from source | In-app updater. `createUpdaterArtifacts` is false and updater endpoints are empty. |
 
 The installed bundle on this machine reports version `0.1.0` and

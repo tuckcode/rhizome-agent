@@ -682,3 +682,35 @@ older briefing (including closed drafts #66–#68):
   read must not invent finishes. Do not close #52 from units.
 - **Blank window.** `main.tsx` lazy-loads `App` behind `BootSplash`.
   `Suspense fallback={null}` is the defect C75 removed. Do not restore it.
+
+## 26. Workspace states replaced “Beside forces compact” (2026-09-26)
+
+**Origin:** Cursor Grok 4.6 · 2026-09-26 · verified against
+`src/lib/panePresets.ts`, `src/lib/panePresets.test.ts`,
+`src/components/chatNoteSplit.ts`, `src/components/FocusedPaneTabs.tsx`,
+`src/App.tsx` (`focusedWindow` / `railFits`).
+
+Older briefings (YOU-SHOULD-KNOW before this date, GETTING-STARTED’s
+`chatNoteSplit` row, ARCHITECTURE’s “Beside forces the compact shell”)
+will send you back to `shouldForceChatShellCompact`. That path is gone.
+
+- **Presets stay four.** `chat` / `notes` / `read` / `workbench`. An
+  open note is not a fifth preset.
+- **Fit owns the live columns.** `fitPanePreset` returns
+  `conversation` | `desk` | `stacked` | `focused`. Chat floor 420.
+  Note floor 280. Fold order: Browse → Notes → pinned rail → beside
+  note. Temporary folds do not write storage.
+- **Desk vs focused.** Opening a note becomes the desk only when both
+  floors fit **without folding a column the preset already shows**.
+  Notes at 900px with a note open focuses; it does not hide the list
+  to make room (`panePresets.test.ts` “does not fold the Notes list
+  to make a desk”).
+- **On top is `preset.stacked`.** `useChatNoteSplit` writes that flag.
+  Beside clears it, or switches to Read when no stacked choice exists.
+- **Narrow Sessions is a drawer.** `railFits === false` →
+  `CommandRail` `drawer`. Pick / scrim / Escape closes it. The saved
+  pin does not change.
+- **Do not restore** Notes-default-open, Research on the command rail,
+  or the 1420 / 1180 `SHELL_COLLAPSE_*` thresholds as the product
+  contract. Research still hides Chat when opened; the entry is the
+  status bar (`leftover-research-rail.test.ts`).

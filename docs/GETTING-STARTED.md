@@ -406,12 +406,17 @@ rhizome-agent/
 | `src/components/PrimeThinkingToggle.tsx` | Composer thinking-level menu. Levels come from the host and are filtered to the model's own set; no hardcoded list. |
 | `src/components/usePrimeSessionSwitcher.ts` | Session list switch / fork / branch. Skips `ensure_prime_session_host` when the host is already running. Clears the transcript on the same click as the row highlight. |
 | `src/lib/replySuggestions.ts` | Rules-first reply pills and Tab ghost-text (#51 Case 1). Options win over completion. Model-backed suggestions are not built. |
-| `src/components/chatNoteSplit.ts` | On top / Beside for an open note over Chat. Beside forces compact Sessions/Notes. |
+| `src/lib/panePresets.ts` | Four stored presets plus live `WorkspaceState` (`conversation` / `desk` / `stacked` / `focused`). `fitPanePreset` never folds Notes to make a desk. |
+| `src/components/FocusedPaneTabs.tsx` | Focused-window Chat / Notes tabs when both panes cannot meet their floors. |
+| `src/hooks/usePrimeActiveSessionTitle.ts` | Chat header title from `list_prime_session_summaries`, keyed by session path. Null list is empty. |
+| `src/components/chatNoteSplit.ts` | Compatibility On top / Beside write onto the preset. On top sets `stacked: true`. Beside does not force compact. |
 | `src/App.tsx` `handleAskAgentAboutNote` | Right-click a list row → Ask the agent about this note. Keeps Chat and opens that note (`App.test.tsx`). |
 | `src/hooks/useNoteLockMode.ts` | Ephemeral per-note lock. Locked notes make BlockNote/raw read-only (`EditorContentLayout.test.tsx`). Not vault `editor_mode`. |
 | `src/components/PrimeExtensionsSection.tsx` | Settings → Packages hub. Catalog is npm `pi-package`; install is the Prime CLI, not a daemon command. |
 | `src/lib/primePackages.ts` | Catalog search URL, install spec (`npm:` prefix), and Ask-Chat fallback prompt. |
 | `src/hooks/useViewMode.ts` | Runtime pane preset (`chat` / `notes` / `read` / `workbench`). Legacy `editor-only` / `editor-list` / `all` remain compatibility mirrors. Fresh default is Chat. |
+| `src/components/SettingsBodyNav.tsx` | Settings section list. A click follows the heading for 2s while lazy Packages content loads. |
+| `src/components/ChatComposerBar.tsx` | Compact composer row: deck + Tools + working status + context percent. |
 | `src/components/ConnectionsPanel.tsx` | Graph/Mycelium cell. Chat-centered shell mounts this only on Changes. |
 | `src/utils/openAiWorkspaceWindow.ts` | Native Tauri AI workspace window creation, focus, and dock-back traffic-light handling. |
 | `src/hooks/useCliAiAgent.ts` | Thin React owner for the selected CLI agent session state. |
@@ -498,9 +503,12 @@ Verified against source 2026-09-14. Longer landmine list:
   first. Quit the installed app before `pnpm tauri dev`.
 - **Chat default.** `useViewMode` returns the Chat preset (`editor-only`) when
   nothing is stored. Notes shut leaves `VaultPanelRestoreButton` (46px rail,
-  32px hit target). Inbox toggles; it does not mount Graph. Beside an open
-  note folds Sessions/Notes — do not restore hover-collapse on that pane
-  (`App.layout-edges.test.ts`). ADR-0173.
+  32px hit target). Inbox toggles; it does not mount Graph. An open note
+  becomes the **desk** when Chat (420) and the note (280) both fit without
+  folding a shown column; otherwise the **focused** window uses Chat / Notes
+  tabs. On top is an explicit stored `stacked` choice. Do not fold Notes to
+  make a desk, and do not restore hover-collapse on the note pane
+  (`panePresets.test.ts`, `App.layout-edges.test.ts`). ADR-0173.
 - **Graph/Mycelium only on Changes.** `ConnectionsPanel` is gated on
   `isChangesSelection` (`App.layout-edges.test.ts`). Inbox rail is a
   Notes filter. Do not remount Graph under Inbox.
@@ -515,7 +523,14 @@ Verified against source 2026-09-14. Longer landmine list:
 - **Settings catalog is lazy.** Do not fetch `get_available_prime_models` or
   `get_prime_provider_status` until Agents is visible. Do not search the
   Packages catalog until that section is opened. Do not cache a failed
-  “host is not running” catalog.
+  “host is not running” catalog. A nav click keeps the heading at the top
+  for 2s while lazy content settles (`SettingsBodyNav`); user scroll
+  cancels that follow. The scroll-end spacer is `calc(100% - 4rem)`.
+- **Chat auto-save is opt-in and skips failures.** Settings shows plain
+  language plus **Technical details**. `isSessionAutoDistillEnabled` is
+  false unless the value is exactly `true`. `isTransientAgentFailureText`
+  skips sign-in errors, tool failures, and `Not logged in` / `/login`
+  replies so they never become wiki notes.
 - **Chat default stays Prime.** Settings must not present Prime as an
   optional local-agent alternative. An API-model default must say it
   skips Prime sessions and vault tools.
@@ -546,13 +561,14 @@ Verified against source 2026-09-14. Longer landmine list:
   (`App.test.tsx`). Locked notes are read-only in BlockNote and raw
   (`EditorContentLayout.test.tsx`). Not vault `editor_mode`. Sheets do
   not get a lock this window.
-- **Agents idle/working** sits on the Chat composer next to thinking
-  (`ChatHome.test.tsx`). The skills pill stays `rhizome-vault` — not a
-  vault switcher. A Settings API default remaps to the Prime harness
-  (`ChatHome.test.tsx`). Inbox shows in the Notes list only when folder
-  mode is on (`App.layout-edges.test.ts`). A long context chip
-  truncates and keeps the full name on hover; queued follow-up text
-  stays 12px.
+- **Compact composer.** Model, thinking, and the idle/working activity
+  pill share one row with **Tools** (Goal, Schedule, `rhizome-vault`)
+  (`ChatComposerBar.tsx`, `ChatHome.test.tsx`). Idle says nothing.
+  Context usage is a percent; the meter is a popover. The Chat header
+  leads with the conversation title, not telemetry. A Settings API
+  default remaps to the Prime harness (`ChatHome.test.tsx`). Inbox shows
+  in the Notes list only when folder mode is on
+  (`App.layout-edges.test.ts`). Queued follow-up text stays 12px.
 - **S3 leftover prefixes** in JS: `ghr_` / `ghu_` / `sk_test_` plus Slack
   `xoxa-` / `xoxr-` / `xoxs-` / `xoxe-` (`sensitiveTextRedaction.test.ts`).
   Native Sentry also scrubs those Slack prefixes plus `hf_` / `npm_` /

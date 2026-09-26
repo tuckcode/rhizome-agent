@@ -7,6 +7,25 @@ you can drag, no Hermes free-dock tree.
 tasks you need so the plan actually ships (tests, leftover locks, View menu
 names). Do **not** invent a fifth layout or a drag-to-any-edge tree.
 
+## Shipped correction (2026-09-26)
+
+**Origin:** Cursor Grok 4.6 · verified against `src/lib/panePresets.ts`.
+
+The packet below is the implement brief. The live contract is the fit
+function, not the 1420 / 1180 compact thresholds named in §3.
+
+- Four stored presets still: `chat` / `notes` / `read` / `workbench`.
+- `fitPanePreset` also returns a **workspace state**:
+  `conversation` (no note), `desk` (note beside Chat when both floors
+  fit without folding a shown column), `stacked` (explicit On top),
+  `focused` (Chat / Notes tabs when 420 + 280 cannot both fit).
+- Opening a note does **not** fold the Notes list to manufacture a
+  desk. That case focuses instead.
+- A pinned Sessions rail that cannot take a column becomes a drawer
+  (`railFits`). Closing the drawer does not clear the pin.
+- Living docs: `ARCHITECTURE.md` § Chat-Centered Layout,
+  `YOU-SHOULD-KNOW.md` §2, `CROSS-MODEL-HANDOFF.md` §26.
+
 ---
 
 ## 1. What this is

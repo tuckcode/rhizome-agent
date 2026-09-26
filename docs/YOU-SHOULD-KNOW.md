@@ -52,11 +52,14 @@ with `pnpm prime:surface` / `pnpm prime:surface:github`. Snapshot:
 
 **Origin:** Cursor Grok 4.6 · 2026-09-08 — §2 corrected against `App.tsx`
 / ADR-0170 / ADR-0171. The 2026-08-26 “Graph replaces Chat” map is stale.
+**Origin:** Cursor Grok 4.6 · 2026-09-26 — workspace states and Chat
+chrome against `panePresets.ts` / `70e5f48`. Notes is **not** default
+open. Beside does **not** force compact.
 
 ```
-rail | sessions | CHAT | Notes (default open; 46px rail when shut)
+rail | sessions | CHAT | Notes (shut on a fresh vault; 46px rail)
 Changes only:          | Graph / Mycelium under Notes
-Research:              | still a center-canvas pane (not Chat)
+Research:              | status-bar destination; still hides Chat when open
 ```
 
 Claude left ADR-0166 with three questions open (what ⌘1/2/3 mean, whether
@@ -65,13 +68,14 @@ longer open the way the ADR text still sounds.
 
 | Question | Now |
 |---|---|
-| ⌘1 / ⌘2 / ⌘3 / ⌘4 | **Settled 2026-09-19 (ADR-0173).** ⌘1 Chat. ⌘2 Notes. ⌘3 Workbench. ⌘4 Read. Reset layout returns to Chat and default widths. Stored `viewMode` values remain compatibility mirrors (`editor-only` / `editor-list` / `all`). Fresh vaults default to Chat. Inbox stays the folder. Source only until rebuild; packaged app is still **`35f217f`**. |
+| ⌘1 / ⌘2 / ⌘3 / ⌘4 | **Settled 2026-09-19 (ADR-0173).** ⌘1 Chat. ⌘2 Notes. ⌘3 Workbench. ⌘4 Read. Reset layout returns to Chat and default widths. Stored `viewMode` values remain compatibility mirrors (`editor-only` / `editor-list` / `all`). Fresh vaults default to Chat. Inbox stays the folder. Confirm `/Applications` with `git log -1` on that tree — do not reuse a briefing hash. |
 | Right panel | **Settled 2026-08-25, refined 2026-09-12.** One Notes panel. Compact nav above the selected list. Rail control is **Notes** (Inbox is a folder in the list). Shut Notes leaves a 46px restore rail. No Inbox/Notes tabs, no second right column. |
-| Canvas destinations | **Corrected 2026-09-07.** Chat stays the centre. Graph/Mycelium are a Changes-only cell under Notes (ADR-0171), not a place you go instead of chatting (`App.layout-edges.test.ts` 14:33). Research is still a centre pane (Chat `display: none`, not an overlay). #39 (graph as an *agent tool*) is still open. |
-| Open note vs Chat | **Shipped 2026-09-12.** Notes header **On top / Beside**. Beside folds Sessions/Notes. Hover must not collapse the note. Highlight → Copy, or **Ask Chat about this** (same thread; `App.layout-edges.test.ts` 14:00). Right-click a list row → **Ask the agent about this note** keeps Chat and opens that note (`App.test.tsx` 13:50). Note lock is ephemeral and per-note — locked notes are read-only (`EditorContentLayout.test.tsx` 13:51). Not vault `editor_mode`. |
+| Canvas destinations | **Corrected 2026-09-07, rail 2026-09-20.** Chat stays the centre. Graph/Mycelium are a Changes-only cell under Notes (ADR-0171), not a place you go instead of chatting (`App.layout-edges.test.ts`). Research is still a centre pane when opened (Chat `display: none`), but it is **off the command rail** and lives on the status bar (`leftover-research-rail.test.ts`). #39 (graph as an *agent tool*) is still open. |
+| Open note vs Chat | **Corrected 2026-09-26.** Four **workspace states** from `fitPanePreset`: `conversation` (no note), `desk` (note beside Chat when both floors fit without folding a shown column), `stacked` (explicit On top), `focused` (Chat / Notes tabs when both panes cannot meet 420 + 280). Do not fold Notes to make a desk. Hover must not collapse the note. Highlight → Copy, or **Ask Chat about this** (same thread; `App.layout-edges.test.ts`). Right-click a list row → **Ask the agent about this note** keeps Chat and opens that note (`App.test.tsx`). Note lock is ephemeral and per-note — locked notes are read-only (`EditorContentLayout.test.tsx`). Not vault `editor_mode`. |
+| Chat chrome | Header leads with the conversation title (`usePrimeActiveSessionTitle`); session id / vault / uptime sit behind the status dot. Wide Chat uses one 46rem reading column. Composer is one compact row (model, thinking, activity, Tools, context %). Idle says nothing. |
 | Latest reply | Green start marker on the newest assistant turn. Moves when a newer reply starts. |
-| Session click | Transcript **clears on the click**, then rehydrates. Leaving the old chat up is the switch beachball. |
-| Settings cost | Model catalog and provider status wait until **Agents** is visible. Packages catalog waits until **Packages**. |
+| Session click | Transcript **clears on the click**, then rehydrates. Leaving the old chat up is the switch beachball. A narrow Sessions rail is a drawer; picking a row closes it and does not change the saved pin. |
+| Settings cost | Model catalog and provider status wait until **Agents** is visible. Packages catalog waits until **Packages**. A picked section stays at the top for 2s while lazy content loads (`SettingsBodyNav`). Chat auto-save is off by default and skips sign-in / tool-failure replies. |
 | Hide vs quit | Red button hides (C22). Hide stops ws-bridge and Mindwalk. **C75:** spawned Prime stays warm. Keep-working changes session intent, not the daemon. Cmd+Q quits. Never Prime `shutdown`. |
 
 **Do not** make nav and the note list exclusive. Claude tried; it broke
@@ -86,10 +90,11 @@ window to half height. Native QA only; Playwright cannot see it.
 Closing a note is the breadcrumb **X** (`breadcrumb-close-note`). The
 sidebar-looking header control is Properties.
 
-Width-aware collapse: sessions overlay first, then the vault panel
-(`src/hooks/useShellCompactLayout.ts`). Dragging a panel does not
-enter or leave compact mode — that is window width only. The overlay
-Notes panel stays resizable.
+Width-aware collapse is `fitPanePreset`, not the old
+`SHELL_COLLAPSE_*` magic widths. Fold order is Browse, then Notes, then
+the pinned rail, then the beside-note, until Chat still has 420. A
+temporary fold does not overwrite saved widths. When the rail cannot
+fit as a column, it is a drawer over Chat (`railFits` / `CommandRail`).
 
 ---
 
@@ -147,11 +152,15 @@ unless a row below is the task.
 
 ### Composer strip (one surface, four issues)
 
-`ChatComposerDeck` is the live control strip. **#38 / #9 / #35 / #21**
-are **closed** on GitHub (2026-08-29). Do not redesign the strip again.
+`ChatComposerBar` is the live compact row (native audit 2026-09-26).
+`ChatComposerDeck` is the model / thinking / activity / context cluster
+inside it. **#38 / #9 / #35 / #21** are **closed** on GitHub (2026-08-29).
+Do not restore the older multi-row strip.
 
 - Pills are live, not inert.
-- Model + thinking live on the strip (moved off the Prime subhead).
+- Model + thinking live on the row (moved off the Prime subhead).
+- Goal, Schedule, and the skill label sit behind **Tools**.
+- Idle says nothing. `ChatComposerFoot` mounts only while a turn runs.
 - Thinking is a **menu of the levels the model can run**
   (`get_prime_thinking_levels` filtered by
   `get_prime_supported_thinking_levels`; on `deepseek-v4-flash` that is Off /

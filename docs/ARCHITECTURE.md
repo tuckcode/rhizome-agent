@@ -221,6 +221,9 @@ flowchart TD
 Graph-on-Changes). Do not restore Graph as a center-canvas destination.
 **Origin:** Cursor Grok 4.6 · 2026-09-19 — pane presets (ADR-0173). Fresh
 launch is Chat. Four legal layouts: Chat, Notes, Read, Workbench.
+**Origin:** Cursor Grok 4.6 · 2026-09-26 — workspace states
+(`conversation` / `desk` / `stacked` / `focused`) from `fitPanePreset`.
+Verified against `src/lib/panePresets.ts` and `src/lib/panePresets.test.ts`.
 
 The **network-shell** product map (ADR-0166, refined by ADR-0170 / ADR-0171 /
 ADR-0173) is:
@@ -232,10 +235,12 @@ Changes only:                         | Graph / Mycelium (resizable, below Notes
 ```
 
 Chat is the center canvas. Sessions are a collapsible column on its left.
-When Chat opens its secondary note pane, that pane joins the shell's existing
-width calculation: below the established compact-session threshold, Sessions
-temporarily auto-collapses and returns when the window widens, without changing
-the person's stored open/closed preference.
+`fitPanePreset` owns the live columns. Temporary folds never overwrite saved
+widths. Chat content stays at least `CHAT_MIN_WIDTH` (420px). When a pinned
+Sessions rail cannot take its own column without folding something the preset
+already shows, `CommandRail` opens as a drawer over Chat (`railFits`). A
+session pick, the scrim, or Escape closes that drawer and does not change the
+saved pin.
 
 The right Notes panel **starts closed** on a fresh vault (`chat` /
 `editor-only`). Stored pane-preset state still wins when one exists. Compact
@@ -269,16 +274,34 @@ overlay. `useChatCenteredShellLayout` owns `notesOpen`, the restore strip,
 compact/Beside fold, and Notes restore strip so App
 does not recombine view mode with compact flags.
 
-#### Open-note split, Copy, and the latest-reply marker
+#### Workspace states, Copy, and the latest-reply marker
 
 **Origin:** PR #66 KEEP · 2026-09-14 · not a merge of the draft.
+**Origin:** Cursor Grok 4.6 · 2026-09-26 — `WorkspaceState` in
+`fitPanePreset` (`70e5f48`). Do not restore “Beside forces compact.”
 
-An open note can sit **On top** of Chat (`stacked`) or **Beside** it
-(`side-by-side`). The toggle is on the Notes header (`ChatNoteSplitToggle`),
-never by the traffic lights. The pick lives in localStorage
-(`APP_STORAGE_KEYS.chatNoteSplit`). Beside forces the compact shell
-(`shouldForceChatShellCompact`) so Sessions/Notes fold and Chat keeps a
-usable column. Hover must not collapse that note pane.
+The four pane presets (`chat` / `notes` / `read` / `workbench`) are the
+stored layout. Opening a note does not pick a fifth preset. `fitPanePreset`
+derives one of four **workspace states** from content floors, not device
+labels:
+
+| State | When | What you see |
+|---|---|---|
+| `conversation` | No note open | Chat only (plus the preset’s legal side columns) |
+| `desk` | A note is open and Chat (420) plus the note (280) both fit without folding a column the preset already shows | Note beside Chat. The fit may narrow the note first. |
+| `stacked` | The person chose **On top** (`preset.stacked`) and there is still room for a desk | Note over Chat. Stored on the preset, not a fifth layout. |
+| `focused` | Chat and the note cannot both meet their minimums | `FocusedPaneTabs` — one pane at a time (`Chat` / `Notes · {title}`). A newly opened note comes forward; closing it returns to Chat. |
+
+Do **not** fold the Notes list to make a desk. At 900px with the Notes
+preset open, the workspace focuses instead
+(`panePresets.test.ts`). At 800px with Chat and a note, the desk stays and
+the note narrows to 284px so Chat keeps 420.
+
+The On top / Beside control (`useChatNoteSplit`) is a compatibility write
+onto that preset. On top sets `stacked: true`. Beside clears it, or
+switches to Read when no stacked choice was stored. Legacy
+`APP_STORAGE_KEYS.chatNoteSplit` is not the runtime source of truth.
+Hover must not collapse the open note.
 
 The Show Notes restore strip is a **32px** hit target (`VaultPanelRestoreButton`);
 the visible rail stays 46px. Open Notes keeps an inner `--sidebar-border`
@@ -304,6 +327,36 @@ The newest assistant turn shows a green start marker
 (`latestAssistantMessageIndex` / `latest-assistant-reply-marker`) left of
 its first line. Compact/local system markers are not replies. The marker
 moves when a newer assistant turn starts streaming or lands.
+
+#### Chat chrome, Settings follow, and note-header overflow
+
+**Origin:** Cursor Grok 4.6 · 2026-09-26 — verified against
+`PrimeSessionSubhead.tsx`, `ChatComposerBar.tsx`, `SettingsBodyNav.tsx`,
+`SettingsPanel.tsx`, `sessionAutoDistill.ts`, and `BreadcrumbBar.tsx`.
+
+- **Chat header.** `PrimeSessionSubhead` leads with the conversation title
+  from `usePrimeActiveSessionTitle` (a second `list_prime_session_summaries`
+  read keyed by session path). No title yet → **New chat**. Session id,
+  vault, and uptime live behind the status-dot popover. A null list is an
+  empty list, not a crash (`d0a55f8`).
+- **Reading column.** On wide windows, prompt / reply / composer share
+  `.chat-column` (`max-width: 46rem`). Tables and fenced code may grow to
+  the transcript width (`--chat-wide-width`, 64rem).
+- **Compact composer.** One row under the input: model, thinking, activity,
+  open-note context, then **Tools** (Goal, Schedule, skill). Context usage
+  is a percent; the meter is a popover. Idle says nothing.
+  `ChatComposerFoot` mounts only while a turn runs.
+- **Chat auto-save.** Settings copy is plain language plus **Technical
+  details**. Default is off (`isSessionAutoDistillEnabled` requires
+  explicit `true`). Sign-in errors, tool failures, and `Not logged in` /
+  `/login` replies are skipped (`isTransientAgentFailureText`).
+- **Settings nav.** A picked section stays at the top for 2s while lazy
+  content (Packages) settles (`scrollSectionToTop`). User scroll or input
+  stops the follow. `settings-scroll-end-spacer` is `calc(100% - 4rem)`
+  so the last section can reach the top of the scroll box.
+- **Note headers.** Breadcrumb and Notes-list tools fold into overflow
+  before the title is crushed. Do not collapse on an unmeasured 0×0 rect
+  (`BreadcrumbBar.tsx`). Close stays visible.
 
 The diagram below is the inherited Desktop notes-app
 map (classic shell / note windows / editor internals); do not treat it as the
@@ -1813,7 +1866,7 @@ No Redux or global context. State lives in the root `App.tsx` and custom hooks:
 | `useNoteWindowLifecycle` | note-window open/title side effects | Opens `tauri://` note windows without full vault scans and keeps the native title current |
 | `useStartupScreenState` | startup visibility booleans | Keeps onboarding, telemetry-consent, missing-vault, and initial indexing decisions out of `App.tsx` |
 | `useAppWindowControls` | view mode persistence, panel visibility for window min-size, command refs, zoom/build labels | Keeps main-window sizing and editor command ref plumbing out of `App.tsx` |
-| `useChatCenteredShellLayout` | `notesOpen`, Browse, restore strip, compact/Beside, split | Chat-centered shell layout. Classic shell uses the same discriminant. |
+| `useChatCenteredShellLayout` | `notesOpen`, Browse, restore strip, `workspace`, `railFits`, split | Fits ADR-0173 presets into `conversation` / `desk` / `stacked` / `focused`. Classic shell uses the same discriminant. Temporary folds do not persist. |
 | `usePrimeSessionRestore` | conversation to show at Chat launch | Live attach vs idle disk log. Hides host `reattached` / `running` / `sessionPath`. |
 | `useAppViewActions` | saved-view/type creation and saved-view mutation callbacks | Keeps saved-view persistence and Type auto-creation orchestration out of `App.tsx` |
 | `useAiWorkspacePublishedContext` | AI workspace note-list snapshot and BroadcastChannel context publishing | Keeps AI workspace context derivation close to its cross-window publication side effect |

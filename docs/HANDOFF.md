@@ -56,9 +56,9 @@ file.
 **Origin:** Cursor Grok 4.7 · 2026-09-25 23:36 CDT · `/Applications` rebuilt from `18eb5ba`.
 **Origin:** Cursor Grok 4.7 · 2026-09-26 00:28 CDT · handoff for Claude.
 **Origin:** Cursor Grok 4.7 · 2026-09-26 02:27 CDT · handy wrap.
-**Origin:** Claude Opus 5.5 · 2026-09-26 04:25 CDT · Astra redesign pushed, `/Applications` rebuilt from `d0a55f8`.
+**Origin:** Cursor Grok 4.6 · 2026-09-26 · living docs synced to workspace states (`835c5bb` tip).
 
-`origin/main` and `HEAD` are **`d0a55f8`**. `/Applications` is that commit, installed **2026-09-26 04:21 CDT** (adhoc, `ai.rhizome.agent`). [`2026-09-26-0425`](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md).
+`origin/main` and `HEAD` are **`835c5bb`**. `/Applications` was last stamped **`d0a55f8`** on **2026-09-26 04:21 CDT** (adhoc, `ai.rhizome.agent`). Later tip commits are docs. [`2026-09-26-0425`](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md).
 Handy: [`2026-09-20-1230`](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md).
 Recap: [`2026-09-20-1228`](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md).
 Detail:
@@ -118,6 +118,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-26 · workspace-state docs](plans/handoffs/2026-09-26-1903-cursor-grok-4-6-workspace-state-docs.md) — living docs match `fitPanePreset` states; Beside-forces-compact retired.
 - [2026-09-26 · Astra redesign](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md) — redesign + login-note skip + list markers pushed as `d0a55f8`; app rebuilt; native QA not done.
 - [2026-09-26 · handy wrap](plans/handoffs/2026-09-26-0227-cursor-grok-4-7-handy.md) — app is `18eb5ba`; rail fix local; staged login skip and list markers are separate.
 - [2026-09-26 · Claude handoff](plans/handoffs/2026-09-26-0028-cursor-grok-4-7-claude-handoff.md) — installed app is `18eb5ba`; rail follow-up is local; audit file is Astra’s corrected report.
@@ -132,7 +133,6 @@ Do not paste leftover paper here.
 - [2026-09-20 · #26 audit r3](plans/handoffs/2026-09-20-0711-cursor-grok-4-6-issue-26-audit-r3.md) — host streaming guard; C18 keys inlined; mock seeded.
 - [2026-09-20 · Lane B chat reliability](plans/2026-09-20-lane-b-chat-reliability-recipe.md) — session titles unwrap history blobs; thinking-only stays empty completion; #41 live still Q.
 - [2026-09-20 · Lane S vault safety](plans/handoffs/2026-09-20-0545-cursor-grok-4-6-lane-s-vault-safety.md) — JS refuses `~`/`~/` as HOME vault; nested vaults stay; #46 open until live no-vault Chat.
-- [2026-09-20 · public readiness plan](plans/handoffs/2026-09-20-0506-gpt-6-public-readiness-plan.md) — assessment, Cursor swarm, parked inventory, and low-context Handy skill.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)
