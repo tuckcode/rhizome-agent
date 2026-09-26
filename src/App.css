@@ -93,6 +93,7 @@
 }
 
 .vault-panel__header {
+  container-type: inline-size;
   min-height: max(44px, var(--overlay-titlebar-height, 44px));
   padding: 0 8px 0 10px;
   flex: 0 0 auto;
@@ -104,7 +105,7 @@
 
 .vault-panel__title {
   margin: 0;
-  min-width: 0;
+  min-width: 6ch;
   flex: 1;
   overflow: hidden;
   color: var(--text-primary);
@@ -112,6 +113,13 @@
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.vault-panel__inline-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
 }
 
 .vault-panel__browse-toggle {
@@ -129,6 +137,40 @@
   width: 32px;
   height: 32px;
   padding: 0;
+}
+
+/* Optional tools (Browse, Hide/Show Chat) move into the overflow menu
+   before the "Notes" title is allowed to shrink below its 6ch floor. */
+.vault-panel__overflow-trigger {
+  display: none;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+@container (max-width: 220px) {
+  .vault-panel__inline-tools {
+    display: none;
+  }
+
+  .vault-panel__overflow-trigger {
+    display: inline-flex;
+  }
+}
+
+/* Note list rows: drop the verbose "Created …" metadata before the row
+   runs out of room, keeping only the shorter "modified" label and link
+   count. Required-order step 3 — secondary metadata shortens before the
+   title is allowed to truncate. */
+.note-list-container {
+  container-type: inline-size;
+}
+
+@container (max-width: 260px) {
+  .note-item__created-label {
+    display: none;
+  }
 }
 
 .app__vault-panel--focus {

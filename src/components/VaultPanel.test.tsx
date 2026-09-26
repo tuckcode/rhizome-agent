@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultPanel, VaultPanelRestoreButton } from './VaultPanel'
 
@@ -88,6 +88,56 @@ describe('VaultPanel', () => {
     expect(screen.getByTestId('vault-panel-collapse')).toHaveClass('vault-panel__collapse')
     expect(screen.queryByTestId('vault-panel-focus')).not.toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel-navigation')).not.toBeInTheDocument()
+  })
+
+  it('gives Browse and Hide Chat an overflow menu with the same handlers as the inline buttons', async () => {
+    const onBrowseToggle = vi.fn()
+    const onFocusToggle = vi.fn()
+    render(
+      <VaultPanel
+        browseOpen={false}
+        locale="en"
+        navigation={<div />}
+        noteList={<div />}
+        onBrowseToggle={onBrowseToggle}
+        onCollapse={vi.fn()}
+        onFocusToggle={onFocusToggle}
+      />,
+    )
+
+    const trigger = screen.getByTestId('vault-panel-overflow-trigger')
+    expect(trigger).toHaveAccessibleName('More Notes actions')
+
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false })
+    const menu = await screen.findByRole('menu')
+
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Show note navigation' }))
+    expect(onBrowseToggle).toHaveBeenCalledTimes(1)
+
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false })
+    const reopenedMenu = await screen.findByRole('menu')
+    fireEvent.click(within(reopenedMenu).getByRole('menuitem', { name: 'Hide Chat' }))
+    expect(onFocusToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the title, its inline tools, and the collapse control as siblings — never absolutely positioned over each other', () => {
+    render(
+      <VaultPanel
+        browseOpen={false}
+        locale="en"
+        navigation={<div />}
+        noteList={<div />}
+        onBrowseToggle={vi.fn()}
+        onCollapse={vi.fn()}
+      />,
+    )
+
+    const title = screen.getByText('Notes')
+    const inlineTools = screen.getByTestId('vault-panel-inline-tools')
+    const collapse = screen.getByTestId('vault-panel-collapse')
+    expect(inlineTools.className).not.toMatch(/\babsolute\b/)
+    expect(title.compareDocumentPosition(inlineTools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(inlineTools.compareDocumentPosition(collapse) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('labels the closed Notes strip as Show Notes', () => {

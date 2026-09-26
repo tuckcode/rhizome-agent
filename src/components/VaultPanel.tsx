@@ -1,10 +1,16 @@
-import { CaretDown, CaretUp, CornersIn, CornersOut, SidebarSimple } from '@phosphor-icons/react'
+import { CaretDown, CaretUp, CornersIn, CornersOut, DotsThree, SidebarSimple } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
 import { translate, type AppLocale } from '../lib/i18n'
 import { COMMAND_RAIL_WIDTH_PX } from '../utils/trafficLights'
 import { ActionTooltip } from './ui/action-tooltip'
 import { ResizeHandle } from './ResizeHandle'
 import { Button } from './ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu'
 
 interface VaultPanelProps {
   browseOpen: boolean
@@ -37,47 +43,77 @@ export function VaultPanel({
     browseOpen ? 'sidebar.action.collapseBrowse' : 'sidebar.action.expandBrowse',
   )
 
+  const focusLabel = focused ? 'Show Chat' : 'Hide Chat'
+
   return (
     <section className="vault-panel" data-testid="vault-panel">
       <header className="vault-panel__header">
         <h2 className="vault-panel__title">{translate(locale, 'rail.notes')}</h2>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="vault-panel__browse-toggle"
-          onClick={onBrowseToggle}
-          aria-expanded={browseOpen}
-          title={browseLabel}
-          aria-label={browseLabel}
-          data-testid="vault-panel-browse-toggle"
-        >
-          {browseOpen ? <CaretUp size={14} /> : <CaretDown size={14} />}
-          {translate(locale, 'sidebar.browse')}
-        </Button>
-        {onFocusToggle ? (
-          <ActionTooltip
-            copy={{
-              label: focused
-                ? 'Show Chat beside Notes'
-                : 'Hide Chat so Notes can fill the window',
-            }}
-            side="bottom"
+        <div className="vault-panel__inline-tools" data-testid="vault-panel-inline-tools">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="vault-panel__browse-toggle"
+            onClick={onBrowseToggle}
+            aria-expanded={browseOpen}
+            title={browseLabel}
+            aria-label={browseLabel}
+            data-testid="vault-panel-browse-toggle"
           >
+            {browseOpen ? <CaretUp size={14} /> : <CaretDown size={14} />}
+            {translate(locale, 'sidebar.browse')}
+          </Button>
+          {onFocusToggle ? (
+            <ActionTooltip
+              copy={{
+                label: focused
+                  ? 'Show Chat beside Notes'
+                  : 'Hide Chat so Notes can fill the window',
+              }}
+              side="bottom"
+            >
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="vault-panel__focus"
+                onClick={onFocusToggle}
+                aria-pressed={focused}
+                aria-label={focusLabel}
+                data-testid="vault-panel-focus"
+              >
+                {focused ? <CornersIn size={16} weight="regular" /> : <CornersOut size={16} weight="regular" />}
+              </Button>
+            </ActionTooltip>
+          ) : null}
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
-              className="vault-panel__focus"
-              onClick={onFocusToggle}
-              aria-pressed={focused}
-              aria-label={focused ? 'Show Chat' : 'Hide Chat'}
-              data-testid="vault-panel-focus"
+              className="vault-panel__overflow-trigger"
+              aria-label="More Notes actions"
+              data-testid="vault-panel-overflow-trigger"
             >
-              {focused ? <CornersIn size={16} weight="regular" /> : <CornersOut size={16} weight="regular" />}
+              <DotsThree size={16} weight="bold" />
             </Button>
-          </ActionTooltip>
-        ) : null}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={onBrowseToggle}>
+              {browseOpen ? <CaretUp size={14} /> : <CaretDown size={14} />}
+              {browseLabel}
+            </DropdownMenuItem>
+            {onFocusToggle && (
+              <DropdownMenuItem onSelect={onFocusToggle}>
+                {focused ? <CornersIn size={16} weight="regular" /> : <CornersOut size={16} weight="regular" />}
+                {focusLabel}
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button
           type="button"
           variant="ghost"
