@@ -55,6 +55,10 @@ If you like the app, contributions are welcome. A small pull request is enough. 
 
 AGPL-3.0-or-later. See [LICENSE](LICENSE). Atticus confirmed this on
 2026-09-26 as the license for the public `tuckcode` release. It is inherited
-from the Rhizome Desktop snapshot this repo started from. The check in
+from the Rhizome Desktop snapshot this repo started from.
+
+Rhizome Agent is a modified version of Rhizome Desktop, which builds on
+[Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi (AGPL-3.0).
+The Mycelium view embeds Mindwalk (MIT) © 2026 Ricko Yu. The check in
 [`docs/PUBLIC-PREVIEW.md`](docs/PUBLIC-PREVIEW.md) is an inventory, not a
 legal determination.

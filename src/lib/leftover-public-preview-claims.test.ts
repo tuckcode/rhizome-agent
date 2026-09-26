@@ -40,8 +40,11 @@ describe('leftover public-preview install claims', () => {
     expect(readme).toContain('PR #66')
   })
 
-  it('keeps the license confirmation as unresolved, not a legal determination', () => {
-    expect(readme).toContain('Confirm before any public release under `tuckcode`')
+  it('records the confirmed license and upstream credit, not a legal determination', () => {
+    // Atticus confirmed AGPL-3.0-or-later for the public release on 2026-09-26.
+    expect(readme).toContain('AGPL-3.0-or-later')
+    expect(readme).toContain('confirmed this on\n2026-09-26')
+    expect(readme).toContain('by Luca Rossi (AGPL-3.0)')
     expect(preview).toContain('not a legal determination')
     expect(preview).toContain('Mindwalk (MIT) © 2026 Ricko Yu')
   })
