@@ -9,10 +9,9 @@ describe('leftover identity — Agent not Desktop', () => {
 
   it('locks Agent repo, bundle, and no-Desktop branding', () => {
     expect(identity).toContain('This repository is not Rhizome Desktop.')
-    expect(identity).toContain('Do not “fix branding back to Desktop.”')
-    expect(identity).toContain(
-      'still `tuckcode/rhizome-agent` / `ai.rhizome.agent`',
-    )
+    expect(identity).toContain('Do not rename the product back to Desktop.')
+    expect(identity).toContain('`tuckcode/rhizome-agent`')
+    expect(identity).toContain('`ai.rhizome.agent`')
     expect(identity).toContain(
       'Do **not** add `knispo/rhizome` as `origin`.',
     )
