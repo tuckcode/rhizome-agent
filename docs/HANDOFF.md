@@ -100,6 +100,8 @@ critical path at ~120s, coverage 85s of it).
 
 ## What to pick up next
 
+**2026-09-25 Astra native frontend audit:** Atticus reports that the collapsible sidebar chops off chat text. The app is running. Use the [audit brief](plans/2026-09-25-astra-native-frontend-audit.md) to reproduce this first and audit the native first-use experience. Existing command rail edits remain in the working tree; identify the running build before attributing behavior to source.
+
 **2026-09-20 assessment — GPT-6 / Codex:** Atticus requested a Cursor-focused
 public-readiness plan with parallel agents. Read the
 [assessment](plans/2026-09-20-public-readiness-plan.md),
@@ -115,6 +117,8 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-25 · Astra frontend audit brief](plans/handoffs/2026-09-25-1926-gpt-6-codex-astra-frontend-audit-brief.md) — native audit instructions and the sidebar clipping report.
+
 - [2026-09-21 · Applications rebuild](plans/handoffs/2026-09-21-2223-cursor-grok-4-7-applications-rebuild.md) — 22:43 banner install. Update now apply **NOT RUN**. First look was **FAIL** (`dev`, no banner).
 - [2026-09-21 · swarm launch](plans/handoffs/2026-09-21-2208-cursor-grok-4-7-swarm-launch.md) — thorough plan local; rebuild then Update now; swarm only after.
 - [2026-09-21 · launch slice](plans/handoffs/2026-09-21-2140-cursor-grok-4-7-launch-slice.md) — rebuild from `2a24eed`, then #26. App still `b7264d6`.
@@ -126,11 +130,8 @@ Do not paste leftover paper here.
 - [2026-09-20 · Astra ↔ Cursor recap](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md) — plan through #26 CPR, D1–D7 local, Free-only dirt.
 - [2026-09-20 · #26 CPR](plans/handoffs/2026-09-20-0723-cursor-grok-4-6-issue-26-cpr.md) — origin and app `b7264d6`; live Update now still Q.
 - [2026-09-20 · #26 audit r3](plans/handoffs/2026-09-20-0711-cursor-grok-4-6-issue-26-audit-r3.md) — host streaming guard; C18 keys inlined; mock seeded.
-- [2026-09-20 · Wave 1 audit reply](plans/handoffs/2026-09-20-0610-cursor-grok-4-6-wave1-audit-reply.md) — coverage 6692; unused classifier deleted; C77/C78 opened.
 - [2026-09-20 · Lane B chat reliability](plans/2026-09-20-lane-b-chat-reliability-recipe.md) — session titles unwrap history blobs; thinking-only stays empty completion; #41 live still Q.
 - [2026-09-20 · Lane S vault safety](plans/handoffs/2026-09-20-0545-cursor-grok-4-6-lane-s-vault-safety.md) — JS refuses `~`/`~/` as HOME vault; nested vaults stay; #46 open until live no-vault Chat.
-- [2026-09-20 · Lane I install docs](plans/handoffs/2026-09-20-0548-cursor-grok-4-6-lane-i-install-docs.md) — public preview quick start; #66 unmerged.
-- [2026-09-20 · rail slice review](plans/handoffs/2026-09-20-0538-cursor-grok-4-6-rail-slice-review.md) — coordinator review of `4f9b4c4`; C76 source fix; Q/D/I intake.
 - [2026-09-20 · public readiness plan](plans/handoffs/2026-09-20-0506-gpt-6-public-readiness-plan.md) — assessment, Cursor swarm, parked inventory, and low-context Handy skill.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
