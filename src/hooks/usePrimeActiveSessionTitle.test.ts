@@ -4,11 +4,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const invoked = vi.hoisted(() => ({
   calls: [] as string[],
   sessions: [] as Array<{ id: string; path: string; title?: string | null }>,
+  returnsNull: false,
 }))
 
 vi.mock('../lib/callHost', () => ({
   callHostOr: (cmd: string, fallback: unknown) => {
     invoked.calls.push(cmd)
+    if (invoked.returnsNull) return Promise.resolve(null)
     return Promise.resolve(invoked.sessions.length > 0 ? invoked.sessions : fallback)
   },
 }))
@@ -19,6 +21,17 @@ describe('usePrimeActiveSessionTitle', () => {
   beforeEach(() => {
     invoked.calls = []
     invoked.sessions = []
+    invoked.returnsNull = false
+  })
+
+  it('treats a host that answers null as no sessions, without throwing', async () => {
+    // App.test's host mock answers null; `.find` on it was an unhandled
+    // rejection that failed the push gate's coverage lane.
+    invoked.returnsNull = true
+    const { result } = renderHook(() => usePrimeActiveSessionTitle('/mock/sessions/a.jsonl'))
+    await waitFor(() => expect(invoked.calls).toHaveLength(1))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(result.current).toBeNull()
   })
 
   it('is null with no attached session, and never calls the host', () => {

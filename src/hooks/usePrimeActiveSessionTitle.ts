@@ -33,9 +33,10 @@ export function usePrimeActiveSessionTitle(
     if (!sessionPath) return
 
     let cancelled = false
-    void callHostOr<PrimeSessionSummary[]>('list_prime_session_summaries', []).then((sessions) => {
+    void callHostOr<PrimeSessionSummary[] | null>('list_prime_session_summaries', []).then((sessions) => {
       if (cancelled) return
-      const match = sessions.find((session) => session.path === sessionPath)
+      // A host (or a test mock) may answer null rather than a list.
+      const match = Array.isArray(sessions) ? sessions.find((session) => session.path === sessionPath) : undefined
       setRead({ path: sessionPath, title: match?.title?.trim() || null })
     })
 
