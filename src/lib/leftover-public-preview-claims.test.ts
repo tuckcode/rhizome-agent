@@ -28,24 +28,19 @@ describe('leftover public-preview install claims', () => {
     expect(gettingStarted).not.toContain('BASE_URL="http://localhost:5173"')
   })
 
-  it('reuses the C75 hide correction and keeps #66 closed', () => {
-    expect(preview).toContain('ws-bridge')
-    expect(preview).toContain('Mindwalk')
-    expect(preview).toMatch(/Prime daemon stays warm/)
+  // 31727b5 rewrote README and PUBLIC-PREVIEW for strangers and dropped
+  // internal notes (PR #66, the daemon hide detail, the legal-determination
+  // caveat). The developer guide keeps the hide correction.
+  it('keeps the C75 hide correction in the developer guide', () => {
     expect(gettingStarted).toContain(
       'Hide stops ws-bridge and Mindwalk, not spawned Prime',
     )
-    expect(preview).toContain('Do not reopen them')
-    expect(preview).toContain('to merge')
-    expect(readme).toContain('PR #66')
   })
 
-  it('records the confirmed license and upstream credit, not a legal determination', () => {
-    // Atticus confirmed AGPL-3.0-or-later for the public release on 2026-09-26.
+  it('states the license, the upstream credit, and the Mindwalk attribution', () => {
     expect(readme).toContain('AGPL-3.0-or-later')
-    expect(readme).toContain('confirmed this on\n2026-09-26')
     expect(readme).toContain('by Luca Rossi (AGPL-3.0)')
-    expect(preview).toContain('not a legal determination')
+    expect(readme).toContain('Mindwalk (MIT) © 2026 Ricko Yu')
     expect(preview).toContain('Mindwalk (MIT) © 2026 Ricko Yu')
   })
 })
