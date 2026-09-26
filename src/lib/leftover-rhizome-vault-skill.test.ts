@@ -8,7 +8,7 @@ describe('leftover rhizome-vault skill label', () => {
   )
 
   it('locks skillsLabel as the rhizome-vault skill name, not a vault switcher', () => {
-    expect(chatHome).toContain('skillsLabel="rhizome-vault"')
+    expect(chatHome).toContain('composerSkillsLabel="rhizome-vault"')
   })
 
   it('keeps composer-vault-pill out of ChatHome', () => {

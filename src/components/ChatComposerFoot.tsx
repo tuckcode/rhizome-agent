@@ -10,7 +10,8 @@ interface ChatComposerFootProps {
 /**
  * Turn status inside ChatComposerBar. Rendered only while a turn runs —
  * idle is the normal state and says nothing (native audit 2026-09-26).
- * Key hints live on the Send button's tooltip.
+ * Key hints live on the Send button's tooltip. There is no stop hint:
+ * Escape leaves Chat (useAiPanelFocus), and Stop is click-only.
  */
 export function ChatComposerFoot({
   locale = 'en',
