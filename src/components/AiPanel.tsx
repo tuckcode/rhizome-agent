@@ -18,7 +18,7 @@ import {
   AiPanelHeader,
   AiPanelMessageHistory,
 } from './AiPanelChrome'
-import { ClockCounterClockwise, CalendarDots, Target } from '@phosphor-icons/react'
+import { ClockCounterClockwise } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { translate } from '../lib/i18n'
 import PrimeSessionList from './PrimeSessionList'
@@ -40,8 +40,7 @@ import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus
 import { promoteSessionFromHost } from '../utils/promoteChatToVault'
 import { usePrimeSessionRestore } from '../hooks/usePrimeSessionRestore'
 import { usePrimeSessionStats } from '../hooks/usePrimeSessionStats'
-import { PrimeContextMeter } from './PrimeContextMeter'
-import { ChatComposerFoot } from './ChatComposerFoot'
+import { ChatComposerBar } from './ChatComposerBar'
 import { lastToolName } from '../utils/lastToolName'
 import { PrimeGoalDialog } from './PrimeGoalDialog'
 import { PrimeScheduleDialog } from './PrimeScheduleDialog'
@@ -74,8 +73,12 @@ interface AiPanelProps {
   showHeader?: boolean
   /** Frame A subhead New chat — panel controller owns the reset. */
   newChatRef?: MutableRefObject<(() => void) | null>
-  /** Chips rendered in the composer's control row (Frame A's control deck). */
+  /** Rendered above the input: banners that explain why a turn may fail. */
   composerControls?: ReactNode
+  /** Live turn controls for the compact row under the input (Prime only). */
+  composerDeck?: ReactNode
+  /** Skill label shown inside the compact row's Tools menu. */
+  composerSkillsLabel?: string | null
   /** Frame B note split — sits beside the transcript so the composer spans both. */
   notePane?: ReactNode
   /** Docked at the far right, outside the note split. */
@@ -116,6 +119,8 @@ interface AiPanelViewProps {
    */
   vaultPath?: string | null
   composerControls?: ReactNode
+  composerDeck?: ReactNode
+  composerSkillsLabel?: string | null
   notePane?: ReactNode
   /** Docked at the far right, outside the note split. */
   sidePanel?: ReactNode
@@ -219,6 +224,8 @@ export function AiPanelView({
   showLeftBorder = true,
   surface = 'default',
   composerControls,
+  composerDeck,
+  composerSkillsLabel,
   notePane,
   sidePanel,
   sessionsAutoCollapsed = false,
@@ -481,38 +488,6 @@ export function AiPanelView({
       {sidePanel}
       </div>
       {isPrimeTarget && (
-        <div style={{ padding: '0 12px 6px' }} className="flex items-center gap-2">
-          {/*
-            The meter keeps its slot even when it renders nothing. With
-            `justify-between` and a meter that returns null before any tokens
-            are used, Goal was the row's only child and sat hard left — then
-            jumped to the far right the moment a session reported usage. One
-            control, two homes, depending on state the user never chose.
-          */}
-          <div className="min-w-0 flex-1" data-testid="prime-context-meter-slot">
-            <PrimeContextMeter stats={primeStats} locale={locale} />
-          </div>
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={goalDialog.openDialog}
-            data-testid="prime-goal-trigger"
-          >
-            <Target size={12} weight="regular" aria-hidden="true" />
-            {translate(locale, 'ai.goal.trigger')}
-          </Button>
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={() => scheduleDialog.onOpenChange(true)}
-            data-testid="prime-schedule-trigger"
-          >
-            <CalendarDots size={12} weight="regular" aria-hidden="true" />
-            {translate(locale, 'ai.schedule.trigger')}
-          </Button>
-        </div>
-      )}
-      {isPrimeTarget && (
         <PrimeGoalDialog
           open={goalDialog.open}
           onOpenChange={goalDialog.onOpenChange}
@@ -551,10 +526,15 @@ export function AiPanelView({
         onRemoveAttachment={removeAttachment}
         lastAgentMessage={getLastAgentMessage(agent.messages)}
         foot={isPrimeTarget ? (
-          <ChatComposerFoot
+          <ChatComposerBar
             locale={locale}
+            deck={composerDeck}
+            skillsLabel={composerSkillsLabel}
+            onOpenGoal={goalDialog.openDialog}
+            onOpenSchedule={() => scheduleDialog.onOpenChange(true)}
             working={isActive}
             lastToolName={lastToolName(agent.messages)}
+            stats={primeStats}
           />
         ) : undefined}
         commandEntries={isPrimeTarget ? localizedCommands : undefined}
@@ -592,6 +572,8 @@ export function AiPanel({
   onClose,
   showHeader,
   composerControls,
+  composerDeck,
+  composerSkillsLabel,
   onForkMessage: providedOnForkMessage,
   forkTargetsPrimeEntry,
   onOpenNote,
@@ -652,6 +634,8 @@ export function AiPanel({
       controller={controller}
       showHeader={showHeader}
       composerControls={composerControls}
+      composerDeck={composerDeck}
+      composerSkillsLabel={composerSkillsLabel}
       onForkMessage={providedOnForkMessage}
       forkTargetsPrimeEntry={forkTargetsPrimeEntry}
       notePane={notePane}

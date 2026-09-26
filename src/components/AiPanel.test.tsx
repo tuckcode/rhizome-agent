@@ -702,13 +702,13 @@ describe('Chat home opens with its sessions column', () => {
 })
 
 /**
- * The visual audit found Goal in two places: hard left with no context meter,
- * far right once a session reported usage. `justify-between` on a row whose
- * first child renders null puts the survivor on the left, so the button moved
- * because of state the user never chose.
+ * The visual audit found Goal in two places, and the native audit
+ * (2026-09-26) found the context/Goal/Schedule row costing a full row of a
+ * small window. Goal and Schedule now live in the compact row's Tools menu,
+ * and there is no separate meter row.
  */
 describe('the Goal button has one home', () => {
-  function goalRow() {
+  it('lives in the compact composer row, behind Tools', () => {
     render(
       <AiPanelView
         controller={primeController()}
@@ -717,15 +717,10 @@ describe('the Goal button has one home', () => {
         targetId="agent:prime"
       />,
     )
-    return screen.getByTestId('prime-goal-trigger').parentElement
-  }
 
-  it('keeps the meter’s slot even when the meter shows nothing', () => {
-    const row = goalRow()
-
-    // Two slots, always: whatever the meter decides to render, and the button.
-    expect(row?.querySelector('[data-testid="prime-context-meter-slot"]')).toBeInTheDocument()
-    expect(row?.className).not.toContain('justify-between')
+    const bar = screen.getByTestId('chat-composer-bar')
+    expect(bar).toContainElement(screen.getByTestId('composer-tools-menu'))
+    expect(screen.queryByTestId('prime-context-meter-slot')).not.toBeInTheDocument()
   })
 })
 

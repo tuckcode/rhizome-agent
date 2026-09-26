@@ -15,7 +15,6 @@ import { PrimeThinkingToggle } from './PrimeThinkingToggle'
 
 interface ChatComposerDeckProps {
   locale?: AppLocale
-  skillsLabel?: string | null
   /** Frame B — the note open in the secondary pane. */
   contextLabel?: string | null
   /** Stop sending the open note. Without it the pill stays a plain label. */
@@ -66,15 +65,15 @@ function Chip({
 }
 
 /**
- * Frame A's composer control strip (#38 / #9 / #35).
+ * Live turn controls on the compact composer row (#38 / #9 / #35, native
+ * audit 2026-09-26): model, thinking, active agents, the open note.
  *
- * Model and thinking are live turn controls. Prime and the skill name are
- * labels — menus that cannot change either were lying. Agent idle/working
- * sits next to thinking. The vault switcher lives only in the status bar.
+ * The "Prime" label chip is gone — Chat is Prime-only and the header status
+ * says whether it is live. The skill label moved into ChatComposerBar's Tools
+ * menu. The vault switcher lives only in the status bar.
  */
 export function ChatComposerDeck({
   locale = 'en',
-  skillsLabel,
   contextLabel,
   onCloseContext,
   model,
@@ -87,11 +86,6 @@ export function ChatComposerDeck({
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1.5" data-testid="chat-composer-deck">
-      <Chip title={t('ai.composer.agent')} testId="composer-agent-pill">
-        <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--accent-green)]" />
-        {t('ai.panel.title')}
-      </Chip>
-
       <span
         onPointerDown={() => trackComposerPillOpened('model')}
       >
@@ -162,11 +156,6 @@ export function ChatComposerDeck({
         </Chip>
       ) : null}
 
-      {skillsLabel ? (
-        <Chip title={t('ai.composer.skills')} testId="composer-skills-pill">
-          {t('ai.panel.skills.withVault', { skills: skillsLabel })}
-        </Chip>
-      ) : null}
     </div>
   )
 }
