@@ -2056,6 +2056,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         sessionsRailSlot={commandRailEnabled ? sessionRailSlot : undefined}
         onNotePaneOpenChange={setChatNotePaneOpen}
         onOpenSessionFootprint={handleOpenSessionFootprint}
+        onOpenCommandPalette={dialogs.openCommandPalette}
         requestedNote={chatNoteRequest}
         chatEngineUpdate={primeUpdateStatus}
         onApplyChatEngineUpdate={() => { void primeUpdateActions.applyEngineUpdate() }}

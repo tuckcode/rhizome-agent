@@ -1041,11 +1041,11 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/CommandRail.tsx`,
       'utf8',
     )
-    expect(rail).toContain('{pinButton}')
+    expect(rail).not.toContain('{pinButton}')
+    expect(rail).toContain('{expandButton}')
     expect(rail).toContain('<span className="ml-auto">{settingsButton}</span>')
     expect(rail).toContain('data-testid="command-rail-footer"')
-    expect(rail).toContain("aria-label={pinLabel}")
-    expect(rail).toContain('data-testid="command-rail-toggle"')
+    expect(rail).toContain('const overlaying = false')
     expect(rail).toContain('Sessions are the rail. Destinations like Research live elsewhere.')
   })
 

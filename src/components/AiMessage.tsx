@@ -165,16 +165,30 @@ function UserBubble({ content, references, onOpenNote, createdAtMs }: {
   )
 }
 
+/** Same slack as the transcript: one deliberate scroll up releases the tail. */
+const REASONING_FOLLOW_THRESHOLD_PX = 48
+
 function ReasoningBlock({ locale, text, expanded, onToggle }: {
   locale: AppLocale; text: string; expanded: boolean; onToggle: () => void
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
+  const followingRef = useRef(true)
+
+  function noteReadingPosition() {
+    const element = contentRef.current
+    if (!element) return
+    const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight
+    followingRef.current = distanceFromBottom <= REASONING_FOLLOW_THRESHOLD_PX
+  }
 
   useEffect(() => {
-    void text
-    if (expanded && contentRef.current) {
-      contentRef.current.scrollTop = contentRef.current.scrollHeight
+    if (!expanded) {
+      followingRef.current = true
+      return
     }
+    const element = contentRef.current
+    if (!element || !followingRef.current) return
+    element.scrollTop = element.scrollHeight
   }, [expanded, text])
 
   return (
@@ -195,6 +209,7 @@ function ReasoningBlock({ locale, text, expanded, onToggle }: {
           ref={contentRef}
           className="text-muted-foreground reasoning-markdown"
           style={{ fontSize: 12, lineHeight: 1.5, padding: '4px 0 4px 20px', maxHeight: 280, overflowY: 'auto' }}
+          onScroll={noteReadingPosition}
           data-testid="reasoning-content"
         >
           <MarkdownContent content={normalizeReasoningDisplay(text)} />
