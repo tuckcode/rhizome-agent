@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../hooks/appCommandCatalog'
 import { PrimeSessionSubhead } from './PrimeSessionSubhead'
 
 describe('PrimeSessionSubhead', () => {
@@ -48,6 +49,18 @@ describe('PrimeSessionSubhead', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
     expect(onNewChat).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens the command palette from the title row', () => {
+    const onOpenCommandPalette = vi.fn()
+    render(<PrimeSessionSubhead live onOpenCommandPalette={onOpenCommandPalette} />)
+
+    fireEvent.click(screen.getByTestId('open-command-palette'))
+    expect(onOpenCommandPalette).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('open-command-palette')).toHaveTextContent('Command Palette')
+    expect(screen.getByTestId('open-command-palette')).toHaveTextContent(
+      getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewCommandPalette) ?? '',
+    )
   })
 
   it('opens this session footprint from the in-session button', () => {

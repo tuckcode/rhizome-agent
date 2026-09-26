@@ -1,5 +1,6 @@
-import { CirclesThree, Plus } from '@phosphor-icons/react'
+import { CirclesThree, MagnifyingGlass, Plus } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../hooks/appCommandCatalog'
 import type { CSSProperties } from 'react'
 import { cn } from '@/lib/utils'
 import { useDragRegion } from '../hooks/useDragRegion'
@@ -38,6 +39,8 @@ interface PrimeSessionSubheadProps {
   onNewChat?: () => void
   /** Open this session's footprint in Mycelium (#22). */
   onOpenFootprint?: () => void
+  /** The command palette is otherwise only a menu shortcut. */
+  onOpenCommandPalette?: () => void
   /** Current sessions-rail layout width. Collapsed and expanded differ. */
   railLayoutWidth?: number
 }
@@ -92,6 +95,7 @@ export function PrimeSessionSubhead({
   problem,
   onNewChat,
   onOpenFootprint,
+  onOpenCommandPalette,
   railLayoutWidth,
 }: PrimeSessionSubheadProps) {
   const t = createTranslator(locale)
@@ -180,8 +184,25 @@ export function PrimeSessionSubhead({
         </>
       ) : null}
 
-      {onOpenFootprint || onNewChat ? (
-        <div className="ml-auto flex shrink-0 items-center gap-0.5">
+      {onOpenCommandPalette || onOpenFootprint || onNewChat ? (
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          {onOpenCommandPalette ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-[32px] gap-1.5 px-2.5 font-sans text-[12px] font-normal"
+              onClick={onOpenCommandPalette}
+              onMouseDown={(event) => event.stopPropagation()}
+              data-testid="open-command-palette"
+            >
+              <MagnifyingGlass size={14} />
+              Command Palette
+              <kbd className="font-sans text-[11px] text-muted-foreground">
+                {getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewCommandPalette)}
+              </kbd>
+            </Button>
+          ) : null}
           {onOpenFootprint ? (
             <Button
               type="button"

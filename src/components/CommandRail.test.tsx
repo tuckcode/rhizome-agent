@@ -88,17 +88,17 @@ describe('the rail puts sessions in its open middle', () => {
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-settings')).not.toHaveTextContent('Settings')
 
-    const pin = screen.getByTestId('command-rail-toggle')
-    const settings = screen.getByTestId('command-rail-settings')
-    expect(pin.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByTestId('command-rail-toggle')).not.toBeInTheDocument()
+    expect(screen.getByTestId('command-rail-settings')).toBeInTheDocument()
   })
 
-  it('keeps Settings above the pin when the rail is collapsed', () => {
+  it('keeps Settings next to the sidebar control when the rail is collapsed', () => {
     renderRail()
 
+    const expand = screen.getByRole('button', { name: 'Expand sidebar' })
     const settings = screen.getByTestId('command-rail-settings')
-    const pin = screen.getByTestId('command-rail-toggle')
-    expect(settings.compareDocumentPosition(pin) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(expand.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByTestId('command-rail-toggle')).not.toBeInTheDocument()
   })
 
   it('returns to compact mode when the pointer leaves an unpinned rail', async () => {
@@ -137,20 +137,7 @@ describe('the rail puts sessions in its open middle', () => {
     expect(rail).toHaveAttribute('data-expanded', 'true')
   })
 
-  it('can be pinned open after hover expansion', async () => {
-    renderRail()
-
-    const rail = screen.getByTestId('command-rail')
-    fireEvent.mouseEnter(rail)
-    await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'true'))
-    fireEvent.click(screen.getByRole('button', { name: 'Pin sidebar' }))
-    fireEvent.mouseMove(window, { clientX: 500, clientY: 220 })
-
-    expect(rail).toHaveAttribute('data-expanded', 'true')
-    expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).toBe('1')
-  })
-
-  it('lets Settings and Pin work on the collapsed rail without expanding it', async () => {
+  it('lets Settings work on the collapsed rail without expanding it', async () => {
     const props = renderRail()
     const rail = screen.getByTestId('command-rail')
     const footer = screen.getByTestId('command-rail-footer')
@@ -162,22 +149,6 @@ describe('the rail puts sessions in its open middle', () => {
     fireEvent.click(screen.getByTestId('command-rail-settings'))
     expect(props.onOpenSettings).toHaveBeenCalledOnce()
     expect(rail).toHaveAttribute('data-expanded', 'false')
-  })
-
-  it('can pin the collapsed rail so hover no longer expands it', async () => {
-    renderRail()
-    const rail = screen.getByTestId('command-rail')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Keep as rail' }))
-    expect(rail).toHaveAttribute('data-compact-locked', 'true')
-    expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailCompactLocked)).toBe('1')
-
-    fireEvent.mouseEnter(rail)
-    await new Promise((resolve) => setTimeout(resolve, 200))
-    expect(rail).toHaveAttribute('data-expanded', 'false')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Allow sidebar to expand' }))
-    expect(rail).toHaveAttribute('data-compact-locked', 'false')
   })
 
   it('widens from its right edge and remembers the chosen width', async () => {
@@ -203,7 +174,7 @@ describe('the rail puts sessions in its open middle', () => {
     renderRail()
 
     expect(screen.queryByTestId('command-rail-sessions')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Keep as rail' })).toBeInTheDocument()
+    expect(screen.queryByTestId('command-rail-toggle')).not.toBeInTheDocument()
   })
 })
 
@@ -222,10 +193,9 @@ describe('the compact rail has a keyboard path to Sessions', () => {
 
     const expand = screen.getByRole('button', { name: 'Expand sidebar' })
     const settings = screen.getByRole('button', { name: 'Settings' })
-    const pin = screen.getByRole('button', { name: 'Keep as rail' })
 
     expect(expand.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(settings.compareDocumentPosition(pin) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Keep as rail' })).not.toBeInTheDocument()
     expect(screen.queryByTestId('command-rail-sessions')).not.toBeInTheDocument()
   })
 
@@ -257,24 +227,9 @@ describe('the compact rail has a keyboard path to Sessions', () => {
     expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailCompactLocked)).toBeNull()
   })
 
-  it('still opens Sessions from Expand when Keep as rail is on', async () => {
+  it('collapses Sessions again from the sidebar control', async () => {
     renderRail()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Keep as rail' }))
-    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-compact-locked', 'true')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
-
-    expect(await screen.findByTestId('command-rail-sessions')).toBeInTheDocument()
-    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'true')
-    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-compact-locked', 'true')
-    expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).not.toBe('1')
-  })
-
-  it('collapses Sessions again from the keyboard without clearing Keep as rail', async () => {
-    renderRail()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Keep as rail' }))
     fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
     await screen.findByTestId('command-rail-sessions')
 
@@ -282,8 +237,6 @@ describe('the compact rail has a keyboard path to Sessions', () => {
 
     expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'false')
     expect(screen.queryByTestId('command-rail-sessions')).not.toBeInTheDocument()
-    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-compact-locked', 'true')
-    expect(screen.getByRole('button', { name: 'Allow sidebar to expand' })).toBeInTheDocument()
   })
 })
 
@@ -304,10 +257,9 @@ describe('a hover-expanded rail does not steal Chat clicks', () => {
     fireEvent.mouseEnter(rail)
     await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'true'))
 
-    expect(rail).toHaveAttribute('data-overlay', 'true')
-    expect(rail).toHaveStyle({ pointerEvents: 'none' })
-    expect(screen.getByTestId('command-rail-footer')).toHaveStyle({ pointerEvents: 'auto' })
-    expect(screen.getByTestId('command-rail-sessions')).toHaveStyle({ pointerEvents: 'none' })
+    expect(rail).toHaveAttribute('data-overlay', 'false')
+    expect(rail.style.pointerEvents).not.toBe('none')
+    expect(rail.style.marginRight).toBe('')
   })
 
   it('keeps a pinned rail in flow so it is not an overlay', () => {

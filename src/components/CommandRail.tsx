@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { GearSix, PushPin, Sidebar } from '@phosphor-icons/react'
+import { GearSix, Sidebar } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { ActionTooltip } from './ui/action-tooltip'
 import { Button } from './ui/button'
 import { createTranslator, type AppLocale } from '../lib/i18n'
-import { trackCommandRailPinChanged } from '../lib/productAnalytics'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import { readStoredBooleanPreference, writeStoredBooleanPreference } from '../lib/uiPreference'
 import { usePanelWidth } from '../hooks/usePanelWidth'
@@ -155,7 +154,8 @@ export function CommandRail({
     onSessionsSlotReadyRef.current?.(slot)
   }, [])
   const expanded = pinnedExpanded || hoverExpanded || keyboardExpanded
-  const overlaying = expanded && !pinnedExpanded
+  // Expansion takes layout width, so Chat shifts instead of sliding under the rail.
+  const overlaying = false
   const openFromHover = () => {
     if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current)
     hoverCloseTimer.current = null
@@ -240,24 +240,6 @@ export function CommandRail({
     setCompactLocked(next)
     writeStoredBooleanPreference(APP_STORAGE_KEYS.commandRailCompactLocked, next)
   }
-  const togglePin = () => {
-    if (expanded && !compactLocked) {
-      const next = !pinnedExpanded
-      writeCompactLock(false)
-      writeExpandedPin(next)
-      trackCommandRailPinChanged(next ? 'expanded' : 'hover')
-      if (!next) setHoverExpanded(false)
-      setKeyboardExpanded(false)
-      return
-    }
-    const next = !compactLocked
-    writeExpandedPin(false)
-    writeCompactLock(next)
-    setHoverExpanded(false)
-    setKeyboardExpanded(false)
-    cancelPendingHoverOpen()
-    trackCommandRailPinChanged(next ? 'compact' : 'hover')
-  }
   const toggleKeyboardExpand = () => {
     cancelPendingHoverOpen()
     setKeyboardExpanded((open) => {
@@ -268,13 +250,6 @@ export function CommandRail({
       return true
     })
   }
-  const pinLabel = compactLocked
-    ? 'Allow sidebar to expand'
-    : pinnedExpanded
-      ? 'Unpin sidebar'
-      : expanded
-        ? 'Pin sidebar'
-        : 'Keep as rail'
   const beginResize = (event: React.MouseEvent) => {
     writeCompactLock(false)
     writeExpandedPin(true)
@@ -295,7 +270,6 @@ export function CommandRail({
       testId="command-rail-settings"
     />
   )
-  const pinLocked = compactLocked || pinnedExpanded
   const showExpandControl = !pinnedExpanded && (!expanded || keyboardExpanded)
   const expandLabel = keyboardExpanded ? 'Collapse sidebar' : 'Expand sidebar'
   const expandButton = showExpandControl ? (
@@ -320,29 +294,6 @@ export function CommandRail({
       </Button>
     </ActionTooltip>
   ) : null
-  const pinButton = (
-    <ActionTooltip copy={{ label: pinLabel }} side="right">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        onClick={togglePin}
-        aria-label={pinLabel}
-        aria-pressed={pinLocked}
-        data-testid="command-rail-toggle"
-        className="rounded-[var(--radius)] p-0 hover:bg-[var(--state-hover,var(--accent))]"
-        style={{
-          width: RAIL_BUTTON_SIZE,
-          height: RAIL_BUTTON_SIZE,
-          color: pinLocked ? 'var(--accent-blue)' : 'var(--text-muted)',
-          backgroundColor: pinLocked ? 'var(--accent-blue-bg)' : undefined,
-        }}
-      >
-        <PushPin size={RAIL_ICON_SIZE} weight={pinLocked ? 'fill' : 'regular'} />
-      </Button>
-    </ActionTooltip>
-  )
-
   return (
     <div
       ref={railRef}
@@ -412,7 +363,6 @@ export function CommandRail({
       >
         {expanded ? (
           <>
-            {pinButton}
             {expandButton}
             <span className="ml-auto">{settingsButton}</span>
           </>
@@ -420,7 +370,6 @@ export function CommandRail({
           <>
             {expandButton}
             {settingsButton}
-            {pinButton}
           </>
         )}
       </div>

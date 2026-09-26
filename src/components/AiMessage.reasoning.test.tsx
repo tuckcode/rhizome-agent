@@ -50,4 +50,58 @@ describe('AiMessage reasoning markdown', () => {
     fireEvent.click(screen.getByTestId('reasoning-toggle'))
     expect(screen.getByTestId('reasoning-content').querySelectorAll('li')).toHaveLength(2)
   })
+
+  it('keeps a scrolled-up reading position while more thinking arrives', () => {
+    const { rerender } = render(
+      <AiMessage
+        userMessage="Ask"
+        reasoning={'line\n'.repeat(40)}
+        reasoningDone={false}
+        actions={[]}
+      />,
+    )
+    const content = screen.getByTestId('reasoning-content')
+    Object.defineProperty(content, 'scrollHeight', { value: 800, configurable: true })
+    Object.defineProperty(content, 'clientHeight', { value: 280, configurable: true })
+    Object.defineProperty(content, 'scrollTop', { value: 40, writable: true, configurable: true })
+    fireEvent.scroll(content)
+
+    rerender(
+      <AiMessage
+        userMessage="Ask"
+        reasoning={`${'line\n'.repeat(40)}and a newer line`}
+        reasoningDone={false}
+        actions={[]}
+      />,
+    )
+
+    expect(content.scrollTop).toBe(40)
+  })
+
+  it('follows the newest thinking line while the reader is at the bottom', () => {
+    const { rerender } = render(
+      <AiMessage
+        userMessage="Ask"
+        reasoning={'line\n'.repeat(40)}
+        reasoningDone={false}
+        actions={[]}
+      />,
+    )
+    const content = screen.getByTestId('reasoning-content')
+    Object.defineProperty(content, 'scrollHeight', { value: 800, configurable: true })
+    Object.defineProperty(content, 'clientHeight', { value: 280, configurable: true })
+    Object.defineProperty(content, 'scrollTop', { value: 520, writable: true, configurable: true })
+    fireEvent.scroll(content)
+
+    rerender(
+      <AiMessage
+        userMessage="Ask"
+        reasoning={`${'line\n'.repeat(40)}and a newer line`}
+        reasoningDone={false}
+        actions={[]}
+      />,
+    )
+
+    expect(content.scrollTop).toBe(800)
+  })
 })

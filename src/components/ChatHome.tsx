@@ -44,6 +44,8 @@ interface ChatHomeProps {
   onShowNotes?: () => void
   /** Open Mycelium on this Prime session only (#22). */
   onOpenSessionFootprint?: (sessionPath: string) => void
+  /** Visible door to the command palette. ⌘K stays. */
+  onOpenCommandPalette?: () => void
   /** Lets the shell make room for Chat's secondary note pane at narrow widths. */
   onNotePaneOpenChange?: (open: boolean) => void
   /**
@@ -83,6 +85,7 @@ export default function ChatHome({
   onExit,
   onShowNotes,
   onOpenSessionFootprint,
+  onOpenCommandPalette,
   onNotePaneOpenChange,
   requestedNote,
   chatEngineUpdate,
@@ -151,6 +154,7 @@ export default function ChatHome({
               ? () => onOpenSessionFootprint(primeHost.sessionPath as string)
               : undefined
           }
+          onOpenCommandPalette={onOpenCommandPalette}
         />
       ) : null}
       <AgentActivityBand locale={locale} enabled={isPrimeTarget} />
