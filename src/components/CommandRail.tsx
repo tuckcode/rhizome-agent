@@ -7,6 +7,7 @@ import { createTranslator, type AppLocale } from '../lib/i18n'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import { readStoredBooleanPreference, writeStoredBooleanPreference } from '../lib/uiPreference'
 import { usePanelWidth } from '../hooks/usePanelWidth'
+import { trackSessionsDrawerOpened } from '../lib/productAnalytics'
 import { startResizeDrag } from '../utils/startResizeDrag'
 import {
   COMMAND_RAIL_EXPANDED_WIDTH_PX,
@@ -26,6 +27,13 @@ interface CommandRailProps {
   onSessionsSlotReady?: (slot: HTMLDivElement | null) => void
   /** Current layout width. Collapsed is 46. Open, including hover, is the wide rail. */
   onLayoutWidthChange?: (width: number) => void
+  /**
+   * The shell cannot give an open rail its own column. Expand then opens a
+   * temporary drawer over Chat behind a scrim (native audit 2026-09-26).
+   */
+  drawer?: boolean
+  /** Bump to close an open drawer — the shell does this after a session is picked. */
+  drawerCloseSignal?: number
 }
 
 const RAIL_BUTTON_SIZE = 30
@@ -126,6 +134,8 @@ export function CommandRail({
   onOpenSettings,
   onSessionsSlotReady,
   onLayoutWidthChange,
+  drawer = false,
+  drawerCloseSignal,
 }: CommandRailProps) {
   const t = createTranslator(locale)
   const [storedPinned, setPinnedExpanded] = useState(() =>
@@ -144,6 +154,14 @@ export function CommandRail({
   if (autoCollapsed !== prevAutoCollapsed) {
     setPrevAutoCollapsed(autoCollapsed)
     if (autoCollapsed) {
+      setHoverExpanded(false)
+      setKeyboardExpanded(false)
+    }
+  }
+  const [prevDrawerCloseSignal, setPrevDrawerCloseSignal] = useState(drawerCloseSignal)
+  if (drawerCloseSignal !== prevDrawerCloseSignal) {
+    setPrevDrawerCloseSignal(drawerCloseSignal)
+    if (drawer) {
       setHoverExpanded(false)
       setKeyboardExpanded(false)
     }
@@ -170,11 +188,14 @@ export function CommandRail({
   const expanded = pinnedExpanded || hoverExpanded || keyboardExpanded
   // Expansion takes layout width, so Chat shifts instead of sliding under the rail.
   const overlaying = false
+  // ...unless the shell has no room: then it is a drawer with a scrim.
+  const drawerOpen = drawer && expanded && !pinnedExpanded
   const openFromHover = () => {
     if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current)
     hoverCloseTimer.current = null
     if (
       autoCollapsed
+      || drawer
       || suppressHoverRef.current
       || compactLocked
       || pinnedExpanded
@@ -256,7 +277,7 @@ export function CommandRail({
   useEffect(() => {
     if (autoCollapsed) suppressHoverRef.current = true
   }, [autoCollapsed])
-  const layoutWidth = expanded ? (width ?? railWidth.width) : RAIL_COLLAPSED_WIDTH
+  const layoutWidth = expanded && !drawerOpen ? (width ?? railWidth.width) : RAIL_COLLAPSED_WIDTH
   useEffect(() => {
     onLayoutWidthChange?.(layoutWidth)
   }, [layoutWidth, onLayoutWidthChange])
@@ -286,9 +307,26 @@ export function CommandRail({
     setKeyboardExpanded(false)
     if (pinRequested) writeExpandedPin(false)
   }
+  // Closing a drawer never touches the saved pin: the pin is a wide-window choice.
+  const closeDrawer = useCallback(() => {
+    if (hoverOpenTimer.current) clearTimeout(hoverOpenTimer.current)
+    hoverOpenTimer.current = null
+    setHoverExpanded(false)
+    setKeyboardExpanded(false)
+  }, [])
+  useEffect(() => {
+    if (!drawerOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeDrawer()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [drawerOpen, closeDrawer])
   const onSidebarClick = () => {
-    if (expanded) collapseRail()
-    else toggleKeyboardExpand()
+    if (drawerOpen) return closeDrawer()
+    if (expanded) return collapseRail()
+    if (drawer) trackSessionsDrawerOpened()
+    toggleKeyboardExpand()
   }
   const beginResize = (event: React.MouseEvent) => {
     writeCompactLock(false)
@@ -334,6 +372,15 @@ export function CommandRail({
     </ActionTooltip>
   )
   return (
+    <>
+    {drawerOpen ? (
+      <div
+        aria-hidden="true"
+        data-testid="command-rail-drawer-scrim"
+        className="fixed inset-0 z-[49] bg-black/30 motion-safe:animate-in motion-safe:fade-in-0"
+        onClick={closeDrawer}
+      />
+    ) : null}
     <div
       ref={railRef}
       className={`relative flex shrink-0 flex-col gap-1 py-2 transition-[width] duration-150 motion-reduce:transition-none ${expanded ? 'items-stretch px-2' : 'items-center'}`}
@@ -342,6 +389,7 @@ export function CommandRail({
       data-pinned={pinnedExpanded ? 'true' : 'false'}
       data-compact-locked={compactLocked ? 'true' : 'false'}
       data-overlay={overlaying ? 'true' : 'false'}
+      data-drawer={drawerOpen ? 'true' : 'false'}
       onMouseEnter={(event) => {
         const footer = event.currentTarget.querySelector('[data-testid="command-rail-footer"]')
         if (footer instanceof Element && event.target instanceof Node && footer.contains(event.target)) {
@@ -356,8 +404,9 @@ export function CommandRail({
       }}
       style={{
         width: expanded ? (width ?? railWidth.width) : RAIL_COLLAPSED_WIDTH,
-        marginRight: overlaying ? -((width ?? railWidth.width) - RAIL_COLLAPSED_WIDTH) : undefined,
-        zIndex: overlaying ? 50 : undefined,
+        marginRight: overlaying || drawerOpen ? -((width ?? railWidth.width) - RAIL_COLLAPSED_WIDTH) : undefined,
+        zIndex: overlaying || drawerOpen ? 50 : undefined,
+        boxShadow: drawerOpen ? 'var(--shadow-lg, 0 10px 30px rgb(0 0 0 / 0.25))' : undefined,
         pointerEvents: overlaying ? 'none' : undefined,
         paddingTop: trafficLightRoom ? COMMAND_RAIL_TRAFFIC_LIGHT_INSET : undefined,
         background: 'var(--surface-sidebar)',
@@ -416,5 +465,6 @@ export function CommandRail({
         )}
       </div>
     </div>
+    </>
   )
 }

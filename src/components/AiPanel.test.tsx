@@ -701,6 +701,29 @@ describe('Chat home opens with its sessions column', () => {
   })
 })
 
+describe('a pick in the rail Sessions list', () => {
+  it('tells the shell, so a narrow-window drawer can close', () => {
+    const slot = document.createElement('div')
+    document.body.append(slot)
+    const onRailSessionPicked = vi.fn()
+
+    render(
+      <AiPanelView
+        controller={primeController()}
+        onClose={vi.fn()}
+        showHeader={false}
+        targetId="agent:prime"
+        sessionsRailSlot={slot}
+        onRailSessionPicked={onRailSessionPicked}
+      />,
+    )
+
+    fireEvent.click(within(slot).getByRole('button', { name: 'New chat' }))
+    expect(onRailSessionPicked).toHaveBeenCalledTimes(1)
+    slot.remove()
+  })
+})
+
 /**
  * The visual audit found Goal in two places, and the native audit
  * (2026-09-26) found the context/Goal/Schedule row costing a full row of a

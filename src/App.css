@@ -255,6 +255,11 @@
   min-height: 180px;
 }
 
+/* Focused window (native audit 2026-09-26): one pane at a time. */
+.app__chat-center[data-focused-pane='note'] .app__chat-center-body > [data-testid="chat-home"] {
+  display: none;
+}
+
 .app__chat-center[data-split='side-by-side'] .app__chat-center-body > [data-testid="chat-home"] {
   min-height: 0;
   min-width: 420px;

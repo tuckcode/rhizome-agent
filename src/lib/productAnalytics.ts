@@ -365,6 +365,16 @@ export function trackCommandRailPinChanged(mode: 'hover' | 'expanded' | 'compact
   trackEvent('command_rail_pin_changed', { mode })
 }
 
+/** Narrow window: the Sessions rail opened as a temporary drawer over Chat. */
+export function trackSessionsDrawerOpened(): void {
+  trackEvent('sessions_drawer_opened')
+}
+
+/** Focused window: the user switched between the Chat and Notes tabs. */
+export function trackFocusedPaneSwitched(pane: 'chat' | 'note'): void {
+  trackEvent('focused_pane_switched', { pane })
+}
+
 export function trackStatusBarPillOpened(pill: StatusBarPill): void {
   trackEvent('statusbar_pill_opened', { pill })
 }

@@ -39,6 +39,8 @@ interface ChatHomeProps {
   sessionsAutoCollapsed?: boolean
   /** Expanded Command Rail slot, if this shell has the rail enabled. */
   sessionsRailSlot?: HTMLElement | null
+  /** A session was picked in the rail list (closes a narrow-window drawer). */
+  onRailSessionPicked?: () => void
   /** Where "close" goes when chat owns the window — back to the vault. */
   onExit: () => void
   /** Reveals the existing Notes workspace after leaving a note preview. */
@@ -83,6 +85,7 @@ export default function ChatHome({
   onUnsupportedAiPaste,
   sessionsAutoCollapsed = false,
   sessionsRailSlot,
+  onRailSessionPicked,
   onExit,
   onShowNotes,
   onOpenSessionFootprint,
@@ -190,6 +193,7 @@ export default function ChatHome({
           showHeader={false}
           sessionsAutoCollapsed={sessionsAutoCollapsed}
           sessionsRailSlot={sessionsRailSlot}
+          onRailSessionPicked={onRailSessionPicked}
           forkTargetsPrimeEntry
           newChatRef={newChatRef}
           onOpenMycelium={onOpenSessionFootprint}

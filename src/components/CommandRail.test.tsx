@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommandRail } from './CommandRail'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 
+const { trackSessionsDrawerOpened } = vi.hoisted(() => ({ trackSessionsDrawerOpened: vi.fn() }))
 vi.mock('../lib/productAnalytics', () => ({
   trackCommandRailPinChanged: () => {},
+  trackSessionsDrawerOpened,
 }))
 
 // ActionTooltip wraps its trigger in a Radix Tooltip; render children directly
@@ -340,5 +342,74 @@ describe('a hover-expanded rail does not steal Chat clicks', () => {
     expect(rail).toHaveAttribute('data-expanded', 'true')
     expect(screen.getByTestId('command-rail-sessions')).toBeInTheDocument()
     expect(search).toHaveFocus()
+  })
+})
+
+/**
+ * Native audit 2026-09-26: "In a narrow window, use a temporary drawer that
+ * closes after conversation selection." When the shell cannot give the rail
+ * its own column, Expand opens a drawer over Chat behind a scrim — a clear
+ * modal boundary, so no control sits hidden and clickable underneath.
+ */
+describe('the Sessions drawer in a narrow window', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  function openDrawer(overrides: Partial<React.ComponentProps<typeof CommandRail>> = {}) {
+    const onLayoutWidthChange = vi.fn()
+    renderRail({ drawer: true, width: 240, onLayoutWidthChange, ...overrides })
+    fireEvent.click(screen.getByTestId('command-rail-expand'))
+    return { onLayoutWidthChange }
+  }
+
+  it('opens over Chat behind a scrim and keeps its collapsed layout width', () => {
+    const { onLayoutWidthChange } = openDrawer()
+    const rail = screen.getByTestId('command-rail')
+    expect(rail).toHaveAttribute('data-expanded', 'true')
+    expect(rail).toHaveAttribute('data-drawer', 'true')
+    expect(screen.getByTestId('command-rail-drawer-scrim')).toBeInTheDocument()
+    expect(onLayoutWidthChange).not.toHaveBeenCalledWith(240)
+    expect(rail.style.pointerEvents).not.toBe('none')
+    expect(trackSessionsDrawerOpened).toHaveBeenCalled()
+  })
+
+  it('closes when the scrim is clicked', () => {
+    openDrawer()
+    fireEvent.click(screen.getByTestId('command-rail-drawer-scrim'))
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'false')
+  })
+
+  it('closes on Escape', () => {
+    openDrawer()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'false')
+  })
+
+  it('closes after a conversation is picked', () => {
+    const props: React.ComponentProps<typeof CommandRail> = {
+      locale: 'en', onOpenSettings: vi.fn(), drawer: true, drawerCloseSignal: 0,
+    }
+    const { rerender } = render(<CommandRail {...props} />)
+    fireEvent.click(screen.getByTestId('command-rail-expand'))
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'true')
+    rerender(<CommandRail {...props} drawerCloseSignal={1} />)
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'false')
+  })
+
+  it('does not open from hover', () => {
+    vi.useFakeTimers()
+    renderRail({ drawer: true })
+    fireEvent.mouseEnter(screen.getByTestId('command-rail'))
+    vi.advanceTimersByTime(2000)
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'false')
+    vi.useRealTimers()
+  })
+
+  it('stays an in-flow column when the shell has room', () => {
+    renderRail({ drawer: false })
+    fireEvent.click(screen.getByTestId('command-rail-expand'))
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-drawer', 'false')
+    expect(screen.queryByTestId('command-rail-drawer-scrim')).not.toBeInTheDocument()
   })
 })

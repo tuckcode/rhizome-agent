@@ -21,6 +21,14 @@ export function useChatCenteredShellLayout(args: UseChatCenteredShellLayoutArgs)
   const { shellRef, width } = useShellCompactLayout(kind === 'chat-centered', noteOpen)
   const context = { shellWidth: width, noteOpen, railPinned, hideNotesForCanvas }
   const fit = fitPanePreset(panePreset, context)
+  // Whether an expanded Sessions rail could take its own column right now.
+  // When it cannot, the rail opens as a temporary drawer over Chat.
+  // It fits only if nothing already open has to fold to make the room.
+  const withRail = fitPanePreset(panePreset, { ...context, railPinned: true })
+  const railFits = withRail.railPinned
+    && withRail.notesOpen === fit.notesOpen
+    && withRail.browseOpen === fit.browseOpen
+    && withRail.split === fit.split
   const layout = resolveShellLayout({
     ...args, preset: panePreset, split: fit.split, shellWidth: width, compactVaultPanelOpen: false,
   })
@@ -43,5 +51,5 @@ export function useChatCenteredShellLayout(args: UseChatCenteredShellLayoutArgs)
     const requested = normalizedWidths(live.panePreset.widths)[column] + delta
     live.updatePanePreset(resizePresetWidth(live.panePreset, column, requested, live.context))
   }, [])
-  return { ...layout, shellRef, widths: fit.widths, fittedRailPinned: fit.railPinned, resizeColumn, openNotes: ensureNotesOpen, ensureNotesOpen, collapseNotes, toggleBrowse, setSplit }
+  return { ...layout, shellRef, widths: fit.widths, fittedRailPinned: fit.railPinned, workspace: fit.workspace, railFits, resizeColumn, openNotes: ensureNotesOpen, ensureNotesOpen, collapseNotes, toggleBrowse, setSplit }
 }

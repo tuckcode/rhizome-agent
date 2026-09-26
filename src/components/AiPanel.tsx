@@ -87,6 +87,8 @@ interface AiPanelProps {
   sessionsAutoCollapsed?: boolean
   /** Expanded Command Rail slot. `undefined` preserves the classic-shell column. */
   sessionsRailSlot?: HTMLElement | null
+  /** A session or New chat was picked in the rail list; the shell closes a narrow-window drawer. */
+  onRailSessionPicked?: () => void
   onForkMessage?: (entryId: string) => void
   /** Fork branches the Prime session rather than copying the conversation. */
   forkTargetsPrimeEntry?: boolean
@@ -126,6 +128,7 @@ interface AiPanelViewProps {
   sidePanel?: ReactNode
   sessionsAutoCollapsed?: boolean
   sessionsRailSlot?: HTMLElement | null
+  onRailSessionPicked?: () => void
   onForkMessage?: (messageId: string) => void
   forkTargetsPrimeEntry?: boolean
   onQueuedPromptTarget?: (targetId: string) => void
@@ -230,6 +233,7 @@ export function AiPanelView({
   sidePanel,
   sessionsAutoCollapsed = false,
   sessionsRailSlot,
+  onRailSessionPicked,
   onForkMessage,
   forkTargetsPrimeEntry,
   onQueuedPromptTarget,
@@ -553,8 +557,14 @@ export function AiPanelView({
             >
               <PrimeSessionList
                 locale={locale}
-                onSelectSession={(session) => void handleSelectSession(session)}
-                onNewChat={handleNewChat}
+                onSelectSession={(session) => {
+                  onRailSessionPicked?.()
+                  void handleSelectSession(session)
+                }}
+                onNewChat={() => {
+                  onRailSessionPicked?.()
+                  handleNewChat()
+                }}
                 onOpenMycelium={onOpenMycelium}
                 activeSessionPath={activeSessionPath}
                 working={isActive}
@@ -600,6 +610,7 @@ export function AiPanel({
   sidePanel,
   sessionsAutoCollapsed,
   sessionsRailSlot,
+  onRailSessionPicked,
   onOpenMycelium,
 }: AiPanelProps) {
   const defaultAiAgentReadiness = providedDefaultAiAgentReadiness
@@ -642,6 +653,7 @@ export function AiPanel({
       sidePanel={sidePanel}
       sessionsAutoCollapsed={sessionsAutoCollapsed}
       sessionsRailSlot={sessionsRailSlot}
+      onRailSessionPicked={onRailSessionPicked}
       onOpenMycelium={onOpenMycelium}
       onClose={onClose}
       onOpenNote={onOpenNote}
