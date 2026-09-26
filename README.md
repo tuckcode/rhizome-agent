@@ -53,7 +53,8 @@ If you like the app, contributions are welcome. A small pull request is enough. 
 
 ## License
 
-AGPL-3.0-or-later (inherited from the desktop snapshot). Confirm before any public release under `tuckcode`.
-That confirmation has not happened. The check in
+AGPL-3.0-or-later. See [LICENSE](LICENSE). Atticus confirmed this on
+2026-09-26 as the license for the public `tuckcode` release. It is inherited
+from the Rhizome Desktop snapshot this repo started from. The check in
 [`docs/PUBLIC-PREVIEW.md`](docs/PUBLIC-PREVIEW.md) is an inventory, not a
 legal determination.
