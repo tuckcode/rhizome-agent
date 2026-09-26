@@ -1243,7 +1243,7 @@ describe('SettingsPanel', () => {
       )
 
       expect(document.getElementById('settings-section-about')).not.toBeNull()
-      expect(screen.getByText('Contribute ideas and open the docs.')).toBeInTheDocument()
+      expect(screen.getByText(/A harness that doesn't forget/)).toBeInTheDocument()
       expect(screen.getByTestId('settings-about-contribute')).toBeInTheDocument()
       expect(screen.getByTestId('settings-about-docs')).toBeInTheDocument()
 

@@ -383,7 +383,7 @@
   "settings.privacy.analytics": "Usage analytics",
   "settings.privacy.analyticsDescription": "Share anonymous usage patterns",
   "settings.about.title": "About",
-  "settings.about.description": "Contribute ideas and open the docs.",
+  "settings.about.description": "A harness that doesn't forget. Built around Prime Agent, with useful tools from Claude Code, Hermes Agent, and DeepSeek. The built-in vault is your memory, wiki, and second brain, beside a research panel. What you save stays as plain Markdown on your disk, where you and the agent can both read it.",
   "settings.about.contributeDescription": "Send feedback, ideas, or a bug report.",
   "settings.about.docsDescription": "Open Rhizome’s documentation.",
   "settings.footerShortcut": "⌘, to open settings",

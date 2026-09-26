@@ -1,9 +1,9 @@
 # Rhizome Agent
 
-![Rhizome Agent — Your work. Your memory.](docs/assets/rhizome-hero-animated.webp)
+![Rhizome Agent — Your work. Your memory.](src/assets/brand/rhizome-organic-hero.png)
 
-**A macOS chat app for [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent).**
-Bring your own model. Chat, open a note beside the conversation, and keep what matters as plain Markdown in a vault on your disk.
+**A harness that doesn't forget.**
+Built around [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent), with useful tools from Claude Code, Hermes Agent, and DeepSeek. The built-in vault is your memory, wiki, and second brain, beside a research panel. What you save stays as plain Markdown on your disk, where you and the agent can both read it.
 
 This is a developer preview. Prime Agent and Node are not bundled. There is no signed download.
 
