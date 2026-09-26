@@ -1,0 +1,41 @@
+name: Landing page
+
+# Publishes website/ to GitHub Pages. Release workflows run the same
+# website/build.sh, so a release deploy keeps the landing page.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - 'docs/assets/**'
+      - 'src/assets/brand/rhizome-organic-hero.png'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Pages on a free plan needs a public repo; skip quietly while private.
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Build landing page
+        run: bash website/build.sh _site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

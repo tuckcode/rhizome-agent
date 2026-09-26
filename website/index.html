@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rhizome Agent</title>
+  <meta name="description" content="A harness that doesn't forget. A macOS chat app for Prime Agent that keeps your work as plain Markdown in a vault you own." />
+  <meta property="og:title" content="Rhizome Agent" />
+  <meta property="og:description" content="A harness that doesn't forget. Your work. Your memory." />
+  <meta property="og:image" content="assets/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="assets/icon.png" />
+  <style>
+    :root {
+      --bg: #0b1510;
+      --panel: #112019;
+      --line: #1f3a2c;
+      --text: #efe9dd;
+      --muted: #9fb3a6;
+      --green: #7fd1a0;
+      --green-strong: #3fae72;
+      --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--bg); }
+    body {
+      margin: 0;
+      color: var(--text);
+      background: var(--bg);
+      font: 17px/1.6 var(--sans);
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--green); }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+    header.top {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 0;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-family: var(--mono); letter-spacing: 0.02em; }
+    .brand img { width: 28px; height: 28px; border-radius: 7px; }
+    .top nav a { color: var(--muted); text-decoration: none; margin-left: 20px; font-size: 15px; }
+    .top nav a:hover { color: var(--text); }
+    .hero { margin: 8px 0 0; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: #0d1a13; }
+    .hero img { display: block; width: 100%; height: auto; aspect-ratio: 2 / 1; }
+    .pitch { text-align: center; padding: 56px 0 24px; }
+    .pitch h1 { font-family: var(--mono); font-weight: 500; font-size: clamp(30px, 5vw, 52px); line-height: 1.15; margin: 0 0 16px; letter-spacing: -0.01em; }
+    .pitch p { color: var(--muted); max-width: 680px; margin: 0 auto; font-size: 19px; }
+    .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 28px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 20px; border-radius: 10px; font-weight: 600; font-size: 16px;
+      text-decoration: none; border: 1px solid var(--line); color: var(--text); background: var(--panel);
+    }
+    .btn.primary { background: var(--green-strong); border-color: var(--green-strong); color: #06120b; }
+    .btn:hover { filter: brightness(1.08); }
+    section { padding: 48px 0; border-top: 1px solid var(--line); }
+    section h2 { font-family: var(--mono); font-weight: 500; font-size: 26px; margin: 0 0 18px; }
+    .demo video { width: 100%; border-radius: 14px; border: 1px solid var(--line); background: #000; display: block; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+    .card h3 { margin: 0 0 8px; font-size: 17px; }
+    .card p { margin: 0; color: var(--muted); font-size: 15.5px; }
+    pre {
+      background: #07100b; border: 1px solid var(--line); border-radius: 12px;
+      padding: 18px 20px; overflow-x: auto; font: 14.5px/1.7 var(--mono); color: var(--text); margin: 0 0 14px;
+    }
+    .note { color: var(--muted); font-size: 15px; }
+    footer { padding: 36px 0 56px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+    footer p { margin: 6px 0; }
+    @media (max-width: 600px) {
+      body { font-size: 16px; }
+      .top nav a { margin-left: 14px; }
+      .pitch { padding-top: 36px; }
+      .pitch p { font-size: 17px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .hero img[data-animated] { content: url("assets/hero.png"); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="./"><img src="assets/icon.png" alt="" />rhizome agent</a>
+      <nav>
+        <a href="#demo">Demo</a>
+        <a href="#run">Run it</a>
+        <a href="https://github.com/tuckcode/rhizome-agent">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="hero">
+      <img data-animated src="assets/hero.webp" width="1200" height="600"
+           alt="Rhizome Agent. Your work. Your memory. Chat with Prime. Keep what matters." />
+    </div>
+
+    <div class="pitch">
+      <h1>A harness that doesn't forget.</h1>
+      <p>A macOS chat app built around Prime Agent. The built-in vault is your memory, wiki, and second brain. What you save stays as plain Markdown on your disk, where you and the agent can both read it.</p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/tuckcode/rhizome-agent">View on GitHub</a>
+        <a class="btn" href="#run">Run it locally</a>
+      </div>
+    </div>
+
+    <section id="demo" class="demo">
+      <h2>20-second demo</h2>
+      <video src="assets/demo.mp4#t=0.5" controls muted playsinline preload="metadata"></video>
+    </section>
+
+    <section>
+      <h2>What it does</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Bring your own model</h3>
+          <p>Prime Agent runs the chat: sessions, tools, skills, and provider login. Pick the model you want.</p>
+        </div>
+        <div class="card">
+          <h3>A vault you own</h3>
+          <p>Notes are plain Markdown in a local folder. No database, no lock-in. Open them in any editor.</p>
+        </div>
+        <div class="card">
+          <h3>Notes beside the chat</h3>
+          <p>Open a note next to the conversation, keep what matters, and let the agent read your vault through MCP.</p>
+        </div>
+        <div class="card">
+          <h3>Research panel</h3>
+          <p>Look things up and bring findings into your notes without leaving the app.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="run">
+      <h2>Run it</h2>
+      <p class="note">Developer preview for macOS. You need Node <code>^20.19.0</code> or <code>&gt;=22.12.0</code>, pnpm, Rust, and the Tauri toolchain. Prime Agent is installed separately, and there is no signed download yet.</p>
+      <pre><code>npm i -g prime-agent &amp;&amp; prime-agent
+git clone https://github.com/tuckcode/rhizome-agent &amp;&amp; cd rhizome-agent
+pnpm install &amp;&amp; pnpm tauri dev</code></pre>
+      <p class="note">Setup, scope, and recovery: <a href="https://github.com/tuckcode/rhizome-agent/blob/main/docs/PUBLIC-PREVIEW.md">PUBLIC-PREVIEW.md</a>.</p>
+    </section>
+
+    <footer>
+      <p>AGPL-3.0-or-later. Rhizome Agent is a modified version of <a href="https://github.com/refactoringhq/tolaria">Tolaria</a> by Luca Rossi. The Mycelium view embeds Mindwalk (MIT) © 2026 Ricko Yu.</p>
+      <p><a href="https://github.com/tuckcode/rhizome-agent/issues">Issues</a> · <a href="https://github.com/tuckcode/rhizome-agent/blob/main/SECURITY.md">Security</a> · <a href="https://github.com/tuckcode/rhizome-agent/blob/main/CONTRIBUTING.md">Contributing</a></p>
+    </footer>
+  </div>
+</body>
+</html>

@@ -445,6 +445,11 @@ jobs:
           cp _site/alpha/latest.json _site/latest.json
           cp _site/alpha/latest.json _site/latest-canary.json
 
+      # A Pages deploy replaces the whole site. Keep the landing page
+      # (website/, also deployed by pages.yml) at the root.
+      - name: Add landing page
+        run: bash website/build.sh _site
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
