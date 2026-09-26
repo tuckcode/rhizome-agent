@@ -294,6 +294,28 @@ describe('NoteItem', () => {
     expect(dateRow).toHaveTextContent('Created April 5, 2025')
   })
 
+  /**
+   * The "Created …" half of this row is the first metadata to go when the
+   * note list is narrow (required-order step 3): `.note-item__created-label`
+   * is hidden by a container query on `.note-list-container` below ~260px
+   * (App.css), which jsdom does not evaluate — so this only checks the class
+   * is present for that CSS rule to target, not the rendered width.
+   */
+  it('marks the Created label so a narrow note list can hide it first', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(NOW_SECONDS * 1000))
+    const entry = makeEntry({
+      title: 'Dated note',
+      createdAt: NOW_SECONDS - 86400 * 5,
+      modifiedAt: NOW_SECONDS - 86400 * 2,
+    })
+
+    render(<NoteItem entry={entry} isSelected={false} typeEntryMap={{}} onClickNote={vi.fn()} />)
+
+    const createdLabel = screen.getByText('Created April 5, 2025')
+    expect(createdLabel).toHaveClass('note-item__created-label')
+  })
+
   it('shows the workspace badge after the creation date as an outlined badge', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(NOW_SECONDS * 1000))
