@@ -104,7 +104,7 @@ Rhizome publishes desktop builds for macOS, Windows, and Linux. macOS is the pri
 Use the latest stable release unless you are intentionally testing pre-release builds:
 
 - <a href="https://tolaria.md/download/" target="_self">Download the latest stable build</a>
-- [Browse all GitHub releases](https://github.com/refactoringhq/tolaria/releases)
+- [Browse all GitHub releases](https://github.com/tuckcode/rhizome-agent/releases)
 - <a href="https://tolaria.md/releases/" target="_self">Read the release notes</a>
 
 ## Homebrew
@@ -1421,17 +1421,17 @@ The best way to support Rhizome is to subscribe to [Refactoring](https://refacto
 
 Use the [product board](https://rhizome.canny.io/) for feature ideas. Search first, upvote existing ideas, and create a new post when the request is genuinely new.
 
-## Discussions
+## Questions
 
-Use [GitHub Discussions](https://github.com/refactoringhq/tolaria/discussions) for questions, conversations, show and tell, and broader community context.
+Use [GitHub Issues](https://github.com/tuckcode/rhizome-agent/issues) for questions, conversations, show and tell, and broader community context.
 
 ## Contribute Code
 
-Small, focused pull requests are welcome. Check the product board first so you build the right thing, then open a PR on [GitHub](https://github.com/refactoringhq/tolaria/pulls). The [contributing guide](https://github.com/refactoringhq/tolaria/blob/main/CONTRIBUTING.md) explains the local workflow.
+Small, focused pull requests are welcome. Check the product board first so you build the right thing, then open a PR on [GitHub](https://github.com/tuckcode/rhizome-agent/pulls). The [contributing guide](https://github.com/refactoringhq/tolaria/blob/main/CONTRIBUTING.md) explains the local workflow.
 
 ## Report A Bug
 
-Use [GitHub Issues](https://github.com/refactoringhq/tolaria/issues) for bugs. Include what happened, what you expected, and clear reproduction steps. If you are reporting from inside Rhizome, use the Contribute panel to copy sanitized diagnostics and attach them to the issue.
+Use [GitHub Issues](https://github.com/tuckcode/rhizome-agent/issues) for bugs. Include what happened, what you expected, and clear reproduction steps. If you are reporting from inside Rhizome, use the Contribute panel to copy sanitized diagnostics and attach them to the issue.
 
 ---
 
