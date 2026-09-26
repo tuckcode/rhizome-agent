@@ -73,7 +73,7 @@ export function ChatNotePane({
         <span className="rounded-sm border border-border px-1.5 py-px text-[10px] uppercase tracking-[0.08em]">
           {t('ai.chatNote.tag')}
         </span>
-        <span className="min-w-0 flex-1 truncate text-foreground" title={label}>{label}</span>
+        <span className="min-w-[6ch] flex-1 truncate text-foreground" title={label}>{label}</span>
         <Button
           type="button"
           variant="ghost"
