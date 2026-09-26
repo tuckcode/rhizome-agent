@@ -97,7 +97,7 @@ there the mode is genuinely enforced.
 **2. A skill file from before #46's guard.** `looks_like_vault` now refuses
 `$HOME` outright, but a file written on Aug 22 was still sitting at
 `~/.prime/agent/skills/rhizome-vault/SKILL.md` saying the active vault root
-was `/Users/dtc`. That is Prime's **global** skills directory, so every
+was `~`. That is Prime's **global** skills directory, so every
 session in every vault read it — the agent was told two different vault roots
 at once. The correct copy inside the real vault says the right thing.
 

@@ -10,7 +10,7 @@ description: >-
 
 **Origin:** Cursor Grok 4.6 · 2026-09-14.
 **Audit (read-only):**
-`/Users/dtc/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/rhizome-security-audit/START-HERE.md`
+`~/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/rhizome-security-audit/START-HERE.md`
 
 Astra planned. Cursor implements. Do not publish a working exploit.
 Keep reports private under root `SECURITY.md`.

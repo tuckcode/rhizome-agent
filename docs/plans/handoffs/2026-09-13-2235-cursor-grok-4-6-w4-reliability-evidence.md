@@ -12,7 +12,7 @@ commits: none
 
 **Origin:** Cursor Grok 4.6 · 2026-09-13 · God-plan W4 (evidence only)
 
-**Contract:** [God plan](/Users/dtc/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/ASTRA_GOD_PLAN.md) · [W4 stub](/Users/dtc/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/s-plans/W4-chat-reliability.md)
+**Contract:** [God plan](~/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/ASTRA_GOD_PLAN.md) · [W4 stub](~/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/s-plans/W4-chat-reliability.md)
 
 Did not edit `src-tauri/src/lib.rs`, `prime_session_host.rs`, `mcp.rs`, `prime_vault_skill.rs`, `vault_list.rs`, `commands/mod.rs`, or MCP JS. W7 owns those paths.
 

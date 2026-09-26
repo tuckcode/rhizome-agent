@@ -16,7 +16,7 @@ description: >-
 
 Running binary path:
 
-`/Users/dtc/code/projects/rhizome-agent/src-tauri/target/debug/RhizomeAgent`
+`~/code/projects/rhizome-agent/src-tauri/target/debug/RhizomeAgent`
 
 (PID **14296**, ~1h15m uptime at check time.)
 
@@ -41,7 +41,7 @@ Running binary path:
 | Check | Result |
 |---|---|
 | Process | PID 14296 = `target/debug/RhizomeAgent`; parent = `pnpm run tauri dev` → `@tauri-apps/cli` `tauri.js dev` + Vite |
-| Absolute path (`lsof`) | `/Users/dtc/code/projects/rhizome-agent/src-tauri/target/debug/RhizomeAgent` |
+| Absolute path (`lsof`) | `~/code/projects/rhizome-agent/src-tauri/target/debug/RhizomeAgent` |
 | `/Applications` MacOS binary | **Not running** (bundle exists; bundle id `ai.rhizome.agent`) |
 | Release bundle on disk | Present: `src-tauri/target/release/bundle/macos/Rhizome Agent.app` |
 | `package.json` scripts | `"tauri": "tauri"` only — **no** `tauri:dev` alias; use `pnpm tauri dev` / `pnpm tauri build` |

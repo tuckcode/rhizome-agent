@@ -11,7 +11,7 @@ commits: pending
 
 **Origin:** Cursor Grok 4.6 · 2026-09-12 · PR #61
 
-Worked in `/Users/dtc/code/projects/rhizome-agent-pr-61` only. Main working
+Worked in `~/code/projects/rhizome-agent-pr-61` only. Main working
 tree was left dirty.
 
 ## Rebase

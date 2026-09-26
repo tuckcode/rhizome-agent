@@ -9,7 +9,7 @@
 > Do not rebuild `/Applications`. Import waits for `1`.
 
 **Origin:** Astra · Codex · 2026-09-13 · task `01a09de9-425c-7972-9dcc-2bbabf7e7a95`.
-**Project:** `/Users/dtc/code/projects/rhizome-agent` · private `tuckcode/rhizome-agent`.
+**Project:** `~/code/projects/rhizome-agent` · private `tuckcode/rhizome-agent`.
 **Planning snapshot:** September 13, approximately 22:18 CT. Recheck moving state before each claim.
 
 **Outcome:** Chat talks to Prime without false status or silent failures. Rhizome remains the desk and vault memory. Prime remains the only engine.

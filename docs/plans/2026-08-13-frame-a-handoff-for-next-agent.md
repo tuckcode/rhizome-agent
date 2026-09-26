@@ -33,7 +33,7 @@ Spec for the session list: `docs/plans/2026-08-13-prime-session-list-spec.md`.
 
 ## The design system is the source of truth
 
-`/Users/dtc/Desktop/rhizome-agent-design-system/`. **Read it before writing
+`~/Desktop/rhizome-agent-design-system/`. **Read it before writing
 UI.** Atticus pointed at it mid-session and it corrected three decisions I had
 already shipped, so treat it as authoritative over your own judgement about
 layout.

@@ -154,39 +154,39 @@ is the only execution engine. Do not replace Chat.
 
 | What | Path |
 |---|---|
-| **Project** | `/Users/dtc/code/projects/rhizome-agent` |
+| **Project** | `~/code/projects/rhizome-agent` |
 | **Git origin** | `https://github.com/tuckcode/rhizome-agent.git` (private) |
-| **This packet** | `/Users/dtc/code/projects/rhizome-agent/docs/ASTRA_PACKET.md` |
-| **Plan-for-a-plan** | `/Users/dtc/code/projects/rhizome-agent/docs/PLAN_FOR_A_PLAN.md` |
-| **Board** | `/Users/dtc/code/projects/rhizome-agent/docs/BOARD.md` |
-| **Morning** | `/Users/dtc/code/projects/rhizome-agent/docs/MORNING.md` |
-| Daily index | `/Users/dtc/code/projects/rhizome-agent/docs/HANDOFF.md` |
-| Unclaimed work | `/Users/dtc/code/projects/rhizome-agent/docs/NEXT.md` |
-| Identity | `/Users/dtc/code/projects/rhizome-agent/docs/IDENTITY.md` |
-| Briefing (stale vs GitHub) | `/Users/dtc/code/projects/rhizome-agent/docs/YOU-SHOULD-KNOW.md` |
-| Architecture | `/Users/dtc/code/projects/rhizome-agent/docs/ARCHITECTURE.md` |
-| Cross-model traps | `/Users/dtc/code/projects/rhizome-agent/docs/CROSS-MODEL-HANDOFF.md` |
-| Product rules | `/Users/dtc/code/projects/rhizome-agent/AGENTS.md` |
-| Evening dump (parked ideas) | `/Users/dtc/code/projects/rhizome-agent/docs/plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md` |
-| Board session note | `/Users/dtc/code/projects/rhizome-agent/docs/plans/handoffs/2026-09-12-2100-cursor-grok-4-6-session-board.md` |
-| Prime coverage (historical %) | `/Users/dtc/code/projects/rhizome-agent/docs/plans/2026-08-22-prime-harness-coverage.md` |
-| Prime surface gap | `/Users/dtc/code/projects/rhizome-agent/docs/plans/2026-08-20-prime-surface-gap.md` |
-| Prime spoken snapshot | `/Users/dtc/code/projects/rhizome-agent/docs/prime-adapter-surface.json` |
-| **#5 skeleton (tonight)** | `/Users/dtc/code/projects/rhizome-agent/docs/design/prime-spoken-surface.md` |
-| **import_jsonl routes (tonight)** | `/Users/dtc/code/projects/rhizome-agent/docs/design/import-jsonl-routes.md` — recommend route 1; do not code |
-| Prime vision (draft) | `/Users/dtc/code/projects/rhizome-agent/docs/design/rhizome-prime-harness-vision.md` |
-| Harness doctrine | `/Users/dtc/code/projects/rhizome-agent/docs/design/harness-doctrine.md` |
-| Harness composition (unratified) | `/Users/dtc/code/projects/rhizome-agent/docs/design/harness-composition.md` |
-| Session import plan | `/Users/dtc/code/projects/rhizome-agent/docs/plans/2026-09-01-session-import-plan.md` |
-| Session-list import brief | `/Users/dtc/code/projects/rhizome-agent/docs/plans/handoffs/2026-09-06-2152-composer-prime-session-list-import-brief.md` |
-| Live-app view plan | `/Users/dtc/code/projects/rhizome-agent/docs/plans/2026-08-29-live-app-view-plan.md` |
-| Windows (never launched) | `/Users/dtc/code/projects/rhizome-agent/docs/WINDOWS-DEV.md` |
+| **This packet** | `~/code/projects/rhizome-agent/docs/ASTRA_PACKET.md` |
+| **Plan-for-a-plan** | `~/code/projects/rhizome-agent/docs/PLAN_FOR_A_PLAN.md` |
+| **Board** | `~/code/projects/rhizome-agent/docs/BOARD.md` |
+| **Morning** | `~/code/projects/rhizome-agent/docs/MORNING.md` |
+| Daily index | `~/code/projects/rhizome-agent/docs/HANDOFF.md` |
+| Unclaimed work | `~/code/projects/rhizome-agent/docs/NEXT.md` |
+| Identity | `~/code/projects/rhizome-agent/docs/IDENTITY.md` |
+| Briefing (stale vs GitHub) | `~/code/projects/rhizome-agent/docs/YOU-SHOULD-KNOW.md` |
+| Architecture | `~/code/projects/rhizome-agent/docs/ARCHITECTURE.md` |
+| Cross-model traps | `~/code/projects/rhizome-agent/docs/CROSS-MODEL-HANDOFF.md` |
+| Product rules | `~/code/projects/rhizome-agent/AGENTS.md` |
+| Evening dump (parked ideas) | `~/code/projects/rhizome-agent/docs/plans/handoffs/2026-09-07-2208-cursor-grok-4-6-evening-design-dump.md` |
+| Board session note | `~/code/projects/rhizome-agent/docs/plans/handoffs/2026-09-12-2100-cursor-grok-4-6-session-board.md` |
+| Prime coverage (historical %) | `~/code/projects/rhizome-agent/docs/plans/2026-08-22-prime-harness-coverage.md` |
+| Prime surface gap | `~/code/projects/rhizome-agent/docs/plans/2026-08-20-prime-surface-gap.md` |
+| Prime spoken snapshot | `~/code/projects/rhizome-agent/docs/prime-adapter-surface.json` |
+| **#5 skeleton (tonight)** | `~/code/projects/rhizome-agent/docs/design/prime-spoken-surface.md` |
+| **import_jsonl routes (tonight)** | `~/code/projects/rhizome-agent/docs/design/import-jsonl-routes.md` — recommend route 1; do not code |
+| Prime vision (draft) | `~/code/projects/rhizome-agent/docs/design/rhizome-prime-harness-vision.md` |
+| Harness doctrine | `~/code/projects/rhizome-agent/docs/design/harness-doctrine.md` |
+| Harness composition (unratified) | `~/code/projects/rhizome-agent/docs/design/harness-composition.md` |
+| Session import plan | `~/code/projects/rhizome-agent/docs/plans/2026-09-01-session-import-plan.md` |
+| Session-list import brief | `~/code/projects/rhizome-agent/docs/plans/handoffs/2026-09-06-2152-composer-prime-session-list-import-brief.md` |
+| Live-app view plan | `~/code/projects/rhizome-agent/docs/plans/2026-08-29-live-app-view-plan.md` |
+| Windows (never launched) | `~/code/projects/rhizome-agent/docs/WINDOWS-DEV.md` |
 | Installed Prime on this Mac | `~/.prime/` — version **0.9.3** |
 | Packaged app | `/Applications/Rhizome Agent.app` — last stamped **`476756c`** at 2026-09-12 22:43 |
 | ADHD Cursor rule | User Rules **id 17932869** |
-| ADHD Claude file | `/Users/dtc/.claude/CLAUDE.md` (ADHD+status block present) |
-| Home CLAUDE | `/Users/dtc/CLAUDE.md` |
-| Rhizome vault (notes, not this repo) | `/Users/dtc/Documents/Rhizome Vault` |
+| ADHD Claude file | `~/.claude/CLAUDE.md` (ADHD+status block present) |
+| Home CLAUDE | `~/CLAUDE.md` |
+| Rhizome vault (notes, not this repo) | `~/Documents/Rhizome Vault` |
 | Sibling overnight chat | Cursor empty-window transcript `542e03eb-7ace-4de1-9846-b4fe9509b41b` |
 
 **Git snapshot when this packet was written (2026-09-13 ~22:10 CT):**
@@ -303,7 +303,7 @@ start a competing Prime product build.
 
 ## 4. Board inventory (every BOARD.md card)
 
-Source: `/Users/dtc/code/projects/rhizome-agent/docs/BOARD.md` (2026-09-12).
+Source: `~/code/projects/rhizome-agent/docs/BOARD.md` (2026-09-12).
 
 ### True right now
 
@@ -425,7 +425,7 @@ Work is **uncommitted** on disk.
 
 | Lane | Status | Notes |
 |---|---|---|
-| **ADHD+status hybrid** | **DONE** | User Rules **id 17932869** + `/Users/dtc/.claude/CLAUDE.md`. |
+| **ADHD+status hybrid** | **DONE** | User Rules **id 17932869** + `~/.claude/CLAUDE.md`. |
 | **Docs / board filler** | **DONE** | BOARD / HANDOFF / NEXT / YOU-SHOULD-KNOW match `5c629a0` + 17 open issues. |
 | **Issues / PRs** | **DONE** | Closed #14 #17 #18 #43 #47 #49 #53 #54 #55. PR #66 not merged (CONFLICTING). |
 | **Security** | **DONE (uncommitted)** | #46 HOME-vault / MCP refuse `$HOME`. Close GitHub after Chat-without-vault live check. |
@@ -622,7 +622,7 @@ Do now, in order, on **Cursor Grok 4.6** unless marked Composer:
 ## 14. Where Astra should start (paste-ready)
 
 ```
-Project: /Users/dtc/code/projects/rhizome-agent
+Project: ~/code/projects/rhizome-agent
 Read:    docs/ASTRA_PACKET.md
 Then:    docs/PLAN_FOR_A_PLAN.md
 Board:   docs/BOARD.md

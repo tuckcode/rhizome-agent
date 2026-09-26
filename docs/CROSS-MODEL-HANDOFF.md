@@ -312,7 +312,7 @@ watcher log lines — across two app restarts and both create and modify
 events. Cause, read straight out of the native WebKit localStorage:
 
 ```
-laputa:vault-config:/Users/dtc/Documents/Rhizome Vault
+laputa:vault-config:~/Documents/Rhizome Vault
   inbox_automation_enabled = False     ← explicit, persisted
 ```
 

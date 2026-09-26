@@ -354,7 +354,7 @@ before spending anything on agent-driven native QA.)
 **That first real screenshot immediately found a defect the whole test suite
 had missed:** every row rendered a *cwd folder name* instead of a title,
 because none of the running sessions had a `firstMessage` (a session with no
-messages has none) — and two shared `/Users/dtc`, so two rows both read
+messages has none) — and two shared `~`, so two rows both read
 "dtc", identical and impossible to tell apart. Colliding titles now get the
 short session id appended. The lesson is cheap to reuse: the fixtures all set
 `firstMessage` because that is the interesting case to write, so the fallback
@@ -765,7 +765,7 @@ The filter is mechanical, not a judgement call. A personal skill arrives as:
 
 ```json
 {"name": "skill:ask-matt",
- "sourceInfo": {"path": "/Users/dtc/.agents/skills/ask-matt/SKILL.md",
+ "sourceInfo": {"path": "~/.agents/skills/ask-matt/SKILL.md",
                 "source": "auto", "scope": "user"}}
 ```
 
@@ -1429,7 +1429,7 @@ so Frame A only has New chat inside the sessions drawer. If that gap hurts,
 put a button on the subhead — do not invent a titlebar.
 
 **The design system is authoritative for UI:**
-`/Users/dtc/Desktop/rhizome-agent-design-system/`, artboards in
+`~/Desktop/rhizome-agent-design-system/`, artboards in
 `rhizome-agent-desktop-ui.html` (Frame A at line 1642, Frame F at 2139). It
 corrected three decisions already shipped this session. **Model names in the
 artboards are examples only** — Rhizome Agent is BYO-model, so never hardcode

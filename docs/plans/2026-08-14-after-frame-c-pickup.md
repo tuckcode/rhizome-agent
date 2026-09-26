@@ -3,9 +3,9 @@
 **You are the next agent.** The Frame A leftover plan is closed. Do not
 resume it. Do not start Frame D because it is the next HTML tab.
 
-Repo: `/Users/dtc/code/projects/rhizome-agent`  
+Repo: `~/code/projects/rhizome-agent`  
 Origin: `tuckcode/rhizome-agent` (private). **Not** Desktop.  
-Design: `/Users/dtc/Desktop/rhizome-agent-design-system/`  
+Design: `~/Desktop/rhizome-agent-design-system/`  
 Named frame → that artboard first. Artboard vs app → flag, don’t invent.
 
 Unpushed: `git rev-list --count origin/main..HEAD`. ~~Do not push until
@@ -85,7 +85,7 @@ Do not rebuild it.
 ## How to see surfaces
 
 ```bash
-cd /Users/dtc/code/projects/rhizome-agent && pnpm tauri dev
+cd ~/code/projects/rhizome-agent && pnpm tauri dev
 ```
 
 Vite (`pnpm dev` → http://localhost:5202) is chrome-only. Chat rail =

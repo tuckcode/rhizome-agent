@@ -91,7 +91,7 @@ stale:
 ```bash
 python3 - <<'EOF'
 import re
-s = open('/Users/dtc/.local/lib/node_modules/prime-agent/dist/modes/daemon/daemon-supervisor.js', errors='replace').read()
+s = open('~/.local/lib/node_modules/prime-agent/dist/modes/daemon/daemon-supervisor.js', errors='replace').read()
 m = re.search(r'DAEMON_COMMAND_TYPES\s*=\s*new Set\(', s)
 j = s.index('(', m.end()-1); d = 0
 for k in range(j, len(s)):

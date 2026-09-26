@@ -301,35 +301,35 @@ docs, confirm the installed handler, then probe a live daemon before coding.
 ### Installed Prime Agent 0.8.0
 
 - **[P1] Package identity/runtime requirement:**  
-  `/Users/dtc/.local/lib/node_modules/prime-agent/package.json:1-18,79-81`
+  `~/.local/lib/node_modules/prime-agent/package.json:1-18,79-81`
 - **[P2] Architecture ownership and non-sandbox boundary:**  
-  `/Users/dtc/.local/lib/node_modules/prime-agent/docs/architecture.md:43-49,86-94`
+  `~/.local/lib/node_modules/prime-agent/docs/architecture.md:43-49,86-94`
 - **[P3] Daemon, worker, owned-session, scheduling and recovery semantics:**  
-  `/Users/dtc/.local/lib/node_modules/prime-agent/docs/daemon.md:23-55,57-95,97-152`
+  `~/.local/lib/node_modules/prime-agent/docs/daemon.md:23-55,57-95,97-152`
 - **[P4] Protocol v7/schema 22, capabilities, lifecycle and command contracts:**  
-  `/Users/dtc/.local/lib/node_modules/prime-agent/dist/modes/daemon/daemon-protocol.d.ts:19-55,68-88,215-267,340-762,769-1100,1185-1206`
+  `~/.local/lib/node_modules/prime-agent/dist/modes/daemon/daemon-protocol.d.ts:19-55,68-88,215-267,340-762,769-1100,1185-1206`
 - **[P5] AgentConnection responsibilities, extension UI and client UI boundary:**  
-  `/Users/dtc/.local/lib/node_modules/prime-agent/docs/agent-connection.md:20-38,70-85,103-134`
+  `~/.local/lib/node_modules/prime-agent/docs/agent-connection.md:20-38,70-85,103-134`
 - **[P6] RLM/subagent and continual-harness ownership:**  
-  `/Users/dtc/.local/lib/node_modules/prime-agent/docs/rlm-runtime.md:23-32,62-72,159-214,228-254`
+  `~/.local/lib/node_modules/prime-agent/docs/rlm-runtime.md:23-32,62-72,159-214,228-254`
 - **[P7] Goals, schedules, heartbeats, autonomy and compaction:**  
-  `/Users/dtc/.local/lib/node_modules/prime-agent/docs/long-running-agents.md:43-69,112-239`
+  `~/.local/lib/node_modules/prime-agent/docs/long-running-agents.md:43-69,112-239`
 - **[P8] Generic MCP behavior and project-setting prohibition:**  
-  `/Users/dtc/.local/lib/node_modules/prime-agent/docs/mcp-integrations.md:73-149,174-180`
+  `~/.local/lib/node_modules/prime-agent/docs/mcp-integrations.md:73-149,174-180`
 - **[P9] Skill ownership and security:**  
-  `/Users/dtc/.local/lib/node_modules/prime-agent/docs/skills.md:23-45,130-168,229-250`
+  `~/.local/lib/node_modules/prime-agent/docs/skills.md:23-45,130-168,229-250`
 - **[P10] Refine semantics:**  
-  `/Users/dtc/.local/lib/node_modules/prime-agent/skills/refine/SKILL.md:1-42`
+  `~/.local/lib/node_modules/prime-agent/skills/refine/SKILL.md:1-42`
 - **[P11] Provider auth ownership and precedence:**  
-  `/Users/dtc/.local/lib/node_modules/prime-agent/docs/providers.md:14-23,38-120,234-248`
+  `~/.local/lib/node_modules/prime-agent/docs/providers.md:14-23,38-120,234-248`
 - **[P12] Custom model/provider routing:**  
-  `/Users/dtc/.local/lib/node_modules/prime-agent/docs/models.md:1-41,132-166,187-246,248-314`
+  `~/.local/lib/node_modules/prime-agent/docs/models.md:1-41,132-166,187-246,248-314`
 - **[P13] Extensions, permissions and full-system trust:**  
-  `/Users/dtc/.local/lib/node_modules/prime-agent/docs/extensions.md:3-29,55-110`
+  `~/.local/lib/node_modules/prime-agent/docs/extensions.md:3-29,55-110`
 - **[P14] Prime's update manifest/settings:**  
-  `/Users/dtc/.local/lib/node_modules/prime-agent/docs/settings.md:49-65`
+  `~/.local/lib/node_modules/prime-agent/docs/settings.md:49-65`
 - **[P15] Prime package manager and package trust:**  
-  `/Users/dtc/.local/lib/node_modules/prime-agent/docs/packages.md:18-44,46-107,149-221`
+  `~/.local/lib/node_modules/prime-agent/docs/packages.md:18-44,46-107,149-221`
 
 ### Rhizome repository
 

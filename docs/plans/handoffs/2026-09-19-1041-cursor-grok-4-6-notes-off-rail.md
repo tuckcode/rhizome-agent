@@ -13,7 +13,7 @@ commits: none
 **Origin:** Cursor Grok 4.6 · 2026-09-19 10:41 · source only.
 
 Spec:
-[`/Users/dtc/.hermes/kanban/workspaces/t_5eb4062a/rhizome-agent-sol/docs/plans/handoffs/2026-09-19-cursor-remove-notes-rail.md`](/Users/dtc/.hermes/kanban/workspaces/t_5eb4062a/rhizome-agent-sol/docs/plans/handoffs/2026-09-19-cursor-remove-notes-rail.md).
+[`~/.hermes/kanban/workspaces/t_5eb4062a/rhizome-agent-sol/docs/plans/handoffs/2026-09-19-cursor-remove-notes-rail.md`](~/.hermes/kanban/workspaces/t_5eb4062a/rhizome-agent-sol/docs/plans/handoffs/2026-09-19-cursor-remove-notes-rail.md).
 
 ## Done
 

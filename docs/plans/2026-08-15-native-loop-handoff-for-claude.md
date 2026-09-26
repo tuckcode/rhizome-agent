@@ -14,11 +14,11 @@ file, then `docs/HANDOFF.md` only for Open threads (C-numbers).
 The 2026-08-14 leftover plan and the 2026-08-14-evening pickup are
 **historical**. This file supersedes both as “what is true now.”
 
-Repo: `/Users/dtc/code/projects/rhizome-agent`
+Repo: `~/code/projects/rhizome-agent`
 Remote: `origin` = `https://github.com/tuckcode/rhizome-agent.git` (private)
-**Not** Rhizome Desktop (`/Users/dtc/code/projects/rhizome`, `knispo/rhizome`).
+**Not** Rhizome Desktop (`~/code/projects/rhizome`, `knispo/rhizome`).
 
-Design: `/Users/dtc/Desktop/rhizome-agent-design-system/`
+Design: `~/Desktop/rhizome-agent-design-system/`
 Named frame → open that artboard first. Artboard vs running app → flag,
 don’t invent. Frame C is **Promote / Save to vault · toast + `create_note`**,
 not “make the split pane editable.”
@@ -37,7 +37,7 @@ Grok worked the rest of 08-14 and the 08-15 native loop.
 ## Git (untrusted — re-run these)
 
 ```bash
-cd /Users/dtc/code/projects/rhizome-agent
+cd ~/code/projects/rhizome-agent
 git status -sb
 git log --oneline origin/main..HEAD
 git rev-list --count origin/main..HEAD
@@ -164,7 +164,7 @@ Surface: **Rhizome Agent** native (`pnpm tauri dev`), Mycelium, Chat rail.
 
 Vite cannot prove Prime tools or promote writes. `demo-vault-v2` has no
 seeded `.prime/agent/skills`. Real skill:
-`/Users/dtc/Documents/Rhizome Vault/.prime/agent/skills/rhizome-vault/SKILL.md`.
+`~/Documents/Rhizome Vault/.prime/agent/skills/rhizome-vault/SKILL.md`.
 
 ---
 
@@ -260,8 +260,8 @@ git push origin main
 ## How to see surfaces
 
 ```bash
-cd /Users/dtc/code/projects/rhizome-agent && pnpm tauri dev   # native — dogfood
-cd /Users/dtc/code/projects/rhizome-agent && pnpm dev         # Vite :5202 chrome only
+cd ~/code/projects/rhizome-agent && pnpm tauri dev   # native — dogfood
+cd ~/code/projects/rhizome-agent && pnpm dev         # Vite :5202 chrome only
 ```
 
 Chat rail = top bubble. Notes rail = list icon under Chat. If wiki: that
@@ -343,7 +343,7 @@ Uncommitted tracker edits must not mix with product commits.
 ## Suggested first 15 minutes
 
 ```bash
-cd /Users/dtc/code/projects/rhizome-agent
+cd ~/code/projects/rhizome-agent
 pwd && git rev-parse --show-toplevel && git remote get-url origin
 git status -sb && git log --oneline origin/main..HEAD | head
 ```

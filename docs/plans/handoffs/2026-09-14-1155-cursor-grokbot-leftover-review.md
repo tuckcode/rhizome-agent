@@ -25,7 +25,7 @@ description: >-
 No standalone “full Grokbot audit” markdown exists for **rhizome-agent**. The
 audit **is** the six Area A–F subtraction PRs plus their session handoffs.
 `~/.grokbot/` holds daemon config only (no audit dump). CodexGPT has a
-narrower [`codexgpt/.lob/audit.md`](file:///Users/dtc/code/projects/CodexGPT/codexgpt/.lob/audit.md)
+narrower [`codexgpt/.lob/audit.md`](file://~/code/projects/CodexGPT/codexgpt/.lob/audit.md)
 (2026-08-30) — different repo.
 
 ## PR train — all six areas on `origin/main`

@@ -10,7 +10,7 @@ commits: none
 # Lane S handoff — vault safety and publication review
 
 **Origin:** Cursor Grok 4.6 · 2026-09-20 05:45 · Lane S
-**Worktree:** `/Users/dtc/code/projects/rhizome-agent/.worktrees/lane-s`
+**Worktree:** `~/code/projects/rhizome-agent/.worktrees/lane-s`
 **Branch:** `cursor/lane-s-vault-safety`
 **Issue:** [#46](https://github.com/tuckcode/rhizome-agent/issues/46) stays **OPEN**.
 

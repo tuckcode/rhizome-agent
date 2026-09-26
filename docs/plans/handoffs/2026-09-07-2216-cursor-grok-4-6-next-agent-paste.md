@@ -28,7 +28,7 @@ term. Temporary until the dictation tool learns words or he adds overrides
 last line must stand alone. Translate a technical word the first time.
 
 **Voice:** STE-100 in Rhizome Vault, not a skill in this repo.
-`/Users/dtc/Documents/Rhizome Vault/agents/shared/mode` is `ste`.
+`~/Documents/Rhizome Vault/agents/shared/mode` is `ste`.
 Read `.../agents/shared/voice-ste.md`. Sync is `.../agents/shared/sync-voice.sh`
 (accepts `ste`, `normal`, leftover `adhd`). Personal voice stays out of this
 tree. If it is ever productized, it belongs as a Settings option, not a default.

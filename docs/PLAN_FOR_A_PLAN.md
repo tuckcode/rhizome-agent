@@ -26,7 +26,7 @@ executes W1–W11 from [`ASTRA_PACKET.md`](ASTRA_PACKET.md).
 
 | | |
 |---|---|
-| Path | `/Users/dtc/code/projects/rhizome-agent` |
+| Path | `~/code/projects/rhizome-agent` |
 | GitHub | `tuckcode/rhizome-agent` (private) |
 | Identity | Rhizome Agent (`ai.rhizome.agent`), **not** Rhizome Desktop (`knispo/rhizome`) — [`IDENTITY.md`](IDENTITY.md) |
 | Product | Desktop Chat shell. Vault = durable memory. **Prime Agent = only engine.** |

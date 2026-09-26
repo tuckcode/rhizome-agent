@@ -16,7 +16,7 @@ Stop fighting lag on debug `pnpm tauri` / `target/debug/RhizomeAgent`. One copy 
 
 | Role | PID | Path / command |
 |---|---|---|
-| Debug app | **14296** | `/Users/dtc/code/projects/rhizome-agent/src-tauri/target/debug/RhizomeAgent` |
+| Debug app | **14296** | `~/code/projects/rhizome-agent/src-tauri/target/debug/RhizomeAgent` |
 | tauri.js dev | 14090 | `node …/@tauri-apps/cli/tauri.js dev` |
 | vite | 14219 | `node …/vite/bin/vite.js` |
 | pnpm tauri | 14073 | `node /opt/homebrew/bin/pnpm run tauri dev` |

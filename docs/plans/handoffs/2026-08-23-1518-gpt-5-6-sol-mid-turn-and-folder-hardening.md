@@ -115,7 +115,7 @@ that evidence exists. Dynamic routing will also require Rhizome to distinguish
 the logical selected route from the physical model that answered.
 
 Durable wiki note:
-`/Users/dtc/Documents/Rhizome Vault/projects/rhizome-agent/switchyard-model-routing.md`.
+`~/Documents/Rhizome Vault/projects/rhizome-agent/switchyard-model-routing.md`.
 
 ## Decision — foreground-owned Prime sessions (C47 / ADR-0167)
 

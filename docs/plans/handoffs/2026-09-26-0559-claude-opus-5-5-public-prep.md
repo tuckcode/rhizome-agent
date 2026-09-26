@@ -28,7 +28,7 @@ Follows [`2026-09-26-0425`](2026-09-26-0425-claude-opus-5-5-astra-redesign.md).
   2026-08-09 to 09-12. Later commits use the noreply address. Undecided:
   accept it, or rewrite history (new SHAs, a force-push, and breaking about
   30 local worktrees).
-- **58 tracked files contain `/Users/dtc` paths.** The handoffs and plans
+- **58 tracked files contain `~` paths.** The handoffs and plans
   also hold personal working context. They need a human read before going
   public.
 - **Upstream lineage** is Tolaria (`refactoringhq/tolaria`, AGPL-3.0,

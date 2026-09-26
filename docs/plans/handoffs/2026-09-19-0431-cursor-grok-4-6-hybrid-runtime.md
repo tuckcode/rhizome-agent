@@ -25,13 +25,13 @@ are not wired in. Thinking defaults are still Prime's settings file.
 - `src-tauri/src/mcp/runtime.rs` — `~/.local/bin/node` is a `find_node`
   home candidate.
 - Live vault skill
-  `/Users/dtc/Documents/Rhizome Vault/.prime/agent/skills/rhizome-vault/SKILL.md`
+  `~/Documents/Rhizome Vault/.prime/agent/skills/rhizome-vault/SKILL.md`
   reseeded from this source. Mode **444** so the packaged app's old seed
   cannot overwrite it on `ensure_host_for_cwd`. After a rebuild:
   `chmod u+w` that file.
 
 This machine's skill currently points `node` at
-`/Users/dtc/.local/bin/node` and `cli-call.mjs` at the repo resource
+`~/.local/bin/node` and `cli-call.mjs` at the repo resource
 copy (the cargo test seeder, not `/Applications`). Graph sidecar is
 still the packaged `rhizome-tool`.
 

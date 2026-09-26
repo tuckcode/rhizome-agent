@@ -12,7 +12,7 @@ commits: pending
 
 **Origin:** Grok 4.6 · 2026-09-12 · isolated worktree `rhizome-agent-pr-60`
 
-Worked only in `/Users/dtc/code/projects/rhizome-agent-pr-60`. Did not touch
+Worked only in `~/code/projects/rhizome-agent-pr-60`. Did not touch
 the main tree's uncommitted UX polish.
 
 ## Conflicts

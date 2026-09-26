@@ -27,7 +27,7 @@ launch, ~0.8s apart:
 
 ```
 2026-08-21T16:36:53.561Z  .../demo-vault-v2
-2026-08-21T16:36:54.357Z  /Users/dtc/Documents/Rhizome Vault
+2026-08-21T16:36:54.357Z  ~/Documents/Rhizome Vault
 ```
 
 The app opens with a default vault and then switches to the real one.

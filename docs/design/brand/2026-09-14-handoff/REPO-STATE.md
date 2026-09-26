@@ -1,7 +1,7 @@
 # Repository state and evidence boundary
 
 **Observed:** September 14, 2026, approximately 11:40 CT.
-**Repository:** `/Users/dtc/code/projects/rhizome-agent`.
+**Repository:** `~/code/projects/rhizome-agent`.
 **HEAD at observation:** `4416411`.
 Cursor was actively editing source and documentation. This is a moving snapshot.
 

@@ -1,7 +1,7 @@
 # Cursor: Rhizome design implementation handoff
 
 **Origin:** Astra / Codex, September 14, 2026, approximately 11:43 CT.
-**Project:** `/Users/dtc/code/projects/rhizome-agent` — private `tuckcode/rhizome-agent`.
+**Project:** `~/code/projects/rhizome-agent` — private `tuckcode/rhizome-agent`.
 **Roles:** Astra plans and designs only. Cursor owns all further implementation, testing, commits, and delivery.
 
 Atticus requested this package for the remaining five-hour Cursor usage window. Start now within your existing work.

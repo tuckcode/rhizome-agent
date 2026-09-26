@@ -43,10 +43,10 @@ Honest count: God plan + docs + issue closes + W7 harden are **committed locally
 
 **God plan arrived.** Source of truth (BOARD untouched):
 
-1. `/Users/dtc/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/ASTRA_GOD_PLAN.md`
-2. `/Users/dtc/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/s-plans/README.md`
+1. `~/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/ASTRA_GOD_PLAN.md`
+2. `~/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/s-plans/README.md`
 
-Project: `/Users/dtc/code/projects/rhizome-agent`
+Project: `~/code/projects/rhizome-agent`
 
 **Priority:** W7 HOME-vault / MCP, then W4 Chat reliability. Broader ENV/key audit is reserve. Morning = integration + native evidence. Do not declare daily-driver ready without native checks. Do not rebuild `/Applications` unless Atticus will launch.
 
@@ -124,7 +124,7 @@ W2 close-on-live-check (`main` `5c629a0`). No re-implement. No commit. No merge 
 
 ## Prime Agent
 
-**Project:** `/Users/dtc/code/projects/rhizome-agent`
+**Project:** `~/code/projects/rhizome-agent`
 
 **Assumption:** `import_jsonl` route stays Atticus-blocked. Default on paper = route 1 (`new_session` + import). Did **not** code list rows.
 
@@ -160,7 +160,7 @@ W2 close-on-live-check (`main` `5c629a0`). No re-implement. No commit. No merge 
 
 ## Security
 
-**Project:** `/Users/dtc/code/projects/rhizome-agent`  
+**Project:** `~/code/projects/rhizome-agent`  
 **Issue:** [#46](https://github.com/tuckcode/rhizome-agent/issues/46) HOME-vault / MCP scope.
 
 **Grok judgment:** the dangerous path is **already guarded on main** (`e90e37c`, 2026-08-27). `looks_like_vault` / `is_home_directory` refuse `$HOME`. `preflight.rs` only **reads** Prime `auth.json`. This machine has no leftover `~/.prime/agent/skills/rhizome-vault` and no `mcpServers.rhizome` in global settings. Tonight’s W7 harden is committed locally **`4416411`** (not pushed) — defense in depth, not the first fix.

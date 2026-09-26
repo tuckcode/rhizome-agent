@@ -1,7 +1,7 @@
 # Astra handoff — integrated into the five-hour burn
 
 **Origin:** Cursor Grok 4.6 · 2026-09-14 · D0.
-**Source zip:** `/Users/dtc/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/rhizome-design-cursor-handoff.zip`
+**Source zip:** `~/Documents/Codex/2026-09-13/you-are-astra-write-the-god/outputs/rhizome-design-cursor-handoff.zip`
 
 This folder is Astra’s planning/design pack **as received**. Cursor implements.
 It does **not** replace `docs/plans/s-plans/2026-09-14-five-hour-burn.md`.

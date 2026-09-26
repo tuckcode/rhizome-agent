@@ -13,7 +13,7 @@ or *where it lands* (`2026-08-10-destination-model-peer-research.md`).
 Sources fetched 2026-08-13. Primary (repo source, PR bodies, shipped code)
 preferred throughout; anything inferred is marked. Prime Agent findings are read
 from the installed `prime-agent@0.7.1` at
-`/Users/dtc/.local/lib/node_modules/prime-agent`.
+`~/.local/lib/node_modules/prime-agent`.
 
 ---
 
@@ -732,11 +732,11 @@ available here.
 - Empty-block / runaway-block failure modes: secondary write-ups only, **unverified** against Letta's issue tracker
 
 **Prime Agent** (installed `prime-agent@0.7.1`, read 2026-08-13)
-- `/Users/dtc/.local/lib/node_modules/prime-agent/dist/core/refinement/refinement.js`
-- `/Users/dtc/.local/lib/node_modules/prime-agent/dist/core/agent-session.js`
-- `/Users/dtc/.local/lib/node_modules/prime-agent/dist/core/settings-manager.js:538` — `turnInterval: 25`, `cooldownMs: 20 * 60_000`, `enabled: true`
-- `/Users/dtc/.local/lib/node_modules/prime-agent/skills/refine/SKILL.md`
-- `/Users/dtc/.local/lib/node_modules/prime-agent/docs/usage.md`
+- `~/.local/lib/node_modules/prime-agent/dist/core/refinement/refinement.js`
+- `~/.local/lib/node_modules/prime-agent/dist/core/agent-session.js`
+- `~/.local/lib/node_modules/prime-agent/dist/core/settings-manager.js:538` — `turnInterval: 25`, `cooldownMs: 20 * 60_000`, `enabled: true`
+- `~/.local/lib/node_modules/prime-agent/skills/refine/SKILL.md`
+- `~/.local/lib/node_modules/prime-agent/docs/usage.md`
 
 **Decay / forgetting (research, secondary)**
 - <https://arxiv.org/pdf/2602.06052> — Rethinking Memory Mechanisms of Foundation Agents (survey)

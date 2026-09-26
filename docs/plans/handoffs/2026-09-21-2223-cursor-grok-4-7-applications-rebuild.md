@@ -26,7 +26,7 @@ Recoverable prior app: `~/Library/Application Support/rhizome-agent-rebuild/Rhiz
 ## Environment
 
 - macOS 27.2 (26B5086k), arm64.
-- Prime **0.9.3** at `/Users/dtc/.local/bin/prime-agent`.
+- Prime **0.9.3** at `~/.local/bin/prime-agent`.
 - GitHub latest release for `PrimeIntellect-ai/prime-agent` is **v0.9.5** (published 2026-09-16). An offer is expected. The apply check is not blocked on a missing release.
 
 ## Build
