@@ -3862,6 +3862,70 @@ fn spawn_daemon_reader(
     Ok(())
 }
 
+/// Prefix Chat looks for when a session worker dies at launch (C53).
+///
+/// The daemon's own connect probe waits `DAEMON_RESPONSE_TIMEOUT` (30s) and
+/// then reports a generic timeout. A spawn failure (`EPERM`, `uv_cwd`, or
+/// the process exiting) is known before that wait finishes when the
+/// supervisor writes it on the socket. Callers must surface it immediately.
+const WORKER_FAILED_PREFIX: &str = "worker-failed: ";
+
+fn worker_start_failure_message(text: &str) -> Option<String> {
+    let lower = text.to_ascii_lowercase();
+    let eperm = lower.contains("eperm");
+    let uv_cwd = lower.contains("uv_cwd");
+    let spawn_failed = lower.contains("failed to spawn session worker")
+        || (eperm && (lower.contains("spawn") || lower.contains("worker") || uv_cwd || lower.contains("cwd")));
+    let process_exit = lower.contains("process exit")
+        || (lower.contains("session worker")
+            && (lower.contains("exited") || lower.contains("exit code")));
+    if !(uv_cwd || spawn_failed || process_exit) {
+        return None;
+    }
+    let mut parts = Vec::new();
+    if process_exit && !eperm && !uv_cwd {
+        parts.push("process exit");
+    }
+    if eperm {
+        parts.push("EPERM");
+    }
+    if uv_cwd {
+        parts.push("uv_cwd");
+    }
+    if parts.is_empty() {
+        parts.push("spawn failed");
+    }
+    Some(format!("{WORKER_FAILED_PREFIX}{}", parts.join(" ")))
+}
+
+fn response_worker_failure(json: &serde_json::Value) -> Option<String> {
+    if json["success"].as_bool() == Some(true) {
+        return None;
+    }
+    json["error"].as_str().and_then(worker_start_failure_message)
+}
+
+fn fail_pending_with_worker_failure(
+    pending: &Mutex<HashMap<String, PendingResponse>>,
+    message: &str,
+) {
+    let Ok(mut map) = pending.lock() else {
+        return;
+    };
+    let ids: Vec<String> = map.keys().cloned().collect();
+    for id in ids {
+        let Some(entry) = map.remove(&id) else {
+            continue;
+        };
+        let _ = entry.tx.send(serde_json::json!({
+            "type": "response",
+            "id": id,
+            "success": false,
+            "error": message,
+        }));
+    }
+}
+
 /// Route one line from the daemon: responses to their caller, everything else
 /// onto the event stream.
 ///
@@ -3869,13 +3933,25 @@ fn spawn_daemon_reader(
 /// with the daemon's own sequencing metadata alongside. The inner object is
 /// byte-identical to what RPC mode emitted, so unwrapping exactly one layer
 /// here is what lets `prime_events` stay untouched by the transport swap.
+///
+/// A worker that dies at launch used to leave the matching command parked
+/// until `DAEMON_RESPONSE_TIMEOUT`. A diagnostic line (or a failure response)
+/// that names that death completes the wait immediately.
 fn route_daemon_line(
     json: serde_json::Value,
     pending: &Mutex<HashMap<String, PendingResponse>>,
     event_tx: &Sender<OutboundLine>,
 ) {
-    let is_response = json["type"].as_str() == Some("response");
-    if is_response {
+    let mut json = json;
+    if json["type"].as_str() == Some("response") {
+        if let Some(message) = response_worker_failure(&json) {
+            if let Some(object) = json.as_object_mut() {
+                object.insert(
+                    "error".into(),
+                    serde_json::Value::String(message),
+                );
+            }
+        }
         if let Some(id) = json["id"].as_str() {
             if let Ok(mut map) = pending.lock() {
                 if let Some(entry) = map.remove(id) {
@@ -3885,6 +3961,10 @@ fn route_daemon_line(
             }
         }
         // Unsolicited response — still forward so it isn't lost.
+    } else if json["type"].as_str() != Some("session_event") {
+        if let Some(message) = worker_start_failure_message(&json.to_string()) {
+            fail_pending_with_worker_failure(pending, &message);
+        }
     }
 
     if json["type"].as_str() == Some("session_event") {
@@ -6922,6 +7002,61 @@ mod tests {
             }
         );
         assert_eq!(clear_queue().unwrap(), PrimeQueue::default());
+
+        let _ = shutdown_host();
+    }
+
+    #[test]
+    fn worker_start_failure_message_names_eperm_uv_cwd_and_process_exit() {
+        assert_eq!(
+            worker_start_failure_message("spawn EPERM").as_deref(),
+            Some("worker-failed: EPERM")
+        );
+        assert_eq!(
+            worker_start_failure_message("Error: EPERM: uv_cwd").as_deref(),
+            Some("worker-failed: EPERM uv_cwd")
+        );
+        assert_eq!(
+            worker_start_failure_message("Session worker process exit").as_deref(),
+            Some("worker-failed: process exit")
+        );
+        assert_eq!(worker_start_failure_message("ordinary refusal"), None);
+    }
+
+    /// A worker that dies at launch must not sit on `DAEMON_RESPONSE_TIMEOUT`.
+    ///
+    /// The fake daemon never answers `create`. It only emits the diagnostic
+    /// the supervisor logs when the child exits (`EPERM` / `uv_cwd` / process
+    /// exit). Before this, `send_bare_command` waited the full 30s.
+    #[cfg(unix)]
+    #[test]
+    fn worker_start_failure_returns_without_waiting_for_the_daemon_timeout() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, _id| {
+            (command["type"].as_str() == Some("create")).then(|| {
+                vec![serde_json::json!({
+                    "type": "daemon_notice",
+                    "message": "Session worker process exit: spawn EPERM uv_cwd",
+                })]
+            })
+        });
+        daemon.install();
+        let started = Instant::now();
+        let error = connect_host(vault.path()).expect_err("a dead worker is not a session");
+        let elapsed = started.elapsed();
+        assert!(
+            elapsed < Duration::from_secs(5),
+            "worker start failure waited {elapsed:?}"
+        );
+        assert!(
+            error.starts_with("worker-failed: "),
+            "{error}"
+        );
+        assert!(
+            !error.contains("timed out"),
+            "the 30s timeout must not hide the worker failure: {error}"
+        );
 
         let _ = shutdown_host();
     }
