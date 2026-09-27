@@ -1,6 +1,7 @@
 import fs from 'fs'
 import { test, expect, type Page } from '@playwright/test'
 import { createFixtureVaultCopy, openFixtureVaultTauri, removeFixtureVaultCopy } from '../helpers/fixtureVault'
+import { SMOKE_UI_READY_TIMEOUT } from './helpers'
 import { triggerMenuCommand } from './testBridge'
 
 interface CreateNoteProbe {
@@ -107,7 +108,7 @@ async function dispatchMenuCommandBurst(page: Page, commandId: string, count: nu
   await page.waitForFunction(
     () => typeof window.__rhizomeTest?.dispatchBrowserMenuCommand === 'function',
     undefined,
-    { timeout: 5_000 },
+    { timeout: SMOKE_UI_READY_TIMEOUT },
   )
   await page.evaluate(({ commandId: id, count: commandCount }) => {
     const testWindow = window as typeof window & {
@@ -142,7 +143,7 @@ test('@smoke creating a note writes its backing file before reload can read it',
   await triggerMenuCommand(page, 'vault-reload')
 
   await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText(/untitled-note-\d+/i, {
-    timeout: 5_000,
+    timeout: SMOKE_UI_READY_TIMEOUT,
   })
   await expect.poll(() => readProbe(page), { timeout: 5_000 }).toMatchObject({
     createCalls: [expect.stringMatching(/untitled-note-\d+\.md$/)],

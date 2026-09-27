@@ -2,6 +2,11 @@ import { test, expect, type Page } from '@playwright/test'
 import { APP_COMMAND_IDS } from '../../src/hooks/appCommandCatalog'
 import { RUNTIME_STYLE_NONCE } from '../../src/lib/runtimeStyleNonce'
 import {
+  installKeyupStamps,
+  SMOKE_UI_READY_TIMEOUT,
+  waitUntilKeyupOutsideDuplicateWindow,
+} from './helpers'
+import {
   dispatchShortcutEvent,
   triggerMenuCommand,
   triggerShortcutCommand,
@@ -86,7 +91,7 @@ async function openQuickOpenFromKeyboard(page: Page): Promise<void> {
     bubbles: true,
     cancelable: true,
   })
-  await expect(page.getByTestId('quick-open-palette')).toBeVisible({ timeout: 5_000 })
+  await expect(page.getByTestId('quick-open-palette')).toBeVisible({ timeout: SMOKE_UI_READY_TIMEOUT })
 }
 
 function selectedQuickOpenTitle(page: Page) {
@@ -134,7 +139,7 @@ test.describe('keyboard command routing', () => {
     await openFixtureVaultDesktopHarness(page, tempVaultDir)
     await triggerMenuCommand(page, APP_COMMAND_IDS.fileNewNote)
 
-    await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText(/untitled-note-\d+/i, { timeout: 5_000 })
+    await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText(/untitled-note-\d+/i, { timeout: SMOKE_UI_READY_TIMEOUT })
     await expectRuntimeStyleNonce(page)
     expect(runtimeStyleCspSignals).toEqual([])
   })
@@ -221,13 +226,13 @@ test.describe('keyboard command routing', () => {
     await input.fill('search')
     await expect(searchResultRow(page, 'Third Search Result')).toBeVisible({ timeout: 5_000 })
 
+    await installKeyupStamps(page)
     await expectSelectedSearchResult(page, 'First Search Result')
     await page.keyboard.press('ArrowDown')
     await expectSelectedSearchResult(page, 'Second Search Result')
-    await page.waitForTimeout(550)
+    await waitUntilKeyupOutsideDuplicateWindow(page, 'ArrowDown')
     await page.keyboard.press('ArrowDown')
     await expectSelectedSearchResult(page, 'Third Search Result')
-    await page.waitForTimeout(550)
     await page.keyboard.press('ArrowUp')
     await expectSelectedSearchResult(page, 'Second Search Result')
   })

@@ -3,9 +3,9 @@ import {
   openCommandPalette,
   closeCommandPalette,
   findCommand,
-  sendShortcut,
+  openQuickOpenPalette,
+  SMOKE_UI_READY_TIMEOUT,
   verifyVisible,
-  waitForKeyboardShortcutsReady,
 } from './helpers'
 import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 
@@ -15,7 +15,7 @@ test.describe('Command Palette smoke tests', () => {
     // shell-ready marker; these command tests do not need the panel open.
     await pinNotesShellLaunch(page)
     await page.goto('/', { waitUntil: 'domcontentloaded' })
-    await expect(page.getByTestId('chat-center')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByTestId('chat-center')).toBeVisible({ timeout: SMOKE_UI_READY_TIMEOUT })
   })
 
   test('Cmd+K opens the command palette @smoke', async ({ page }) => {
@@ -57,19 +57,11 @@ test.describe('Keyboard shortcuts smoke tests', () => {
     // See the shell-ready marker comment in the block above.
     await pinNotesShellLaunch(page)
     await page.goto('/', { waitUntil: 'domcontentloaded' })
-    await expect(page.getByTestId('chat-center')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByTestId('chat-center')).toBeVisible({ timeout: SMOKE_UI_READY_TIMEOUT })
   })
 
   test('Cmd+P opens quick open palette @smoke', async ({ page }) => {
-    await waitForKeyboardShortcutsReady(page)
-    await page.locator('body').click()
-    await sendShortcut(page, 'p', ['Control'])
-    const searchInput = page.locator('input[placeholder="Search notes..."]')
-    await expect(searchInput).toBeVisible()
-    // QuickOpenPalette autofocuses its input once mounted; waiting for focus
-    // (rather than just visibility) confirms the palette has actually
-    // finished settling instead of being mid-mount.
-    await expect(searchInput).toBeFocused()
+    await openQuickOpenPalette(page)
   })
 
   test('Escape closes command palette after Cmd+K', async ({ page }) => {

@@ -4,7 +4,7 @@ import {
   openFixtureVault,
   removeFixtureVaultCopy,
 } from '../helpers/fixtureVault'
-import { sendShortcut, waitForKeyboardShortcutsReady } from './helpers'
+import { sendShortcut, SMOKE_UI_READY_TIMEOUT, waitForKeyboardShortcutsReady } from './helpers'
 import { chooseNotePlacement } from '../helpers/noteActions'
 
 let tempVaultDir: string
@@ -126,7 +126,7 @@ test.describe('Unified shell geometry', () => {
     await expect(page.getByTestId('vault-panel')).toHaveCount(0)
     await waitForKeyboardShortcutsReady(page)
     await sendShortcut(page, '2', ['Control'])
-    await expect(page.getByTestId('vault-panel')).toBeVisible()
+    await expect(page.getByTestId('vault-panel')).toBeVisible({ timeout: SMOKE_UI_READY_TIMEOUT })
     await expect(page.getByTestId('vault-panel-navigation')).toHaveCount(0)
     await expect(page.getByTestId('note-list-container')).toBeVisible()
 

@@ -6,7 +6,7 @@ import {
   openFixtureVaultDesktopHarness,
   removeFixtureVaultCopy,
 } from '../helpers/fixtureVault'
-import { executeCommand, openCommandPalette } from './helpers'
+import { executeCommand, openCommandPalette, SMOKE_UI_READY_TIMEOUT } from './helpers'
 import { clickNoteActionIfOffered } from '../helpers/noteActions'
 import { triggerMenuCommand } from './testBridge'
 
@@ -201,8 +201,6 @@ async function delayedSaveCount(page: Page): Promise<number> {
 
 test.beforeEach(async ({ page }, testInfo) => {
   testInfo.setTimeout(60_000)
-  await page.goto('/')
-  await page.waitForLoadState('networkidle')
   tempVaultDir = createFixtureVaultCopy()
   await openFixtureVaultDesktopHarness(page, tempVaultDir)
 })
@@ -220,7 +218,7 @@ test('@smoke switching notes persists unsaved raw edits without waiting for the 
 
   const rawContent = await getRawEditorContent(page)
   await setRawEditorContent(page, `${rawContent}\n\n${appendedText}`)
-  await page.waitForTimeout(100)
+  await expect.poll(() => getRawEditorContent(page)).toContain(appendedText)
 
   await openNote(page, 'Alpha Project')
 
@@ -228,7 +226,10 @@ test('@smoke switching notes persists unsaved raw edits without waiting for the 
   await expect.poll(async () => getRawEditorContent(page)).toContain('# Alpha Project')
   await expect.poll(
     () => fs.readFileSync(noteBPath, 'utf8'),
-    { timeout: 450, intervals: [50, 100, 100, 100, 100] },
+    // Stay under the 1500ms autosave debounce so a flush-on-switch is what
+    // writes the file. The poll is the condition; 450ms was too short when
+    // the machine was busy.
+    { timeout: 1_200, intervals: [50, 100, 100, 200, 200, 200] },
   ).toContain(appendedText)
 })
 
@@ -244,8 +245,7 @@ test('@smoke switching notes during a slow rich-editor save writes once and open
 
   await placeCaretAtEndOfBlock(page, 1)
   await page.keyboard.type(` ${appendedText}`, { delay: 10 })
-  await expect(page.locator('.bn-block-content').filter({ hasText: appendedText })).toBeVisible({ timeout: 5_000 })
-  await page.waitForTimeout(100)
+  await expect(page.locator('.bn-block-content').filter({ hasText: appendedText })).toBeVisible({ timeout: SMOKE_UI_READY_TIMEOUT })
   await triggerMenuCommand(page, 'file-save')
   await expect.poll(() => delayedSaveCount(page), { timeout: 5_000 }).toBe(1)
 

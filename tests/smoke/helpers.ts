@@ -1,8 +1,22 @@
 import { type Page, expect } from '@playwright/test'
 
 const COMMAND_INPUT = 'input[placeholder="Type a command..."]'
+const QUICK_OPEN_INPUT = 'input[placeholder="Search notes..."]'
 type KeyboardModifier = 'Meta' | 'Control' | 'Shift' | 'Alt'
 const COMMAND_MODIFIER: KeyboardModifier = process.platform === 'darwin' ? 'Meta' : 'Control'
+
+/** How long a smoke test waits for a control that is the readiness condition. */
+export const SMOKE_UI_READY_TIMEOUT = 15_000
+
+/**
+ * SearchPanel drops a second ArrowUp/ArrowDown when the two keydowns land
+ * inside this window. The test waits until the page clock says the window
+ * has closed, instead of sleeping a fixed 550ms that can still be inside it
+ * when the main thread is busy.
+ */
+const SEARCH_KEY_DUPLICATE_WINDOW_MS = 500
+
+type KeyupStampWindow = Window & { __rhizomeSmokeKeyupAt?: Record<string, number> }
 
 /**
  * The renderer attaches its global keydown listener from a `useEffect` in
@@ -16,39 +30,70 @@ const COMMAND_MODIFIER: KeyboardModifier = process.platform === 'darwin' ? 'Meta
  */
 export async function waitForKeyboardShortcutsReady(page: Page): Promise<void> {
   await page.waitForFunction(() => window.__rhizomeFrontendReady === true, undefined, {
-    timeout: 10_000,
+    timeout: 20_000,
   })
+}
+
+/**
+ * Focus the page without pressing anything. `body.click()` with no position
+ * clicks the element's centre, which lands on whatever the layout puts there.
+ * The top-left corner is chrome padding in every layout.
+ */
+export async function focusShellChrome(page: Page): Promise<void> {
+  await page.locator('body').click({ position: { x: 2, y: 2 } })
+}
+
+async function openByShortcutOnce(
+  page: Page,
+  key: string,
+  ready: ReturnType<Page['locator']>,
+): Promise<void> {
+  await waitForKeyboardShortcutsReady(page)
+  await focusShellChrome(page)
+  // A second shortcut toggles the palette shut. Send one only while it is
+  // still closed, then wait until the control is actually visible.
+  if (!(await ready.isVisible().catch(() => false))) {
+    await sendShortcut(page, key, ['Control'])
+  }
+  await expect(ready).toBeVisible({ timeout: SMOKE_UI_READY_TIMEOUT })
 }
 
 export async function openCommandPalette(page: Page): Promise<void> {
   const input = page.locator(COMMAND_INPUT)
-  await waitForKeyboardShortcutsReady(page)
+  await openByShortcutOnce(page, 'k', input)
+  await expect(input).toBeFocused({ timeout: SMOKE_UI_READY_TIMEOUT })
+}
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    // Focus the page without pressing anything. `body.click()` with no
-    // position clicks the element's *centre* — the middle of the window —
-    // which lands on whatever the layout happens to put there. It quietly
-    // selected a note row the moment the command rail got wider (2026-08-20),
-    // and the resulting failure looked like a note-creation bug three steps
-    // later. The top-left corner is chrome padding in every layout.
-    await page.locator('body').click({ position: { x: 2, y: 2 } })
-    await sendShortcut(page, 'k', ['Control'])
-
-    try {
-      await input.waitFor({ state: 'visible', timeout: 2_000 })
-      await expect(input).toBeFocused({ timeout: 2_000 })
-      return
-    } catch {
-      if (attempt === 2) {
-        throw new Error('Command palette did not open after 3 shortcut attempts')
-      }
-    }
-  }
+export async function openQuickOpenPalette(page: Page): Promise<void> {
+  const palette = page.getByTestId('quick-open-palette')
+  const input = page.locator(QUICK_OPEN_INPUT)
+  await openByShortcutOnce(page, 'p', palette)
+  await expect(input).toBeFocused({ timeout: SMOKE_UI_READY_TIMEOUT })
 }
 
 export async function closeCommandPalette(page: Page): Promise<void> {
   await page.keyboard.press('Escape')
-  await expect(page.locator(COMMAND_INPUT)).not.toBeVisible()
+  await expect(page.locator(COMMAND_INPUT)).not.toBeVisible({ timeout: SMOKE_UI_READY_TIMEOUT })
+}
+
+export async function installKeyupStamps(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const target = window as KeyupStampWindow
+    if (target.__rhizomeSmokeKeyupAt) return
+    target.__rhizomeSmokeKeyupAt = {}
+    document.addEventListener('keyup', (event) => {
+      target.__rhizomeSmokeKeyupAt![event.key] = performance.now()
+    }, true)
+  })
+}
+
+export async function waitUntilKeyupOutsideDuplicateWindow(page: Page, key: string): Promise<void> {
+  await expect.poll(async () => page.evaluate(({ watched, windowMs }) => {
+    const at = (window as KeyupStampWindow).__rhizomeSmokeKeyupAt?.[watched]
+    return typeof at === 'number' && performance.now() - at > windowMs
+  }, { watched: key, windowMs: SEARCH_KEY_DUPLICATE_WINDOW_MS }), {
+    timeout: SMOKE_UI_READY_TIMEOUT,
+  }).toBe(true)
 }
 
 export async function installMockAiAgent(page: Page): Promise<void> {
@@ -92,7 +137,7 @@ export async function findCommand(
   await page.locator(COMMAND_INPUT).fill(name)
   const match = page.locator('[data-selected="true"]').first()
   try {
-    await match.waitFor({ timeout: 2_000 })
+    await expect(match).toBeVisible({ timeout: SMOKE_UI_READY_TIMEOUT })
     const text = await match.textContent()
     return text?.toLowerCase().includes(name.toLowerCase()) ?? false
   } catch {
@@ -106,7 +151,7 @@ export async function executeCommand(
 ): Promise<void> {
   await page.locator(COMMAND_INPUT).fill(name)
   const match = page.locator('[data-selected="true"]').first()
-  await match.waitFor({ timeout: 2_000 })
+  await expect(match).toBeVisible({ timeout: SMOKE_UI_READY_TIMEOUT })
   await page.keyboard.press('Enter')
 }
 

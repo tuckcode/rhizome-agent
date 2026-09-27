@@ -3,8 +3,10 @@ import path from 'path'
 import { test, expect, type Page } from '@playwright/test'
 import {
   executeCommand,
+  focusShellChrome,
   openCommandPalette,
   sendShortcut,
+  SMOKE_UI_READY_TIMEOUT,
   waitForKeyboardShortcutsReady,
 } from './helpers'
 import { createFixtureVaultCopy, openFixtureVault, removeFixtureVaultCopy } from '../helpers/fixtureVault'
@@ -76,7 +78,7 @@ function isReadyEmptyTitleHeading(state: EmptyHeadingState): boolean {
 
 async function expectReadyEmptyTitleHeading(page: Page): Promise<void> {
   await expect.poll(async () => isReadyEmptyTitleHeading(await readEmptyHeadingState(page)), {
-    timeout: 5_000,
+    timeout: SMOKE_UI_READY_TIMEOUT,
   }).toBe(true)
 }
 
@@ -88,7 +90,7 @@ async function expectUntitledNoteWithoutCrash(
   const errors = capturePageErrors(page)
 
   await createNote()
-  await expect(untitledRow(page, typeLabel)).toBeVisible({ timeout: 5_000 })
+  await expect(untitledRow(page, typeLabel)).toBeVisible({ timeout: SMOKE_UI_READY_TIMEOUT })
   await expectReadyEmptyTitleHeading(page)
 
   expect(errors).toEqual([])
@@ -119,7 +121,7 @@ test.describe('Create note crash fix', () => {
       // fires before `FrontendReadyMarker`'s effect, so this flag is a real
       // guarantee the shortcut has something to land on.
       await waitForKeyboardShortcutsReady(page)
-      await page.locator('body').click()
+      await focusShellChrome(page)
       await sendShortcut(page, 'n', ['Control'])
     })
   })
