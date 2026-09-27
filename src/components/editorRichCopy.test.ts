@@ -1,4 +1,7 @@
 import { BlockNoteEditor } from '@blocknote/core'
+import { BlockNoteViewRaw } from '@blocknote/react'
+import { render } from '@testing-library/react'
+import { createElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { schema } from './editorSchema'
 import {
@@ -48,8 +51,6 @@ function createMountedEditor() {
 
 describe('richEditorClipboardPayload', () => {
   it('keeps single and multi wikilink targets in copied markdown', () => {
-    const mount = globalThis.document.createElement('div')
-    globalThis.document.body.appendChild(mount)
     const editor = BlockNoteEditor.create({
       schema,
       initialContent: [{
@@ -62,7 +63,9 @@ describe('richEditorClipboardPayload', () => {
         ],
       }],
     })
-    editor.mount(mount)
+    // BlockNote 0.55 renders React inline content (wikilinks) through the
+    // view's element renderer, so mount the editor the way the app does.
+    const view = render(createElement(BlockNoteViewRaw, { editor }))
 
     try {
       editor._tiptapEditor.commands.selectAll()
@@ -72,8 +75,7 @@ describe('richEditorClipboardPayload', () => {
       expect(payload?.markdown).toContain('[[Project Alpha]]')
       expect(payload?.markdown).toContain('[[team/Beta|Beta Team]]')
     } finally {
-      editor.unmount()
-      mount.remove()
+      view.unmount()
     }
   })
 

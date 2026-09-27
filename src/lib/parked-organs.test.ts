@@ -48,14 +48,13 @@ describe('parked organs leftover', () => {
     expect(settings).not.toMatch(/agentProfile|agent_profile|C66/)
   })
 
-  it('does not bump Tiptap or Medium deps this window', () => {
+  it('keeps the Dependabot pins and the BlockNote 0.55 Tiptap line', () => {
     const pkg = readFileSync(`${process.cwd()}/package.json`, 'utf8')
     const workspace = readFileSync(`${process.cwd()}/pnpm-workspace.yaml`, 'utf8')
-    expect(pkg).toContain('"@tiptap/pm": "3.22.5"')
-    expect(workspace).toContain("'@tiptap/extension-link@3.19.0'")
+    expect(pkg).toContain('"@tiptap/pm": "3.31.3"')
+    expect(pkg).toContain('"@blocknote/core": "^0.55.0"')
     expect(workspace).toContain('hono: 4.13.5')
     expect(workspace).toContain('qs: 6.16.0')
-    expect(workspace).not.toMatch(/@tiptap\/core.*3\.30/)
   })
 
   it('keeps list-import blocked until Atticus types 1', () => {
