@@ -517,10 +517,21 @@ export function trackPrimeModelAllowListChanged(selected: number, available: num
 }
 
 /**
- * The Free only catalog cut was toggled. On/off only — never model ids.
+ * The name filter (`-free` or `:free` in the model id) was toggled.
+ * On/off only. Never a price, a key, or a note.
+ *
+ * `trackEvent` accepts string or number, so the boolean is `yes` / `no`.
  */
 export function trackPrimeModelsFreeOnly(on: boolean): void {
   trackEvent('prime_models_free_only', { on: on ? 'yes' : 'no' })
+}
+
+/**
+ * The Settings default model was changed (#45).
+ * Model id only. Never a provider key, an API key, or note text.
+ */
+export function trackPrimeDefaultModelChanged(modelId: string): void {
+  trackEvent('prime_default_model_changed', { model_id: modelId })
 }
 
 /**

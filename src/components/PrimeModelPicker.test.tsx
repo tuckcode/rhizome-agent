@@ -423,6 +423,15 @@ describe('PrimeModelPicker — allow-list freshness (#45)', () => {
     expect(cmds().filter((cmd) => cmd === 'get_available_prime_models')).toHaveLength(1)
   })
 
+  it('labels the quick filter as a name match, not a price', async () => {
+    render(<PrimeModelPicker vaultPath="/v" />)
+    open()
+    const toggle = await screen.findByTestId('prime-models-free-only')
+    expect(toggle).toHaveAttribute('aria-label', expect.stringMatching(/name filter/i))
+    expect(toggle).toHaveAttribute('aria-label', expect.stringMatching(/not a price/i))
+    expect(toggle).toHaveAttribute('aria-label', expect.stringMatching(/-free/))
+  })
+
   it('hides paid models when Free only is on, and keeps the running model', async () => {
     invoked.models = [
       ...MODELS,
