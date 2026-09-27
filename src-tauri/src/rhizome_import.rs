@@ -255,6 +255,12 @@ pub fn write_imported_document(
     project: Option<&str>,
     last_updated: &str,
 ) -> Result<(String, PathBuf), String> {
+    if crate::rhizome_distill::is_junk_distill_title(&card.title) {
+        return Err(format!(
+            "refusing to import tooling/auth failure as a note: {}",
+            card.title
+        ));
+    }
     let slug = crate::rhizome_distill::slugify(&card.title);
     let (slug, path) =
         crate::rhizome_write_location::unique_slug_path(vault_path, ArtifactKind::Document, &slug);
@@ -545,6 +551,54 @@ mod tests {
         );
         let contents = std::fs::read_to_string(&path).unwrap();
         assert!(contents.contains("source: https://example.com/article"));
+    }
+
+    #[test]
+    fn write_imported_document_skips_a_junk_title_and_writes_a_good_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let junk = crate::rhizome_distill::ParsedCard {
+            title: "Not logged in · Please run /login".to_string(),
+            context: "An auth failure.".to_string(),
+            body: "This must not become a note.".to_string(),
+        };
+        let err = write_imported_document(
+            dir.path(),
+            &junk,
+            "https://example.com/article",
+            None,
+            "2026-07-09",
+        )
+        .expect_err("a junk title must not be written");
+        assert!(
+            err.contains("Not logged in · Please run /login"),
+            "got: {err}"
+        );
+        let junk_path = dir
+            .path()
+            .join("wiki/sources/documents/not-logged-in-please-run-login.md");
+        assert!(
+            !junk_path.exists(),
+            "junk title must not write a page at {}",
+            junk_path.display()
+        );
+
+        let good = crate::rhizome_distill::ParsedCard {
+            title: "Login flows in OAuth 2.1".to_string(),
+            context: "How sign-in works.".to_string(),
+            body: "The authorization code flow.".to_string(),
+        };
+        let (slug, path) = write_imported_document(
+            dir.path(),
+            &good,
+            "https://example.com/oauth",
+            None,
+            "2026-07-09",
+        )
+        .unwrap();
+        assert_eq!(slug, "login-flows-in-oauth-2-1");
+        let contents = std::fs::read_to_string(&path).unwrap();
+        assert!(contents.contains("title: Login flows in OAuth 2.1"));
+        assert!(contents.contains("The authorization code flow."));
     }
 
     #[test]
