@@ -3,6 +3,7 @@ import { useEditorTabSwap } from '../hooks/useEditorTabSwap'
 import { SyntaxHighlightingExtension } from '@blocknote/core'
 import { useCreateBlockNote } from '@blocknote/react'
 import { createTolariaSyntaxHighlighting } from './codeBlockOptions'
+import { RICH_EDITOR_LINK_OPTIONS } from './richEditorLinkOptions'
 import '@blocknote/mantine/style.css'
 import 'katex/dist/katex.min.css'
 import { uploadImageFile } from '../hooks/useImageDrop'
@@ -254,6 +255,7 @@ function useEditorSetup({
     domAttributes: RICH_EDITOR_BIDI_DOM_ATTRIBUTES,
     uploadFile: (file: File) => uploadImageFile(file, vaultPathRef.current),
     pasteHandler: handleRichEditorPaste,
+    links: RICH_EDITOR_LINK_OPTIONS,
     _tiptapOptions: { injectNonce: RUNTIME_STYLE_NONCE },
     extensions: [
       createRichEditorTransformErrorRecoveryExtension(),
