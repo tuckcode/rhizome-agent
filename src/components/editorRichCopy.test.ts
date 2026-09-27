@@ -65,7 +65,7 @@ describe('richEditorClipboardPayload', () => {
     })
     // BlockNote 0.55 renders React inline content (wikilinks) through the
     // view's element renderer, so mount the editor the way the app does.
-    const view = render(createElement(BlockNoteViewRaw, { editor }))
+    const view = render(createElement(BlockNoteViewRaw, { editor: editor as never }))
 
     try {
       editor._tiptapEditor.commands.selectAll()
