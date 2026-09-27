@@ -71,7 +71,7 @@ describe('mockHandlers additional coverage', () => {
       failed_updates: 0,
     })
 
-    const content = mockHandlers.get_all_content() as Record<string, string>
+    const content = mockHandlers.get_all_content(undefined) as Record<string, string>
     expect(content[`${vaultPath}/weekly-notes.md`]).toBe('# Meeting Notes')
     expect(content[backlinkPath]).toBe('Links: [[weekly-notes]] and [[Meeting Notes|alias]].')
   })
@@ -102,7 +102,7 @@ describe('mockHandlers additional coverage', () => {
       failed_updates: 0,
     })
 
-    const content = mockHandlers.get_all_content() as Record<string, string>
+    const content = mockHandlers.get_all_content(undefined) as Record<string, string>
     expect(content[`${destinationVaultPath}/areas/weekly-review.md`]).toBe('# Weekly Review')
     expect(content[backlinkPath]).toBe('Links: [[areas/weekly-review]] and [[Weekly Review|alias]].')
   })
@@ -163,31 +163,31 @@ describe('mockHandlers additional coverage', () => {
   it('persists last-vault state, reports vault existence, and restores AI guidance state', async () => {
     const { mockHandlers } = await loadHandlers()
 
-    expect(mockHandlers.get_last_vault_path()).toBe('/Users/mock/demo-vault-v2')
+    expect(mockHandlers.get_last_vault_path(undefined)).toBe('/Users/mock/demo-vault-v2')
     expect(mockHandlers.set_last_vault_path({ path: '/Users/mock/Documents/Work' })).toBeNull()
-    expect(mockHandlers.get_last_vault_path()).toBe('/Users/mock/Documents/Work')
+    expect(mockHandlers.get_last_vault_path(undefined)).toBe('/Users/mock/Documents/Work')
 
     expect(mockHandlers.check_vault_exists({ path: '/tmp/demo-vault-v2-copy' })).toBe(true)
     expect(mockHandlers.check_vault_exists({ path: '/tmp/random-vault' })).toBe(false)
 
-    expect(mockHandlers.get_vault_ai_guidance_status()).toEqual({
+    expect(mockHandlers.get_vault_ai_guidance_status(undefined)).toEqual({
       agents_state: 'managed',
       claude_state: 'managed',
       gemini_state: 'managed',
       can_restore: false,
     })
-    expect(mockHandlers.restore_vault_ai_guidance()).toEqual({
+    expect(mockHandlers.restore_vault_ai_guidance(undefined)).toEqual({
       agents_state: 'managed',
       claude_state: 'managed',
       gemini_state: 'managed',
       can_restore: false,
     })
-    expect(mockHandlers.repair_vault()).toBe('Vault repaired')
+    expect(mockHandlers.repair_vault(undefined)).toBe('Vault repaired')
   })
 
   it('persists theme mode through the mock settings backend', async () => {
     const { mockHandlers } = await loadHandlers()
-    const settings = mockHandlers.get_settings()
+    const settings = mockHandlers.get_settings(undefined)
 
     mockHandlers.save_settings({
       settings: {
@@ -196,7 +196,7 @@ describe('mockHandlers additional coverage', () => {
       },
     })
 
-    expect(mockHandlers.get_settings()).toEqual(expect.objectContaining({
+    expect(mockHandlers.get_settings(undefined)).toEqual(expect.objectContaining({
       theme_mode: 'dark',
     }))
   })
@@ -204,28 +204,28 @@ describe('mockHandlers additional coverage', () => {
   it('surfaces the simple command handlers for git, conflicts, trash, and telemetry', async () => {
     const { mockHandlers } = await loadHandlers()
 
-    expect(mockHandlers.git_pull()).toEqual({
+    expect(mockHandlers.git_pull(undefined)).toEqual({
       status: 'up_to_date',
       message: 'Already up to date',
       updatedFiles: [],
       conflictFiles: [],
     })
-    expect(mockHandlers.git_push()).toEqual({
+    expect(mockHandlers.git_push(undefined)).toEqual({
       status: 'ok',
       message: 'Pushed to remote',
     })
-    expect(mockHandlers.get_conflict_files()).toEqual([])
-    expect(mockHandlers.purge_trash()).toEqual([])
-    expect(mockHandlers.empty_trash()).toEqual([])
+    expect(mockHandlers.get_conflict_files(undefined)).toEqual([])
+    expect(mockHandlers.purge_trash(undefined)).toEqual([])
+    expect(mockHandlers.empty_trash(undefined)).toEqual([])
     expect(mockHandlers.delete_note({ path: '/vault/trash/me.md' })).toBe('/vault/trash/me.md')
     expect(mockHandlers.batch_delete_notes({ paths: ['/a.md', '/b.md'] })).toEqual(['/a.md', '/b.md'])
     expect(mockHandlers.batch_trash_notes({ paths: ['/a.md', '/b.md'] })).toBe(2)
-    expect(mockHandlers.register_mcp_tools()).toBe('registered')
-    expect(mockHandlers.check_mcp_status()).toBe('installed')
-    expect(mockHandlers.copy_text_to_clipboard()).toBeNull()
-    expect(mockHandlers.read_text_from_clipboard()).toBe('')
-    expect(mockHandlers.reinit_telemetry()).toBeNull()
-    expect(mockHandlers.stream_claude_chat()).toBe('mock-session')
-    expect(mockHandlers.stream_ai_agent()).toBeNull()
+    expect(mockHandlers.register_mcp_tools(undefined)).toBe('registered')
+    expect(mockHandlers.check_mcp_status(undefined)).toBe('installed')
+    expect(mockHandlers.copy_text_to_clipboard(undefined)).toBeNull()
+    expect(mockHandlers.read_text_from_clipboard(undefined)).toBe('')
+    expect(mockHandlers.reinit_telemetry(undefined)).toBeNull()
+    expect(mockHandlers.stream_claude_chat(undefined)).toBe('mock-session')
+    expect(mockHandlers.stream_ai_agent(undefined)).toBeNull()
   })
 })

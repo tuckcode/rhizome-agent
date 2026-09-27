@@ -106,7 +106,6 @@
     "src/hooks/useMcpStatus.test.ts",
     "src/hooks/useMenuEvents.test.ts",
     "src/hooks/useMenuEvents.ts",
-    "src/hooks/useNavigationHistory.test.ts",
     "src/hooks/useNeighborhoodSelection.test.ts",
     "src/hooks/useNoteActions.hook.test.ts",
     "src/hooks/useNoteActions.persistence.test.ts",
