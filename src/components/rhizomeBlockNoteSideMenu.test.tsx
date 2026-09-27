@@ -110,6 +110,7 @@ vi.mock('@blocknote/core/extensions', () => ({
 }))
 
 vi.mock('@blocknote/react', () => ({
+  usePortalElement: () => null,
   AddBlockButton: () => (
     <button
       type="button"

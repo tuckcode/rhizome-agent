@@ -49,6 +49,7 @@ const blockNoteViewState = vi.hoisted(() => ({
 
 // Mock BlockNote components
 vi.mock('@blocknote/core', () => ({
+  SyntaxHighlightingExtension: vi.fn(() => ({})),
   audioParse: vi.fn(() => undefined),
   BlockNoteSchema: { create: () => ({ extend: () => ({}) }) },
   createAudioBlockConfig: vi.fn(() => ({})),
@@ -77,6 +78,7 @@ type SuggestionControllerProps = {
 const capturedGetItemsByTrigger: Record<string, (query: string) => Promise<unknown[]>> = {}
 let capturedGetItems: ((query: string) => Promise<unknown[]>) | null = null
 vi.mock('@blocknote/react', () => ({
+  usePortalElement: () => null,
   AudioBlock: () => null,
   AudioToExternalHTML: () => null,
   createReactBlockSpec: () => () => ({}),

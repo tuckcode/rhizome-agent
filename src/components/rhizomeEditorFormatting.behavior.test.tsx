@@ -25,6 +25,7 @@ function MockIcon() {
 }
 
 vi.mock('@blocknote/react', () => ({
+  usePortalElement: () => null,
   FormattingToolbar: ({ children }: { children?: ReactNode }) => (
     <div data-testid="mock-formatting-toolbar">{children}</div>
   ),
@@ -78,6 +79,7 @@ vi.mock('@blocknote/react', () => ({
 }))
 
 vi.mock('@blocknote/core', () => ({
+  SyntaxHighlightingExtension: vi.fn(() => ({})),
   blockHasType: blockHasTypeMock,
   createExtension: (factory: unknown) => factory,
   defaultProps: { textAlignment: 'left' },

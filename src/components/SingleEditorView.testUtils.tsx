@@ -27,6 +27,7 @@ export function getSingleEditorViewTestState() {
 }
 
 vi.mock('@blocknote/react', () => ({
+  usePortalElement: () => null,
   ComponentsContext: {
     Provider: ({ children }: { children?: ReactNode }) => <>{children}</>,
   },
