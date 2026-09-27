@@ -64,7 +64,7 @@ proposed → active → superseded
 | [0006](0006-flat-vault-structure.md) | Flat vault structure (no type-based folders) | active |
 | [0007](0007-title-filename-sync.md) | Title equals filename (slug sync) | active |
 | [0008](0008-underscore-system-properties.md) | Underscore convention for system properties | active |
-| [0009](0009-keyword-only-search.md) | Keyword-only search (remove semantic indexing) | active |
+| [0009](0009-keyword-only-search.md) | Keyword-only search (remove semantic indexing) | active — note search only; wiki search → [0174](0174-hybrid-wiki-search-index.md) |
 | [0010](0010-dynamic-wikilink-relationship-detection.md) | Dynamic wikilink relationship detection | active |
 | [0011](0011-mcp-server-for-ai-integration.md) | MCP server for AI tool integration | superseded → [0074](0074-explicit-external-ai-tool-setup-and-least-privilege-desktop-scope.md) |
 | [0012](0012-claude-cli-for-ai-agent.md) | Claude CLI subprocess for AI agent | active |
@@ -211,3 +211,4 @@ proposed → active → superseded
 | [0150](0150-markitdown-ytdlp-optional-import-subprocesses.md) | markitdown and yt-dlp as optional Import-tab conversion subprocesses | active |
 | [0151](0151-repo-cache-for-agent-layer-repo-research.md) | Repo cache for agent-layer repo research (`.rhizome/repo-cache`) | active |
 | [0152](0152-mcp-rust-sidecar.md) | MCP research verbs via Rust `rhizome-tool` sidecar | active |
+| [0174](0174-hybrid-wiki-search-index.md) | Hybrid tantivy + fastembed index for wiki search | active |
