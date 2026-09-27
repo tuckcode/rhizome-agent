@@ -90,7 +90,6 @@ const child = spawn(
   {
     detached: true,
     stdio: 'ignore',
-    env: { ...process.env, TMPDIR: tmp },
   },
 )
 child.unref()
@@ -130,7 +129,6 @@ try {
         ...process.env,
         RHIZOME_PRIME_DAEMON_SOCKET: sock,
         RHIZOME_PRIME_SESSION_DIR: sessions,
-        TMPDIR: tmp,
       },
     },
   )
