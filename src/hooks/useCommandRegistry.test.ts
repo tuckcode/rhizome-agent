@@ -4,8 +4,25 @@ import { useCommandRegistry, buildTypeCommands, extractVaultTypes, pluralizeType
 import type { CommandAction } from './useCommandRegistry'
 import { NEW_AI_CHAT_EVENT, OPEN_AI_CHAT_EVENT } from '../utils/aiPromptBridge'
 import { formatShortcutDisplay } from './appCommandCatalog'
+import { createMissingAiAgentsStatus, type AiAgentsStatus } from '../lib/aiAgents'
+import type { VaultEntry } from '../types'
 
-function makeConfig(overrides: Record<string, unknown> = {}) {
+function testVaultEntry(partial: Partial<VaultEntry> & Pick<VaultEntry, 'path' | 'title'>): VaultEntry {
+  return {
+    filename: partial.path.split('/').pop() ?? partial.title,
+    isA: null,
+    aliases: [],
+    ...partial,
+  } as VaultEntry
+}
+
+function testAiAgentsStatus(overrides: Partial<AiAgentsStatus>): AiAgentsStatus {
+  return { ...createMissingAiAgentsStatus(), ...overrides }
+}
+
+type CommandRegistryConfig = Parameters<typeof useCommandRegistry>[0]
+
+function makeConfig(overrides: Partial<CommandRegistryConfig> = {}): CommandRegistryConfig {
   return {
     activeTabPath: '/vault/test.md',
     entries: [],
@@ -38,7 +55,6 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
     onZoomReset: vi.fn(),
     zoomLevel: 100,
     onSelect: vi.fn(),
-    onCloseTab: vi.fn(),
     onGoBack: vi.fn(),
     onGoForward: vi.fn(),
     canGoBack: false,
@@ -53,7 +69,7 @@ function findCommand(commands: CommandAction[], id: string): CommandAction | und
   return commands.find(c => c.id === id)
 }
 
-function expectFolderCommandStates(overrides: Record<string, unknown>, expected: {
+function expectFolderCommandStates(overrides: Partial<CommandRegistryConfig>, expected: {
   copy: boolean
   delete: boolean
   rename: boolean
@@ -386,7 +402,7 @@ describe('useCommandRegistry', () => {
     const onExportNoteAsPdf = vi.fn()
     const config = makeConfig({
       activeTabPath: '/vault/current.md',
-      entries: [{ path: '/vault/current.md', title: 'Current', fileKind: 'markdown' }],
+      entries: [testVaultEntry({ path: '/vault/current.md', title: 'Current', fileKind: 'markdown' })],
       onRevealActiveFile,
       onCopyActiveFilePath,
       onCopyActiveDeepLink,
@@ -434,7 +450,7 @@ describe('useCommandRegistry', () => {
       {
         initialProps: makeConfig({
           activeTabPath: '/vault/current.md',
-          entries: [{ path: '/vault/current.md', title: 'Current', fileKind: 'markdown' }],
+          entries: [testVaultEntry({ path: '/vault/current.md', title: 'Current', fileKind: 'markdown' })],
           onOpenActiveFileExternal,
           onExportNoteAsPdf,
         }),
@@ -446,7 +462,7 @@ describe('useCommandRegistry', () => {
 
     rerender(makeConfig({
       activeTabPath: '/vault/Attachments/photo.png',
-      entries: [{ path: '/vault/Attachments/photo.png', title: 'photo.png', fileKind: 'binary' }],
+      entries: [testVaultEntry({ path: '/vault/Attachments/photo.png', title: 'photo.png', fileKind: 'binary' })],
       onOpenActiveFileExternal,
       onExportNoteAsPdf,
     }))
@@ -728,8 +744,8 @@ describe('useCommandRegistry', () => {
   it('keeps a single canonical New Note command when generic note types are present', () => {
     const config = makeConfig({
       entries: [
-        { path: '/type-note.md', title: 'Note', isA: 'Type' },
-        { path: '/lowercase-note.md', title: 'lowercase-note', isA: 'note' },
+        testVaultEntry({ path: '/type-note.md', title: 'Note', isA: 'Type' }),
+        testVaultEntry({ path: '/lowercase-note.md', title: 'lowercase-note', isA: 'note' }),
       ],
     })
     const { result } = renderHook(() => useCommandRegistry(config))
@@ -814,8 +830,8 @@ describe('useCommandRegistry', () => {
       onCreateType,
       onCreateNoteOfType,
       entries: [
-        { path: '/type-definition.md', title: 'Type', isA: 'Type' },
-        { path: '/recipe-definition.md', title: 'Recipe', isA: 'Type' },
+        testVaultEntry({ path: '/type-definition.md', title: 'Type', isA: 'Type' }),
+        testVaultEntry({ path: '/recipe-definition.md', title: 'Recipe', isA: 'Type' }),
       ],
     })
     const { result } = renderHook(() => useCommandRegistry(config))
@@ -1043,13 +1059,13 @@ describe('reload-vault command', () => {
   it('builds explicit AI agent switch commands for installed alternatives', () => {
     const onSetDefaultAiAgent = vi.fn()
     const config = makeConfig({
-      aiAgentsStatus: {
+      aiAgentsStatus: testAiAgentsStatus({
         claude_code: { status: 'installed', version: '1.0.20' },
         codex: { status: 'installed', version: '0.37.0' },
         opencode: { status: 'installed', version: '0.3.1' },
         pi: { status: 'installed', version: '0.70.2' },
         antigravity: { status: 'installed', version: '0.5.1' },
-      },
+      }),
       selectedAiAgent: 'claude_code',
       onSetDefaultAiAgent,
     })
@@ -1069,13 +1085,13 @@ describe('reload-vault command', () => {
 
   it('omits explicit AI switch commands when no alternate installed agent exists', () => {
     const config = makeConfig({
-      aiAgentsStatus: {
+      aiAgentsStatus: testAiAgentsStatus({
         claude_code: { status: 'installed', version: '1.0.20' },
         codex: { status: 'missing', version: null },
         opencode: { status: 'missing', version: null },
         pi: { status: 'missing', version: null },
         antigravity: { status: 'missing', version: null },
-      },
+      }),
       selectedAiAgent: 'claude_code',
       onSetDefaultAiAgent: vi.fn(),
     })
