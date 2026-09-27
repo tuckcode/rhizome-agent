@@ -1,6 +1,8 @@
 import { useRef, useEffect, useCallback, memo, useState, type ReactNode } from 'react'
 import { useEditorTabSwap } from '../hooks/useEditorTabSwap'
+import { SyntaxHighlightingExtension } from '@blocknote/core'
 import { useCreateBlockNote } from '@blocknote/react'
+import { createTolariaSyntaxHighlighting } from './codeBlockOptions'
 import '@blocknote/mantine/style.css'
 import 'katex/dist/katex.min.css'
 import { uploadImageFile } from '../hooks/useImageDrop'
@@ -227,6 +229,8 @@ interface EditorSetupParams {
   diffToggleRef?: React.MutableRefObject<() => void>
 }
 
+const RICH_EDITOR_SYNTAX_HIGHLIGHTING = createTolariaSyntaxHighlighting()
+
 function installDirectMarkdownForRealEditor(editor: ReturnType<typeof useCreateBlockNote>) {
   if (!('pmSchema' in editor) || !('_tiptapEditor' in editor)) return
   installBlockNoteDirectMarkdown(editor as DirectMarkdownCapableSerializer)
@@ -258,6 +262,7 @@ function useEditorSetup({
       createRichEditorMarkdownInputTransformExtension(),
       createRichEditorTextDirectionExtension(),
       createRichEditorBlockSelectionExtension(),
+      ...(RICH_EDITOR_SYNTAX_HIGHLIGHTING ? [SyntaxHighlightingExtension(RICH_EDITOR_SYNTAX_HIGHLIGHTING)] : []),
     ],
   })
   installDirectMarkdownForRealEditor(editor)

@@ -1,5 +1,5 @@
-import { codeBlockOptions } from '@blocknote/code-block'
-import type { CodeBlockOptions } from '@blocknote/core'
+import { codeBlockOptions, createBundledShikiHighlighter } from '@blocknote/code-block'
+import type { CodeBlockOptions, SyntaxHighlightingOptions } from '@blocknote/core'
 import {
   canonicalKnownCodeBlockLanguage,
   codeBlockLanguageOptions,
@@ -50,7 +50,7 @@ const GO_LANGUAGE_REGISTRATION = {
   },
 }
 
-type TolariaCodeHighlighter = Awaited<ReturnType<NonNullable<typeof codeBlockOptions.createHighlighter>>>
+type TolariaCodeHighlighter = Awaited<ReturnType<typeof createBundledShikiHighlighter>>
 type TolariaLoadLanguage = TolariaCodeHighlighter['loadLanguage']
 type TolariaLanguageInput = Parameters<TolariaLoadLanguage>[number]
 type TolariaLanguageLoader = () => Promise<TolariaLanguageInput[]>
@@ -149,11 +149,11 @@ async function expandLanguage(language: TolariaLanguageInput): Promise<TolariaLa
 }
 
 async function createTolariaCodeHighlighter(): Promise<TolariaCodeHighlighter> {
-  const highlighter = await codeBlockOptions.createHighlighter()
+  const highlighter = await createBundledShikiHighlighter({ themes: ['github-dark', 'github-light'], langs: [] })
   return {
     ...highlighter,
     getLoadedThemes: () => prioritizeTheme(highlighter.getLoadedThemes(), currentCodeBlockTheme()),
-    loadLanguage: async (...languages) => {
+    loadLanguage: async (...languages: TolariaLanguageInput[]) => {
       const expandedLanguages = await Promise.all(languages.map(expandLanguage))
       return highlighter.loadLanguage(...expandedLanguages.flat())
     },
@@ -161,9 +161,8 @@ async function createTolariaCodeHighlighter(): Promise<TolariaCodeHighlighter> {
 }
 
 export function createTolariaCodeBlockOptions(): Partial<CodeBlockOptions> {
-  const options: Partial<CodeBlockOptions> = {
+  return {
     ...codeBlockOptions,
-    createHighlighter: createTolariaCodeHighlighter,
     defaultLanguage: 'text',
     supportedLanguages: {
       ...codeBlockOptions.supportedLanguages,
@@ -171,9 +170,13 @@ export function createTolariaCodeBlockOptions(): Partial<CodeBlockOptions> {
       ...EXTRA_SUPPORTED_LANGUAGES,
     },
   }
+}
 
-  if (supportsShikiRegexFeatures()) return options
-
-  delete options.createHighlighter
-  return options
+/**
+ * BlockNote 0.55 moved highlighting from the code block options to an
+ * editor extension. Returns null where WebKit lacks the regex features
+ * Shiki needs, so those editors render code as plain text.
+ */
+export function createTolariaSyntaxHighlighting(): SyntaxHighlightingOptions | null {
+  return supportsShikiRegexFeatures() ? { createHighlighter: createTolariaCodeHighlighter } : null
 }

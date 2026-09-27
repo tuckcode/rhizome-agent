@@ -13,12 +13,13 @@ import type {
 import {
   DragHandleMenu,
   SideMenu,
+  type SideMenuProps,
   useBlockNoteEditor,
   useComponentsContext,
   useDictionary,
   useExtension,
   useExtensionState,
-  type SideMenuProps,
+  usePortalElement,
 } from '@blocknote/react'
 import { translate, type AppLocale } from '../lib/i18n'
 import {
@@ -280,6 +281,7 @@ function RhizomeDragHandleButton({
   const { block, editor } = useSideMenuBlock()
   const MenuComponent: ComponentType<{ children?: ReactNode }> = dragHandleMenu ?? DragHandleMenu
   const { onClickCapture, onPointerDown } = usePointerBlockReorder(editor, block)
+  const portalElement = usePortalElement()
 
   if (!block) return null
 
@@ -290,6 +292,7 @@ function RhizomeDragHandleButton({
         else sideMenu.unfreezeMenu()
       }}
       position="left"
+      portalElement={portalElement}
     >
       <Components.Generic.Menu.Trigger>
         <span

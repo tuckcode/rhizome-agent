@@ -68,8 +68,8 @@ describe('editor schema code block highlighting', () => {
     document.documentElement.classList.remove('dark')
     document.documentElement.dataset.theme = 'light'
 
-    const { createTolariaCodeBlockOptions } = await import('./codeBlockOptions')
-    const highlighter = await createTolariaCodeBlockOptions().createHighlighter?.()
+    const { createTolariaSyntaxHighlighting } = await import('./codeBlockOptions')
+    const highlighter = await createTolariaSyntaxHighlighting()?.createHighlighter()
 
     expect(highlighter?.getLoadedThemes()[0]).toBe('github-light')
   })
@@ -79,8 +79,8 @@ describe('editor schema code block highlighting', () => {
     document.documentElement.classList.add('dark')
     document.documentElement.dataset.theme = 'dark'
 
-    const { createTolariaCodeBlockOptions } = await import('./codeBlockOptions')
-    const highlighter = await createTolariaCodeBlockOptions().createHighlighter?.()
+    const { createTolariaSyntaxHighlighting } = await import('./codeBlockOptions')
+    const highlighter = await createTolariaSyntaxHighlighting()?.createHighlighter()
 
     expect(highlighter?.getLoadedThemes()[0]).toBe('github-dark')
   })
@@ -136,8 +136,8 @@ describe('editor schema code block highlighting', () => {
   it('loads the Go Shiki grammar for Go code blocks', async () => {
     vi.resetModules()
 
-    const { createTolariaCodeBlockOptions } = await import('./codeBlockOptions')
-    const highlighter = await createTolariaCodeBlockOptions().createHighlighter?.()
+    const { createTolariaSyntaxHighlighting } = await import('./codeBlockOptions')
+    const highlighter = await createTolariaSyntaxHighlighting()?.createHighlighter()
 
     await expect(highlighter?.loadLanguage('go')).resolves.toBeUndefined()
     expect(highlighter?.getLoadedLanguages()).toContain('go')
@@ -151,8 +151,8 @@ describe('editor schema code block highlighting', () => {
   ])('loads the %s Shiki grammar for code blocks', async (language, loadedLanguage) => {
     vi.resetModules()
 
-    const { createTolariaCodeBlockOptions } = await import('./codeBlockOptions')
-    const highlighter = await createTolariaCodeBlockOptions().createHighlighter?.()
+    const { createTolariaSyntaxHighlighting } = await import('./codeBlockOptions')
+    const highlighter = await createTolariaSyntaxHighlighting()?.createHighlighter()
 
     await expect(highlighter?.loadLanguage(language)).resolves.toBeUndefined()
     expect(highlighter?.getLoadedLanguages()).toContain(loadedLanguage)
@@ -162,26 +162,26 @@ describe('editor schema code block highlighting', () => {
     installLegacyWebKitRegExp()
     vi.resetModules()
 
-    const { createTolariaCodeBlockOptions } = await import('./codeBlockOptions')
+    const { createTolariaSyntaxHighlighting } = await import('./codeBlockOptions')
 
-    expect(createTolariaCodeBlockOptions()).not.toHaveProperty('createHighlighter')
+    expect(createTolariaSyntaxHighlighting()).toBeNull()
   })
 
   it('omits the Shiki highlighter when WebKit lacks regex lookbehind syntax', async () => {
     installLookbehindMissingRegExp()
     vi.resetModules()
 
-    const { createTolariaCodeBlockOptions } = await import('./codeBlockOptions')
+    const { createTolariaSyntaxHighlighting } = await import('./codeBlockOptions')
 
-    expect(createTolariaCodeBlockOptions()).not.toHaveProperty('createHighlighter')
+    expect(createTolariaSyntaxHighlighting()).toBeNull()
   })
 
   it('keeps the Shiki highlighter on modern WebKit when regex probes pass', async () => {
     setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 Safari/605.1.15')
     vi.resetModules()
 
-    const { createTolariaCodeBlockOptions } = await import('./codeBlockOptions')
+    const { createTolariaSyntaxHighlighting } = await import('./codeBlockOptions')
 
-    expect(createTolariaCodeBlockOptions()).toHaveProperty('createHighlighter')
+    expect(createTolariaSyntaxHighlighting()).toHaveProperty('createHighlighter')
   })
 })
