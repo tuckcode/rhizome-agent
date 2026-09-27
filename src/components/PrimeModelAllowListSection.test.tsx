@@ -143,6 +143,19 @@ describe('PrimeModelAllowListSection (#45)', () => {
     expect(await screen.findByTestId('model-allow-list-no-matches')).toBeInTheDocument()
   })
 
+  it('labels the quick filter as a name match, not a price', async () => {
+    await renderSection()
+    const note = screen.getByTestId('model-allow-list-name-filter-note')
+    expect(note).toHaveTextContent('-free')
+    expect(note).toHaveTextContent(':free')
+    expect(note).toHaveTextContent(/not a price/i)
+    expect(note).toHaveTextContent(/reliable/i)
+    expect(screen.getByTestId('model-allow-list-free-only')).toHaveAttribute(
+      'aria-label',
+      expect.stringMatching(/name filter/i),
+    )
+  })
+
   it('keeps only provider-marked free models when Free only is on', async () => {
     await renderSection()
     fireEvent.click(screen.getByTestId('model-allow-list-free-only'))

@@ -203,18 +203,18 @@ export function findModel(
 }
 
 /**
- * True when the catalog row is a no-cost model. Only the marks Prime prints on this machine count:
- * OpenRouter `:free` / `free`, OpenCode `-free`. A paid model whose display
- * name mentions "free" is still paid. NVIDIA NIM (`provider: nvidia`) has
- * no `:free` suffix. Free Nemotron twins on OpenRouter still use `:free`.
+ * Name match for the quick filter. Prime's catalog has no price field.
+ *
+ * An id matches when it contains `:free` or ends with `-free`, on any
+ * provider. OpenRouter's free router id is `openrouter/free`, which has
+ * neither mark, so that one id is included by name as well. A display name
+ * that says "free" does not match. This is not a price.
  */
 export function isFreeCatalogModel(model: PrimeModel): boolean {
-  const provider = model.provider.trim().toLowerCase()
   const id = model.id.trim().toLowerCase()
-  if (provider === 'openrouter' && (id.endsWith(':free') || id === 'free' || id.endsWith('/free'))) {
-    return true
-  }
-  if (provider === 'opencode' && id.endsWith('-free')) return true
+  if (id.includes(':free') || id.endsWith('-free')) return true
+  const provider = model.provider.trim().toLowerCase()
+  if (provider === 'openrouter' && (id === 'free' || id.endsWith('/free'))) return true
   return false
 }
 

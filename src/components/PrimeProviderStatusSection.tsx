@@ -220,6 +220,9 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
       <p className="text-[11px] text-muted-foreground">
         {t('settings.providers.description')}
       </p>
+      <p className="text-[11px] text-muted-foreground" data-testid="prime-connect-not-built">
+        Connect from Rhizome is not built. Prime has no auth command, and that step needs an architecture decision.
+      </p>
       {providers === null ? (
         <div className="text-[11px] text-muted-foreground">{t('settings.providers.loading')}</div>
       ) : cards.length === 0 ? (

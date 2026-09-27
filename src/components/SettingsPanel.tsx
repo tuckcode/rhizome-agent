@@ -54,6 +54,7 @@ import { areGitFeaturesEnabled } from '../lib/gitSettings'
 import { areAutomaticUpdateChecksEnabled } from '../lib/automaticUpdateChecks'
 import { trackAllNotesVisibilityChanged } from '../lib/productAnalytics'
 import { AiProviderSettings } from './AiProviderSettings'
+import { PrimeDefaultModelSection } from './PrimeDefaultModelSection'
 import { PrimeModelAllowListSection } from './PrimeModelAllowListSection'
 import { PrimeProviderStatusSection } from './PrimeProviderStatusSection'
 import { PrimeExtensionsSection } from './PrimeExtensionsSection'
@@ -1011,6 +1012,7 @@ function SettingsAgentWorkflowSections({
           setAiModelProviders={setAiModelProviders}
           onCopyMcpConfig={onCopyMcpConfig}
           loadModelCatalog={loadModelCatalog}
+          activeVaultPath={activeVaultPath}
         />
         <div className="mt-4">
           <SessionImportSettingsSection vaultPath={activeVaultPath ?? null} />
@@ -1378,6 +1380,7 @@ function AiAgentSettingsSection({
   setAiModelProviders,
   onCopyMcpConfig,
   loadModelCatalog,
+  activeVaultPath,
 }: Pick<
   SettingsBodyProps,
   | 't'
@@ -1388,6 +1391,7 @@ function AiAgentSettingsSection({
   | 'setAiModelProviders'
   | 'onCopyMcpConfig'
   | 'loadModelCatalog'
+  | 'activeVaultPath'
 >) {
   const primeStatus = getAiAgentAvailability(aiAgentsStatus, DEFAULT_AI_AGENT)
   const vaultConfig = useSyncExternalStore(subscribeVaultConfig, getVaultConfig, getVaultConfig)
@@ -1441,6 +1445,7 @@ function AiAgentSettingsSection({
         setAiModelProviders={setAiModelProviders}
         onCopyMcpConfig={onCopyMcpConfig}
         loadModelCatalog={loadModelCatalog}
+        vaultPath={activeVaultPath}
       />
     </>
   )
@@ -1453,6 +1458,7 @@ function AiTargetManagementTabs({
   setAiModelProviders,
   onCopyMcpConfig,
   loadModelCatalog,
+  vaultPath,
 }: {
   t: Translate
   aiAgentsStatus: AiAgentsStatus
@@ -1460,6 +1466,7 @@ function AiTargetManagementTabs({
   setAiModelProviders: (value: AiModelProvider[]) => void
   onCopyMcpConfig?: () => void
   loadModelCatalog?: boolean
+  vaultPath?: string | null
 }) {
   return (
     <Tabs defaultValue="agents" className="gap-3">
@@ -1472,6 +1479,7 @@ function AiTargetManagementTabs({
         <AiAgentsInstalledSection t={t} aiAgentsStatus={aiAgentsStatus} />
         {/* Same Agents-visible gate as the model list: skip provider IPC until then. */}
         {loadModelCatalog ? <PrimeProviderStatusSection t={t} /> : null}
+        {loadModelCatalog ? <PrimeDefaultModelSection vaultPath={vaultPath} /> : null}
         {loadModelCatalog ? <PrimeModelAllowListSection t={t} /> : null}
         {onCopyMcpConfig ? <CopyMcpConfigButton t={t} onCopyMcpConfig={onCopyMcpConfig} /> : null}
         <BridgeTokenRow t={t} />

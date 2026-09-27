@@ -308,10 +308,10 @@ export function PrimeModelPicker({
               aria-label={t('ai.composer.modelsFilter')}
             />
             <div className="mt-1.5 flex items-center justify-between gap-2 px-0.5">
-              <span className="font-mono text-[11px] text-foreground">Free only</span>
+              <span className="font-mono text-[11px] text-foreground">Name filter</span>
               <Switch
                 checked={freeOnly}
-                aria-label="Free only"
+                aria-label="Name filter. Matches -free or :free in the model id. Not a price."
                 data-testid="prime-models-free-only"
                 onKeyDown={(event) => event.stopPropagation()}
                 onCheckedChange={(on) => {
@@ -331,7 +331,7 @@ export function PrimeModelPicker({
         !error &&
         (editingList ? editGroups.length === 0 : groups.length === 0 && matchingHidden.length === 0) ? (
           <div className="px-2 py-1.5 text-xs text-muted-foreground" data-testid="prime-models-empty">
-            {freeOnly ? 'No free models in this catalog.' : t('ai.composer.modelsEmpty')}
+            {freeOnly ? 'No model ids match -free or :free.' : t('ai.composer.modelsEmpty')}
           </div>
         ) : null}
         {editingList ? (

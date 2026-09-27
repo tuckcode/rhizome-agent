@@ -266,6 +266,14 @@ describe('isFreeCatalogModel', () => {
       isFreeCatalogModel(model({ provider: 'anthropic', id: 'claude-opus-5', name: 'Freeform Claude' })),
     ).toBe(false)
   })
+
+  it('matches -free or :free in the id on any provider', () => {
+    expect(isFreeCatalogModel(model({ provider: 'xai', id: 'grok-4-free', name: 'Grok' }))).toBe(true)
+    expect(isFreeCatalogModel(model({ provider: 'custom', id: 'vendor/model:free' }))).toBe(true)
+    expect(isFreeCatalogModel(model({ provider: 'xai', id: 'freeform-grok', name: 'Free Grok' }))).toBe(
+      false,
+    )
+  })
 })
 
 describe('partitionModelsByFree', () => {

@@ -22,8 +22,8 @@ import { usePrimeModelsFreeOnly } from '../hooks/usePrimeModelsFreeOnly'
  * Choose which of Prime's models appear in the chat model menu (#45).
  *
  * Prime publishes its whole catalog — 501 models on one measured machine.
- * Free only is a second cut on that catalog: an explicit host flag, then
- * provider-marked suffixes. The hand-picked list is still the shortlist.
+ * Name filter is a second cut: ids that contain `:free` or end with `-free`.
+ * It is not a price. The hand-picked list is still the reliable shortlist.
  *
  * The editor therefore must not be the same wall it is fixing: it opens on
  * the shortlist (or, when nothing is curated yet, on provider names — not
@@ -170,6 +170,13 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
         Check models you want in Chat. Uncheck models you do not use. The first
         check starts a shortlist. Search or pick a provider to find the rest.
       </p>
+      <p
+        className="text-[11px] text-muted-foreground"
+        data-testid="model-allow-list-name-filter-note"
+      >
+        The checked list is the reliable way to choose models. Name filter matches
+        ids that contain -free or :free. It is not a price.
+      </p>
       {models === null ? (
         <div className="text-[11px] text-muted-foreground">
           {t('settings.modelAllowList.loading')}
@@ -191,10 +198,10 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
               className="h-8 text-[11px]"
             />
             <div className="flex shrink-0 items-center gap-1.5">
-              <span className="text-[11px] text-foreground">Free only</span>
+              <span className="text-[11px] text-foreground">Name filter</span>
               <Switch
                 checked={freeOnly}
-                aria-label="Free only"
+                aria-label="Name filter. Matches -free or :free in the model id. Not a price."
                 data-testid="model-allow-list-free-only"
                 onCheckedChange={(on) => {
                   setFreeOnly(on)
@@ -290,7 +297,7 @@ export function PrimeModelAllowListSection({ t }: PrimeModelAllowListSectionProp
               }
             >
               {freeOnly && catalog.length === 0
-                ? 'No free models in this catalog.'
+                ? 'No model ids match -free or :free.'
                 : t('settings.modelAllowList.noMatches')}
             </div>
           ) : null}
