@@ -41,6 +41,7 @@ import type { VaultEntry } from '../types'
 import { NEW_AI_CHAT_EVENT } from '../utils/aiPromptBridge'
 import { type GenerateAiConversationTitleRequest } from '../utils/aiConversationTitle'
 import { cloneAiWorkspaceSessionUntilMessage } from '../lib/aiWorkspaceSessionStore'
+import { AiPanelErrorBoundary } from './AiPanelErrorBoundary'
 import { AiPanelView } from './AiPanel'
 import { GuidanceWarning, WorkspaceHeader } from './AiWorkspaceChrome'
 import { WorkspaceResizeHandles } from './AiWorkspaceResizeHandles'
@@ -644,31 +645,33 @@ function ConversationSession({
       />
       <GuidanceWarning locale={locale} onRestore={onRestoreVaultAiGuidance} status={vaultAiGuidanceStatus} />
       <div className="flex min-h-0 flex-1">
-        <AiPanelView
-          controller={controller}
-          defaultAiAgent={targetAgent(target)}
-          defaultAiAgentReadiness={readiness}
-          defaultAiAgentReady={aiTargetReady(target, aiAgentsStatus)}
-          defaultAiTarget={target}
-          entries={context.entries}
-          activeEntry={context.activeEntry}
-          vaultPath={vaultPath}
-          composerControls={composerControls}
-          interactive={active}
-          locale={locale}
-          onClose={onClose}
-          onForkMessage={onForkMessage}
-          onMessageHistoryScrollStateChange={active ? onMessageHistoryScrollStateChange : undefined}
-          onOpenNote={onOpenNote}
-          onPromoteToVault={onPromoteToVault}
-          onSendPrompt={() => onPromptSubmitted(conversation.id)}
-          onQueuedPromptTarget={onSelectTarget}
-          onUnsupportedAiPaste={onUnsupportedAiPaste}
-          showHeader={false}
-          showLeftBorder={false}
-          surface={mode === 'side' ? 'sidebar' : 'default'}
-          targetId={target.id}
-        />
+        <AiPanelErrorBoundary>
+          <AiPanelView
+            controller={controller}
+            defaultAiAgent={targetAgent(target)}
+            defaultAiAgentReadiness={readiness}
+            defaultAiAgentReady={aiTargetReady(target, aiAgentsStatus)}
+            defaultAiTarget={target}
+            entries={context.entries}
+            activeEntry={context.activeEntry}
+            vaultPath={vaultPath}
+            composerControls={composerControls}
+            interactive={active}
+            locale={locale}
+            onClose={onClose}
+            onForkMessage={onForkMessage}
+            onMessageHistoryScrollStateChange={active ? onMessageHistoryScrollStateChange : undefined}
+            onOpenNote={onOpenNote}
+            onPromoteToVault={onPromoteToVault}
+            onSendPrompt={() => onPromptSubmitted(conversation.id)}
+            onQueuedPromptTarget={onSelectTarget}
+            onUnsupportedAiPaste={onUnsupportedAiPaste}
+            showHeader={false}
+            showLeftBorder={false}
+            surface={mode === 'side' ? 'sidebar' : 'default'}
+            targetId={target.id}
+          />
+        </AiPanelErrorBoundary>
       </div>
     </div>
   )
