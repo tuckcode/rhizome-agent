@@ -127,6 +127,7 @@ fn current_problem() -> Option<PrimeConnectionProblem> {
 /// drive a fake daemon through.
 const DAEMON_SOCKET_ENV: &str = "RHIZOME_PRIME_DAEMON_SOCKET";
 /// Scratch directory for `pnpm test:live-prime`. Never `~/.prime/agent/sessions`.
+#[cfg(test)]
 const LIVE_SESSION_DIR_ENV: &str = "RHIZOME_PRIME_SESSION_DIR";
 
 static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
@@ -743,16 +744,19 @@ fn daemon_socket_is_overridden() -> bool {
 }
 
 /// Prime's real session store. Live tests must not read or write it.
+#[cfg(test)]
 fn default_prime_session_dir() -> Option<PathBuf> {
     dirs::home_dir().map(|home| home.join(".prime/agent/sessions"))
 }
 
+#[cfg(test)]
 fn paths_equal(left: &Path, right: &Path) -> bool {
     let left = std::fs::canonicalize(left).unwrap_or_else(|_| left.to_path_buf());
     let right = std::fs::canonicalize(right).unwrap_or_else(|_| right.to_path_buf());
     left == right
 }
 
+#[cfg(test)]
 fn is_default_prime_session_dir(path: &Path) -> bool {
     default_prime_session_dir().is_some_and(|default_dir| paths_equal(path, &default_dir))
 }
@@ -763,6 +767,7 @@ fn is_default_prime_session_dir(path: &Path) -> bool {
 /// is the scratch store the isolated daemon was started with. Either missing,
 /// or the session dir being `~/.prime/agent/sessions`, is a refusal — the
 /// caller must not fall through to the default socket.
+#[cfg(test)]
 fn require_isolated_live_harness() -> Result<(), String> {
     let socket = match std::env::var(DAEMON_SOCKET_ENV) {
         Ok(socket) if !socket.trim().is_empty() => socket,
@@ -788,6 +793,7 @@ fn require_isolated_live_harness() -> Result<(), String> {
 
 /// Scratch session directory for live-test cleanup. `None` when the harness
 /// is missing or points at the real store — callers then delete nothing.
+#[cfg(test)]
 fn isolated_live_session_dir() -> Option<PathBuf> {
     let dir = std::env::var(LIVE_SESSION_DIR_ENV).ok()?;
     let path = PathBuf::from(dir.trim());

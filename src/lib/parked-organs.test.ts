@@ -85,13 +85,13 @@ describe('parked organs leftover', () => {
     expect(host).toContain('Rhizome · Sep 6 · 3:35p · dtc · f65c06')
   })
 
-  it('does not widen rust Sentry for ghr_ or Stripe underscore keys', () => {
+  it('keeps the ghr and Stripe underscore scrub in rust Sentry', () => {
     const telemetry = readFileSync(
       `${process.cwd()}/src-tauri/src/telemetry.rs`,
       'utf8',
     )
     expect(telemetry).toContain(
-      'scrub_secrets_does_not_yet_cover_ghr_or_stripe_underscore_keys',
+      'scrub_secrets_redacts_ghr_and_stripe_underscore_keys',
     )
   })
 
