@@ -755,7 +755,11 @@ type: Note
   })
 })
 
-describe('RHIZOME_TOOL_PATH wiring (ADR-0152 MCP bridge Phase 2)', () => {
+// The stub sidecar is a shebang `.mjs` script, which Windows cannot exec
+// (C80). The argv routing it checks is platform-independent; Mac/Linux cover it.
+const SHEBANG_STUB_SKIP = process.platform === 'win32' ? 'Windows cannot exec a shebang stub script' : false
+
+describe('RHIZOME_TOOL_PATH wiring (ADR-0152 MCP bridge Phase 2)', { skip: SHEBANG_STUB_SKIP }, () => {
   let stubDir
   let stubPath
   let argvLogPath

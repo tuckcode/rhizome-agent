@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { symlinkSync } from 'node:fs'
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import os from 'node:os'
@@ -18,6 +18,23 @@ import { createMcpToolService } from './tool-service.js'
 const ACTIVE_VAULT_ERROR = 'Note path must stay inside the active vault'
 const SENTINEL = 'RHIZOME_SYNTHETIC_OUTSIDE_SENTINEL'
 const FRONTMATTER_MARK = '__RHIZOME_S1_FRONTMATTER__'
+
+// Windows allows symlinks only with admin rights or Developer Mode. Skip the
+// symlink tests visibly there instead of failing on EPERM (C80).
+const SYMLINK_SKIP = canCreateSymlinks() ? false : 'this machine cannot create symlinks (Windows: admin or Developer Mode)'
+
+function canCreateSymlinks() {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'rhizome-symlink-probe-'))
+  try {
+    writeFileSync(path.join(dir, 'target'), '')
+    symlinkSync(path.join(dir, 'target'), path.join(dir, 'link'))
+    return true
+  } catch {
+    return false
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
 
 let fixture
 let vault
@@ -158,7 +175,7 @@ describe('S1 executable frontmatter', () => {
 })
 
 describe('S2 vault symlink boundary', () => {
-  it('rejects an external file symlink on getNote and omits it from search and context', async () => {
+  it('rejects an external file symlink on getNote and omits it from search and context', { skip: SYMLINK_SKIP }, async () => {
     symlinkSync(outside, path.join(vault, 'linked.md'))
 
     await assert.rejects(() => getNote(vault, 'linked.md'), { message: ACTIVE_VAULT_ERROR })
@@ -171,7 +188,7 @@ describe('S2 vault symlink boundary', () => {
     assert.ok(context.recentNotes.some((row) => row.path === 'normal.md'))
   })
 
-  it('does not read config/agents.md or AGENTS.md through external symlinks', async () => {
+  it('does not read config/agents.md or AGENTS.md through external symlinks', { skip: SYMLINK_SKIP }, async () => {
     symlinkSync(outside, path.join(vault, 'config', 'agents.md'))
     symlinkSync(outside, path.join(vault, 'AGENTS.md'))
 
@@ -182,7 +199,7 @@ describe('S2 vault symlink boundary', () => {
     assert.equal(instructions, null)
   })
 
-  it('rejects an external directory symlink used as config', async () => {
+  it('rejects an external directory symlink used as config', { skip: SYMLINK_SKIP }, async () => {
     const outsideDir = path.join(fixture, 'outside-config')
     await mkdir(outsideDir, { recursive: true })
     await writeFile(path.join(outsideDir, 'agents.md'), `# ${SENTINEL}\n`)
@@ -193,7 +210,7 @@ describe('S2 vault symlink boundary', () => {
     assert.equal(Boolean(context.configFiles.agents?.includes(SENTINEL)), false)
   })
 
-  it('skips a broken symlink and still reads a nested normal note', async () => {
+  it('skips a broken symlink and still reads a nested normal note', { skip: SYMLINK_SKIP }, async () => {
     symlinkSync(path.join(fixture, 'missing-target.md'), path.join(vault, 'broken.md'))
     const files = await findMarkdownFiles(vault)
     assert.equal(files.some((filePath) => filePath.endsWith('broken.md')), false)
@@ -201,7 +218,7 @@ describe('S2 vault symlink boundary', () => {
     assert.equal(nested.frontmatter.title, 'Nested')
   })
 
-  it('does not treat a sibling-prefix directory as inside the vault', async () => {
+  it('does not treat a sibling-prefix directory as inside the vault', { skip: SYMLINK_SKIP }, async () => {
     const twin = path.join(fixture, 'vault-extra')
     await mkdir(twin, { recursive: true })
     const twinNote = path.join(twin, 'secret.md')
@@ -213,7 +230,7 @@ describe('S2 vault symlink boundary', () => {
     assert.equal(found.length, 0)
   })
 
-  it('allows an in-vault symlink to another in-vault note', async () => {
+  it('allows an in-vault symlink to another in-vault note', { skip: SYMLINK_SKIP }, async () => {
     symlinkSync(path.join(vault, 'normal.md'), path.join(vault, 'alias.md'))
     const note = await getNote(vault, 'alias.md')
     assert.equal(note.frontmatter.title, 'Inside')

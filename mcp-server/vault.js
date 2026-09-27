@@ -78,7 +78,7 @@ export async function getNote(vaultPath, notePath) {
   const raw = await readUtf8File(noteRealPath)
   const parsed = parseMarkdownNote(raw)
   return {
-    path: relativePath,
+    path: toVaultNotePath(relativePath),
     frontmatter: parsed.data,
     content: parsed.content.trim(),
   }
@@ -95,7 +95,7 @@ export async function createNote(vaultPath, notePath, content) {
   const { requestedPath, relativePath } = await resolveNewVaultNotePath(vaultPath, notePath)
   await writeNewUtf8File(requestedPath, content)
   return {
-    path: relativePath,
+    path: toVaultNotePath(relativePath),
     absolutePath: requestedPath,
   }
 }
@@ -123,7 +123,7 @@ export async function searchNotes(vaultPath, query, limit = 10) {
 
     const snippet = extractSnippet(content, q)
     results.push({
-      path: path.relative(vaultRoot, filePath),
+      path: toVaultNotePath(path.relative(vaultRoot, filePath)),
       title: titleMatch,
       snippet,
     })
@@ -273,6 +273,12 @@ function resolveInside(root, target) {
   return null
 }
 
+// Note paths leave the server with `/` on every platform, so a client sees
+// `note/alpha.md`, never `note\alpha.md` on Windows (C80).
+function toVaultNotePath(relativePath) {
+  return relativePath.split(path.sep).join('/')
+}
+
 function isVaultRelativePath(relativePath) {
   return !relativePath.startsWith('..') && !path.isAbsolute(relativePath)
 }
@@ -293,7 +299,7 @@ async function readVaultContextNote(vaultRoot, filePath) {
   const raw = await readContainedUtf8(vaultRoot, filePath)
   if (raw === null) return null
   const parsed = parseMarkdownNote(raw)
-  const rel = path.relative(vaultRoot, filePath)
+  const rel = toVaultNotePath(path.relative(vaultRoot, filePath))
   const topFolder = extractTopFolder(rel)
   const fileStat = await statContainedRegularFile(vaultRoot, filePath)
   if (!fileStat) return null
@@ -458,7 +464,7 @@ function stripMatchingQuotes(value) {
 }
 
 function extractTopFolder(relativePath) {
-  const topFolder = relativePath.split(path.sep)[0]
+  const topFolder = relativePath.split('/')[0]
   return topFolder === relativePath ? null : `${topFolder}/`
 }
 
