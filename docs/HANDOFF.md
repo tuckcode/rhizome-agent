@@ -58,7 +58,7 @@ file.
 **Origin:** Cursor Grok 4.7 · 2026-09-26 · retargeted Chunk vcs + release Pages URLs off refactoringhq (local, unpushed).
 **Origin:** GPT-6 Codex · 2026-09-26 · splash grows two branches, then breathes with shaded nodes. Browser checks passed. Installed app unchanged.
 
-`origin/main` is **`835c5bb`**. Local HEAD adds public-prep, the macOS title bar, and the Chunk/release leftover cleanup (unpushed). `/Applications` is still `d0a55f8`, installed **2026-09-26 04:21 CDT**. [`2026-09-26-0425`](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md).
+`origin/main` is current as of **2026-09-27** (BlockNote 0.55 `c13d5b6`, then docs). Nothing unpushed. `/Applications` is still `d0a55f8`, installed **2026-09-26 04:21 CDT** — every change since is source-only. [`2026-09-27-0951`](plans/handoffs/2026-09-27-0951-claude-opus-5-5-blocknote-055-and-cleanup.md). Open work: [`2026-09-27-cursor-swarm-plan.md`](plans/2026-09-27-cursor-swarm-plan.md).
 Handy: [`2026-09-20-1230`](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md).
 Recap: [`2026-09-20-1228`](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md).
 Detail: [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
@@ -115,6 +115,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-27 · BlockNote 0.55 + cleanup](plans/handoffs/2026-09-27-0951-claude-opus-5-5-blocknote-055-and-cleanup.md) — BlockNote 0.55/tiptap 3.31.3 with patches ported; Dependabot, C80/C82, stranded files pushed; native QA not done; swarm plan written.
 - [2026-09-26 · animated splash](plans/handoffs/2026-09-26-0818-gpt-6-splash-logo.md) — shaded mark grows two branches, then breathes. Dither artwork and original Codex chat located. Source only.
 - [2026-09-26 · macOS title bar](plans/handoffs/2026-09-26-0635-cursor-grok-4-7-macos-titlebar.md) — 32px MacOSTitlebar, y=9, Command Palette docked; packaged app not checked.
 - [2026-09-26 · public prep](plans/handoffs/2026-09-26-0559-claude-opus-5-5-public-prep.md) — secret scan clean; AGPL confirmed, Tolaria credited; Gmail-in-history open.
@@ -129,7 +130,6 @@ Do not paste leftover paper here.
 - [2026-09-20 · Astra ↔ Cursor recap](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md) — plan through #26 CPR, D1–D7 local, Free-only dirt.
 - [2026-09-20 · #26 CPR](plans/handoffs/2026-09-20-0723-cursor-grok-4-6-issue-26-cpr.md) — origin and app `b7264d6`; live Update now still Q.
 - [2026-09-20 · Lane S vault safety](plans/handoffs/2026-09-20-0545-cursor-grok-4-6-lane-s-vault-safety.md) — JS refuses `~`/`~/` as HOME vault; nested vaults stay; #46 open until live no-vault Chat.
-- [2026-09-20 · public readiness plan](plans/handoffs/2026-09-20-0506-gpt-6-public-readiness-plan.md) — assessment, Cursor swarm, parked inventory, and low-context Handy skill.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)
