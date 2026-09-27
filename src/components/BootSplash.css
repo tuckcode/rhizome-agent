@@ -16,9 +16,29 @@
   width: 100%;
 }
 
-.boot-splash > svg {
+.boot-splash-card {
+  align-items: center;
+  background: #F7F8F5;
+  border: 1px solid #E3E7DE;
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgb(15 23 42 / 0.12), 0 1px 3px rgb(15 23 42 / 0.08);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 28px 32px 22px;
+  width: 240px;
+}
+
+:root[data-theme="dark"] .boot-splash-card {
+  background: #2A2824;
+  border-color: #34322D;
+  box-shadow: 0 18px 44px rgb(0 0 0 / 0.35), 0 1px 4px rgb(0 0 0 / 0.22);
+}
+
+.boot-splash-card > svg {
   flex: none;
-  margin-bottom: 12px;
+  margin-bottom: 4px;
   overflow: visible;
   filter: drop-shadow(0 3px 2px rgb(0 0 0 / 0.2));
   transform-origin: 50% 52%;
@@ -63,7 +83,7 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .boot-splash > svg {
+  .boot-splash-card > svg {
     animation: boot-breathe 4.8s ease-in-out 1.2s infinite both;
   }
 
@@ -102,7 +122,7 @@
 }
 
 /* The bootstrap releases this visibility listener when the app is ready. */
-.boot-splash > svg,
+.boot-splash-card > svg,
 .boot-splash path,
 .boot-splash circle {
   animation-play-state: var(--boot-motion-state, running);

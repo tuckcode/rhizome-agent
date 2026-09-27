@@ -221,7 +221,8 @@
     <div id="root">
       <div id="rhizome-boot-splash" class="boot-splash" aria-busy="true" aria-label="Loading Rhizome" role="status">
         <!-- Mirrors BrandMark.tsx so the first paint and React fallback agree. -->
-        <svg viewBox="0 0 100 100" width="80" height="80" fill="none" aria-hidden="true">
+        <div class="boot-splash-card">
+        <svg viewBox="0 0 100 100" width="56" height="56" fill="none" aria-hidden="true">
           <defs>
             <radialGradient id="boot-node-material" cx="28%" cy="22%" r="78%">
               <stop offset="0" class="boot-node-highlight" />
@@ -248,6 +249,7 @@
         </svg>
         <div class="boot-splash-wordmark">rhizome</div>
         <div class="boot-splash-status">Starting…</div>
+        </div>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
