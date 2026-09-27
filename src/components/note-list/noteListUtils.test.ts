@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
+import type { MouseEvent } from 'react'
 import { createNoteStatusResolver, resolveHeaderTitle, routeNoteClick } from './noteListUtils'
+import type { ModifiedFile, NoteStatus, SidebarSelection, VaultEntry } from '../../types'
 
-function makeEntry(path = '/test.md') {
+function makeEntry(path = '/test.md'): VaultEntry {
   return {
     path, filename: 'test.md', title: 'Test', isA: null,
     aliases: [], belongsTo: [], relatedTo: [], status: null,
@@ -11,7 +13,7 @@ function makeEntry(path = '/test.md') {
     icon: null, color: null, order: null, sidebarLabel: null,
     template: null, sort: null, view: null, visible: null,
     outgoingLinks: [], properties: {},
-  }
+  } as unknown as VaultEntry
 }
 
 function makeActions() {
@@ -27,31 +29,31 @@ function makeActions() {
   }
 }
 
-function makeMouseEvent(overrides = {}) {
-  return { metaKey: false, ctrlKey: false, shiftKey: false, ...overrides }
+function makeMouseEvent(overrides: Partial<Pick<MouseEvent, 'metaKey' | 'ctrlKey' | 'shiftKey'>> = {}): MouseEvent {
+  return { metaKey: false, ctrlKey: false, shiftKey: false, ...overrides } as MouseEvent
 }
 
-function makeStatusResolver(activeStatus, modifiedFiles) {
+function makeStatusResolver(activeStatus: NoteStatus, modifiedFiles: ModifiedFile[]) {
   return createNoteStatusResolver(
     () => activeStatus,
     modifiedFiles,
-    new Set(modifiedFiles.map((file) => file.path)),
+    new Set(modifiedFiles.map((file: ModifiedFile) => file.path)),
   )
 }
 
 describe('resolveHeaderTitle', () => {
   it('returns History for the pulse filter', () => {
-    const selection = { kind: 'filter', filter: 'pulse' }
+    const selection = { kind: 'filter', filter: 'pulse' } as SidebarSelection
     expect(resolveHeaderTitle(selection, null)).toBe('History')
   })
 
   it('localizes built-in note list titles', () => {
-    const selection = { kind: 'filter', filter: 'archived' }
+    const selection = { kind: 'filter', filter: 'archived' } as SidebarSelection
     expect(resolveHeaderTitle(selection, null, [], 'zh-CN')).toBe('归档')
   })
 
   it('keeps user-authored view names unchanged', () => {
-    const selection = { kind: 'view', filename: 'custom.yml' }
+    const selection = { kind: 'view', filename: 'custom.yml' } as SidebarSelection
 
     expect(resolveHeaderTitle(selection, null, [{
       filename: 'custom.yml',
@@ -104,7 +106,7 @@ describe('routeNoteClick', () => {
   it('Cmd+Shift+click is a no-op when handler is undefined', () => {
     const entry = makeEntry()
     const actions = makeActions()
-    actions.onOpenInNewWindow = undefined
+    delete (actions as Partial<typeof actions>).onOpenInNewWindow
     routeNoteClick(entry, makeMouseEvent({ metaKey: true, shiftKey: true }), actions)
     expect(actions.onReplace).not.toHaveBeenCalled()
     expect(actions.onEnterNeighborhood).not.toHaveBeenCalled()
@@ -113,7 +115,7 @@ describe('routeNoteClick', () => {
 
 describe('createNoteStatusResolver', () => {
   it('keeps transient note status ahead of repository status', () => {
-    const modifiedFiles = [{
+    const modifiedFiles: ModifiedFile[] = [{
       path: '/vault/note.md',
       relativePath: 'note.md',
       status: 'modified',
@@ -124,7 +126,7 @@ describe('createNoteStatusResolver', () => {
   })
 
   it('uses modified files when active-vault status says the note is clean', () => {
-    const modifiedFiles = [{
+    const modifiedFiles: ModifiedFile[] = [{
       path: '/other-vault/note.md',
       relativePath: 'note.md',
       status: 'untracked',

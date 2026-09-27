@@ -10,20 +10,22 @@ vi.mock('../mock-tauri', () => ({
 const { mockInvoke } = await import('../mock-tauri')
 const mockInvokeFn = mockInvoke as ReturnType<typeof vi.fn>
 
+type DeleteActionsInput = Parameters<typeof useDeleteActions>[0]
+
 describe('useDeleteActions', () => {
-  let onDeselectNote: ReturnType<typeof vi.fn>
-  let removeEntry: ReturnType<typeof vi.fn>
-  let removeEntries: ReturnType<typeof vi.fn>
-  let resolveVaultPathForPath: ReturnType<typeof vi.fn>
-  let refreshModifiedFiles: ReturnType<typeof vi.fn>
-  let reloadVault: ReturnType<typeof vi.fn>
-  let setToastMessage: ReturnType<typeof vi.fn>
+  let onDeselectNote: ReturnType<typeof vi.fn<(path: string) => void>>
+  let removeEntry: ReturnType<typeof vi.fn<(path: string) => void>>
+  let removeEntries: ReturnType<typeof vi.fn<(paths: string[]) => void>>
+  let resolveVaultPathForPath: ReturnType<typeof vi.fn<(path: string) => string | null | undefined>>
+  let refreshModifiedFiles: ReturnType<typeof vi.fn<DeleteActionsInput['refreshModifiedFiles']>>
+  let reloadVault: ReturnType<typeof vi.fn<DeleteActionsInput['reloadVault']>>
+  let setToastMessage: ReturnType<typeof vi.fn<DeleteActionsInput['setToastMessage']>>
 
   beforeEach(() => {
-    onDeselectNote = vi.fn()
-    removeEntry = vi.fn()
-    removeEntries = vi.fn()
-    resolveVaultPathForPath = vi.fn()
+    onDeselectNote = vi.fn<(path: string) => void>()
+    removeEntry = vi.fn<(path: string) => void>()
+    removeEntries = vi.fn<(paths: string[]) => void>()
+    resolveVaultPathForPath = vi.fn<(path: string) => string | null | undefined>()
     refreshModifiedFiles = vi.fn().mockResolvedValue(undefined)
     reloadVault = vi.fn().mockResolvedValue(undefined)
     setToastMessage = vi.fn()
@@ -31,17 +33,16 @@ describe('useDeleteActions', () => {
   })
 
   function renderDeleteActions(options: { resolveVaultPathForPath?: (path: string) => string | null | undefined } = {}) {
-    return renderHook(() =>
-      useDeleteActions({
-        onDeselectNote,
-        removeEntry,
-        removeEntries,
-        resolveVaultPathForPath: options.resolveVaultPathForPath,
-        refreshModifiedFiles,
-        reloadVault,
-        setToastMessage,
-      }),
-    )
+    const input: DeleteActionsInput = {
+      onDeselectNote,
+      removeEntry,
+      removeEntries,
+      resolveVaultPathForPath: options.resolveVaultPathForPath ?? resolveVaultPathForPath,
+      refreshModifiedFiles,
+      reloadVault,
+      setToastMessage,
+    }
+    return renderHook(() => useDeleteActions(input))
   }
 
   async function openDeleteDialog(
