@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import PrimeSessionList from './PrimeSessionList'
+import PrimeSessionList, { SESSION_LIST_WINDOW } from './PrimeSessionList'
 import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
 
 const invoked = vi.hoisted(() => ({
@@ -886,5 +886,71 @@ describe('PrimeSessionList — truncated names and keyboard focus', () => {
 
     const row = await screen.findByRole('button', { name: 'Open session Focus me' })
     expect(row.className).toMatch(/focus-visible:ring/)
+  })
+})
+
+describe('PrimeSessionList — cold launch window', () => {
+  function manySessions(count: number) {
+    return Array.from({ length: count }, (_, index) =>
+      summary({
+        id: `row-${index}`,
+        path: `/sessions/row-${index}.jsonl`,
+        title: `Row ${index}`,
+        mtimeMs: NOW - index * HOUR,
+      }),
+    )
+  }
+
+  it('mounts the first window of rows and reveals the rest from the last row', async () => {
+    invoked.result = manySessions(SESSION_LIST_WINDOW + 8)
+
+    render(<PrimeSessionList locale="en" now={NOW} />)
+
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /Open session Row/ })).toHaveLength(SESSION_LIST_WINDOW),
+    )
+    expect(screen.queryByRole('button', { name: 'Open session Row 30' })).not.toBeInTheDocument()
+
+    const open = screen.getAllByRole('button', { name: /Open session Row/ })
+    fireEvent.focus(open[open.length - 1])
+
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /Open session Row/ }).length).toBeGreaterThan(
+        SESSION_LIST_WINDOW,
+      ),
+    )
+    expect(screen.getByRole('button', { name: 'Open session Row 30' })).toBeInTheDocument()
+  })
+
+  it('still finds a session past the window when search matches it', async () => {
+    invoked.result = manySessions(SESSION_LIST_WINDOW + 8)
+
+    render(<PrimeSessionList locale="en" now={NOW} />)
+    await screen.findByRole('button', { name: 'Open session Row 0' })
+    expect(screen.queryByText('Row 30')).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByTestId('prime-session-search'), { target: { value: 'Row 30' } })
+
+    expect(await screen.findByText('Row 30')).toBeInTheDocument()
+  })
+
+  it('mounts the next window when the list is scrolled near the end', async () => {
+    invoked.result = manySessions(SESSION_LIST_WINDOW + 8)
+
+    render(<PrimeSessionList locale="en" now={NOW} />)
+    await screen.findByRole('button', { name: 'Open session Row 0' })
+
+    const viewport = document.querySelector('[data-slot="scroll-area-viewport"]')
+    if (!(viewport instanceof HTMLElement)) throw new Error('session list viewport missing')
+    Object.defineProperty(viewport, 'clientHeight', { value: 200, configurable: true })
+    Object.defineProperty(viewport, 'scrollHeight', { value: 2000, configurable: true })
+    Object.defineProperty(viewport, 'scrollTop', { value: 1800, configurable: true })
+    viewport.dispatchEvent(new Event('scroll'))
+
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /Open session Row/ }).length).toBeGreaterThan(
+        SESSION_LIST_WINDOW,
+      ),
+    )
   })
 })

@@ -1,10 +1,12 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
+  type FocusEvent as ReactFocusEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from 'react'
@@ -111,10 +113,12 @@ function SessionRowFrame({
   active,
   children,
   onContextMenu,
+  onFocus,
 }: {
   active: boolean
   children: ReactNode
   onContextMenu?: (event: ReactMouseEvent) => void
+  onFocus?: (event: ReactFocusEvent) => void
 }) {
   return (
     <div
@@ -124,6 +128,7 @@ function SessionRowFrame({
         active && 'border-border-strong bg-background',
       )}
       onContextMenu={onContextMenu}
+      onFocus={onFocus}
     >
       {children}
     </div>
@@ -173,6 +178,13 @@ function SessionRowAction({
     </Button>
   )
 }
+
+/**
+ * Rows mounted on cold launch. A rail shows about this many. The rest mount
+ * when the reader scrolls near the end, or focuses the last mounted row.
+ * Search and filter run on the full list first, then this window applies.
+ */
+export const SESSION_LIST_WINDOW = 24
 
 const SESSION_FILTER_OPTIONS: { value: PrimeSessionFilterKey; label: string }[] = [
   { value: 'all', label: 'All sessions' },
@@ -350,75 +362,91 @@ function SessionRowButton({
  * composes the same frame and button and differs only in its one action,
  * which is the whole of the difference.
  */
-function LiveSessionRow({
+const LiveSessionRow = memo(function LiveSessionRow({
+  sessionId,
   label,
   title,
   meta,
   active,
   status,
-  onSelect,
-  onContextMenu,
+  onSelectId,
+  onContextMenuId,
   renameLabel,
-  onRename,
+  onRenameId,
   archiveLabel,
-  onArchive,
+  onArchiveId,
+  onReachEnd,
 }: {
+  sessionId: string
   label: string
   title: string
   meta: string | null
   active: boolean
   status: PrimeSessionStatus
-  onSelect: () => void
-  onContextMenu: (event: ReactMouseEvent) => void
+  onSelectId: (id: string) => void
+  onContextMenuId: (id: string, event: ReactMouseEvent) => void
   renameLabel: string
-  onRename: () => void
+  onRenameId: (id: string) => void
   archiveLabel: string
-  onArchive: () => void
+  onArchiveId: (id: string) => void
+  onReachEnd?: () => void
 }) {
   return (
-    <SessionRowFrame active={active} onContextMenu={onContextMenu}>
+    <SessionRowFrame
+      active={active}
+      onFocus={onReachEnd ? () => onReachEnd() : undefined}
+      onContextMenu={(event) => onContextMenuId(sessionId, event)}
+    >
       <SessionRowButton
         label={label}
         title={title}
         meta={meta}
         active={active}
         status={status}
-        onSelect={onSelect}
+        onSelect={() => onSelectId(sessionId)}
       />
       <SessionRowActions>
-        <SessionRowAction label={renameLabel} icon={<PencilSimple size={13} />} onClick={onRename} />
-        <SessionRowAction label={archiveLabel} icon={<Archive size={13} />} onClick={onArchive} />
+        <SessionRowAction label={renameLabel} icon={<PencilSimple size={13} />} onClick={() => onRenameId(sessionId)} />
+        <SessionRowAction label={archiveLabel} icon={<Archive size={13} />} onClick={() => onArchiveId(sessionId)} />
       </SessionRowActions>
     </SessionRowFrame>
   )
-}
+})
 
 /** A filed session. Same row, and its action puts it back. */
-function ArchivedSessionRow({
+const ArchivedSessionRow = memo(function ArchivedSessionRow({
+  sessionId,
   label,
   title,
   meta,
   active,
-  onSelect,
-  onContextMenu,
+  onSelectId,
+  onContextMenuId,
   renameLabel,
-  onRename,
+  onRenameId,
   restoreLabel,
-  onRestore,
+  onRestoreId,
+  onReachEnd,
 }: {
+  sessionId: string
   label: string
   title: string
   meta: string | null
   active: boolean
-  onSelect: () => void
-  onContextMenu: (event: ReactMouseEvent) => void
+  onSelectId: (id: string) => void
+  onContextMenuId: (id: string, event: ReactMouseEvent) => void
   renameLabel: string
-  onRename: () => void
+  onRenameId: (id: string) => void
   restoreLabel: string
-  onRestore: () => void
+  onRestoreId: (id: string) => void
+  onReachEnd?: () => void
 }) {
   return (
-    <SessionRowFrame active={active} onContextMenu={onContextMenu}>
+    <SessionRowFrame
+      active={active}
+      onFocus={onReachEnd ? () => onReachEnd() : undefined}
+      onContextMenu={(event) => onContextMenuId(sessionId, event)}
+    >
       <SessionRowButton
         label={label}
         title={title}
@@ -428,19 +456,19 @@ function ArchivedSessionRow({
         // dot even if the daemon still holds it — the archive is where you
         // put the things you are not watching.
         status="saved"
-        onSelect={onSelect}
+        onSelect={() => onSelectId(sessionId)}
       />
       <SessionRowActions>
-        <SessionRowAction label={renameLabel} icon={<PencilSimple size={13} />} onClick={onRename} />
+        <SessionRowAction label={renameLabel} icon={<PencilSimple size={13} />} onClick={() => onRenameId(sessionId)} />
         <SessionRowAction
           label={restoreLabel}
           icon={<ArrowCounterClockwise size={13} />}
-          onClick={onRestore}
+          onClick={() => onRestoreId(sessionId)}
         />
       </SessionRowActions>
     </SessionRowFrame>
   )
-}
+})
 
 /**
  * Past Prime sessions, newest first.
@@ -471,9 +499,12 @@ export default function PrimeSessionList({
   const [query, setQuery] = useState('')
   const [filterKey, setFilterKey] = useState<PrimeSessionFilterKey>('all')
   const [sortKey, setSortKey] = useState<PrimeSessionSortKey>('newest')
+  const [liveWindow, setLiveWindow] = useState(SESSION_LIST_WINDOW)
+  const [archiveWindow, setArchiveWindow] = useState(SESSION_LIST_WINDOW)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [ctxMenu, setCtxMenu] = useState<PrimeSessionContextMenuState | null>(null)
   const ctxMenuRef = useRef<HTMLDivElement>(null)
+  const listRootRef = useRef<HTMLDivElement>(null)
   const filterTracked = useRef(false)
   // Which of these logs the daemon still holds. Polled only while this column
   // is mounted, which is while it is open.
@@ -623,6 +654,8 @@ export default function PrimeSessionList({
     visibleLive.length === 0 &&
     visibleArchived.length === 0
   const showArchived = archiveOpen || (searching && visibleArchived.length > 0)
+  const shownLive = visibleLive.slice(0, liveWindow)
+  const shownArchived = visibleArchived.slice(0, archiveWindow)
 
   useEffect(() => {
     if (!searching || filterTracked.current) return
@@ -721,8 +754,57 @@ export default function PrimeSessionList({
     [vaultPath],
   )
 
+  const findSession = useCallback(
+    (id: string) => sessions?.find((entry) => entry.id === id),
+    [sessions],
+  )
+  const selectById = useCallback((id: string) => {
+    const session = findSession(id)
+    if (session) select(session)
+  }, [findSession, select])
+  const contextMenuById = useCallback((id: string, event: ReactMouseEvent) => {
+    const session = findSession(id)
+    if (session) openContextMenu(session, event)
+  }, [findSession, openContextMenu])
+  const renameById = useCallback((id: string) => {
+    const session = findSession(id)
+    if (session) startRename(session)
+  }, [findSession, startRename])
+  const archiveById = useCallback((id: string) => {
+    const session = findSession(id)
+    if (session) setArchived(session, true)
+  }, [findSession, setArchived])
+  const restoreById = useCallback((id: string) => {
+    const session = findSession(id)
+    if (session) setArchived(session, false)
+  }, [findSession, setArchived])
+  const revealMoreLive = useCallback(() => {
+    setLiveWindow((count) => count + SESSION_LIST_WINDOW)
+  }, [])
+  const revealMoreArchived = useCallback(() => {
+    setArchiveWindow((count) => count + SESSION_LIST_WINDOW)
+  }, [])
+
+  useEffect(() => {
+    const viewport = listRootRef.current?.querySelector('[data-slot="scroll-area-viewport"]')
+    if (!(viewport instanceof HTMLElement)) return
+    const liveLength = visibleLive.length
+    const archivedLength = visibleArchived.length
+    const onScroll = () => {
+      if (viewport.clientHeight <= 0) return
+      const remaining = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight
+      if (remaining >= 80) return
+      setLiveWindow((count) => (count >= liveLength ? count : Math.min(liveLength, count + SESSION_LIST_WINDOW)))
+      setArchiveWindow((count) => (
+        count >= archivedLength ? count : Math.min(archivedLength, count + SESSION_LIST_WINDOW)
+      ))
+    }
+    viewport.addEventListener('scroll', onScroll, { passive: true })
+    return () => viewport.removeEventListener('scroll', onScroll)
+  }, [visibleArchived.length, visibleLive.length])
+
   return (
-    <div className="flex h-full w-full min-w-0 flex-col" data-testid="prime-session-list">
+    <div ref={listRootRef} className="flex h-full w-full min-w-0 flex-col" data-testid="prime-session-list">
       <div
         className={cn(
           'flex shrink-0 items-center justify-between gap-2 border-b border-border px-2.5',
@@ -746,6 +828,8 @@ export default function PrimeSessionList({
                 testId="prime-session-filter"
                 onChange={(next) => {
                   setFilterKey(next)
+                  setLiveWindow(SESSION_LIST_WINDOW)
+                  setArchiveWindow(SESSION_LIST_WINDOW)
                   trackPrimeSessionListScoped(next)
                 }}
               />
@@ -757,6 +841,8 @@ export default function PrimeSessionList({
                 testId="prime-session-sort"
                 onChange={(next) => {
                   setSortKey(next)
+                  setLiveWindow(SESSION_LIST_WINDOW)
+                  setArchiveWindow(SESSION_LIST_WINDOW)
                   trackPrimeSessionListSorted(next)
                 }}
               />
@@ -790,7 +876,11 @@ export default function PrimeSessionList({
         <div className="px-1.5 py-1">
           <Input
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value)
+              setLiveWindow(SESSION_LIST_WINDOW)
+              setArchiveWindow(SESSION_LIST_WINDOW)
+            }}
             placeholder={t('ai.sessions.searchPlaceholder')}
             aria-label={t('ai.sessions.search')}
             data-testid="prime-session-search"
@@ -818,13 +908,14 @@ export default function PrimeSessionList({
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-0 p-1">
-          {visibleLive.map((session) => {
+          {shownLive.map((session, index) => {
             const title = titleFor.get(session.id) ?? untitled
             const active = Boolean(activeSessionPath) && session.path === activeSessionPath
             const status = statusFor.get(session.id) ?? 'saved'
+            const atEnd = index === shownLive.length - 1 && shownLive.length < visibleLive.length
             if (renamingId === session.id) {
               return (
-                <SessionRowFrame key={session.id} active={active}>
+                <SessionRowFrame key={session.id} active={active} onFocus={atEnd ? revealMoreLive : undefined}>
                   <SessionNameInput
                     initialValue={session.title?.trim() ?? ''}
                     onCommit={(name) => commitRename(session, name)}
@@ -837,17 +928,19 @@ export default function PrimeSessionList({
             return (
               <LiveSessionRow
                 key={session.id}
+                sessionId={session.id}
                 title={title}
                 meta={metaFor.get(session.id) ?? null}
                 label={rowLabel(title, status)}
                 active={active}
                 status={status}
-                onSelect={() => select(session)}
-                onContextMenu={(event) => openContextMenu(session, event)}
+                onSelectId={selectById}
+                onContextMenuId={contextMenuById}
                 renameLabel={t('ai.sessions.rename', { title })}
-                onRename={() => startRename(session)}
+                onRenameId={renameById}
                 archiveLabel={t('ai.sessions.archive', { title })}
-                onArchive={() => setArchived(session, true)}
+                onArchiveId={archiveById}
+                onReachEnd={atEnd ? revealMoreLive : undefined}
               />
             )
           })}
@@ -873,13 +966,14 @@ export default function PrimeSessionList({
               </Button>
 
               {showArchived
-                ? visibleArchived.map((session) => {
+                ? shownArchived.map((session, index) => {
                     const title = titleFor.get(session.id) ?? untitled
                     const active =
                       Boolean(activeSessionPath) && session.path === activeSessionPath
+                    const atEnd = index === shownArchived.length - 1 && shownArchived.length < visibleArchived.length
                     if (renamingId === session.id) {
                       return (
-                        <SessionRowFrame key={session.id} active={active}>
+                        <SessionRowFrame key={session.id} active={active} onFocus={atEnd ? revealMoreArchived : undefined}>
                           <SessionNameInput
                             initialValue={session.title?.trim() ?? ''}
                             onCommit={(name) => commitRename(session, name)}
@@ -892,16 +986,18 @@ export default function PrimeSessionList({
                     return (
                       <ArchivedSessionRow
                         key={session.id}
+                        sessionId={session.id}
                         title={title}
                         meta={metaFor.get(session.id) ?? null}
                         label={t('ai.sessions.selectAria', { title })}
                         active={active}
-                        onSelect={() => select(session)}
-                        onContextMenu={(event) => openContextMenu(session, event)}
+                        onSelectId={selectById}
+                        onContextMenuId={contextMenuById}
                         renameLabel={t('ai.sessions.rename', { title })}
-                        onRename={() => startRename(session)}
+                        onRenameId={renameById}
                         restoreLabel={t('ai.sessions.restore', { title })}
-                        onRestore={() => setArchived(session, false)}
+                        onRestoreId={restoreById}
+                        onReachEnd={atEnd ? revealMoreArchived : undefined}
                       />
                     )
                   })
