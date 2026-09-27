@@ -1,0 +1,79 @@
+diff --git a/dist/blocknote-react.js b/dist/blocknote-react.js
+index cc3af01f251ef4393bb3f9318d8e28c97a62f0dc..c101902234ae5d51586c715e943c7a345829cd1d 100644
+--- a/dist/blocknote-react.js
++++ b/dist/blocknote-react.js
+@@ -10,6 +10,15 @@ import { createPortal as dt, flushSync as ft } from "react-dom";
+ import { Mark as pt, NodeViewWrapper as mt, ReactMarkViewContext as ht, ReactMarkViewRenderer as gt, ReactNodeViewRenderer as _t, useReactNodeView as vt } from "@tiptap/react";
+ import { createRoot as yt } from "react-dom/client";
+ import { TextSelection as bt } from "@tiptap/pm/state";
++function __rhizomeSafeDomAtPos(e, t) {
++	let n = e.prosemirrorView;
++	if (!n || n.isDestroyed) return null;
++	try {
++		return n.domAtPos(t);
++	} catch {
++		return null;
++	}
++}
+ //#region \0rolldown/runtime.js
+ var xt = Object.defineProperty, St = (e, t) => {
+ 	let n = {};
+@@ -23,7 +32,7 @@ var xt = Object.defineProperty, St = (e, t) => {
+ 		if (!t) return;
+ 		let n = Je(t, e.doc);
+ 		if (!n) return;
+-		let { node: r } = i.prosemirrorView.domAtPos(n.posBeforeNode + 1);
++		let r = __rhizomeSafeDomAtPos(i, n.posBeforeNode + 1)?.node;
+ 		if (r instanceof Element) return { element: r };
+ 	}), [i, t]);
+ 	return /* @__PURE__ */ K(p, {
+@@ -2595,7 +2604,14 @@ function ui(e, t, n, r, a) {
+ //#region src/components/SuggestionMenu/GridSuggestionMenu/GridSuggestionMenuWrapper.tsx
+ function di(e) {
+ 	let n = t().setContentEditableProps, r = C(), { getItems: i, gridSuggestionMenuComponent: a, query: o, clearQuery: s, closeMenu: c, onItemClick: l, columns: u } = e, d = k((e) => {
+-		c(), s(), l?.(e);
++		c();
++		try {
++			s();
++		} catch (t) {
++			console.warn("Ignored stale suggestion menu query cleanup:", t);
++			return;
++		}
++		l?.(e);
+ 	}, [
+ 		l,
+ 		c,
+@@ -2787,7 +2803,14 @@ function gi(e, t, n, r, a) {
+ //#region src/components/SuggestionMenu/SuggestionMenuWrapper.tsx
+ function _i(e) {
+ 	let n = t().setContentEditableProps, r = C(), { getItems: i, suggestionMenuComponent: a, query: o, clearQuery: s, closeMenu: c, onItemClick: l } = e, u = k((e) => {
+-		c(), s(), l?.(e);
++		c();
++		try {
++			s();
++		} catch (t) {
++			console.warn("Ignored stale suggestion menu query cleanup:", t);
++			return;
++		}
++		l?.(e);
+ 	}, [
+ 		l,
+ 		c,
+diff --git a/dist/confirmDiscardUnsavedComment-BLTco3jJ.js b/dist/confirmDiscardUnsavedComment-BLTco3jJ.js
+index 2619d4f5b9227e503610994acc0860e10ffca009..7f7f3fd7ba67ef3c5e10ed69e3ad4c2d6dc37011 100644
+--- a/dist/confirmDiscardUnsavedComment-BLTco3jJ.js
++++ b/dist/confirmDiscardUnsavedComment-BLTco3jJ.js
+@@ -207,8 +207,11 @@ function Y(e) {
+ //#endregion
+ //#region src/components/Popovers/GenericPopover.tsx
+ function X(e) {
+-	let t = new DOMRect(), n = "getBoundingClientRect" in e ? () => e.getBoundingClientRect() : () => e.element.getBoundingClientRect();
+-	return () => e.element && (e.cacheMountedBoundingClientRect ?? !0) ? (e.element.isConnected && (t = n()), t) : n();
++	let t = new DOMRect(), n = () => "getBoundingClientRect" in e ? e.getBoundingClientRect() : e.element instanceof Element ? e.element.getBoundingClientRect() : t;
++	return () => {
++		if (!e.element || !(e.cacheMountedBoundingClientRect ?? !0) || !(e.element instanceof Element)) return n();
++		return e.element.isConnected && (t = n()), t;
++	};
+ }
+ function ie(e, t) {
+ 	return e ? t ? (n, r, i) => {

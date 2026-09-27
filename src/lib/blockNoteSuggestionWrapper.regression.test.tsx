@@ -6,6 +6,8 @@ import type { SuggestionMenuProps } from '@blocknote/react'
 function createEditor() {
   return {
     domElement: document.createElement('div'),
+    // BlockNote 0.55 subscribes to Tiptap events for the editor DOM element.
+    _tiptapEditor: { on: () => {}, off: () => {} },
   }
 }
 
