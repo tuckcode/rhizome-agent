@@ -488,6 +488,19 @@ pub fn clear_prime_session_queue() -> Result<crate::prime_session_host::PrimeQue
     crate::prime_session_host::clear_queue()
 }
 
+/// Rewrite, delete, or move one queued line. `expected_text` is the preview
+/// from the last `get_queue`.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn mutate_prime_queued_message(
+    lane: String,
+    index: u64,
+    expected_text: String,
+    mutation: serde_json::Value,
+) -> Result<crate::prime_session_host::PrimeQueuedMutationResult, String> {
+    crate::prime_session_host::mutate_queued_message(&lane, index, &expected_text, mutation)
+}
+
 /// Fork/branch history of the attached conversation (#17).
 #[cfg(desktop)]
 #[tauri::command]

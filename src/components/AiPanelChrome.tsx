@@ -20,6 +20,7 @@ import type { NoteReference } from '../utils/ai-context'
 import type { VaultEntry } from '../types'
 import type { CommandMenuAction, CommandMenuEntry } from '../lib/primeCommandMenu'
 import { primeQueueIsEmpty, primeQueueItems, type PrimeQueue } from '../lib/primeQueue'
+import { PrimeQueueItemActions } from './PrimeQueueItemActions'
 import { cn } from '@/lib/utils'
 import { suggestReply } from '../lib/replySuggestions'
 import { latestAssistantMessageIndex } from '../lib/latestAssistantMessage'
@@ -900,6 +901,7 @@ export function AiPanelComposer({
                   </span>
                   <span className="text-foreground">{item.text}</span>
                 </span>
+                <PrimeQueueItemActions item={item} />
               </li>
             ))}
           </ul>

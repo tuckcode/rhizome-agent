@@ -385,6 +385,10 @@ impl PrimeSessionStats {
 pub struct PrimeQueue {
     pub steering: Vec<String>,
     pub follow_up: Vec<String>,
+    /// True when the daemon advertised `queue_message_mutation`. Chat hides
+    /// per-row edit controls when this is false.
+    #[serde(default)]
+    pub can_mutate: bool,
 }
 
 impl PrimeQueue {
@@ -397,6 +401,7 @@ impl PrimeQueue {
         Self {
             steering: string_previews(&data["steering"]),
             follow_up,
+            can_mutate: false,
         }
     }
 }
@@ -2345,7 +2350,7 @@ pub fn get_queue() -> Result<PrimeQueue, String> {
             return Ok(PrimeQueue::default());
         }
         let data = host.call(serde_json::json!({ "type": "get_queue" }))?;
-        Ok(PrimeQueue::from_data(&data))
+        Ok(host.queue_from_data(&data))
     })
 }
 
@@ -2357,7 +2362,59 @@ pub fn clear_queue() -> Result<PrimeQueue, String> {
             return Ok(PrimeQueue::default());
         }
         let data = host.call(serde_json::json!({ "type": "clear_queue" }))?;
-        Ok(PrimeQueue::from_data(&data))
+        Ok(host.queue_from_data(&data))
+    })
+}
+
+/// One queued line was edited, removed, or the daemon refused the edit.
+///
+/// `status` is Prime's `QueuedMessageMutationStatus`, plus `unsupported` when
+/// this daemon did not advertise `queue_message_mutation`.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrimeQueuedMutationResult {
+    pub status: String,
+}
+
+fn prime_queue_lane(lane: &str) -> Result<&'static str, String> {
+    match lane {
+        "steer" | "steering" => Ok("steering"),
+        "followUp" | "follow_up" => Ok("followUp"),
+        other => Err(format!("Unknown queue lane: {other}")),
+    }
+}
+
+/// Edit, delete, or move one queued line. Clear-all stays `clear_queue`.
+///
+/// `expected_text` must be the preview from the last `get_queue`. Rhizome's
+/// `steer` lane is Prime's `"steering"`. The other lane is `"followUp"`.
+pub fn mutate_queued_message(
+    lane: &str,
+    index: u64,
+    expected_text: &str,
+    mutation: serde_json::Value,
+) -> Result<PrimeQueuedMutationResult, String> {
+    let prime_lane = prime_queue_lane(lane)?;
+    with_host_mut(|host| {
+        if !host.has_session() {
+            return Ok(PrimeQueuedMutationResult {
+                status: "rejected".into(),
+            });
+        }
+        if !host.queue_mutation_available() {
+            return Ok(PrimeQueuedMutationResult {
+                status: "unsupported".into(),
+            });
+        }
+        let data = host.call(serde_json::json!({
+            "type": "mutate_queued_message",
+            "lane": prime_lane,
+            "index": index,
+            "expectedText": expected_text,
+            "mutation": mutation,
+        }))?;
+        let status = data["status"].as_str().unwrap_or("rejected").to_string();
+        Ok(PrimeQueuedMutationResult { status })
     })
 }
 
@@ -3587,6 +3644,18 @@ impl PrimeHost {
                     .collect()
             })
             .unwrap_or_default();
+    }
+
+    fn queue_mutation_available(&self) -> bool {
+        self.server_capabilities
+            .iter()
+            .any(|capability| capability == "queue_message_mutation")
+    }
+
+    fn queue_from_data(&self, data: &serde_json::Value) -> PrimeQueue {
+        let mut queue = PrimeQueue::from_data(data);
+        queue.can_mutate = self.queue_mutation_available();
+        queue
     }
 
     fn require_client_owned_sessions(&self, operation: &str) -> Result<(), String> {
@@ -7026,6 +7095,7 @@ mod tests {
             PrimeQueue {
                 steering: vec!["focus on error handling".into()],
                 follow_up: vec!["then summarise".into()],
+                can_mutate: false,
             }
         );
 
@@ -7065,9 +7135,84 @@ mod tests {
             PrimeQueue {
                 steering: vec!["focus on error handling".into()],
                 follow_up: vec!["then summarise".into()],
+                can_mutate: false,
             }
         );
         assert_eq!(clear_queue().unwrap(), PrimeQueue::default());
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn mutate_queued_message_maps_steer_and_sends_the_preview() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let mut hello = fake_hello();
+        hello["serverCapabilities"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!("queue_message_mutation"));
+        let daemon = FakeDaemon::start_with_hello(
+            |command, id| match command["type"].as_str() {
+                Some("mutate_queued_message") => Some(vec![ok(
+                    id,
+                    "mutate_queued_message",
+                    serde_json::json!({ "status": "applied" }),
+                )]),
+                Some("get_queue") => Some(vec![ok(
+                    id,
+                    "get_queue",
+                    serde_json::json!({ "steering": ["focus on error handling"], "followUp": [] }),
+                )]),
+                _ => None,
+            },
+            hello,
+        );
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        assert!(get_queue().unwrap().can_mutate);
+        let result = mutate_queued_message(
+            "steer",
+            0,
+            "focus on error handling",
+            serde_json::json!({ "type": "delete" }),
+        )
+        .unwrap();
+        assert_eq!(result.status, "applied");
+
+        let sent = daemon.command("mutate_queued_message").unwrap();
+        assert_eq!(sent["lane"], "steering");
+        assert_eq!(sent["index"], 0);
+        assert_eq!(sent["expectedText"], "focus on error handling");
+        assert_eq!(sent["mutation"]["type"], "delete");
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn mutate_queued_message_stays_unsent_without_the_capability() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_command, _id| None);
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let result = mutate_queued_message(
+            "followUp",
+            1,
+            "then summarise",
+            serde_json::json!({
+                "type": "replace",
+                "text": "rewritten",
+                "lane": "followUp",
+            }),
+        )
+        .unwrap();
+        assert_eq!(result.status, "unsupported");
+        assert!(daemon.command("mutate_queued_message").is_none());
 
         let _ = shutdown_host();
     }
