@@ -13,10 +13,10 @@ assessment and a Cursor execution plan. Start with the
 The [inventory](plans/2026-09-20-public-readiness-inventory.md) preserves all
 17 live open issues, latest design papers, and parked ideas. Drafts #66–#68
 are closed.
-Local product checkpoint is `4f9b4c4` and is **unpushed**. `origin/main`
-is still `dc44d84`. Planning also sits locally as **`bcd4b87`** and is
-**unpushed**. **C76** source is in this commit series. Rebuild remains
-separate.
+**Origin:** Composer 2.5 Fast · 2026-09-27 · snapshot refresh (swarm Wave 1).
+
+`origin/main` = **`5c37d28`**; local HEAD matches; nothing unpushed. Installed
+app = **`d0a55f8`**. Rebuild remains a separate verb from commit/push.
 
 **Origin:** Composer · Cursor · 2026-09-20 04:38.
 
@@ -48,8 +48,8 @@ It indexes, it does not restate. Every row points at the issue, ADR, or C-number
 that owns the detail. If you find yourself copying a paragraph out of one of
 those into here, link it instead — the same rule `HANDOFF.md` runs on.
 
-Snapshot: **2026-09-20** — local product checkpoint **`4f9b4c4` (unpushed)**,
-`origin/main` **`dc44d84`**, planning **uncommitted**, app **`6860762`**.
+Snapshot: **2026-09-27** — `origin/main` **`5c37d28`**, app **`d0a55f8`**
+(source-only after that SHA until rebuild).
 God plan: [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md).
 Pickup handoff: [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
 Live `gh` open-issue count is stale here — re-derive:
@@ -390,7 +390,7 @@ the backlog, not a replacement for it.
 - **Correctness:** C40 (`rhizome_graph_summary` answers about a different graph)
 - ~~**Health and cleanup:** C46~~ **RESOLVED 2026-08-30** — see HANDOFF
   C46-RESOLVED
-- **Health and cleanup:** C21 / C30 (branding residues). ~~**C11 / #55**~~
+- **Health and cleanup:** ~~C21~~ **RESOLVED** (eight live residues fixed 2026-08-02; confirmed 2026-09-27). ~~C30~~ **RESOLVED** (`__rhizomeFrontendReady`). ~~**C11 / #55**~~
   local scaffold shipped; C11 remote env override still deferred.
 - **Product decisions pending:** C9 (optional first-run Welcome — ties to
   session import), C10 (spotlight onboarding, spec written and unbuilt), C7
@@ -419,11 +419,8 @@ in both directions.
 
 Worth doing, in order:
 
-1. **Cross-reference what exists.** Add issue numbers to ADR-0166's open
-   questions, and an ADR/design link to each blocked issue. Cheapest fix, kills
-   the whole class.
-2. **Close the ADR-0166 open questions** into a decision (§1). Three unresolved
-   questions in the newest structural ADR are blocking five issues.
+1. **Cross-reference what exists.** **Done 2026-09-27:** [ADR-0175](adr/0175-chat-shell-github-issue-crosswalk.md) indexes #27, #34, #39, #11, and #22 against ADR-0166 / ADR-0170 / ADR-0171. Link issue bodies both ways when you touch them.
+2. **Close the ADR-0166 open questions** into a decision (§1). **Canvas placement closed** by ADR-0170 and ADR-0171; ADR-0175 records the issue states. **#39 (agent tools)** stays open on GitHub — not a shell-layout question.
 3. **Memory-loop index exists:** [`design/memory-loop.md`](design/memory-loop.md).
    #24 / #25 are **closed** on GitHub. Consolidation sketch is still
    [`automatic-memory-consolidation.md`](design/automatic-memory-consolidation.md)
