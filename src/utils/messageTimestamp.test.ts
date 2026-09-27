@@ -28,6 +28,12 @@ describe('messageTimestamp', () => {
     expect(formatMessageClock(Number.NaN)).toBe('')
   })
 
+  it('follows a display zone instead of this machine', () => {
+    const instant = Date.parse('2026-01-16T04:30:00.000Z')
+    expect(formatMessageClock(instant, 'America/Chicago')).toBe('10:30p')
+    expect(formatMessageClock(instant, 'Europe/Rome')).toBe('5:30a')
+  })
+
   it('passes through millisecond timestamps unchanged', () => {
     const ms = new Date(2026, 8, 6, 15, 35, 0).getTime()
     expect(normalizeMessageTimestampMs(ms)).toBe(ms)

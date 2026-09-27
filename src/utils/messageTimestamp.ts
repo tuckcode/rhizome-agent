@@ -1,3 +1,5 @@
+import { clockPartsForDisplay } from './dateDisplay'
+
 /**
  * Clock labels on Chat bubbles (C70).
  *
@@ -13,12 +15,13 @@ export function normalizeMessageTimestampMs(value: number | undefined | null): n
 }
 
 /** Local clock like `3:35p` / `12:05a`. Empty string when unusable. */
-export function formatMessageClock(ms: number): string {
+export function formatMessageClock(ms: number, timeZone?: string | null): string {
   const normalized = normalizeMessageTimestampMs(ms)
   if (normalized === undefined) return ''
   const date = new Date(normalized)
-  let hours = date.getHours()
-  const minutes = date.getMinutes()
+  const zoned = clockPartsForDisplay(date, timeZone)
+  let hours = zoned.hour
+  const minutes = zoned.minute
   const meridiem = hours >= 12 ? 'p' : 'a'
   hours = hours % 12
   if (hours === 0) hours = 12

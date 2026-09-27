@@ -5,6 +5,57 @@ export type DateDisplayFormat = 'us' | 'european' | 'friendly' | 'iso'
 export const DEFAULT_DATE_DISPLAY_FORMAT: DateDisplayFormat = 'friendly'
 export const DATE_DISPLAY_FORMATS: readonly DateDisplayFormat[] = ['us', 'european', 'friendly', 'iso']
 
+/** Stored as `null`. The picker uses this sentinel because Select cannot use an empty value. */
+export const LOCAL_DISPLAY_TIME_ZONE = 'local'
+
+let activeDisplayTimeZone: string | null = null
+let cachedTimeZones: readonly string[] | null = null
+
+export function listDisplayTimeZones(): readonly string[] {
+  if (cachedTimeZones) return cachedTimeZones
+  if (typeof Intl.supportedValuesOf !== 'function') {
+    cachedTimeZones = []
+    return cachedTimeZones
+  }
+  cachedTimeZones = Intl.supportedValuesOf('timeZone')
+  return cachedTimeZones
+}
+
+export function normalizeDisplayTimeZone(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const lower = trimmed.toLowerCase()
+  if (lower === 'local' || lower === 'none') return null
+  if (isNumericUtcOffset(trimmed)) return null
+  const zones = listDisplayTimeZones()
+  if (zones.length === 0) return isIanaTimeZoneName(trimmed) ? trimmed : null
+  return zones.find((zone) => zone.toLowerCase() === lower) ?? null
+}
+
+export function bindDisplayTimeZone(timeZone: string | null): void {
+  activeDisplayTimeZone = normalizeDisplayTimeZone(timeZone)
+}
+
+function chosenZone(timeZone: string | null | undefined): string | null {
+  if (timeZone === undefined) return activeDisplayTimeZone
+  return normalizeDisplayTimeZone(timeZone)
+}
+
+function isNumericUtcOffset(value: string): boolean {
+  return /^(?:UTC|GMT)?[+-]\d{1,2}(?::?\d{2})?$/i.test(value)
+}
+
+function isIanaTimeZoneName(value: string): boolean {
+  if (value.length < 2 || value.length > 64) return false
+  if (!/^[A-Za-z0-9_/+-]+$/.test(value)) return false
+  if (value.includes('/')) {
+    const parts = value.split('/')
+    return parts.length >= 2 && parts.every((part) => part.length > 0)
+  }
+  return /^[A-Za-z]+$/.test(value)
+}
+
 const FRIENDLY_MONTHS = [
   'January',
   'February',
@@ -44,41 +95,96 @@ export function formatDatePartsForDisplay(
   return `${FRIENDLY_MONTHS[parts.month - 1]} ${parts.day}, ${parts.year}`
 }
 
-function datePartsFromDate(date: Date): DateParts {
+interface ClockParts {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+}
+
+function localClockParts(date: Date): ClockParts {
   return {
     year: date.getFullYear(),
     month: date.getMonth() + 1,
     day: date.getDate(),
+    hour: date.getHours(),
+    minute: date.getMinutes(),
   }
+}
+
+function zonedClockParts(date: Date, timeZone: string): ClockParts | null {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+    const bag = new Map(formatter.formatToParts(date).map((part) => [part.type, part.value]))
+    const year = Number(bag.get('year'))
+    const month = Number(bag.get('month'))
+    const day = Number(bag.get('day'))
+    let hour = Number(bag.get('hour'))
+    const minute = Number(bag.get('minute'))
+    if (![year, month, day, hour, minute].every(Number.isFinite)) return null
+    if (hour === 24) hour = 0
+    return { year, month, day, hour, minute }
+  } catch {
+    return null
+  }
+}
+
+function clockParts(date: Date, timeZone: string | null | undefined): ClockParts {
+  const zone = chosenZone(timeZone)
+  if (!zone) return localClockParts(date)
+  return zonedClockParts(date, zone) ?? localClockParts(date)
+}
+
+function datePartsFromDate(date: Date, timeZone?: string | null): DateParts {
+  const parts = clockParts(date, timeZone)
+  return { year: parts.year, month: parts.month, day: parts.day }
 }
 
 export function formatDateForDisplay(
   date: Date,
   format: DateDisplayFormat = DEFAULT_DATE_DISPLAY_FORMAT,
+  timeZone?: string | null,
 ): string {
-  return formatDatePartsForDisplay(datePartsFromDate(date), format)
+  return formatDatePartsForDisplay(datePartsFromDate(date, timeZone), format)
 }
 
 export function formatTimestampForDateDisplay(
   timestampSeconds: number | null | undefined,
   format: DateDisplayFormat = DEFAULT_DATE_DISPLAY_FORMAT,
+  timeZone?: string | null,
 ): string {
   if (!timestampSeconds) return ''
-  return formatDateForDisplay(new Date(timestampSeconds * 1000), format)
+  return formatDateForDisplay(new Date(timestampSeconds * 1000), format, timeZone)
 }
 
-/** Local clock time, `14:08`. Matches the session list's meta line. */
-export function formatTimeForDisplay(date: Date): string {
-  return `${twoDigit(date.getHours())}:${twoDigit(date.getMinutes())}`
+/** Clock time, `14:08`. `None` uses this machine. A zone uses `Intl` in that zone. */
+export function formatTimeForDisplay(date: Date, timeZone?: string | null): string {
+  const parts = clockParts(date, timeZone)
+  return `${twoDigit(parts.hour)}:${twoDigit(parts.minute)}`
 }
 
-/** Same calendar day on the viewer's own clock. */
-export function isSameDisplayDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear()
-    && a.getMonth() === b.getMonth()
-    && a.getDate() === b.getDate()
-  )
+export function clockPartsForDisplay(
+  date: Date,
+  timeZone?: string | null,
+): { hour: number; minute: number } {
+  const parts = clockParts(date, timeZone)
+  return { hour: parts.hour, minute: parts.minute }
+}
+
+/** Same calendar day in the display zone, or on this machine when the zone is `None`. */
+export function isSameDisplayDay(a: Date, b: Date, timeZone?: string | null): boolean {
+  const left = datePartsFromDate(a, timeZone)
+  const right = datePartsFromDate(b, timeZone)
+  return left.year === right.year && left.month === right.month && left.day === right.day
 }
 
 /**
@@ -94,22 +200,23 @@ export function isSameDisplayDay(a: Date, b: Date): boolean {
  * instead. Nothing is lost and the row starts carrying information it did not
  * before.
  *
- * Local time throughout, which is what `getHours` and `getDate` read — a
- * timestamp is only meaningful to a reader in their own zone.
+ * `None` follows this machine. A chosen IANA zone formats through `Intl` and
+ * does not read `getHours` or `getDate`.
  */
 export function formatSavedLabel(
   savedSeconds: number | null | undefined,
   createdSeconds: number | null | undefined,
   format: DateDisplayFormat = DEFAULT_DATE_DISPLAY_FORMAT,
+  timeZone?: string | null,
 ): string {
   if (!savedSeconds) return ''
   const saved = new Date(savedSeconds * 1000)
-  if (!createdSeconds) return formatDateForDisplay(saved, format)
+  if (!createdSeconds) return formatDateForDisplay(saved, format, timeZone)
 
   const created = new Date(createdSeconds * 1000)
-  return isSameDisplayDay(saved, created)
-    ? formatTimeForDisplay(saved)
-    : formatDateForDisplay(saved, format)
+  return isSameDisplayDay(saved, created, timeZone)
+    ? formatTimeForDisplay(saved, timeZone)
+    : formatDateForDisplay(saved, format, timeZone)
 }
 
 export function parseDateDisplayParts(value: string): DateParts | null {

@@ -5,12 +5,14 @@ import {
   trackDefaultNoteWidthChanged,
   trackGitFeaturesEnabledChanged,
   trackSidebarTypePluralizationChanged,
+  trackTimezoneDisplayChanged,
 } from '../lib/productAnalytics'
 import { areGitFeaturesEnabled } from '../lib/gitSettings'
 import { areAutomaticUpdateChecksEnabled } from '../lib/automaticUpdateChecks'
 import {
   DEFAULT_DATE_DISPLAY_FORMAT,
   normalizeDateDisplayFormat,
+  normalizeDisplayTimeZone,
   type DateDisplayFormat,
 } from '../utils/dateDisplay'
 import { DEFAULT_NOTE_WIDTH_MODE, normalizeNoteWidthMode } from '../utils/noteWidth'
@@ -19,6 +21,7 @@ export interface SettingsPreferenceDraft {
   analytics: boolean
   automaticUpdateChecksEnabled: boolean
   dateDisplayFormat: DateDisplayFormat
+  displayTimeZone: string | null
   defaultNoteWidth: NoteWidthMode
   gitFeaturesEnabled: boolean
   multiWorkspaceEnabled: boolean
@@ -63,6 +66,13 @@ export function trackSettingsPreferenceChanges(settings: Settings, draft: Settin
     normalizeDateDisplayFormat(settings.date_display_format) ?? DEFAULT_DATE_DISPLAY_FORMAT,
     draft.dateDisplayFormat,
     trackDateDisplayFormatChanged,
+  )
+  trackPreferenceChange(
+    normalizeDisplayTimeZone(settings.timezone),
+    draft.displayTimeZone,
+    (timezone) => {
+      if (timezone) trackTimezoneDisplayChanged(timezone)
+    },
   )
   trackPreferenceChange(
     normalizeNoteWidthMode(settings.note_width_mode) ?? DEFAULT_NOTE_WIDTH_MODE,

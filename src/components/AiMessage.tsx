@@ -22,6 +22,7 @@ import { writeClipboardText } from '../utils/clipboardText'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
 import { groupConsecutiveToolActions } from '../lib/groupConsecutiveToolActions'
 import { trackVaultRetrievalSourceOpened } from '../lib/productAnalytics'
+import { useDisplayTimeZone } from '../hooks/useAppPreferences'
 import { formatMessageClock } from '../utils/messageTimestamp'
 
 export interface AiAction {
@@ -113,7 +114,8 @@ function UserBubble({ content, references, onOpenNote, createdAtMs }: {
   onOpenNote?: (path: string) => void
   createdAtMs?: number
 }) {
-  const clock = typeof createdAtMs === 'number' ? formatMessageClock(createdAtMs) : ''
+  const displayTimeZone = useDisplayTimeZone()
+  const clock = typeof createdAtMs === 'number' ? formatMessageClock(createdAtMs, displayTimeZone) : ''
   return (
     <div className="flex flex-col items-end" style={{ marginBottom: 8 }}>
       {/*

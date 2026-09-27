@@ -148,6 +148,8 @@ export interface Settings {
   accent_color?: AccentColor | null
   ui_language?: AppLocale | null
   date_display_format?: DateDisplayFormat | null
+  /** IANA zone for on-screen clocks. Absent or null follows this machine. */
+  timezone?: string | null
   note_width_mode?: NoteWidthMode | null
   sidebar_type_pluralization_enabled?: boolean | null
   initial_h1_auto_rename_enabled?: boolean | null

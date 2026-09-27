@@ -252,6 +252,10 @@ export function trackDateDisplayFormatChanged(format: DateDisplayFormat): void {
   trackEvent('date_display_format_changed', { format })
 }
 
+export function trackTimezoneDisplayChanged(timezone: string): void {
+  trackEvent('timezone_display_changed', { timezone })
+}
+
 export function trackSidebarTypePluralizationChanged(enabled: AnalyticsBoolean): void {
   trackEvent('sidebar_type_pluralization_changed', {
     enabled: numericFlag(enabled),

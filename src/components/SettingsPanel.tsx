@@ -91,6 +91,7 @@ import {
 import {
   DEFAULT_DATE_DISPLAY_FORMAT,
   normalizeDateDisplayFormat,
+  normalizeDisplayTimeZone,
   type DateDisplayFormat,
 } from '../utils/dateDisplay'
 import { BridgeTokenRow } from './BridgeTokenRow'
@@ -145,6 +146,7 @@ interface SettingsDraft {
   accentColor: AccentColor
   uiLanguage: UiLanguagePreference
   dateDisplayFormat: DateDisplayFormat
+  displayTimeZone: string | null
   defaultNoteWidth: NoteWidthMode
   sidebarTypePluralizationEnabled: boolean
   initialH1AutoRename: boolean
@@ -193,6 +195,8 @@ interface SettingsBodyProps {
   setUiLanguage: (value: UiLanguagePreference) => void
   dateDisplayFormat: DateDisplayFormat
   setDateDisplayFormat: (value: DateDisplayFormat) => void
+  displayTimeZone: string | null
+  setDisplayTimeZone: (value: string | null) => void
   defaultNoteWidth: NoteWidthMode
   setDefaultNoteWidth: (value: NoteWidthMode) => void
   sidebarTypePluralizationEnabled: boolean
@@ -264,6 +268,7 @@ function createSettingsDraft(
     accentColor: resolveSettingsDraftAccentColor(settings.accent_color),
     uiLanguage: settings.ui_language ?? SYSTEM_UI_LANGUAGE,
     dateDisplayFormat: normalizeDateDisplayFormat(settings.date_display_format) ?? DEFAULT_DATE_DISPLAY_FORMAT,
+    displayTimeZone: normalizeDisplayTimeZone(settings.timezone),
     defaultNoteWidth: normalizeNoteWidthMode(settings.note_width_mode) ?? DEFAULT_NOTE_WIDTH_MODE,
     sidebarTypePluralizationEnabled: settings.sidebar_type_pluralization_enabled ?? true,
     initialH1AutoRename: settings.initial_h1_auto_rename_enabled ?? true,
@@ -327,6 +332,7 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     accent_color: draft.accentColor,
     ui_language: serializeUiLanguagePreference(draft.uiLanguage),
     date_display_format: draft.dateDisplayFormat,
+    timezone: draft.displayTimeZone,
     note_width_mode: draft.defaultNoteWidth,
     sidebar_type_pluralization_enabled: draft.sidebarTypePluralizationEnabled,
     initial_h1_auto_rename_enabled: draft.initialH1AutoRename,
@@ -727,6 +733,8 @@ function SettingsBodyFromDraft({
       setUiLanguage={(value) => updateDraft('uiLanguage', value)}
       dateDisplayFormat={draft.dateDisplayFormat}
       setDateDisplayFormat={(value) => updateDraft('dateDisplayFormat', value)}
+      displayTimeZone={draft.displayTimeZone}
+      setDisplayTimeZone={(value) => updateDraft('displayTimeZone', value)}
       defaultNoteWidth={draft.defaultNoteWidth}
       setDefaultNoteWidth={(value) => updateDraft('defaultNoteWidth', value)}
       sidebarTypePluralizationEnabled={draft.sidebarTypePluralizationEnabled}
@@ -929,6 +937,8 @@ function SettingsContentSections({
   t,
   dateDisplayFormat,
   setDateDisplayFormat,
+  displayTimeZone,
+  setDisplayTimeZone,
   defaultNoteWidth,
   setDefaultNoteWidth,
   sidebarTypePluralizationEnabled,
@@ -946,6 +956,8 @@ function SettingsContentSections({
         t={t}
         dateDisplayFormat={dateDisplayFormat}
         setDateDisplayFormat={setDateDisplayFormat}
+        displayTimeZone={displayTimeZone}
+        setDisplayTimeZone={setDisplayTimeZone}
         defaultNoteWidth={defaultNoteWidth}
         setDefaultNoteWidth={setDefaultNoteWidth}
         sidebarTypePluralizationEnabled={sidebarTypePluralizationEnabled}

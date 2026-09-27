@@ -2,7 +2,12 @@ import { Article } from '@phosphor-icons/react'
 import type { TranslationKey, TranslationValues } from '../lib/i18n'
 import type { NoteWidthMode } from '../types'
 import type { AllNotesFileVisibility } from '../utils/allNotesFileVisibility'
-import { DATE_DISPLAY_FORMATS, type DateDisplayFormat } from '../utils/dateDisplay'
+import {
+  DATE_DISPLAY_FORMATS,
+  LOCAL_DISPLAY_TIME_ZONE,
+  listDisplayTimeZones,
+  type DateDisplayFormat,
+} from '../utils/dateDisplay'
 import {
   SectionHeading,
   SelectControl,
@@ -17,6 +22,8 @@ interface VaultContentSettingsSectionProps {
   t: Translate
   dateDisplayFormat: DateDisplayFormat
   setDateDisplayFormat: (value: DateDisplayFormat) => void
+  displayTimeZone: string | null
+  setDisplayTimeZone: (value: string | null) => void
   defaultNoteWidth: NoteWidthMode
   setDefaultNoteWidth: (value: NoteWidthMode) => void
   sidebarTypePluralizationEnabled: boolean
@@ -34,6 +41,11 @@ const NOTE_WIDTH_LABEL_KEYS: Record<NoteWidthMode, TranslationKey> = {
   normal: 'settings.noteWidth.normal',
   wide: 'settings.noteWidth.wide',
 }
+const TIME_ZONE_OPTIONS = [
+  { value: LOCAL_DISPLAY_TIME_ZONE, label: 'Same as this computer' },
+  ...listDisplayTimeZones().map((zone) => ({ value: zone, label: zone })),
+]
+
 const DATE_DISPLAY_LABEL_KEYS: Record<DateDisplayFormat, TranslationKey> = {
   us: 'settings.dateDisplay.us',
   european: 'settings.dateDisplay.european',
@@ -59,6 +71,8 @@ export function VaultContentSettingsSection({
   t,
   dateDisplayFormat,
   setDateDisplayFormat,
+  displayTimeZone,
+  setDisplayTimeZone,
   defaultNoteWidth,
   setDefaultNoteWidth,
   sidebarTypePluralizationEnabled,
@@ -93,6 +107,22 @@ export function VaultContentSettingsSection({
             onValueChange={(value) => setDateDisplayFormat(value as DateDisplayFormat)}
             options={buildDateDisplayOptions(t)}
             testId="settings-date-display-format"
+          />
+        </SettingsRow>
+
+        <SettingsRow
+          label="Time zone"
+          description="Clocks on screen use this zone. File names, note dates, and git stay unchanged."
+          controlWidth="wide"
+        >
+          <SelectControl
+            ariaLabel="Time zone"
+            value={displayTimeZone ?? LOCAL_DISPLAY_TIME_ZONE}
+            onValueChange={(value) => {
+              setDisplayTimeZone(value === LOCAL_DISPLAY_TIME_ZONE ? null : value)
+            }}
+            options={TIME_ZONE_OPTIONS}
+            testId="settings-display-timezone"
           />
         </SettingsRow>
 
