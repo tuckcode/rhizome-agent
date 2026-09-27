@@ -24,18 +24,20 @@ pub enum AppUpdateDownloadEvent {
     Finished,
 }
 
-/// Rhizome has no signing key or published release feed yet (see
-/// docs/HANDOFF.md). This used to point at upstream Tolaria's GitHub
-/// releases, which ship multiple times a day -- the version check against
-/// Rhizome's static tauri.conf.json version always reported an update
-/// available, and a real download would have installed an actual Tolaria
-/// build. Report no update until Rhizome ships its own signed release feed.
+/// In-app install needs a signed update feed. That feed is not wired:
+/// `updater.endpoints` is empty and releases are not signed.
+///
+/// Returning "no update" made Check for updates say the installed app was
+/// current. Say what is actually true instead. The Mac download is the
+/// Apple Silicon disk image on the GitHub release.
+const IN_APP_UPDATE_UNAVAILABLE: &str = "In-app updates are not available yet. Install the Apple Silicon disk image from the GitHub release.";
+
 fn no_update_available() -> Result<Option<AppUpdateMetadata>, String> {
-    Ok(None)
+    Err(IN_APP_UPDATE_UNAVAILABLE.into())
 }
 
 fn updates_not_yet_available() -> Result<(), String> {
-    Err("Rhizome doesn't have a release feed configured yet -- updates aren't available.".into())
+    Err(IN_APP_UPDATE_UNAVAILABLE.into())
 }
 
 pub async fn check_for_app_update<R: Runtime>(
@@ -62,15 +64,18 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn no_update_available_reports_none() {
-        assert_eq!(no_update_available(), Ok(None));
+    fn no_update_available_explains_that_the_feed_is_not_wired() {
+        assert_eq!(
+            no_update_available().unwrap_err(),
+            "In-app updates are not available yet. Install the Apple Silicon disk image from the GitHub release."
+        );
     }
 
     #[test]
     fn updates_not_yet_available_reports_an_explanatory_error() {
         assert_eq!(
             updates_not_yet_available().unwrap_err(),
-            "Rhizome doesn't have a release feed configured yet -- updates aren't available."
+            "In-app updates are not available yet. Install the Apple Silicon disk image from the GitHub release."
         );
     }
 

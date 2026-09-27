@@ -25,6 +25,11 @@ describe('release workflow macOS artifact names', () => {
     expect(alphaWorkflow).toContain(
       'Rhizome_${{ needs.version.outputs.version }}_macOS_Silicon.app.tar.gz',
     )
+    expect(alphaWorkflow).toContain(
+      'Rhizome_${{ needs.version.outputs.version }}_macOS_Silicon.dmg',
+    )
+    expect(alphaWorkflow).toContain('upload_macos_dmg: true')
+    expect(alphaWorkflow).toContain('macos_bundles: app,dmg')
     expect(alphaWorkflow).not.toContain(
       'Rhizome_${{ needs.version.outputs.version }}_macOS_Intel.app.tar.gz',
     )

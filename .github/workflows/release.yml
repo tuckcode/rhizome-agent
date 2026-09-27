@@ -124,8 +124,8 @@ jobs:
     uses: ./.github/workflows/release-build-artifacts.yml
     with:
       version: ${{ needs.version.outputs.version }}
-      macos_bundles: app
-      upload_macos_dmg: false
+      macos_bundles: app,dmg
+      upload_macos_dmg: true
     secrets: inherit
 
   # ─────────────────────────────────────────────────────────────
@@ -147,14 +147,16 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
 
-      - name: Normalize macOS updater artifact names
+      - name: Normalize macOS release artifact names
         run: |
           # .sig is optional: unsigned builds (no TAURI_SIGNING_*) ship the
-          # download archive only. updater.endpoints is [] so nothing consumes
-          # signatures today. Intel Mac (x86_64) is no longer in the matrix.
-          normalize_updater() {
+          # download archive only. updater.endpoints is [] so the app cannot
+          # install from this release. The disk image is the Mac download.
+          # Intel Mac (x86_64) is no longer in the matrix.
+          normalize_macos_artifacts() {
             local arch="$1"
             local normalized_updater="$2"
+            local normalized_dmg="$3"
             local artifact_dir="updater-${arch}"
             local updater_file
             if [ ! -d "$artifact_dir" ]; then
@@ -179,9 +181,22 @@ jobs:
             else
               echo "::warning::No .sig for ${normalized_updater} — publishing download artifact without updater signature."
             fi
+
+            local dmg_dir="dmg-${arch}"
+            local dmg_file
+            dmg_file=$(find "$dmg_dir" -maxdepth 1 -name "*.dmg" -print -quit)
+            if [ -z "$dmg_file" ]; then
+              echo "::error::Missing macOS DMG artifact in ${dmg_dir}" >&2
+              return 1
+            fi
+            if [ "$dmg_file" != "$normalized_dmg" ]; then
+              mv "$dmg_file" "$normalized_dmg"
+            fi
           }
 
-          normalize_updater aarch64 "updater-aarch64/Rhizome_${{ needs.version.outputs.version }}_macOS_Silicon.app.tar.gz"
+          normalize_macos_artifacts aarch64 \
+            "updater-aarch64/Rhizome_${{ needs.version.outputs.version }}_macOS_Silicon.app.tar.gz" \
+            "dmg-aarch64/Rhizome_${{ needs.version.outputs.version }}_macOS_Silicon.dmg"
 
       - name: Generate release notes
         run: |
@@ -217,9 +232,9 @@ jobs:
             echo "$NOTES" | while IFS= read -r line; do echo "- $line"; done
             echo ""
             echo "---"
-            echo "**Alpha build — updated on every push to \`main\`**"
+            echo "**Alpha build — cut by hand from \`main\`, not on every push.**"
             echo ""
-            echo "**Includes macOS (Apple Silicon), Linux x64, and Windows x64 bundles**"
+            echo "**Mac install: open the Apple Silicon disk image (.dmg).**"
             echo ""
             echo "*Built from \`$(git rev-parse --short HEAD)\` on $(date -u +%Y-%m-%d)*"
           } > release_notes.md
@@ -292,6 +307,7 @@ jobs:
           }
 
           ARM_DOWNLOAD=$(find_required "updater-aarch64/*.app.tar.gz")
+          ARM_DMG=$(find_required "dmg-aarch64/*.dmg")
           LINUX_DOWNLOAD=$(find_required \
             "linux-x86_64-bundles/*/*.AppImage" \
             "linux-x86_64-bundles/*/*.deb" \
@@ -309,8 +325,10 @@ jobs:
             "windows-x86_64-bundles/*.nsis.zip" \
             "windows-x86_64-bundles/*.msi.zip")
 
+          ARM_DMG_URL="https://github.com/${REPO}/releases/download/${TAG}/$(basename "$ARM_DMG")"
           ARM_JSON=$(platform_json "darwin-aarch64" "$ARM_DOWNLOAD" \
             "updater-aarch64/*.app.tar.gz.sig")
+          ARM_JSON="${ARM_JSON%\}}, \"dmg_url\": \"${ARM_DMG_URL}\" }"
           LINUX_JSON=$(platform_json "linux-x86_64" "$LINUX_DOWNLOAD" \
             "linux-x86_64-bundles/*/*.AppImage.sig" \
             "linux-x86_64-bundles/*/*.AppImage.tar.gz.sig" \
@@ -351,6 +369,7 @@ jobs:
           draft: false
           prerelease: true
           files: |
+            dmg-aarch64/*.dmg
             updater-aarch64/*.app.tar.gz
             updater-aarch64/*.app.tar.gz.sig
             linux-x86_64-bundles/*.deb
