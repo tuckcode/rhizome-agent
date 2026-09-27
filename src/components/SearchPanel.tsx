@@ -11,6 +11,9 @@ import { getTypeIcon } from './NoteItem'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { WorkspaceInitialsBadge } from './WorkspaceInitialsBadge'
 import { useDateDisplayFormat } from '../hooks/useAppPreferences'
+import { useSessionTranscriptSearch } from '../hooks/useSessionTranscriptSearch'
+import type { SessionTranscriptHit } from '../lib/sessionTranscriptSearch'
+import { SessionTranscriptSearchResults } from './SessionTranscriptSearchResults'
 
 interface SearchPanelProps {
   open: boolean
@@ -18,6 +21,8 @@ interface SearchPanelProps {
   entries: VaultEntry[]
   onSelectNote: (entry: VaultEntry) => void
   onClose: () => void
+  /** Open a transcript hit. The hit carries the session path and message index. */
+  onSelectSessionHit?: (hit: SessionTranscriptHit) => void
   locale?: AppLocale
 }
 
@@ -312,6 +317,7 @@ export function SearchPanel({
   entries,
   onSelectNote,
   onClose,
+  onSelectSessionHit,
   locale = 'en',
 }: SearchPanelProps) {
   const dateDisplayFormat = useDateDisplayFormat()
@@ -331,6 +337,7 @@ export function SearchPanel({
     showWorkspace,
     typeEntryMap,
   } = useSearchPanelController({ open, vaultPath, entries, onSelectNote, onClose })
+  const sessionHits = useSessionTranscriptSearch(query, open)
   const handleResultHover = useCallback((index: number, event: React.MouseEvent<HTMLDivElement>) => {
     if (shouldApplySearchResultHover(event)) setSelectedIndex(index)
   }, [setSelectedIndex])
@@ -383,7 +390,9 @@ export function SearchPanel({
           dateDisplayFormat={dateDisplayFormat}
           listRef={listRef}
           locale={locale}
+          sessionHits={sessionHits}
           onSelect={handleSelect}
+          onSelectSessionHit={onSelectSessionHit}
           onHover={handleResultHover}
         />
       </div>
@@ -443,7 +452,9 @@ interface SearchContentProps {
   dateDisplayFormat: DateDisplayFormat
   listRef: React.RefObject<HTMLDivElement | null>
   locale: AppLocale
+  sessionHits: SessionTranscriptHit[]
   onSelect: (result: SearchResult) => void
+  onSelectSessionHit?: (hit: SessionTranscriptHit) => void
   onHover: (index: number, event: React.MouseEvent<HTMLDivElement>) => void
 }
 
@@ -603,34 +614,40 @@ function SearchResultsHeader({ count, elapsedMs, locale }: { count: number; elap
 }
 
 function SearchContent({
-  query, results, selectedIndex, loading, elapsedMs, entryLookup, typeEntryMap, showWorkspace, dateDisplayFormat, listRef, locale, onSelect, onHover,
+  query, results, selectedIndex, loading, elapsedMs, entryLookup, typeEntryMap, showWorkspace, dateDisplayFormat, listRef, locale, sessionHits, onSelect, onSelectSessionHit, onHover,
 }: SearchContentProps) {
   const hasQuery = query.trim().length > 0
   const hasResults = results.length > 0
+  const hasSessionHits = sessionHits.length > 0
   return (
     <div className="flex-1 overflow-y-auto">
       {!hasQuery && <SearchIdleMessage locale={locale} />}
-      {hasQuery && !hasResults && loading && <SearchLoadingMessage locale={locale} />}
-      {hasQuery && !hasResults && !loading && <SearchNoResultsMessage locale={locale} />}
-      {hasResults && (
+      {hasQuery && !hasResults && !hasSessionHits && loading && <SearchLoadingMessage locale={locale} />}
+      {hasQuery && !hasResults && !hasSessionHits && !loading && <SearchNoResultsMessage locale={locale} />}
+      {(hasResults || hasSessionHits) && (
         <>
-          <SearchResultsHeader count={results.length} elapsedMs={elapsedMs} locale={locale} />
-          <div ref={listRef} role="listbox" aria-label={translate(locale, 'search.resultsAria')}>
-            {results.map((result, i) => (
-              <SearchResultRow
-                key={result.path}
-                result={result}
-                entry={entryLookup.get(result.path)}
-                selected={i === selectedIndex}
-                index={i}
-                typeEntryMap={typeEntryMap}
-                showWorkspace={showWorkspace}
-                dateDisplayFormat={dateDisplayFormat}
-                onSelect={onSelect}
-                onHover={onHover}
-              />
-            ))}
-          </div>
+          {hasResults && (
+            <>
+              <SearchResultsHeader count={results.length} elapsedMs={elapsedMs} locale={locale} />
+              <div ref={listRef} role="listbox" aria-label={translate(locale, 'search.resultsAria')}>
+                {results.map((result, i) => (
+                  <SearchResultRow
+                    key={result.path}
+                    result={result}
+                    entry={entryLookup.get(result.path)}
+                    selected={i === selectedIndex}
+                    index={i}
+                    typeEntryMap={typeEntryMap}
+                    showWorkspace={showWorkspace}
+                    dateDisplayFormat={dateDisplayFormat}
+                    onSelect={onSelect}
+                    onHover={onHover}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+          <SessionTranscriptSearchResults hits={sessionHits} onSelect={onSelectSessionHit} />
         </>
       )}
     </div>
