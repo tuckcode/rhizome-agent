@@ -6,11 +6,11 @@ import type { VaultEntry } from '../../types'
 function makeEntry(overrides: Partial<VaultEntry> = {}): VaultEntry {
   return {
     path: '/vault/test.md', filename: 'test.md', title: 'Test', isA: 'Note',
-    aliases: [], outgoingLinks: [], relationships: {}, tags: [],
+    aliases: [], outgoingLinks: [], relationships: {},
     modifiedAt: 1700000000, createdAt: 1700000000, fileSize: 1024,
     icon: null, color: null, archived: false, favorite: false,
     ...overrides,
-  }
+  } as unknown as VaultEntry
 }
 
 describe('NoteInfoPanel', () => {

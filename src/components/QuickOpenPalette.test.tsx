@@ -12,8 +12,6 @@ const makeEntry = (overrides: Partial<VaultEntry> = {}): VaultEntry => ({
   belongsTo: [],
   relatedTo: [],
   status: 'Active',
-  owner: null,
-  cadence: null,
   archived: false,
   modifiedAt: 1700000000,
   createdAt: 1700000000,
@@ -27,7 +25,7 @@ const makeEntry = (overrides: Partial<VaultEntry> = {}): VaultEntry => ({
   template: null, sort: null,
   outgoingLinks: [],
   ...overrides,
-})
+} as unknown as VaultEntry)
 
 const entries: VaultEntry[] = [
   makeEntry({ path: '/vault/note/alpha.md', title: 'Alpha Project', isA: 'Project', modifiedAt: 1700000003 }),

@@ -23,7 +23,7 @@ const makeEntry = (overrides: Partial<VaultEntry> = {}): VaultEntry => ({
   color: null,
   order: null,
   ...overrides,
-})
+} as unknown as VaultEntry)
 
 const entries: VaultEntry[] = [
   makeEntry({ path: '/vault/a.md', title: 'Alpha Project', isA: 'Project', modifiedAt: 1700000003 }),

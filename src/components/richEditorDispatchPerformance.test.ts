@@ -17,7 +17,8 @@ describe('rich editor dispatch performance probe', () => {
     const nowSpy = vi.spyOn(performance, 'now')
       .mockReturnValueOnce(10)
       .mockReturnValueOnce(16)
-    const originalDispatch = vi.fn(() => {
+    const originalDispatch = vi.fn((..._args: unknown[]) => {
+      void _args
       view.state.doc.content.size = 70_010
     })
     const view = {

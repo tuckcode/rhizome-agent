@@ -103,7 +103,7 @@ describe('createArrowLigaturesExtension', () => {
   it('preserves escaped <-> as literal ASCII on the next keystroke', () => {
     const fixture = createFixture()
     fixture.mount()
-    fixture.view.state.selection = { from: 3, to: 3 }
+    Object.assign(fixture.view.state.selection, { from: 3, to: 3 })
 
     fixture.view.state.doc.textBetween.mockReturnValueOnce('\\<')
     fixture.fireInput({ data: '-' })

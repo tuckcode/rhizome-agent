@@ -207,7 +207,7 @@ describe('createRichEditorMarkdownInputTransformExtension', () => {
       preventDefault: vi.fn(),
     } as unknown as InputEvent
 
-    beforeInputListener(event)
+    (beforeInputListener as (event: InputEvent) => void)(event)
 
     expect(handleBeforeInput).not.toHaveBeenCalled()
     expect(view.dispatch).not.toHaveBeenCalled()

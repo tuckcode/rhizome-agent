@@ -21,7 +21,8 @@ function nodeNamesAt(view: EditorView, doc: string, needle: string) {
   forceParsing(view, view.state.doc.length)
 
   const names: string[] = []
-  let node = syntaxTree(view.state).resolveInner(pos + 1, 1)
+  let node: ReturnType<ReturnType<typeof syntaxTree>['resolveInner']> | null =
+    syntaxTree(view.state).resolveInner(pos + 1, 1)
   while (node) {
     names.push(node.name)
     node = node.parent

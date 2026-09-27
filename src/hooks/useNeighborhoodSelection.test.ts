@@ -18,8 +18,6 @@ function buildEntry(path: string, title: string): VaultEntry {
     relatedTo: [],
     status: null,
     archived: false,
-    owner: null,
-    cadence: null,
     modifiedAt: 1,
     createdAt: null,
     fileSize: 1,

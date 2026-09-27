@@ -30,7 +30,7 @@ const makeEntry = (overrides: Partial<VaultEntry> = {}): VaultEntry => ({
   outgoingLinks: [],
   properties: {},
   ...overrides,
-})
+} as unknown as VaultEntry)
 
 describe('useKeyboardNavigation', () => {
   const onReplaceActiveTab = vi.fn()

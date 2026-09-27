@@ -14,8 +14,6 @@ const entry: VaultEntry = {
   belongsTo: [],
   relatedTo: [],
   status: null,
-  owner: null,
-  cadence: null,
   archived: false,
   modifiedAt: 1700000000,
   createdAt: 1700000000,

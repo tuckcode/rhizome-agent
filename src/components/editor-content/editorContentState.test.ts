@@ -38,7 +38,7 @@ const baseEntry: VaultEntry = {
 function deriveState(tab: EditorContentTab | null, overrides?: Partial<VaultEntry>) {
   const entry = tab ? { ...baseEntry, ...overrides, ...tab.entry } : null
   return deriveEditorContentState({
-    activeTab: entry ? { ...tab, entry } : null,
+    activeTab: entry && tab ? { ...tab, entry } as EditorContentTab : null,
     entries: entry ? [entry] : [],
     rawMode: false,
     activeStatus: 'clean',
