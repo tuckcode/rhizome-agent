@@ -84,6 +84,11 @@ export function fitPanePreset(preset: PanePresetState, context: PaneFitContext) 
   // Room left for a note beside Chat without folding anything the preset shows.
   const besideRoom = () => available - used() - CHAT_MIN_WIDTH - NOTE_DIVIDER_WIDTH
   const noteFloor = PANE_LIMITS.note.min
+  // The pinned rail yields to an open note when folding it makes the desk fit.
+  const deskWanted = !beside && context.noteOpen === true && preset.stacked !== true
+  if (deskWanted && railPinned && besideRoom() < noteFloor && besideRoom() + widths.rail - RAIL_WIDTH >= noteFloor) {
+    railPinned = false
+  }
   if (!beside && context.noteOpen === true && preset.stacked !== true && besideRoom() >= noteFloor) {
     widths.note = Math.min(widths.note, besideRoom())
     beside = true

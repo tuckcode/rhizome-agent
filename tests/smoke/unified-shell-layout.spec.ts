@@ -130,9 +130,10 @@ test.describe('Unified shell geometry', () => {
     await expect(page.getByTestId('vault-panel-navigation')).toHaveCount(0)
     await expect(page.getByTestId('note-list-container')).toBeVisible()
 
+    // First launch pins the rail open. At 1500 it fits, so Sessions stay
+    // visible when the pointer leaves. CommandRail.test.tsx covers the
+    // compact rail's hover reveal.
     await page.locator('.app__editor').hover()
-    await expect(page.getByTestId('prime-session-list')).toHaveCount(0)
-    await rail.hover()
     await expect(page.getByTestId('prime-session-list')).toBeVisible()
   })
 

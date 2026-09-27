@@ -99,6 +99,19 @@ describe('workspace states', () => {
     expect(fit).toMatchObject({ notesOpen: true, workspace: 'focused' })
   })
 
+  it('folds the pinned rail so an open note fits beside Chat', () => {
+    // Pinned: 240 rail + 240 notes + 420 chat leaves 196 for the note at 1100.
+    // Folded: 46 rail leaves 390, so the desk fits.
+    const fit = fitPanePreset({ id: 'notes', widths: {} }, { shellWidth: 1100, noteOpen: true, railPinned: true })
+    expect(fit).toMatchObject({ notesOpen: true, railPinned: false, workspace: 'desk' })
+    expect(fit.chatWidth).toBeGreaterThanOrEqual(420)
+  })
+
+  it('keeps the pinned rail when folding it would not make room for the note', () => {
+    const fit = fitPanePreset({ id: 'notes', widths: {} }, { shellWidth: 900, noteOpen: true, railPinned: true })
+    expect(fit).toMatchObject({ railPinned: true, workspace: 'focused' })
+  })
+
   it('narrows the desk note to fit before giving up on the desk', () => {
     // 46 + 46 restore + 420 chat leaves 288 for divider + note at 800.
     const fit = fitPanePreset({ id: 'chat', widths: {} }, { shellWidth: 800, noteOpen: true })
