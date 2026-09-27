@@ -6,15 +6,12 @@ import {
   APP_COMMAND_IDS,
 } from '../hooks/appCommandDispatcher'
 import { getAppCommandShortcutDisplay } from '../hooks/appCommandCatalog'
-import {
-  hasNativeMacosTrafficLights,
-  MACOS_TRAFFIC_LIGHT_SAFE_PADDING,
-} from '../utils/trafficLights'
+import { hasNativeMacosTrafficLights } from '../utils/trafficLights'
 
 /**
- * Thin macOS chrome band. Traffic lights sit here (tao height = button + y),
- * and Command Palette docks on the left after them. The sessions rail starts
- * below this band so its border no longer cuts through the lights.
+ * Thin macOS chrome band. Traffic lights own the left corner. Command Palette
+ * sits on the right. The sessions rail starts below this band so its border
+ * no longer cuts through the lights.
  */
 export const MACOS_TITLEBAR_HEIGHT = 32
 
@@ -35,15 +32,11 @@ export function MacOSTitlebar() {
   return (
     <div
       ref={dragRegionRef}
-      className="fixed top-0 right-0 left-0 z-[1000] flex items-center border-b border-border bg-[var(--surface-sidebar)] select-none"
+      className="fixed top-0 right-0 left-0 z-[1000] flex items-center justify-end border-b border-border bg-[var(--surface-sidebar)] pr-2 select-none"
       style={{ height: MACOS_TITLEBAR_HEIGHT }}
       data-testid="macos-titlebar"
     >
-      <div
-        className="flex h-full items-center"
-        style={{ paddingLeft: MACOS_TRAFFIC_LIGHT_SAFE_PADDING }}
-        data-no-drag
-      >
+      <div className="flex h-full items-center" data-no-drag>
         <Button
           type="button"
           variant="outline"

@@ -58,7 +58,7 @@ describe('MacOSTitlebar', () => {
     expect(screen.queryByTestId('macos-titlebar')).toBeNull()
   })
 
-  it('docks Command Palette on the left and opens it through the shared command bus', () => {
+  it('docks Command Palette on the right, clear of the traffic lights, and opens it through the shared command bus', () => {
     const received: string[] = []
     const onCommand = (event: Event) => {
       const detail = (event as CustomEvent<string>).detail
@@ -70,6 +70,7 @@ describe('MacOSTitlebar', () => {
 
     const bar = screen.getByTestId('macos-titlebar')
     expect(bar).toHaveStyle({ height: `${MACOS_TITLEBAR_HEIGHT}px` })
+    expect(bar.className).toContain('justify-end')
     fireEvent.click(screen.getByTestId('open-command-palette'))
     expect(received).toEqual([APP_COMMAND_IDS.viewCommandPalette])
     expect(screen.getByTestId('open-command-palette')).toHaveTextContent('Command Palette')
