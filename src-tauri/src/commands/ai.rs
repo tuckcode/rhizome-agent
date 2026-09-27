@@ -548,6 +548,10 @@ fn normalize_prime_request(
     mut request: crate::prime_session_host::PrimePromptRequest,
 ) -> crate::prime_session_host::PrimePromptRequest {
     request.vault_path = expand_tilde(&request.vault_path).into_owned();
+    request.system_prompt = crate::settings::compose_agent_profile(
+        crate::settings::saved_agent_profile().as_deref(),
+        request.system_prompt.as_deref(),
+    );
     request
 }
 

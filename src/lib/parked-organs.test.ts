@@ -40,12 +40,13 @@ describe('parked organs leftover', () => {
     expect(tray).not.toMatch(/UNUserNotification|NSUserNotification/)
   })
 
-  it('does not encode a C66 agent-profile store', () => {
+  it('keeps one installation-wide C66 profile in Settings', () => {
     const settings = readFileSync(
       `${process.cwd()}/src/components/SettingsPanel.tsx`,
       'utf8',
     )
-    expect(settings).not.toMatch(/agentProfile|agent_profile|C66/)
+    expect(settings).toContain('settings-agent-profile')
+    expect(settings).toContain('agent_profile')
   })
 
   it('keeps the Dependabot pins and the BlockNote 0.55 Tiptap line', () => {

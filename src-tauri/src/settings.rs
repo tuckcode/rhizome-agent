@@ -193,6 +193,13 @@ pub struct Settings {
     /// Generated once per install by [`ensure_bridge_token`] and never shown
     /// to anyone but the user. See `docs/adr/0159-bridge-token-auth.md`.
     pub bridge_token: Option<String>,
+    /// How Chat should respond. One profile for this installation.
+    ///
+    /// Not per agent, and not per vault. Blank is the same as unset. Chat
+    /// places this ahead of the turn's other instructions. It is not vault
+    /// `AGENTS.md` and it is not Prime `USER.md`.
+    #[serde(default)]
+    pub agent_profile: Option<String>,
 }
 
 /// Return the persisted bridge token, generating and saving one the first
@@ -337,6 +344,38 @@ fn is_numeric_utc_offset(value: &str) -> bool {
     !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit() || c == ':')
 }
 
+/// Trim a profile and drop a blank one.
+///
+/// The words stay as typed. A profile is instructions, not a token, so this
+/// does not change case.
+pub fn normalize_agent_profile(value: Option<String>) -> Option<String> {
+    normalize_optional_string(value)
+}
+
+/// Put the saved profile ahead of any instructions this turn already has.
+///
+/// A blank profile leaves the turn alone. Note context stays, behind the
+/// profile, so a saved sentence is part of the next Chat turn.
+pub fn compose_agent_profile(profile: Option<&str>, existing: Option<&str>) -> Option<String> {
+    let profile = normalize_agent_profile(profile.map(str::to_string));
+    let existing = existing
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .map(str::to_string);
+    match (profile, existing) {
+        (Some(profile), Some(existing)) => Some(format!("{profile}\n\n{existing}")),
+        (Some(profile), None) => Some(profile),
+        (None, Some(existing)) => Some(existing),
+        (None, None) => None,
+    }
+}
+
+pub fn saved_agent_profile() -> Option<String> {
+    get_settings()
+        .ok()
+        .and_then(|settings| settings.agent_profile)
+}
+
 pub fn normalize_date_display_format(value: Option<&str>) -> Option<String> {
     match value.map(|candidate| candidate.trim().to_ascii_lowercase()) {
         Some(format) if SUPPORTED_DATE_DISPLAY_FORMATS.contains(&format.as_str()) => Some(format),
@@ -426,6 +465,7 @@ fn normalize_settings(settings: Settings) -> Settings {
         all_notes_show_images: settings.all_notes_show_images,
         all_notes_show_unsupported: settings.all_notes_show_unsupported,
         multi_workspace_enabled: settings.multi_workspace_enabled,
+        agent_profile: normalize_agent_profile(settings.agent_profile),
     }
 }
 
@@ -626,6 +666,43 @@ mod tests {
         let path = dir.path().join("settings.json");
         save_settings_at(&path, settings).unwrap();
         get_settings_at(&path).unwrap()
+    }
+
+    #[test]
+    fn agent_profile_roundtrip_trims_and_drops_blank() {
+        let kept = save_and_reload(Settings {
+            agent_profile: Some("  Be brief.  ".into()),
+            ..Settings::default()
+        });
+        assert_eq!(kept.agent_profile.as_deref(), Some("Be brief."));
+
+        let cleared = save_and_reload(Settings {
+            agent_profile: Some("   ".into()),
+            ..Settings::default()
+        });
+        assert_eq!(cleared.agent_profile, None);
+    }
+
+    #[test]
+    fn agent_profile_sits_ahead_of_turn_instructions() {
+        assert_eq!(
+            compose_agent_profile(None, Some("Note context")),
+            Some("Note context".into())
+        );
+        assert_eq!(
+            compose_agent_profile(Some("  "), Some("Note context")),
+            Some("Note context".into())
+        );
+        assert_eq!(
+            compose_agent_profile(Some("Be brief."), None),
+            Some("Be brief.".into())
+        );
+        let composed = compose_agent_profile(Some("Be brief."), Some("Note context"));
+        let prompt = crate::cli_agent_runtime::build_prompt("hello", composed.as_deref());
+        assert_eq!(
+            prompt,
+            "System instructions:\nBe brief.\n\nNote context\n\nUser request:\nhello"
+        );
     }
 
     #[test]
@@ -860,6 +937,7 @@ mod tests {
             all_notes_show_images: Some(true),
             all_notes_show_unsupported: Some(false),
             bridge_token: Some("deadbeefdeadbeefdeadbeefdeadbeef".to_string()),
+            agent_profile: Some("Be brief.".to_string()),
         };
         let json = serde_json::to_string(&settings).unwrap();
         let parsed: Settings = serde_json::from_str(&json).unwrap();

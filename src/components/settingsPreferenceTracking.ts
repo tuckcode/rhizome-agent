@@ -5,6 +5,7 @@ import {
   trackDefaultNoteWidthChanged,
   trackGitFeaturesEnabledChanged,
   trackSidebarTypePluralizationChanged,
+  trackAgentProfileSaved,
   trackTimezoneDisplayChanged,
 } from '../lib/productAnalytics'
 import { areGitFeaturesEnabled } from '../lib/gitSettings'
@@ -22,6 +23,7 @@ export interface SettingsPreferenceDraft {
   automaticUpdateChecksEnabled: boolean
   dateDisplayFormat: DateDisplayFormat
   displayTimeZone: string | null
+  agentProfile: string
   defaultNoteWidth: NoteWidthMode
   gitFeaturesEnabled: boolean
   multiWorkspaceEnabled: boolean
@@ -66,6 +68,11 @@ export function trackSettingsPreferenceChanges(settings: Settings, draft: Settin
     normalizeDateDisplayFormat(settings.date_display_format) ?? DEFAULT_DATE_DISPLAY_FORMAT,
     draft.dateDisplayFormat,
     trackDateDisplayFormatChanged,
+  )
+  trackPreferenceChange(
+    settings.agent_profile?.trim() ?? '',
+    draft.agentProfile.trim(),
+    (profile) => trackAgentProfileSaved(profile.length),
   )
   trackPreferenceChange(
     normalizeDisplayTimeZone(settings.timezone),

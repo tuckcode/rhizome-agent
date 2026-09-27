@@ -278,14 +278,11 @@ push is not a release — releases are tagged builds with signed installers.
   this machine (do not delete it without asking). `pi_config` now skips a
   skill link it cannot follow and keeps copying the rest. Regression:
   `command_skips_a_skill_symlink_that_points_at_itself`.
-- **C66-OPEN (2026-09-06): Settings needs a profile page for agent
-  instructions.** Atticus: how the agent should respond, rules, the usual
-  custom instructions — for whichever agent. **Not building this session.**
-  This is not vault `AGENTS.md` (project conventions), not Settings → AI
-  agents (which model), and not harness-composition slice 3 (tool
-  allow-lists). Do not store it as Prime `USER.md` / Hermes `SOUL.md` (ADR-0168:
-  one memory store, the vault). Still open: one profile vs per-agent; app-wide
-  vs per-vault; new Settings section vs under the existing AI agents page.
+- **C66-BUILT (2026-09-27): one app-wide Settings profile.** Atticus picked one
+  profile, for this installation, on the AI agents page. It lives in app
+  settings, not the vault and not Prime `USER.md`. Chat puts that text ahead
+  of the turn's other instructions. It is not per-agent and not per-vault.
+  This is not vault `AGENTS.md`, not which model, and not tool allow-lists.
 - ~~**C68-OPEN (2026-09-06): restore note lock/view.**~~ **RESOLVED 2026-09-06.** Ephemeral per-note lock (default editable); breadcrumb + Cmd+K; BlockNote/CodeMirror read-only when locked. Not vault `editor_mode`. Layout lock 2026-09-14: `EditorContentLayout.test.tsx`.
 - ~~**C69-OPEN (2026-09-06): Linux CI Clippy (`-D warnings`) fails on macOS-only
   `src-tauri`.**~~ **RESOLVED 2026-09-12 on main (`f4b8b60`).**

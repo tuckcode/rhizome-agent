@@ -516,6 +516,16 @@ export function trackCelebration({
  * so "curated to 6 of 501" is the signal. Which models they picked is a
  * per-user preference, and shipping 501 ids per event would bury it anyway.
  */
+/**
+ * The one app-wide Chat profile was saved.
+ *
+ * Length only. The text is instructions the person wrote, so it stays off
+ * the event.
+ */
+export function trackAgentProfileSaved(length: number): void {
+  trackEvent('agent_profile_saved', { length })
+}
+
 export function trackPrimeModelAllowListChanged(selected: number, available: number): void {
   trackEvent('prime_model_allow_list_changed', { selected, available })
 }

@@ -47,6 +47,7 @@ import {
   type ThemeMode,
 } from '../lib/themeMode'
 import { cn } from '@/lib/utils'
+import { Textarea } from './ui/textarea'
 import { AccentColorPicker } from './AccentColorPicker'
 import { normalizeReleaseChannel, serializeReleaseChannel, type ReleaseChannel } from '../lib/releaseChannel'
 import { shouldHideGitignoredFiles } from '../lib/gitignoredVisibility'
@@ -139,6 +140,7 @@ interface SettingsDraft {
   autoGitInactiveThresholdSeconds: number
   autoAdvanceInboxAfterOrganize: boolean
   celebrationsEnabled: boolean
+  agentProfile: string
   aiModelProviders: AiModelProvider[]
   releaseChannel: ReleaseChannel
   automaticUpdateChecksEnabled: boolean
@@ -177,6 +179,8 @@ interface SettingsBodyProps {
   setAutoAdvanceInboxAfterOrganize: (value: boolean) => void
   celebrationsEnabled: boolean
   setCelebrationsEnabled: (value: boolean) => void
+  agentProfile: string
+  setAgentProfile: (value: string) => void
   aiAgentsStatus: AiAgentsStatus
   aiModelProviders: AiModelProvider[]
   setAiModelProviders: (value: AiModelProvider[]) => void
@@ -261,6 +265,7 @@ function createSettingsDraft(
     autoAdvanceInboxAfterOrganize: settings.auto_advance_inbox_after_organize ?? false,
     // Absent means never chosen, which is on: the effect is opt-out.
     celebrationsEnabled: readCelebrationsEnabled(settings.celebrations_enabled),
+    agentProfile: settings.agent_profile?.trim() ?? '',
     aiModelProviders: normalizeAiModelProviders(settings.ai_model_providers),
     releaseChannel: normalizeReleaseChannel(settings.release_channel),
     automaticUpdateChecksEnabled: areAutomaticUpdateChecksEnabled(settings),
@@ -338,6 +343,7 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     sidebar_type_pluralization_enabled: draft.sidebarTypePluralizationEnabled,
     initial_h1_auto_rename_enabled: draft.initialH1AutoRename,
     celebrations_enabled: draft.celebrationsEnabled,
+    agent_profile: draft.agentProfile.trim() || null,
     default_ai_agent: DEFAULT_AI_AGENT,
     default_ai_target: agentTargetId(DEFAULT_AI_AGENT),
     ai_model_providers: draft.aiModelProviders.length > 0 ? draft.aiModelProviders : null,
@@ -715,6 +721,8 @@ function SettingsBodyFromDraft({
       setAutoAdvanceInboxAfterOrganize={(value) => updateDraft('autoAdvanceInboxAfterOrganize', value)}
       celebrationsEnabled={draft.celebrationsEnabled}
       setCelebrationsEnabled={(value) => updateDraft('celebrationsEnabled', value)}
+      agentProfile={draft.agentProfile}
+      setAgentProfile={(value) => updateDraft('agentProfile', value)}
       aiAgentsStatus={aiAgentsStatus}
       aiModelProviders={draft.aiModelProviders}
       setAiModelProviders={(value) => updateDraft('aiModelProviders', value)}
@@ -980,6 +988,8 @@ function SettingsAgentWorkflowSections({
   setAutoAdvanceInboxAfterOrganize,
   celebrationsEnabled,
   setCelebrationsEnabled,
+  agentProfile,
+  setAgentProfile,
   aiAgentsStatus,
   aiModelProviders,
   setAiModelProviders,
@@ -1007,6 +1017,8 @@ function SettingsAgentWorkflowSections({
           t={t}
           celebrationsEnabled={celebrationsEnabled}
           setCelebrationsEnabled={setCelebrationsEnabled}
+          agentProfile={agentProfile}
+          setAgentProfile={setAgentProfile}
           aiAgentsStatus={aiAgentsStatus}
           aiModelProviders={aiModelProviders}
           setAiModelProviders={setAiModelProviders}
@@ -1375,6 +1387,8 @@ function AiAgentSettingsSection({
   t,
   celebrationsEnabled,
   setCelebrationsEnabled,
+  agentProfile,
+  setAgentProfile,
   aiAgentsStatus,
   aiModelProviders,
   setAiModelProviders,
@@ -1386,6 +1400,8 @@ function AiAgentSettingsSection({
   | 't'
   | 'celebrationsEnabled'
   | 'setCelebrationsEnabled'
+  | 'agentProfile'
+  | 'setAgentProfile'
   | 'aiAgentsStatus'
   | 'aiModelProviders'
   | 'setAiModelProviders'
@@ -1435,6 +1451,22 @@ function AiAgentSettingsSection({
                 : `(${t('settings.aiAgents.missing')})`}
             </span>
           </div>
+        </SettingsRow>
+      </SettingsGroup>
+
+      <SettingsGroup>
+        <SettingsRow
+          label="Instructions"
+          description="One profile for this installation. Chat adds it to every turn. It is not saved in the vault."
+          controlWidth="wide"
+        >
+          <Textarea
+            value={agentProfile}
+            onChange={(event) => setAgentProfile(event.target.value)}
+            placeholder="How Chat should respond"
+            aria-label="Instructions"
+            data-testid="settings-agent-profile"
+          />
         </SettingsRow>
       </SettingsGroup>
 

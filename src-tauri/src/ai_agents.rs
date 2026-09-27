@@ -257,7 +257,10 @@ where
         // This path is the agent-panel bridge, which has no attachment
         // surface — images arrive only through the chat composer.
         images: Vec::new(),
-        system_prompt: request.system_prompt,
+        system_prompt: crate::settings::compose_agent_profile(
+            crate::settings::saved_agent_profile().as_deref(),
+            request.system_prompt.as_deref(),
+        ),
         vault_path,
         event_name: request.event_name,
         provider: None,
