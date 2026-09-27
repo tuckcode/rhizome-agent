@@ -1,12 +1,13 @@
 {
   "repo": "PrimeIntellect-ai/prime-agent",
-  "auditedAt": "2026-09-12",
-  "installedVersion": "0.9.3",
-  "githubLatestTag": "v0.9.3",
+  "auditedAt": "2026-09-27",
+  "installedVersion": "0.9.6",
+  "githubLatestTag": "v0.9.6",
   "protocolVersion": 7,
   "daemonCommands": [
     "abort",
     "abort_and_clear_queue",
+    "abort_and_send_queued",
     "abort_bash",
     "abort_branch_summary",
     "abort_compaction",
