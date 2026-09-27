@@ -35,18 +35,15 @@ Wrong: the newest line becomes the job. The old job sits half-done. A footer lis
 
 Right: finish the slice, or park it, then start the oldest pending item.
 
-The footer is a read of the todos. It is not the work. Omit every empty line. Never print `Doing: none`. He kept the other lines. Dropping the whole footer was a misread of 2026-09-21.
+The Doing / Queued / Wanted / Parked / Done footer is a read of the todos. It is not the work. Keep the list when Doing is empty.
 
-## End the turn with only the lines that have something in them
+## When any bucket has an item, end the turn with
 
-- Doing — the `in_progress` title, only while one job is actually running
-- Queued — pending titles, oldest first
-- Wanted — keep this idea, not started
+- Doing (the `in_progress` title, or `none`)
+- Queued (pending titles, oldest first)
+- Wanted (keep this idea, not started)
 - Parked
-- Done — finished this session and still worth one line
-- Flags — at most three short lines. A trap that will bite the next action. One line each. Add one when you catch it. Do not repeat a flag he already parked. Do not paste HANDOFF, issue lists, or a standing inventory.
-
-If every line would be empty, end with `Ready.` and nothing else.
+- Done
 
 ## After that list, offer to delegate
 
