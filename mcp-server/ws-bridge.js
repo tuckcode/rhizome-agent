@@ -176,22 +176,38 @@ const TOOL_EXECUTORS = [
     })
     return { result: out.trim() }
   }],
-  ['rhizome_graph_summary', async (args) => {
-    const { execFileSync } = await import('node:child_process')
-    const vaultPath = typeof args.vaultPath === 'string'
-      ? args.vaultPath
-      : toolService.activeVaultPaths()[0]
-    if (args.vaultPath && !toolService.activeVaultPaths().includes(args.vaultPath)) {
-      return { error: 'Vault path is not active' }
-    }
-    if (!vaultPath) return { error: 'No active vault' }
-    const out = execFileSync('rhizome-graph', ['summary', vaultPath], {
-      encoding: 'utf-8',
-      timeout: 30000,
-    })
-    return { result: out }
-  }],
+  ['rhizome_graph_summary', (args) => runGraphSummary(args)],
 ]
+
+/**
+ * `rhizome_graph_summary` keeps its name (Q-A6) and answers with the same
+ * in-repo `graph-query health` payload as `rhizome_graph_health` on the MCP
+ * stdio path. The external graph CLI builds a different graph (C40).
+ *
+ * `deps` exists so tests can see the argv without spawning a process.
+ */
+export async function runGraphSummary(args = {}, deps = {}) {
+  const activeVaultPaths = deps.activeVaultPaths ?? (() => toolService.activeVaultPaths())
+  const toolPath = deps.toolPath ?? RHIZOME_TOOL_PATH
+  const vaultPath = typeof args.vaultPath === 'string'
+    ? args.vaultPath
+    : activeVaultPaths()[0]
+  if (args.vaultPath && !activeVaultPaths().includes(args.vaultPath)) {
+    return { error: 'Vault path is not active' }
+  }
+  if (!vaultPath) return { error: 'No active vault' }
+  if (typeof toolPath !== 'string' || !toolPath) {
+    return {
+      error: 'Graph queries need the Rhizome sidecar. Set RHIZOME_TOOL_PATH to the rhizome-tool binary.',
+    }
+  }
+  const execFileSync = deps.execFileSync ?? (await import('node:child_process')).execFileSync
+  const out = execFileSync(toolPath, ['graph-query', vaultPath, 'health'], {
+    encoding: 'utf-8',
+    timeout: 30000,
+  })
+  return { result: out }
+}
 
 function callToolHandler(tool, args) {
   const executor = TOOL_EXECUTORS.find(([name]) => name === tool)?.[1]
