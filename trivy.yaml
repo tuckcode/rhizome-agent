@@ -1,0 +1,13 @@
+severity:
+  - LOW
+  - MEDIUM
+  - HIGH
+  - CRITICAL
+
+scan:
+  scanners:
+    - vuln
+    - secret
+  skip-dirs:
+    - .worktrees
+    - .claude/worktrees
