@@ -6,6 +6,7 @@ import os from 'node:os'
 import process from 'node:process'
 import { resolve } from 'node:path'
 import { spawn } from 'node:child_process'
+import { spawnPnpm } from './spawn-pnpm.mjs'
 
 const rootDir = process.cwd()
 const finalCoverageDir = resolve(rootDir, process.env.VITEST_COVERAGE_FINAL_DIR ?? 'coverage')
@@ -38,6 +39,15 @@ const baseCommandArgs = isJsExecpath
 const clearCacheCommandArgs = isJsExecpath
   ? [packageManagerExec, 'exec', 'vitest', '--clearCache']
   : ['exec', 'vitest', '--clearCache']
+
+// A bare `pnpm` goes through spawnPnpm so it also starts on Windows (C82).
+function spawnVitest(args, options) {
+  if (isJsExecpath) {
+    return spawn(command, args, options)
+  }
+
+  return spawnPnpm(args, options)
+}
 
 function isKnownVitestInternalStateFlake(output) {
   return output.includes('Vitest failed to access its internal state.')
@@ -105,7 +115,7 @@ async function runCoverageAttempt(attempt) {
   let output = ''
 
   const exitCode = await new Promise((resolveExit, rejectExit) => {
-    const child = spawn(command, commandArgs, {
+    const child = spawnVitest(commandArgs, {
       cwd: rootDir,
       env: {
         ...process.env,
@@ -146,7 +156,7 @@ async function runCoverageAttempt(attempt) {
 
 async function clearVitestCache() {
   const exitCode = await new Promise((resolveExit, rejectExit) => {
-    const child = spawn(command, clearCacheCommandArgs, {
+    const child = spawnVitest(clearCacheCommandArgs, {
       cwd: rootDir,
       env: process.env,
       stdio: 'inherit',

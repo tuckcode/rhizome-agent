@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process'
+import { spawnPnpm } from './spawn-pnpm.mjs'
 import console from 'node:console'
 import { readFile, rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
@@ -85,11 +86,8 @@ function runShard(shardIndex) {
 function spawnCommand(name, command, args, env) {
   return new Promise((resolveExit, rejectExit) => {
     console.log(`[${name}] started`)
-    const child = spawn(command, args, {
-      cwd: rootDir,
-      env,
-      stdio: ['inherit', 'pipe', 'pipe'],
-    })
+    const options = { cwd: rootDir, env, stdio: ['inherit', 'pipe', 'pipe'] }
+    const child = command === 'pnpm' ? spawnPnpm(args, options) : spawn(command, args, options)
 
     child.stdout?.on('data', (chunk) => process.stdout.write(`[${name}] ${chunk}`))
     child.stderr?.on('data', (chunk) => process.stderr.write(`[${name}] ${chunk}`))
