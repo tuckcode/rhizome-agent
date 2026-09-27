@@ -1,8 +1,14 @@
 import { renderHook, act } from '@testing-library/react'
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest'
+import type { KeyboardEvent } from 'react'
+import type { VirtuosoHandle } from 'react-virtuoso'
 import { useNoteListKeyboard } from './useNoteListKeyboard'
+import type { VaultEntry } from '../types'
 
-function makeEntry(path, title) {
+type NoteListKeyboardOptions = Parameters<typeof useNoteListKeyboard>[0]
+type NoteListKeyboardResult = ReturnType<typeof useNoteListKeyboard>
+
+function makeEntry(path: string, title: string): VaultEntry {
   return {
     path,
     title,
@@ -22,23 +28,31 @@ function makeEntry(path, title) {
     template: null, sort: null,
     outgoingLinks: [],
     relationships: {},
-  }
+  } as unknown as VaultEntry
 }
 
-function keyEvent(key, opts = {}) {
+type HookRef = { current: NoteListKeyboardResult }
+
+type KeyEventStub = Pick<KeyboardEvent, 'key' | 'preventDefault' | 'metaKey' | 'ctrlKey' | 'altKey'>
+
+function keyEvent(key: string, opts: Partial<KeyEventStub> = {}): KeyEventStub {
   return { key, preventDefault: vi.fn(), metaKey: false, ctrlKey: false, altKey: false, ...opts }
 }
 
-function installAnimationFrameStub() {
-  let nextId = 1
-  const callbacks = new Map()
+function asKeyboardEvent(stub: KeyEventStub): KeyboardEvent<Element> {
+  return stub as unknown as KeyboardEvent<Element>
+}
 
-  vi.stubGlobal('requestAnimationFrame', (callback) => {
+function installAnimationFrameStub(): { flushAnimationFrame: () => void } {
+  let nextId = 1
+  const callbacks = new Map<number, FrameRequestCallback>()
+
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     const id = nextId++
     callbacks.set(id, callback)
     return id
   })
-  vi.stubGlobal('cancelAnimationFrame', (id) => {
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => {
     callbacks.delete(id)
   })
 
@@ -52,11 +66,11 @@ function installAnimationFrameStub() {
 }
 
 describe('useNoteListKeyboard', () => {
-  const items = [makeEntry('/a.md', 'A'), makeEntry('/b.md', 'B'), makeEntry('/c.md', 'C')]
+  const items: VaultEntry[] = [makeEntry('/a.md', 'A'), makeEntry('/b.md', 'B'), makeEntry('/c.md', 'C')]
   const onOpen = vi.fn()
-  let flushAnimationFrame
+  let flushAnimationFrame: () => void
 
-  function renderKeyboard(options = {}) {
+  function renderKeyboard(options: Partial<NoteListKeyboardOptions> = {}) {
     const open = options.onOpen ?? vi.fn()
     const hook = renderHook(() =>
       useNoteListKeyboard({ items, selectedNotePath: null, onOpen: open, enabled: true, ...options }),
@@ -64,15 +78,15 @@ describe('useNoteListKeyboard', () => {
     return { ...hook, open }
   }
 
-  function pressKey(result, key, opts = {}) {
-    act(() => result.current.handleKeyDown(keyEvent(key, opts)))
+  function pressKey(result: HookRef, key: string, opts: Partial<KeyEventStub> = {}) {
+    act(() => result.current.handleKeyDown(asKeyboardEvent(keyEvent(key, opts))))
   }
 
-  function pressKeyTimes(result, key, times) {
+  function pressKeyTimes(result: HookRef, key: string, times: number) {
     for (let index = 0; index < times; index++) pressKey(result, key)
   }
 
-  function expectDeferredOpen(open, entry) {
+  function expectDeferredOpen(open: (entry: VaultEntry) => void, entry: VaultEntry) {
     expect(open).not.toHaveBeenCalled()
     act(() => flushAnimationFrame())
     expect(open).toHaveBeenCalledTimes(1)
@@ -129,7 +143,7 @@ describe('useNoteListKeyboard', () => {
       useNoteListKeyboard({ items, selectedNotePath: null, onOpen: open, enabled: true }),
     )
     const scrollIntoView = vi.fn()
-    result.current.virtuosoRef.current = { scrollIntoView }
+    result.current.virtuosoRef.current = { scrollIntoView } as unknown as VirtuosoHandle
 
     pressKey(result, 'ArrowDown')
 
@@ -215,7 +229,7 @@ describe('useNoteListKeyboard', () => {
     const { result } = renderHook(() =>
       useNoteListKeyboard({ items: [], selectedNotePath: null, onOpen, enabled: true }),
     )
-    act(() => result.current.handleKeyDown(keyEvent('ArrowDown')))
+    act(() => result.current.handleKeyDown(asKeyboardEvent(keyEvent('ArrowDown'))))
     expect(result.current.highlightedPath).toBeNull()
   })
 
