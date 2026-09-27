@@ -84,21 +84,12 @@ ensure_llvm_coverage_tooling() {
   fi
 }
 
-ensure_playwright_browser() {
-  # A missing browser binary does not fail loudly — every spec dies in about a
-  # millisecond inside browserType.launch, so the lane reports twenty-six
-  # failures that look like the change under test broke everything. Checking
-  # first turns that into one line.
-  #
-  # Playwright pins a browser build per version, so a version bump orphans the
-  # cached binary. That happened on 2026-08-22 between two pushes an hour
-  # apart, with no change to any test.
-  if npx --no-install playwright install --dry-run chromium >/dev/null 2>&1; then
-    if ! npx --no-install playwright install chromium >/dev/null 2>&1; then
-      echo "  ⚠️  playwright browser install failed — run: npx playwright install chromium"
-    fi
-  fi
-}
+# Playwright browser install lives in its own file so a stub can source it
+# without running this hook. C81: visible output, a timeout, and a failure
+# that names the browser build and the cache path.
+# shellcheck disable=SC1091
+HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+. "$HOOK_DIR/ensure-playwright-browser.sh"
 
 ensure_node_tooling() {
   if command -v node >/dev/null 2>&1 && command -v pnpm >/dev/null 2>&1; then
