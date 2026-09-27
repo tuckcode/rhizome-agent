@@ -126,6 +126,8 @@ fn current_problem() -> Option<PrimeConnectionProblem> {
 /// This is the transport's only injection point, and it is what the tests
 /// drive a fake daemon through.
 const DAEMON_SOCKET_ENV: &str = "RHIZOME_PRIME_DAEMON_SOCKET";
+/// Scratch directory for `pnpm test:live-prime`. Never `~/.prime/agent/sessions`.
+const LIVE_SESSION_DIR_ENV: &str = "RHIZOME_PRIME_SESSION_DIR";
 
 static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 /// Hidden window (C22): do not spawn Prime again from the status poll.
@@ -733,6 +735,61 @@ fn daemon_socket_path() -> Result<PathBuf, String> {
 /// socket) would be a side effect the suite cannot clean up.
 fn daemon_socket_is_overridden() -> bool {
     std::env::var_os(DAEMON_SOCKET_ENV).is_some()
+}
+
+/// Prime's real session store. Live tests must not read or write it.
+fn default_prime_session_dir() -> Option<PathBuf> {
+    dirs::home_dir().map(|home| home.join(".prime/agent/sessions"))
+}
+
+fn paths_equal(left: &Path, right: &Path) -> bool {
+    let left = std::fs::canonicalize(left).unwrap_or_else(|_| left.to_path_buf());
+    let right = std::fs::canonicalize(right).unwrap_or_else(|_| right.to_path_buf());
+    left == right
+}
+
+fn is_default_prime_session_dir(path: &Path) -> bool {
+    default_prime_session_dir().is_some_and(|default_dir| paths_equal(path, &default_dir))
+}
+
+/// Fail closed before any live test talks to the default daemon.
+///
+/// `RHIZOME_PRIME_DAEMON_SOCKET` isolates the socket. `RHIZOME_PRIME_SESSION_DIR`
+/// is the scratch store the isolated daemon was started with. Either missing,
+/// or the session dir being `~/.prime/agent/sessions`, is a refusal — the
+/// caller must not fall through to the default socket.
+fn require_isolated_live_harness() -> Result<(), String> {
+    let socket = match std::env::var(DAEMON_SOCKET_ENV) {
+        Ok(socket) if !socket.trim().is_empty() => socket,
+        Ok(_) => return Err(format!("{DAEMON_SOCKET_ENV} is empty")),
+        Err(_) => return Err(format!("{DAEMON_SOCKET_ENV} is not set")),
+    };
+    if let Some(default_sock) = default_daemon_socket_path() {
+        if paths_equal(Path::new(socket.trim()), &default_sock) {
+            return Err("refusing the default Prime daemon socket".into());
+        }
+    }
+    let dir = match std::env::var(LIVE_SESSION_DIR_ENV) {
+        Ok(dir) if !dir.trim().is_empty() => dir,
+        Ok(_) => return Err(format!("{LIVE_SESSION_DIR_ENV} is empty")),
+        Err(_) => return Err(format!("{LIVE_SESSION_DIR_ENV} is not set")),
+    };
+    let path = PathBuf::from(dir.trim());
+    if is_default_prime_session_dir(&path) {
+        return Err("refusing the default Prime session dir".into());
+    }
+    Ok(())
+}
+
+/// Scratch session directory for live-test cleanup. `None` when the harness
+/// is missing or points at the real store — callers then delete nothing.
+fn isolated_live_session_dir() -> Option<PathBuf> {
+    let dir = std::env::var(LIVE_SESSION_DIR_ENV).ok()?;
+    let path = PathBuf::from(dir.trim());
+    if path.as_os_str().is_empty() || is_default_prime_session_dir(&path) {
+        return None;
+    }
+    Some(path)
 }
 
 /// Arguments Prime's CLI uses to start a supervisor.
@@ -3875,7 +3932,11 @@ fn worker_start_failure_message(text: &str) -> Option<String> {
     let eperm = lower.contains("eperm");
     let uv_cwd = lower.contains("uv_cwd");
     let spawn_failed = lower.contains("failed to spawn session worker")
-        || (eperm && (lower.contains("spawn") || lower.contains("worker") || uv_cwd || lower.contains("cwd")));
+        || (eperm
+            && (lower.contains("spawn")
+                || lower.contains("worker")
+                || uv_cwd
+                || lower.contains("cwd")));
     let process_exit = lower.contains("process exit")
         || (lower.contains("session worker")
             && (lower.contains("exited") || lower.contains("exit code")));
@@ -3902,7 +3963,9 @@ fn response_worker_failure(json: &serde_json::Value) -> Option<String> {
     if json["success"].as_bool() == Some(true) {
         return None;
     }
-    json["error"].as_str().and_then(worker_start_failure_message)
+    json["error"]
+        .as_str()
+        .and_then(worker_start_failure_message)
 }
 
 fn fail_pending_with_worker_failure(
@@ -3946,10 +4009,7 @@ fn route_daemon_line(
     if json["type"].as_str() == Some("response") {
         if let Some(message) = response_worker_failure(&json) {
             if let Some(object) = json.as_object_mut() {
-                object.insert(
-                    "error".into(),
-                    serde_json::Value::String(message),
-                );
+                object.insert("error".into(), serde_json::Value::String(message));
             }
         }
         if let Some(id) = json["id"].as_str() {
@@ -4003,11 +4063,17 @@ mod tests {
         guard
     }
 
+    /// Stop before `ensure_host` when the scratch socket or session dir is missing.
+    fn enter_isolated_live_test() {
+        require_isolated_live_harness().expect(
+            "live tests require RHIZOME_PRIME_DAEMON_SOCKET and a scratch RHIZOME_PRIME_SESSION_DIR",
+        );
+    }
+
     /// Cleanup guard for live daemon tests.
     ///
-    /// Tracks a session ID and deletes its `.jsonl` file from
-    /// `~/.prime/agent/sessions/` when dropped. This ensures that tests
-    /// against the real daemon clean up after themselves even if they panic.
+    /// Deletes the session file from `RHIZOME_PRIME_SESSION_DIR` only. A missing
+    /// scratch dir, or the real `~/.prime/agent/sessions` store, deletes nothing.
     ///
     /// Only deletes sessions this test actually created — identified by the
     /// ID passed at construction. Will not error if the file doesn't exist
@@ -4021,12 +4087,12 @@ mod tests {
             if self.session_id.is_empty() {
                 return;
             }
-            if let Some(home) = dirs::home_dir() {
-                let session_file = home
-                    .join(".prime/agent/sessions")
-                    .join(format!("{}.jsonl", self.session_id));
-                let _ = std::fs::remove_file(&session_file);
-            }
+            // Fail closed: a missing scratch dir, or the real store, deletes nothing.
+            let Some(dir) = isolated_live_session_dir() else {
+                return;
+            };
+            let session_file = dir.join(format!("{}.jsonl", self.session_id));
+            let _ = std::fs::remove_file(session_file);
         }
     }
 
@@ -7049,10 +7115,7 @@ mod tests {
             elapsed < Duration::from_secs(5),
             "worker start failure waited {elapsed:?}"
         );
-        assert!(
-            error.starts_with("worker-failed: "),
-            "{error}"
-        );
+        assert!(error.starts_with("worker-failed: "), "{error}");
         assert!(
             !error.contains("timed out"),
             "the 30s timeout must not hide the worker failure: {error}"
@@ -7440,6 +7503,7 @@ mod tests {
     #[ignore = "needs a running prime-agent daemon with scheduled work"]
     fn scheduled_work_against_the_live_daemon() {
         let _guard = host_guard();
+        enter_isolated_live_test();
         let home = dirs::home_dir().expect("home");
         let session_id = connect_host(&home).expect("connect");
         let _cleanup = SessionCleanupGuard::new(session_id);
@@ -8500,8 +8564,7 @@ mod tests {
     #[ignore = "requires a running prime-agent daemon (see `prime-agent status`)"]
     fn live_daemon_round_trip() {
         let _guard = host_guard();
-        // Use the real socket, not whatever a sibling test last pointed at.
-        std::env::remove_var(DAEMON_SOCKET_ENV);
+        enter_isolated_live_test();
         let vault = tempfile::tempdir().unwrap();
 
         let socket = daemon_socket_path().expect("a reachable daemon");
@@ -8587,7 +8650,7 @@ mod tests {
     #[ignore = "requires a running prime-agent daemon (see `prime-agent status`)"]
     fn live_session_naming() {
         let _guard = host_guard();
-        std::env::remove_var(DAEMON_SOCKET_ENV);
+        enter_isolated_live_test();
         let vault = tempfile::tempdir().unwrap();
 
         ensure_host(&vault.path().to_string_lossy()).expect("connect + attach");
@@ -8627,9 +8690,8 @@ mod tests {
         );
 
         // The name is only real if the daemon wrote it where the list reads.
-        let log = dirs::home_dir()
-            .unwrap()
-            .join(".prime/agent/sessions")
+        let log = isolated_live_session_dir()
+            .expect("scratch session dir")
             .join(format!("{session_id}.jsonl"));
         let summary = crate::prime_sessions::summarize_file(&log).expect("the session log");
         println!("title: {:?}", summary.title);
@@ -8652,7 +8714,7 @@ mod tests {
     #[ignore = "requires a running prime-agent daemon (see `prime-agent status`)"]
     fn live_goal_round_trip() {
         let _guard = host_guard();
-        std::env::remove_var(DAEMON_SOCKET_ENV);
+        enter_isolated_live_test();
         let vault = tempfile::tempdir().unwrap();
 
         let session_id = ensure_host(&vault.path().to_string_lossy()).expect("connect + attach");
@@ -8701,7 +8763,8 @@ mod tests {
     #[ignore = "requires a running prime-agent daemon (see `prime-agent status`)"]
     fn live_unreachable_service_is_actionable_and_recovers() {
         let _guard = host_guard();
-        std::env::remove_var(DAEMON_SOCKET_ENV);
+        enter_isolated_live_test();
+        let isolated = std::env::var(DAEMON_SOCKET_ENV).expect("isolated socket");
         record_problem(None);
         let vault = tempfile::tempdir().unwrap();
 
@@ -8728,9 +8791,9 @@ mod tests {
                 | PrimeConnectionProblem::NotInstalled
         ));
 
-        // Recovery: the real daemon is still there, and the state must clear.
-        std::env::remove_var(DAEMON_SOCKET_ENV);
-        ensure_host(&vault.path().to_string_lossy()).expect("reconnect to the real daemon");
+        // Recovery: the isolated daemon is still there, and the state must clear.
+        std::env::set_var(DAEMON_SOCKET_ENV, &isolated);
+        ensure_host(&vault.path().to_string_lossy()).expect("reconnect to the isolated daemon");
         assert_eq!(
             get_status().problem,
             None,
@@ -8758,9 +8821,7 @@ mod tests {
     #[ignore = "requires an isolated daemon; set RHIZOME_TEST_DAEMON_SOCKET"]
     fn live_quit_stops_our_session_by_default_and_keeps_it_when_asked() {
         let _guard = host_guard();
-        let socket = std::env::var("RHIZOME_TEST_DAEMON_SOCKET")
-            .expect("set RHIZOME_TEST_DAEMON_SOCKET to an isolated daemon socket");
-        std::env::set_var(DAEMON_SOCKET_ENV, &socket);
+        enter_isolated_live_test();
         record_problem(None);
         let vault = tempfile::tempdir().unwrap();
 
@@ -8848,7 +8909,6 @@ mod tests {
         }
 
         let _ = shutdown_host();
-        std::env::remove_var(DAEMON_SOCKET_ENV);
         record_problem(None);
     }
 
@@ -8861,34 +8921,71 @@ mod tests {
     }
 
     #[test]
-    fn session_cleanup_guard_deletes_session_files() {
-        // Create a fake session file to verify the guard deletes it
-        if let Some(home) = dirs::home_dir() {
-            let sessions_dir = home.join(".prime/agent/sessions");
-            let _ = std::fs::create_dir_all(&sessions_dir);
+    fn session_cleanup_guard_deletes_only_the_scratch_session_file() {
+        let _guard = host_guard();
+        let scratch = tempfile::tempdir().unwrap();
+        let previous = std::env::var(LIVE_SESSION_DIR_ENV).ok();
+        std::env::set_var(LIVE_SESSION_DIR_ENV, scratch.path());
 
-            let test_id = "test-cleanup-session-id-12345".to_string();
-            let test_file = sessions_dir.join(format!("{}.jsonl", test_id));
-
-            // Create a dummy file
-            let _ = std::fs::write(&test_file, "test content");
-            assert!(test_file.exists(), "test file should exist before cleanup");
-
-            // Drop the guard, which should delete the file
-            {
-                let _guard = SessionCleanupGuard::new(test_id);
-                // Guard is still in scope
-                assert!(
-                    test_file.exists(),
-                    "test file should still exist while guard is in scope"
-                );
-            }
-            // Guard has dropped now
-
+        let test_id = "test-cleanup-session-id-12345".to_string();
+        let test_file = scratch.path().join(format!("{test_id}.jsonl"));
+        std::fs::write(&test_file, "test content").unwrap();
+        {
+            let _cleanup = SessionCleanupGuard::new(test_id);
             assert!(
-                !test_file.exists(),
-                "test file should be deleted after cleanup guard drops"
+                test_file.exists(),
+                "scratch file stays while the guard is in scope"
             );
+        }
+        assert!(
+            !test_file.exists(),
+            "the guard deletes the scratch session file"
+        );
+
+        match previous {
+            Some(value) => std::env::set_var(LIVE_SESSION_DIR_ENV, value),
+            None => std::env::remove_var(LIVE_SESSION_DIR_ENV),
+        }
+    }
+
+    #[test]
+    fn live_harness_refuses_the_default_session_dir() {
+        let _guard = host_guard();
+        let previous_socket = std::env::var(DAEMON_SOCKET_ENV).ok();
+        let previous_dir = std::env::var(LIVE_SESSION_DIR_ENV).ok();
+        let home = dirs::home_dir().expect("home");
+        let default_dir = home.join(".prime/agent/sessions");
+
+        std::env::set_var(DAEMON_SOCKET_ENV, "/tmp/rz-not-the-default-daemon.sock");
+        std::env::set_var(LIVE_SESSION_DIR_ENV, &default_dir);
+        let refused = require_isolated_live_harness().expect_err("the real store is refused");
+        assert!(refused.contains("default Prime session dir"), "{refused}");
+        assert!(
+            is_default_prime_session_dir(&default_dir),
+            "the harness must recognise ~/.prime/agent/sessions"
+        );
+
+        std::env::remove_var(LIVE_SESSION_DIR_ENV);
+        let missing_dir =
+            require_isolated_live_harness().expect_err("a missing scratch dir is refused");
+        assert!(missing_dir.contains(LIVE_SESSION_DIR_ENV), "{missing_dir}");
+
+        std::env::set_var(LIVE_SESSION_DIR_ENV, "/tmp/rzlive/sessions");
+        std::env::remove_var(DAEMON_SOCKET_ENV);
+        let missing_socket =
+            require_isolated_live_harness().expect_err("a missing socket is refused");
+        assert!(
+            missing_socket.contains(DAEMON_SOCKET_ENV),
+            "{missing_socket}"
+        );
+
+        match previous_socket {
+            Some(value) => std::env::set_var(DAEMON_SOCKET_ENV, value),
+            None => std::env::remove_var(DAEMON_SOCKET_ENV),
+        }
+        match previous_dir {
+            Some(value) => std::env::set_var(LIVE_SESSION_DIR_ENV, value),
+            None => std::env::remove_var(LIVE_SESSION_DIR_ENV),
         }
     }
 
@@ -8897,17 +8994,13 @@ mod tests {
     #[ignore = "requires a running prime-agent daemon"]
     fn live_session_cleanup_works_end_to_end() {
         let _guard = host_guard();
-        std::env::remove_var(DAEMON_SOCKET_ENV);
+        enter_isolated_live_test();
         let vault = tempfile::tempdir().unwrap();
+        let sessions_dir = isolated_live_session_dir().expect("scratch session dir");
 
-        // Get session count before
-        let sessions_before: usize = if let Some(home) = dirs::home_dir() {
-            std::fs::read_dir(home.join(".prime/agent/sessions"))
-                .map(|entries| entries.count())
-                .unwrap_or(0)
-        } else {
-            0
-        };
+        let sessions_before = std::fs::read_dir(&sessions_dir)
+            .map(|entries| entries.count())
+            .unwrap_or(0);
 
         // Create a session and let cleanup guard delete it
         {
@@ -8921,26 +9014,16 @@ mod tests {
 
             let _cleanup = SessionCleanupGuard::new(session_id.clone());
 
-            // Verify session file exists while guard is in scope
-            if let Some(home) = dirs::home_dir() {
-                let session_file = home
-                    .join(".prime/agent/sessions")
-                    .join(format!("{}.jsonl", session_id));
-                assert!(session_file.exists(), "session file should exist in scope");
-            }
+            let session_file = sessions_dir.join(format!("{session_id}.jsonl"));
+            assert!(session_file.exists(), "session file should exist in scope");
 
             let _ = shutdown_host();
         }
         // Guard has dropped here
 
-        // Get session count after
-        let sessions_after: usize = if let Some(home) = dirs::home_dir() {
-            std::fs::read_dir(home.join(".prime/agent/sessions"))
-                .map(|entries| entries.count())
-                .unwrap_or(0)
-        } else {
-            0
-        };
+        let sessions_after = std::fs::read_dir(&sessions_dir)
+            .map(|entries| entries.count())
+            .unwrap_or(0);
 
         println!(
             "sessions before: {}, after: {}",
@@ -9125,6 +9208,7 @@ mod tests {
     #[ignore = "needs a running prime-agent daemon"]
     fn roster_against_the_live_daemon() {
         let _guard = host_guard();
+        enter_isolated_live_test();
         let sessions = list_running_sessions().expect("roster");
         println!("live daemon reported {} sessions", sessions.len());
         for session in &sessions {
