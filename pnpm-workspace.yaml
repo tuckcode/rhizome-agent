@@ -13,7 +13,7 @@ overrides:
   '@hono/node-server': 1.19.15
   dompurify: 3.4.13
   express-rate-limit: 8.2.2
-  hono: 4.12.34
+  hono: 4.13.5
   ip-address: 10.3.1
   js-yaml@3: 3.15.2
   linkify-it: 5.0.2
@@ -31,10 +31,22 @@ overrides:
   picomatch: 4.0.4
   postcss: 8.5.23
   protobufjs: 7.6.5
-  qs: 6.15.2
+  qs: 6.16.0
   rollup: 4.59.0
-  undici: 7.25.0
+  undici: 7.29.0
   '@blocknote/core>uuid': 11.1.1
+  '@babel/core': 7.29.6
+  '@humanfs/node': 0.16.8
+  '@opentelemetry/core': 2.8.0
+  baseline-browser-mapping: 2.11.0
+  body-parser: 2.3.0
+  brace-expansion@1: 1.1.16
+  brace-expansion@2: 2.1.2
+  browserslist: 4.28.7
+  fflate@0.4: 0.4.9
+  js-yaml@4: 4.3.2
+  smol-toml: 1.7.1
+  ws@8: 8.21.0
 
 patchedDependencies:
   '@blocknote/core@0.46.2': patches/@blocknote__core@0.46.2.patch

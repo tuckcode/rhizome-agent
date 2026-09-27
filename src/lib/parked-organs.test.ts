@@ -53,8 +53,8 @@ describe('parked organs leftover', () => {
     const workspace = readFileSync(`${process.cwd()}/pnpm-workspace.yaml`, 'utf8')
     expect(pkg).toContain('"@tiptap/pm": "3.22.5"')
     expect(workspace).toContain("'@tiptap/extension-link@3.19.0'")
-    expect(workspace).toContain('hono: 4.12.34')
-    expect(workspace).toContain('qs: 6.15.2')
+    expect(workspace).toContain('hono: 4.13.5')
+    expect(workspace).toContain('qs: 6.16.0')
     expect(workspace).not.toMatch(/@tiptap\/core.*3\.30/)
   })
 
