@@ -15,6 +15,11 @@
 //! runtime, and five of its event types (`search`, `lint`, `graph-summary`,
 //! `wiki-generate-*`) have no Rust path at all. See
 //! `docs/plans/2026-07-31-save-path-audit-session-status.md` finding 3.
+//!
+//! The live log rolls at [`EVENTS_JSONL_MAX_BYTES`]. The file that just
+//! filled becomes `events.jsonl.1` (one previous generation; any older
+//! generation is replaced) and the record that crossed the cap is written
+//! to a new live file. That record is never dropped.
 
 use serde_json::{Map, Value};
 use std::path::Path;
@@ -88,15 +93,45 @@ impl VaultEvent {
     }
 }
 
+/// Byte cap for the live `.rhizome/events.jsonl`.
+///
+/// When appending a record would push the live file past this many bytes,
+/// the current file is renamed to `events.jsonl.1` (any older generation is
+/// replaced) and the new record is written to a fresh live file. The record
+/// that triggered rollover is never dropped. A single record larger than
+/// the cap is still written, so the live file can exceed the cap by at most
+/// one record.
+///
+/// Tests pass a smaller cap to `append_with_limit` so rollover does not need
+/// a large fixture. Production callers use [`append`], which applies this cap.
+pub const EVENTS_JSONL_MAX_BYTES: u64 = 1_048_576;
+
 /// Append one record to `<vault>/.rhizome/events.jsonl`, creating the
 /// directory and file if needed.
+///
+/// Rolls the live file at [`EVENTS_JSONL_MAX_BYTES`]. See that constant.
 pub fn append(vault_path: &Path, event: &VaultEvent) -> Result<(), String> {
+    append_with_limit(vault_path, event, EVENTS_JSONL_MAX_BYTES)
+}
+
+/// Append one record, rolling the live log when it would pass `max_bytes`.
+///
+/// Same rules as [`append`]. `max_bytes` replaces [`EVENTS_JSONL_MAX_BYTES`]
+/// so a unit test can force rollover with a few records.
+fn append_with_limit(vault_path: &Path, event: &VaultEvent, max_bytes: u64) -> Result<(), String> {
     use std::io::Write;
 
     let events_dir = vault_path.join(".rhizome");
     std::fs::create_dir_all(&events_dir).map_err(|e| format!("Failed to create dir: {e}"))?;
     let events_path = events_dir.join("events.jsonl");
     let line = format!("{}\n", event.to_json());
+    let line_len = line.len() as u64;
+    let current_len = events_file_len(&events_path)?;
+
+    if current_len > 0 && current_len.saturating_add(line_len) > max_bytes {
+        roll_events_log(&events_dir, &events_path)?;
+    }
+
     let mut file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -104,6 +139,27 @@ pub fn append(vault_path: &Path, event: &VaultEvent) -> Result<(), String> {
         .map_err(|e| format!("Failed to open events log: {e}"))?;
     file.write_all(line.as_bytes())
         .map_err(|e| format!("Failed to write events log: {e}"))
+}
+
+fn events_file_len(events_path: &Path) -> Result<u64, String> {
+    match std::fs::metadata(events_path) {
+        Ok(meta) => Ok(meta.len()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(0),
+        Err(err) => Err(format!("Failed to stat events log: {err}")),
+    }
+}
+
+/// Move the live log to `events.jsonl.1`, replacing any older generation.
+fn roll_events_log(events_dir: &Path, events_path: &Path) -> Result<(), String> {
+    let previous = events_dir.join("events.jsonl.1");
+    // Windows refuses to rename onto an existing path. Remove the older
+    // generation first so one previous file is the only history kept.
+    match std::fs::remove_file(&previous) {
+        Ok(()) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => return Err(format!("Failed to replace previous events log: {err}")),
+    }
+    std::fs::rename(events_path, &previous).map_err(|e| format!("Failed to roll events log: {e}"))
 }
 
 #[cfg(test)]
@@ -211,5 +267,78 @@ mod tests {
             .as_object()
             .unwrap()
             .contains_key("from"));
+    }
+
+    fn marked(label: &str) -> VaultEvent {
+        VaultEvent::new("distill", "manual").field("mark", label)
+    }
+
+    /// The next record that would push the live log past the byte cap moves
+    /// the current file to `events.jsonl.1` (replacing any older generation)
+    /// and is written to a new live file. That record is not dropped, and
+    /// the live file stays at or under the cap.
+    #[test]
+    fn rolls_live_log_at_the_byte_cap_and_keeps_one_previous_generation() {
+        let dir = tempfile::tempdir().unwrap();
+        let live = dir.path().join(".rhizome/events.jsonl");
+        let previous = dir.path().join(".rhizome/events.jsonl.1");
+
+        append_with_limit(dir.path(), &marked("aaa"), u64::MAX).unwrap();
+        let one = std::fs::metadata(&live).unwrap().len();
+        // Two records of this shape fit. Three do not.
+        let cap = one * 2 + one / 2;
+
+        append_with_limit(dir.path(), &marked("bbb"), cap).unwrap();
+        assert!(
+            !previous.exists(),
+            "two records under the cap must stay in the live file"
+        );
+        assert_eq!(read_events(dir.path()).len(), 2);
+        assert!(std::fs::metadata(&live).unwrap().len() <= cap);
+
+        append_with_limit(dir.path(), &marked("ccc"), cap).unwrap();
+
+        let live_len = std::fs::metadata(&live).unwrap().len();
+        assert!(
+            live_len <= cap,
+            "live file is {live_len} bytes, cap is {cap}"
+        );
+        let live_events = read_events(dir.path());
+        assert_eq!(live_events.len(), 1);
+        assert_eq!(live_events[0]["mark"], "ccc");
+
+        let rolled = std::fs::read_to_string(&previous).unwrap();
+        assert!(rolled.contains("\"mark\":\"aaa\""));
+        assert!(rolled.contains("\"mark\":\"bbb\""));
+        assert!(!rolled.contains("\"mark\":\"ccc\""));
+        assert!(!dir.path().join(".rhizome/events.jsonl.2").exists());
+
+        append_with_limit(dir.path(), &marked("ddd"), cap).unwrap();
+        append_with_limit(dir.path(), &marked("eee"), cap).unwrap();
+
+        let live_len = std::fs::metadata(&live).unwrap().len();
+        assert!(
+            live_len <= cap,
+            "live file is {live_len} bytes, cap is {cap}"
+        );
+        let live_events = read_events(dir.path());
+        assert_eq!(live_events.len(), 1);
+        assert_eq!(live_events[0]["mark"], "eee");
+
+        let rolled = std::fs::read_to_string(&previous).unwrap();
+        assert!(
+            rolled.contains("\"mark\":\"ccc\""),
+            "the generation that just filled must become the previous file"
+        );
+        assert!(
+            rolled.contains("\"mark\":\"ddd\""),
+            "records written after the first roll stay until the next roll"
+        );
+        assert!(
+            !rolled.contains("\"mark\":\"aaa\""),
+            "an older generation must be replaced, not kept as a chain"
+        );
+        assert!(!rolled.contains("\"mark\":\"eee\""));
+        assert!(!dir.path().join(".rhizome/events.jsonl.2").exists());
     }
 }

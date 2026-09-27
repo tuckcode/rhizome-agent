@@ -7,7 +7,13 @@ const source = readFileSync(
 )
 
 describe('leftover issue 36 heading', () => {
-  it('locks the issue 36 timezone findings heading', () => {
+  it('keeps the findings heading and allows the timezone picker', () => {
+    const settings = readFileSync(
+      `${process.cwd()}/src/components/VaultContentSettingsSection.tsx`,
+      'utf8',
+    )
     expect(source).toContain('Issue #36 — timezone findings')
+    expect(settings).toContain('displayTimeZone')
+    expect(settings).toContain('Time zone')
   })
 })

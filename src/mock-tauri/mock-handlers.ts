@@ -135,6 +135,7 @@ let mockSettings: Settings = {
   accent_color: null,
   ui_language: null,
   date_display_format: null,
+  timezone: null,
   note_width_mode: null,
   sidebar_type_pluralization_enabled: null,
   initial_h1_auto_rename_enabled: null,
@@ -148,6 +149,7 @@ let mockSettings: Settings = {
   all_notes_show_images: null,
   all_notes_show_unsupported: null,
   multi_workspace_enabled: null,
+  agent_profile: null,
 }
 
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
@@ -975,6 +977,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       accent_color: s.accent_color ?? null,
       ui_language: s.ui_language ?? null,
       date_display_format: s.date_display_format ?? null,
+      timezone: s.timezone ?? null,
       note_width_mode: s.note_width_mode ?? null,
       sidebar_type_pluralization_enabled: s.sidebar_type_pluralization_enabled ?? null,
       initial_h1_auto_rename_enabled: s.initial_h1_auto_rename_enabled ?? null,
@@ -988,6 +991,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       all_notes_show_images: s.all_notes_show_images ?? null,
       all_notes_show_unsupported: s.all_notes_show_unsupported ?? null,
       multi_workspace_enabled: s.multi_workspace_enabled ?? null,
+      agent_profile: s.agent_profile?.trim() || null,
     }
     return null
   },

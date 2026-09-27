@@ -7,6 +7,7 @@ import {
   createFixtureVaultCopy,
   removeFixtureVaultCopy,
 } from '../helpers/fixtureVault'
+import { SMOKE_UI_READY_TIMEOUT } from './helpers'
 
 const SOURCE_NOTE_TITLE = 'Grow Newsletter'
 const INSERTED_WIKILINK_QUERY = '[[Mana'
@@ -18,12 +19,12 @@ let tempVaultDir: string | null = null
 
 async function insertWikilink(page: Page) {
   const editor = page.locator('.bn-editor')
-  await expect(editor).toBeVisible({ timeout: 5000 })
+  await expect(editor).toBeVisible({ timeout: SMOKE_UI_READY_TIMEOUT })
 
   const firstParagraph = editor.locator('p').first()
   await expect(
     firstParagraph,
-  ).toContainText('Build a sustainable audience through high-quality weekly essays', { timeout: 5000 })
+  ).toContainText('Build a sustainable audience through high-quality weekly essays', { timeout: SMOKE_UI_READY_TIMEOUT })
   const firstParagraphBox = await firstParagraph.boundingBox()
   if (!firstParagraphBox) throw new Error('Source paragraph is not visible')
 
@@ -31,20 +32,20 @@ async function insertWikilink(page: Page) {
     firstParagraphBox.x + Math.max(1, firstParagraphBox.width - 2),
     firstParagraphBox.y + Math.max(1, firstParagraphBox.height - 2),
   )
+  const paragraphCount = await editor.locator('p').count()
   await page.keyboard.press('Enter')
-  await page.waitForTimeout(200)
+  await expect(editor.locator('p')).toHaveCount(paragraphCount + 1, { timeout: SMOKE_UI_READY_TIMEOUT })
 
   await page.keyboard.type(INSERTED_WIKILINK_QUERY)
 
   const suggestionMenu = page.locator('.wikilink-menu')
-  await expect(suggestionMenu).toBeVisible({ timeout: 5000 })
+  await expect(suggestionMenu).toBeVisible({ timeout: SMOKE_UI_READY_TIMEOUT })
   const matchingWikilinks = editor.locator(`.wikilink[data-target="${INSERTED_WIKILINK_TARGET}"]`)
   const existingCount = await matchingWikilinks.count()
   await expect(suggestionMenu.getByText(INSERTED_WIKILINK_TITLE, { exact: true })).toBeVisible()
   await page.keyboard.press('Enter')
-  await page.waitForTimeout(500)
 
-  await expect(matchingWikilinks).toHaveCount(existingCount + 1)
+  await expect(matchingWikilinks).toHaveCount(existingCount + 1, { timeout: SMOKE_UI_READY_TIMEOUT })
   return matchingWikilinks.nth(existingCount)
 }
 
@@ -85,7 +86,7 @@ async function openNote(page: Page, title: string) {
     await searchInput.fill(title)
   }
   await noteList.getByText(title, { exact: true }).click()
-  await expect(page.locator('.bn-editor h1').first()).toHaveText(title, { timeout: 5_000 })
+  await expect(page.locator('.bn-editor h1').first()).toHaveText(title, { timeout: SMOKE_UI_READY_TIMEOUT })
 }
 
 async function dispatchModifiedLinkActivation(link: ReturnType<Page['locator']>): Promise<void> {
@@ -148,7 +149,7 @@ test.describe('Wikilink insertion and navigation', () => {
     await expect(wikilink).toBeVisible()
 
     await wikilink.click({ modifiers: ['Meta'] })
-    await expect(page.locator('.bn-editor h1').first()).toHaveText(INSERTED_WIKILINK_TITLE, { timeout: 5000 })
+    await expect(page.locator('.bn-editor h1').first()).toHaveText(INSERTED_WIKILINK_TITLE, { timeout: SMOKE_UI_READY_TIMEOUT })
   })
 })
 

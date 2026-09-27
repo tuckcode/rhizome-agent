@@ -1,6 +1,6 @@
 # C66 — agent profile (instructions)
 
-**Status:** agreed 2026-09-06, not built. Awaiting two product calls.  
+**Status:** built 2026-09-27. One profile, app-wide, on the AI agents page.  
 **Origin:** Atticus · HANDOFF C66.  
 **Pickup:** [`BOARD.md`](../BOARD.md). Not harness-composition slice 3.
 
@@ -9,8 +9,8 @@
 ## Done / now / next
 
 - **Done:** named as a Settings need. Distinguished from three lookalikes.
-- **Now:** still docked (16:26). Do not encode a store this window (C66).
-- **Next:** Settings page after those two calls. No Prime `USER.md`.
+- **Now:** one textarea on the AI agents page. App settings keep the text.
+- **Next:** none for this slice. No Prime `USER.md`.
 
 **Done when:** Chat uses the profile Atticus typed, for the agent he meant, and it is stored in the vault (or an explicit app store if he picks app-wide).
 
@@ -29,13 +29,11 @@ How the agent should **respond**: rules, tone, standing instructions — for whi
 | Composition slice 3 | Prime tool allow-lists (`pi-permission-modes` etc.) |
 | Prime `USER.md` / Hermes `SOUL.md` | second memory authority (ADR-0168) |
 
-## Open (Atticus)
+## Decided (Atticus, 2026-09-27)
 
-1. One profile vs per-agent.
-2. App-wide vs per-vault.
-3. New Settings section vs under the existing AI agents page.
-
-Until those are picked, do not encode a store.
+1. One profile.
+2. App-wide.
+3. On the existing AI agents page.
 
 ## Smallest slice after the calls
 

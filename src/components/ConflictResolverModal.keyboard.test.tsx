@@ -24,7 +24,7 @@ vi.mock('@/components/ui/dialog', () => ({
     onKeyDown,
   }: {
     children: React.ReactNode
-    onKeyDown?: (event: React.KeyboardEvent<HTMLDivElement>) => void
+    onKeyDown?: React.KeyboardEventHandler<HTMLDialogElement>
   }) => (
     <dialog open onKeyDown={onKeyDown}>
       {children}

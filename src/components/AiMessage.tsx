@@ -22,7 +22,9 @@ import { writeClipboardText } from '../utils/clipboardText'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
 import { groupConsecutiveToolActions } from '../lib/groupConsecutiveToolActions'
 import { trackVaultRetrievalSourceOpened } from '../lib/productAnalytics'
+import { useDisplayTimeZone } from '../hooks/useAppPreferences'
 import { formatMessageClock } from '../utils/messageTimestamp'
+import { presentWorkerStartFailure } from '../lib/primeWorkerStartError'
 
 export interface AiAction {
   tool: string
@@ -113,7 +115,8 @@ function UserBubble({ content, references, onOpenNote, createdAtMs }: {
   onOpenNote?: (path: string) => void
   createdAtMs?: number
 }) {
-  const clock = typeof createdAtMs === 'number' ? formatMessageClock(createdAtMs) : ''
+  const displayTimeZone = useDisplayTimeZone()
+  const clock = typeof createdAtMs === 'number' ? formatMessageClock(createdAtMs, displayTimeZone) : ''
   return (
     <div className="flex flex-col items-end" style={{ marginBottom: 8 }}>
       {/*
@@ -613,7 +616,7 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
           locale={locale}
           messageId={messageId}
           forkTargetId={forkTargetId}
-          text={response}
+          text={presentWorkerStartFailure(response) ?? response}
           onFork={onFork}
           onOpenNote={onOpenNote}
           onNavigateWikilink={onNavigateWikilink}

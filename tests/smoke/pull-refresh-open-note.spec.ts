@@ -6,7 +6,7 @@ import {
   openFixtureVaultDesktopHarness,
   removeFixtureVaultCopy,
 } from '../helpers/fixtureVault'
-import { executeCommand, openCommandPalette } from './helpers'
+import { executeCommand, openCommandPalette, SMOKE_UI_READY_TIMEOUT } from './helpers'
 
 let tempVaultDir: string
 
@@ -166,10 +166,12 @@ ${pulledBody}
 
     await triggerPullCommand(page)
 
-    await expect(page.getByText('Pulled 1 update(s) from remote')).toBeVisible({ timeout: 5_000 })
-    await page.waitForTimeout(500)
-    expect(await readEditorSwapCount(page)).toBe(0)
-    await expect.poll(() => activeSelectionBlockType(page), { timeout: 5_000 }).toBe('paragraph')
+    await expect(page.getByText('Pulled 1 update(s) from remote')).toBeVisible({ timeout: SMOKE_UI_READY_TIMEOUT })
+    await expect.poll(async () => {
+      const swaps = await readEditorSwapCount(page)
+      const block = await activeSelectionBlockType(page)
+      return swaps === 0 && block === 'paragraph'
+    }, { timeout: SMOKE_UI_READY_TIMEOUT }).toBe(true)
     await expectEditorFocused(page)
   })
 })

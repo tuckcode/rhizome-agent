@@ -1,9 +1,10 @@
-# Session board — 2026-09-20 morning
+# Session board — 2026-09-27
 
-**Origin:** Cursor Grok 4.6 · Lane I · 2026-09-20 · stamped against
-local product checkpoint `4f9b4c4` (**unpushed**), `origin/main` `dc44d84`,
-planning local `bcd4b87` (**unpushed**), app `6860762`. C76 source is in
-this commit series.
+**Origin:** Cursor Grok 4.6 · Lane I · 2026-09-20 · historical pickup block below.
+**Origin:** Composer 2.5 Fast · 2026-09-27 · header refresh for swarm Wave 1.
+
+Stamped **`origin/main` = `5c37d28`**, local HEAD matches, nothing unpushed.
+Installed app = **`d0a55f8`** (2026-09-26 04:21 CDT). Source after that is not in `/Applications` until rebuild.
 
 God-plan input: [`ASTRA_PACKET.md`](ASTRA_PACKET.md). Inventory:
 [`PLAN_FOR_A_PLAN.md`](PLAN_FOR_A_PLAN.md). Daily index: `HANDOFF.md`.
@@ -40,7 +41,7 @@ roadmap row in the inventory is not implementation approval.
 
 ## True right now
 
-- **Git:** `origin/main` and local HEAD are **`d0a55f8`**.
+- **Git:** `origin/main` and local HEAD are **`5c37d28`**. Last packaged app build is still **`d0a55f8`**.
 - **Last stamped app:** **`d0a55f8`**, **2026-09-26 04:21 CDT**,
   `/Applications/Rhizome Agent.app`. Recoverable copies:
   `~/Library/Application Support/rhizome-agent-rebuild/Rhizome-Agent-2a24eed-2026-09-21-2223.zip`

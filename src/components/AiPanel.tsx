@@ -42,6 +42,7 @@ import { usePrimeSessionRestore } from '../hooks/usePrimeSessionRestore'
 import { usePrimeSessionStats } from '../hooks/usePrimeSessionStats'
 import { ChatComposerBar } from './ChatComposerBar'
 import { lastToolName } from '../utils/lastToolName'
+import { workerStartFailureReason } from '../lib/primeWorkerStartError'
 import { PrimeGoalDialog } from './PrimeGoalDialog'
 import { PrimeScheduleDialog } from './PrimeScheduleDialog'
 import { useAiPanelGoalDialog } from './useAiPanelGoalDialog'
@@ -383,6 +384,7 @@ export function AiPanelView({
           agentLabel={view.agentLabel}
           agentReadiness={view.defaultAiAgentReadiness}
           agentStatus={agent.status}
+          sendError={agent.status === 'error' ? getLastAgentMessage(agent.messages) : null}
           modelLabel={modelLabel}
           targetKind={view.targetKind}
           locale={locale}
@@ -538,6 +540,9 @@ export function AiPanelView({
             onOpenSchedule={() => scheduleDialog.onOpenChange(true)}
             working={isActive}
             lastToolName={lastToolName(agent.messages)}
+            failureReason={agent.status === 'error'
+              ? workerStartFailureReason(getLastAgentMessage(agent.messages) ?? '')
+              : null}
             stats={primeStats}
           />
         ) : undefined}

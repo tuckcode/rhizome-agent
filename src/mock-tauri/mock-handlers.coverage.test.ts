@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ModifiedFile } from '../types'
 
 async function loadHandlers() {
   vi.resetModules()
@@ -32,7 +33,7 @@ describe('mockHandlers coverage', () => {
       old_title: 'Old Note',
     })
 
-    const updatedContent = mockHandlers.get_all_content() as Record<string, string>
+    const updatedContent = mockHandlers.get_all_content(undefined) as Record<string, string>
 
     expect(result).toEqual({
       new_path: `${vaultPath}/new-title.md`,
@@ -104,14 +105,14 @@ describe('mockHandlers coverage', () => {
       content: '# New note',
     })
 
-    const modifiedBeforeCommit = mockHandlers.get_modified_files()
-    const basePathCount = modifiedBeforeCommit.filter((entry) => entry.path === '/Users/luca/Laputa/26q1-laputa-app.md').length
+    const modifiedBeforeCommit = mockHandlers.get_modified_files(undefined)
+    const basePathCount = modifiedBeforeCommit.filter((entry: ModifiedFile) => entry.path === '/Users/luca/Laputa/26q1-laputa-app.md').length
 
     expect(basePathCount).toBe(1)
-    expect(modifiedBeforeCommit.some((entry) => entry.path === '/Users/luca/Laputa/new-note.md')).toBe(true)
+    expect(modifiedBeforeCommit.some((entry: ModifiedFile) => entry.path === '/Users/luca/Laputa/new-note.md')).toBe(true)
 
     expect(mockHandlers.git_commit({ message: 'Save everything' })).toContain('6 files changed')
-    expect(mockHandlers.get_modified_files()).toEqual([])
+    expect(mockHandlers.get_modified_files(undefined)).toEqual([])
   })
 
   it('searches mock content and slices pulse results to the requested limit', async () => {
@@ -157,7 +158,7 @@ describe('mockHandlers coverage', () => {
       },
     })
 
-    expect(mockHandlers.get_settings()).toEqual({
+    expect(mockHandlers.get_settings(undefined)).toEqual({
       auto_pull_interval_minutes: 5,
       git_enabled: null,
       autogit_enabled: true,
@@ -174,6 +175,7 @@ describe('mockHandlers coverage', () => {
       color_theme: null,
       accent_color: null,
       date_display_format: null,
+      timezone: null,
       note_width_mode: null,
       sidebar_type_pluralization_enabled: null,
       initial_h1_auto_rename_enabled: null,
@@ -188,6 +190,7 @@ describe('mockHandlers coverage', () => {
       all_notes_show_images: null,
       all_notes_show_unsupported: null,
       multi_workspace_enabled: null,
+      agent_profile: null,
     })
 
     const list = {
@@ -196,10 +199,10 @@ describe('mockHandlers coverage', () => {
     }
     mockHandlers.save_vault_list({ list })
 
-    const savedList = mockHandlers.load_vault_list()
+    const savedList = mockHandlers.load_vault_list(undefined)
     savedList.vaults.push({ label: 'Leak', path: '/leak' })
 
-    expect(mockHandlers.load_vault_list()).toEqual({
+    expect(mockHandlers.load_vault_list(undefined)).toEqual({
       vaults: [{ label: 'Work', path: '/work' }],
       active_vault: '/work',
     })

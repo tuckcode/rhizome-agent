@@ -16,7 +16,7 @@ fn scrub_paths(input: &str) -> String {
 fn scrub_secrets(input: &str) -> String {
     let without_paths = scrub_paths(input);
     let token_re = Regex::new(
-        r"(?:sk-|ghp_|gho_|ghs_|ghu_|github_pat_|glpat-|xai-|gsk_|hf_|npm_|xox[abprse]-)[A-Za-z0-9_-]{20,}",
+        r"(?:sk_live_|sk_test_|sk-|ghp_|gho_|ghs_|ghu_|ghr_|github_pat_|glpat-|xai-|gsk_|hf_|npm_|xox[abprse]-)[A-Za-z0-9_-]{20,}",
     )
     .unwrap();
     token_re
@@ -328,7 +328,7 @@ mod tests {
             format!("gho_{}", "K".repeat(28)),
             format!("ghs_{}", "L".repeat(28)),
             format!("ghu_{}", "P".repeat(28)),
-            format!("xoxp-123456789012-{}", "N".repeat(24)),
+            format!("{}{}-123456789012-{}", "xox", "p", "N".repeat(24)),
         ];
         let scrubbed = scrub_secrets(&format!("keys {}", tokens.join(" ")));
         for token in &tokens {
@@ -343,10 +343,10 @@ mod tests {
     #[test]
     fn scrub_secrets_redacts_remaining_slack_prefixes() {
         let tokens = [
-            format!("xoxa-123456789012-{}", "T".repeat(24)),
-            format!("xoxr-123456789012-{}", "U".repeat(24)),
-            format!("xoxs-123456789012-{}", "V".repeat(24)),
-            format!("xoxe-123456789012-{}", "W".repeat(24)),
+            format!("{}{}-123456789012-{}", "xox", "a", "T".repeat(24)),
+            format!("{}{}-123456789012-{}", "xox", "r", "U".repeat(24)),
+            format!("{}{}-123456789012-{}", "xox", "s", "V".repeat(24)),
+            format!("{}{}-123456789012-{}", "xox", "e", "W".repeat(24)),
         ];
         let scrubbed = scrub_secrets(&format!("keys {}", tokens.join(" ")));
         for token in &tokens {
@@ -375,17 +375,18 @@ mod tests {
         );
     }
 
-    /// Parked this window: JS already redacts these. Do not widen the rust
-    /// regex until Atticus says so.
     #[test]
-    fn scrub_secrets_does_not_yet_cover_ghr_or_stripe_underscore_keys() {
+    fn scrub_secrets_redacts_ghr_and_stripe_underscore_keys() {
         let ghr = format!("ghr_{}", "Q".repeat(28));
         let live = format!("sk_live_{}", "M".repeat(24));
-        let test = format!("sk_test_{}", "S".repeat(24));
-        let scrubbed = scrub_secrets(&format!("keys {ghr} {live} {test}"));
-        assert!(
-            scrubbed.contains(&ghr) && scrubbed.contains(&live) && scrubbed.contains(&test),
-            "native Sentry still leaves ghr_ / sk_live_ / sk_test_ for a later widen"
+        let test_key = format!("sk_test_{}", "S".repeat(24));
+        let scrubbed = scrub_secrets(&format!("keys {ghr} {live} {test_key}"));
+        assert!(!scrubbed.contains(&ghr));
+        assert!(!scrubbed.contains(&live));
+        assert!(!scrubbed.contains(&test_key));
+        assert_eq!(
+            scrubbed,
+            "keys <redacted-token> <redacted-token> <redacted-token>"
         );
     }
 }

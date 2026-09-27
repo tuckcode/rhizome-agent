@@ -48,7 +48,7 @@ describe('repairEditorDocumentForRenderRecovery', () => {
     })
     expect(nextBlocks[0].id).not.toBe('heading-block')
     expect(nextBlocks[1].id).not.toBe('list-parent')
-    expect(nextBlocks[1].children[0].id).not.toBe('list-child')
+    expect((nextBlocks[1].children[0] as { id: string }).id).not.toBe('list-child')
   })
 
   it('leaves already-valid documents alone for non-stale render recovery reasons', () => {

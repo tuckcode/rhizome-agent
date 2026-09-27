@@ -2,7 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useNavigationHistory } from './useNavigationHistory'
 
-function renderNavigationHistory(paths = []) {
+type NavigationHistory = ReturnType<typeof useNavigationHistory>
+type NavigationHookRef = { current: NavigationHistory }
+type NavigationDirection = 'goBack' | 'goForward'
+
+function renderNavigationHistory(paths: string[] = []) {
   const hook = renderHook(() => useNavigationHistory())
   if (paths.length > 0) {
     act(() => {
@@ -12,8 +16,12 @@ function renderNavigationHistory(paths = []) {
   return hook
 }
 
-function navigate(result, direction, isValidPath) {
-  let target = null
+function navigate(
+  result: NavigationHookRef,
+  direction: NavigationDirection,
+  isValidPath?: (path: string) => boolean,
+): string | null {
+  let target: string | null = null
   act(() => { target = result.current[direction](isValidPath) })
   return target
 }
@@ -131,7 +139,7 @@ describe('useNavigationHistory', () => {
 
     // Simulate: /deleted was removed from vault, but /a still exists
     const vaultPaths = new Set(['/a', '/c'])
-    const isEntryExists = (p) => vaultPaths.has(p)
+    const isEntryExists = (p: string) => vaultPaths.has(p)
 
     // Should skip /deleted and return /a
     expect(navigate(result, 'goBack', isEntryExists)).toBe('/a')
@@ -143,7 +151,7 @@ describe('useNavigationHistory', () => {
     navigate(result, 'goBack')
 
     const vaultPaths = new Set(['/a', '/c'])
-    const isEntryExists = (p) => vaultPaths.has(p)
+    const isEntryExists = (p: string) => vaultPaths.has(p)
 
     // Should skip /deleted and return /c
     expect(navigate(result, 'goForward', isEntryExists)).toBe('/c')

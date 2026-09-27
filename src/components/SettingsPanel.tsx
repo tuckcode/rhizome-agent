@@ -47,6 +47,7 @@ import {
   type ThemeMode,
 } from '../lib/themeMode'
 import { cn } from '@/lib/utils'
+import { Textarea } from './ui/textarea'
 import { AccentColorPicker } from './AccentColorPicker'
 import { normalizeReleaseChannel, serializeReleaseChannel, type ReleaseChannel } from '../lib/releaseChannel'
 import { shouldHideGitignoredFiles } from '../lib/gitignoredVisibility'
@@ -54,6 +55,7 @@ import { areGitFeaturesEnabled } from '../lib/gitSettings'
 import { areAutomaticUpdateChecksEnabled } from '../lib/automaticUpdateChecks'
 import { trackAllNotesVisibilityChanged } from '../lib/productAnalytics'
 import { AiProviderSettings } from './AiProviderSettings'
+import { PrimeDefaultModelSection } from './PrimeDefaultModelSection'
 import { PrimeModelAllowListSection } from './PrimeModelAllowListSection'
 import { PrimeProviderStatusSection } from './PrimeProviderStatusSection'
 import { PrimeExtensionsSection } from './PrimeExtensionsSection'
@@ -91,6 +93,7 @@ import {
 import {
   DEFAULT_DATE_DISPLAY_FORMAT,
   normalizeDateDisplayFormat,
+  normalizeDisplayTimeZone,
   type DateDisplayFormat,
 } from '../utils/dateDisplay'
 import { BridgeTokenRow } from './BridgeTokenRow'
@@ -137,6 +140,7 @@ interface SettingsDraft {
   autoGitInactiveThresholdSeconds: number
   autoAdvanceInboxAfterOrganize: boolean
   celebrationsEnabled: boolean
+  agentProfile: string
   aiModelProviders: AiModelProvider[]
   releaseChannel: ReleaseChannel
   automaticUpdateChecksEnabled: boolean
@@ -145,6 +149,7 @@ interface SettingsDraft {
   accentColor: AccentColor
   uiLanguage: UiLanguagePreference
   dateDisplayFormat: DateDisplayFormat
+  displayTimeZone: string | null
   defaultNoteWidth: NoteWidthMode
   sidebarTypePluralizationEnabled: boolean
   initialH1AutoRename: boolean
@@ -174,6 +179,8 @@ interface SettingsBodyProps {
   setAutoAdvanceInboxAfterOrganize: (value: boolean) => void
   celebrationsEnabled: boolean
   setCelebrationsEnabled: (value: boolean) => void
+  agentProfile: string
+  setAgentProfile: (value: string) => void
   aiAgentsStatus: AiAgentsStatus
   aiModelProviders: AiModelProvider[]
   setAiModelProviders: (value: AiModelProvider[]) => void
@@ -193,6 +200,8 @@ interface SettingsBodyProps {
   setUiLanguage: (value: UiLanguagePreference) => void
   dateDisplayFormat: DateDisplayFormat
   setDateDisplayFormat: (value: DateDisplayFormat) => void
+  displayTimeZone: string | null
+  setDisplayTimeZone: (value: string | null) => void
   defaultNoteWidth: NoteWidthMode
   setDefaultNoteWidth: (value: NoteWidthMode) => void
   sidebarTypePluralizationEnabled: boolean
@@ -256,6 +265,7 @@ function createSettingsDraft(
     autoAdvanceInboxAfterOrganize: settings.auto_advance_inbox_after_organize ?? false,
     // Absent means never chosen, which is on: the effect is opt-out.
     celebrationsEnabled: readCelebrationsEnabled(settings.celebrations_enabled),
+    agentProfile: settings.agent_profile?.trim() ?? '',
     aiModelProviders: normalizeAiModelProviders(settings.ai_model_providers),
     releaseChannel: normalizeReleaseChannel(settings.release_channel),
     automaticUpdateChecksEnabled: areAutomaticUpdateChecksEnabled(settings),
@@ -264,6 +274,7 @@ function createSettingsDraft(
     accentColor: resolveSettingsDraftAccentColor(settings.accent_color),
     uiLanguage: settings.ui_language ?? SYSTEM_UI_LANGUAGE,
     dateDisplayFormat: normalizeDateDisplayFormat(settings.date_display_format) ?? DEFAULT_DATE_DISPLAY_FORMAT,
+    displayTimeZone: normalizeDisplayTimeZone(settings.timezone),
     defaultNoteWidth: normalizeNoteWidthMode(settings.note_width_mode) ?? DEFAULT_NOTE_WIDTH_MODE,
     sidebarTypePluralizationEnabled: settings.sidebar_type_pluralization_enabled ?? true,
     initialH1AutoRename: settings.initial_h1_auto_rename_enabled ?? true,
@@ -327,10 +338,12 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     accent_color: draft.accentColor,
     ui_language: serializeUiLanguagePreference(draft.uiLanguage),
     date_display_format: draft.dateDisplayFormat,
+    timezone: draft.displayTimeZone,
     note_width_mode: draft.defaultNoteWidth,
     sidebar_type_pluralization_enabled: draft.sidebarTypePluralizationEnabled,
     initial_h1_auto_rename_enabled: draft.initialH1AutoRename,
     celebrations_enabled: draft.celebrationsEnabled,
+    agent_profile: draft.agentProfile.trim() || null,
     default_ai_agent: DEFAULT_AI_AGENT,
     default_ai_target: agentTargetId(DEFAULT_AI_AGENT),
     ai_model_providers: draft.aiModelProviders.length > 0 ? draft.aiModelProviders : null,
@@ -708,6 +721,8 @@ function SettingsBodyFromDraft({
       setAutoAdvanceInboxAfterOrganize={(value) => updateDraft('autoAdvanceInboxAfterOrganize', value)}
       celebrationsEnabled={draft.celebrationsEnabled}
       setCelebrationsEnabled={(value) => updateDraft('celebrationsEnabled', value)}
+      agentProfile={draft.agentProfile}
+      setAgentProfile={(value) => updateDraft('agentProfile', value)}
       aiAgentsStatus={aiAgentsStatus}
       aiModelProviders={draft.aiModelProviders}
       setAiModelProviders={(value) => updateDraft('aiModelProviders', value)}
@@ -727,6 +742,8 @@ function SettingsBodyFromDraft({
       setUiLanguage={(value) => updateDraft('uiLanguage', value)}
       dateDisplayFormat={draft.dateDisplayFormat}
       setDateDisplayFormat={(value) => updateDraft('dateDisplayFormat', value)}
+      displayTimeZone={draft.displayTimeZone}
+      setDisplayTimeZone={(value) => updateDraft('displayTimeZone', value)}
       defaultNoteWidth={draft.defaultNoteWidth}
       setDefaultNoteWidth={(value) => updateDraft('defaultNoteWidth', value)}
       sidebarTypePluralizationEnabled={draft.sidebarTypePluralizationEnabled}
@@ -929,6 +946,8 @@ function SettingsContentSections({
   t,
   dateDisplayFormat,
   setDateDisplayFormat,
+  displayTimeZone,
+  setDisplayTimeZone,
   defaultNoteWidth,
   setDefaultNoteWidth,
   sidebarTypePluralizationEnabled,
@@ -946,6 +965,8 @@ function SettingsContentSections({
         t={t}
         dateDisplayFormat={dateDisplayFormat}
         setDateDisplayFormat={setDateDisplayFormat}
+        displayTimeZone={displayTimeZone}
+        setDisplayTimeZone={setDisplayTimeZone}
         defaultNoteWidth={defaultNoteWidth}
         setDefaultNoteWidth={setDefaultNoteWidth}
         sidebarTypePluralizationEnabled={sidebarTypePluralizationEnabled}
@@ -967,6 +988,8 @@ function SettingsAgentWorkflowSections({
   setAutoAdvanceInboxAfterOrganize,
   celebrationsEnabled,
   setCelebrationsEnabled,
+  agentProfile,
+  setAgentProfile,
   aiAgentsStatus,
   aiModelProviders,
   setAiModelProviders,
@@ -994,11 +1017,14 @@ function SettingsAgentWorkflowSections({
           t={t}
           celebrationsEnabled={celebrationsEnabled}
           setCelebrationsEnabled={setCelebrationsEnabled}
+          agentProfile={agentProfile}
+          setAgentProfile={setAgentProfile}
           aiAgentsStatus={aiAgentsStatus}
           aiModelProviders={aiModelProviders}
           setAiModelProviders={setAiModelProviders}
           onCopyMcpConfig={onCopyMcpConfig}
           loadModelCatalog={loadModelCatalog}
+          activeVaultPath={activeVaultPath}
         />
         <div className="mt-4">
           <SessionImportSettingsSection vaultPath={activeVaultPath ?? null} />
@@ -1361,21 +1387,27 @@ function AiAgentSettingsSection({
   t,
   celebrationsEnabled,
   setCelebrationsEnabled,
+  agentProfile,
+  setAgentProfile,
   aiAgentsStatus,
   aiModelProviders,
   setAiModelProviders,
   onCopyMcpConfig,
   loadModelCatalog,
+  activeVaultPath,
 }: Pick<
   SettingsBodyProps,
   | 't'
   | 'celebrationsEnabled'
   | 'setCelebrationsEnabled'
+  | 'agentProfile'
+  | 'setAgentProfile'
   | 'aiAgentsStatus'
   | 'aiModelProviders'
   | 'setAiModelProviders'
   | 'onCopyMcpConfig'
   | 'loadModelCatalog'
+  | 'activeVaultPath'
 >) {
   const primeStatus = getAiAgentAvailability(aiAgentsStatus, DEFAULT_AI_AGENT)
   const vaultConfig = useSyncExternalStore(subscribeVaultConfig, getVaultConfig, getVaultConfig)
@@ -1422,6 +1454,22 @@ function AiAgentSettingsSection({
         </SettingsRow>
       </SettingsGroup>
 
+      <SettingsGroup>
+        <SettingsRow
+          label="Instructions"
+          description="One profile for this installation. Chat adds it to every turn. It is not saved in the vault."
+          controlWidth="wide"
+        >
+          <Textarea
+            value={agentProfile}
+            onChange={(event) => setAgentProfile(event.target.value)}
+            placeholder="How Chat should respond"
+            aria-label="Instructions"
+            data-testid="settings-agent-profile"
+          />
+        </SettingsRow>
+      </SettingsGroup>
+
       <AiTargetManagementTabs
         t={t}
         aiAgentsStatus={aiAgentsStatus}
@@ -1429,6 +1477,7 @@ function AiAgentSettingsSection({
         setAiModelProviders={setAiModelProviders}
         onCopyMcpConfig={onCopyMcpConfig}
         loadModelCatalog={loadModelCatalog}
+        vaultPath={activeVaultPath}
       />
     </>
   )
@@ -1441,6 +1490,7 @@ function AiTargetManagementTabs({
   setAiModelProviders,
   onCopyMcpConfig,
   loadModelCatalog,
+  vaultPath,
 }: {
   t: Translate
   aiAgentsStatus: AiAgentsStatus
@@ -1448,6 +1498,7 @@ function AiTargetManagementTabs({
   setAiModelProviders: (value: AiModelProvider[]) => void
   onCopyMcpConfig?: () => void
   loadModelCatalog?: boolean
+  vaultPath?: string | null
 }) {
   return (
     <Tabs defaultValue="agents" className="gap-3">
@@ -1460,6 +1511,7 @@ function AiTargetManagementTabs({
         <AiAgentsInstalledSection t={t} aiAgentsStatus={aiAgentsStatus} />
         {/* Same Agents-visible gate as the model list: skip provider IPC until then. */}
         {loadModelCatalog ? <PrimeProviderStatusSection t={t} /> : null}
+        {loadModelCatalog ? <PrimeDefaultModelSection vaultPath={vaultPath} /> : null}
         {loadModelCatalog ? <PrimeModelAllowListSection t={t} /> : null}
         {onCopyMcpConfig ? <CopyMcpConfigButton t={t} onCopyMcpConfig={onCopyMcpConfig} /> : null}
         <BridgeTokenRow t={t} />

@@ -66,6 +66,25 @@ pub fn delete_research_format(
     crate::rhizome_research_formats::delete(Path::new(&vault_path), &id)
 }
 
+/// Answer a `rhizome_graph_*` tool from the in-repo graph.
+///
+/// `rhizome_graph_summary` keeps its name (Q-A6) and means the same health
+/// query as `rhizome_graph_health`. Both use `vault::graph::build_graph`.
+/// The external graph CLI builds a different graph (C40).
+fn answer_graph_tool(
+    name: &str,
+    vault: &Path,
+    args: &std::collections::HashMap<String, String>,
+) -> Result<String, String> {
+    let query_name = if name == "rhizome_graph_summary" {
+        "rhizome_graph_health"
+    } else {
+        name
+    };
+    let query = crate::rhizome_api::graph_query_from_tool(query_name, args)?;
+    crate::rhizome_api::graph_query(vault, &query)
+}
+
 /// Execute a Rhizome CLI tool and return its stdout.
 #[tauri::command]
 pub fn call_rhizome_tool(
@@ -101,14 +120,9 @@ pub fn call_rhizome_tool(
             let vault = args.get("vaultPath").ok_or("Missing vaultPath")?;
             run_cli(&["rhizome-lint", vault, "--format", "text"])
         }
-        "rhizome_graph_summary" => {
+        name if name.starts_with("rhizome_graph_") => {
             let vault = args.get("vaultPath").ok_or("Missing vaultPath")?;
-            run_cli(&["rhizome-graph", "summary", vault])
-        }
-        name if name.starts_with("rhizome_graph_") && name != "rhizome_graph_summary" => {
-            let vault = args.get("vaultPath").ok_or("Missing vaultPath")?;
-            let query = crate::rhizome_api::graph_query_from_tool(name, &args)?;
-            crate::rhizome_api::graph_query(Path::new(vault), &query)
+            answer_graph_tool(name, Path::new(vault), &args)
         }
         "rhizome_wiki_graph" => {
             let vault = args.get("vaultPath").ok_or("Missing vaultPath")?;
@@ -700,5 +714,45 @@ mod library_scan_tests {
         let vault = tempfile::tempdir().unwrap();
         let json = scan_vault_library(vault.path().to_str().unwrap()).unwrap();
         assert_eq!(json, "[]");
+    }
+}
+
+#[cfg(test)]
+mod graph_summary_tests {
+    use super::*;
+
+    /// C40: `rhizome_graph_summary` must answer from the in-repo graph, the
+    /// same health payload as `rhizome_graph_health`. The external
+    /// `rhizome-graph` CLI drops uncreated wikilink targets, so a dead link
+    /// is the disagreement the test has to catch.
+    #[test]
+    fn summary_matches_in_repo_health_and_keeps_the_tool_name() {
+        let source = include_str!("rhizome_commands.rs");
+        assert!(
+            source.contains("name == \"rhizome_graph_summary\""),
+            "the tool name stays; retiring it is Q-A6"
+        );
+        assert!(
+            !source.contains("\"rhizome-graph\""),
+            "summary must not shell out to the external graph CLI"
+        );
+
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.md"), "# A\n\nSee [[Ghost Note]].\n").unwrap();
+        std::fs::write(dir.path().join("b.md"), "# B\n\nNothing here.\n").unwrap();
+        let args = std::collections::HashMap::new();
+
+        let summary = answer_graph_tool("rhizome_graph_summary", dir.path(), &args).unwrap();
+        let health = answer_graph_tool("rhizome_graph_health", dir.path(), &args).unwrap();
+        let direct =
+            crate::rhizome_api::graph_query(dir.path(), &crate::rhizome_api::GraphQuery::Health)
+                .unwrap();
+
+        assert_eq!(summary, health);
+        assert_eq!(summary, direct);
+        let parsed: serde_json::Value = serde_json::from_str(&summary).unwrap();
+        assert_eq!(parsed["notes"], 2);
+        assert_eq!(parsed["deadLinks"], 1);
+        assert_eq!(parsed["uncreated"], 1);
     }
 }

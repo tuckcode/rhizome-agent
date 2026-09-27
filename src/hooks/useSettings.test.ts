@@ -30,6 +30,7 @@ const defaultSettings: Settings = {
   accent_color: null,
   ui_language: null,
   date_display_format: null,
+  timezone: null,
   note_width_mode: null,
   sidebar_type_pluralization_enabled: null,
   default_ai_agent: null,
@@ -42,6 +43,7 @@ const defaultSettings: Settings = {
   all_notes_show_pdfs: null,
   all_notes_show_images: null,
   all_notes_show_unsupported: null,
+  agent_profile: null,
 }
 
 const savedSettings: Settings = {
@@ -62,6 +64,7 @@ const savedSettings: Settings = {
   accent_color: null,
   ui_language: null,
   date_display_format: null,
+  timezone: null,
   note_width_mode: null,
   sidebar_type_pluralization_enabled: null,
   default_ai_agent: null,
@@ -74,6 +77,7 @@ const savedSettings: Settings = {
   all_notes_show_pdfs: null,
   all_notes_show_images: null,
   all_notes_show_unsupported: null,
+  agent_profile: null,
 }
 
 let mockSettingsStore: Settings = { ...defaultSettings }
@@ -131,6 +135,7 @@ function changedSettings(): Settings {
     accent_color: null,
     ui_language: 'zh-CN',
     date_display_format: 'iso',
+    timezone: null,
     note_width_mode: 'wide',
     sidebar_type_pluralization_enabled: false,
     default_ai_agent: null,
@@ -143,6 +148,7 @@ function changedSettings(): Settings {
     all_notes_show_pdfs: true,
     all_notes_show_images: false,
     all_notes_show_unsupported: true,
+    agent_profile: null,
   }
 }
 
@@ -239,6 +245,24 @@ describe('useSettings', () => {
 
     expect(mockInvokeFn).toHaveBeenCalledWith('save_settings', { settings: newSettings })
     expect(result.current.settings).toEqual(newSettings)
+  })
+
+  it('round-trips an IANA timezone and drops an offset', async () => {
+    const { result } = renderHook(() => useSettings())
+
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true)
+    })
+
+    await act(async () => {
+      await result.current.saveSettings({ ...defaultSettings, timezone: 'America/Chicago' })
+    })
+    expect(result.current.settings.timezone).toBe('America/Chicago')
+
+    await act(async () => {
+      await result.current.saveSettings({ ...defaultSettings, timezone: 'UTC-6' })
+    })
+    expect(result.current.settings.timezone).toBeNull()
   })
 
   it('tracks theme mode changes after settings save succeeds', async () => {

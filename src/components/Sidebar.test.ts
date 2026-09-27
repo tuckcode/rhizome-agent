@@ -11,6 +11,7 @@ const baseEntry: VaultEntry = {
   wordCount: 0,
   icon: null, color: null, order: null, sidebarLabel: null, template: null, sort: null,
   view: null, visible: null, outgoingLinks: [], properties: {},
+  organized: false, favorite: false, favoriteIndex: null, listPropertiesDisplay: [], hasH1: false,
 }
 
 describe('buildSectionGroup', () => {

@@ -14,7 +14,7 @@ description: >-
 
 ## State
 
-- `origin/main` = the commit that adds this file, on top of `b2c306e`. Nothing unpushed after it.
+- `origin/main` = **`5c37d28`** (2026-09-27 handoff + swarm plan on top of BlockNote/docs). Nothing unpushed.
 - `/Applications` is still `d0a55f8`. Everything below is source-only until a rebuild.
 
 ## What landed

@@ -289,6 +289,12 @@ pub fn write_repo_wiki(
     slug: &str,
     last_updated: &str,
 ) -> Result<(String, PathBuf), String> {
+    if crate::rhizome_distill::is_junk_distill_title(&card.title) {
+        return Err(format!(
+            "refusing to write repo research tooling/auth failure as a note: {}",
+            card.title
+        ));
+    }
     let (slug, path) = crate::rhizome_write_location::unique_slug_path(
         vault_path,
         crate::rhizome_write_location::ArtifactKind::RepoWiki,
@@ -729,6 +735,56 @@ mod tests {
         .unwrap();
         assert_eq!(slug2, "rust-lang-cargo-2");
         assert!(path2.ends_with("rust-lang-cargo-2.md"));
+    }
+
+    #[test]
+    fn write_repo_wiki_skips_a_junk_title_and_writes_a_good_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let junk = crate::rhizome_distill::ParsedCard {
+            title: "Not logged in · Please run /login".to_string(),
+            context: "An auth failure.".to_string(),
+            body: "This must not become a note.".to_string(),
+        };
+        let err = write_repo_wiki(
+            dir.path(),
+            &junk,
+            "rust-lang/cargo",
+            "architecture",
+            None,
+            "rust-lang-cargo",
+            "2026-07-10",
+        )
+        .expect_err("a junk title must not be written");
+        assert!(
+            err.contains("Not logged in · Please run /login"),
+            "got: {err}"
+        );
+        let junk_path = dir.path().join("wiki/sources/repos/rust-lang-cargo.md");
+        assert!(
+            !junk_path.exists(),
+            "junk title must not write a page at {}",
+            junk_path.display()
+        );
+
+        let good = crate::rhizome_distill::ParsedCard {
+            title: "Login flows in OAuth 2.1".to_string(),
+            context: "How sign-in works.".to_string(),
+            body: "The authorization code flow.".to_string(),
+        };
+        let (slug, path) = write_repo_wiki(
+            dir.path(),
+            &good,
+            "rust-lang/cargo",
+            "architecture",
+            None,
+            "rust-lang-cargo",
+            "2026-07-10",
+        )
+        .unwrap();
+        assert_eq!(slug, "rust-lang-cargo");
+        let contents = std::fs::read_to_string(&path).unwrap();
+        assert!(contents.contains("title: Login flows in OAuth 2.1"));
+        assert!(contents.contains("The authorization code flow."));
     }
 
     /// Exercises the real live path end to end: a real agent CLI subprocess

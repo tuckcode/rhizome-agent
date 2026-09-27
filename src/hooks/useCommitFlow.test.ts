@@ -40,12 +40,12 @@ const testAuthorIdentity = {
 }
 
 describe('useCommitFlow', () => {
-  let savePending: vi.Mock
-  let loadModifiedFiles: vi.Mock
-  let loadModifiedFilesForVaultPath: vi.Mock
-  let resolveRemoteStatusForVaultPath: vi.Mock
-  let setToastMessage: vi.Mock
-  let onPushRejected: vi.Mock
+  let savePending: ReturnType<typeof vi.fn>
+  let loadModifiedFiles: ReturnType<typeof vi.fn>
+  let loadModifiedFilesForVaultPath: ReturnType<typeof vi.fn>
+  let resolveRemoteStatusForVaultPath: ReturnType<typeof vi.fn>
+  let setToastMessage: ReturnType<typeof vi.fn>
+  let onPushRejected: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     savePending = vi.fn().mockResolvedValue(undefined)
@@ -74,7 +74,7 @@ describe('useCommitFlow', () => {
       onPushRejected,
       vaultPath: '/vault',
       ...overrides,
-    }))
+    } as Parameters<typeof useCommitFlow>[0]))
   }
 
   it('openCommitDialog saves pending, refreshes files, and sets local mode when no remote exists', async () => {
@@ -194,7 +194,7 @@ describe('useCommitFlow', () => {
         onPushRejected,
         manualVaultPath,
         vaultPath: '/vault',
-      }),
+      } as Parameters<typeof useCommitFlow>[0]),
       { initialProps: props },
     )
 
@@ -291,7 +291,7 @@ describe('useCommitFlow', () => {
     const loadModifiedFilesForVaultPath = vi.fn((vaultPath: string) => Promise.resolve([{
       path: `${vaultPath}/note.md`,
       relativePath: 'note.md',
-      status: 'modified',
+      status: 'modified' as const,
     }]))
     mockInvokeFn.mockImplementation((command: string) => {
       if (command === 'git_commit') return Promise.resolve('[main abc1234] test commit')
@@ -301,7 +301,7 @@ describe('useCommitFlow', () => {
 
     const { result } = renderCommitFlow({
       automaticVaultPaths: ['/vault', '/work'],
-      loadModifiedFilesForVaultPath,
+      loadModifiedFilesForVaultPath: loadModifiedFilesForVaultPath as Parameters<typeof useCommitFlow>[0]['loadModifiedFilesForVaultPath'],
       resolveRemoteStatusForVaultPath,
     })
 
@@ -326,7 +326,7 @@ describe('useCommitFlow', () => {
     const loadModifiedFilesForVaultPath = vi.fn((vaultPath: string) => Promise.resolve([{
       path: `${vaultPath}/note.md`,
       relativePath: 'note.md',
-      status: 'modified',
+      status: 'modified' as const,
     }]))
     mockInvokeFn.mockImplementation((command: string) => {
       if (command === 'git_commit') return Promise.reject(new Error('Please tell me who you are'))
@@ -335,7 +335,7 @@ describe('useCommitFlow', () => {
 
     const { result } = renderCommitFlow({
       automaticVaultPaths: ['/vault', '/work'],
-      loadModifiedFilesForVaultPath,
+      loadModifiedFilesForVaultPath: loadModifiedFilesForVaultPath as Parameters<typeof useCommitFlow>[0]['loadModifiedFilesForVaultPath'],
     })
     let didHandleCheckpoint = false
 
@@ -442,7 +442,7 @@ describe('useCommitFlow', () => {
         onPushRejected,
         vaultPath: '/vault',
         manualVaultPath,
-      }),
+      } as Parameters<typeof useCommitFlow>[0]),
       { initialProps: { manualVaultPath: '/work' } },
     )
 

@@ -37,6 +37,8 @@ interface ChatComposerBarProps {
   onOpenSchedule: () => void
   working?: boolean
   lastToolName?: string | null
+  /** Shown in the status slot when a Prime worker failed to start. */
+  failureReason?: string | null
   stats: PrimeSessionStats
 }
 
@@ -128,6 +130,7 @@ export function ChatComposerBar({
   onOpenSchedule,
   working = false,
   lastToolName = null,
+  failureReason = null,
   stats,
 }: ChatComposerBarProps) {
   return (
@@ -141,7 +144,14 @@ export function ChatComposerBar({
           onOpenSchedule={onOpenSchedule}
         />
       </div>
-      {working ? <ChatComposerFoot locale={locale} working lastToolName={lastToolName} /> : null}
+      {(working || failureReason) ? (
+        <ChatComposerFoot
+          locale={locale}
+          working={working}
+          lastToolName={lastToolName}
+          failureReason={failureReason}
+        />
+      ) : null}
       <PrimeContextButton stats={stats} locale={locale} />
     </div>
   )

@@ -123,6 +123,17 @@ describe('SettingsPanel', () => {
     installPointerCapturePolyfill()
   })
 
+  it('saves one installation-wide profile and keeps the words out of analytics', () => {
+    renderOpenSettings({ ...emptySettings, agent_profile: 'Be brief.' })
+    const field = screen.getByTestId('settings-agent-profile')
+    expect(field).toHaveValue('Be brief.')
+    fireEvent.change(field, { target: { value: '  Use short answers.  ' } })
+    saveSettingsPanel()
+    expectSettingsSaved({ agent_profile: 'Use short answers.' })
+    expect(trackEventMock).toHaveBeenCalledWith('agent_profile_saved', { length: 'Use short answers.'.length })
+    expect(JSON.stringify(trackEventMock.mock.calls)).not.toContain('Use short answers.')
+  })
+
   it('renders nothing when not open', () => {
     const { container } = render(
       <SettingsPanel open={false} settings={emptySettings} onSave={onSave} onClose={onClose} />

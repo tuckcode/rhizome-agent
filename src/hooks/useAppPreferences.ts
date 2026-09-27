@@ -19,7 +19,13 @@ import {
   serializeUiLanguagePreference,
   type UiLanguagePreference,
 } from '../lib/i18n'
-import { DEFAULT_DATE_DISPLAY_FORMAT, normalizeDateDisplayFormat, type DateDisplayFormat } from '../utils/dateDisplay'
+import {
+  bindDisplayTimeZone,
+  DEFAULT_DATE_DISPLAY_FORMAT,
+  normalizeDateDisplayFormat,
+  normalizeDisplayTimeZone,
+  type DateDisplayFormat,
+} from '../utils/dateDisplay'
 import { resolveAllNotesFileVisibility } from '../utils/allNotesFileVisibility'
 import { syncAppIconThemeMode } from '../lib/appIconTheme'
 import { useAiAgentPreferences } from './useAiAgentPreferences'
@@ -38,10 +44,12 @@ interface AppPreferencesConfig {
 
 interface AppPreferenceValues {
   dateDisplayFormat: DateDisplayFormat
+  displayTimeZone: string | null
 }
 
 const DEFAULT_APP_PREFERENCES: AppPreferenceValues = {
   dateDisplayFormat: DEFAULT_DATE_DISPLAY_FORMAT,
+  displayTimeZone: null,
 }
 
 const AppPreferencesContext = createContext<AppPreferenceValues>(DEFAULT_APP_PREFERENCES)
@@ -49,16 +57,28 @@ const AppPreferencesContext = createContext<AppPreferenceValues>(DEFAULT_APP_PRE
 export function AppPreferencesProvider({
   children,
   dateDisplayFormat = DEFAULT_DATE_DISPLAY_FORMAT,
+  displayTimeZone = null,
 }: {
   children: ReactNode
   dateDisplayFormat?: DateDisplayFormat
+  displayTimeZone?: string | null
 }) {
-  const value = useMemo(() => ({ dateDisplayFormat }), [dateDisplayFormat])
+  const zone = normalizeDisplayTimeZone(displayTimeZone)
+  bindDisplayTimeZone(zone)
+  useEffect(() => () => bindDisplayTimeZone(null), [])
+  const value = useMemo(
+    () => ({ dateDisplayFormat, displayTimeZone: zone }),
+    [dateDisplayFormat, zone],
+  )
   return createElement(AppPreferencesContext.Provider, { value }, children)
 }
 
 export function useDateDisplayFormat(): DateDisplayFormat {
   return useContext(AppPreferencesContext).dateDisplayFormat
+}
+
+export function useDisplayTimeZone(): string | null {
+  return useContext(AppPreferencesContext).displayTimeZone
 }
 
 export function useAppPreferences({
@@ -80,6 +100,11 @@ export function useAppPreferences({
     () => normalizeDateDisplayFormat(settings.date_display_format) ?? DEFAULT_DATE_DISPLAY_FORMAT,
     [settings.date_display_format],
   )
+  const displayTimeZone = useMemo(
+    () => normalizeDisplayTimeZone(settings.timezone),
+    [settings.timezone],
+  )
+  bindDisplayTimeZone(displayTimeZone)
   const allNotesFileVisibility = useMemo(
     () => resolveAllNotesFileVisibility(settings),
     [settings],
@@ -148,6 +173,7 @@ export function useAppPreferences({
     allNotesFileVisibility,
     appLocale,
     dateDisplayFormat,
+    displayTimeZone,
     documentThemeMode,
     handleSetThemeMode,
     handleSetUiLanguage,

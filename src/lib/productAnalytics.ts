@@ -252,6 +252,10 @@ export function trackDateDisplayFormatChanged(format: DateDisplayFormat): void {
   trackEvent('date_display_format_changed', { format })
 }
 
+export function trackTimezoneDisplayChanged(timezone: string): void {
+  trackEvent('timezone_display_changed', { timezone })
+}
+
 export function trackSidebarTypePluralizationChanged(enabled: AnalyticsBoolean): void {
   trackEvent('sidebar_type_pluralization_changed', {
     enabled: numericFlag(enabled),
@@ -512,15 +516,36 @@ export function trackCelebration({
  * so "curated to 6 of 501" is the signal. Which models they picked is a
  * per-user preference, and shipping 501 ids per event would bury it anyway.
  */
+/**
+ * The one app-wide Chat profile was saved.
+ *
+ * Length only. The text is instructions the person wrote, so it stays off
+ * the event.
+ */
+export function trackAgentProfileSaved(length: number): void {
+  trackEvent('agent_profile_saved', { length })
+}
+
 export function trackPrimeModelAllowListChanged(selected: number, available: number): void {
   trackEvent('prime_model_allow_list_changed', { selected, available })
 }
 
 /**
- * The Free only catalog cut was toggled. On/off only — never model ids.
+ * The name filter (`-free` or `:free` in the model id) was toggled.
+ * On/off only. Never a price, a key, or a note.
+ *
+ * `trackEvent` accepts string or number, so the boolean is `yes` / `no`.
  */
 export function trackPrimeModelsFreeOnly(on: boolean): void {
   trackEvent('prime_models_free_only', { on: on ? 'yes' : 'no' })
+}
+
+/**
+ * The Settings default model was changed (#45).
+ * Model id only. Never a provider key, an API key, or note text.
+ */
+export function trackPrimeDefaultModelChanged(modelId: string): void {
+  trackEvent('prime_default_model_changed', { model_id: modelId })
 }
 
 /**

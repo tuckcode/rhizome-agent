@@ -133,6 +133,10 @@ pub struct Settings {
     pub accent_color: Option<String>,
     pub ui_language: Option<String>,
     pub date_display_format: Option<String>,
+    /// IANA name for on-screen clocks. `None` follows this machine.
+    /// Never a UTC offset, and never written into a filename, note date, or git date.
+    #[serde(default)]
+    pub timezone: Option<String>,
     pub note_width_mode: Option<String>,
     pub sidebar_type_pluralization_enabled: Option<bool>,
     pub initial_h1_auto_rename_enabled: Option<bool>,
@@ -189,6 +193,13 @@ pub struct Settings {
     /// Generated once per install by [`ensure_bridge_token`] and never shown
     /// to anyone but the user. See `docs/adr/0159-bridge-token-auth.md`.
     pub bridge_token: Option<String>,
+    /// How Chat should respond. One profile for this installation.
+    ///
+    /// Not per agent, and not per vault. Blank is the same as unset. Chat
+    /// places this ahead of the turn's other instructions. It is not vault
+    /// `AGENTS.md` and it is not Prime `USER.md`.
+    #[serde(default)]
+    pub agent_profile: Option<String>,
 }
 
 /// Return the persisted bridge token, generating and saving one the first
@@ -289,6 +300,82 @@ pub fn normalize_note_width_mode(value: Option<&str>) -> Option<String> {
     }
 }
 
+pub fn normalize_timezone(value: Option<&str>) -> Option<String> {
+    let raw = value?.trim();
+    if raw.is_empty()
+        || raw.eq_ignore_ascii_case("none")
+        || raw.eq_ignore_ascii_case("local")
+        || !is_iana_time_zone_name(raw)
+    {
+        return None;
+    }
+    Some(raw.to_string())
+}
+
+fn is_iana_time_zone_name(value: &str) -> bool {
+    if !(2..=64).contains(&value.len()) {
+        return false;
+    }
+    if !value
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '_' | '+' | '-'))
+    {
+        return false;
+    }
+    if is_numeric_utc_offset(value) {
+        return false;
+    }
+    if value.contains('/') {
+        return value.split('/').all(|part| !part.is_empty());
+    }
+    value.chars().all(|c| c.is_ascii_alphabetic())
+}
+
+fn is_numeric_utc_offset(value: &str) -> bool {
+    let rest = value
+        .strip_prefix("UTC")
+        .or_else(|| value.strip_prefix("utc"))
+        .or_else(|| value.strip_prefix("GMT"))
+        .or_else(|| value.strip_prefix("gmt"))
+        .unwrap_or(value);
+    let Some(digits) = rest.strip_prefix('+').or_else(|| rest.strip_prefix('-')) else {
+        return false;
+    };
+    !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit() || c == ':')
+}
+
+/// Trim a profile and drop a blank one.
+///
+/// The words stay as typed. A profile is instructions, not a token, so this
+/// does not change case.
+pub fn normalize_agent_profile(value: Option<String>) -> Option<String> {
+    normalize_optional_string(value)
+}
+
+/// Put the saved profile ahead of any instructions this turn already has.
+///
+/// A blank profile leaves the turn alone. Note context stays, behind the
+/// profile, so a saved sentence is part of the next Chat turn.
+pub fn compose_agent_profile(profile: Option<&str>, existing: Option<&str>) -> Option<String> {
+    let profile = normalize_agent_profile(profile.map(str::to_string));
+    let existing = existing
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .map(str::to_string);
+    match (profile, existing) {
+        (Some(profile), Some(existing)) => Some(format!("{profile}\n\n{existing}")),
+        (Some(profile), None) => Some(profile),
+        (None, Some(existing)) => Some(existing),
+        (None, None) => None,
+    }
+}
+
+pub fn saved_agent_profile() -> Option<String> {
+    get_settings()
+        .ok()
+        .and_then(|settings| settings.agent_profile)
+}
+
 pub fn normalize_date_display_format(value: Option<&str>) -> Option<String> {
     match value.map(|candidate| candidate.trim().to_ascii_lowercase()) {
         Some(format) if SUPPORTED_DATE_DISPLAY_FORMATS.contains(&format.as_str()) => Some(format),
@@ -361,6 +448,7 @@ fn normalize_settings(settings: Settings) -> Settings {
         accent_color: normalize_accent_color(settings.accent_color.as_deref()),
         ui_language: normalize_ui_language(settings.ui_language.as_deref()),
         date_display_format: normalize_date_display_format(settings.date_display_format.as_deref()),
+        timezone: normalize_timezone(settings.timezone.as_deref()),
         note_width_mode: normalize_note_width_mode(settings.note_width_mode.as_deref()),
         sidebar_type_pluralization_enabled: settings.sidebar_type_pluralization_enabled,
         initial_h1_auto_rename_enabled: settings.initial_h1_auto_rename_enabled,
@@ -377,6 +465,7 @@ fn normalize_settings(settings: Settings) -> Settings {
         all_notes_show_images: settings.all_notes_show_images,
         all_notes_show_unsupported: settings.all_notes_show_unsupported,
         multi_workspace_enabled: settings.multi_workspace_enabled,
+        agent_profile: normalize_agent_profile(settings.agent_profile),
     }
 }
 
@@ -577,6 +666,43 @@ mod tests {
         let path = dir.path().join("settings.json");
         save_settings_at(&path, settings).unwrap();
         get_settings_at(&path).unwrap()
+    }
+
+    #[test]
+    fn agent_profile_roundtrip_trims_and_drops_blank() {
+        let kept = save_and_reload(Settings {
+            agent_profile: Some("  Be brief.  ".into()),
+            ..Settings::default()
+        });
+        assert_eq!(kept.agent_profile.as_deref(), Some("Be brief."));
+
+        let cleared = save_and_reload(Settings {
+            agent_profile: Some("   ".into()),
+            ..Settings::default()
+        });
+        assert_eq!(cleared.agent_profile, None);
+    }
+
+    #[test]
+    fn agent_profile_sits_ahead_of_turn_instructions() {
+        assert_eq!(
+            compose_agent_profile(None, Some("Note context")),
+            Some("Note context".into())
+        );
+        assert_eq!(
+            compose_agent_profile(Some("  "), Some("Note context")),
+            Some("Note context".into())
+        );
+        assert_eq!(
+            compose_agent_profile(Some("Be brief."), None),
+            Some("Be brief.".into())
+        );
+        let composed = compose_agent_profile(Some("Be brief."), Some("Note context"));
+        let prompt = crate::cli_agent_runtime::build_prompt("hello", composed.as_deref());
+        assert_eq!(
+            prompt,
+            "System instructions:\nBe brief.\n\nNote context\n\nUser request:\nhello"
+        );
     }
 
     #[test]
@@ -795,6 +921,7 @@ mod tests {
             accent_color: Some("purple".to_string()),
             ui_language: Some("zh-Hans".to_string()),
             date_display_format: Some("iso".to_string()),
+            timezone: Some("America/Chicago".to_string()),
             note_width_mode: Some("wide".to_string()),
             sidebar_type_pluralization_enabled: Some(false),
             initial_h1_auto_rename_enabled: Some(false),
@@ -810,6 +937,7 @@ mod tests {
             all_notes_show_images: Some(true),
             all_notes_show_unsupported: Some(false),
             bridge_token: Some("deadbeefdeadbeefdeadbeefdeadbeef".to_string()),
+            agent_profile: Some("Be brief.".to_string()),
         };
         let json = serde_json::to_string(&settings).unwrap();
         let parsed: Settings = serde_json::from_str(&json).unwrap();
@@ -1073,6 +1201,45 @@ mod tests {
             ..Default::default()
         });
         assert!(loaded.date_display_format.is_none());
+    }
+
+    #[test]
+    fn test_timezone_round_trips_an_iana_name_and_drops_offsets() {
+        let chicago = save_and_reload(Settings {
+            timezone: Some("  America/Chicago  ".to_string()),
+            ..Default::default()
+        });
+        assert_eq!(chicago.timezone.as_deref(), Some("America/Chicago"));
+
+        let rome = save_and_reload(Settings {
+            timezone: Some("Europe/Rome".to_string()),
+            ..Default::default()
+        });
+        assert_eq!(rome.timezone.as_deref(), Some("Europe/Rome"));
+
+        for offset in [
+            "+05:00",
+            "UTC-6",
+            "UTC+05:00",
+            "GMT-05:00",
+            "local",
+            "none",
+            "",
+        ] {
+            let loaded = save_and_reload(Settings {
+                timezone: Some(offset.to_string()),
+                ..Default::default()
+            });
+            assert!(
+                loaded.timezone.is_none(),
+                "expected {offset:?} to be dropped"
+            );
+        }
+
+        let mut value = serde_json::to_value(Settings::default()).unwrap();
+        value.as_object_mut().unwrap().remove("timezone");
+        let parsed: Settings = serde_json::from_value(value).unwrap();
+        assert!(parsed.timezone.is_none());
     }
 
     #[test]

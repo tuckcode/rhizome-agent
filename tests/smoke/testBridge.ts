@@ -1,4 +1,5 @@
 import { type Page } from '@playwright/test'
+import { SMOKE_UI_READY_TIMEOUT, waitForKeyboardShortcutsReady } from './helpers'
 import type {
   AppCommandId,
   AppCommandShortcutEventInit,
@@ -6,10 +7,11 @@ import type {
 } from '../../src/hooks/appCommandCatalog'
 
 async function waitForDispatchBrowserMenuCommand(page: Page): Promise<void> {
+  await waitForKeyboardShortcutsReady(page)
   await page.waitForFunction(
     () => typeof window.__rhizomeTest?.dispatchBrowserMenuCommand === 'function',
     undefined,
-    { timeout: 5_000 },
+    { timeout: SMOKE_UI_READY_TIMEOUT },
   )
 }
 
@@ -85,6 +87,7 @@ export async function dispatchShortcutEvent(
   page: Page,
   init: AppCommandShortcutEventInit,
 ): Promise<void> {
+  await waitForKeyboardShortcutsReady(page)
   await page.evaluate((eventInit) => {
     const bridge = window.__rhizomeTest?.dispatchShortcutEvent
     if (typeof bridge !== 'function') {
@@ -99,6 +102,7 @@ export async function triggerShortcutCommand(
   id: AppCommandId,
   options?: AppCommandShortcutEventOptions,
 ): Promise<void> {
+  await waitForKeyboardShortcutsReady(page)
   await page.evaluate((payload) => {
     const bridge = window.__rhizomeTest?.triggerShortcutCommand
     if (typeof bridge !== 'function') {

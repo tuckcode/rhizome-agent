@@ -455,6 +455,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     allNotesFileVisibility,
     appLocale,
     dateDisplayFormat,
+    displayTimeZone,
     documentThemeMode,
     handleSetThemeMode,
     handleSetUiLanguage,
@@ -2086,7 +2087,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   )
 
   return (
-    <AppPreferencesProvider dateDisplayFormat={dateDisplayFormat}>
+    <AppPreferencesProvider dateDisplayFormat={dateDisplayFormat} displayTimeZone={displayTimeZone}>
       <CelebrationProvider
         enabled={readCelebrationsEnabled(settings.celebrations_enabled)}
         locale={appLocale}

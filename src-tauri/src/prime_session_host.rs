@@ -126,6 +126,8 @@ fn current_problem() -> Option<PrimeConnectionProblem> {
 /// This is the transport's only injection point, and it is what the tests
 /// drive a fake daemon through.
 const DAEMON_SOCKET_ENV: &str = "RHIZOME_PRIME_DAEMON_SOCKET";
+/// Scratch directory for `pnpm test:live-prime`. Never `~/.prime/agent/sessions`.
+const LIVE_SESSION_DIR_ENV: &str = "RHIZOME_PRIME_SESSION_DIR";
 
 static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 /// Hidden window (C22): do not spawn Prime again from the status poll.
@@ -383,6 +385,10 @@ impl PrimeSessionStats {
 pub struct PrimeQueue {
     pub steering: Vec<String>,
     pub follow_up: Vec<String>,
+    /// True when the daemon advertised `queue_message_mutation`. Chat hides
+    /// per-row edit controls when this is false.
+    #[serde(default)]
+    pub can_mutate: bool,
 }
 
 impl PrimeQueue {
@@ -395,6 +401,7 @@ impl PrimeQueue {
         Self {
             steering: string_previews(&data["steering"]),
             follow_up,
+            can_mutate: false,
         }
     }
 }
@@ -733,6 +740,61 @@ fn daemon_socket_path() -> Result<PathBuf, String> {
 /// socket) would be a side effect the suite cannot clean up.
 fn daemon_socket_is_overridden() -> bool {
     std::env::var_os(DAEMON_SOCKET_ENV).is_some()
+}
+
+/// Prime's real session store. Live tests must not read or write it.
+fn default_prime_session_dir() -> Option<PathBuf> {
+    dirs::home_dir().map(|home| home.join(".prime/agent/sessions"))
+}
+
+fn paths_equal(left: &Path, right: &Path) -> bool {
+    let left = std::fs::canonicalize(left).unwrap_or_else(|_| left.to_path_buf());
+    let right = std::fs::canonicalize(right).unwrap_or_else(|_| right.to_path_buf());
+    left == right
+}
+
+fn is_default_prime_session_dir(path: &Path) -> bool {
+    default_prime_session_dir().is_some_and(|default_dir| paths_equal(path, &default_dir))
+}
+
+/// Fail closed before any live test talks to the default daemon.
+///
+/// `RHIZOME_PRIME_DAEMON_SOCKET` isolates the socket. `RHIZOME_PRIME_SESSION_DIR`
+/// is the scratch store the isolated daemon was started with. Either missing,
+/// or the session dir being `~/.prime/agent/sessions`, is a refusal — the
+/// caller must not fall through to the default socket.
+fn require_isolated_live_harness() -> Result<(), String> {
+    let socket = match std::env::var(DAEMON_SOCKET_ENV) {
+        Ok(socket) if !socket.trim().is_empty() => socket,
+        Ok(_) => return Err(format!("{DAEMON_SOCKET_ENV} is empty")),
+        Err(_) => return Err(format!("{DAEMON_SOCKET_ENV} is not set")),
+    };
+    if let Some(default_sock) = default_daemon_socket_path() {
+        if paths_equal(Path::new(socket.trim()), &default_sock) {
+            return Err("refusing the default Prime daemon socket".into());
+        }
+    }
+    let dir = match std::env::var(LIVE_SESSION_DIR_ENV) {
+        Ok(dir) if !dir.trim().is_empty() => dir,
+        Ok(_) => return Err(format!("{LIVE_SESSION_DIR_ENV} is empty")),
+        Err(_) => return Err(format!("{LIVE_SESSION_DIR_ENV} is not set")),
+    };
+    let path = PathBuf::from(dir.trim());
+    if is_default_prime_session_dir(&path) {
+        return Err("refusing the default Prime session dir".into());
+    }
+    Ok(())
+}
+
+/// Scratch session directory for live-test cleanup. `None` when the harness
+/// is missing or points at the real store — callers then delete nothing.
+fn isolated_live_session_dir() -> Option<PathBuf> {
+    let dir = std::env::var(LIVE_SESSION_DIR_ENV).ok()?;
+    let path = PathBuf::from(dir.trim());
+    if path.as_os_str().is_empty() || is_default_prime_session_dir(&path) {
+        return None;
+    }
+    Some(path)
 }
 
 /// Arguments Prime's CLI uses to start a supervisor.
@@ -2288,7 +2350,7 @@ pub fn get_queue() -> Result<PrimeQueue, String> {
             return Ok(PrimeQueue::default());
         }
         let data = host.call(serde_json::json!({ "type": "get_queue" }))?;
-        Ok(PrimeQueue::from_data(&data))
+        Ok(host.queue_from_data(&data))
     })
 }
 
@@ -2300,7 +2362,59 @@ pub fn clear_queue() -> Result<PrimeQueue, String> {
             return Ok(PrimeQueue::default());
         }
         let data = host.call(serde_json::json!({ "type": "clear_queue" }))?;
-        Ok(PrimeQueue::from_data(&data))
+        Ok(host.queue_from_data(&data))
+    })
+}
+
+/// One queued line was edited, removed, or the daemon refused the edit.
+///
+/// `status` is Prime's `QueuedMessageMutationStatus`, plus `unsupported` when
+/// this daemon did not advertise `queue_message_mutation`.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrimeQueuedMutationResult {
+    pub status: String,
+}
+
+fn prime_queue_lane(lane: &str) -> Result<&'static str, String> {
+    match lane {
+        "steer" | "steering" => Ok("steering"),
+        "followUp" | "follow_up" => Ok("followUp"),
+        other => Err(format!("Unknown queue lane: {other}")),
+    }
+}
+
+/// Edit, delete, or move one queued line. Clear-all stays `clear_queue`.
+///
+/// `expected_text` must be the preview from the last `get_queue`. Rhizome's
+/// `steer` lane is Prime's `"steering"`. The other lane is `"followUp"`.
+pub fn mutate_queued_message(
+    lane: &str,
+    index: u64,
+    expected_text: &str,
+    mutation: serde_json::Value,
+) -> Result<PrimeQueuedMutationResult, String> {
+    let prime_lane = prime_queue_lane(lane)?;
+    with_host_mut(|host| {
+        if !host.has_session() {
+            return Ok(PrimeQueuedMutationResult {
+                status: "rejected".into(),
+            });
+        }
+        if !host.queue_mutation_available() {
+            return Ok(PrimeQueuedMutationResult {
+                status: "unsupported".into(),
+            });
+        }
+        let data = host.call(serde_json::json!({
+            "type": "mutate_queued_message",
+            "lane": prime_lane,
+            "index": index,
+            "expectedText": expected_text,
+            "mutation": mutation,
+        }))?;
+        let status = data["status"].as_str().unwrap_or("rejected").to_string();
+        Ok(PrimeQueuedMutationResult { status })
     })
 }
 
@@ -3532,6 +3646,18 @@ impl PrimeHost {
             .unwrap_or_default();
     }
 
+    fn queue_mutation_available(&self) -> bool {
+        self.server_capabilities
+            .iter()
+            .any(|capability| capability == "queue_message_mutation")
+    }
+
+    fn queue_from_data(&self, data: &serde_json::Value) -> PrimeQueue {
+        let mut queue = PrimeQueue::from_data(data);
+        queue.can_mutate = self.queue_mutation_available();
+        queue
+    }
+
     fn require_client_owned_sessions(&self, operation: &str) -> Result<(), String> {
         if self
             .server_capabilities
@@ -3862,6 +3988,76 @@ fn spawn_daemon_reader(
     Ok(())
 }
 
+/// Prefix Chat looks for when a session worker dies at launch (C53).
+///
+/// The daemon's own connect probe waits `DAEMON_RESPONSE_TIMEOUT` (30s) and
+/// then reports a generic timeout. A spawn failure (`EPERM`, `uv_cwd`, or
+/// the process exiting) is known before that wait finishes when the
+/// supervisor writes it on the socket. Callers must surface it immediately.
+const WORKER_FAILED_PREFIX: &str = "worker-failed: ";
+
+fn worker_start_failure_message(text: &str) -> Option<String> {
+    let lower = text.to_ascii_lowercase();
+    let eperm = lower.contains("eperm");
+    let uv_cwd = lower.contains("uv_cwd");
+    let spawn_failed = lower.contains("failed to spawn session worker")
+        || (eperm
+            && (lower.contains("spawn")
+                || lower.contains("worker")
+                || uv_cwd
+                || lower.contains("cwd")));
+    let process_exit = lower.contains("process exit")
+        || (lower.contains("session worker")
+            && (lower.contains("exited") || lower.contains("exit code")));
+    if !(uv_cwd || spawn_failed || process_exit) {
+        return None;
+    }
+    let mut parts = Vec::new();
+    if process_exit && !eperm && !uv_cwd {
+        parts.push("process exit");
+    }
+    if eperm {
+        parts.push("EPERM");
+    }
+    if uv_cwd {
+        parts.push("uv_cwd");
+    }
+    if parts.is_empty() {
+        parts.push("spawn failed");
+    }
+    Some(format!("{WORKER_FAILED_PREFIX}{}", parts.join(" ")))
+}
+
+fn response_worker_failure(json: &serde_json::Value) -> Option<String> {
+    if json["success"].as_bool() == Some(true) {
+        return None;
+    }
+    json["error"]
+        .as_str()
+        .and_then(worker_start_failure_message)
+}
+
+fn fail_pending_with_worker_failure(
+    pending: &Mutex<HashMap<String, PendingResponse>>,
+    message: &str,
+) {
+    let Ok(mut map) = pending.lock() else {
+        return;
+    };
+    let ids: Vec<String> = map.keys().cloned().collect();
+    for id in ids {
+        let Some(entry) = map.remove(&id) else {
+            continue;
+        };
+        let _ = entry.tx.send(serde_json::json!({
+            "type": "response",
+            "id": id,
+            "success": false,
+            "error": message,
+        }));
+    }
+}
+
 /// Route one line from the daemon: responses to their caller, everything else
 /// onto the event stream.
 ///
@@ -3869,13 +4065,22 @@ fn spawn_daemon_reader(
 /// with the daemon's own sequencing metadata alongside. The inner object is
 /// byte-identical to what RPC mode emitted, so unwrapping exactly one layer
 /// here is what lets `prime_events` stay untouched by the transport swap.
+///
+/// A worker that dies at launch used to leave the matching command parked
+/// until `DAEMON_RESPONSE_TIMEOUT`. A diagnostic line (or a failure response)
+/// that names that death completes the wait immediately.
 fn route_daemon_line(
     json: serde_json::Value,
     pending: &Mutex<HashMap<String, PendingResponse>>,
     event_tx: &Sender<OutboundLine>,
 ) {
-    let is_response = json["type"].as_str() == Some("response");
-    if is_response {
+    let mut json = json;
+    if json["type"].as_str() == Some("response") {
+        if let Some(message) = response_worker_failure(&json) {
+            if let Some(object) = json.as_object_mut() {
+                object.insert("error".into(), serde_json::Value::String(message));
+            }
+        }
         if let Some(id) = json["id"].as_str() {
             if let Ok(mut map) = pending.lock() {
                 if let Some(entry) = map.remove(id) {
@@ -3885,6 +4090,10 @@ fn route_daemon_line(
             }
         }
         // Unsolicited response — still forward so it isn't lost.
+    } else if json["type"].as_str() != Some("session_event") {
+        if let Some(message) = worker_start_failure_message(&json.to_string()) {
+            fail_pending_with_worker_failure(pending, &message);
+        }
     }
 
     if json["type"].as_str() == Some("session_event") {
@@ -3923,11 +4132,17 @@ mod tests {
         guard
     }
 
+    /// Stop before `ensure_host` when the scratch socket or session dir is missing.
+    fn enter_isolated_live_test() {
+        require_isolated_live_harness().expect(
+            "live tests require RHIZOME_PRIME_DAEMON_SOCKET and a scratch RHIZOME_PRIME_SESSION_DIR",
+        );
+    }
+
     /// Cleanup guard for live daemon tests.
     ///
-    /// Tracks a session ID and deletes its `.jsonl` file from
-    /// `~/.prime/agent/sessions/` when dropped. This ensures that tests
-    /// against the real daemon clean up after themselves even if they panic.
+    /// Deletes the session file from `RHIZOME_PRIME_SESSION_DIR` only. A missing
+    /// scratch dir, or the real `~/.prime/agent/sessions` store, deletes nothing.
     ///
     /// Only deletes sessions this test actually created — identified by the
     /// ID passed at construction. Will not error if the file doesn't exist
@@ -3941,12 +4156,12 @@ mod tests {
             if self.session_id.is_empty() {
                 return;
             }
-            if let Some(home) = dirs::home_dir() {
-                let session_file = home
-                    .join(".prime/agent/sessions")
-                    .join(format!("{}.jsonl", self.session_id));
-                let _ = std::fs::remove_file(&session_file);
-            }
+            // Fail closed: a missing scratch dir, or the real store, deletes nothing.
+            let Some(dir) = isolated_live_session_dir() else {
+                return;
+            };
+            let session_file = dir.join(format!("{}.jsonl", self.session_id));
+            let _ = std::fs::remove_file(session_file);
         }
     }
 
@@ -6880,6 +7095,7 @@ mod tests {
             PrimeQueue {
                 steering: vec!["focus on error handling".into()],
                 follow_up: vec!["then summarise".into()],
+                can_mutate: false,
             }
         );
 
@@ -6919,9 +7135,136 @@ mod tests {
             PrimeQueue {
                 steering: vec!["focus on error handling".into()],
                 follow_up: vec!["then summarise".into()],
+                can_mutate: false,
             }
         );
         assert_eq!(clear_queue().unwrap(), PrimeQueue::default());
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn mutate_queued_message_maps_steer_and_sends_the_preview() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let mut hello = fake_hello();
+        hello["serverCapabilities"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!("queue_message_mutation"));
+        let daemon = FakeDaemon::start_with_hello(
+            |command, id| match command["type"].as_str() {
+                Some("mutate_queued_message") => Some(vec![ok(
+                    id,
+                    "mutate_queued_message",
+                    serde_json::json!({ "status": "applied" }),
+                )]),
+                Some("get_queue") => Some(vec![ok(
+                    id,
+                    "get_queue",
+                    serde_json::json!({ "steering": ["focus on error handling"], "followUp": [] }),
+                )]),
+                _ => None,
+            },
+            hello,
+        );
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        assert!(get_queue().unwrap().can_mutate);
+        let result = mutate_queued_message(
+            "steer",
+            0,
+            "focus on error handling",
+            serde_json::json!({ "type": "delete" }),
+        )
+        .unwrap();
+        assert_eq!(result.status, "applied");
+
+        let sent = daemon.command("mutate_queued_message").unwrap();
+        assert_eq!(sent["lane"], "steering");
+        assert_eq!(sent["index"], 0);
+        assert_eq!(sent["expectedText"], "focus on error handling");
+        assert_eq!(sent["mutation"]["type"], "delete");
+
+        let _ = shutdown_host();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn mutate_queued_message_stays_unsent_without_the_capability() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_command, _id| None);
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let result = mutate_queued_message(
+            "followUp",
+            1,
+            "then summarise",
+            serde_json::json!({
+                "type": "replace",
+                "text": "rewritten",
+                "lane": "followUp",
+            }),
+        )
+        .unwrap();
+        assert_eq!(result.status, "unsupported");
+        assert!(daemon.command("mutate_queued_message").is_none());
+
+        let _ = shutdown_host();
+    }
+
+    #[test]
+    fn worker_start_failure_message_names_eperm_uv_cwd_and_process_exit() {
+        assert_eq!(
+            worker_start_failure_message("spawn EPERM").as_deref(),
+            Some("worker-failed: EPERM")
+        );
+        assert_eq!(
+            worker_start_failure_message("Error: EPERM: uv_cwd").as_deref(),
+            Some("worker-failed: EPERM uv_cwd")
+        );
+        assert_eq!(
+            worker_start_failure_message("Session worker process exit").as_deref(),
+            Some("worker-failed: process exit")
+        );
+        assert_eq!(worker_start_failure_message("ordinary refusal"), None);
+    }
+
+    /// A worker that dies at launch must not sit on `DAEMON_RESPONSE_TIMEOUT`.
+    ///
+    /// The fake daemon never answers `create`. It only emits the diagnostic
+    /// the supervisor logs when the child exits (`EPERM` / `uv_cwd` / process
+    /// exit). Before this, `send_bare_command` waited the full 30s.
+    #[cfg(unix)]
+    #[test]
+    fn worker_start_failure_returns_without_waiting_for_the_daemon_timeout() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, _id| {
+            (command["type"].as_str() == Some("create")).then(|| {
+                vec![serde_json::json!({
+                    "type": "daemon_notice",
+                    "message": "Session worker process exit: spawn EPERM uv_cwd",
+                })]
+            })
+        });
+        daemon.install();
+        let started = Instant::now();
+        let error = connect_host(vault.path()).expect_err("a dead worker is not a session");
+        let elapsed = started.elapsed();
+        assert!(
+            elapsed < Duration::from_secs(5),
+            "worker start failure waited {elapsed:?}"
+        );
+        assert!(error.starts_with("worker-failed: "), "{error}");
+        assert!(
+            !error.contains("timed out"),
+            "the 30s timeout must not hide the worker failure: {error}"
+        );
 
         let _ = shutdown_host();
     }
@@ -7305,6 +7648,7 @@ mod tests {
     #[ignore = "needs a running prime-agent daemon with scheduled work"]
     fn scheduled_work_against_the_live_daemon() {
         let _guard = host_guard();
+        enter_isolated_live_test();
         let home = dirs::home_dir().expect("home");
         let session_id = connect_host(&home).expect("connect");
         let _cleanup = SessionCleanupGuard::new(session_id);
@@ -8365,8 +8709,7 @@ mod tests {
     #[ignore = "requires a running prime-agent daemon (see `prime-agent status`)"]
     fn live_daemon_round_trip() {
         let _guard = host_guard();
-        // Use the real socket, not whatever a sibling test last pointed at.
-        std::env::remove_var(DAEMON_SOCKET_ENV);
+        enter_isolated_live_test();
         let vault = tempfile::tempdir().unwrap();
 
         let socket = daemon_socket_path().expect("a reachable daemon");
@@ -8452,7 +8795,7 @@ mod tests {
     #[ignore = "requires a running prime-agent daemon (see `prime-agent status`)"]
     fn live_session_naming() {
         let _guard = host_guard();
-        std::env::remove_var(DAEMON_SOCKET_ENV);
+        enter_isolated_live_test();
         let vault = tempfile::tempdir().unwrap();
 
         ensure_host(&vault.path().to_string_lossy()).expect("connect + attach");
@@ -8492,9 +8835,8 @@ mod tests {
         );
 
         // The name is only real if the daemon wrote it where the list reads.
-        let log = dirs::home_dir()
-            .unwrap()
-            .join(".prime/agent/sessions")
+        let log = isolated_live_session_dir()
+            .expect("scratch session dir")
             .join(format!("{session_id}.jsonl"));
         let summary = crate::prime_sessions::summarize_file(&log).expect("the session log");
         println!("title: {:?}", summary.title);
@@ -8517,7 +8859,7 @@ mod tests {
     #[ignore = "requires a running prime-agent daemon (see `prime-agent status`)"]
     fn live_goal_round_trip() {
         let _guard = host_guard();
-        std::env::remove_var(DAEMON_SOCKET_ENV);
+        enter_isolated_live_test();
         let vault = tempfile::tempdir().unwrap();
 
         let session_id = ensure_host(&vault.path().to_string_lossy()).expect("connect + attach");
@@ -8566,7 +8908,8 @@ mod tests {
     #[ignore = "requires a running prime-agent daemon (see `prime-agent status`)"]
     fn live_unreachable_service_is_actionable_and_recovers() {
         let _guard = host_guard();
-        std::env::remove_var(DAEMON_SOCKET_ENV);
+        enter_isolated_live_test();
+        let isolated = std::env::var(DAEMON_SOCKET_ENV).expect("isolated socket");
         record_problem(None);
         let vault = tempfile::tempdir().unwrap();
 
@@ -8593,9 +8936,9 @@ mod tests {
                 | PrimeConnectionProblem::NotInstalled
         ));
 
-        // Recovery: the real daemon is still there, and the state must clear.
-        std::env::remove_var(DAEMON_SOCKET_ENV);
-        ensure_host(&vault.path().to_string_lossy()).expect("reconnect to the real daemon");
+        // Recovery: the isolated daemon is still there, and the state must clear.
+        std::env::set_var(DAEMON_SOCKET_ENV, &isolated);
+        ensure_host(&vault.path().to_string_lossy()).expect("reconnect to the isolated daemon");
         assert_eq!(
             get_status().problem,
             None,
@@ -8623,9 +8966,7 @@ mod tests {
     #[ignore = "requires an isolated daemon; set RHIZOME_TEST_DAEMON_SOCKET"]
     fn live_quit_stops_our_session_by_default_and_keeps_it_when_asked() {
         let _guard = host_guard();
-        let socket = std::env::var("RHIZOME_TEST_DAEMON_SOCKET")
-            .expect("set RHIZOME_TEST_DAEMON_SOCKET to an isolated daemon socket");
-        std::env::set_var(DAEMON_SOCKET_ENV, &socket);
+        enter_isolated_live_test();
         record_problem(None);
         let vault = tempfile::tempdir().unwrap();
 
@@ -8713,7 +9054,6 @@ mod tests {
         }
 
         let _ = shutdown_host();
-        std::env::remove_var(DAEMON_SOCKET_ENV);
         record_problem(None);
     }
 
@@ -8726,34 +9066,71 @@ mod tests {
     }
 
     #[test]
-    fn session_cleanup_guard_deletes_session_files() {
-        // Create a fake session file to verify the guard deletes it
-        if let Some(home) = dirs::home_dir() {
-            let sessions_dir = home.join(".prime/agent/sessions");
-            let _ = std::fs::create_dir_all(&sessions_dir);
+    fn session_cleanup_guard_deletes_only_the_scratch_session_file() {
+        let _guard = host_guard();
+        let scratch = tempfile::tempdir().unwrap();
+        let previous = std::env::var(LIVE_SESSION_DIR_ENV).ok();
+        std::env::set_var(LIVE_SESSION_DIR_ENV, scratch.path());
 
-            let test_id = "test-cleanup-session-id-12345".to_string();
-            let test_file = sessions_dir.join(format!("{}.jsonl", test_id));
-
-            // Create a dummy file
-            let _ = std::fs::write(&test_file, "test content");
-            assert!(test_file.exists(), "test file should exist before cleanup");
-
-            // Drop the guard, which should delete the file
-            {
-                let _guard = SessionCleanupGuard::new(test_id);
-                // Guard is still in scope
-                assert!(
-                    test_file.exists(),
-                    "test file should still exist while guard is in scope"
-                );
-            }
-            // Guard has dropped now
-
+        let test_id = "test-cleanup-session-id-12345".to_string();
+        let test_file = scratch.path().join(format!("{test_id}.jsonl"));
+        std::fs::write(&test_file, "test content").unwrap();
+        {
+            let _cleanup = SessionCleanupGuard::new(test_id);
             assert!(
-                !test_file.exists(),
-                "test file should be deleted after cleanup guard drops"
+                test_file.exists(),
+                "scratch file stays while the guard is in scope"
             );
+        }
+        assert!(
+            !test_file.exists(),
+            "the guard deletes the scratch session file"
+        );
+
+        match previous {
+            Some(value) => std::env::set_var(LIVE_SESSION_DIR_ENV, value),
+            None => std::env::remove_var(LIVE_SESSION_DIR_ENV),
+        }
+    }
+
+    #[test]
+    fn live_harness_refuses_the_default_session_dir() {
+        let _guard = host_guard();
+        let previous_socket = std::env::var(DAEMON_SOCKET_ENV).ok();
+        let previous_dir = std::env::var(LIVE_SESSION_DIR_ENV).ok();
+        let home = dirs::home_dir().expect("home");
+        let default_dir = home.join(".prime/agent/sessions");
+
+        std::env::set_var(DAEMON_SOCKET_ENV, "/tmp/rz-not-the-default-daemon.sock");
+        std::env::set_var(LIVE_SESSION_DIR_ENV, &default_dir);
+        let refused = require_isolated_live_harness().expect_err("the real store is refused");
+        assert!(refused.contains("default Prime session dir"), "{refused}");
+        assert!(
+            is_default_prime_session_dir(&default_dir),
+            "the harness must recognise ~/.prime/agent/sessions"
+        );
+
+        std::env::remove_var(LIVE_SESSION_DIR_ENV);
+        let missing_dir =
+            require_isolated_live_harness().expect_err("a missing scratch dir is refused");
+        assert!(missing_dir.contains(LIVE_SESSION_DIR_ENV), "{missing_dir}");
+
+        std::env::set_var(LIVE_SESSION_DIR_ENV, "/tmp/rzlive/sessions");
+        std::env::remove_var(DAEMON_SOCKET_ENV);
+        let missing_socket =
+            require_isolated_live_harness().expect_err("a missing socket is refused");
+        assert!(
+            missing_socket.contains(DAEMON_SOCKET_ENV),
+            "{missing_socket}"
+        );
+
+        match previous_socket {
+            Some(value) => std::env::set_var(DAEMON_SOCKET_ENV, value),
+            None => std::env::remove_var(DAEMON_SOCKET_ENV),
+        }
+        match previous_dir {
+            Some(value) => std::env::set_var(LIVE_SESSION_DIR_ENV, value),
+            None => std::env::remove_var(LIVE_SESSION_DIR_ENV),
         }
     }
 
@@ -8762,17 +9139,13 @@ mod tests {
     #[ignore = "requires a running prime-agent daemon"]
     fn live_session_cleanup_works_end_to_end() {
         let _guard = host_guard();
-        std::env::remove_var(DAEMON_SOCKET_ENV);
+        enter_isolated_live_test();
         let vault = tempfile::tempdir().unwrap();
+        let sessions_dir = isolated_live_session_dir().expect("scratch session dir");
 
-        // Get session count before
-        let sessions_before: usize = if let Some(home) = dirs::home_dir() {
-            std::fs::read_dir(home.join(".prime/agent/sessions"))
-                .map(|entries| entries.count())
-                .unwrap_or(0)
-        } else {
-            0
-        };
+        let sessions_before = std::fs::read_dir(&sessions_dir)
+            .map(|entries| entries.count())
+            .unwrap_or(0);
 
         // Create a session and let cleanup guard delete it
         {
@@ -8786,26 +9159,16 @@ mod tests {
 
             let _cleanup = SessionCleanupGuard::new(session_id.clone());
 
-            // Verify session file exists while guard is in scope
-            if let Some(home) = dirs::home_dir() {
-                let session_file = home
-                    .join(".prime/agent/sessions")
-                    .join(format!("{}.jsonl", session_id));
-                assert!(session_file.exists(), "session file should exist in scope");
-            }
+            let session_file = sessions_dir.join(format!("{session_id}.jsonl"));
+            assert!(session_file.exists(), "session file should exist in scope");
 
             let _ = shutdown_host();
         }
         // Guard has dropped here
 
-        // Get session count after
-        let sessions_after: usize = if let Some(home) = dirs::home_dir() {
-            std::fs::read_dir(home.join(".prime/agent/sessions"))
-                .map(|entries| entries.count())
-                .unwrap_or(0)
-        } else {
-            0
-        };
+        let sessions_after = std::fs::read_dir(&sessions_dir)
+            .map(|entries| entries.count())
+            .unwrap_or(0);
 
         println!(
             "sessions before: {}, after: {}",
@@ -8990,6 +9353,7 @@ mod tests {
     #[ignore = "needs a running prime-agent daemon"]
     fn roster_against_the_live_daemon() {
         let _guard = host_guard();
+        enter_isolated_live_test();
         let sessions = list_running_sessions().expect("roster");
         println!("live daemon reported {} sessions", sessions.len());
         for session in &sessions {

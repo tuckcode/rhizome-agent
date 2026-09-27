@@ -11,7 +11,7 @@ import {
 import { serializeUiLanguagePreference } from '../lib/i18n'
 import { trackAccentColorChanged, trackColorThemeChanged, trackThemeModeChanged } from '../lib/productAnalytics'
 import { normalizeReleaseChannel, serializeReleaseChannel } from '../lib/releaseChannel'
-import { normalizeDateDisplayFormat } from '../utils/dateDisplay'
+import { normalizeDateDisplayFormat, normalizeDisplayTimeZone } from '../utils/dateDisplay'
 import {
   DEFAULT_ACCENT_COLOR,
   DEFAULT_COLOR_THEME,
@@ -60,6 +60,7 @@ const EMPTY_SETTINGS: Settings = {
   accent_color: null,
   ui_language: null,
   date_display_format: null,
+  timezone: null,
   note_width_mode: null,
   sidebar_type_pluralization_enabled: null,
   default_ai_agent: null,
@@ -72,6 +73,7 @@ const EMPTY_SETTINGS: Settings = {
   all_notes_show_images: null,
   all_notes_show_unsupported: null,
   multi_workspace_enabled: null,
+  agent_profile: null,
 }
 
 function normalizeSettings(settings: Settings): Settings {
@@ -89,6 +91,7 @@ function normalizeSettings(settings: Settings): Settings {
     accent_color: normalizeAccentColor(settings.accent_color),
     ui_language: serializeUiLanguagePreference(settings.ui_language),
     date_display_format: normalizeDateDisplayFormat(settings.date_display_format),
+    timezone: normalizeDisplayTimeZone(settings.timezone),
     note_width_mode: normalizeNoteWidthMode(settings.note_width_mode),
     sidebar_type_pluralization_enabled: settings.sidebar_type_pluralization_enabled ?? null,
     default_ai_agent: normalizeStoredAiAgent(settings.default_ai_agent),
@@ -101,6 +104,7 @@ function normalizeSettings(settings: Settings): Settings {
     all_notes_show_images: settings.all_notes_show_images ?? null,
     all_notes_show_unsupported: settings.all_notes_show_unsupported ?? null,
     multi_workspace_enabled: settings.multi_workspace_enabled ?? null,
+    agent_profile: settings.agent_profile?.trim() || null,
   }
 }
 

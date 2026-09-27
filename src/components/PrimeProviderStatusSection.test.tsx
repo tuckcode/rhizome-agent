@@ -50,6 +50,16 @@ beforeEach(() => {
 })
 
 describe('PrimeProviderStatusSection', () => {
+  it('lists connect-from-Rhizome as not built and does not add a connect button', async () => {
+    state.providers = []
+    render(<PrimeProviderStatusSection t={t} />)
+    const note = await screen.findByTestId('prime-connect-not-built')
+    expect(note).toHaveTextContent(/not built/i)
+    expect(note).toHaveTextContent(/auth command/i)
+    expect(screen.queryByRole('button', { name: /^connect$/i })).not.toBeInTheDocument()
+    expect(screen.getByTestId('prime-provider-sign-in-anthropic')).toHaveTextContent('Sign in')
+  })
+
   it('lists each provider with how it is connected', async () => {
     state.providers = [
       { name: 'anthropic', authKind: 'oauth', expiresAt: 9e12, expired: false },

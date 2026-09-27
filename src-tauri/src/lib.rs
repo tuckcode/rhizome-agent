@@ -671,6 +671,7 @@ macro_rules! app_invoke_handler {
             commands::follow_up_prime_session,
             commands::get_prime_session_queue,
             commands::clear_prime_session_queue,
+            commands::mutate_prime_queued_message,
             commands::get_prime_session_tree,
             commands::navigate_prime_session_tree,
             commands::cancel_prime_rlm_child,

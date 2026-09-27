@@ -12,7 +12,7 @@ vi.mock('../mock-tauri', () => ({
   mockInvoke: vi.fn(),
 }))
 
-const { mockInvoke } = await import('../mock-tauri') as { mockInvoke: ReturnType<typeof vi.fn> }
+const { mockInvoke } = await import('../mock-tauri') as unknown as { mockInvoke: ReturnType<typeof vi.fn> }
 
 function installedStatusResponse() {
   return {
