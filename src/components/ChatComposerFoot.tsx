@@ -5,6 +5,8 @@ interface ChatComposerFootProps {
   locale?: AppLocale
   working?: boolean
   lastToolName?: string | null
+  /** Reason a Prime session worker failed to start. Shown in place of turn status. */
+  failureReason?: string | null
 }
 
 /**
@@ -17,13 +19,16 @@ export function ChatComposerFoot({
   locale = 'en',
   working = false,
   lastToolName = null,
+  failureReason = null,
 }: ChatComposerFootProps) {
   const t = createTranslator(locale)
-  const status = working
-    ? (lastToolName
-        ? t('ai.composer.foot.working', { tool: lastToolName })
-        : t('ai.composer.foot.workingBare'))
-    : t('ai.composer.foot.idle')
+  const status = failureReason
+    ? failureReason
+    : working
+      ? (lastToolName
+          ? t('ai.composer.foot.working', { tool: lastToolName })
+          : t('ai.composer.foot.workingBare'))
+      : t('ai.composer.foot.idle')
 
   return (
     <span
@@ -31,7 +36,8 @@ export function ChatComposerFoot({
       role="status"
       className={cn(
         'min-w-0 truncate font-mono text-[12px] tracking-[0.03em] text-muted-foreground',
-        working && 'text-primary',
+        working && !failureReason && 'text-primary',
+        failureReason && 'text-destructive',
       )}
     >
       {status}

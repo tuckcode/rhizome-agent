@@ -15,6 +15,7 @@ import {
 } from './productAnalytics'
 import { translate, type AppLocale } from './i18n'
 import { localizedStreamErrorMessage } from './localizedStreamError'
+import { workerStartFailureReason } from './primeWorkerStartError'
 import {
   isSessionAutoDistillEnabled,
   queueSessionAutoDistill,
@@ -175,6 +176,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
   } = context
   let failureTracked = false
   let streamFailed = false
+  let workerFailureReason: string | null = null
   // Retargeted after each Prime TurnBoundary so a queued follow-up owns its
   // own bubble instead of merging into the first turn's reply.
   let activeMessageId = messageId
@@ -306,7 +308,9 @@ export function createStreamCallbacks(context: StreamMutationContext) {
 
       setStatus('error')
       streamFailed = true
-      const displayError = localizedStreamErrorMessage({ message: error, locale })
+      const reason = workerStartFailureReason(error)
+      if (reason) workerFailureReason = reason
+      const displayError = reason ?? localizedStreamErrorMessage({ message: error, locale })
       const partial = normalizeAssistantResponseText(responseAccRef.current)
       failureTracked = true
       trackAiAgentResponseFailed(agent, partial, toolInputMapRef.current.size)
@@ -314,7 +318,9 @@ export function createStreamCallbacks(context: StreamMutationContext) {
         ...message,
         isStreaming: false,
         reasoningDone: true,
-        response: partial ? `${partial}\n\nError: ${displayError}` : `Error: ${displayError}`,
+        response: partial
+          ? `${partial}\n\nError: ${reason ? `worker-failed: ${reason}` : displayError}`
+          : `Error: ${reason ? `worker-failed: ${reason}` : displayError}`,
         actions: message.actions.map((action) => (
           action.status === 'pending' ? { ...action, status: 'error' as const } : action
         )),
@@ -332,7 +338,9 @@ export function createStreamCallbacks(context: StreamMutationContext) {
 
     onDone: () => {
       if (abortRef.current.aborted) return
-      if (streamFailed) return
+      // A worker that failed to start already explained itself. Do not replace
+      // that reason with "finished without returning a reply".
+      if (streamFailed || workerFailureReason) return
 
       setStatus('done')
       // TurnBoundary already sealed the last agent_end and cleared the

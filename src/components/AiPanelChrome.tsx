@@ -30,12 +30,15 @@ import {
   trackComposerReplyCompletionDismissed,
   trackComposerReplyCompletionShown,
 } from '../lib/productAnalytics'
+import { workerStartFailureReason } from '../lib/primeWorkerStartError'
 
 interface AiPanelHeaderProps {
   agentLabel: string
   agentReadiness: AiAgentReadiness
   /** Live turn state from the session controller. */
   agentStatus?: 'idle' | 'thinking' | 'tool-executing' | 'done' | 'error'
+  /** Latest send error, when the turn failed. Worker failures name their reason. */
+  sendError?: string | null
   /** Optional model label from Prime host (e.g. "Grok 4.5"). */
   modelLabel?: string | null
   targetKind?: 'agent' | 'api_model'
@@ -409,6 +412,7 @@ function headerStatusText({
   agentLabel,
   agentReadiness,
   agentStatus,
+  sendError,
   modeLabel,
   modelLabel,
   t,
@@ -416,6 +420,7 @@ function headerStatusText({
   agentLabel: string
   agentReadiness: AiAgentReadiness
   agentStatus?: 'idle' | 'thinking' | 'tool-executing' | 'done' | 'error'
+  sendError?: string | null
   modeLabel: string
   modelLabel?: string | null
   t: ReturnType<typeof createTranslator>
@@ -424,7 +429,10 @@ function headerStatusText({
   if (agentReadiness === 'missing') return t('ai.panel.status.missing', { agent: agentLabel })
   if (agentStatus === 'thinking') return t('ai.panel.status.working', { agent: agentLabel })
   if (agentStatus === 'tool-executing') return t('ai.panel.status.tools', { agent: agentLabel })
-  if (agentStatus === 'error') return t('ai.panel.status.error', { agent: agentLabel })
+  if (agentStatus === 'error') {
+    const reason = sendError ? workerStartFailureReason(sendError) : null
+    return reason ?? t('ai.panel.status.error', { agent: agentLabel })
+  }
   const ready = t('ai.panel.status.ready', { agent: agentLabel, mode: modeLabel })
   const model = modelLabel?.trim()
   return model ? t('ai.panel.status.readyWithModel', { agent: agentLabel, mode: modeLabel, model }) : ready
@@ -495,6 +503,7 @@ export const AiPanelHeader = memo(function AiPanelHeader({
   agentLabel,
   agentReadiness,
   agentStatus = 'idle',
+  sendError = null,
   modelLabel = null,
   targetKind = 'agent',
   locale = 'en',
@@ -529,7 +538,7 @@ export const AiPanelHeader = memo(function AiPanelHeader({
             {t('ai.panel.title')}
           </span>
           <span className="truncate text-[11px] text-muted-foreground" data-agent-status={agentStatus}>
-            {headerStatusText({ agentLabel, agentReadiness, agentStatus, modeLabel, modelLabel, t })}
+            {headerStatusText({ agentLabel, agentReadiness, agentStatus, sendError, modeLabel, modelLabel, t })}
           </span>
         </div>
         <Button

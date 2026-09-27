@@ -23,6 +23,7 @@ import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
 import { groupConsecutiveToolActions } from '../lib/groupConsecutiveToolActions'
 import { trackVaultRetrievalSourceOpened } from '../lib/productAnalytics'
 import { formatMessageClock } from '../utils/messageTimestamp'
+import { presentWorkerStartFailure } from '../lib/primeWorkerStartError'
 
 export interface AiAction {
   tool: string
@@ -613,7 +614,7 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
           locale={locale}
           messageId={messageId}
           forkTargetId={forkTargetId}
-          text={response}
+          text={presentWorkerStartFailure(response) ?? response}
           onFork={onFork}
           onOpenNote={onOpenNote}
           onNavigateWikilink={onNavigateWikilink}
