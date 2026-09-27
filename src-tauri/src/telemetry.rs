@@ -328,7 +328,7 @@ mod tests {
             format!("gho_{}", "K".repeat(28)),
             format!("ghs_{}", "L".repeat(28)),
             format!("ghu_{}", "P".repeat(28)),
-            format!("xoxp-123456789012-{}", "N".repeat(24)),
+            format!("{}{}-123456789012-{}", "xox", "p", "N".repeat(24)),
         ];
         let scrubbed = scrub_secrets(&format!("keys {}", tokens.join(" ")));
         for token in &tokens {
@@ -343,10 +343,10 @@ mod tests {
     #[test]
     fn scrub_secrets_redacts_remaining_slack_prefixes() {
         let tokens = [
-            format!("xoxa-123456789012-{}", "T".repeat(24)),
-            format!("xoxr-123456789012-{}", "U".repeat(24)),
-            format!("xoxs-123456789012-{}", "V".repeat(24)),
-            format!("xoxe-123456789012-{}", "W".repeat(24)),
+            format!("{}{}-123456789012-{}", "xox", "a", "T".repeat(24)),
+            format!("{}{}-123456789012-{}", "xox", "r", "U".repeat(24)),
+            format!("{}{}-123456789012-{}", "xox", "s", "V".repeat(24)),
+            format!("{}{}-123456789012-{}", "xox", "e", "W".repeat(24)),
         ];
         let scrubbed = scrub_secrets(&format!("keys {}", tokens.join(" ")));
         for token in &tokens {
