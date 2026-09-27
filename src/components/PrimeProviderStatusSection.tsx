@@ -25,8 +25,8 @@ import { writeClipboardText } from '../utils/clipboardText'
  *
  * API-key hosts and custom OpenAI-compatible hosts (Nous Portal) use the same
  * Terminal handoff for keys: copy a command, never write Prime's auth.json
- * from the desktop. Nous models themselves are merged into Prime's
- * `models.json` when the user clicks Add to Chat list.
+ * from the desktop. Nous models themselves are merged into
+ * Prime's `models.json` when the user clicks Add to Chat list.
  */
 
 interface ProviderStatus {
