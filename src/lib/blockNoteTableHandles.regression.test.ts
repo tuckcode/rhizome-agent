@@ -158,6 +158,8 @@ describe('BlockNote table handles regression', () => {
       {
         dom: editorRoot,
         root: document,
+        // BlockNote 0.55 reads the view state when it refreshes handles.
+        state: {},
       } as never,
       emitUpdate,
     )
@@ -198,6 +200,8 @@ describe('BlockNote table handles regression', () => {
       {
         dom: editorRoot,
         root: document,
+        // BlockNote 0.55 reads the view state when it refreshes handles.
+        state: {},
       } as never,
       emitUpdate,
     )
@@ -284,6 +288,8 @@ describe('BlockNote table handles regression', () => {
       {
         dom: editorRoot,
         root: document,
+        // BlockNote 0.55 reads the view state when it refreshes handles.
+        state: {},
       } as never,
       emitUpdate,
     )
@@ -330,6 +336,8 @@ describe('BlockNote table handles regression', () => {
       {
         dom: editorRoot,
         root: document,
+        // BlockNote 0.55 reads the view state when it refreshes handles.
+        state: {},
       } as never,
       emitUpdate,
     )

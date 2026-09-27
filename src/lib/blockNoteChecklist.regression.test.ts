@@ -8,6 +8,7 @@ type CheckListItemEditor = Parameters<typeof checkListItemSpec.implementation.re
 type RenderedCheckListItem = ReturnType<typeof checkListItemSpec.implementation.render>
 
 type CheckListItemControlEditor = {
+  isEditable: boolean
   getBlock: (id: string) => CheckListItemBlock | undefined
   updateBlock: (block: CheckListItemBlock, update: { props: { checked: boolean } }) => void
 }
@@ -26,6 +27,7 @@ function createCheckListItem(checked = false): CheckListItemBlock {
 
 function createEditor(getBlock: CheckListItemLookup): CheckListItemControlEditor {
   return {
+    isEditable: true,
     getBlock: vi.fn(getBlock),
     updateBlock: vi.fn(),
   }

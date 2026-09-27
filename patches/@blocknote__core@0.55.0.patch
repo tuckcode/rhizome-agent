@@ -1,0 +1,862 @@
+diff --git a/dist/blocks-DaEUT0O1.js b/dist/blocks-DaEUT0O1.js
+index f27910dc4b95b8bad149070d5dd851e7470a5074..00fcd586cb750c7cf9e2708a30afd01190c02752 100644
+--- a/dist/blocks-DaEUT0O1.js
++++ b/dist/blocks-DaEUT0O1.js
+@@ -1844,7 +1844,10 @@ var Fn = (e) => (t, r) => n({
+ 		n.value = e, n.text = t, i.appendChild(n);
+ 	}), i.value = n;
+ 	let a = (n) => {
+-		t.isEditable && t.updateBlock(e.id, { props: { language: n.target.value } });
++		if (!t.isEditable) return;
++		let l;
++		try { l = t.getBlock(e.id); } catch { return; }
++		l && t.updateBlock(l.id, { props: { language: n.target.value } });
+ 	};
+ 	t.isEditable ? i.addEventListener("change", a) : i.disabled = !0;
+ 	let o = document.createElement("div");
+@@ -2354,7 +2357,10 @@ var fr = F(() => ({
+ 	render(e, t) {
+ 		let n = document.createDocumentFragment(), r = document.createElement("input");
+ 		r.type = "checkbox", r.checked = e.props.checked, e.props.checked && r.setAttribute("checked", ""), r.disabled = !t.isEditable, r.addEventListener("change", () => {
+-			t.isEditable && t.updateBlock(e, { props: { checked: !e.props.checked } });
++			if (!t.isEditable) return;
++			let l;
++			try { l = t.getBlock(e.id); } catch { return; }
++			l && t.updateBlock(l, { props: { checked: !l.props.checked } });
+ 		});
+ 		let i = document.createElement("p"), a = document.createElement("div");
+ 		return a.contentEditable = "false", a.appendChild(r), n.appendChild(a), n.appendChild(i), {
+@@ -3100,7 +3106,7 @@ var Zr = m((e) => e.type.name === "blockContainer"), Qr = class {
+ 	pluginState;
+ 	constructor(e, t, n) {
+ 		this.editor = e, this.pluginState = void 0, this.emitUpdate = (e) => {
+-			if (!this.state) throw Error("Attempting to update uninitialized suggestions menu");
++			if (!this.state) return;
+ 			t(e, {
+ 				...this.state,
+ 				ignoreQueryLength: this.pluginState?.ignoreQueryLength
+@@ -3122,6 +3128,10 @@ var Zr = m((e) => e.type.name === "blockContainer"), Qr = class {
+ 			return;
+ 		}
+ 		let o = this.rootEl?.querySelector(`[data-decoration-id="${this.pluginState.decorationId}"]`);
++		if (!o) {
++			this.state && (this.state.show = !1), this.emitUpdate(this.pluginState.triggerCharacter);
++			return;
++		}
+ 		this.editor.isEditable && o && (this.state = {
+ 			show: !0,
+ 			referencePos: o.getBoundingClientRect().toJSON(),
+diff --git a/dist/extensions-B1JQURVF.js b/dist/extensions-B1JQURVF.js
+index a637c12bfe8cdac81d4fd2768b0daa1a22757407..8b9e63d5a32c9500484c6517f312fea6dbe9e523 100644
+--- a/dist/extensions-B1JQURVF.js
++++ b/dist/extensions-B1JQURVF.js
+@@ -43,7 +43,7 @@ function Pe(e, t, n, i) {
+ 		}
+ 	} else if (t.type.name === "text") {
+ 		let n = document.createTextNode(t.textContent);
+-		for (let r of t.marks.toReversed()) if (r.type.name in e.schema.styleSpecs) {
++		for (let r of Array.from(t.marks).reverse()) if (r.type.name in e.schema.styleSpecs) {
+ 			let t = (e.schema.styleSpecs[r.type.name].implementation.toExternalHTML ?? e.schema.styleSpecs[r.type.name].implementation.render)(r.attrs.stringValue, e);
+ 			t.contentDOM.appendChild(n), n = t.dom;
+ 		} else {
+@@ -1075,7 +1075,12 @@ var B = class e extends w {
+ 		};
+ 	}
+ };
+-w.jsonID("multiple-node", B);
++try {
++	w.jsonID("multiple-node", B);
++} catch (e) {
++	if (!(e instanceof RangeError && e.message === "Duplicate use of selection JSON ID multiple-node")) throw e;
++	Object.defineProperty(B.prototype, "jsonID", { value: "multiple-node" });
++}
+ //#endregion
+ //#region src/extensions/SideMenu/dragging.ts
+ var V;
+@@ -1487,6 +1492,21 @@ async function an(e, t) {
+ 	}));
+ }
+ //#endregion
++function __rhizomeValidIndex(e) {
++	return Number.isInteger(e) && e >= 0;
++}
++function __rhizomeResolveCell(e, t, n) {
++	if (!__rhizomeValidIndex(t) || !__rhizomeValidIndex(n?.row) || !__rhizomeValidIndex(n?.col)) return;
++	try {
++		let r = e.doc.resolve(t + 1);
++		if (n.row >= r.node().childCount) return;
++		let i = e.doc.resolve(r.posAtIndex(n.row) + 1);
++		if (n.col >= i.node().childCount) return;
++		return e.doc.resolve(i.posAtIndex(n.col));
++	} catch {
++		return;
++	}
++}
+ //#region src/extensions/TableHandles/TableHandles.ts
+ var G;
+ function K(e) {
+@@ -1539,8 +1559,12 @@ var ln = class {
+ 	viewMousedownHandler = () => {
+ 		this.mouseState = "down";
+ 	};
+-	hideHandles = () => {
+-		this.state?.show && (this.state.show = !1, this.state.showAddOrRemoveRowsButton = !1, this.state.showAddOrRemoveColumnsButton = !1, this.emitUpdate());
++	hideHandles = ({ resetCell: e = !1, resetDragging: t = !1 } = {}) => {
++		if (!this.state || !this.state.show && !e && !t) return;
++		this.state.show = !1, this.state.showAddOrRemoveRowsButton = !1, this.state.showAddOrRemoveColumnsButton = !1;
++		t && (this.state.draggingState = void 0);
++		e && (this.state.rowIndex = void 0, this.state.colIndex = void 0, this.state.referencePosCell = void 0);
++		this.emitUpdate();
+ 	};
+ 	mouseUpHandler = (e) => {
+ 		this.mouseState = "up", this.mouseMoveHandler(e);
+@@ -1559,10 +1583,16 @@ var ln = class {
+ 		if (!t.tbodyNode) return;
+ 		let n = t.tbodyNode.getBoundingClientRect(), r = ft(t.domNode, this.pmView);
+ 		if (!r) return;
+-		let { pmNodeInfo: i, doc: a } = this.editor.transact((e) => ({
+-			pmNodeInfo: o(r.id, e.doc),
+-			doc: e.doc
+-		}));
++		let i, a;
++		try {
++			({ pmNodeInfo: i, doc: a } = this.editor.transact((e) => ({
++				pmNodeInfo: o(r.id, e.doc),
++				doc: e.doc
++			})));
++		} catch {
++			this.hideHandles({ resetCell: !0, resetDragging: !0 });
++			return;
++		}
+ 		if (!i) {
+ 			this.hideHandles();
+ 			return;
+@@ -1622,7 +1652,7 @@ var ln = class {
+ 	};
+ 	dropHandler = (t) => {
+ 		if (this.mouseState = "up", this.state === void 0 || this.state.draggingState === void 0) return !1;
+-		if (this.state.rowIndex === void 0 || this.state.colIndex === void 0) throw Error("Attempted to drop table row or column, but no table block was hovered prior.");
++		if (this.state.rowIndex === void 0 || this.state.colIndex === void 0) return t.preventDefault(), this.hideHandles({ resetCell: !0, resetDragging: !0 }), !1;
+ 		t.preventDefault();
+ 		let { draggingState: n, colIndex: r, rowIndex: a } = this.state;
+ 		this.state.draggingState = void 0;
+@@ -1658,6 +1688,10 @@ var ln = class {
+ 	}
+ 	update() {
+ 		if (!this.state || !this.state.show) return;
++		if (!this.state.block) {
++			this.hideHandles({ resetCell: !0, resetDragging: !0 });
++			return;
++		}
+ 		let e = this.editor.getBlock(this.state.block.id);
+ 		if (!e || e.type !== "table" || !this.tableElement?.isConnected) {
+ 			this.state = void 0, this.tableId = void 0, this.tablePos = void 0, this.tableElement = void 0, this.emitUpdate();
+@@ -1667,7 +1701,10 @@ var ln = class {
+ 		let { height: n, width: r } = t(this.state.block);
+ 		this.state.rowIndex !== void 0 && this.state.colIndex !== void 0 && (this.state.rowIndex >= n && (this.state.rowIndex = n - 1), this.state.colIndex >= r && (this.state.colIndex = r - 1));
+ 		let i = this.tableElement.querySelector("tbody");
+-		if (!i) throw Error("Table block does not contain a 'tbody' HTML element. This should never happen.");
++		if (!i) {
++			this.hideHandles({ resetCell: !0 });
++			return;
++		}
+ 		if (this.state.rowIndex !== void 0 && this.state.colIndex !== void 0) {
+ 			let e = i.children[this.state.rowIndex].children[this.state.colIndex];
+ 			e ? this.state.referencePosCell = e.getBoundingClientRect() : (this.state.rowIndex = void 0, this.state.colIndex = void 0);
+@@ -1715,7 +1752,10 @@ var ln = class {
+ 			} }
+ 		})],
+ 		colDragStart(e) {
+-			if (r === void 0 || r.state === void 0 || r.state.colIndex === void 0) throw Error("Attempted to drag table column, but no table block was hovered prior.");
++			if (r === void 0 || r.state === void 0 || r.state.colIndex === void 0 || r.tablePos === void 0) {
++				r?.hideHandles({ resetCell: !0, resetDragging: !0 });
++				return;
++			}
+ 			r.state.draggingState = {
+ 				draggedCellOrientation: "col",
+ 				originalIndex: r.state.colIndex,
+@@ -1728,7 +1768,10 @@ var ln = class {
+ 			})), !t.headless && (K(t.prosemirrorView.root), e.dataTransfer.setDragImage(G, 0, 0), e.dataTransfer.effectAllowed = "move");
+ 		},
+ 		rowDragStart(e) {
+-			if (r.state === void 0 || r.state.rowIndex === void 0) throw Error("Attempted to drag table row, but no table block was hovered prior.");
++			if (r === void 0 || r.state === void 0 || r.state.rowIndex === void 0 || r.tablePos === void 0) {
++				r?.hideHandles({ resetCell: !0, resetDragging: !0 });
++				return;
++			}
+ 			r.state.draggingState = {
+ 				draggedCellOrientation: "row",
+ 				originalIndex: r.state.rowIndex,
+@@ -1741,7 +1784,10 @@ var ln = class {
+ 			})), !t.headless && (K(t.prosemirrorView.root), e.dataTransfer.setDragImage(G, 0, 0), e.dataTransfer.effectAllowed = "copyMove");
+ 		},
+ 		dragEnd() {
+-			if (r.state === void 0) throw Error("Attempted to drag table row, but no table block was hovered prior.");
++			if (r === void 0 || r.state === void 0) {
++				!t.headless && on(t.prosemirrorView.root);
++				return;
++			}
+ 			r.state.draggingState = void 0, r.emitUpdate(), t.transact((e) => e.setMeta(J, null)), !t.headless && on(t.prosemirrorView.root);
+ 		},
+ 		freezeHandles() {
+@@ -1762,11 +1808,17 @@ var ln = class {
+ 		setCellSelection(e, t, n = t) {
+ 			if (!r) throw Error("Table handles view not initialized");
+ 			let i = r.getTablePos(e.doc);
+-			if (i === void 0) throw Error("Attempted to select table cells, but the hovered table is no longer in the document.");
+-			let a = e.doc.resolve(i + 1), o = e.doc.resolve(a.posAtIndex(t.row) + 1), s = e.doc.resolve(o.posAtIndex(t.col)), c = e.doc.resolve(a.posAtIndex(n.row) + 1), l = e.doc.resolve(c.posAtIndex(n.col)), u = e.tr;
++			if (i === void 0) return;
++			let s = __rhizomeResolveCell(e, i, t), l = __rhizomeResolveCell(e, i, n);
++			if (!s || !l) return;
++			let u = e.tr;
+ 			return u.setSelection(new he(s, l)), e.apply(u);
+ 		},
+ 		addRowOrColumn(e, n) {
++			if (!r || !__rhizomeValidIndex(r.tablePos) || !__rhizomeValidIndex(e)) {
++				r?.hideHandles({ resetCell: !0 });
++				return;
++			}
+ 			t.exec((t, r) => {
+ 				let i = this.setCellSelection(t, n.orientation === "row" ? {
+ 					row: e,
+@@ -1775,6 +1827,7 @@ var ln = class {
+ 					row: 0,
+ 					col: e
+ 				});
++				if (!i) return !1;
+ 				return n.orientation === "row" ? n.side === "above" ? ye(i, r) : ve(i, r) : n.side === "left" ? _e(i, r) : ge(i, r);
+ 			});
+ 		},
+@@ -1784,25 +1837,25 @@ var ln = class {
+ 					row: e,
+ 					col: 0
+ 				});
+-				return xe(r, n);
++				return r ? xe(r, n) : !1;
+ 			}) : t.exec((t, n) => {
+ 				let r = this.setCellSelection(t, {
+ 					row: 0,
+ 					col: e
+ 				});
+-				return be(r, n);
++				return r ? be(r, n) : !1;
+ 			});
+ 		},
+ 		mergeCells(e) {
+ 			return t.exec((t, n) => {
+ 				let r = e ? this.setCellSelection(t, e.relativeStartCell, e.relativeEndCell) : t;
+-				return Se(r, n);
++				return r ? Se(r, n) : !1;
+ 			});
+ 		},
+ 		splitCell(e) {
+ 			return t.exec((t, n) => {
+ 				let r = e ? this.setCellSelection(t, e) : t;
+-				return Ce(r, n);
++				return r ? Ce(r, n) : !1;
+ 			});
+ 		},
+ 		getCellSelection() {
+diff --git a/dist/src-D5w0XAHX.js b/dist/src-D5w0XAHX.js
+index 71a06e762e7c032c1660f2f623de6346081bffc0..1b0ba6f5a9a913052a77481d4647c086c2960894 100644
+--- a/dist/src-D5w0XAHX.js
++++ b/dist/src-D5w0XAHX.js
+@@ -226,7 +226,7 @@ function Ct(e, t, n, r, i) {
+ 		}
+ 	} else if (t.type.name === "text") {
+ 		let n = document.createTextNode(t.textContent);
+-		for (let r of t.marks.toReversed()) if (r.type.name in e.schema.styleSpecs) {
++		for (let r of Array.from(t.marks).reverse()) if (r.type.name in e.schema.styleSpecs) {
+ 			let t = e.schema.styleSpecs[r.type.name].implementation.render(r.attrs.stringValue, e);
+ 			t.contentDOM.appendChild(n), n = t.dom;
+ 		} else {
+diff --git a/src/api/exporters/html/util/serializeBlocksExternalHTML.ts b/src/api/exporters/html/util/serializeBlocksExternalHTML.ts
+index e2274140f72e5415e9858d6a5eb5de8ff6990d14..b58f1cf41088552ca2b7a872b9fcc4cd381ee405 100644
+--- a/src/api/exporters/html/util/serializeBlocksExternalHTML.ts
++++ b/src/api/exporters/html/util/serializeBlocksExternalHTML.ts
+@@ -138,7 +138,7 @@ export function serializeInlineContentExternalHTML<
+         node.textContent,
+       );
+       // Reverse the order of marks to maintain the correct priority.
+-      for (const mark of node.marks.toReversed()) {
++      for (const mark of Array.from(node.marks).reverse()) {
+         if (mark.type.name in editor.schema.styleSpecs) {
+           const newDom = (
+             editor.schema.styleSpecs[mark.type.name].implementation
+diff --git a/src/api/exporters/html/util/serializeBlocksInternalHTML.ts b/src/api/exporters/html/util/serializeBlocksInternalHTML.ts
+index 0f890b77abec5ec6271b1280368a0efdd1be2aa5..9f0d95e21b9758bd04fd70d7fc542d31dff58d25 100644
+--- a/src/api/exporters/html/util/serializeBlocksInternalHTML.ts
++++ b/src/api/exporters/html/util/serializeBlocksInternalHTML.ts
+@@ -97,7 +97,7 @@ export function serializeInlineContentInternalHTML<
+         node.textContent,
+       );
+       // Reverse the order of marks to maintain the correct priority.
+-      for (const mark of node.marks.toReversed()) {
++      for (const mark of Array.from(node.marks).reverse()) {
+         if (mark.type.name in editor.schema.styleSpecs) {
+           const newDom = editor.schema.styleSpecs[
+             mark.type.name
+diff --git a/src/blocks/Code/helpers/render/createCodeBlock.ts b/src/blocks/Code/helpers/render/createCodeBlock.ts
+index ed1e73edf32b259addc5c869594faf915ff8a265..9f7263038485bddfdadc40275365493b10f3cd7b 100644
+--- a/src/blocks/Code/helpers/render/createCodeBlock.ts
++++ b/src/blocks/Code/helpers/render/createCodeBlock.ts
+@@ -31,7 +31,18 @@ export const createLanguageSelect = (
+       return;
+     }
+ 
+-    editor.updateBlock(block.id, {
++    let liveBlock;
++    try {
++      liveBlock = editor.getBlock(block.id);
++    } catch {
++      return;
++    }
++
++    if (!liveBlock) {
++      return;
++    }
++
++    editor.updateBlock(liveBlock.id, {
+       props: { language: (event.target as HTMLSelectElement).value },
+     });
+   };
+diff --git a/src/blocks/ListItem/CheckListItem/block.ts b/src/blocks/ListItem/CheckListItem/block.ts
+index 6d514270bfa7aa7535d7711ff5e4984ca5750424..3cd2d5cfa0c53509c5e711a342f50f196b5c244f 100644
+--- a/src/blocks/ListItem/CheckListItem/block.ts
++++ b/src/blocks/ListItem/CheckListItem/block.ts
+@@ -87,7 +87,18 @@ export const createCheckListItemBlockSpec = createBlockSpec(
+         if (!editor.isEditable) {
+           return;
+         }
+-        editor.updateBlock(block, { props: { checked: !block.props.checked } });
++        let liveBlock;
++        try {
++          liveBlock = editor.getBlock(block.id);
++        } catch {
++          return;
++        }
++
++        if (!liveBlock) {
++          return;
++        }
++
++        editor.updateBlock(liveBlock, { props: { checked: !liveBlock.props.checked } });
+       });
+       // We use a <p> tag, because for <li> tags we'd need a <ul> element to put
+       // them in to be semantically correct, which we can't have due to the
+diff --git a/src/extensions/SideMenu/MultipleNodeSelection.ts b/src/extensions/SideMenu/MultipleNodeSelection.ts
+index cc241f0c35dce86100ee29cc1d26aa9c0c1acaee..95980bc702045cb8da7c6508e9adc4e4ff547dc3 100644
+--- a/src/extensions/SideMenu/MultipleNodeSelection.ts
++++ b/src/extensions/SideMenu/MultipleNodeSelection.ts
+@@ -86,4 +86,18 @@ export class MultipleNodeSelection extends Selection {
+   }
+ }
+ 
+-Selection.jsonID("multiple-node", MultipleNodeSelection);
++try {
++  Selection.jsonID("multiple-node", MultipleNodeSelection);
++} catch (error) {
++  const isDuplicateRegistration =
++    error instanceof RangeError &&
++    error.message === "Duplicate use of selection JSON ID multiple-node";
++
++  if (!isDuplicateRegistration) {
++    throw error;
++  }
++
++  Object.defineProperty(MultipleNodeSelection.prototype, "jsonID", {
++    value: "multiple-node",
++  });
++}
+diff --git a/src/extensions/SideMenu/SideMenu.ts b/src/extensions/SideMenu/SideMenu.ts
+index 112803b95d75badaf494ac437ff86f7fb639e93d..c40c95709215f14929abc70a48f9fb663609b4b2 100644
+--- a/src/extensions/SideMenu/SideMenu.ts
++++ b/src/extensions/SideMenu/SideMenu.ts
+@@ -193,6 +193,15 @@ export class SideMenuView<
+     this.emitUpdate(this.state);
+   };
+ 
++  private hideMenu = () => {
++    if (!this.state?.show) {
++      return;
++    }
++
++    this.state.show = false;
++    this.updateState(this.state);
++  };
++
+   updateStateFromMousePos = () => {
+     if (this.menuFrozen || !this.mousePos) {
+       return;
+@@ -207,10 +216,7 @@ export class SideMenuView<
+       closestEditor?.element !== this.pmView.dom ||
+       closestEditor.distance > DISTANCE_TO_CONSIDER_EDITOR_BOUNDS
+     ) {
+-      if (this.state?.show) {
+-        this.state.show = false;
+-        this.updateState(this.state);
+-      }
++      this.hideMenu();
+       return;
+     }
+ 
+@@ -218,11 +224,7 @@ export class SideMenuView<
+ 
+     // Closes the menu if the mouse cursor is beyond the editor vertically.
+     if (!block || !this.editor.isEditable) {
+-      if (this.state?.show) {
+-        this.state.show = false;
+-        this.updateState(this.state);
+-      }
+-
++      this.hideMenu();
+       return;
+     }
+ 
+@@ -236,6 +238,15 @@ export class SideMenuView<
+     }
+ 
+     this.hoveredBlock = block.node;
++    const hoveredBlockId = this.hoveredBlock.getAttribute("data-id");
++    const hoveredEditorBlock = hoveredBlockId
++      ? this.editor.getBlock(hoveredBlockId)
++      : undefined;
++
++    if (!hoveredEditorBlock) {
++      this.hideMenu();
++      return;
++    }
+ 
+     // Shows or updates elements.
+     if (this.editor.isEditable) {
+diff --git a/src/extensions/SuggestionMenu/SuggestionMenu.ts b/src/extensions/SuggestionMenu/SuggestionMenu.ts
+index 62d01c77a68fad2aa0d3afac2db9c9b983c8bb7c..e62c49f93c1226c9817c882a5bdd8ea39ed43988 100644
+--- a/src/extensions/SuggestionMenu/SuggestionMenu.ts
++++ b/src/extensions/SuggestionMenu/SuggestionMenu.ts
+@@ -32,7 +32,7 @@ class SuggestionMenuView {
+ 
+     this.emitUpdate = (menuName: string) => {
+       if (!this.state) {
+-        throw new Error("Attempting to update uninitialized suggestions menu");
++        return;
+       }
+ 
+       emitUpdate(menuName, {
+@@ -64,6 +64,15 @@ class SuggestionMenuView {
+     }
+   };
+ 
++  private hideMenu = (menuName: string) => {
++    if (!this.state) {
++      return;
++    }
++
++    this.state.show = false;
++    this.emitUpdate(menuName);
++  };
++
+   update(view: EditorView, prevState: EditorState) {
+     const prev: SuggestionPluginState =
+       suggestionMenuPluginKey.getState(prevState);
+@@ -84,11 +93,7 @@ class SuggestionMenuView {
+     this.pluginState = stopped ? prev : next;
+ 
+     if (stopped || !this.editor.isEditable) {
+-      if (this.state) {
+-        this.state.show = false;
+-      }
+-      this.emitUpdate(this.pluginState!.triggerCharacter);
+-
++      this.hideMenu(this.pluginState!.triggerCharacter);
+       return;
+     }
+ 
+@@ -96,17 +101,20 @@ class SuggestionMenuView {
+       `[data-decoration-id="${this.pluginState!.decorationId}"]`,
+     );
+ 
+-    if (this.editor.isEditable && decorationNode) {
+-      this.state = {
+-        show: true,
+-        referencePos: decorationNode
+-          .getBoundingClientRect()
+-          .toJSON() as DOMRect,
+-        query: this.pluginState!.query,
+-      };
+-
+-      this.emitUpdate(this.pluginState!.triggerCharacter!);
++    if (!decorationNode) {
++      this.hideMenu(this.pluginState!.triggerCharacter!);
++      return;
+     }
++
++    this.state = {
++      show: true,
++      referencePos: decorationNode
++        .getBoundingClientRect()
++        .toJSON() as DOMRect,
++      query: this.pluginState!.query,
++    };
++
++    this.emitUpdate(this.pluginState!.triggerCharacter!);
+   }
+ 
+   destroy() {
+diff --git a/src/extensions/TableHandles/TableHandles.ts b/src/extensions/TableHandles/TableHandles.ts
+index bb396fbdd7a90374fe2bc2dd43abcc540b91b6a3..ff3abc67cb454f6b397ca37fefa0139386c0efd4 100644
+--- a/src/extensions/TableHandles/TableHandles.ts
++++ b/src/extensions/TableHandles/TableHandles.ts
+@@ -101,6 +101,46 @@ function getChildIndex(node: Element) {
+   return Array.prototype.indexOf.call(node.parentElement!.childNodes, node);
+ }
+ 
++function isValidTablePosition(tablePos: number | undefined): tablePos is number {
++  return Number.isInteger(tablePos) && tablePos >= 0;
++}
++
++function isValidCellIndex(index: number | undefined): index is number {
++  return Number.isInteger(index) && index >= 0;
++}
++
++function isValidRelativeCell(cell: RelativeCellIndices) {
++  return isValidCellIndex(cell.row) && isValidCellIndex(cell.col);
++}
++
++function resolveCellPosition(
++  state: EditorState,
++  tablePos: number | undefined,
++  relativeCell: RelativeCellIndices,
++) {
++  if (!isValidTablePosition(tablePos) || !isValidRelativeCell(relativeCell)) {
++    return undefined;
++  }
++
++  try {
++    const tableResolvedPos = state.doc.resolve(tablePos + 1);
++    if (relativeCell.row >= tableResolvedPos.node().childCount) {
++      return undefined;
++    }
++
++    const rowResolvedPos = state.doc.resolve(
++      tableResolvedPos.posAtIndex(relativeCell.row) + 1,
++    );
++    if (relativeCell.col >= rowResolvedPos.node().childCount) {
++      return undefined;
++    }
++
++    return state.doc.resolve(rowResolvedPos.posAtIndex(relativeCell.col));
++  } catch {
++    return undefined;
++  }
++}
++
+ // Finds the DOM element corresponding to the table cell that the target element
+ // is currently in. If the target element is not in a table cell, returns null.
+ function domCellAround(target: Element) {
+@@ -185,19 +225,34 @@ export class TableHandlesView implements PluginView {
+     );
+   }
+ 
+-  viewMousedownHandler = () => {
+-    this.mouseState = "down";
+-  };
++  hideHandles = ({
++    resetCell = false,
++    resetDragging = false,
++  } = {}) => {
++    if (!this.state) {
++      return;
++    }
+ 
+-  // Hides the handles if they're currently shown. Used whenever the mouse moves
+-  // somewhere that shouldn't have table handles attached to it.
+-  hideHandles = () => {
+-    if (this.state?.show) {
+-      this.state.show = false;
+-      this.state.showAddOrRemoveRowsButton = false;
+-      this.state.showAddOrRemoveColumnsButton = false;
+-      this.emitUpdate();
++    if (!this.state.show && !resetCell && !resetDragging) {
++      return;
+     }
++
++    this.state.show = false;
++    this.state.showAddOrRemoveRowsButton = false;
++    this.state.showAddOrRemoveColumnsButton = false;
++    if (resetDragging) {
++      this.state.draggingState = undefined;
++    }
++    if (resetCell) {
++      this.state.rowIndex = undefined;
++      this.state.colIndex = undefined;
++      this.state.referencePosCell = undefined;
++    }
++    this.emitUpdate();
++  };
++
++  viewMousedownHandler = () => {
++    this.mouseState = "down";
+   };
+ 
+   mouseUpHandler = (event: MouseEvent) => {
+@@ -251,10 +306,18 @@ export class TableHandlesView implements PluginView {
+       return;
+     }
+ 
+-    const { pmNodeInfo, doc } = this.editor.transact((tr) => ({
+-      pmNodeInfo: getNodeById(blockEl.id, tr.doc),
+-      doc: tr.doc,
+-    }));
++    let lookup: { pmNodeInfo: ReturnType<typeof getNodeById>; doc: typeof this.pmView.state.doc };
++    try {
++      lookup = this.editor.transact((tr) => ({
++        pmNodeInfo: getNodeById(blockEl.id, tr.doc),
++        doc: tr.doc,
++      }));
++    } catch {
++      // The table DOM can outlive its block while a note reload is settling.
++      this.hideHandles({ resetCell: true, resetDragging: true });
++      return;
++    }
++    const { pmNodeInfo, doc } = lookup;
+ 
+     // The hovered cell may belong to a document other than this editor's, as a
+     // custom block can embed a nested editor which itself contains a table. The
+@@ -461,9 +524,9 @@ export class TableHandlesView implements PluginView {
+       this.state.rowIndex === undefined ||
+       this.state.colIndex === undefined
+     ) {
+-      throw new Error(
+-        "Attempted to drop table row or column, but no table block was hovered prior.",
+-      );
++      event.preventDefault();
++      this.hideHandles({ resetCell: true, resetDragging: true });
++      return false;
+     }
+ 
+     event.preventDefault();
+@@ -554,6 +617,10 @@ export class TableHandlesView implements PluginView {
+     }
+ 
+     // Hide handles if the table block has been removed.
++    if (!this.state.block) {
++      this.hideHandles({ resetCell: true, resetDragging: true });
++      return;
++    }
+     const refreshedBlock = this.editor.getBlock(this.state.block.id);
+     if (
+       !refreshedBlock ||
+@@ -598,9 +665,8 @@ export class TableHandlesView implements PluginView {
+     const tableBody = this.tableElement!.querySelector("tbody");
+ 
+     if (!tableBody) {
+-      throw new Error(
+-        "Table block does not contain a 'tbody' HTML element. This should never happen.",
+-      );
++      this.hideHandles({ resetCell: true });
++      return;
+     }
+ 
+     if (
+@@ -831,11 +897,11 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+       if (
+         view === undefined ||
+         view.state === undefined ||
+-        view.state.colIndex === undefined
++        view.state.colIndex === undefined ||
++        view.tablePos === undefined
+       ) {
+-        throw new Error(
+-          "Attempted to drag table column, but no table block was hovered prior.",
+-        );
++        view?.hideHandles({ resetCell: true, resetDragging: true });
++        return;
+       }
+ 
+       view.state.draggingState = {
+@@ -872,26 +938,30 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+       dataTransfer: DataTransfer | null;
+       clientY: number;
+     }) {
+-      if (view!.state === undefined || view!.state.rowIndex === undefined) {
+-        throw new Error(
+-          "Attempted to drag table row, but no table block was hovered prior.",
+-        );
++      if (
++        view === undefined ||
++        view.state === undefined ||
++        view.state.rowIndex === undefined ||
++        view.tablePos === undefined
++      ) {
++        view?.hideHandles({ resetCell: true, resetDragging: true });
++        return;
+       }
+ 
+-      view!.state.draggingState = {
++      view.state.draggingState = {
+         draggedCellOrientation: "row",
+-        originalIndex: view!.state.rowIndex,
++        originalIndex: view.state.rowIndex,
+         mousePos: event.clientY,
+       };
+-      view!.emitUpdate();
++      view.emitUpdate();
+ 
+       editor.transact((tr) =>
+         tr.setMeta(tableHandlesPluginKey, {
+           draggedCellOrientation:
+-            view!.state!.draggingState!.draggedCellOrientation,
+-          originalIndex: view!.state!.rowIndex,
+-          newIndex: view!.state!.rowIndex,
+-          tablePos: view!.tablePos,
++            view.state!.draggingState!.draggedCellOrientation,
++          originalIndex: view.state!.rowIndex,
++          newIndex: view.state!.rowIndex,
++          tablePos: view.tablePos,
+         }),
+       );
+ 
+@@ -909,14 +979,15 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+      * used as the row drag handle, and the one used as the column drag handle.
+      */
+     dragEnd() {
+-      if (view!.state === undefined) {
+-        throw new Error(
+-          "Attempted to drag table row, but no table block was hovered prior.",
+-        );
++      if (view === undefined || view.state === undefined) {
++        if (!editor.headless) {
++          unsetHiddenDragImage(editor.prosemirrorView.root);
++        }
++        return;
+       }
+ 
+-      view!.state.draggingState = undefined;
+-      view!.emitUpdate();
++      view.state.draggingState = undefined;
++      view.emitUpdate();
+ 
+       editor.transact((tr) => tr.setMeta(tableHandlesPluginKey, null));
+ 
+@@ -990,27 +1061,25 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+       const tablePos = view.getTablePos(state.doc);
+ 
+       if (tablePos === undefined) {
+-        throw new Error(
+-          "Attempted to select table cells, but the hovered table is no longer in the document.",
+-        );
++        // The hovered table left the document while a menu stayed open.
++        return undefined;
+       }
+ 
+-      const tableResolvedPos = state.doc.resolve(tablePos + 1);
+-      const startRowResolvedPos = state.doc.resolve(
+-        tableResolvedPos.posAtIndex(relativeStartCell.row) + 1,
+-      );
+-      const startCellResolvedPos = state.doc.resolve(
+-        // No need for +1, since CellSelection expects the position before the cell
+-        startRowResolvedPos.posAtIndex(relativeStartCell.col),
++      const startCellResolvedPos = resolveCellPosition(
++        state,
++        tablePos,
++        relativeStartCell,
+       );
+-      const endRowResolvedPos = state.doc.resolve(
+-        tableResolvedPos.posAtIndex(relativeEndCell.row) + 1,
+-      );
+-      const endCellResolvedPos = state.doc.resolve(
+-        // No need for +1, since CellSelection expects the position before the cell
+-        endRowResolvedPos.posAtIndex(relativeEndCell.col),
++      const endCellResolvedPos = resolveCellPosition(
++        state,
++        tablePos,
++        relativeEndCell,
+       );
+ 
++      if (!startCellResolvedPos || !endCellResolvedPos) {
++        return undefined;
++      }
++
+       // Begin a new transaction to set the selection
+       const tr = state.tr;
+ 
+@@ -1032,6 +1101,15 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+         | { orientation: "row"; side: "above" | "below" }
+         | { orientation: "column"; side: "left" | "right" },
+     ) {
++      if (
++        !view ||
++        !isValidTablePosition(view.tablePos) ||
++        !isValidCellIndex(index)
++      ) {
++        view?.hideHandles({ resetCell: true });
++        return;
++      }
++
+       editor.exec((beforeState, dispatch) => {
+         const state = this.setCellSelection(
+           beforeState,
+@@ -1040,6 +1118,11 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+             : { row: 0, col: index },
+         );
+ 
++        if (!state) {
++          view?.hideHandles({ resetCell: true });
++          return false;
++        }
++
+         if (direction.orientation === "row") {
+           if (direction.side === "above") {
+             return addRowBefore(state, dispatch);
+@@ -1063,12 +1146,19 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+       index: RelativeCellIndices["row"],
+       direction: "row" | "column",
+     ) {
++      if (!isValidCellIndex(index)) {
++        return false;
++      }
++
+       if (direction === "row") {
+         return editor.exec((beforeState, dispatch) => {
+           const state = this.setCellSelection(beforeState, {
+             row: index,
+             col: 0,
+           });
++          if (!state) {
++            return false;
++          }
+           return deleteRow(state, dispatch);
+         });
+       } else {
+@@ -1077,6 +1167,9 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+             row: 0,
+             col: index,
+           });
++          if (!state) {
++            return false;
++          }
+           return deleteColumn(state, dispatch);
+         });
+       }
+@@ -1098,6 +1191,10 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+             )
+           : beforeState;
+ 
++        if (!state) {
++          return false;
++        }
++
+         return mergeCells(state, dispatch);
+       });
+     },
+@@ -1112,6 +1209,10 @@ export const TableHandlesExtension = createExtension(({ editor }) => {
+           ? this.setCellSelection(beforeState, relativeCellToSplit)
+           : beforeState;
+ 
++        if (!state) {
++          return false;
++        }
++
+         return splitCell(state, dispatch);
+       });
+     },

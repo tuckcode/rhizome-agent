@@ -50,4 +50,5 @@ overrides:
 
 patchedDependencies:
   '@blocknote/code-block@0.55.0': patches/@blocknote__code-block@0.55.0.patch
+  '@blocknote/core@0.55.0': patches/@blocknote__core@0.55.0.patch
   prosemirror-tables@1.8.5: patches/prosemirror-tables@1.8.5.patch
