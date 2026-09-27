@@ -45,24 +45,22 @@ describe('CommandRail', () => {
 })
 
 /**
- * The 2026-08-20 audit expanded the rail because an icon-only launcher hid
- * its available places. Atticus later chose a compact default: familiar
- * icons save room, while a readable hover label says what each one is and an
- * explicit expand action reveals the persistent Sessions area.
+ * First launch opens the sessions list. A saved collapse still wins after that.
  */
 describe('the rail puts sessions in its open middle', () => {
   beforeEach(() => {
     localStorage.clear()
+    localStorage.setItem(APP_STORAGE_KEYS.commandRailExpanded, '0')
   })
 
-  it('starts compact with Settings discoverable by its accessible label', () => {
+  it('starts expanded when nothing is saved, and does not write that choice yet', () => {
+    localStorage.removeItem(APP_STORAGE_KEYS.commandRailExpanded)
     renderRail()
 
-    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'false')
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'true')
+    expect(screen.getByTestId('command-rail-sessions')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Chat' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Research' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Changes' })).not.toBeInTheDocument()
+    expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).toBeNull()
   })
 
   it('expands to mount Sessions above Settings', async () => {
@@ -75,7 +73,7 @@ describe('the rail puts sessions in its open middle', () => {
     expect(sessions.parentElement).toHaveClass('overflow-hidden')
     expect(screen.getByTestId('command-rail-footer')).toHaveClass('z-10')
     expect(onSessionsSlotReady).toHaveBeenCalledWith(sessions)
-    expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).toBeNull()
+    expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).toBe('0')
   })
 
   it('keeps Settings as a gear when the rail is expanded, pin on the left', async () => {
@@ -188,6 +186,7 @@ describe('the rail puts sessions in its open middle', () => {
 describe('the compact rail has a keyboard path to Sessions', () => {
   beforeEach(() => {
     localStorage.clear()
+    localStorage.setItem(APP_STORAGE_KEYS.commandRailExpanded, '0')
   })
 
   it('offers Expand sidebar in the compact tab order', () => {
@@ -225,7 +224,7 @@ describe('the compact rail has a keyboard path to Sessions', () => {
     const sessions = await screen.findByTestId('command-rail-sessions')
     expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'true')
     expect(onSessionsSlotReady).toHaveBeenCalledWith(sessions)
-    expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).toBeNull()
+    expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailExpanded)).toBe('0')
     expect(localStorage.getItem(APP_STORAGE_KEYS.commandRailCompactLocked)).toBeNull()
   })
 
@@ -250,6 +249,7 @@ describe('the compact rail has a keyboard path to Sessions', () => {
 describe('a hover-expanded rail does not steal Chat clicks', () => {
   beforeEach(() => {
     localStorage.clear()
+    localStorage.setItem(APP_STORAGE_KEYS.commandRailExpanded, '0')
   })
 
   it('turns off pointer events on the overlay so Chat under it stays clickable', async () => {
@@ -354,6 +354,7 @@ describe('a hover-expanded rail does not steal Chat clicks', () => {
 describe('the Sessions drawer in a narrow window', () => {
   beforeEach(() => {
     localStorage.clear()
+    localStorage.setItem(APP_STORAGE_KEYS.commandRailExpanded, '0')
   })
 
   function openDrawer(overrides: Partial<React.ComponentProps<typeof CommandRail>> = {}) {

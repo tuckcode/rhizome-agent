@@ -565,7 +565,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const [connectionsRequest, setConnectionsRequest] = useState<ConnectionsViewRequest | null>(null)
   // Note sits on top of Chat by default. Side-by-side reuses width.
   // Bounds leave a usable note and a usable composer in both layouts.
-  const [railPinned, setRailPinned] = useState(() => readStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, false))
+  const [railPinned, setRailPinned] = useState(() => readStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, true))
   const [reportedRailWidth, setReportedRailWidth] = useState(COMMAND_RAIL_WIDTH_PX)
   const handleRailPinned = useCallback((pinned: boolean) => {
     setRailPinned(pinned)

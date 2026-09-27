@@ -135,7 +135,7 @@ export function CommandRail({
 }: CommandRailProps) {
   const t = createTranslator(locale)
   const [storedPinned, setPinnedExpanded] = useState(() =>
-    readStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, false),
+    readStoredBooleanPreference(APP_STORAGE_KEYS.commandRailExpanded, true),
   )
   const [compactLocked, setCompactLocked] = useState(() =>
     readStoredBooleanPreference(APP_STORAGE_KEYS.commandRailCompactLocked, false),
