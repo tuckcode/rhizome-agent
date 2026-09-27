@@ -19,10 +19,14 @@ import { writeClipboardText } from '../utils/clipboardText'
  * here — Prime's daemon exposes no auth command — but it can show who is
  * connected and hand the user the one terminal command that starts sign-in.
  *
- * API-key hosts (DeepSeek) and custom OpenAI-compatible hosts (Nous Portal)
- * use the same Terminal handoff for *keys*: copy a command, never write
- * Prime's auth.json from the desktop. Nous models themselves are merged into
- * Prime's `models.json` when the user clicks Add to Chat list.
+ * Prime Inference is the model backend: one API key, OpenAI-compatible, for
+ * Claude, Grok, DeepSeek, Qwen, and the rest. Per-provider OAuth stays
+ * available, and it is not the path we lead with.
+ *
+ * API-key hosts and custom OpenAI-compatible hosts (Nous Portal) use the same
+ * Terminal handoff for keys: copy a command, never write Prime's auth.json
+ * from the desktop. Nous models themselves are merged into Prime's
+ * `models.json` when the user clicks Add to Chat list.
  */
 
 interface ProviderStatus {
@@ -40,6 +44,7 @@ interface PrimeProviderStatusSectionProps {
 
 /** Always-visible cards so missing/expired providers are not invisible. */
 const ALWAYS_SHOW_PROVIDERS: ReadonlyArray<{ name: string; authKind: string }> = [
+  { name: 'prime-inference', authKind: 'api_key' },
   { name: 'anthropic', authKind: 'oauth' },
   { name: 'xai', authKind: 'oauth' },
   { name: 'deepseek', authKind: 'api_key' },
@@ -114,7 +119,11 @@ function mergeProviderCards(
       })
     }
   }
-  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name))
+  return [...byName.values()].sort((a, b) => {
+    if (a.name === 'prime-inference') return -1
+    if (b.name === 'prime-inference') return 1
+    return a.name.localeCompare(b.name)
+  })
 }
 
 export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProps) {
@@ -267,8 +276,10 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
                     </span>
                   )}
                 </div>
-                <div className="mt-1 truncate text-xs text-muted-foreground">
-                  {authKindLabel(provider.authKind)}
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {provider.name === 'prime-inference'
+                    ? 'One API key. Claude, Grok, DeepSeek, Qwen, and more.'
+                    : authKindLabel(provider.authKind)}
                 </div>
                 {setup ? (
                   <div className="mt-2 flex flex-wrap gap-1.5">

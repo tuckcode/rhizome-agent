@@ -57,7 +57,7 @@ describe('PrimeProviderStatusSection', () => {
     ]
     render(<PrimeProviderStatusSection t={t} />)
     await waitFor(() => {
-      // Connected + always-show placeholders (xai, deepseek, nous-portal).
+      // Connected + always-show placeholders (prime-inference, xai, deepseek, nous-portal).
       expect(screen.getAllByTestId('prime-provider-row').length).toBeGreaterThanOrEqual(5)
     })
     expect(screen.getByText('Anthropic')).toBeInTheDocument()
@@ -133,7 +133,21 @@ describe('PrimeProviderStatusSection', () => {
     expect(screen.getByTestId('prime-provider-sign-in-xai')).toBeInTheDocument()
     expect(screen.getByTestId('prime-provider-sign-in-deepseek')).toBeInTheDocument()
     expect(screen.getByTestId('prime-provider-sign-in-nous-portal')).toBeInTheDocument()
+    expect(screen.getByTestId('prime-provider-sign-in-prime-inference')).toBeInTheDocument()
+    expect(screen.getByText('One API key. Claude, Grok, DeepSeek, Qwen, and more.')).toBeInTheDocument()
     expect(screen.queryByTestId('prime-provider-status-empty')).not.toBeInTheDocument()
+  })
+
+  it('copies the Prime Inference key command', async () => {
+    state.providers = []
+    render(<PrimeProviderStatusSection t={t} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('prime-provider-sign-in-prime-inference')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('prime-provider-sign-in-prime-inference'))
+    await waitFor(() => {
+      expect(writeClipboardText).toHaveBeenCalledWith('prime-agent --provider prime-inference')
+    })
   })
 
   it('copies the prime-agent login command when sign in is clicked', async () => {
