@@ -38,7 +38,8 @@ if (lines > MAX_LINES) {
 // decide whether to open it. A file without `description` costs someone the
 // whole read to find out it was irrelevant.
 for (const name of readdirSync(HANDOFF_DIR).filter((f) => f.endsWith('.md') && !f.startsWith('archive'))) {
-  const body = readFileSync(`${HANDOFF_DIR}/${name}`, 'utf8')
+  // Normalise CRLF: Windows checkouts with core.autocrlf=true get \r\n.
+  const body = readFileSync(`${HANDOFF_DIR}/${name}`, 'utf8').replace(/\r\n/g, '\n')
   if (!body.startsWith('---\n')) {
     problems.push(`${HANDOFF_DIR}/${name} has no frontmatter.`)
     continue
