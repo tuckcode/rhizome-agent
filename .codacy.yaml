@@ -1,6 +1,8 @@
 ---
 exclude_paths:
   - "coverage/**"
+  - ".worktrees/**"
+  - ".claude/worktrees/**"
   - "dist/**"
   - "e2e/**"
   - "node_modules/**"
