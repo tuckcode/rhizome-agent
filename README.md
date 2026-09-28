@@ -1,8 +1,9 @@
 # Rhizome Agent
 
-![Rhizome Agent — Your work. Your memory.](src/assets/brand/rhizome-organic-hero.png)
+[![repowise](https://api.repowise.dev/badge/wiki/tuckcode/rhizome-agent.svg)](https://repowise.dev/repo/tuckcode/rhizome-agent)
+[![Code health](https://api.repowise.dev/badge/health/tuckcode/rhizome-agent.svg)](https://repowise.dev/repo/tuckcode/rhizome-agent)
 
-https://github.com/user-attachments/assets/c373461f-1dd7-438b-ac89-0f98856be89e
+![Rhizome Agent — Your work. Your memory.](src/assets/brand/rhizome-organic-hero.png)
 
 **A harness that doesn't forget.**
 Built around [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent), with useful tools from Claude Code, Hermes Agent, and DeepSeek. The built-in vault is your memory, wiki, and second brain, beside a research panel. What you save stays as plain Markdown on your disk, where you and the agent can both read it.
@@ -48,6 +49,8 @@ To look at the interface without a live Prime session: `pnpm dev`, then http://l
 Notes live in the vault folder you opened. Chat transcripts live with Prime, under `~/.prime/agent/sessions/`.
 
 If something fails, the longer recovery page is [`docs/PUBLIC-PREVIEW.md`](docs/PUBLIC-PREVIEW.md). Ports and tests are in [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md).
+
+https://github.com/user-attachments/assets/c373461f-1dd7-438b-ac89-0f98856be89e
 
 ## Hand this to an agent
 
