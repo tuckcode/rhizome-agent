@@ -494,6 +494,15 @@ mod tests {
             .output()
             .unwrap();
 
+        // Keep checkouts byte-identical to what the tests write: a machine
+        // with `core.autocrlf=true` (common on Windows) rewrites LF to CRLF
+        // on checkout and breaks exact-content assertions.
+        git_command()
+            .args(["config", "core.autocrlf", "false"])
+            .current_dir(path)
+            .output()
+            .unwrap();
+
         dir
     }
 
@@ -517,6 +526,8 @@ mod tests {
         for cmd in &[
             &["config", "user.email", "a@test.com"][..],
             &["config", "user.name", "User A"][..],
+            // Keep checkouts byte-identical on autocrlf machines (Windows).
+            &["config", "core.autocrlf", "false"][..],
         ] {
             git_command()
                 .args(*cmd)
@@ -534,6 +545,8 @@ mod tests {
         for cmd in &[
             &["config", "user.email", "b@test.com"][..],
             &["config", "user.name", "User B"][..],
+            // Keep checkouts byte-identical on autocrlf machines (Windows).
+            &["config", "core.autocrlf", "false"][..],
         ] {
             git_command()
                 .args(*cmd)
@@ -733,19 +746,30 @@ mod tests {
 
     #[test]
     fn test_git_launch_config_prefers_login_shell_git_and_path() {
+        let shell_path = OsString::from("/opt/homebrew/bin:/usr/bin:/bin");
         let config = git_launch_config_from_parts(
             Some(OsString::from("/usr/bin:/bin")),
             Some(ShellGitConfig {
                 git_path: Some(PathBuf::from("/opt/homebrew/bin/git")),
-                path: Some(OsString::from("/opt/homebrew/bin:/usr/bin:/bin")),
+                path: Some(shell_path.clone()),
             }),
         );
 
         assert_eq!(config.program, OsString::from("/opt/homebrew/bin/git"));
-        assert_eq!(
-            config.path,
-            Some(OsString::from("/opt/homebrew/bin:/usr/bin:/bin"))
-        );
+        // Mirror `path_with_git_parent`: the shell PATH entries are kept in
+        // order and git's parent is appended once, deduped, joined with the
+        // platform separator (`std::env::join_paths`).
+        let mut expected = std::env::split_paths(&shell_path).collect::<Vec<_>>();
+        let parent = std::env::split_paths(OsStr::new("/opt/homebrew/bin/git"))
+            .next()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        if !expected.iter().any(|path| path == &parent) {
+            expected.push(parent);
+        }
+        assert_eq!(config.path, Some(std::env::join_paths(expected).unwrap()));
     }
 
     #[test]

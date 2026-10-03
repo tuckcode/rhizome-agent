@@ -626,6 +626,7 @@ pub async fn stream_prime_session(_request: serde_json::Value) -> Result<String,
 mod tests {
     use super::*;
     use crate::vault::AiGuidanceFileState;
+    use std::path::Path;
 
     // ── Prime strip commands (#9) ───────────────────────────────────────────
     //
@@ -702,14 +703,19 @@ mod tests {
 
         let normalized = normalize_agent_request(request);
 
+        // Compare as paths: the separator is the platform's (Windows uses `\`).
         assert_eq!(
-            normalized.vault_path,
-            format!("{}/Vaults/content", home.display()),
+            Path::new(&normalized.vault_path),
+            home.join("Vaults").join("content"),
             "vault_path must be tilde-expanded so spawned agents can chdir into it",
         );
         assert_eq!(
-            normalized.vault_paths,
-            vec![format!("{}/Vaults/secondary", home.display())],
+            normalized
+                .vault_paths
+                .iter()
+                .map(|path| Path::new(path).to_path_buf())
+                .collect::<Vec<_>>(),
+            vec![home.join("Vaults").join("secondary")],
             "vault_paths must be tilde-expanded so spawned agents can access every active vault",
         );
     }

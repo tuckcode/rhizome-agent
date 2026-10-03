@@ -433,6 +433,13 @@ mod tests {
         fs::write(dir.path().join("note.md"), "# Note\n").unwrap();
         let vault = vault_path(&dir);
         init_git_repo(vault.clone()).unwrap();
+        // Keep checkouts byte-identical on autocrlf machines (Windows): the
+        // discard assertion below compares exact file content.
+        crate::git::git_command()
+            .args(["config", "core.autocrlf", "false"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
         (dir, vault)
     }
 

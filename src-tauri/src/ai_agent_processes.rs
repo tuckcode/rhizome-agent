@@ -117,6 +117,8 @@ fn current_stream_id() -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    // The only test here is `#[cfg(unix)]`; the glob import is dead elsewhere.
+    #[cfg(unix)]
     use super::*;
 
     #[cfg(unix)]

@@ -182,6 +182,9 @@ pub async fn read_text_from_clipboard() -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
+    // The only test here is `#[cfg(all(desktop, unix))]`; the glob import is
+    // dead elsewhere.
+    #[cfg(all(desktop, unix))]
     use super::*;
 
     #[cfg(all(desktop, unix))]

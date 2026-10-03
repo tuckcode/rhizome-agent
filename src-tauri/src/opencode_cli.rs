@@ -35,7 +35,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    // Every test here is `#[cfg(unix)]`; the glob import is dead elsewhere.
+    #[cfg(unix)]
     use super::*;
+    // Only the Unix-gated tests use these.
+    #[cfg(unix)]
     use crate::ai_agents::AiAgentPermissionMode;
 
     #[cfg(unix)]
@@ -48,6 +52,7 @@ mod tests {
         script
     }
 
+    #[cfg(unix)] // callers are Unix-only tests
     fn request(vault_path: String) -> AgentStreamRequest {
         AgentStreamRequest {
             message: "Summarize".into(),

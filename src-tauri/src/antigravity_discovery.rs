@@ -179,8 +179,12 @@ mod tests {
     fn first_existing_path_skips_empty_and_missing_lines() {
         let dir = tempfile::tempdir().unwrap();
         let missing = dir.path().join("missing-agy");
-        let agy = dir.path().join("agy");
-        std::fs::write(&agy, "#!/bin/sh\n").unwrap();
+        // Windows `first_existing_path` requires a CLI extension, so the
+        // fixture must be one a Windows lookup would accept.
+        let agy = dir
+            .path()
+            .join(if cfg!(windows) { "agy.cmd" } else { "agy" });
+        std::fs::write(&agy, "@echo off\n").unwrap();
 
         let stdout = format!("\n{}\n{}\n", missing.display(), agy.display());
 

@@ -4142,6 +4142,9 @@ mod tests {
     }
 
     /// Stop before `ensure_host` when the scratch socket or session dir is missing.
+    /// Every caller is a `#[cfg(unix)]` live test, so the helper is gated too;
+    /// clippy otherwise counts it dead on Windows.
+    #[cfg(unix)]
     fn enter_isolated_live_test() {
         require_isolated_live_harness().expect(
             "live tests require RHIZOME_PRIME_DAEMON_SOCKET and a scratch RHIZOME_PRIME_SESSION_DIR",
