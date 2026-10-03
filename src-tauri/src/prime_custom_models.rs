@@ -4,8 +4,7 @@
 //! hosts (OpenRouter, Anthropic) are already in that list. An OpenAI-compatible
 //! host such as Nous Portal is not, until `~/.prime/agent/models.json` names it
 //! and lists model ids. Settings → Add to Chat list is that write: merge one
-//! provider, copy each record's reasoning flag and input modalities, never
-//! the API key, never `auth.json`.
+//! provider, copy each record's reasoning flag and input modalities, never the API key, never `auth.json`.
 
 use serde::Serialize;
 use serde_json::{json, Value};
