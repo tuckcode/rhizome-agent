@@ -1,7 +1,11 @@
 use std::ffi::OsStr;
+#[cfg(unix)]
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
+#[cfg(unix)]
+use std::process::Stdio;
 
+#[cfg(any(unix, test))]
 const OUTPUT_PREFIX: &str = "__RHIZOME_ENV__:";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -143,6 +147,7 @@ fn shell_probe_script(shell: &Path, names: &[EnvName<'_>]) -> String {
     )
 }
 
+#[cfg(unix)]
 fn joined_names(names: &[EnvName<'_>]) -> String {
     names
         .iter()
@@ -166,10 +171,13 @@ fn rc_source_command(shell: &Path) -> &'static str {
     ""
 }
 
+#[cfg(any(unix, test))]
 struct ProbeOutput<'a>(&'a str);
 
+#[cfg(any(unix, test))]
 struct ProbeLine<'a>(&'a str);
 
+#[cfg(any(unix, test))]
 fn parse_probe_output(stdout: &str, names: &[EnvName<'_>]) -> Vec<EnvBinding> {
     ProbeOutput(stdout)
         .0
@@ -178,6 +186,7 @@ fn parse_probe_output(stdout: &str, names: &[EnvName<'_>]) -> Vec<EnvBinding> {
         .collect()
 }
 
+#[cfg(any(unix, test))]
 fn parse_probe_line(line: ProbeLine<'_>, names: &[EnvName<'_>]) -> Option<EnvBinding> {
     let (name, value) = line.0.strip_prefix(OUTPUT_PREFIX)?.split_once('=')?;
     let name = EnvName::new(name)?;
