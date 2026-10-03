@@ -67,7 +67,7 @@ longer open the way the ADR text still sounds.
 |---|---|
 | ⌘1 / ⌘2 / ⌘3 / ⌘4 | **Settled 2026-09-19 (ADR-0173).** ⌘1 Chat. ⌘2 Notes. ⌘3 Workbench. ⌘4 Read. Reset layout returns to Chat and default widths. Stored `viewMode` values remain compatibility mirrors (`editor-only` / `editor-list` / `all`). Fresh vaults default to Chat. Inbox stays the folder. Source only until rebuild; packaged app is still **`35f217f`**. |
 | Right panel | **Settled 2026-08-25, refined 2026-09-12.** One Notes panel. Compact nav above the selected list. Rail control is **Notes** (Inbox is a folder in the list). Shut Notes leaves a 46px restore rail. No Inbox/Notes tabs, no second right column. |
-| Canvas destinations | **Corrected 2026-09-07.** Chat stays the centre. Graph/Mycelium are a Changes-only cell under Notes (ADR-0171), not a place you go instead of chatting (`App.layout-edges.test.ts` 14:33). Research is still a centre pane (Chat `display: none`, not an overlay). #39 (graph as an *agent tool*) is still open. |
+| Canvas destinations | **Corrected 2026-09-07.** Chat stays the centre. Graph/Mycelium are a Changes-only cell under Notes (ADR-0171), not a place you go instead of chatting (`App.layout-edges.test.ts` 14:33). Research is still a centre pane (Chat `display: none`, not an overlay). #39 agent tool: `rhizome_graph_summary` still exists and now answers from the in-repo graph (`rhizome_graph_health` / `vault::graph`). GitHub #39 may still be open. |
 | Open note vs Chat | **Shipped 2026-09-12.** Notes header **On top / Beside**. Beside folds Sessions/Notes. Hover must not collapse the note. Highlight → Copy, or **Ask Chat about this** (same thread; `App.layout-edges.test.ts` 14:00). Right-click a list row → **Ask the agent about this note** keeps Chat and opens that note (`App.test.tsx` 13:50). Note lock is ephemeral and per-note — locked notes are read-only (`EditorContentLayout.test.tsx` 13:51). Not vault `editor_mode`. |
 | Latest reply | Green start marker on the newest assistant turn. Moves when a newer reply starts. |
 | Session click | Transcript **clears on the click**, then rehydrates. Leaving the old chat up is the switch beachball. |
@@ -126,8 +126,12 @@ unless a row below is the task.
   When this column is the top band (no Prime subhead), the header clears
   the traffic lights and is a `useDragRegion` drag surface
   (`PrimeSessionList.test.tsx` / `AiPanel.test.tsx`). Native drag NOT RUN.
-- Filter matches **title / cwd / git branch**, not transcript. Archived
-  rows included; a hit expands that section. **#34 closed.**
+- Sessions-rail filter matches **title / cwd / git branch**, not
+  transcript. Archived rows included; a hit expands that section.
+  **#34 closed.**
+- **App Search** also indexes Prime transcripts (`sessionTranscriptSearch`).
+  User and assistant prose only. Not `import_jsonl`. Hits render; click
+  to switch the session is **not** wired from `App.tsx`. **#23 partial.**
 - Named at creation: `Rhizome · {Mon D} · {h:mm}{a|p} · {vault} · {id-tail}`
   via `set_session_name` (clock first so quit/reopen can find the latest).
   The older `Rhizome · {vault} · {id-tail}` shape is still a replaceable
@@ -183,9 +187,10 @@ Implemented on main. **#14 / #17 / #18 closed tonight** (2026-09-13):
 | #18 | Compact / fork / model markers in the transcript |
 | (no issue) | Live RLM children from the `list` roster + `cancel_rlm_child`. That is **not** #17. |
 | (no issue) | Chat shows Prime `get_queue`; Clear → `clear_queue`. Not a local follow-up list. |
+| #41 mutate | Rewrite / Delete on one queued line when the host reports `canMutate`. Tauri `mutate_prime_queued_message` → daemon `mutate_queued_message` (`steering` / `followUp`). Hidden when `canMutate` is false. |
 
-**#41** (steer / queue path wired to nothing) is still a real gap for
-*steering*. The queue *display* is not that issue.
+**#41 leftover** is native Enter-queue / Steer evidence. The queue
+*display* and one-line mutate are source-shipped. Do not close from units.
 
 ### Memory loop (partial)
 
@@ -236,6 +241,23 @@ On main. **#11 / #22 closed** 2026-08-27. M4 restyle not started.
 **#42 closed.** Expandable “Tool use” group. `ipython` + `%%bash`
 shows the recovered command, not “ipython” five times.
 
+### Late-September source ships (Wave 3, 2026-09-27)
+
+Verified against the tree at `ff9909a`. GitHub issues may still be
+open. Packaged `/Applications` is still `d0a55f8` until a rebuild.
+
+- **C66** — one app-wide Settings profile (`agent_profile`).
+- **#36** — IANA display timezone in Settings → Vault content.
+- **#41 mutate** — Rewrite / Delete one queued line when `canMutate`.
+- **#23** — App Search lists transcript hits; click is not wired.
+- **#45** — Default model + Free-only filter.
+- **C75 rail** — Sessions list mounts 24 rows, then more on scroll.
+- **Events log** — `.rhizome/events.jsonl` rolls at 1 MiB to
+  `events.jsonl.1`.
+- **C53 leftover (b)** — worker start failure shows the reason; the
+  worker path no longer waits the 30s daemon timeout.
+- **Chat throw** — `AiWorkspace` keeps the rest of that window.
+
 ### Hardening you should not re-open
 
 - C43 / C44: mid-turn is tri-state (accepted / no longer running /
@@ -262,13 +284,19 @@ issue.** Check `main` and the handoff first.
 #31 #34 #35 #37 #38 #42 #43 #44 #47 #55, plus earlier #1–#8, #10, #12,
 #15 #16 #19 #20 #28 #30 #33.
 
-**Still OPEN (live `gh` 2026-09-14, 17 issues):**
+**Still OPEN on GitHub last checked 2026-09-14 (17 issues).** Source
+has moved since then. Check `main` before re-implementing:
+
 #5 #13 #23 #26 #32 #36 #39 #40 #41 #45 #46 #48 #50 #51 #52 #56 #57.
 
 | Still open | Honest read |
 |---|---|
 | #40 | Filter answered (ADR-0168); composition not ratified |
-| #41 | Source `onSteer` is wired. Leftover is native Enter-queue / Steer plus unspoken `mutate_queued_message`. Do not close from units. |
+| #41 | `onSteer`, follow-up Enter, queue display, and `mutate_queued_message` are spoken. Leftover is native Enter-queue / Steer evidence. Do not close from units. |
+| #23 | Transcript hits in App Search. Click-to-open is not wired. Session-list `import_jsonl` still waits for `1`. |
+| #36 | Display timezone shipped in app settings. Do not rebuild the picker. |
+| #45 | Default model, allow-list, and Free-only name filter shipped. |
+| #39 | `rhizome_graph_summary` uses the in-repo health query. |
 | #5 | Spec skeleton: [`design/prime-agent-surface.md`](design/prime-agent-surface.md) |
 | #46 | Source refuses HOME as a vault (`4416411`). Leftover is live Chat-without-vault. Do not close from units. |
 | #51 | Case 1 shipped; Case 2 deferred |
@@ -336,6 +364,13 @@ These are the ones this week added or re-proved:
 - **rustfmt** on new Tauri commands or the rust lane fails the push.
 - **Titlebar drag** — see §2. Do not “restore” `data-tauri-drag-region`.
 - **Notes nav + list exclusivity** — see §2. Do not retry it.
+- **`pnpm test:live-prime`** needs both `RHIZOME_PRIME_DAEMON_SOCKET`
+  (not the default socket) and `RHIZOME_PRIME_SESSION_DIR` (not
+  `~/.prime/agent/sessions`). Ignore comments that still say
+  `RHIZOME_TEST_DAEMON_SOCKET` are stale.
+- **Do not restore Intel macOS** on the alpha/stable matrix.
+  `x86_64-apple-darwin` dropped because `ort-sys`/fastembed has no
+  prebuilt. Alpha publishes an Apple Silicon DMG.
 - **Mycelium iframe** is Mindwalk’s UI. Restyle is M4 (JSON client),
   not CSS-on-iframe.
 - **Inverted Dock icon** is `stash@{0}`, parked. Do not pop it into
@@ -352,7 +387,8 @@ User leftover, in this order:
    then [`ASTRA_GOD_PLAN.md`](ASTRA_GOD_PLAN.md) and [`BOARD.md`](BOARD.md).
 2. **Do not** start TokenJuice, Switchyard, or harness composition.
 3. If choosing freely: **#46** (security), C64 verify, hide-on-close
-   helpers, #41 steer honesty. Do not re-close #11 / #22 / #24 / #47.
+   helpers, #41 native steer evidence, #23 click-to-open search hits.
+   Do not re-close #11 / #22 / #24 / #47.
 4. C28 / C31 whenever the push gate flakes — re-run-and-move-on is
    how they stay unfixed.
 

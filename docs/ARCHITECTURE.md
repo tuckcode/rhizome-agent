@@ -342,7 +342,7 @@ Agent main-window layout.
 - **Status bar** (30px footer): two shells, chosen by the `shell_command_rail` flag. The **legacy** shell is the pipe-separated badge strip — vault switcher, build number, and the git/MCP/graph/jobs badges from `status-bar/StatusBarBadges.tsx`. The **pill** shell collapses always-on git into a **vault·git pill** (`● <vault> · <branch> · <n>△`, green when clean / orange when dirty, behind, or in conflict) whose dropdown is the existing `VaultMenu` extended with sync/commit/history/conflict entries via its `extraActions` prop. Agent idle/working (`status-bar/AgentsPill.tsx`) sits on the composer next to thinking (`ChatHome.test.tsx` wires `<AgentsPill>` into `ChatComposerDeck` activity), reading the same `useRhizomeJobs` store the command rail's agent-avatar dot uses. Check-for-updates / build number sits next to the theme toggle on the right; Contribute and Docs live in Settings → About. In pill mode the command rail is sessions-only (Settings + pin in the footer); Research stays on the status bar, and the status bar hides only the duplicate Settings gear. The exceptional badges (offline, vault reloading, no remote, missing git, MCP) survive in both shells because they only render in abnormal states.
 - **AI workspace** (docked panel or native window): `AiWorkspace` owns the multi-chat orchestration, sidebar tabs, installed-only target picker, permission-mode picker, and dock/pop-out controls. Header/guidance chrome lives in `AiWorkspaceChrome`, edge-resize handles in `AiWorkspaceResizeHandles`, conversation metadata/settings persistence in `aiWorkspaceConversations`, and sizing/class/style helpers in `aiWorkspaceSizing`. The status-bar AI affordance opens this workspace instead of changing the default target inline. Docked workspace mode renders as a compact bounded desktop tool inside the main app; users resize the anchored panel from its left/top edges and resize the chat-list sidebar separately from the transcript area. Pop-out mode opens a dedicated undecorated transparent Tauri webview window labeled `ai-workspace` and boots the lightweight `AiWorkspaceWindowApp` route instead of the full vault shell. The chat header and sidebar header are draggable in native-window mode; closing the pop-out only closes that window, while the dock control emits a dock request back to the main window before closing the pop-out. Chat sessions reuse `AiPanelView` for transcript/composer rendering with the old panel header disabled; target and permission controls live in the composer toolbar so there is one workspace header per active chat. AI workspace cross-window localStorage, BroadcastChannel, storage-event, and subscriber-set plumbing is owned by `createCrossWindowPersistedStore`; domain stores keep only sanitization, mutation, and native persistence behavior.
 
-Panels are separated by `ResizeHandle` components that support drag-to-resize. `useLayoutPanels` clamps the sidebar, note-list, and inspector widths before applying them, keeps the side panes from flex-shrinking below their protected widths, and persists the last chosen widths in installation-local localStorage under `rhizome:layout-panels`. The chat-centered Notes panel uses the same `noteList` width (220–500px) with a 12px trailing handle that stays on the overlay in compact mode; window-width collapse (`useShellCompactLayout`) does not hide or override the drag. Mycelium's session list persists separately under `rhizome:mycelium-sessions-width` (180–420px) via `usePanelWidth`. In the Command-Rail shell, the rail starts icon-first and expands as a whole on hover, mounting `PrimeSessionList` into its open middle above Settings. Research opens from the status bar, not from this rail. Pin on the collapsed rail **keeps it as a rail** (no hover expand). Pin after hover keeps it open. Settings and Pin sit in a footer that does not start hover-expand, so both work while the rail is collapsed. Unpin returns to hover. Its right edge drag-resizes the remembered open width from 180–360px and pins the rail at drag start so it cannot collapse under the cursor. The classic shell retains the older resizable Chat sessions column.
+Panels are separated by `ResizeHandle` components that support drag-to-resize. `useLayoutPanels` clamps the sidebar, note-list, and inspector widths before applying them, keeps the side panes from flex-shrinking below their protected widths, and persists the last chosen widths in installation-local localStorage under `rhizome:layout-panels`. The chat-centered Notes panel uses the same `noteList` width (220–500px) with a 12px trailing handle that stays on the overlay in compact mode; window-width collapse (`useShellCompactLayout`) does not hide or override the drag. Mycelium's session list persists separately under `rhizome:mycelium-sessions-width` (180–420px) via `usePanelWidth`. In the Command-Rail shell, the rail starts **expanded** on first launch (`rhizome:command-rail-expanded` defaults true, 240px). A later collapse is remembered. Hover still expands an unpinned compact rail. `PrimeSessionList` mounts into the open middle above Settings. Research opens from the status bar, not from this rail. Pin on the collapsed rail **keeps it as a rail** (no hover expand). Pin after hover keeps it open. Settings and Pin sit in a footer that does not start hover-expand, so both work while the rail is collapsed. Unpin returns to hover. Its right edge drag-resizes the remembered open width from 180–360px and pins the rail at drag start so it cannot collapse under the cursor. The classic shell retains the older resizable Chat sessions column.
 
 The main Tauri window derives its minimum width from the visible panes instead of a single fixed floor. `useMainWindowSizeConstraints` treats the editor-only shell as the 480px baseline, adds the current sidebar / note-list / expanded-inspector widths on top with minimum floors, and calls the native `update_current_window_min_size` command whenever view mode, inspector visibility, or restored pane widths change. That same native command can grow the current window back out when a wider pane combination is restored, but Windows keeps grow-to-fit disabled and skips min-size mutation while fullscreen or maximized so navigation/sidebar interactions do not unfullscreen or reposition the main window. Note windows skip this path and keep their dedicated 800×700 initial sizing.
 
@@ -637,6 +637,13 @@ order, and the order is load-bearing:
 4. **Credentials** — `partitionModelsByConnection` against
    `get_connected_providers`.
 
+Settings → AI agents also has **Default model**
+(`PrimeDefaultModelSection` → `set_prime_model`) and the same Free-only
+cut as the picker (`usePrimeModelsFreeOnly`, localStorage
+`rhizome:prime-models-free-only`). The provider status list leads with
+`prime-inference`. PostHog: `prime_default_model_changed`,
+`prime_model_allow_list_changed`, `prime_models_free_only`.
+
 The curation and credential passes **separate rather than hide**: curated-out
 and unconnected models render under their own disclosure and stay selectable.
 Free only is a live catalog cut. Two states are refused
@@ -695,8 +702,11 @@ Cold launch shows `BootSplash` while the lazy `App` chunk loads
 (`src/main.tsx` — not `Suspense fallback={null}`). Setup calls
 `warm_daemon_in_background`. Idle Chat restore speaks
 `latest_prime_session_for_restore` (newest resumable session), not the
-full list. Full transcript remount and the Sessions-rail list are
-separate costs.
+full list. The Sessions rail now mounts the first 24 live/archived rows
+(`SESSION_LIST_WINDOW` in `PrimeSessionList.tsx`) and adds 24 more on
+scroll or focus of the last mounted row. Search and filter still run on
+the full list, then the window applies. Full transcript remount of
+`AiPanelMessageHistory` is still a separate cold-launch cost.
 
 `menu_bar_companion.rs` keeps a chat that leaves the running roster as
 `Done: {title}` for `FINISHED_ROW_KEEP_MS` (45s). A failed roster read
@@ -707,6 +717,32 @@ A failed “host is not running” answer is **not** cached. Settings must
 not fetch that catalog — or `get_prime_provider_status` — until the
 Agents section is opened or scrolled into view. Fetching 501 models on
 every Settings open was the pinwheel.
+
+#### Agent profile (C66)
+
+`settings.agent_profile` is one installation-wide Chat instruction block
+in app `settings.json`. It is not per-agent, not per-vault, not vault
+`AGENTS.md`, and not Prime `USER.md`. Settings → AI agents → Instructions
+edits it. `compose_agent_profile` puts the saved text **ahead of** the
+turn's other `system_prompt` (note context stays behind it). Blank is
+unset. PostHog: `agent_profile_saved` with `{ length }` only.
+
+#### Display time zone (#36)
+
+`settings.timezone` is also installation-wide. Settings → Vault content
+→ Time zone. `null` / `local` / `none` means the machine clock.
+`normalizeDisplayTimeZone` (and Rust `normalize_timezone`) drop unknown
+IANA names and numeric UTC offsets. Chat bubble clocks
+(`formatMessageClock`) and note saved/created labels
+(`formatSavedLabel`) both use `bindDisplayTimeZone`. Stored vault
+timestamps are unchanged. PostHog: `timezone_display_changed` when the
+saved zone is not local.
+
+#### Chat error boundary
+
+`AiWorkspace` wraps `AiPanelView` in `AiPanelErrorBoundary`. A bad
+status payload keeps the rest of that window. The main-shell `AiPanel`
+in `App.tsx` is not inside that boundary.
 
 Native hide/reopen live-check is still **NOT RUN**. Do not mass-kill
 Prime-spawned `mcp-server/index.js` (ADR-0163). Do not recode hide to
@@ -907,6 +943,30 @@ The `search_vault` Tauri command runs the scan in a blocking Tokio task and retu
 
 The note-list search field combines client-side scoped filtering with that same command: title, snippet, and visible-property matches resolve immediately, while backend body-content hits use `search_vault` with frontmatter excluded before adding matching paths for the currently visible workspace roots without displaying matched body text in the note row.
 
+### Session transcript search (#23)
+
+App Search (`SearchPanel`) also queries Prime session transcripts. This is
+not the Sessions-rail filter (that still matches title / cwd / git branch
+only) and it is not `import_jsonl`.
+
+- Host reads: `list_prime_session_summaries`, then
+  `read_prime_session_transcript` for each path
+  (`src/hooks/useSessionTranscriptSearch.ts`).
+- Index: `src/lib/sessionTranscriptSearch.ts`. One in-memory cache per
+  path, keyed by the list row's `mtimeMs`. A path that leaves the list
+  leaves the cache.
+- Indexed text: `kind === 'message'` with role `user` or `assistant`.
+  User text is `visibleUserText`. Assistant text is `message.text`.
+  Tool results, `agent_status`, `session_state`, and `tool_status` are
+  skipped.
+- Debounce is 600 ms (notes debounce at 300 ms so the two host reads do
+  not start on the same keystroke). Excerpt radius is 72 characters.
+- PostHog: `session_transcript_search` with `{ hit_count }`.
+- **Not wired:** `App.tsx` does not pass `onSelectSessionHit`. Hits
+  render as a list. Clicking a hit does not switch the session.
+  `openSessionTranscriptHit` exists for that switch and still does not
+  scroll the chat to the matched turn.
+
 ## Rhizome Wiki Search Index
 
 `src-tauri/src/rhizome_search/` (One Brain steps 3a/3b — see
@@ -1083,6 +1143,12 @@ instead of filing into it. Four fixes landed together:
   the single JS writer and stamps `trigger` (default `"mcp"`) plus
   `timestamp` on every record. The two runtimes can't share code, so they
   share the invariant instead — `type`, `trigger`, `timestamp`, always.
+  **Size cap (2026-09-27):** `vault_events::append` rolls the live file at
+  `EVENTS_JSONL_MAX_BYTES` (1 MiB). The live file is renamed to
+  `events.jsonl.1` (the previous `.1` is replaced) and the triggering
+  record is written to a fresh live file. One record larger than the cap
+  is still written, so the live file can exceed 1 MiB by at most one
+  record. The activity-feed reader still takes the newest 200 lines.
   **Caveat — historical records predate the guarantee:** a real 15-event log
   held five distinct shapes and 33% had no `trigger`, so any reader must
   still tolerate every shape ever written.
@@ -1837,7 +1903,7 @@ No Redux or global context. State lives in the root `App.tsx` and custom hooks:
 | `useCommitFlow` | Commit dialog state, shared manual/automatic checkpoint runner | Git commit/push orchestration |
 | `useGitRemoteStatus` | `remoteStatus`, `refreshRemoteStatus()` | On-demand remote detection for commit UI |
 | `useUnifiedSearch` | Query, results, loading state | Keyword search |
-| `useSettings` | App settings (telemetry, release channel, theme mode, UI language, date display format, auto-sync interval, Git visibility, AutoGit thresholds, default AI agent, Gitignored-content visibility, All Notes file visibility) | Persistent settings |
+| `useSettings` | App settings (telemetry, release channel, theme mode, UI language, date display format, display timezone, agent_profile, auto-sync interval, Git visibility, AutoGit thresholds, default AI agent, Gitignored-content visibility, All Notes file visibility) | Persistent settings |
 | `useVaultConfig` | Per-vault UI preferences, Git setup prompt preference, AI permission mode | Vault-specific config |
 | `appCommandDispatcher` | Manifest-backed shortcut/menu command IDs | Shared execution path for renderer and native menu commands |
 
@@ -1896,9 +1962,12 @@ push to main
       → use today's UTC date unless the latest stable-vYYYY.M.D tag already uses today
       → if stable already uses today, advance alpha to the next calendar day so semver still increases
   → build-artifacts job, via `.github/workflows/release-build-artifacts.yml`:
-      → pnpm install, stamp version, pnpm build, tauri build --target aarch64-apple-darwin --bundles app
-      → pnpm install, stamp version, pnpm build, tauri build --target x86_64-apple-darwin --bundles app
-      → upload signed Apple Silicon and Intel .app.tar.gz + .sig updater artifacts named Tolaria_<version>_macOS_Silicon and Tolaria_<version>_macOS_Intel
+      → macOS matrix is aarch64-apple-darwin only (x86_64-apple-darwin
+        dropped: ort-sys/fastembed has no Intel prebuilt)
+      → pnpm install, stamp version, pnpm build
+      → tauri build --target aarch64-apple-darwin --bundles app,dmg
+      → upload signed Apple Silicon .app.tar.gz + .sig updater artifacts
+        and Rhizome_*_macOS_Silicon.dmg
       → pnpm install, stamp version
       → tauri build --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
       → verify Linux installer and updater-signature artifacts exist
@@ -1908,8 +1977,8 @@ push to main
       → verify Windows app executable and installer Authenticode signatures when Authenticode signing ran
       → upload NSIS installer, optional MSI artifacts, and signed Windows updater bundles
   → release job:
-      → generate alpha-latest.json with darwin-aarch64, darwin-x86_64, Linux, and Windows updater URLs
-      → publish GitHub prerelease alpha-vYYYY.M.D-alpha.NNNN named Tolaria Alpha YYYY.M.D.N
+      → generate alpha-latest.json with darwin-aarch64, Linux, and Windows updater URLs
+      → publish GitHub prerelease alpha-vYYYY.M.D-alpha.NNNN named Rhizome Alpha YYYY.M.D.N
   → pages job:
       → build VitePress public docs into the GitHub Pages root
       → build static HTML release history page at /releases/
@@ -1925,9 +1994,11 @@ Stable promotions trigger `.github/workflows/release-stable.yml`:
 push stable-vYYYY.M.D tag
   → version job: validate YYYY.M.D from the tag
   → build-artifacts job, via `.github/workflows/release-build-artifacts.yml`:
-      → pnpm install, stamp version, pnpm build, tauri build --target aarch64-apple-darwin
-      → pnpm install, stamp version, pnpm build, tauri build --target x86_64-apple-darwin
-      → upload signed Apple Silicon and Intel .app.tar.gz + .sig and .dmg artifacts named Tolaria_<version>_macOS_Silicon and Tolaria_<version>_macOS_Intel
+      → same aarch64-only macOS matrix as alpha
+      → pnpm install, stamp version, pnpm build
+      → tauri build --target aarch64-apple-darwin
+      → upload signed Apple Silicon .app.tar.gz + .sig and .dmg artifacts
+        named Rhizome_<version>_macOS_Silicon
       → pnpm install, stamp version
       → tauri build --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
       → verify Linux installer and updater-signature artifacts exist
@@ -1937,8 +2008,8 @@ push stable-vYYYY.M.D tag
       → verify Windows app executable and installer Authenticode signatures when Authenticode signing ran
       → upload NSIS installer, optional MSI artifacts, and signed Windows updater bundles
   → release job:
-      → generate stable-latest.json with macOS Apple Silicon, macOS Intel, Linux, and Windows updater URLs plus platform-specific manual download URLs
-      → publish GitHub release Tolaria YYYY.M.D
+      → generate stable-latest.json with macOS Apple Silicon, Linux, and Windows updater URLs plus platform-specific manual download URLs
+      → publish GitHub release Rhizome YYYY.M.D
   → pages job:
       → build VitePress public docs into the GitHub Pages root
       → build static HTML release history page at /releases/

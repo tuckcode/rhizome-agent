@@ -363,8 +363,12 @@ diff is a gate people learn to ignore. Run it when you touch the adapter. No
 daemon is a clean skip, not a failure.
 
 Three of its five current failures state their own missing setup (a started
-session, a scheduled job, `RHIZOME_TEST_DAEMON_SOCKET`) and are not defects.
-Two are real and tracked as C56 — read the message before assuming rot.
+session, a scheduled job, or the isolated harness). The harness env vars
+are `RHIZOME_PRIME_DAEMON_SOCKET` and `RHIZOME_PRIME_SESSION_DIR` — not
+the default socket, not `~/.prime/agent/sessions`, and not the stale
+name `RHIZOME_TEST_DAEMON_SOCKET` still printed on some `#[ignore]`
+attributes. Those setup misses are not defects. Two failures are real
+and tracked as C56 — read the message before assuming rot.
 
 `pnpm test:mcp` exists because vitest's `include` is
 `src/**/*.{test,spec}.{ts,tsx}`, so nothing under `mcp-server/` was ever run

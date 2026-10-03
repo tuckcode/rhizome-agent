@@ -15,8 +15,11 @@ The [inventory](plans/2026-09-20-public-readiness-inventory.md) preserves all
 are closed.
 **Origin:** Composer 2.5 Fast · 2026-09-27 · snapshot refresh (swarm Wave 1).
 
-`origin/main` = **`5c37d28`**; local HEAD matches; nothing unpushed. Installed
+`origin/main` = **`ff9909a`**; local HEAD matches; nothing unpushed. Installed
 app = **`d0a55f8`**. Rebuild remains a separate verb from commit/push.
+Wave 3 source (timezone, chat profile, queue mutate, transcript search,
+event-log cap, live-prime isolation, Apple Silicon alpha DMG) is on
+`main`. Native QA and `/Applications` rebuild are still separate.
 
 **Origin:** Composer · Cursor · 2026-09-20 04:38.
 
@@ -83,7 +86,7 @@ Board cards: [`BOARD.md`](BOARD.md) W11.
 | Memory loop index | Index | [`design/memory-loop.md`](design/memory-loop.md) |
 | TokenJuice / Switchyard | Notes only | [`design/token-routing-and-compression.md`](design/token-routing-and-compression.md) |
 | Living-docs audit | In progress | [`plans/living-docs-audit.md`](plans/living-docs-audit.md) |
-| C66 agent profile | Agreed, not built | [`plans/c66-agent-profile.md`](plans/c66-agent-profile.md) |
+| C66 agent profile | **Shipped 2026-09-27** — app `settings.agent_profile`, one install-wide block | [`plans/c66-agent-profile.md`](plans/c66-agent-profile.md) |
 | #5 Prime surface skeleton | Structured talk | [`design/prime-agent-surface.md`](design/prime-agent-surface.md) |
 | Sessions-only rail + Research on status bar | Local `4f9b4c4`, **unpushed** | [0438](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md) |
 | Public preview install claims | Draft, not dogfooded | [`PUBLIC-PREVIEW.md`](PUBLIC-PREVIEW.md) · [inventory](plans/2026-09-20-public-readiness-inventory.md) |
@@ -94,7 +97,8 @@ Chat ↔ Prime still first. Do not replace Chat. Do not add `kanban.db`.
 Do not invent the briefing. Do not expand two big overlays at once.
 
 **Stamped 15:52:** D6 landed at `c44ee2b`. Session-list import still
-waits for **`1`**. #51 Case 2 and #36 stay parked. TokenJuice /
+waits for **`1`**. #51 Case 2 stays parked. #36 timezone shipped
+(display-only). TokenJuice /
 `kanban.db` still unbuilt. Leftover through 1530. No push. No rebuild.
 
 ---
@@ -254,7 +258,7 @@ composition doc — do not restate them here.
 | **What ⌘1/⌘2/⌘3 and "Full Layout" mean once Chat is the centre** | — | **Settled 2026-09-19 (ADR-0173).** ⌘1 Chat, ⌘2 Notes, ⌘3 Workbench, ⌘4 Read. Reset layout returns to Chat. Fresh launch is Chat. Stored `viewMode` values remain compatibility mirrors. |
 | **Does Wiki Graph replace the canvas or feed a side panel** | #39 | **Settled 2026-09-06 (ADR-0170).** Graph and Mycelium sit under Notes in the right column. They no longer replace Chat. #39 (graph as an agent tool vs a place) is still open for the *agent* interface. |
 | **Right panel composition** | — | **ADR-0170 settled the stack** (Notes heavy + Graph/Mycelium below). **ADR-0173** names the four layouts. Inbox stays the folder. Right icon rail still undecided. In `/Applications` as **`6860762`**. |
-| **C66 agent profile / instructions in Settings** | chat personality UX | **Agreed, not built 2026-09-06.** How the agent should respond, rules, for whichever agent. Not vault `AGENTS.md`, not the model picker, not tool-allowlist profiles. Awaiting: one vs per-agent; app vs vault. |
+| **C66 agent profile / instructions in Settings** | chat personality UX | **Shipped 2026-09-27.** One install-wide `agent_profile` in app settings. Not per-agent, not per-vault, not `AGENTS.md`, not the model picker, not tool allow-lists. |
 | **C67 sessions-list context menu** | session row actions | **Shipped 2026-09-06** (`a309a17`). Open / Rename / Archive·Restore / View in Mycelium / Copy path. |
 | **C68 restore note lock** | accidental edits while reading | **Shipped 2026-09-06** (`a309a17`). Default editable; breadcrumb + Cmd+K; not vault `editor_mode`. Layout lock 2026-09-14: `EditorContentLayout.test.tsx` (rich + raw read-only). |
 | **TokenJuice + Switchyard** | later stacked system; not a Rhizome organ | **Wanted 2026-08-26, not started.** Discuss/plan only. TokenJuice-shaped tool-output shrink first (Prime owns what the model sees). Switchyard-shaped model hop second (sidecar behind Prime; halfway house is `set_scoped_models`). Write-up: [`token-routing-and-compression.md`](design/token-routing-and-compression.md). Do not vendor either in this tree. |
@@ -283,7 +287,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | #22 | Mycelium: Rhizome chrome + rail overview vs This run — **closed 2026-08-27** (`5d2d34a`, skin `6377b04`; engine still Mindwalk; M4 restyle not started) |
 | #11 | Mycelium runs as an in-app sidecar embed — **closed 2026-08-27** (`5d2d34a`) |
 | #44 | Panels resizable by dragging — **closed 2026-08-29** (Chat sessions `a26eb40`, chat note pane `fe97f99`; Notes + Mycelium list resizable) |
-| #39 | Make the knowledge graph an agent tool, not a place you visit — **B** |
+| #39 | Make the knowledge graph an agent tool, not a place you visit — **source: `rhizome_graph_summary` now answers from the in-repo health query.** GitHub may still be open. |
 | #43 | Window-level navigation guard — **closed 2026-09-13** live-check (`navigation_guard.rs`) |
 | C68 | Restore note lock/view — **shipped 2026-09-06.** Default editable; breadcrumb + Cmd+K |
 
@@ -294,7 +298,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | #9 | Model and thinking level as one control on the strip — **closed 2026-08-29** (`163403f`; composer `1a1bfa9`) |
 | #35 | Verbose modifier reachable from the composer — **closed 2026-08-29** (`1a1bfa9`, one-click thinking toggle) |
 | #21 | Argument hints for commands that take arguments — **closed 2026-08-29** (`6037490`) |
-| #41 | Typing while Prime is working: steer/queue — queue **display** dogfooded 2026-09-06 (`MIDTURN_QUEUE_PROBE`). **Steer UX still the gap.** Issue **OPEN**. C43/C44 path. |
+| #41 | Typing while Prime is working: steer/queue — queue display plus Rewrite/Delete (`mutate_queued_message`) shipped in source. Leftover is **native** Enter-queue / Steer evidence. Issue **OPEN**. Do not close from units. |
 | #51 | Tab to fill in the reply you were going to type — **Case 1 in tree 2026-09-12** (`5c04828`): rules-first `completion` + Tab ghost text. Case 2 (model-backed) still deferred. Research: vault `projects/rhizome-agent/sub-agents/2026-09-01-tab-completion-ux-research.md`. **Related:** ~~C71~~ up-arrow history shipped 2026-09-06. |
 | C70 | Per-message timestamps on Chat bubbles — **RESOLVED 2026-09-06** (`3:35p` under ask). |
 | C71 | Composer up-arrow previous-prompt history — **RESOLVED 2026-09-06** (in-memory; caret at start / empty). |
@@ -306,7 +310,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | #18 | Transcript markers for actions that change what Prime remembers — **closed 2026-09-13** |
 | #31 | Name Prime sessions at creation — **closed 2026-08-26** (create-time name + rename from the list) |
 | #49 | Sessions should be named by the model, not by whatever text came first — step 2 shipped in handoff; issue may still be open for remainder |
-| #23 | Sessions are searchable knowledge, not opaque logs — also fed by **session import** plan (§1) |
+| #23 | Sessions are searchable knowledge — App Search lists transcript hits. Click-to-open is not wired. Session-list `import_jsonl` still waits for `1`. |
 | C67 | Sessions list right-click menu — **shipped 2026-09-06** |
 | #42 | Tool cards say "ipython" five times — **closed 2026-08-26** (expandable Tool use group; `%%bash` → command) |
 
@@ -333,13 +337,13 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | #52 | Menu bar should tell you when the agent is done — **partial.** Running list + tooltip shipped with #13. Leftover: [`plans/issue-52-menu-bar-done.md`](plans/issue-52-menu-bar-done.md) |
 | #53 | Failure creating the quick-note window silently costs the menu bar icon — **closed 2026-09-13** (`e469ee4`; tray and quick-note are independent) |
 | #54 | ws-bridge restarts in a loop (12× / session observed) — **closed 2026-09-13** (`f76b46c` / `unchanged` + one sync owner) |
-| #36 | Timezone setting — spec, not tonight: [`plans/issue-36-timezone-setting.md`](plans/issue-36-timezone-setting.md) |
+| #36 | Timezone setting — **source shipped 2026-09-27** (app `settings.timezone`, display-only). Spec: [`plans/issue-36-timezone-setting.md`](plans/issue-36-timezone-setting.md) |
 | #29 | Redact credentials before chat content is written to the vault — **closed 2026-08-26** (`a8f83de`) |
 
 **Models and providers**
 | | |
 |---|---|
-| #45 | Model settings: connect providers and curate the model dropdown — allow-list step shipped; remainder open |
+| #45 | Model settings — allow-list, default model (`set_prime_model`), and Free-only name filter shipped. Connect-provider remainder may still be open on GitHub. |
 | #48 | OmniRoute as a managed local gateway |
 | #46 | **Security — still open.** Local **`4416411`** refuses HOME aliases (`~/`, `$HOME/`, symlink-to-HOME). Seed / MCP / `save_vault_list` already drop HOME roots. Connect scrubs only a Rhizome-authored global `rhizome-vault`. **Leftover:** live Chat-without-vault (no global skill returns). Source lock: ChatHome still mounts with empty vault ([1456](plans/handoffs/2026-09-14-1456-cursor-grok-4-6-chat-no-vault.md)). Host status still polls with empty path ([1466](plans/handoffs/2026-09-14-1466-cursor-grok-4-6-host-no-vault.md)). Do not close from units. Do not invent a Prime sandbox. Do not change `normalize_cwd("")` — empty vault → Prime cwd `$HOME` is Chat-without-vault, not MCP scope. |
 
@@ -387,7 +391,7 @@ the backlog, not a replacement for it.
 - ~~**Correctness:** C34~~ **RESOLVED 2026-08-29** (`1509f9f`, `be85f80`)
 - ~~**Correctness:** C52~~ **RESOLVED 2026-08-30** — see HANDOFF C52-RESOLVED
 - ~~**Correctness:** C56~~ **RESOLVED 2026-08-30** — see HANDOFF C56-RESOLVED
-- **Correctness:** C40 (`rhizome_graph_summary` answers about a different graph)
+- ~~**Correctness:** C40~~ **SOURCE-FIXED 2026-09-27** — `rhizome_graph_summary` now runs the in-repo health query (`vault::graph` / `rhizome_graph_health`). Do not restore the external CLI path.
 - ~~**Health and cleanup:** C46~~ **RESOLVED 2026-08-30** — see HANDOFF
   C46-RESOLVED
 - **Health and cleanup:** ~~C21~~ **RESOLVED** (eight live residues fixed 2026-08-02; confirmed 2026-09-27). ~~C30~~ **RESOLVED** (`__rhizomeFrontendReady`). ~~**C11 / #55**~~
@@ -395,7 +399,7 @@ the backlog, not a replacement for it.
 - **Product decisions pending:** C9 (optional first-run Welcome — ties to
   session import), C10 (spotlight onboarding, spec written and unbuilt), C7
   (native QA gate for shell waves), ~~**C67**~~ / ~~**C68**~~ shipped 2026-09-06,
-  **C66** (agent profile — agreed, not built)
+  **C66** (agent profile — shipped, one install-wide block)
 
 ⚠️ **C-numbers and issue numbers collide and mean different things.** C40 is
 `rhizome_graph_summary`; issue #40 is the harness question. C34 is menu-bar
@@ -451,15 +455,16 @@ composition stays discuss-only until Atticus wants a graft.
 1. **Agent tooling path** — ~~C69 `cli-call.mjs` / graph verbs~~ shipped.
    Graph Find locked [1354](plans/handoffs/2026-09-14-1354-cursor-grok-4-6-graph-find-label.md).
    Session-list import waits for Atticus to type **`1`**.
-2. **Chat reliability** — #41 source `onSteer` is wired. Leftover is native
-   Enter-queue / Steer plus unspoken `mutate_queued_message`. Do not close
-   from units. ~~#54~~ ~~#47~~ closed. ~~C57~~ settled 2026-09-06.
+2. **Chat reliability** — #41 `onSteer`, follow-up Enter, queue display,
+   and `mutate_queued_message` are spoken. Leftover is native Enter-queue
+   / Steer evidence. Do not close from units. ~~#54~~ ~~#47~~ closed.
+   ~~C57~~ settled 2026-09-06.
 3. **Composer remainder** — #51 Case 2 (model-backed Tab). Case 1 ghost text
    shipped 2026-09-12 (`5c04828`).
    ~~Up-arrow Ask-box history~~ shipped as C71 2026-09-06.
 4. **First-run** — ~~#55~~ closed (local scaffold). C11 remote env override
-   still deferred; C9 Welcome + import offer; **C66** agent profile once
-   one-vs-per-agent and app-vs-vault are picked.
+   still deferred; C9 Welcome + import offer; **C66** agent profile
+   shipped as one install-wide block.
 5. **Harness composition (§1)** — discuss/decide when you want grafts; closing
    **#40** / confronting **#56** is paperwork, not a substitute for product UX.
    TokenJuice/Switchyard and Windows stay later.

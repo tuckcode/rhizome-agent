@@ -2,8 +2,9 @@
 
 **Origin:** Cursor Grok 4.6 · Lane I · 2026-09-20 · historical pickup block below.
 **Origin:** Composer 2.5 Fast · 2026-09-27 · header refresh for swarm Wave 1.
+**Origin:** Cursor Grok 4.6 · 2026-10-03 · Wave 3 living-docs sync.
 
-Stamped **`origin/main` = `5c37d28`**, local HEAD matches, nothing unpushed.
+Stamped **`origin/main` = `ff9909a`**, local HEAD matches, nothing unpushed.
 Installed app = **`d0a55f8`** (2026-09-26 04:21 CDT). Source after that is not in `/Applications` until rebuild.
 
 God-plan input: [`ASTRA_PACKET.md`](ASTRA_PACKET.md). Inventory:
@@ -33,7 +34,7 @@ roadmap row in the inventory is not implementation approval.
   [`2026-09-26-0425`](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md).
   The 04:21 app is `d0a55f8`. Native QA of the redesign is not done.
   Prime here is **0.9.3**. Do not downgrade it.
-- **Next:** human session titles; #41 live; Packages shortcut only if claimed.
+- **Next:** human session titles; #41 native steer evidence; #23 click-to-open search hits; Packages shortcut only if claimed.
 
 **Origin:** Composer · 2026-09-20 04:38.
 
@@ -41,7 +42,7 @@ roadmap row in the inventory is not implementation approval.
 
 ## True right now
 
-- **Git:** `origin/main` and local HEAD are **`5c37d28`**. Last packaged app build is still **`d0a55f8`**.
+- **Git:** `origin/main` and local HEAD are **`ff9909a`**. Last packaged app build is still **`d0a55f8`**.
 - **Last stamped app:** **`d0a55f8`**, **2026-09-26 04:21 CDT**,
   `/Applications/Rhizome Agent.app`. Recoverable copies:
   `~/Library/Application Support/rhizome-agent-rebuild/Rhizome-Agent-2a24eed-2026-09-21-2223.zip`

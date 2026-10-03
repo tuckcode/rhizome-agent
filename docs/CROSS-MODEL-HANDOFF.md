@@ -682,3 +682,49 @@ older briefing (including closed drafts #66–#68):
   read must not invent finishes. Do not close #52 from units.
 - **Blank window.** `main.tsx` lazy-loads `App` behind `BootSplash`.
   `Suspense fallback={null}` is the defect C75 removed. Do not restore it.
+- **Sessions rail window (2026-09-27).** `PrimeSessionList` mounts the
+  first 24 rows (`SESSION_LIST_WINDOW`) and adds 24 more on scroll or
+  focus of the last mounted row. Search/filter still run on the full
+  list. Do not remount every row to “fix” cold launch. Full transcript
+  remount is still a separate cost.
+
+## 26. Live Prime tests refuse the real session store (2026-09-27)
+
+**Origin:** Cursor Grok 4.6 · 2026-10-03 · verified against
+`prime_session_host.rs` `require_isolated_live_harness`.
+
+`pnpm test:live-prime` is isolated on purpose. The host now **refuses**
+to talk to the default daemon or to `~/.prime/agent/sessions`.
+
+Required:
+
+```bash
+export RHIZOME_PRIME_DAEMON_SOCKET=/path/to/scratch.sock   # not the default
+export RHIZOME_PRIME_SESSION_DIR=/path/to/scratch-sessions # not ~/.prime/agent/sessions
+```
+
+Either unset, empty, the default socket, or the real session dir is a
+hard error. Cleanup deletes only under the scratch dir.
+
+**Trap:** several `#[ignore]` messages and `AGENTS.md` still name
+`RHIZOME_TEST_DAEMON_SOCKET`. That variable is not read. Setting only
+that name still hits the refusal.
+
+**Sentry trap that is now stale:** older notes say Rust does not scrub
+`ghr_` / `sk_live_` / `sk_test_`. `telemetry.rs` does, as of
+`8169311`. Do not re-park that regex.
+
+## 27. Alpha macOS is Apple Silicon only — do not restore Intel
+
+**Origin:** Cursor Grok 4.6 · 2026-10-03 ·
+`.github/workflows/release-build-artifacts.yml`.
+
+The shared macOS matrix is `aarch64-apple-darwin` only.
+`x86_64-apple-darwin` was dropped because `ort-sys`/fastembed has no
+Intel prebuilt. Alpha now also uploads
+`Rhizome_*_macOS_Silicon.dmg` (`upload_macos_dmg: true`).
+
+ARCHITECTURE and ABSTRACTIONS used to list both architectures and
+`Tolaria_*_macOS_Intel` names. Those lines were wrong after `91062f7`.
+The download page still understands a `darwin-x86_64` key if an old
+manifest has one; the workflow no longer builds that artifact.

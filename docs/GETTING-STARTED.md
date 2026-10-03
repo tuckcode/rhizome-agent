@@ -549,9 +549,10 @@ Verified against source 2026-09-14. Longer landmine list:
   stays 12px.
 - **S3 leftover prefixes** in JS: `ghr_` / `ghu_` / `sk_test_` plus Slack
   `xoxa-` / `xoxr-` / `xoxs-` / `xoxe-` (`sensitiveTextRedaction.test.ts`).
-  Native Sentry also scrubs those Slack prefixes plus `hf_` / `npm_` /
-  `glpat-`. It still does not scrub `ghr_` or `sk_test_` / `sk_live_` —
-  do not widen rust this window.
+  Native Sentry `scrub_secrets` now also redacts `ghr_`, `sk_live_`, and
+  `sk_test_` (`telemetry.rs`,
+  `scrub_secrets_redacts_ghr_and_stripe_underscore_keys`). Do not revert
+  that regex.
 - **Settings and secrets writes** go through `secure_fs::write_owner_only_atomic`.
   Do not write the real app-support settings or key file in tests.
 - **Session-list import** stays blocked until Atticus types **`1`**.
@@ -564,8 +565,9 @@ Verified against source 2026-09-14. Longer landmine list:
   no vault. Live Chat-without-vault is **NOT RUN**. Do not close #46
   from units. Welcome Download words stay in `en.json` (C18).
   Chat history shows the C70 clock when a turn has `createdAtMs`.
-  Linux titlebar uses `useDragRegion`. #51 Case 2 and #36 timezone
-  stay unbuilt. D6 landed `c44ee2b`. Do not `git add -A`.
+  Linux titlebar uses `useDragRegion`. **#36 timezone shipped** —
+  Settings → Vault content, app `settings.timezone`, display-only.
+  #51 Case 2 stays unbuilt. D6 landed `c44ee2b`. Do not `git add -A`.
   Nous Portal models share the Chat picker when the
   catalog includes them. Packaged MCP stays generated/gitignored.
 - **First-run Getting Started** is a local folder scaffold (no clone)
@@ -575,6 +577,25 @@ Verified against source 2026-09-14. Longer landmine list:
   Welcome still says Download — leftover words. Do not rewrite `en.json`
   this window (C18). Local scaffold failures say **create**; git-clone
   failures (C11) still say **download** (`gettingStartedVault.test.ts`).
+- **Chat profile is one install-wide block.** Settings → AI agents →
+  Instructions writes `settings.agent_profile`. Chat prepends it to the
+  turn. Not per-agent, not per-vault, not `AGENTS.md`.
+- **App Search lists session transcript hits.** User and assistant
+  prose from Prime `.jsonl`. The Sessions-rail filter is still
+  metadata-only. Clicking a hit does not switch the session yet.
+- **Sessions rail mounts 24 rows** on cold launch (`SESSION_LIST_WINDOW`),
+  then more on scroll. Do not remount the full list to “fix” launch cost.
+- **`.rhizome/events.jsonl` rolls at 1 MiB** to `events.jsonl.1`. Do not
+  add a second rotator. The feed still reads the newest 200 lines.
+- **`pnpm test:live-prime` needs an isolated harness.** Set
+  `RHIZOME_PRIME_DAEMON_SOCKET` (not the default socket) and
+  `RHIZOME_PRIME_SESSION_DIR` (not `~/.prime/agent/sessions`). The
+  host refuses either missing or pointing at the real store. Ignore
+  comments that still say `RHIZOME_TEST_DAEMON_SOCKET` are stale.
+- **Alpha macOS is Apple Silicon only.** The shared artifact workflow
+  dropped `x86_64-apple-darwin` (`ort-sys`/fastembed). Alpha uploads
+  `Rhizome_*_macOS_Silicon.dmg`. Do not re-add Intel without a new
+  prebuilt.
 - **`pnpm typecheck` is `tsc -b`.** `npx tsc --noEmit` compiles zero files.
 - **English only.** Do not add `en.json` keys or run `pnpm l10n:translate`.
 - **ASCII mark.** Copyable fence: [`docs/design/brand/2026-09-13/README.md`](design/brand/2026-09-13/README.md) — the PNG is not selectable text.
