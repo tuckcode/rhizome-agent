@@ -48,6 +48,23 @@ Evidence: `a_parked_reader_does_not_block_writes_on_the_pipe` failed
 - `auth.json` on this machine is empty, so Chat shows only local llama.cpp
   models.
 
+## Later the same session
+
+- **Sign in (C85, ADR-0176):** Settings runs Prime's `AuthStorage` through
+  `mcp-server/prime-login.mjs`. Anthropic: browser OAuth. xAI, DeepSeek: key
+  page + pasted key. Not yet run end to end on a real account.
+- **Thinking levels:** "Add to Chat list" guessed `reasoning` from the model
+  name, so 412 of 425 Nous models (Claude Opus, GPT-5, DeepSeek V4, Grok)
+  offered only "Off". It now reads `supported_parameters` and
+  `reasoning.supported_efforts` into `reasoning` + `thinkingLevelMap`: 309
+  reason, 178 with exact levels. Takes effect when Add to Chat list is clicked
+  again. Unverified: whether Nous accepts `reasoning_effort` for models that
+  list only `reasoning` (no NOUS_API_KEY on this machine).
+- **Console windows (C84):** Prime's session worker is spawned `detached`
+  without `windowsHide`; its console is the blank "prime-agent" window.
+- **Start-menu "Rhizome" is Rhizome Desktop** (`ai.rhizome.desktop`, built
+  2026-08-08). Rhizome Agent has never been installed on this machine.
+
 ## Notes for the next Windows session
 
 - Do not set `CARGO_TARGET_DIR` inside the repo while `pnpm tauri dev` runs:
