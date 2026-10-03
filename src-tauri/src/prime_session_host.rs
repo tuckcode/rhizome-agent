@@ -888,9 +888,7 @@ fn spawn_prime_daemon(socket_path: &Path) -> Result<(), String> {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        const DETACHED_PROCESS: u32 = 0x00000008;
-        const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
-        command.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+        command.creation_flags(DAEMON_CREATION_FLAGS);
     }
     let mut child = command
         .spawn()
@@ -909,6 +907,21 @@ fn spawn_prime_daemon(socket_path: &Path) -> Result<(), String> {
     });
     Ok(())
 }
+
+/// How Windows starts Prime's daemon: its own hidden console, its own process
+/// group (so Rhizome's Ctrl+C never reaches it).
+///
+/// Not `DETACHED_PROCESS`. A daemon with no console makes Windows open a new,
+/// visible console for every ordinary child it runs — `prime-agent --version`,
+/// git, powershell — which were the "prime-agent" windows on launch (C84).
+/// A hidden console is inherited by those children instead. The console is
+/// the daemon's own, so it still outlives Rhizome.
+#[cfg(windows)]
+const DAEMON_CREATION_FLAGS: u32 = {
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP
+};
 
 fn wait_for_daemon(socket_path: &Path) -> Result<(), String> {
     let deadline = Instant::now() + DAEMON_STARTUP_TIMEOUT;
@@ -6633,6 +6646,20 @@ mod tests {
             default_daemon_socket_path().expect("a pipe path on windows"),
             PathBuf::from(r"\\.\pipe\prime-agent-daemon")
         );
+    }
+
+    /// A daemon with no console makes Windows open a visible console for
+    /// every ordinary child it starts (`prime-agent --version`, git,
+    /// powershell): the "prime-agent" windows on launch. A hidden console is
+    /// inherited by those children instead (C84).
+    #[cfg(windows)]
+    #[test]
+    fn the_daemon_starts_with_a_hidden_console_not_none() {
+        const DETACHED_PROCESS: u32 = 0x0000_0008;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+        assert_eq!(DAEMON_CREATION_FLAGS & DETACHED_PROCESS, 0);
+        assert_eq!(DAEMON_CREATION_FLAGS & CREATE_NO_WINDOW, CREATE_NO_WINDOW);
     }
 
     /// The reader thread sits in a read on one handle while commands are
