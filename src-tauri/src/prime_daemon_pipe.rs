@@ -150,14 +150,19 @@ impl Drop for Event {
     }
 }
 
-/// A one-instance pipe server for tests, standing in for the daemon.
+/// One pipe server instance for tests, standing in for the daemon.
+///
+/// Instances are unlimited so a fake daemon can serve several clients at once,
+/// as the real one does.
 #[cfg(test)]
 pub(crate) fn test_server(name: &str) -> File {
     use std::os::windows::ffi::OsStrExt;
     use std::os::windows::io::FromRawHandle;
     use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
     use windows_sys::Win32::Storage::FileSystem::PIPE_ACCESS_DUPLEX;
-    use windows_sys::Win32::System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE, PIPE_WAIT};
+    use windows_sys::Win32::System::Pipes::{
+        CreateNamedPipeW, PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, PIPE_WAIT,
+    };
 
     const PIPE_BUFFER: u32 = 4096;
 
@@ -170,7 +175,7 @@ pub(crate) fn test_server(name: &str) -> File {
             wide.as_ptr(),
             PIPE_ACCESS_DUPLEX,
             PIPE_TYPE_BYTE | PIPE_WAIT,
-            1,
+            PIPE_UNLIMITED_INSTANCES,
             PIPE_BUFFER,
             PIPE_BUFFER,
             0,

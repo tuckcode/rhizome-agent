@@ -187,3 +187,100 @@ pub(crate) fn strip_ansi_codes(input: &str) -> String {
     let re = RE.get_or_init(|| Regex::new(r"\x1b\[[0-?]*[ -/]*[@-~]").unwrap());
     re.replace_all(input, "").to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::process::Stdio;
+
+    /// A child that runs `script` under node — present wherever the test
+    /// suite runs, so this needs no shell and no per-platform script file.
+    fn node(script: &str) -> Command {
+        let mut command = Command::new("node");
+        command
+            .args(["-e", script])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        command
+    }
+
+    fn run(process: LineStreamProcess) -> (Result<String, String>, Vec<AiAgentStreamEvent>) {
+        let mut events = Vec::new();
+        let result = run_ai_agent_line_stream(
+            process,
+            |event| events.push(event),
+            |stderr, status| format!("failed ({status}): {stderr}"),
+        );
+        (result, events)
+    }
+
+    fn texts(events: &[AiAgentStreamEvent]) -> Vec<String> {
+        events
+            .iter()
+            .filter_map(|event| match event {
+                AiAgentStreamEvent::TextDelta { text } => Some(text.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn streams_each_stdout_line_without_ansi_then_finishes() {
+        let script = r#"console.log("\x1b[32mhello\x1b[0m"); console.log("world")"#;
+        let (result, events) = run(LineStreamProcess::new(node(script), "Node", "node"));
+
+        let session_id = result.expect("session id");
+        assert!(session_id.starts_with("node-"), "{session_id}");
+        assert!(matches!(
+            &events[0],
+            AiAgentStreamEvent::Init { session_id: id } if *id == session_id
+        ));
+        assert_eq!(texts(&events), vec!["hello\n", "world\n"]);
+        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
+    }
+
+    #[test]
+    fn a_failed_exit_reports_stderr_before_done() {
+        let script = r#"process.stderr.write("bad key"); process.exit(3)"#;
+        let (result, events) = run(LineStreamProcess::new(node(script), "Node", "node"));
+
+        assert!(result.is_ok());
+        let error = events.iter().find_map(|event| match event {
+            AiAgentStreamEvent::Error { message } => Some(message.clone()),
+            _ => None,
+        });
+        let error = error.expect("error event");
+        assert!(error.contains("bad key"), "{error}");
+        assert!(error.contains('3'), "{error}");
+        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
+    }
+
+    #[test]
+    fn stdin_input_reaches_the_child() {
+        let script = r#"let s = ""; process.stdin.on("data", (d) => (s += d));
+            process.stdin.on("end", () => console.log("got " + s))"#;
+        let process =
+            LineStreamProcess::new(node(script), "Node", "node").with_stdin("prompt".into());
+        let (_, events) = run(process);
+
+        assert_eq!(texts(&events), vec!["got prompt\n"]);
+    }
+
+    #[test]
+    fn a_missing_binary_is_an_error_not_a_stream() {
+        let mut command = Command::new("rhizome-no-such-binary-for-tests");
+        command.stdout(Stdio::piped());
+        let (result, events) = run(LineStreamProcess::new(command, "Ghost", "ghost"));
+
+        assert!(result.is_err());
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn diagnostic_lines_are_newline_separated() {
+        let mut output = String::new();
+        append_diagnostic_line(&mut output, "first");
+        append_diagnostic_line(&mut output, "second");
+        assert_eq!(output, "first\nsecond");
+    }
+}

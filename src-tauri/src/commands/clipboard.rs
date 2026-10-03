@@ -180,18 +180,29 @@ pub async fn read_text_from_clipboard() -> Result<String, String> {
     Err("Clipboard is not available on mobile".into())
 }
 
-#[cfg(test)]
+#[cfg(all(test, desktop))]
 mod tests {
-    // The only test here is `#[cfg(all(desktop, unix))]`; the glob import is
-    // dead elsewhere.
-    #[cfg(all(desktop, unix))]
     use super::*;
 
-    #[cfg(all(desktop, unix))]
+    /// A stand-in clipboard tool. Node runs on every platform the suite does,
+    /// so these need no shell.
+    fn node(script: &str) -> Command {
+        let mut command = Command::new("node");
+        command.args(["-e", script]);
+        command
+    }
+
+    /// Drain stdin, then run `then` — a tool that exits before reading its
+    /// input would fail the write with a broken pipe instead.
+    fn after_stdin(then: &str) -> Command {
+        node(&format!(
+            r#"process.stdin.resume(); process.stdin.on("end", () => {{ {then} }})"#
+        ))
+    }
+
     #[test]
     fn native_clipboard_write_times_out_slow_commands() {
-        let mut command = Command::new("sh");
-        command.args(["-c", "cat >/dev/null; sleep 2"]);
+        let command = after_stdin("setTimeout(() => {}, 2000)");
 
         let started = Instant::now();
         let result =
@@ -205,6 +216,53 @@ mod tests {
         assert!(
             started.elapsed() < Duration::from_secs(1),
             "clipboard timeout should return promptly"
+        );
+    }
+
+    #[test]
+    fn a_clipboard_write_succeeds_when_the_tool_exits_cleanly() {
+        assert_eq!(write_native_clipboard(after_stdin(""), "copy me"), Ok(()));
+    }
+
+    #[test]
+    fn a_failed_clipboard_write_names_the_tool_error() {
+        let command = after_stdin(r#"process.stderr.write("no display"); process.exit(1)"#);
+        assert_eq!(
+            write_native_clipboard(command, "copy me"),
+            Err("Native clipboard command failed: no display".into())
+        );
+    }
+
+    #[test]
+    fn a_silent_failure_still_says_the_clipboard_failed() {
+        assert_eq!(
+            clipboard_failure_message(b"  \n"),
+            "Native clipboard command failed"
+        );
+    }
+
+    #[test]
+    fn a_clipboard_read_returns_stdout_verbatim() {
+        let command = node(r#"process.stdout.write("pasted\ntext")"#);
+        assert_eq!(read_native_clipboard(command), Ok("pasted\ntext".into()));
+    }
+
+    #[test]
+    fn a_failed_clipboard_read_names_the_tool_error() {
+        let command = node(r#"process.stderr.write("empty"); process.exit(1)"#);
+        assert_eq!(
+            read_native_clipboard(command),
+            Err("Native clipboard command failed: empty".into())
+        );
+    }
+
+    #[test]
+    fn a_missing_clipboard_tool_is_reported() {
+        let error = read_native_clipboard(Command::new("rhizome-no-such-clipboard-tool"))
+            .expect_err("missing tool");
+        assert!(
+            error.starts_with("Failed to read native clipboard text"),
+            "{error}"
         );
     }
 }
