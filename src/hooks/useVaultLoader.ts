@@ -362,7 +362,7 @@ interface InitialVaultLoadSnapshot {
 
 interface InitialVaultLoadEffectOptions extends Omit<
   InitialVaultLoadOptions,
-  'forceReload' | 'isWorkspacePathLoaded' | 'reloadIfEmpty' | 'tracker' | 'unsaved' | 'vaults'
+  'forceReload' | 'isWorkspacePathLoaded' | 'loadIndex' | 'reloadIfEmpty' | 'tracker' | 'unsaved' | 'vaults'
 > {
   clearNewPaths: () => void
   clearUnsaved: () => void

@@ -90,8 +90,6 @@ function ComposerToolsMenu({
                 Skills · {skillsLabel}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent
-                side="right"
-                align="end"
                 className="w-56 overflow-y-auto"
                 style={{ maxHeight: '22rem' }}
                 data-testid="composer-skills-menu"
