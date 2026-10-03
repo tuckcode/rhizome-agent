@@ -363,13 +363,28 @@ pub fn test_ai_model_provider(
     Err("Direct AI model tests are not available in this mobile build yet.".into())
 }
 
+/// Run a synchronous host or shell call off the UI thread.
+///
+/// A `fn` Tauri command runs on the app main thread. `Command::output` and a
+/// Prime reply wait there turn the cursor into the pinwheel.
+async fn run_blocking<T, F>(work: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> T + Send + 'static,
+{
+    tokio::task::spawn_blocking(work)
+        .await
+        .map_err(|error| format!("Task failed: {error}"))
+}
+
 // ── Prime session host (desktop) ────────────────────────────────────────────
 // Long-lived `prime-agent --mode rpc` process. Slice 1 of the harness chat spike.
 
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn get_prime_session_host_status() -> crate::prime_session_host::PrimeHostStatus {
-    crate::prime_session_host::get_status()
+pub async fn get_prime_session_host_status(
+) -> Result<crate::prime_session_host::PrimeHostStatus, String> {
+    run_blocking(crate::prime_session_host::get_status).await
 }
 
 /// Set the attached session's reasoning level (#9).
@@ -541,7 +556,7 @@ pub fn compact_prime_session(custom_instructions: Option<String>) -> Result<Opti
 #[tauri::command]
 pub async fn ensure_prime_session_host(vault_path: String) -> Result<String, String> {
     let vault_path = expand_tilde(&vault_path).into_owned();
-    crate::prime_session_host::ensure_host(&vault_path)
+    run_blocking(move || crate::prime_session_host::ensure_host(&vault_path)).await?
 }
 
 #[cfg(desktop)]
@@ -620,6 +635,11 @@ pub fn abort_prime_session_turn() -> Result<bool, String> {
 #[tauri::command]
 pub async fn stream_prime_session(_request: serde_json::Value) -> Result<String, String> {
     Err("Prime session host is only available on desktop".into())
+}
+
+#[tauri::command]
+pub async fn speak_reply(args: crate::read_aloud::SpeakReplyArgs) -> Result<Vec<u8>, String> {
+    crate::read_aloud::speak_reply(args).await
 }
 
 #[cfg(test)]
@@ -966,8 +986,9 @@ pub fn settle_prime_session(
 /// Every model the live Prime host can switch to.
 #[cfg(desktop)]
 #[tauri::command]
-pub fn get_available_prime_models() -> Result<Vec<crate::prime_session_host::PrimeModel>, String> {
-    crate::prime_session_host::get_available_models()
+pub async fn get_available_prime_models(
+) -> Result<Vec<crate::prime_session_host::PrimeModel>, String> {
+    run_blocking(crate::prime_session_host::get_available_models).await?
 }
 
 /// Export a saved Prime session to standalone HTML, returning the file written.
@@ -1022,8 +1043,8 @@ pub fn list_prime_sessions() -> Result<Vec<crate::mycelium::PrimeSessionEntry>, 
 /// surface at all, so a provider that was never connected looked identical to
 /// one that was working. Metadata only; no key or token is read.
 #[tauri::command]
-pub fn get_prime_provider_status() -> Vec<crate::preflight::ProviderStatus> {
-    crate::preflight::provider_statuses()
+pub async fn get_prime_provider_status() -> Result<Vec<crate::preflight::ProviderStatus>, String> {
+    run_blocking(crate::preflight::provider_statuses).await
 }
 
 /// Sign Prime in to an OAuth provider in the system browser (ADR-0176).
@@ -1100,26 +1121,29 @@ pub async fn ensure_nous_portal_models(
 /// cannot: Prime publishes its full catalog regardless of auth state, so a
 /// fifth of the list can belong to a provider the user never signed into.
 #[tauri::command]
-pub fn get_connected_providers() -> Vec<String> {
-    crate::preflight::connected_providers()
+pub async fn get_connected_providers() -> Result<Vec<String>, String> {
+    run_blocking(crate::preflight::connected_providers).await
 }
 
 /// Everything the app can determine about whether a turn will work, without
 /// spending one. Cheap enough to call on vault switch and model change.
 #[tauri::command]
-pub fn preflight_chat(
+pub async fn preflight_chat(
     vault_path: Option<String>,
     provider: Option<String>,
-) -> crate::preflight::Preflight {
-    let vault_path = vault_path
-        .map(|path| expand_tilde(&path).into_owned())
-        .unwrap_or_default();
-    let connected = crate::preflight::connected_providers();
-    crate::preflight::run(
-        std::path::Path::new(&vault_path),
-        provider.as_deref().unwrap_or_default(),
-        &connected,
-    )
+) -> Result<crate::preflight::Preflight, String> {
+    run_blocking(move || {
+        let vault_path = vault_path
+            .map(|path| expand_tilde(&path).into_owned())
+            .unwrap_or_default();
+        let connected = crate::preflight::connected_providers();
+        crate::preflight::run(
+            std::path::Path::new(&vault_path),
+            provider.as_deref().unwrap_or_default(),
+            &connected,
+        )
+    })
+    .await
 }
 
 #[tauri::command]

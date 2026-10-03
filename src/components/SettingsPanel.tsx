@@ -321,6 +321,7 @@ function resolveAnonymousId(settings: Settings, draft: SettingsDraft): string | 
 
 function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Settings {
   const nextSettings = {
+    ...settings,
     auto_pull_interval_minutes: draft.pullInterval,
     git_enabled: draft.gitFeaturesEnabled,
     autogit_enabled: draft.autoGitEnabled,
@@ -534,6 +535,14 @@ function SettingsPanelInner({
     onSave({ ...settings, accent_color: value })
   }, [draft.colorTheme, draft.themeMode, onSave, settings, updateDraft])
 
+  const handleAiModelProvidersChange = useCallback((value: AiModelProvider[]) => {
+    updateDraft('aiModelProviders', value)
+    onSave({
+      ...settings,
+      ai_model_providers: value.length > 0 ? value : null,
+    })
+  }, [onSave, settings, updateDraft])
+
   const handleSave = useCallback(() => {
     trackTelemetryConsentChange(settings.analytics_enabled === true, draft.analytics)
     trackSettingsPreferenceChanges(settings, draft)
@@ -612,6 +621,7 @@ function SettingsPanelInner({
           setAccentColor={handleAccentColorChange}
           setHideGitignoredFiles={handleGitignoredVisibilityChange}
           setAllNotesFileVisibility={handleAllNotesFileVisibilityChange}
+          onAiModelProvidersChange={handleAiModelProvidersChange}
           initialSectionId={initialSectionId}
           onClose={onClose}
         />
@@ -673,6 +683,7 @@ interface SettingsBodyFromDraftProps {
   setAccentColor: (value: AccentColor) => void
   setHideGitignoredFiles: (value: boolean) => void
   setAllNotesFileVisibility: (value: AllNotesFileVisibility) => void
+  onAiModelProvidersChange: (value: AiModelProvider[]) => void
   initialSectionId?: string | null
   onClose?: () => void
 }
@@ -698,6 +709,7 @@ function SettingsBodyFromDraft({
   setAccentColor,
   setHideGitignoredFiles,
   setAllNotesFileVisibility,
+  onAiModelProvidersChange,
   initialSectionId,
   onClose,
 }: SettingsBodyFromDraftProps) {
@@ -725,7 +737,7 @@ function SettingsBodyFromDraft({
       setAgentProfile={(value) => updateDraft('agentProfile', value)}
       aiAgentsStatus={aiAgentsStatus}
       aiModelProviders={draft.aiModelProviders}
-      setAiModelProviders={(value) => updateDraft('aiModelProviders', value)}
+      setAiModelProviders={onAiModelProvidersChange}
       onCopyMcpConfig={onCopyMcpConfig}
       onAdoptPortentTypes={onAdoptPortentTypes}
       releaseChannel={draft.releaseChannel}

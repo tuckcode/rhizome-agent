@@ -536,6 +536,13 @@ export function AiPanelView({
             locale={locale}
             deck={composerDeck}
             skillsLabel={composerSkillsLabel}
+            skills={localizedCommands.filter((entry) => entry.kind === 'skill')}
+            onPickSkill={(slash) => {
+              const next = input.trim().length > 0
+                ? `${input.replace(/\s+$/, '')} /${slash} `
+                : `/${slash} `
+              void handleCommandAction({ kind: 'compose', name: slash }, next)
+            }}
             onOpenGoal={goalDialog.openDialog}
             onOpenSchedule={() => scheduleDialog.onOpenChange(true)}
             working={isActive}

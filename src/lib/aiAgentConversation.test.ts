@@ -101,6 +101,16 @@ describe('aiAgentConversation', () => {
     ])
   })
 
+  it('keeps pasted images on the user turn so the bubble can show them', () => {
+    nextMessageIdMock.mockReturnValue('msg-image')
+    const store = createMessageStore()
+    const images = [{ type: 'image' as const, data: 'abc', mimeType: 'image/png' }]
+
+    appendStreamingMessage(store.setMessages, { text: '', images })
+
+    expect(store.getMessages()[0]?.images).toEqual(images)
+  })
+
   it('appends a queued follow-up without marking it streaming', () => {
     nextMessageIdMock.mockReturnValue('msg-follow')
     const store = createMessageStore([

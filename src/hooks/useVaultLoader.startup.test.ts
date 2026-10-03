@@ -111,4 +111,35 @@ describe('useVaultLoader startup recovery', () => {
     expect(startupMock.activeListCount()).toBeGreaterThanOrEqual(2)
     expect(startupMock.activeReloadCount()).toBeGreaterThanOrEqual(2)
   })
+
+  it('does not scan the vault until the notes dock asks for the index', async () => {
+    backendInvokeFn.mockResolvedValue([])
+
+    const { rerender } = renderHook(
+      ({ loadIndex }: { loadIndex: boolean }) => useVaultLoader(
+        ACTIVE_VAULT_PATH,
+        undefined,
+        ACTIVE_VAULT_PATH,
+        undefined,
+        loadIndex,
+      ),
+      { initialProps: { loadIndex: false } },
+    )
+
+    await waitFor(() => {
+      expect(backendInvokeFn).toHaveBeenCalled()
+    }).catch(() => undefined)
+
+    const commands = () => backendInvokeFn.mock.calls.map((call) => call[0])
+    expect(commands()).not.toContain('list_vault')
+    expect(commands()).not.toContain('reload_vault')
+    expect(commands()).not.toContain('list_vault_folders')
+    expect(commands()).not.toContain('get_modified_files')
+
+    rerender({ loadIndex: true })
+
+    await waitFor(() => {
+      expect(commands()).toContain('list_vault')
+    })
+  })
 })

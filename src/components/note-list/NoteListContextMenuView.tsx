@@ -4,12 +4,14 @@ import {
   ArrowSquareOut,
   ChatTeardropText,
   CheckCircle,
+  CirclesThree,
   ClipboardText,
   FilePdf,
   FolderOpen,
   GitBranch,
   MapTrifold,
   PencilSimple,
+  ShareNetwork,
   Star,
   Trash,
   type Icon,
@@ -19,6 +21,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../../hooks/appCommandCatalog'
 import { translate, type AppLocale } from '../../lib/i18n'
+import { openConnections } from '../../lib/notesChrome'
 import { trackEvent } from '../../lib/telemetry'
 import type { VaultEntry } from '../../types'
 import { isMarkdownEntry } from '../../utils/typeDefinitions'
@@ -157,6 +160,22 @@ function renameItem(
   }]
 }
 
+function connectionItems(entry: VaultEntry, selectAction: SelectContextAction): NoteListContextMenuItem[] {
+  if (entry.fileKind === 'binary') return []
+  return [
+    {
+      icon: CirclesThree,
+      label: 'Mycelium report',
+      onSelect: () => selectAction('mycelium_report', () => openConnections('mycelium')),
+    },
+    {
+      icon: ShareNetwork,
+      label: 'Node map',
+      onSelect: () => selectAction('node_map', () => openConnections('graph', entry.path)),
+    },
+  ]
+}
+
 function neighborhoodItem(
   entry: VaultEntry,
   locale: AppLocale,
@@ -267,6 +286,7 @@ function buildContextMenuItems(
   return [
     // First: it is the reason someone right-clicks a note while chat is open.
     ...askAgentItem(entry, props.locale, props.onAskAgent, selectAction),
+    ...connectionItems(entry, selectAction),
     ...openWindowItem(entry, props.locale, props.onOpenInNewWindow, selectAction),
     ...favoriteItem(entry, props.locale, props.onToggleFavorite, selectAction),
     ...organizedItem(entry, props.locale, props.onToggleOrganized, selectAction),

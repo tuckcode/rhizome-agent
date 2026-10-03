@@ -887,36 +887,38 @@ describe('BreadcrumbBar — narrow layout keeps title, overflow trigger, and clo
 })
 
 describe('BreadcrumbBar — raw editor toggle', () => {
-  it('shows Raw editor button with tooltip "Raw editor" when rawMode is off', () => {
+  it('shows a Source control when the rich editor is open', () => {
     const onToggleRaw = vi.fn()
     render(<BreadcrumbBar entry={baseEntry} {...defaultProps} rawMode={false} onToggleRaw={onToggleRaw} />)
-    expect(screen.getByRole('button', { name: 'Open the raw editor' })).toBeInTheDocument()
+    const toggle = screen.getByRole('button', { name: 'Show the note source' })
+    expect(toggle).toHaveTextContent('Source')
+    expect(toggle.closest('.breadcrumb-bar__overflowable-action')).toBeNull()
   })
 
-  it('shows "Back to editor" tooltip when rawMode is on', () => {
+  it('shows an Editor control when the source is open', () => {
     const onToggleRaw = vi.fn()
     render(<BreadcrumbBar entry={baseEntry} {...defaultProps} rawMode={true} onToggleRaw={onToggleRaw} />)
-    expect(screen.getByRole('button', { name: 'Return to the editor' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Return to the editor' })).toHaveTextContent('Editor')
   })
 
   it('calls onToggleRaw when raw button is clicked', () => {
     const onToggleRaw = vi.fn()
     render(<BreadcrumbBar entry={baseEntry} {...defaultProps} rawMode={false} onToggleRaw={onToggleRaw} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Open the raw editor' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show the note source' }))
     expect(onToggleRaw).toHaveBeenCalledOnce()
   })
 
   it('hides raw toggle when forceRawMode is true (non-markdown file)', () => {
     const onToggleRaw = vi.fn()
     render(<BreadcrumbBar entry={baseEntry} {...defaultProps} rawMode={true} onToggleRaw={onToggleRaw} forceRawMode={true} />)
-    expect(screen.queryByRole('button', { name: 'Open the raw editor' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Show the note source' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Return to the editor' })).not.toBeInTheDocument()
   })
 
   it('shows raw toggle when forceRawMode is false (markdown file)', () => {
     const onToggleRaw = vi.fn()
     render(<BreadcrumbBar entry={baseEntry} {...defaultProps} rawMode={false} onToggleRaw={onToggleRaw} forceRawMode={false} />)
-    expect(screen.getByRole('button', { name: 'Open the raw editor' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show the note source' })).toBeInTheDocument()
   })
 })
 

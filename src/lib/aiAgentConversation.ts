@@ -42,6 +42,11 @@ export interface AiAgentMessage {
   queuedFollowUp?: boolean
   /** When the user turn was created (ms since epoch). Shown as a clock on the bubble. */
   createdAtMs?: number
+  /**
+   * Images on this user turn. Absent for a text-only message.
+   * The bubble reads this to show a thumbnail.
+   */
+  images?: PrimeImageContent[]
 }
 
 export type AgentStatus = 'idle' | 'thinking' | 'tool-executing' | 'done' | 'error'
@@ -113,6 +118,7 @@ export function appendLocalResponse(
     {
       userMessage: prompt.text,
       references: prompt.references,
+      ...(prompt.images && prompt.images.length > 0 ? { images: prompt.images } : {}),
       actions: [],
       response,
       id: nextMessageId(),
@@ -183,6 +189,7 @@ export function appendStreamingMessage(
     {
       userMessage: prompt.text,
       references: prompt.references,
+      ...(prompt.images && prompt.images.length > 0 ? { images: prompt.images } : {}),
       actions: [],
       isStreaming: true,
       id: messageId,

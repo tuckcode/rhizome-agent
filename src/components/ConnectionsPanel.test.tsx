@@ -6,30 +6,36 @@ import type { SessionActivityRetainedState } from './SessionActivityHistory'
 vi.mock('./graph/GraphView', () => ({ default: ({ onOpenNote }: { onOpenNote?: (path: string) => void }) => <button type="button" onClick={() => onOpenNote?.('/vault/graph.md')}>Graph canvas</button> }))
 vi.mock('./SessionActivityHistory', () => ({ SessionActivityHistory: ({ onOpenNote, retainedState }: { onOpenNote?: (path: string) => void, retainedState?: SessionActivityRetainedState }) => <button type="button" data-testid="mock-session-activity" data-focused-path={retainedState?.path || ''} onClick={() => onOpenNote?.('/vault/activity.md')}>Recorded actions</button> }))
 beforeEach(() => localStorage.clear())
-it('shows Graph immediately, with no closed-edge strip', async () => {
+it('stays closed until a view is requested', async () => {
   render(<ConnectionsPanel vaultPath="/vault" />)
-  expect(screen.queryByTestId('connections-edge')).not.toBeInTheDocument()
-  expect(await screen.findByText('Graph canvas')).toBeVisible()
+  expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
+  expect(screen.queryByText('Graph canvas')).not.toBeInTheDocument()
 })
-it('clips Graph to its own pane so it cannot paint over the Changes list', async () => {
-  render(<ConnectionsPanel vaultPath="/vault" />)
+it('opens Graph over the workspace, not as a half-height dock', async () => {
+  const ref = createRef<ConnectionsPanelHandle>()
+  render(<ConnectionsPanel ref={ref} vaultPath="/vault" />)
+  act(() => { ref.current?.openView('graph') })
   const pane = await screen.findByTestId('connections-panel')
   expect(pane).toHaveClass('overflow-hidden')
-  expect(screen.getByRole('region', { name: 'Connections' })).toHaveStyle({ maxHeight: '50%' })
+  expect(pane).toHaveAttribute('data-expanded', 'true')
+  expect(pane).not.toHaveStyle({ maxHeight: '50%' })
+  expect(await screen.findByText('Graph canvas')).toBeVisible()
 })
-it('shows one view at a time and can expand and collapse it', async () => {
-  render(<ConnectionsPanel vaultPath="/vault" />)
+it('shows one view at a time and can close it', async () => {
+  const ref = createRef<ConnectionsPanelHandle>()
+  render(<ConnectionsPanel ref={ref} vaultPath="/vault" />)
+  act(() => { ref.current?.openView('graph') })
   expect(await screen.findByText('Graph canvas')).toBeVisible()
   fireEvent.click(screen.getByRole('tab', { name: 'Mycelium' }))
   expect(await screen.findByText('Recorded actions')).toBeVisible()
   expect(screen.queryByText('Graph canvas')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Expand connections' }))
-  expect(screen.getByTestId('connections-panel')).toHaveAttribute('data-expanded', 'true')
-  fireEvent.click(screen.getByRole('button', { name: 'Return to side panel' }))
-  expect(screen.getByTestId('connections-panel')).toHaveAttribute('data-expanded', 'false')
+  fireEvent.click(screen.getByRole('button', { name: 'Close connections' }))
+  expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
 })
 it('tears down the inactive renderer when switching views', async () => {
-  render(<ConnectionsPanel vaultPath="/vault" />)
+  const ref = createRef<ConnectionsPanelHandle>()
+  render(<ConnectionsPanel ref={ref} vaultPath="/vault" />)
+  act(() => { ref.current?.openView('graph') })
   expect(await screen.findByText('Graph canvas')).toBeVisible()
   fireEvent.click(screen.getByRole('tab', { name: 'Mycelium' }))
   expect(await screen.findByText('Recorded actions')).toBeVisible()
@@ -38,19 +44,19 @@ it('tears down the inactive renderer when switching views', async () => {
   expect(await screen.findByText('Graph canvas')).toBeVisible()
   expect(screen.queryByText('Recorded actions')).not.toBeInTheDocument()
 })
-it('collapses the expanded overlay when either view opens a note, and keeps the sub-panel', async () => {
+it('closes when either view opens a note', async () => {
   const open = vi.fn()
-  render(<ConnectionsPanel vaultPath="/vault" onOpenNote={open} />)
-  fireEvent.click(screen.getByRole('tab', { name: 'Mycelium' }))
-  fireEvent.click(await screen.findByRole('button', { name: 'Expand connections' }))
+  const ref = createRef<ConnectionsPanelHandle>()
+  render(<ConnectionsPanel ref={ref} vaultPath="/vault" onOpenNote={open} />)
+  act(() => { ref.current?.openView('mycelium') })
   fireEvent.click(await screen.findByText('Recorded actions'))
   expect(open).toHaveBeenCalledWith('/vault/activity.md')
-  expect(screen.getByTestId('connections-panel')).toHaveAttribute('data-expanded', 'false')
+  expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
 })
 it('opens a requested view through the imperative handle', async () => {
   const ref = createRef<ConnectionsPanelHandle>()
   render(<ConnectionsPanel ref={ref} vaultPath="/vault" />)
-  expect(await screen.findByText('Graph canvas')).toBeVisible()
+  expect(screen.queryByText('Graph canvas')).not.toBeInTheDocument()
   act(() => { ref.current?.openView('mycelium') })
   expect(await screen.findByText('Recorded actions')).toBeVisible()
 })
@@ -82,37 +88,13 @@ it('honours a requested view passed as a prop on first mount', async () => {
  * handle up must make the panel taller. `usePanelWidth.resizeBy` already
  * treats a negative delta as growth, which matches a top-edge drag.
  */
-it('grows when its top edge is dragged upward', async () => {
-  render(<ConnectionsPanel vaultPath="/vault" />)
-  const panel = await screen.findByRole('region', { name: 'Connections' })
-  const startingHeight = panel.style.height
-
-  fireEvent.mouseDown(screen.getByRole('separator', { name: 'Resize graph' }), { clientX: 400, clientY: 500 })
-  fireEvent.mouseMove(window, { clientX: 400, clientY: 400 })
-  fireEvent.mouseUp(window)
-
-  expect(parseInt(panel.style.height, 10)).toBeGreaterThan(parseInt(startingHeight, 10))
-})
-
-it('shrinks when its top edge is dragged downward', async () => {
-  render(<ConnectionsPanel vaultPath="/vault" />)
-  const panel = await screen.findByRole('region', { name: 'Connections' })
-  const startingHeight = panel.style.height
-
-  fireEvent.mouseDown(screen.getByRole('separator', { name: 'Resize graph' }), { clientX: 400, clientY: 400 })
-  fireEvent.mouseMove(window, { clientX: 400, clientY: 500 })
-  fireEvent.mouseUp(window)
-
-  expect(parseInt(panel.style.height, 10)).toBeLessThan(parseInt(startingHeight, 10))
-})
-
-it('persists independent view preferences and retains a way to re-enable views', () => {
+it('stays closed when both views were turned off, until one is opened', async () => {
   localStorage.setItem('rhizome:connections-placement:v1', JSON.stringify({ graph: 'off', mycelium: 'off' }))
-  render(<ConnectionsPanel vaultPath="/vault" />)
-  expect(screen.getByText('Enable a view in Connections settings.')).toBeVisible()
-  expect(screen.queryByRole('tab')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Enable Graph' }))
-  expect(screen.getByRole('tab', { name: 'Graph' })).toBeInTheDocument()
+  const ref = createRef<ConnectionsPanelHandle>()
+  render(<ConnectionsPanel ref={ref} vaultPath="/vault" />)
+  expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
+  act(() => { ref.current?.openView('graph') })
+  expect(await screen.findByRole('tab', { name: 'Graph' })).toBeInTheDocument()
 })
 
 it('opens Mycelium from the notes-chrome shortcut and turns the view back on', async () => {

@@ -39,6 +39,11 @@ describe('pane presets', () => {
     expect(fitPanePreset(preset, { shellWidth: 666 })).toMatchObject({ notesOpen: true, chatWidth: 420 })
   })
 
+  it('lets Notes grow past the old cap when Chat still has its minimum', () => {
+    const next = resizePresetWidth({ id: 'notes', widths: { notes: 240 } }, 'notes', 800, { shellWidth: 1600 })
+    expect(next.widths.notes).toBe(800)
+  })
+
   it('clamps a width drag before it consumes Chat', () => {
     const preset = { id: 'notes', widths: { notes: 240 } } as const
     const next = resizePresetWidth(preset, 'notes', 360, { shellWidth: 720 })
