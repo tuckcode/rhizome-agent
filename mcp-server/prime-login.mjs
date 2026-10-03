@@ -18,16 +18,27 @@
  *   {"event":"done"}
  *   {"event":"error","message":"..."}
  */
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const KEY_FROM_STDIN = '--key-from-stdin'
 
-/** Run one sign-in. Never throws: failures become an `error` event. */
-export async function runPrimeLogin({ provider, authStorage, emit, readKey }) {
+/**
+ * Run one sign-in. `mode` is `browser` (OAuth) or `key` (store a pasted key).
+ * Never throws: failures become an `error` event.
+ */
+export async function runPrimeLogin({ provider, mode, authStorage, emit, readKey }) {
   try {
-    const usesOAuth = authStorage.getOAuthProviders().some((entry) => entry.id === provider)
-    if (usesOAuth) {
+    if (mode === 'browser') {
+      const usesOAuth = authStorage.getOAuthProviders().some((entry) => entry.id === provider)
+      if (!usesOAuth) {
+        emit({
+          event: 'error',
+          message: `Prime has no browser sign-in for ${provider}. A Prime extension can add one (~/.prime/agent/extensions).`,
+        })
+        return
+      }
       await authStorage.login(provider, {
         onAuth: ({ url }) => emit({ event: 'open_url', url }),
         onProgress: (message) => emit({ event: 'progress', message }),
@@ -73,14 +84,35 @@ async function main() {
 
   // Prime's public entry point; resolves its own dependencies from there.
   const primeEntry = pathToFileURL(path.join(packageDir, 'dist', 'index.js')).href
-  const { AuthStorage } = await import(primeEntry)
+  const prime = await import(primeEntry)
+  const authStorage = prime.AuthStorage.create()
+  await registerExtensionProviders(prime, authStorage)
 
+  const keyMode = mode === KEY_FROM_STDIN
   await runPrimeLogin({
     provider,
-    authStorage: AuthStorage.create(),
+    mode: keyMode ? 'key' : 'browser',
+    authStorage,
     emit,
-    readKey: mode === KEY_FROM_STDIN ? readStdin : async () => '',
+    readKey: keyMode ? readStdin : async () => '',
   })
+}
+
+/**
+ * Load the user's Prime extensions and register their providers, the way
+ * Prime does when a session starts. An extension can add a browser sign-in
+ * (e.g. `xai-oauth.ts`); without this step `/login` has it and Rhizome not.
+ */
+async function registerExtensionProviders(prime, authStorage) {
+  const registry = prime.ModelRegistry.create(authStorage)
+  const loaded = await prime.discoverAndLoadExtensions([], os.homedir())
+  for (const { name, config } of loaded.runtime.pendingProviderRegistrations) {
+    try {
+      registry.registerProvider(name, config)
+    } catch {
+      // A broken extension must not block signing in to anything else.
+    }
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

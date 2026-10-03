@@ -30,7 +30,7 @@ describe('runPrimeLogin', () => {
     const authStorage = fakeAuthStorage()
     const { events, emit } = collector()
 
-    await runPrimeLogin({ provider: 'anthropic', authStorage, emit, readKey: () => assert.fail('no key needed') })
+    await runPrimeLogin({ provider: 'anthropic', mode: 'browser', authStorage, emit, readKey: () => assert.fail('no key needed') })
 
     assert.deepEqual(events[0], { event: 'open_url', url: 'https://example.test/authorize?p=anthropic' })
     assert.deepEqual(events.at(-1), { event: 'done' })
@@ -41,9 +41,9 @@ describe('runPrimeLogin', () => {
     const authStorage = fakeAuthStorage()
     const { events, emit } = collector()
 
-    await runPrimeLogin({ provider: 'xai', authStorage, emit, readKey: async () => '  xai-secret\n' })
+    await runPrimeLogin({ provider: 'deepseek', mode: 'key', authStorage, emit, readKey: async () => '  test-key\n' })
 
-    assert.deepEqual(authStorage.saved.xai, { type: 'api_key', key: 'xai-secret' })
+    assert.deepEqual(authStorage.saved.deepseek, { type: 'api_key', key: 'test-key' })
     assert.deepEqual(events, [{ event: 'done' }])
   })
 
@@ -51,17 +51,31 @@ describe('runPrimeLogin', () => {
     const authStorage = fakeAuthStorage()
     const { events, emit } = collector()
 
-    await runPrimeLogin({ provider: 'xai', authStorage, emit, readKey: async () => '   ' })
+    await runPrimeLogin({ provider: 'deepseek', mode: 'key', authStorage, emit, readKey: async () => '   ' })
 
-    assert.equal(authStorage.saved.xai, undefined)
+    assert.equal(authStorage.saved.deepseek, undefined)
     assert.deepEqual(events, [{ event: 'error', message: 'No API key was entered.' }])
+  })
+
+  it('says so when Prime has no browser sign-in for the provider', async () => {
+    // xAI's browser login comes from a user extension (xai-oauth.ts); without
+    // it, a browser sign-in must not fall through to asking for a key.
+    const authStorage = fakeAuthStorage({ oauthIds: ['anthropic'] })
+    const { events, emit } = collector()
+
+    await runPrimeLogin({ provider: 'xai', mode: 'browser', authStorage, emit, readKey: () => assert.fail('no key') })
+
+    assert.equal(events.length, 1)
+    assert.equal(events[0].event, 'error')
+    assert.match(events[0].message, /no browser sign-in for xai/)
+    assert.equal(authStorage.saved.xai, undefined)
   })
 
   it('reports a failed OAuth exchange as an error event', async () => {
     const authStorage = fakeAuthStorage({ loginError: 'Token exchange request failed' })
     const { events, emit } = collector()
 
-    await runPrimeLogin({ provider: 'anthropic', authStorage, emit, readKey: async () => '' })
+    await runPrimeLogin({ provider: 'anthropic', mode: 'browser', authStorage, emit, readKey: async () => '' })
 
     assert.deepEqual(events.at(-1), { event: 'error', message: 'Token exchange request failed' })
   })

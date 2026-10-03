@@ -48,15 +48,16 @@ interface PrimeProviderStatusSectionProps {
 const ALWAYS_SHOW_PROVIDERS: ReadonlyArray<{ name: string; authKind: string }> = [
   { name: 'prime-inference', authKind: 'api_key' },
   { name: 'anthropic', authKind: 'oauth' },
-  // Prime has no xAI OAuth; it connects xAI by API key only.
-  { name: 'xai', authKind: 'api_key' },
+  { name: 'openai-codex', authKind: 'oauth' },
+  // Browser sign-in comes from the user's `xai-oauth.ts` Prime extension,
+  // not Prime itself; without it Sign in says so.
+  { name: 'xai', authKind: 'oauth' },
   { name: 'deepseek', authKind: 'api_key' },
   { name: 'nous-portal', authKind: 'api_key' },
 ]
 
 /** Where each key provider hands out API keys. Sign in opens this page. */
 const KEY_PAGES: Record<string, string> = {
-  xai: 'https://console.x.ai',
   deepseek: 'https://platform.deepseek.com/api_keys',
 }
 
@@ -79,6 +80,7 @@ interface EnsureNousPortalResult {
 const PROVIDER_LABELS: Record<string, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
+  'openai-codex': 'ChatGPT (Codex)',
   openrouter: 'OpenRouter',
   opencode: 'OpenCode',
   'opencode-go': 'OpenCode Go',

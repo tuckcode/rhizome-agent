@@ -91,26 +91,44 @@ describe('PrimeProviderStatusSection', () => {
     expect(trackPrimeProviderSignIn).toHaveBeenCalledWith('anthropic', 'browser', 'failed')
   })
 
-  it('opens the xAI key page and saves the pasted key through Prime', async () => {
+  it('saves a pasted DeepSeek key through Prime', async () => {
     state.providers = []
     render(<PrimeProviderStatusSection t={t} />)
-    fireEvent.click(await screen.findByTestId('prime-provider-sign-in-xai'))
+    fireEvent.click(await screen.findByTestId('prime-provider-sign-in-deepseek'))
 
-    expect(openExternalUrl).toHaveBeenCalledWith('https://console.x.ai')
-    fireEvent.change(await screen.findByTestId('prime-provider-key-input-xai'), {
-      target: { value: 'xai-test-key' },
+    fireEvent.change(await screen.findByTestId('prime-provider-key-input-deepseek'), {
+      target: { value: 'test-key' },
     })
-    fireEvent.click(screen.getByTestId('prime-provider-key-save-xai'))
+    fireEvent.click(screen.getByTestId('prime-provider-key-save-deepseek'))
 
     await waitFor(() => {
-      expect(screen.getByTestId('prime-provider-sign-in-notice')).toHaveTextContent('Saved the xAI (Grok) key.')
+      expect(screen.getByTestId('prime-provider-sign-in-notice')).toHaveTextContent('Saved the DeepSeek key.')
     })
     expect(state.calls).toContainEqual({
       cmd: 'save_prime_provider_key',
-      args: { provider: 'xai', key: 'xai-test-key' },
+      args: { provider: 'deepseek', key: 'test-key' },
     })
-    expect(screen.queryByTestId('prime-provider-key-input-xai')).not.toBeInTheDocument()
-    expect(trackPrimeProviderSignIn).toHaveBeenCalledWith('xai', 'api_key', 'success')
+    expect(screen.queryByTestId('prime-provider-key-input-deepseek')).not.toBeInTheDocument()
+    expect(trackPrimeProviderSignIn).toHaveBeenCalledWith('deepseek', 'api_key', 'success')
+  })
+
+  it.each([
+    ['xai', 'xAI (Grok)'],
+    ['openai-codex', 'ChatGPT (Codex)'],
+  ])('signs in to %s in the browser, never asking for a key', async (provider, label) => {
+    state.providers = []
+    render(<PrimeProviderStatusSection t={t} />)
+    const button = await screen.findByTestId(`prime-provider-sign-in-${provider}`)
+    expect(button).toHaveTextContent('Sign in')
+
+    fireEvent.click(button)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('prime-provider-sign-in-notice')).toHaveTextContent(`Signed in to ${label}.`)
+    })
+    expect(state.calls).toContainEqual({ cmd: 'sign_in_prime_provider', args: { provider } })
+    expect(screen.queryByTestId(`prime-provider-key-input-${provider}`)).not.toBeInTheDocument()
+    expect(openExternalUrl).not.toHaveBeenCalled()
   })
 
   it('opens the DeepSeek key page instead of copying a command', async () => {
@@ -123,11 +141,6 @@ describe('PrimeProviderStatusSection', () => {
     expect(writeClipboardText).not.toHaveBeenCalled()
   })
 
-  it('labels xAI as an API key, the only way Prime connects it', async () => {
-    state.providers = []
-    render(<PrimeProviderStatusSection t={t} />)
-    expect(await screen.findByTestId('prime-provider-sign-in-xai')).toHaveTextContent('Add key')
-  })
 
   it('lists each provider with how it is connected', async () => {
     state.providers = [

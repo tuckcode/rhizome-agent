@@ -35,12 +35,14 @@ and calls `login` or `set`. It reports one JSON event per line;
 and returns on `done` or `error`. Afterwards the attached session is reloaded,
 which re-reads `auth.json`.
 
-- OAuth providers (Prime's list: Anthropic, OpenAI Codex, GitHub Copilot)
-  sign in in the browser.
-- Key providers with a known key page (xAI, DeepSeek) open that page and
-  take the pasted key in Settings. The key goes to the helper on stdin, never
-  argv.
-- xAI is a key provider: Prime 0.8.0 has no xAI OAuth.
+- Browser sign-in for any provider Prime has OAuth for: Anthropic,
+  ChatGPT (OpenAI Codex), GitHub Copilot, plus any a user extension adds.
+  The helper loads the user's Prime extensions first, as a session does, so
+  `~/.prime/agent/extensions/xai-oauth.ts` gives xAI its browser login.
+  Without that extension, xAI Sign in reports that Prime has no browser
+  sign-in for it; it never falls back to asking for a key.
+- Key providers with a known key page (DeepSeek) open that page and take the
+  pasted key in Settings. The key goes to the helper on stdin, never argv.
 
 ## Consequences
 
