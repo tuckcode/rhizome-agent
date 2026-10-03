@@ -96,9 +96,9 @@ fn spawn_helper(provider: &str, source: &KeySource) -> Result<Child, String> {
 
     let mut command = crate::hidden_command(crate::mcp::find_node()?);
     command
-        .arg(&script)
+        .arg(node_path(&script))
         .arg(provider)
-        .env(PACKAGE_DIR_ENV, prime_package_dir()?)
+        .env(PACKAGE_DIR_ENV, node_path(&prime_package_dir()?))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
@@ -182,18 +182,53 @@ fn prime_package_dir() -> Result<PathBuf, String> {
     })
 }
 
+/// `path` without Windows' verbatim prefix, which `canonicalize` adds and
+/// Node cannot load from. Same rule as `mcp::paths::client_script_path`.
+fn node_path(path: &Path) -> PathBuf {
+    let text = path.to_string_lossy();
+    if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{rest}"));
+    }
+    match text.strip_prefix(r"\\?\") {
+        Some(rest) => PathBuf::from(rest),
+        None => path.to_path_buf(),
+    }
+}
+
 pub(crate) fn parse_login_event(line: &str) -> Option<LoginEvent> {
     serde_json::from_str(line.trim()).ok()
 }
 
-/// The `prime-agent` package root: the nearest ancestor of `script` whose
-/// `package.json` names `prime-agent`.
+/// The `prime-agent` package root, from the binary or a script inside it.
+///
+/// Walks up from `script`. At each level the package can be that directory
+/// (a script inside the package), or sit in npm's global layout beside a
+/// shim:
+///
+/// ```text
+/// …/prime-agent/dist/cli.js          → …/prime-agent
+/// %APPDATA%\npm\prime-agent          → %APPDATA%\npm\node_modules\prime-agent
+/// <prefix>/bin/prime-agent           → <prefix>/lib/node_modules/prime-agent
+/// ```
 pub(crate) fn package_root_from(script: &Path) -> Option<PathBuf> {
     script.ancestors().skip(1).find_map(|dir| {
-        let manifest = std::fs::read_to_string(dir.join("package.json")).ok()?;
-        let parsed: serde_json::Value = serde_json::from_str(&manifest).ok()?;
-        (parsed["name"].as_str() == Some(PRIME_PACKAGE_NAME)).then(|| dir.to_path_buf())
+        [
+            dir.to_path_buf(),
+            dir.join("node_modules").join(PRIME_PACKAGE_NAME),
+            dir.join("lib")
+                .join("node_modules")
+                .join(PRIME_PACKAGE_NAME),
+        ]
+        .into_iter()
+        .find(|candidate| is_prime_package(candidate))
     })
+}
+
+fn is_prime_package(dir: &Path) -> bool {
+    std::fs::read_to_string(dir.join("package.json"))
+        .ok()
+        .and_then(|manifest| serde_json::from_str::<serde_json::Value>(&manifest).ok())
+        .is_some_and(|parsed| parsed["name"].as_str() == Some(PRIME_PACKAGE_NAME))
 }
 
 #[cfg(test)]
@@ -272,6 +307,57 @@ mod tests {
     fn a_helper_that_exits_silently_is_a_failure() {
         let outcome = read_outcome("".as_bytes(), &|_: &str| {});
         assert!(outcome.is_err());
+    }
+
+    /// npm's global layout: the shim sits in the prefix and the package in
+    /// `node_modules` beside it (`%APPDATA%\npm\prime-agent` on Windows).
+    #[test]
+    fn finds_the_prime_package_beside_an_npm_shim() {
+        let dir = tempfile::tempdir().unwrap();
+        let prefix = dir.path().join("npm");
+        let root = prefix.join("node_modules").join("prime-agent");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("package.json"), r#"{"name":"prime-agent"}"#).unwrap();
+        let shim = prefix.join("prime-agent");
+        std::fs::write(&shim, "#!/bin/sh").unwrap();
+
+        assert_eq!(package_root_from(&shim), Some(root));
+    }
+
+    /// Unix npm prefix: `<prefix>/bin/prime-agent`, package under `lib/`.
+    #[test]
+    fn finds_the_prime_package_under_an_npm_prefix_lib() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir
+            .path()
+            .join("lib")
+            .join("node_modules")
+            .join("prime-agent");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("package.json"), r#"{"name":"prime-agent"}"#).unwrap();
+        let bin = dir.path().join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        let shim = bin.join("prime-agent");
+        std::fs::write(&shim, "").unwrap();
+
+        assert_eq!(package_root_from(&shim), Some(root));
+    }
+
+    /// Node cannot load a script or import a module from a `\\?\` path.
+    #[test]
+    fn hands_node_plain_windows_paths() {
+        assert_eq!(
+            node_path(Path::new(r"\\?\C:\Users\A\npm\node_modules\prime-agent")),
+            PathBuf::from(r"C:\Users\A\npm\node_modules\prime-agent")
+        );
+        assert_eq!(
+            node_path(Path::new(r"\\?\UNC\server\share\prime-agent")),
+            PathBuf::from(r"\\server\share\prime-agent")
+        );
+        assert_eq!(
+            node_path(Path::new("/usr/lib/node_modules/prime-agent")),
+            PathBuf::from("/usr/lib/node_modules/prime-agent")
+        );
     }
 
     #[test]
