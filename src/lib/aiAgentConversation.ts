@@ -113,6 +113,7 @@ export function appendLocalResponse(
     {
       userMessage: prompt.text,
       references: prompt.references,
+      ...(prompt.images && prompt.images.length > 0 ? { images: prompt.images } : {}),
       actions: [],
       response,
       id: nextMessageId(),
@@ -183,6 +184,7 @@ export function appendStreamingMessage(
     {
       userMessage: prompt.text,
       references: prompt.references,
+      ...(prompt.images && prompt.images.length > 0 ? { images: prompt.images } : {}),
       actions: [],
       isStreaming: true,
       id: messageId,

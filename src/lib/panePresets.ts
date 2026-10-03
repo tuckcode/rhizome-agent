@@ -21,7 +21,7 @@ export type PanePresetState = {
 export type WorkspaceState = 'conversation' | 'desk' | 'stacked' | 'focused'
 export const PANE_LIMITS = {
   rail: { min: 180, default: 240, max: 360 },
-  notes: { min: 200, default: 240, max: 360 },
+  notes: { min: 200, default: 240, max: 1200 },
   browse: { min: 200, default: 240, max: 320 },
   note: { min: 280, default: 360, max: 480 },
 } as const

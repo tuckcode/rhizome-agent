@@ -386,7 +386,14 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     windowMode: Boolean(noteWindowParams),
   })
 
-  const vault = useVaultLoader(resolvedPath, graphVaults, multiWorkspaceEnabled ? defaultWorkspacePath : null, folderVaults)
+  const [notesDockRequested, setNotesDockRequested] = useState(false)
+  const vault = useVaultLoader(
+    resolvedPath,
+    graphVaults,
+    multiWorkspaceEnabled ? defaultWorkspacePath : null,
+    folderVaults,
+    notesDockRequested,
+  )
   const isWikiVault = useIsWikiVault(resolvedPath)
   useInboxWatcher(resolvedPath, isInboxAutomationEnabled(vaultConfig.inbox_automation_enabled), setToastMessage)
   const gitRepositories = useMemo(() => activeGitRepositories({
@@ -1604,6 +1611,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     hideNotesForCanvas,
     chatDestination: isChatDestination,
   })
+  if ((notesOpen || notes.tabs.length > 0) && !notesDockRequested) {
+    setNotesDockRequested(true)
+  }
   const railOccupiesExpandedWidth = railConsumesExpandedWidth(reportedRailWidth)
   // Native audit 2026-09-26: in a narrow window the Sessions rail is a
   // drawer, and picking a conversation closes it.

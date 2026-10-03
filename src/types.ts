@@ -170,6 +170,8 @@ export interface Settings {
    * Not per agent and not per vault. Blank is unset.
    */
   agent_profile?: string | null
+  /** Models shown first in Chat, as `provider/id`. Empty means the whole catalog. */
+  prime_model_allow_list?: string[] | null
 }
 
 export interface AiWorkspaceConversationSetting {

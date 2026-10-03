@@ -4,9 +4,12 @@ import {
   Brain,
   CaretDown,
   CaretRight,
+  CircleNotch,
   Copy,
   FloppyDisk,
   GitFork,
+  SpeakerHigh,
+  Square,
   Terminal,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
@@ -17,6 +20,7 @@ import { MarkdownContent } from './MarkdownContent'
 import { translate, type AppLocale } from '../lib/i18n'
 import { normalizeReasoningDisplay } from '../lib/normalizeReasoningDisplay'
 import { visibleUserText } from '../utils/ai-chat'
+import { isSupportedImageType, type PrimeImageContent } from '../lib/composerAttachments'
 import type { NoteReference } from '../utils/ai-context'
 import { writeClipboardText } from '../utils/clipboardText'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
@@ -25,6 +29,7 @@ import { trackVaultRetrievalSourceOpened } from '../lib/productAnalytics'
 import { useDisplayTimeZone } from '../hooks/useAppPreferences'
 import { formatMessageClock } from '../utils/messageTimestamp'
 import { presentWorkerStartFailure } from '../lib/primeWorkerStartError'
+import { toggleReadAloud, useReadAloud } from '../lib/readAloudPlayer'
 
 export interface AiAction {
   tool: string
@@ -51,6 +56,8 @@ export interface AiMessageProps {
   isStreaming?: boolean
   /** When this turn was created (ms). Shown as a small clock under the ask. */
   createdAtMs?: number
+  /** Images pasted with this turn. Shown in the user bubble. */
+  images?: PrimeImageContent[]
   /** Find-aid: green dot left of the first line of the newest assistant reply. */
   isLatestReply?: boolean
   onFork?: (messageId: string) => void
@@ -109,8 +116,14 @@ function ReferencePill({ reference, onClick }: {
   )
 }
 
-function UserBubble({ content, references, onOpenNote, createdAtMs }: {
+function userImageSrc(image: PrimeImageContent): string | null {
+  if (!isSupportedImageType(image.mimeType) || !image.data) return null
+  return `data:${image.mimeType};base64,${image.data}`
+}
+
+function UserBubble({ content, images, references, onOpenNote, createdAtMs }: {
   content: string
+  images?: PrimeImageContent[]
   references?: NoteReference[]
   onOpenNote?: (path: string) => void
   createdAtMs?: number
@@ -152,6 +165,23 @@ function UserBubble({ content, references, onOpenNote, createdAtMs }: {
             ))}
           </div>
         )}
+        {images && images.length > 0 ? (
+          <div className="flex flex-col gap-1.5" data-testid="user-message-images">
+            {images.map((image, index) => {
+              const src = userImageSrc(image)
+              if (!src) return null
+              return (
+                <img
+                  key={`${image.mimeType}-${index}`}
+                  alt=""
+                  src={src}
+                  className="block max-h-40 max-w-full rounded-md"
+                  data-testid="user-message-image"
+                />
+              )
+            })}
+          </div>
+        ) : null}
         {visibleUserText(content)}
       </div>
       {clock ? (
@@ -317,7 +347,9 @@ function ResponseActions({
   onFork,
   onPromoteToVault,
   onRegenerate,
+  onReadAloud,
   promoteDisabled = false,
+  showReadAloud = false,
 }: {
   locale: AppLocale
   messageId?: string
@@ -325,7 +357,9 @@ function ResponseActions({
   onFork?: (messageId: string) => void
   onPromoteToVault?: () => void
   onRegenerate?: (messageId: string) => void
+  onReadAloud?: () => void
   promoteDisabled?: boolean
+  showReadAloud?: boolean
   /**
    * What a fork branches from. Hosts differ: the AI workspace copies its own
    * conversation and uses the local message id, ChatHome branches the Prime
@@ -340,6 +374,11 @@ function ResponseActions({
   const copyLabel = translate(locale, 'ai.message.copy')
   const saveLabel = translate(locale, 'ai.message.saveToVault')
   const forkLabel = translate(locale, 'ai.message.fork')
+  const readAloud = useReadAloud()
+  const readingThis = showReadAloud && messageId != null && readAloud.messageId === messageId
+  const readAloudLabel = readingThis && readAloud.phase === 'playing'
+    ? 'Stop reading'
+    : 'Read aloud'
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -361,6 +400,27 @@ function ResponseActions({
             <ArrowClockwise size={14} aria-hidden="true" />
           </Button>
         </ActionTooltip>
+        {showReadAloud ? (
+          <ActionTooltip copy={{ label: readAloud.error && readingThis ? readAloud.error : readAloudLabel }}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              aria-label={readAloudLabel}
+              onClick={onReadAloud}
+              data-testid="ai-message-read-aloud"
+            >
+              {readingThis && readAloud.phase === 'loading' ? (
+                <CircleNotch size={14} className="animate-spin" aria-hidden="true" />
+              ) : readingThis && readAloud.phase === 'playing' ? (
+                <Square size={14} weight="fill" aria-hidden="true" />
+              ) : (
+                <SpeakerHigh size={14} aria-hidden="true" />
+              )}
+            </Button>
+          </ActionTooltip>
+        ) : null}
         <ActionTooltip copy={{ label: copyLabel }}>
           <Button
             type="button"
@@ -483,6 +543,7 @@ function ResponseBlock({
   onRegenerate,
   text,
   isLatestReply = false,
+  isStreaming = false,
 }: {
   actions: AiAction[]
   locale: AppLocale
@@ -495,6 +556,7 @@ function ResponseBlock({
   onRegenerate?: (messageId: string) => void
   text: string
   isLatestReply?: boolean
+  isStreaming?: boolean
 }) {
   const handleCopy = useCallback(() => {
     void writeClipboardText(text).catch((error) => {
@@ -522,7 +584,9 @@ function ResponseBlock({
           onFork={onFork}
           onPromoteToVault={onPromoteToVault ? handlePromote : undefined}
           onRegenerate={onRegenerate}
+          onReadAloud={() => messageId && void toggleReadAloud(messageId, text)}
           promoteDisabled={!text.trim()}
+          showReadAloud={!isStreaming && Boolean(text.trim()) && Boolean(messageId)}
         />
       </div>
     </div>
@@ -553,7 +617,7 @@ export function AiMessage(props: AiMessageProps) {
   return <ConversationMessage {...props} />
 }
 
-function ConversationMessage({ userMessage, references, locale = 'en', messageId, forkTargetId, reasoning, reasoningDone, actions, response, isStreaming, createdAtMs, isLatestReply = false, onFork, onOpenNote, onNavigateWikilink, onPromoteToVault, onRegenerate }: AiMessageProps) {
+function ConversationMessage({ userMessage, images, references, locale = 'en', messageId, forkTargetId, reasoning, reasoningDone, actions, response, isStreaming, createdAtMs, isLatestReply = false, onFork, onOpenNote, onNavigateWikilink, onPromoteToVault, onRegenerate }: AiMessageProps) {
   // Manual override: null = follow auto behavior, true/false = user forced
   const [userOverride, setUserOverride] = useState<boolean | null>(null)
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())
@@ -587,6 +651,7 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
     >
       <UserBubble
         content={userMessage}
+        images={images}
         references={references}
         onOpenNote={onOpenNote}
         createdAtMs={createdAtMs}
@@ -623,6 +688,7 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
           onPromoteToVault={onPromoteToVault}
           onRegenerate={onRegenerate}
           isLatestReply={isLatestReply}
+          isStreaming={isStreaming}
         />
       )}
       {isStreaming && !response && <StreamingIndicator isLatestReply={isLatestReply} />}

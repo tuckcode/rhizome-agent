@@ -803,6 +803,23 @@ describe('SettingsPanel', () => {
     })
   })
 
+  it('keeps the chat model list when the rest of Settings is saved', () => {
+    render(
+      <SettingsPanel
+        open={true}
+        settings={{ ...emptySettings, prime_model_allow_list: ['anthropic/claude-opus-4-6'] }}
+        onSave={onSave}
+        onClose={onClose}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('settings-save'))
+
+    expectSettingsSaved({
+      prime_model_allow_list: ['anthropic/claude-opus-4-6'],
+    })
+  })
+
   it('keeps Prime as the fixed Chat engine', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />

@@ -569,7 +569,7 @@ describe('Editor', () => {
       activeTabPath: mockEntry.path,
     })
 
-    expect(screen.getByRole('button', { name: 'Open the raw editor' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show the note source' })).toBeInTheDocument()
     fireEvent.pointerDown(screen.getByRole('button', { name: 'More note actions' }), {
       button: 0,
       ctrlKey: false,

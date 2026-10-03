@@ -50,7 +50,9 @@ describe('AiProviderSettings removal', () => {
     // The click opens a confirmation; nothing is destroyed yet.
     expect(deleteApiKeyMock).not.toHaveBeenCalled()
     expect(onChange).not.toHaveBeenCalled()
-    expect(await screen.findByTestId('ai-provider-remove-confirm')).toBeInTheDocument()
+    const confirm = await screen.findByTestId('ai-provider-remove-confirm')
+    expect(confirm).toBeInTheDocument()
+    expect(confirm.className).toContain('z-[1400]')
   })
 
   it('names the provider in the confirmation so the wrong one is not deleted', async () => {

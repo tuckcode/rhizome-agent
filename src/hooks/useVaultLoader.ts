@@ -330,6 +330,8 @@ export function resolveNoteStatus({
 }
 
 interface InitialVaultLoadOptions {
+  /** False keeps the notes dock empty until the dock opens. */
+  loadIndex: boolean
   defaultWorkspacePath?: string | null
   folderVaults?: VaultOption[]
   forceReload: boolean, reloadIfEmpty: boolean
@@ -466,6 +468,7 @@ function useInitialVaultLoad(options: InitialVaultLoadOptions) {
     folderVaults,
     forceReload,
     reloadIfEmpty,
+    loadIndex,
   } = options
   const loadOptionsRef = useInitialVaultLoadSnapshot(vaults, defaultWorkspacePath, forceReload, reloadIfEmpty)
   const loadOptionsKey = useMemo(
@@ -474,6 +477,10 @@ function useInitialVaultLoad(options: InitialVaultLoadOptions) {
   )
 
   useEffect(() => {
+    if (!loadIndex) {
+      setIsLoading(false)
+      return
+    }
     const path = vaultPath
     const loadOptions = loadOptionsRef.current
     const effectOptions = {
@@ -515,11 +522,12 @@ function useInitialVaultLoad(options: InitialVaultLoadOptions) {
     setEntries, setFolders, setIsLoading, setModifiedFiles, setModifiedFilesError, setViews,
     loadOptionsRef,
     loadOptionsKey,
-    folderVaults
+    folderVaults,
+    loadIndex,
   ])
 }
 
-function useModifiedFilesLoader(vaultPath: string, isCurrentVaultPath: (path: string) => boolean) {
+function useModifiedFilesLoader(vaultPath: string, isCurrentVaultPath: (path: string) => boolean, loadIndex: boolean) {
   const [modifiedFiles, setModifiedFiles] = useState<ModifiedFile[]>([])
   const [modifiedFilesError, setModifiedFilesError] = useState<string | null>(null)
 
@@ -550,7 +558,10 @@ function useModifiedFilesLoader(vaultPath: string, isCurrentVaultPath: (path: st
 
   const loadModifiedFiles = useCoalescedAsyncTask(runModifiedFilesLoad)
 
-  useEffect(() => { loadModifiedFiles() }, [loadModifiedFiles])
+  useEffect(() => {
+    if (!loadIndex) return
+    loadModifiedFiles()
+  }, [loadIndex, loadModifiedFiles])
 
   return {
     modifiedFiles,
@@ -900,16 +911,16 @@ function useGitignoredVisibilityReloads(
   }, [reloadFolders, reloadVault, reloadViews])
 }
 
-function useVaultState(vaultPath: string) {
+function useVaultState(vaultPath: string, loadIndex: boolean) {
   const [entries, setEntries] = useState<VaultEntry[]>([])
   const [folders, setFolders] = useState<FolderNode[]>([])
-  const [isLoading, setIsLoading] = useState(() => hasVaultPath({ vaultPath }))
+  const [isLoading, setIsLoading] = useState(() => loadIndex && hasVaultPath({ vaultPath }))
   const [views, setViews] = useState<ViewFile[]>([])
   const tracker = useNewNoteTracker()
   const pendingSave = usePendingSaveTracker()
   const unsaved = useUnsavedTracker()
   const isCurrentVaultPath = useCurrentVaultPathGuard(vaultPath)
-  const modified = useModifiedFilesLoader(vaultPath, isCurrentVaultPath)
+  const modified = useModifiedFilesLoader(vaultPath, isCurrentVaultPath, loadIndex)
 
   return {
     entries,
@@ -968,7 +979,7 @@ interface VaultLoaderStartupOptions {
   vaults?: VaultOption[]
 }
 
-function useVaultLoaderStartup(options: VaultLoaderStartupOptions) {
+function useVaultLoaderStartup(options: VaultLoaderStartupOptions & { loadIndex: boolean }) {
   const {
     defaultWorkspacePath,
     folderVaults,
@@ -981,6 +992,7 @@ function useVaultLoaderStartup(options: VaultLoaderStartupOptions) {
     vaultPath,
     vaultReloads,
     vaults,
+    loadIndex,
   } = options
 
   const isWorkspacePathLoaded = useWorkspaceEntrySync({
@@ -988,6 +1000,7 @@ function useVaultLoaderStartup(options: VaultLoaderStartupOptions) {
     entries: state.entries,
     isCurrentVaultPath: state.isCurrentVaultPath,
     isLoading: state.isLoading,
+    loadIndex,
     newPathsRef,
     newEntriesRef,
     setEntries: state.setEntries,
@@ -996,6 +1009,7 @@ function useVaultLoaderStartup(options: VaultLoaderStartupOptions) {
   })
 
   useInitialVaultLoad({
+    loadIndex,
     handleVaultAvailable: unavailableVault.markVaultAvailable,
     handleVaultUnavailable: unavailableVault.markVaultUnavailable,
     vaultPath,
@@ -1036,14 +1050,15 @@ function useVaultChromeReloadEffect(
   vaultPath: string,
   reloadFoldersForCurrentVault: () => Promise<FolderNode[]>,
   reloadViewsForCurrentVault: () => Promise<ViewFile[]>,
+  loadIndex: boolean,
 ) {
   useEffect(() => {
-    if (!hasVaultPath({ vaultPath })) return
+    if (!loadIndex || !hasVaultPath({ vaultPath })) return
     void Promise.all([
       reloadFoldersForCurrentVault(),
       reloadViewsForCurrentVault(),
     ])
-  }, [vaultPath, reloadFoldersForCurrentVault, reloadViewsForCurrentVault])
+  }, [loadIndex, vaultPath, reloadFoldersForCurrentVault, reloadViewsForCurrentVault])
 }
 
 interface WorkspaceLoadRefs {
@@ -1242,10 +1257,11 @@ function useMissingWorkspaceLoads({
   defaultWorkspacePath,
   desiredWorkspaceKey,
   desiredWorkspacePaths,
-  isCurrentVaultPath,
-  isLoading,
-  loadedWorkspacePathsRef,
-  loadingWorkspacePathsRef,
+    isCurrentVaultPath,
+    isLoading,
+    loadIndex,
+    loadedWorkspacePathsRef,
+    loadingWorkspacePathsRef,
   newPathsRef,
   newEntriesRef,
   setEntries,
@@ -1257,6 +1273,7 @@ function useMissingWorkspaceLoads({
   desiredWorkspacePaths: readonly string[]
   isCurrentVaultPath: (path: string) => boolean
   isLoading: boolean
+  loadIndex: boolean
   loadedWorkspacePathsRef: MutableRefObject<Set<string>>
   loadingWorkspacePathsRef: MutableRefObject<Set<string>>
   newPathsRef: MutableRefObject<Set<string>>
@@ -1267,7 +1284,7 @@ function useMissingWorkspaceLoads({
 }) {
   useEffect(() => {
     void desiredWorkspaceKey
-    if (!hasVaultPath({ vaultPath }) || !vaults?.length || isLoading) return
+    if (!loadIndex || !hasVaultPath({ vaultPath }) || !vaults?.length || isLoading) return
 
     const loadedPaths = loadedWorkspacePathsRef.current
     const loadingPaths = loadingWorkspacePathsRef.current
@@ -1295,6 +1312,7 @@ function useMissingWorkspaceLoads({
     desiredWorkspacePaths,
     isCurrentVaultPath,
     isLoading,
+    loadIndex,
     loadedWorkspacePathsRef,
     loadingWorkspacePathsRef,
     newPathsRef,
@@ -1310,6 +1328,7 @@ function useWorkspaceEntrySync({
   entries,
   isCurrentVaultPath,
   isLoading,
+  loadIndex,
   newPathsRef,
   newEntriesRef,
   setEntries,
@@ -1320,6 +1339,7 @@ function useWorkspaceEntrySync({
   entries: VaultEntry[]
   isCurrentVaultPath: (path: string) => boolean
   isLoading: boolean
+  loadIndex: boolean
   newPathsRef: MutableRefObject<Set<string>>
   newEntriesRef: MutableRefObject<Map<string, VaultEntry>>
   setEntries: Dispatch<SetStateAction<VaultEntry[]>>
@@ -1345,6 +1365,7 @@ function useWorkspaceEntrySync({
     desiredWorkspacePaths,
     isCurrentVaultPath,
     isLoading,
+    loadIndex,
     newPathsRef,
     newEntriesRef,
     setEntries,
@@ -1406,8 +1427,15 @@ function useVaultLoaderResult({
   }
 }
 
-export function useVaultLoader(vaultPath: string, vaults?: VaultOption[], defaultWorkspacePath?: string | null, folderVaults?: VaultOption[]) {
-  const state = useVaultState(vaultPath)
+export function useVaultLoader(
+  vaultPath: string,
+  vaults?: VaultOption[],
+  defaultWorkspacePath?: string | null,
+  folderVaults?: VaultOption[],
+  loadIndex = true,
+) {
+  const indexWanted = loadIndex || isNoteWindow()
+  const state = useVaultState(vaultPath, indexWanted)
   const setInitialFolders = useInitialFolderSetter(folderVaults, state.setFolders)
   const entryMutations = useEntryMutations(
     state.setEntries,
@@ -1436,9 +1464,10 @@ export function useVaultLoader(vaultPath: string, vaults?: VaultOption[], defaul
   })
 
   useGitignoredVisibilityReloads(vaultReloads)
-  useVaultChromeReloadEffect(vaultPath, vaultReloads.reloadFolders, vaultReloads.reloadViews)
+  useVaultChromeReloadEffect(vaultPath, vaultReloads.reloadFolders, vaultReloads.reloadViews, indexWanted)
 
   useVaultLoaderStartup({
+    loadIndex: indexWanted,
     defaultWorkspacePath,
     folderVaults,
     newPathsRef,

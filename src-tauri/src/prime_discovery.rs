@@ -2,13 +2,16 @@ use crate::ai_agents::AiAgentAvailability;
 use std::path::{Path, PathBuf};
 
 pub(crate) fn check_cli() -> AiAgentAvailability {
-    let mut availability = crate::cli_agent_runtime::check_cli_availability(find_binary);
-    if availability.installed && availability.version.is_none() {
-        availability.version = find_binary()
-            .ok()
-            .and_then(|binary| version_from_package(&binary));
+    match find_binary() {
+        Ok(binary) => AiAgentAvailability {
+            installed: true,
+            version: installed_version_for(&binary),
+        },
+        Err(_) => AiAgentAvailability {
+            installed: false,
+            version: None,
+        },
     }
-    availability
 }
 
 /// Read the version out of the npm package the CLI lives in.
@@ -81,6 +84,31 @@ mod tests {
     /// install. `prime-agent` is a symlink into the npm package, so the
     /// manifest is the exact answer and a file read rather than a Node
     /// process.
+    #[test]
+    fn installed_version_reads_the_package_manifest_without_running_it() {
+        let root = std::env::temp_dir().join(format!(
+            "rhizome-prime-version-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        let binary = root.join("dist").join("bundle").join("cli.js");
+        std::fs::create_dir_all(binary.parent().expect("parent")).expect("dir");
+        std::fs::write(&binary, "not an executable\n").expect("binary");
+        std::fs::write(
+            root.join("package.json"),
+            r#"{"name":"prime-agent","version":"9.9.9"}"#,
+        )
+        .expect("manifest");
+
+        let version = super::installed_version_for(&binary);
+        let _ = std::fs::remove_dir_all(&root);
+
+        assert_eq!(version.as_deref(), Some("9.9.9"));
+    }
+
     #[test]
     fn a_version_is_read_out_of_the_package_manifest() {
         assert_eq!(

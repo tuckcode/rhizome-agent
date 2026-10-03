@@ -21,6 +21,13 @@ function open(testId: string) {
   )
 }
 
+function openSkillsRow() {
+  open('composer-tools-menu')
+  const row = screen.getByTestId('composer-skills-pill')
+  row.focus()
+  fireEvent.keyDown(row, { key: 'ArrowRight' })
+}
+
 function renderBar(props: Partial<Parameters<typeof ChatComposerBar>[0]> = {}) {
   const onOpenGoal = vi.fn()
   const onOpenSchedule = vi.fn()
@@ -54,6 +61,29 @@ describe('ChatComposerBar', () => {
     expect(trackComposerPillOpened).toHaveBeenCalledWith('tools')
     fireEvent.click(screen.getByTestId('prime-goal-trigger'))
     expect(onOpenGoal).toHaveBeenCalledTimes(1)
+  })
+
+  it('lists skill names and keeps each description on hover', async () => {
+    const onPickSkill = vi.fn()
+    renderBar({
+      skills: [{ slash: 'rhizome-vault', description: 'Vault tools' }],
+      onPickSkill,
+    })
+    openSkillsRow()
+    const row = screen.getByTestId('composer-skill-rhizome-vault')
+    expect(row).toHaveTextContent('/rhizome-vault')
+    expect(row).not.toHaveTextContent('Vault tools')
+    expect(screen.getByTestId('composer-skills-menu')).toHaveStyle({ maxHeight: '22rem' })
+    fireEvent.focus(row)
+    expect(await screen.findByTestId('composer-skill-tip-rhizome-vault')).toHaveTextContent('Vault tools')
+    fireEvent.click(row)
+    expect(onPickSkill).toHaveBeenCalledWith('rhizome-vault')
+  })
+
+  it('says when this session reported no skills', () => {
+    renderBar({ skills: [] })
+    openSkillsRow()
+    expect(screen.getByTestId('composer-skills-empty')).toHaveTextContent('No skills reported for this session')
   })
 
   it('says nothing about status while idle', () => {

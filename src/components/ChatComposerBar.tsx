@@ -5,11 +5,14 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { trackComposerPillOpened } from '../lib/productAnalytics'
 import { translate, type AppLocale } from '../lib/i18n'
@@ -33,6 +36,9 @@ interface ChatComposerBarProps {
   /** Live turn controls from ChatHome: model, thinking, context note, active agents. */
   deck?: ReactNode
   skillsLabel?: string | null
+  /** Product skills Prime reported for this session. The Tools row lists these. */
+  skills?: readonly { slash: string, description: string }[]
+  onPickSkill?: (slash: string) => void
   onOpenGoal: () => void
   onOpenSchedule: () => void
   working?: boolean
@@ -45,9 +51,11 @@ interface ChatComposerBarProps {
 function ComposerToolsMenu({
   locale,
   skillsLabel,
+  skills = [],
+  onPickSkill,
   onOpenGoal,
   onOpenSchedule,
-}: Pick<ChatComposerBarProps, 'locale' | 'skillsLabel' | 'onOpenGoal' | 'onOpenSchedule'>) {
+}: Pick<ChatComposerBarProps, 'locale' | 'skillsLabel' | 'skills' | 'onPickSkill' | 'onOpenGoal' | 'onOpenSchedule'>) {
   return (
     <DropdownMenu onOpenChange={(open) => { if (open) trackComposerPillOpened('tools') }}>
       <DropdownMenuTrigger asChild>
@@ -74,12 +82,46 @@ function ComposerToolsMenu({
         {skillsLabel ? (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel
-              className="font-mono text-[11px] font-normal text-muted-foreground"
-              data-testid="composer-skills-pill"
-            >
-              Skills · {skillsLabel}
-            </DropdownMenuLabel>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger
+                className="font-mono text-[12px] font-normal text-muted-foreground"
+                data-testid="composer-skills-pill"
+              >
+                Skills · {skillsLabel}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent
+                side="right"
+                align="end"
+                className="w-56 overflow-y-auto"
+                style={{ maxHeight: '22rem' }}
+                data-testid="composer-skills-menu"
+              >
+                <TooltipProvider delayDuration={300}>
+                  {skills.length > 0 ? skills.map((skill) => (
+                    <Tooltip key={skill.slash}>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuItem
+                          className="font-mono text-[12px]"
+                          onSelect={() => onPickSkill?.(skill.slash)}
+                          data-testid={`composer-skill-${skill.slash}`}
+                        >
+                          /{skill.slash}
+                        </DropdownMenuItem>
+                      </TooltipTrigger>
+                      {skill.description ? (
+                        <TooltipContent side="right" data-testid={`composer-skill-tip-${skill.slash}`}>
+                          {skill.description}
+                        </TooltipContent>
+                      ) : null}
+                    </Tooltip>
+                  )) : (
+                  <DropdownMenuItem disabled data-testid="composer-skills-empty">
+                    No skills reported for this session
+                  </DropdownMenuItem>
+                  )}
+                </TooltipProvider>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
           </>
         ) : null}
       </DropdownMenuContent>
@@ -126,6 +168,8 @@ export function ChatComposerBar({
   locale = 'en',
   deck,
   skillsLabel,
+  skills,
+  onPickSkill,
   onOpenGoal,
   onOpenSchedule,
   working = false,
@@ -140,6 +184,8 @@ export function ChatComposerBar({
         <ComposerToolsMenu
           locale={locale}
           skillsLabel={skillsLabel}
+          skills={skills}
+          onPickSkill={onPickSkill}
           onOpenGoal={onOpenGoal}
           onOpenSchedule={onOpenSchedule}
         />

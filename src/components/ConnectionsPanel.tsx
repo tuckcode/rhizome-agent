@@ -1,15 +1,15 @@
 import { forwardRef, lazy, Suspense, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { ArrowsIn, ArrowsOut } from '@phosphor-icons/react'
+import { X } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { trackEvent } from '../lib/telemetry'
 import type { AppLocale } from '../lib/i18n'
-import { APP_STORAGE_KEYS } from '../constants/appStorage'
-import { usePanelWidth } from '../hooks/usePanelWidth'
-import { startResizeDrag } from '../utils/startResizeDrag'
 import { SessionActivityHistory, type SessionActivityRetainedState } from './SessionActivityHistory'
 import type { GraphViewRetainedState } from './graph/GraphView'
 import {
+  CONNECTIONS_OPEN_EVENT,
   NOTES_CHROME_EVENT,
+  consumePendingConnectionsFocus,
+  type ConnectionsOpenDetail,
   consumePendingConnectionsView,
   type ConnectionsChromeView,
   type NotesChromeDestination,
@@ -35,9 +35,8 @@ function readPlacements(): Record<View, Placement> {
   } catch { return { graph: 'sidebar', mycelium: 'sidebar' } }
 }
 /**
- * Graph and Mycelium sit under Notes on the Changes tab. Height is the
- * thing you drag — Notes stays the heavy half, this is the bottom quarter
- * to half. Inbox keeps the full notes list (no graph chrome).
+ * Graph and Mycelium stay closed until an icon or a context menu opens them.
+ * They open over the workspace. They do not take a share of the Notes column.
  */
 export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
   vaultPath: string
@@ -50,7 +49,8 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
 }>(function ConnectionsPanel({ vaultPath, locale = 'en', onOpenNote, canOpenNote, requestedView }, ref) {
   const [placements, setPlacements] = useState(readPlacements)
   const [view, setView] = useState<View>(() => requestedView?.view ?? 'graph')
-  const [expanded, setExpanded] = useState(false)
+  const [presented, setPresented] = useState(() => requestedView != null)
+  const [graphFocusToken, setGraphFocusToken] = useState(0)
   const [graphState, setGraphState] = useState<GraphViewRetainedState>({ selectedId: null, egoRootId: null, query: '', hiddenTypes: [], hideGhosts: false })
   const [myceliumState, setMyceliumState] = useState<SessionActivityRetainedState>(() => ({
     path: requestedView?.view === 'mycelium' ? requestedView.focusPath ?? '' : '',
@@ -64,10 +64,8 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
   const [seenRequestId, setSeenRequestId] = useState<number | null>(
     () => requestedView?.requestId ?? null,
   )
-  const height = usePanelWidth(APP_STORAGE_KEYS.connectionsPanelHeight, 280, 140, 560)
   const available = (['graph', 'mycelium'] as const).filter(v => placements[v] !== 'off')
   const selected = available.includes(view) ? view : available[0]
-  const full = Boolean(selected) && (expanded || placements[selected] === 'full')
   function changePlacement(target: View, placement: Placement) {
     const next = { ...placements, [target]: placement }
     setPlacements(next)
@@ -81,9 +79,14 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
   function applyRequest(target: View, options?: { focusPath?: string }) {
     if (placements[target] === 'off') changePlacement(target, 'sidebar')
     select(target)
+    setPresented(true)
     if (target === 'mycelium' && options?.focusPath) {
       setMyceliumState({ path: options.focusPath, selected: null, scrollTop: 0 })
       setMyceliumFocusToken(token => token + 1)
+    }
+    if (target === 'graph' && options?.focusPath) {
+      setGraphState(state => ({ ...state, selectedId: options.focusPath ?? null, egoRootId: options.focusPath ?? null }))
+      setGraphFocusToken(token => token + 1)
     }
   }
   const applyRequestRef = useRef(applyRequest)
@@ -92,22 +95,35 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
   })
   useEffect(() => {
     const pending = consumePendingConnectionsView()
-    if (pending) applyRequestRef.current(pending)
+    const pendingFocus = consumePendingConnectionsFocus()
+    if (pending) applyRequestRef.current(pending, pendingFocus ? { focusPath: pendingFocus } : undefined)
     const onChrome = (event: Event) => {
       const destination = (event as CustomEvent<NotesChromeDestination>).detail
       if (destination === 'graph' || destination === 'mycelium') {
-        applyRequestRef.current(destination as ConnectionsChromeView)
+        consumePendingConnectionsView()
+        const focusPath = consumePendingConnectionsFocus()
+        applyRequestRef.current(destination as ConnectionsChromeView, focusPath ? { focusPath } : undefined)
+      }
+    }
+    const onOpen = (event: Event) => {
+      const detail = (event as CustomEvent<ConnectionsOpenDetail>).detail
+      if (detail?.view === 'graph' || detail?.view === 'mycelium') {
+        applyRequestRef.current(detail.view, detail.focusPath ? { focusPath: detail.focusPath } : undefined)
       }
     }
     window.addEventListener(NOTES_CHROME_EVENT, onChrome)
-    return () => window.removeEventListener(NOTES_CHROME_EVENT, onChrome)
+    window.addEventListener(CONNECTIONS_OPEN_EVENT, onOpen)
+    return () => {
+      window.removeEventListener(NOTES_CHROME_EVENT, onChrome)
+      window.removeEventListener(CONNECTIONS_OPEN_EVENT, onOpen)
+    }
   }, [])
-  // Both views open notes the same way: hand the path up, then get out of the
-  // editor's way. Overlay collapses; the docked sub-panel stays so Notes and
-  // Graph are still both there after you open a file.
+  function closePanel() {
+    setPresented(false)
+  }
   function openNote(path: string) {
     onOpenNote?.(path)
-    setExpanded(false)
+    closePanel()
   }
   useImperativeHandle(ref, () => ({
     openView(target, options) {
@@ -117,34 +133,25 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
   if (requestedView && requestedView.requestId !== seenRequestId) {
     setSeenRequestId(requestedView.requestId)
     setView(requestedView.view)
+    setPresented(true)
     if (requestedView.view === 'mycelium' && requestedView.focusPath) {
       setMyceliumState({ path: requestedView.focusPath, selected: null, scrollTop: 0 })
       setMyceliumFocusToken(token => token + 1)
     }
   }
-  return <section
-    className="relative flex min-h-0 shrink-0 flex-col border-t border-border bg-background"
-    style={{ height: full ? undefined : height.width, maxHeight: full ? undefined : '50%' }}
+  if (!presented) return null
+  return <div
+    data-testid="connections-panel"
+    data-expanded="true"
+    role="region"
     aria-label="Connections"
+    className="fixed inset-4 top-10 z-40 flex min-h-0 flex-col overflow-hidden rounded border border-border bg-background shadow-lg"
   >
-    {/* Top-edge handle: dragging up (negative deltaY) grows the panel, which
-        matches `usePanelWidth.resizeBy` ("negative delta means growth"). */}
-    {!full && <div
-      role="separator"
-      aria-orientation="horizontal"
-      aria-label="Resize graph"
-      className="absolute inset-x-0 -top-[10px] z-20 h-4 cursor-row-resize bg-transparent transition-colors hover:bg-border"
-      onMouseDown={event => startResizeDrag(event, 'row-resize', (_deltaX, deltaY) => height.resizeBy(deltaY))}
-    />}
-    <div data-testid="connections-panel" data-expanded={full ? 'true' : 'false'} className={full ? 'fixed inset-4 top-10 z-40 flex min-h-0 flex-col overflow-hidden rounded border border-border bg-background shadow-lg' : 'flex min-h-0 flex-1 flex-col overflow-hidden'}>
       <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-1">
         <div role="tablist" aria-label="Connection views" className="flex min-w-0 flex-1">
           {available.map(target => <button type="button" role="tab" aria-selected={selected === target} key={target} className={`min-h-8 px-2 text-xs ${selected === target ? 'bg-muted text-foreground' : 'text-muted-foreground'}`} onClick={() => select(target)}>{target === 'graph' ? 'Graph' : 'Mycelium'}</button>)}
         </div>
-        {selected && <Button type="button" variant="ghost" size="icon-xs" className="p-2 text-muted-foreground" aria-label={full ? 'Return to side panel' : 'Expand connections'} onClick={() => {
-          setExpanded(!full)
-          trackEvent('connections_expanded', { expanded: full ? 0 : 1 })
-        }}>{full ? <ArrowsIn size={14} /> : <ArrowsOut size={14} />}</Button>}
+        <Button type="button" variant="ghost" size="icon-xs" className="p-2 text-muted-foreground" aria-label="Close connections" onClick={closePanel}><X size={14} /></Button>
       </div>
       {!selected && <div className="space-y-2 p-3">
         <p className="text-xs text-muted-foreground">Enable a view in Connections settings.</p>
@@ -160,10 +167,9 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
       >
         <Suspense fallback={<p className="p-3 text-xs">Loading connections…</p>}>
           {selected === 'graph'
-            ? <GraphView vaultPath={vaultPath} locale={locale} compact={!full} onOpenNote={openNote} retainedState={graphState} onRetainedStateChange={setGraphState} />
-            : <SessionActivityHistory key={myceliumFocusToken} expanded={full} locale={locale} vaultPath={vaultPath} canOpenNote={canOpenNote} onOpenNote={onOpenNote ? openNote : undefined} retainedState={myceliumState} onRetainedStateChange={setMyceliumState} />}
+            ? <GraphView key={graphFocusToken} vaultPath={vaultPath} locale={locale} onOpenNote={openNote} retainedState={graphState} onRetainedStateChange={setGraphState} />
+            : <SessionActivityHistory key={myceliumFocusToken} expanded locale={locale} vaultPath={vaultPath} canOpenNote={canOpenNote} onOpenNote={onOpenNote ? openNote : undefined} retainedState={myceliumState} onRetainedStateChange={setMyceliumState} />}
         </Suspense>
       </div>}
-    </div>
-  </section>
+  </div>
 })

@@ -230,13 +230,6 @@ function TranslatedToggleIconAction({
 }
 
 const TOGGLE_ACTION_CONFIGS = {
-  raw: {
-    activeClassName: 'text-foreground',
-    activeLabelKey: 'editor.toolbar.rawReturn',
-    inactiveLabelKey: 'editor.toolbar.rawOpen',
-    shortcut: '⌘\\',
-    renderIcon: () => <Code size={16} className={BREADCRUMB_ICON_CLASS} />,
-  },
   favorite: {
     activeClassName: 'text-[var(--accent-yellow)]',
     activeLabelKey: 'editor.toolbar.removeFavorite',
@@ -285,8 +278,24 @@ function ConfiguredToggleAction({
   )
 }
 
-function RawToggleButton({ rawMode, locale = 'en', onToggleRaw }: { rawMode?: boolean; locale?: AppLocale; onToggleRaw?: () => void }) {
-  return <ConfiguredToggleAction active={!!rawMode} config={TOGGLE_ACTION_CONFIGS.raw} locale={locale} onClick={onToggleRaw} />
+function RawToggleButton({ rawMode, onToggleRaw }: { rawMode?: boolean; onToggleRaw?: () => void }) {
+  if (!onToggleRaw) return null
+  const showingSource = !!rawMode
+  return (
+    <Button
+      type="button"
+      variant={showingSource ? 'secondary' : 'ghost'}
+      size="sm"
+      className="breadcrumb-bar__source-toggle gap-1 text-xs"
+      aria-pressed={showingSource}
+      aria-label={showingSource ? 'Return to the editor' : 'Show the note source'}
+      data-testid="breadcrumb-source-toggle"
+      onClick={onToggleRaw}
+    >
+      <Code size={16} className={BREADCRUMB_ICON_CLASS} />
+      {showingSource ? 'Editor' : 'Source'}
+    </Button>
+  )
 }
 
 function LockToggleButton({
@@ -951,11 +960,6 @@ function BreadcrumbActions({
       <OverflowToolbarAction>
         <NeighborhoodAction entry={entry} locale={locale} onEnterNeighborhood={onEnterNeighborhood} />
       </OverflowToolbarAction>
-      {!forceRawMode && (
-        <OverflowToolbarAction>
-          <RawToggleButton rawMode={rawMode} locale={locale} onToggleRaw={onToggleRaw} />
-        </OverflowToolbarAction>
-      )}
       <OverflowToolbarAction>
         <LockToggleButton noteLocked={noteLocked} onToggleNoteLock={onToggleNoteLock} />
       </OverflowToolbarAction>
@@ -1008,6 +1012,7 @@ function BreadcrumbActions({
         showResponsiveActions={overflowCollapsed}
         locale={locale}
       />
+      {!forceRawMode ? <RawToggleButton rawMode={rawMode} onToggleRaw={onToggleRaw} /> : null}
       <CloseNoteAction locale={locale} onCloseNote={onCloseNote} />
     </div>
   )

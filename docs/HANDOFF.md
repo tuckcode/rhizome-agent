@@ -57,7 +57,9 @@ file.
 **Origin:** Cursor Grok 4.7 · 2026-09-26 · thin macOS title bar + Command Palette (local, unpushed).
 **Origin:** Cursor Grok 4.7 · 2026-09-26 · retargeted Chunk vcs + release Pages URLs off refactoringhq (local, unpushed).
 **Origin:** GPT-6 Codex · 2026-09-26 · splash grows two branches, then breathes with shaded nodes. Browser checks passed. Installed app unchanged.
-`origin/main` = **`5c37d28`** (2026-09-27). Local HEAD matches; nothing unpushed. Installed app = **`d0a55f8`**, **2026-09-26 04:21 CDT** — every commit after that is source-only until rebuild. Latest detail: [`2026-09-27-0951`](plans/handoffs/2026-09-27-0951-claude-opus-5-5-blocknote-055-and-cleanup.md). Open work: [`2026-09-27-cursor-swarm-plan.md`](plans/2026-09-27-cursor-swarm-plan.md).
+**Origin:** Cursor Grok 4.7 · 2026-09-28 · stall plan only. Vault-index gate and Source control are local and uncommitted. Installed app unchanged.
+**Origin:** Cursor Grok 4.7 · 2026-10-03 · Chat waits leave the UI thread. Add to Chat list copies Nous reasoning and input modalities. Installed app unchanged.
+`origin/main` was **`ff9909a`** before this commit. Installed app = **`d0a55f8`**, **2026-09-26 04:21 CDT**. Latest detail: [`2026-10-03-0942`](plans/handoffs/2026-10-03-0942-cursor-grok-4-7-nous-catalog-fields.md).
 Handy: [`2026-09-20-1230`](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md).
 Recap: [`2026-09-20-1228`](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md).
 Detail: [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
@@ -114,20 +116,16 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-09-30 · open issues](plans/2026-09-30-open-issues-plan.md) — closed #46, #13, #52, #51 as already built. #23 stays open: search hits are not wired. #40 and #56 stay a product call.
+- [2026-10-03 · Nous catalog fields](plans/handoffs/2026-10-03-0942-cursor-grok-4-7-nous-catalog-fields.md) — Add to Chat list copies reasoning and input modalities from each Nous record. Name guesses are gone. Not in the installed app.
+- [2026-10-03 · Nous catalog and stall sample](plans/handoffs/2026-10-03-0921-cursor-grok-4-7-nous-catalog-handy.md) — stall sampled; shell waits, skills, lights, and image bubble are uncommitted. Nous already sends reasoning and image modalities. No automatic model refresh.
+- [2026-10-02 · stall and empty reply](plans/handoffs/2026-10-02-1649-cursor-grok-4-7-stall-and-empty-reply.md) — run the stall sample, then the empty chat line. #26 closed: Update now installs Prime.
+- [2026-09-28 · stall plan](plans/handoffs/2026-09-28-1344-cursor-grok-4-7-stall-plan.md) — pinwheel plan for startup, Settings, and AI Agents, revised for an Opus 5.5 review. No live click timed. Vault-index gate and Source control uncommitted.
 - [2026-09-27 · BlockNote 0.55 + cleanup](plans/handoffs/2026-09-27-0951-claude-opus-5-5-blocknote-055-and-cleanup.md) — BlockNote 0.55/tiptap 3.31.3 with patches ported; Dependabot, C80/C82, stranded files pushed; native QA not done; swarm plan written.
 - [2026-09-26 · animated splash](plans/handoffs/2026-09-26-0818-gpt-6-splash-logo.md) — shaded mark grows two branches, then breathes. Dither artwork and original Codex chat located. Source only.
 - [2026-09-26 · macOS title bar](plans/handoffs/2026-09-26-0635-cursor-grok-4-7-macos-titlebar.md) — 32px MacOSTitlebar, y=9, Command Palette docked; packaged app not checked.
 - [2026-09-26 · public prep](plans/handoffs/2026-09-26-0559-claude-opus-5-5-public-prep.md) — secret scan clean; AGPL confirmed, Tolaria credited; Gmail-in-history open.
 - [2026-09-26 · Astra redesign](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md) — redesign + login-note skip + list markers pushed as `d0a55f8`; app rebuilt; native QA not done.
-- [2026-09-26 · handy wrap](plans/handoffs/2026-09-26-0227-cursor-grok-4-7-handy.md) — app is `18eb5ba`; rail fix local; staged login skip and list markers are separate.
-- [2026-09-26 · Claude handoff](plans/handoffs/2026-09-26-0028-cursor-grok-4-7-claude-handoff.md) — installed app is `18eb5ba`; rail follow-up is local; audit file is Astra’s corrected report.
-- [2026-09-25 · Astra frontend audit brief](plans/handoffs/2026-09-25-1926-gpt-6-codex-astra-frontend-audit-brief.md) — native audit instructions and the sidebar clipping report.
-- [2026-09-21 · Astra next phase](plans/handoffs/2026-09-21-2104-cursor-grok-4-7-astra-next-phase.md) — origin `2a24eed`; app `b7264d6`; planning only.
-- [2026-09-21 · C75 living docs](plans/handoffs/2026-09-21-0215-cursor-grok-4-6-c75-docs.md) — hide leaves spawned Prime warm; #66–#68 closed.
-- [2026-09-20 · Astra combined handoff](plans/handoffs/2026-09-20-1234-claude-opus-5-astra-combined-handoff.md) — D1–D7 audit, plugin rescope, ADR findings, and the Edit-list completion contract.
-- [2026-09-20 · Astra ↔ Cursor recap](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md) — plan through #26 CPR, D1–D7 local, Free-only dirt.
-- [2026-09-20 · #26 CPR](plans/handoffs/2026-09-20-0723-cursor-grok-4-6-issue-26-cpr.md) — origin and app `b7264d6`; live Update now still Q.
-- [2026-09-20 · Lane S vault safety](plans/handoffs/2026-09-20-0545-cursor-grok-4-6-lane-s-vault-safety.md) — JS refuses `~`/`~/` as HOME vault; nested vaults stay; #46 open until live no-vault Chat.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)
@@ -251,6 +249,7 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 
 ## Open threads
+- **C83-OPEN (2026-10-03): pinwheel sample is written; the off-main-thread change is uncommitted; the second sample is not done.** Empty reply not captured. Nous catalog still guesses from the id. Detail: [`2026-10-03-0921`](plans/handoffs/2026-10-03-0921-cursor-grok-4-7-nous-catalog-handy.md). Plan: [`plans/2026-10-02-stall-and-empty-reply.md`](plans/2026-10-02-stall-and-empty-reply.md).
 - **C82-FIXED (2026-09-27): check scripts could not start `pnpm` on Windows.** Fixed: `scripts/spawn-pnpm.mjs` runs `pnpm` through `cmd.exe /d /c` on Windows; used by the coverage, coverage-shards and smoke-server scripts. Test: `node --test scripts/spawn-pnpm.test.mjs`. Verified on Windows: coverage shards pass (88.55% lines), smoke 30/30. Original: `scripts/run-vitest-coverage.mjs` (`clearVitestCache`, and the coverage run) and `scripts/playwright-smoke-server.mjs` call `spawn('pnpm', …)` without a shell. On Windows `pnpm` is an npm `.cmd` shim, which Node's `spawn` cannot run without `shell: true`, so both fail `spawn pnpm ENOENT`. This fails the pre-push frontend and Playwright lanes on Windows. Found by Claude Opus 5.5 (Claude Code desktop).
 - **C81-OPEN (2026-09-27): Playwright browser install hangs on Windows, silently.** Two parts. (1) Playwright 1.58.2's `install chromium` downloaded the 181MB zip, extracted one file, then stopped with no CPU use; `tar -xf` of the same zip took under 1s. Unconfirmed cause: Playwright's unzip under Node 26.4. Workaround used: manual `tar` into `%LOCALAPPDATA%\ms-playwright\chromium-1208` and `chromium_headless_shell-1208`, plus an empty `INSTALLATION_COMPLETE` file in each. (2) `.husky/pre-push` `ensure_playwright_browser` sends the install output to `/dev/null` and has no timeout, so the hang showed as a push that stopped for 20+ minutes with no message. Found by Claude Opus 5.5 (Claude Code desktop).
 - **C80-FIXED (2026-09-27): `pnpm test:mcp` failed 16 of 94 tests on Windows.** Fixed: `vault.js` returns note paths with `/` on every platform (`toVaultNotePath`; real bug, MCP clients got `notelpha.md`); the 6 symlink tests skip with a reason when the machine cannot create symlinks; the `RHIZOME_TOOL_PATH` group skips on Windows (shebang stub). Windows symlink containment is therefore unverified here. Original: Found by Claude Opus 5.5 (Claude Code desktop) during the Dependabot pass; not caused by it. Three causes, all Windows-only: tests expect `/` in note paths but `tool-service.js` / `vault.js` return `\` (`note\alpha.md`); `fs.symlink` in `vault.security.test.js` needs admin or Developer Mode (`EPERM`); the `RHIZOME_TOOL_PATH` wiring tests get empty stdout from their fake sidecar (`Unexpected end of JSON input`). The path-separator one may be a real bug: MCP clients on Windows receive backslash note paths. **Corrected same day:** the pre-push frontend lane does run `pnpm test:mcp` (`.husky/pre-push`, `FRONTEND_LANE`), so this blocks every push from Windows.

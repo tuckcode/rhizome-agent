@@ -4,7 +4,8 @@
 //! hosts (OpenRouter, Anthropic) are already in that list. An OpenAI-compatible
 //! host such as Nous Portal is not, until `~/.prime/agent/models.json` names it
 //! and lists model ids. Settings → Add to Chat list is that write: merge one
-//! provider, never the API key, never `auth.json`.
+//! provider, copy each record's reasoning flag and input modalities, never
+//! the API key, never `auth.json`.
 
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -30,8 +31,24 @@ pub fn models_json_path() -> Option<PathBuf> {
     dirs::home_dir().map(|home| home.join(".prime").join("agent").join("models.json"))
 }
 
-/// Model ids from an OpenAI-shaped `/v1/models` body.
-pub fn openai_model_ids(value: &Value) -> Vec<String> {
+/// One Nous `/v1/models` record, reduced to the fields Prime stores.
+///
+/// `reasoning` on the wire is an object when the model can think, and absent
+/// when it cannot. Prime stores a boolean. `input` is only `text` and `image`.
+/// Nous also sends video, file, and audio. Those tokens are dropped. Prime's
+/// schema rejects them, and a rejected file hides the whole provider.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NousCatalogModel {
+    pub id: String,
+    pub reasoning: bool,
+    pub input: Vec<String>,
+}
+
+/// Catalog rows from an OpenAI-shaped `/v1/models` body.
+///
+/// Fields come from each record. The id is not a hint. A name that contains
+/// "claude" or "glm" does not set reasoning or image input.
+pub fn nous_catalog_models(value: &Value) -> Vec<NousCatalogModel> {
     let items = value
         .get("data")
         .and_then(Value::as_array)
@@ -39,37 +56,66 @@ pub fn openai_model_ids(value: &Value) -> Vec<String> {
     let Some(items) = items else {
         return Vec::new();
     };
-    let mut ids: Vec<String> = items
-        .iter()
-        .filter_map(|entry| {
-            entry
-                .get("id")
-                .and_then(Value::as_str)
-                .map(str::trim)
-                .filter(|id| !id.is_empty())
-                .map(str::to_string)
-        })
-        .collect();
-    ids.sort();
-    ids.dedup();
-    ids
+    let mut models: Vec<NousCatalogModel> =
+        items.iter().filter_map(catalog_model_from_record).collect();
+    models.sort_by(|left, right| left.id.cmp(&right.id));
+    models.dedup_by(|left, right| left.id == right.id);
+    models
 }
 
-pub fn looks_like_reasoning_model(id: &str) -> bool {
-    let lower = id.to_ascii_lowercase();
-    lower.contains("hermes") || lower.contains("reason") || lower.contains("think")
+fn catalog_model_from_record(entry: &Value) -> Option<NousCatalogModel> {
+    let id = entry
+        .get("id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|id| !id.is_empty())?;
+    Some(NousCatalogModel {
+        id: id.to_string(),
+        reasoning: record_supports_reasoning(entry),
+        input: record_input_modalities(entry),
+    })
+}
+
+fn record_supports_reasoning(entry: &Value) -> bool {
+    match entry.get("reasoning") {
+        Some(Value::Bool(value)) => *value,
+        Some(Value::Object(_)) => true,
+        _ => false,
+    }
+}
+
+fn record_input_modalities(entry: &Value) -> Vec<String> {
+    let Some(list) = entry
+        .pointer("/architecture/input_modalities")
+        .and_then(Value::as_array)
+    else {
+        return vec!["text".to_string()];
+    };
+    let mut input = Vec::new();
+    for value in list {
+        let Some(token) = value.as_str() else {
+            continue;
+        };
+        if matches!(token, "text" | "image") && !input.iter().any(|seen| seen == token) {
+            input.push(token.to_string());
+        }
+    }
+    if input.is_empty() {
+        input.push("text".to_string());
+    }
+    input
 }
 
 /// Merge Nous Portal into an existing `models.json` object.
 ///
 /// Other providers stay as they were. The API key field is the environment
 /// variable *name*, never a pasted secret.
-pub fn merge_nous_portal(existing: &Value, model_ids: &[String]) -> Result<Value, String> {
-    if model_ids.is_empty() {
+pub fn merge_nous_portal(existing: &Value, models: &[NousCatalogModel]) -> Result<Value, String> {
+    if models.is_empty() {
         return Err("Nous Portal returned no models.".into());
     }
     if existing.is_null() {
-        return Ok(models_file_with_nous(json!({}), model_ids));
+        return Ok(models_file_with_nous(json!({}), models));
     }
     let Value::Object(_) = existing else {
         return Err(
@@ -77,19 +123,20 @@ pub fn merge_nous_portal(existing: &Value, model_ids: &[String]) -> Result<Value
                 .into(),
         );
     };
-    Ok(models_file_with_nous(existing.clone(), model_ids))
+    Ok(models_file_with_nous(existing.clone(), models))
 }
 
-fn models_file_with_nous(mut root: Value, model_ids: &[String]) -> Value {
+fn models_file_with_nous(mut root: Value, models: &[NousCatalogModel]) -> Value {
     if !root.is_object() {
         root = json!({});
     }
-    let models: Vec<Value> = model_ids
+    let models: Vec<Value> = models
         .iter()
-        .map(|id| {
+        .map(|model| {
             json!({
-                "id": id,
-                "reasoning": looks_like_reasoning_model(id),
+                "id": model.id,
+                "reasoning": model.reasoning,
+                "input": model.input,
             })
         })
         .collect();
@@ -117,9 +164,9 @@ fn models_file_with_nous(mut root: Value, model_ids: &[String]) -> Value {
     root
 }
 
-pub fn write_nous_portal_models(path: &Path, model_ids: &[String]) -> Result<usize, String> {
+pub fn write_nous_portal_models(path: &Path, models: &[NousCatalogModel]) -> Result<usize, String> {
     let existing = read_models_json(path)?;
-    let merged = merge_nous_portal(&existing, model_ids)?;
+    let merged = merge_nous_portal(&existing, models)?;
     let pretty = serde_json::to_string_pretty(&merged)
         .map_err(|error| format!("Could not write models.json: {error}"))?;
     if let Some(parent) = path.parent() {
@@ -132,7 +179,7 @@ pub fn write_nous_portal_models(path: &Path, model_ids: &[String]) -> Result<usi
     }
     fs::write(path, format!("{pretty}\n"))
         .map_err(|error| format!("Could not write {path}: {error}", path = path.display()))?;
-    Ok(model_ids.len())
+    Ok(models.len())
 }
 
 fn read_models_json(path: &Path) -> Result<Value, String> {
@@ -149,7 +196,7 @@ fn read_models_json(path: &Path) -> Result<Value, String> {
     })
 }
 
-pub fn fetch_nous_model_ids() -> Result<Vec<String>, String> {
+pub fn fetch_nous_catalog() -> Result<Vec<NousCatalogModel>, String> {
     let client = reqwest::blocking::Client::builder()
         .timeout(FETCH_TIMEOUT)
         .user_agent("Rhizome Agent")
@@ -166,19 +213,19 @@ pub fn fetch_nous_model_ids() -> Result<Vec<String>, String> {
     let body: Value = response
         .json()
         .map_err(|error| format!("Nous Portal returned a body this app could not read: {error}"))?;
-    let ids = openai_model_ids(&body);
-    if ids.is_empty() {
+    let models = nous_catalog_models(&body);
+    if models.is_empty() {
         return Err("Nous Portal returned no models.".into());
     }
-    Ok(ids)
+    Ok(models)
 }
 
 /// Fetch Nous Portal's public model list, merge it into Prime's `models.json`,
 /// then reload the attached session so Chat sees the new provider.
 pub fn ensure_nous_portal() -> Result<EnsureNousPortalResult, String> {
-    let ids = fetch_nous_model_ids()?;
+    let models = fetch_nous_catalog()?;
     let path = models_json_path().ok_or_else(|| "Could not find the home folder.".to_string())?;
-    let model_count = write_nous_portal_models(&path, &ids)?;
+    let model_count = write_nous_portal_models(&path, &models)?;
     let reloaded = crate::prime_session_host::reload_attached_session();
     Ok(EnsureNousPortalResult {
         provider: NOUS_PORTAL_PROVIDER.to_string(),
@@ -192,26 +239,63 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    fn row(id: &str, reasoning: bool, input: &[&str]) -> NousCatalogModel {
+        NousCatalogModel {
+            id: id.to_string(),
+            reasoning,
+            input: input.iter().map(|token| (*token).to_string()).collect(),
+        }
+    }
+
     #[test]
-    fn reads_openai_shaped_model_ids() {
+    fn reads_catalog_fields_from_each_record() {
         let body = json!({
             "data": [
-                { "id": "nousresearch/hermes-4-405b" },
                 { "id": "  " },
-                { "id": "tencent/hy3" },
-                { "id": "nousresearch/hermes-4-405b" }
+                {
+                    "id": "z-ai/glm-5.3-flash",
+                    "reasoning": { "mandatory": true, "supported_efforts": ["max", "high", "low"] },
+                    "architecture": { "input_modalities": ["text", "image", "video"] }
+                },
+                {
+                    "id": "~anthropic/claude-opus-latest",
+                    "architecture": { "input_modalities": ["text"] }
+                },
+                {
+                    "id": "baai/bge-m3",
+                    "architecture": { "input_modalities": ["text"] }
+                },
+                {
+                    "id": "acme/pictor-1",
+                    "reasoning": { "mandatory": false },
+                    "architecture": { "input_modalities": ["file", "image", "audio"] }
+                },
+                { "id": "acme/flag", "reasoning": false },
+                { "id": "z-ai/glm-5.3-flash" }
             ]
         });
         assert_eq!(
-            openai_model_ids(&body),
-            ["nousresearch/hermes-4-405b", "tencent/hy3"]
+            nous_catalog_models(&body),
+            vec![
+                row("acme/flag", false, &["text"]),
+                row("acme/pictor-1", true, &["image"]),
+                row("baai/bge-m3", false, &["text"]),
+                row("z-ai/glm-5.3-flash", true, &["text", "image"]),
+                row("~anthropic/claude-opus-latest", false, &["text"]),
+            ]
         );
     }
 
     #[test]
-    fn hermes_ids_count_as_reasoning() {
-        assert!(looks_like_reasoning_model("nousresearch/hermes-4-405b"));
-        assert!(!looks_like_reasoning_model("tencent/hy3"));
+    fn merge_writes_the_catalog_fields() {
+        let merged = merge_nous_portal(
+            &json!({}),
+            &[row("z-ai/glm-5.3-flash", true, &["text", "image"])],
+        )
+        .unwrap();
+        let model = &merged["providers"]["nous-portal"]["models"][0];
+        assert_eq!(model["reasoning"], true);
+        assert_eq!(model["input"], json!(["text", "image"]));
     }
 
     #[test]
@@ -227,7 +311,10 @@ mod tests {
         });
         let merged = merge_nous_portal(
             &existing,
-            &["nousresearch/hermes-4-405b".into(), "tencent/hy3".into()],
+            &[
+                row("nousresearch/hermes-4-405b", true, &["text"]),
+                row("tencent/hy3", false, &["text"]),
+            ],
         )
         .unwrap();
 
@@ -243,6 +330,8 @@ mod tests {
         assert_eq!(nous["models"][0]["reasoning"], true);
         assert_eq!(nous["models"][1]["id"], "tencent/hy3");
         assert_eq!(nous["models"][1]["reasoning"], false);
+        assert_eq!(nous["models"][0]["input"], json!(["text"]));
+        assert_eq!(nous["models"][1]["input"], json!(["text"]));
         let serialized = serde_json::to_string(&merged).unwrap();
         assert!(!serialized.contains("sk-"));
         assert!(!serialized.contains("paste-your-key"));
@@ -250,7 +339,8 @@ mod tests {
 
     #[test]
     fn merge_starts_a_missing_file() {
-        let merged = merge_nous_portal(&Value::Null, &["tencent/hy3".into()]).unwrap();
+        let merged =
+            merge_nous_portal(&Value::Null, &[row("tencent/hy3", false, &["text"])]).unwrap();
         assert_eq!(
             merged["providers"]["nous-portal"]["models"][0]["id"],
             "tencent/hy3"
@@ -268,7 +358,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("models.json");
         fs::write(&path, "{ not json }\n{ also not }\n").unwrap();
-        let error = write_nous_portal_models(&path, &["tencent/hy3".into()]).unwrap_err();
+        let error =
+            write_nous_portal_models(&path, &[row("tencent/hy3", false, &["text"])]).unwrap_err();
         assert!(error.contains("not valid JSON"));
         let leftover = fs::read_to_string(&path).unwrap();
         assert!(leftover.contains("not json"));
@@ -283,7 +374,8 @@ mod tests {
             r#"{ "providers": { "ollama": { "baseUrl": "http://localhost:11434/v1" } } }"#,
         )
         .unwrap();
-        let count = write_nous_portal_models(&path, &["tencent/hy3".into()]).unwrap();
+        let count =
+            write_nous_portal_models(&path, &[row("tencent/hy3", false, &["text"])]).unwrap();
         assert_eq!(count, 1);
         let parsed: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(

@@ -237,6 +237,20 @@ describe('NoteList context menu — ask the agent', () => {
     expect(screen.queryByText('Ask the agent about this note')).not.toBeInTheDocument()
   })
 
+  it('opens the node map for that note, and the Mycelium report', () => {
+    const listener = vi.fn()
+    window.addEventListener('rhizome:connections-open', listener)
+    renderNoteListWithFullActionMenu()
+    fireEvent.contextMenu(screen.getByText('Build Laputa App'))
+    expect(screen.getByText('Mycelium report')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Node map'))
+    expect((listener.mock.calls[0]?.[0] as CustomEvent<{ view: string, focusPath?: string }>).detail).toEqual({
+      view: 'graph',
+      focusPath: mockEntries[0].path,
+    })
+    window.removeEventListener('rhizome:connections-open', listener)
+  })
+
   it('keeps Copy file path, not a selected-text Copy path leftover', () => {
     renderNoteListWithFullActionMenu()
     fireEvent.contextMenu(screen.getByText('Build Laputa App'))

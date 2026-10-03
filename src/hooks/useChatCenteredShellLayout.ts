@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useChatNoteSplit } from '../components/chatNoteSplit'
 import { bumpViewModeToOpenNotes, viewModeAfterCollapseNotes, viewModeAfterToggleBrowse, resolveShellLayout, type ShellKind } from '../lib/shellLayout'
-import { fitPanePreset, normalizedWidths, resizePresetWidth, type PaneColumn } from '../lib/panePresets'
+import { fitPanePreset, resizePresetWidth, type PaneColumn } from '../lib/panePresets'
 import { useShellCompactLayout } from './useShellCompactLayout'
 import type { useViewMode } from './useViewMode'
 
@@ -38,17 +38,20 @@ export function useChatCenteredShellLayout(args: UseChatCenteredShellLayoutArgs)
   const collapseNotes = useCallback(() => setViewMode(viewModeAfterCollapseNotes()), [setViewMode])
   const toggleBrowse = useCallback(() => setViewMode(viewModeAfterToggleBrowse(panePreset.id === 'workbench')), [panePreset.id, setViewMode])
   const { setSplit } = useChatNoteSplit(args)
-  const liveResize = useRef({ panePreset, context, updatePanePreset })
+  const liveResize = useRef({ panePreset, context, updatePanePreset, fitted: fit.widths })
   useEffect(() => {
     liveResize.current = {
       panePreset,
       context: { shellWidth: width, noteOpen, railPinned, hideNotesForCanvas },
       updatePanePreset,
+      fitted: fit.widths,
     }
-  }, [hideNotesForCanvas, noteOpen, panePreset, railPinned, updatePanePreset, width])
+  }, [fit.widths, hideNotesForCanvas, noteOpen, panePreset, railPinned, updatePanePreset, width])
   const resizeColumn = useCallback((column: PaneColumn, delta: number) => {
     const live = liveResize.current
-    const requested = normalizedWidths(live.panePreset.widths)[column] + delta
+    // Drag from the width on screen. The saved width can sit at the old cap
+    // while the fitted column is narrower, and that gap makes the handle jump.
+    const requested = live.fitted[column] + delta
     live.updatePanePreset(resizePresetWidth(live.panePreset, column, requested, live.context))
   }, [])
   return { ...layout, shellRef, widths: fit.widths, fittedRailPinned: fit.railPinned, workspace: fit.workspace, railFits, resizeColumn, openNotes: ensureNotesOpen, ensureNotesOpen, collapseNotes, toggleBrowse, setSplit }

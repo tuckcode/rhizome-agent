@@ -37,6 +37,31 @@ describe('AiMessage', () => {
     expect(screen.getByText('Hello AI')).toBeTruthy()
   })
 
+  it('shows a thumbnail when the user turn is only an image', () => {
+    render(
+      <AiMessage
+        userMessage=""
+        actions={[]}
+        images={[{ type: 'image', data: 'abc', mimeType: 'image/png' }]}
+      />,
+    )
+    const thumb = screen.getByTestId('user-message-image')
+    expect(thumb).toHaveAttribute('src', 'data:image/png;base64,abc')
+    expect(thumb.closest('[data-testid="ai-message"]')).not.toHaveTextContent('abc')
+  })
+
+  it('shows read aloud only after the reply finishes', () => {
+    const { rerender } = render(
+      <AiMessage userMessage="Hi" actions={[]} response="Hello there" messageId="m1" isStreaming />,
+    )
+    expect(screen.queryByTestId('ai-message-read-aloud')).not.toBeInTheDocument()
+
+    rerender(
+      <AiMessage userMessage="Hi" actions={[]} response="Hello there" messageId="m1" />,
+    )
+    expect(screen.getByTestId('ai-message-read-aloud')).toHaveAttribute('aria-label', 'Read aloud')
+  })
+
   it('shows a clock under the ask when createdAtMs is set (C70)', () => {
     const createdAtMs = new Date(2026, 8, 6, 15, 35, 0).getTime()
     render(<AiMessage userMessage="Hello AI" actions={[]} createdAtMs={createdAtMs} />)

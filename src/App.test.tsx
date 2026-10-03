@@ -710,9 +710,9 @@ describe('App', () => {
     input.textContent = 'Keep this unsent draft'
     fireEvent.input(input)
     await selectChangesInVaultPanel()
-    fireEvent.click(await screen.findByRole('button', { name: 'Expand connections' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Wiki Graph' }))
     await screen.findByTestId('graph-view')
-    fireEvent.click(screen.getByRole('button', { name: 'Return to side panel' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close connections' }))
     expect(await screen.findByTestId('agent-input')).toHaveTextContent('Keep this unsent draft')
   })
 
@@ -721,12 +721,11 @@ describe('App', () => {
     render(<App />)
     await screen.findByTestId('chat-home')
     await selectChangesInVaultPanel()
-    fireEvent.click(await screen.findByRole('button', { name: 'Expand connections' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Wiki Graph' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Open note' }))
-    await waitFor(() => expect(screen.getByTestId('connections-panel')).toHaveAttribute('data-expanded', 'false'))
+    await waitFor(() => expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument())
     await waitFor(() => expect(window.__rhizomeTest?.activeTabPath).toBe('/vault/project/test.md'))
     expect(await screen.findByTestId('blocknote-view')).toBeVisible()
-    expect(screen.getByTestId('graph-view')).toBeInTheDocument()
   })
 
   it('opens the session-footprint chip into Connections, not the full-page Mycelium destination', async () => {
@@ -753,25 +752,15 @@ describe('App', () => {
     expect(await screen.findByLabelText('Activity session')).toHaveValue('/prime/sessions/session-1.jsonl')
   })
 
-  it('shows Graph under Notes without switching the list to Changes', async () => {
+  it('keeps Graph and Mycelium out of the Notes column until an icon opens them', async () => {
     localStorage.setItem('rhizome:command-rail-expanded', '1')
     render(<App />)
     await screen.findByTestId('chat-home')
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
+    expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Wiki Graph' }))
     expect(await screen.findByTestId('connections-panel')).toBeInTheDocument()
     expect(await screen.findByTestId('graph-view')).toBeInTheDocument()
-  })
-
-  it('stacks Graph under Notes, with no Connections strip', async () => {
-    render(<App />)
-    const notes = await screen.findByTestId('vault-panel')
-    const graph = await screen.findByTestId('connections-panel')
-    expect(screen.queryByTestId('connections-edge')).not.toBeInTheDocument()
-    expect(notes.compareDocumentPosition(graph) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    const list = screen.getByTestId('vault-panel-note-list')
-    expect(list).not.toContainElement(graph)
-    expect(graph).toHaveClass('overflow-hidden')
-    expect(screen.getByRole('region', { name: 'Connections' })).toHaveStyle({ maxHeight: '50%' })
   })
 
   it('opens Research as the center canvas, without a Chat overlay', async () => {

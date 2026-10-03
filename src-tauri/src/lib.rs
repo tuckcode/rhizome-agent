@@ -53,6 +53,7 @@ mod prime_settings;
 pub mod prime_tool_unwrap;
 pub mod prime_update;
 mod prime_vault_skill;
+mod read_aloud;
 pub mod rhizome_api;
 pub mod rhizome_commands;
 pub mod rhizome_distill;
@@ -482,7 +483,76 @@ fn setup_custom_window_chrome(app: &mut tauri::App) -> Result<(), Box<dyn std::e
     Ok(())
 }
 
-#[cfg(not(all(desktop, any(target_os = "linux", target_os = "windows"))))]
+#[cfg(all(desktop, target_os = "macos"))]
+fn setup_custom_window_chrome(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    use tauri::Manager;
+
+    if let Some(window) = app.get_webview_window("main") {
+        seat_macos_traffic_lights(&window);
+        let watched = window.clone();
+        window.on_window_event(move |event| {
+            if matches!(
+                event,
+                tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. }
+            ) {
+                seat_macos_traffic_lights(&watched);
+            }
+        });
+    }
+    Ok(())
+}
+
+/// Center the overlay traffic lights in the 32px `MacOSTitlebar` band.
+///
+/// tao sets each button's x and the title-bar height, and leaves y alone.
+/// On this macOS the buttons stay pinned to the top of that band, so the
+/// Command Palette (centered in the 32px strip) sits on a lower line.
+#[cfg(all(desktop, target_os = "macos"))]
+fn seat_macos_traffic_lights(window: &tauri::WebviewWindow) {
+    use objc2::rc::Retained;
+    use objc2_app_kit::{NSWindow, NSWindowButton};
+
+    const BAND_CENTER_FROM_TOP: f64 = 16.0;
+
+    let Ok(ptr) = window.ns_window() else {
+        return;
+    };
+    if ptr.is_null() {
+        return;
+    }
+
+    unsafe {
+        let Some(ns_window) = Retained::retain(ptr.cast::<NSWindow>()) else {
+            return;
+        };
+        let Some(close) = ns_window.standardWindowButton(NSWindowButton::CloseButton) else {
+            return;
+        };
+        let Some(container) = close.superview().and_then(|view| view.superview()) else {
+            return;
+        };
+        let height = container.frame().size.height;
+        let button_height = close.frame().size.height;
+        let origin_y = (height - BAND_CENTER_FROM_TOP - button_height / 2.0).max(0.0);
+        for kind in [
+            NSWindowButton::CloseButton,
+            NSWindowButton::MiniaturizeButton,
+            NSWindowButton::ZoomButton,
+        ] {
+            let Some(button) = ns_window.standardWindowButton(kind) else {
+                continue;
+            };
+            let mut origin = button.frame().origin;
+            origin.y = origin_y;
+            button.setFrameOrigin(origin);
+        }
+    }
+}
+
+#[cfg(not(any(
+    all(desktop, any(target_os = "linux", target_os = "windows")),
+    all(desktop, target_os = "macos")
+)))]
 fn setup_custom_window_chrome(_app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
@@ -640,6 +710,7 @@ macro_rules! app_invoke_handler {
             commands::restore_vault_ai_guidance,
             commands::stream_claude_chat,
             commands::stream_ai_agent,
+            commands::speak_reply,
             commands::abort_ai_agent_stream,
             commands::get_prime_session_host_status,
             commands::list_prime_running_sessions,
