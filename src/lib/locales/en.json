@@ -1374,7 +1374,7 @@
   "ai.panel.queuedFollowUp": "After",
   "ai.panel.queuedClear": "Clear",
   "settings.providers.title": "Model providers",
-  "settings.providers.description": "Providers Prime can use. OAuth sign-in runs in Terminal via prime-agent — Rhizome shows status and copies the command for you.",
+  "settings.providers.description": "Providers Prime can use. Sign in opens your browser; Add key opens the provider's key page and saves the key you paste.",
   "settings.providers.loading": "Checking connections…",
   "settings.providers.none": "No connected providers found.",
   "settings.providers.notConnected": "Not connected",

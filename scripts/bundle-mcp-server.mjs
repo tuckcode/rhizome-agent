@@ -11,7 +11,7 @@
 import { build } from 'esbuild'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
-import { mkdirSync, writeFileSync, existsSync, unlinkSync } from 'fs'
+import { copyFileSync, mkdirSync, writeFileSync, existsSync, unlinkSync } from 'fs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -59,11 +59,15 @@ await build({
   },
 })
 
+// Settings sign-in (ADR-0176). No dependencies of its own: it imports the
+// installed Prime package at runtime, so it ships unbundled.
+copyFileSync(join(SRC, 'prime-login.mjs'), join(OUT, 'prime-login.mjs'))
+
 // Drop a failed CJS attempt if present.
 const staleCjs = join(OUT, 'cli-call.js')
 if (existsSync(staleCjs)) unlinkSync(staleCjs)
 
-const required = ['index.js', 'ws-bridge.js', 'cli-call.mjs', 'package.json']
+const required = ['index.js', 'ws-bridge.js', 'cli-call.mjs', 'prime-login.mjs', 'package.json']
 for (const name of required) {
   const path = join(OUT, name)
   if (!existsSync(path)) {
@@ -71,4 +75,4 @@ for (const name of required) {
   }
 }
 
-console.log('mcp-server bundled → src-tauri/resources/mcp-server/ (index, ws-bridge, cli-call)')
+console.log('mcp-server bundled → src-tauri/resources/mcp-server/ (index, ws-bridge, cli-call, prime-login)')

@@ -896,6 +896,8 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     modelCount: 1,
     reloaded: true,
   }),
+  sign_in_prime_provider: () => null,
+  save_prime_provider_key: () => null,
   set_prime_model_allow_list: (args: { models?: string[] }) => {
     mockPrimeModelAllowList = (args?.models ?? []).map((key) => key.trim()).filter(Boolean)
     return null

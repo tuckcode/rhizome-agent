@@ -604,6 +604,21 @@ export function trackNousPortalAddedToChat(modelCount: number): void {
   trackEvent('nous_portal_added_to_chat', { model_count: modelCount })
 }
 
+export type PrimeSignInMethod = 'browser' | 'api_key'
+export type PrimeSignInOutcome = 'success' | 'failed'
+
+/**
+ * Settings signed Prime in to a provider (ADR-0176). Provider slug, method
+ * and outcome only — never the key, token, or error text.
+ */
+export function trackPrimeProviderSignIn(
+  provider: string,
+  method: PrimeSignInMethod,
+  outcome: PrimeSignInOutcome,
+): void {
+  trackEvent('prime_provider_sign_in', { provider, method, outcome })
+}
+
 export type EngineUpdateFailReason = 'busy' | 'stale' | 'missing' | 'failed' | 'unknown'
 
 /**

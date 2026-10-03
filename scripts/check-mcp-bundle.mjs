@@ -13,11 +13,11 @@ const out = join(
   'resources',
   'mcp-server',
 )
-const required = ['index.js', 'ws-bridge.js', 'cli-call.mjs', 'package.json']
+const required = ['index.js', 'ws-bridge.js', 'cli-call.mjs', 'prime-login.mjs', 'package.json']
 const missing = required.filter((name) => !existsSync(join(out, name)))
 if (missing.length) {
   console.error(`mcp-server bundle incomplete under ${out}: missing ${missing.join(', ')}`)
   console.error('Run: pnpm bundle-mcp')
   process.exit(1)
 }
-console.log('mcp-server bundle OK (index, ws-bridge, cli-call)')
+console.log('mcp-server bundle OK (index, ws-bridge, cli-call, prime-login)')

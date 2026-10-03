@@ -3,9 +3,11 @@ import { cn } from '@/lib/utils'
 import { createTranslator } from '../lib/i18n'
 import { callHost } from '../lib/callHost'
 import { resetPrimeModelCatalog } from '../lib/primeModelCatalog'
-import { trackNousPortalAddedToChat } from '../lib/productAnalytics'
+import { trackNousPortalAddedToChat, trackPrimeProviderSignIn } from '../lib/productAnalytics'
 import { Button } from './ui/button'
+import { Input } from './ui/input'
 import { writeClipboardText } from '../utils/clipboardText'
+import { openExternalUrl } from '../utils/url'
 
 /**
  * Which model providers the engine is actually connected to.
@@ -15,9 +17,9 @@ import { writeClipboardText } from '../utils/clipboardText'
  * signed into as a flaky model (#45). Reading the answer costs nothing and
  * removes a whole class of misdiagnosis.
  *
- * Prime owns the credential store (ADR-0168). Rhizome cannot finish OAuth from
- * here — Prime's daemon exposes no auth command — but it can show who is
- * connected and hand the user the one terminal command that starts sign-in.
+ * Prime owns the credential store (ADR-0168). Sign in runs Prime's own login
+ * code through a helper (ADR-0176): OAuth providers open the browser, and
+ * key providers open their key page and take the pasted key here.
  *
  * Prime Inference is the model backend: one API key, OpenAI-compatible, for
  * Claude, Grok, DeepSeek, Qwen, and the rest. Per-provider OAuth stays
@@ -46,10 +48,22 @@ interface PrimeProviderStatusSectionProps {
 const ALWAYS_SHOW_PROVIDERS: ReadonlyArray<{ name: string; authKind: string }> = [
   { name: 'prime-inference', authKind: 'api_key' },
   { name: 'anthropic', authKind: 'oauth' },
-  { name: 'xai', authKind: 'oauth' },
+  // Prime has no xAI OAuth; it connects xAI by API key only.
+  { name: 'xai', authKind: 'api_key' },
   { name: 'deepseek', authKind: 'api_key' },
   { name: 'nous-portal', authKind: 'api_key' },
 ]
+
+/** Where each key provider hands out API keys. Sign in opens this page. */
+const KEY_PAGES: Record<string, string> = {
+  xai: 'https://console.x.ai',
+  deepseek: 'https://platform.deepseek.com/api_keys',
+}
+
+interface KeyEntry {
+  provider: string
+  value: string
+}
 
 interface EnsureNousPortalResult {
   provider: string
@@ -131,21 +145,71 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
   const [signInNotice, setSignInNotice] = useState<string | null>(null)
   const [signInError, setSignInError] = useState<string | null>(null)
   const [nousBusy, setNousBusy] = useState(false)
+  const [busyProvider, setBusyProvider] = useState<string | null>(null)
+  const [keyEntry, setKeyEntry] = useState<KeyEntry | null>(null)
+
+  const loadProviders = useCallback(async (): Promise<ProviderStatus[]> => {
+    try {
+      const listed = await callHost<ProviderStatus[]>('get_prime_provider_status')
+      return Array.isArray(listed) ? listed : []
+    } catch {
+      return []
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
-    void (async () => {
-      try {
-        const listed = await callHost<ProviderStatus[]>('get_prime_provider_status')
-        if (!cancelled) setProviders(Array.isArray(listed) ? listed : [])
-      } catch {
-        if (!cancelled) setProviders([])
-      }
-    })()
+    void loadProviders().then((listed) => {
+      if (!cancelled) setProviders(listed)
+    })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [loadProviders])
+
+  // After a credential lands: re-read the cards and drop the cached model list,
+  // so Chat's picker asks Prime again and sees the new provider's models.
+  const refreshAfterSignIn = useCallback(async () => {
+    resetPrimeModelCatalog()
+    setProviders(await loadProviders())
+  }, [loadProviders])
+
+  const signInWithBrowser = useCallback(async (provider: ProviderStatus) => {
+    const label = providerLabel(provider.name)
+    setBusyProvider(provider.name)
+    setSignInNotice(`Finish signing in to ${label} in your browser.`)
+    try {
+      await callHost('sign_in_prime_provider', { provider: provider.name })
+      await refreshAfterSignIn()
+      trackPrimeProviderSignIn(provider.name, 'browser', 'success')
+      setSignInNotice(`Signed in to ${label}.`)
+    } catch (error) {
+      trackPrimeProviderSignIn(provider.name, 'browser', 'failed')
+      setSignInNotice(null)
+      setSignInError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setBusyProvider(null)
+    }
+  }, [refreshAfterSignIn])
+
+  const saveKey = useCallback(async () => {
+    if (!keyEntry) return
+    const { provider, value } = keyEntry
+    setSignInError(null)
+    setBusyProvider(provider)
+    try {
+      await callHost('save_prime_provider_key', { provider, key: value })
+      await refreshAfterSignIn()
+      trackPrimeProviderSignIn(provider, 'api_key', 'success')
+      setKeyEntry(null)
+      setSignInNotice(`Saved the ${providerLabel(provider)} key.`)
+    } catch (error) {
+      trackPrimeProviderSignIn(provider, 'api_key', 'failed')
+      setSignInError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setBusyProvider(null)
+    }
+  }, [keyEntry, refreshAfterSignIn])
 
   const cards = useMemo(
     () => mergeProviderCards(providers ?? []),
@@ -173,6 +237,17 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
       }
       return
     }
+    if (provider.authKind === 'oauth') {
+      await signInWithBrowser(provider)
+      return
+    }
+    const keyPage = KEY_PAGES[provider.name]
+    if (keyPage) {
+      setKeyEntry({ provider: provider.name, value: '' })
+      setSignInNotice(`Create a key on the ${providerLabel(provider.name)} page that opened, then paste it here.`)
+      await openExternalUrl(keyPage)
+      return
+    }
     const command = primeProviderLoginCommand(provider.name)
     try {
       await writeClipboardText(command)
@@ -185,7 +260,7 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
     } catch (error) {
       setSignInError(error instanceof Error ? error.message : String(error))
     }
-  }, [t])
+  }, [t, signInWithBrowser])
 
   const copyNousKeyCommand = useCallback(async () => {
     setSignInError(null)
@@ -219,9 +294,6 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
       </div>
       <p className="text-[11px] text-muted-foreground">
         {t('settings.providers.description')}
-      </p>
-      <p className="text-[11px] text-muted-foreground" data-testid="prime-connect-not-built">
-        Connect from Rhizome is not built. Prime has no auth command, and that step needs an architecture decision.
       </p>
       {providers === null ? (
         <div className="text-[11px] text-muted-foreground">{t('settings.providers.loading')}</div>
@@ -292,12 +364,14 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
                       size="sm"
                       className="h-7 text-[11px]"
                       data-testid={`prime-provider-sign-in-${provider.name}`}
-                      disabled={provider.name === 'nous-portal' && nousBusy}
+                      disabled={(provider.name === 'nous-portal' && nousBusy) || busyProvider !== null}
                       onClick={() => void startSignIn(provider)}
                     >
                       {provider.name === 'nous-portal' && nousBusy
                         ? 'Adding…'
-                        : setupButtonLabel(provider, connected)}
+                        : busyProvider === provider.name && provider.authKind === 'oauth'
+                          ? 'Waiting for browser…'
+                          : setupButtonLabel(provider, connected)}
                     </Button>
                     {provider.name === 'nous-portal' ? (
                       <Button
@@ -312,6 +386,45 @@ export function PrimeProviderStatusSection({ t }: PrimeProviderStatusSectionProp
                       </Button>
                     ) : null}
                   </div>
+                ) : null}
+                {keyEntry?.provider === provider.name ? (
+                  <form
+                    className="mt-2 flex gap-1.5"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      void saveKey()
+                    }}
+                  >
+                    <Input
+                      type="password"
+                      autoFocus
+                      autoComplete="off"
+                      placeholder="Paste API key"
+                      aria-label={`${providerLabel(provider.name)} API key`}
+                      className="h-7 text-[11px]"
+                      data-testid={`prime-provider-key-input-${provider.name}`}
+                      value={keyEntry.value}
+                      onChange={(event) => setKeyEntry({ provider: provider.name, value: event.target.value })}
+                    />
+                    <Button
+                      type="submit"
+                      size="sm"
+                      className="h-7 text-[11px]"
+                      data-testid={`prime-provider-key-save-${provider.name}`}
+                      disabled={!keyEntry.value.trim() || busyProvider !== null}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-[11px]"
+                      onClick={() => setKeyEntry(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </form>
                 ) : null}
               </div>
             )
