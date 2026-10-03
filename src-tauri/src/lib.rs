@@ -44,6 +44,8 @@ mod pi_events;
 pub mod preflight;
 pub mod prime_agent_activity;
 mod prime_custom_models;
+#[cfg(windows)]
+mod prime_daemon_pipe;
 mod prime_discovery;
 mod prime_events;
 mod prime_packages;

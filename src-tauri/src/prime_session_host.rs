@@ -203,7 +203,7 @@ fn kill_process_group(pid: u32) {
 #[cfg(unix)]
 type DaemonStream = std::os::unix::net::UnixStream;
 #[cfg(windows)]
-type DaemonStream = std::fs::File;
+type DaemonStream = crate::prime_daemon_pipe::PipeStream;
 
 // ── Public types ────────────────────────────────────────────────────────────
 
@@ -966,11 +966,6 @@ fn current_uid() -> Option<u32> {
     std::fs::metadata(dirs::home_dir()?).ok().map(|m| m.uid())
 }
 
-#[cfg(not(unix))]
-fn current_uid() -> Option<u32> {
-    None
-}
-
 /// Ask the CLI where its daemon is. Used only when the default path is absent.
 fn reported_daemon_socket_path() -> Option<PathBuf> {
     let binary = crate::prime_discovery::find_binary().ok()?;
@@ -1012,7 +1007,6 @@ fn connect_stream(path: &Path) -> Result<DaemonStream, String> {
 
 #[cfg(windows)]
 fn connect_stream(path: &Path) -> Result<DaemonStream, String> {
-    use std::fs::OpenOptions;
     use std::os::windows::ffi::OsStrExt;
 
     const PIPE_CONNECT_TIMEOUT_MS: u32 = 3_000;
@@ -1029,16 +1023,12 @@ fn connect_stream(path: &Path) -> Result<DaemonStream, String> {
         windows_sys::Win32::System::Pipes::WaitNamedPipeW(wide.as_ptr(), PIPE_CONNECT_TIMEOUT_MS);
     }
 
-    OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(path)
-        .map_err(|error| {
-            format!(
-                "Could not reach Prime's background service at {}: {error}",
-                path.display()
-            )
-        })
+    DaemonStream::open(path).map_err(|error| {
+        format!(
+            "Could not reach Prime's background service at {}: {error}",
+            path.display()
+        )
+    })
 }
 
 fn set_stream_roster_timeouts(stream: &mut DaemonStream) {
@@ -6643,6 +6633,53 @@ mod tests {
             default_daemon_socket_path().expect("a pipe path on windows"),
             PathBuf::from(r"\\.\pipe\prime-agent-daemon")
         );
+    }
+
+    /// The reader thread sits in a read on one handle while commands are
+    /// written on its clone. A synchronous pipe handle serializes the two, so
+    /// the write waited for daemon output that only the write could cause —
+    /// the Windows first-boot window freeze.
+    #[cfg(windows)]
+    #[test]
+    fn a_parked_reader_does_not_block_writes_on_the_pipe() {
+        use crate::prime_daemon_pipe::{test_accept, test_server};
+        use std::io::Read;
+
+        // A server that never writes, so a client read parks.
+        let name = format!(
+            r"\\.\pipe\rhizome-test-{}-{}",
+            std::process::id(),
+            next_id()
+        );
+        let server = test_server(&name);
+        let client = connect_stream(Path::new(&name)).expect("connect to test pipe");
+        test_accept(&server);
+
+        // Park a reader on the clone, exactly as `spawn_daemon_reader` does.
+        let reader = client.try_clone().expect("clone pipe");
+        thread::spawn(move || {
+            let mut byte = [0u8; 1];
+            let _ = (&reader).read(&mut byte);
+        });
+        thread::sleep(Duration::from_millis(200));
+
+        // Write on the original. Bounded by a channel so a regression fails
+        // instead of hanging the suite.
+        let (tx, rx) = mpsc::channel();
+        thread::spawn(move || {
+            let _ = tx.send((&client).write_all(b"ping\n").is_ok());
+        });
+        assert_eq!(
+            rx.recv_timeout(Duration::from_secs(2)),
+            Ok(true),
+            "write blocked behind the parked read"
+        );
+
+        let mut line = String::new();
+        BufReader::new(&server)
+            .read_line(&mut line)
+            .expect("server read");
+        assert_eq!(line, "ping\n");
     }
 
     #[cfg(unix)]

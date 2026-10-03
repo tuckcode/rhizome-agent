@@ -368,7 +368,7 @@ pub fn test_ai_model_provider(
 
 #[cfg(desktop)]
 #[tauri::command]
-pub fn get_prime_session_host_status() -> crate::prime_session_host::PrimeHostStatus {
+pub async fn get_prime_session_host_status() -> crate::prime_session_host::PrimeHostStatus {
     crate::prime_session_host::get_status()
 }
 
@@ -539,7 +539,7 @@ pub fn compact_prime_session(custom_instructions: Option<String>) -> Result<Opti
 
 #[cfg(desktop)]
 #[tauri::command]
-pub fn ensure_prime_session_host(vault_path: String) -> Result<String, String> {
+pub async fn ensure_prime_session_host(vault_path: String) -> Result<String, String> {
     let vault_path = expand_tilde(&vault_path).into_owned();
     crate::prime_session_host::ensure_host(&vault_path)
 }
