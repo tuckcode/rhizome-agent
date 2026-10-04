@@ -57,3 +57,24 @@ describe('vault-path HOME aliases', () => {
     }
   })
 })
+
+describe('vault-path Windows verbatim prefix', () => {
+  it('treats a \\\\?\\ path and its plain form as one vault', () => {
+    const plain = 'C:\\Users\\Admin\\Documents\\Rhizome Vault'
+    const verbatim = `\\\\?\\${plain}`
+
+    assert.deepEqual(
+      requireVaultPaths({ VAULT_PATH: plain, VAULT_PATHS: JSON.stringify([plain, verbatim]) }),
+      [plain],
+    )
+  })
+
+  it('maps a \\\\?\\UNC\\ path to its \\\\server form', () => {
+    const verbatim = '\\\\?\\UNC\\nas\\share\\Vault'
+
+    assert.deepEqual(
+      requireVaultPaths({ VAULT_PATHS: JSON.stringify([verbatim]) }),
+      ['\\\\nas\\share\\Vault'],
+    )
+  })
+})
