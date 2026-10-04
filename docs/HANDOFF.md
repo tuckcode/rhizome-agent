@@ -48,6 +48,8 @@ file.
 
 ## State
 **Origin:** Claude Opus 5.5 · 2026-10-04 · vault-memory MCP fixes merged locally as `bf22be8`, not pushed. Claude Code's `rhizome` MCP now runs this checkout's `mcp-server` and release `rhizome-tool`. [Handoff](plans/handoffs/2026-10-04-1548-claude-opus-5-5-vault-memory-mcp.md).
+**Origin:** Astra through Hermes desktop · 2026-10-04 · browser design audit at `9a48e00`.
+Browser evidence identifies C89–C92. No product code changed. Native Windows and MacBook checks remain open. [Review](design/2026-10-04-ui-audit.md).
 **Origin:** GPT-6 Codex · 2026-09-20 · reviewed Astra landing.
 **Origin:** Cursor Grok 4.6 · 2026-09-21 · C75 living-docs; #66–#68 closed.
 **Origin:** Cursor Grok 4.7 · 2026-09-21 · evening wrap. Local main unpushed.
@@ -119,6 +121,8 @@ Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
 - [2026-10-04 · Vault memory MCP](plans/handoffs/2026-10-04-1548-claude-opus-5-5-vault-memory-mcp.md) — one listing per vault, MCP server instructions, distill SKIP; merged `bf22be8`, not pushed.
+- [2026-10-04 · Split handoffs](plans/handoffs/2026-10-04-1423-astra-audit-continuation.md) — Astra owns audit completion and independent review. [Cursor assignment](plans/handoffs/2026-10-04-1422-astra-cursor-implementation.md) covers bounded fixes. No product edits started.
+- [2026-10-04 · Design audit](plans/handoffs/2026-10-04-1417-astra-design-audit.md) — splash/theme/Settings findings, 83 focused tests passed, no product fixes; native checks open.
 - [2026-10-03 · Windows pipe freeze](plans/handoffs/2026-10-03-1015-claude-opus-5-5-windows-pipe-freeze.md) — freeze fixed, test target compiles, File > Exit; C83–C85 opened; not pushed.
 - [2026-09-30 · open issues](plans/2026-09-30-open-issues-plan.md) — closed #46, #13, #52, #51 as already built. #23 stays open: search hits are not wired. #40 and #56 stay a product call.
 - [2026-10-03 · Nous catalog fields](plans/handoffs/2026-10-03-0942-cursor-grok-4-7-nous-catalog-fields.md) — Add to Chat list copies reasoning and input modalities from each Nous record. Name guesses are gone. Not in the installed app.
@@ -262,6 +266,11 @@ push is not a release — releases are tagged builds with signed installers.
 
 ## Open threads
 - **C93-FIXED (2026-10-04): stale `fast-uri` 3.1.6 pins after C88.** C88 moved the `pnpm-workspace.yaml` override to 3.1.7, but `leftover-dep-pins.test.ts` and `parked-organs.test.ts` still asserted 3.1.6 and failed the push gate, and `mcp-server/package.json` `overrides` still pinned 3.1.6. **Fixed:** both tests assert 3.1.7; the `mcp-server` override is 3.1.7, guarded by a new test. That override only applies to a hand-run `npm install` in `mcp-server/`; the bundle builds from the pnpm workspace. Found by Hermes (DeepSeek Flash); tests fixed by Claude Opus 5.5 (Claude Code desktop).
+**Origin:** Astra through Hermes desktop · 2026-10-04 · C89–C92 from the browser design audit.
+- **C89-OPEN:** HTML splash ignores current theme keys, lacks the early local wordmark face, and restarts motion under React. Browser probes reproduced these states. Native verification remains open. [Report](design/2026-10-04-ui-audit.md).
+- **C90-OPEN:** Tailwind dark variants follow the operating-system preference instead of the application theme. The four-case Button probe confirms different alpha treatment. Review destructive contrast after correcting the selector. [Report](design/2026-10-04-ui-audit.md).
+- **C91-OPEN:** Settings exposes no dialog role or modal state. Closing Settings returned focus to BODY in the tested sequence. Initial focus and a short Tab sequence worked. [Report](design/2026-10-04-ui-audit.md).
+- **C92-OPEN:** Theme names truncate, appearance changes survive Cancel, and Windows shows a macOS shortcut hint. Cancellation policy needs approval. Native verification remains open. [Report](design/2026-10-04-ui-audit.md).
 Closed C32, C35 and C41 moved to [`archive-closed-threads.md`](plans/handoffs/archive-closed-threads.md) on 2026-10-03.
 - **C88-FIXED (2026-10-03): two High advisories in `fast-uri@3.1.6`.** CVE-2026-84292 and CVE-2026-84394, fixed in 3.1.7. Fixed: the `pnpm-workspace.yaml` override now pins 3.1.7 (only path: `ajv` under `@modelcontextprotocol/sdk`); Trivy High/Critical on `pnpm-lock.yaml` is 0, `pnpm test:mcp` passes. Also 6 Medium / 1 Low in `pnpm-lock.yaml`, 1 Medium / 2 Low in `Cargo.lock`; no secrets. Lockfiles match `main`, so this predates the macOS merge. Codacy's Trivy run timed out on `package.json` yet exited 0; this result is Trivy 0.69.3 run directly with `--timeout 60m --skip-dirs '**/node_modules'`. Found by Claude Opus 5.5 (Claude Code desktop).
 - **C87-FIXED (2026-10-03): Rust line coverage on Windows was under the 85% gate.** `cargo llvm-cov --ignore-filename-regex "lib\.rs|main\.rs|menu\.rs" --fail-under-lines 85` on Windows: **81.40%** at `004989d` (before the macOS merge), **81.34%** on the merge; every test passed. Cause: Unix-only tests. The 110 `prime_session_host` tests ran against a unix-socket `FakeDaemon`. **Fix:** `FakeDaemon` and the roster socket pair listen on a named pipe on Windows (`prime_daemon_pipe::test_server`, now unlimited instances), so those tests run everywhere (`prime_session_host.rs` 49.7% → 91.6%); `line_stream.rs`, `commands/clipboard.rs` and `ai_agent_processes.rs` gained or ported tests that drive `node -e` instead of `sh`. Now **85.15%** on Windows, 1878 pass. **Thin margin (0.15 pts).** Still Unix-only: `roster_query_is_quiet_when_the_daemon_never_greets` (needs a socket read timeout; a pipe has none), live-daemon tests, and the CLI adapter tests (`claude_cli`, `codex_cli`, `pi_cli`, `opencode_cli`, `hermes_cli`, `antigravity_cli`) that fake each CLI with a shell script — the next lever if coverage dips. Found and fixed by Claude Opus 5.5 (Claude Code desktop).
