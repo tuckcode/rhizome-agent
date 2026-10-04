@@ -20,6 +20,7 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 import WebSocket from 'ws'
+import { SERVER_INSTRUCTIONS } from './agent-instructions.js'
 import { createMcpToolService } from './tool-service.js'
 import { appendRhizomeEvent } from './vault-events.js'
 
@@ -694,7 +695,7 @@ function callToolHandler(name, args) {
 
 const server = new Server(
   { name: 'rhizome-mcp-server', version: '0.1.0' },
-  { capabilities: { tools: {} } },
+  { capabilities: { tools: {} }, instructions: SERVER_INSTRUCTIONS },
 )
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({

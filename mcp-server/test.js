@@ -589,6 +589,19 @@ describe('requireVaultPath', () => {
 })
 
 describe('stdio process lifecycle', () => {
+  it('sends server instructions that tell the client when to save and read memory', async () => {
+    const { client, stderr } = await connectMcpClient()
+
+    try {
+      const instructions = client.getInstructions() ?? ''
+      assert.match(instructions, /rhizome_distill/)
+      assert.match(instructions, /get_vault_context/)
+      assert.match(instructions, /rhizome_search/)
+    } finally {
+      await closeMcpClient(client, stderr)
+    }
+  })
+
   it('advertises local vault tools as approval-safe for MCP clients', async () => {
     const { client, stderr } = await connectMcpClient()
 
