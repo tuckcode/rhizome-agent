@@ -1,7 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ChatComposerBar } from './ChatComposerBar'
-import { trackComposerPillOpened } from '../lib/productAnalytics'
 
 vi.mock('../lib/productAnalytics', () => ({ trackComposerPillOpened: vi.fn() }))
 
@@ -13,77 +12,23 @@ vi.mock('../lib/productAnalytics', () => ({ trackComposerPillOpened: vi.fn() }))
  * active work gets inline status.
  */
 
-// Radix opens on pointerdown, not click.
-function open(testId: string) {
-  fireEvent.pointerDown(
-    screen.getByTestId(testId),
-    new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
-  )
-}
-
-function openSkillsRow() {
-  open('composer-tools-menu')
-  const row = screen.getByTestId('composer-skills-pill')
-  row.focus()
-  fireEvent.keyDown(row, { key: 'ArrowRight' })
-}
-
 function renderBar(props: Partial<Parameters<typeof ChatComposerBar>[0]> = {}) {
-  const onOpenGoal = vi.fn()
-  const onOpenSchedule = vi.fn()
   render(
     <ChatComposerBar
       deck={<span data-testid="deck">model</span>}
-      skillsLabel="rhizome-vault"
-      onOpenGoal={onOpenGoal}
-      onOpenSchedule={onOpenSchedule}
       stats={{}}
       {...props}
     />,
   )
-  return { onOpenGoal, onOpenSchedule }
 }
 
 describe('ChatComposerBar', () => {
-  it('is one row holding the deck and a Tools menu', () => {
+  it('is one row holding the deck, without the tools menu', () => {
     renderBar()
     const bar = screen.getByTestId('chat-composer-bar')
     expect(bar).toContainElement(screen.getByTestId('deck'))
-    expect(bar).toContainElement(screen.getByTestId('composer-tools-menu'))
+    expect(screen.queryByTestId('composer-tools-menu')).not.toBeInTheDocument()
     expect(screen.queryByTestId('prime-goal-trigger')).not.toBeInTheDocument()
-  })
-
-  it('puts Goal, Schedule and the skill inside Tools', () => {
-    const { onOpenGoal } = renderBar()
-    open('composer-tools-menu')
-    expect(screen.getByTestId('composer-skills-pill')).toHaveTextContent('rhizome-vault')
-    expect(screen.getByTestId('prime-schedule-trigger')).toBeInTheDocument()
-    expect(trackComposerPillOpened).toHaveBeenCalledWith('tools')
-    fireEvent.click(screen.getByTestId('prime-goal-trigger'))
-    expect(onOpenGoal).toHaveBeenCalledTimes(1)
-  })
-
-  it('lists skill names and keeps each description on hover', async () => {
-    const onPickSkill = vi.fn()
-    renderBar({
-      skills: [{ slash: 'rhizome-vault', description: 'Vault tools' }],
-      onPickSkill,
-    })
-    openSkillsRow()
-    const row = screen.getByTestId('composer-skill-rhizome-vault')
-    expect(row).toHaveTextContent('/rhizome-vault')
-    expect(row).not.toHaveTextContent('Vault tools')
-    expect(screen.getByTestId('composer-skills-menu')).toHaveStyle({ maxHeight: '22rem' })
-    fireEvent.focus(row)
-    expect(await screen.findByTestId('composer-skill-tip-rhizome-vault')).toHaveTextContent('Vault tools')
-    fireEvent.click(row)
-    expect(onPickSkill).toHaveBeenCalledWith('rhizome-vault')
-  })
-
-  it('says when this session reported no skills', () => {
-    renderBar({ skills: [] })
-    openSkillsRow()
-    expect(screen.getByTestId('composer-skills-empty')).toHaveTextContent('No skills reported for this session')
   })
 
   it('says nothing about status while idle', () => {
@@ -106,11 +51,14 @@ describe('ChatComposerBar', () => {
     renderBar({ stats: { contextTokens: 2_000, contextWindow: 200_000 } })
     const button = screen.getByTestId('prime-context-button')
     expect(button).toHaveTextContent('1%')
+    expect(screen.getByTestId('prime-context-ring')).toBeInTheDocument()
     expect(button).toHaveAttribute('data-pressure', 'ok')
     expect(screen.queryByTestId('prime-context-meter')).not.toBeInTheDocument()
     // Radix Popover opens on click.
     fireEvent.click(button)
     expect(screen.getByTestId('prime-context-meter')).toHaveTextContent('2.0k / 200.0k')
+    expect(screen.getByTestId('prime-context-breakdown')).toHaveTextContent('Free')
+    expect(screen.getByTestId('prime-context-breakdown')).toHaveTextContent('198.0k')
   })
 
   it('flags context pressure on the compact control', () => {

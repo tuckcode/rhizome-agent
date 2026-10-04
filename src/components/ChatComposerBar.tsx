@@ -1,21 +1,9 @@
 import type { ReactNode } from 'react'
-import { CalendarDots, CaretDown, Target } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { trackComposerPillOpened } from '../lib/productAnalytics'
-import { translate, type AppLocale } from '../lib/i18n'
+import type { AppLocale } from '../lib/i18n'
 import {
   contextPercent,
   contextPressure,
@@ -35,12 +23,6 @@ interface ChatComposerBarProps {
   locale?: AppLocale
   /** Live turn controls from ChatHome: model, thinking, context note, active agents. */
   deck?: ReactNode
-  skillsLabel?: string | null
-  /** Product skills Prime reported for this session. The Tools row lists these. */
-  skills?: readonly { slash: string, description: string }[]
-  onPickSkill?: (slash: string) => void
-  onOpenGoal: () => void
-  onOpenSchedule: () => void
   working?: boolean
   lastToolName?: string | null
   /** Shown in the status slot when a Prime worker failed to start. */
@@ -48,82 +30,32 @@ interface ChatComposerBarProps {
   stats: PrimeSessionStats
 }
 
-function ComposerToolsMenu({
-  locale,
-  skillsLabel,
-  skills = [],
-  onPickSkill,
-  onOpenGoal,
-  onOpenSchedule,
-}: Pick<ChatComposerBarProps, 'locale' | 'skillsLabel' | 'skills' | 'onPickSkill' | 'onOpenGoal' | 'onOpenSchedule'>) {
+const PRESSURE_STROKE = {
+  ok: 'var(--accent-blue)',
+  warn: 'var(--accent-orange)',
+  high: 'var(--accent-red)',
+} as const
+
+/** How full the window is, drawn as a ring beside the percent. */
+function ContextRing({ percent, pressure }: { percent: number, pressure: 'ok' | 'warn' | 'high' | null }) {
+  const radius = 7
+  const circumference = 2 * Math.PI * radius
+  const filled = (percent / 100) * circumference
   return (
-    <DropdownMenu onOpenChange={(open) => { if (open) trackComposerPillOpened('tools') }}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          className="font-mono text-[11px] text-muted-foreground"
-          data-testid="composer-tools-menu"
-        >
-          Tools
-          <CaretDown size={9} weight="bold" aria-hidden="true" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="start" className="w-52">
-        <DropdownMenuItem className="text-[12px]" onSelect={onOpenGoal} data-testid="prime-goal-trigger">
-          <Target size={12} aria-hidden="true" />
-          {translate(locale ?? 'en', 'ai.goal.trigger')}
-        </DropdownMenuItem>
-        <DropdownMenuItem className="text-[12px]" onSelect={onOpenSchedule} data-testid="prime-schedule-trigger">
-          <CalendarDots size={12} aria-hidden="true" />
-          {translate(locale ?? 'en', 'ai.schedule.trigger')}
-        </DropdownMenuItem>
-        {skillsLabel ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger
-                className="font-mono text-[12px] font-normal text-muted-foreground"
-                data-testid="composer-skills-pill"
-              >
-                Skills · {skillsLabel}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent
-                className="w-56 overflow-y-auto"
-                style={{ maxHeight: '22rem' }}
-                data-testid="composer-skills-menu"
-              >
-                <TooltipProvider delayDuration={300}>
-                  {skills.length > 0 ? skills.map((skill) => (
-                    <Tooltip key={skill.slash}>
-                      <TooltipTrigger asChild>
-                        <DropdownMenuItem
-                          className="font-mono text-[12px]"
-                          onSelect={() => onPickSkill?.(skill.slash)}
-                          data-testid={`composer-skill-${skill.slash}`}
-                        >
-                          /{skill.slash}
-                        </DropdownMenuItem>
-                      </TooltipTrigger>
-                      {skill.description ? (
-                        <TooltipContent side="right" data-testid={`composer-skill-tip-${skill.slash}`}>
-                          {skill.description}
-                        </TooltipContent>
-                      ) : null}
-                    </Tooltip>
-                  )) : (
-                  <DropdownMenuItem disabled data-testid="composer-skills-empty">
-                    No skills reported for this session
-                  </DropdownMenuItem>
-                  )}
-                </TooltipProvider>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          </>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" data-testid="prime-context-ring">
+      <circle cx="8" cy="8" r={radius} fill="none" stroke="var(--state-hover)" strokeWidth="2" />
+      <circle
+        cx="8"
+        cy="8"
+        r={radius}
+        fill="none"
+        stroke={pressure ? PRESSURE_STROKE[pressure] : 'var(--accent-blue)'}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeDasharray={`${filled} ${circumference - filled}`}
+        transform="rotate(-90 8 8)"
+      />
+    </svg>
   )
 }
 
@@ -140,11 +72,12 @@ function PrimeContextButton({ stats, locale }: { stats: PrimeSessionStats, local
           type="button"
           variant="ghost"
           size="xs"
-          className={cn('shrink-0 font-mono text-[11px]', PRESSURE_TEXT_CLASS[pressure ?? 'ok'])}
+          className={cn('shrink-0 gap-1 font-mono text-[11px]', PRESSURE_TEXT_CLASS[pressure ?? 'ok'])}
           aria-label={`Context window ${usage}`}
           data-pressure={pressure ?? undefined}
           data-testid="prime-context-button"
         >
+          {percent !== null ? <ContextRing percent={percent} pressure={pressure} /> : null}
           {percent === null ? usage : `${percent}%`}
         </Button>
       </PopoverTrigger>
@@ -156,20 +89,14 @@ function PrimeContextButton({ stats, locale }: { stats: PrimeSessionStats, local
 }
 
 /**
- * The one compact row under the Chat input (native audit 2026-09-26).
+ * The row under the Chat input.
  *
- * Routine settings sit here together; Goal, Schedule and the skill go
- * behind Tools. Idle says nothing. A running turn and context pressure
- * are the only things that raise their voice.
+ * Model and thinking stay here. Goal, Schedule and skills live in the
+ * plus menu. The context ring sits at the end, under the send control.
  */
 export function ChatComposerBar({
   locale = 'en',
   deck,
-  skillsLabel,
-  skills,
-  onPickSkill,
-  onOpenGoal,
-  onOpenSchedule,
   working = false,
   lastToolName = null,
   failureReason = null,
@@ -179,14 +106,6 @@ export function ChatComposerBar({
     <div className="mt-1.5 flex min-w-0 items-center gap-1.5" data-testid="chat-composer-bar">
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
         {deck}
-        <ComposerToolsMenu
-          locale={locale}
-          skillsLabel={skillsLabel}
-          skills={skills}
-          onPickSkill={onPickSkill}
-          onOpenGoal={onOpenGoal}
-          onOpenSchedule={onOpenSchedule}
-        />
       </div>
       {(working || failureReason) ? (
         <ChatComposerFoot

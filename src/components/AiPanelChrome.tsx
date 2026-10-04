@@ -1,10 +1,20 @@
 import { memo, useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { Sparkle, X, PaperPlaneRight, Plus, Stop, ImageSquare } from '@phosphor-icons/react'
+import { CirclesThree, ImageSquare, PaperPlaneRight, Plugs, Plus, Sparkle, Stop, X } from '@phosphor-icons/react'
 import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
-import { TooltipProvider } from '@/components/ui/tooltip'
-import type { ComposerAttachment } from '../lib/composerAttachments'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { IMAGE_MIME_TYPES, type ComposerAttachment } from '../lib/composerAttachments'
 import { WikilinkChatInput } from './WikilinkChatInput'
 import { extractInlineWikilinkReferences } from './inlineWikilinkText'
 import { serializeInlineNode } from './inlineWikilinkDom'
@@ -22,11 +32,15 @@ import type { CommandMenuAction, CommandMenuEntry } from '../lib/primeCommandMen
 import { primeQueueIsEmpty, primeQueueItems, type PrimeQueue } from '../lib/primeQueue'
 import { PrimeQueueItemActions } from './PrimeQueueItemActions'
 import { cn } from '@/lib/utils'
+import { requestMcpSetupToggle } from '../hooks/useMcpSetupDialogController'
+import { dispatchNotesChrome } from '../lib/notesChrome'
+import { expandReplyQuotes } from '../lib/replyQuote'
 import { suggestReply } from '../lib/replySuggestions'
 import { latestAssistantMessageIndex } from '../lib/latestAssistantMessage'
 import { useDragRegion } from '../hooks/useDragRegion'
 import { useComposerPromptHistory } from '../hooks/useComposerPromptHistory'
 import {
+  trackComposerPillOpened,
   trackComposerReplyCompletionAccepted,
   trackComposerReplyCompletionDismissed,
   trackComposerReplyCompletionShown,
@@ -104,6 +118,14 @@ interface AiPanelComposerProps {
   onCommandAction?: (action: CommandMenuAction, nextValue: string) => void
   /** The last agent message in the conversation, used to compute reply suggestions. */
   lastAgentMessage?: string | null
+  /** Open this chat in Mycelium. Absent until the session has a path. */
+  sessionPath?: string | null
+  onOpenMycelium?: (sessionPath: string) => void
+  skillsLabel?: string | null
+  skills?: readonly { slash: string; description: string }[]
+  onPickSkill?: (slash: string) => void
+  onOpenGoal?: () => void
+  onOpenSchedule?: () => void
 }
 
 function getComposerPlaceholder(
@@ -210,11 +232,11 @@ function ComposerInput({
       placeholderClassName={
         completion
           ? cn(
-              hasControls ? 'px-2 py-1.5 text-[12px] leading-5' : 'flex items-center px-[10px] py-[8px] text-[13px]',
+              hasControls ? 'flex items-center px-1 text-[13px] leading-5' : 'flex items-center px-[10px] py-[8px] text-[13px]',
               'italic',
             )
           : hasControls
-            ? 'px-2 py-1.5 text-[12px] leading-5'
+            ? 'flex items-center px-1 text-[13px] leading-5'
             : undefined
       }
       placeholderTestId={completion ? 'composer-reply-completion' : undefined}
@@ -229,7 +251,7 @@ function ComposerInput({
       onBrowsePromptHistory={onBrowsePromptHistory}
       editorClassName={cn(
         'max-h-[120px] overflow-y-auto overscroll-contain',
-        hasControls && 'min-h-[34px] border-0 px-2 py-1.5 leading-5',
+        hasControls && 'min-h-0 border-0 px-1 py-1 leading-5',
       )}
       editorStyle={{ maxHeight: 120, overflowY: 'auto', overscrollBehavior: 'contain' }}
     />
@@ -744,6 +766,161 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
   )
 })
 
+function ComposerPlusMenu({
+  locale,
+  onAttachImages,
+  sessionPath,
+  onOpenMycelium,
+  skillsLabel,
+  skills = [],
+  onPickSkill,
+  onOpenGoal,
+  onOpenSchedule,
+}: Pick<
+  AiPanelComposerProps,
+  | 'locale'
+  | 'onAttachImages'
+  | 'sessionPath'
+  | 'onOpenMycelium'
+  | 'skillsLabel'
+  | 'skills'
+  | 'onPickSkill'
+  | 'onOpenGoal'
+  | 'onOpenSchedule'
+>) {
+  const attachInputRef = useRef<HTMLInputElement>(null)
+  const t = createTranslator(locale ?? 'en')
+  const canMycelium = Boolean(sessionPath && onOpenMycelium)
+  const hasTools = Boolean(onOpenGoal || onOpenSchedule || skillsLabel)
+  if (!onAttachImages && !canMycelium && !hasTools) return null
+
+  return (
+    <>
+      {onAttachImages ? (
+        <input
+          ref={attachInputRef}
+          type="file"
+          accept={IMAGE_MIME_TYPES.join(',')}
+          multiple
+          className="hidden"
+          tabIndex={-1}
+          data-testid="composer-attach-input"
+          onChange={(event) => {
+            const files = Array.from(event.target.files ?? [])
+            event.currentTarget.value = ''
+            if (files.length > 0) onAttachImages(files)
+          }}
+        />
+      ) : null}
+      <DropdownMenu onOpenChange={(open) => { if (open) trackComposerPillOpened('tools') }}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="shrink-0 rounded-full text-muted-foreground"
+            aria-label="Add"
+            data-testid="composer-plus"
+          >
+            <Plus size={16} />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="top" align="start" className="w-56">
+          {onAttachImages ? (
+            <DropdownMenuItem
+              className="text-[12px]"
+              data-testid="composer-plus-attach"
+              onSelect={() => {
+                window.setTimeout(() => attachInputRef.current?.click(), 0)
+              }}
+            >
+              <ImageSquare size={14} aria-hidden="true" />
+              Attach image
+            </DropdownMenuItem>
+          ) : null}
+          {canMycelium ? (
+            <DropdownMenuItem
+              className="text-[12px]"
+              data-testid="composer-plus-mycelium"
+              onSelect={() => onOpenMycelium?.(sessionPath ?? '')}
+            >
+              <CirclesThree size={14} aria-hidden="true" />
+              View in Mycelium
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuItem
+            className="text-[12px]"
+            data-testid="composer-plus-research"
+            onSelect={() => dispatchNotesChrome('research')}
+          >
+            <Sparkle size={14} aria-hidden="true" />
+            Research
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="text-[12px]"
+            data-testid="composer-plus-external-ai"
+            onSelect={() => requestMcpSetupToggle()}
+          >
+            <Plugs size={14} aria-hidden="true" />
+            External AI tools
+          </DropdownMenuItem>
+          {hasTools ? <DropdownMenuSeparator /> : null}
+          {onOpenGoal ? (
+            <DropdownMenuItem className="text-[12px]" onSelect={onOpenGoal} data-testid="prime-goal-trigger">
+              {t('ai.goal.trigger')}
+            </DropdownMenuItem>
+          ) : null}
+          {onOpenSchedule ? (
+            <DropdownMenuItem className="text-[12px]" onSelect={onOpenSchedule} data-testid="prime-schedule-trigger">
+              {t('ai.schedule.trigger')}
+            </DropdownMenuItem>
+          ) : null}
+          {skillsLabel ? (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger
+                className="font-mono text-[12px] font-normal text-muted-foreground"
+                data-testid="composer-skills-pill"
+              >
+                Skills · {skillsLabel}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent
+                className="w-56 overflow-y-auto"
+                style={{ maxHeight: '22rem' }}
+                data-testid="composer-skills-menu"
+              >
+                <TooltipProvider delayDuration={300}>
+                  {skills.length > 0 ? skills.map((skill) => (
+                    <Tooltip key={skill.slash}>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuItem
+                          className="font-mono text-[12px]"
+                          onSelect={() => onPickSkill?.(skill.slash)}
+                          data-testid={`composer-skill-${skill.slash}`}
+                        >
+                          /{skill.slash}
+                        </DropdownMenuItem>
+                      </TooltipTrigger>
+                      {skill.description ? (
+                        <TooltipContent side="right" data-testid={`composer-skill-tip-${skill.slash}`}>
+                          {skill.description}
+                        </TooltipContent>
+                      ) : null}
+                    </Tooltip>
+                  )) : (
+                    <DropdownMenuItem disabled data-testid="composer-skills-empty">
+                      No skills reported for this session
+                    </DropdownMenuItem>
+                  )}
+                </TooltipProvider>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  )
+}
+
 export function AiPanelComposer({
   entries,
   agentLabel,
@@ -770,6 +947,13 @@ export function AiPanelComposer({
   commandInstantLabel,
   onCommandAction,
   lastAgentMessage,
+  sessionPath,
+  onOpenMycelium,
+  skillsLabel,
+  skills,
+  onPickSkill,
+  onOpenGoal,
+  onOpenSchedule,
 }: AiPanelComposerProps) {
   const t = createTranslator(locale)
   const { recordSent, browse } = useComposerPromptHistory(onChange)
@@ -802,13 +986,15 @@ export function AiPanelComposer({
   }, [completionText, lastAgentMessage])
 
   const handleSend = useCallback((text: string, references: NoteReference[]) => {
-    recordSent(text)
-    onSend(text, references)
+    const outgoing = expandReplyQuotes(text)
+    recordSent(outgoing)
+    onSend(outgoing, references)
   }, [onSend, recordSent])
   const handleSteer = useCallback((text: string, references: NoteReference[]) => {
     if (!onSteer) return
-    recordSent(text)
-    onSteer(text, references)
+    const outgoing = expandReplyQuotes(text)
+    recordSent(outgoing)
+    onSteer(outgoing, references)
   }, [onSteer, recordSent])
   // Steering keeps the input live during a turn. Without an onSteer handler the
   // composer locks while streaming, exactly as it did before.
@@ -948,9 +1134,20 @@ export function AiPanelComposer({
         </ul>
       ) : null}
       <div className={cn(
-        'flex items-end gap-2',
-        hasControls && 'rounded-xl border border-border bg-background px-2 py-1.5 shadow-xs',
+        'flex items-center gap-1',
+        hasControls && 'rounded-xl border border-border bg-background px-1.5 py-0.5 shadow-xs',
       )}>
+        <ComposerPlusMenu
+          locale={locale}
+          onAttachImages={onAttachImages}
+          sessionPath={sessionPath}
+          onOpenMycelium={onOpenMycelium}
+          skillsLabel={skillsLabel}
+          skills={skills}
+          onPickSkill={onPickSkill}
+          onOpenGoal={onOpenGoal}
+          onOpenSchedule={onOpenSchedule}
+        />
         <div className="min-w-0 flex-1">
           <ComposerInput
             disabled={composerDisabled}

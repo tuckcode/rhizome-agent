@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { NOTES_CHROME_EVENT } from '../lib/notesChrome'
+import { MCP_SETUP_TOGGLE_EVENT } from '../hooks/useMcpSetupDialogController'
 import { AiPanelComposer } from './AiPanelChrome'
 import type { ComposerAttachment } from '../lib/composerAttachments'
 
@@ -78,6 +80,65 @@ describe('AiPanelComposer attachments', () => {
   it('still refuses to send an empty message with nothing attached', () => {
     renderComposer({ attachments: [], input: '   ' })
     expect(screen.getByTestId('agent-send')).toBeDisabled()
+  })
+
+  it('opens an attach picker from the plus menu', () => {
+    const { onAttachImages } = renderComposer()
+    fireEvent.pointerDown(
+      screen.getByTestId('composer-plus'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+    expect(screen.getByTestId('composer-plus-attach')).toBeInTheDocument()
+    const input = screen.getByTestId('composer-attach-input') as HTMLInputElement
+    const file = new File([new Uint8Array(4)], 'shot.png', { type: 'image/png' })
+    fireEvent.change(input, { target: { files: [file] } })
+    expect(onAttachImages).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers this session in Mycelium and keeps Goal with the other tools', () => {
+    const onOpenMycelium = vi.fn()
+    const onOpenGoal = vi.fn()
+    renderComposer({
+      sessionPath: '/sessions/a.jsonl',
+      onOpenMycelium,
+      onOpenGoal,
+      skillsLabel: 'rhizome-vault',
+      skills: [],
+    })
+    fireEvent.pointerDown(
+      screen.getByTestId('composer-plus'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+    fireEvent.click(screen.getByTestId('composer-plus-mycelium'))
+    expect(onOpenMycelium).toHaveBeenCalledWith('/sessions/a.jsonl')
+    fireEvent.pointerDown(
+      screen.getByTestId('composer-plus'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+    fireEvent.click(screen.getByTestId('prime-goal-trigger'))
+    expect(onOpenGoal).toHaveBeenCalledTimes(1)
+  })
+
+  it('puts Research and External AI tools in the plus menu', () => {
+    const research = vi.fn()
+    const external = vi.fn()
+    window.addEventListener(NOTES_CHROME_EVENT, research)
+    window.addEventListener(MCP_SETUP_TOGGLE_EVENT, external)
+    renderComposer()
+    fireEvent.pointerDown(
+      screen.getByTestId('composer-plus'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+    fireEvent.click(screen.getByTestId('composer-plus-research'))
+    fireEvent.pointerDown(
+      screen.getByTestId('composer-plus'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+    fireEvent.click(screen.getByTestId('composer-plus-external-ai'))
+    expect(research).toHaveBeenCalled()
+    expect(external).toHaveBeenCalled()
+    window.removeEventListener(NOTES_CHROME_EVENT, research)
+    window.removeEventListener(MCP_SETUP_TOGGLE_EVENT, external)
   })
 
   it('hands pasted image files to the owner rather than swallowing them', () => {

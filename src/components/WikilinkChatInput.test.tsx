@@ -106,6 +106,18 @@ function Controlled({
   )
 }
 
+function clearSelection() {
+  const selection = window.getSelection()
+  if (!selection) return
+  // A focus caret can point at the empty-box marker. Replacing the editor
+  // text detaches that node, and jsdom then throws on removeAllRanges.
+  try {
+    selection.removeAllRanges()
+  } catch {
+    // The old range is already gone.
+  }
+}
+
 function setSelection(editor: HTMLElement, offset: number) {
   const selection = window.getSelection()
   if (!selection) return
@@ -118,7 +130,7 @@ function setSelection(editor: HTMLElement, offset: number) {
   const range = document.createRange()
   range.setStart(targetNode, safeOffset)
   range.collapse(true)
-  selection.removeAllRanges()
+  clearSelection()
   selection.addRange(range)
 }
 
@@ -126,6 +138,7 @@ function updateEditorText(text: string) {
   const editor = screen.getByTestId('agent-input')
   editor.focus()
   fireEvent.focus(editor)
+  clearSelection()
   editor.textContent = text
   setSelection(editor, text.length)
   fireEvent.input(editor)
@@ -586,7 +599,11 @@ describe('WikilinkChatInput', () => {
     editor.focus()
     // Synthetic typing (computer-use / some paste paths) can update the
     // contenteditable without an `input` event — React's draft stays empty.
+    clearSelection()
     editor.textContent = 'MIDTURN_QUEUE_PROBE'
+    setSelection(editor, 'MIDTURN_QUEUE_PROBE'.length)
+    fireEvent.keyDown(editor, { key: 'Enter' })
+    editor.focus()
     setSelection(editor, 'MIDTURN_QUEUE_PROBE'.length)
     fireEvent.keyDown(editor, { key: 'Enter' })
 

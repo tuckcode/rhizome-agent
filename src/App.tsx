@@ -168,7 +168,7 @@ import { useGitFileWorkflows } from './hooks/useGitFileWorkflows'
 import { useAutoGitWork } from './hooks/useAutoGitWork'
 import { useAppAiWorkspaceBridge } from './hooks/useAppAiWorkspaceBridge'
 import { useAiWorkspaceWindowBridgeEvents } from './hooks/useAiWorkspaceWindowBridgeEvents'
-import { useMcpSetupDialogController } from './hooks/useMcpSetupDialogController'
+import { MCP_SETUP_TOGGLE_EVENT, useMcpSetupDialogController } from './hooks/useMcpSetupDialogController'
 import { useFeatureFlag } from './hooks/useFeatureFlag'
 import { shouldReplaceSyncedTabEntry } from './utils/tabEntrySync'
 import {
@@ -485,6 +485,12 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     resolvedPath,
   })
   const mcpSetupDialog = useMcpSetupDialogController(resolvedPath, setToastMessage, appLocale)
+  const toggleMcpSetup = mcpSetupDialog.toggleDialog
+  useEffect(() => {
+    const onToggle = () => toggleMcpSetup()
+    window.addEventListener(MCP_SETUP_TOGGLE_EVENT, onToggle)
+    return () => window.removeEventListener(MCP_SETUP_TOGGLE_EVENT, onToggle)
+  }, [toggleMcpSetup])
   const loadDefaultVaultModifiedFiles = vault.loadModifiedFiles
   const loadAllGitModifiedFiles = gitSurfaces.loadAllModifiedFiles
   const loadModifiedFilesForRepository = gitSurfaces.loadModifiedFilesForRepository
@@ -564,8 +570,12 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     })
   }, [handleRailSelectChat])
   const handleRailSelectResearch = useCallback(() => {
+    if (isResearchDestination) {
+      handleRailSelectChat()
+      return
+    }
     handleSetSelection({ kind: 'filter', filter: 'research' })
-  }, [handleSetSelection])
+  }, [handleRailSelectChat, handleSetSelection, isResearchDestination])
   // Graph and Mycelium live under Notes on the Changes tab only. Inbox
   // keeps the full notes list. Classic shell still uses the old toggle.
   const connectionsPanelRef = useRef<ConnectionsPanelHandle>(null)
@@ -1822,7 +1832,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     onSetUiLanguage: handleSetUiLanguage,
     onSetThemeMode: handleSetThemeMode,
     mcpStatus: mcpSetupDialog.status,
-    onInstallMcp: mcpSetupDialog.openDialog,
+    onInstallMcp: mcpSetupDialog.toggleDialog,
     onReloadVault: handleManualVaultReload,
     onRepairVault: handleRepairVault,
     onReopenAiOnboarding: handleReopenAiOnboarding,

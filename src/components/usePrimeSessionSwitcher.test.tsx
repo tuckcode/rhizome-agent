@@ -121,6 +121,55 @@ describe('usePrimeSessionSwitcher', () => {
     })
   })
 
+  it('retries once when the previous window still holds the session', async () => {
+    let attempts = 0
+    invoked.switchImpl = () => {
+      attempts += 1
+      if (attempts === 1) {
+        return Promise.reject(new Error('That session is already open in another Prime client. Close it there, or choose a different session.'))
+      }
+      return Promise.resolve('ok')
+    }
+
+    const { result } = renderHook(() => usePrimeSessionSwitcher({
+      agent: agent as never,
+      locale: 'en',
+      vaultPath: '/vault',
+      sessionsAutoCollapsed: false,
+      refreshSessionTree,
+      primeHostSessionPath: '/live.jsonl',
+      hostRunning: true,
+    }))
+
+    await act(async () => {
+      await result.current.handleSelectSession({ id: 'past', path: '/past.jsonl' })
+    })
+
+    expect(attempts).toBe(2)
+    expect(result.current.switchError).toBeNull()
+    expect(result.current.activeSessionPath).toBe('/past.jsonl')
+  })
+
+  it('loads the transcript when this window is already on that session', async () => {
+    const { result } = renderHook(() => usePrimeSessionSwitcher({
+      agent: agent as never,
+      locale: 'en',
+      vaultPath: '/vault',
+      sessionsAutoCollapsed: false,
+      refreshSessionTree,
+      primeHostSessionPath: '/past.jsonl',
+      hostRunning: true,
+    }))
+
+    await act(async () => {
+      await result.current.handleSelectSession({ id: 'past', path: '/past.jsonl' })
+    })
+
+    expect(invoked.calls.map((call) => call.cmd)).toEqual(['read_prime_session_transcript'])
+    expect(result.current.switchError).toBeNull()
+    expect(result.current.activeSessionPath).toBe('/past.jsonl')
+  })
+
   it('rolls the highlight back when the host refuses the switch', async () => {
     invoked.switchImpl = () => Promise.reject(new Error('still streaming'))
     const stale = [{ role: 'assistant', content: 'stale turn' }]

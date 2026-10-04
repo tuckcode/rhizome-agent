@@ -531,20 +531,22 @@ export function AiPanelView({
         onAttachImages={attachImages}
         onRemoveAttachment={removeAttachment}
         lastAgentMessage={getLastAgentMessage(agent.messages)}
+        sessionPath={activeSessionPath}
+        onOpenMycelium={onOpenMycelium}
+        skillsLabel={isPrimeTarget ? composerSkillsLabel : undefined}
+        skills={isPrimeTarget ? localizedCommands.filter((entry) => entry.kind === 'skill') : undefined}
+        onPickSkill={isPrimeTarget ? (slash) => {
+          const next = input.trim().length > 0
+            ? `${input.replace(/\s+$/, '')} /${slash} `
+            : `/${slash} `
+          void handleCommandAction({ kind: 'compose', name: slash }, next)
+        } : undefined}
+        onOpenGoal={isPrimeTarget ? goalDialog.openDialog : undefined}
+        onOpenSchedule={isPrimeTarget ? () => scheduleDialog.onOpenChange(true) : undefined}
         foot={isPrimeTarget ? (
           <ChatComposerBar
             locale={locale}
             deck={composerDeck}
-            skillsLabel={composerSkillsLabel}
-            skills={localizedCommands.filter((entry) => entry.kind === 'skill')}
-            onPickSkill={(slash) => {
-              const next = input.trim().length > 0
-                ? `${input.replace(/\s+$/, '')} /${slash} `
-                : `/${slash} `
-              void handleCommandAction({ kind: 'compose', name: slash }, next)
-            }}
-            onOpenGoal={goalDialog.openDialog}
-            onOpenSchedule={() => scheduleDialog.onOpenChange(true)}
             working={isActive}
             lastToolName={lastToolName(agent.messages)}
             failureReason={agent.status === 'error'

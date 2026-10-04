@@ -55,6 +55,27 @@ export function prefillAiComposer(text: string): void {
   window.dispatchEvent(new CustomEvent(AI_COMPOSER_PREFILL_EVENT, { detail: { text } }))
 }
 
+/** Insert text at the composer's caret. Does not send. */
+export const AI_COMPOSER_INSERT_EVENT = 'rhizome:ai-composer-insert'
+
+export interface ComposerInsertDetail {
+  text?: string
+  /** When set, the caret gets a quote chip tied to this reply. */
+  quoted?: boolean
+  messageId?: string
+}
+
+export function insertAiComposerText(text: string): void {
+  window.dispatchEvent(new CustomEvent<ComposerInsertDetail>(AI_COMPOSER_INSERT_EVENT, { detail: { text } }))
+}
+
+/** Insert a quote of an agent reply at the composer's caret. Does not send. */
+export function insertAiComposerQuote(text: string, messageId?: string): void {
+  const detail: ComposerInsertDetail = { text, quoted: true }
+  if (messageId) detail.messageId = messageId
+  window.dispatchEvent(new CustomEvent<ComposerInsertDetail>(AI_COMPOSER_INSERT_EVENT, { detail }))
+}
+
 export function requestOpenAiChat() {
   window.dispatchEvent(new Event(OPEN_AI_CHAT_EVENT))
 }
