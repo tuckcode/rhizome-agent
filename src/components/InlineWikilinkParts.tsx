@@ -240,9 +240,7 @@ export function InlineWikilinkEditorField({
   const editorRef = useRef<HTMLDivElement | null>(null)
   const lastSegment = segments[segments.length - 1]
   const needsTrailingCaretAnchor = lastSegment?.kind === 'chip' || lastSegment?.kind === 'quote'
-  // An empty contenteditable has no line for the caret, so a click focuses
-  // the box and the flashing line stays hidden until the first character.
-  const needsEmptyCaret = value.length === 0
+  useEmptyCaretAnchor(editorRef, value.length === 0)
   useImperativeHandle(inputRef, () => editorRef.current as HTMLDivElement, [])
   useInlineWikilinkPlaceholder(editorRef, placeholder)
   useInlineWikilinkEditorEvents(editorRef, {
@@ -285,7 +283,6 @@ export function InlineWikilinkEditorField({
         style={{ ...editorStyle, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
       >
         {segments.map((segment, index) => renderInlineWikilinkSegment(segment, typeEntryMap, index))}
-        {needsEmptyCaret ? <br data-caret-anchor="" /> : null}
         {needsTrailingCaretAnchor ? '\u200B' : null}
       </div>
     </div>
@@ -304,6 +301,28 @@ type InlineWikilinkEditorHandlers = Pick<
   | 'onPaste'
   | 'onSelectionChange'
 >
+
+/**
+ * An empty contenteditable has no line, so a click focuses it and the caret
+ * stays hidden until the first character. The marker is not a React child:
+ * a test (and some paste paths) replace the DOM text before React hears
+ * about it, and React must not try to remove a marker it still thinks is there.
+ */
+function useEmptyCaretAnchor(editorRef: React.RefObject<HTMLDivElement | null>, empty: boolean) {
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+    const existing = editor.querySelector('[data-caret-anchor]')
+    if (!empty) {
+      existing?.remove()
+      return
+    }
+    if (existing) return
+    const marker = document.createElement('br')
+    marker.dataset.caretAnchor = ''
+    editor.appendChild(marker)
+  }, [editorRef, empty])
+}
 
 function useInlineWikilinkPlaceholder(editorRef: React.RefObject<HTMLDivElement | null>, placeholder?: string) {
   useEffect(() => {

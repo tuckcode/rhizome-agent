@@ -43,6 +43,7 @@ vi.mock('@tauri-apps/api/window', () => ({
 vi.mock('../utils/aiPromptBridge', () => ({
   queueAiPrompt: vi.fn(),
   requestOpenAiChat: vi.fn(),
+  AI_COMPOSER_INSERT_EVENT: 'rhizome:ai-composer-insert',
 }))
 
 const makeCommand = (overrides: Partial<CommandAction> = {}): CommandAction => ({
