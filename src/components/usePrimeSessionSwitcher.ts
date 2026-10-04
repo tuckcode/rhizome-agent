@@ -20,6 +20,37 @@ import type { useCliAiAgent } from '../hooks/useCliAiAgent'
 
 type AiAgentBridge = ReturnType<typeof useCliAiAgent>
 
+const SESSION_HELD_ELSEWHERE = 'already open in another Prime client'
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * The previous window can still hold the log for a moment after it closes.
+ * One retry covers that handoff. If this host is already on the file, the
+ * transcript is enough — switching again is what Prime refuses.
+ */
+async function switchPrimeSession(
+  path: string,
+  currentPath: string | null | undefined,
+): Promise<void> {
+  if (currentPath && currentPath === path) return
+  try {
+    await callHost<string>('switch_prime_session', { path })
+  } catch (error) {
+    if (!errorText(error).includes(SESSION_HELD_ELSEWHERE)) throw error
+    await new Promise((resolve) => window.setTimeout(resolve, 400))
+    try {
+      await callHost<string>('switch_prime_session', { path })
+    } catch (retryError) {
+      if (!errorText(retryError).includes(SESSION_HELD_ELSEWHERE)) throw retryError
+      if (currentPath === path) return
+      throw retryError
+    }
+  }
+}
+
 interface UsePrimeSessionSwitcherArgs {
   agent: AiAgentBridge
   locale: AppLocale
@@ -122,7 +153,7 @@ export function usePrimeSessionSwitcher({
       if (vaultPath && !hostRunning) {
         await callHost('ensure_prime_session_host', { vaultPath })
       }
-      await callHost<string>('switch_prime_session', { path: session.path })
+      await switchPrimeSession(session.path, primeHostSessionPath)
       const transcript = await callHost<PrimeTranscriptItem[]>('read_prime_session_transcript', {
         path: session.path,
       })
@@ -140,7 +171,7 @@ export function usePrimeSessionSwitcher({
       agent.replaceMessages(previousMessages)
       reportSwitchError(e)
     }
-  }, [activeSessionPath, agent, hostRunning, refreshSessionTree, reportSwitchError, vaultPath])
+  }, [activeSessionPath, agent, hostRunning, primeHostSessionPath, refreshSessionTree, reportSwitchError, vaultPath])
 
   // A roster row clicked in the menu bar lands here (#13). Reuses the same
   // switch path as the in-app session list so there is one way to change

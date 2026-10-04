@@ -4,7 +4,10 @@ import type { VaultEntry } from '../types'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { getTypeIcon } from './note-item/typeIcon'
+import { Quotes } from '@phosphor-icons/react'
+import { focusQuotedReply } from '../lib/replyQuote'
 import type {
+  InlineReplyQuote,
   InlineWikilinkChip,
   InlineWikilinkSegment,
 } from './inlineWikilinkText'
@@ -60,6 +63,33 @@ export function InlineWikilinkChipView({
         })
       )}
       <span className="truncate">{chip.entry.title}</span>
+    </span>
+  )
+}
+
+export function InlineReplyQuoteView({ quote }: { quote: InlineReplyQuote }) {
+  const linked = quote.messageId.length > 0
+  return (
+    <span
+      contentEditable={false}
+      data-reply-quote={quote.token}
+      data-message-id={linked ? quote.messageId : undefined}
+      data-testid="composer-reply-quote"
+      role={linked ? 'button' : undefined}
+      tabIndex={-1}
+      aria-label={linked ? 'Quoted from this reply' : 'Quoted reply'}
+      title={quote.text}
+      className="mx-[1px] inline-flex max-w-[240px] cursor-pointer items-center gap-1 align-baseline border-l-2 pl-1.5 text-[12px] italic"
+      style={{
+        color: 'var(--link-color)',
+        borderLeftColor: 'var(--link-color)',
+        backgroundColor: 'color-mix(in srgb, var(--link-color) 14%, transparent)',
+      }}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => focusQuotedReply(quote.messageId)}
+    >
+      <Quotes size={12} aria-hidden="true" className="shrink-0" />
+      <span className="truncate">“{quote.text}”</span>
     </span>
   )
 }
@@ -208,7 +238,11 @@ export function InlineWikilinkEditorField({
   typeEntryMap: Record<string, VaultEntry>
 }) {
   const editorRef = useRef<HTMLDivElement | null>(null)
-  const needsTrailingCaretAnchor = segments[segments.length - 1]?.kind === 'chip'
+  const lastSegment = segments[segments.length - 1]
+  const needsTrailingCaretAnchor = lastSegment?.kind === 'chip' || lastSegment?.kind === 'quote'
+  // An empty contenteditable has no line for the caret, so a click focuses
+  // the box and the flashing line stays hidden until the first character.
+  const needsEmptyCaret = value.length === 0
   useImperativeHandle(inputRef, () => editorRef.current as HTMLDivElement, [])
   useInlineWikilinkPlaceholder(editorRef, placeholder)
   useInlineWikilinkEditorEvents(editorRef, {
@@ -250,7 +284,8 @@ export function InlineWikilinkEditorField({
         )}
         style={{ ...editorStyle, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
       >
-        {segments.map((segment) => renderInlineWikilinkSegment(segment, typeEntryMap))}
+        {segments.map((segment, index) => renderInlineWikilinkSegment(segment, typeEntryMap, index))}
+        {needsEmptyCaret ? <br data-caret-anchor="" /> : null}
         {needsTrailingCaretAnchor ? '\u200B' : null}
       </div>
     </div>
@@ -295,11 +330,41 @@ function useInlineWikilinkEditorEvents(
     if (!editor) return
 
     const listenerMap = inlineWikilinkEditorListenerMap(handlers)
+    const showCaret = () => placeCaretInEditor(editor)
     for (const [eventName, listener] of listenerMap) editor.addEventListener(eventName, listener)
+    editor.addEventListener('focus', showCaret)
+    editor.addEventListener('mouseup', showCaret)
     return () => {
       for (const [eventName, listener] of listenerMap) editor.removeEventListener(eventName, listener)
+      editor.removeEventListener('focus', showCaret)
+      editor.removeEventListener('mouseup', showCaret)
     }
   }, [editorRef, handlers])
+}
+
+/** Put the flashing caret in the box when a click focused it but left no selection. */
+function placeCaretInEditor(editor: HTMLDivElement) {
+  const selection = window.getSelection()
+  if (!selection) return
+  if (
+    selection.rangeCount > 0
+    && editor.contains(selection.anchorNode)
+    && selection.anchorNode !== editor
+  ) return
+  const range = document.createRange()
+  const anchor = editor.querySelector('[data-caret-anchor]') ?? editor.firstChild
+  if (anchor?.nodeType === Node.TEXT_NODE) {
+    range.setStart(anchor, 0)
+    range.collapse(true)
+  } else if (anchor) {
+    range.setStartBefore(anchor)
+    range.collapse(true)
+  } else {
+    range.selectNodeContents(editor)
+    range.collapse(true)
+  }
+  selection.removeAllRanges()
+  selection.addRange(range)
 }
 
 function inlineWikilinkEditorListenerMap({
@@ -329,8 +394,15 @@ function inlineWikilinkEditorListenerMap({
   ]
 }
 
-function renderInlineWikilinkSegment(segment: InlineWikilinkSegment, typeEntryMap: Record<string, VaultEntry>) {
-  if (segment.kind === 'text') return <Fragment key={`text-${segment.text}`}>{segment.text}</Fragment>
+function renderInlineWikilinkSegment(
+  segment: InlineWikilinkSegment,
+  typeEntryMap: Record<string, VaultEntry>,
+  index: number,
+) {
+  if (segment.kind === 'text') return <Fragment key={`text-${index}`}>{segment.text}</Fragment>
+  if (segment.kind === 'quote') {
+    return <InlineReplyQuoteView key={`quote-${index}`} quote={segment.quote} />
+  }
   return (
     <InlineWikilinkChipView
       key={`chip-${segment.chip.entry.path}-${segment.chip.target}`}

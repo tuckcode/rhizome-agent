@@ -19,6 +19,7 @@ export function serializeInlineNode(node: Node): string {
   }
 
   if (node instanceof HTMLElement) {
+    if (node.dataset.replyQuote) return node.dataset.replyQuote
     if (node.dataset.chipTarget) {
       return chipToken(node.dataset.chipTarget)
     }
@@ -117,8 +118,8 @@ function boundaryForChip(
   child: HTMLElement,
   index: number,
   remaining: number,
+  tokenLength = chipToken(child.dataset.chipTarget ?? '').length,
 ): { boundary: SelectionBoundary | null; remaining: number } {
-  const tokenLength = chipToken(child.dataset.chipTarget ?? '').length
   if (remaining <= 0) {
     const previousSibling = node.childNodes.item(index - 1)
     return {
@@ -162,8 +163,11 @@ function findSelectionBoundary(
 
     if (!(child instanceof HTMLElement)) continue
 
-    if (child.dataset.chipTarget) {
-      const chipBoundary = boundaryForChip(node, child, index, remaining)
+    if (child.dataset.replyQuote || child.dataset.chipTarget) {
+      const tokenLength = child.dataset.replyQuote
+        ? child.dataset.replyQuote.length
+        : chipToken(child.dataset.chipTarget ?? '').length
+      const chipBoundary = boundaryForChip(node, child, index, remaining, tokenLength)
       if (chipBoundary.boundary) return chipBoundary.boundary
       remaining = chipBoundary.remaining
       continue

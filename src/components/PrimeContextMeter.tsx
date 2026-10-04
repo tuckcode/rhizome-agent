@@ -3,6 +3,7 @@ import {
   contextPercent,
   contextPressure,
   formatContextUsage,
+  formatTokenCount,
   type PrimeSessionStats,
 } from '../hooks/usePrimeSessionStats'
 
@@ -63,6 +64,49 @@ export function PrimeContextMeter({
           />
         </div>
       )}
+      <ContextBreakdown stats={stats} />
     </div>
+  )
+}
+
+function formatCost(cost: number | null | undefined): string | null {
+  if (typeof cost !== 'number' || !Number.isFinite(cost) || cost < 0) return null
+  if (cost === 0) return '$0'
+  if (cost < 0.01) return `$${cost.toFixed(4)}`
+  return `$${cost.toFixed(2)}`
+}
+
+function freeTokens(stats: PrimeSessionStats): string | null {
+  const used = stats.contextTokens
+  const total = stats.contextWindow
+  if (typeof used !== 'number' || typeof total !== 'number' || total < used) return null
+  return formatTokenCount(total - used)
+}
+
+/** The figures Prime actually reports. A missing figure stays off the list. */
+function ContextBreakdown({ stats }: { stats: PrimeSessionStats }) {
+  const rows: Array<[string, string]> = []
+  const free = freeTokens(stats)
+  const used = formatTokenCount(stats.contextTokens)
+  const window = formatTokenCount(stats.contextWindow)
+  const total = formatTokenCount(stats.totalTokens)
+  const cost = formatCost(stats.cost)
+  if (used) rows.push(['Used', used])
+  if (free) rows.push(['Free', free])
+  if (window) rows.push(['Window', window])
+  if (typeof stats.totalMessages === 'number') rows.push(['Messages', String(stats.totalMessages)])
+  if (typeof stats.toolCalls === 'number') rows.push(['Tool calls', String(stats.toolCalls)])
+  if (total) rows.push(['Tokens', total])
+  if (cost) rows.push(['Cost', cost])
+  if (rows.length === 0) return null
+  return (
+    <dl className="mt-1 flex flex-col gap-1" data-testid="prime-context-breakdown">
+      {rows.map(([label, value]) => (
+        <div key={label} className="flex items-baseline justify-between gap-3 font-mono text-[11px]">
+          <dt className="text-muted-foreground">{label}</dt>
+          <dd className="text-foreground">{value}</dd>
+        </div>
+      ))}
+    </dl>
   )
 }

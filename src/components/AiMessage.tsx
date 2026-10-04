@@ -17,6 +17,7 @@ import { ActionTooltip } from '@/components/ui/action-tooltip'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AiActionCard, type AiActionStatus } from './AiActionCard'
 import { MarkdownContent } from './MarkdownContent'
+import { ReplySelectionPill } from './ReplySelectionPill'
 import { translate, type AppLocale } from '../lib/i18n'
 import { normalizeReasoningDisplay } from '../lib/normalizeReasoningDisplay'
 import { visibleUserText } from '../utils/ai-chat'
@@ -26,6 +27,8 @@ import { writeClipboardText } from '../utils/clipboardText'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
 import { groupConsecutiveToolActions } from '../lib/groupConsecutiveToolActions'
 import { trackVaultRetrievalSourceOpened } from '../lib/productAnalytics'
+import { trackEvent } from '../lib/telemetry'
+import { insertAiComposerQuote } from '../utils/aiPromptBridge'
 import { useDisplayTimeZone } from '../hooks/useAppPreferences'
 import { formatMessageClock } from '../utils/messageTimestamp'
 import { presentWorkerStartFailure } from '../lib/primeWorkerStartError'
@@ -573,8 +576,16 @@ function ResponseBlock({
       <div
         className="group/ai-response min-w-0 max-w-full overflow-hidden"
         data-testid="ai-response-block"
+        data-reply-id={messageId}
       >
-        <MarkdownContent content={text} onWikilinkClick={onNavigateWikilink} />
+        <ReplySelectionPill
+          onAdd={(excerpt) => {
+            insertAiComposerQuote(excerpt, messageId)
+            trackEvent('chat_reply_quote_added', { length: excerpt.length, linked: Boolean(messageId) })
+          }}
+        >
+          <MarkdownContent content={text} onWikilinkClick={onNavigateWikilink} />
+        </ReplySelectionPill>
         <RetrievedNoteSources actions={actions} onOpenNote={onOpenNote} />
         <ResponseActions
           locale={locale}

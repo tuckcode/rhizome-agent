@@ -741,8 +741,9 @@ describe('the Goal button has one home', () => {
       />,
     )
 
-    const bar = screen.getByTestId('chat-composer-bar')
-    expect(bar).toContainElement(screen.getByTestId('composer-tools-menu'))
+    expect(screen.getByTestId('chat-composer-bar')).toBeInTheDocument()
+    expect(screen.queryByTestId('composer-tools-menu')).not.toBeInTheDocument()
+    expect(screen.getByTestId('composer-plus')).toBeInTheDocument()
     expect(screen.queryByTestId('prime-context-meter-slot')).not.toBeInTheDocument()
   })
 })

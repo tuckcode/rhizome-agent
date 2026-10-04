@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -10,6 +11,8 @@ import {
 import { imageFilesFromTransfer } from '../lib/composerAttachments'
 import type { VaultEntry } from '../types'
 import type { NoteReference } from '../utils/ai-context'
+import { replyQuoteToken } from '../lib/replyQuote'
+import { AI_COMPOSER_INSERT_EVENT, type ComposerInsertDetail } from '../utils/aiPromptBridge'
 import { buildTypeEntryMap } from '../utils/typeColors'
 import {
   deleteInlineSelection,
@@ -367,6 +370,19 @@ export function InlineWikilinkInput({
     pendingScrollTopAfterRemountRef.current = editor?.scrollTop ?? null
     forceRender((current) => current + 1)
   }, [editorRef, onChange, selectionRange, setSelectionRange, value])
+  useEffect(() => {
+    const onInsert = (event: Event) => {
+      const detail = (event as CustomEvent<ComposerInsertDetail>).detail
+      const text = detail?.text
+      if (typeof text !== 'string' || text.length === 0) return
+      const inserted = detail.quoted
+        ? replyQuoteToken({ messageId: detail.messageId ?? '', text })
+        : text
+      insertTransferText(inserted, true)
+    }
+    window.addEventListener(AI_COMPOSER_INSERT_EVENT, onInsert)
+    return () => window.removeEventListener(AI_COMPOSER_INSERT_EVENT, onInsert)
+  }, [insertTransferText])
   const insertNativePathDrop = (paths: string[]) => {
     const droppedPathText = formatDroppedPathList(paths)
     if (!droppedPathText) return

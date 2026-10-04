@@ -1,4 +1,10 @@
 import { useCallback, useState } from 'react'
+
+export const MCP_SETUP_TOGGLE_EVENT = 'rhizome:mcp-setup-toggle'
+
+export function requestMcpSetupToggle(): void {
+  window.dispatchEvent(new Event(MCP_SETUP_TOGGLE_EVENT))
+}
 import { useMcpStatus } from './useMcpStatus'
 import type { AppLocale } from '../lib/i18n'
 
@@ -49,6 +55,13 @@ export function useMcpSetupDialogController(
     setOpen(false)
   }, [busyAction])
 
+  const toggleDialog = useCallback(() => {
+    setOpen((current) => {
+      if (current && busyAction !== null) return current
+      return !current
+    })
+  }, [busyAction])
+
   const connect = useCallback(
     () => runDialogMutation('connect', setBusyAction, setOpen, connectMcp),
     [connectMcp],
@@ -85,6 +98,7 @@ export function useMcpSetupDialogController(
     opencodeManualConfigSnippet: opencodeMcpConfigSnippet,
     open,
     openDialog,
+    toggleDialog,
     status: mcpStatus,
   }
 }

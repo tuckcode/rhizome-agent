@@ -776,6 +776,9 @@ describe('App', () => {
     expect(screen.getByTestId('research-destination')).not.toContainElement(
       screen.getByTestId('chat-home'),
     )
+
+    fireEvent.click(screen.getByTestId('status-research'))
+    expect(screen.queryByTestId('research-destination')).not.toBeInTheDocument()
   })
 
   it('Ask the agent about this note keeps Chat and opens that note', async () => {

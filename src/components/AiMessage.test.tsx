@@ -1,6 +1,15 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { AiMessage } from './AiMessage'
+import { AI_COMPOSER_INSERT_EVENT } from '../utils/aiPromptBridge'
+
+function selectNodeText(node: HTMLElement) {
+  const range = document.createRange()
+  range.selectNodeContents(node)
+  const selection = window.getSelection()
+  selection?.removeAllRanges()
+  selection?.addRange(range)
+}
 
 vi.mock('./MarkdownContent', () => ({
   MarkdownContent: ({ content }: { content: string }) => <div data-testid="markdown-content">{content}</div>,
@@ -35,6 +44,21 @@ describe('AiMessage', () => {
   it('renders user message', () => {
     render(<AiMessage userMessage="Hello AI" actions={[]} />)
     expect(screen.getByText('Hello AI')).toBeTruthy()
+  })
+
+  it('adds a highlighted reply to the composer without sending', () => {
+    const insert = vi.fn()
+    window.addEventListener(AI_COMPOSER_INSERT_EVENT, insert)
+    render(<AiMessage userMessage="Ask" actions={[]} response="The path is blocked." />)
+
+    const body = screen.getByText('The path is blocked.')
+    selectNodeText(body)
+    fireEvent.mouseUp(body)
+    fireEvent.click(screen.getByRole('button', { name: 'Add to Chat' }))
+
+    const event = insert.mock.calls[0][0] as CustomEvent<{ text: string; quoted?: boolean; messageId?: string }>
+    expect(event.detail).toEqual({ text: 'The path is blocked.', quoted: true })
+    window.removeEventListener(AI_COMPOSER_INSERT_EVENT, insert)
   })
 
   it('shows a thumbnail when the user turn is only an image', () => {

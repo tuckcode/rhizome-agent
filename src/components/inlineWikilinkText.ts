@@ -1,5 +1,6 @@
 import type { VaultEntry } from '../types'
 import type { NoteReference } from '../utils/ai-context'
+import { decodeReplyQuote } from '../lib/replyQuote'
 import { resolveEntry } from '../utils/wikilink'
 import {
   chipToken,
@@ -12,9 +13,16 @@ export interface InlineWikilinkChip {
   target: string
 }
 
+export interface InlineReplyQuote {
+  messageId: string
+  text: string
+  token: string
+}
+
 export type InlineWikilinkSegment =
   | { kind: 'text'; text: string }
   | { kind: 'chip'; chip: InlineWikilinkChip }
+  | { kind: 'quote'; quote: InlineReplyQuote }
 
 export interface ActiveWikilinkQuery {
   start: number
@@ -22,12 +30,39 @@ export interface ActiveWikilinkQuery {
 }
 
 const INLINE_WIKILINK_PATTERN = /\[\[([^[\]\r\n]+?)\]\]/g
+const REPLY_QUOTE_PATTERN = /«quote:([^»]*)»/g
 
 export function buildInlineWikilinkSegments(
   value: string,
   entries: VaultEntry[],
 ): InlineWikilinkSegment[] {
   const normalizedValue = normalizeInlineWikilinkValue(value)
+  const segments: InlineWikilinkSegment[] = []
+  let cursor = 0
+
+  REPLY_QUOTE_PATTERN.lastIndex = 0
+  for (const match of normalizedValue.matchAll(REPLY_QUOTE_PATTERN)) {
+    const start = match.index ?? 0
+    if (start > cursor) {
+      segments.push(...wikilinkSegments(normalizedValue.slice(cursor, start), entries))
+    }
+    const token = match[0]
+    const quote = decodeReplyQuote(match[1])
+    segments.push(quote
+      ? { kind: 'quote', quote: { messageId: quote.messageId, text: quote.text, token } }
+      : { kind: 'text', text: token })
+    cursor = start + token.length
+  }
+
+  if (cursor < normalizedValue.length) {
+    segments.push(...wikilinkSegments(normalizedValue.slice(cursor), entries))
+  }
+
+  return segments.length > 0 ? segments : [{ kind: 'text', text: '' }]
+}
+
+function wikilinkSegments(normalizedValue: string, entries: VaultEntry[]): InlineWikilinkSegment[] {
+  if (normalizedValue.length === 0) return []
   const segments: InlineWikilinkSegment[] = []
   let cursor = 0
 
@@ -57,7 +92,7 @@ export function buildInlineWikilinkSegments(
     segments.push({ kind: 'text', text: normalizedValue.slice(cursor) })
   }
 
-  return segments.length > 0 ? segments : [{ kind: 'text', text: '' }]
+  return segments
 }
 
 export function extractInlineWikilinkReferences(
@@ -118,9 +153,9 @@ export function replaceActiveWikilinkQuery(
 }
 
 function segmentLength(segment: InlineWikilinkSegment): number {
-  return segment.kind === 'text'
-    ? segment.text.length
-    : chipToken(segment.chip.target).length
+  if (segment.kind === 'text') return segment.text.length
+  if (segment.kind === 'quote') return segment.quote.token.length
+  return chipToken(segment.chip.target).length
 }
 
 export function findInlineChipDeletionRange(
@@ -133,7 +168,7 @@ export function findInlineChipDeletionRange(
   for (const segment of segments) {
     const nextCursor = cursor + segmentLength(segment)
 
-    if (segment.kind === 'chip') {
+    if (segment.kind === 'chip' || segment.kind === 'quote') {
       const removePreviousChip = direction === 'backward' && selectionIndex === nextCursor
       const removeNextChip = direction === 'forward' && selectionIndex === cursor
 
