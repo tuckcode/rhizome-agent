@@ -8,7 +8,7 @@ import { BootSplash } from './components/BootSplash'
 import { FrontendReadyMarker } from './components/FrontendReadyMarker'
 import { LinuxTitlebar } from './components/LinuxTitlebar'
 import { MacOSTitlebar } from './components/MacOSTitlebar'
-import { applyStoredThemeMode } from './lib/themeMode'
+import { applyStoredAppearance } from './lib/themeMode'
 import {
   APP_COMMAND_EVENT_NAME,
   isAppCommandId,
@@ -67,7 +67,7 @@ if (isTauri() && isMac()) {
   document.body.classList.add('mac-chrome')
 }
 
-applyStoredThemeMode(document, window.localStorage)
+applyStoredAppearance(document, window.localStorage)
 
 function dispatchDeterministicShortcutEvent(init: AppCommandShortcutEventInit) {
   const target =

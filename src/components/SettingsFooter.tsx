@@ -1,3 +1,4 @@
+import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../hooks/appCommandCatalog'
 import type { createTranslator } from '../lib/i18n'
 import { Button } from './ui/button'
 
@@ -17,7 +18,9 @@ export function SettingsFooter({
       className="flex items-center justify-between shrink-0"
       style={{ height: 56, padding: '0 24px', borderTop: '1px solid var(--border)' }}
     >
-      <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{t('settings.footerShortcut')}</span>
+      <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
+        {getAppCommandShortcutDisplay(APP_COMMAND_IDS.appSettings)} to open settings
+      </span>
       <div className="flex gap-2">
         <Button variant="outline" size="sm" onClick={onClose}>
           {t('settings.cancel')}

@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   ACCENT_COLOR_STORAGE_KEY,
   applyAppearanceToDocument,
+  applyStoredAppearance,
   applyStoredThemeMode,
+  readStoredAppearance,
   applyThemeModeToDocument,
   buildStatusBarThemeTogglePatch,
   COLOR_THEME_STORAGE_KEY,
@@ -162,6 +164,78 @@ describe('color themes and accent', () => {
     writeStoredAccentColor(storage, 'gray')
     expect(readStoredColorTheme(storage)).toBe('everforest')
     expect(readStoredAccentColor(storage)).toBe('gray')
+  })
+
+  it('applies the current theme, named theme, and accent together', () => {
+    const storage = makeStorage({
+      [THEME_MODE_STORAGE_KEY]: 'light',
+      [COLOR_THEME_STORAGE_KEY]: 'nord',
+      [ACCENT_COLOR_STORAGE_KEY]: 'green',
+    })
+
+    expect(readStoredAppearance(storage)).toEqual({
+      mode: 'light',
+      colorTheme: 'nord',
+      accentColor: 'green',
+    })
+    expect(applyStoredAppearance(document, storage, makeMatchMedia(false))).toBe('dark')
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'nord')
+    expect(document.documentElement).not.toHaveAttribute('data-accent')
+    expect(document.documentElement).toHaveClass('dark')
+
+    const rhizome = makeStorage({
+      [THEME_MODE_STORAGE_KEY]: 'light',
+      [ACCENT_COLOR_STORAGE_KEY]: 'green',
+    })
+    expect(applyStoredAppearance(document, rhizome, makeMatchMedia(false))).toBe('light')
+    expect(document.documentElement).toHaveAttribute('data-accent', 'green')
+    expect(document.documentElement).not.toHaveClass('dark')
+  })
+
+  it('uses light defaults when storage is unavailable', () => {
+    const storage = {
+      getItem: () => {
+        throw new Error('blocked')
+      },
+      setItem: () => {
+        throw new Error('blocked')
+      },
+    } as unknown as Storage
+
+    expect(applyStoredAppearance(document, storage)).toBe('light')
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+  })
+
+  it('prefers current keys over legacy keys and ignores invalid values', () => {
+    const conflicting = makeStorage({
+      [THEME_MODE_STORAGE_KEY]: 'dark',
+      [LEGACY_THEME_MODE_STORAGE_KEY]: 'light',
+      [COLOR_THEME_STORAGE_KEY]: 'github-light',
+      [LEGACY_COLOR_THEME_STORAGE_KEY]: 'dracula',
+      [ACCENT_COLOR_STORAGE_KEY]: 'pink',
+      [LEGACY_ACCENT_COLOR_STORAGE_KEY]: 'green',
+    })
+
+    expect(applyStoredAppearance(document, conflicting, makeMatchMedia(true))).toBe('light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'github-light')
+    expect(document.documentElement).not.toHaveAttribute('data-accent')
+
+    const invalid = makeStorage({
+      [THEME_MODE_STORAGE_KEY]: 'sepia',
+      [LEGACY_THEME_MODE_STORAGE_KEY]: 'system',
+      [COLOR_THEME_STORAGE_KEY]: 'nope',
+      [ACCENT_COLOR_STORAGE_KEY]: 'nope',
+    })
+    expect(readStoredAppearance(invalid)).toEqual({
+      mode: 'system',
+      colorTheme: 'rhizome',
+      accentColor: 'blue',
+    })
+    expect(applyStoredAppearance(document, invalid, makeMatchMedia(true))).toBe('dark')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(document.documentElement).not.toHaveAttribute('data-accent')
   })
 
   it('reads the legacy color-theme/accent keys as a fallback when the current keys are absent', () => {

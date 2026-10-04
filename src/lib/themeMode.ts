@@ -104,6 +104,14 @@ export function applyStoredThemeMode(
   return applyThemeSelectionToDocument(documentObject, mode, matchMedia)
 }
 
+export function readStoredAppearance(storage: ThemeStorage): AppearanceSelection {
+  return {
+    mode: readStoredThemeMode(storage) ?? DEFAULT_THEME_MODE,
+    colorTheme: readStoredColorTheme(storage) ?? DEFAULT_COLOR_THEME,
+    accentColor: readStoredAccentColor(storage) ?? DEFAULT_ACCENT_COLOR,
+  }
+}
+
 // ── Color themes and accent ──────────────────────────────────────────────────
 // The default `rhizome` theme is the hand-tuned light/dark contract in
 // index.css and follows the Light/Dark/System mode toggle. Fixed themes
@@ -250,6 +258,15 @@ export function applyAppearanceToDocument(
   const resolvedMode = colorThemePolarity(colorTheme) ?? resolveThemeMode(selection.mode, matchMedia)
   applyThemeModeToDocument(documentObject, resolvedMode)
   return resolvedMode
+}
+
+/** First React paint. Same key order as the HTML bootstrap in index.html. */
+export function applyStoredAppearance(
+  documentObject: ThemeDocument,
+  storage: ThemeStorage,
+  matchMedia?: ThemeMatchMedia,
+): ResolvedThemeMode {
+  return applyAppearanceToDocument(documentObject, readStoredAppearance(storage), matchMedia)
 }
 
 /**

@@ -13,6 +13,10 @@ export default defineConfig([
     'src-tauri/target/',
     'src-tauri/gen/',
     'tools/',
+    // Untracked plugin-marketplace scaffold (my-marketplace/). Not part of
+    // the app source tree; an unrelated lint error there must not gate
+    // every commit of the tracked frontend. Mirrors the `tools/` precedent.
+    'my-marketplace/',
     // Playwright's output. It is build product, never source — and it is
     // *deleted and recreated* at the start of a run, so a lint walking the
     // tree while the smoke lane starts crashes on a directory that vanished

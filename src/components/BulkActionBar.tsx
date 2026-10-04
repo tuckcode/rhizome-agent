@@ -28,7 +28,7 @@ function BulkActionButton({ ariaLabel, children, destructive = false, onClick, t
       variant={destructive ? 'destructive' : 'ghost'}
       className={
         destructive
-          ? 'h-8 w-8 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/30'
+          ? 'h-8 w-8 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/95 focus-visible:ring-destructive/30'
           : 'h-8 w-8 rounded-lg bg-background/10 text-background hover:bg-background/20 focus-visible:ring-background/35 disabled:bg-background/5 disabled:text-background/35'
       }
       onClick={onClick}

@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { SettingsPanel } from './SettingsPanel'
 import type { Settings } from '../types'
-import { THEME_MODE_STORAGE_KEY } from '../lib/themeMode'
+import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../hooks/appCommandCatalog'
+import { COLOR_THEMES, THEME_MODE_STORAGE_KEY } from '../lib/themeMode'
 import {
   createAiAgentAvailability,
   createMissingAiAgentsStatus,
@@ -1146,7 +1147,97 @@ describe('SettingsPanel', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
-    expect(screen.getByText(/to open settings/)).toBeInTheDocument()
+    const shortcut = getAppCommandShortcutDisplay(APP_COMMAND_IDS.appSettings)
+    expect(screen.getByText(`${shortcut} to open settings`)).toBeInTheDocument()
+  })
+
+  it('shows the Windows settings shortcut when the platform is Windows', () => {
+    const originalUserAgent = navigator.userAgent
+    Object.defineProperty(window.navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+    })
+    try {
+      render(
+        <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+      )
+      expect(screen.getByText('Ctrl+, to open settings')).toBeInTheDocument()
+    } finally {
+      Object.defineProperty(window.navigator, 'userAgent', {
+        configurable: true,
+        value: originalUserAgent,
+      })
+    }
+  })
+
+  it('shows the Mac settings shortcut when the platform is macOS', () => {
+    const originalUserAgent = navigator.userAgent
+    Object.defineProperty(window.navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7)',
+    })
+    try {
+      render(
+        <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+      )
+      expect(screen.getByText('⌘, to open settings')).toBeInTheDocument()
+    } finally {
+      Object.defineProperty(window.navigator, 'userAgent', {
+        configurable: true,
+        value: originalUserAgent,
+      })
+    }
+  })
+
+  it('names the settings dialog and returns focus to the opening control', () => {
+    const opener = document.createElement('button')
+    opener.type = 'button'
+    opener.textContent = 'Open settings'
+    document.body.appendChild(opener)
+    opener.focus()
+
+    const view = render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+    const dialog = screen.getByRole('dialog', { name: 'Settings' })
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+
+    view.rerender(
+      <SettingsPanel open={false} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+    expect(opener).toHaveFocus()
+    opener.remove()
+  })
+
+  it('leaves settings open when Escape is pressed inside a portaled select', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+    act(() => {
+      fireEvent.pointerDown(screen.getByTestId('settings-release-channel'), { button: 0, pointerType: 'mouse' })
+    })
+    const option = screen.getByRole('option', { name: 'Stable' })
+    fireEvent.keyDown(option, { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Settings' }), { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('shows each color theme name without clipping the label', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+    const group = screen.getByTestId('settings-color-theme')
+    expect(group).toHaveClass('grid-cols-2')
+    expect(group).toHaveClass('max-[520px]:grid-cols-1')
+    for (const theme of COLOR_THEMES) {
+      const control = screen.getByTestId(`settings-color-theme-${theme.slug}`)
+      expect(control).toHaveTextContent(theme.name)
+      expect(control).not.toHaveClass('truncate')
+      expect(control.querySelector('.truncate')).toBeNull()
+      expect(control.tagName).toBe('BUTTON')
+    }
   })
 
   it('keeps Tab focus inside the settings panel', () => {

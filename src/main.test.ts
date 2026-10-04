@@ -311,4 +311,18 @@ describe('main entrypoint', () => {
 
     expect(dragOverEvent.defaultPrevented).toBe(false)
   })
+
+  it('applies a stored named theme before the first React render', async () => {
+    window.localStorage.setItem('rhizome-theme', 'light')
+    window.localStorage.setItem('rhizome-color-theme', 'nord')
+    window.localStorage.setItem('rhizome-accent', 'green')
+
+    await importEntrypoint()
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'nord')
+    expect(document.documentElement).toHaveClass('dark')
+    expect(document.documentElement).not.toHaveAttribute('data-accent')
+    window.localStorage.clear()
+  })
 })
