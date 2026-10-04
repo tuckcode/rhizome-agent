@@ -151,7 +151,7 @@ The existing reminder is documentary, not a scheduled notification.
 Vite responded at `http://127.0.0.1:5201` during handoff preparation.
 Its process identifier in Hermes is `proc_b889e6456a1d`.
 Check current ownership before stopping it.
-The fixture copy lives at `C:/Users/Admin/AppData/Local/hermes/cache/scratch/rhizome-design-audit-vault`.
+The fixture copy lives at `%LOCALAPPDATA%/hermes/cache/scratch/rhizome-design-audit-vault`.
 
 The audit scripts live in `docs/design/2026-10-04-ui-audit/probes/`.
 They retain machine-specific paths.

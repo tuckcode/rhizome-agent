@@ -30,7 +30,7 @@ The report separates measured findings, design proposals, and unavailable eviden
 
 ## Reference
 
-The user supplied `C:/Users/Admin/Downloads/rhizome-design-system.zip`.
+The user supplied `~/Downloads/rhizome-design-system.zip`.
 Its integrity check passed. The archive metadata references `main@9a48e00`.
 The original Claude link requires sign-in, but the archive supports continued review.
 The archive omits component API cards and its hero image.
@@ -68,7 +68,7 @@ Mycelium, complete onboarding, attachments, and several keyboard flows remain un
 Two GPT-5.4-mini CLI workers completed with exit code 0.
 Both printed `Warning: Unknown toolsets: stt` without failing.
 Their session IDs are `20261004_131412_1c1e58` and `20261004_131412_06f6a5`.
-Their temporary reports remain under `C:/Users/Admin/AppData/Local/hermes/cache/scratch/`.
+Their temporary reports remain under `%LOCALAPPDATA%/hermes/cache/scratch/`.
 The consolidated report supersedes them.
 
 One worker incorrectly treated the default `--primary` alias as a broken accent picker.
@@ -98,7 +98,7 @@ Early failed attempts do not invalidate successful final runs, but preserve the 
 
 Vite responded on `http://127.0.0.1:5201` during handoff preparation.
 Its tracked process is `proc_b889e6456a1d`.
-The copied fixture is `C:/Users/Admin/AppData/Local/hermes/cache/scratch/rhizome-design-audit-vault`.
+The copied fixture is `%LOCALAPPDATA%/hermes/cache/scratch/rhizome-design-audit-vault`.
 Orca opened during native-control discovery. No Rhizome application opened.
 
 The available debug executable is `src-tauri/target/debug/RhizomeAgent.exe`.

@@ -117,3 +117,7 @@ skills-lock.json
 rhizome-agent-claude-session/
 rhizome-agent-design-system/
 rhizome-agent/
+
+# Audit evidence (screenshots, measurements, probe scripts) stays local.
+# The repository is public; reports note the evidence is not committed.
+docs/design/*-ui-audit/

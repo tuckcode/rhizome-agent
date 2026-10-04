@@ -60,7 +60,7 @@ describe('vault-path HOME aliases', () => {
 
 describe('vault-path Windows verbatim prefix', () => {
   it('treats a \\\\?\\ path and its plain form as one vault', () => {
-    const plain = 'C:\\Users\\Admin\\Documents\\Rhizome Vault'
+    const plain = 'C:\\Users\\mock\\Documents\\Rhizome Vault'
     const verbatim = `\\\\?\\${plain}`
 
     assert.deepEqual(

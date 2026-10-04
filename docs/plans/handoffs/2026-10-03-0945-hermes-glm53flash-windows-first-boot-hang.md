@@ -167,7 +167,7 @@ yet. `pnpm handoff:check` should pass this file's shape.
 When the third hung app was force-killed, the `tauri dev` log tail showed a
 hot reconnect loop: `Prime vault skill ready … / Connected to Prime daemon`
 pairs every ~4 s (14:42:59, 14:43:03, 14:43:07, 14:43:11), each on the
-`C:\Users\Admin\Documents\Rhizome Vault` cwd — a different vault from the
+`~\Documents\Rhizome Vault` cwd — a different vault from the
 demo-vault-v2 boots. Something tears the host down right after a successful
 connect and the status poll reconnects forever. Two failure modes therefore
 coexist: (a) the main-thread pipe-write block, and (b) a reconnect loop that
