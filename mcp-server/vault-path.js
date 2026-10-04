@@ -27,11 +27,29 @@ function expandLeadingTilde(vaultPath, home = homedir()) {
   return vaultPath
 }
 
+const VERBATIM_UNC_PREFIX = '\\\\?\\UNC\\'
+const VERBATIM_PREFIX = '\\\\?\\'
+
+// Rust's canonicalize returns Windows verbatim paths. Without this,
+// `\\?\C:\Vault` and `C:\Vault` list the same vault twice.
+// e.g. `\\?\C:\Vault` → `C:\Vault`, `\\?\UNC\nas\share` → `\\nas\share`
+function stripVerbatimPrefix(vaultPath) {
+  if (vaultPath.startsWith(VERBATIM_UNC_PREFIX)) {
+    return `\\\\${vaultPath.slice(VERBATIM_UNC_PREFIX.length)}`
+  }
+
+  if (vaultPath.startsWith(VERBATIM_PREFIX)) {
+    return vaultPath.slice(VERBATIM_PREFIX.length)
+  }
+
+  return vaultPath
+}
+
 function normalizeVaultPath(vaultPath, home = homedir()) {
   if (typeof vaultPath !== 'string') return ''
   const trimmed = vaultPath.trim()
   if (!trimmed) return ''
-  return expandLeadingTilde(trimmed, home)
+  return expandLeadingTilde(stripVerbatimPrefix(trimmed), home)
 }
 
 function uniqueVaultPaths(paths) {
