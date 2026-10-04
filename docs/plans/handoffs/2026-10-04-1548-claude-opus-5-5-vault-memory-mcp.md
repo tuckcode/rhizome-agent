@@ -43,8 +43,7 @@ Each test was seen failing before its fix.
   checkout with `RHIZOME_TOOL_PATH` at `src-tauri/target/release/rhizome-tool.exe`.
   Before: `AppData\Local\Rhizome\mcp-server\index.js`, an older bundle that
   still ships `rhizome_grok_import` and reads `com.tolaria.app`. It is untouched.
-- The Rhizome Vault holds two junk cards titled "No durable knowledge here — …"
-  under `concepts/grok2api-repo-research-docs/`. Left for Atticus.
+- The vault holds two junk cards written before the SKIP fix. Left for Atticus.
 
 ## Decision recorded
 
