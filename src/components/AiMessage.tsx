@@ -581,7 +581,7 @@ function ResponseBlock({
         <ReplySelectionPill
           onAdd={(excerpt) => {
             insertAiComposerQuote(excerpt, messageId)
-            trackEvent('chat_reply_quote_added', { length: excerpt.length, linked: Boolean(messageId) })
+            trackEvent('chat_reply_quote_added', { length: excerpt.length, linked: messageId ? 1 : 0 })
           }}
         >
           <MarkdownContent content={text} onWikilinkClick={onNavigateWikilink} />
