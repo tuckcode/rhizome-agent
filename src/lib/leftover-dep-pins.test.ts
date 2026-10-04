@@ -8,7 +8,7 @@ describe('leftover dep pins', () => {
     expect(source).toContain('js-yaml@3: 3.15.2')
   })
 
-  it('locks fast-uri at 3.1.6', () => {
-    expect(source).toContain('fast-uri: 3.1.6')
+  it('locks fast-uri at 3.1.7', () => {
+    expect(source).toContain('fast-uri: 3.1.7')
   })
 })
