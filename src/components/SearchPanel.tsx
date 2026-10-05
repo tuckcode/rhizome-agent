@@ -48,8 +48,10 @@ interface SearchKeydownRecord {
 
 interface SearchKeyboardActionContext {
   handleSelect: (result: SearchResult) => void
+  handleSelectSessionHit?: (hit: SessionTranscriptHit) => void
   onClose: () => void
   resultsRef: React.MutableRefObject<SearchResult[]>
+  sessionHitsRef: React.MutableRefObject<SessionTranscriptHit[]>
   selectedIndexRef: React.MutableRefObject<number>
   setSelectedIndex: React.Dispatch<React.SetStateAction<number>>
 }
@@ -135,13 +137,25 @@ function resolveSearchKeyboardEventIdentity(event: SearchKeyboardEvent): Event |
   return null
 }
 
+function searchSelectableCount(
+  results: SearchResult[],
+  sessionHits: SessionTranscriptHit[],
+): number {
+  return results.length + sessionHits.length
+}
+
 function applySearchSelection(
   action: Extract<SearchKeyboardAction, 'next' | 'previous'>,
   resultsRef: React.MutableRefObject<SearchResult[]>,
+  sessionHitsRef: React.MutableRefObject<SessionTranscriptHit[]>,
   selectedIndexRef: React.MutableRefObject<number>,
   setSelectedIndex: React.Dispatch<React.SetStateAction<number>>,
 ) {
-  const nextIndex = nextSearchSelectionIndex(action, selectedIndexRef.current, resultsRef.current.length)
+  const nextIndex = nextSearchSelectionIndex(
+    action,
+    selectedIndexRef.current,
+    searchSelectableCount(resultsRef.current, sessionHitsRef.current),
+  )
   selectedIndexRef.current = nextIndex
   setSelectedIndex(nextIndex)
 }
@@ -153,12 +167,25 @@ function performSearchKeyboardAction(action: SearchKeyboardAction, context: Sear
   }
 
   if (action === 'select') {
-    const result = context.resultsRef.current[context.selectedIndexRef.current]
+    const noteCount = context.resultsRef.current.length
+    const selectedIndex = context.selectedIndexRef.current
+    if (selectedIndex >= noteCount) {
+      const hit = context.sessionHitsRef.current[selectedIndex - noteCount]
+      if (hit) context.handleSelectSessionHit?.(hit)
+      return
+    }
+    const result = context.resultsRef.current[selectedIndex]
     if (result) context.handleSelect(result)
     return
   }
 
-  applySearchSelection(action, context.resultsRef, context.selectedIndexRef, context.setSelectedIndex)
+  applySearchSelection(
+    action,
+    context.resultsRef,
+    context.sessionHitsRef,
+    context.selectedIndexRef,
+    context.setSelectedIndex,
+  )
 }
 
 function useSearchKeyboardDocumentListeners({
@@ -200,16 +227,22 @@ function shouldShowWorkspace(entries: VaultEntry[]): boolean {
   return new Set(entries.map((entry) => entry.workspace?.alias).filter(Boolean)).size > 1
 }
 
-function useSearchSelectionRefs(results: SearchResult[], selectedIndex: number) {
+function useSearchSelectionRefs(
+  results: SearchResult[],
+  sessionHits: SessionTranscriptHit[],
+  selectedIndex: number,
+) {
   const resultsRef = useRef(results)
+  const sessionHitsRef = useRef(sessionHits)
   const selectedIndexRef = useRef(selectedIndex)
 
   useLayoutEffect(() => {
     resultsRef.current = results
+    sessionHitsRef.current = sessionHits
     selectedIndexRef.current = selectedIndex
-  }, [results, selectedIndex])
+  }, [results, sessionHits, selectedIndex])
 
-  return { resultsRef, selectedIndexRef }
+  return { resultsRef, sessionHitsRef, selectedIndexRef }
 }
 
 function useSearchEntryData(entries: VaultEntry[]) {
@@ -228,14 +261,18 @@ function useSearchKeyboard({
   open,
   onClose,
   handleSelect,
+  handleSelectSessionHit,
   resultsRef,
+  sessionHitsRef,
   selectedIndexRef,
   setSelectedIndex,
 }: {
   open: boolean
   onClose: () => void
   handleSelect: (result: SearchResult) => void
+  handleSelectSessionHit?: (hit: SessionTranscriptHit) => void
   resultsRef: React.MutableRefObject<SearchResult[]>
+  sessionHitsRef: React.MutableRefObject<SessionTranscriptHit[]>
   selectedIndexRef: React.MutableRefObject<number>
   setSelectedIndex: React.Dispatch<React.SetStateAction<number>>
 }) {
@@ -250,8 +287,16 @@ function useSearchKeyboard({
     e.stopPropagation?.()
     if (!shouldHandleKeydown(e, pressedKeysRef.current, handledSearchKeyboardEvents, recentKeydownRef)) return
 
-    performSearchKeyboardAction(action, { handleSelect, onClose, resultsRef, selectedIndexRef, setSelectedIndex })
-  }, [handleSelect, onClose, resultsRef, selectedIndexRef, setSelectedIndex])
+    performSearchKeyboardAction(action, {
+      handleSelect,
+      handleSelectSessionHit,
+      onClose,
+      resultsRef,
+      sessionHitsRef,
+      selectedIndexRef,
+      setSelectedIndex,
+    })
+  }, [handleSelect, handleSelectSessionHit, onClose, resultsRef, sessionHitsRef, selectedIndexRef, setSelectedIndex])
 
   const handleKeyUp = useCallback((e: { key: string }) => {
     if (resolveSearchKeyboardAction(e.key)) pressedKeysRef.current.delete(e.key)
@@ -260,19 +305,36 @@ function useSearchKeyboard({
   useSearchKeyboardDocumentListeners({ handleKeyDown, handleKeyUp, open, pressedKeysRef })
 }
 
-function useSearchPanelController({ open, vaultPath, entries, onSelectNote, onClose }: SearchPanelProps) {
+function useSearchPanelController({
+  open,
+  vaultPath,
+  entries,
+  onSelectNote,
+  onClose,
+  onSelectSessionHit,
+}: SearchPanelProps) {
   const searchVaultPaths = useMemo(() => searchVaultPathsForEntries(entries, vaultPath), [entries, vaultPath])
   const {
     query, setQuery, results, selectedIndex, setSelectedIndex, loading, elapsedMs,
   } = useUnifiedSearch(searchVaultPaths, open)
+  const sessionHits = useSessionTranscriptSearch(query, open)
 
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
-  const { resultsRef, selectedIndexRef } = useSearchSelectionRefs(results, selectedIndex)
+  const { resultsRef, sessionHitsRef, selectedIndexRef } = useSearchSelectionRefs(
+    results,
+    sessionHits,
+    selectedIndex,
+  )
 
   useEffect(() => {
+    const selected = listRef.current?.querySelector('[aria-selected="true"]')
+    if (selected instanceof HTMLElement) {
+      selected.scrollIntoView({ block: 'nearest' })
+      return
+    }
     scrollSelectedHTMLChildIntoView(listRef.current, selectedIndex)
-  }, [selectedIndex])
+  }, [selectedIndex, sessionHits])
 
   const handleSelect = useCallback((result: SearchResult) => {
     const entry = entries.find(e => e.path === result.path)
@@ -282,6 +344,11 @@ function useSearchPanelController({ open, vaultPath, entries, onSelectNote, onCl
     }
   }, [entries, onSelectNote, onClose])
 
+  const handleSelectSessionHit = useCallback((hit: SessionTranscriptHit) => {
+    onSelectSessionHit?.(hit)
+    onClose()
+  }, [onSelectSessionHit, onClose])
+
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 50)
   }, [open])
@@ -290,7 +357,9 @@ function useSearchPanelController({ open, vaultPath, entries, onSelectNote, onCl
     open,
     onClose,
     handleSelect,
+    handleSelectSessionHit,
     resultsRef,
+    sessionHitsRef,
     selectedIndexRef,
     setSelectedIndex,
   })
@@ -299,12 +368,14 @@ function useSearchPanelController({ open, vaultPath, entries, onSelectNote, onCl
   return {
     elapsedMs,
     handleSelect,
+    handleSelectSessionHit,
     inputRef,
     listRef,
     loading,
     query,
     results,
     selectedIndex,
+    sessionHits,
     setQuery,
     setSelectedIndex,
     ...entryData,
@@ -332,17 +403,14 @@ export function SearchPanel({
     query,
     results,
     selectedIndex,
+    handleSelectSessionHit,
     setQuery,
     setSelectedIndex,
+    sessionHits,
     showWorkspace,
     typeEntryMap,
-  } = useSearchPanelController({ open, vaultPath, entries, onSelectNote, onClose })
-  const sessionHits = useSessionTranscriptSearch(query, open)
-  const handleSelectSessionHit = useCallback((hit: SessionTranscriptHit) => {
-    onSelectSessionHit?.(hit)
-    onClose()
-  }, [onSelectSessionHit, onClose])
-  const handleResultHover = useCallback((index: number, event: React.MouseEvent<HTMLDivElement>) => {
+  } = useSearchPanelController({ open, vaultPath, entries, onSelectNote, onClose, onSelectSessionHit })
+  const handleResultHover = useCallback((index: number, event: React.MouseEvent<HTMLElement>) => {
     if (shouldApplySearchResultHover(event)) setSelectedIndex(index)
   }, [setSelectedIndex])
 
@@ -459,7 +527,7 @@ interface SearchContentProps {
   sessionHits: SessionTranscriptHit[]
   onSelect: (result: SearchResult) => void
   onSelectSessionHit?: (hit: SessionTranscriptHit) => void
-  onHover: (index: number, event: React.MouseEvent<HTMLDivElement>) => void
+  onHover: (index: number, event: React.MouseEvent<HTMLElement>) => void
 }
 
 interface SearchResultRowProps {
@@ -471,7 +539,7 @@ interface SearchResultRowProps {
   showWorkspace: boolean
   dateDisplayFormat: DateDisplayFormat
   onSelect: (result: SearchResult) => void
-  onHover: (index: number, event: React.MouseEvent<HTMLDivElement>) => void
+  onHover: (index: number, event: React.MouseEvent<HTMLElement>) => void
 }
 
 interface SearchResultPresentation {
@@ -651,13 +719,18 @@ function SearchContent({
               </div>
             </>
           )}
-          <SessionTranscriptSearchResults hits={sessionHits} onSelect={onSelectSessionHit} />
+          <SessionTranscriptSearchResults
+            hits={sessionHits}
+            selectedIndex={selectedIndex - results.length}
+            onSelect={onSelectSessionHit}
+            onHover={(index, event) => onHover(results.length + index, event)}
+          />
         </>
       )}
     </div>
   )
 }
 
-function shouldApplySearchResultHover(event: React.MouseEvent<HTMLDivElement>): boolean {
+function shouldApplySearchResultHover(event: React.MouseEvent<HTMLElement>): boolean {
   return event.movementX !== 0 || event.movementY !== 0
 }
