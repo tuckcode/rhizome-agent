@@ -679,7 +679,7 @@ mod tests {
 
         assert!(
             message.contains("saved as structured-notes.md"),
-            "got: {message}"
+            "import success should name the saved document"
         );
         let doc_path = dir
             .path()
