@@ -229,7 +229,7 @@ git log origin/main..HEAD --oneline | wc -l
 git log origin/main..HEAD --format='%b' | rg 'Co-Authored-By'
 
 # Sub-agent transcripts (Cursor)
-ls -lt ~/.cursor/projects/Users-dtc-code-projects-rhizome-agent/agent-transcripts/**/*.jsonl | head
+ls -lt ~/.cursor/projects/Users-<user>-code-projects-rhizome-agent/agent-transcripts/**/*.jsonl | head
 ```
 
 ---

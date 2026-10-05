@@ -408,6 +408,7 @@ mod tests {
         ));
     }
 
+    #[cfg(unix)]
     #[test]
     fn resolves_real_git_dir_through_symlink() {
         let dir = tempfile::tempdir().unwrap();

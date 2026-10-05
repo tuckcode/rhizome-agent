@@ -41,6 +41,7 @@ pub struct NousCatalogModel {
     pub id: String,
     pub reasoning: bool,
     pub input: Vec<String>,
+    pub thinking_level_map: Option<Value>,
 }
 
 /// Catalog rows from an OpenAI-shaped `/v1/models` body.
@@ -72,6 +73,7 @@ fn catalog_model_from_record(entry: &Value) -> Option<NousCatalogModel> {
         id: id.to_string(),
         reasoning: record_supports_reasoning(entry),
         input: record_input_modalities(entry),
+        thinking_level_map: thinking_level_map(entry),
     })
 }
 
@@ -81,6 +83,35 @@ fn record_supports_reasoning(entry: &Value) -> bool {
         Some(Value::Object(_)) => true,
         _ => false,
     }
+}
+
+/// Map listed efforts to Prime levels. Hide all unlisted levels.
+/// Keep Prime defaults when no efforts are listed. Hide `off` if mandatory.
+fn thinking_level_map(item: &Value) -> Option<Value> {
+    const PRIME_EFFORT_LEVELS: [&str; 6] = ["minimal", "low", "medium", "high", "xhigh", "max"];
+    let reasoning = item.get("reasoning")?.as_object()?;
+    let mut map = serde_json::Map::new();
+    if reasoning.get("mandatory") == Some(&Value::Bool(true)) {
+        map.insert("off".into(), Value::Null);
+    }
+    let efforts = reasoning
+        .get("supported_efforts")
+        .and_then(Value::as_array)
+        .filter(|efforts| !efforts.is_empty());
+    if let Some(efforts) = efforts {
+        for level in PRIME_EFFORT_LEVELS {
+            let listed = efforts.iter().any(|effort| effort.as_str() == Some(level));
+            map.insert(
+                level.into(),
+                if listed {
+                    Value::from(level)
+                } else {
+                    Value::Null
+                },
+            );
+        }
+    }
+    (!map.is_empty()).then_some(Value::Object(map))
 }
 
 fn record_input_modalities(entry: &Value) -> Vec<String> {
@@ -132,11 +163,15 @@ fn models_file_with_nous(mut root: Value, models: &[NousCatalogModel]) -> Value 
     let models: Vec<Value> = models
         .iter()
         .map(|model| {
-            json!({
+            let mut entry = json!({
                 "id": model.id,
                 "reasoning": model.reasoning,
                 "input": model.input,
-            })
+            });
+            if let Some(map) = &model.thinking_level_map {
+                entry["thinkingLevelMap"] = map.clone();
+            }
+            entry
         })
         .collect();
     let nous = json!({
@@ -243,6 +278,7 @@ mod tests {
             id: id.to_string(),
             reasoning,
             input: input.iter().map(|token| (*token).to_string()).collect(),
+            thinking_level_map: None,
         }
     }
 
@@ -279,10 +315,105 @@ mod tests {
                 row("acme/flag", false, &["text"]),
                 row("acme/pictor-1", true, &["image"]),
                 row("baai/bge-m3", false, &["text"]),
-                row("z-ai/glm-5.3-flash", true, &["text", "image"]),
+                NousCatalogModel {
+                    thinking_level_map: Some(json!({
+                        "off": null, "minimal": null, "low": "low", "medium": null,
+                        "high": "high", "xhigh": null, "max": "max"
+                    })),
+                    ..row("z-ai/glm-5.3-flash", true, &["text", "image"])
+                },
                 row("~anthropic/claude-opus-latest", false, &["text"]),
             ]
         );
+    }
+
+    #[test]
+    fn image_input_and_mandatory_efforts_survive_the_file_write() {
+        let models = nous_catalog_models(&json!({ "data": [{
+            "id": "acme/vision",
+            "architecture": { "input_modalities": ["text", "image", "video"] },
+            "reasoning": { "mandatory": true, "supported_efforts": ["high", "xhigh"] }
+        }] }));
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("models.json");
+        assert_eq!(write_nous_portal_models(&path, &models).unwrap(), 1);
+        let stored: Value = serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+        assert_eq!(
+            stored["providers"]["nous-portal"]["models"][0],
+            json!({
+                "id": "acme/vision", "reasoning": true, "input": ["text", "image"],
+                "thinkingLevelMap": {
+                    "off": null, "minimal": null, "low": null, "medium": null,
+                    "high": "high", "xhigh": "xhigh", "max": null
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn maps_advertised_efforts_onto_prime_levels() {
+        let model = catalog_model_from_record(&json!({
+            "id": "deepseek/deepseek-v4-flash",
+            "reasoning": { "mandatory": false, "supported_efforts": ["xhigh", "high"] }
+        }))
+        .unwrap();
+        assert!(model.reasoning);
+        assert_eq!(
+            model.thinking_level_map,
+            Some(json!({
+                "minimal": null, "low": null, "medium": null,
+                "high": "high", "xhigh": "xhigh", "max": null
+            }))
+        );
+    }
+
+    #[test]
+    fn mandatory_reasoning_cannot_be_turned_off() {
+        let model = catalog_model_from_record(&json!({
+            "id": "acme/mandatory", "reasoning": { "mandatory": true }
+        }))
+        .unwrap();
+        assert_eq!(model.thinking_level_map, Some(json!({"off": null})));
+    }
+
+    #[test]
+    fn reasoning_without_listed_efforts_keeps_prime_defaults() {
+        for reasoning in [
+            json!({"mandatory": false}),
+            json!({"supported_efforts": []}),
+            json!(true),
+        ] {
+            let model =
+                catalog_model_from_record(&json!({"id": "acme/default", "reasoning": reasoning}))
+                    .unwrap();
+            assert!(model.reasoning);
+            assert_eq!(model.thinking_level_map, None);
+            let merged = merge_nous_portal(&Value::Null, &[model]).unwrap();
+            assert!(merged["providers"]["nous-portal"]["models"][0]
+                .get("thinkingLevelMap")
+                .is_none());
+        }
+    }
+
+    #[test]
+    fn a_model_without_reasoning_stays_off() {
+        for id in [
+            "nousresearch/hermes-4-405b",
+            "acme/reason-think",
+            "~anthropic/claude-opus-latest",
+        ] {
+            let model = catalog_model_from_record(
+                &json!({"id": id, "supported_parameters": ["reasoning"]}),
+            )
+            .unwrap();
+            assert_eq!(model, row(id, false, &["text"]));
+        }
+        for reasoning in [json!(false), Value::Null, json!("true")] {
+            let model =
+                catalog_model_from_record(&json!({"id": "acme/flag", "reasoning": reasoning}))
+                    .unwrap();
+            assert_eq!(model, row("acme/flag", false, &["text"]));
+        }
     }
 
     #[test]

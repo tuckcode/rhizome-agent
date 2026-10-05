@@ -19,6 +19,10 @@ vi.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: () => ({ minimize, toggleMaximize, close }),
 }))
 
+const { exit } = vi.hoisted(() => ({ exit: vi.fn().mockResolvedValue(undefined) }))
+
+vi.mock('@tauri-apps/plugin-process', () => ({ exit }))
+
 async function openSubmenu(label: string) {
   fireEvent.pointerDown(screen.getByRole('button', { name: 'Application menu' }), { button: 0 })
   const trigger = await screen.findByRole('menuitem', {
@@ -81,6 +85,17 @@ describe('LinuxMenuButton', () => {
     fireEvent.click(await screen.findByText('切换 AI 面板'))
 
     expect(invoke).toHaveBeenCalledWith('trigger_menu_command', { id: 'view-toggle-ai-chat' })
+  }, MENU_TEST_TIMEOUT_MS)
+
+  it('quits the app from Exit at the bottom of File', async () => {
+    render(<LinuxMenuButton />)
+
+    await openHorizontalMenu('File')
+    const items = await screen.findAllByRole('menuitem')
+    expect(items.at(-1)).toHaveTextContent('Exit')
+
+    fireEvent.click(items.at(-1)!)
+    expect(exit).toHaveBeenCalledWith(0)
   }, MENU_TEST_TIMEOUT_MS)
 
   it('invokes direct window actions from the Window submenu', async () => {

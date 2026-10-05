@@ -3,7 +3,7 @@
  *
  * Observed live the first time this shipped (#13): four running sessions, none
  * with a `firstMessage` — a session with no messages yet has none — two of
- * them rooted at `/Users/dtc`. Both rows rendered as "dtc": identical, and
+ * them rooted at `/Users/jdoe`. Both rows rendered as "jdoe": identical, and
  * giving the user no way to tell which session was which or that they were
  * even two different sessions. A row you cannot tell apart from its neighbour
  * is not a row you can click.

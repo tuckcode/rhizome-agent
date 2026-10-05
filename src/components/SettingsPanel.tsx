@@ -245,6 +245,13 @@ function isSaveShortcut(event: { ctrlKey: boolean; key: string; metaKey: boolean
   return event.key === 'Enter' && (event.metaKey || event.ctrlKey)
 }
 
+function isNestedSettingsOverlay(target: EventTarget | null, panel: HTMLElement | null): boolean {
+  if (!(target instanceof Element)) return false
+  if (target.closest('[data-settings-panel-portal="true"], [role="listbox"], [role="menu"]')) return true
+  const dialog = target.closest('[role="dialog"]')
+  return dialog !== null && dialog !== panel
+}
+
 function createSettingsDraft(
   settings: Settings,
   explicitOrganizationEnabled: boolean,
@@ -490,6 +497,20 @@ function SettingsPanelInner({
   useSettingsPanelAutofocus(panelRef, open)
   useSettingsPanelFocusTrap(panelRef, open)
 
+  const openerRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!open) {
+      const opener = openerRef.current
+      openerRef.current = null
+      if (opener?.isConnected) opener.focus()
+      return
+    }
+
+    if (openerRef.current) return
+    const active = document.activeElement
+    if (active instanceof HTMLElement) openerRef.current = active
+  }, [open])
+
   useEffect(() => {
     if (!initialSectionId) return
     const timer = window.setTimeout(() => {
@@ -556,6 +577,7 @@ function SettingsPanelInner({
     if (!open) return
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (event.defaultPrevented || isNestedSettingsOverlay(event.target, panelRef.current)) return
         event.stopPropagation()
         onClose()
         return
@@ -596,6 +618,9 @@ function SettingsPanelInner({
       <SettingsBackdropCloseButton onClose={onClose} t={t} />
       <div
         ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-dialog-title"
         className="relative rounded-lg border border-border bg-background shadow-[0_18px_55px_var(--shadow-dialog)]"
         style={{ width: 'min(960px, calc(100vw - 48px))', maxHeight: '86vh', display: 'flex', flexDirection: 'column' }}
       >
@@ -648,7 +673,7 @@ function SettingsHeader({ onClose, t }: { onClose: () => void; t: Translate }) {
       className="flex items-center justify-between shrink-0"
       style={{ height: 56, padding: '0 24px', borderBottom: '1px solid var(--border)' }}
     >
-      <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--foreground)' }}>{t('settings.title')}</span>
+      <span id="settings-dialog-title" style={{ fontSize: 16, fontWeight: 600, color: 'var(--foreground)' }}>{t('settings.title')}</span>
       <Button
         variant="ghost"
         size="icon-sm"
@@ -1161,7 +1186,11 @@ function AppearanceSettingsSection({
   const isRhizomeTheme = colorTheme === DEFAULT_COLOR_THEME
   return (
     <>
-      <SettingsRow label={t('settings.colorTheme.label')} description={t('settings.colorTheme.description')}>
+      <SettingsRow
+        label={t('settings.colorTheme.label')}
+        description={t('settings.colorTheme.description')}
+        controlWidth="wide"
+      >
         <ColorThemeControl value={colorTheme} onChange={setColorTheme} t={t} />
       </SettingsRow>
       <SettingsRow
@@ -1202,34 +1231,35 @@ function ColorThemeControl({
       role="radiogroup"
       aria-label={t('settings.colorTheme.label')}
       data-testid="settings-color-theme"
-      className="grid grid-cols-3 gap-2"
+      className="grid w-full grid-cols-2 gap-2 max-[520px]:grid-cols-1"
     >
       {COLOR_THEMES.map((theme) => {
         const selected = value === theme.slug
         return (
-          <button
+          <Button
             key={theme.slug}
             type="button"
+            variant="outline"
             role="radio"
             aria-checked={selected}
             aria-label={theme.name}
             data-testid={`settings-color-theme-${theme.slug}`}
             onClick={() => onChange(theme.slug)}
             className={cn(
-              'flex items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors',
-              selected ? 'border-foreground bg-muted' : 'border-border hover:bg-muted/50',
+              'h-auto min-h-8 w-full items-start justify-start gap-2 whitespace-normal px-2 py-1.5 text-left text-xs font-medium',
+              selected ? 'border-foreground bg-muted hover:bg-muted' : 'hover:bg-muted/50',
             )}
           >
             <span
-              className="flex h-5 w-5 shrink-0 overflow-hidden rounded-full border border-border/60"
+              className="mt-0.5 flex h-5 w-5 shrink-0 overflow-hidden rounded-full border border-border/60"
               aria-hidden="true"
             >
               <span className="h-full w-1/2" style={{ backgroundColor: theme.swatch[0] }} />
               <span className="h-full w-1/4" style={{ backgroundColor: theme.swatch[1] }} />
               <span className="h-full w-1/4" style={{ backgroundColor: theme.swatch[2] }} />
             </span>
-            <span className="truncate text-xs font-medium text-foreground">{theme.name}</span>
-          </button>
+            <span className="min-w-0 whitespace-normal text-xs font-medium leading-4">{theme.name}</span>
+          </Button>
         )
       })}
     </div>

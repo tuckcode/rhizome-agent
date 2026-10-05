@@ -646,6 +646,7 @@ pub async fn speak_reply(args: crate::read_aloud::SpeakReplyArgs) -> Result<Vec<
 mod tests {
     use super::*;
     use crate::vault::AiGuidanceFileState;
+    use std::path::Path;
 
     // ── Prime strip commands (#9) ───────────────────────────────────────────
     //
@@ -722,14 +723,19 @@ mod tests {
 
         let normalized = normalize_agent_request(request);
 
+        // Compare as paths: the separator is the platform's (Windows uses `\`).
         assert_eq!(
-            normalized.vault_path,
-            format!("{}/Vaults/content", home.display()),
+            Path::new(&normalized.vault_path),
+            home.join("Vaults").join("content"),
             "vault_path must be tilde-expanded so spawned agents can chdir into it",
         );
         assert_eq!(
-            normalized.vault_paths,
-            vec![format!("{}/Vaults/secondary", home.display())],
+            normalized
+                .vault_paths
+                .iter()
+                .map(|path| Path::new(path).to_path_buf())
+                .collect::<Vec<_>>(),
+            vec![home.join("Vaults").join("secondary")],
             "vault_paths must be tilde-expanded so spawned agents can access every active vault",
         );
     }
@@ -1039,6 +1045,45 @@ pub fn list_prime_sessions() -> Result<Vec<crate::mycelium::PrimeSessionEntry>, 
 #[tauri::command]
 pub async fn get_prime_provider_status() -> Result<Vec<crate::preflight::ProviderStatus>, String> {
     run_blocking(crate::preflight::provider_statuses).await
+}
+
+/// Sign Prime in to an OAuth provider in the system browser (ADR-0176).
+///
+/// Resolves once the browser has returned and Prime has stored the token,
+/// then reloads the attached session so it reads the new credential.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn sign_in_prime_provider(app: tauri::AppHandle, provider: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+
+    tokio::task::spawn_blocking(move || {
+        crate::prime_login::sign_in(&provider, crate::prime_login::KeySource::Browser, |url| {
+            if let Err(error) = app.opener().open_url(url, None::<&str>) {
+                log::warn!("Could not open the sign-in page: {error}");
+            }
+        })?;
+        crate::prime_session_host::reload_attached_session();
+        Ok(())
+    })
+    .await
+    .map_err(|error| format!("Sign-in task failed: {error}"))?
+}
+
+/// Store a pasted API key in Prime's credential store (ADR-0176).
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn save_prime_provider_key(provider: String, key: String) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || {
+        crate::prime_login::sign_in(
+            &provider,
+            crate::prime_login::KeySource::Pasted(&key),
+            |_| {},
+        )?;
+        crate::prime_session_host::reload_attached_session();
+        Ok(())
+    })
+    .await
+    .map_err(|error| format!("Saving the key failed: {error}"))?
 }
 
 /// Packages listed in Prime's global settings. Catalog search is the public

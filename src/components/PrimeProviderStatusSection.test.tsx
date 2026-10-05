@@ -8,11 +8,18 @@ const state = vi.hoisted(() => ({
   fail: false,
   nousFail: '',
   nousResult: { provider: 'nous-portal', modelCount: 2, reloaded: true },
+  signInFail: '',
+  calls: [] as Array<{ cmd: string; args: unknown }>,
 }))
 
 vi.mock('../mock-tauri', () => ({
   isTauri: () => false,
-  mockInvoke: async (cmd: string) => {
+  mockInvoke: async (cmd: string, args?: unknown) => {
+    state.calls.push({ cmd, args })
+    if (cmd === 'sign_in_prime_provider' || cmd === 'save_prime_provider_key') {
+      if (state.signInFail) throw new Error(state.signInFail)
+      return null
+    }
     if (cmd === 'get_prime_provider_status') {
       if (state.fail) throw new Error('unavailable')
       return state.providers
@@ -31,10 +38,16 @@ vi.mock('../utils/clipboardText', () => ({
 
 vi.mock('../lib/productAnalytics', () => ({
   trackNousPortalAddedToChat: vi.fn(),
+  trackPrimeProviderSignIn: vi.fn(),
+}))
+
+vi.mock('../utils/url', () => ({
+  openExternalUrl: vi.fn().mockResolvedValue(undefined),
 }))
 
 import { writeClipboardText } from '../utils/clipboardText'
-import { trackNousPortalAddedToChat } from '../lib/productAnalytics'
+import { trackNousPortalAddedToChat, trackPrimeProviderSignIn } from '../lib/productAnalytics'
+import { openExternalUrl } from '../utils/url'
 import { resetPrimeModelCatalog } from '../lib/primeModelCatalog'
 
 const t = createTranslator('en')
@@ -44,21 +57,90 @@ beforeEach(() => {
   state.fail = false
   state.nousFail = ''
   state.nousResult = { provider: 'nous-portal', modelCount: 2, reloaded: true }
+  state.signInFail = ''
+  state.calls = []
+  vi.mocked(openExternalUrl).mockClear()
+  vi.mocked(trackPrimeProviderSignIn).mockClear()
   vi.mocked(writeClipboardText).mockClear()
   vi.mocked(trackNousPortalAddedToChat).mockClear()
   resetPrimeModelCatalog()
 })
 
 describe('PrimeProviderStatusSection', () => {
-  it('lists connect-from-Rhizome as not built and does not add a connect button', async () => {
+  it('signs in to Anthropic in the browser and refreshes the cards', async () => {
     state.providers = []
     render(<PrimeProviderStatusSection t={t} />)
-    const note = await screen.findByTestId('prime-connect-not-built')
-    expect(note).toHaveTextContent(/not built/i)
-    expect(note).toHaveTextContent(/auth command/i)
-    expect(screen.queryByRole('button', { name: /^connect$/i })).not.toBeInTheDocument()
-    expect(screen.getByTestId('prime-provider-sign-in-anthropic')).toHaveTextContent('Sign in')
+    fireEvent.click(await screen.findByTestId('prime-provider-sign-in-anthropic'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('prime-provider-sign-in-notice')).toHaveTextContent('Signed in to Anthropic.')
+    })
+    expect(state.calls).toContainEqual({ cmd: 'sign_in_prime_provider', args: { provider: 'anthropic' } })
+    expect(state.calls.filter((call) => call.cmd === 'get_prime_provider_status')).toHaveLength(2)
+    expect(writeClipboardText).not.toHaveBeenCalled()
+    expect(trackPrimeProviderSignIn).toHaveBeenCalledWith('anthropic', 'browser', 'success')
   })
+
+  it('shows why a browser sign-in failed', async () => {
+    state.providers = []
+    state.signInFail = 'Sign-in stopped before it finished.'
+    render(<PrimeProviderStatusSection t={t} />)
+    fireEvent.click(await screen.findByTestId('prime-provider-sign-in-anthropic'))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sign-in stopped before it finished.')
+    expect(trackPrimeProviderSignIn).toHaveBeenCalledWith('anthropic', 'browser', 'failed')
+  })
+
+  it('saves a pasted DeepSeek key through Prime', async () => {
+    state.providers = []
+    render(<PrimeProviderStatusSection t={t} />)
+    fireEvent.click(await screen.findByTestId('prime-provider-sign-in-deepseek'))
+
+    fireEvent.change(await screen.findByTestId('prime-provider-key-input-deepseek'), {
+      target: { value: 'test-key' },
+    })
+    fireEvent.click(screen.getByTestId('prime-provider-key-save-deepseek'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('prime-provider-sign-in-notice')).toHaveTextContent('Saved the DeepSeek key.')
+    })
+    expect(state.calls).toContainEqual({
+      cmd: 'save_prime_provider_key',
+      args: { provider: 'deepseek', key: 'test-key' },
+    })
+    expect(screen.queryByTestId('prime-provider-key-input-deepseek')).not.toBeInTheDocument()
+    expect(trackPrimeProviderSignIn).toHaveBeenCalledWith('deepseek', 'api_key', 'success')
+  })
+
+  it.each([
+    ['xai', 'xAI (Grok)'],
+    ['openai-codex', 'ChatGPT (Codex)'],
+  ])('signs in to %s in the browser, never asking for a key', async (provider, label) => {
+    state.providers = []
+    render(<PrimeProviderStatusSection t={t} />)
+    const button = await screen.findByTestId(`prime-provider-sign-in-${provider}`)
+    expect(button).toHaveTextContent('Sign in')
+
+    fireEvent.click(button)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('prime-provider-sign-in-notice')).toHaveTextContent(`Signed in to ${label}.`)
+    })
+    expect(state.calls).toContainEqual({ cmd: 'sign_in_prime_provider', args: { provider } })
+    expect(screen.queryByTestId(`prime-provider-key-input-${provider}`)).not.toBeInTheDocument()
+    expect(openExternalUrl).not.toHaveBeenCalled()
+  })
+
+  it('opens the DeepSeek key page instead of copying a command', async () => {
+    state.providers = []
+    render(<PrimeProviderStatusSection t={t} />)
+    fireEvent.click(await screen.findByTestId('prime-provider-sign-in-deepseek'))
+
+    expect(openExternalUrl).toHaveBeenCalledWith('https://platform.deepseek.com/api_keys')
+    expect(await screen.findByTestId('prime-provider-key-input-deepseek')).toBeInTheDocument()
+    expect(writeClipboardText).not.toHaveBeenCalled()
+  })
+
 
   it('lists each provider with how it is connected', async () => {
     state.providers = [
@@ -157,33 +239,6 @@ describe('PrimeProviderStatusSection', () => {
     fireEvent.click(screen.getByTestId('prime-provider-sign-in-prime-inference'))
     await waitFor(() => {
       expect(writeClipboardText).toHaveBeenCalledWith('prime-agent --provider prime-inference')
-    })
-  })
-
-  it('copies the prime-agent login command when sign in is clicked', async () => {
-    state.providers = []
-    render(<PrimeProviderStatusSection t={t} />)
-    await waitFor(() => {
-      expect(screen.getByTestId('prime-provider-sign-in-xai')).toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByTestId('prime-provider-sign-in-xai'))
-
-    await waitFor(() => {
-      expect(writeClipboardText).toHaveBeenCalledWith('prime-agent --provider xai')
-    })
-    expect(await screen.findByTestId('prime-provider-sign-in-notice')).toHaveTextContent('prime-agent --provider xai')
-  })
-
-  it('copies DeepSeek add-key command', async () => {
-    state.providers = []
-    render(<PrimeProviderStatusSection t={t} />)
-    await waitFor(() => {
-      expect(screen.getByTestId('prime-provider-sign-in-deepseek')).toBeInTheDocument()
-    })
-    fireEvent.click(screen.getByTestId('prime-provider-sign-in-deepseek'))
-    await waitFor(() => {
-      expect(writeClipboardText).toHaveBeenCalledWith('prime-agent --provider deepseek')
     })
   })
 

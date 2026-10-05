@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Follow the application theme (`html.dark`), including portaled descendants.
+   The default Tailwind variant follows the operating-system preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Brand wordmark font — bundled locally so the `rhizome` lockup renders
    offline (every other font still comes from the Google Fonts link in
    index.html; this one is a fixed brand element and must not fall back). */

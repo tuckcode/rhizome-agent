@@ -129,7 +129,10 @@ fn cleanup_failed_clone(dest: &Path) {
 mod tests {
     use super::*;
     use std::fs;
+    #[cfg(unix)]
     use std::os::unix::process::ExitStatusExt;
+    #[cfg(windows)]
+    use std::os::windows::process::ExitStatusExt;
     use std::path::Path;
     use std::process::Command as StdCommand;
 

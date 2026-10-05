@@ -1,4 +1,5 @@
 use serde::Serialize;
+#[cfg(unix)]
 use std::process::Command;
 
 const WEBKIT_AUX_PID_WINDOW: u32 = 512;
@@ -86,6 +87,7 @@ fn is_nearby_webkit_auxiliary(row: &ProcessRow, current_pid: u32) -> bool {
         && row.command.contains("com.apple.WebKit.")
 }
 
+#[cfg(any(unix, test))]
 fn parse_process_row(line: &str) -> Option<ProcessRow> {
     let mut fields = line.split_whitespace();
     let pid = fields.next()?.parse().ok()?;

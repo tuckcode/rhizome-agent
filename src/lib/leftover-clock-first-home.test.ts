@@ -8,6 +8,6 @@ const source = readFileSync(
 
 describe('leftover clock-first home session name', () => {
   it('locks the clock-first home-folder session name example', () => {
-    expect(source).toContain('Rhizome · Sep 6 · 3:35p · dtc · f65c06')
+    expect(source).toContain('Rhizome · Sep 6 · 3:35p · jdoe · f65c06')
   })
 })

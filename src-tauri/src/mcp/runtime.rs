@@ -370,7 +370,7 @@ mod tests {
     fn assert_home_binary_candidates_include(
         home: &Path,
         candidates: &[PathBuf],
-        expected_relative_paths: &[&str],
+        expected_relative_paths: &[String],
     ) {
         let expected = expected_relative_paths
             .iter()
@@ -395,7 +395,11 @@ mod tests {
     fn first_existing_path_skips_empty_and_missing_lines() {
         let dir = tempfile::tempdir().unwrap();
         let missing = dir.path().join("missing-node");
-        let node = dir.path().join("node");
+        // Windows `first_existing_path` requires a CLI extension, so the
+        // fixture must be one a Windows lookup would accept.
+        let node = dir
+            .path()
+            .join(if cfg!(windows) { "node.exe" } else { "node" });
         std::fs::write(&node, "#!/bin/sh\n").unwrap();
 
         let stdout = format!("\n{}\n{}\n", missing.display(), node.display());
@@ -436,28 +440,31 @@ mod tests {
 
     #[test]
     fn home_binary_candidates_include_shell_managed_installs() {
-        let home = PathBuf::from("/Users/alex");
+        // The candidate names are platform-dependent (`node` vs `node.exe`).
+        let node = node_binary_name();
+        let bun = bun_binary_name();
+        let home = if cfg!(windows) {
+            PathBuf::from("C:\\Users\\alex")
+        } else {
+            PathBuf::from("/Users/alex")
+        };
+        let node_expected = [
+            format!(".local/bin/{node}"),
+            format!(".local/share/mise/shims/{node}"),
+            format!(".asdf/shims/{node}"),
+            format!(".volta/bin/{node}"),
+            format!(".linuxbrew/bin/{node}"),
+        ];
+        let bun_expected = [
+            format!(".bun/bin/{bun}"),
+            format!(".local/share/mise/shims/{bun}"),
+            format!(".mise/shims/{bun}"),
+            format!(".asdf/shims/{bun}"),
+            format!(".proto/bin/{bun}"),
+        ];
         let cases = [
-            (
-                node_binary_candidates_for_home(&home),
-                &[
-                    ".local/bin/node",
-                    ".local/share/mise/shims/node",
-                    ".asdf/shims/node",
-                    ".volta/bin/node",
-                    ".linuxbrew/bin/node",
-                ][..],
-            ),
-            (
-                bun_binary_candidates_for_home(&home),
-                &[
-                    ".bun/bin/bun",
-                    ".local/share/mise/shims/bun",
-                    ".mise/shims/bun",
-                    ".asdf/shims/bun",
-                    ".proto/bin/bun",
-                ][..],
-            ),
+            (node_binary_candidates_for_home(&home), &node_expected[..]),
+            (bun_binary_candidates_for_home(&home), &bun_expected[..]),
         ];
 
         for (candidates, expected_paths) in cases {

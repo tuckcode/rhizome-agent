@@ -355,7 +355,10 @@ mod tests {
         })
         .unwrap();
 
-        assert!(moved.new_path.ends_with("Projects/custom-name.md"));
+        assert!(moved
+            .new_path
+            .replace('\\', "/")
+            .ends_with("Projects/custom-name.md"));
         assert!(fs::read_to_string(moved.new_path)
             .unwrap()
             .contains("Draft Title"));

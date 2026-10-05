@@ -276,7 +276,7 @@ copies across 11 transcripts were redacted.
 ### Read this before writing a feature
 
 **Every real bug this session was found by Atticus using the app; none by the
-suite.** Three for three — #13 shipped with two rows both reading `dtc`, #9
+suite.** Three for three — #13 shipped with two rows both reading `<user>`, #9
 shipped where picking a thinking level never updated the strip, and #14's read
 path had been broken since it was written. The shape is always the same: **the
 tests assert the right request went out on the wire, never that the resulting
@@ -355,7 +355,7 @@ before spending anything on agent-driven native QA.)
 had missed:** every row rendered a *cwd folder name* instead of a title,
 because none of the running sessions had a `firstMessage` (a session with no
 messages has none) — and two shared `~`, so two rows both read
-"dtc", identical and impossible to tell apart. Colliding titles now get the
+"<user>", identical and impossible to tell apart. Colliding titles now get the
 short session id appended. The lesson is cheap to reuse: the fixtures all set
 `firstMessage` because that is the interesting case to write, so the fallback
 path — the only one production actually took — was never exercised for

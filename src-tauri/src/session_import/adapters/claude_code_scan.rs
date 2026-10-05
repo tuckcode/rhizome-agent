@@ -101,7 +101,7 @@ mod tests {
                 "type": "user",
                 "sessionId": session,
                 "timestamp": "2026-08-30T14:56:14.799Z",
-                "cwd": "/Users/dtc/code",
+                "cwd": "/Users/jdoe/code",
                 "isSidechain": false,
                 "message": { "role": "user", "content": text },
             })

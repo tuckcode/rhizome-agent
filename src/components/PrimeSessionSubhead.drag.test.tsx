@@ -14,7 +14,7 @@ function renderSubhead() {
       locale="en"
       live
       sessionId="sess_1036"
-      vaultPath="/Users/dtc/Documents/Rhizome Vault"
+      vaultPath="/Users/jdoe/Documents/Rhizome Vault"
     />,
   )
 }

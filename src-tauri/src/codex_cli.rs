@@ -531,6 +531,7 @@ mod tests {
         script
     }
 
+    #[cfg(unix)] // callers are Unix-only tests (`run_codex_script`)
     fn codex_request(
         vault_path: &Path,
         permission_mode: AiAgentPermissionMode,
@@ -572,6 +573,7 @@ mod tests {
         (thread_id, events)
     }
 
+    #[cfg(unix)] // callers are Unix-only tests
     fn assert_codex_text_flow(events: &[AiAgentStreamEvent], session: &str, text_delta: &str) {
         assert!(matches!(
             &events[0],
@@ -677,7 +679,7 @@ mod tests {
             "Codex MCP command should use Tolaria's resolved Node path, got {command_override}"
         );
         assert!(
-            command_override.contains('/'),
+            command_override.contains('/') || command_override.contains('\\'),
             "Codex MCP command should be an absolute Node path, got {command_override}"
         );
         assert!(args.iter().any(|arg| arg.contains(r#"WS_UI_PORT="9711""#)));
@@ -1033,8 +1035,12 @@ printf '%s\n' '{"type":"item.completed","item":{"id":"msg_1","type":"agent_messa
     fn first_existing_path_skips_empty_and_missing_lines() {
         let dir = tempfile::tempdir().unwrap();
         let missing = dir.path().join("missing-codex");
-        let codex = dir.path().join("codex");
-        std::fs::write(&codex, "#!/bin/sh\n").unwrap();
+        // Windows `first_existing_path` requires a CLI extension, so the
+        // fixture must be one a Windows lookup would accept.
+        let codex = dir
+            .path()
+            .join(if cfg!(windows) { "codex.cmd" } else { "codex" });
+        std::fs::write(&codex, "@echo off\n").unwrap();
 
         let stdout = format!("\n{}\n{}\n", missing.display(), codex.display());
 

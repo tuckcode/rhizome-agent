@@ -47,6 +47,9 @@ file.
 ---
 
 ## State
+**Origin:** Claude Opus 5.5 · 2026-10-04 · vault-memory MCP fixes merged locally as `bf22be8`, not pushed. Claude Code's `rhizome` MCP now runs this checkout's `mcp-server` and release `rhizome-tool`. [Handoff](plans/handoffs/2026-10-04-1548-claude-opus-5-5-vault-memory-mcp.md).
+**Origin:** Astra through Hermes desktop · 2026-10-04 · browser design audit at `9a48e00`.
+Browser evidence identifies C89–C92. No product code changed. Native Windows and MacBook checks remain open. [Review](design/2026-10-04-ui-audit.md).
 **Origin:** GPT-6 Codex · 2026-09-20 · reviewed Astra landing.
 **Origin:** Cursor Grok 4.6 · 2026-09-21 · C75 living-docs; #66–#68 closed.
 **Origin:** Cursor Grok 4.7 · 2026-09-21 · evening wrap. Local main unpushed.
@@ -59,7 +62,8 @@ file.
 **Origin:** GPT-6 Codex · 2026-09-26 · splash grows two branches, then breathes with shaded nodes. Browser checks passed. Installed app unchanged.
 **Origin:** Cursor Grok 4.7 · 2026-09-28 · stall plan only. Vault-index gate and Source control are local and uncommitted. Installed app unchanged.
 **Origin:** Cursor Grok 4.7 · 2026-10-03 · Chat waits leave the UI thread. Add to Chat list copies Nous reasoning and input modalities. Installed app unchanged.
-`origin/main` was **`ff9909a`** before this commit. Installed app = **`d0a55f8`**, **2026-09-26 04:21 CDT**. Latest detail: [`2026-10-03-0942`](plans/handoffs/2026-10-03-0942-cursor-grok-4-7-nous-catalog-fields.md).
+**Origin:** Hermes Agent · 2026-10-03 · Windows and macOS merge in a separate worktree.
+The merge combines Windows `004989d` with macOS `c8b5db2`. Main and the installed apps stay unchanged. Windows gates pass, Rust coverage included (C87 fixed). Native macOS QA not run. The prior macOS report lists installed app **`d0a55f8`**, **2026-09-26 04:21 CDT**. Windows test detail: [`2026-10-03-1533`](plans/handoffs/2026-10-03-1533-hermes-glm-c83-windows-tests-closed.md).
 Handy: [`2026-09-20-1230`](plans/handoffs/2026-09-20-1230-cursor-grok-4-6-handy.md).
 Recap: [`2026-09-20-1228`](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md).
 Detail: [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
@@ -116,6 +120,10 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-10-04 · Vault memory MCP](plans/handoffs/2026-10-04-1548-claude-opus-5-5-vault-memory-mcp.md) — one listing per vault, MCP server instructions, distill SKIP; merged `bf22be8`, not pushed.
+- [2026-10-04 · Split handoffs](plans/handoffs/2026-10-04-1423-astra-audit-continuation.md) — Astra owns audit completion and independent review. [Cursor assignment](plans/handoffs/2026-10-04-1422-astra-cursor-implementation.md) covers bounded fixes. No product edits started.
+- [2026-10-04 · Design audit](plans/handoffs/2026-10-04-1417-astra-design-audit.md) — splash/theme/Settings findings, 83 focused tests passed, no product fixes; native checks open.
+- [2026-10-03 · Windows pipe freeze](plans/handoffs/2026-10-03-1015-claude-opus-5-5-windows-pipe-freeze.md) — freeze fixed, test target compiles, File > Exit; C83–C85 opened; not pushed.
 - [2026-09-30 · open issues](plans/2026-09-30-open-issues-plan.md) — closed #46, #13, #52, #51 as already built. #23 stays open: search hits are not wired. #40 and #56 stay a product call.
 - [2026-10-03 · Nous catalog fields](plans/handoffs/2026-10-03-0942-cursor-grok-4-7-nous-catalog-fields.md) — Add to Chat list copies reasoning and input modalities from each Nous record. Name guesses are gone. Not in the installed app.
 - [2026-10-03 · Nous catalog and stall sample](plans/handoffs/2026-10-03-0921-cursor-grok-4-7-nous-catalog-handy.md) — stall sampled; shell waits, skills, lights, and image bubble are uncommitted. Nous already sends reasoning and image modalities. No automatic model refresh.
@@ -126,6 +134,14 @@ Do not paste leftover paper here.
 - [2026-09-26 · macOS title bar](plans/handoffs/2026-09-26-0635-cursor-grok-4-7-macos-titlebar.md) — 32px MacOSTitlebar, y=9, Command Palette docked; packaged app not checked.
 - [2026-09-26 · public prep](plans/handoffs/2026-09-26-0559-claude-opus-5-5-public-prep.md) — secret scan clean; AGPL confirmed, Tolaria credited; Gmail-in-history open.
 - [2026-09-26 · Astra redesign](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md) — redesign + login-note skip + list markers pushed as `d0a55f8`; app rebuilt; native QA not done.
+- [2026-09-26 · handy wrap](plans/handoffs/2026-09-26-0227-cursor-grok-4-7-handy.md) — app is `18eb5ba`; rail fix local; staged login skip and list markers are separate.
+- [2026-09-26 · Claude handoff](plans/handoffs/2026-09-26-0028-cursor-grok-4-7-claude-handoff.md) — installed app is `18eb5ba`; rail follow-up is local; audit file is Astra’s corrected report.
+- [2026-09-25 · Astra frontend audit brief](plans/handoffs/2026-09-25-1926-gpt-6-codex-astra-frontend-audit-brief.md) — native audit instructions and the sidebar clipping report.
+- [2026-09-21 · Astra next phase](plans/handoffs/2026-09-21-2104-cursor-grok-4-7-astra-next-phase.md) — origin `2a24eed`; app `b7264d6`; planning only.
+- [2026-09-21 · C75 living docs](plans/handoffs/2026-09-21-0215-cursor-grok-4-6-c75-docs.md) — hide leaves spawned Prime warm; #66–#68 closed.
+- [2026-09-20 · Astra combined handoff](plans/handoffs/2026-09-20-1234-claude-opus-5-astra-combined-handoff.md) — D1–D7 audit, plugin rescope, ADR findings, and the Edit-list completion contract.
+- [2026-09-20 · Astra ↔ Cursor recap](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md) — plan through #26 CPR, D1–D7 local, Free-only dirt.
+- [2026-09-20 · #26 CPR](plans/handoffs/2026-09-20-0723-cursor-grok-4-6-issue-26-cpr.md) — origin and app `b7264d6`; live Update now still Q.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)
@@ -249,6 +265,19 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 
 ## Open threads
+- **C93-FIXED (2026-10-04): stale `fast-uri` 3.1.6 pins after C88.** C88 moved the `pnpm-workspace.yaml` override to 3.1.7, but `leftover-dep-pins.test.ts` and `parked-organs.test.ts` still asserted 3.1.6 and failed the push gate, and `mcp-server/package.json` `overrides` still pinned 3.1.6. **Fixed:** both tests assert 3.1.7; the `mcp-server` override is 3.1.7, guarded by a new test. That override only applies to a hand-run `npm install` in `mcp-server/`; the bundle builds from the pnpm workspace. Found by Hermes (DeepSeek Flash); tests fixed by Claude Opus 5.5 (Claude Code desktop).
+**Origin:** Astra through Hermes desktop · 2026-10-04 · C89–C92 from the browser design audit.
+- **C89-FIXED (`7c680ac`):** HTML splash ignores current theme keys, lacks the early local wordmark face, and restarts motion under React. Browser probes reproduced these states. Native Windows checked after the fix; native macOS not. [Report](design/2026-10-04-ui-audit.md), [fix](design/2026-10-04-cursor-implementation-result.md).
+- **C90-FIXED (`7c680ac`):** Tailwind dark variants follow the operating-system preference instead of the application theme. The four-case Button probe confirms different alpha treatment. Destructive contrast corrected in the same commit. [Report](design/2026-10-04-ui-audit.md), [fix](design/2026-10-04-cursor-implementation-result.md).
+- **C91-FIXED (`7c680ac`):** Settings exposes no dialog role or modal state. Closing Settings returned focus to BODY in the tested sequence. Initial focus and a short Tab sequence worked. [Report](design/2026-10-04-ui-audit.md), [fix](design/2026-10-04-cursor-implementation-result.md).
+- **C92-PARTLY-FIXED (`7c680ac`):** Theme names truncate, appearance changes survive Cancel, and Windows shows a macOS shortcut hint. Fixed: names and shortcut hint. **Open:** appearance changes still survive Cancel; cancellation policy needs Atticus's approval. [Report](design/2026-10-04-ui-audit.md), [fix](design/2026-10-04-cursor-implementation-result.md).
+Closed C32, C35 and C41 moved to [`archive-closed-threads.md`](plans/handoffs/archive-closed-threads.md) on 2026-10-03.
+- **C88-FIXED (2026-10-03): two High advisories in `fast-uri@3.1.6`.** CVE-2026-84292 and CVE-2026-84394, fixed in 3.1.7. Fixed: the `pnpm-workspace.yaml` override now pins 3.1.7 (only path: `ajv` under `@modelcontextprotocol/sdk`); Trivy High/Critical on `pnpm-lock.yaml` is 0, `pnpm test:mcp` passes. Also 6 Medium / 1 Low in `pnpm-lock.yaml`, 1 Medium / 2 Low in `Cargo.lock`; no secrets. Lockfiles match `main`, so this predates the macOS merge. Codacy's Trivy run timed out on `package.json` yet exited 0; this result is Trivy 0.69.3 run directly with `--timeout 60m --skip-dirs '**/node_modules'`. Found by Claude Opus 5.5 (Claude Code desktop).
+- **C87-FIXED (2026-10-03): Rust line coverage on Windows was under the 85% gate.** `cargo llvm-cov --ignore-filename-regex "lib\.rs|main\.rs|menu\.rs" --fail-under-lines 85` on Windows: **81.40%** at `004989d` (before the macOS merge), **81.34%** on the merge; every test passed. Cause: Unix-only tests. The 110 `prime_session_host` tests ran against a unix-socket `FakeDaemon`. **Fix:** `FakeDaemon` and the roster socket pair listen on a named pipe on Windows (`prime_daemon_pipe::test_server`, now unlimited instances), so those tests run everywhere (`prime_session_host.rs` 49.7% → 91.6%); `line_stream.rs`, `commands/clipboard.rs` and `ai_agent_processes.rs` gained or ported tests that drive `node -e` instead of `sh`. Now **85.15%** on Windows, 1878 pass. **Thin margin (0.15 pts).** Still Unix-only: `roster_query_is_quiet_when_the_daemon_never_greets` (needs a socket read timeout; a pipe has none), live-daemon tests, and the CLI adapter tests (`claude_cli`, `codex_cli`, `pi_cli`, `opencode_cli`, `hermes_cli`, `antigravity_cli`) that fake each CLI with a shell script — the next lever if coverage dips. Found and fixed by Claude Opus 5.5 (Claude Code desktop).
+- **C85-FIXED-SOURCE (2026-10-03): Settings Sign in needed a terminal.** Sign in now runs Prime's own `AuthStorage` through `mcp-server/prime-login.mjs` (ADR-0176): browser OAuth for Anthropic, ChatGPT (Codex) and xAI; DeepSeek takes a pasted key. xAI's browser login comes from the user's Mac-only Prime extension `~/.prime/agent/extensions/xai-oauth.ts`, which is not in this repo; on Windows, xAI Sign in says Prime has no browser sign-in until that file is copied over. Not yet signed in end to end on a real account. Found by Claude Opus 5.5 (Claude Code desktop).
+- **C84-PARTLY-FIXED (2026-10-03): "prime-agent" console windows on Windows launch.** Rhizome started Prime's daemon with `DETACHED_PROCESS` (no console), overwriting `hidden_command`'s `CREATE_NO_WINDOW`. Windows then opens a visible console for every ordinary child the daemon runs; the window seen was `cli.js --version` (spawned by the daemon, still hung 20 min later). Probe: a console-less parent's child got a visible window, a hidden-console parent's child did not. Now `CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP` (`DAEMON_CREATION_FLAGS`). Applies to daemons Rhizome starts; one already running keeps its windows until it restarts. Verified 2026-10-03 10:47: daemon's own children no longer open windows. **Still open, upstream:** Prime's session worker (spawned `detached`, no console) runs `powershell.exe GetProcessById(pid).StartTime` via `runProcessQuery` (`dist/core/session-lease.js:96`, `execFileSync` without `windowsHide: true`); 9 "Windows PowerShell" windows flashed in 8 s after one worker start. Also: Rhizome could not start the daemon on Windows at all until `02037cf` (`where` listed the extensionless npm script first). Found by Claude Opus 5.5 (Claude Code desktop).
+- **C83-FIXED-SOURCE (2026-10-03): the Rust test suite fails on Windows.** First Windows run of `cargo test --lib`: 1730 pass, 24 fail. Causes: `/` vs `\\` in path assertions (`expand_tilde`, `vault::rename`, `git::status`, `inbox_action`), CRLF from git checkout (`git::conflict`, `git::status`, `commands::git`), `sh` not found (`rhizome_commands::library_scan_tests`), Unix `:` PATH joins (`git::tests`, `mcp::runtime`), and `first_existing_path` discovery tests. `cargo clippy --all-targets -D warnings` also fails on 13 test-only unused items under Windows (`antigravity_cli`, `codex_cli`, `hermes_cli`, `opencode_cli`, `pi_cli`, `claude_cli`, `secure_fs`, `clipboard`, `ai_agent_processes`, `prime_session_host::enter_isolated_live_test`); the gate's lib-only clippy passes. The test target did not compile at all on Windows until 2026-10-03 (Unix-only `ExitStatusExt` and `symlink`). **Fixes (2026-10-03, Hermes):** all 24 tests fixed — tilde assertions compare as `Path`; discovery fixtures write `.cmd`/`.exe` on Windows; `sh` tests use `node -e`; test git repos pin `core.autocrlf=false` (`setup_git_repo`, `setup_remote_pair` both clones, `create_initialized_vault`); the PATH-join expectation mirrors `path_with_git_parent` via `std::env::join_paths`; separator assertions normalize `\` to `/`. Two product bugs fixed alongside: `classify_repo_reference` rejected absolute Windows paths (`C:\...`, UNC) as owner/repo; `relative_to_vault` wrote backslashes into `events.jsonl`'s `artifact_path` (now always `/`). All 13 clippy items resolved with `#[cfg(unix)]` on the Unix-only test helpers and their imports (no `#[allow]`). Verified on Windows: `cargo test --lib` 1770 pass / 0 fail, `cargo clippy --all-targets` 0 warnings, `cargo fmt --check` clean. Not yet pushed (needs macOS-side coverage lane confirmation). Found by Claude Opus 5.5 (Claude Code desktop); fixed by Hermes (GLM).
+- **C86-OPEN (2026-10-03): the second pinwheel sample and an empty-reply capture remain open.** This was C83 in the macOS handoff. C83 now names the Windows test work. The merged source moves Chat waits off the UI thread and reads Nous metadata without name guesses. Native confirmation still needs a build with those changes. Detail: [`2026-10-03-0942`](plans/handoffs/2026-10-03-0942-cursor-grok-4-7-nous-catalog-fields.md). Plan: [`plans/2026-10-02-stall-and-empty-reply.md`](plans/2026-10-02-stall-and-empty-reply.md).
 - **C83-OPEN (2026-10-03): second stall sample is in the plan.** Settings open and section changes left the main thread idle. AI Agents click and a live empty reply are not captured. Detail: [`2026-10-02-stall-and-empty-reply.md`](plans/2026-10-02-stall-and-empty-reply.md).
 - **C82-FIXED (2026-09-27): check scripts could not start `pnpm` on Windows.** Fixed: `scripts/spawn-pnpm.mjs` runs `pnpm` through `cmd.exe /d /c` on Windows; used by the coverage, coverage-shards and smoke-server scripts. Test: `node --test scripts/spawn-pnpm.test.mjs`. Verified on Windows: coverage shards pass (88.55% lines), smoke 30/30. Original: `scripts/run-vitest-coverage.mjs` (`clearVitestCache`, and the coverage run) and `scripts/playwright-smoke-server.mjs` call `spawn('pnpm', …)` without a shell. On Windows `pnpm` is an npm `.cmd` shim, which Node's `spawn` cannot run without `shell: true`, so both fail `spawn pnpm ENOENT`. This fails the pre-push frontend and Playwright lanes on Windows. Found by Claude Opus 5.5 (Claude Code desktop).
 - **C81-OPEN (2026-09-27): Playwright browser install hangs on Windows, silently.** Two parts. (1) Playwright 1.58.2's `install chromium` downloaded the 181MB zip, extracted one file, then stopped with no CPU use; `tar -xf` of the same zip took under 1s. Unconfirmed cause: Playwright's unzip under Node 26.4. Workaround used: manual `tar` into `%LOCALAPPDATA%\ms-playwright\chromium-1208` and `chromium_headless_shell-1208`, plus an empty `INSTALLATION_COMPLETE` file in each. (2) `.husky/pre-push` `ensure_playwright_browser` sends the install output to `/dev/null` and has no timeout, so the hang showed as a push that stopped for 20+ minutes with no message. Found by Claude Opus 5.5 (Claude Code desktop).
@@ -482,19 +511,7 @@ push is not a release — releases are tagged builds with signed installers.
 
   First action for whoever has a Windows machine: `pnpm tauri dev` and record
   what actually happens, before touching the daemon at all.
-
-- **C41-RESOLVED (2026-08-22): `pnpm test:mcp` never ran `mcp-server/test.js`.**
-  The script globbed `mcp-server/*.test.js`, which matches
-  `tool-service.test.js` and `vault-events.test.js` but not `test.js` — so the
-  stdio-lifecycle, vault, `vault-path`, `agent-instructions` and `ws-bridge`
-  suites, **49 tests**, ran on no gate. This is the mirror image of the July
-  finding that `tool-service.test.js` was ungated because vitest's `include`
-  did not reach `mcp-server/`: both times the fix was to the glob, and both
-  times everything was green while it was unreachable. The script now names
-  `test.js` explicitly (`node --test mcp-server/test.js mcp-server/*.test.js`);
-  `pnpm test:mcp` went from 16 tests to 67. Do **not** widen it to
-  `mcp-server/*.js` — that imports `index.js`, which starts the server and
-  hangs forever.
+  **2026-10-03:** boots and connects on Windows 11; pipe freeze fixed; ~5s stalls remain. [Session](plans/handoffs/2026-10-03-1015-claude-opus-5-5-windows-pipe-freeze.md). The Start-menu "Rhizome" on that machine is Rhizome **Desktop** (`ai.rhizome.desktop`, built 2026-08-08), not Agent; Agent has never been installed there.
 
 - **C40-OPEN: `rhizome_graph_summary` answers with a different graph than the
   app's own.** It shells out to the external `rhizome-graph` CLI. Measured
@@ -820,24 +837,6 @@ push is not a release — releases are tagged builds with signed installers.
 
 - **C30-RESOLVED (2026-08-29): `window.__tolariaFrontendReady` → `window.__rhizomeFrontendReady`.** Renamed in `src/utils/frontendReady.ts` (ambient `Window` typing + set/read), `index.html` (startup reload guard), `src/main.test.ts`, `src/utils/frontendReady.test.ts`, and `tests/smoke/helpers.ts`. Left `tolaria:frontend-ready` / `tolaria:startup-reload-attempted` sessionStorage keys unchanged — separate from the window flag. Verified: `pnpm lint`, `pnpm typecheck`, targeted vitest on touched tests.
 
-- **C35-RESOLVED (2026-08-20): `npx tsc --noEmit` typechecked nothing at all.**
-  Not "weaker than `tsc -b`" as first written — a no-op. Measured: appending
-  `export const X: number = "nope"` to `src/lib/uiPreference.ts` and running
-  `npx tsc --noEmit` exits **0**; `tsc -b` reports TS2322 on the same file. The
-  root `tsconfig.json` is `"files": []` plus two project references, and
-  `--noEmit` does not follow references.
-
-  Every "tsc clean" this repo's sessions have reported from that command was
-  evidence of nothing. It had already been noticed **three times** in this file
-  (a gate gotcha at the 2026-08-06 and 2026-08-08 entries, and again when a
-  push failed on `tsc -b` after `--noEmit` passed) and written down as a trap
-  each time, while `AGENTS.md` kept documenting the broken command — which is
-  precisely the failure mode the C-number rule exists to stop.
-
-  Fixed by making the right command the easy one: **`pnpm typecheck`** (`tsc
-  -b`), now what `AGENTS.md`, `CONTRIBUTING.md` and `CROSS-MODEL-HANDOFF.md`
-  all tell you to run.
-
 - **C33-PARTLY-RESOLVED (2026-08-21): test files are typechecked now, minus a
   named backlog.** Found 2026-08-19 while landing #9; **restated 2026-08-20**,
   because the original diagnosis was half the story. `tsconfig.app.json` sets
@@ -874,19 +873,6 @@ push is not a release — releases are tagged builds with signed installers.
   `knip.json`'s `ignore`, because nothing imports them by design.
 - **C31-NOT-REPRODUCED (2026-09-27): ten full `pnpm test` runs exited 0.** Seen 2026-08-19 while landing #13: one run reported `Tests 5433 passed` alongside `Errors 1` and exited non-zero, and the error text was never captured. On 2026-09-27, ten complete runs on this tree each reported 783 files and 6856 tests and exited 0. None printed `Errors` or an unhandled rejection. One extra run was killed before it finished and is not counted. The failure did not reproduce, so this stays a record rather than a fix. If it appears again, capture the whole run before doing anything else (`pnpm test > /tmp/t.txt 2>&1`).
 
-- **C32-RESOLVED (2026-08-22): both docs cover Prime now.** `ARCHITECTURE.md`
-  gained a *Prime Agent* section under AI System — that it is a **daemon
-  client, not a subprocess** (so the `cli_agent_runtime.rs` mental model on the
-  same page actively misleads), the `prime_session_host.rs` vs
-  `prime_sessions.rs` split and why confusing them is the classic mistake, the
-  lazy session lifecycle and its command order, a map of the eight `prime_*`
-  modules and the frontend hooks, and what Rhizome does not own.
-  `ABSTRACTIONS.md` gained a *Prime Session* section: the two data sources and
-  the log-path join between them, `PrimeSessionStatus`, and the uuidv7 trap in
-  session ids. Written from a session that had just re-derived all of it, which
-  is the point — the original entry below is kept for the reasoning.
-
-- **C32-WAS-OPEN: `ARCHITECTURE.md` and `ABSTRACTIONS.md` contain no mention of Prime at all.** Confirmed 2026-08-19 by grepping both files for `Prime` — zero hits in either, while `src-tauri/src/prime_session_host.rs` alone is ~4,600 lines and the daemon client, session host, goal, fork, compact, heartbeat and roster surfaces all live outside the docs. AGENTS.md requires updating these two after "any Tauri command, new component/hook, data model change, or new integration", so every harness session has been in technical violation of that rule and every one of them has let it pass. The practical cost: a new session has no structural map of the harness and re-derives it from source each time — this session spent a meaningful chunk of its budget rediscovering that `prime_session_host.rs` is a full daemon client and that `prime_sessions.rs` is a *disk* reader that cannot answer "what is running". Do not fix this as a side quest inside a feature commit; it is its own piece of work.
 ## Links out
 
 - Prime harness coverage, quantified → `docs/plans/2026-08-22-prime-harness-coverage.md` (25% of the daemon surface; what is missing, and in what order)

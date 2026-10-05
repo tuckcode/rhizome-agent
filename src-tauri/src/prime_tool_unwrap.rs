@@ -258,7 +258,7 @@ mod tests {
     use super::*;
 
     /// Copied from a real session log: the skill's own invocation shape.
-    const REAL_GET_NOTE: &str = "VAULT_PATH='/Users/dtc/Documents/Rhizome Vault' node '/Users/dtc/code/projects/rhizome-agent/mcp-server/cli-call.mjs' get_note '{\"path\":\"wiki/foo.md\"}'";
+    const REAL_GET_NOTE: &str = "VAULT_PATH='/Users/jdoe/Documents/Rhizome Vault' node '/Users/jdoe/code/projects/rhizome-agent/mcp-server/cli-call.mjs' get_note '{\"path\":\"wiki/foo.md\"}'";
 
     #[test]
     fn a_shelled_out_vault_call_reports_the_inner_tool_and_path() {
@@ -278,7 +278,7 @@ mod tests {
     /// space inside the vault path.
     #[test]
     fn the_live_skill_invocation_unwraps() {
-        let code = "%%bash\nVAULT_PATH='/Users/dtc/Documents/Rhizome Vault' node '/Users/dtc/code/projects/rhizome-agent/mcp-server/cli-call.mjs' get_note '{\"path\":\"inbox/20260814-promote-loop.md\"}'";
+        let code = "%%bash\nVAULT_PATH='/Users/jdoe/Documents/Rhizome Vault' node '/Users/jdoe/code/projects/rhizome-agent/mcp-server/cli-call.mjs' get_note '{\"path\":\"inbox/20260814-promote-loop.md\"}'";
 
         let unwrapped = unwrap_tool("ipython", &serde_json::json!({ "code": code }));
 
@@ -294,7 +294,7 @@ mod tests {
     /// operation, so it must stay `ipython` and offer no Open.
     #[test]
     fn the_live_skill_read_is_not_mistaken_for_a_vault_call() {
-        let code = "from pathlib import Path\nprint(Path('/Users/dtc/Documents/Rhizome Vault/.prime/agent/skills/rhizome-vault/SKILL.md').read_text())";
+        let code = "from pathlib import Path\nprint(Path('/Users/jdoe/Documents/Rhizome Vault/.prime/agent/skills/rhizome-vault/SKILL.md').read_text())";
 
         let unwrapped = unwrap_tool("ipython", &serde_json::json!({ "code": code }));
 
@@ -322,7 +322,7 @@ mod tests {
 import subprocess
 path = "projects/rhizome-agent/sub-agents/2026-09-01-tab-completion-ux-research.md"
 result = subprocess.run([
-    "node", "/Users/dtc/code/projects/rhizome-agent/mcp-server/cli-call.mjs",
+    "node", "/Users/jdoe/code/projects/rhizome-agent/mcp-server/cli-call.mjs",
     "get_note", f'{{"path":"{path}"}}'
 ], capture_output=True, text=True)
 "#;

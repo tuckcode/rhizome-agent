@@ -81,7 +81,7 @@ function runningSession(overrides: Record<string, unknown> = {}) {
   return {
     id: 'root',
     activeSessionId: 'root',
-    sessionFile: '/Users/dtc/.prime/agent/sessions/root.jsonl',
+    sessionFile: '/Users/jdoe/.prime/agent/sessions/root.jsonl',
     activity: 'working',
     runtimeKind: 'top-level',
     rlmDepth: 0,
@@ -343,7 +343,7 @@ describe('MenuBarCompanionApp', () => {
     const rows = await screen.findAllByTestId('menu-bar-companion-running-row')
     fireEvent.click(rows[0])
     expect(invokeMock).toHaveBeenCalledWith('open_main_from_menu_bar_companion', {
-      sessionFile: '/Users/dtc/.prime/agent/sessions/root.jsonl',
+      sessionFile: '/Users/jdoe/.prime/agent/sessions/root.jsonl',
     })
   })
 })

@@ -63,6 +63,8 @@ fn write_unix_owner_only(path: &Path, content: &str) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
+    // Every test here is `#[cfg(unix)]`; the glob import is dead elsewhere.
+    #[cfg(unix)]
     use super::*;
 
     #[cfg(unix)]

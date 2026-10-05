@@ -653,15 +653,46 @@ fn path_from_successful_output(output: &std::process::Output) -> Option<PathBuf>
     }
 }
 
+/// Which OS a path lookup is choosing a runnable binary for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Platform {
+    Windows,
+    Unix,
+}
+
+impl Platform {
+    fn current() -> Self {
+        if cfg!(windows) {
+            Platform::Windows
+        } else {
+            Platform::Unix
+        }
+    }
+}
+
 pub(crate) fn first_existing_path(stdout: &str) -> Option<PathBuf> {
-    stdout.lines().find_map(|line| {
+    first_existing_path_for_platform(stdout, Platform::current())
+}
+
+/// The first listed path that exists and this platform can run.
+///
+/// On Windows, npm installs both `prime-agent` (a shell script) and
+/// `prime-agent.cmd`, and `where` lists the script first. Only a name with a
+/// Windows CLI extension is runnable there.
+fn first_existing_path_for_platform(stdout: &str, platform: Platform) -> Option<PathBuf> {
+    let mut paths = stdout.lines().filter_map(|line| {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             return None;
         }
         let candidate = PathBuf::from(trimmed);
         candidate.exists().then_some(candidate)
-    })
+    });
+
+    match platform {
+        Platform::Windows => paths.find(|path| has_windows_cli_extension(path)),
+        Platform::Unix => paths.next(),
+    }
 }
 
 /// Shared check_cli pattern for CLI agents.
@@ -683,6 +714,28 @@ pub(crate) fn check_cli_availability(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `where prime-agent` lists npm's extensionless shell script before the
+    /// `.cmd` shim. Windows cannot run the script ("not a valid Win32
+    /// application"), so Rhizome never started Prime's daemon there.
+    #[test]
+    fn windows_path_lookup_prefers_the_cmd_shim_over_the_shell_script() {
+        let dir = tempfile::tempdir().unwrap();
+        let shell_script = dir.path().join("prime-agent");
+        let cmd_shim = dir.path().join("prime-agent.cmd");
+        std::fs::write(&shell_script, "#!/bin/sh\n").unwrap();
+        std::fs::write(&cmd_shim, "@ECHO off\n").unwrap();
+        let stdout = format!("{}\n{}\n", shell_script.display(), cmd_shim.display());
+
+        assert_eq!(
+            first_existing_path_for_platform(&stdout, Platform::Windows),
+            Some(cmd_shim)
+        );
+        assert_eq!(
+            first_existing_path_for_platform(&stdout, Platform::Unix),
+            Some(shell_script)
+        );
+    }
 
     #[test]
     fn build_prompt_keeps_system_prompt_first() {

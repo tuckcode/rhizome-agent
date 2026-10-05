@@ -749,6 +749,8 @@ mod tests {
     use crate::ai_agents::AiAgentPermissionMode;
     use std::ffi::OsStr;
     use std::ffi::OsString;
+    // Only the Unix-gated tests use `std::process::Command` here.
+    #[cfg(unix)]
     use std::process::Command;
 
     #[cfg(target_os = "linux")]

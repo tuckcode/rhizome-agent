@@ -212,3 +212,4 @@ proposed → active → superseded
 | [0151](0151-repo-cache-for-agent-layer-repo-research.md) | Repo cache for agent-layer repo research (`.rhizome/repo-cache`) | active |
 | [0152](0152-mcp-rust-sidecar.md) | MCP research verbs via Rust `rhizome-tool` sidecar | active |
 | [0174](0174-hybrid-wiki-search-index.md) | Hybrid tantivy + fastembed index for wiki search | active |
+| [0176](0176-settings-sign-in-through-prime-auth-storage.md) | Settings sign-in drives Prime's own AuthStorage | active |

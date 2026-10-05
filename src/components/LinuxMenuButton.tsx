@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { exit } from '@tauri-apps/plugin-process'
 import { getAppCommandMenuSections } from '../hooks/appCommandCatalog'
 import { createTranslator, translate, type AppLocale } from '../lib/i18n'
 import { Button } from './ui/button'
@@ -32,10 +33,19 @@ type MenuSection = {
   label: string
 }
 
+const EXIT_ITEM: MenuItem = { kind: 'action', label: 'Exit', action: () => void exit(0).catch(() => {}) }
+
 function menuSections(locale: AppLocale): ReadonlyArray<MenuSection> {
   const t = createTranslator(locale)
+  // macOS keeps Quit in its native app menu. This custom menu is the only
+  // way out on Windows and Linux, where closing the window just hides it.
+  const sections = getAppCommandMenuSections(t).map((section) =>
+    section.label === t('menu.file')
+      ? { ...section, items: [...section.items, { kind: 'separator' } as const, EXIT_ITEM] }
+      : section,
+  )
   return [
-    ...getAppCommandMenuSections(t),
+    ...sections,
     {
       label: t('menu.window'),
       items: [

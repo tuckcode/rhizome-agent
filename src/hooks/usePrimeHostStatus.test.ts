@@ -44,12 +44,12 @@ describe('usePrimeHostStatus', () => {
   })
 
   it('starts the Prime host when a vault is attached', async () => {
-    renderHook(() => usePrimeHostStatus(true, '/Users/dtc/Documents/Rhizome Vault'))
+    renderHook(() => usePrimeHostStatus(true, '/Users/jdoe/Documents/Rhizome Vault'))
 
     await waitFor(() => {
       expect(invoked.calls[0]).toEqual({
         cmd: 'ensure_prime_session_host',
-        args: { vaultPath: '/Users/dtc/Documents/Rhizome Vault' },
+        args: { vaultPath: '/Users/jdoe/Documents/Rhizome Vault' },
       })
     })
   })
@@ -61,7 +61,7 @@ describe('usePrimeHostStatus', () => {
       get: () => 'hidden',
     })
 
-    renderHook(() => usePrimeHostStatus(true, '/Users/dtc/Documents/Rhizome Vault'))
+    renderHook(() => usePrimeHostStatus(true, '/Users/jdoe/Documents/Rhizome Vault'))
     await new Promise((resolve) => setTimeout(resolve, 80))
 
     expect(
@@ -75,7 +75,7 @@ describe('usePrimeHostStatus', () => {
    * the rest of the session. A down host has to be retried, not observed.
    */
   it('shares one Prime poll across Chat chrome instead of starting one per widget', async () => {
-    const vault = '/Users/dtc/Documents/Rhizome Vault'
+    const vault = '/Users/jdoe/Documents/Rhizome Vault'
     renderHook(() => usePrimeHostStatus(true, vault))
     renderHook(() => usePrimeHostStatus(true, vault))
     renderHook(() => usePrimeHostStatus(true, vault))
@@ -93,7 +93,7 @@ describe('usePrimeHostStatus', () => {
 
   it('reconnects when a status poll finds the host down', async () => {
     invoked.running = false
-    renderHook(() => usePrimeHostStatus(true, '/Users/dtc/Documents/Rhizome Vault'))
+    renderHook(() => usePrimeHostStatus(true, '/Users/jdoe/Documents/Rhizome Vault'))
 
     await waitFor(() => {
       const ensures = invoked.calls.filter((call) => call.cmd === 'ensure_prime_session_host')

@@ -23,7 +23,7 @@ function session(overrides: Partial<PrimeRosterSession> = {}): PrimeRosterSessio
     id: 'aaa1',
     activeSessionId: 'aaa1',
     sessionId: '01a00dea-98f3-773a-b1f6-54ed0f07736e',
-    cwd: '/Users/dtc/code/projects/rhizome-agent',
+    cwd: '/Users/jdoe/code/projects/rhizome-agent',
     lifecycle: 'live',
     activity: 'idle',
     isSessionActive: false,
@@ -97,7 +97,7 @@ describe('rosterSessionTitle', () => {
   })
 
   it('falls back to the working directory name when there is no message', () => {
-    expect(rosterSessionTitle(session({ firstMessage: undefined, cwd: '/Users/dtc/code/projects/rhizome-agent' })))
+    expect(rosterSessionTitle(session({ firstMessage: undefined, cwd: '/Users/jdoe/code/projects/rhizome-agent' })))
       .toBe('rhizome-agent')
   })
 
@@ -319,24 +319,24 @@ describe('toRunningSessionRows', () => {
 
   it('disambiguates rows that would otherwise render the same title', () => {
     // Seen live: four running sessions, none with a firstMessage, two of them
-    // rooted at /Users/dtc. Both rows rendered "dtc" and the user had no way
+    // rooted at /Users/jdoe. Both rows rendered "jdoe" and the user had no way
     // to tell which was which -- or that they were different sessions at all.
     const rows = toRunningSessionRows([
-      session({ id: 'aaa1bbb2ccc3', activeSessionId: 'aaa1bbb2ccc3', activity: 'working', firstMessage: undefined, cwd: '/Users/dtc' }),
-      session({ id: 'ddd4eee5fff6', activeSessionId: 'ddd4eee5fff6', activity: 'working', firstMessage: undefined, cwd: '/Users/dtc' }),
+      session({ id: 'aaa1bbb2ccc3', activeSessionId: 'aaa1bbb2ccc3', activity: 'working', firstMessage: undefined, cwd: '/Users/jdoe' }),
+      session({ id: 'ddd4eee5fff6', activeSessionId: 'ddd4eee5fff6', activity: 'working', firstMessage: undefined, cwd: '/Users/jdoe' }),
     ])
     expect(rows).toHaveLength(2)
     expect(rows[0].title).not.toBe(rows[1].title)
-    expect(rows[0].title.startsWith('dtc')).toBe(true)
-    expect(rows[1].title.startsWith('dtc')).toBe(true)
+    expect(rows[0].title.startsWith('jdoe')).toBe(true)
+    expect(rows[1].title.startsWith('jdoe')).toBe(true)
   })
 
   it('leaves a unique title alone', () => {
     const rows = toRunningSessionRows([
-      session({ id: 'aaa1', activeSessionId: 'aaa1', activity: 'working', firstMessage: undefined, cwd: '/Users/dtc' }),
+      session({ id: 'aaa1', activeSessionId: 'aaa1', activity: 'working', firstMessage: undefined, cwd: '/Users/jdoe' }),
       session({ id: 'bbb2', activeSessionId: 'bbb2', activity: 'working', firstMessage: undefined, cwd: '/repo/demo-vault-v2' }),
     ])
-    expect(rows.map((row) => row.title).sort()).toEqual(['demo-vault-v2', 'dtc'])
+    expect(rows.map((row) => row.title).sort()).toEqual(['demo-vault-v2', 'jdoe'])
   })
 
   it('disambiguates duplicate first messages too, not just cwd fallbacks', () => {

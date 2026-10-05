@@ -203,7 +203,7 @@ fn kill_process_group(pid: u32) {
 #[cfg(unix)]
 type DaemonStream = std::os::unix::net::UnixStream;
 #[cfg(windows)]
-type DaemonStream = std::fs::File;
+type DaemonStream = crate::prime_daemon_pipe::PipeStream;
 
 // ── Public types ────────────────────────────────────────────────────────────
 
@@ -888,9 +888,7 @@ fn spawn_prime_daemon(socket_path: &Path) -> Result<(), String> {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        const DETACHED_PROCESS: u32 = 0x00000008;
-        const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
-        command.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+        command.creation_flags(DAEMON_CREATION_FLAGS);
     }
     let mut child = command
         .spawn()
@@ -909,6 +907,21 @@ fn spawn_prime_daemon(socket_path: &Path) -> Result<(), String> {
     });
     Ok(())
 }
+
+/// How Windows starts Prime's daemon: its own hidden console, its own process
+/// group (so Rhizome's Ctrl+C never reaches it).
+///
+/// Not `DETACHED_PROCESS`. A daemon with no console makes Windows open a new,
+/// visible console for every ordinary child it runs — `prime-agent --version`,
+/// git, powershell — which were the "prime-agent" windows on launch (C84).
+/// A hidden console is inherited by those children instead. The console is
+/// the daemon's own, so it still outlives Rhizome.
+#[cfg(windows)]
+const DAEMON_CREATION_FLAGS: u32 = {
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP
+};
 
 fn wait_for_daemon(socket_path: &Path) -> Result<(), String> {
     let deadline = Instant::now() + DAEMON_STARTUP_TIMEOUT;
@@ -966,11 +979,6 @@ fn current_uid() -> Option<u32> {
     std::fs::metadata(dirs::home_dir()?).ok().map(|m| m.uid())
 }
 
-#[cfg(not(unix))]
-fn current_uid() -> Option<u32> {
-    None
-}
-
 /// Ask the CLI where its daemon is. Used only when the default path is absent.
 fn reported_daemon_socket_path() -> Option<PathBuf> {
     let binary = crate::prime_discovery::find_binary().ok()?;
@@ -1012,7 +1020,6 @@ fn connect_stream(path: &Path) -> Result<DaemonStream, String> {
 
 #[cfg(windows)]
 fn connect_stream(path: &Path) -> Result<DaemonStream, String> {
-    use std::fs::OpenOptions;
     use std::os::windows::ffi::OsStrExt;
 
     const PIPE_CONNECT_TIMEOUT_MS: u32 = 3_000;
@@ -1029,16 +1036,12 @@ fn connect_stream(path: &Path) -> Result<DaemonStream, String> {
         windows_sys::Win32::System::Pipes::WaitNamedPipeW(wide.as_ptr(), PIPE_CONNECT_TIMEOUT_MS);
     }
 
-    OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(path)
-        .map_err(|error| {
-            format!(
-                "Could not reach Prime's background service at {}: {error}",
-                path.display()
-            )
-        })
+    DaemonStream::open(path).map_err(|error| {
+        format!(
+            "Could not reach Prime's background service at {}: {error}",
+            path.display()
+        )
+    })
 }
 
 fn set_stream_roster_timeouts(stream: &mut DaemonStream) {
@@ -4139,6 +4142,9 @@ mod tests {
     }
 
     /// Stop before `ensure_host` when the scratch socket or session dir is missing.
+    /// Every caller is a `#[cfg(unix)]` live test, so the helper is gated too;
+    /// clippy otherwise counts it dead on Windows.
+    #[cfg(unix)]
     fn enter_isolated_live_test() {
         require_isolated_live_harness().expect(
             "live tests require RHIZOME_PRIME_DAEMON_SOCKET and a scratch RHIZOME_PRIME_SESSION_DIR",
@@ -4188,7 +4194,7 @@ mod tests {
             .expect("fixed local noon");
         assert_eq!(
             rhizome_created_session_name_at(
-                Path::new("/Users/dtc/Documents/Notes"),
+                Path::new("/Users/jdoe/Documents/Notes"),
                 "01a0252e-b9d5-71e9-83de-2bce32f65c06",
                 noon,
             ),
@@ -4221,11 +4227,11 @@ mod tests {
             .expect("fixed local noon");
         assert_eq!(
             rhizome_created_session_name_at(
-                Path::new("/Users/dtc"),
+                Path::new("/Users/jdoe"),
                 "01a0252e-b9d5-71e9-83de-2bce32f65c06",
                 noon,
             ),
-            "Rhizome · Sep 6 · 3:35p · dtc · f65c06"
+            "Rhizome · Sep 6 · 3:35p · jdoe · f65c06"
         );
     }
 
@@ -4246,14 +4252,70 @@ mod tests {
 
     // ── Fake daemon ─────────────────────────────────────────────────────────
     //
-    // The one seam this work adds. It is a real unix socket speaking the real
-    // envelope framing, not a stub of our own client — so a test passing here
-    // means the bytes on the wire were parsed, not that a mock was called.
+    // The one seam this work adds. It is a real unix socket (a named pipe on
+    // Windows) speaking the real envelope framing, not a stub of our own
+    // client — so a test passing here means the bytes on the wire were parsed,
+    // not that a mock was called.
 
-    #[cfg(unix)]
     const FAKE_ACTIVE_SESSION_ID: &str = "daemon-1";
 
+    /// The fake daemon's end of one connection.
     #[cfg(unix)]
+    type FakeServerStream = std::os::unix::net::UnixStream;
+    #[cfg(windows)]
+    type FakeServerStream = std::fs::File;
+
+    /// A daemon address nothing listens on yet, unique per call.
+    ///
+    /// Unix: a socket file in `dir`. Keep the name short: macOS caps a unix
+    /// socket path at 104 bytes, and a tempdir already spends about sixty.
+    /// Windows: a pipe name; pipes live in their own namespace, not in `dir`.
+    #[cfg(unix)]
+    fn scratch_daemon_path(dir: &Path) -> PathBuf {
+        dir.join("d.sock")
+    }
+
+    #[cfg(windows)]
+    fn scratch_daemon_path(_dir: &Path) -> PathBuf {
+        use std::sync::atomic::AtomicUsize;
+
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let n = NEXT.fetch_add(1, Ordering::SeqCst);
+        PathBuf::from(format!(
+            r"\\.\pipe\rhizome-fake-daemon-{}-{n}",
+            std::process::id()
+        ))
+    }
+
+    /// Accept connections at `path` forever, handing each to `serve`.
+    ///
+    /// The listener exists before this returns, so a client may connect at once.
+    #[cfg(unix)]
+    fn listen_fake_daemon(path: &Path, serve: impl Fn(FakeServerStream) + Send + 'static) {
+        let listener = std::os::unix::net::UnixListener::bind(path).unwrap();
+        thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(stream) = stream else { break };
+                serve(stream);
+            }
+        });
+    }
+
+    /// Windows: one pipe instance per client. The next instance is created
+    /// as soon as one connects, so a second client waits rather than fails.
+    #[cfg(windows)]
+    fn listen_fake_daemon(path: &Path, serve: impl Fn(FakeServerStream) + Send + 'static) {
+        use crate::prime_daemon_pipe::{test_accept, test_server};
+
+        let name = path.to_string_lossy().into_owned();
+        let mut pending = test_server(&name);
+        thread::spawn(move || loop {
+            test_accept(&pending);
+            let connected = std::mem::replace(&mut pending, test_server(&name));
+            serve(connected);
+        });
+    }
+
     struct FakeDaemon {
         path: PathBuf,
         /// Every command the daemon received, inner command object only.
@@ -4261,7 +4323,6 @@ mod tests {
         _dir: tempfile::TempDir,
     }
 
-    #[cfg(unix)]
     impl FakeDaemon {
         /// Start a listener. `overrides` answers a command, or returns `None`
         /// to fall through to the handshake defaults.
@@ -4283,30 +4344,22 @@ mod tests {
                 + Sync
                 + 'static,
         {
-            use std::os::unix::net::UnixListener;
-
             let dir = tempfile::tempdir().unwrap();
-            // Keep the filename short: macOS caps a unix socket path at 104
-            // bytes, and a tempdir already spends about sixty of them.
-            let path = dir.path().join("d.sock");
-            let listener = UnixListener::bind(&path).unwrap();
+            let path = scratch_daemon_path(dir.path());
             let received = Arc::new(Mutex::new(Vec::new()));
 
             let thread_received = Arc::clone(&received);
-            let overrides = Arc::new(overrides);
+            let overrides: Overrides = Arc::new(overrides);
             let hello = Arc::new(hello);
-            thread::spawn(move || {
-                let session_id = Arc::new(Mutex::new("sess-a".to_string()));
-                for stream in listener.incoming() {
-                    let Ok(stream) = stream else { break };
-                    let received = Arc::clone(&thread_received);
-                    let overrides = Arc::clone(&overrides);
-                    let session_id = Arc::clone(&session_id);
-                    let hello = Arc::clone(&hello);
-                    thread::spawn(move || {
-                        serve_fake_client(stream, received, overrides, session_id, &hello);
-                    });
-                }
+            let session_id = Arc::new(Mutex::new("sess-a".to_string()));
+            listen_fake_daemon(&path, move |stream| {
+                let received = Arc::clone(&thread_received);
+                let overrides = Arc::clone(&overrides);
+                let session_id = Arc::clone(&session_id);
+                let hello = Arc::clone(&hello);
+                thread::spawn(move || {
+                    serve_fake_client(stream, received, overrides, session_id, &hello);
+                });
             });
 
             Self {
@@ -4387,21 +4440,19 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
     type Overrides = Arc<
         dyn Fn(&serde_json::Value, &str) -> Option<Vec<serde_json::Value>> + Send + Sync + 'static,
     >;
 
-    #[cfg(unix)]
     fn serve_fake_client(
-        stream: std::os::unix::net::UnixStream,
+        stream: FakeServerStream,
         received: Arc<Mutex<Vec<serde_json::Value>>>,
         overrides: Overrides,
         session_id: Arc<Mutex<String>>,
         hello: &serde_json::Value,
     ) {
         let mut writer = stream.try_clone().unwrap();
-        let write = |writer: &mut std::os::unix::net::UnixStream, value: &serde_json::Value| {
+        let write = |writer: &mut FakeServerStream, value: &serde_json::Value| {
             let _ = writeln!(writer, "{value}");
             let _ = writer.flush();
         };
@@ -4458,7 +4509,6 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
     fn fake_hello() -> serde_json::Value {
         serde_json::json!({
             "type": "daemon_hello",
@@ -4476,7 +4526,6 @@ mod tests {
         })
     }
 
-    #[cfg(unix)]
     fn fake_state(session_id: &str) -> serde_json::Value {
         serde_json::json!({
             "activeSessionId": FAKE_ACTIVE_SESSION_ID,
@@ -4486,14 +4535,12 @@ mod tests {
         })
     }
 
-    #[cfg(unix)]
     fn ok(id: &str, command: &str, data: serde_json::Value) -> serde_json::Value {
         serde_json::json!({
             "type": "response", "id": id, "command": command, "success": true, "data": data
         })
     }
 
-    #[cfg(unix)]
     fn failed(id: &str, command: &str, error: &str) -> serde_json::Value {
         serde_json::json!({
             "type": "response", "id": id, "command": command, "success": false, "error": error
@@ -4502,7 +4549,6 @@ mod tests {
 
     /// Wrap an agent event the way the daemon does. The inner object is the
     /// shape RPC mode emitted, pinned from a live 0.7.1 capture.
-    #[cfg(unix)]
     fn session_event(event: serde_json::Value) -> serde_json::Value {
         serde_json::json!({
             "type": "session_event",
@@ -4518,7 +4564,6 @@ mod tests {
         })
     }
 
-    #[cfg(unix)]
     fn text_delta(text: &str) -> serde_json::Value {
         serde_json::json!({
             "type": "message_update",
@@ -4529,7 +4574,6 @@ mod tests {
     /// Connect and materialize the session, the way a user reaching for the
     /// agent does. Most tests here exercise a live session, so this keeps them
     /// reading as they did before sessions became lazy.
-    #[cfg(unix)]
     fn connect_host(vault: &Path) -> Result<String, String> {
         ensure_host(&vault.to_string_lossy())?;
         with_host_mut(|host| {
@@ -4540,12 +4584,10 @@ mod tests {
 
     /// Connect and stop there — no session. This is what attaching a vault
     /// does now, and the only helper that should be used to assert it.
-    #[cfg(unix)]
     fn connect_host_lazy(vault: &Path) -> Result<String, String> {
         ensure_host(&vault.to_string_lossy())
     }
 
-    #[cfg(unix)]
     fn prompt_request(vault: &Path, new_session: bool) -> PrimePromptRequest {
         PrimePromptRequest {
             images: Vec::new(),
@@ -4566,7 +4608,6 @@ mod tests {
     /// Attaching before the daemon has greeted, or issuing a session command
     /// before attaching, is how a client gets rejected in ways that look like
     /// an unreachable service.
-    #[cfg(unix)]
     #[test]
     fn connecting_greets_looks_for_running_work_then_attaches_and_reads_state() {
         let _guard = host_guard();
@@ -4591,7 +4632,6 @@ mod tests {
     /// requires, and the turn has to stream as it always did — including the
     /// `Init` that tells the frontend which session it is now in, which on
     /// this path can only be known after the prompt has been sent.
-    #[cfg(unix)]
     #[test]
     fn the_first_prompt_on_a_lazy_host_creates_the_session_and_still_streams() {
         let _guard = host_guard();
@@ -4649,7 +4689,6 @@ mod tests {
     /// draws it before a word is typed, and "Model unknown" on every launch
     /// would be a worse answer than the true one: what Prime is configured to
     /// start a session with.
-    #[cfg(unix)]
     #[test]
     fn a_session_less_host_reports_the_model_prime_would_start_with() {
         let _guard = host_guard();
@@ -4685,7 +4724,6 @@ mod tests {
     /// author's `~/.prime/agent/sessions` held no message at all. Filtering
     /// them out of the list was the display half; this is the half that stops
     /// making them.
-    #[cfg(unix)]
     #[test]
     fn attaching_a_vault_creates_no_session() {
         let _guard = host_guard();
@@ -4707,7 +4745,6 @@ mod tests {
     /// The deferred half, on demand. A command that needs a session pays for
     /// one — in the same order the eager path used, because the daemon
     /// rejects a session command sent before `attach`.
-    #[cfg(unix)]
     #[test]
     fn the_first_command_that_needs_a_session_creates_one() {
         let _guard = host_guard();
@@ -4733,7 +4770,6 @@ mod tests {
 
     /// Once a session exists, later commands reuse it rather than creating
     /// another. Deferring must not turn into creating one per command.
-    #[cfg(unix)]
     #[test]
     fn a_session_is_created_once_and_then_reused() {
         let _guard = host_guard();
@@ -4752,7 +4788,6 @@ mod tests {
 
     /// #31 / daily-drive. Name at create: time · vault · id tail — scannable
     /// after quit/reopen, unique for the daemon.
-    #[cfg(unix)]
     #[test]
     fn a_new_session_is_named_for_rhizome_and_the_vault() {
         let _guard = host_guard();
@@ -4787,7 +4822,6 @@ mod tests {
     /// lands in Prime's own log and every client reads the same one — rather
     /// than each client re-deriving a label from the first message, which is
     /// what left rows reading `/prime-intellect`.
-    #[cfg(unix)]
     #[test]
     fn the_first_exchange_replaces_the_placeholder_name() {
         let _guard = host_guard();
@@ -4828,7 +4862,6 @@ mod tests {
 
     /// A turn too slight to name leaves the placeholder in place, and the next
     /// turn may still earn one. Better a stand-in than a session called `hi`.
-    #[cfg(unix)]
     #[test]
     fn a_turn_with_nothing_to_name_it_keeps_the_placeholder() {
         let _guard = host_guard();
@@ -4865,7 +4898,6 @@ mod tests {
 
     /// Renaming a past conversation must not be what materializes a session.
     /// `send_command` would `ensure_session` first; this path is bare.
-    #[cfg(unix)]
     #[test]
     fn renaming_a_saved_session_does_not_create_one() {
         let _guard = host_guard();
@@ -4891,7 +4923,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn renaming_rejects_an_empty_name_without_talking_to_the_daemon() {
         let _guard = host_guard();
@@ -4933,7 +4964,6 @@ mod tests {
     /// app level and ticks on a timer; the stats poll, the command menu, and
     /// the composer queue all fetch on mount. If any of them materialized a
     /// session, deferring creation would buy nothing.
-    #[cfg(unix)]
     #[test]
     fn background_reads_do_not_create_a_session() {
         let _guard = host_guard();
@@ -4970,7 +5000,6 @@ mod tests {
     /// one. Materializing and then asking the daemon for a fresh session
     /// would create two logs and leave the first empty — the exact litter
     /// this change exists to stop.
-    #[cfg(unix)]
     #[test]
     fn a_new_chat_on_a_fresh_host_creates_one_session_not_two() {
         let _guard = host_guard();
@@ -4999,7 +5028,6 @@ mod tests {
     /// top-level `cwd` field, so sending it there is accepted and ignored —
     /// and the session silently lands in the daemon's own directory, which is
     /// how the vault tools would start reading the wrong tree.
-    #[cfg(unix)]
     #[test]
     fn create_sends_the_vault_path_as_the_session_cwd() {
         let _guard = host_guard();
@@ -5033,7 +5061,6 @@ mod tests {
 
     /// Promotion is the explicit grant that turns a foreground-owned session
     /// into resident work. The command must name the attached session.
-    #[cfg(unix)]
     #[test]
     fn promote_owned_session_sends_the_attached_session() {
         let _guard = host_guard();
@@ -5057,7 +5084,6 @@ mod tests {
 
     /// Completing owned work is the default close/quit stop. Same handle as
     /// promote, different lifetime.
-    #[cfg(unix)]
     #[test]
     fn complete_owned_session_sends_the_attached_session() {
         let _guard = host_guard();
@@ -5081,7 +5107,6 @@ mod tests {
 
     /// A daemon that cannot own sessions must fail before the command goes
     /// out. Sending it anyway would produce a raw protocol error.
-    #[cfg(unix)]
     #[test]
     fn promote_refuses_when_the_daemon_lacks_client_owned_sessions() {
         let _guard = host_guard();
@@ -5129,7 +5154,6 @@ mod tests {
 
     /// Creating as `client_owned` is rejected the same way: do not send a
     /// lifecycle the greeting said this daemon cannot honor.
-    #[cfg(unix)]
     #[test]
     fn create_refuses_client_owned_when_the_daemon_lacks_the_capability() {
         let _guard = host_guard();
@@ -5160,7 +5184,6 @@ mod tests {
     /// Every session-scoped command carries the daemon's session handle. A
     /// command sent without it is rejected by the daemon, which would surface
     /// as an inexplicable failure of a feature that used to work.
-    #[cfg(unix)]
     #[test]
     fn session_commands_carry_the_daemon_session_handle() {
         let _guard = host_guard();
@@ -5184,7 +5207,6 @@ mod tests {
     /// The whole of ADR-0163 in one assertion. Rhizome does not own Prime, so
     /// closing the connection must detach and leave the session running. A
     /// `kill` here would destroy the user's work on window close.
-    #[cfg(unix)]
     #[test]
     fn shutdown_detaches_and_never_kills_the_session() {
         let _guard = host_guard();
@@ -5215,7 +5237,6 @@ mod tests {
 
     // ── Reattach (#7) ───────────────────────────────────────────────────────
 
-    #[cfg(unix)]
     fn listed(sessions: serde_json::Value) -> serde_json::Value {
         serde_json::json!({ "sessions": sessions })
     }
@@ -5325,7 +5346,6 @@ mod tests {
 
     /// The whole of #7 at the transport seam: reopening rejoins the session
     /// the daemon kept running, instead of stranding it and starting over.
-    #[cfg(unix)]
     #[test]
     fn opening_rejoins_the_session_left_running_here() {
         let _guard = host_guard();
@@ -5371,7 +5391,6 @@ mod tests {
     /// not an adopted one — #6's behaviour has to survive #7, or a first run
     /// would land nowhere. It arrives on demand now rather than at connect
     /// (see `attaching_a_vault_creates_no_session`), but it still arrives.
-    #[cfg(unix)]
     #[test]
     fn a_first_run_creates_rather_than_rejoins() {
         let _guard = host_guard();
@@ -5398,7 +5417,6 @@ mod tests {
 
     /// Enumeration is an optimisation, not a precondition. A daemon that
     /// cannot list must not leave the user unable to open the app at all.
-    #[cfg(unix)]
     #[test]
     fn a_failed_enumeration_still_opens_a_session() {
         let _guard = host_guard();
@@ -5419,7 +5437,6 @@ mod tests {
 
     /// Uptime is how a user tells working from stuck, so the session's start
     /// time has to reach status rather than being computed from "now".
-    #[cfg(unix)]
     #[test]
     fn status_carries_the_session_start_time_for_uptime() {
         let _guard = host_guard();
@@ -5448,7 +5465,6 @@ mod tests {
     /// number the user can act on. ADR-0163 forbids the alternative — quietly
     /// dropping to the old transport would make "close the app, work
     /// continues" untrue with no explanation.
-    #[cfg(unix)]
     #[test]
     fn a_daemon_older_than_the_floor_is_refused_and_names_the_version() {
         let _guard = host_guard();
@@ -5492,7 +5508,6 @@ mod tests {
 
     /// A daemon newer than this client still speaks the envelope, so a version
     /// floor must not become a ceiling that breaks on every Prime release.
-    #[cfg(unix)]
     #[test]
     fn a_newer_daemon_is_accepted_rather_than_treated_as_incompatible() {
         let _guard = host_guard();
@@ -5524,14 +5539,13 @@ mod tests {
     /// A socket nothing is listening on is the "service is not running" case,
     /// and must be distinguishable from Prime not being installed at all —
     /// they need different actions from the user.
-    #[cfg(unix)]
     #[test]
     fn an_unreachable_service_is_reported_as_a_state_the_user_can_act_on() {
         let _guard = host_guard();
         let vault = tempfile::tempdir().unwrap();
         let dir = tempfile::tempdir().unwrap();
         // A path with no listener: connect fails the way a stopped daemon does.
-        std::env::set_var(DAEMON_SOCKET_ENV, dir.path().join("absent.sock"));
+        std::env::set_var(DAEMON_SOCKET_ENV, scratch_daemon_path(dir.path()));
         {
             let slot = host_slot();
             *slot.host.lock().unwrap_or_else(|p| p.into_inner()) = None;
@@ -5560,7 +5574,6 @@ mod tests {
 
     /// Reconnecting must clear the state, or the app would keep telling a user
     /// to fix something they already fixed.
-    #[cfg(unix)]
     #[test]
     fn connecting_successfully_clears_a_previous_problem() {
         let _guard = host_guard();
@@ -5642,7 +5655,6 @@ mod tests {
 
     /// Quitting without a connection has nothing to decide and must not error
     /// on the way out of the app.
-    #[cfg(unix)]
     #[test]
     fn quitting_without_a_connection_is_a_no_op() {
         let _guard = host_guard();
@@ -5666,7 +5678,6 @@ mod tests {
     /// and ends **only** ours. `shutdown` would stop every agent on the
     /// machine including other clients' — never the right tool for "the user
     /// closed my window".
-    #[cfg(unix)]
     #[test]
     fn quitting_completes_our_owned_session_and_never_the_whole_service() {
         let _guard = host_guard();
@@ -5702,7 +5713,6 @@ mod tests {
 
     /// Idle close detaches. The owned worker expires after Prime's grace;
     /// we do not complete or kill it here.
-    #[cfg(unix)]
     #[test]
     fn idle_close_detaches_without_completing_or_killing() {
         let _guard = host_guard();
@@ -5771,7 +5781,6 @@ mod tests {
     }
 
     /// Keep working is the explicit grant: promote, then detach.
-    #[cfg(unix)]
     #[test]
     fn keep_working_promotes_then_detaches() {
         let _guard = host_guard();
@@ -5803,7 +5812,6 @@ mod tests {
     }
 
     /// After an explicit promote, full quit must not complete the worker.
-    #[cfg(unix)]
     #[test]
     fn quit_after_promote_detaches_resident_work() {
         let _guard = host_guard();
@@ -5831,7 +5839,6 @@ mod tests {
     /// Multi-turn on one connection, with the daemon's `session_event`
     /// wrapper. If the unwrap were missing every event would be an unknown
     /// type and the transcript would render empty while the turn "succeeded".
-    #[cfg(unix)]
     #[test]
     fn prompt_maps_wrapped_events_and_survives_two_turns() {
         let _guard = host_guard();
@@ -5908,7 +5915,6 @@ mod tests {
     /// `agent_end`. Chat must keep listening — otherwise the interrupt the
     /// user already saw under "Waiting in this session" never appears as a
     /// reply (Atticus dogfood 2026-09-06).
-    #[cfg(unix)]
     #[test]
     fn prompt_keeps_streaming_through_follow_up_after_first_agent_end() {
         let _guard = host_guard();
@@ -5959,7 +5965,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn prompt_rejected_by_the_daemon_emits_error_then_done_and_clears_streaming() {
         let _guard = host_guard();
@@ -5991,7 +5996,6 @@ mod tests {
     /// `new_session` keeps the daemon handle and mints a fresh Prime session
     /// id behind it — verified against 0.7.1. The Init the UI rehydrates from
     /// must carry the new id, and must be emitted exactly once.
-    #[cfg(unix)]
     #[test]
     fn new_session_emits_one_init_with_the_refreshed_id() {
         let _guard = host_guard();
@@ -6056,7 +6060,6 @@ mod tests {
     /// Rhizome does not claim the `extension_ui` capability, so the daemon
     /// should never route one here. If one arrives anyway the turn must not
     /// hang on a prompt this app has no surface to answer.
-    #[cfg(unix)]
     #[test]
     fn an_unexpected_extension_ui_request_is_cancelled_so_the_turn_finishes() {
         let _guard = host_guard();
@@ -6100,7 +6103,6 @@ mod tests {
 
     // ── Status and harness reads ────────────────────────────────────────────
 
-    #[cfg(unix)]
     #[test]
     fn status_surfaces_session_and_model_metadata_while_connected() {
         let _guard = host_guard();
@@ -6133,7 +6135,6 @@ mod tests {
     /// heartbeats *and* cron jobs tagged by `source`, so the extra
     /// `heartbeats_list` round-trip only re-delivered the same heartbeats in a
     /// `{"job": …}` envelope — showing each one twice, once unparseable.
-    #[cfg(unix)]
     #[test]
     fn agent_activity_asks_for_the_daemon_names_for_scheduled_work() {
         let _guard = host_guard();
@@ -6178,7 +6179,6 @@ mod tests {
 
     // ── Goal set / clear (#20) ──────────────────────────────────────────────
 
-    #[cfg(unix)]
     fn goal_state_json(goal: &Option<(String, Option<u64>)>) -> serde_json::Value {
         match goal {
             None => serde_json::json!({ "active": false, "status": "idle", "tokensUsed": 0 }),
@@ -6198,7 +6198,6 @@ mod tests {
     /// `prompt` never carries goal data itself — only admits the text — so a
     /// test relying on the send response instead of a re-read would pass
     /// against this fake even though it proves nothing about confirmation.
-    #[cfg(unix)]
     fn goal_tracking_daemon(initial: Option<(String, Option<u64>)>) -> FakeDaemon {
         goal_tracking_daemon_with_streaming(initial, false)
     }
@@ -6210,7 +6209,6 @@ mod tests {
     /// (confirmed live, 2026-08-16 — see `send_goal_command`'s doc). Only
     /// `abort` clears the streaming flag here, matching what actually
     /// unblocks it.
-    #[cfg(unix)]
     fn goal_tracking_daemon_with_streaming(
         initial: Option<(String, Option<u64>)>,
         initially_streaming: bool,
@@ -6265,7 +6263,6 @@ mod tests {
     /// Confirmation must come from re-reading state. `prompt`'s own response
     /// carries no goal data at all here — if `set_goal` returned success from
     /// that response alone, it would be trusting nothing.
-    #[cfg(unix)]
     #[test]
     fn set_goal_confirms_from_a_re_read_not_the_send_response() {
         let _guard = host_guard();
@@ -6292,7 +6289,6 @@ mod tests {
     /// Prime refuses `/goal <new>` while a goal is already active, so
     /// replacing one means clearing first — both steps confirmed the same
     /// way a fresh set is.
-    #[cfg(unix)]
     #[test]
     fn set_goal_replaces_an_active_goal_by_clearing_first() {
         let _guard = host_guard();
@@ -6318,7 +6314,6 @@ mod tests {
 
     /// A set that never shows up in state must fail, not report success
     /// because the daemon accepted the text.
-    #[cfg(unix)]
     #[test]
     fn set_goal_fails_when_state_never_confirms_it() {
         let _guard = host_guard();
@@ -6339,7 +6334,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn clear_goal_confirms_the_goal_is_gone() {
         let _guard = host_guard();
@@ -6356,7 +6350,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn set_goal_rejects_an_empty_objective_without_contacting_the_daemon() {
         let _guard = host_guard();
@@ -6377,7 +6370,6 @@ mod tests {
     /// the goal's own auto-continuation) is queued rather than parsed, so
     /// `set_goal`/`clear_goal` must interrupt it first — otherwise the send
     /// reports success and nothing actually changes (observed live).
-    #[cfg(unix)]
     #[test]
     fn clear_goal_aborts_a_busy_session_before_sending_the_clear() {
         let _guard = host_guard();
@@ -6401,7 +6393,6 @@ mod tests {
     /// A turn *this* Rhizome client started must never be silently cancelled
     /// just because the goal dialog was also used — that would cut off a
     /// response the user is actively watching stream.
-    #[cfg(unix)]
     #[test]
     fn set_goal_refuses_rather_than_interrupting_our_own_in_flight_turn() {
         let _guard = host_guard();
@@ -6426,7 +6417,6 @@ mod tests {
 
     /// A connection that has gone away must be evicted, not left reporting
     /// `running` — the UI would offer a composer wired to nothing.
-    #[cfg(unix)]
     #[test]
     fn abort_reports_false_and_clears_the_slot_when_the_connection_is_gone() {
         let _guard = host_guard();
@@ -6449,7 +6439,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn abort_returns_false_when_no_host() {
         let _guard = host_guard();
@@ -6459,7 +6448,6 @@ mod tests {
 
     /// Stop must leave the session able to take the next message. Prime's
     /// `abort` suspends the input pump; we lift it with `resume_queue`.
-    #[cfg(unix)]
     #[test]
     fn abort_resumes_the_session_input_pump() {
         let _guard = host_guard();
@@ -6496,7 +6484,6 @@ mod tests {
     /// Abort leaves the pump suspended. The daemon answers the next prompt with
     /// `success: false` (not a socket Err). Retry must call `resume_queue` and
     /// send again — otherwise Chat looks idle and every Enter fails.
-    #[cfg(unix)]
     #[test]
     fn prompt_retries_after_suspended_input_refusal() {
         let _guard = host_guard();
@@ -6643,6 +6630,67 @@ mod tests {
             default_daemon_socket_path().expect("a pipe path on windows"),
             PathBuf::from(r"\\.\pipe\prime-agent-daemon")
         );
+    }
+
+    /// A daemon with no console makes Windows open a visible console for
+    /// every ordinary child it starts (`prime-agent --version`, git,
+    /// powershell): the "prime-agent" windows on launch. A hidden console is
+    /// inherited by those children instead (C84).
+    #[cfg(windows)]
+    #[test]
+    fn the_daemon_starts_with_a_hidden_console_not_none() {
+        const DETACHED_PROCESS: u32 = 0x0000_0008;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+        assert_eq!(DAEMON_CREATION_FLAGS & DETACHED_PROCESS, 0);
+        assert_eq!(DAEMON_CREATION_FLAGS & CREATE_NO_WINDOW, CREATE_NO_WINDOW);
+    }
+
+    /// The reader thread sits in a read on one handle while commands are
+    /// written on its clone. A synchronous pipe handle serializes the two, so
+    /// the write waited for daemon output that only the write could cause —
+    /// the Windows first-boot window freeze.
+    #[cfg(windows)]
+    #[test]
+    fn a_parked_reader_does_not_block_writes_on_the_pipe() {
+        use crate::prime_daemon_pipe::{test_accept, test_server};
+        use std::io::Read;
+
+        // A server that never writes, so a client read parks.
+        let name = format!(
+            r"\\.\pipe\rhizome-test-{}-{}",
+            std::process::id(),
+            next_id()
+        );
+        let server = test_server(&name);
+        let client = connect_stream(Path::new(&name)).expect("connect to test pipe");
+        test_accept(&server);
+
+        // Park a reader on the clone, exactly as `spawn_daemon_reader` does.
+        let reader = client.try_clone().expect("clone pipe");
+        thread::spawn(move || {
+            let mut byte = [0u8; 1];
+            let _ = (&reader).read(&mut byte);
+        });
+        thread::sleep(Duration::from_millis(200));
+
+        // Write on the original. Bounded by a channel so a regression fails
+        // instead of hanging the suite.
+        let (tx, rx) = mpsc::channel();
+        thread::spawn(move || {
+            let _ = tx.send((&client).write_all(b"ping\n").is_ok());
+        });
+        assert_eq!(
+            rx.recv_timeout(Duration::from_secs(2)),
+            Ok(true),
+            "write blocked behind the parked read"
+        );
+
+        let mut line = String::new();
+        BufReader::new(&server)
+            .read_line(&mut line)
+            .expect("server read");
+        assert_eq!(line, "ping\n");
     }
 
     #[cfg(unix)]
@@ -6802,7 +6850,6 @@ mod tests {
 
     /// The daemon's `get_state` model carries id and name but often omits
     /// `input`; the catalog has it. Without this fallback C55 never fired.
-    #[cfg(unix)]
     #[test]
     fn status_falls_back_to_the_catalog_when_get_state_omits_input() {
         let _guard = host_guard();
@@ -7036,7 +7083,6 @@ mod tests {
         );
     }
 
-    #[cfg(unix)]
     #[test]
     fn follow_up_returns_the_daemons_queue_admission_result() {
         let _guard = host_guard();
@@ -7058,7 +7104,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn admitted_follow_ups_and_successful_steers_return_true() {
         let _guard = host_guard();
@@ -7112,7 +7157,6 @@ mod tests {
         assert_eq!(from_event.follow_up, vec!["after that, ship it"]);
     }
 
-    #[cfg(unix)]
     #[test]
     fn get_queue_asks_prime_and_clear_drops_both_lanes() {
         let _guard = host_guard();
@@ -7149,7 +7193,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn mutate_queued_message_maps_steer_and_sends_the_preview() {
         let _guard = host_guard();
@@ -7197,7 +7240,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn mutate_queued_message_stays_unsent_without_the_capability() {
         let _guard = host_guard();
@@ -7245,7 +7287,6 @@ mod tests {
     /// The fake daemon never answers `create`. It only emits the diagnostic
     /// the supervisor logs when the child exits (`EPERM` / `uv_cwd` / process
     /// exit). Before this, `send_bare_command` waited the full 30s.
-    #[cfg(unix)]
     #[test]
     fn worker_start_failure_returns_without_waiting_for_the_daemon_timeout() {
         let _guard = host_guard();
@@ -7318,7 +7359,6 @@ mod tests {
         assert!(navigate_tree("   ").is_err());
     }
 
-    #[cfg(unix)]
     #[test]
     fn get_session_tree_asks_prime_and_navigate_moves_the_leaf() {
         let _guard = host_guard();
@@ -7473,7 +7513,7 @@ mod tests {
                     "description": "Ask which skill fits",
                     "source": "skill",
                     "sourceInfo": {
-                        "path": "/Users/dtc/.agents/skills/ask-matt/SKILL.md",
+                        "path": "/Users/jdoe/.agents/skills/ask-matt/SKILL.md",
                         "source": "auto",
                         "scope": "user",
                         "origin": "top-level"
@@ -7527,7 +7567,6 @@ mod tests {
     /// The composer chip reads `get_status`, which is a cache of the last
     /// `get_state`. Switching the model without refreshing that cache leaves
     /// the chip on the previous model even when Prime accepted the switch.
-    #[cfg(unix)]
     #[test]
     fn status_reports_the_thinking_level_the_daemon_sent() {
         let _guard = host_guard();
@@ -7553,7 +7592,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn thinking_level_survives_a_state_payload_with_no_model() {
         // apply_state_data returns early when `model` is null. Anything read
@@ -7705,7 +7743,6 @@ mod tests {
     // `{"success": false}` was indistinguishable from an empty answer. These
     // pin the policy each one now has.
 
-    #[cfg(unix)]
     #[test]
     fn a_failed_streaming_check_refuses_the_goal_instead_of_sending_it_mid_turn() {
         // The dangerous one. `session_is_streaming` answered `false` on any
@@ -7758,7 +7795,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn call_names_the_command_from_the_payload_it_sent() {
         // Written by hand, the name appears twice per call — in the payload and
@@ -7782,7 +7818,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn call_returns_the_data_payload_not_the_envelope() {
         let _guard = host_guard();
@@ -7806,7 +7841,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn a_refused_state_read_is_not_reported_as_an_absent_goal() {
         // `read_goal_state` returning None on refusal let the confirm loop
@@ -7831,7 +7865,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn a_refused_schedule_read_empties_only_its_own_section() {
         // The tolerant policy is deliberate and stays: one failed section must
@@ -7880,7 +7913,6 @@ mod tests {
         assert!(create_scheduled_work("heartbeat", "every 5m", "check in", Some("queue")).is_err());
     }
 
-    #[cfg(unix)]
     #[test]
     fn pausing_a_heartbeat_sends_the_job_id_and_action() {
         let _guard = host_guard();
@@ -7911,7 +7943,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn cancelling_scheduled_work_uses_cron_cancel_for_either_kind() {
         let _guard = host_guard();
@@ -7940,7 +7971,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn creating_a_heartbeat_asks_prime_and_does_not_invent_a_session() {
         let _guard = host_guard();
@@ -8004,7 +8034,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn a_refused_pause_is_surfaced_not_swallowed() {
         let _guard = host_guard();
@@ -8028,7 +8057,6 @@ mod tests {
     /// Every command that returns a list must fail loudly rather than hand the
     /// UI an empty one: an empty model picker and a refused daemon look
     /// identical on screen, and only one of them is the user's problem.
-    #[cfg(unix)]
     #[test]
     fn a_refused_model_list_is_not_reported_as_no_models() {
         let _guard = host_guard();
@@ -8050,7 +8078,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn a_refused_command_list_is_not_reported_as_no_commands() {
         let _guard = host_guard();
@@ -8068,7 +8095,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn a_refused_compact_surfaces_the_reason_rather_than_no_tokens() {
         let _guard = host_guard();
@@ -8087,7 +8113,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn a_successful_compact_still_reports_the_tokens_it_reclaimed() {
         let _guard = host_guard();
@@ -8108,7 +8133,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn cancel_rlm_child_refuses_an_empty_id_before_talking_to_the_daemon() {
         let _guard = host_guard();
@@ -8119,7 +8143,6 @@ mod tests {
         );
     }
 
-    #[cfg(unix)]
     #[test]
     fn cancel_rlm_child_asks_prime_with_the_child_id() {
         let _guard = host_guard();
@@ -8143,7 +8166,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn a_refused_auto_compaction_toggle_is_surfaced_not_swallowed() {
         let _guard = host_guard();
@@ -8211,7 +8233,6 @@ mod tests {
         assert!(supported_thinking_levels(None, None).is_none());
     }
 
-    #[cfg(unix)]
     #[test]
     fn supported_levels_come_from_the_live_state_payload() {
         let _guard = host_guard();
@@ -8253,7 +8274,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn supported_levels_fall_back_to_the_scale_before_a_model_is_known() {
         // No session yet: the honest answer is the whole scale. A menu
@@ -8287,7 +8307,6 @@ mod tests {
         );
     }
 
-    #[cfg(unix)]
     #[test]
     fn set_thinking_level_sends_the_level_to_the_daemon() {
         let _guard = host_guard();
@@ -8313,7 +8332,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn setting_a_level_updates_what_the_strip_will_read() {
         // The strip polls `get_status`, which reads a cache rather than asking
@@ -8361,7 +8379,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn set_thinking_level_surfaces_a_daemon_refusal() {
         let _guard = host_guard();
@@ -8385,7 +8402,6 @@ mod tests {
         let _ = shutdown_host();
     }
 
-    #[cfg(unix)]
     #[test]
     fn set_model_updates_status_to_the_model_just_chosen() {
         let _guard = host_guard();
@@ -8656,10 +8672,10 @@ mod tests {
             "command": "switch_session",
             "success": false,
             "error": "Session is already active in ba59aa844040: \
-                      /Users/dtc/.prime/agent/sessions/01a005b2-9453.jsonl",
+                      /Users/jdoe/.prime/agent/sessions/01a005b2-9453.jsonl",
             "errorInfo": {
                 "code": "session_already_active",
-                "sessionPath": "/Users/dtc/.prime/agent/sessions/01a005b2-9453.jsonl",
+                "sessionPath": "/Users/jdoe/.prime/agent/sessions/01a005b2-9453.jsonl",
                 "activeSessionId": "ba59aa844040"
             }
         });
@@ -9212,10 +9228,26 @@ mod tests {
         assert!(roster_sessions(&serde_json::json!({ "data": { "sessions": 7 } })).is_empty());
     }
 
+    /// A connected client and daemon end, with no listener left behind.
+    #[cfg(unix)]
+    fn fake_daemon_pair() -> (DaemonStream, FakeServerStream) {
+        std::os::unix::net::UnixStream::pair().unwrap()
+    }
+
+    #[cfg(windows)]
+    fn fake_daemon_pair() -> (DaemonStream, FakeServerStream) {
+        use crate::prime_daemon_pipe::{test_accept, test_server};
+
+        let path = scratch_daemon_path(Path::new(""));
+        let server = test_server(&path.to_string_lossy());
+        let client = DaemonStream::open(&path).unwrap();
+        test_accept(&server);
+        (client, server)
+    }
+
     /// Drive `read_roster_over` against a scripted daemon on the other end of a
     /// socket pair. Returns what the roster query produced plus every command
     /// the fake daemon received, so the exchange itself can be asserted.
-    #[cfg(unix)]
     fn roster_against_fake_daemon(
         script: impl Fn(&serde_json::Value) -> Vec<serde_json::Value> + Send + 'static,
         greet: bool,
@@ -9223,7 +9255,7 @@ mod tests {
         Result<Vec<serde_json::Value>, String>,
         Vec<serde_json::Value>,
     ) {
-        let (client, server) = std::os::unix::net::UnixStream::pair().unwrap();
+        let (client, server) = fake_daemon_pair();
         let received = Arc::new(Mutex::new(Vec::new()));
         let thread_received = Arc::clone(&received);
 
@@ -9248,6 +9280,7 @@ mod tests {
             }
         });
 
+        #[cfg(unix)]
         let _ = client.set_read_timeout(Some(Duration::from_secs(5)));
         let result = read_roster_over(client);
         let _ = daemon.join();
@@ -9255,7 +9288,6 @@ mod tests {
         (result, commands)
     }
 
-    #[cfg(unix)]
     #[test]
     fn roster_query_greets_then_lists() {
         let (result, commands) = roster_against_fake_daemon(
@@ -9288,7 +9320,6 @@ mod tests {
         assert_eq!(commands[0]["protocol"]["version"], DAEMON_PROTOCOL_VERSION);
     }
 
-    #[cfg(unix)]
     #[test]
     fn roster_query_skips_events_before_the_response() {
         // The daemon interleaves session events with command responses on one
@@ -9314,7 +9345,6 @@ mod tests {
         assert_eq!(sessions[0]["id"], "mine");
     }
 
-    #[cfg(unix)]
     #[test]
     fn roster_query_is_quiet_when_the_daemon_refuses() {
         // "Nothing running" and "the service said no" must render the same
@@ -9333,7 +9363,6 @@ mod tests {
         assert_eq!(result.expect("roster"), Vec::<serde_json::Value>::new());
     }
 
-    #[cfg(unix)]
     #[test]
     fn roster_query_is_quiet_when_the_daemon_hangs_up() {
         let (result, _) = roster_against_fake_daemon(|_| Vec::new(), true);
@@ -9382,20 +9411,18 @@ mod tests {
         assert!(sessions.iter().any(|s| s["activity"].is_string()));
     }
 
-    #[cfg(unix)]
     #[test]
     fn roster_is_empty_when_no_daemon_is_listening() {
         // The ordinary case on a fresh boot: the socket path resolves but
         // nothing is behind it. The menu bar must show nothing, not an error.
         let _guard = host_guard();
         let dir = tempfile::tempdir().unwrap();
-        std::env::set_var(DAEMON_SOCKET_ENV, dir.path().join("absent.sock"));
+        std::env::set_var(DAEMON_SOCKET_ENV, scratch_daemon_path(dir.path()));
         let sessions = list_running_sessions().expect("roster");
         std::env::remove_var(DAEMON_SOCKET_ENV);
         assert!(sessions.is_empty());
     }
 
-    #[cfg(unix)]
     #[test]
     fn roster_is_empty_when_the_socket_path_cannot_be_resolved() {
         let _guard = host_guard();
@@ -9407,6 +9434,8 @@ mod tests {
         assert!(sessions.is_empty());
     }
 
+    /// Unix only: it ends on the 5s socket read timeout. A Windows pipe has
+    /// none, so both ends wait forever (see `only_one_roster_read_runs_at_a_time`).
     #[cfg(unix)]
     #[test]
     fn roster_query_is_quiet_when_the_daemon_never_greets() {

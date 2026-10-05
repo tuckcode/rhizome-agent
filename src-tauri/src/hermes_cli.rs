@@ -94,9 +94,14 @@ fn is_auth_or_setup_error(stderr_output: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // Only the Unix-gated `request` helper uses this.
+    #[cfg(unix)]
     use crate::ai_agents::AiAgentPermissionMode;
+    // Only the Unix-gated tests use `PathBuf` here.
+    #[cfg(unix)]
     use std::path::PathBuf;
 
+    #[cfg(unix)] // callers are Unix-only tests
     fn request(vault_path: String) -> AgentStreamRequest {
         AgentStreamRequest {
             message: "Summarize".into(),

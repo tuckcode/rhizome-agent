@@ -1269,7 +1269,10 @@ mod tests {
         })
         .expect("move should succeed");
 
-        assert!(result.new_path.ends_with("areas/weekly-review.md"));
+        assert!(result
+            .new_path
+            .replace('\\', "/")
+            .ends_with("areas/weekly-review.md"));
         assert!(!vault.join("projects/weekly-review.md").exists());
         assert!(vault.join("areas/weekly-review.md").exists());
         assert_eq!(
@@ -1301,7 +1304,10 @@ mod tests {
         .expect("move should succeed");
 
         assert_eq!(result.updated_files, 1);
-        assert!(result.new_path.ends_with("areas/weekly-review.md"));
+        assert!(result
+            .new_path
+            .replace('\\', "/")
+            .ends_with("areas/weekly-review.md"));
         assert_eq!(
             fs::read_to_string(vault.join("areas/linked.md")).unwrap(),
             "---\nrelated_to:\n  - \"[[areas/weekly-review]]\"\n---\nReference [[areas/weekly-review|review notes]] and [[areas/weekly-review]].\n",

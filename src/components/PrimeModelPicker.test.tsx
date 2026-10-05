@@ -82,7 +82,7 @@ describe('PrimeModelPicker', () => {
     render(
       <PrimeModelPicker
         label={null}
-        vaultPath="/Users/dtc/Documents/Rhizome Vault"
+        vaultPath="/Users/jdoe/Documents/Rhizome Vault"
         hostReady
       />,
     )
@@ -103,7 +103,7 @@ describe('PrimeModelPicker', () => {
   })
 
   it('starts the Prime host before listing when the menu opens without a live host', async () => {
-    render(<PrimeModelPicker label={null} vaultPath="/Users/dtc/Documents/Rhizome Vault" />)
+    render(<PrimeModelPicker label={null} vaultPath="/Users/jdoe/Documents/Rhizome Vault" />)
     fireEvent.pointerDown(
       screen.getByTestId('prime-model-chip'),
       new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
@@ -111,7 +111,7 @@ describe('PrimeModelPicker', () => {
 
     await waitFor(() => {
       expect(cmds()[0]).toBe('ensure_prime_session_host')
-      expect(invoked.calls[0]?.args).toEqual({ vaultPath: '/Users/dtc/Documents/Rhizome Vault' })
+      expect(invoked.calls[0]?.args).toEqual({ vaultPath: '/Users/jdoe/Documents/Rhizome Vault' })
     })
     expect(cmds()).toContain('get_available_prime_models')
   })

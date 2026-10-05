@@ -8,7 +8,14 @@ describe('leftover dep pins', () => {
     expect(source).toContain('js-yaml@3: 3.15.2')
   })
 
-  it('locks fast-uri at 3.1.6', () => {
-    expect(source).toContain('fast-uri: 3.1.6')
+  it('locks fast-uri at 3.1.7', () => {
+    expect(source).toContain('fast-uri: 3.1.7')
+  })
+
+  // An npm install of mcp-server alone reads these overrides, not the
+  // workspace pins above (C93).
+  it('locks fast-uri at 3.1.7 for a standalone mcp-server install', () => {
+    const manifest = JSON.parse(readFileSync(`${process.cwd()}/mcp-server/package.json`, 'utf8'))
+    expect(manifest.overrides['fast-uri']).toBe('3.1.7')
   })
 })

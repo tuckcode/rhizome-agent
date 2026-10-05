@@ -25,6 +25,19 @@ ensure_node_tooling
 
 echo "🔍 Pre-commit checks..."
 
+# Personal home paths and emails in added lines; runs for docs too.
+echo "  → personal info..."
+node scripts/check-personal-info.mjs
+
+# Secrets in staged changes. Optional tool: warn, don't block, where it
+# is not installed (winget install Gitleaks.Gitleaks / brew install gitleaks).
+if command -v gitleaks >/dev/null 2>&1; then
+  echo "  → secrets (gitleaks)..."
+  gitleaks git --pre-commit --staged --redact --no-banner
+else
+  echo "  ⚠️  gitleaks not installed; secret scan skipped"
+fi
+
 STAGED_FILES=$(git diff --cached --name-only)
 APP_CHANGED=false
 

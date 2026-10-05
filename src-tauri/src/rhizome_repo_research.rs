@@ -57,7 +57,9 @@ pub fn classify_repo_reference(repo: &str) -> Result<RepoReference, String> {
     }
 
     // Absolute or home-relative paths are local-only: never cloned.
-    if repo.starts_with('/') || repo.starts_with("~/") {
+    // `Path::is_absolute` covers Windows drives (`C:\...`) and UNC shares
+    // (`\\server\share`), which the `/` prefix check misses.
+    if repo.starts_with('/') || repo.starts_with("~/") || Path::new(repo).is_absolute() {
         let expanded = if let Some(rest) = repo.strip_prefix("~/") {
             dirs::home_dir()
                 .ok_or("Cannot resolve home directory")?

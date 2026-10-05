@@ -197,7 +197,7 @@ mod tests {
             "type": "user",
             "sessionId": session,
             "timestamp": timestamp,
-            "cwd": "/Users/dtc/code/projects/rhizome-agent",
+            "cwd": "/Users/jdoe/code/projects/rhizome-agent",
             "gitBranch": "main",
             "isSidechain": false,
             "message": { "role": "user", "content": text },
@@ -240,7 +240,7 @@ mod tests {
         );
         assert_eq!(
             session.cwd.as_deref(),
-            Some("/Users/dtc/code/projects/rhizome-agent")
+            Some("/Users/jdoe/code/projects/rhizome-agent")
         );
         assert_eq!(session.git_branch.as_deref(), Some("main"));
     }

@@ -681,8 +681,10 @@ mod library_scan_tests {
     #[test]
     fn run_cli_streaming_reports_each_stdout_line_and_collects_output() {
         let mut lines: Vec<String> = Vec::new();
+        // Node is the crate's accepted test runtime (see find_node tests);
+        // `sh` does not exist on Windows spawns.
         let out = run_cli_streaming(
-            &["sh", "-c", "printf 'first\\nsecond\\n'"],
+            &["node", "-e", "process.stdout.write('first\\nsecond\\n')"],
             &[],
             &mut |line| lines.push(line.to_string()),
         )
@@ -693,15 +695,23 @@ mod library_scan_tests {
 
     #[test]
     fn run_cli_streaming_surfaces_stderr_on_failure() {
-        let err = run_cli_streaming(&["sh", "-c", "echo boom >&2; exit 3"], &[], &mut |_| {})
-            .unwrap_err();
+        let err = run_cli_streaming(
+            &[
+                "node",
+                "-e",
+                "process.stderr.write('boom'); process.exit(3)",
+            ],
+            &[],
+            &mut |_| {},
+        )
+        .unwrap_err();
         assert!(err.contains("boom"), "unexpected error: {err}");
     }
 
     #[test]
     fn run_cli_streaming_sets_child_env() {
         let out = run_cli_streaming(
-            &["sh", "-c", "printf '%s' \"$MARKER\""],
+            &["node", "-e", "process.stdout.write(process.env.MARKER)"],
             &[("MARKER", "env-visible")],
             &mut |_| {},
         )

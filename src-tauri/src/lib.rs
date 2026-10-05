@@ -44,8 +44,11 @@ mod pi_events;
 pub mod preflight;
 pub mod prime_agent_activity;
 mod prime_custom_models;
+#[cfg(windows)]
+mod prime_daemon_pipe;
 mod prime_discovery;
 mod prime_events;
+mod prime_login;
 mod prime_packages;
 pub mod prime_session_host;
 pub mod prime_sessions;
@@ -754,6 +757,8 @@ macro_rules! app_invoke_handler {
             commands::list_prime_sessions,
             commands::get_connected_providers,
             commands::get_prime_provider_status,
+            commands::sign_in_prime_provider,
+            commands::save_prime_provider_key,
             commands::list_prime_packages,
             commands::install_prime_package,
             commands::ensure_nous_portal_models,

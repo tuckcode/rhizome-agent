@@ -119,12 +119,10 @@ fn current_stream_id() -> Option<String> {
 mod tests {
     use super::*;
 
-    #[cfg(unix)]
     #[test]
     fn abort_stream_kills_registered_child() {
-        let child = std::process::Command::new("sh")
-            .arg("-c")
-            .arg("sleep 30")
+        let child = std::process::Command::new("node")
+            .args(["-e", "setTimeout(() => {}, 30000)"])
             .spawn()
             .unwrap();
 
@@ -136,5 +134,38 @@ mod tests {
 
             assert!(!status.success());
         });
+    }
+
+    #[test]
+    fn abort_is_false_for_an_unknown_or_finished_stream() {
+        assert!(!abort_stream("ai-agent-stream-unknown").unwrap());
+
+        let mut child = std::process::Command::new("node")
+            .args(["-e", ""])
+            .spawn()
+            .unwrap();
+        child.wait().unwrap();
+        with_stream_id("ai-agent-stream-finished".into(), || {
+            let _registered = register_current_stream_child(child);
+            assert!(!abort_stream("ai-agent-stream-finished").unwrap());
+        });
+    }
+
+    #[test]
+    fn dropping_a_registration_forgets_the_stream() {
+        let child = std::process::Command::new("node")
+            .args(["-e", "setTimeout(() => {}, 30000)"])
+            .spawn()
+            .unwrap();
+        let registered = with_stream_id("ai-agent-stream-dropped".into(), || {
+            register_current_stream_child(child)
+        });
+        let shared = Arc::clone(&registered.child);
+        drop(registered);
+
+        assert!(!abort_stream("ai-agent-stream-dropped").unwrap());
+        let mut child = shared.lock().unwrap();
+        let _ = child.kill();
+        let _ = child.wait();
     }
 }

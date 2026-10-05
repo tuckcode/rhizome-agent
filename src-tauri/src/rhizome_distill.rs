@@ -11,6 +11,9 @@ use std::path::{Path, PathBuf};
 
 use crate::rhizome_write_location::{default_frontmatter, ArtifactKind};
 
+/// The agent's whole answer when the text holds nothing worth a card.
+const SKIP_RESPONSE: &str = "SKIP";
+
 /// Card kind hint from the UI's distill dropdown. All six values collapse to
 /// `ArtifactKind::Concept` per `docs/VAULT_CONTRACT.md` (none name a literal
 /// person/org/tool/product) and are preserved as a `kind:` frontmatter field.
@@ -21,7 +24,9 @@ pub fn build_distill_prompt(text: &str, kind: Option<&str>) -> String {
     format!(
         "Distill the following text into a single, well-formed wiki card capturing \
 one durable idea. {kind_hint}\n\
-Respond with exactly this shape and nothing else:\n\
+If the text holds no durable idea (small talk, a refused or blocked step, \
+nothing resolved), respond with exactly {SKIP_RESPONSE} and nothing else.\n\
+Otherwise respond with exactly this shape and nothing else:\n\
 TITLE: <short human title, no markdown>\n\
 CONTEXT: <one sentence situating this card for retrieval>\n\
 ---\n\
@@ -246,6 +251,11 @@ where
         on_line,
         model_runner,
     )?;
+
+    // Nothing durable: write no card and log no event.
+    if response.trim() == SKIP_RESPONSE {
+        return Ok("Nothing durable to distill; no card written.".to_string());
+    }
 
     let card = parse_agent_response(&response);
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
@@ -633,6 +643,39 @@ mod tests {
         let events = std::fs::read_to_string(dir.path().join(".rhizome/events.jsonl")).unwrap();
         assert!(events.contains("\"type\":\"distill\""));
         assert!(!lines.is_empty());
+    }
+
+    #[test]
+    fn build_distill_prompt_offers_a_skip_answer() {
+        let prompt = build_distill_prompt("ok thanks", None);
+        assert!(prompt.contains(SKIP_RESPONSE), "got: {prompt}");
+    }
+
+    /// A "nothing durable here" answer used to be saved as a card titled
+    /// "No durable knowledge here — …". A skip must write nothing.
+    #[test]
+    fn distill_skip_response_writes_no_card_and_logs_no_event() {
+        let dir = tempfile::tempdir().unwrap();
+        let message = run_distill_via_target_with_model_runner(
+            dir.path(),
+            "ok thanks",
+            None,
+            None,
+            "manual",
+            stub_api_model_target(),
+            &mut |_| {},
+            |_req, emit| {
+                emit(crate::ai_agents::AiAgentStreamEvent::TextDelta {
+                    text: format!("  {SKIP_RESPONSE}\n"),
+                });
+                Ok(String::new())
+            },
+        )
+        .unwrap();
+
+        assert!(message.contains("no card written"), "got: {message}");
+        assert!(!dir.path().join("wiki").exists());
+        assert!(!dir.path().join(".rhizome/events.jsonl").exists());
     }
 
     #[test]

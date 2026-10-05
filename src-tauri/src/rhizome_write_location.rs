@@ -116,11 +116,15 @@ pub fn resolve_write_path(vault_path: &Path, kind: ArtifactKind, slug: &str) -> 
 /// A written artifact's path relative to its vault root, for `events.jsonl`'s
 /// `artifact_path` field. Falls back to the absolute path if `path` isn't
 /// actually under `vault_path` (shouldn't happen for writer-produced paths).
+/// Separators are normalized to `/` so the JSONL field is stable across
+/// platforms (Windows `strip_prefix` yields `\`).
 pub fn relative_to_vault(vault_path: &Path, path: &Path) -> String {
-    path.strip_prefix(vault_path)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .to_string()
+    let relative = path.strip_prefix(vault_path).unwrap_or(path);
+    relative
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 /// Frontmatter skeleton for a new artifact of this kind, per

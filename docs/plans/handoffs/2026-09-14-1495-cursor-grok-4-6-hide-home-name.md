@@ -16,7 +16,7 @@ Keep-working drops only the spawned Prime daemon. Native live-check
 still **NOT RUN**.
 
 HOME-cwd session names stay clock-first
-(`Rhizome · Sep 6 · 3:35p · dtc · f65c06`).
+(`Rhizome · Sep 6 · 3:35p · <user> · f65c06`).
 
 ## Not this window
 

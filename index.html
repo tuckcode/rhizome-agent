@@ -50,14 +50,34 @@
     <style>
       :root {
         color-scheme: light;
-        background: #FFFFFF;
-        color: #37352F;
+        background: #E9ECE5;
+        color: #23281F;
+        --primary: #2E6B4F;
+        --text-primary: #23281F;
+        --text-muted: #77806E;
       }
       :root[data-theme="dark"] {
         color-scheme: dark;
-        background: #1F1E1B;
-        color: #E6E1D8;
+        background: #10150E;
+        color: #E6EBE0;
+        --primary: #6FE3A0;
+        --text-primary: #E6EBE0;
+        --text-muted: #79836F;
       }
+      :root[data-accent="red"] { --primary: #C03D30; }
+      :root[data-accent="orange"] { --primary: #B4552D; }
+      :root[data-accent="yellow"] { --primary: #B08A25; }
+      :root[data-accent="green"] { --primary: #38A169; }
+      :root[data-accent="purple"] { --primary: #7C5CB8; }
+      :root[data-accent="pink"] { --primary: #B84A7E; }
+      :root[data-accent="gray"] { --primary: #6E7867; }
+      :root[data-theme="dark"][data-accent="red"] { --primary: #E8837C; }
+      :root[data-theme="dark"][data-accent="orange"] { --primary: #E0A458; }
+      :root[data-theme="dark"][data-accent="yellow"] { --primary: #E4C97A; }
+      :root[data-theme="dark"][data-accent="green"] { --primary: #9BCF7E; }
+      :root[data-theme="dark"][data-accent="purple"] { --primary: #B4A0E8; }
+      :root[data-theme="dark"][data-accent="pink"] { --primary: #E594BB; }
+      :root[data-theme="dark"][data-accent="gray"] { --primary: #9AA491; }
       body {
         background: inherit;
         color: inherit;
@@ -76,8 +96,8 @@
         padding: 20px;
       }
       :root.ai-workspace-native-window #root {
-        background: #FFFFFF;
-        border: 1px solid #E9E9E7;
+        background: #EFF1EC;
+        border: 1px solid #D6DBCF;
         border-radius: 12px;
         box-sizing: border-box;
         box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.10);
@@ -86,8 +106,8 @@
         width: 100%;
       }
       :root.ai-workspace-native-window[data-theme="dark"] #root {
-        background: #1F1E1B;
-        border-color: #34322D;
+        background: #0E120C;
+        border-color: #232A1F;
         box-shadow: 0 12px 26px rgba(0, 0, 0, 0.30), 0 1px 4px rgba(0, 0, 0, 0.22);
       }
     </style>
@@ -96,10 +116,13 @@
   <body>
     <script>
       (function () {
-        var key = 'tolaria-theme';
-        var legacyKey = 'laputa-theme';
-        var colorThemeKey = 'tolaria-color-theme';
-        var accentKey = 'tolaria-accent';
+        /* rhizome-boot-appearance */
+        var themeKey = 'rhizome-theme';
+        var legacyThemeKey = 'tolaria-theme';
+        var colorThemeKey = 'rhizome-color-theme';
+        var legacyColorThemeKey = 'tolaria-color-theme';
+        var accentKey = 'rhizome-accent';
+        var legacyAccentKey = 'tolaria-accent';
         var systemDarkQuery = '(prefers-color-scheme: dark)';
         // Mirrors COLOR_THEMES in src/lib/themeMode.ts — keep in sync. Fixed
         // themes pin the resolved mode to their polarity so there is no
@@ -152,13 +175,24 @@
             document.documentElement.removeAttribute('data-accent');
           }
         }
-        try {
-          var mode = normalizeTheme(localStorage.getItem(key));
-          if (mode === null) {
-            mode = normalizeTheme(localStorage.getItem(legacyKey));
-            if (mode !== null) localStorage.setItem(key, mode);
+        function readStored(currentKey, legacyKey, normalize) {
+          var current = normalize(localStorage.getItem(currentKey));
+          if (current !== null) return current;
+          var legacy = normalize(localStorage.getItem(legacyKey));
+          if (legacy === null) return null;
+          try {
+            localStorage.setItem(currentKey, legacy);
+          } catch {
+            // A read-only store still keeps the legacy value for this paint.
           }
-          applyTheme(mode, localStorage.getItem(colorThemeKey), localStorage.getItem(accentKey));
+          return legacy;
+        }
+        try {
+          applyTheme(
+            readStored(themeKey, legacyThemeKey, normalizeTheme),
+            readStored(colorThemeKey, legacyColorThemeKey, normalizeColorTheme),
+            readStored(accentKey, legacyAccentKey, normalizeAccent)
+          );
         } catch {
           applyTheme('light', null, null);
         }
@@ -217,6 +251,9 @@
           window.location.reload();
         }, startupTimeoutMs);
       })();
+    </script>
+    <script>
+      window.__rhizomeBootStartedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
     </script>
     <div id="root">
       <div id="rhizome-boot-splash" class="boot-splash" aria-busy="true" aria-label="Loading Rhizome" role="status">
