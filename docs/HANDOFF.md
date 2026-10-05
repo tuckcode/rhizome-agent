@@ -47,6 +47,7 @@ file.
 ---
 
 ## State
+**Origin:** Cursor Grok 4.6 · 2026-10-05 · #40 decided: Rhizome is a client of harnesses (ADR-0177). Docs only. [Handoff](plans/handoffs/2026-10-05-1855-cursor-grok-4-6-adr-0177-client.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · docs-only dead-link cleanup in ARCHITECTURE.md and HANDOFF.md. [Handoff](plans/handoffs/2026-10-05-0440-cursor-grok-4-6-dead-links.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · #23 first slice: app search opens a session hit at the transcript index. On-disk index and real-log dogfood remain. [Handoff](plans/handoffs/2026-10-05-0325-cursor-grok-4-6-issue-23-open-hit.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · #57: leftover `is_a:` never ran on the vault in use because `list_vault` skipped the migrator. Open-path rewrite added; dead Laputa/Tolaria env names dropped. [Handoff](plans/handoffs/2026-10-05-0320-cursor-grok-4-6-issue-57-is-a-open.md).
@@ -123,6 +124,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-10-05 · ADR-0177](plans/handoffs/2026-10-05-1855-cursor-grok-4-6-adr-0177-client.md) — #40 option 1: Rhizome is a client of harnesses. Docs only.
 - [2026-10-05 · dead links](plans/handoffs/2026-10-05-0440-cursor-grok-4-6-dead-links.md) — ARCHITECTURE.md and HANDOFF.md path drift only. No code.
 - [2026-10-05 · #23 open hit](plans/handoffs/2026-10-05-0325-cursor-grok-4-6-issue-23-open-hit.md) — search hit opens the session at `messageIndex`. On-disk index and real-log dogfood remain.
 - [2026-10-05 · #57 ghost-compat](plans/handoffs/2026-10-05-0320-cursor-grok-4-6-issue-57-is-a-open.md) — `is_a:` rewrite now runs on `list_vault` / `reload_vault`; leftover file is on Atticus's machine.
@@ -411,8 +413,9 @@ Closed C32, C35 and C41 moved to [`archive-closed-threads.md`](plans/handoffs/ar
   ADR-0168. Source reviews and divergence scoring are in `docs/plans/2026-08-24-*`.
   OpenHuman: TokenJuice compression path read 2026-08-26
   (`docs/design/token-routing-and-compression.md`); full stack still unread.
-  Composition (option 2) is written but unratified:
-  `docs/design/harness-composition.md`, pickup in `docs/NEXT.md` §1.
+  Composition (#40 options 2 and 3) is rejected by ADR-0177
+  (2026-10-05): Rhizome is a client of harnesses and does not own the loop.
+  Older `harness-composition.md` "option 2" used different numbering.
   **2026-09-19 metabolite (source + live skill, not a new runtime):**
   Hermes/Pi short-reply manners and a GUI-safe Node `PATH` live in
   `prime_vault_skill.rs`. Do not cite this as swapping Prime for Hermes.
