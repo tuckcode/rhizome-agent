@@ -634,7 +634,20 @@ fn transcript_from_lines<I: Iterator<Item = String>>(lines: I) -> Vec<PrimeTrans
 /// `..` segments and symlinks cannot walk out of the directory.
 pub(crate) fn ensure_inside_sessions_dir(path: &Path) -> Result<(), String> {
     let dir = sessions_dir().ok_or_else(|| "Could not resolve home directory".to_string())?;
-    let dir = std::fs::canonicalize(&dir).map_err(|e| format!("resolve sessions dir: {e}"))?;
+    ensure_inside_dir(path, &dir)
+}
+
+/// Same check as [`ensure_inside_sessions_dir`], with the sessions directory
+/// supplied so a missing dir can be tested without Prime having run.
+fn ensure_inside_dir(path: &Path, dir: &Path) -> Result<(), String> {
+    // `canonicalize` requires the path to exist. A machine that has never
+    // started Prime has no `~/.prime/agent/sessions`, and no file can be
+    // inside a directory that is not there. Refuse the same way as an
+    // outside-dir walk so callers do not see a resolve ENOENT.
+    if !dir.is_dir() {
+        return Err("Not a Prime session log".into());
+    }
+    let dir = std::fs::canonicalize(dir).map_err(|e| format!("resolve sessions dir: {e}"))?;
     let resolved = std::fs::canonicalize(path).map_err(|e| format!("resolve session log: {e}"))?;
 
     if !resolved.starts_with(&dir) {
@@ -1658,12 +1671,38 @@ mod tests {
         std::fs::write(&outside, r#"{"type":"message"}"#).expect("write");
 
         let error = read_transcript(&outside).expect_err("must refuse");
-        assert!(error.contains("Not a Prime session log"), "{error}");
+        assert!(
+            error.contains("Not a Prime session log"),
+            "outside-dir reads must refuse as a session-log check, not a resolve panic: {error}"
+        );
 
         // An ordinary file that merely exists is refused for the same reason.
         let secret = dir.path().join("id_rsa");
         std::fs::write(&secret, "PRIVATE KEY").expect("write");
         assert!(read_transcript(&secret).is_err());
+    }
+
+    /// Fresh CI runners (and any machine that has never started Prime) have
+    /// no `~/.prime/agent/sessions`. That must still be a refuse, not
+    /// `canonicalize` ENOENT.
+    #[test]
+    fn a_missing_sessions_dir_is_a_refuse_not_a_resolve_error() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let missing = tmp.path().join("sessions");
+        assert!(!missing.exists(), "sessions dir must be absent");
+
+        let outside = tmp.path().join("not-a-session.jsonl");
+        std::fs::write(&outside, r#"{"type":"message"}"#).expect("write");
+
+        let error = ensure_inside_dir(&outside, &missing).expect_err("must refuse");
+        assert!(
+            error.contains("Not a Prime session log"),
+            "missing sessions dir must refuse, not canonicalize: {error}"
+        );
+        assert!(
+            !error.contains("resolve sessions dir"),
+            "missing sessions dir leaked a resolve error: {error}"
+        );
     }
 
     #[test]
