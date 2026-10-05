@@ -460,7 +460,6 @@ fn ensure_root_type_definitions(vault_path: &Path) {
 }
 
 /// Repair config files: ensure `AGENTS.md` at vault root and root type definitions.
-/// Migrates legacy `config/agents.md` to root if present.
 /// Called by the "Repair Vault" command. Returns a status message.
 pub fn repair_config_files(vault_path: impl AsRef<str>) -> Result<String, String> {
     let vault = Path::new(vault_path.as_ref());

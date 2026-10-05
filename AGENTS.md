@@ -542,6 +542,8 @@ Durable Rhizome Agent rules. Kept here on purpose so
 **Learned** stays empty and continual-learning cannot bury them in
 mega-bullets. Do not move these into Learned.
 
+- Do not add a compatibility path for a stored value, filename, or
+  environment variable without first checking that an instance exists on disk.
 - List-row import (`import_jsonl` into the Prime session list)
   stays blocked until Atticus says `1`. Silence is not approval.
 - **Selective harness doctrine (ADR-0168) is design intent, not settled fact**,

@@ -124,6 +124,7 @@ pub async fn reload_vault(
     tokio::task::spawn_blocking(move || {
         let vault_path = Path::new(&path);
         vault::invalidate_cache(vault_path);
+        vault::migrate_is_a_on_open(vault_path);
         if let Err(e) = crate::vault::refresh_agents_md_if_stale(vault_path) {
             log::warn!("Failed to refresh AGENTS.md on vault open: {e}");
         }
