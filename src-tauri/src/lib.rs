@@ -1,3 +1,4 @@
+mod acp_client;
 mod ai_agent_processes;
 pub mod ai_agents;
 mod ai_model_tools;
