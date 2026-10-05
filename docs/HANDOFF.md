@@ -47,6 +47,7 @@ file.
 ---
 
 ## State
+**Origin:** Cursor Grok 4.6 · 2026-10-05 · #81: on-disk session-transcript index, Prime jsonl fixtures, and Sessions-group keyboard nav. Rhizome-owned memory (ADR-0177). [Handoff](plans/handoffs/2026-10-05-2015-cursor-grok-4-6-issue-81-session-index.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · #40 decided: Rhizome is a client of harnesses (ADR-0177). Docs only. [Handoff](plans/handoffs/2026-10-05-1855-cursor-grok-4-6-adr-0177-client.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · docs-only dead-link cleanup in ARCHITECTURE.md and HANDOFF.md. [Handoff](plans/handoffs/2026-10-05-0440-cursor-grok-4-6-dead-links.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · #23 first slice: app search opens a session hit at the transcript index. On-disk index and real-log dogfood remain. [Handoff](plans/handoffs/2026-10-05-0325-cursor-grok-4-6-issue-23-open-hit.md).
@@ -124,6 +125,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-10-05 · #81 session index](plans/handoffs/2026-10-05-2015-cursor-grok-4-6-issue-81-session-index.md) — on-disk transcript index, jsonl fixtures, Sessions keyboard nav.
 - [2026-10-05 · ADR-0177](plans/handoffs/2026-10-05-1855-cursor-grok-4-6-adr-0177-client.md) — #40 option 1: Rhizome is a client of harnesses. Docs only.
 - [2026-10-05 · dead links](plans/handoffs/2026-10-05-0440-cursor-grok-4-6-dead-links.md) — ARCHITECTURE.md and HANDOFF.md path drift only. No code.
 - [2026-10-05 · #23 open hit](plans/handoffs/2026-10-05-0325-cursor-grok-4-6-issue-23-open-hit.md) — search hit opens the session at `messageIndex`. On-disk index and real-log dogfood remain.
