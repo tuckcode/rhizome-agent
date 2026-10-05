@@ -33,6 +33,7 @@ import { useDisplayTimeZone } from '../hooks/useAppPreferences'
 import { formatMessageClock } from '../utils/messageTimestamp'
 import { presentWorkerStartFailure } from '../lib/primeWorkerStartError'
 import { toggleReadAloud, useReadAloud } from '../lib/readAloudPlayer'
+import { TranscriptHitAnchor } from './TranscriptHitAnchor'
 
 export interface AiAction {
   tool: string
@@ -63,6 +64,9 @@ export interface AiMessageProps {
   images?: PrimeImageContent[]
   /** Find-aid: green dot left of the first line of the newest assistant reply. */
   isLatestReply?: boolean
+  transcriptUserIndex?: number
+  transcriptAssistantIndex?: number
+  focusedTranscriptIndex?: number | null
   onFork?: (messageId: string) => void
   onOpenNote?: (path: string) => void
   onNavigateWikilink?: (target: string) => void
@@ -134,7 +138,7 @@ function UserBubble({ content, images, references, onOpenNote, createdAtMs }: {
   const displayTimeZone = useDisplayTimeZone()
   const clock = typeof createdAtMs === 'number' ? formatMessageClock(createdAtMs, displayTimeZone) : ''
   return (
-    <div className="flex flex-col items-end" style={{ marginBottom: 8 }}>
+    <>
       {/*
         Tinted with the accent rather than `--state-hover`, and carrying a
         2px accent rule down its right edge.
@@ -197,7 +201,7 @@ function UserBubble({ content, images, references, onOpenNote, createdAtMs }: {
           {clock}
         </time>
       ) : null}
-    </div>
+    </>
   )
 }
 
@@ -571,7 +575,7 @@ function ResponseBlock({
   }, [onPromoteToVault, text])
 
   return (
-    <div className="relative min-w-0 max-w-full" style={{ marginBottom: 4 }}>
+    <>
       {isLatestReply ? <LatestReplyMarker /> : null}
       <div
         className="group/ai-response min-w-0 max-w-full overflow-hidden"
@@ -600,7 +604,7 @@ function ResponseBlock({
           showReadAloud={!isStreaming && Boolean(text.trim()) && Boolean(messageId)}
         />
       </div>
-    </div>
+    </>
   )
 }
 
@@ -628,7 +632,7 @@ export function AiMessage(props: AiMessageProps) {
   return <ConversationMessage {...props} />
 }
 
-function ConversationMessage({ userMessage, images, references, locale = 'en', messageId, forkTargetId, reasoning, reasoningDone, actions, response, isStreaming, createdAtMs, isLatestReply = false, onFork, onOpenNote, onNavigateWikilink, onPromoteToVault, onRegenerate }: AiMessageProps) {
+function ConversationMessage({ userMessage, images, references, locale = 'en', messageId, forkTargetId, reasoning, reasoningDone, actions, response, isStreaming, createdAtMs, isLatestReply = false, transcriptUserIndex, transcriptAssistantIndex, focusedTranscriptIndex, onFork, onOpenNote, onNavigateWikilink, onPromoteToVault, onRegenerate }: AiMessageProps) {
   // Manual override: null = follow auto behavior, true/false = user forced
   const [userOverride, setUserOverride] = useState<boolean | null>(null)
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())
@@ -660,13 +664,20 @@ function ConversationMessage({ userMessage, images, references, locale = 'en', m
       data-no-drag
       style={{ marginBottom: 16 }}
     >
-      <UserBubble
-        content={userMessage}
-        images={images}
-        references={references}
-        onOpenNote={onOpenNote}
-        createdAtMs={createdAtMs}
-      />
+      <TranscriptHitAnchor
+        index={transcriptUserIndex}
+        focused={focusedTranscriptIndex}
+        className="flex flex-col items-end"
+        style={{ marginBottom: 8 }}
+      >
+        <UserBubble
+          content={userMessage}
+          images={images}
+          references={references}
+          onOpenNote={onOpenNote}
+          createdAtMs={createdAtMs}
+        />
+      </TranscriptHitAnchor>
       {reasoningVisible && reasoning ? (
         <ReasoningBlock
           locale={locale}
@@ -687,20 +698,27 @@ function ConversationMessage({ userMessage, images, references, locale = 'en', m
         />
       )}
       {response && (
-        <ResponseBlock
-          actions={actions}
-          locale={locale}
-          messageId={messageId}
-          forkTargetId={forkTargetId}
-          text={presentWorkerStartFailure(response) ?? response}
-          onFork={onFork}
-          onOpenNote={onOpenNote}
-          onNavigateWikilink={onNavigateWikilink}
-          onPromoteToVault={onPromoteToVault}
-          onRegenerate={onRegenerate}
-          isLatestReply={isLatestReply}
-          isStreaming={isStreaming}
-        />
+        <TranscriptHitAnchor
+          index={transcriptAssistantIndex}
+          focused={focusedTranscriptIndex}
+          className="relative min-w-0 max-w-full"
+          style={{ marginBottom: 4 }}
+        >
+          <ResponseBlock
+            actions={actions}
+            locale={locale}
+            messageId={messageId}
+            forkTargetId={forkTargetId}
+            text={presentWorkerStartFailure(response) ?? response}
+            onFork={onFork}
+            onOpenNote={onOpenNote}
+            onNavigateWikilink={onNavigateWikilink}
+            onPromoteToVault={onPromoteToVault}
+            onRegenerate={onRegenerate}
+            isLatestReply={isLatestReply}
+            isStreaming={isStreaming}
+          />
+        </TranscriptHitAnchor>
       )}
       {isStreaming && !response && <StreamingIndicator isLatestReply={isLatestReply} />}
     </div>

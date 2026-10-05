@@ -46,6 +46,8 @@ import {
   trackComposerReplyCompletionShown,
 } from '../lib/productAnalytics'
 import { workerStartFailureReason } from '../lib/primeWorkerStartError'
+import { afterPaint } from '../lib/sessionTranscriptHit'
+import { useScrollToTranscriptHit } from '../hooks/useScrollToTranscriptHit'
 
 interface AiPanelHeaderProps {
   agentLabel: string
@@ -84,6 +86,8 @@ interface AiPanelMessageHistoryProps {
   onPromoteToVault?: (text: string) => void
   onScrollStateChange?: (scrolled: boolean) => void
   hasContext: boolean
+  /** Transcript item index from a session search hit. Scrolls that turn into view. */
+  focusedTranscriptIndex?: number | null
 }
 
 interface AiPanelComposerProps {
@@ -687,6 +691,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
   onPromoteToVault,
   onScrollStateChange,
   hasContext,
+  focusedTranscriptIndex = null,
 }: AiPanelMessageHistoryProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
@@ -706,18 +711,26 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
     onScrollStateChange?.((element?.scrollTop ?? 0) > 1)
   }, [onScrollStateChange])
 
+  const scrolledToHit = useScrollToTranscriptHit(
+    containerRef,
+    focusedTranscriptIndex,
+    followingRef,
+    updateScrollState,
+    messages,
+  )
+
   useEffect(() => {
     void isActive
     // A longer response is output arriving on its own; a longer list is the
     // reader sending. Only the second one earns yanking them to the bottom.
     const sent = messages.length > messageCountRef.current
     messageCountRef.current = messages.length
-    if (sent) followingRef.current = true
+    if (scrolledToHit) return
 
+    if (sent) followingRef.current = true
     if (followingRef.current) endRef.current?.scrollIntoView({ behavior: 'smooth' })
-    if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(updateScrollState)
-    else updateScrollState()
-  }, [messages, isActive, updateScrollState])
+    afterPaint(updateScrollState)
+  }, [messages, isActive, scrolledToHit, updateScrollState])
 
   const latestReplyIndex = latestAssistantMessageIndex(messages)
 
@@ -749,6 +762,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
             locale={locale}
             isLatestReply={index === latestReplyIndex}
             messageId={message.id}
+            focusedTranscriptIndex={focusedTranscriptIndex}
             // ChatHome forks the Prime session and needs its entry id, which
             // only replayed turns carry; the AI workspace copies its own
             // conversation and uses the local id.

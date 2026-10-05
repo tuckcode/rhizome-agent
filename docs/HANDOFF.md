@@ -47,6 +47,7 @@ file.
 ---
 
 ## State
+**Origin:** Cursor Grok 4.6 · 2026-10-05 · #23 first slice: app search opens a session hit at the transcript index. On-disk index and real-log dogfood remain. [Handoff](plans/handoffs/2026-10-05-0325-cursor-grok-4-6-issue-23-open-hit.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · #57: leftover `is_a:` never ran on the vault in use because `list_vault` skipped the migrator. Open-path rewrite added; dead Laputa/Tolaria env names dropped. [Handoff](plans/handoffs/2026-10-05-0320-cursor-grok-4-6-issue-57-is-a-open.md).
 **Origin:** Claude Opus 5.5 · 2026-10-04 · vault-memory MCP fixes merged locally as `bf22be8`, not pushed. Claude Code's `rhizome` MCP now runs this checkout's `mcp-server` and release `rhizome-tool`. [Handoff](plans/handoffs/2026-10-04-1548-claude-opus-5-5-vault-memory-mcp.md).
 **Origin:** Astra through Hermes desktop · 2026-10-04 · browser design audit at `9a48e00`.
@@ -121,6 +122,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-10-05 · #23 open hit](plans/handoffs/2026-10-05-0325-cursor-grok-4-6-issue-23-open-hit.md) — search hit opens the session at `messageIndex`. On-disk index and real-log dogfood remain.
 - [2026-10-05 · #57 ghost-compat](plans/handoffs/2026-10-05-0320-cursor-grok-4-6-issue-57-is-a-open.md) — `is_a:` rewrite now runs on `list_vault` / `reload_vault`; leftover file is on Atticus's machine.
 - [2026-10-04 · Vault memory MCP](plans/handoffs/2026-10-04-1548-claude-opus-5-5-vault-memory-mcp.md) — one listing per vault, MCP server instructions, distill SKIP; merged `bf22be8`, not pushed.
 - [2026-10-04 · Split handoffs](plans/handoffs/2026-10-04-1423-astra-audit-continuation.md) — Astra owns audit completion and independent review. [Cursor assignment](plans/handoffs/2026-10-04-1422-astra-cursor-implementation.md) covers bounded fixes. No product edits started.

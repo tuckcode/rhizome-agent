@@ -338,6 +338,10 @@ export function SearchPanel({
     typeEntryMap,
   } = useSearchPanelController({ open, vaultPath, entries, onSelectNote, onClose })
   const sessionHits = useSessionTranscriptSearch(query, open)
+  const handleSelectSessionHit = useCallback((hit: SessionTranscriptHit) => {
+    onSelectSessionHit?.(hit)
+    onClose()
+  }, [onSelectSessionHit, onClose])
   const handleResultHover = useCallback((index: number, event: React.MouseEvent<HTMLDivElement>) => {
     if (shouldApplySearchResultHover(event)) setSelectedIndex(index)
   }, [setSelectedIndex])
@@ -392,7 +396,7 @@ export function SearchPanel({
           locale={locale}
           sessionHits={sessionHits}
           onSelect={handleSelect}
-          onSelectSessionHit={onSelectSessionHit}
+          onSelectSessionHit={handleSelectSessionHit}
           onHover={handleResultHover}
         />
       </div>

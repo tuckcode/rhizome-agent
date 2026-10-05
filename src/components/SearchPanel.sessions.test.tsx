@@ -54,6 +54,7 @@ const entry: VaultEntry = {
 describe('SearchPanel session transcripts', () => {
   it('shows a Sessions group for a transcript hit', async () => {
     const onSelectSessionHit = vi.fn()
+    const onClose = vi.fn()
     mockInvoke.mockImplementation(async (command: string) => {
       if (command === 'list_prime_session_summaries') {
         return [{ id: 'a', path: '/sessions/a.jsonl', title: 'Socket work', mtimeMs: 4 }]
@@ -77,8 +78,8 @@ describe('SearchPanel session transcripts', () => {
         vaultPath="/vault"
         entries={[entry]}
         onSelectNote={vi.fn()}
-        onClose={vi.fn()}
         onSelectSessionHit={onSelectSessionHit}
+        onClose={onClose}
       />,
     )
 
@@ -97,6 +98,7 @@ describe('SearchPanel session transcripts', () => {
       messageIndex: 0,
       role: 'assistant',
     }))
+    expect(onClose).toHaveBeenCalled()
 
     expect(trackEvent).toHaveBeenCalledWith('session_transcript_search', { hit_count: 1 })
     const properties = trackEvent.mock.calls.find((call) => call[0] === 'session_transcript_search')?.[1]

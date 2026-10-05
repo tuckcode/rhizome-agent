@@ -30,7 +30,7 @@ function HitBody({ hit }: { hit: SessionTranscriptHit }) {
  * Sessions group for the app search panel.
  *
  * A hit names the session and the transcript message index. Pass `onSelect`
- * to open it. This slice does not move the chat panel on its own.
+ * to open that session at the hit.
  */
 export function SessionTranscriptSearchResults({ hits, onSelect }: SessionTranscriptSearchResultsProps) {
   if (hits.length === 0) return null

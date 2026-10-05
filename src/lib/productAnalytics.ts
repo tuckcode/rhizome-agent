@@ -421,6 +421,15 @@ export function trackPrimeSessionOpened(age: PrimeSessionAge): void {
 }
 
 /**
+ * A session search hit was opened in the live chat (#23).
+ *
+ * Role only — the query, path, and excerpt are the user's words.
+ */
+export function trackSessionTranscriptHitOpened(role: 'user' | 'assistant'): void {
+  trackEvent('session_transcript_hit_opened', { role })
+}
+
+/**
  * A session was filed out of the list, or put back.
  *
  * Whether people curate this list at all is the question #30 left open: if

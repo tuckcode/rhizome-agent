@@ -26,6 +26,7 @@ import { QuickOpenPalette } from './components/QuickOpenPalette'
 import { CommandPalette } from './components/CommandPalette'
 import { KeyboardShortcutsDialog } from './components/KeyboardShortcutsDialog'
 import { SearchPanel } from './components/SearchPanel'
+import { requestOpenSessionTranscriptHit } from './lib/sessionTranscriptSearch'
 import { Toast } from './components/Toast'
 import { CommitDialog } from './components/CommitDialog'
 import { PulseView } from './components/PulseView'
@@ -2431,7 +2432,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           }}
           locale={appLocale}
         />
-        <SearchPanel open={dialogs.showSearch} vaultPath={resolvedPath} entries={visibleEntries} onSelectNote={notes.handleSelectNote} onClose={dialogs.closeSearch} locale={appLocale} />
+        <SearchPanel open={dialogs.showSearch} vaultPath={resolvedPath} entries={visibleEntries} onSelectNote={notes.handleSelectNote} onSelectSessionHit={(hit) => { handleRailSelectChat(); requestOpenSessionTranscriptHit(hit) }} onClose={dialogs.closeSearch} locale={appLocale} />
         <CreateTypeDialog open={dialogs.showCreateTypeDialog} onClose={dialogs.closeCreateType} onCreate={handleCreateType} />
         <NoteRetargetingDialogs
           dialogState={noteRetargetingUi.dialogState}

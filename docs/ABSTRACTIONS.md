@@ -845,6 +845,11 @@ interface SearchResult {
 - Real-time results as user types (300ms debounce)
 - Click result to open note in editor
 - Shows relevance score and snippet
+- Session transcript hits sit in a Sessions group beside note results. A hit
+  names the session and the transcript message index. Choosing it closes search
+  and opens that session at that point (`requestOpenSessionTranscriptHit` →
+  `usePrimeSessionSwitcher` → `useScrollToTranscriptHit`). The session list
+  filter stays metadata-only.
 
 The NoteList header search keeps its local title/snippet/property filtering for immediate scoped results, then augments the match set with `search_vault` hits from the visible workspace roots using the command's frontmatter-excluding search option. React stores only matching paths so body-only matches appear in the current list scope without a second content-read pass or rendering private matched text in note rows.
 

@@ -145,7 +145,8 @@ export function primeTranscriptToConversation(items: PrimeTranscriptItem[]): AiA
     return turn
   }
 
-  for (const item of items) {
+  for (let messageIndex = 0; messageIndex < items.length; messageIndex += 1) {
+    const item = items[messageIndex]
     if (item.kind === 'compaction') {
       // The summary is the only surviving record of the turns it replaced.
       // It rides on the marker, not as a fake assistant message — #18.
@@ -189,10 +190,12 @@ export function primeTranscriptToConversation(items: PrimeTranscriptItem[]): AiA
           // What `fork` branches from. Absent on live turns by necessity.
           primeEntryId: item.id,
           createdAtMs: normalizeMessageTimestampMs(message.timestamp),
+          transcriptUserIndex: messageIndex,
         })
         break
       case 'assistant': {
         const turn = current()
+        turn.transcriptAssistantIndex = messageIndex
         const reasoning = reasoningFrom(message)
         const actions = actionsFrom(item.tools, index++)
         if (reasoning) {

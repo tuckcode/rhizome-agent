@@ -82,6 +82,27 @@ export async function openSessionTranscriptHit(
   return { transcript, messageIndex: hit.messageIndex }
 }
 
+type SessionTranscriptHitListener = (hit: SessionTranscriptHit) => void
+
+const hitOpenListeners = new Set<SessionTranscriptHitListener>()
+
+/**
+ * Ask the live chat to open a search hit. SearchPanel lives in App;
+ * the session switcher lives in the chat panel. This is the seam.
+ */
+export function requestOpenSessionTranscriptHit(hit: SessionTranscriptHit): void {
+  for (const listener of hitOpenListeners) listener(hit)
+}
+
+export function subscribeSessionTranscriptHitOpen(
+  listener: SessionTranscriptHitListener,
+): () => void {
+  hitOpenListeners.add(listener)
+  return () => {
+    hitOpenListeners.delete(listener)
+  }
+}
+
 export function createSessionTranscriptIndex(reader: SessionTranscriptReader): SessionTranscriptIndex {
   const cache = new Map<string, CachedSession>()
   const inflight = new Map<string, InflightRead>()

@@ -33,8 +33,12 @@ describe('primeTranscriptToConversation', () => {
     expect(turns).toHaveLength(2)
     expect(turns[0].userMessage).toBe('first question')
     expect(turns[0].response).toBe('first answer')
+    expect(turns[0].transcriptUserIndex).toBe(0)
+    expect(turns[0].transcriptAssistantIndex).toBe(1)
     expect(turns[1].userMessage).toBe('second question')
     expect(turns[1].response).toBe('second answer')
+    expect(turns[1].transcriptUserIndex).toBe(2)
+    expect(turns[1].transcriptAssistantIndex).toBe(3)
   })
 
   it('shows the latest typed line when the log stored a conversation_history prompt', () => {
