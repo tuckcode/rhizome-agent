@@ -5,7 +5,7 @@ description: >-
   #81 first slice: on-disk session-transcript index, Prime jsonl fixtures,
   and keyboard move through the Sessions search group. Rhizome-owned
   memory (ADR-0177). Did not close #81.
-commits: e17d074..20883c8
+commits: e17d074..3ea6b77
 ---
 
 # #81 — on-disk session index, fixtures, Sessions keyboard
