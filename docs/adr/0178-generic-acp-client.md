@@ -43,9 +43,12 @@ proven on a real Hermes install.**
   (or Hermes `allow_once`). Power User also asks Hermes for session mode
   `accept_edits`. There is no new per-request card in this slice — the
   existing toggle is the policy, and the decision is shown as a tool event.
-- Session resume uses `session/resume` or `session/load` when the agent
-  advertises them. Replay during load is swallowed so Rhizome's own
-  transcript is not duplicated.
+- Session restore prefers `session/load` when advertised. Hermes
+  `session/resume` mints a new session when the id is missing and still
+  returns success, so a later prompt on the remembered id fails. Resume is
+  used only when load is not advertised. Replay during load is swallowed
+  so Rhizome's own transcript is not duplicated. A failed restore keeps
+  the full composed prompt (persona + history) on `session/new`.
 - Do not fork or vendor Hermes code. Do not add the official
   `agent-client-protocol` crate for this surface: the methods we speak are
   small, and a new dependency is not justified.

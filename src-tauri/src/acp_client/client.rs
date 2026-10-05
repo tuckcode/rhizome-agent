@@ -29,7 +29,12 @@ pub(crate) struct AcpLaunch {
 #[derive(Debug, Clone)]
 pub(crate) struct AcpSessionRequest {
     pub cwd: String,
+    /// Full composed prompt, including persona and conversation history.
+    /// Used when this turn opens a new session.
     pub prompt: String,
+    /// Latest user line only. Used when resume/load actually succeeded so
+    /// the harness history is not duplicated.
+    pub resumed_prompt: Option<String>,
     pub resume_session_id: Option<String>,
     pub mcp_servers: Vec<Value>,
     pub permission_mode: AiAgentPermissionMode,
@@ -135,7 +140,7 @@ where
 
     fn run_turn(&mut self, request: &AcpSessionRequest) -> Result<String, String> {
         self.handshake()?;
-        let session_id = self.open_session(request)?;
+        let (session_id, resumed) = self.open_session(request)?;
         (self.emit)(AiAgentStreamEvent::Init {
             session_id: session_id.clone(),
         });
@@ -143,16 +148,17 @@ where
             let _ = self.call("session/set_mode", set_mode_params(&session_id, mode_id));
         }
         self.phase = EmitPhase::Live;
-        self.call(
-            "session/prompt",
-            prompt_params(&session_id, &request.prompt),
-        )?;
-        if self.capabilities.can_close() {
-            let _ = self.call(
-                "session/close",
-                serde_json::json!({ "sessionId": session_id }),
-            );
-        }
+        let prompt = if resumed {
+            request
+                .resumed_prompt
+                .as_deref()
+                .unwrap_or(request.prompt.as_str())
+        } else {
+            request.prompt.as_str()
+        };
+        self.call("session/prompt", prompt_params(&session_id, prompt))?;
+        // Do not session/close. The child exits after this turn. Close on an
+        // agent that advertises it can drop the row we need for the next load.
         (self.emit)(AiAgentStreamEvent::Done);
         Ok(session_id)
     }
@@ -172,7 +178,7 @@ where
         Ok(())
     }
 
-    fn open_session(&mut self, request: &AcpSessionRequest) -> Result<String, String> {
+    fn open_session(&mut self, request: &AcpSessionRequest) -> Result<(String, bool), String> {
         if let Some(resume_id) = request
             .resume_session_id
             .as_deref()
@@ -180,7 +186,7 @@ where
             .filter(|id| !id.is_empty())
         {
             if self.try_resume(resume_id, request) {
-                return Ok(resume_id.to_string());
+                return Ok((resume_id.to_string(), true));
             }
         }
 
@@ -191,16 +197,19 @@ where
         )?;
         let parsed: NewSessionResult = serde_json::from_value(result)
             .map_err(|error| format!("ACP session/new result was not valid: {error}"))?;
-        Ok(parsed.session_id)
+        Ok((parsed.session_id, false))
     }
 
     fn try_resume(&mut self, session_id: &str, request: &AcpSessionRequest) -> bool {
         self.phase = EmitPhase::Silent;
         let params = load_session_params(session_id, &request.cwd, &request.mcp_servers);
-        if self.capabilities.can_resume() && self.call("session/resume", params.clone()).is_ok() {
-            return true;
+        // Prefer session/load. Hermes session/resume mints a new session when
+        // the id is missing and still returns success, so a later prompt on
+        // the remembered id fails.
+        if self.capabilities.load_session {
+            return call_restored_session(self.call("session/load", params));
         }
-        self.capabilities.load_session && self.call("session/load", params).is_ok()
+        self.capabilities.can_resume() && call_restored_session(self.call("session/resume", params))
     }
 
     fn call(&mut self, method: &str, params: Value) -> Result<Value, String> {
@@ -360,6 +369,14 @@ fn json_rpc_id_matches(incoming: &Option<Value>, expected: u64) -> bool {
         Some(Value::Number(number)) => number.as_u64() == Some(expected),
         Some(Value::String(text)) => text.parse::<u64>().ok() == Some(expected),
         _ => false,
+    }
+}
+
+fn call_restored_session(result: Result<Value, String>) -> bool {
+    match result {
+        Ok(Value::Null) => false,
+        Ok(_) => true,
+        Err(_) => false,
     }
 }
 

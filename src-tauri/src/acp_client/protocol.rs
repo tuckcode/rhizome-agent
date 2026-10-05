@@ -70,6 +70,7 @@ impl AgentCapabilities {
             .is_some_and(|caps| caps.resume.is_some())
     }
 
+    #[allow(dead_code)]
     pub(crate) fn can_close(&self) -> bool {
         self.session_capabilities
             .as_ref()

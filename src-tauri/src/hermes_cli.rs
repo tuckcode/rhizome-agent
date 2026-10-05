@@ -95,11 +95,9 @@ where
     let prompt =
         crate::cli_agent_runtime::build_prompt(&request.message, request.system_prompt.as_deref());
     let resume_session_id = resume_session_id_for(&request.vault_path, &prompt);
-    let prompt = if resume_session_id.is_some() {
-        crate::cli_agent_runtime::spoken_user_request(&prompt)
-    } else {
-        prompt
-    };
+    let resumed_prompt = resume_session_id
+        .as_ref()
+        .map(|_| crate::cli_agent_runtime::spoken_user_request(&prompt));
 
     let mut args: Vec<String> = launch
         .prefix_args
@@ -116,6 +114,7 @@ where
     let session_request = AcpSessionRequest {
         cwd: absolute_vault_cwd(&request.vault_path),
         prompt,
+        resumed_prompt,
         resume_session_id,
         mcp_servers: rhizome_mcp_servers(&request),
         permission_mode: request.permission_mode,

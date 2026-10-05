@@ -18,7 +18,10 @@ commits: 744e938
 - `hermes chat --quiet --source tool` remains the automatic fallback.
 - Permission / edit-approval go through the existing Limited tools /
   Power User policy. Decisions appear as tool events. No new approval card.
-- Session resume via `session/resume` or `session/load` when advertised.
+- Session restore prefers `session/load`. A failed restore keeps the full
+  composed prompt on `session/new` (do not strip history before the load
+  result is known). Hermes `session/resume` is not used when load exists:
+  a missing id mints a new session and still returns success.
 
 ## Tests
 

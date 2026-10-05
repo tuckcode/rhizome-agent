@@ -35,6 +35,7 @@ const loadReplay = process.env.ACP_FAKE_LOAD_REPLAY === '1'
 const resume = process.env.ACP_FAKE_RESUME === '1'
 const permStyle = process.env.ACP_FAKE_PERM_STYLE || 'hermes'
 const rejectUnknown = process.env.ACP_FAKE_UNKNOWN_VERSION === '1'
+const echoPrompt = process.env.ACP_FAKE_ECHO_PROMPT === '1'
 
 let nextClientId = 1000
 const pending = new Map()
@@ -71,6 +72,7 @@ function permissionOptions() {
 
 function handlePrompt(id, params) {
   const currentSession = params.sessionId
+  const echoed = echoPrompt ? promptText(params) : ''
   if (thought) {
     notify('session/update', {
       sessionId: currentSession,
@@ -97,7 +99,7 @@ function handlePrompt(id, params) {
   if (wantPermission) {
     const reqId = nextClientId
     nextClientId += 1
-    pending.set(String(reqId), () => finishPrompt(id, currentSession))
+    pending.set(String(reqId), () => finishPrompt(id, currentSession, echoed))
     send({
       jsonrpc: '2.0',
       id: reqId,
@@ -114,15 +116,22 @@ function handlePrompt(id, params) {
     })
     return
   }
-  finishPrompt(id, currentSession)
+  finishPrompt(id, currentSession, echoed)
 }
 
-function finishPrompt(id, currentSession) {
+function promptText(params) {
+  const blocks = params && Array.isArray(params.prompt) ? params.prompt : []
+  return blocks
+    .map((block) => (block && typeof block.text === 'string' ? block.text : ''))
+    .join('')
+}
+
+function finishPrompt(id, currentSession, echoed) {
   notify('session/update', {
     sessionId: currentSession,
     update: {
       sessionUpdate: 'agent_message_chunk',
-      content: { type: 'text', text: reply },
+      content: { type: 'text', text: echoed || reply },
     },
   })
   if (tool) {

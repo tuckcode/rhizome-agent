@@ -19,6 +19,7 @@ fn request(permission_mode: AiAgentPermissionMode) -> AcpSessionRequest {
     AcpSessionRequest {
         cwd: std::env::temp_dir().to_string_lossy().into_owned(),
         prompt: "Summarize the note".into(),
+        resumed_prompt: None,
         resume_session_id: None,
         mcp_servers: Vec::new(),
         permission_mode,
@@ -129,6 +130,7 @@ fn acp_resume_does_not_replay_history_into_the_stream() {
 
     let request = AcpSessionRequest {
         resume_session_id: Some("sess_existing".into()),
+        resumed_prompt: Some("only the latest ask".into()),
         ..request(AiAgentPermissionMode::Safe)
     };
     let (result, events) = run(launch, request);
@@ -139,6 +141,32 @@ fn acp_resume_does_not_replay_history_into_the_stream() {
         AiAgentStreamEvent::TextDelta { text } => text != "replayed-should-be-silent",
         _ => true,
     }));
+}
+
+#[test]
+fn failed_resume_keeps_full_prompt_on_the_new_session() {
+    let mut launch = launch();
+    launch
+        .extra_env
+        .push(("ACP_FAKE_FAIL_LOAD".into(), "1".into()));
+    launch
+        .extra_env
+        .push(("ACP_FAKE_ECHO_PROMPT".into(), "1".into()));
+
+    let history = format!(
+        "System instructions:\nrules\n\nUser request:\n<{}>\n[user]: first\n[assistant]: ok\n[user]: later ask\n</{}>\n",
+        "conversation_history", "conversation_history"
+    );
+    let request = AcpSessionRequest {
+        prompt: history.clone(),
+        resumed_prompt: Some("later ask".into()),
+        resume_session_id: Some("sess_missing".into()),
+        ..request(AiAgentPermissionMode::Safe)
+    };
+    let (result, events) = run(launch, request);
+
+    assert_eq!(result.unwrap(), "sess_fake_1");
+    assert_eq!(texts(&events), [history.as_str()]);
 }
 
 #[test]
