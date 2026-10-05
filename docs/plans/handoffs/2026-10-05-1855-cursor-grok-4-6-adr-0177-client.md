@@ -4,7 +4,7 @@ model: Grok 4.6 (Cursor)
 description: >-
   ADR-0177: Rhizome is a client of harnesses. Atticus / knispo room
   consensus on #40 option 1. Docs only; no app code.
-commits: pending
+commits: e004140
 ---
 
 # ADR-0177 — Rhizome is a client of harnesses
