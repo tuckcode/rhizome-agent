@@ -106,8 +106,6 @@ The main window starts a native watcher for the active vault through `start_vaul
 
 Vault opening is allowed to render the main app shell while the entry index is still in flight. Initial startup hydration uses the cached/incremental `list_vault` path; the main window falls back to `reload_vault` only when that cached startup result is empty, while explicit refresh paths still force a fresh reload. Clean same-commit cache hits reuse stored entry timestamps without running a full `git log` date scan, so warm startup does not scale with the vault's complete history. `useVaultLoader` keeps `isLoading` true until entries are ready, but folders and saved views load independently so the sidebar can become useful before the note index completes. The status bar uses the vault activity badge during this initial indexing state, while command-palette and editor-shell interactions remain mounted instead of being hidden behind the full app skeleton. The full skeleton is reserved for app-level capability checks such as the initial Git-state probe.
 
-Large-vault reproduction and keyboard QA steps live in [LARGE-VAULT-LOADING-QA.md](./LARGE-VAULT-LOADING-QA.md).
-
 #### Mounted Workspaces
 
 The registered vault list can act as a mounted-workspace set. `useVaultSwitcher` persists each workspace's installation-local identity (`label`, stable `alias`, color, mount flag) and the default destination for newly created notes in `vaults.json` under Tolaria's app config directory (`$XDG_CONFIG_HOME/com.tolaria.app/`, defaulting to `$HOME/.config/com.tolaria.app/` on Unix platforms). `useVaultLoader` scans every available mounted workspace and annotates each `VaultEntry` with provenance before React consumes the combined graph. The default workspace is the write target for new notes and Type documents; it is not the only active vault when multiple workspaces are enabled.
@@ -1798,7 +1796,7 @@ The desktop MCP WebSocket bridge is intentionally local-only. `mcp-server/ws-bri
 
 ## Mock Layer
 
-When running outside Tauri (browser at `localhost:5173`), `src/mock-tauri.ts` provides a transparent mock layer:
+When running outside Tauri (browser at `localhost:5173`), `src/mock-tauri/` provides a transparent mock layer:
 
 ```typescript
 if (isTauri()) {
@@ -2097,6 +2095,6 @@ Features that work on both platforms without changes:
 - Settings persistence
 - Vault list management
 
-**Capabilities:** `src-tauri/capabilities/default.json` targets desktop; `mobile.json` targets iOS/Android with a minimal permission set.
+**Capabilities:** `src-tauri/capabilities/default.json` targets desktop. The old mobile capability file was removed with the unused iOS leftovers.
 
-**Detailed feasibility report:** `docs/IPAD-PROTOTYPE.md`
+**iPad prototype decision:** `docs/adr/0005-tauri-ios-for-ipad.md`
