@@ -114,7 +114,7 @@ export function buildPromotedNoteMarkdown(
   const frontmatter = [
     '---',
     `title: ${yamlDoubleQuoted(title)}`,
-    'is_a: Note',
+    'type: Note',
     `created: ${date}`,
     'source: prime-chat-promote',
     ...(sessionValue ? [`session: ${yamlDoubleQuoted(sessionValue)}`] : []),

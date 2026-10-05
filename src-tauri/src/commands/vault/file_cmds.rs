@@ -401,6 +401,27 @@ mod tests {
         assert!(folders.iter().any(|folder| folder.name == "Projects"));
     }
 
+    #[tokio::test]
+    async fn list_vault_rewrites_is_a_on_a_cold_open() {
+        let dir = TempDir::new().unwrap();
+        let root = vault_root(&dir);
+        let leftover = note_path(&dir, "session-log.md");
+        fs::write(&leftover, "---\nis_a: Note\n---\n# Leftover\n").unwrap();
+
+        let entries = list_vault(root).await.unwrap();
+        let content = fs::read_to_string(&leftover).unwrap();
+
+        assert!(
+            content.contains("type: Note"),
+            "list_vault must rewrite leftover is_a: on a cold open"
+        );
+        assert!(
+            !content.contains("is_a:"),
+            "migrated note must not keep is_a:"
+        );
+        assert_eq!(entries[0].is_a.as_deref(), Some("Note"));
+    }
+
     #[test]
     fn commands_reject_paths_outside_requested_vault() {
         let vault = TempDir::new().unwrap();

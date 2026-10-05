@@ -258,7 +258,7 @@ mod tests {
 
         let cache_dir = tempfile::TempDir::new().unwrap();
         std::env::set_var(
-            "LAPUTA_CACHE_DIR",
+            "RHIZOME_CACHE_DIR",
             cache_dir.path().to_string_lossy().as_ref(),
         );
 

@@ -112,9 +112,9 @@ fn vault_path_hash(vault: &Path) -> String {
     format!("{:016x}", hasher.finish())
 }
 
-/// Return the cache directory. Override with `LAPUTA_CACHE_DIR` env var (for tests).
+/// Return the cache directory. Override with `RHIZOME_CACHE_DIR` env var (for tests).
 fn cache_dir() -> PathBuf {
-    if let Ok(dir) = std::env::var("LAPUTA_CACHE_DIR") {
+    if let Ok(dir) = std::env::var("RHIZOME_CACHE_DIR") {
         return PathBuf::from(dir);
     }
     dirs::home_dir()
@@ -139,7 +139,6 @@ fn cache_temp_path(final_path: &Path) -> PathBuf {
     final_path.with_file_name(format!("{file_name}.{}.tmp", Uuid::new_v4()))
 }
 
-/// Legacy cache path inside the vault directory (pre-migration).
 fn git_head_hash(vault: &Path) -> Option<String> {
     run_git(vault, &["rev-parse", "HEAD"]).map(|s| s.trim().to_string())
 }
@@ -661,7 +660,10 @@ pub fn scan_vault_cached(vault_path: &Path) -> Result<Vec<VaultEntry>, String> {
 
     let current_hash = match git_head_hash(vault_path) {
         Some(h) => h,
-        None => return scan_vault(vault_path, &HashMap::new()),
+        None => {
+            super::migrate_is_a_on_open(vault_path);
+            return scan_vault(vault_path, &HashMap::new());
+        }
     };
 
     match load_cache(vault_path) {
@@ -673,6 +675,7 @@ pub fn scan_vault_cached(vault_path: &Path) -> Result<Vec<VaultEntry>, String> {
         }
         CacheLoadState::Loaded(loaded_cache) => {
             if cache_requires_full_rescan(&loaded_cache.cache, vault_path) {
+                super::migrate_is_a_on_open(vault_path);
                 let git_dates = load_git_dates(vault_path);
                 return scan_and_cache_full(
                     vault_path,
@@ -696,6 +699,7 @@ pub fn scan_vault_cached(vault_path: &Path) -> Result<Vec<VaultEntry>, String> {
     }
 
     // No cache — full scan and write cache
+    super::migrate_is_a_on_open(vault_path);
     let git_dates = load_git_dates(vault_path);
     scan_and_cache_full(vault_path, &git_dates, current_hash, None)
 }
@@ -707,14 +711,14 @@ mod tests {
     use std::sync::Mutex;
     use tempfile::TempDir;
 
-    /// Serialize all cache tests that mutate the LAPUTA_CACHE_DIR env var.
+    /// Serialize all cache tests that mutate the RHIZOME_CACHE_DIR env var.
     /// `std::env::set_var` is process-global, so parallel tests would race.
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     /// Set up a temporary cache directory for test isolation.
     /// Caller MUST hold `ENV_LOCK` for the duration of the test.
     fn set_test_cache_dir(dir: &Path) {
-        std::env::set_var("LAPUTA_CACHE_DIR", dir.to_string_lossy().as_ref());
+        std::env::set_var("RHIZOME_CACHE_DIR", dir.to_string_lossy().as_ref());
     }
 
     fn create_test_file(dir: &Path, name: &str, content: &str) {
@@ -753,6 +757,36 @@ mod tests {
         let vault_tmp = TempDir::new().unwrap();
         init_git_repo(vault_tmp.path());
         (lock, cache_tmp, vault_tmp)
+    }
+
+    #[test]
+    fn cold_scan_rewrites_is_a_and_warm_hit_does_not_walk() {
+        let (_lock, _cache_tmp, vault_tmp) = setup_git_vault();
+        let vault = vault_tmp.path();
+        create_test_file(vault, "leftover.md", "---\nis_a: Note\n---\n# Leftover\n");
+        git_add_commit(vault, "init");
+
+        let entries = scan_vault_cached(vault).unwrap();
+        let leftover = fs::read_to_string(vault.join("leftover.md")).unwrap();
+        assert!(
+            leftover.contains("type: Note") && !leftover.contains("is_a:"),
+            "cold scan must rewrite leftover is_a:"
+        );
+        assert!(
+            entries
+                .iter()
+                .any(|entry| entry.is_a.as_deref() == Some("Note")),
+            "cold scan must still parse the leftover note as Note"
+        );
+
+        create_test_file(vault, "planted.md", "---\nis_a: Topic\n---\n# Planted\n");
+        let _ = scan_vault_cached(vault).unwrap();
+        let planted = fs::read_to_string(vault.join("planted.md")).unwrap();
+        assert!(
+            planted.contains("is_a: Topic"),
+            "warm cache hit must not walk the vault to rewrite is_a:"
+        );
+        assert!(!planted.contains("type: Topic"));
     }
 
     fn git_add_commit(vault: &Path, msg: &str) {

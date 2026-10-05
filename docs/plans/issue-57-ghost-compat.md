@@ -1,61 +1,55 @@
 # #57 — Delete code for users who do not exist
 
-**Status:** spec. Do not mass-delete tonight.
-**Stamped 15:59:** still no mass-delete. Live `~/Laputa` is data, not a ghost.  
-**Origin:** Cursor Grok 4.6 · 2026-09-13 · GitHub [#57](https://github.com/tuckcode/rhizome-agent/issues/57)  
-**Pickup:** [`NEXT.md`](../NEXT.md) First-run table. Issue body is 2026-08-29; some of it already landed.
+**Status:** implemented in `cursor/issue-57-ghost-compat-3319`.
+**Origin:** Cursor Grok 4.6 · 2026-10-05 · GitHub [#57](https://github.com/tuckcode/rhizome-agent/issues/57)
 
 ---
 
-## Plain answer
+## `is_a:` root cause (verified in this tree)
 
-Old product names (Laputa, Tolaria) still sit in this tree. Some of that is **dead**. Some of it is **Atticus’s live data** under an old folder name. Deleting the second kind breaks the app he already uses.
+`run_startup_tasks_for_vault` is gone. The rewriter `migrate_is_a_to_type` still
+works, but until this slice it ran only from **Repair Vault**. Normal open uses
+`list_vault` (cached scan). `reload_vault` is the empty-cache / force-refresh
+path. That is why a leftover `is_a: Note` in a live vault could sit for days.
 
----
+The leftover file named in the issue lives on Atticus's machine, not in this
+repo. Do not invent vault content. The next open of that vault rewrites it.
 
-## Already gone (do not re-delete)
-
-- `migrate_views` — `view_migration.rs` is now only `is_view_definition_file`. Comment names #57.
-- `config/agents.md` → root `AGENTS.md` move — repair leaves the old file where it is (`test_repair_config_files_leaves_a_legacy_file_where_it_is`).
-- Launch no longer migrates `~/Laputa` (PR #62 / Area E).
-- `migrate_legacy_cache` as a function — gone. The comment “Legacy cache path inside the vault” in `cache.rs` is leftover prose.
-
----
-
-## Still live — and it is his data, not ghosts
-
-| Thing | Why keep until renamed |
-|---|---|
-| `LAPUTA_CACHE_DIR` + `~/.laputa/cache` | **This is the current cache**, not a one-shot migrate. |
-| `com.tolaria.app` / `com.laputa.app` in `app_config.rs` | Settings lookup still walks those folders. Check disk before dropping. |
-| `@@TOLARIA_*` tokens in notes | Live markdown format. Not #57. |
-
-Do not rename those in the same commit as deletions.
+`migrate_is_a_on_open` runs on a full rescan (`scan_vault_cached` with no
+reusable cache) and from `reload_vault` / Repair. A warm cache hit does not
+walk the vault again. Parser aliases for `is_a` stay so notes still read
+until that open.
 
 ---
 
-## Still live — safe to delete after a disk check
+## Already gone before this slice
 
-1. **`LAPUTA_` / `TOLARIA_` Getting Started env aliases** — dropped 2026-09-18. Only `RHIZOME_GETTING_STARTED_REPO_URL` is read. Neither old name was set on this machine.
-2. **Test-only `TOLARIA_*` env names** — renamed 2026-09-18 in `shell_env.rs`, Claude/Codex stdin probes, and the OpenCode config fixture. Note tokens (`@@TOLARIA_`) and the live cache path were not touched.
-3. **Settings shape migrations** — disk check 2026-09-18: `~/.config/com.tolaria.app/settings.json` **exists** (agent `hermes`, no `release_channel`, no `ui_language`). `~/.config/com.rhizome.app/settings.json` also exists, so the preferred path wins when both are present. **Do not drop** `LEGACY_APP_CONFIG_DIRS` (`com.tolaria.app`, `com.laputa.app`). `gemini` → `antigravity` stays (ADR-0147). `beta` is already ignored by `normalize_release_channel`. `zh-Hans` is localization (C18). `gho_` is redaction, not a settings migration.
+- `migrate_legacy_cache` (`.laputa-cache.json`)
+- `migrate_agents_md` / `migrate_legacy_agents_file`
+- `migrate_views` directory move (`view_migration.rs` is only `is_view_definition_file`)
 
----
+## Removed or retargeted here
 
-## `is_a:` → `type:` — the leftover bug, already answered
+- `LAPUTA_CACHE_DIR` → `RHIZOME_CACHE_DIR` (test override). Default dir stays
+  `~/.laputa/cache` — that is live data, not a ghost path.
+- `TOLARIA_APPIMAGE_WAYLAND_PRELOAD_ATTEMPTED` → `RHIZOME_APPIMAGE_WAYLAND_PRELOAD_ATTEMPTED`
+- Getting Started already ignores `LAPUTA_` / `TOLARIA_` repo URL names
+- New notes write `type: Note` (`promoteChatToVault`, vault skill example)
 
-`migrate_is_a_to_type` runs only on **Repair Vault**, not on vault open (`lifecycle_cmds.rs`). That is why `agents/claude/session-logs/2026-08-26 - Rhizome Agent live check and Mycelium skin.md` still has `is_a: Note`.
+## Settings migrations — kept
 
-**Do not delete this migrator yet.** Next slice:
+This VM does not hold Atticus's settings. Prior disk check (2026-09-18):
+`com.tolaria.app/settings.json` still exists beside `com.rhizome.app`. Kept:
 
-1. Convert that one vault file (or run Repair on the attached vault).
-2. Confirm `find` across the real vault + demos returns zero `is_a:`.
-3. Then delete `vault/migration.rs` and the Repair call.
+- `gemini` → `antigravity` (ADR-0147)
+- `normalize_release_channel` (current validator; only `alpha` is a channel)
+- UI-language alias table (current locale normalizer; C18 is English-only product)
+- `gho_` in settings tests is ignored `github_token` load, not a live token path
 
----
+`LEGACY_APP_CONFIG_DIRS` (`com.tolaria.app`, `com.laputa.app`) stays.
 
-## AGENTS.md line to add in the same commit as the first real deletion
+## Still live — not ghosts
 
-Do not add a compatibility path for a stored value, filename, or env var without first checking whether any instance exists on disk.
-
-**Done when:** GitHub #57 can close with a comment listing what was deleted vs what is still Atticus’s live path. Not a drive-by knip sweep.
+- `~/.laputa/cache` default cache directory
+- `@@TOLARIA_*` note tokens
+- Frontmatter `is_a` *read* aliases until the one leftover file is converted
