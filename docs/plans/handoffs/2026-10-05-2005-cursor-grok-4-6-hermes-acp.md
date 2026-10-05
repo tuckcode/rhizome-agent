@@ -4,7 +4,7 @@ model: Grok 4.6 (Cursor)
 description: >-
   Generic ACP client plus Hermes adapter. One-shot chat stays as
   fallback. Fixture-tested; not run against real Hermes.
-commits: 744e938
+commits: 744e938..eb884d6
 ---
 
 # Hermes ACP client (ADR-0178)
