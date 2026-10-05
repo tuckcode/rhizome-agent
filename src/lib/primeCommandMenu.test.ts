@@ -28,7 +28,7 @@ function reported(
     source: 'skill',
     ...rest,
     sourceInfo: {
-      path: '/Users/dtc/.agents/skills/ask-matt/SKILL.md',
+      path: '/Users/jdoe/.agents/skills/ask-matt/SKILL.md',
       source: 'auto',
       scope: 'user',
       origin: 'top-level',
@@ -43,7 +43,7 @@ describe('selectCommandMenuEntries', () => {
       reported({ name: 'skill:ask-matt' }),
       reported({
         name: 'skill:tdd',
-        sourceInfo: { path: '/Users/dtc/.agents/skills/tdd/SKILL.md', source: 'auto', scope: 'user' },
+        sourceInfo: { path: '/Users/jdoe/.agents/skills/tdd/SKILL.md', source: 'auto', scope: 'user' },
       }),
     ])
 
@@ -56,7 +56,7 @@ describe('selectCommandMenuEntries', () => {
         name: 'skill:goal',
         description: 'Set a persistent objective',
         sourceInfo: {
-          path: '/Users/dtc/.local/lib/node_modules/prime-agent/dist/skills/goal/SKILL.md',
+          path: '/Users/jdoe/.local/lib/node_modules/prime-agent/dist/skills/goal/SKILL.md',
           source: 'builtin',
           scope: 'user',
         },
@@ -79,7 +79,7 @@ describe('selectCommandMenuEntries', () => {
         name: 'skill:rhizome-vault',
         description: 'Call Rhizome vault tools',
         sourceInfo: {
-          path: '/Users/dtc/Documents/Rhizome Vault/.prime/agent/skills/rhizome-vault/SKILL.md',
+          path: '/Users/jdoe/Documents/Rhizome Vault/.prime/agent/skills/rhizome-vault/SKILL.md',
           source: 'auto',
           scope: 'project',
           origin: 'top-level',

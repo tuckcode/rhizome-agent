@@ -299,8 +299,8 @@ Continue the conversation. Respond only to the latest [user] message.`
 })
 
 describe('primeSessionPlace', () => {
-  const VAULT = '/Users/dtc/Documents/Rhizome Vault'
-  const HOME = '/Users/dtc'
+  const VAULT = '/Users/jdoe/Documents/Rhizome Vault'
+  const HOME = '/Users/jdoe'
 
   /**
    * The list shows every log in `~/.prime/agent/sessions` regardless of which
@@ -313,7 +313,7 @@ describe('primeSessionPlace', () => {
    * no client field at all. Where it ran is the honest answer.
    */
   it('names the directory a session ran in', () => {
-    expect(primeSessionPlace(session({ cwd: '/Users/dtc/code/projects/rhizome-agent' }), VAULT))
+    expect(primeSessionPlace(session({ cwd: '/Users/jdoe/code/projects/rhizome-agent' }), VAULT))
       .toBe('rhizome-agent')
     expect(primeSessionPlace(session({ cwd: '/private/tmp' }), VAULT)).toBe('tmp')
   })
@@ -351,12 +351,12 @@ describe('primeSessionPlace', () => {
 })
 
 describe('primeSessionMetaLabel with a place', () => {
-  const VAULT = '/Users/dtc/Documents/Rhizome Vault'
+  const VAULT = '/Users/jdoe/Documents/Rhizome Vault'
   const at = (h: number, m: number) => new Date(2026, 7, 13, h, m).getTime()
 
   it('appends the place after the time, so the sort key stays leftmost', () => {
     const label = primeSessionMetaLabel(
-      session({ mtimeMs: at(14, 8), cwd: '/Users/dtc/code/projects/rhizome-agent' }),
+      session({ mtimeMs: at(14, 8), cwd: '/Users/jdoe/code/projects/rhizome-agent' }),
       NOW,
       { vaultPath: VAULT },
     )
@@ -466,7 +466,7 @@ describe('primeSessionMatchesQuery', () => {
   it('matches place and branch so a search for where it ran still hits', () => {
     const row = session({
       title: 'Watch the inbox',
-      cwd: '/Users/dtc/code/projects/rhizome-agent',
+      cwd: '/Users/jdoe/code/projects/rhizome-agent',
       gitBranch: 'shell-harden',
     })
 
@@ -477,7 +477,7 @@ describe('primeSessionMatchesQuery', () => {
 })
 
 describe('primeSessionMatchesFilter', () => {
-  const vault = '/Users/dtc/Documents/Rhizome Vault'
+  const vault = '/Users/jdoe/Documents/Rhizome Vault'
 
   it('keeps every row when the scope is all', () => {
     expect(

@@ -4194,7 +4194,7 @@ mod tests {
             .expect("fixed local noon");
         assert_eq!(
             rhizome_created_session_name_at(
-                Path::new("/Users/dtc/Documents/Notes"),
+                Path::new("/Users/jdoe/Documents/Notes"),
                 "01a0252e-b9d5-71e9-83de-2bce32f65c06",
                 noon,
             ),
@@ -4227,11 +4227,11 @@ mod tests {
             .expect("fixed local noon");
         assert_eq!(
             rhizome_created_session_name_at(
-                Path::new("/Users/dtc"),
+                Path::new("/Users/jdoe"),
                 "01a0252e-b9d5-71e9-83de-2bce32f65c06",
                 noon,
             ),
-            "Rhizome · Sep 6 · 3:35p · dtc · f65c06"
+            "Rhizome · Sep 6 · 3:35p · jdoe · f65c06"
         );
     }
 
@@ -7513,7 +7513,7 @@ mod tests {
                     "description": "Ask which skill fits",
                     "source": "skill",
                     "sourceInfo": {
-                        "path": "/Users/dtc/.agents/skills/ask-matt/SKILL.md",
+                        "path": "/Users/jdoe/.agents/skills/ask-matt/SKILL.md",
                         "source": "auto",
                         "scope": "user",
                         "origin": "top-level"
@@ -8672,10 +8672,10 @@ mod tests {
             "command": "switch_session",
             "success": false,
             "error": "Session is already active in ba59aa844040: \
-                      /Users/dtc/.prime/agent/sessions/01a005b2-9453.jsonl",
+                      /Users/jdoe/.prime/agent/sessions/01a005b2-9453.jsonl",
             "errorInfo": {
                 "code": "session_already_active",
-                "sessionPath": "/Users/dtc/.prime/agent/sessions/01a005b2-9453.jsonl",
+                "sessionPath": "/Users/jdoe/.prime/agent/sessions/01a005b2-9453.jsonl",
                 "activeSessionId": "ba59aa844040"
             }
         });

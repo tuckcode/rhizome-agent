@@ -28,8 +28,8 @@ describe('shortPrimeSessionId', () => {
 
 describe('tildeVaultPath', () => {
   it('collapses the home directory on macOS and linux paths', () => {
-    expect(tildeVaultPath('/Users/dtc/Documents/Laputa')).toBe('~/Documents/Laputa')
-    expect(tildeVaultPath('/home/dtc/vault')).toBe('~/vault')
+    expect(tildeVaultPath('/Users/jdoe/Documents/Laputa')).toBe('~/Documents/Laputa')
+    expect(tildeVaultPath('/home/jdoe/vault')).toBe('~/vault')
   })
 
   it('prefers an explicit home directory when given one', () => {

@@ -18,24 +18,24 @@ describe('loadChatNoteContent', () => {
   it('loads get_note_content for a vault-relative path', async () => {
     await expect(loadChatNoteContent(
       'wiki/decisions/memory-loop.md',
-      '/Users/dtc/Documents/Laputa',
+      '/Users/jdoe/Documents/Laputa',
     )).resolves.toBe('# Memory loop\n\nPromote is explicit.')
 
     expect(mockInvoke).toHaveBeenCalledWith('get_note_content', {
-      path: '/Users/dtc/Documents/Laputa/wiki/decisions/memory-loop.md',
-      vaultPath: '/Users/dtc/Documents/Laputa',
+      path: '/Users/jdoe/Documents/Laputa/wiki/decisions/memory-loop.md',
+      vaultPath: '/Users/jdoe/Documents/Laputa',
     })
   })
 
   it('does not double-prefix an absolute path', async () => {
     await loadChatNoteContent(
-      '/Users/dtc/Documents/Laputa/wiki/decisions/memory-loop.md',
-      '/Users/dtc/Documents/Laputa',
+      '/Users/jdoe/Documents/Laputa/wiki/decisions/memory-loop.md',
+      '/Users/jdoe/Documents/Laputa',
     )
 
     expect(mockInvoke).toHaveBeenCalledWith('get_note_content', {
-      path: '/Users/dtc/Documents/Laputa/wiki/decisions/memory-loop.md',
-      vaultPath: '/Users/dtc/Documents/Laputa',
+      path: '/Users/jdoe/Documents/Laputa/wiki/decisions/memory-loop.md',
+      vaultPath: '/Users/jdoe/Documents/Laputa',
     })
   })
 })

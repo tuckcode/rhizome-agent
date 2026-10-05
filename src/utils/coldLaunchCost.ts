@@ -127,7 +127,7 @@ export function buildColdLaunchSessions(count = COLD_LAUNCH_SESSION_ROWS): Prime
     id: `session-${index.toString().padStart(4, '0')}`,
     path: `/sessions/session-${index}.jsonl`,
     title: index % 7 === 0 ? 'Vault index' : `Session ${index}`,
-    cwd: index % 5 === 0 ? '/tmp/scratch' : '/Users/dtc/code/projects/rhizome-agent',
+    cwd: index % 5 === 0 ? '/tmp/scratch' : '/Users/jdoe/code/projects/rhizome-agent',
     gitBranch: 'main',
     mtimeMs: now - index * hour,
     hasConversation: true,

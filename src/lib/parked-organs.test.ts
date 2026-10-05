@@ -82,7 +82,7 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src-tauri/src/prime_session_host.rs`,
       'utf8',
     )
-    expect(host).toContain('Rhizome · Sep 6 · 3:35p · dtc · f65c06')
+    expect(host).toContain('Rhizome · Sep 6 · 3:35p · jdoe · f65c06')
   })
 
   it('keeps the ghr and Stripe underscore scrub in rust Sentry', () => {

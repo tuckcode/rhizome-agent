@@ -781,7 +781,7 @@ mod tests {
         std::fs::create_dir_all(&skill_dir).unwrap();
         std::fs::write(
             skill_dir.join("SKILL.md"),
-            "The active vault root is:\n/Users/dtc\nUse `node …/cli-call.mjs`.\n# rhizome-vault\n",
+            "The active vault root is:\n/Users/jdoe\nUse `node …/cli-call.mjs`.\n# rhizome-vault\n",
         )
         .unwrap();
         let other = home

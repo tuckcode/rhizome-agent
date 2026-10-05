@@ -12,7 +12,7 @@ commits: uncommitted
 **Origin:** Cursor Grok 4.6 · 2026-09-14 14:54 · leftover tests.
 
 Empty-vault Chat still names a new session with the local clock and
-the home folder (`dtc`), not the generic `vault` fallback. Composer
+the home folder (`<user>`), not the generic `vault` fallback. Composer
 up-arrow history is in-memory only — the library has no `vaultPath`.
 
 ```bash

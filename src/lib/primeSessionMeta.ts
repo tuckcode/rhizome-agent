@@ -94,7 +94,7 @@ function clockTime(timestamp: number): string {
  * row "Rhizome Vault" inside the Rhizome Vault spends the common case to serve
  * the rare one. A row earns its place by being from somewhere *else*.
  *
- * Home collapses to `~`: the basename of `/Users/dtc` is a username, which
+ * Home collapses to `~`: the basename of `/Users/jdoe` is a username, which
  * names nothing. Inferred from the path shape rather than read from the
  * environment, the way `tildeVaultPath` already does it — the renderer has no
  * `$HOME` and this is a cosmetic label, not worth a Tauri call.

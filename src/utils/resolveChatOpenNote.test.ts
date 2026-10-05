@@ -4,10 +4,10 @@ import { resolveChatOpenNote } from './resolveChatOpenNote'
 describe('resolveChatOpenNote', () => {
   it('keeps chat on the conversation and labels the note relative to the vault', () => {
     expect(resolveChatOpenNote(
-      '/Users/dtc/Documents/Laputa/wiki/decisions/memory-loop.md',
-      '/Users/dtc/Documents/Laputa',
+      '/Users/jdoe/Documents/Laputa/wiki/decisions/memory-loop.md',
+      '/Users/jdoe/Documents/Laputa',
     )).toEqual({
-      path: '/Users/dtc/Documents/Laputa/wiki/decisions/memory-loop.md',
+      path: '/Users/jdoe/Documents/Laputa/wiki/decisions/memory-loop.md',
       label: 'wiki/decisions/memory-loop.md',
     })
   })
@@ -17,7 +17,7 @@ describe('resolveChatOpenNote', () => {
   })
 
   it('keeps a vault-relative path as the label', () => {
-    expect(resolveChatOpenNote('wiki/decisions/memory-loop.md', '/Users/dtc/Documents/Laputa')).toEqual({
+    expect(resolveChatOpenNote('wiki/decisions/memory-loop.md', '/Users/jdoe/Documents/Laputa')).toEqual({
       path: 'wiki/decisions/memory-loop.md',
       label: 'wiki/decisions/memory-loop.md',
     })
@@ -25,7 +25,7 @@ describe('resolveChatOpenNote', () => {
 
   it('resolves a wikilink title to the vault file path', () => {
     const entries = [{
-      path: '/Users/dtc/Documents/Rhizome Vault/inbox/20260814-promote-loop.md',
+      path: '/Users/jdoe/Documents/Rhizome Vault/inbox/20260814-promote-loop.md',
       filename: '20260814-promote-loop.md',
       title: 'Promote loop check',
       aliases: [],
@@ -33,10 +33,10 @@ describe('resolveChatOpenNote', () => {
 
     expect(resolveChatOpenNote(
       'Promote loop check',
-      '/Users/dtc/Documents/Rhizome Vault',
+      '/Users/jdoe/Documents/Rhizome Vault',
       entries,
     )).toEqual({
-      path: '/Users/dtc/Documents/Rhizome Vault/inbox/20260814-promote-loop.md',
+      path: '/Users/jdoe/Documents/Rhizome Vault/inbox/20260814-promote-loop.md',
       label: 'inbox/20260814-promote-loop.md',
     })
   })

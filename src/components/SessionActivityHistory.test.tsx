@@ -54,7 +54,7 @@ it('reveals the request and command for a recorded action and opens its file', a
   await waitFor(() => expect(callHost).toHaveBeenCalledWith('read_prime_session_transcript', { path: '/sessions/test' }))
 })
 it('does not offer to open a path the vault opener cannot resolve', async () => {
-  mockTranscript([{ id: 'one', tool: 'edit_file', path: '/Users/dtc/code/app.ts', detail: 'Patch app' }])
+  mockTranscript([{ id: 'one', tool: 'edit_file', path: '/Users/jdoe/code/app.ts', detail: 'Patch app' }])
   render(<SessionActivityHistory expanded locale="en" vaultPath="/vault" onOpenNote={vi.fn()} />)
   fireEvent.click(await screen.findByRole('button', { name: /1. edit_file/ }))
   expect(screen.queryByRole('button', { name: 'Open file' })).not.toBeInTheDocument()

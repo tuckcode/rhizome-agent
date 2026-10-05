@@ -171,7 +171,7 @@ describe('PrimeSessionList', () => {
    * noise on the common case.
    */
   it('says where a session ran when that is not the vault in front of you', async () => {
-    const vault = '/Users/dtc/Documents/Rhizome Vault'
+    const vault = '/Users/jdoe/Documents/Rhizome Vault'
     invoked.result = [
       summary({ id: 'a', path: '/sessions/a.jsonl', title: 'Here', cwd: vault }),
       summary({ id: 'b', path: '/sessions/b.jsonl', title: 'Elsewhere', cwd: '/private/tmp' }),
@@ -190,7 +190,7 @@ describe('PrimeSessionList', () => {
         id: 'a',
         path: '/sessions/a.jsonl',
         title: 'Somewhere',
-        cwd: '/Users/dtc/code/projects/rhizome-agent',
+        cwd: '/Users/jdoe/code/projects/rhizome-agent',
       }),
     ]
 
@@ -544,7 +544,7 @@ describe('PrimeSessionList', () => {
       summary({
         id: 'a',
         title: 'Watch the inbox',
-        cwd: '/Users/dtc/code/projects/rhizome-agent',
+        cwd: '/Users/jdoe/code/projects/rhizome-agent',
         gitBranch: 'shell-harden',
       }),
       summary({ id: 'b', title: 'Release notes', cwd: '/private/tmp', gitBranch: 'main' }),

@@ -69,7 +69,7 @@ describe('PrimeSessionSubhead — status control', () => {
       <PrimeSessionSubhead
         live
         sessionId="019fe641-61fa-73e9-82ef-91fc90097aab"
-        vaultPath="/Users/dtc/Documents/Laputa"
+        vaultPath="/Users/jdoe/Documents/Laputa"
         startedAt="2026-08-15T09:00:00.000Z"
       />,
     )
@@ -84,15 +84,15 @@ describe('PrimeSessionSubhead — status control', () => {
   })
 
   it('never shows the absolute home path in the popover', () => {
-    render(<PrimeSessionSubhead live vaultPath="/Users/dtc/Documents/Laputa" />)
+    render(<PrimeSessionSubhead live vaultPath="/Users/jdoe/Documents/Laputa" />)
 
     openStatus()
 
-    expect(screen.queryByText('/Users/dtc/Documents/Laputa')).not.toBeInTheDocument()
+    expect(screen.queryByText('/Users/jdoe/Documents/Laputa')).not.toBeInTheDocument()
   })
 
   it('omits popover segments it has no value for', () => {
-    render(<PrimeSessionSubhead live vaultPath="/Users/dtc/vault" />)
+    render(<PrimeSessionSubhead live vaultPath="/Users/jdoe/vault" />)
 
     openStatus()
 

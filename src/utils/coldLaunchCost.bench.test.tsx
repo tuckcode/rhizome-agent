@@ -83,7 +83,7 @@ describe.skipIf(!enabled)('cold launch cost', () => {
     let railNodes = 0
     for (let index = 0; index < ITERATIONS + 1; index += 1) {
       const start = performance.now()
-      const view = render(<PrimeSessionList locale="en" now={Date.UTC(2026, 8, 27, 15, 0, 0)} vaultPath="/Users/dtc/code/projects/rhizome-agent" />)
+      const view = render(<PrimeSessionList locale="en" now={Date.UTC(2026, 8, 27, 15, 0, 0)} vaultPath="/Users/jdoe/code/projects/rhizome-agent" />)
       await flushList()
       const rows = screen.getAllByRole('button', { name: /Open session/ })
       const totalMs = performance.now() - start

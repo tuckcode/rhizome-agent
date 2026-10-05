@@ -736,9 +736,9 @@ mod tests {
     /// noise, so a directory merely *named* tmp does not qualify.
     #[test]
     fn a_real_directory_is_never_called_scratch() {
-        assert!(!is_scratch_cwd("/Users/dtc/Documents/Rhizome Vault"));
-        assert!(!is_scratch_cwd("/Users/dtc/code/tmp-notes"));
-        assert!(!is_scratch_cwd("/Users/dtc/tmp"));
+        assert!(!is_scratch_cwd("/Users/jdoe/Documents/Rhizome Vault"));
+        assert!(!is_scratch_cwd("/Users/jdoe/code/tmp-notes"));
+        assert!(!is_scratch_cwd("/Users/jdoe/tmp"));
         assert!(!is_scratch_cwd(""));
         assert!(!is_scratch_cwd("   "));
     }
@@ -788,10 +788,10 @@ mod tests {
         assert_eq!(
             log_path_for_session(
                 "01a009fc-98f1-7219-858e-5bd22e766bc1",
-                Path::new("/Users/dtc/.prime/agent/sessions")
+                Path::new("/Users/jdoe/.prime/agent/sessions")
             ),
             Some(PathBuf::from(
-                "/Users/dtc/.prime/agent/sessions/01a009fc-98f1-7219-858e-5bd22e766bc1.jsonl"
+                "/Users/jdoe/.prime/agent/sessions/01a009fc-98f1-7219-858e-5bd22e766bc1.jsonl"
             ))
         );
     }
@@ -814,17 +814,17 @@ mod tests {
     #[test]
     fn an_exported_session_is_named_after_its_log() {
         let out = default_export_path(
-            Path::new("/Users/dtc/.prime/agent/sessions/019fe2e7-e9dd-701f.jsonl"),
-            Path::new("/Users/dtc/Downloads"),
+            Path::new("/Users/jdoe/.prime/agent/sessions/019fe2e7-e9dd-701f.jsonl"),
+            Path::new("/Users/jdoe/Downloads"),
         );
         assert_eq!(
             out,
-            PathBuf::from("/Users/dtc/Downloads/prime-session-019fe2e7-e9dd-701f.html")
+            PathBuf::from("/Users/jdoe/Downloads/prime-session-019fe2e7-e9dd-701f.html")
         );
 
         let other = default_export_path(
-            Path::new("/Users/dtc/.prime/agent/sessions/aaaabbbb-1111.jsonl"),
-            Path::new("/Users/dtc/Downloads"),
+            Path::new("/Users/jdoe/.prime/agent/sessions/aaaabbbb-1111.jsonl"),
+            Path::new("/Users/jdoe/Downloads"),
         );
         assert_ne!(out, other);
     }
@@ -863,14 +863,14 @@ mod tests {
     #[test]
     fn summary_reads_header_and_first_user_message() {
         let summary = summarize_lines(lines(&[
-            r#"{"type":"session","version":3,"id":"abc-123","timestamp":"2026-08-09T11:21:12.442Z","cwd":"/Users/dtc/code","git":{"branch":"main","commit":"22c426f"}}"#,
+            r#"{"type":"session","version":3,"id":"abc-123","timestamp":"2026-08-09T11:21:12.442Z","cwd":"/Users/jdoe/code","git":{"branch":"main","commit":"22c426f"}}"#,
             r#"{"type":"agent_status","status":"thinking"}"#,
             r#"{"type":"message","id":"m1","message":{"role":"user","content":[{"type":"text","text":"rhiz-agent - sesh2"}]}}"#,
         ]));
 
         assert_eq!(summary.id, "abc-123");
         assert_eq!(summary.title.as_deref(), Some("rhiz-agent - sesh2"));
-        assert_eq!(summary.cwd.as_deref(), Some("/Users/dtc/code"));
+        assert_eq!(summary.cwd.as_deref(), Some("/Users/jdoe/code"));
         assert_eq!(summary.git_branch.as_deref(), Some("main"));
         assert_eq!(
             summary.started_at.as_deref(),

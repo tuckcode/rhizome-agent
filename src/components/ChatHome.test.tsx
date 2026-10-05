@@ -34,7 +34,7 @@ vi.mock('./AiPanel', () => ({
         <span data-testid="agent-note-body">{activeNoteContent ?? 'none'}</span>
         <span data-testid="agent-target-kind">{defaultAiTarget?.kind ?? 'none'}</span>
         <span data-testid="composer-controls">{composerControls ? 'yes' : 'no'}</span>
-        <button type="button" onClick={() => onOpenNote?.('/Users/dtc/Documents/Laputa/wiki/decisions/memory-loop.md')}>
+        <button type="button" onClick={() => onOpenNote?.('/Users/jdoe/Documents/Laputa/wiki/decisions/memory-loop.md')}>
           Open
         </button>
         {notePane}
@@ -66,8 +66,8 @@ describe('ChatHome', () => {
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
         defaultAiAgentReady
-        vaultPath="/Users/dtc/Documents/Laputa"
-        vaultPaths={['/Users/dtc/Documents/Laputa']}
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
         entries={[]}
         onExit={vi.fn()}
       />,
@@ -97,8 +97,8 @@ describe('ChatHome', () => {
         }}
         defaultAiAgentReadiness="ready"
         defaultAiAgentReady
-        vaultPath="/Users/dtc/Documents/Laputa"
-        vaultPaths={['/Users/dtc/Documents/Laputa']}
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
         entries={[]}
         onExit={vi.fn()}
       />,
@@ -117,8 +117,8 @@ describe('ChatHome', () => {
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
         defaultAiAgentReady
-        vaultPath="/Users/dtc/Documents/Laputa"
-        vaultPaths={['/Users/dtc/Documents/Laputa']}
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
         entries={[]}
         onOpenNote={onOpenNote}
         onExit={vi.fn()}
@@ -149,8 +149,8 @@ describe('ChatHome', () => {
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
         defaultAiAgentReady
-        vaultPath="/Users/dtc/Documents/Laputa"
-        vaultPaths={['/Users/dtc/Documents/Laputa']}
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
         entries={[]}
         onShowNotes={onShowNotes}
         onExit={vi.fn()}
@@ -177,7 +177,7 @@ describe('ChatHome — the agent sees the note you have open', () => {
   })
 
   const entry = {
-    path: '/Users/dtc/Documents/Laputa/wiki/decisions/memory-loop.md',
+    path: '/Users/jdoe/Documents/Laputa/wiki/decisions/memory-loop.md',
     filename: 'memory-loop.md',
     title: 'Memory loop',
     isA: 'Note',
@@ -204,8 +204,8 @@ describe('ChatHome — the agent sees the note you have open', () => {
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
         defaultAiAgentReady
-        vaultPath="/Users/dtc/Documents/Laputa"
-        vaultPaths={['/Users/dtc/Documents/Laputa']}
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
         entries={[entry]}
         onExit={vi.fn()}
       />,
@@ -220,8 +220,8 @@ describe('ChatHome — the agent sees the note you have open', () => {
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
         defaultAiAgentReady
-        vaultPath="/Users/dtc/Documents/Laputa"
-        vaultPaths={['/Users/dtc/Documents/Laputa']}
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
         entries={[entry]}
         onExit={vi.fn()}
       />,
@@ -256,7 +256,7 @@ describe('ChatHome — the agent sees the note you have open', () => {
  */
 describe('ChatHome — a note handed in from the vault', () => {
   const entry = {
-    path: '/Users/dtc/Documents/Laputa/wiki/decisions/memory-loop.md',
+    path: '/Users/jdoe/Documents/Laputa/wiki/decisions/memory-loop.md',
     filename: 'memory-loop.md',
     title: 'Memory loop',
     isA: 'Note',
@@ -283,8 +283,8 @@ describe('ChatHome — a note handed in from the vault', () => {
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
         defaultAiAgentReady
-        vaultPath="/Users/dtc/Documents/Laputa"
-        vaultPaths={['/Users/dtc/Documents/Laputa']}
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
         entries={[entry]}
         requestedNote={requestedNote}
         onExit={vi.fn()}
@@ -294,7 +294,7 @@ describe('ChatHome — a note handed in from the vault', () => {
 
   it('opens the handed-in note and gives it to the agent', async () => {
     renderWith({
-      path: '/Users/dtc/Documents/Laputa/wiki/decisions/memory-loop.md',
+      path: '/Users/jdoe/Documents/Laputa/wiki/decisions/memory-loop.md',
       label: 'Memory loop',
       requestId: 1,
     })
@@ -311,7 +311,7 @@ describe('ChatHome — a note handed in from the vault', () => {
    */
   it('reopens the same note when it is asked for again', async () => {
     const note = {
-      path: '/Users/dtc/Documents/Laputa/wiki/decisions/memory-loop.md',
+      path: '/Users/jdoe/Documents/Laputa/wiki/decisions/memory-loop.md',
       label: 'Memory loop',
     }
     const { rerender } = renderWith({ ...note, requestId: 1 })
@@ -328,8 +328,8 @@ describe('ChatHome — a note handed in from the vault', () => {
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
         defaultAiAgentReady
-        vaultPath="/Users/dtc/Documents/Laputa"
-        vaultPaths={['/Users/dtc/Documents/Laputa']}
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
         entries={[entry]}
         requestedNote={{ ...note, requestId: 2 }}
         onExit={vi.fn()}

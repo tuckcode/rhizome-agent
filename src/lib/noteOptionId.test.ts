@@ -3,7 +3,7 @@ import { noteOptionId } from './noteOptionId'
 
 describe('noteOptionId', () => {
   it('survives the characters a real note path contains', () => {
-    const id = noteOptionId('/Users/dtc/Rhizome Vault/10 - Areas/a.note.md')
+    const id = noteOptionId('/Users/jdoe/Rhizome Vault/10 - Areas/a.note.md')
 
     expect(id.startsWith('note-option-')).toBe(true)
     expect(id).not.toMatch(/[/\s%.]/)

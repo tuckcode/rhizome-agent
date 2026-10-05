@@ -962,7 +962,7 @@ mod tests {
 
     #[test]
     fn session_title_falls_back_to_cwd_folder_when_no_message() {
-        let session = json!({ "cwd": "/Users/dtc/code/projects/rhizome-agent/" });
+        let session = json!({ "cwd": "/Users/jdoe/code/projects/rhizome-agent/" });
         assert_eq!(session_title(&session, 40), "rhizome-agent");
     }
 
