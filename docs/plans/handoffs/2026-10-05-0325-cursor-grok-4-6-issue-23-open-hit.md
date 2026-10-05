@@ -5,7 +5,7 @@ description: >-
   First #23 slice: app search still indexes session transcripts, and a hit now
   opens that session at the transcript message index. On-disk index and real-log
   dogfood remain.
-commits: pending
+commits: 0107b23
 ---
 
 # #23 first slice — open a transcript hit at that point
