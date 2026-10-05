@@ -2,6 +2,8 @@ use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 
+use super::invalidate_cache;
+
 const LEGACY_IS_A_PREFIXES: [&str; 4] = ["is_a:", "\"Is A\":", "'Is A':", "Is A:"];
 
 fn has_legacy_is_a(fm_content: &str) -> bool {
@@ -119,6 +121,20 @@ pub fn migrate_is_a_to_type(vault_path: &str) -> Result<usize, String> {
     }
 
     Ok(migrated)
+}
+
+/// Rewrite leftover `is_a:` / `Is A:` frontmatter to `type:` in the vault
+/// that is actually opening.
+///
+/// `run_startup_tasks_for_vault` used to do this only for a legacy default
+/// vault and is gone. Repair Vault still calls [`migrate_is_a_to_type`].
+/// Normal open uses `list_vault`, so the open-path copy lives here.
+pub fn migrate_is_a_on_open(vault_path: &Path) {
+    match migrate_is_a_to_type(&vault_path.to_string_lossy()) {
+        Ok(0) => {}
+        Ok(_) => invalidate_cache(vault_path),
+        Err(e) => log::warn!("Failed to migrate is_a → type on vault open: {e}"),
+    }
 }
 
 #[cfg(test)]
@@ -246,5 +262,21 @@ mod tests {
         write_file(tmp.path(), "data.json", "{\"is_a\": \"test\"}");
         let count = migrate_is_a_to_type(tmp.path().to_str().unwrap()).unwrap();
         assert_eq!(count, 0, "non-markdown files should be ignored");
+    }
+
+    #[test]
+    fn migrate_is_a_on_open_rewrites_the_vault_being_opened() {
+        let tmp = tempdir().unwrap();
+        let path = write_file(
+            tmp.path(),
+            "leftover.md",
+            "---\nis_a: Note\n---\n# Leftover\n",
+        );
+
+        migrate_is_a_on_open(tmp.path());
+
+        let content = fs::read_to_string(&path).unwrap();
+        assert!(content.contains("type: Note"));
+        assert!(!content.contains("is_a:"));
     }
 }

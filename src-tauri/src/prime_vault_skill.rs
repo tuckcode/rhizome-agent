@@ -356,7 +356,7 @@ When the user wants to **keep** something from chat, write a vault note with `cr
 Example:
 
 ```bash
-{env_prefix} {node_cmd} {cli_q} create_note '{{"path":"inbox/20260809-example.md","content":"---\ntitle: Example\nis_a: Note\n---\n\n# Example\n\nBody here.\n"}}'
+{env_prefix} {node_cmd} {cli_q} create_note '{{"path":"inbox/20260809-example.md","content":"---\ntitle: Example\ntype: Note\n---\n\n# Example\n\nBody here.\n"}}'
 {env_prefix} {node_cmd} {cli_q} open_note '{{"path":"inbox/20260809-example.md"}}'
 ```
 
@@ -667,6 +667,8 @@ mod tests {
         assert!(skill.contains("search_notes"));
         assert!(skill.contains("get_note"));
         assert!(skill.contains("create_note"));
+        assert!(skill.contains("type: Note"));
+        assert!(!skill.contains("is_a: Note"));
         // The graph tools shipped documented nowhere the agent reads, so it
         // never learned they existed — the reason the vault's own structure
         // went unused for a year of sessions.

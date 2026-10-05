@@ -246,7 +246,7 @@ where
     }
 
     if has_non_empty_env(&mut get_var, "LD_PRELOAD")
-        || get_var("TOLARIA_APPIMAGE_WAYLAND_PRELOAD_ATTEMPTED").is_some_and(|value| value == "1")
+        || get_var("RHIZOME_APPIMAGE_WAYLAND_PRELOAD_ATTEMPTED").is_some_and(|value| value == "1")
     {
         return None;
     }
@@ -479,7 +479,7 @@ fn apply_wayland_client_preload() {
     let error = std::process::Command::new(exe)
         .args(launched_process_args())
         .env("LD_PRELOAD", preload_path)
-        .env("TOLARIA_APPIMAGE_WAYLAND_PRELOAD_ATTEMPTED", "1")
+        .env("RHIZOME_APPIMAGE_WAYLAND_PRELOAD_ATTEMPTED", "1")
         .exec();
     eprintln!("Rhizome AppImage Wayland preload skipped: failed to re-exec ({error})");
 }
@@ -777,6 +777,39 @@ mod tests {
         );
 
         assert_eq!(preload_path, None);
+    }
+
+    #[test]
+    fn wayland_preload_skips_when_rhizome_reexec_already_attempted() {
+        let preload_path = wayland_client_preload_path_with(
+            |key| match key {
+                "APPIMAGE" => Some("/tmp/Rhizome.AppImage".to_string()),
+                "XDG_SESSION_TYPE" => Some("wayland".to_string()),
+                "RHIZOME_APPIMAGE_WAYLAND_PRELOAD_ATTEMPTED" => Some("1".to_string()),
+                _ => None,
+            },
+            |_| true,
+        );
+
+        assert_eq!(preload_path, None);
+    }
+
+    #[test]
+    fn wayland_preload_does_not_honor_the_old_tolaria_reexec_name() {
+        let preload_path = wayland_client_preload_path_with(
+            |key| match key {
+                "APPIMAGE" => Some("/tmp/Rhizome.AppImage".to_string()),
+                "XDG_SESSION_TYPE" => Some("wayland".to_string()),
+                "TOLARIA_APPIMAGE_WAYLAND_PRELOAD_ATTEMPTED" => Some("1".to_string()),
+                _ => None,
+            },
+            |path| path == "/lib/x86_64-linux-gnu/libwayland-client.so.0",
+        );
+
+        assert_eq!(
+            preload_path,
+            Some("/lib/x86_64-linux-gnu/libwayland-client.so.0")
+        );
     }
 
     #[test]

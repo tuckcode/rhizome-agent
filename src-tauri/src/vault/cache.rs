@@ -112,9 +112,9 @@ fn vault_path_hash(vault: &Path) -> String {
     format!("{:016x}", hasher.finish())
 }
 
-/// Return the cache directory. Override with `LAPUTA_CACHE_DIR` env var (for tests).
+/// Return the cache directory. Override with `RHIZOME_CACHE_DIR` env var (for tests).
 fn cache_dir() -> PathBuf {
-    if let Ok(dir) = std::env::var("LAPUTA_CACHE_DIR") {
+    if let Ok(dir) = std::env::var("RHIZOME_CACHE_DIR") {
         return PathBuf::from(dir);
     }
     dirs::home_dir()
@@ -139,7 +139,6 @@ fn cache_temp_path(final_path: &Path) -> PathBuf {
     final_path.with_file_name(format!("{file_name}.{}.tmp", Uuid::new_v4()))
 }
 
-/// Legacy cache path inside the vault directory (pre-migration).
 fn git_head_hash(vault: &Path) -> Option<String> {
     run_git(vault, &["rev-parse", "HEAD"]).map(|s| s.trim().to_string())
 }
@@ -707,14 +706,14 @@ mod tests {
     use std::sync::Mutex;
     use tempfile::TempDir;
 
-    /// Serialize all cache tests that mutate the LAPUTA_CACHE_DIR env var.
+    /// Serialize all cache tests that mutate the RHIZOME_CACHE_DIR env var.
     /// `std::env::set_var` is process-global, so parallel tests would race.
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     /// Set up a temporary cache directory for test isolation.
     /// Caller MUST hold `ENV_LOCK` for the duration of the test.
     fn set_test_cache_dir(dir: &Path) {
-        std::env::set_var("LAPUTA_CACHE_DIR", dir.to_string_lossy().as_ref());
+        std::env::set_var("RHIZOME_CACHE_DIR", dir.to_string_lossy().as_ref());
     }
 
     fn create_test_file(dir: &Path, name: &str, content: &str) {

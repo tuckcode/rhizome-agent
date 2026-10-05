@@ -39,7 +39,7 @@ pub use getting_started::{
 };
 pub use ignored::{filter_gitignored_entries, filter_gitignored_folders, filter_gitignored_paths};
 pub use image::{copy_image_to_vault, save_image};
-pub use migration::migrate_is_a_to_type;
+pub use migration::{migrate_is_a_on_open, migrate_is_a_to_type};
 pub use rename::{
     auto_rename_untitled, detect_renames, move_note_to_folder, move_note_to_workspace, rename_note,
     rename_note_filename, update_wikilinks_for_renames, AutoRenameUntitledRequest, DetectedRename,

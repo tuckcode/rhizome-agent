@@ -284,7 +284,10 @@ pub fn copy_image_to_vault(
 #[tauri::command]
 pub async fn list_vault(path: PathBuf) -> Result<Vec<VaultEntry>, String> {
     tokio::task::spawn_blocking(move || {
-        with_expanded_vault_root(path.as_path(), scan_visible_vault_entries)
+        with_expanded_vault_root(path.as_path(), |vault_path| {
+            vault::migrate_is_a_on_open(vault_path);
+            scan_visible_vault_entries(vault_path)
+        })
     })
     .await
     .map_err(|e| format!("Task panicked: {e}"))?
@@ -399,6 +402,27 @@ mod tests {
 
         let folders = list_vault_folders(root).await.unwrap();
         assert!(folders.iter().any(|folder| folder.name == "Projects"));
+    }
+
+    #[tokio::test]
+    async fn list_vault_migrates_is_a_to_type_on_the_opened_vault() {
+        let dir = TempDir::new().unwrap();
+        let root = vault_root(&dir);
+        let leftover = note_path(&dir, "session-log.md");
+        fs::write(&leftover, "---\nis_a: Note\n---\n# Leftover\n").unwrap();
+
+        let entries = list_vault(root).await.unwrap();
+        let content = fs::read_to_string(&leftover).unwrap();
+
+        assert!(
+            content.contains("type: Note"),
+            "list_vault must rewrite leftover is_a: on the vault in use"
+        );
+        assert!(
+            !content.contains("is_a:"),
+            "migrated note must not keep is_a:"
+        );
+        assert_eq!(entries[0].is_a.as_deref(), Some("Note"));
     }
 
     #[test]
