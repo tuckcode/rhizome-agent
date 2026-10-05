@@ -181,6 +181,21 @@ describe('AiPanelMessageHistory latest-reply marker', () => {
   })
 })
 
+describe('AiPanelMessageHistory session search focus', () => {
+  it('scrolls the matching transcript turn instead of the tail', () => {
+    const messages = [
+      { ...message('one', 'first'), id: 'a', transcriptUserIndex: 0, transcriptAssistantIndex: 1 },
+      { ...message('two', 'named socket'), id: 'b', transcriptUserIndex: 2, transcriptAssistantIndex: 4 },
+    ]
+    render(<AiPanelMessageHistory {...historyProps(messages)} focusedTranscriptIndex={4} />)
+
+    const hit = screen.getByTestId('transcript-search-hit')
+    expect(hit).toHaveAttribute('data-transcript-index', '4')
+    expect(hit).toHaveTextContent('named socket')
+    expect(scrollIntoView).toHaveBeenCalled()
+  })
+})
+
 describe('AiPanelMessageHistory first-run contrast (C77)', () => {
   it('does not stack extra opacity on the first-run description', () => {
     render(<AiPanelMessageHistory {...historyProps([])} isActive={false} />)

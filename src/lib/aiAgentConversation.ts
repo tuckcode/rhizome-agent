@@ -47,6 +47,16 @@ export interface AiAgentMessage {
    * The bubble reads this to show a thumbnail.
    */
   images?: PrimeImageContent[]
+  /**
+   * Index of the user item in the Prime transcript this turn came from.
+   * Search hits use this to open the session at that point (#23).
+   */
+  transcriptUserIndex?: number
+  /**
+   * Index of the last assistant item folded into this turn.
+   * Search hits use this to open the session at that point (#23).
+   */
+  transcriptAssistantIndex?: number
 }
 
 export type AgentStatus = 'idle' | 'thinking' | 'tool-executing' | 'done' | 'error'

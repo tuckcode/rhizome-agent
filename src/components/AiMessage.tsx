@@ -63,6 +63,9 @@ export interface AiMessageProps {
   images?: PrimeImageContent[]
   /** Find-aid: green dot left of the first line of the newest assistant reply. */
   isLatestReply?: boolean
+  transcriptUserIndex?: number
+  transcriptAssistantIndex?: number
+  focusedTranscriptIndex?: number | null
   onFork?: (messageId: string) => void
   onOpenNote?: (path: string) => void
   onNavigateWikilink?: (target: string) => void
@@ -124,17 +127,25 @@ function userImageSrc(image: PrimeImageContent): string | null {
   return `data:${image.mimeType};base64,${image.data}`
 }
 
-function UserBubble({ content, images, references, onOpenNote, createdAtMs }: {
+function UserBubble({ content, images, references, onOpenNote, createdAtMs, transcriptIndex, highlighted }: {
   content: string
   images?: PrimeImageContent[]
   references?: NoteReference[]
   onOpenNote?: (path: string) => void
   createdAtMs?: number
+  transcriptIndex?: number
+  highlighted?: boolean
 }) {
   const displayTimeZone = useDisplayTimeZone()
   const clock = typeof createdAtMs === 'number' ? formatMessageClock(createdAtMs, displayTimeZone) : ''
   return (
-    <div className="flex flex-col items-end" style={{ marginBottom: 8 }}>
+    <div
+      className="flex flex-col items-end"
+      style={{ marginBottom: 8 }}
+      data-transcript-index={transcriptIndex}
+      data-transcript-hit={highlighted ? 'true' : undefined}
+      data-testid={highlighted ? 'transcript-search-hit' : undefined}
+    >
       {/*
         Tinted with the accent rather than `--state-hover`, and carrying a
         2px accent rule down its right edge.
@@ -159,6 +170,8 @@ function UserBubble({ content, images, references, onOpenNote, createdAtMs }: {
           fontSize: 13,
           lineHeight: 1.5,
           overflowWrap: 'anywhere',
+          outline: highlighted ? '2px solid var(--accent-blue)' : undefined,
+          outlineOffset: highlighted ? 2 : undefined,
         }}
       >
         {references && references.length > 0 && (
@@ -547,6 +560,8 @@ function ResponseBlock({
   text,
   isLatestReply = false,
   isStreaming = false,
+  transcriptIndex,
+  highlighted = false,
 }: {
   actions: AiAction[]
   locale: AppLocale
@@ -560,6 +575,8 @@ function ResponseBlock({
   text: string
   isLatestReply?: boolean
   isStreaming?: boolean
+  transcriptIndex?: number
+  highlighted?: boolean
 }) {
   const handleCopy = useCallback(() => {
     void writeClipboardText(text).catch((error) => {
@@ -571,7 +588,17 @@ function ResponseBlock({
   }, [onPromoteToVault, text])
 
   return (
-    <div className="relative min-w-0 max-w-full" style={{ marginBottom: 4 }}>
+    <div
+      className="relative min-w-0 max-w-full"
+      style={{
+        marginBottom: 4,
+        outline: highlighted ? '2px solid var(--accent-blue)' : undefined,
+        outlineOffset: highlighted ? 2 : undefined,
+      }}
+      data-transcript-index={transcriptIndex}
+      data-transcript-hit={highlighted ? 'true' : undefined}
+      data-testid={highlighted ? 'transcript-search-hit' : undefined}
+    >
       {isLatestReply ? <LatestReplyMarker /> : null}
       <div
         className="group/ai-response min-w-0 max-w-full overflow-hidden"
@@ -628,7 +655,7 @@ export function AiMessage(props: AiMessageProps) {
   return <ConversationMessage {...props} />
 }
 
-function ConversationMessage({ userMessage, images, references, locale = 'en', messageId, forkTargetId, reasoning, reasoningDone, actions, response, isStreaming, createdAtMs, isLatestReply = false, onFork, onOpenNote, onNavigateWikilink, onPromoteToVault, onRegenerate }: AiMessageProps) {
+function ConversationMessage({ userMessage, images, references, locale = 'en', messageId, forkTargetId, reasoning, reasoningDone, actions, response, isStreaming, createdAtMs, isLatestReply = false, transcriptUserIndex, transcriptAssistantIndex, focusedTranscriptIndex, onFork, onOpenNote, onNavigateWikilink, onPromoteToVault, onRegenerate }: AiMessageProps) {
   // Manual override: null = follow auto behavior, true/false = user forced
   const [userOverride, setUserOverride] = useState<boolean | null>(null)
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())
@@ -666,6 +693,8 @@ function ConversationMessage({ userMessage, images, references, locale = 'en', m
         references={references}
         onOpenNote={onOpenNote}
         createdAtMs={createdAtMs}
+        transcriptIndex={transcriptUserIndex}
+        highlighted={focusedTranscriptIndex === transcriptUserIndex}
       />
       {reasoningVisible && reasoning ? (
         <ReasoningBlock
@@ -700,6 +729,8 @@ function ConversationMessage({ userMessage, images, references, locale = 'en', m
           onRegenerate={onRegenerate}
           isLatestReply={isLatestReply}
           isStreaming={isStreaming}
+          transcriptIndex={transcriptAssistantIndex}
+          highlighted={focusedTranscriptIndex === transcriptAssistantIndex}
         />
       )}
       {isStreaming && !response && <StreamingIndicator isLatestReply={isLatestReply} />}

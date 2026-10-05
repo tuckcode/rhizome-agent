@@ -343,6 +343,7 @@ export function AiPanelView({
     switchError,
     reportSwitchError,
     handleSelectSession,
+    focusedTranscriptIndex,
     handleForkFromEntry,
     branchBusyId,
     branchError,
@@ -487,6 +488,7 @@ export function AiPanelView({
         }
         onScrollStateChange={onMessageHistoryScrollStateChange}
         hasContext={hasContext}
+        focusedTranscriptIndex={focusedTranscriptIndex}
       />
       </div>
       </div>

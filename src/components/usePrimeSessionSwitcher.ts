@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useState } from 'react'
+import { startTransition, useCallback, useEffect, useState } from 'react'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import {
   chatSessionsOpenDefault,
@@ -14,7 +14,14 @@ import {
 import type { PrimeSessionTree } from '../lib/primeSessionTree'
 import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
 import { useMenuBarSessionOpen } from '../hooks/useMenuBarSessionOpen'
-import { trackPrimeSessionTreeNavigated } from '../lib/productAnalytics'
+import {
+  trackPrimeSessionTreeNavigated,
+  trackSessionTranscriptHitOpened,
+} from '../lib/productAnalytics'
+import {
+  subscribeSessionTranscriptHitOpen,
+  type SessionTranscriptHit,
+} from '../lib/sessionTranscriptSearch'
 import { translate, type AppLocale } from '../lib/i18n'
 import type { useCliAiAgent } from '../hooks/useCliAiAgent'
 
@@ -72,6 +79,8 @@ interface UsePrimeSessionSwitcherResult {
   switchError: string | null
   reportSwitchError: (error: unknown) => void
   handleSelectSession: (session: PrimeSessionSummary) => Promise<void>
+  /** Transcript item index to scroll to after a search hit, or null. */
+  focusedTranscriptIndex: number | null
   /** Branch a new session from a past entry, then show the branch. */
   handleForkFromEntry: (entryId: string) => Promise<void>
   branchBusyId: string | null
@@ -124,6 +133,7 @@ export function usePrimeSessionSwitcher({
   const sessionsVisible = sessionsOpen && !sessionsAutoCollapsed
 
   const [activeSessionPath, setActiveSessionPath] = useState<string | null>(null)
+  const [focusedTranscriptIndex, setFocusedTranscriptIndex] = useState<number | null>(null)
   const [switchError, setSwitchError] = useState<string | null>(null)
   const reportSwitchError = useCallback((error: unknown) => {
     setSwitchError(error instanceof Error ? error.message : String(error))
@@ -140,8 +150,12 @@ export function usePrimeSessionSwitcher({
    * runs before the final transcript replace: if the host refuses (it will
    * not switch mid-turn), we restore the previous messages and path.
    */
-  const handleSelectSession = useCallback(async (session: PrimeSessionSummary) => {
+  const handleSelectSession = useCallback(async (
+    session: PrimeSessionSummary,
+    options?: { messageIndex?: number },
+  ) => {
     setSwitchError(null)
+    setFocusedTranscriptIndex(null)
     const previousPath = activeSessionPath
     const previousMessages = [...agent.messages]
     // Highlight the row immediately. Clear the stale transcript in the same
@@ -159,6 +173,9 @@ export function usePrimeSessionSwitcher({
       })
       startTransition(() => {
         agent.replaceMessages(primeTranscriptToConversation(transcript))
+        if (typeof options?.messageIndex === 'number') {
+          setFocusedTranscriptIndex(options.messageIndex)
+        }
       })
       refreshSessionTree()
       // The column deliberately stays open. Closing it made sense when this
@@ -168,10 +185,21 @@ export function usePrimeSessionSwitcher({
       // makes you reopen it to pick a second session.
     } catch (e) {
       setActiveSessionPath(previousPath)
+      setFocusedTranscriptIndex(null)
       agent.replaceMessages(previousMessages)
       reportSwitchError(e)
     }
   }, [activeSessionPath, agent, hostRunning, primeHostSessionPath, refreshSessionTree, reportSwitchError, vaultPath])
+
+  const handleOpenTranscriptHit = useCallback((hit: SessionTranscriptHit) => {
+    trackSessionTranscriptHitOpened(hit.role)
+    void handleSelectSession(
+      { id: hit.sessionId || hit.sessionPath, path: hit.sessionPath },
+      { messageIndex: hit.messageIndex },
+    )
+  }, [handleSelectSession])
+
+  useEffect(() => subscribeSessionTranscriptHitOpen(handleOpenTranscriptHit), [handleOpenTranscriptHit])
 
   // A roster row clicked in the menu bar lands here (#13). Reuses the same
   // switch path as the in-app session list so there is one way to change
@@ -254,6 +282,7 @@ export function usePrimeSessionSwitcher({
     switchError,
     reportSwitchError,
     handleSelectSession,
+    focusedTranscriptIndex,
     handleForkFromEntry,
     branchBusyId,
     branchError,

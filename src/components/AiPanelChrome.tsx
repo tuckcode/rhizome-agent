@@ -84,6 +84,8 @@ interface AiPanelMessageHistoryProps {
   onPromoteToVault?: (text: string) => void
   onScrollStateChange?: (scrolled: boolean) => void
   hasContext: boolean
+  /** Transcript item index from a session search hit. Scrolls that turn into view. */
+  focusedTranscriptIndex?: number | null
 }
 
 interface AiPanelComposerProps {
@@ -687,6 +689,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
   onPromoteToVault,
   onScrollStateChange,
   hasContext,
+  focusedTranscriptIndex = null,
 }: AiPanelMessageHistoryProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
@@ -712,12 +715,23 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
     // reader sending. Only the second one earns yanking them to the bottom.
     const sent = messages.length > messageCountRef.current
     messageCountRef.current = messages.length
-    if (sent) followingRef.current = true
 
+    if (typeof focusedTranscriptIndex === 'number') {
+      followingRef.current = false
+      const target = containerRef.current?.querySelector<HTMLElement>(
+        `[data-transcript-index="${focusedTranscriptIndex}"]`,
+      )
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(updateScrollState)
+      else updateScrollState()
+      return
+    }
+
+    if (sent) followingRef.current = true
     if (followingRef.current) endRef.current?.scrollIntoView({ behavior: 'smooth' })
     if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(updateScrollState)
     else updateScrollState()
-  }, [messages, isActive, updateScrollState])
+  }, [messages, isActive, focusedTranscriptIndex, updateScrollState])
 
   const latestReplyIndex = latestAssistantMessageIndex(messages)
 
@@ -749,6 +763,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
             locale={locale}
             isLatestReply={index === latestReplyIndex}
             messageId={message.id}
+            focusedTranscriptIndex={focusedTranscriptIndex}
             // ChatHome forks the Prime session and needs its entry id, which
             // only replayed turns carry; the AI workspace copies its own
             // conversation and uses the local id.

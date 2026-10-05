@@ -1,6 +1,7 @@
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { usePrimeSessionSwitcher } from './usePrimeSessionSwitcher'
+import { requestOpenSessionTranscriptHit } from '../lib/sessionTranscriptSearch'
 
 const invoked = vi.hoisted(() => ({
   calls: [] as Array<{ cmd: string; args?: Record<string, unknown> }>,
@@ -233,5 +234,70 @@ describe('usePrimeSessionSwitcher', () => {
     })
 
     expect(invoked.calls.map((call) => call.cmd)[0]).toBe('ensure_prime_session_host')
+  })
+
+  it('opens a search hit and keeps the transcript message index', async () => {
+    const { result } = renderHook(() => usePrimeSessionSwitcher({
+      agent: agent as never,
+      locale: 'en',
+      vaultPath: '/vault',
+      sessionsAutoCollapsed: false,
+      refreshSessionTree,
+      primeHostSessionPath: '/live.jsonl',
+      hostRunning: true,
+    }))
+
+    await act(async () => {
+      requestOpenSessionTranscriptHit({
+        sessionId: 'past',
+        sessionPath: '/past.jsonl',
+        sessionTitle: 'Past',
+        messageIndex: 4,
+        role: 'assistant',
+        excerpt: 'named socket',
+      })
+    })
+
+    await waitFor(() => {
+      expect(result.current.focusedTranscriptIndex).toBe(4)
+    })
+    expect(invoked.calls.map((call) => call.cmd)).toEqual([
+      'switch_prime_session',
+      'read_prime_session_transcript',
+    ])
+    expect(result.current.activeSessionPath).toBe('/past.jsonl')
+  })
+
+  it('clears a search focus when a later list open fails', async () => {
+    const { result } = renderHook(() => usePrimeSessionSwitcher({
+      agent: agent as never,
+      locale: 'en',
+      vaultPath: '/vault',
+      sessionsAutoCollapsed: false,
+      refreshSessionTree,
+      primeHostSessionPath: '/live.jsonl',
+      hostRunning: true,
+    }))
+
+    await act(async () => {
+      requestOpenSessionTranscriptHit({
+        sessionId: 'past',
+        sessionPath: '/past.jsonl',
+        sessionTitle: 'Past',
+        messageIndex: 4,
+        role: 'assistant',
+        excerpt: 'named socket',
+      })
+    })
+    await waitFor(() => {
+      expect(result.current.focusedTranscriptIndex).toBe(4)
+    })
+
+    invoked.switchImpl = () => Promise.reject(new Error('still streaming'))
+    await act(async () => {
+      await result.current.handleSelectSession({ id: 'other', path: '/other.jsonl' })
+    })
+
+    expect(result.current.focusedTranscriptIndex).toBeNull()
   })
 })

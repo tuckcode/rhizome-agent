@@ -3,6 +3,8 @@ import type { PrimeTranscriptItem } from './primeTranscriptToConversation'
 import {
   createSessionTranscriptIndex,
   openSessionTranscriptHit,
+  requestOpenSessionTranscriptHit,
+  subscribeSessionTranscriptHitOpen,
   type SessionTranscriptSource,
 } from './sessionTranscriptSearch'
 
@@ -201,5 +203,25 @@ describe('session transcript search', () => {
     expect(switchSession.mock.invocationCallOrder[0]).toBeLessThan(readTranscript.mock.invocationCallOrder[0])
     expect(opened.messageIndex).toBe(4)
     expect(opened.transcript).toBe(transcript)
+  })
+
+  it('asks the live chat to open a hit', () => {
+    const opened = vi.fn()
+    const unsubscribe = subscribeSessionTranscriptHitOpen(opened)
+    const hit = {
+      sessionId: 'daemon',
+      sessionPath: '/sessions/daemon.jsonl',
+      sessionTitle: 'Daemon notes',
+      messageIndex: 4,
+      role: 'assistant' as const,
+      excerpt: 'named socket',
+    }
+
+    requestOpenSessionTranscriptHit(hit)
+    unsubscribe()
+    requestOpenSessionTranscriptHit(hit)
+
+    expect(opened).toHaveBeenCalledTimes(1)
+    expect(opened).toHaveBeenCalledWith(hit)
   })
 })
