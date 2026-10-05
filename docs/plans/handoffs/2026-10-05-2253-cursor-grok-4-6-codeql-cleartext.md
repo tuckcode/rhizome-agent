@@ -4,7 +4,7 @@ model: Grok 4.6 (Cursor)
 description: >-
   Silence CodeQL rust/cleartext-logging false positives that failed
   the GHAS umbrella on the Hermes ACP PR.
-commits: pending
+commits: b33fab5
 ---
 
 # CodeQL cleartext-logging (C94)
