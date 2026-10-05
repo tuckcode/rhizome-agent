@@ -212,12 +212,12 @@ Filter: ADR-0168 / [`harness-doctrine.md`](design/harness-doctrine.md).
   engine or context layer. The docs elaborated a rejection nobody asked for.
   Do not re-open it.
 
-Still open: ratify option 2; ratify the first slice; name remaining
-incompatibilities (especially one write authority for memory). #5 cannot
-finish until this is yes enough to build against. Closing #40 against the
-filter is not “composition done.” **#56** documents that the tree already has
-a second provider path (`ai_models.rs`) — do not cite ADR-0168 as settled
-fact when arguing grafts until that contradiction is resolved.
+**#40 identity is settled (ADR-0177, 2026-10-05):** Rhizome is a client of
+harnesses and does not own the loop. The #40 "option 2" (Rhizome owns the
+loop) is rejected; it is not the same numbering as this file's older
+"composition option 2" notes above. #5 remains the Prime surface spec.
+**#56** still documents a second provider path (`ai_models.rs`) — leftover
+code, not a reopened identity question.
 
 **Read before claiming the first slice (added 2026-08-31):** Prime is a
 distribution of **Pi** (Earendil) — its own `package.json` depends on
@@ -247,7 +247,7 @@ composition doc — do not restate them here.
 
 | Decision | Blocks | Where it stands |
 |---|---|---|
-| **Harness composition: option 2 + first slice** | #5, #40, #56, and any graft of a foreign harness idea | Filter ratified (ADR-0168). Working notes in `harness-composition.md`. Still discuss/decide: ratify option 2, first slice, remaining incompatibilities. Code already disagrees with doctrine on providers (#56). |
+| **Harness identity (#40)** | leftover Hermes one-shot; ACP; #5 surface spec; #56 leftover path | **Settled 2026-10-05 ([ADR-0177](adr/0177-rhizome-is-a-client-of-harnesses.md)).** Option 1: Rhizome is a client of harnesses. #40 option 2 (own the loop) and option 3 (borrow organs into a Rhizome loop) rejected. ACP is a follow-up. #56 leftover path is unchanged. |
 | **Session import destinations** | first-run + Settings import build | **Vault half shipped 2026-09-06** (Settings → Import chat history; Claude Code → `Imports/`). Prime session-list half still blocked on `import_jsonl` semantics (Atticus decision). Decision page: [`plans/import-jsonl-decision.md`](plans/import-jsonl-decision.md) (recommend **route 1**). Plan: [`plans/2026-09-01-session-import-plan.md`](plans/2026-09-01-session-import-plan.md). Relates to #23, C9. |
 | **C57 permission naming / defaults** | honest Limited-tools UX | **Settled 2026-09-06 (Atticus).** CLI default Limited tools; Prime toggle stays hidden (always Power User); keep Limited tools / Power User — no Vault Safe. Code already matched. |
 | **#50 live app view: which surface** | agent QA of the drawn UI | Answers proposed 2026-08-29, awaiting Atticus. Browser `pnpm dev`, read + test-bridge steer, `pnpm live-ui` not an in-app pane. [plan](plans/2026-08-29-live-app-view-plan.md). |
@@ -259,10 +259,11 @@ composition doc — do not restate them here.
 | **C68 restore note lock** | accidental edits while reading | **Shipped 2026-09-06** (`a309a17`). Default editable; breadcrumb + Cmd+K; not vault `editor_mode`. Layout lock 2026-09-14: `EditorContentLayout.test.tsx` (rich + raw read-only). |
 | **TokenJuice + Switchyard** | later stacked system; not a Rhizome organ | **Wanted 2026-08-26, not started.** Discuss/plan only. TokenJuice-shaped tool-output shrink first (Prime owns what the model sees). Switchyard-shaped model hop second (sidecar behind Prime; halfway house is `set_scoped_models`). Write-up: [`token-routing-and-compression.md`](design/token-routing-and-compression.md). Do not vendor either in this tree. |
 
-**#40** can close against ADR-0168 (Rhizome is a client of Prime, not a second
-harness). Do not treat that close as "the harness question is done."
-Ratify `harness-composition.md` before grafting. Resolve **#56** before treating
-the doctrine as constitutional for build choices.
+**#40** closes against [ADR-0177](adr/0177-rhizome-is-a-client-of-harnesses.md)
+(Rhizome is a client of harnesses; it does not own the loop). That is the
+identity answer. **#5** stays — it is the Prime harness surface spec, not only
+this question. **#56** still records a second provider path in the tree; this
+ADR does not delete it.
 
 The shipped map is sessions left, Chat center, and one optional right column:
 Notes on top, Graph/Mycelium resizable below (ADR-0170). Rail Inbox opens that
@@ -354,7 +355,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | | |
 |---|---|
 | #5 | Spec: the Prime harness surface — parent of #40; **B** on §1 / `harness-composition.md` |
-| #40 | Harness or client — filter answered (ADR-0168); composition still discuss/decide |
+| #40 | Harness or client — **decided ADR-0177** (option 1: client of harnesses). Close when the ADR is on `main`. |
 | #56 | Rhizome already has the second provider path the doctrine forbids — **B** / doctrine honesty |
 
 #29 (credential redaction) is **closed**. #46 (HOME vault / wide MCP) is the
@@ -434,10 +435,10 @@ Worth doing, in order:
    stays parked. Do not invent a second suggestion system that fights pills.
 5. Shell region map is ADR-0166 / ADR-0170, not a separate design spec.
 
-The harness *filter* is settled (ADR-0168). Composition working
-notes now live in [`harness-composition.md`](design/harness-composition.md);
-they are not ratified. Do not treat the doctrine or that file as a license
-to start grafting — and read **#56** before treating the filter as law.
+The harness *identity* is settled ([ADR-0177](adr/0177-rhizome-is-a-client-of-harnesses.md)):
+Rhizome is a client of harnesses. The metabolite filter remains ADR-0168.
+Older composition notes live in [`harness-composition.md`](design/harness-composition.md).
+Read **#56** before treating leftover provider code as already gone.
 
 ---
 
