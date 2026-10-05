@@ -25,8 +25,11 @@ product slice.
   and scrolls the matching transcript item into view.
 - `session_transcript_hit_opened` records the role only. No query, path, or
   excerpt.
-- `import_jsonl` was not touched. No new Tauri command. `prime_sessions.rs`
-  was not edited (#77). Laputa/Tolaria migration paths were not edited (#57).
+- `import_jsonl` was not touched. No new Tauri command. The #23 commits did
+  not edit `prime_sessions.rs`; the branch later merged #77 so a missing
+  sessions dir is a refuse. Laputa/Tolaria paths were not edited (#57).
+- Hit highlight/scroll lives in `TranscriptHitAnchor` and
+  `useScrollToTranscriptHit`, not inlined in `AiMessage` / `AiPanelChrome`.
 
 ## Still open for #23
 

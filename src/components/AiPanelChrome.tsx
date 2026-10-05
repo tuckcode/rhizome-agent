@@ -46,6 +46,8 @@ import {
   trackComposerReplyCompletionShown,
 } from '../lib/productAnalytics'
 import { workerStartFailureReason } from '../lib/primeWorkerStartError'
+import { afterPaint } from '../lib/sessionTranscriptHit'
+import { useScrollToTranscriptHit } from '../hooks/useScrollToTranscriptHit'
 
 interface AiPanelHeaderProps {
   agentLabel: string
@@ -709,29 +711,26 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
     onScrollStateChange?.((element?.scrollTop ?? 0) > 1)
   }, [onScrollStateChange])
 
+  const scrolledToHit = useScrollToTranscriptHit(
+    containerRef,
+    focusedTranscriptIndex,
+    followingRef,
+    updateScrollState,
+    messages,
+  )
+
   useEffect(() => {
     void isActive
     // A longer response is output arriving on its own; a longer list is the
     // reader sending. Only the second one earns yanking them to the bottom.
     const sent = messages.length > messageCountRef.current
     messageCountRef.current = messages.length
-
-    if (typeof focusedTranscriptIndex === 'number') {
-      followingRef.current = false
-      const target = containerRef.current?.querySelector<HTMLElement>(
-        `[data-transcript-index="${focusedTranscriptIndex}"]`,
-      )
-      target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(updateScrollState)
-      else updateScrollState()
-      return
-    }
+    if (scrolledToHit) return
 
     if (sent) followingRef.current = true
     if (followingRef.current) endRef.current?.scrollIntoView({ behavior: 'smooth' })
-    if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(updateScrollState)
-    else updateScrollState()
-  }, [messages, isActive, focusedTranscriptIndex, updateScrollState])
+    afterPaint(updateScrollState)
+  }, [messages, isActive, scrolledToHit, updateScrollState])
 
   const latestReplyIndex = latestAssistantMessageIndex(messages)
 
