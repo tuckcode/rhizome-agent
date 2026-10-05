@@ -4,7 +4,7 @@ model: Grok 4.6 (Cursor)
 description: >-
   Docs-only cleanup: retarget or drop dead file references in ARCHITECTURE.md
   and HANDOFF.md after a Repowise drift scan. No product code.
-commits: pending
+commits: 71ce785
 ---
 
 # Dead links in ARCHITECTURE.md and HANDOFF.md
