@@ -16,8 +16,9 @@ fn launch() -> AcpLaunch {
 }
 
 fn request(permission_mode: AiAgentPermissionMode) -> AcpSessionRequest {
+    let vault = tempfile::tempdir().expect("scoped test vault");
     AcpSessionRequest {
-        cwd: std::env::temp_dir().to_string_lossy().into_owned(),
+        cwd: vault.path().to_string_lossy().into_owned(),
         prompt: "Summarize the note".into(),
         resumed_prompt: None,
         resume_session_id: None,
