@@ -15,9 +15,10 @@ path. That is why a leftover `is_a: Note` in a live vault could sit for days.
 The leftover file named in the issue lives on Atticus's machine, not in this
 repo. Do not invent vault content. The next open of that vault rewrites it.
 
-`migrate_is_a_on_open` now runs from `list_vault` and `reload_vault`. Repair
-still calls the same rewriter. Parser aliases for `is_a` stay so notes still
-read until that open.
+`migrate_is_a_on_open` runs on a full rescan (`scan_vault_cached` with no
+reusable cache) and from `reload_vault` / Repair. A warm cache hit does not
+walk the vault again. Parser aliases for `is_a` stay so notes still read
+until that open.
 
 ---
 

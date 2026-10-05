@@ -88,17 +88,16 @@ fn migrate_file_is_a_to_type(path: &Path) -> Result<bool, String> {
 
 /// Migrate all markdown files in the vault from `is_a`/`Is A` to `type`.
 /// Returns the number of files migrated.
-pub fn migrate_is_a_to_type(vault_path: &str) -> Result<usize, String> {
-    let vault = Path::new(vault_path);
-    if !vault.exists() || !vault.is_dir() {
+pub fn migrate_is_a_to_type(vault_path: &Path) -> Result<usize, String> {
+    if !vault_path.exists() || !vault_path.is_dir() {
         return Err(format!(
             "Vault path does not exist or is not a directory: {}",
-            vault_path
+            vault_path.display()
         ));
     }
 
     let mut migrated = 0;
-    for entry in WalkDir::new(vault)
+    for entry in WalkDir::new(vault_path)
         .follow_links(true)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -123,14 +122,12 @@ pub fn migrate_is_a_to_type(vault_path: &str) -> Result<usize, String> {
     Ok(migrated)
 }
 
-/// Rewrite leftover `is_a:` / `Is A:` frontmatter to `type:` in the vault
-/// that is actually opening.
+/// Rewrite leftover `is_a:` / `Is A:` frontmatter to `type:`.
 ///
-/// `run_startup_tasks_for_vault` used to do this only for a legacy default
-/// vault and is gone. Repair Vault still calls [`migrate_is_a_to_type`].
-/// Normal open uses `list_vault`, so the open-path copy lives here.
+/// Call this on a full rescan (`scan_vault_cached` with no reusable cache)
+/// and from Repair / `reload_vault`. A warm cache hit must not walk again.
 pub fn migrate_is_a_on_open(vault_path: &Path) {
-    match migrate_is_a_to_type(&vault_path.to_string_lossy()) {
+    match migrate_is_a_to_type(vault_path) {
         Ok(0) => {}
         Ok(_) => invalidate_cache(vault_path),
         Err(e) => log::warn!("Failed to migrate is_a → type on vault open: {e}"),
@@ -245,13 +242,13 @@ mod tests {
             "note3.md",
             "---\ntype: Event\nname: Conf\n---\n",
         );
-        let count = migrate_is_a_to_type(tmp.path().to_str().unwrap()).unwrap();
+        let count = migrate_is_a_to_type(tmp.path()).unwrap();
         assert_eq!(count, 2, "should migrate exactly 2 files");
     }
 
     #[test]
     fn test_migrate_vault_returns_error_for_nonexistent_path() {
-        let result = migrate_is_a_to_type("/tmp/this-path-does-not-exist-laputa-test");
+        let result = migrate_is_a_to_type(Path::new("/tmp/this-path-does-not-exist-laputa-test"));
         assert!(result.is_err());
     }
 
@@ -260,7 +257,7 @@ mod tests {
         let tmp = tempdir().unwrap();
         write_file(tmp.path(), "image.png", "not a markdown file");
         write_file(tmp.path(), "data.json", "{\"is_a\": \"test\"}");
-        let count = migrate_is_a_to_type(tmp.path().to_str().unwrap()).unwrap();
+        let count = migrate_is_a_to_type(tmp.path()).unwrap();
         assert_eq!(count, 0, "non-markdown files should be ignored");
     }
 

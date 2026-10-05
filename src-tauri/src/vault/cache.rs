@@ -660,7 +660,10 @@ pub fn scan_vault_cached(vault_path: &Path) -> Result<Vec<VaultEntry>, String> {
 
     let current_hash = match git_head_hash(vault_path) {
         Some(h) => h,
-        None => return scan_vault(vault_path, &HashMap::new()),
+        None => {
+            super::migrate_is_a_on_open(vault_path);
+            return scan_vault(vault_path, &HashMap::new());
+        }
     };
 
     match load_cache(vault_path) {
@@ -672,6 +675,7 @@ pub fn scan_vault_cached(vault_path: &Path) -> Result<Vec<VaultEntry>, String> {
         }
         CacheLoadState::Loaded(loaded_cache) => {
             if cache_requires_full_rescan(&loaded_cache.cache, vault_path) {
+                super::migrate_is_a_on_open(vault_path);
                 let git_dates = load_git_dates(vault_path);
                 return scan_and_cache_full(
                     vault_path,
@@ -695,6 +699,7 @@ pub fn scan_vault_cached(vault_path: &Path) -> Result<Vec<VaultEntry>, String> {
     }
 
     // No cache — full scan and write cache
+    super::migrate_is_a_on_open(vault_path);
     let git_dates = load_git_dates(vault_path);
     scan_and_cache_full(vault_path, &git_dates, current_hash, None)
 }
@@ -752,6 +757,36 @@ mod tests {
         let vault_tmp = TempDir::new().unwrap();
         init_git_repo(vault_tmp.path());
         (lock, cache_tmp, vault_tmp)
+    }
+
+    #[test]
+    fn cold_scan_rewrites_is_a_and_warm_hit_does_not_walk() {
+        let (_lock, _cache_tmp, vault_tmp) = setup_git_vault();
+        let vault = vault_tmp.path();
+        create_test_file(vault, "leftover.md", "---\nis_a: Note\n---\n# Leftover\n");
+        git_add_commit(vault, "init");
+
+        let entries = scan_vault_cached(vault).unwrap();
+        let leftover = fs::read_to_string(vault.join("leftover.md")).unwrap();
+        assert!(
+            leftover.contains("type: Note") && !leftover.contains("is_a:"),
+            "cold scan must rewrite leftover is_a:"
+        );
+        assert!(
+            entries
+                .iter()
+                .any(|entry| entry.is_a.as_deref() == Some("Note")),
+            "cold scan must still parse the leftover note as Note"
+        );
+
+        create_test_file(vault, "planted.md", "---\nis_a: Topic\n---\n# Planted\n");
+        let _ = scan_vault_cached(vault).unwrap();
+        let planted = fs::read_to_string(vault.join("planted.md")).unwrap();
+        assert!(
+            planted.contains("is_a: Topic"),
+            "warm cache hit must not walk the vault to rewrite is_a:"
+        );
+        assert!(!planted.contains("type: Topic"));
     }
 
     fn git_add_commit(vault: &Path, msg: &str) {

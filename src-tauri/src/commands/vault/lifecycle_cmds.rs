@@ -89,7 +89,7 @@ pub fn get_default_vault_path() -> Result<String, String> {
 #[tauri::command]
 pub fn repair_vault(vault_path: String) -> Result<String, String> {
     let vault_path = expand_tilde(&vault_path);
-    vault::migrate_is_a_to_type(&vault_path)?;
+    vault::migrate_is_a_to_type(Path::new(vault_path.as_ref()))?;
     vault::repair_config_files(&vault_path)?;
     git::ensure_gitignore(std::path::Path::new(vault_path.as_ref()))?;
     Ok("Vault repaired".to_string())

@@ -284,10 +284,7 @@ pub fn copy_image_to_vault(
 #[tauri::command]
 pub async fn list_vault(path: PathBuf) -> Result<Vec<VaultEntry>, String> {
     tokio::task::spawn_blocking(move || {
-        with_expanded_vault_root(path.as_path(), |vault_path| {
-            vault::migrate_is_a_on_open(vault_path);
-            scan_visible_vault_entries(vault_path)
-        })
+        with_expanded_vault_root(path.as_path(), scan_visible_vault_entries)
     })
     .await
     .map_err(|e| format!("Task panicked: {e}"))?
@@ -405,7 +402,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn list_vault_migrates_is_a_to_type_on_the_opened_vault() {
+    async fn list_vault_rewrites_is_a_on_a_cold_open() {
         let dir = TempDir::new().unwrap();
         let root = vault_root(&dir);
         let leftover = note_path(&dir, "session-log.md");
@@ -416,7 +413,7 @@ mod tests {
 
         assert!(
             content.contains("type: Note"),
-            "list_vault must rewrite leftover is_a: on the vault in use"
+            "list_vault must rewrite leftover is_a: on a cold open"
         );
         assert!(
             !content.contains("is_a:"),

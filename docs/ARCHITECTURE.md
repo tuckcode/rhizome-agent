@@ -1680,7 +1680,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 
 | Command | Description |
 |---------|-------------|
-| `list_vault` | Housekeeping for the vault in use (`is_a:` → `type:`), then cached scan + Gitignored-content visibility → `Vec<VaultEntry>` |
+| `list_vault` | Cached scan + Gitignored-content visibility. A full rescan (no reusable cache) also rewrites leftover `is_a:` frontmatter. Warm cache hits do not walk the vault for that rewrite. |
 | `get_note_content` | Read note file content |
 | `save_note_content` | Write note content to disk |
 | `delete_note` | Permanently delete note from disk (with confirm dialog) |
@@ -1693,7 +1693,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `sync_note_title` | Legacy helper: rewrite `title` frontmatter from filename → `bool` (modified); not used by the normal note-open flow |
 | `batch_archive_notes` | Archive multiple notes |
 | `batch_delete_notes` | Permanently delete notes from disk |
-| `reload_vault` | Allow the requested vault roots in the runtime asset scope, invalidate cache, rewrite leftover `is_a:` frontmatter, refresh stale managed `AGENTS.md`, full rescan from filesystem, then apply Gitignored-content visibility → `Vec<VaultEntry>` |
+| `reload_vault` | Allow the requested vault roots in the runtime asset scope, invalidate cache, rewrite leftover `is_a:` frontmatter, refresh stale managed `AGENTS.md`, then a full rescan + Gitignored-content visibility → `Vec<VaultEntry>` |
 | `reload_vault_entry` | Re-read a single file from disk → `VaultEntry` |
 | `open_vault_file_external` | Validate an existing file against the active vault boundary, then open it with the system default app |
 | `start_vault_watcher` / `stop_vault_watcher` | Start or stop native active-vault filesystem change events |
