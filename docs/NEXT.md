@@ -216,6 +216,8 @@ Filter: ADR-0168 / [`harness-doctrine.md`](design/harness-doctrine.md).
 harnesses and does not own the loop. The #40 "option 2" (Rhizome owns the
 loop) is rejected; it is not the same numbering as this file's older
 "composition option 2" notes above. #5 remains the Prime surface spec.
+Hermes ACP is [ADR-0178](adr/0178-generic-acp-client.md): generic client,
+chat fallback until a real Hermes install dogfoods it.
 **#56** still documents a second provider path (`ai_models.rs`) — leftover
 code, not a reopened identity question.
 
@@ -247,7 +249,7 @@ composition doc — do not restate them here.
 
 | Decision | Blocks | Where it stands |
 |---|---|---|
-| **Harness identity (#40)** | leftover Hermes one-shot; ACP; #5 surface spec; #56 leftover path | **Settled 2026-10-05 ([ADR-0177](adr/0177-rhizome-is-a-client-of-harnesses.md)).** Option 1: Rhizome is a client of harnesses. #40 option 2 (own the loop) and option 3 (borrow organs into a Rhizome loop) rejected. ACP is a follow-up. #56 leftover path is unchanged. |
+| **Harness identity (#40)** | leftover Hermes one-shot; ACP; #5 surface spec; #56 leftover path | **Settled 2026-10-05 ([ADR-0177](adr/0177-rhizome-is-a-client-of-harnesses.md)).** Hermes ACP client is [ADR-0178](adr/0178-generic-acp-client.md): generic stdio client, chat fallback until real-Hermes dogfood. #56 leftover path is unchanged. |
 | **Session import destinations** | first-run + Settings import build | **Vault half shipped 2026-09-06** (Settings → Import chat history; Claude Code → `Imports/`). Prime session-list half still blocked on `import_jsonl` semantics (Atticus decision). Decision page: [`plans/import-jsonl-decision.md`](plans/import-jsonl-decision.md) (recommend **route 1**). Plan: [`plans/2026-09-01-session-import-plan.md`](plans/2026-09-01-session-import-plan.md). Relates to #23, C9. |
 | **C57 permission naming / defaults** | honest Limited-tools UX | **Settled 2026-09-06 (Atticus).** CLI default Limited tools; Prime toggle stays hidden (always Power User); keep Limited tools / Power User — no Vault Safe. Code already matched. |
 | **#50 live app view: which surface** | agent QA of the drawn UI | Answers proposed 2026-08-29, awaiting Atticus. Browser `pnpm dev`, read + test-bridge steer, `pnpm live-ui` not an in-app pane. [plan](plans/2026-08-29-live-app-view-plan.md). |
@@ -355,7 +357,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | | |
 |---|---|
 | #5 | Spec: the Prime harness surface — parent of #40; **B** on §1 / `harness-composition.md` |
-| #40 | Harness or client — **decided ADR-0177** (option 1: client of harnesses). Close when the ADR is on `main`. |
+| #40 | Harness or client — **decided ADR-0177**. Hermes ACP client is ADR-0178 (chat fallback until real-Hermes dogfood). |
 | #56 | Rhizome already has the second provider path the doctrine forbids — **B** / doctrine honesty |
 
 #29 (credential redaction) is **closed**. #46 (HOME vault / wide MCP) is the

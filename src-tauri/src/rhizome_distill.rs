@@ -631,7 +631,7 @@ mod tests {
 
         assert!(
             message.contains("saved as idempotency.md"),
-            "got: {message}"
+            "distill success should name the saved card"
         );
         let card_path = dir.path().join("wiki/concepts/idempotency.md");
         let contents = std::fs::read_to_string(&card_path).unwrap();
@@ -648,7 +648,10 @@ mod tests {
     #[test]
     fn build_distill_prompt_offers_a_skip_answer() {
         let prompt = build_distill_prompt("ok thanks", None);
-        assert!(prompt.contains(SKIP_RESPONSE), "got: {prompt}");
+        assert!(
+            prompt.contains(SKIP_RESPONSE),
+            "distill prompt should offer the skip answer"
+        );
     }
 
     /// A "nothing durable here" answer used to be saved as a card titled
@@ -673,7 +676,10 @@ mod tests {
         )
         .unwrap();
 
-        assert!(message.contains("no card written"), "got: {message}");
+        assert!(
+            message.contains("no card written"),
+            "skip response should write no card"
+        );
         assert!(!dir.path().join("wiki").exists());
         assert!(!dir.path().join(".rhizome/events.jsonl").exists());
     }
@@ -712,7 +718,7 @@ idempotent; HTTP POST is not.",
         let message = result.expect("live distill should succeed");
         assert!(
             message.contains("saved as"),
-            "unexpected message: {message}"
+            "live distill should report a saved card"
         );
         assert!(
             !lines.is_empty(),
