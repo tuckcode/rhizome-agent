@@ -72,7 +72,7 @@ longer open the way the ADR text still sounds.
 | Latest reply | Green start marker on the newest assistant turn. Moves when a newer reply starts. |
 | Session click | Transcript **clears on the click**, then rehydrates. Leaving the old chat up is the switch beachball. |
 | Settings cost | Model catalog and provider status wait until **Agents** is visible. Packages catalog waits until **Packages**. |
-| Hide vs quit | Red button hides (C22). Hide stops ws-bridge and Mindwalk. **C75:** spawned Prime stays warm. Keep-working changes session intent, not the daemon. Cmd+Q quits. Never Prime `shutdown`. |
+| Hide vs quit | Red X quits unless Keep in taskbar (ADR-0179). Default quit stops ws-bridge, Mindwalk, and a spawned Prime. Keep in taskbar restores C22 hide; **C75** then leaves spawned Prime warm. Keep working leaves that daemon so the grant can live. Never Prime `shutdown`. |
 
 **Do not** make nav and the note list exclusive. Claude tried; it broke
 Cmd+N, inbox auto-advance, and note selection. Keep them mounted
