@@ -412,10 +412,7 @@ pub(crate) fn release_helpers_for_hidden_window(
 /// Quit path: same helper stop as hide, plus the spawned Prime supervisor
 /// unless Keep working left it resident.
 #[cfg(desktop)]
-pub(crate) fn release_helpers_on_quit(
-    app_handle: &tauri::AppHandle,
-    keep_prime_daemon: bool,
-) {
+pub(crate) fn release_helpers_on_quit(app_handle: &tauri::AppHandle, keep_prime_daemon: bool) {
     log::info!(
         "quit stopping helpers: {:?}",
         quit_helper_stops(keep_prime_daemon)

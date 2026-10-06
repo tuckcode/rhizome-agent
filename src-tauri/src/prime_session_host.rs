@@ -3187,10 +3187,7 @@ pub fn settle_session(intent: SessionCloseIntent) -> Result<QuitDisposition, Str
     let _ = host.shutdown();
     *guard = None;
     let disposition = disposition_for(intent);
-    remember_keep_spawned_daemon(matches!(
-        disposition,
-        QuitDisposition::KeepSessionRunning
-    ));
+    remember_keep_spawned_daemon(matches!(disposition, QuitDisposition::KeepSessionRunning));
     Ok(disposition)
 }
 

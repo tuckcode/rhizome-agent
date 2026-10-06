@@ -71,10 +71,11 @@ describe('parked organs leftover', () => {
     expect(host).toContain('normalize_cwd_falls_back_to_home_for_blank_paths')
   })
 
-  it('keeps hide-on-close helper names', () => {
+  it('keeps hide and quit helper names', () => {
     const lib = readFileSync(`${process.cwd()}/src-tauri/src/lib.rs`, 'utf8')
-    expect(lib).not.toContain('["spawned_prime_daemon", "ws_bridge", "mindwalk"]')
+    expect(lib).toContain('["spawned_prime_daemon", "ws_bridge", "mindwalk"]')
     expect(lib).toContain('["ws_bridge", "mindwalk"]')
+    expect(lib).toContain('fn quit_helper_stops')
   })
 
   it('keeps clock-first HOME session names', () => {
