@@ -6,7 +6,6 @@ import { useUnifiedSearch } from '../hooks/useUnifiedSearch'
 import { getTypeColor, buildTypeEntryMap } from '../utils/typeColors'
 import { formatSearchSubtitle } from '../utils/noteListHelpers'
 import type { DateDisplayFormat } from '../utils/dateDisplay'
-import { scrollSelectedHTMLChildIntoView } from '../utils/domScroll'
 import { getTypeIcon } from './NoteItem'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { WorkspaceInitialsBadge } from './WorkspaceInitialsBadge'
@@ -331,9 +330,7 @@ function useSearchPanelController({
     const selected = listRef.current?.querySelector('[aria-selected="true"]')
     if (selected instanceof HTMLElement) {
       selected.scrollIntoView({ block: 'nearest' })
-      return
     }
-    scrollSelectedHTMLChildIntoView(listRef.current, selectedIndex)
   }, [selectedIndex, sessionHits])
 
   const handleSelect = useCallback((result: SearchResult) => {
@@ -692,7 +689,7 @@ function SearchContent({
   const hasResults = results.length > 0
   const hasSessionHits = sessionHits.length > 0
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div ref={listRef} className="flex-1 overflow-y-auto">
       {!hasQuery && <SearchIdleMessage locale={locale} />}
       {hasQuery && !hasResults && !hasSessionHits && loading && <SearchLoadingMessage locale={locale} />}
       {hasQuery && !hasResults && !hasSessionHits && !loading && <SearchNoResultsMessage locale={locale} />}
@@ -701,7 +698,7 @@ function SearchContent({
           {hasResults && (
             <>
               <SearchResultsHeader count={results.length} elapsedMs={elapsedMs} locale={locale} />
-              <div ref={listRef} role="listbox" aria-label={translate(locale, 'search.resultsAria')}>
+              <div role="listbox" aria-label={translate(locale, 'search.resultsAria')}>
                 {results.map((result, i) => (
                   <SearchResultRow
                     key={result.path}

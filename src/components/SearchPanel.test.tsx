@@ -491,6 +491,22 @@ describe('SearchPanel', () => {
     })
   })
 
+  it('scrolls a selected session hit into view', async () => {
+    mockedSessionHits = [SESSION_HIT]
+    const { input } = await renderSingleResultSearch()
+    const sessionOption = screen.getByRole('option', { name: /Daemon notes/ })
+    const scrollIntoView = vi.spyOn(sessionOption, 'scrollIntoView')
+
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'ArrowDown' })
+    })
+
+    await waitFor(() => {
+      expect(sessionOption).toHaveAttribute('aria-selected', 'true')
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    })
+  })
+
   it('opens the selected session hit on Enter', async () => {
     mockedSessionHits = [SESSION_HIT]
     const onSelectSessionHit = vi.fn()
