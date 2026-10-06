@@ -31,6 +31,7 @@ Read the session file first:
 | 5 | **Harness leftovers** | #41 live steer/queue; human session titles (unwrap history blobs on list); Packages rail shortcut only if claimed. |
 | Parked | Import `1`, #56 keep/remove, W11 cards, TraderAlice patterns, kanban/automations on rail | Ledger: [inventory](plans/2026-09-20-public-readiness-inventory.md). A row is not approval. |
 | Wanted | **Grill the standing rules** | Sit-down `/grill-with-docs` (or vault) over `AGENTS.md`, ASTRA_PACKET §10, YOU-SHOULD-KNOW, ship rules, ADR-0163/0168/0177. Map: [`plans/2026-10-06-standing-rule-inventory.md`](plans/2026-10-06-standing-rule-inventory.md). Remind him. Do not start unless he says now. |
+| Wanted | **Vault as agent home + scratch hygiene** | Wiki + `agents/shared/` / dotfiles as sacred. Scratch untitled notes may go. Never in-app `git clean -fd`. Parked layout: [`design/vault-skill-home.md`](design/vault-skill-home.md). Inventory §7. Do not start unless he says now. |
 
 **Hard nos:** wrong tree; reopen/merge closed drafts #66–#68; `import_jsonl` without `1`; cite ADR-0168 as settled; ADHD packing; English-only churn (C18).
 

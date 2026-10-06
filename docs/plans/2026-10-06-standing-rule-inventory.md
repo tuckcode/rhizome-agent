@@ -154,8 +154,8 @@ Default weight: **context**. Cheap technical gotchas can be **practice**.
 
 | Rule | Weight | Still in code? | Notes |
 |---|---|---|---|
-| Demo vault hygiene; default `demo-vault-v2/` | **practice** | Fixtures exist. | Clean up dirt. Not a product identity rule. |
-| User vault is `~/Laputa/` | **stale** | **Name is leftover Desktop.** ADRs/README still say “Laputa app.” Smoke fixtures still use `/Users/luca/Laputa`. | Do not send testers to Laputa. The *hygiene* (do not pollute a real vault) is **practice**. |
+| Demo vault hygiene; default `demo-vault-v2/` | **practice** | **Thin fixture.** Git tracks only `demo-vault-v2/AGENTS.md`. `demo-vault/` is gitignored. GETTING-STARTED still calls v2 a curated wiki; that content is not in this tree. | Agent chore, not an in-app Clean. See **What “clean the vault” means** below. |
+| User vault is `~/Laputa/` | **stale** | **Name is leftover Desktop.** The clean it names is `git checkout -- . && git clean -fd`. | Do not send testers to Laputa. Do **not** ship that restore as a product button on a vault that holds agent source of truth. |
 | Always use shadcn/ui. Never raw `<button>` / `<input>` / `<select>`. | **context** | **Partial.** Many surfaces use `@/components/ui/button`. Raw `<button>` still exists in product files. | Agents *over-treat* this as a wall. Match neighbors. Do not block a slice over a native control. |
 | `Option+N`, `app.set_menu()` replaces the whole menu, `mock-tauri` swallows calls | **practice** | Still true on macOS / in this tree. | Cheap gotchas. Keep. |
 | osascript / computer-use QA | **practice** | CROSS-MODEL: osascript TCC dies; CuaDriver does not. | Follow the *corrected* this-repo version, not the Desktop sentence. |
@@ -223,7 +223,44 @@ Opposite list — agents *under-treat* these:
 
 ---
 
-## 7. Wanted: sit-down grill
+## 7. What “clean the vault” means
+
+Two different vaults got one inherited rule. They are not the same job.
+
+**Repo QA fixture** (`demo-vault/`, `demo-vault-v2/` in this git tree).
+Agents test by making untitled notes. “Clean” means: delete those notes
+and revert tracked edits so `git status --short -- demo-vault demo-vault-v2`
+is empty. Nothing in the app does this. There is no Clean button.
+Measured 2026-10-06: v2 holds one tracked file, `AGENTS.md`. The
+“curated search / relationship / project notes” line in
+`GETTING-STARTED.md` is stale.
+
+**A person’s vault** (the Desktop rule still says `~/Laputa/`).
+“Clean” there is nuclear: `git checkout -- . && git clean -fd` — throw
+away every uncommitted file and restore the last commit. That is how
+Desktop kept a personal wiki from filling with untitled QA notes. It
+is the **wrong** tool if the vault is also the home for agent
+dotfiles, `agents/shared/`, skills, and anything an agent must keep.
+
+A vault used as wiki **and** agent home needs a different hygiene:
+
+- Sacred / durable: notes he wrote, `agents/shared/`, named dotfiles,
+  skills. Agents may read and, with approval, edit. Never wipe.
+- Scratch: untitled notes, QA residue, one-off agent dumps. Those may
+  be deleted on purpose.
+- Never “reset the whole vault to last git commit” from the app.
+
+That product is **not built**. `docs/design/vault-skill-home.md` is
+the parked layout (vault `agents/shared/` as the one source, sync
+copies into Cursor / Claude / Codex must-load files). Do not implement
+CC Switch. Do not add a Clean command that runs `git clean -fd`.
+
+Speak up, then wait, if a later session wants a slice: durable layout
+first, scratch-delete second, never nuclear restore.
+
+---
+
+## 8. Wanted: sit-down grill
 
 **Remind Atticus.** This inventory is a map, not the comb.
 
@@ -242,7 +279,7 @@ the homework.
 
 ---
 
-## 8. Sources opened
+## 9. Sources opened
 
 - `AGENTS.md` §1–3, Standing holds, Learned
 - `docs/ASTRA_PACKET.md` §4, §10
