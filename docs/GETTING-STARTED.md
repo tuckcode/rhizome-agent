@@ -195,7 +195,6 @@ rhizome-agent/
 │   │   ├── AddRemoteModal.tsx    # Connect a local-only vault to a remote later
 │   │   ├── ConflictResolverModal.tsx # Git conflict resolution
 │   │   ├── CommitDialog.tsx      # Git commit modal
-│   │   ├── CreateNoteDialog.tsx  # New note modal
 │   │   ├── CreateTypeDialog.tsx  # New type modal
 │   │   ├── UpdateBanner.tsx      # In-app update notification
 │   │   ├── inspector/            # Inspector sub-panels
@@ -627,7 +626,7 @@ BASE_URL="http://localhost:5202" npx playwright test tests/smoke/<slug>.spec.ts
 
 1. Create a type document at the vault root: `mytype.md` with `type: Type` frontmatter (icon, color, order, etc.)
 2. The sidebar section groups are auto-generated from type documents — no code change needed if `visible: true`
-3. Update `CreateNoteDialog.tsx` type options if users should be able to create it from the dialog
+3. No type list to edit. The sidebar and note list create a note of that type immediately through `useNoteCreation.ts` (`handleCreateNoteImmediate`)
 4. Notes of this type are created at the vault root with `type: MyType` in frontmatter — no dedicated folder needed
 
 ### Add a command palette entry
