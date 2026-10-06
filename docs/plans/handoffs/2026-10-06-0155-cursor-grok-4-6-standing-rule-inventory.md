@@ -4,7 +4,7 @@ model: Grok 4.6 (Cursor)
 description: >-
   Inventory of standing agent stops: inherited Desktop, one-night Astra
   packet, dated Atticus calls, and what the tree still does. Evidence only.
-commits: pending
+commits: 4398bf3
 ---
 
 # Standing-rule inventory
