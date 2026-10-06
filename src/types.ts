@@ -138,6 +138,11 @@ export interface Settings {
    */
   keep_sessions_running_on_quit?: boolean | null
   /**
+   * Leave Rhizome in the Dock/taskbar after the red close button.
+   * Absent or false: close quits and stops helpers this process started.
+   */
+  keep_in_taskbar_on_close?: boolean | null
+  /**
    * Confetti when something worth marking finishes. Absent means never
    * chosen, which reads as on. A system reduced-motion preference suppresses
    * celebrations whatever this says.

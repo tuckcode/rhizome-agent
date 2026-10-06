@@ -398,6 +398,26 @@ pub fn save_settings(settings: Settings) -> Result<(), String> {
     crate::settings::save_settings(settings)
 }
 
+/// After the active-close dialog settles, hide or quit from the same rule
+/// the red X uses. Destroying `main` while the process lives is C22.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn finish_main_window_close(
+    app: tauri::AppHandle,
+    window: tauri::Window,
+) -> Result<(), String> {
+    if crate::keep_in_taskbar_on_close_enabled(
+        crate::settings::get_settings()
+            .ok()
+            .and_then(|settings| settings.keep_in_taskbar_on_close),
+    ) {
+        window.hide().map_err(|error| error.to_string())
+    } else {
+        app.exit(0);
+        Ok(())
+    }
+}
+
 #[tauri::command]
 pub fn get_ai_workspace_sessions() -> Result<serde_json::Value, String> {
     crate::settings::get_ai_workspace_sessions()

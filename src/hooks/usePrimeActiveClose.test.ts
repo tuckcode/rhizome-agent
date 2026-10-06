@@ -4,7 +4,6 @@ import { PRIME_ACTIVE_CLOSE_EVENT, usePrimeActiveClose } from './usePrimeActiveC
 
 const listenMock = vi.fn()
 const unlistenMock = vi.fn()
-const hideMock = vi.fn()
 const { invoked, tauri } = vi.hoisted(() => ({
   invoked: { calls: [] as Array<{ cmd: string; args?: Record<string, unknown> }> },
   tauri: { on: true },
@@ -12,10 +11,6 @@ const { invoked, tauri } = vi.hoisted(() => ({
 
 vi.mock('@tauri-apps/api/event', () => ({
   listen: (...args: unknown[]) => listenMock(...args),
-}))
-
-vi.mock('@tauri-apps/api/window', () => ({
-  getCurrentWindow: () => ({ hide: hideMock }),
 }))
 
 vi.mock('../mock-tauri', () => ({
@@ -39,8 +34,6 @@ describe('usePrimeActiveClose', () => {
   beforeEach(() => {
     listenMock.mockReset()
     unlistenMock.mockReset()
-    hideMock.mockReset()
-    hideMock.mockResolvedValue(undefined)
     invoked.calls = []
     tauri.on = true
     listenMock.mockResolvedValue(unlistenMock)
@@ -64,7 +57,7 @@ describe('usePrimeActiveClose', () => {
     expect(result.current.open).toBe(true)
   })
 
-  it('stop and close settles with stop, then hides', async () => {
+  it('stop and close settles with stop, then finishes the close', async () => {
     const { result } = renderHook(() => usePrimeActiveClose())
     await waitFor(() => expect(listenMock).toHaveBeenCalled())
     act(() => {
@@ -77,12 +70,12 @@ describe('usePrimeActiveClose', () => {
 
     expect(invoked.calls).toEqual([
       { cmd: 'settle_prime_session', args: { intent: 'stop' } },
+      { cmd: 'finish_main_window_close' },
     ])
-    await waitFor(() => expect(hideMock).toHaveBeenCalled())
     expect(result.current.open).toBe(false)
   })
 
-  it('keep working settles with keep_working, then hides', async () => {
+  it('keep working settles with keep_working, then finishes the close', async () => {
     const { result } = renderHook(() => usePrimeActiveClose())
     await waitFor(() => expect(listenMock).toHaveBeenCalled())
     act(() => {
@@ -95,8 +88,8 @@ describe('usePrimeActiveClose', () => {
 
     expect(invoked.calls).toEqual([
       { cmd: 'settle_prime_session', args: { intent: 'keep_working' } },
+      { cmd: 'finish_main_window_close' },
     ])
-    await waitFor(() => expect(hideMock).toHaveBeenCalled())
   })
 
   it('cancel leaves the window open and does not settle', async () => {
@@ -110,6 +103,5 @@ describe('usePrimeActiveClose', () => {
     })
     expect(result.current.open).toBe(false)
     expect(invoked.calls).toEqual([])
-    expect(hideMock).not.toHaveBeenCalled()
   })
 })

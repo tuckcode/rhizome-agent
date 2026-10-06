@@ -135,9 +135,10 @@ unless a row below is the task.
   (`sessionPath` + `name`) and must **not** create a session. **#31 closed.**
 - Session switch skips `ensure_prime_session_host` when the host is
   already running (`usePrimeSessionSwitcher` `hostRunning`).
-- New sessions are Prime `client_owned` (ADR-0167 / C47). Idle close
-  detaches. Active close defaults to **stop**, with Keep working as an
-  explicit promote to `resident`. Quit follows ownership.
+- New sessions are Prime `client_owned` (ADR-0167 / C47). Red X **quits**
+  unless Settings → Keep in taskbar (ADR-0179). Active close defaults
+  to **stop**, with Keep working as an explicit promote to `resident`.
+  Quit follows ownership and stops a spawned Prime unless that grant.
 - Rhizome starts the Prime supervisor on connect
   (`prime-agent --mode daemon --daemon-socket <path>`). Do not spawn
   when `RHIZOME_PRIME_DAEMON_SOCKET` is set. If the host is down, **retry

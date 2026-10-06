@@ -163,6 +163,13 @@ pub struct Settings {
     /// daemon is shared infrastructure that starts itself and hosts other
     /// clients' work; Rhizome stops what it started and nothing else.
     pub keep_sessions_running_on_quit: Option<bool>,
+    /// Keep the main window in the Dock/taskbar after the red close button.
+    ///
+    /// Off by default (including `None`): red X quits and stops helpers this
+    /// process started. On restores C22 hide so tray/dock can reopen Chat.
+    /// A user-started shared Prime daemon is never sent `shutdown`.
+    #[serde(default)]
+    pub keep_in_taskbar_on_close: Option<bool>,
     /// Whether finishing something worth marking shows a burst of confetti.
     ///
     /// `None` means "never chosen", which reads as on — the effect is opt-out.
@@ -425,6 +432,7 @@ fn normalize_settings(settings: Settings) -> Settings {
         archived_prime_sessions: settings.archived_prime_sessions,
         prime_model_allow_list: normalize_prime_model_allow_list(settings.prime_model_allow_list),
         keep_sessions_running_on_quit: settings.keep_sessions_running_on_quit,
+        keep_in_taskbar_on_close: settings.keep_in_taskbar_on_close,
         celebrations_enabled: settings.celebrations_enabled,
         auto_pull_interval_minutes: settings.auto_pull_interval_minutes,
         git_enabled: settings.git_enabled,
@@ -898,11 +906,22 @@ mod tests {
     }
 
     #[test]
+    fn keep_in_taskbar_on_close_defaults_off() {
+        assert_eq!(Settings::default().keep_in_taskbar_on_close, None);
+        let loaded = save_and_reload(Settings {
+            keep_in_taskbar_on_close: Some(true),
+            ..Settings::default()
+        });
+        assert_eq!(loaded.keep_in_taskbar_on_close, Some(true));
+    }
+
+    #[test]
     fn test_settings_json_roundtrip() {
         let settings = Settings {
             archived_prime_sessions: Some(vec!["01a0252e-filed".to_string()]),
             prime_model_allow_list: Some(vec!["opencode/hy3-free".to_string()]),
             keep_sessions_running_on_quit: Some(true),
+            keep_in_taskbar_on_close: Some(true),
             celebrations_enabled: Some(false),
             auto_pull_interval_minutes: Some(10),
             git_enabled: Some(false),

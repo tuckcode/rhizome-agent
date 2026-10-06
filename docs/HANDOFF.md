@@ -47,6 +47,7 @@ file.
 ---
 
 ## State
+**Origin:** Cursor Grok 4.6 · 2026-10-06 · ADR-0179: red X quits unless Keep in taskbar. [Handoff](plans/handoffs/2026-10-06-0225-cursor-grok-4-6-red-close-quits.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · C94: CodeQL rust/cleartext-logging false positives on CLI stdout and test asserts. [Handoff](plans/handoffs/2026-10-05-2253-cursor-grok-4-6-codeql-cleartext.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · Hermes ACP client (ADR-0178). Generic stdio JSON-RPC; `hermes chat` stays fallback. Fixture-tested only. [Handoff](plans/handoffs/2026-10-05-2005-cursor-grok-4-6-hermes-acp.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · #40 decided: Rhizome is a client of harnesses (ADR-0177). Docs only. [Handoff](plans/handoffs/2026-10-05-1855-cursor-grok-4-6-adr-0177-client.md).
@@ -126,6 +127,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-10-06 · red X quits](plans/handoffs/2026-10-06-0225-cursor-grok-4-6-red-close-quits.md) — ADR-0179: default close exits and stops Rhizome-owned helpers; Keep in taskbar restores hide.
 - [2026-10-05 · CodeQL C94](plans/handoffs/2026-10-05-2253-cursor-grok-4-6-codeql-cleartext.md) — GHAS umbrella failed on rust/cleartext-logging false positives; CLI stdout + assert text.
 - [2026-10-05 · Hermes ACP](plans/handoffs/2026-10-05-2005-cursor-grok-4-6-hermes-acp.md) — generic ACP client; Hermes one-shot is fallback. Fixture only.
 - [2026-10-05 · ADR-0177](plans/handoffs/2026-10-05-1855-cursor-grok-4-6-adr-0177-client.md) — #40 option 1: Rhizome is a client of harnesses. Docs only.

@@ -1090,13 +1090,15 @@ describe('parked organs leftover', () => {
     expect(menu).toContain('onSetArchived(session, true)')
   })
 
-  it('hides the window on close and still quits on Cmd+Q', () => {
+  it('quits on close unless keep-in-taskbar is on, and still restores from the Dock', () => {
     const rust = readFileSync(`${process.cwd()}/src-tauri/src/lib.rs`, 'utf8')
     expect(rust).toContain('fn window_hides_instead_of_closing')
-    expect(rust).toContain('Cmd+Q raises `ExitRequested`, not `CloseRequested`')
+    expect(rust).toContain('label == "main" && keep_in_taskbar')
+    expect(rust).toContain('Cmd+Q still raises `ExitRequested`')
     expect(rust).toContain('fn focus_main_window')
     expect(rust).toContain('app_handle.show()')
     expect(rust).toContain('window.unminimize()')
+    expect(rust).toContain('fn release_helpers_on_quit')
   })
 
   it('keeps the vault dropdown on the bottom-left status bar', () => {
@@ -1246,7 +1248,7 @@ describe('parked organs leftover', () => {
     expect(levels).toContain("max: 'Max'")
   })
 
-  it('promotes on Keep working, then hides', () => {
+  it('promotes on Keep working, then finishes the close', () => {
     const close = readFileSync(
       `${process.cwd()}/src/hooks/usePrimeActiveClose.ts`,
       'utf8',
@@ -1255,8 +1257,9 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src-tauri/src/prime_session_host.rs`,
       'utf8',
     )
-    expect(close).toContain("void settleAndHide('keep_working')")
+    expect(close).toContain("void settleAndFinish('keep_working')")
     expect(close).toContain("await callHost('settle_prime_session', { intent })")
+    expect(close).toContain("await callHost('finish_main_window_close')")
     expect(rust).toContain('"type": "promote_owned_session"')
     expect(rust).toContain('fn keep_working_promotes_then_detaches')
   })

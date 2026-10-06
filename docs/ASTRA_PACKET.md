@@ -537,7 +537,8 @@ Astra: do not fight overnight agents, and do not expand scope.
 - Do **not** expand two big overlays at once
 - Do **not** port CC Switch into the product
 - Do **not** add GitHub Actions / paid CI
-- Do **not** make the red close button quit (C22 hide is intended)
+- Do **not** make the red close button quit (C22 hide is intended).
+  Later (2026-10-06): Atticus asked for the opposite; [ADR-0179](adr/0179-red-close-quits-unless-keep-in-taskbar.md) quits unless Keep in taskbar.
 - Do **not** apply the Cursor model split to Codex/Claude
 - Do **not** redirect running Cursor siblings to Codex
 - Do **not** clobber `BOARD.md`

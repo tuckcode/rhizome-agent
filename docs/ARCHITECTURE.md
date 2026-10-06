@@ -676,18 +676,20 @@ then reloads the attached session. Rhizome writes the environment variable
 
 **Origin:** PR #66 KEEP · 2026-09-14 · not a merge of the draft.
 **Origin:** Cursor Grok 4.6 · 2026-09-21 · C75 — hide leaves spawned Prime warm.
+**Origin:** Cursor Grok 4.6 · 2026-10-06 · ADR-0179 — red X quits unless keep in taskbar.
 
-The red traffic light **hides** the main window (C22); Cmd+Q quits.
-Idle hide settles the owned session as **Stop**, then
-`release_helpers_for_hidden_window` stops the MCP WebSocket bridge and
-the Mindwalk sidecar so they do not leave a Dock “running” mark.
-**C75:** a Prime daemon this process spawned stays warm for fast reopen
-(`hidden_window_helper_stops` is `["ws_bridge", "mindwalk"]` only).
-Keep-working (`resident`) also leaves that daemon; it changes session
-intent, not whether the process stays. Rhizome never sends Prime’s
-`shutdown` RPC (other clients share the machine). Active hide asks first
-(`prime-active-close-requested`); `settle_prime_session` also releases
-helpers because `window.hide()` does not raise `CloseRequested` again.
+The red traffic light **quits** unless Settings → Keep in taskbar is on
+(ADR-0179). Cmd+Q still quits. Default red X calls `app.exit(0)` so the
+Exit path settles the session and `release_helpers_on_quit` stops the
+MCP WebSocket bridge, Mindwalk, and a Prime daemon this process spawned.
+Keep in taskbar restores C22 hide: `release_helpers_for_hidden_window`
+stops ws-bridge and Mindwalk; **C75** leaves the spawned Prime warm.
+Keep-working (`resident`) leaves that daemon on quit so the grant can
+live. Rhizome never sends Prime’s `shutdown` RPC (other clients share
+the machine). Active close still asks first
+(`prime-active-close-requested`); `finish_main_window_close` then hides
+or exits from the same setting. Do not destroy `main` while the process
+lives.
 
 Cold launch shows `BootSplash` while the lazy `App` chunk loads
 (`src/main.tsx` — not `Suspense fallback={null}`). Setup calls

@@ -30,6 +30,7 @@ Read the session file first:
 | 4 | **Public-install dogfood** | Draft: [`PUBLIC-PREVIEW.md`](PUBLIC-PREVIEW.md). Still needs a clean-account run. Honest Prime-missing first minute (C64); one live turn + note; #46 live. Windows out. |
 | 5 | **Harness leftovers** | #41 live steer/queue; human session titles (unwrap history blobs on list); Packages rail shortcut only if claimed. |
 | Parked | Import `1`, #56 keep/remove, W11 cards, TraderAlice patterns, kanban/automations on rail | Ledger: [inventory](plans/2026-09-20-public-readiness-inventory.md). A row is not approval. |
+| Done | **Red X quits unless Keep in taskbar** | ADR-0179. Default close exits and stops Rhizome-owned helpers. Native live-check still open. |
 
 **Hard nos:** wrong tree; reopen/merge closed drafts #66–#68; `import_jsonl` without `1`; cite ADR-0168 as settled; ADHD packing; English-only churn (C18).
 
