@@ -18,11 +18,17 @@ describe('SessionTranscriptSearchResults', () => {
     render(<SessionTranscriptSearchResults hits={[hit]} onSelect={onSelect} />)
 
     expect(screen.getByRole('region', { name: 'Sessions' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /Daemon notes/ }))
+    fireEvent.click(screen.getByRole('option', { name: /Daemon notes/ }))
 
     expect(onSelect).toHaveBeenCalledWith(hit)
     expect(screen.getByText('Assistant')).toBeInTheDocument()
     expect(screen.getByText('The daemon transport uses a named socket.')).toBeInTheDocument()
+  })
+
+  it('marks the keyboard-selected hit', () => {
+    render(<SessionTranscriptSearchResults hits={[hit]} selectedIndex={0} />)
+
+    expect(screen.getByRole('option', { name: /Daemon notes/ })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('renders nothing when there are no hits', () => {

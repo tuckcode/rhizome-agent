@@ -31,6 +31,8 @@ beforeEach(() => {
       return [{ id: 'a', path: '/sessions/a.jsonl', title: 'Socket', mtimeMs: 5 }]
     }
     if (command === 'read_prime_session_transcript') return transcript
+    if (command === 'load_session_transcript_index') return { version: 1, sessions: [] }
+    if (command === 'save_session_transcript_index') return undefined
     return []
   })
 })
@@ -59,5 +61,36 @@ describe('useSessionTranscriptSearch', () => {
     rerender({ query: 'named' })
     await waitFor(() => expect(trackEvent).toHaveBeenCalledTimes(2), { timeout: 2000 })
     expect(reads()).toHaveLength(1)
+  })
+
+  it('uses a stored index so a later hook does not re-read an unchanged transcript', async () => {
+    callHost.mockImplementation(async (command: string) => {
+      if (command === 'list_prime_session_summaries') {
+        return [{ id: 'a', path: '/sessions/a.jsonl', title: 'Socket', mtimeMs: 5 }]
+      }
+      if (command === 'read_prime_session_transcript') return transcript
+      if (command === 'load_session_transcript_index') {
+        return {
+          version: 1,
+          sessions: [{
+            path: '/sessions/a.jsonl',
+            stamp: '5',
+            id: 'a',
+            title: 'Socket',
+            turns: [{ messageIndex: 0, role: 'user', text: 'named socket' }],
+          }],
+        }
+      }
+      return []
+    })
+
+    renderHook(() => useSessionTranscriptSearch('socket', true))
+
+    await waitFor(() => {
+      expect(trackEvent).toHaveBeenCalledWith('session_transcript_search', { hit_count: 1 })
+    }, { timeout: 2000 })
+
+    expect(callHost.mock.calls.filter((call) => call[0] === 'read_prime_session_transcript')).toHaveLength(0)
+    expect(callHost).toHaveBeenCalledWith('load_session_transcript_index')
   })
 })

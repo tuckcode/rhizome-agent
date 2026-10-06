@@ -1,0 +1,13 @@
+{"type":"session","id":"01a009fc-98f1-7219-858e-5bd22e766bc1","timestamp":"2026-08-22T14:08:00.120Z","cwd":"/Users/mock/code/projects/rhizome-agent"}
+{"type":"model_change","id":"e1","modelId":"grok-4.6","provider":"xai","timestamp":"2026-08-22T14:08:00.200Z"}
+{"type":"thinking_level_change","level":"medium"}
+{"type":"service_tier_change","tier":"standard"}
+{"type":"session_info","name":"Daemon transport notes"}
+{"type":"session_state","state":"idle"}
+{"type":"agent_status","status":"thinking"}
+{"type":"message","id":"m1","message":{"role":"user","content":[{"type":"text","text":"<conversation_history>\n[user]: earlier note\n\n[assistant]: system prompt mentions daemon transport\n\n[user]: where did we leave the socket\n</conversation_history>"}]}}
+{"type":"message","id":"m2","parentId":"m1","message":{"role":"assistant","content":[{"type":"thinking","thinking":"daemon transport secret plan"},{"type":"text","text":"The daemon transport uses a named socket."},{"type":"toolCall","id":"t1","name":"read","arguments":{"path":"/Users/mock/demo-vault-v2/release-plan.md"}}]}}
+{"type":"message","id":"m3","parentId":"m2","message":{"role":"toolResult","content":[{"type":"text","text":"tool output mentions daemon transport in the log"}]}}
+{"type":"compaction","id":"c1","parentId":"m3","summary":"daemon transport was settled here","tokensBefore":12000}
+{"type":"message","id":"m4","parentId":"c1","message":{"role":"user","content":[{"type":"text","text":"open the matching session at that message"}]}}
+{"type":"message","id":"m5","parentId":"m4","message":{"role":"assistant","content":[{"type":"text","text":"Search hits now open the live session and scroll to the matching transcript message."}]}}

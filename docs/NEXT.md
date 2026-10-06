@@ -309,7 +309,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | #18 | Transcript markers for actions that change what Prime remembers — **closed 2026-09-13** |
 | #31 | Name Prime sessions at creation — **closed 2026-08-26** (create-time name + rename from the list) |
 | #49 | Sessions should be named by the model, not by whatever text came first — step 2 shipped in handoff; issue may still be open for remainder |
-| #23 | Sessions are searchable knowledge, not opaque logs — app search indexes transcripts and opens a hit at that message. Still open: on-disk index and real-log dogfood. Also fed by **session import** plan (§1) |
+| #23 | Sessions are searchable knowledge, not opaque logs — search opens a hit at that message. Follow-up **#81**: on-disk index, fixture dogfood, and Sessions-group keyboard nav. Also fed by **session import** plan (§1) |
 | C67 | Sessions list right-click menu — **shipped 2026-09-06** |
 | #42 | Tool cards say "ipython" five times — **closed 2026-08-26** (expandable Tool use group; `%%bash` → command) |
 

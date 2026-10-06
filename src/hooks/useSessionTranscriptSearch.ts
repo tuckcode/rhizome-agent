@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { callHost } from '../lib/callHost'
 import {
   createSessionTranscriptIndex,
+  parseSessionTranscriptIndexDocument,
+  serializeSessionTranscriptIndexDocument,
   type SessionTranscriptHit,
   type SessionTranscriptIndex,
+  type SessionTranscriptIndexStore,
   type SessionTranscriptReader,
   type SessionTranscriptSource,
 } from '../lib/sessionTranscriptSearch'
@@ -37,11 +40,26 @@ function primeSessionTranscriptReader(): SessionTranscriptReader {
   }
 }
 
+function hostSessionTranscriptIndexStore(): SessionTranscriptIndexStore {
+  return {
+    async load() {
+      const document = await callHost<unknown>('load_session_transcript_index')
+      return parseSessionTranscriptIndexDocument(document)
+    },
+    async save(records) {
+      await callHost('save_session_transcript_index', {
+        index: serializeSessionTranscriptIndexDocument(records),
+      })
+    },
+  }
+}
+
 /**
  * Search session transcripts for the app search box.
  *
- * The index lives for the life of this hook, so a later keystroke does not
- * re-read a transcript whose list stamp has not changed.
+ * The index lives for the life of this hook and hydrates from the on-disk
+ * store, so a later keystroke or a later launch does not re-read a
+ * transcript whose list stamp has not changed.
  */
 export function useSessionTranscriptSearch(query: string, enabled: boolean): SessionTranscriptHit[] {
   const indexRef = useRef<SessionTranscriptIndex | null>(null)
@@ -56,7 +74,10 @@ export function useSessionTranscriptSearch(query: string, enabled: boolean): Ses
 
     let cancelled = false
     const timer = setTimeout(() => {
-      const index = indexRef.current ?? createSessionTranscriptIndex(primeSessionTranscriptReader())
+      const index = indexRef.current ?? createSessionTranscriptIndex(
+        primeSessionTranscriptReader(),
+        { store: hostSessionTranscriptIndexStore() },
+      )
       indexRef.current = index
       void index.search(trimmed).then((next) => {
         if (cancelled) return

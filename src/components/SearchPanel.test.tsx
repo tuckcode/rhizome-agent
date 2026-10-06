@@ -2,11 +2,18 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { SearchPanel } from './SearchPanel'
 import type { VaultEntry } from '../types'
+import type { SessionTranscriptHit } from '../lib/sessionTranscriptSearch'
+
+let mockedSessionHits: SessionTranscriptHit[] = []
 
 // Mock the mock-tauri module (component uses mockInvoke when isTauri() is false)
 vi.mock('../mock-tauri', () => ({
   mockInvoke: vi.fn(),
   isTauri: () => false,
+}))
+
+vi.mock('../hooks/useSessionTranscriptSearch', () => ({
+  useSessionTranscriptSearch: () => mockedSessionHits,
 }))
 
 import { mockInvoke } from '../mock-tauri'
@@ -100,17 +107,35 @@ const API_SEARCH_RESULT: MockSearchResult = {
   note_type: null,
 }
 
+const SESSION_HIT: SessionTranscriptHit = {
+  sessionId: 'daemon',
+  sessionPath: '/sessions/daemon.jsonl',
+  sessionTitle: 'Daemon notes',
+  messageIndex: 4,
+  role: 'assistant',
+  excerpt: 'The daemon transport uses a named socket.',
+}
+
 function renderSearchPanel({
   entries = MOCK_ENTRIES,
   onClose = vi.fn(),
   onSelectNote = vi.fn(),
+  onSelectSessionHit = vi.fn(),
 }: {
   entries?: VaultEntry[]
   onClose?: () => void
   onSelectNote?: (entry: VaultEntry) => void
+  onSelectSessionHit?: (hit: SessionTranscriptHit) => void
 } = {}) {
   render(
-    <SearchPanel open={true} vaultPath="/vault" entries={entries} onSelectNote={onSelectNote} onClose={onClose} />,
+    <SearchPanel
+      open={true}
+      vaultPath="/vault"
+      entries={entries}
+      onSelectNote={onSelectNote}
+      onSelectSessionHit={onSelectSessionHit}
+      onClose={onClose}
+    />,
   )
 }
 
@@ -125,6 +150,7 @@ async function renderSearchWithResults({
   query = 'test',
   visibleTitle = 'Search Patterns',
   onSelectNote = vi.fn(),
+  onSelectSessionHit = vi.fn(),
 }: {
   elapsedMs?: number
   entries?: VaultEntry[]
@@ -132,9 +158,10 @@ async function renderSearchWithResults({
   query?: string
   visibleTitle?: string
   onSelectNote?: (entry: VaultEntry) => void
+  onSelectSessionHit?: (hit: SessionTranscriptHit) => void
 } = {}) {
   mockSearchResults(results, elapsedMs)
-  renderSearchPanel({ entries, onSelectNote })
+  renderSearchPanel({ entries, onSelectNote, onSelectSessionHit })
 
   const input = screen.getByPlaceholderText(SEARCH_INPUT_PLACEHOLDER)
   fireEvent.change(input, { target: { value: query } })
@@ -143,7 +170,7 @@ async function renderSearchWithResults({
     expect(screen.getByText(visibleTitle)).toBeInTheDocument()
   })
 
-  return { input, onSelectNote }
+  return { input, onSelectNote, onSelectSessionHit }
 }
 
 async function renderSingleResultSearch({
@@ -212,6 +239,7 @@ function dispatchKeyboardEvent(
 describe('SearchPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockedSessionHits = []
   })
 
   it('renders nothing when closed', () => {
@@ -447,6 +475,54 @@ describe('SearchPanel', () => {
       expect(onSelectNote).toHaveBeenCalledWith(MOCK_ENTRIES[0])
     })
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('moves from the last note into the Sessions group with ArrowDown', async () => {
+    mockedSessionHits = [SESSION_HIT]
+    const { input } = await renderSingleResultSearch()
+
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'ArrowDown' })
+    })
+
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: /Daemon notes/ })).toHaveAttribute('aria-selected', 'true')
+      expectUnselectedResult('How to Design AI-first APIs')
+    })
+  })
+
+  it('scrolls a selected session hit into view', async () => {
+    mockedSessionHits = [SESSION_HIT]
+    const { input } = await renderSingleResultSearch()
+    const sessionOption = screen.getByRole('option', { name: /Daemon notes/ })
+    const scrollIntoView = vi.spyOn(sessionOption, 'scrollIntoView')
+
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'ArrowDown' })
+    })
+
+    await waitFor(() => {
+      expect(sessionOption).toHaveAttribute('aria-selected', 'true')
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    })
+  })
+
+  it('opens the selected session hit on Enter', async () => {
+    mockedSessionHits = [SESSION_HIT]
+    const onSelectSessionHit = vi.fn()
+    const { input } = await renderSearchWithResults({
+      entries: MOCK_ENTRIES,
+      onSelectSessionHit,
+      results: [API_SEARCH_RESULT],
+      visibleTitle: 'How to Design AI-first APIs',
+    })
+
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'ArrowDown' })
+      fireEvent.keyDown(input, { key: 'Enter' })
+    })
+
+    expect(onSelectSessionHit).toHaveBeenCalledWith(SESSION_HIT)
   })
 
   it('shows result count and elapsed time', async () => {
