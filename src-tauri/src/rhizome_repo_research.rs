@@ -826,7 +826,7 @@ mod tests {
         let message = result.expect("live repo research should succeed");
         assert!(
             message.contains("saved as"),
-            "unexpected message: {message}"
+            "live repo research should report a saved page"
         );
         assert!(!lines.is_empty(), "expected progress lines");
 

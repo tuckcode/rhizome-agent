@@ -291,7 +291,9 @@ rhizome-agent/
 │   │   ├── secure_fs.rs          # Owner-only atomic writes (settings + secrets)
 │   │   ├── search.rs             # Keyword search (walkdir-based)
 │   │   ├── ai_agents.rs          # CLI-agent request normalization + adapter dispatch
+│   │   ├── acp_client/           # Generic ACP stdio JSON-RPC client (Hermes first)
 │   │   ├── cli_agent_runtime.rs  # Shared CLI-agent runtime process/prompt/MCP helpers
+│   │   ├── hermes_cli.rs         # Hermes ACP adapter + one-shot chat fallback
 │   │   ├── claude_cli.rs         # Claude CLI adapter
 │   │   ├── codex_cli.rs          # Codex CLI adapter
 │   │   ├── pi_cli.rs             # Pi CLI adapter
