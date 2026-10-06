@@ -2,8 +2,8 @@
 session: 2026-10-06T01:55Z
 model: Grok 4.6 (Cursor)
 description: >-
-  Inventory of standing agent stops: inherited Desktop, one-night Astra
-  packet, dated Atticus calls, and what the tree still does. Evidence only.
+  Standing-rule inventory plus weight, push-back disclaimer, solid-rule
+  list, and a wanted grill-with-docs sit-down. Evidence only.
 commits: 4398bf3
 ---
 
@@ -18,8 +18,7 @@ commits: 4398bf3
 
 Does not change `AGENTS.md` or product code. Does not reopen C22.
 
-## Re-judge first (from the inventory)
-
-Red close hides; “no GitHub Actions / paid CI” (already stale); shadcn-always;
-`~/Laputa/`; ADR-0168 as a veto; ASTRA_PACKET §10 as standing law;
-evening-dump hard nos treated as forever.
+Weight column tells agents bind / live / practice / context / stale / dead.
+Push back if a rule is nonsense; he is open to a better product even when
+a rule is sound. Wanted: later `/grill-with-docs` sit-down. Remind him.
+Do not start unless he says now.
