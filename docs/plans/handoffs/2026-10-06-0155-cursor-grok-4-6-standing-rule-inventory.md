@@ -19,6 +19,6 @@ commits: 4398bf3
 Does not change `AGENTS.md` or product code. Does not reopen C22.
 
 Weight column tells agents bind / live / practice / context / stale / dead.
-Push back if a rule is nonsense; he is open to a better product even when
-a rule is sound. Wanted: later `/grill-with-docs` sit-down. Remind him.
-Do not start unless he says now.
+Speak up if a rule is nonsense or a better shape exists. Do not unilaterally
+drop a rule and build. Wait for him. Wanted: later `/grill-with-docs`.
+Remind him. Do not start unless he says now.

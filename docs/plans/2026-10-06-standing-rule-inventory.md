@@ -31,26 +31,32 @@ not promote a `context` or `stale` row to a stop. Do not demote a
 `bind` or `live` row to optional. `context` means *read it and do not
 veto with it*, not *skip the file*.
 
-Atticus's current ask still wins. Weight tells you how hard to push
-back, not whether to refuse him.
+His current ask is the job. A doc is not a veto of that job. Changing
+a rule, or building past one, still goes through him.
 
-## Push back
+## Speak up. Do not decide.
 
 A lot of these rows are pre-existing Desktop text, one-night traffic,
 or two agents writing past each other on bad data. Some are solid.
 The file is allowed to contain both.
 
-**If a rule truly does not make sense, say so.** Do not quietly obey a
-nonsense stop. Do not invent a workaround that pretends the rule is
-fine. Name the row, why it fails, and what you would do instead.
+**Do not unilaterally drop a rule and implement your own way.** That is
+the last thing he wants. “I have a better idea, so I built it” is a
+miss even when the idea is good.
 
-**Even when a rule does make sense, he is open to a better product.**
-Push back with evidence. Offer the better shape. He decides. Safety
-still stands until he overrides it this turn (wrong tree, English-only,
-`import_jsonl` waits for `1`).
+**Do speak up** when:
 
-Quiet obedience and quiet dismissal are the same failure: the human
-does not get the argument.
+- a rule is about to stop the request and you see no reason it should
+  exist, or no reason it applies to this task, or
+- you have a better shape than the rule or the request implies.
+
+Name the row, why it fails or does not apply, and what you would do
+instead. Then **wait**. He decides. Only then build.
+
+Safety rows stay until he overrides them this turn (wrong tree,
+English-only, `import_jsonl` waits for `1`). Quiet obedience (building
+the stop) and quiet override (building past the stop) are the same
+miss: it did not go through him.
 
 ## What is solid
 
@@ -60,7 +66,7 @@ spine about, until he changes them on purpose:
 - Wrong tree (`tuckcode/rhizome-agent`, not Desktop).
 - English only. Stop reopening localization.
 - `import_jsonl` list rows wait for `1`.
-- Current ask wins. Docs are evidence, not a veto.
+- His current ask is the job. Docs are evidence, not a veto. Deviations still go through him.
 - ADR-0177: Rhizome is a client of harnesses.
 - Do not send Prime `shutdown`.
 - Voice files stay out of this repo.
