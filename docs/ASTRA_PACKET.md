@@ -382,7 +382,7 @@ close-on-live-check. Do **not** re-implement.
 | #32 | Prime on Windows | Code + docs; **C42 never launched** |
 | #36 | Timezone setting | **Spec tonight** — [`plans/issue-36-timezone-setting.md`](plans/issue-36-timezone-setting.md). Display-only; do not code until God plan. |
 | #39 | Graph as agent tool | **B** — place vs tool; ADR-0170 settled place |
-| #40 | Harness vs client | **Decided 2026-10-05:** client of harnesses ([ADR-0177](adr/0177-rhizome-is-a-client-of-harnesses.md)). Close when the ADR is on `main`. #5 stays (Prime surface spec). |
+| #40 | Harness vs client | **Decided 2026-10-05:** client of harnesses ([ADR-0177](adr/0177-rhizome-is-a-client-of-harnesses.md)). Hermes ACP: [ADR-0178](adr/0178-generic-acp-client.md). #5 stays (Prime surface spec). |
 | #41 | Steer/queue wired to nothing | Queue display exists; steer UX still the gap |
 | #43 | Window navigation guard | **Closed 2026-09-13** (`navigation_guard.rs`) |
 | #45 | Model settings / OAuth / allow-list | Allow-list + Nous list shipped; remainder open |

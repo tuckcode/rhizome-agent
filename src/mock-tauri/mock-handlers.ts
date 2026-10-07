@@ -3,6 +3,10 @@
  * Each handler simulates a Tauri backend command.
  */
 
+import {
+  SESSION_TRANSCRIPT_INDEX_VERSION,
+  type SessionTranscriptIndexDocument,
+} from '../lib/sessionTranscriptSearch'
 import type {
   VaultEntry,
   ModifiedFile,
@@ -491,6 +495,11 @@ const MOCK_WIKI_GRAPH = {
   ],
 }
 
+let mockSessionTranscriptIndex: SessionTranscriptIndexDocument = {
+  version: SESSION_TRANSCRIPT_INDEX_VERSION,
+  sessions: [],
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock handler map accepts heterogeneous arg types
 export const mockHandlers: Record<string, (args: any) => any> = {
   list_vault: () => MOCK_ENTRIES,
@@ -793,6 +802,12 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   // in `pnpm dev` looked broken — the conversation stayed on its empty state —
   // so a genuine bug in that path (the column collapsing on select) was
   // indistinguishable from the mock having nothing to give, and went unnoticed.
+  load_session_transcript_index: () => mockSessionTranscriptIndex,
+  save_session_transcript_index: (args: { index?: SessionTranscriptIndexDocument }) => {
+    if (args?.index && args.index.version === SESSION_TRANSCRIPT_INDEX_VERSION) {
+      mockSessionTranscriptIndex = args.index
+    }
+  },
   read_prime_session_transcript: (args: { path?: string }) => {
     const which = (args?.path ?? '').includes('01a0208e') ? 'release notes' : 'the vault watcher'
     return [

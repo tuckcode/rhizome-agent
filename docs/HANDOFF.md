@@ -48,6 +48,9 @@ file.
 
 ## State
 **Origin:** Cursor Grok 4.6 · 2026-10-06 · standing-rule inventory (inherited / one-night / Atticus / still in code). Evidence only. [Inventory](plans/2026-10-06-standing-rule-inventory.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-05 · C94: CodeQL rust/cleartext-logging false positives on CLI stdout and test asserts. [Handoff](plans/handoffs/2026-10-05-2253-cursor-grok-4-6-codeql-cleartext.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-05 · #81: on-disk session-transcript index, Prime jsonl fixtures, and Sessions-group keyboard nav. Rhizome-owned memory (ADR-0177). [Handoff](plans/handoffs/2026-10-05-2015-cursor-grok-4-6-issue-81-session-index.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-05 · Hermes ACP client (ADR-0178). Generic stdio JSON-RPC; `hermes chat` stays fallback. Fixture-tested only. [Handoff](plans/handoffs/2026-10-05-2005-cursor-grok-4-6-hermes-acp.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · #40 decided: Rhizome is a client of harnesses (ADR-0177). Docs only. [Handoff](plans/handoffs/2026-10-05-1855-cursor-grok-4-6-adr-0177-client.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · docs-only dead-link cleanup in ARCHITECTURE.md and HANDOFF.md. [Handoff](plans/handoffs/2026-10-05-0440-cursor-grok-4-6-dead-links.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · #23 first slice: app search opens a session hit at the transcript index. On-disk index and real-log dogfood remain. [Handoff](plans/handoffs/2026-10-05-0325-cursor-grok-4-6-issue-23-open-hit.md).
@@ -126,6 +129,9 @@ Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
 - [2026-10-06 · rule inventory](plans/handoffs/2026-10-06-0155-cursor-grok-4-6-standing-rule-inventory.md) — inherited / one-night / Atticus / still in code. Evidence only.
+- [2026-10-05 · CodeQL C94](plans/handoffs/2026-10-05-2253-cursor-grok-4-6-codeql-cleartext.md) — GHAS umbrella failed on rust/cleartext-logging false positives; CLI stdout + assert text.
+- [2026-10-05 · #81 session index](plans/handoffs/2026-10-05-2015-cursor-grok-4-6-issue-81-session-index.md) — on-disk transcript index, jsonl fixtures, Sessions keyboard nav.
+- [2026-10-05 · Hermes ACP](plans/handoffs/2026-10-05-2005-cursor-grok-4-6-hermes-acp.md) — generic ACP client; Hermes one-shot is fallback. Fixture only.
 - [2026-10-05 · ADR-0177](plans/handoffs/2026-10-05-1855-cursor-grok-4-6-adr-0177-client.md) — #40 option 1: Rhizome is a client of harnesses. Docs only.
 - [2026-10-05 · dead links](plans/handoffs/2026-10-05-0440-cursor-grok-4-6-dead-links.md) — ARCHITECTURE.md and HANDOFF.md path drift only. No code.
 - [2026-10-05 · #23 open hit](plans/handoffs/2026-10-05-0325-cursor-grok-4-6-issue-23-open-hit.md) — search hit opens the session at `messageIndex`. On-disk index and real-log dogfood remain.
@@ -275,6 +281,7 @@ push is not a release — releases are tagged builds with signed installers.
 5. `AGENTS.md` at repo root
 
 ## Open threads
+- **C94-FIXED (2026-10-05): CodeQL `rust/cleartext-logging` on CLI stdout and test asserts.** GHAS marked six high alerts as new on PR #85 after `main`'s rust baseline cancelled. The sinks were `println!` of `rhizome-tool` results and `assert!(…, "got: {message}")` interpolations. CodeQL treated those as logs of `session_id` / `api_key`. **Fixed:** CLI writes stdout through `write_cli_output`; asserts use static messages. [Handoff](plans/handoffs/2026-10-05-2253-cursor-grok-4-6-codeql-cleartext.md).
 - **C93-FIXED (2026-10-04): stale `fast-uri` 3.1.6 pins after C88.** C88 moved the `pnpm-workspace.yaml` override to 3.1.7, but `leftover-dep-pins.test.ts` and `parked-organs.test.ts` still asserted 3.1.6 and failed the push gate, and `mcp-server/package.json` `overrides` still pinned 3.1.6. **Fixed:** both tests assert 3.1.7; the `mcp-server` override is 3.1.7, guarded by a new test. That override only applies to a hand-run `npm install` in `mcp-server/`; the bundle builds from the pnpm workspace. Found by Hermes (DeepSeek Flash); tests fixed by Claude Opus 5.5 (Claude Code desktop).
 **Origin:** Astra through Hermes desktop · 2026-10-04 · C89–C92 from the browser design audit.
 - **C89-FIXED (`7c680ac`):** HTML splash ignores current theme keys, lacks the early local wordmark face, and restarts motion under React. Browser probes reproduced these states. Native Windows checked after the fix; native macOS not. [Report](design/2026-10-04-ui-audit.md), [fix](design/2026-10-04-cursor-implementation-result.md).
@@ -417,6 +424,7 @@ Closed C32, C35 and C41 moved to [`archive-closed-threads.md`](plans/handoffs/ar
   (`docs/design/token-routing-and-compression.md`); full stack still unread.
   Composition (#40 options 2 and 3) is rejected by ADR-0177
   (2026-10-05): Rhizome is a client of harnesses and does not own the loop.
+  Hermes ACP client is ADR-0178 (`acp_client/`); one-shot chat is fallback.
   Older `harness-composition.md` "option 2" used different numbering.
   **2026-09-19 metabolite (source + live skill, not a new runtime):**
   Hermes/Pi short-reply manners and a GUI-safe Node `PATH` live in

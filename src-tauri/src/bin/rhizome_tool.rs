@@ -9,6 +9,7 @@
 
 use rhizome_lib::inbox_action::CaptureRequest;
 use rhizome_lib::rhizome_api::{self, GraphQuery};
+use std::io::{self, Write};
 use std::path::PathBuf;
 
 /// Trigger recorded when a caller does not name itself. Everything reaching
@@ -281,6 +282,16 @@ fn run(command: Command) -> Result<String, String> {
     }
 }
 
+/// CLI product output. This is stdout, not a log — CodeQL rust/cleartext-logging
+/// treats `println!` of command results as logging session ids / keys.
+fn write_cli_output(output: &str, writer: &mut impl Write) -> io::Result<()> {
+    writer.write_all(output.as_bytes())?;
+    if !output.ends_with('\n') {
+        writer.write_all(b"\n")?;
+    }
+    Ok(())
+}
+
 fn main() {
     let argv: Vec<String> = std::env::args().skip(1).collect();
     let command = match parse_args(&argv) {
@@ -291,7 +302,12 @@ fn main() {
         }
     };
     match run(command) {
-        Ok(output) => println!("{output}"),
+        Ok(output) => {
+            if let Err(error) = write_cli_output(&output, &mut io::stdout()) {
+                eprintln!("rhizome-tool: {error}");
+                std::process::exit(1);
+            }
+        }
         Err(e) => {
             eprintln!("rhizome-tool: {e}");
             std::process::exit(1);
@@ -305,6 +321,20 @@ mod tests {
 
     fn args(v: &[&str]) -> Vec<String> {
         v.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn write_cli_output_adds_a_trailing_newline() {
+        let mut buf = Vec::new();
+        write_cli_output("saved as card.md", &mut buf).unwrap();
+        assert_eq!(buf, b"saved as card.md\n");
+    }
+
+    #[test]
+    fn write_cli_output_keeps_an_existing_trailing_newline() {
+        let mut buf = Vec::new();
+        write_cli_output("ok\n", &mut buf).unwrap();
+        assert_eq!(buf, b"ok\n");
     }
 
     #[test]
