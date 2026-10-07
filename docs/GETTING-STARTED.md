@@ -317,7 +317,7 @@ rhizome-agent/
 │   └── package.json
 │
 ├── tests/smoke/                  # Playwright specs (full regression + @smoke subset)
-├── demo-vault-v2/                # Curated local QA fixture for native/dev flows
+├── demo-vault-v2/                # Dev vault path; git tracks AGENTS.md only
 ├── scripts/                      # Build/utility scripts
 │
 ├── package.json                  # Frontend dependencies + scripts
@@ -334,7 +334,9 @@ rhizome-agent/
 
 ### Fixtures
 
-- `demo-vault-v2/` is the small checked-in QA fixture used for native/manual Rhizome Agent flows. It is intentionally curated around a handful of search, relationship, project-navigation, and attachment scenarios.
+- `demo-vault-v2/` is the checked-in QA fixture path for local/dev vault
+  defaulting. Git tracks `AGENTS.md` only. It is not a curated wiki.
+  Playwright uses `tests/fixtures/test-vault/` copies instead.
 - `tests/fixtures/test-vault/` is the deterministic Playwright fixture copied into temp directories for isolated integration and smoke tests.
 
 ### Start here
