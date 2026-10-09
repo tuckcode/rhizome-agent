@@ -15,6 +15,8 @@ The [inventory](plans/2026-09-20-public-readiness-inventory.md) preserves all
 are closed.
 **Origin:** Composer 2.5 Fast · 2026-09-27 · snapshot refresh (swarm Wave 1).
 
+**Harness plan (2026-10-09):** [`plans/2026-10-09-rhizome-harness-plan.md`](plans/2026-10-09-rhizome-harness-plan.md) — ADR-0180 phases. Docs only until the open questions are answered.
+
 `origin/main` = **`5c37d28`**; local HEAD matches; nothing unpushed. Installed
 app = **`d0a55f8`**. Rebuild remains a separate verb from commit/push.
 
