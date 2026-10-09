@@ -213,5 +213,6 @@ proposed → active → superseded
 | [0152](0152-mcp-rust-sidecar.md) | MCP research verbs via Rust `rhizome-tool` sidecar | active |
 | [0174](0174-hybrid-wiki-search-index.md) | Hybrid tantivy + fastembed index for wiki search | active |
 | [0176](0176-settings-sign-in-through-prime-auth-storage.md) | Settings sign-in drives Prime's own AuthStorage | active |
-| [0177](0177-rhizome-is-a-client-of-harnesses.md) | Rhizome is a client of harnesses | active |
+| [0177](0177-rhizome-is-a-client-of-harnesses.md) | Rhizome is a client of harnesses | superseded → [0179](0179-rhizome-is-its-own-harness.md) |
 | [0178](0178-generic-acp-client.md) | Generic ACP client; Hermes one-shot is fallback | active |
+| [0179](0179-rhizome-is-its-own-harness.md) | Rhizome is its own harness | active |

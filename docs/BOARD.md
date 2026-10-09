@@ -150,12 +150,13 @@ STE stays in the vault. Do not copy voice skills into this tree.
 
 ---
 
-## Prime Agent (do not invent an architecture)
+## Prime Agent (optional engine)
 
-Rhizome is the desk. Prime is the engine. Daemon **client**. Coverage by
-**user job**, not command count. Detail:
+Rhizome owns the harness (ADR-0179). Prime is an optional engine.
+Daemon **client** when attached (ADR-0163). Coverage by **user job**,
+not command count. Detail:
 [`design/prime-agent-surface.md`](design/prime-agent-surface.md).
-Doctrine: ADR-0168. Transport: ADR-0163. Lifecycle: ADR-0167.
+Borrow-care: ADR-0168 (amended). Lifecycle: ADR-0167.
 
 ---
 

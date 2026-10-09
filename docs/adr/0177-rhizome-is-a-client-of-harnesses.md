@@ -2,11 +2,15 @@
 type: ADR
 id: "0177"
 title: "Rhizome is a client of harnesses"
-status: active
+status: superseded
 date: 2026-10-05
+superseded_by: "0179"
 ---
 
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · Atticus / knispo room consensus (#40)
+
+**Superseded 2026-10-09** by [ADR-0179](0179-rhizome-is-its-own-harness.md).
+The vault-layer ownership table still holds. The client identity does not.
 
 ## Context
 

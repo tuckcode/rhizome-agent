@@ -1,6 +1,6 @@
 # Architecture
 
-> This document describes Rhizome Agent (`ai.rhizome.agent`, `tuckcode/rhizome-agent`) — a chat shell on the Prime Agent harness, not Rhizome Desktop (`knispo/rhizome`). See `docs/IDENTITY.md`. "Tolaria" below is the pre-fork product name, not renamed on every line; treat it as a synonym for "the app," not evidence of the wrong product.
+> This document describes Rhizome Agent (`ai.rhizome.agent`, `tuckcode/rhizome-agent`) — a chat UI plus Rhizome's own harness (ADR-0179). Prime and Hermes are optional engines. Not Rhizome Desktop (`knispo/rhizome`). See `docs/IDENTITY.md`. "Tolaria" below is the pre-fork product name, not renamed on every line; treat it as a synonym for "the app," not evidence of the wrong product.
 
 Tolaria is a personal knowledge and life management desktop app. It reads a vault of markdown files with YAML frontmatter and presents them in a four-panel UI inspired by Bear Notes.
 
@@ -457,9 +457,9 @@ New sessions are `client_owned` (ADR-0167). Idle close detaches; the owned
 worker expires after Prime's reconnect grace. Active close asks, with
 **Stop and close** as the default and **Keep working** as an explicit
 `promote_owned_session`. The daemon may stay available; that is not the same
-as an agent still working. ADR-0168 is the broader take/leave rule: Rhizome
-renders Prime, it does not become a second runtime. See
-`docs/design/harness-doctrine.md`.
+as an agent still working. ADR-0179 is the identity: Rhizome owns the loop.
+ADR-0168 (amended) is the borrow-care rule. Prime is an optional engine
+(ADR-0163). See `docs/design/harness-doctrine.md`.
 
 #### The two modules, and why confusing them is the classic mistake
 
@@ -906,7 +906,8 @@ Search is keyword-based, using `walkdir` to scan all `.md` files in the vault di
 The `search_vault` Tauri command runs the scan in a blocking Tokio task and returns results sorted by relevance score.
 
 App search (`SearchPanel`) also queries harness session transcripts through a
-Rhizome-owned index (`src/lib/sessionTranscriptSearch.ts`, ADR-0177). It reads
+Rhizome-owned index (`src/lib/sessionTranscriptSearch.ts`, ADR-0177 vault
+layer, still holds under ADR-0179). It reads
 each `list_prime_session_summaries` path once per `mtimeMs` stamp via
 `read_prime_session_transcript`, then persists the extracted turns under the
 OS cache (`ai.rhizome.agent/session-transcript-index/v1.json`). A later search
