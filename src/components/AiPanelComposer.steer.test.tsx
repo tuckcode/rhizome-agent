@@ -95,11 +95,9 @@ describe('AiPanelComposer steering', () => {
   })
 
   it('renders a foot row under the composer when one is provided', () => {
-    renderComposer({ foot: <div data-testid="chat-composer-foot">Working · last tool get_note</div> })
+    renderComposer({ foot: <div data-testid="chat-composer-foot">busy</div> })
 
-    expect(screen.getByTestId('chat-composer-foot')).toHaveTextContent(
-      'Working · last tool get_note',
-    )
+    expect(screen.getByTestId('chat-composer-foot')).toHaveTextContent('busy')
   })
 
   it('puts the control deck above the input', () => {

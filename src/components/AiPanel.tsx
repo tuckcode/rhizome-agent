@@ -41,7 +41,6 @@ import { promoteSessionFromHost } from '../utils/promoteChatToVault'
 import { usePrimeSessionRestore } from '../hooks/usePrimeSessionRestore'
 import { usePrimeSessionStats } from '../hooks/usePrimeSessionStats'
 import { ChatComposerBar } from './ChatComposerBar'
-import { lastToolName } from '../utils/lastToolName'
 import { workerStartFailureReason } from '../lib/primeWorkerStartError'
 import { PrimeGoalDialog } from './PrimeGoalDialog'
 import { PrimeScheduleDialog } from './PrimeScheduleDialog'
@@ -550,7 +549,6 @@ export function AiPanelView({
             locale={locale}
             deck={composerDeck}
             working={isActive}
-            lastToolName={lastToolName(agent.messages)}
             failureReason={agent.status === 'error'
               ? workerStartFailureReason(getLastAgentMessage(agent.messages) ?? '')
               : null}

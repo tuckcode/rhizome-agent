@@ -37,9 +37,12 @@ describe('ChatComposerBar', () => {
     expect(screen.getByTestId('chat-composer-bar')).not.toHaveTextContent('Idle')
   })
 
-  it('names the running tool while a turn works', () => {
-    renderBar({ working: true, lastToolName: 'get_note' })
-    expect(screen.getByTestId('chat-composer-foot')).toHaveTextContent('Working · last tool get_note')
+  it('shows a quiet busy mark while a turn works, not the last tool name', () => {
+    renderBar({ working: true, stats: { contextTokens: 2_000, contextWindow: 200_000 } })
+    const foot = screen.getByTestId('chat-composer-foot')
+    expect(foot).toHaveAttribute('aria-label', 'Working')
+    expect(foot).not.toHaveTextContent('last tool')
+    expect(screen.getByTestId('prime-context-button')).toHaveTextContent('1%')
   })
 
   it('hides the context control until Prime reports usage', () => {
