@@ -507,7 +507,9 @@ Each answers "nothing", which is true of a host with no session.
 
 - **`prime_session_host.rs`** — socket transport, handshake, attach, session
   lifecycle, prompt streaming, model/thinking level, goals, fork, compact,
-  heartbeats, quit disposition
+  heartbeats, quit disposition. After `agent_end` the drain waits briefly for
+  a follow-up; `agent_status` / `session_state` / `tool_status` are spinner
+  noise and must not cancel that grace (otherwise Chat stays Working).
 - **`prime_sessions.rs`** — summarising logs off disk for the history list; caps
   each read at 400 lines (`SUMMARY_SCAN_LINE_LIMIT`) and stops early, which is
   why listing 2,000 sessions costs ~50ms rather than reading gigabytes
