@@ -6,6 +6,12 @@ status: active
 date: 2026-08-24
 supersedes: "the unratified 'full harness desktop' / command-count parity premise; does not supersede ADR-0163 transport or ADR-0167 lifecycle"
 ---
+
+**Amended 2026-10-09:** [ADR-0180](0180-rhizome-is-its-own-harness.md)
+supersedes the Prime-only execution lock and the ban on a Rhizome-owned
+loop. Borrow-care (no second memory authority, no blind transplant)
+still holds.
+
 ## Context
 
 Rhizome Agent sits next to several serious agent harnesses: Prime Agent (the

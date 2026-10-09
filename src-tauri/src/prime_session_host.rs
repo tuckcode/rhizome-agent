@@ -184,24 +184,95 @@ pub fn stop_spawned_daemon() {
     kill_process_group(pid);
 }
 
+/// Unix `kill(2)` / `getpgid(2)` without taking a `libc` crate dependency.
+///
+/// The `kill` executable's `-<pgid>` parsing is runner-specific (GNU vs BSD,
+/// and some environments treat a negative target as the caller's group).
+/// Signal numbers and `ESRCH` are the POSIX values on Linux and macOS.
+#[cfg(unix)]
+mod unix_signals {
+    pub const SIGTERM: i32 = 15;
+    pub const SIGKILL: i32 = 9;
+    pub const ESRCH: i32 = 3;
+
+    extern "C" {
+        fn kill(pid: i32, sig: i32) -> i32;
+        #[cfg(test)]
+        fn getpgid(pid: i32) -> i32;
+    }
+
+    pub fn send(pid: i32, sig: i32) -> i32 {
+        // SAFETY: kill(2) is defined for any pid; a missing process returns
+        // -1 / ESRCH rather than undefined behaviour.
+        unsafe { kill(pid, sig) }
+    }
+
+    #[cfg(test)]
+    pub fn process_group_id(pid: i32) -> Option<i32> {
+        // SAFETY: getpgid(2) is defined for any pid; -1 means the lookup failed.
+        let pgid = unsafe { getpgid(pid) };
+        if pgid < 0 {
+            None
+        } else {
+            Some(pgid)
+        }
+    }
+
+    pub fn is_alive(pid: i32) -> bool {
+        if send(pid, 0) == 0 {
+            return true;
+        }
+        std::io::Error::last_os_error().raw_os_error() != Some(ESRCH)
+    }
+}
+
 fn kill_process_group(pid: u32) {
     #[cfg(unix)]
     {
-        let pgid = format!("-{pid}");
-        let pid = pid.to_string();
-        let _ = std::process::Command::new("kill")
-            .args(["-TERM", &pgid, &pid])
-            .status();
-        thread::sleep(Duration::from_millis(50));
-        let _ = std::process::Command::new("kill")
-            .args(["-KILL", &pgid, &pid])
-            .status();
+        // macOS can report a successful kill against a process that was just
+        // spawned and then drop the signal (rust-lang/rust#14232 / XNU). One
+        // `kill` CLI shot plus a fixed 50ms sleep loses that race. Retry TERM,
+        // then KILL, against both the process group and the leader until the
+        // pid is gone or the bound elapses.
+        let pid = pid as i32;
+        let group = -pid;
+        if !signal_until_gone(
+            group,
+            pid,
+            unix_signals::SIGTERM,
+            Duration::from_millis(200),
+        ) {
+            let _ = signal_until_gone(
+                group,
+                pid,
+                unix_signals::SIGKILL,
+                Duration::from_millis(200),
+            );
+        }
     }
     #[cfg(windows)]
     {
         let _ = std::process::Command::new("taskkill")
             .args(["/PID", &pid.to_string(), "/T", "/F"])
             .status();
+    }
+}
+
+/// Send `sig` to the process group and the leader, polling until the leader
+/// is gone or `timeout` elapses.
+#[cfg(unix)]
+fn signal_until_gone(group: i32, pid: i32, sig: i32, timeout: Duration) -> bool {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let _ = unix_signals::send(group, sig);
+        let _ = unix_signals::send(pid, sig);
+        if !unix_signals::is_alive(pid) {
+            return true;
+        }
+        if Instant::now() >= deadline {
+            return !unix_signals::is_alive(pid);
+        }
+        thread::sleep(Duration::from_millis(10));
     }
 }
 
@@ -5782,23 +5853,120 @@ mod tests {
     }
 
     /// A supervisor we spawned is ours to stop. We still never send `shutdown`.
+    ///
+    /// macOS can drop a signal sent in the same instant as spawn
+    /// (rust-lang/rust#14232). The helper retries until the group is gone.
+    /// This test waits until the fixture is a live group, then polls for a
+    /// signaled exit instead of one `wait()` on a 30s sleep.
     #[cfg(unix)]
     #[test]
     fn stop_spawned_daemon_kills_the_process_group() {
-        use std::os::unix::process::CommandExt;
+        use std::os::unix::process::{CommandExt, ExitStatusExt};
 
         let _guard = host_guard();
         std::env::remove_var(DAEMON_SOCKET_ENV);
+
         let mut child = std::process::Command::new("sleep")
             .arg("30")
             .process_group(0)
             .spawn()
             .unwrap();
         let pid = child.id();
+        assert!(
+            wait_until_group_leader(pid as i32, Duration::from_secs(2)),
+            "leader must be in its own process group before stop"
+        );
+        let mut member = std::process::Command::new("sleep")
+            .arg("30")
+            .process_group(pid as i32)
+            .spawn()
+            .unwrap();
+        let member_pid = member.id();
+        assert_ne!(member_pid, pid, "member must be a separate process");
+        assert!(
+            wait_until_alive(member_pid as i32, Duration::from_secs(2)),
+            "the group member must be running before stop"
+        );
+        assert!(
+            wait_until_in_group(member_pid as i32, pid as i32, Duration::from_secs(2)),
+            "member must join the leader's process group"
+        );
+
         record_spawned_daemon_pid(pid);
         stop_spawned_daemon();
-        let status = child.wait().unwrap();
-        assert!(!status.success(), "the helper must not stay running");
+
+        let status = match wait_for_child_exit(&mut child, Duration::from_secs(2)) {
+            Some(status) => status,
+            None => {
+                let _ = unix_signals::send(-(pid as i32), unix_signals::SIGKILL);
+                let _ = unix_signals::send(pid as i32, unix_signals::SIGKILL);
+                let _ = unix_signals::send(member_pid as i32, unix_signals::SIGKILL);
+                let _ = child.wait();
+                panic!("the spawned supervisor must exit after stop");
+            }
+        };
+        assert!(
+            status.signal().is_some(),
+            "the helper must be signaled, not exit 0: {status:?}"
+        );
+        let member_status = match wait_for_child_exit(&mut member, Duration::from_secs(2)) {
+            Some(status) => status,
+            None => {
+                let _ = unix_signals::send(member_pid as i32, unix_signals::SIGKILL);
+                let _ = member.wait();
+                panic!("stop must kill the process group, not only the leader");
+            }
+        };
+        assert!(
+            member_status.signal().is_some(),
+            "the group member must be signaled, not exit 0: {member_status:?}"
+        );
+    }
+
+    #[cfg(unix)]
+    fn wait_until_alive(pid: i32, timeout: Duration) -> bool {
+        let deadline = Instant::now() + timeout;
+        while Instant::now() < deadline {
+            if unix_signals::is_alive(pid) {
+                return true;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        unix_signals::is_alive(pid)
+    }
+
+    #[cfg(unix)]
+    fn wait_until_in_group(pid: i32, pgid: i32, timeout: Duration) -> bool {
+        let deadline = Instant::now() + timeout;
+        while Instant::now() < deadline {
+            if unix_signals::process_group_id(pid) == Some(pgid) {
+                return true;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        unix_signals::process_group_id(pid) == Some(pgid)
+    }
+
+    #[cfg(unix)]
+    fn wait_until_group_leader(pid: i32, timeout: Duration) -> bool {
+        wait_until_in_group(pid, pid, timeout)
+    }
+
+    #[cfg(unix)]
+    fn wait_for_child_exit(
+        child: &mut std::process::Child,
+        timeout: Duration,
+    ) -> Option<std::process::ExitStatus> {
+        let deadline = Instant::now() + timeout;
+        loop {
+            match child.try_wait() {
+                Ok(Some(status)) => return Some(status),
+                Ok(None) if Instant::now() < deadline => {
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Ok(None) | Err(_) => return None,
+            }
+        }
     }
 
     /// Keep working is the explicit grant: promote, then detach.

@@ -521,7 +521,9 @@ Verified against source 2026-09-14. Longer landmine list:
   and a Prime daemon this process spawned (ADR-0179). Keep in taskbar
   restores C22 hide; **C75** then leaves that daemon warm. Keep-working
   still settles the session as `resident` and leaves a spawned daemon
-  so the grant can live. Never send Prime `shutdown`. Cmd+Q still quits.
+  so the grant can live. Never send Prime `shutdown` (ADR-0163
+  transport, kept by ADR-0180). A Rhizome-owned turn that is not
+  using Prime is not a Prime helper. Cmd+Q still quits.
 - **Packages install is CLI, not the daemon.** `install_prime_package` runs
   `prime-agent package install` (180s). Confirm full system access once.
 - **Tab completion is rules-first.** `suggestReply` only. Do not add

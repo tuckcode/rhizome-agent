@@ -48,12 +48,13 @@ file.
 
 ## State
 **Origin:** Cursor Grok 4.6 · 2026-10-09 · PR #88 merged with main. Close path unchanged. Native red-X live-check still not run. [Handoff](plans/handoffs/2026-10-09-2225-cursor-grok-4-6-red-close-merge.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-09 · #80: spawned-daemon process-group stop retries via `kill(2)`. [Handoff](plans/handoffs/2026-10-09-2222-cursor-grok-4-6-issue-80-process-group-flake.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-06 · ADR-0179: red X quits unless Keep in taskbar. [Handoff](plans/handoffs/2026-10-06-0225-cursor-grok-4-6-red-close-quits.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-06 · standing-rule inventory (inherited / one-night / Atticus / still in code). Evidence only. [Inventory](plans/2026-10-06-standing-rule-inventory.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · C94: CodeQL rust/cleartext-logging false positives on CLI stdout and test asserts. [Handoff](plans/handoffs/2026-10-05-2253-cursor-grok-4-6-codeql-cleartext.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · #81: on-disk session-transcript index, Prime jsonl fixtures, and Sessions-group keyboard nav. Rhizome-owned memory (ADR-0177). [Handoff](plans/handoffs/2026-10-05-2015-cursor-grok-4-6-issue-81-session-index.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · Hermes ACP client (ADR-0178). Generic stdio JSON-RPC; `hermes chat` stays fallback. Fixture-tested only. [Handoff](plans/handoffs/2026-10-05-2005-cursor-grok-4-6-hermes-acp.md).
-**Origin:** Cursor Grok 4.6 · 2026-10-05 · #40 decided: Rhizome is a client of harnesses (ADR-0177). Docs only. [Handoff](plans/handoffs/2026-10-05-1855-cursor-grok-4-6-adr-0177-client.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-09 · #40 reversed: Rhizome is its own harness (ADR-0180). Docs only. [Handoff](plans/handoffs/2026-10-09-2239-cursor-grok-4-6-adr-0180-own-harness.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · docs-only dead-link cleanup in ARCHITECTURE.md and HANDOFF.md. [Handoff](plans/handoffs/2026-10-05-0440-cursor-grok-4-6-dead-links.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · #23 first slice: app search opens a session hit at the transcript index. On-disk index and real-log dogfood remain. [Handoff](plans/handoffs/2026-10-05-0325-cursor-grok-4-6-issue-23-open-hit.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · #57: leftover `is_a:` never ran on the vault in use because `list_vault` skipped the migrator. Open-path rewrite added; dead Laputa/Tolaria env names dropped. [Handoff](plans/handoffs/2026-10-05-0320-cursor-grok-4-6-issue-57-is-a-open.md).
@@ -131,12 +132,13 @@ Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
 - [2026-10-09 · #88 merge](plans/handoffs/2026-10-09-2225-cursor-grok-4-6-red-close-merge.md) — main merged into ADR-0179 close/quit. Hermes ACP is per-turn; native red-X not run.
+- [2026-10-09 · #80 process-group flake](plans/handoffs/2026-10-09-2222-cursor-grok-4-6-issue-80-process-group-flake.md) — `kill(2)` retry; test polls a live group.
 - [2026-10-06 · red X quits](plans/handoffs/2026-10-06-0225-cursor-grok-4-6-red-close-quits.md) — ADR-0179: default close exits and stops Rhizome-owned helpers; Keep in taskbar restores hide.
 - [2026-10-06 · rule inventory](plans/handoffs/2026-10-06-0155-cursor-grok-4-6-standing-rule-inventory.md) — inherited / one-night / Atticus / still in code. Evidence only.
 - [2026-10-05 · CodeQL C94](plans/handoffs/2026-10-05-2253-cursor-grok-4-6-codeql-cleartext.md) — GHAS umbrella failed on rust/cleartext-logging false positives; CLI stdout + assert text.
 - [2026-10-05 · #81 session index](plans/handoffs/2026-10-05-2015-cursor-grok-4-6-issue-81-session-index.md) — on-disk transcript index, jsonl fixtures, Sessions keyboard nav.
 - [2026-10-05 · Hermes ACP](plans/handoffs/2026-10-05-2005-cursor-grok-4-6-hermes-acp.md) — generic ACP client; Hermes one-shot is fallback. Fixture only.
-- [2026-10-05 · ADR-0177](plans/handoffs/2026-10-05-1855-cursor-grok-4-6-adr-0177-client.md) — #40 option 1: Rhizome is a client of harnesses. Docs only.
+- [2026-10-09 · ADR-0180](plans/handoffs/2026-10-09-2239-cursor-grok-4-6-adr-0180-own-harness.md) — #40 reversed: Rhizome is its own harness. Docs only.
 - [2026-10-05 · dead links](plans/handoffs/2026-10-05-0440-cursor-grok-4-6-dead-links.md) — ARCHITECTURE.md and HANDOFF.md path drift only. No code.
 - [2026-10-05 · #23 open hit](plans/handoffs/2026-10-05-0325-cursor-grok-4-6-issue-23-open-hit.md) — search hit opens the session at `messageIndex`. On-disk index and real-log dogfood remain.
 - [2026-10-05 · #57 ghost-compat](plans/handoffs/2026-10-05-0320-cursor-grok-4-6-issue-57-is-a-open.md) — `is_a:` rewrite now runs on `list_vault` / `reload_vault`; leftover file is on Atticus's machine.
@@ -155,8 +157,6 @@ Do not paste leftover paper here.
 - [2026-09-26 · public prep](plans/handoffs/2026-09-26-0559-claude-opus-5-5-public-prep.md) — secret scan clean; AGPL confirmed, Tolaria credited; Gmail-in-history open.
 - [2026-09-26 · Astra redesign](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md) — redesign + login-note skip + list markers pushed as `d0a55f8`; app rebuilt; native QA not done.
 - [2026-09-20 · Astra combined handoff](plans/handoffs/2026-09-20-1234-claude-opus-5-astra-combined-handoff.md) — D1–D7 audit, plugin rescope, ADR findings, and the Edit-list completion contract.
-- [2026-09-20 · Astra ↔ Cursor recap](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md) — plan through #26 CPR, D1–D7 local, Free-only dirt.
-- [2026-09-20 · #26 CPR](plans/handoffs/2026-09-20-0723-cursor-grok-4-6-issue-26-cpr.md) — origin and app `b7264d6`; live Update now still Q.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)
@@ -414,17 +414,15 @@ Closed C32, C35 and C41 moved to [`archive-closed-threads.md`](plans/handoffs/ar
   checked while keeping the old names — caught before commit, see `1f73a68`/
   next commit. All 4 pass, `--repeat-each=2` clean.
 
-- **C50-DECIDED (2026-08-24): selective harness doctrine.** Rhizome absorbs
-  contracts and artifacts from other harnesses, never their control loops or
-  memory stores. Prime remains the only execution core. Coverage is by user
-  job, not Prime command count. Ledger: `docs/design/harness-doctrine.md`,
-  ADR-0168. Source reviews and divergence scoring are in `docs/plans/2026-08-24-*`.
-  OpenHuman: TokenJuice compression path read 2026-08-26
-  (`docs/design/token-routing-and-compression.md`); full stack still unread.
-  Composition (#40 options 2 and 3) is rejected by ADR-0177
-  (2026-10-05): Rhizome is a client of harnesses and does not own the loop.
-  Hermes ACP client is ADR-0178 (`acp_client/`); one-shot chat is fallback.
-  Older `harness-composition.md` "option 2" used different numbering.
+- **C50-DECIDED (2026-08-24): selective harness doctrine.** Borrow with
+  care. ADR-0180 (2026-10-09) supersedes the Prime-only execution lock:
+  Rhizome owns its loop, tools, plugins, and routing. Prime and Hermes
+  are optional engines. Coverage is by user job, not command count.
+  Ledger: `docs/design/harness-doctrine.md`, ADR-0168 (amended). Reviews
+  in `docs/plans/2026-08-24-*`. TokenJuice path read 2026-08-26. ADR-0177
+  is superseded. Hermes ACP (ADR-0178) stays an optional engine. #56 is
+  won't-remove: `ai_models.rs` starts the Rhizome loop. Vault layer from
+  0177 still holds. Older `harness-composition.md` numbering differs.
   **2026-09-19 metabolite (source + live skill, not a new runtime):**
   Hermes/Pi short-reply manners and a GUI-safe Node `PATH` live in
   `prime_vault_skill.rs`. Do not cite this as swapping Prime for Hermes.

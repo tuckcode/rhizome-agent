@@ -597,7 +597,9 @@ Mindwalk, and a Prime daemon this process spawned. Keep in taskbar
 restores C22 hide: `release_helpers_for_hidden_window` stops only
 ws-bridge and Mindwalk (**C75** leaves spawned Prime warm). Keep working
 is a session grant: quit then leaves that spawned daemon. Never send
-Prime `shutdown`. Do not destroy `main` while the process lives.
+Prime `shutdown` (ADR-0163 transport, kept by ADR-0180). A Rhizome-owned
+turn that is not using Prime is not a Prime helper. Do not destroy
+`main` while the process lives.
 `finish_main_window_close` applies the same hide-or-quit rule after the
 active-close dialog.
 

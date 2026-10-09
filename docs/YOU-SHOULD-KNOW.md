@@ -72,7 +72,7 @@ longer open the way the ADR text still sounds.
 | Latest reply | Green start marker on the newest assistant turn. Moves when a newer reply starts. |
 | Session click | Transcript **clears on the click**, then rehydrates. Leaving the old chat up is the switch beachball. |
 | Settings cost | Model catalog and provider status wait until **Agents** is visible. Packages catalog waits until **Packages**. |
-| Hide vs quit | Red X quits unless Keep in taskbar (ADR-0179). Default quit stops ws-bridge, Mindwalk, and a spawned Prime. Keep in taskbar restores C22 hide; **C75** then leaves spawned Prime warm. Keep working leaves that daemon so the grant can live. Never Prime `shutdown`. |
+| Hide vs quit | Red X quits unless Keep in taskbar (ADR-0179). Default quit stops ws-bridge, Mindwalk, and a spawned Prime. Keep in taskbar restores C22 hide; **C75** then leaves spawned Prime warm. Keep working leaves that daemon so the grant can live. Never Prime `shutdown` (0163, kept by 0180). A Rhizome-owned turn that is not using Prime is not a Prime helper. |
 
 **Do not** make nav and the note list exclusive. Claude tried; it broke
 Cmd+N, inbox auto-advance, and note selection. Keep them mounted
@@ -107,6 +107,8 @@ unless a row below is the task.
   selective doctrine. Borrow contracts and artifacts. Never a second
   runtime or memory store. Option 2 is the intended shape (Rhizome
   harness, Prime engine) and is **not ratified** as composition.
+  **Amended 2026-10-09:** ADR-0180 — Rhizome owns the loop. 0168
+  borrow-care remains.
 - Working notes: [`harness-composition.md`](design/harness-composition.md).
   Proposed first slice if ratified: native Prime `extension_ui`
   (select / confirm / input — Rhizome auto-cancels those today).
@@ -268,7 +270,7 @@ issue.** Check `main` and the handoff first.
 
 | Still open | Honest read |
 |---|---|
-| #40 | Filter answered (ADR-0168); composition not ratified |
+| #40 | Reversed (ADR-0180); Rhizome is its own harness |
 | #41 | Source `onSteer` is wired. Leftover is native Enter-queue / Steer plus unspoken `mutate_queued_message`. Do not close from units. |
 | #5 | Spec skeleton: [`design/prime-agent-surface.md`](design/prime-agent-surface.md) |
 | #46 | Source refuses HOME as a vault (`4416411`). Leftover is live Chat-without-vault. Do not close from units. |
@@ -372,7 +374,7 @@ User leftover, in this order:
 | Traps | [`CROSS-MODEL-HANDOFF.md`](CROSS-MODEL-HANDOFF.md) |
 | Identity / Prime-first | [`IDENTITY.md`](IDENTITY.md) |
 | Shell ADR (Chat centre; canvas Qs superseded) | [`adr/0166-chat-centered-shell.md`](adr/0166-chat-centered-shell.md) · [0170](adr/0170-notes-heavy-right-panel.md) · [0171](adr/0171-graph-on-changes-only.md) |
-| Doctrine | [`design/harness-doctrine.md`](design/harness-doctrine.md) · ADR-0168 |
+| Doctrine | [`design/harness-doctrine.md`](design/harness-doctrine.md) · ADR-0168 (amended) · [ADR-0180](adr/0180-rhizome-is-its-own-harness.md) |
 | Composition (unratified) | [`design/harness-composition.md`](design/harness-composition.md) |
 | Token routing (discuss only) | [`design/token-routing-and-compression.md`](design/token-routing-and-compression.md) |
 | Afternoon wrap (now on origin) | [`plans/handoffs/2026-08-26-1718-grok-4-6-research-mycelium-canvas.md`](plans/handoffs/2026-08-26-1718-grok-4-6-research-mycelium-canvas.md) |
