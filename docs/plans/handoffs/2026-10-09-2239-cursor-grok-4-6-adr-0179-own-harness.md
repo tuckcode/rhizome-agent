@@ -4,7 +4,7 @@ model: Grok 4.6 (Cursor)
 description: >-
   ADR-0179: Rhizome is its own harness. Atticus / knispo room
   consensus reversing ADR-0177 option 1. Docs only; no app code.
-commits: pending
+commits: ac3b574
 ---
 
 # ADR-0179 — Rhizome is its own harness
