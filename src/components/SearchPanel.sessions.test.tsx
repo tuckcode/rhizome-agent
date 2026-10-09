@@ -92,7 +92,7 @@ describe('SearchPanel session transcripts', () => {
     expect(screen.getByText('The daemon transport uses a named socket.')).toBeInTheDocument()
     expect(screen.queryByText('No results found')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /Socket work/ }))
+    fireEvent.click(screen.getByRole('option', { name: /Socket work/ }))
     expect(onSelectSessionHit).toHaveBeenCalledWith(expect.objectContaining({
       sessionPath: '/sessions/a.jsonl',
       messageIndex: 0,

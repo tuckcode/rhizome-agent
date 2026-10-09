@@ -1,9 +1,12 @@
+import type { MouseEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import type { SessionTranscriptHit } from '../lib/sessionTranscriptSearch'
 
 interface SessionTranscriptSearchResultsProps {
   hits: SessionTranscriptHit[]
+  selectedIndex?: number
   onSelect?: (hit: SessionTranscriptHit) => void
+  onHover?: (index: number, event: MouseEvent<HTMLButtonElement>) => void
 }
 
 function roleLabel(role: SessionTranscriptHit['role']): string {
@@ -32,7 +35,12 @@ function HitBody({ hit }: { hit: SessionTranscriptHit }) {
  * A hit names the session and the transcript message index. Pass `onSelect`
  * to open that session at the hit.
  */
-export function SessionTranscriptSearchResults({ hits, onSelect }: SessionTranscriptSearchResultsProps) {
+export function SessionTranscriptSearchResults({
+  hits,
+  selectedIndex = -1,
+  onSelect,
+  onHover,
+}: SessionTranscriptSearchResultsProps) {
   if (hits.length === 0) return null
 
   return (
@@ -40,29 +48,33 @@ export function SessionTranscriptSearchResults({ hits, onSelect }: SessionTransc
       <h2 className="border-t border-border/50 px-4 py-1.5 text-[11px] font-medium text-muted-foreground">
         Sessions
       </h2>
-      <ul>
-        {hits.map((hit) => (
-          <li
-            key={`${hit.sessionPath}:${hit.messageIndex}:${hit.role}`}
-            data-message-index={hit.messageIndex}
-            data-session-path={hit.sessionPath}
-          >
-            {onSelect ? (
+      <ul role="listbox" aria-label="Session results">
+        {hits.map((hit, index) => {
+          const selected = index === selectedIndex
+          return (
+            <li
+              key={`${hit.sessionPath}:${hit.messageIndex}:${hit.role}`}
+              data-message-index={hit.messageIndex}
+              data-session-path={hit.sessionPath}
+            >
               <Button
                 type="button"
+                role="option"
+                aria-selected={selected}
                 variant="ghost"
-                className="h-auto w-full justify-start whitespace-normal rounded-none px-4 py-2.5 text-left font-normal hover:bg-secondary"
-                onClick={() => onSelect(hit)}
+                className={
+                  selected
+                    ? 'h-auto w-full justify-start whitespace-normal rounded-none px-4 py-2.5 text-left font-normal bg-accent hover:bg-accent'
+                    : 'h-auto w-full justify-start whitespace-normal rounded-none px-4 py-2.5 text-left font-normal hover:bg-secondary'
+                }
+                onClick={() => onSelect?.(hit)}
+                onMouseMove={(event) => onHover?.(index, event)}
               >
                 <HitBody hit={hit} />
               </Button>
-            ) : (
-              <div className="px-4 py-2.5">
-                <HitBody hit={hit} />
-              </div>
-            )}
-          </li>
-        ))}
+            </li>
+          )
+        })}
       </ul>
     </section>
   )

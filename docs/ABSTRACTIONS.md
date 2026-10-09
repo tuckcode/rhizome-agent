@@ -846,10 +846,12 @@ interface SearchResult {
 - Click result to open note in editor
 - Shows relevance score and snippet
 - Session transcript hits sit in a Sessions group beside note results. A hit
-  names the session and the transcript message index. Choosing it closes search
-  and opens that session at that point (`requestOpenSessionTranscriptHit` →
+  names the session and the transcript message index. Arrow keys move through
+  that group with the note rows. Choosing a hit closes search and opens that
+  session at that point (`requestOpenSessionTranscriptHit` →
   `usePrimeSessionSwitcher` → `useScrollToTranscriptHit`). The session list
-  filter stays metadata-only.
+  filter stays metadata-only. Extracted turns persist in Rhizome's cache
+  (ADR-0177); the harness log is not rewritten.
 
 The NoteList header search keeps its local title/snippet/property filtering for immediate scoped results, then augments the match set with `search_vault` hits from the visible workspace roots using the command's frontmatter-excluding search option. React stores only matching paths so body-only matches appear in the current list scope without a second content-read pass or rendering private matched text in note rows.
 

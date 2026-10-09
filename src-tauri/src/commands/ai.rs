@@ -923,6 +923,26 @@ pub fn read_prime_session_transcript(
     crate::prime_sessions::read_transcript(std::path::Path::new(&path))
 }
 
+/// Load Rhizome's on-disk session-transcript search index.
+///
+/// This is Rhizome memory (ADR-0177), not a Prime file. A missing cache is
+/// an empty index so a first search can build it.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn load_session_transcript_index(
+) -> Result<crate::session_transcript_index::SessionTranscriptIndexDocument, String> {
+    crate::session_transcript_index::load()
+}
+
+/// Persist Rhizome's session-transcript search index.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn save_session_transcript_index(
+    index: crate::session_transcript_index::SessionTranscriptIndexDocument,
+) -> Result<(), String> {
+    crate::session_transcript_index::save(&index)
+}
+
 /// Goal, heartbeats and schedules for the live Prime session.
 #[cfg(desktop)]
 #[tauri::command]

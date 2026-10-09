@@ -31,6 +31,8 @@ Read the session file first:
 | 5 | **Harness leftovers** | #41 live steer/queue; human session titles (unwrap history blobs on list); Packages rail shortcut only if claimed. |
 | Parked | Import `1`, #56 keep/remove, W11 cards, TraderAlice patterns, kanban/automations on rail | Ledger: [inventory](plans/2026-09-20-public-readiness-inventory.md). A row is not approval. |
 | Done | **Red X quits unless Keep in taskbar** | ADR-0179. Default close exits and stops Rhizome-owned helpers. Native live-check still open. |
+| Wanted | **Grill the standing rules** | Sit-down `/grill-with-docs` (or vault) over `AGENTS.md`, ASTRA_PACKET §10, YOU-SHOULD-KNOW, ship rules, ADR-0163/0168/0177. Map: [`plans/2026-10-06-standing-rule-inventory.md`](plans/2026-10-06-standing-rule-inventory.md). Remind him. Do not start unless he says now. |
+| Wanted | **Vault as agent home + scratch hygiene** | Wiki + `agents/shared/` / dotfiles as sacred. Scratch untitled notes may go. Never in-app `git clean -fd`. Parked layout: [`design/vault-skill-home.md`](design/vault-skill-home.md). Inventory §7. Do not start unless he says now.
 
 **Hard nos:** wrong tree; reopen/merge closed drafts #66–#68; `import_jsonl` without `1`; cite ADR-0168 as settled; ADHD packing; English-only churn (C18).
 
@@ -310,7 +312,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | #18 | Transcript markers for actions that change what Prime remembers — **closed 2026-09-13** |
 | #31 | Name Prime sessions at creation — **closed 2026-08-26** (create-time name + rename from the list) |
 | #49 | Sessions should be named by the model, not by whatever text came first — step 2 shipped in handoff; issue may still be open for remainder |
-| #23 | Sessions are searchable knowledge, not opaque logs — app search indexes transcripts and opens a hit at that message. Still open: on-disk index and real-log dogfood. Also fed by **session import** plan (§1) |
+| #23 | Sessions are searchable knowledge, not opaque logs — search opens a hit at that message. Follow-up **#81**: on-disk index, fixture dogfood, and Sessions-group keyboard nav. Also fed by **session import** plan (§1) |
 | C67 | Sessions list right-click menu — **shipped 2026-09-06** |
 | #42 | Tool cards say "ipython" five times — **closed 2026-08-26** (expandable Tool use group; `%%bash` → command) |
 

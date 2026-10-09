@@ -907,14 +907,18 @@ Search is keyword-based, using `walkdir` to scan all `.md` files in the vault di
 
 The `search_vault` Tauri command runs the scan in a blocking Tokio task and returns results sorted by relevance score.
 
-App search (`SearchPanel`) also queries Prime session transcripts through a
-separate in-memory index (`src/lib/sessionTranscriptSearch.ts`). It reads each
-`list_prime_session_summaries` path once per `mtimeMs` stamp via
-`read_prime_session_transcript`. Hits are user turns and assistant prose; tool
-noise is left out. Choosing a hit closes search, switches the live session, and
-scrolls that transcript index into view (`useScrollToTranscriptHit` /
-`TranscriptHitAnchor`). This is not the vault tantivy index.
-An on-disk incremental session index is still open (#23).
+App search (`SearchPanel`) also queries harness session transcripts through a
+Rhizome-owned index (`src/lib/sessionTranscriptSearch.ts`, ADR-0177). It reads
+each `list_prime_session_summaries` path once per `mtimeMs` stamp via
+`read_prime_session_transcript`, then persists the extracted turns under the
+OS cache (`ai.rhizome.agent/session-transcript-index/v1.json`). A later search
+or launch skips an unchanged log. Hits are user turns and assistant prose; tool
+noise is left out. Arrow keys move through the Sessions group with note
+results. Choosing a hit closes search, switches the live session, and scrolls
+that transcript index into view (`useScrollToTranscriptHit` /
+`TranscriptHitAnchor`). This is not the vault tantivy index. Prime's session
+directory is the first source; the stored record is path + stamp + turns so a
+later Hermes source can use the same store.
 
 The note-list search field combines client-side scoped filtering with that same command: title, snippet, and visible-property matches resolve immediately, while backend body-content hits use `search_vault` with frontmatter excluded before adding matching paths for the currently visible workspace roots without displaying matched body text in the note row.
 

@@ -3,8 +3,12 @@ import type { PrimeTranscriptItem } from './primeTranscriptToConversation'
 import {
   createSessionTranscriptIndex,
   openSessionTranscriptHit,
+  parseSessionTranscriptIndexDocument,
   requestOpenSessionTranscriptHit,
+  serializeSessionTranscriptIndexDocument,
   subscribeSessionTranscriptHitOpen,
+  type PersistedSessionRecord,
+  type SessionTranscriptIndexStore,
   type SessionTranscriptSource,
 } from './sessionTranscriptSearch'
 
@@ -54,6 +58,19 @@ function daemonTranscript(): PrimeTranscriptItem[] {
 
 function source(path: string, mtimeMs: number, title = 'Daemon notes'): SessionTranscriptSource {
   return { id: path, path, title, mtimeMs }
+}
+
+function memoryStore(initial: PersistedSessionRecord[] = []): SessionTranscriptIndexStore & { saved: PersistedSessionRecord[] } {
+  const store = {
+    saved: [...initial],
+    async load() {
+      return [...store.saved]
+    },
+    async save(records: PersistedSessionRecord[]) {
+      store.saved = [...records]
+    },
+  }
+  return store
 }
 
 describe('session transcript search', () => {
@@ -203,6 +220,103 @@ describe('session transcript search', () => {
     expect(switchSession.mock.invocationCallOrder[0]).toBeLessThan(readTranscript.mock.invocationCallOrder[0])
     expect(opened.messageIndex).toBe(4)
     expect(opened.transcript).toBe(transcript)
+  })
+
+  it('hydrates from the on-disk store and skips a matching transcript read', async () => {
+    const readTranscript = vi.fn(async () => daemonTranscript())
+    const store = memoryStore([{
+      path: '/sessions/daemon.jsonl',
+      stamp: '10',
+      id: '/sessions/daemon.jsonl',
+      title: 'Daemon notes',
+      turns: [{ messageIndex: 4, role: 'assistant', text: 'The daemon transport uses a named socket.' }],
+    }])
+    const index = createSessionTranscriptIndex({
+      listSessions: async () => [source('/sessions/daemon.jsonl', 10)],
+      readTranscript,
+    }, { store })
+
+    const hits = await index.search('named socket')
+
+    expect(readTranscript).not.toHaveBeenCalled()
+    expect(hits).toHaveLength(1)
+    expect(hits[0].excerpt).toContain('named socket')
+    expect(store.saved).toHaveLength(1)
+  })
+
+  it('re-reads and rewrites the store when the list stamp no longer matches', async () => {
+    const readTranscript = vi.fn(async () => [message('assistant', 'new pipe')])
+    const store = memoryStore([{
+      path: '/sessions/daemon.jsonl',
+      stamp: '1',
+      id: '/sessions/daemon.jsonl',
+      title: 'Daemon notes',
+      turns: [{ messageIndex: 0, role: 'assistant', text: 'old socket' }],
+    }])
+    const index = createSessionTranscriptIndex({
+      listSessions: async () => [source('/sessions/daemon.jsonl', 2)],
+      readTranscript,
+    }, { store })
+
+    const hits = await index.search('pipe')
+
+    expect(readTranscript).toHaveBeenCalledTimes(1)
+    expect(hits[0].excerpt).toContain('new pipe')
+    expect(store.saved[0]).toMatchObject({
+      path: '/sessions/daemon.jsonl',
+      stamp: '2',
+    })
+    expect(store.saved[0].turns[0].text).toContain('new pipe')
+  })
+
+  it('writes extracted turns after a cold read and drops a session the list no longer has', async () => {
+    const transcripts: Record<string, PrimeTranscriptItem[]> = {
+      '/sessions/keep.jsonl': [message('user', 'keep the socket notes')],
+      '/sessions/drop.jsonl': [message('user', 'drop the socket notes')],
+    }
+    let listed = [
+      source('/sessions/keep.jsonl', 1, 'Keep'),
+      source('/sessions/drop.jsonl', 1, 'Drop'),
+    ]
+    const store = memoryStore()
+    const index = createSessionTranscriptIndex({
+      listSessions: async () => listed,
+      readTranscript: async (path) => transcripts[path] ?? [],
+    }, { store })
+
+    await index.search('socket')
+    expect(store.saved.map((record) => record.path).sort()).toEqual([
+      '/sessions/drop.jsonl',
+      '/sessions/keep.jsonl',
+    ])
+
+    listed = [source('/sessions/keep.jsonl', 1, 'Keep')]
+    await index.search('socket')
+
+    expect(store.saved.map((record) => record.path)).toEqual(['/sessions/keep.jsonl'])
+  })
+
+  it('ignores a stored document with the wrong version', () => {
+    expect(parseSessionTranscriptIndexDocument({
+      version: 2,
+      sessions: [{ path: '/sessions/daemon.jsonl', stamp: '1', id: 'x', title: 'x', turns: [] }],
+    })).toEqual([])
+    expect(serializeSessionTranscriptIndexDocument([{
+      path: '/sessions/daemon.jsonl',
+      stamp: '1',
+      id: 'daemon',
+      title: 'Daemon notes',
+      turns: [{ messageIndex: 4, role: 'assistant', text: 'named socket' }],
+    }])).toEqual({
+      version: 1,
+      sessions: [{
+        path: '/sessions/daemon.jsonl',
+        stamp: '1',
+        id: 'daemon',
+        title: 'Daemon notes',
+        turns: [{ messageIndex: 4, role: 'assistant', text: 'named socket' }],
+      }],
+    })
   })
 
   it('asks the live chat to open a hit', () => {

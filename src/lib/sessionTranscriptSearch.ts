@@ -1,11 +1,16 @@
 /**
- * In-memory search over Prime session transcripts.
+ * Search over harness session transcripts.
  *
- * The session list stays metadata-only. This index reads a transcript once
- * per path and list stamp (`mtimeMs`), then answers later queries from memory.
- * A path that leaves the list leaves the index. User turns and assistant
- * prose are searchable. Tool results, status lines, and other non-prose
- * items are not.
+ * Rhizome owns this memory layer (ADR-0177). The session list stays
+ * metadata-only. The index reads a transcript once per path and list stamp
+ * (`mtimeMs`), keeps the extracted turns on disk, and answers later queries
+ * without re-reading an unchanged log. A path that leaves the list leaves
+ * the index. User turns and assistant prose are searchable. Tool results,
+ * status lines, and other non-prose items are not.
+ *
+ * The record shape is harness-agnostic (path + stamp + searchable turns) so
+ * a later Hermes source can use the same store. Prime's sessions directory
+ * is the first reader.
  */
 
 import type { PrimeTranscriptItem } from './primeTranscriptToConversation'
@@ -37,6 +42,36 @@ export interface SessionTranscriptIndex {
   indexedPaths: () => readonly string[]
 }
 
+export interface IndexedTranscriptTurn {
+  messageIndex: number
+  role: 'user' | 'assistant'
+  text: string
+}
+
+export interface PersistedSessionRecord {
+  path: string
+  stamp: string
+  id: string
+  title: string
+  turns: IndexedTranscriptTurn[]
+}
+
+export interface SessionTranscriptIndexDocument {
+  version: number
+  sessions: PersistedSessionRecord[]
+}
+
+export interface SessionTranscriptIndexStore {
+  load: () => Promise<PersistedSessionRecord[]>
+  save: (records: PersistedSessionRecord[]) => Promise<void>
+}
+
+export interface SessionTranscriptIndexOptions {
+  store?: SessionTranscriptIndexStore
+}
+
+export const SESSION_TRANSCRIPT_INDEX_VERSION = 1
+
 export interface SessionTranscriptOpenDeps {
   switchSession: (path: string) => Promise<unknown>
   readTranscript: (path: string) => Promise<PrimeTranscriptItem[]>
@@ -47,17 +82,11 @@ export interface SessionTranscriptOpenResult {
   messageIndex: number
 }
 
-interface IndexedTurn {
-  messageIndex: number
-  role: 'user' | 'assistant'
-  text: string
-}
-
 interface CachedSession {
   stamp: string
   id: string
   title: string
-  turns: IndexedTurn[]
+  turns: IndexedTranscriptTurn[]
 }
 
 interface InflightRead {
@@ -103,10 +132,16 @@ export function subscribeSessionTranscriptHitOpen(
   }
 }
 
-export function createSessionTranscriptIndex(reader: SessionTranscriptReader): SessionTranscriptIndex {
+export function createSessionTranscriptIndex(
+  reader: SessionTranscriptReader,
+  options: SessionTranscriptIndexOptions = {},
+): SessionTranscriptIndex {
   const cache = new Map<string, CachedSession>()
   const inflight = new Map<string, InflightRead>()
   let livePaths = new Set<string>()
+  let hydrated = false
+  let dirty = false
+  const store = options.store
 
   async function search(query: string): Promise<SessionTranscriptHit[]> {
     const needle = query.trim()
@@ -115,12 +150,12 @@ export function createSessionTranscriptIndex(reader: SessionTranscriptReader): S
     const sessions = await listedSessions()
     if (!sessions) return []
 
+    await hydrate()
     livePaths = new Set(sessions.map((session) => session.path))
-    for (const path of cache.keys()) {
-      if (!livePaths.has(path)) cache.delete(path)
-    }
+    pruneMissing()
 
     await Promise.all(sessions.map((session) => ensure(session)))
+    await persist()
     return collect(needle, sessions)
   }
 
@@ -138,8 +173,13 @@ export function createSessionTranscriptIndex(reader: SessionTranscriptReader): S
     const stamp = stampOf(session)
     const cached = cache.get(session.path)
     if (cached && cached.stamp === stamp) {
-      cached.id = session.id || session.path
-      cached.title = sessionTitle(session)
+      const id = session.id || session.path
+      const title = sessionTitle(session)
+      if (cached.id !== id || cached.title !== title) {
+        cached.id = id
+        cached.title = title
+        dirty = true
+      }
       return Promise.resolve()
     }
 
@@ -172,17 +212,65 @@ export function createSessionTranscriptIndex(reader: SessionTranscriptReader): S
     }
   }
 
+  async function hydrate() {
+    if (hydrated || !store) {
+      hydrated = true
+      return
+    }
+    hydrated = true
+    try {
+      const records = await store.load()
+      for (const record of records) {
+        if (cache.has(record.path)) continue
+        cache.set(record.path, {
+          stamp: record.stamp,
+          id: record.id,
+          title: record.title,
+          turns: record.turns,
+        })
+      }
+    } catch {
+      // A missing or unreadable store is a cold start, not a search failure.
+    }
+  }
+
+  function pruneMissing() {
+    for (const path of cache.keys()) {
+      if (livePaths.has(path)) continue
+      cache.delete(path)
+      dirty = true
+    }
+  }
+
+  async function persist() {
+    if (!store || !dirty) return
+    const records = [...cache.entries()].map(([path, cached]) => ({
+      path,
+      stamp: cached.stamp,
+      id: cached.id,
+      title: cached.title,
+      turns: cached.turns,
+    }))
+    try {
+      await store.save(records)
+      dirty = false
+    } catch {
+      // Keep dirty so the next search retries. Search still used memory.
+    }
+  }
+
   function remember(path: string, reading: Promise<CachedSession | null>, stored: CachedSession | null) {
     const pending = inflight.get(path)
     if (pending?.promise === reading) inflight.delete(path)
     if (!livePaths.has(path)) {
-      cache.delete(path)
+      if (cache.delete(path)) dirty = true
       return
     }
     if (!stored) return
     const existing = cache.get(path)
     if (existing && stampRank(existing.stamp) > stampRank(stored.stamp)) return
     cache.set(path, stored)
+    dirty = true
   }
 
   function collect(needle: string, sessions: SessionTranscriptSource[]): SessionTranscriptHit[] {
@@ -228,8 +316,46 @@ function sessionTitle(session: SessionTranscriptSource): string {
   return title ? title : 'Untitled session'
 }
 
-function searchableTurns(items: PrimeTranscriptItem[]): IndexedTurn[] {
-  const turns: IndexedTurn[] = []
+export function parseSessionTranscriptIndexDocument(raw: unknown): PersistedSessionRecord[] {
+  if (!raw || typeof raw !== 'object') return []
+  const doc = raw as Partial<SessionTranscriptIndexDocument>
+  if (doc.version !== SESSION_TRANSCRIPT_INDEX_VERSION || !Array.isArray(doc.sessions)) return []
+  return doc.sessions.filter(isPersistedSessionRecord)
+}
+
+export function serializeSessionTranscriptIndexDocument(
+  records: PersistedSessionRecord[],
+): SessionTranscriptIndexDocument {
+  return {
+    version: SESSION_TRANSCRIPT_INDEX_VERSION,
+    sessions: records.filter(isPersistedSessionRecord),
+  }
+}
+
+function isPersistedSessionRecord(value: unknown): value is PersistedSessionRecord {
+  if (!value || typeof value !== 'object') return false
+  const record = value as Partial<PersistedSessionRecord>
+  if (typeof record.path !== 'string' || record.path.length === 0) return false
+  if (typeof record.stamp !== 'string') return false
+  if (typeof record.id !== 'string') return false
+  if (typeof record.title !== 'string') return false
+  if (!Array.isArray(record.turns)) return false
+  return record.turns.every(isIndexedTranscriptTurn)
+}
+
+function isIndexedTranscriptTurn(value: unknown): value is IndexedTranscriptTurn {
+  if (!value || typeof value !== 'object') return false
+  const turn = value as Partial<IndexedTranscriptTurn>
+  return (
+    typeof turn.messageIndex === 'number'
+    && Number.isFinite(turn.messageIndex)
+    && (turn.role === 'user' || turn.role === 'assistant')
+    && typeof turn.text === 'string'
+  )
+}
+
+function searchableTurns(items: PrimeTranscriptItem[]): IndexedTranscriptTurn[] {
+  const turns: IndexedTranscriptTurn[] = []
   items.forEach((item, messageIndex) => {
     if (item.kind !== 'message') return
     if (item.message.role !== 'user' && item.message.role !== 'assistant') return

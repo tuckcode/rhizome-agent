@@ -71,6 +71,7 @@ pub mod rhizome_write_location;
 pub mod search;
 mod secure_fs;
 pub mod session_import;
+pub mod session_transcript_index;
 pub mod settings;
 pub mod telemetry;
 pub mod vault;
@@ -760,6 +761,8 @@ macro_rules! app_invoke_handler {
             commands::set_prime_model_allow_list,
             commands::rename_prime_session,
             commands::read_prime_session_transcript,
+            commands::load_session_transcript_index,
+            commands::save_session_transcript_index,
             commands::switch_prime_session,
             commands::get_available_prime_models,
             commands::get_prime_commands,
