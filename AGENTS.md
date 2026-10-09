@@ -4,7 +4,8 @@
 > This is **Rhizome Agent** (`ai.rhizome.agent`, repo `tuckcode/rhizome-agent`).  
 > It is **not** Rhizome Desktop (`ai.rhizome.desktop`, `knispo/rhizome`).  
 > Do not push here to desktop origin. Do not “fix branding back to Desktop.”  
-> Direction: chat UI + **Prime Agent** harness. Details: `docs/IDENTITY.md`.
+> Direction: chat UI + **Rhizome's own harness** (ADR-0180). Prime and
+> Hermes are optional engines. Details: `docs/IDENTITY.md`.
 > **Personal reply-voice skills stay out of this repo.** Global voice is STE-100
 > in Rhizome Vault `agents/shared/`. Do not copy voice skills into this tree.
 
@@ -549,7 +550,12 @@ mega-bullets. Do not move these into Learned.
 - **Selective harness doctrine (ADR-0168) is design intent, not settled fact**,
   and the code still disagrees with it until #56 is resolved.
   **Do not cite it as decided when arguing to adopt or reject a tool until #56 is resolved.**
+  ADR-0180 (2026-10-09) supersedes the Prime-only execution lock. Rhizome
+  owns its own agent loop. #56 is closed as won't-remove; that path is a
+  starting point. Borrow-care in 0168 still holds.
   Kern (getkern/kern) is Linux/WSL2 only.
+- **Rhizome is its own harness (ADR-0180).** It owns the agent loop, tool
+  runner, plugins, and model routing. Prime and Hermes are optional engines.
 
 ## Continual-learning (Cursor plugin)
 
