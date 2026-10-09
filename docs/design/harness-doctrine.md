@@ -1,9 +1,9 @@
 # Selective harness doctrine
 
-**Status:** ratified 2026-08-24 (ADR-0168); **amended 2026-10-09 (ADR-0179)**  
+**Status:** ratified 2026-08-24 (ADR-0168); **amended 2026-10-09 (ADR-0180)**  
 **Audience:** anyone deciding whether Rhizome should borrow a harness idea
 
-ADR-0179 supersedes the Prime-only execution lock. Rhizome owns its
+ADR-0180 supersedes the Prime-only execution lock. Rhizome owns its
 loop. Prime and Hermes are optional engines. Borrow-care below still
 holds for foreign runtimes.
 
@@ -23,12 +23,12 @@ The earlier vision draft, [`rhizome-prime-harness-vision.md`](./rhizome-prime-ha
 still states the product shape. This file is the decision about what to take
 from other harnesses and what to leave behind.
 
-Composition working notes (older option-2 numbering; identity is ADR-0179):
+Composition working notes (older option-2 numbering; identity is ADR-0180):
 [`harness-composition.md`](./harness-composition.md).
 
 ## One sentence
 
-**Borrow with care; own the loop.** Rhizome is its own harness (ADR-0179).
+**Borrow with care; own the loop.** Rhizome is its own harness (ADR-0180).
 Prime and Hermes are optional engines. Rhizome owns desktop presentation
 and durable markdown memory. Background work is an explicit, revocable
 grant, not the default. Foreign runtimes still donate contracts, not
@@ -38,7 +38,7 @@ competing organs.
 
 A borrowed idea is welcome when it is a **contract, artifact, or signal**
 that Rhizome can render or store, or when it is licensed code that
-extends the Rhizome loop (ADR-0179).
+extends the Rhizome loop (ADR-0180).
 
 A borrowed *foreign* idea is forbidden when it is an **organ** that would
 compete with the Rhizome loop: a second planner, credential store, or
@@ -60,7 +60,7 @@ These three identities may evolve. They may not exchange ownership.
 
 | Layer | Owner | May become | May not become |
 |---|---|---|---|
-| Execution | Rhizome loop (ADR-0179) | richer tools, plugins, routing; optional Prime / Hermes engines | a second competing loop or a second memory authority |
+| Execution | Rhizome loop (ADR-0180) | richer tools, plugins, routing; optional Prime / Hermes engines | a second competing loop or a second memory authority |
 | Desktop UX | Rhizome | Rhizome visual language over Prime state | a cloned Prime TUI, Hermes desktop, or DSH console |
 | Durable memory | Rhizome vault | better promote/search/provenance | silent dual-write or a second `MEMORY.md` authority |
 | Background permission | the user | visible leases with stop/expiry | inferred persistence from close, hide, or crash |
@@ -157,7 +157,7 @@ UI.
 
 | Item | Why |
 |---|---|
-| Rhizome loop as the execution substrate; Prime as an optional engine | Ownership lock (ADR-0179). Prime transport still ADR-0163. |
+| Rhizome loop as the execution substrate; Prime as an optional engine | Ownership lock (ADR-0180). Prime transport still ADR-0163. |
 | Observable, interruptible work | Hermes product invariant. |
 | Explicit lifecycle objects and `unknown` as a first-class outcome | Hermes + Prime 0.8.0. |
 | Children may narrow, never widen | Hermes security seam. |
@@ -189,10 +189,10 @@ UI.
 
 | Item | Why |
 |---|---|
-| A second *competing* agent runtime beside the Rhizome loop | Organ transplant. The Rhizome loop itself is in scope (ADR-0179). Optional Prime / Hermes engines are allowed. |
+| A second *competing* agent runtime beside the Rhizome loop | Organ transplant. The Rhizome loop itself is in scope (ADR-0180). Optional Prime / Hermes engines are allowed. |
 | Command-count parity with Prime | Coverage is by user job. |
 | Resident-by-default sessions and a global “survive quit” preference | Implicit autonomy. |
-| App-stored provider keys or a Rhizome model router *for Prime chat* | Bypasses Prime auth when Prime is the attached engine. A Rhizome router for the Rhizome loop is in scope (ADR-0179). |
+| App-stored provider keys or a Rhizome model router *for Prime chat* | Bypasses Prime auth when Prime is the attached engine. A Rhizome router for the Rhizome loop is in scope (ADR-0180). |
 | Silent dual-write to vault + harness memory | Two sources of truth. |
 | Treating `~/.prime` as the second brain | Operational continuity only. |
 | Project-local Prime `mcpServers` as future wiring | Prime 0.8.0 ignores them by design. |

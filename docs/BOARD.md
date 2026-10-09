@@ -152,7 +152,7 @@ STE stays in the vault. Do not copy voice skills into this tree.
 
 ## Prime Agent (optional engine)
 
-Rhizome owns the harness (ADR-0179). Prime is an optional engine.
+Rhizome owns the harness (ADR-0180). Prime is an optional engine.
 Daemon **client** when attached (ADR-0163). Coverage by **user job**,
 not command count. Detail:
 [`design/prime-agent-surface.md`](design/prime-agent-surface.md).

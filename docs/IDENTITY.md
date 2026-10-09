@@ -7,7 +7,7 @@ Do not push this repo to the Desktop remote. Do not rename the product back to D
 
 | | Rhizome Desktop | Rhizome Agent (this repo) |
 |---|---|---|
-| Purpose | Personal knowledge / vault / wiki app | Chat UI plus Rhizome's own harness; Prime and Hermes optional (ADR-0179) |
+| Purpose | Personal knowledge / vault / wiki app | Chat UI plus Rhizome's own harness; Prime and Hermes optional (ADR-0180) |
 | GitHub | `knispo/rhizome` (public AGPL desktop) | `tuckcode/rhizome-agent` |
 | Folder (local) | e.g. Grok worktree `code-lens` | `~/code/projects/rhizome-agent` |
 | Bundle id | `ai.rhizome.desktop` | `ai.rhizome.agent` |
@@ -26,7 +26,7 @@ Do **not** add `knispo/rhizome` as `origin`. Desktop and Agent stay separate rem
 
 ## Prime first, when Prime already does it
 
-**Amended 2026-10-09 (ADR-0179):** Rhizome owns the agent loop. "Use
+**Amended 2026-10-09 (ADR-0180):** Rhizome owns the agent loop. "Use
 Prime's" still applies when Prime is the attached engine, and as a
 design source for vault-side work.
 

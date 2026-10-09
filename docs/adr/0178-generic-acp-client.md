@@ -9,7 +9,7 @@ date: 2026-10-05
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · implements ADR-0177 consequence 1
 
 **Amended 2026-10-09:** ADR-0177's client identity is superseded by
-[ADR-0179](0179-rhizome-is-its-own-harness.md). This ADR still holds as
+[ADR-0180](0180-rhizome-is-its-own-harness.md). This ADR still holds as
 the optional Hermes / ACP engine path.
 
 ## Context

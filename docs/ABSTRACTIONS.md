@@ -851,7 +851,7 @@ interface SearchResult {
   session at that point (`requestOpenSessionTranscriptHit` →
   `usePrimeSessionSwitcher` → `useScrollToTranscriptHit`). The session list
   filter stays metadata-only. Extracted turns persist in Rhizome's cache
-  (ADR-0177 vault layer, still holds under ADR-0179); the harness log is not rewritten.
+  (ADR-0177 vault layer, still holds under ADR-0180); the harness log is not rewritten.
 
 The NoteList header search keeps its local title/snippet/property filtering for immediate scoped results, then augments the match set with `search_vault` hits from the visible workspace roots using the command's frontmatter-excluding search option. React stores only matching paths so body-only matches appear in the current list scope without a second content-read pass or rendering private matched text in note rows.
 
@@ -1006,7 +1006,7 @@ modelled wrongly. Full detail in `ARCHITECTURE.md` → *Prime Agent*.
 connects to over a Unix socket (ADR-0163). The daemon may outlive the window;
 the *session* does not, unless the user granted background residency
 (ADR-0167). New sessions are client-owned; `promote_owned_session` is the
-explicit grant. Identity is ADR-0179 (Rhizome owns the loop). Borrow-care
+explicit grant. Identity is ADR-0180 (Rhizome owns the loop). Borrow-care
 is ADR-0168 (amended) / `docs/design/harness-doctrine.md`. Prime transport
 is ADR-0163.
 

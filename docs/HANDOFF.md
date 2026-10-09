@@ -51,7 +51,7 @@ file.
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · C94: CodeQL rust/cleartext-logging false positives on CLI stdout and test asserts. [Handoff](plans/handoffs/2026-10-05-2253-cursor-grok-4-6-codeql-cleartext.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · #81: on-disk session-transcript index, Prime jsonl fixtures, and Sessions-group keyboard nav. Rhizome-owned memory (ADR-0177). [Handoff](plans/handoffs/2026-10-05-2015-cursor-grok-4-6-issue-81-session-index.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · Hermes ACP client (ADR-0178). Generic stdio JSON-RPC; `hermes chat` stays fallback. Fixture-tested only. [Handoff](plans/handoffs/2026-10-05-2005-cursor-grok-4-6-hermes-acp.md).
-**Origin:** Cursor Grok 4.6 · 2026-10-09 · #40 reversed: Rhizome is its own harness (ADR-0179). Docs only. [Handoff](plans/handoffs/2026-10-09-2239-cursor-grok-4-6-adr-0179-own-harness.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-09 · #40 reversed: Rhizome is its own harness (ADR-0180). Docs only. [Handoff](plans/handoffs/2026-10-09-2239-cursor-grok-4-6-adr-0180-own-harness.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · docs-only dead-link cleanup in ARCHITECTURE.md and HANDOFF.md. [Handoff](plans/handoffs/2026-10-05-0440-cursor-grok-4-6-dead-links.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · #23 first slice: app search opens a session hit at the transcript index. On-disk index and real-log dogfood remain. [Handoff](plans/handoffs/2026-10-05-0325-cursor-grok-4-6-issue-23-open-hit.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · #57: leftover `is_a:` never ran on the vault in use because `list_vault` skipped the migrator. Open-path rewrite added; dead Laputa/Tolaria env names dropped. [Handoff](plans/handoffs/2026-10-05-0320-cursor-grok-4-6-issue-57-is-a-open.md).
@@ -132,7 +132,7 @@ Do not paste leftover paper here.
 - [2026-10-05 · CodeQL C94](plans/handoffs/2026-10-05-2253-cursor-grok-4-6-codeql-cleartext.md) — GHAS umbrella failed on rust/cleartext-logging false positives; CLI stdout + assert text.
 - [2026-10-05 · #81 session index](plans/handoffs/2026-10-05-2015-cursor-grok-4-6-issue-81-session-index.md) — on-disk transcript index, jsonl fixtures, Sessions keyboard nav.
 - [2026-10-05 · Hermes ACP](plans/handoffs/2026-10-05-2005-cursor-grok-4-6-hermes-acp.md) — generic ACP client; Hermes one-shot is fallback. Fixture only.
-- [2026-10-09 · ADR-0179](plans/handoffs/2026-10-09-2239-cursor-grok-4-6-adr-0179-own-harness.md) — #40 reversed: Rhizome is its own harness. Docs only.
+- [2026-10-09 · ADR-0180](plans/handoffs/2026-10-09-2239-cursor-grok-4-6-adr-0180-own-harness.md) — #40 reversed: Rhizome is its own harness. Docs only.
 - [2026-10-05 · dead links](plans/handoffs/2026-10-05-0440-cursor-grok-4-6-dead-links.md) — ARCHITECTURE.md and HANDOFF.md path drift only. No code.
 - [2026-10-05 · #23 open hit](plans/handoffs/2026-10-05-0325-cursor-grok-4-6-issue-23-open-hit.md) — search hit opens the session at `messageIndex`. On-disk index and real-log dogfood remain.
 - [2026-10-05 · #57 ghost-compat](plans/handoffs/2026-10-05-0320-cursor-grok-4-6-issue-57-is-a-open.md) — `is_a:` rewrite now runs on `list_vault` / `reload_vault`; leftover file is on Atticus's machine.
@@ -416,7 +416,7 @@ Closed C32, C35 and C41 moved to [`archive-closed-threads.md`](plans/handoffs/ar
   next commit. All 4 pass, `--repeat-each=2` clean.
 
 - **C50-DECIDED (2026-08-24): selective harness doctrine.** Borrow with
-  care. ADR-0179 (2026-10-09) supersedes the Prime-only execution lock:
+  care. ADR-0180 (2026-10-09) supersedes the Prime-only execution lock:
   Rhizome owns its loop, tools, plugins, and routing. Prime and Hermes
   are optional engines. Coverage is by user job, not command count.
   Ledger: `docs/design/harness-doctrine.md`, ADR-0168 (amended). Reviews

@@ -6,7 +6,7 @@ status: active
 date: 2026-08-15
 ---
 
-**Amended 2026-10-09:** [ADR-0179](0179-rhizome-is-its-own-harness.md)
+**Amended 2026-10-09:** [ADR-0180](0180-rhizome-is-its-own-harness.md)
 keeps this transport decision. Prime is a supported optional engine.
 Rhizome no longer treats this connection as the product identity.
 

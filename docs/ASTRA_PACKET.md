@@ -382,7 +382,7 @@ close-on-live-check. Do **not** re-implement.
 | #32 | Prime on Windows | Code + docs; **C42 never launched** |
 | #36 | Timezone setting | **Spec tonight** — [`plans/issue-36-timezone-setting.md`](plans/issue-36-timezone-setting.md). Display-only; do not code until God plan. |
 | #39 | Graph as agent tool | **B** — place vs tool; ADR-0170 settled place |
-| #40 | Harness vs client | **Reversed 2026-10-09:** Rhizome is its own harness ([ADR-0179](adr/0179-rhizome-is-its-own-harness.md)). 0177 superseded. Hermes ACP stays optional ([ADR-0178](adr/0178-generic-acp-client.md)). |
+| #40 | Harness vs client | **Reversed 2026-10-09:** Rhizome is its own harness ([ADR-0180](adr/0180-rhizome-is-its-own-harness.md)). 0177 superseded. Hermes ACP stays optional ([ADR-0178](adr/0178-generic-acp-client.md)). |
 | #41 | Steer/queue wired to nothing | Queue display exists; steer UX still the gap |
 | #43 | Window navigation guard | **Closed 2026-09-13** (`navigation_guard.rs`) |
 | #45 | Model settings / OAuth / allow-list | Allow-list + Nous list shipped; remainder open |
@@ -396,7 +396,7 @@ close-on-live-check. Do **not** re-implement.
 | #53 | Quick-note window failure kills menu bar | **Closed 2026-09-13** |
 | #54 | ws-bridge restart loop | **Closed 2026-09-13** |
 | #55 | Starter vault not a clone | **Closed 2026-09-13** — local scaffold; C11 remote still deferred |
-| #56 | Second provider path (`ai_models.rs`) | Closed as won't-remove under ADR-0179; starting point for the Rhizome loop. |
+| #56 | Second provider path (`ai_models.rs`) | Closed as won't-remove under ADR-0180; starting point for the Rhizome loop. |
 | #57 | Delete compatibility for users who do not exist | **Spec tonight** — [`plans/issue-57-ghost-compat.md`](plans/issue-57-ghost-compat.md). Do not delete `~/.laputa/cache`. |
 
 **Closed (do not reopen):** #11, #14, #17, #18, #22, #24, #25, #27, #29,

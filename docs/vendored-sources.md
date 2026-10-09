@@ -1,6 +1,6 @@
 # Vendored sources
 
-**Origin:** Cursor Grok 4.6 · 2026-10-09 · convention from [ADR-0179](adr/0179-rhizome-is-its-own-harness.md)
+**Origin:** Cursor Grok 4.6 · 2026-10-09 · convention from [ADR-0180](adr/0180-rhizome-is-its-own-harness.md)
 
 Index of code copied into this tree from another project. Library
 dependencies stay in `package.json` / `Cargo.toml` and are not listed

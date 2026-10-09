@@ -8,7 +8,7 @@ still lives in `docs/ARCHITECTURE.md` / `docs/ABSTRACTIONS.md` (Desktop inherita
 
 | Term | Meaning |
 |------|---------|
-| **Rhizome Agent** | Desktop app (`ai.rhizome.agent`, `tuckcode/rhizome-agent`): chat UI plus **Rhizome's own harness** (ADR-0179), plus a research & **memory** product. Prime and Hermes are optional engines. Not Rhizome Desktop. The word “Agent” in the app's *name* is a naming question still open — see `docs/HANDOFF.md`; it does not govern the common noun below. |
+| **Rhizome Agent** | Desktop app (`ai.rhizome.agent`, `tuckcode/rhizome-agent`): chat UI plus **Rhizome's own harness** (ADR-0180), plus a research & **memory** product. Prime and Hermes are optional engines. Not Rhizome Desktop. The word “Agent” in the app's *name* is a naming question still open — see `docs/HANDOFF.md`; it does not govern the common noun below. |
 | **Rhizome Desktop** | Separate product (`ai.rhizome.desktop`, `knispo/rhizome`): full vault/wiki shell. Do not push Agent work to Desktop origin. |
 | **v0** | Circle-ready bar: daily multi-turn Prime chat, vault tools when attached, auth via `~/.prime`, skills+status smooth; BYO `prime-agent` OK. Not full harness-desktop parity. |
 | **Trusted circle** | v0 audience: Atticus + small trusted users — not strangers-first launch. |
@@ -19,7 +19,7 @@ still lives in `docs/ARCHITECTURE.md` / `docs/ABSTRACTIONS.md` (Desktop inherita
 > of it; (2) the differentiated work is the **memory loop**, not the harness
 > surface — the surface is the cost of the shell not being worse than Prime's
 > own terminal. See `docs/HANDOFF.md` for the ticket re-ordering this implies.
-> **Amended 2026-10-09 (ADR-0179):** Rhizome owns the loop. Prime is no
+> **Amended 2026-10-09 (ADR-0180):** Rhizome owns the loop. Prime is no
 > longer the only figure.
 
 ## Harness
@@ -28,7 +28,7 @@ still lives in `docs/ARCHITECTURE.md` / `docs/ABSTRACTIONS.md` (Desktop inherita
 |------|---------|
 | **Prime / Prime Agent** | An **optional** agent runtime. Session engine, skills, extensions, providers/models, compaction, continual harness when attached. **Built on Pi** — session JSONL under `~/.prime/agent/sessions/` is Pi-shaped (Mindwalk already labels it `harness: pi`). Prime can persist work, but persistence is a capability, not the default permission model. |
 | **Harness** | Prime’s tooling and infrastructure embedded in the chat desktop shell (Hermes-Desktop-class ambition over time; v0 = core loop + skills/status). |
-| **Selective doctrine** | Borrow with care. Own the Rhizome loop (ADR-0179). Do not transplant a second memory authority. Coverage is by user job, not daemon command count. Ledger: `docs/design/harness-doctrine.md` (ADR-0168, amended). |
+| **Selective doctrine** | Borrow with care. Own the Rhizome loop (ADR-0180). Do not transplant a second memory authority. Coverage is by user job, not daemon command count. Ledger: `docs/design/harness-doctrine.md` (ADR-0168, amended). |
 | **Prime daemon** | Prime’s own background service. Runs independently of any client and can outlive them; hosts workers. Rhizome connects to it and never owns or stops it. A running daemon means Prime is available, not that an agent is working (ADR-0163, ADR-0167). |
 | **Session host** | Rhizome’s Rust client of the [[Prime daemon]] (`prime_session_host`). A connection, not the daemon's parent. Sessions are foreground-owned by default; only an explicit background grant lets work outlive Rhizome (ADR-0167). Superseded the RPC-child owner it was until 2026-08-15. |
 | **Session** | The user-facing unit of work: one conversation with Prime, listed, named, switched and resumed. **The only word the UI uses** for a running thing. Follows Hermes Agent, which meets the same product-name collision and resolves it the same way. |
@@ -36,7 +36,7 @@ still lives in `docs/ARCHITECTURE.md` / `docs/ABSTRACTIONS.md` (Desktop inherita
 | **Background grant** | Explicit, visible, revocable permission for a specific turn, goal, heartbeat, or schedule to continue without the Rhizome window. Never inferred from closing the UI and never granted globally to every session. |
 | **Worker** | The daemon-side process holding one or more sessions. **Internal to the transport layer** — never surfaced in UI or product copy. |
 | **Subagent** | A session Prime spawned from another session (Prime’s RLM recursion). Subordinate by name, so it does not compete with [[Session]]. |
-| **Agent** | The runtime that does the work: **the Rhizome loop** (ADR-0179). Prime or Hermes may be an attached engine. Still never a *running* thing — that is a [[Session]]. |
+| **Agent** | The runtime that does the work: **the Rhizome loop** (ADR-0180). Prime or Hermes may be an attached engine. Still never a *running* thing — that is a [[Session]]. |
 | **Model** | An LLM selected by Rhizome routing, or through an optional engine (e.g. Prime `~/.prime`). |
 | **Agent backend** (legacy) | Desktop-era CLI targets (Claude Code, Codex, Hermes, …). **Hidden** in Rhizome's UI. The last surviving competing sense of “agent”; rename on contact so [[Agent]] means only the runtime. |
 | **Goal** | A persistent objective a [[Session]] works toward, with a token budget. Readable from Prime’s state; **set by invoking Prime’s own `goal` skill**, not by a protocol call — the one harness control without a direct mechanism. |
@@ -75,9 +75,9 @@ still lives in `docs/ARCHITECTURE.md` / `docs/ABSTRACTIONS.md` (Desktop inherita
 
 ## Related docs
 
-- Identity: `docs/IDENTITY.md` · harness: `docs/adr/0179-rhizome-is-its-own-harness.md`
+- Identity: `docs/IDENTITY.md` · harness: `docs/adr/0180-rhizome-is-its-own-harness.md`
 - Spike (session host): `docs/plans/2026-08-09-prime-harness-chat-spike.md`
 - v0 brief + roadmap: `docs/plans/2026-08-09-rhizome-agent-v0-brief-and-roadmap.md`
-- Harness doctrine: `docs/design/harness-doctrine.md` (ADR-0168, amended by ADR-0179)
+- Harness doctrine: `docs/design/harness-doctrine.md` (ADR-0168, amended by ADR-0180)
 - Issue tracker / triage: `docs/agents/`
 - ADRs: `docs/adr/` (read when touching that area; many are Desktop-era)
