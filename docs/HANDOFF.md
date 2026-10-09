@@ -47,6 +47,7 @@ file.
 ---
 
 ## State
+**Origin:** Cursor Grok 4.6 · 2026-10-09 · #80: spawned-daemon process-group stop retries via `kill(2)`. [Handoff](plans/handoffs/2026-10-09-2222-cursor-grok-4-6-issue-80-process-group-flake.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-06 · standing-rule inventory (inherited / one-night / Atticus / still in code). Evidence only. [Inventory](plans/2026-10-06-standing-rule-inventory.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · C94: CodeQL rust/cleartext-logging false positives on CLI stdout and test asserts. [Handoff](plans/handoffs/2026-10-05-2253-cursor-grok-4-6-codeql-cleartext.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · #81: on-disk session-transcript index, Prime jsonl fixtures, and Sessions-group keyboard nav. Rhizome-owned memory (ADR-0177). [Handoff](plans/handoffs/2026-10-05-2015-cursor-grok-4-6-issue-81-session-index.md).
@@ -128,6 +129,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-10-09 · #80 process-group flake](plans/handoffs/2026-10-09-2222-cursor-grok-4-6-issue-80-process-group-flake.md) — `kill(2)` retry; test polls a live group.
 - [2026-10-06 · rule inventory](plans/handoffs/2026-10-06-0155-cursor-grok-4-6-standing-rule-inventory.md) — inherited / one-night / Atticus / still in code. Evidence only.
 - [2026-10-05 · CodeQL C94](plans/handoffs/2026-10-05-2253-cursor-grok-4-6-codeql-cleartext.md) — GHAS umbrella failed on rust/cleartext-logging false positives; CLI stdout + assert text.
 - [2026-10-05 · #81 session index](plans/handoffs/2026-10-05-2015-cursor-grok-4-6-issue-81-session-index.md) — on-disk transcript index, jsonl fixtures, Sessions keyboard nav.
@@ -156,8 +158,6 @@ Do not paste leftover paper here.
 - [2026-09-21 · Astra next phase](plans/handoffs/2026-09-21-2104-cursor-grok-4-7-astra-next-phase.md) — origin `2a24eed`; app `b7264d6`; planning only.
 - [2026-09-21 · C75 living docs](plans/handoffs/2026-09-21-0215-cursor-grok-4-6-c75-docs.md) — hide leaves spawned Prime warm; #66–#68 closed.
 - [2026-09-20 · Astra combined handoff](plans/handoffs/2026-09-20-1234-claude-opus-5-astra-combined-handoff.md) — D1–D7 audit, plugin rescope, ADR findings, and the Edit-list completion contract.
-- [2026-09-20 · Astra ↔ Cursor recap](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-cursor-recap.md) — plan through #26 CPR, D1–D7 local, Free-only dirt.
-- [2026-09-20 · #26 CPR](plans/handoffs/2026-09-20-0723-cursor-grok-4-6-issue-26-cpr.md) — origin and app `b7264d6`; live Update now still Q.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)
