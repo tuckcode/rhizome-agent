@@ -64,47 +64,279 @@ impl ProviderKeys {
     }
 
     /// The app's store: the OS keychain and the real legacy file.
+    ///
+    /// Test builds get an in-memory backend and a legacy path that never
+    /// exists, so no test can read or change a real key.
     pub fn for_app() -> Result<Self, String> {
-        Err("not built".into())
+        Ok(Self::new(app_backend(), app_legacy_file()?))
     }
 
     /// The key for `provider_id`, from the keychain, or from the legacy file
     /// (moving it into the keychain on the way). `None` when neither has one.
-    pub fn get(&self, _provider_id: &str) -> Result<Option<String>, String> {
-        Err("not built".into())
+    pub fn get(&self, provider_id: &str) -> Result<Option<String>, String> {
+        let id = normalize_id(provider_id)?;
+        let stored = match self.backend.get(&id) {
+            Ok(stored) => stored.filter(|key| !key.trim().is_empty()),
+            Err(error) => {
+                // A locked or missing keychain must not break a key that
+                // still sits in the legacy file.
+                log::warn!("provider key lookup for {id} fell back to the legacy file: {error}");
+                return self.legacy_key(&id);
+            }
+        };
+        match self.migrate_one(&id, stored.as_deref())? {
+            Step::Moved(key) | Step::Kept(key, _) => Ok(Some(key)),
+            Step::NoFileKey => Ok(stored),
+        }
     }
 
     /// Saves a key, checks it reads back, then drops any legacy file copy so
     /// an old key cannot shadow the new one.
-    pub fn save(&self, _provider_id: &str, _api_key: &str) -> Result<(), String> {
-        Err("not built".into())
+    pub fn save(&self, provider_id: &str, api_key: &str) -> Result<(), String> {
+        let id = normalize_id(provider_id)?;
+        let key = api_key.trim();
+        if key.is_empty() {
+            return Err("API key cannot be empty.".into());
+        }
+        self.backend.set(&id, key)?;
+        if self.backend.get(&id)?.as_deref() != Some(key) {
+            return Err(format!(
+                "The keychain did not return the key just saved for {id}. Nothing else changed."
+            ));
+        }
+        self.remove_from_legacy(&id)
     }
 
     /// Removes the key from the keychain and from the legacy file.
-    pub fn delete(&self, _provider_id: &str) -> Result<(), String> {
-        Err("not built".into())
+    pub fn delete(&self, provider_id: &str) -> Result<(), String> {
+        let id = normalize_id(provider_id)?;
+        self.backend.delete(&id)?;
+        self.remove_from_legacy(&id)
     }
 
     /// Moves every legacy file key into the keychain.
     pub fn migrate_all(&self) -> Result<MigrationReport, String> {
-        Err("not built".into())
+        let mut report = MigrationReport::default();
+        let ids: Vec<String> = read_legacy(&self.legacy_file)?
+            .provider_api_keys
+            .into_keys()
+            .collect();
+        for id in ids {
+            let stored = match self.backend.get(&id) {
+                Ok(stored) => stored,
+                Err(error) => {
+                    report.kept.push((id, error));
+                    continue;
+                }
+            };
+            match self.migrate_one(&id, stored.as_deref())? {
+                Step::Moved(_) => report.moved.push(id),
+                Step::Kept(_, reason) => report.kept.push((id, reason)),
+                Step::NoFileKey => {}
+            }
+        }
+        Ok(report)
+    }
+
+    /// One key: write, read back, then remove the file copy (ADR-0183).
+    /// `stored` is what the keychain holds for `id` now.
+    fn migrate_one(&self, id: &str, stored: Option<&str>) -> Result<Step, String> {
+        let Some(file_key) = self.legacy_key(id)? else {
+            return Ok(Step::NoFileKey);
+        };
+        match stored {
+            // The crash case: the write landed, the file update did not.
+            Some(stored) if stored == file_key => {
+                self.remove_from_legacy(id)?;
+                return Ok(Step::Moved(file_key));
+            }
+            Some(stored) => {
+                return Ok(Step::Kept(
+                    stored.to_string(),
+                    "The keychain holds a different key. The file copy stays.".into(),
+                ));
+            }
+            None => {}
+        }
+        if let Err(error) = self.backend.set(id, &file_key) {
+            log::warn!("provider key for {id} stays in the legacy file: {error}");
+            return Ok(Step::Kept(file_key, error));
+        }
+        match self.backend.get(id) {
+            Ok(Some(read_back)) if read_back == file_key => {
+                self.remove_from_legacy(id)?;
+                Ok(Step::Moved(file_key))
+            }
+            Ok(_) => {
+                log::warn!("provider key for {id} did not read back. The file copy stays.");
+                Ok(Step::Kept(
+                    file_key,
+                    "The keychain did not return the key just written.".into(),
+                ))
+            }
+            Err(error) => Ok(Step::Kept(file_key, error)),
+        }
+    }
+
+    fn legacy_key(&self, id: &str) -> Result<Option<String>, String> {
+        Ok(read_legacy(&self.legacy_file)?
+            .provider_api_keys
+            .get(id)
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty()))
+    }
+
+    /// Deletes the file when the last key leaves it.
+    fn remove_from_legacy(&self, id: &str) -> Result<(), String> {
+        let mut secrets = read_legacy(&self.legacy_file)?;
+        if secrets.provider_api_keys.remove(id).is_none() {
+            return Ok(());
+        }
+        if secrets.provider_api_keys.is_empty() {
+            return std::fs::remove_file(&self.legacy_file)
+                .map_err(|error| format!("Failed to remove the legacy key file: {error}"));
+        }
+        write_legacy(&self.legacy_file, &secrets)
     }
 }
 
+enum Step {
+    Moved(String),
+    /// The key to use, and why the file copy stays.
+    Kept(String, String),
+    NoFileKey,
+}
+
 impl KeyStore for ProviderKeys {
-    fn credential(&self, _provider_id: &str) -> Option<Credential> {
-        None
+    fn credential(&self, provider_id: &str) -> Option<Credential> {
+        let api_key = self.get(provider_id).ok().flatten()?;
+        let account = format!("{}:account", normalize_id(provider_id).ok()?);
+        let account_id = self
+            .backend
+            .get(&account)
+            .ok()
+            .flatten()
+            .filter(|value| !value.trim().is_empty());
+        Some(Credential {
+            api_key,
+            account_id,
+        })
+    }
+}
+
+fn normalize_id(provider_id: &str) -> Result<String, String> {
+    let id = provider_id.trim().to_ascii_lowercase();
+    if id.is_empty() {
+        Err("Provider ID cannot be empty.".into())
+    } else {
+        Ok(id)
     }
 }
 
 pub(crate) fn read_legacy(path: &Path) -> Result<LegacySecrets, String> {
-    let _ = path;
-    Err("not built".into())
+    if !path.exists() {
+        return Ok(LegacySecrets::default());
+    }
+    let content = std::fs::read_to_string(path)
+        .map_err(|error| format!("Failed to read the legacy key file: {error}"))?;
+    serde_json::from_str(&content)
+        .map_err(|error| format!("Failed to parse the legacy key file: {error}"))
 }
 
 pub(crate) fn write_legacy(path: &Path, secrets: &LegacySecrets) -> Result<(), String> {
-    let _ = (path, secrets);
-    Err("not built".into())
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|error| format!("Failed to create the key file folder: {error}"))?;
+    }
+    let json = serde_json::to_string_pretty(secrets)
+        .map_err(|error| format!("Failed to serialize the legacy key file: {error}"))?;
+    crate::secure_fs::write_owner_only_atomic(path, &json)
+        .map_err(|error| format!("Failed to write the legacy key file: {error}"))
+}
+
+/// The OS keychain: macOS Keychain, Windows Credential Manager, or the
+/// Secret Service on Linux.
+struct OsKeychain;
+
+impl SecretBackend for OsKeychain {
+    fn get(&self, account: &str) -> Result<Option<String>, String> {
+        match keychain_entry(account)?.get_password() {
+            Ok(value) => Ok(Some(value)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(error) => Err(format!("Keychain read failed for {account}: {error}")),
+        }
+    }
+
+    fn set(&self, account: &str, value: &str) -> Result<(), String> {
+        keychain_entry(account)?
+            .set_password(value)
+            .map_err(|error| format!("Keychain write failed for {account}: {error}"))
+    }
+
+    fn delete(&self, account: &str) -> Result<(), String> {
+        match keychain_entry(account)?.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(error) => Err(format!("Keychain delete failed for {account}: {error}")),
+        }
+    }
+}
+
+fn keychain_entry(account: &str) -> Result<keyring::Entry, String> {
+    keyring::Entry::new(KEYCHAIN_SERVICE, account)
+        .map_err(|error| format!("Keychain entry for {account} is not usable: {error}"))
+}
+
+#[cfg(not(test))]
+fn app_backend() -> Box<dyn SecretBackend> {
+    Box::new(OsKeychain)
+}
+
+#[cfg(not(test))]
+fn app_legacy_file() -> Result<PathBuf, String> {
+    crate::settings::preferred_app_config_path(LEGACY_FILE_NAME)
+}
+
+#[cfg(test)]
+fn app_backend() -> Box<dyn SecretBackend> {
+    Box::new(test_backend::MemoryOnly::default())
+}
+
+#[cfg(test)]
+fn app_legacy_file() -> Result<PathBuf, String> {
+    // A unique folder that is deleted when `dir` drops, so the path is
+    // unpredictable and never exists. Nothing at a fixed temp path can feed
+    // keys into a test.
+    let dir = tempfile::tempdir().map_err(|error| format!("No temp folder for tests: {error}"))?;
+    Ok(dir.path().join(LEGACY_FILE_NAME))
+}
+
+#[cfg(test)]
+mod test_backend {
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    /// The backend `ProviderKeys::for_app` gets in test builds.
+    #[derive(Default)]
+    pub(super) struct MemoryOnly(Mutex<HashMap<String, String>>);
+
+    impl super::SecretBackend for MemoryOnly {
+        fn get(&self, account: &str) -> Result<Option<String>, String> {
+            Ok(self.0.lock().expect("memory keys").get(account).cloned())
+        }
+
+        fn set(&self, account: &str, value: &str) -> Result<(), String> {
+            self.0
+                .lock()
+                .expect("memory keys")
+                .insert(account.to_string(), value.to_string());
+            Ok(())
+        }
+
+        fn delete(&self, account: &str) -> Result<(), String> {
+            self.0.lock().expect("memory keys").remove(account);
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]
@@ -208,7 +440,11 @@ mod tests {
         keys.save("groq", "  gsk-test  ").unwrap();
 
         assert_eq!(keys.get("groq").unwrap().as_deref(), Some("gsk-test"));
-        assert_eq!(fixture.file_keys(), None, "save must not create the legacy file");
+        assert_eq!(
+            fixture.file_keys(),
+            None,
+            "save must not create the legacy file"
+        );
     }
 
     #[test]
@@ -217,10 +453,20 @@ mod tests {
         let backend = MemoryBackend::default();
         let keys = fixture.keys(backend);
 
-        assert_eq!(keys.get("open_ai_compatible-a").unwrap().as_deref(), Some("sk-a"));
+        assert_eq!(
+            keys.get("open_ai_compatible-a").unwrap().as_deref(),
+            Some("sk-a")
+        );
 
-        assert_eq!(keys.backend.get("open_ai_compatible-a").unwrap().as_deref(), Some("sk-a"));
-        assert_eq!(fixture.file_keys(), None, "an emptied legacy file is deleted");
+        assert_eq!(
+            keys.backend.get("open_ai_compatible-a").unwrap().as_deref(),
+            Some("sk-a")
+        );
+        assert_eq!(
+            fixture.file_keys(),
+            None,
+            "an emptied legacy file is deleted"
+        );
     }
 
     #[test]
@@ -243,7 +489,10 @@ mod tests {
         });
 
         assert_eq!(keys.get("a").unwrap().as_deref(), Some("sk-a"));
-        assert_eq!(fixture.file_keys().unwrap().get("a").map(String::as_str), Some("sk-a"));
+        assert_eq!(
+            fixture.file_keys().unwrap().get("a").map(String::as_str),
+            Some("sk-a")
+        );
     }
 
     #[test]
@@ -259,7 +508,10 @@ mod tests {
         assert!(report.moved.is_empty());
         assert_eq!(report.kept.len(), 1);
         assert_eq!(report.kept[0].0, "a");
-        assert_eq!(fixture.file_keys().unwrap().get("a").map(String::as_str), Some("sk-a"));
+        assert_eq!(
+            fixture.file_keys().unwrap().get("a").map(String::as_str),
+            Some("sk-a")
+        );
     }
 
     /// The crash case: the keychain write landed, the file update did not.
@@ -282,7 +534,10 @@ mod tests {
         assert_eq!(keys.get("a").unwrap().as_deref(), Some("sk-new"));
         let report = keys.migrate_all().unwrap();
         assert_eq!(report.kept[0].0, "a");
-        assert_eq!(fixture.file_keys().unwrap().get("a").map(String::as_str), Some("sk-old"));
+        assert_eq!(
+            fixture.file_keys().unwrap().get("a").map(String::as_str),
+            Some("sk-old")
+        );
     }
 
     #[test]
@@ -320,7 +575,10 @@ mod tests {
         let error = keys.save("groq", "gsk-secret-value").unwrap_err();
 
         assert!(error.contains("groq"), "{error}");
-        assert!(!error.contains("gsk-secret-value"), "a key value leaked: {error}");
+        assert!(
+            !error.contains("gsk-secret-value"),
+            "a key value leaked: {error}"
+        );
     }
 
     #[test]
@@ -410,12 +668,75 @@ mod tests {
         }
     }
 
+    /// Talks to the real OS keychain with a throwaway account, then
+    /// deletes it. Ignored: CI has no login keychain, and a local run may
+    /// show an OS prompt. Run by hand when changing `OsKeychain`.
+    #[test]
+    #[ignore]
+    fn os_keychain_round_trips_a_throwaway_account() {
+        let account = format!("rhizome-live-test-{}", uuid::Uuid::new_v4());
+        let keychain = OsKeychain;
+
+        keychain.set(&account, "throwaway-value").unwrap();
+        let read = keychain.get(&account);
+        keychain.delete(&account).unwrap();
+
+        assert_eq!(read.unwrap().as_deref(), Some("throwaway-value"));
+        assert_eq!(keychain.get(&account).unwrap(), None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_legacy_write_does_not_follow_a_symlink() {
+        use std::os::unix::fs::symlink;
+
+        let dir = tempfile::tempdir().unwrap();
+        let outside = dir.path().join("outside-secrets.json");
+        let path = dir.path().join(LEGACY_FILE_NAME);
+        std::fs::write(&outside, "{\"marker\":\"RHIZOME_R3_OUTSIDE\"}\n").unwrap();
+        symlink(&outside, &path).unwrap();
+        let secrets = LegacySecrets {
+            provider_api_keys: BTreeMap::from([("demo".into(), "fixture-only".into())]),
+        };
+
+        write_legacy(&path, &secrets).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(&outside).unwrap(),
+            "{\"marker\":\"RHIZOME_R3_OUTSIDE\"}\n"
+        );
+        assert!(!path.symlink_metadata().unwrap().file_type().is_symlink());
+        assert_eq!(read_legacy(&path).unwrap(), secrets);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_legacy_write_tightens_a_permissive_file() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(LEGACY_FILE_NAME);
+        std::fs::write(&path, "{}").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let secrets = LegacySecrets {
+            provider_api_keys: BTreeMap::from([("demo".into(), "fixture-only".into())]),
+        };
+
+        write_legacy(&path, &secrets).unwrap();
+
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        assert_eq!(read_legacy(&path).unwrap(), secrets);
+    }
+
     #[test]
     fn tests_can_never_reach_the_real_keychain_or_key_file() {
         let keys = ProviderKeys::for_app().unwrap();
 
         assert!(
-            !keys.legacy_file.ends_with(Path::new("com.rhizome.app").join(LEGACY_FILE_NAME)),
+            !keys
+                .legacy_file
+                .ends_with(Path::new("com.rhizome.app").join(LEGACY_FILE_NAME)),
             "test builds must not point at the real key file: {}",
             keys.legacy_file.display()
         );

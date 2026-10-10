@@ -220,3 +220,4 @@ proposed → active → superseded
 | [0181](0181-pr-branches-with-full-gates.md) | PR branches with full pre-push gates | active |
 | [0182](0182-free-tier-provider-routing.md) | Free-tier provider routing ports OmniRoute rules | active |
 | [0183](0183-save-native-chat-sessions.md) | Save native chat sessions (plan step 2c) | active |
+| [0184](0184-provider-keys-in-the-os-keychain.md) | Provider keys live in the OS keychain through the keyring crate | active |
