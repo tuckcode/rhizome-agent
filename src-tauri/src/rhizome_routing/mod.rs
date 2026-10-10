@@ -13,6 +13,7 @@
 //! already saw partial output.
 
 mod catalog;
+pub mod free_tier;
 mod health;
 
 use std::hash::{Hash, Hasher};
@@ -262,6 +263,14 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
         emit(ModelEvent::Error(error));
         true
     }
+}
+
+/// True when at least one target can be tried: its provider is on, and it
+/// has the key (and account id) it needs, or needs none. The Chat picker
+/// shows "Free tier (auto)" only then (D11). A keyless user endpoint counts.
+pub fn has_usable_target(catalog: &Catalog, options: &RoutingOptions, keys: &impl KeyStore) -> bool {
+    let _ = (catalog, options, keys);
+    false
 }
 
 enum Outcome {
@@ -557,6 +566,55 @@ mod tests {
     }
 
     #[test]
+    fn usable_needs_a_key_for_a_key_required_provider() {
+        let catalog = catalog(&[("a", "http://a.test/v1"), ("b", "http://b.test/v1")]);
+        let options = RoutingOptions::default();
+
+        assert!(!has_usable_target(&catalog, &options, &keys(&[])));
+        assert!(has_usable_target(&catalog, &options, &keys(&["b"])));
+    }
+
+    #[test]
+    fn a_provider_the_user_turned_off_is_not_usable() {
+        let catalog = catalog(&[("a", "http://a.test/v1")]);
+        let options = RoutingOptions {
+            disabled: ["a".to_string()].into(),
+            ..Default::default()
+        };
+
+        assert!(!has_usable_target(&catalog, &options, &keys(&["a"])));
+    }
+
+    #[test]
+    fn a_keyless_user_endpoint_is_usable() {
+        let catalog = catalog(&[("a", "http://a.test/v1")]).with_user_endpoint(UserEndpoint {
+            base_url: "http://192.168.1.50:8080/v1".into(),
+            model: "local".into(),
+        });
+
+        assert!(has_usable_target(&catalog, &RoutingOptions::default(), &keys(&[])));
+    }
+
+    #[test]
+    fn an_account_url_needs_the_account_id() {
+        let catalog = catalog(&[("cf", "http://cf.test/{account_id}/v1")]);
+        let key_only = keys(&["cf"]);
+        let with_account = FakeKeys(
+            [(
+                "cf".to_string(),
+                Credential {
+                    api_key: "k".into(),
+                    account_id: Some("acct".into()),
+                },
+            )]
+            .into(),
+        );
+
+        assert!(!has_usable_target(&catalog, &RoutingOptions::default(), &key_only));
+        assert!(has_usable_target(&catalog, &RoutingOptions::default(), &with_account));
+    }
+
+    #[test]
     fn a_provider_without_a_key_is_never_called() {
         let first = serve(vec![]);
         let second = serve(vec![reply("ok")]);
@@ -799,6 +857,7 @@ mod tests {
         let options = RoutingOptions {
             opt_in: ["cf".to_string()].into(),
             strict: false,
+            ..Default::default()
         };
         let mut router =
             RoutingModel::new(catalog, keys(&["a", "cf"]), FakeClock::at(T0), TEST_LIMITS)

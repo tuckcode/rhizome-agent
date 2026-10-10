@@ -82,6 +82,8 @@ pub struct RoutingOptions {
     /// Upstream `freeAccessPolicy=strict`. A missing flag means "not
     /// established", so the default mode does not check it.
     pub strict: bool,
+    /// Provider ids the user turned off, default-on or opt-in.
+    pub disabled: BTreeSet<String>,
 }
 
 /// One upstream free-model row.
@@ -256,6 +258,7 @@ mod tests {
         RoutingOptions {
             opt_in: ids.iter().map(|id| id.to_string()).collect(),
             strict: false,
+            ..Default::default()
         }
     }
 
@@ -354,6 +357,20 @@ mod tests {
                 "{dropped} must not route: {routable:?}"
             );
         }
+    }
+
+    #[test]
+    fn a_provider_the_user_turned_off_does_not_route() {
+        let catalog = Catalog::pinned();
+        let options = RoutingOptions {
+            disabled: ["groq".to_string()].into(),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            providers(&ids(&catalog, &options)),
+            ["mistral", "llm7", "openrouter", "nvidia"]
+        );
     }
 
     #[test]
