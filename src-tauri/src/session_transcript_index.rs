@@ -186,12 +186,17 @@ mod tests {
     }
 
     fn with_cache_dir<T>(body: impl FnOnce(&TempDir) -> T) -> T {
-        let _guard = ENV_LOCK.lock().expect("cache dir lock");
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let dir = TempDir::new().expect("temp cache dir");
         std::env::set_var("RHIZOME_CACHE_DIR", dir.path());
-        let result = body(&dir);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| body(&dir)));
         std::env::remove_var("RHIZOME_CACHE_DIR");
-        result
+        match result {
+            Ok(value) => value,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
     }
 
     fn sample_document() -> SessionTranscriptIndexDocument {

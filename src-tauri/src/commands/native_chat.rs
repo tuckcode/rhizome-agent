@@ -767,7 +767,9 @@ mod tests {
     static HOME_LOCK: Mutex<()> = Mutex::new(());
 
     fn with_temp_home<T>(body: impl FnOnce(&tempfile::TempDir) -> T) -> T {
-        let _guard = HOME_LOCK.lock().expect("home lock");
+        let _guard = HOME_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let home = tempfile::tempdir().unwrap();
         let previous = std::env::var("HOME").ok();
         std::env::set_var("HOME", home.path());
@@ -785,37 +787,40 @@ mod tests {
 
     #[test]
     fn native_chat_start_emits_text_on_the_scoped_channel() {
-        let chats = NativeChats::new();
-        let (tx, rx) = mpsc::channel();
-        let id = chats
-            .start_with_engine("hi", NativeEngine::saying("hello"), move |event| {
-                let _ = tx.send(event);
-            })
-            .expect("start");
-        assert_eq!(native_chat_channel(&id), format!("native-chat:{id}"));
-        let mut seen = Vec::new();
-        let deadline = Instant::now() + Duration::from_secs(2);
-        while Instant::now() < deadline {
-            if let Ok(event) = rx.recv_timeout(Duration::from_millis(20)) {
-                seen.push(event);
+        with_temp_home(|_| {
+            let chats = NativeChats::new();
+            let (tx, rx) = mpsc::channel();
+            let id = chats
+                .start_with_engine("hi", NativeEngine::saying("hello"), move |event| {
+                    let _ = tx.send(event);
+                })
+                .expect("start");
+            assert_eq!(native_chat_channel(&id), format!("native-chat:{id}"));
+            let mut seen = Vec::new();
+            let deadline = Instant::now() + Duration::from_secs(2);
+            while Instant::now() < deadline {
+                if let Ok(event) = rx.recv_timeout(Duration::from_millis(20)) {
+                    seen.push(event);
+                }
+                if seen
+                    .iter()
+                    .any(|event| matches!(event, EngineEvent::TurnEnd))
+                {
+                    break;
+                }
             }
-            if seen
-                .iter()
-                .any(|event| matches!(event, EngineEvent::TurnEnd))
-            {
-                break;
-            }
-        }
-        assert!(
-            seen.iter()
-                .any(|event| matches!(event, EngineEvent::TextDelta { text } if text == "hello")),
-            "scoped channel missing text: {seen:?}"
-        );
-        assert!(
-            seen.iter()
-                .any(|event| matches!(event, EngineEvent::TurnEnd)),
-            "scoped channel missing turn end: {seen:?}"
-        );
+            assert!(
+                seen.iter().any(
+                    |event| matches!(event, EngineEvent::TextDelta { text } if text == "hello")
+                ),
+                "scoped channel missing text: {seen:?}"
+            );
+            assert!(
+                seen.iter()
+                    .any(|event| matches!(event, EngineEvent::TurnEnd)),
+                "scoped channel missing turn end: {seen:?}"
+            );
+        });
     }
 
     #[test]
@@ -861,93 +866,128 @@ mod tests {
 
     #[test]
     fn quit_cancels_native_chat_turn() {
-        let chats = NativeChats::new();
-        let (chunk_tx, chunk_rx) = mpsc::channel();
-        let (hold_tx, hold_rx) = mpsc::channel::<()>();
-        let mut model = FakeModel::streaming(vec![vec!["one".into(), "two".into()]]);
-        model.on_after_chunk(move |index| {
-            if index == 0 {
-                let _ = chunk_tx.send(());
-                let _ = hold_rx.recv();
+        with_temp_home(|_| {
+            let chats = NativeChats::new();
+            let (chunk_tx, chunk_rx) = mpsc::channel();
+            let (hold_tx, hold_rx) = mpsc::channel::<()>();
+            let mut model = FakeModel::streaming(vec![vec!["one".into(), "two".into()]]);
+            model.on_after_chunk(move |index| {
+                if index == 0 {
+                    let _ = chunk_tx.send(());
+                    let _ = hold_rx.recv();
+                }
+            });
+            let (tx, rx) = mpsc::channel();
+            let id = chats
+                .start_with_engine(
+                    "hi",
+                    NativeEngine::from_parts(AgentLoop::new(), model),
+                    move |event| {
+                        let _ = tx.send(event);
+                    },
+                )
+                .expect("start");
+            chunk_rx
+                .recv_timeout(Duration::from_secs(2))
+                .expect("first chunk");
+            chats.cancel(&id, "quit").expect("cancel");
+            drop(hold_tx);
+            let mut seen = Vec::new();
+            let deadline = Instant::now() + Duration::from_secs(2);
+            while Instant::now() < deadline {
+                if let Ok(event) = rx.recv_timeout(Duration::from_millis(20)) {
+                    seen.push(event);
+                }
+                if seen.iter().any(
+                    |event| matches!(event, EngineEvent::Cancelled { cause } if cause == "quit"),
+                ) {
+                    break;
+                }
             }
+            assert!(
+                seen.iter().any(
+                    |event| matches!(event, EngineEvent::Cancelled { cause } if cause == "quit")
+                ),
+                "quit must cancel the native turn: {seen:?}"
+            );
         });
-        let (tx, rx) = mpsc::channel();
-        let id = chats
-            .start_with_engine(
-                "hi",
-                NativeEngine::from_parts(AgentLoop::new(), model),
-                move |event| {
-                    let _ = tx.send(event);
-                },
-            )
-            .expect("start");
-        chunk_rx
-            .recv_timeout(Duration::from_secs(2))
-            .expect("first chunk");
-        chats.cancel(&id, "quit").expect("cancel");
-        drop(hold_tx);
-        let mut seen = Vec::new();
-        let deadline = Instant::now() + Duration::from_secs(2);
-        while Instant::now() < deadline {
-            if let Ok(event) = rx.recv_timeout(Duration::from_millis(20)) {
-                seen.push(event);
-            }
-            if seen
-                .iter()
-                .any(|event| matches!(event, EngineEvent::Cancelled { cause } if cause == "quit"))
-            {
-                break;
-            }
-        }
-        assert!(
-            seen.iter()
-                .any(|event| matches!(event, EngineEvent::Cancelled { cause } if cause == "quit")),
-            "quit must cancel the native turn: {seen:?}"
-        );
     }
 
     #[test]
     fn quit_does_not_wait_past_the_bound() {
-        let chats = NativeChats::new();
-        let mut model = FakeModel::streaming(vec![vec!["one".into(), "two".into()]]);
-        model.on_after_chunk(|_| {
-            thread::sleep(Duration::from_secs(2));
+        with_temp_home(|_| {
+            let chats = NativeChats::new();
+            let mut model = FakeModel::streaming(vec![vec!["one".into(), "two".into()]]);
+            model.on_after_chunk(|_| {
+                thread::sleep(Duration::from_secs(2));
+            });
+            chats
+                .start_with_engine(
+                    "hi",
+                    NativeEngine::from_parts(AgentLoop::new(), model),
+                    |_| {},
+                )
+                .expect("start");
+            let started = Instant::now();
+            chats.settle_all(Duration::from_millis(80));
+            let elapsed = started.elapsed();
+            assert!(
+                elapsed < Duration::from_millis(400),
+                "quit bound leaked: {elapsed:?}"
+            );
         });
-        chats
-            .start_with_engine(
-                "hi",
-                NativeEngine::from_parts(AgentLoop::new(), model),
-                |_| {},
-            )
-            .expect("start");
-        let started = Instant::now();
-        chats.settle_all(Duration::from_millis(80));
-        let elapsed = started.elapsed();
-        assert!(
-            elapsed < Duration::from_millis(400),
-            "quit bound leaked: {elapsed:?}"
-        );
+    }
+
+    fn with_temp_home_and_cache<T>(body: impl FnOnce(&tempfile::TempDir) -> T) -> T {
+        with_temp_home(|home| session_transcript_index::with_temp_cache(|| body(home)))
+    }
+
+    fn wait_for_indexed_session(
+        path: &str,
+    ) -> crate::session_transcript_index::PersistedSessionRecord {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            if let Ok(document) = session_transcript_index::load() {
+                if let Some(record) = document
+                    .sessions
+                    .iter()
+                    .find(|session| session.path == path)
+                {
+                    return record.clone();
+                }
+            }
+            assert!(
+                Instant::now() < deadline,
+                "index never got the native session {path}"
+            );
+            thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    fn wait_for_path(path: &std::path::Path) {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            if path.exists() {
+                return;
+            }
+            assert!(Instant::now() < deadline, "path never appeared: {path:?}");
+            thread::sleep(Duration::from_millis(20));
+        }
     }
 
     #[test]
     fn transcript_index_contains_native_turn() {
-        session_transcript_index::with_temp_cache(|| {
+        with_temp_home_and_cache(|_| {
             let chats = NativeChats::new();
             let id = chats
                 .start_with_engine("hello vault", NativeEngine::saying("ok"), |_| {})
                 .expect("start");
-            thread::sleep(Duration::from_millis(80));
             let path = chats.path_for(&id).expect("native path");
             assert!(
                 path.starts_with(NATIVE_SESSION_PREFIX),
                 "path must be Rhizome-owned"
             );
-            let document = session_transcript_index::load().expect("load");
-            let record = document
-                .sessions
-                .iter()
-                .find(|session| session.path == path)
-                .expect("indexed native session");
+            let record = wait_for_indexed_session(&path);
             assert!(record
                 .turns
                 .iter()
@@ -1000,46 +1040,30 @@ mod tests {
         );
     }
 
-    fn write_native_log(session_id: &str, version: u32, target: &str, event_json: &[&str]) {
-        write_native_log_lines(session_id, version, target, event_json, &[]);
+    fn write_native_log(name: &str, version: u32, target: &str, event_json: &[&str]) {
+        write_native_log_lines(name, version, target, event_json, &[]);
     }
 
     fn write_native_log_lines(
-        session_id: &str,
+        name: &str,
         version: u32,
         target: &str,
         event_json: &[&str],
         extra_lines: &[&str],
     ) {
-        let path = crate::engines::native_log::session_log_path(session_id).expect("log path");
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).expect("native-sessions dir");
-        }
-        let header = serde_json::json!({
-            "version": version,
-            "session_id": session_id,
-            "created_at": "2026-10-10T00:00:00Z",
-            "target": target,
-            "permission_mode": "safe",
-            "vault_path": null,
-        });
-        let mut lines = vec![header.to_string()];
-        for (index, event) in event_json.iter().enumerate() {
-            let seq = (index as u64) + 1;
-            let checksum = crate::engines::native_log::checksum_event(seq, event);
-            lines.push(
-                serde_json::json!({
-                    "seq": seq,
-                    "checksum": checksum,
-                    "event": serde_json::from_str::<serde_json::Value>(event).expect("event json"),
-                })
-                .to_string(),
-            );
-        }
-        for extra in extra_lines {
-            lines.push((*extra).to_string());
-        }
-        std::fs::write(&path, format!("{}\n", lines.join("\n"))).expect("write log");
+        let events: Vec<DurableEvent> = event_json
+            .iter()
+            .map(|line| serde_json::from_str(line).expect("event json"))
+            .collect();
+        let header = crate::engines::native_log::SessionHeader {
+            version,
+            session_id: name.to_string(),
+            created_at: "2026-10-10T00:00:00Z".into(),
+            target: target.to_string(),
+            permission_mode: "safe".into(),
+            vault_path: None,
+        };
+        crate::engines::native_log::write_fixture(&header, &events, extra_lines).expect("fixture");
     }
 
     fn two_turn_events() -> [&'static str; 6] {
@@ -1380,12 +1404,8 @@ mod tests {
             let id = chats
                 .start_with_engine("hi", NativeEngine::saying("ok"), |_| {})
                 .expect("start");
-            thread::sleep(Duration::from_millis(80));
             let log_path = crate::engines::native_log::session_log_path(&id).expect("path");
-            assert!(
-                log_path.exists(),
-                "native session must write a log in the app config folder: {log_path:?}"
-            );
+            wait_for_path(&log_path);
             assert!(
                 !home.path().join(".prime").exists(),
                 "native log must not be written under ~/.prime"
@@ -1404,28 +1424,26 @@ mod tests {
 
     #[test]
     fn delete_removes_the_log_and_the_index_entry() {
-        session_transcript_index::with_temp_cache(|| {
-            with_temp_home(|_| {
-                let chats = NativeChats::new();
-                let id = chats
-                    .start_with_engine("delete me", NativeEngine::saying("ok"), |_| {})
-                    .expect("start");
-                thread::sleep(Duration::from_millis(80));
-                let path = chats.path_for(&id).expect("native path");
-                let log_path = crate::engines::native_log::session_log_path(&id).expect("log");
-                assert!(log_path.exists(), "log should exist before delete");
-                super::delete_native_session(&chats, &id).expect("delete");
-                assert!(!log_path.exists(), "delete must remove the log file");
-                let document = session_transcript_index::load().expect("load");
-                assert!(
-                    document
-                        .sessions
-                        .iter()
-                        .all(|session| session.path != path && session.id != id),
-                    "delete must drop the index entry: {:?}",
-                    document.sessions
-                );
-            });
+        with_temp_home_and_cache(|_| {
+            let chats = NativeChats::new();
+            let id = chats
+                .start_with_engine("delete me", NativeEngine::saying("ok"), |_| {})
+                .expect("start");
+            let path = chats.path_for(&id).expect("native path");
+            let _indexed = wait_for_indexed_session(&path);
+            let log_path = crate::engines::native_log::session_log_path(&id).expect("log");
+            assert!(log_path.exists(), "log should exist before delete");
+            super::delete_native_session(&chats, &id).expect("delete");
+            assert!(!log_path.exists(), "delete must remove the log file");
+            let document = session_transcript_index::load().expect("load");
+            assert!(
+                document
+                    .sessions
+                    .iter()
+                    .all(|session| session.path != path && session.id != id),
+                "delete must drop the index entry: {:?}",
+                document.sessions
+            );
         });
     }
 

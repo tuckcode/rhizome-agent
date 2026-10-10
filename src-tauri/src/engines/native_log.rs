@@ -487,6 +487,33 @@ pub fn next_seq_after(events: &[DurableEvent]) -> u64 {
     events.len() as u64 + 1
 }
 
+/// Test helper: write a session through the real append path, then optional
+/// extra raw lines (for damage cases). Callers pass events, not session ids,
+/// into the file write.
+#[cfg(test)]
+pub fn write_fixture(
+    header: &SessionHeader,
+    events: &[DurableEvent],
+    extra_lines: &[&str],
+) -> Result<PathBuf, String> {
+    let mut writer = create_session_log(header)?;
+    for event in events {
+        writer.append(event)?;
+    }
+    let path = writer.path().to_path_buf();
+    drop(writer);
+    if !extra_lines.is_empty() {
+        let mut file = OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .map_err(|error| format!("append fixture tail: {error}"))?;
+        for line in extra_lines {
+            write_line(&mut file, line)?;
+        }
+    }
+    Ok(path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
