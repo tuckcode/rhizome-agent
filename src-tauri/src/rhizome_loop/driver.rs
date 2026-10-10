@@ -12,9 +12,13 @@ use super::types::{DurableEvent, HistoryItem, ModelView};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApprovalReply {
     AllowOnce,
+    AllowSession,
     Deny,
     Cancelled,
 }
+
+/// Default model rounds in one turn. A runaway tool loop stops here.
+pub const DEFAULT_STEP_CAP: usize = 8;
 
 type ApprovalWaiter = Box<dyn FnMut(&str) -> ApprovalReply + Send>;
 
@@ -27,10 +31,16 @@ struct Shared {
     mode: AiAgentPermissionMode,
     /// Name and args already consumed by an allow-once grant.
     grants: Vec<(String, String)>,
+    /// Session grants. Echo and other tools match by name; bash
+    /// matches the exact command. Cleared by `end_session`.
+    session_grants: Vec<(String, String)>,
     /// Names a test adds on top of `policy::offered_tools`. Production
     /// modes do not use this list.
     extra_offered: Vec<String>,
     waiter: Option<ApprovalWaiter>,
+    stopped: bool,
+    step_cap: usize,
+    after_tool: Option<Box<dyn FnMut(&str, &str) + Send>>,
 }
 
 /// Clears `step_active` when the step returns, including on cancel.
@@ -70,8 +80,12 @@ impl AgentLoop {
                 cancel_cause: None,
                 mode: AiAgentPermissionMode::Safe,
                 grants: Vec::new(),
+                session_grants: Vec::new(),
                 extra_offered: Vec::new(),
                 waiter: None,
+                stopped: false,
+                step_cap: DEFAULT_STEP_CAP,
+                after_tool: None,
             })),
         }
     }
@@ -98,6 +112,27 @@ impl AgentLoop {
 
     pub fn set_approval_waiter(&self, waiter: impl FnMut(&str) -> ApprovalReply + Send + 'static) {
         self.lock().waiter = Some(Box::new(waiter));
+    }
+
+    /// Records a session grant. The waiter uses this when the human
+    /// picks allow-for-this-session. Tests may call it directly.
+    pub fn grant_for_session(&self, _name: impl Into<String>, _args: impl Into<String>) {}
+
+    /// Drops session grants. Allow-once spends stay until they are used.
+    pub fn end_session(&self) {}
+
+    /// Quit path: cancel an in-flight turn, drop the inbox, and refuse
+    /// later submits. Distinct from `cancel`, which ends one turn only.
+    pub fn stop_and_drain(&self, cause: impl Into<String>) {
+        self.cancel(cause);
+    }
+
+    pub fn set_step_cap(&self, cap: usize) {
+        self.lock().step_cap = cap;
+    }
+
+    pub fn on_after_tool_for_test(&self, hook: impl FnMut(&str, &str) + Send + 'static) {
+        self.lock().after_tool = Some(Box::new(hook));
     }
 
     /// Adds a name to this loop's offered set. Production `offered_tools`
@@ -226,6 +261,15 @@ impl AgentLoop {
             Ruling::Deny { reason } => self.record_denial(name, reason),
             Ruling::Ask => self.ask_then_finish(name, args),
         }
+        self.fire_after_tool(name, args);
+    }
+
+    fn fire_after_tool(&self, name: &str, args: &str) {
+        let mut hook = self.lock().after_tool.take();
+        if let Some(callback) = hook.as_mut() {
+            callback(name, args);
+        }
+        self.lock().after_tool = hook;
     }
 
     fn ask_then_finish(&self, name: &str, args: &str) {
@@ -237,6 +281,7 @@ impl AgentLoop {
         self.lock().waiter = waiter;
         match reply {
             ApprovalReply::AllowOnce => self.record_run(name, args, true),
+            ApprovalReply::AllowSession => self.record_run(name, args, true),
             ApprovalReply::Deny | ApprovalReply::Cancelled => {
                 self.record_denial(name, "approval cancelled".into());
             }

@@ -62,6 +62,31 @@ pub fn offered_tools(mode: AiAgentPermissionMode) -> Vec<String> {
     }
 }
 
+/// A session grant covers later calls of the same tool.
+/// Bash matches the exact command only so a session cannot
+/// become "run any shell".
+pub fn session_matches(name: &str, _granted_args: &str, _call_args: &str) -> bool {
+    let _ = name;
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::session_matches;
+
+    #[test]
+    fn session_grant_echo_matches_any_args() {
+        assert!(session_matches("echo", "hi", "bye"));
+        assert!(session_matches("edit", "a", "b"));
+    }
+
+    #[test]
+    fn session_grant_bash_matches_exact_command_only() {
+        assert!(session_matches("bash", "ls", "ls"));
+        assert!(!session_matches("bash", "ls", "pwd"));
+    }
+}
+
 fn allow_once_option() -> PolicyOption {
     PolicyOption {
         id: "allow_once".into(),

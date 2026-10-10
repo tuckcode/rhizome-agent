@@ -11,17 +11,18 @@ mod policy;
 mod tools;
 mod types;
 
-pub use driver::{AgentLoop, ApprovalReply};
+pub use driver::{AgentLoop, ApprovalReply, DEFAULT_STEP_CAP};
 pub use fake_model::{FakeModel, ScriptPart};
 pub use types::{DurableEvent, HistoryItem, ModelView};
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::Arc;
 
     use super::{
         AgentLoop, ApprovalReply, DurableEvent, FakeModel, HistoryItem, ModelView, ScriptPart,
+        DEFAULT_STEP_CAP,
     };
     use crate::ai_agents::AiAgentPermissionMode;
 
@@ -415,5 +416,267 @@ mod tests {
         assert!(denied.events().iter().any(|event| {
             matches!(event, DurableEvent::ToolDenied { name, .. } if name == "edit")
         }));
+    }
+
+    #[test]
+    fn allow_session_covers_the_tool_for_any_args() {
+        let agent = AgentLoop::new();
+        agent.offer_extra_tool_for_test("edit");
+        let asks = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&asks);
+        agent.set_approval_waiter(move |_| {
+            count.fetch_add(1, Ordering::SeqCst);
+            ApprovalReply::AllowSession
+        });
+        let mut model = FakeModel::script(vec![
+            vec![
+                ScriptPart::Tool {
+                    name: "edit".into(),
+                    args: "alpha".into(),
+                },
+                ScriptPart::Tool {
+                    name: "edit".into(),
+                    args: "beta".into(),
+                },
+            ],
+            vec![ScriptPart::Text("done".into())],
+        ]);
+        agent.submit("go");
+        agent.run_until_idle(&mut model);
+
+        assert_eq!(asks.load(Ordering::SeqCst), 1);
+        let edits = agent
+            .events()
+            .iter()
+            .filter(|event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit"))
+            .count();
+        assert_eq!(edits, 2);
+    }
+
+    #[test]
+    fn allow_session_bash_matches_exact_command_only() {
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        let mut prep = FakeModel::script(vec![vec![
+            ScriptPart::Tool {
+                name: "bash".into(),
+                args: "ls".into(),
+            },
+            ScriptPart::Tool {
+                name: "bash".into(),
+                args: "pwd".into(),
+            },
+        ]]);
+        agent.submit("prep");
+        agent.run_until_idle(&mut prep);
+
+        agent.grant_for_session("bash", "ls");
+        let mut model = FakeModel::script(vec![vec![
+            ScriptPart::Tool {
+                name: "bash".into(),
+                args: "ls".into(),
+            },
+            ScriptPart::Tool {
+                name: "bash".into(),
+                args: "pwd".into(),
+            },
+        ]]);
+        agent.submit("go");
+        agent.run_until_idle(&mut model);
+
+        let ls_runs = agent
+            .events()
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event,
+                    DurableEvent::ToolResult { name, output }
+                        if name == "bash" && output == "ls"
+                )
+            })
+            .count();
+        let pwd_runs = agent
+            .events()
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event,
+                    DurableEvent::ToolResult { name, output }
+                        if name == "bash" && output == "pwd"
+                )
+            })
+            .count();
+        assert_eq!(ls_runs, 2);
+        assert_eq!(pwd_runs, 1);
+        assert!(agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolDenied { name, .. } if name == "bash")
+        }));
+    }
+
+    #[test]
+    fn session_grants_clear_when_the_session_ends() {
+        let agent = AgentLoop::new();
+        agent.offer_extra_tool_for_test("edit");
+        let asks = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&asks);
+        agent.set_approval_waiter(move |_| {
+            count.fetch_add(1, Ordering::SeqCst);
+            ApprovalReply::AllowSession
+        });
+        let mut first = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "edit".into(),
+            args: "one".into(),
+        }]]);
+        agent.submit("a");
+        agent.run_until_idle(&mut first);
+        assert_eq!(asks.load(Ordering::SeqCst), 1);
+
+        let mut replay = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "edit".into(),
+            args: "one".into(),
+        }]]);
+        agent.submit("again");
+        agent.run_until_idle(&mut replay);
+        assert_eq!(
+            asks.load(Ordering::SeqCst),
+            1,
+            "the same tool should stay granted until the session ends"
+        );
+
+        agent.end_session();
+
+        let mut after = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "edit".into(),
+            args: "one".into(),
+        }]]);
+        agent.submit("b");
+        agent.run_until_idle(&mut after);
+        assert_eq!(asks.load(Ordering::SeqCst), 2);
+        let edits = agent
+            .events()
+            .iter()
+            .filter(|event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit"))
+            .count();
+        assert_eq!(edits, 3);
+    }
+
+    #[test]
+    fn step_cap_stops_a_runaway_turn() {
+        assert_eq!(DEFAULT_STEP_CAP, 8);
+        let agent = AgentLoop::new();
+        agent.set_step_cap(2);
+        let mut model = FakeModel::script(vec![
+            vec![ScriptPart::Tool {
+                name: "echo".into(),
+                args: "1".into(),
+            }],
+            vec![ScriptPart::Tool {
+                name: "echo".into(),
+                args: "2".into(),
+            }],
+            vec![ScriptPart::Tool {
+                name: "echo".into(),
+                args: "3".into(),
+            }],
+            vec![ScriptPart::Text("never".into())],
+        ]);
+        agent.submit("loop");
+        agent.run_until_idle(&mut model);
+
+        let echoes = agent
+            .events()
+            .iter()
+            .filter(|event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "echo"))
+            .count();
+        assert_eq!(echoes, 2);
+        assert!(!agent.events().iter().any(
+            |event| matches!(event, DurableEvent::Assistant { text } if text == "never")
+        ));
+        assert!(agent
+            .events()
+            .iter()
+            .any(|event| matches!(event, DurableEvent::TurnEnd)));
+        assert_eq!(model.seen.len(), 2);
+    }
+
+    #[test]
+    fn cancel_between_queued_tools_skips_the_rest() {
+        let agent = AgentLoop::new();
+        let cancel = agent.clone();
+        let once = Arc::new(AtomicBool::new(false));
+        let armed = Arc::clone(&once);
+        agent.on_after_tool_for_test(move |name, _| {
+            if name == "echo" && !armed.swap(true, Ordering::SeqCst) {
+                cancel.cancel("quit");
+            }
+        });
+        let mut model = FakeModel::script(vec![vec![
+            ScriptPart::Tool {
+                name: "echo".into(),
+                args: "one".into(),
+            },
+            ScriptPart::Tool {
+                name: "echo".into(),
+                args: "two".into(),
+            },
+        ]]);
+        agent.submit("go");
+        agent.run_until_idle(&mut model);
+
+        let echoes: Vec<String> = agent
+            .events()
+            .iter()
+            .filter_map(|event| match event {
+                DurableEvent::ToolResult { name, output } if name == "echo" => {
+                    Some(output.clone())
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(echoes, vec!["one".to_string()]);
+        assert!(agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::Cancelled { cause } if cause == "quit")
+        }));
+    }
+
+    #[test]
+    fn stop_and_drain_drops_the_inbox_and_does_not_start_the_next_turn() {
+        let agent = AgentLoop::new();
+        let stop = agent.clone();
+        let mut model = FakeModel::streaming(vec![
+            vec!["one".into(), "two".into()],
+            vec!["bee".into()],
+        ]);
+        model.on_after_chunk(move |index| {
+            if index == 0 {
+                stop.stop_and_drain("quit");
+            }
+        });
+        agent.submit("A");
+        agent.submit("B");
+        agent.run_until_idle(&mut model);
+
+        assert_eq!(
+            agent.events(),
+            vec![
+                DurableEvent::User { text: "A".into() },
+                DurableEvent::Assistant { text: "one".into() },
+                DurableEvent::Cancelled {
+                    cause: "quit".into(),
+                },
+            ]
+        );
+        assert!(agent.when_idle());
+    }
+
+    #[test]
+    fn submit_after_stop_and_drain_does_not_run() {
+        let agent = AgentLoop::new();
+        agent.stop_and_drain("quit");
+        agent.submit("later");
+        let mut model = FakeModel::saying("nope");
+        agent.run_until_idle(&mut model);
+        assert!(agent.events().is_empty());
+        assert!(model.seen.is_empty());
     }
 }
