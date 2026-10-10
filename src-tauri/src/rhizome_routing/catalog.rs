@@ -142,7 +142,11 @@ impl Catalog {
     pub fn with_user_endpoint(mut self, endpoint: UserEndpoint) -> Self {
         self.providers.push(CatalogProvider {
             id: USER_ENDPOINT_ID.into(),
-            name: "Custom endpoint".into(),
+            name: if endpoint.name.trim().is_empty() {
+                "Custom endpoint".into()
+            } else {
+                endpoint.name
+            },
             base_url: endpoint.base_url,
             per_model_quota: false,
             free_suffix: None,
@@ -150,7 +154,7 @@ impl Catalog {
             tool_params: Map::new(),
             key_required: false,
             user_supplied: true,
-            key_id: None,
+            key_id: endpoint.key_id,
             default_on: true,
             billing_warning: None,
             free_type_override: None,

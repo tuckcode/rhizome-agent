@@ -13,8 +13,9 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use super::UserEndpoint;
 use super::{has_usable_target, Catalog, KeyStore, RoutingOptions};
-use crate::ai_models::AiModelProvider;
+use crate::ai_models::{provider_base_url, AiModelProvider, AiModelProviderKind};
 
 /// The settings file name in the app config folder.
 pub const SETTINGS_FILE_NAME: &str = "free-tier-settings.json";
@@ -45,8 +46,38 @@ pub struct EndpointChoice {
 /// Saved providers that speak the OpenAI API with a model set: custom
 /// OpenAI-compatible, LM Studio, and Ollama. Hosted vendors stay out.
 pub fn endpoint_choices(providers: &[AiModelProvider]) -> Vec<EndpointChoice> {
-    let _ = providers;
-    Vec::new()
+    providers
+        .iter()
+        .filter_map(own_endpoint_for)
+        .map(|(provider, _)| EndpointChoice {
+            id: provider.id.clone(),
+            name: provider.name.clone(),
+        })
+        .collect()
+}
+
+/// The provider and its endpoint, when it can be the own endpoint.
+fn own_endpoint_for(provider: &AiModelProvider) -> Option<(&AiModelProvider, UserEndpoint)> {
+    let compatible = matches!(
+        provider.kind,
+        AiModelProviderKind::OpenAiCompatible
+            | AiModelProviderKind::LmStudio
+            | AiModelProviderKind::Ollama
+    );
+    if !compatible {
+        return None;
+    }
+    let model = provider.models.first()?.id.clone();
+    let base_url = provider_base_url(provider).ok()?;
+    Some((
+        provider,
+        UserEndpoint {
+            base_url,
+            model,
+            name: provider.name.clone(),
+            key_id: Some(provider.id.clone()),
+        },
+    ))
 }
 
 /// `catalog` with the chosen own endpoint added last. An id that no longer
@@ -56,8 +87,16 @@ pub fn with_own_endpoint(
     settings: &FreeTierSettings,
     providers: &[AiModelProvider],
 ) -> Catalog {
-    let _ = (settings, providers);
-    catalog
+    let chosen = settings.own_endpoint.as_deref().and_then(|id| {
+        providers
+            .iter()
+            .filter(|provider| provider.id == id)
+            .find_map(own_endpoint_for)
+    });
+    match chosen {
+        Some((_, endpoint)) => catalog.with_user_endpoint(endpoint),
+        None => catalog,
+    }
 }
 
 impl FreeTierSettings {
@@ -110,11 +149,12 @@ pub fn overview(
     providers_saved: &[AiModelProvider],
     keys: &impl KeyStore,
 ) -> FreeTierOverview {
-    let _ = providers_saved;
+    let catalog = &with_own_endpoint(catalog.clone(), settings, providers_saved);
     let options = settings.to_options();
     let providers = catalog
         .providers
         .iter()
+        .filter(|provider| !provider.user_supplied)
         .map(|provider| {
             let credential = keys.credential(&provider.id);
             FreeTierProviderRow {
@@ -145,7 +185,7 @@ pub fn overview(
         route_order,
         usable: has_usable_target(catalog, &options, keys),
         own_endpoint: settings.own_endpoint.clone(),
-        endpoint_choices: Vec::new(),
+        endpoint_choices: endpoint_choices(providers_saved),
     }
 }
 
@@ -251,7 +291,12 @@ mod tests {
 
     #[test]
     fn the_overview_lists_every_provider_in_the_fixed_order() {
-        let view = overview(&Catalog::pinned(), &FreeTierSettings::default(), &[], &keys(&[]));
+        let view = overview(
+            &Catalog::pinned(),
+            &FreeTierSettings::default(),
+            &[],
+            &keys(&[]),
+        );
 
         let ids: Vec<&str> = view.providers.iter().map(|row| row.id.as_str()).collect();
         assert_eq!(
@@ -272,7 +317,12 @@ mod tests {
 
     #[test]
     fn cloudflare_is_off_until_opted_in_and_carries_its_warning() {
-        let off = overview(&Catalog::pinned(), &FreeTierSettings::default(), &[], &keys(&[]));
+        let off = overview(
+            &Catalog::pinned(),
+            &FreeTierSettings::default(),
+            &[],
+            &keys(&[]),
+        );
         let on = overview(
             &Catalog::pinned(),
             &FreeTierSettings {
@@ -386,11 +436,26 @@ mod tests {
 
     fn saved_providers() -> Vec<AiModelProvider> {
         vec![
-            saved("lm_studio-pc", "lm_studio", Some("http://192.168.1.50:8080/v1"), Some("qwen")),
+            saved(
+                "lm_studio-pc",
+                "lm_studio",
+                Some("http://192.168.1.50:8080/v1"),
+                Some("qwen"),
+            ),
             saved("ollama-home", "ollama", None, Some("llama3.2")),
-            saved("open_ai_compatible-x", "open_ai_compatible", Some("https://hosted.test/v1"), Some("m")),
+            saved(
+                "open_ai_compatible-x",
+                "open_ai_compatible",
+                Some("https://hosted.test/v1"),
+                Some("m"),
+            ),
             saved("open_ai-main", "open_ai", None, Some("gpt-5-nano")),
-            saved("lm_studio-empty", "lm_studio", Some("http://127.0.0.1:1234/v1"), None),
+            saved(
+                "lm_studio-empty",
+                "lm_studio",
+                Some("http://127.0.0.1:1234/v1"),
+                None,
+            ),
         ]
     }
 
@@ -452,14 +517,24 @@ mod tests {
             ..Default::default()
         };
 
-        let view = overview(&Catalog::pinned(), &settings, &saved_providers(), &keys(&[]));
+        let view = overview(
+            &Catalog::pinned(),
+            &settings,
+            &saved_providers(),
+            &keys(&[]),
+        );
 
         assert!(view.usable);
-        assert_eq!(view.route_order.last().map(String::as_str), Some(crate::rhizome_routing::USER_ENDPOINT_ID));
+        assert_eq!(
+            view.route_order.last().map(String::as_str),
+            Some(crate::rhizome_routing::USER_ENDPOINT_ID)
+        );
         assert_eq!(view.own_endpoint.as_deref(), Some("lm_studio-pc"));
         assert_eq!(view.endpoint_choices.len(), 3);
         assert!(
-            view.providers.iter().all(|row| row.id != crate::rhizome_routing::USER_ENDPOINT_ID),
+            view.providers
+                .iter()
+                .all(|row| row.id != crate::rhizome_routing::USER_ENDPOINT_ID),
             "the own endpoint is a dropdown, not a provider row"
         );
     }

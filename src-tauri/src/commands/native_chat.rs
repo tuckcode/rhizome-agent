@@ -466,13 +466,19 @@ fn free_tier_routing_model(
     system: Option<String>,
     observer: impl FnMut(crate::rhizome_routing::ProviderAttempt) + Send + 'static,
 ) -> Result<RoutingModel<ProviderKeys, SystemClock>, String> {
-    Ok(RoutingModel::new(
+    let settings = super::saved_free_tier_settings()?;
+    let catalog = crate::rhizome_routing::free_tier::with_own_endpoint(
         Catalog::pinned(),
+        &settings,
+        &super::saved_model_providers()?,
+    );
+    Ok(RoutingModel::new(
+        catalog,
         ProviderKeys::for_app()?,
         SystemClock,
         HttpLimits::STREAM,
     )
-    .with_options(super::saved_free_tier_settings()?.to_options())
+    .with_options(settings.to_options())
     .with_observer(observer)
     .with_system_prompt(system))
 }

@@ -282,7 +282,7 @@ fn reachable(
     provider: &CatalogProvider,
     keys: &impl KeyStore,
 ) -> Option<(Option<Credential>, String)> {
-    let credential = keys.credential(&provider.id);
+    let credential = keys.credential(provider.key_id.as_deref().unwrap_or(&provider.id));
     if provider.key_required && credential.is_none() {
         return None;
     }
