@@ -187,11 +187,7 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
 
         for target in catalog.targets(options) {
             let provider = &catalog.providers[target.provider];
-            let credential = keys.credential(&provider.id);
-            if provider.key_required && credential.is_none() {
-                continue;
-            }
-            let Some(base_url) = resolve_base_url(&provider.base_url, credential.as_ref()) else {
+            let Some((credential, base_url)) = reachable(provider, keys) else {
                 continue;
             };
             keyed = true;
@@ -268,9 +264,30 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
 /// True when at least one target can be tried: its provider is on, and it
 /// has the key (and account id) it needs, or needs none. The Chat picker
 /// shows "Free tier (auto)" only then (D11). A keyless user endpoint counts.
-pub fn has_usable_target(catalog: &Catalog, options: &RoutingOptions, keys: &impl KeyStore) -> bool {
-    let _ = (catalog, options, keys);
-    false
+pub fn has_usable_target(
+    catalog: &Catalog,
+    options: &RoutingOptions,
+    keys: &impl KeyStore,
+) -> bool {
+    catalog
+        .targets(options)
+        .iter()
+        .any(|target| reachable(&catalog.providers[target.provider], keys).is_some())
+}
+
+/// The credential and base URL for one provider, or `None` when it cannot
+/// be called: a key it needs is missing, or its URL needs an account id the
+/// credential lacks. The router and `has_usable_target` share this rule.
+fn reachable(
+    provider: &CatalogProvider,
+    keys: &impl KeyStore,
+) -> Option<(Option<Credential>, String)> {
+    let credential = keys.credential(&provider.id);
+    if provider.key_required && credential.is_none() {
+        return None;
+    }
+    let base_url = resolve_base_url(&provider.base_url, credential.as_ref())?;
+    Some((credential, base_url))
 }
 
 enum Outcome {
@@ -592,7 +609,11 @@ mod tests {
             model: "local".into(),
         });
 
-        assert!(has_usable_target(&catalog, &RoutingOptions::default(), &keys(&[])));
+        assert!(has_usable_target(
+            &catalog,
+            &RoutingOptions::default(),
+            &keys(&[])
+        ));
     }
 
     #[test]
@@ -610,8 +631,16 @@ mod tests {
             .into(),
         );
 
-        assert!(!has_usable_target(&catalog, &RoutingOptions::default(), &key_only));
-        assert!(has_usable_target(&catalog, &RoutingOptions::default(), &with_account));
+        assert!(!has_usable_target(
+            &catalog,
+            &RoutingOptions::default(),
+            &key_only
+        ));
+        assert!(has_usable_target(
+            &catalog,
+            &RoutingOptions::default(),
+            &with_account
+        ));
     }
 
     #[test]

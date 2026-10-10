@@ -180,6 +180,7 @@ impl Catalog {
             .iter()
             .enumerate()
             .filter(|(_, provider)| provider.default_on || options.opt_in.contains(&provider.id))
+            .filter(|(_, provider)| !options.disabled.contains(&provider.id))
             .flat_map(|(index, provider)| {
                 provider
                     .models

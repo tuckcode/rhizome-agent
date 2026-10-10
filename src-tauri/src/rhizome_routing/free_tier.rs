@@ -13,7 +13,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::{Catalog, KeyStore, RoutingOptions};
+use super::{has_usable_target, Catalog, KeyStore, RoutingOptions};
 
 /// The settings file name in the app config folder.
 pub const SETTINGS_FILE_NAME: &str = "free-tier-settings.json";
@@ -32,8 +32,11 @@ pub struct FreeTierSettings {
 
 impl FreeTierSettings {
     pub fn to_options(&self) -> RoutingOptions {
-        let _ = self;
-        RoutingOptions::default()
+        RoutingOptions {
+            opt_in: self.opt_in.clone(),
+            strict: self.strict,
+            disabled: self.disabled.clone(),
+        }
     }
 }
 
@@ -74,24 +77,62 @@ pub fn overview(
     settings: &FreeTierSettings,
     keys: &impl KeyStore,
 ) -> FreeTierOverview {
-    let _ = (catalog, keys);
+    let options = settings.to_options();
+    let providers = catalog
+        .providers
+        .iter()
+        .map(|provider| {
+            let credential = keys.credential(&provider.id);
+            FreeTierProviderRow {
+                id: provider.id.clone(),
+                name: provider.name.clone(),
+                default_on: provider.default_on,
+                enabled: (provider.default_on || settings.opt_in.contains(&provider.id))
+                    && !settings.disabled.contains(&provider.id),
+                has_key: credential.is_some(),
+                needs_account_id: provider.base_url.contains("{account_id}"),
+                has_account_id: credential
+                    .is_some_and(|credential| credential.account_id.is_some()),
+                billing_warning: provider.billing_warning.clone(),
+                hard_stop: provider.models.iter().any(|model| model.hard_stop),
+            }
+        })
+        .collect();
+    let mut route_order: Vec<String> = Vec::new();
+    for target in catalog.targets(&options) {
+        let id = &catalog.providers[target.provider].id;
+        if route_order.last() != Some(id) {
+            route_order.push(id.clone());
+        }
+    }
     FreeTierOverview {
-        providers: Vec::new(),
+        providers,
         strict: settings.strict,
-        route_order: Vec::new(),
-        usable: false,
+        route_order,
+        usable: has_usable_target(catalog, &options, keys),
     }
 }
 
 /// Defaults when the file does not exist.
 pub fn load_at(path: &Path) -> Result<FreeTierSettings, String> {
-    let _ = path;
-    Err("not built".into())
+    if !path.exists() {
+        return Ok(FreeTierSettings::default());
+    }
+    let raw = std::fs::read_to_string(path)
+        .map_err(|error| format!("Failed to read free-tier settings: {error}"))?;
+    serde_json::from_str(&raw)
+        .map_err(|error| format!("Failed to parse free-tier settings: {error}"))
 }
 
 pub fn save_at(path: &Path, settings: &FreeTierSettings) -> Result<(), String> {
-    let _ = (path, settings);
-    Err("not built".into())
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|error| format!("Failed to create the settings folder: {error}"))?;
+    }
+    let json = serde_json::to_string_pretty(settings)
+        .map_err(|error| format!("Failed to serialize free-tier settings: {error}"))?;
+    crate::secure_fs::write_owner_only_atomic(path, &json)
+        .map_err(|error| format!("Failed to write free-tier settings: {error}"))
 }
 
 #[cfg(test)]
@@ -177,7 +218,14 @@ mod tests {
         let ids: Vec<&str> = view.providers.iter().map(|row| row.id.as_str()).collect();
         assert_eq!(
             ids,
-            ["groq", "mistral", "llm7", "openrouter", "nvidia", "cloudflare-ai"]
+            [
+                "groq",
+                "mistral",
+                "llm7",
+                "openrouter",
+                "nvidia",
+                "cloudflare-ai"
+            ]
         );
         assert!(row(&view, "groq").enabled);
         assert!(row(&view, "groq").hard_stop);
@@ -200,7 +248,10 @@ mod tests {
         assert!(!cloudflare.default_on);
         assert!(!cloudflare.enabled);
         assert!(cloudflare.needs_account_id);
-        assert!(cloudflare.billing_warning.as_deref().is_some_and(|text| text.contains("billed")));
+        assert!(cloudflare
+            .billing_warning
+            .as_deref()
+            .is_some_and(|text| text.contains("billed")));
         assert!(row(&on, "cloudflare-ai").enabled);
         assert_eq!(row(&off, "groq").billing_warning, None);
     }
@@ -232,7 +283,10 @@ mod tests {
         assert!(!row(&view, "mistral").has_key);
         assert!(row(&view, "cloudflare-ai").has_account_id);
         let json = serde_json::to_string(&view).unwrap();
-        assert!(!json.contains("test-groq"), "a key leaked into the overview: {json}");
+        assert!(
+            !json.contains("test-groq"),
+            "a key leaked into the overview: {json}"
+        );
     }
 
     #[test]
@@ -260,9 +314,15 @@ mod tests {
 
         assert!(!none.usable);
         assert!(normal.usable);
-        assert_eq!(normal.route_order, ["groq", "mistral", "llm7", "openrouter", "nvidia"]);
+        assert_eq!(
+            normal.route_order,
+            ["groq", "mistral", "llm7", "openrouter", "nvidia"]
+        );
         assert_eq!(strict.route_order, ["groq"]);
         assert!(groq_off.usable);
-        assert_eq!(groq_off.route_order.first().map(String::as_str), Some("mistral"));
+        assert_eq!(
+            groq_off.route_order.first().map(String::as_str),
+            Some("mistral")
+        );
     }
 }
