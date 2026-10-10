@@ -3,9 +3,9 @@ session: 2026-10-10T22:00Z
 model: Claude Opus 5.5
 description: >-
   Phase 4b backend: RoutingModel over ProviderModel, pinned OmniRoute
-  free catalog, three cooldown layers, KeyStore trait. Test builds only.
-  The pinned data contradicts ADR-0182's membership claim for 7 of 8
-  providers; three decisions wait on knispo.
+  free catalog, three cooldown layers, KeyStore trait, default-on vs
+  opt-in providers, strict mode. Test builds only. Provider list follows
+  the revised ADR-0182 on #106.
 ---
 
 **Origin:** Claude Code (Opus 5.5) · 2026-10-10 · Phase 4b free-tier routing, backend only
@@ -37,27 +37,34 @@ Branch `claude/phase4b-free-routing`, stacked on #105
 - `THIRD_PARTY_NOTICES` (OmniRoute MIT) and two rows in
   `docs/vendored-sources.md`.
 
-## Decisions for knispo (the PR repeats these)
+## Provider policy (revised ADR-0182, 2026-10-10)
 
-ADR-0182 decision 1 calls all eight providers "keyed, recurring, ToS ok or
-caution, hardStopGuaranteed". The pinned upstream data says otherwise:
-
-| Provider | Upstream at the pin | Routes now? |
+| Provider | Upstream at the pin | Rhizome |
 |---|---|---|
-| Groq | recurring-daily, hardStop true | yes |
-| Cerebras | one-time-initial ($5 signup credit, card on file, "hardStopGuaranteed must stay unset") | no, signup credit (decision 2) |
-| Mistral | recurring-monthly, hardStop unset | yes |
-| Cloudflare Workers AI | recurring-daily, hardStop unset, needs account id | yes, with account id |
-| OpenRouter | `auto` (not `:free`), `stealth/ox-alpha`, `liquid/lfm-2.5-2.6b:free` | `liquid/...:free` only |
-| NVIDIA NIM | one-time-initial | no, signup credit (decision 2) |
-| GitHub Models | absent. Upstream `github` is Copilot OAuth | no rows |
-| LLM7 | recurring-daily, hardStop unset | yes |
+| Groq | recurring-daily, hardStop true | default-on |
+| Mistral | recurring-monthly, hardStop unset | default-on |
+| LLM7 | recurring-daily, hardStop unset | default-on |
+| OpenRouter | `auto`, `stealth/ox-alpha`, `liquid/lfm-2.5-2.6b:free` | default-on, `:free` ids only |
+| NVIDIA NIM | rows say one-time-initial | default-on. `free_type_override: recurring-uncapped`, because `docs/reference/FREE_TIERS.md` line 346 says the credit pool was removed |
+| User endpoint | none | default-on, last |
+| Cloudflare Workers AI | recurring-daily, hardStop unset | opt-in, with `billing_warning` |
+| Cerebras, GitHub Models | | dropped from the catalog |
 
-1. Gate on `hardStopGuaranteed`? Today it is recorded, not gated. Gating
-   leaves only Groq.
-2. Cerebras and NVIDIA are excluded by decision 2. Keep that, or make an
-   exception?
-3. GitHub Models needs a free-tier source that is not OmniRoute.
+- `RoutingOptions { opt_in, strict }`. Strict mode routes only rows with
+  `hard_stop` (today Groq only) and the user endpoint. A missing flag means
+  "not established" (FREE_TIERS.md methodology), so the default mode does
+  not check it.
+- The user endpoint stays in strict mode. Its billing is the user's own
+  setup, and Rhizome cannot know it.
+- Cloudflare's rank is after the default-on providers. The ADR does not
+  rank it.
+
+## Open follow-up
+
+- GLM 5.3 is not on OmniRoute's NVIDIA list. Check NVIDIA's own catalog
+  separately. It is not in this catalog.
+- NIM's ~40 req/min limit is recorded, not enforced client-side. A 429
+  from NIM locks the quota pool through layer 3.
 
 ## Not done
 
