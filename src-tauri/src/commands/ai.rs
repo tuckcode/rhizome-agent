@@ -983,9 +983,9 @@ pub fn fork_prime_session(
 
 /// Settle the attached Prime session, then drop the Rhizome connection.
 ///
-/// The active-close dialog calls this, then hides. Helpers this process
-/// started must stop here too — `window.hide()` does not raise CloseRequested
-/// again.
+/// The active-close dialog calls this, then `finish_main_window_close`.
+/// Helpers this process started must stop here too when hiding —
+/// `window.hide()` does not raise CloseRequested again.
 #[cfg(desktop)]
 #[tauri::command]
 pub fn settle_prime_session(

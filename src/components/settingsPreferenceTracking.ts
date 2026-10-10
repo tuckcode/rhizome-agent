@@ -28,6 +28,7 @@ export interface SettingsPreferenceDraft {
   gitFeaturesEnabled: boolean
   multiWorkspaceEnabled: boolean
   sidebarTypePluralizationEnabled: boolean
+  keepInTaskbarOnClose: boolean
 }
 
 function numericFlag(value: boolean): number {
@@ -95,5 +96,10 @@ export function trackSettingsPreferenceChanges(settings: Settings, draft: Settin
     settings.multi_workspace_enabled === true,
     draft.multiWorkspaceEnabled,
     'multi_workspace_mode_changed',
+  )
+  trackEnabledPreferenceChange(
+    settings.keep_in_taskbar_on_close === true,
+    draft.keepInTaskbarOnClose,
+    'keep_in_taskbar_on_close_changed',
   )
 }

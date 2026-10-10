@@ -780,6 +780,22 @@ describe('SettingsPanel', () => {
     expect(screen.queryByText(/Beta\/Stable/i)).not.toBeInTheDocument()
   })
 
+  it('saves keep in taskbar off by default and on when switched', () => {
+    renderOpenSettings()
+    const row = screen.getByTestId('settings-keep-in-taskbar-on-close')
+    expect(row).toBeInTheDocument()
+    saveSettingsPanel()
+    expectSettingsSaved({ keep_in_taskbar_on_close: null })
+
+    onSave.mockClear()
+    fireEvent.click(screen.getByRole('switch', { name: 'Keep in taskbar' }))
+    saveSettingsPanel()
+    expectSettingsSaved({ keep_in_taskbar_on_close: true })
+    expect(trackEventMock).toHaveBeenCalledWith('keep_in_taskbar_on_close_changed', {
+      enabled: 1,
+    })
+  })
+
   it('defaults automatic update checks to on', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />

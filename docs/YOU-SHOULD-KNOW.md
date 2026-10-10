@@ -72,7 +72,7 @@ longer open the way the ADR text still sounds.
 | Latest reply | Green start marker on the newest assistant turn. Moves when a newer reply starts. |
 | Session click | Transcript **clears on the click**, then rehydrates. Leaving the old chat up is the switch beachball. |
 | Settings cost | Model catalog and provider status wait until **Agents** is visible. Packages catalog waits until **Packages**. |
-| Hide vs quit | Red button hides (C22). Hide stops ws-bridge and Mindwalk. **C75:** spawned Prime stays warm. Keep-working changes session intent, not the daemon. Cmd+Q quits. Never Prime `shutdown`. |
+| Hide vs quit | Red X quits unless Keep in taskbar (ADR-0179). Default quit stops ws-bridge, Mindwalk, and a spawned Prime. Keep in taskbar restores C22 hide; **C75** then leaves spawned Prime warm. Keep working leaves that daemon so the grant can live. Never Prime `shutdown` (0163, kept by 0180). A Rhizome-owned turn that is not using Prime is not a Prime helper. |
 
 **Do not** make nav and the note list exclusive. Claude tried; it broke
 Cmd+N, inbox auto-advance, and note selection. Keep them mounted
@@ -137,9 +137,10 @@ unless a row below is the task.
   (`sessionPath` + `name`) and must **not** create a session. **#31 closed.**
 - Session switch skips `ensure_prime_session_host` when the host is
   already running (`usePrimeSessionSwitcher` `hostRunning`).
-- New sessions are Prime `client_owned` (ADR-0167 / C47). Idle close
-  detaches. Active close defaults to **stop**, with Keep working as an
-  explicit promote to `resident`. Quit follows ownership.
+- New sessions are Prime `client_owned` (ADR-0167 / C47). Red X **quits**
+  unless Settings → Keep in taskbar (ADR-0179). Active close defaults
+  to **stop**, with Keep working as an explicit promote to `resident`.
+  Quit follows ownership and stops a spawned Prime unless that grant.
 - Rhizome starts the Prime supervisor on connect
   (`prime-agent --mode daemon --daemon-socket <path>`). Do not spawn
   when `RHIZOME_PRIME_DAEMON_SOCKET` is set. If the host is down, **retry

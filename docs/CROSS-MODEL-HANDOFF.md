@@ -590,20 +590,21 @@ models. Opening Settings used to fetch it immediately, plus
 `loadPrimeModelCatalog`; a failed “host is not running” answer is not
 cached.
 
-## 21. Hide-on-close stops ws-bridge and Mindwalk, not spawned Prime
+## 21. Red X quits unless Keep in taskbar (ADR-0179)
 
-C22 hides the main window; it does not quit. `release_helpers_for_hidden_window`
-(`lib.rs`) stops the MCP WebSocket bridge and Mindwalk sidecar.
-**C75:** a Prime daemon this process spawned stays warm
-(`hidden_window_helper_stops` is `["ws_bridge", "mindwalk"]` only).
-Keep-working still settles the session as `resident`; it does not change
-whether that daemon stays. `settle_prime_session` also releases those
-helpers, because `window.hide()` does not raise `CloseRequested` again.
-Never send Prime `shutdown` — other clients share the daemon. Cmd+Q is
-the quit path.
+Default red close **quits** and `release_helpers_on_quit` stops ws-bridge,
+Mindwalk, and a Prime daemon this process spawned. Keep in taskbar
+restores C22 hide: `release_helpers_for_hidden_window` stops only
+ws-bridge and Mindwalk (**C75** leaves spawned Prime warm). Keep working
+is a session grant: quit then leaves that spawned daemon. Never send
+Prime `shutdown` (ADR-0163 transport, kept by ADR-0180). A Rhizome-owned
+turn that is not using Prime is not a Prime helper. Do not destroy
+`main` while the process lives.
+`finish_main_window_close` applies the same hide-or-quit rule after the
+active-close dialog.
 
-Remainder: native live-check. See `docs/plans/hide-on-close-helpers.md`.
-Do not recode hide to stop `spawned_prime_daemon`.
+Remainder: native live-check. See `docs/plans/hide-on-close-helpers.md`
+and [ADR-0179](adr/0179-red-close-quits-unless-keep-in-taskbar.md).
 
 ## 22. Astra security traps (2026-09-14) — do not rediscover
 

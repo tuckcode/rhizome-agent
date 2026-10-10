@@ -143,6 +143,17 @@ const LIVE_SESSION_DIR_ENV: &str = "RHIZOME_PRIME_SESSION_DIR";
 static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 /// Hidden window (C22): do not spawn Prime again from the status poll.
 static HOST_SUSPENDED: AtomicBool = AtomicBool::new(false);
+/// Last live settle asked to leave a spawned Prime daemon (Keep working).
+/// Exit after `settle_prime_session` finds no host; this keeps that grant.
+static LAST_SETTLE_KEEP_DAEMON: AtomicBool = AtomicBool::new(false);
+
+fn remember_keep_spawned_daemon(keep: bool) {
+    LAST_SETTLE_KEEP_DAEMON.store(keep, Ordering::SeqCst);
+}
+
+fn last_settle_keeps_spawned_daemon() -> bool {
+    LAST_SETTLE_KEEP_DAEMON.load(Ordering::SeqCst)
+}
 
 fn spawned_daemon_pid() -> &'static Mutex<Option<u32>> {
     static PID: OnceLock<Mutex<Option<u32>>> = OnceLock::new();
@@ -3261,7 +3272,9 @@ pub fn settle_session(intent: SessionCloseIntent) -> Result<QuitDisposition, Str
     }
     let _ = host.shutdown();
     *guard = None;
-    Ok(disposition_for(intent))
+    let disposition = disposition_for(intent);
+    remember_keep_spawned_daemon(matches!(disposition, QuitDisposition::KeepSessionRunning));
+    Ok(disposition)
 }
 
 /// Full quit: stop foreground-owned work; leave explicitly resident work.
@@ -3269,6 +3282,13 @@ pub fn settle_session_on_quit() -> Result<QuitDisposition, String> {
     let ownership = {
         let slot = host_slot();
         let guard = slot.host.lock().map_err(poison)?;
+        if guard.as_ref().is_none() {
+            return Ok(if last_settle_keeps_spawned_daemon() {
+                QuitDisposition::KeepSessionRunning
+            } else {
+                QuitDisposition::NotConnected
+            });
+        }
         guard
             .as_ref()
             .map(|host| host.session_ownership)
@@ -4221,6 +4241,7 @@ mod tests {
     fn host_guard() -> MutexGuard<'static, ()> {
         let guard = TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
         set_host_suspended(false);
+        remember_keep_spawned_daemon(false);
         if let Ok(mut slot) = spawned_daemon_pid().lock() {
             *slot = None;
         }
@@ -5992,6 +6013,26 @@ mod tests {
             .contains(&"complete_owned_session".to_string()));
         assert!(!daemon.commands().contains(&"kill".to_string()));
         assert!(!daemon.commands().contains(&"shutdown".to_string()));
+    }
+
+    /// Active-close Keep working drops the host, then red X exits. Exit must
+    /// still honour that grant and leave a spawned daemon.
+    #[test]
+    fn quit_after_keep_working_settle_remembers_the_daemon_grant() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        assert_eq!(
+            settle_session(SessionCloseIntent::KeepWorking).unwrap(),
+            QuitDisposition::KeepSessionRunning
+        );
+        assert_eq!(
+            settle_session_on_quit().unwrap(),
+            QuitDisposition::KeepSessionRunning
+        );
     }
 
     /// After an explicit promote, full quit must not complete the worker.

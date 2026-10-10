@@ -30,11 +30,12 @@ describe('leftover public-preview install claims', () => {
 
   // 31727b5 rewrote README and PUBLIC-PREVIEW for strangers and dropped
   // internal notes (PR #66, the daemon hide detail, the legal-determination
-  // caveat). The developer guide keeps the hide correction.
-  it('keeps the C75 hide correction in the developer guide', () => {
+  // caveat). The developer guide keeps the close-path correction.
+  it('keeps the ADR-0179 close correction in the developer guide', () => {
     expect(gettingStarted).toContain(
-      'Hide stops ws-bridge and Mindwalk, not spawned Prime',
+      'Red X quits unless Keep in taskbar',
     )
+    expect(gettingStarted).toContain('Never send Prime `shutdown`')
   })
 
   it('states the license, the upstream credit, and the Mindwalk attribution', () => {

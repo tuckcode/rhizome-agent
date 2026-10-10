@@ -32,6 +32,7 @@ Read the session file first:
 | 4 | **Public-install dogfood** | Draft: [`PUBLIC-PREVIEW.md`](PUBLIC-PREVIEW.md). Still needs a clean-account run. Honest Prime-missing first minute (C64); one live turn + note; #46 live. Windows out. |
 | 5 | **Harness leftovers** | #41 live steer/queue; human session titles (unwrap history blobs on list); Packages rail shortcut only if claimed. |
 | Parked | Import `1`, W11 cards, TraderAlice patterns, kanban/automations on rail | Ledger: [inventory](plans/2026-09-20-public-readiness-inventory.md). A row is not approval. #56 is won't-remove under ADR-0180 (`ai_models.rs` starts the Rhizome loop). |
+| Done | **Red X quits unless Keep in taskbar** | ADR-0179. Default close exits and stops Rhizome-owned helpers. Native live-check still open. |
 | Wanted | **Grill the standing rules** | Sit-down `/grill-with-docs` (or vault) over `AGENTS.md`, ASTRA_PACKET §10, YOU-SHOULD-KNOW, ship rules, ADR-0163/0168/0180. Map: [`plans/2026-10-06-standing-rule-inventory.md`](plans/2026-10-06-standing-rule-inventory.md). Remind him. Do not start unless he says now. |
 | Wanted | **Vault as agent home + scratch hygiene** | Wiki + `agents/shared/` / dotfiles as sacred. Scratch untitled notes may go. Never in-app `git clean -fd`. Parked layout: [`design/vault-skill-home.md`](design/vault-skill-home.md). Inventory §7. Do not start unless he says now. |
 

@@ -516,12 +516,14 @@ Verified against source 2026-09-14. Longer landmine list:
 - **Chat default stays Prime.** Settings must not present Prime as an
   optional local-agent alternative. An API-model default must say it
   skips Prime sessions and vault tools.
-- **Hide stops ws-bridge and Mindwalk, not spawned Prime.** Red-button
-  close hides (C22). `release_helpers_for_hidden_window` stops the
-  app-owned MCP bridge and Mindwalk sidecar. **C75:** a Prime daemon
-  this process spawned stays warm for fast reopen. Keep-working still
-  settles the session as `resident`; it does not change whether the
-  daemon stays. Never send Prime `shutdown`. Cmd+Q is the real quit.
+- **Red X quits unless Keep in taskbar.** Default close exits and
+  `release_helpers_on_quit` stops the app-owned MCP bridge, Mindwalk,
+  and a Prime daemon this process spawned (ADR-0179). Keep in taskbar
+  restores C22 hide; **C75** then leaves that daemon warm. Keep-working
+  still settles the session as `resident` and leaves a spawned daemon
+  so the grant can live. Never send Prime `shutdown` (ADR-0163
+  transport, kept by ADR-0180). A Rhizome-owned turn that is not
+  using Prime is not a Prime helper. Cmd+Q still quits.
 - **Packages install is CLI, not the daemon.** `install_prime_package` runs
   `prime-agent package install` (180s). Confirm full system access once.
 - **Tab completion is rules-first.** `suggestReply` only. Do not add

@@ -51,7 +51,9 @@ file.
 **Origin:** Cursor Grok 4.7 · 2026-10-10 · Phase 2 Rhizome loop: tools, Limited tools vs Power User, cancel reset. Chat stays on Prime. Not installed. [Handoff](plans/handoffs/2026-10-10-0135-cursor-grok-4-7-harness-phase-2.md).
 **Origin:** Cursor Grok 4.7 · 2026-10-10 · Phase 1 Rhizome loop (fake model, four behavior tests). Chat stays on Prime. Not installed. [Handoff](plans/handoffs/2026-10-10-0045-cursor-grok-4-7-harness-phase-1.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-09 · Chat stays Working after agent_end when Prime keeps emitting agent_status. Host ignores that noise; composer spinner only. [Handoff](plans/handoffs/2026-10-09-2335-cursor-grok-4-6-stuck-working.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-10 · PR #88 merged main after #95/#96/#97. Close path unchanged. [Handoff](plans/handoffs/2026-10-10-0556-cursor-grok-4-6-red-close-merge.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-09 · #80: spawned-daemon process-group stop retries via `kill(2)`. [Handoff](plans/handoffs/2026-10-09-2222-cursor-grok-4-6-issue-80-process-group-flake.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-06 · ADR-0179: red X quits unless Keep in taskbar. [Handoff](plans/handoffs/2026-10-06-0225-cursor-grok-4-6-red-close-quits.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-06 · standing-rule inventory (inherited / one-night / Atticus / still in code). Evidence only. [Inventory](plans/2026-10-06-standing-rule-inventory.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · C94: CodeQL rust/cleartext-logging false positives on CLI stdout and test asserts. [Handoff](plans/handoffs/2026-10-05-2253-cursor-grok-4-6-codeql-cleartext.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-05 · #81: on-disk session-transcript index, Prime jsonl fixtures, and Sessions-group keyboard nav. Rhizome-owned memory (ADR-0177). [Handoff](plans/handoffs/2026-10-05-2015-cursor-grok-4-6-issue-81-session-index.md).
@@ -135,7 +137,9 @@ Do not paste leftover paper here.
 - [2026-10-10 · phase 2 tools](plans/handoffs/2026-10-10-0135-cursor-grok-4-7-harness-phase-2.md) — loop tools, Limited tools vs Power User, cancel reset. Chat stays on Prime.
 - [2026-10-10 · phase 1 loop](plans/handoffs/2026-10-10-0045-cursor-grok-4-7-harness-phase-1.md) — bare Rhizome loop and four behavior tests. Chat stays on Prime. Not in the app.
 - [2026-10-09 · stuck Working](plans/handoffs/2026-10-09-2335-cursor-grok-4-6-stuck-working.md) — post-`agent_end` status noise cancelled the follow-up grace; composer no longer prints last tool.
+- [2026-10-10 · #88 merge](plans/handoffs/2026-10-10-0556-cursor-grok-4-6-red-close-merge.md) — main after #95/#96/#97. Red X still quits unless Keep in taskbar.
 - [2026-10-09 · #80 process-group flake](plans/handoffs/2026-10-09-2222-cursor-grok-4-6-issue-80-process-group-flake.md) — `kill(2)` retry; test polls a live group.
+- [2026-10-06 · red X quits](plans/handoffs/2026-10-06-0225-cursor-grok-4-6-red-close-quits.md) — ADR-0179: default close exits and stops Rhizome-owned helpers; Keep in taskbar restores hide.
 - [2026-10-06 · rule inventory](plans/handoffs/2026-10-06-0155-cursor-grok-4-6-standing-rule-inventory.md) — inherited / one-night / Atticus / still in code. Evidence only.
 - [2026-10-05 · CodeQL C94](plans/handoffs/2026-10-05-2253-cursor-grok-4-6-codeql-cleartext.md) — GHAS umbrella failed on rust/cleartext-logging false positives; CLI stdout + assert text.
 - [2026-10-05 · #81 session index](plans/handoffs/2026-10-05-2015-cursor-grok-4-6-issue-81-session-index.md) — on-disk transcript index, jsonl fixtures, Sessions keyboard nav.
@@ -146,7 +150,6 @@ Do not paste leftover paper here.
 - [2026-10-05 · #57 ghost-compat](plans/handoffs/2026-10-05-0320-cursor-grok-4-6-issue-57-is-a-open.md) — `is_a:` rewrite now runs on `list_vault` / `reload_vault`; leftover file is on Atticus's machine.
 - [2026-10-04 · Vault memory MCP](plans/handoffs/2026-10-04-1548-claude-opus-5-5-vault-memory-mcp.md) — one listing per vault, MCP server instructions, distill SKIP; merged `bf22be8`, not pushed.
 - [2026-10-04 · Split handoffs](plans/handoffs/2026-10-04-1423-astra-audit-continuation.md) — Astra owns audit completion and independent review. [Cursor assignment](plans/handoffs/2026-10-04-1422-astra-cursor-implementation.md) covers bounded fixes. No product edits started.
-- [2026-10-04 · Design audit](plans/handoffs/2026-10-04-1417-astra-design-audit.md) — splash/theme/Settings findings, 83 focused tests passed, no product fixes; native checks open.
 - [2026-10-03 · Windows pipe freeze](plans/handoffs/2026-10-03-1015-claude-opus-5-5-windows-pipe-freeze.md) — freeze fixed, test target compiles, File > Exit; C83–C85 opened; not pushed.
 - [2026-10-03 · Nous catalog fields](plans/handoffs/2026-10-03-0942-cursor-grok-4-7-nous-catalog-fields.md) — Add to Chat list copies reasoning and input modalities from each Nous record. Name guesses are gone. Not in the installed app.
 - [2026-10-03 · Nous catalog and stall sample](plans/handoffs/2026-10-03-0921-cursor-grok-4-7-nous-catalog-handy.md) — stall sampled; shell waits, skills, lights, and image bubble are uncommitted. Nous already sends reasoning and image modalities. No automatic model refresh.
@@ -157,9 +160,6 @@ Do not paste leftover paper here.
 - [2026-09-26 · public prep](plans/handoffs/2026-09-26-0559-claude-opus-5-5-public-prep.md) — secret scan clean; AGPL confirmed, Tolaria credited; Gmail-in-history open.
 - [2026-09-26 · Astra redesign](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md) — redesign + login-note skip + list markers pushed as `d0a55f8`; app rebuilt; native QA not done.
 - [2026-09-26 · handy wrap](plans/handoffs/2026-09-26-0227-cursor-grok-4-7-handy.md) — app is `18eb5ba`; rail fix local; staged login skip and list markers are separate.
-- [2026-09-26 · Claude handoff](plans/handoffs/2026-09-26-0028-cursor-grok-4-7-claude-handoff.md) — installed app is `18eb5ba`; rail follow-up is local; audit file is Astra’s corrected report.
-- [2026-09-25 · Astra frontend audit brief](plans/handoffs/2026-09-25-1926-gpt-6-codex-astra-frontend-audit-brief.md) — native audit instructions and the sidebar clipping report.
-- [2026-09-21 · C75 living docs](plans/handoffs/2026-09-21-0215-cursor-grok-4-6-c75-docs.md) — hide leaves spawned Prime warm; #66–#68 closed.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)

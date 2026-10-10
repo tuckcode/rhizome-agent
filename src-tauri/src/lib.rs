@@ -336,18 +336,27 @@ fn setup_common_plugins(app: &mut tauri::App) -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
-/// The main window is hidden on close, not destroyed.
+/// The main window hides on close only when the user opted into the taskbar.
 ///
-/// C22: closing the window used to destroy it while the app stayed alive for
-/// the menu-bar companion, so every reopen path — tray, dock, single-instance —
-/// called `show()` on a window that no longer existed and silently did nothing.
-/// The app was running with no way to get back to it. Reported on Windows,
-/// reproduced on macOS 2026-08-15; it was never platform-specific.
-///
-/// Only the main window. Note windows are genuinely disposable, and quitting
-/// still works because Cmd+Q raises `ExitRequested`, not `CloseRequested`.
-pub(crate) fn window_hides_instead_of_closing(label: &str) -> bool {
-    label == "main"
+/// Default is a full quit: red X stops Rhizome-owned helpers and exits, the
+/// same as Cmd+Q. C22 still applies when `keep_in_taskbar` is on — do not
+/// destroy `main` while the process lives, or tray/dock/`show()` go dead.
+/// Note windows stay disposable. Cmd+Q still raises `ExitRequested`.
+pub(crate) fn window_hides_instead_of_closing(label: &str, keep_in_taskbar: bool) -> bool {
+    label == "main" && keep_in_taskbar
+}
+
+/// Red X quits unless Settings → Keep in taskbar is on. Absent means off.
+pub(crate) fn keep_in_taskbar_on_close_enabled(setting: Option<bool>) -> bool {
+    setting.unwrap_or(false)
+}
+
+fn current_keep_in_taskbar_on_close() -> bool {
+    keep_in_taskbar_on_close_enabled(
+        crate::settings::get_settings()
+            .ok()
+            .and_then(|settings| settings.keep_in_taskbar_on_close),
+    )
 }
 
 /// Should a dock/reopen click restore the main window?
@@ -359,7 +368,7 @@ pub(crate) fn should_reopen_main_window(has_visible_windows: bool) -> bool {
     !has_visible_windows
 }
 
-/// Idle close of the main window. Work stops; the window still hides (C22).
+/// Idle close of the main window. Work stops; hide only if keep-in-taskbar.
 pub(crate) fn idle_main_window_close_intent() -> crate::prime_session_host::SessionCloseIntent {
     crate::prime_session_host::SessionCloseIntent::Stop
 }
@@ -370,6 +379,17 @@ pub(crate) fn idle_main_window_close_intent() -> crate::prime_session_host::Sess
 /// Rhizome-owned MCP is the ws-bridge child, not Prime's own tool processes.
 pub(crate) fn hidden_window_helper_stops(_keep_prime_daemon: bool) -> &'static [&'static str] {
     &["ws_bridge", "mindwalk"]
+}
+
+/// Full quit stops Rhizome-owned helpers, including a Prime daemon this
+/// process spawned — unless Keep working left that session resident.
+/// Never send Prime `shutdown`; a user-started shared daemon stays up.
+pub(crate) fn quit_helper_stops(keep_prime_daemon: bool) -> &'static [&'static str] {
+    if keep_prime_daemon {
+        hidden_window_helper_stops(true)
+    } else {
+        &["spawned_prime_daemon", "ws_bridge", "mindwalk"]
+    }
 }
 
 /// Prime and MCP helpers this process started. They keep a Dock "running"
@@ -393,6 +413,20 @@ pub(crate) fn release_helpers_for_hidden_window(
         stop_ws_bridge_child(&mut guard);
     }
     let _ = crate::mycelium::stop_mindwalk_sidecar();
+}
+
+/// Quit path: same helper stop as hide, plus the spawned Prime supervisor
+/// unless Keep working left it resident.
+#[cfg(desktop)]
+pub(crate) fn release_helpers_on_quit(app_handle: &tauri::AppHandle, keep_prime_daemon: bool) {
+    log::info!(
+        "quit stopping helpers: {:?}",
+        quit_helper_stops(keep_prime_daemon)
+    );
+    release_helpers_for_hidden_window(app_handle, keep_prime_daemon);
+    if !keep_prime_daemon {
+        crate::prime_session_host::stop_spawned_daemon();
+    }
 }
 
 #[cfg(desktop)]
@@ -744,6 +778,7 @@ macro_rules! app_invoke_handler {
             commands::get_prime_supported_thinking_levels,
             commands::fork_prime_session,
             commands::settle_prime_session,
+            commands::finish_main_window_close,
             commands::get_prime_agent_activity,
             commands::manage_prime_heartbeat,
             commands::cancel_prime_scheduled_work,
@@ -892,7 +927,7 @@ fn handle_run_event(app_handle: &tauri::AppHandle, event: &tauri::RunEvent) {
                 false
             }
         };
-        release_helpers_for_hidden_window(app_handle, keep_prime_daemon);
+        release_helpers_on_quit(app_handle, keep_prime_daemon);
     }
 }
 
@@ -928,7 +963,8 @@ pub fn run() {
             // silently does nothing, which is indistinguishable from the bug it
             // fixes. `WindowEvent` is core to Tauri on every target.
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window_hides_instead_of_closing(window.label()) {
+                let keep_in_taskbar = current_keep_in_taskbar_on_close();
+                if window_hides_instead_of_closing(window.label(), keep_in_taskbar) {
                     use tauri::{Emitter, Manager};
                     api.prevent_close();
                     if crate::prime_session_host::is_streaming() {
@@ -941,7 +977,7 @@ pub fn run() {
                         return;
                     }
                     log::info!(
-                        "main window close requested — stopping owned work and hiding (C22)"
+                        "main window close requested — stopping owned work and hiding (keep in taskbar)"
                     );
                     let keep_prime_daemon = match crate::prime_session_host::settle_session(
                         idle_main_window_close_intent(),
@@ -960,6 +996,24 @@ pub fn run() {
                     if let Err(err) = window.hide() {
                         log::warn!("main window hide failed, it will close: {err}");
                     }
+                } else if window.label() == "main" {
+                    use tauri::{Emitter, Manager};
+                    // Do not destroy `main` while the process lives (C22). Exit
+                    // the app so the Exit path settles and stops owned helpers.
+                    api.prevent_close();
+                    if crate::prime_session_host::is_streaming() {
+                        log::info!(
+                            "main window close requested while Prime is working — asking (ADR-0167)"
+                        );
+                        if let Err(err) = window.emit("prime-active-close-requested", ()) {
+                            log::warn!("could not ask about the active close: {err}");
+                        }
+                        return;
+                    }
+                    log::info!(
+                        "main window close requested — quitting and stopping owned helpers"
+                    );
+                    window.app_handle().exit(0);
                 }
             }
         })
@@ -978,11 +1032,15 @@ mod tests {
     use super::should_use_native_desktop_menu;
     use super::window_hides_instead_of_closing;
 
-    /// C22 regression: the app stayed alive with an unreachable window because
-    /// closing destroyed it and every reopen path called `show()` on nothing.
+    /// Red X quits by default. Hide is opt-in so C22 does not return: never
+    /// destroy `main` while the process stays alive.
     #[test]
-    fn the_main_window_hides_on_close_so_it_can_be_reopened() {
-        assert!(window_hides_instead_of_closing("main"));
+    fn the_main_window_quits_on_close_unless_kept_in_the_taskbar() {
+        assert!(!window_hides_instead_of_closing("main", false));
+        assert!(window_hides_instead_of_closing("main", true));
+        assert!(!super::keep_in_taskbar_on_close_enabled(None));
+        assert!(!super::keep_in_taskbar_on_close_enabled(Some(false)));
+        assert!(super::keep_in_taskbar_on_close_enabled(Some(true)));
     }
 
     /// Closing the window must stop owned work. Detach left Prime helpers
@@ -1021,6 +1079,20 @@ mod tests {
         }
     }
 
+    /// Full quit stops a Prime daemon this process spawned, plus the same
+    /// Rhizome helpers hide already stops. Keep working leaves that daemon.
+    #[test]
+    fn quit_stops_owned_helpers_including_spawned_prime() {
+        let quit = super::quit_helper_stops(false);
+        let keep_working = super::quit_helper_stops(true);
+        assert_eq!(quit, ["spawned_prime_daemon", "ws_bridge", "mindwalk"]);
+        assert_eq!(keep_working, ["ws_bridge", "mindwalk"]);
+        assert!(
+            !keep_working.contains(&"spawned_prime_daemon"),
+            "Keep working leaves the spawned Prime daemon so resident work lives"
+        );
+    }
+
     /// A dock click with a window already up must not steal focus.
     #[test]
     fn reopen_restores_only_when_nothing_is_on_screen() {
@@ -1032,9 +1104,10 @@ mod tests {
     /// window per note opened.
     #[test]
     fn other_windows_still_close_for_real() {
-        assert!(!window_hides_instead_of_closing("note-1"));
-        assert!(!window_hides_instead_of_closing("ai-workspace"));
-        assert!(!window_hides_instead_of_closing(""));
+        assert!(!window_hides_instead_of_closing("note-1", false));
+        assert!(!window_hides_instead_of_closing("note-1", true));
+        assert!(!window_hides_instead_of_closing("ai-workspace", true));
+        assert!(!window_hides_instead_of_closing("", false));
     }
     use super::MACOS_WEBVIEW_RESERVED_COMMAND_KEYS;
     use super::MACOS_WEBVIEW_RESERVED_COMMAND_SHIFT_KEYS;

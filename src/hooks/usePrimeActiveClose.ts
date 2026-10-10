@@ -6,14 +6,10 @@ export const PRIME_ACTIVE_CLOSE_EVENT = 'prime-active-close-requested'
 
 export type PrimeCloseIntent = 'stop' | 'keep_working'
 
-async function hideMainWindow() {
-  const { getCurrentWindow } = await import('@tauri-apps/api/window')
-  await getCurrentWindow().hide().catch(() => {})
-}
-
 /**
- * Active window close (ADR-0167): Rust prevents the hide and asks here.
+ * Active window close (ADR-0167): Rust prevents the hide/quit and asks here.
  * Default is Stop and close. Keep working promotes, then detaches.
+ * finish_main_window_close hides only when Keep in taskbar is on.
  */
 export function usePrimeActiveClose() {
   const [open, setOpen] = useState(false)
@@ -41,19 +37,19 @@ export function usePrimeActiveClose() {
     }
   }, [])
 
-  const settleAndHide = useCallback(async (intent: PrimeCloseIntent) => {
+  const settleAndFinish = useCallback(async (intent: PrimeCloseIntent) => {
     await callHost('settle_prime_session', { intent })
     setOpen(false)
-    await hideMainWindow()
+    await callHost('finish_main_window_close')
   }, [])
 
   const stopAndClose = useCallback(() => {
-    void settleAndHide('stop')
-  }, [settleAndHide])
+    void settleAndFinish('stop')
+  }, [settleAndFinish])
 
   const keepWorking = useCallback(() => {
-    void settleAndHide('keep_working')
-  }, [settleAndHide])
+    void settleAndFinish('keep_working')
+  }, [settleAndFinish])
 
   const cancel = useCallback(() => {
     setOpen(false)

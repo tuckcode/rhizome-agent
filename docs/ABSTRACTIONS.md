@@ -1094,9 +1094,13 @@ daemon has no package-install verb.
 
 ### Hide vs quit
 
-Main-window close hides (C22) and `release_helpers_for_hidden_window`
-stops helpers this process started, unless Keep working left a resident
-session. Quit is Cmd+Q / `ExitRequested`. Never Prime `shutdown`.
+**Origin:** Cursor Grok 4.6 · 2026-10-06 · ADR-0179
+
+Main-window close **quits** unless Settings → Keep in taskbar is on
+(ADR-0179). Default red X is `app.exit(0)` plus `release_helpers_on_quit`
+(ws-bridge, Mindwalk, and a spawned Prime unless Keep working). Keep in
+taskbar restores C22 hide and `release_helpers_for_hidden_window`.
+Cmd+Q is still `ExitRequested`. Never Prime `shutdown`.
 
 ## Settings
 

@@ -140,6 +140,7 @@ interface SettingsDraft {
   autoGitInactiveThresholdSeconds: number
   autoAdvanceInboxAfterOrganize: boolean
   celebrationsEnabled: boolean
+  keepInTaskbarOnClose: boolean
   agentProfile: string
   aiModelProviders: AiModelProvider[]
   releaseChannel: ReleaseChannel
@@ -179,6 +180,8 @@ interface SettingsBodyProps {
   setAutoAdvanceInboxAfterOrganize: (value: boolean) => void
   celebrationsEnabled: boolean
   setCelebrationsEnabled: (value: boolean) => void
+  keepInTaskbarOnClose: boolean
+  setKeepInTaskbarOnClose: (value: boolean) => void
   agentProfile: string
   setAgentProfile: (value: string) => void
   aiAgentsStatus: AiAgentsStatus
@@ -272,6 +275,7 @@ function createSettingsDraft(
     autoAdvanceInboxAfterOrganize: settings.auto_advance_inbox_after_organize ?? false,
     // Absent means never chosen, which is on: the effect is opt-out.
     celebrationsEnabled: readCelebrationsEnabled(settings.celebrations_enabled),
+    keepInTaskbarOnClose: settings.keep_in_taskbar_on_close === true,
     agentProfile: settings.agent_profile?.trim() ?? '',
     aiModelProviders: normalizeAiModelProviders(settings.ai_model_providers),
     releaseChannel: normalizeReleaseChannel(settings.release_channel),
@@ -351,6 +355,7 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     sidebar_type_pluralization_enabled: draft.sidebarTypePluralizationEnabled,
     initial_h1_auto_rename_enabled: draft.initialH1AutoRename,
     celebrations_enabled: draft.celebrationsEnabled,
+    keep_in_taskbar_on_close: draft.keepInTaskbarOnClose ? true : null,
     agent_profile: draft.agentProfile.trim() || null,
     default_ai_agent: DEFAULT_AI_AGENT,
     default_ai_target: agentTargetId(DEFAULT_AI_AGENT),
@@ -758,6 +763,8 @@ function SettingsBodyFromDraft({
       setAutoAdvanceInboxAfterOrganize={(value) => updateDraft('autoAdvanceInboxAfterOrganize', value)}
       celebrationsEnabled={draft.celebrationsEnabled}
       setCelebrationsEnabled={(value) => updateDraft('celebrationsEnabled', value)}
+      keepInTaskbarOnClose={draft.keepInTaskbarOnClose}
+      setKeepInTaskbarOnClose={(value) => updateDraft('keepInTaskbarOnClose', value)}
       agentProfile={draft.agentProfile}
       setAgentProfile={(value) => updateDraft('agentProfile', value)}
       aiAgentsStatus={aiAgentsStatus}
@@ -908,6 +915,8 @@ function SettingsSyncAndAppearanceSections({
   setAccentColor,
   uiLanguage,
   setUiLanguage,
+  keepInTaskbarOnClose,
+  setKeepInTaskbarOnClose,
 }: SettingsBodyProps) {
   return (
     <>
@@ -972,6 +981,15 @@ function SettingsSyncAndAppearanceSections({
             systemLocale={systemLocale}
             uiLanguage={uiLanguage}
             setUiLanguage={setUiLanguage}
+          />
+        </SettingsGroup>
+        <SettingsGroup>
+          <SettingsSwitchRow
+            label="Keep in taskbar"
+            description="Leave Rhizome running after the red close button so you can reopen it from the Dock or taskbar. Off by default: close quits the app and stops helpers it started."
+            checked={keepInTaskbarOnClose}
+            onChange={setKeepInTaskbarOnClose}
+            testId="settings-keep-in-taskbar-on-close"
           />
         </SettingsGroup>
       </SettingsSection>
