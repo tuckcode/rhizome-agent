@@ -460,6 +460,9 @@ worker expires after Prime's reconnect grace. Active close asks, with
 as an agent still working. ADR-0180 is the identity: Rhizome owns the loop.
 `src-tauri/src/engines/` holds the Phase 5 trait and the native / Prime /
 Hermes wrappers. Chat still calls Prime directly (Phase 6 toggle).
+`rhizome_provider_model.rs` is the native loop's OpenAI-compatible `Model`.
+`rhizome_routing/` wraps it with free-tier fallback over a pinned OmniRoute
+catalog (ADR-0182). Chat calls neither yet.
 ADR-0168 (amended) is the borrow-care rule. Prime is an optional engine
 (ADR-0163). See `docs/design/harness-doctrine.md`.
 

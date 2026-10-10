@@ -4,14 +4,21 @@ model: Claude Opus 5.5
 description: >-
   Phase 4b backend: RoutingModel over ProviderModel, pinned OmniRoute
   free catalog, three cooldown layers, KeyStore trait, default-on vs
-  opt-in providers, strict mode. Test builds only. Provider list follows
-  the revised ADR-0182 on #106.
+  opt-in providers, strict mode. Compiles in normal builds; Chat does not
+  call it. Rebased onto main after #105, #106, #107.
 ---
 
 **Origin:** Claude Code (Opus 5.5) · 2026-10-10 · Phase 4b free-tier routing, backend only
 
-Branch `claude/phase4b-free-routing`, stacked on #105
-(`claude/phase4-multiturn-adapter`). Rebase onto `main` after #105 merges.
+Branch `claude/phase4b-free-routing`, PR #108 against `main`. Rebased on
+2026-10-10 after #105, #106 (ADR-0182), and #107 (engines, loop in normal
+builds, `ModelView::turn_start`) merged.
+
+- `ProviderModel` dropped its own turn tracker. It uses
+  `ModelView::turn_start`.
+- `rhizome_provider_model` and `rhizome_routing` compile in normal builds,
+  like `rhizome_loop`. Their items are `pub`, so the lib build has no dead
+  code.
 
 ## What landed
 
@@ -72,5 +79,4 @@ Branch `claude/phase4b-free-routing`, stacked on #105
 - `leftover-omniroute-parked.test.ts` still reads "No OmniRoute code in
   tree". This PR ports data rows and rules, not code. ADR-0182 says that
   lock changes only if code is copied.
-- `docs/ARCHITECTURE.md` not updated: the routing module is test-only, like
-  `rhizome_loop` and `ProviderModel`, which it also does not list.
+- `docs/ARCHITECTURE.md` names both modules next to `engines/`.
