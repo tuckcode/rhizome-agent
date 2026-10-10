@@ -321,7 +321,7 @@ impl AgentLoop {
         };
         self.lock().waiter = waiter;
         match reply {
-            ApprovalReply::AllowOnce => self.record_run(name, args, true),
+            ApprovalReply::AllowOnce => self.record_run(name, args, name != "bash"),
             ApprovalReply::AllowSession => {
                 self.grant_for_session(name, args);
                 self.record_run(name, args, false);

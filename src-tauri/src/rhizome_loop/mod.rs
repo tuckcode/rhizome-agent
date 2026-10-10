@@ -2,8 +2,9 @@
 //!
 //! Chat does not call this module. `lib.rs` compiles it only for tests.
 //! One inbox, one turn at a time. A step is one model request.
-//! Allow-once is spent. Allow-session matches the tool (bash: exact
-//! command) and clears on `end_session`. Quit is `stop_and_drain`.
+//! Allow-once is spent for echo. Power User bash asks each call
+//! unless a session grant matches the exact command. Quit is
+//! `stop_and_drain`.
 //! The turn / inbox vocabulary is the DeepSeek Harness idea. No DeepSeek
 //! code is copied.
 

@@ -1,10 +1,11 @@
 //! Tool allow / deny for the Rhizome loop.
 //!
 //! Limited tools (`Safe`) may run `echo` and must not run `bash`.
-//! Power User allow-once comes from the shared permission table.
-//! A name outside `offered_tools` is denied by the driver before this
-//! function runs. An offered name that this function does not decide
-//! asks a human. No waiter, or a cancelled wait, denies.
+//! Power User `echo` still auto-runs once from the shared table.
+//! Power User `bash` asks a human for each call unless a session
+//! grant already matches. A name outside `offered_tools` is denied
+//! by the driver before this function runs. No waiter, or a
+//! cancelled wait, denies.
 
 use crate::ai_agents::AiAgentPermissionMode;
 use crate::permission_decision::{decide, PolicyDecision, PolicyOption};
@@ -34,7 +35,11 @@ pub fn rule_tool(mode: AiAgentPermissionMode, name: &str, grant_spent: bool) -> 
         return Ruling::Run { spend_grant: false };
     }
 
-    if name == "echo" || name == "bash" {
+    if name == "bash" {
+        return Ruling::Ask;
+    }
+
+    if name == "echo" {
         if grant_spent {
             return Ruling::Deny {
                 reason: "grant spent".into(),
