@@ -526,6 +526,54 @@ mod tests {
     }
 
     #[test]
+    fn native_engine_current_approval_survives_a_stale_flood() {
+        let vault = tempfile::tempdir().unwrap();
+        let note = vault.path().join("flood.md");
+        let (tx, rx) = mpsc::channel();
+        let mut engine = NativeEngine::from_parts(
+            AgentLoop::new(),
+            FakeModel::script(vec![
+                vec![ScriptPart::Tool {
+                    name: "create_note".into(),
+                    args: serde_json::json!({
+                        "path": "flood.md",
+                        "content": "# Note\n",
+                    })
+                    .to_string(),
+                }],
+                vec![ScriptPart::Text("done".into())],
+            ]),
+        );
+        engine.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        engine.set_approval_timeout(Duration::from_millis(250));
+        let control = engine.control();
+        let (done_tx, done_rx) = mpsc::channel();
+        thread::spawn(move || {
+            engine
+                .start(
+                    "write",
+                    Box::new(move |event| {
+                        let _ = tx.send(event);
+                    }),
+                )
+                .ok();
+            let _ = done_tx.send(engine.events());
+        });
+        let requested = wait_for_approval(&rx);
+        for index in 0..16 {
+            control.reply_approval(&format!("prompt_old_{index}"), ApprovalReply::Deny);
+        }
+        control.reply_approval(&requested.prompt_id, ApprovalReply::AllowOnce);
+        done_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("matching allow must get through the flood");
+        assert_eq!(std::fs::read_to_string(&note).unwrap(), "# Note\n");
+    }
+
+    #[test]
     fn native_engine_reports_provider_failover() {
         let (tx, rx) = mpsc::channel();
         let model = FailoverModel { tx: tx.clone() };

@@ -119,12 +119,21 @@ fn index_dir() -> Result<PathBuf, String> {
 }
 
 #[cfg(test)]
+pub fn with_temp_cache<T>(body: impl FnOnce() -> T) -> T {
+    tests::with_temp_cache(body)
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::Mutex;
     use tempfile::TempDir;
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    pub fn with_temp_cache<T>(body: impl FnOnce() -> T) -> T {
+        with_cache_dir(|_| body())
+    }
 
     fn with_cache_dir<T>(body: impl FnOnce(&TempDir) -> T) -> T {
         let _guard = ENV_LOCK.lock().expect("cache dir lock");
