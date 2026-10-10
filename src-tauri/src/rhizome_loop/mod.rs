@@ -26,7 +26,10 @@ pub use types::{DurableEvent, HistoryItem, ModelView, ToolCall};
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::mpsc;
     use std::sync::Arc;
+    use std::thread;
+    use std::time::Duration;
 
     use super::{
         AgentLoop, ApprovalReply, DurableEvent, FakeModel, HistoryItem, Model, ModelView,
@@ -994,6 +997,158 @@ mod tests {
             ]
         );
         assert_eq!(model.seen.len(), 1);
+    }
+
+    #[test]
+    fn cancel_ends_a_blocked_approval_wait() {
+        let (events, _) = run_until_approval_then(|agent| {
+            agent.cancel("quit");
+        });
+        assert!(
+            events.iter().any(|event| {
+                matches!(
+                    event,
+                    DurableEvent::ToolDenied { id, reason, .. }
+                        if id == "call_1" && reason == "cancelled"
+                )
+            }),
+            "cancel mid-wait must deny the call as cancelled: {events:?}"
+        );
+        assert!(!events
+            .iter()
+            .any(|event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit")));
+        assert!(events
+            .iter()
+            .any(|event| matches!(event, DurableEvent::Cancelled { cause } if cause == "quit")));
+    }
+
+    #[test]
+    fn quit_ends_a_blocked_approval_wait() {
+        let (events, agent) = run_until_approval_then(|agent| {
+            agent.stop_and_drain("quit");
+        });
+        assert!(events.iter().any(|event| {
+            matches!(
+                event,
+                DurableEvent::ToolDenied { id, reason, .. }
+                    if id == "call_1" && reason == "cancelled"
+            )
+        }));
+        assert!(!events
+            .iter()
+            .any(|event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit")));
+        assert!(events
+            .iter()
+            .any(|event| matches!(event, DurableEvent::Cancelled { cause } if cause == "quit")));
+
+        let mut later = FakeModel::saying("nope");
+        agent.submit("later");
+        agent.run_until_idle(&mut later);
+        assert!(later.seen.is_empty(), "quit must keep refusing later submits");
+    }
+
+    #[test]
+    fn allow_once_after_cancel_does_not_run_the_tool() {
+        let agent = AgentLoop::new();
+        agent.offer_extra_tool_for_test("edit");
+        let cancel = agent.clone();
+        agent.set_approval_waiter(move |_| {
+            cancel.cancel("quit");
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "edit".into(),
+            args: "note".into(),
+        }]]);
+        agent.submit("go");
+        agent.run_until_idle(&mut model);
+
+        assert!(!agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit")
+        }));
+        assert!(agent.events().iter().any(|event| {
+            matches!(
+                event,
+                DurableEvent::ToolDenied { id, reason, .. }
+                    if id == "call_1" && reason == "cancelled"
+            )
+        }));
+    }
+
+    #[test]
+    fn allow_session_after_cancel_does_not_record_a_grant() {
+        let agent = AgentLoop::new();
+        agent.offer_extra_tool_for_test("edit");
+        let cancel = agent.clone();
+        let asks = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&asks);
+        agent.set_approval_waiter(move |_| {
+            let n = count.fetch_add(1, Ordering::SeqCst);
+            if n == 0 {
+                cancel.cancel("quit");
+                ApprovalReply::AllowSession
+            } else {
+                ApprovalReply::AllowOnce
+            }
+        });
+        let mut first = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "edit".into(),
+            args: "note".into(),
+        }]]);
+        agent.submit("one");
+        agent.run_until_idle(&mut first);
+        assert!(!agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit")
+        }));
+
+        let mut second = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "edit".into(),
+            args: "note".into(),
+        }]]);
+        agent.submit("two");
+        agent.run_until_idle(&mut second);
+        assert_eq!(
+            asks.load(Ordering::SeqCst),
+            2,
+            "AllowSession after cancel must not store a session grant"
+        );
+    }
+
+    /// Blocks in the waiter until `on_entered` runs, then expects the loop
+    /// to finish without the waiter returning. Times out if cancel/quit
+    /// cannot end the wait.
+    fn run_until_approval_then(
+        on_entered: impl FnOnce(&AgentLoop) + Send + 'static,
+    ) -> (Vec<DurableEvent>, AgentLoop) {
+        let agent = AgentLoop::new();
+        agent.offer_extra_tool_for_test("edit");
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (hold_tx, hold_rx) = mpsc::channel::<()>();
+        agent.set_approval_waiter(move |_| {
+            entered_tx.send(()).ok();
+            let _ = hold_rx.recv();
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "edit".into(),
+            args: "note".into(),
+        }]]);
+        agent.submit("go");
+        let runner = agent.clone();
+        let (done_tx, done_rx) = mpsc::channel();
+        thread::spawn(move || {
+            runner.run_until_idle(&mut model);
+            done_tx.send(runner.events()).ok();
+        });
+        entered_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("the waiter should block");
+        on_entered(&agent);
+        let events = done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("cancel or quit must end the approval wait");
+        drop(hold_tx);
+        (events, agent)
     }
 
     struct OnceModel {
