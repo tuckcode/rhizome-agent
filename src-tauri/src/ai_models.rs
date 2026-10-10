@@ -1143,12 +1143,29 @@ mod tests {
         request
     }
 
+    fn user_message(request: &AiModelStreamRequest) -> Vec<serde_json::Value> {
+        vec![json!({ "role": "user", "content": request.message })]
+    }
+
     fn collect_events(request: &AiModelStreamRequest) -> Vec<ModelEvent> {
+        collect_events_with_tools(request, Vec::new())
+    }
+
+    fn collect_events_with_tools(
+        request: &AiModelStreamRequest,
+        tools: Vec<serde_json::Value>,
+    ) -> Vec<ModelEvent> {
         let mut events = Vec::new();
-        stream_model_events_with(request, TEST_LIMITS, &mut |event| {
-            events.push(event);
-            true
-        });
+        stream_chat_events_with(
+            request,
+            user_message(request),
+            tools,
+            TEST_LIMITS,
+            &mut |event| {
+                events.push(event);
+                true
+            },
+        );
         events
     }
 
@@ -1267,7 +1284,7 @@ mod tests {
     }
 
     #[test]
-    fn stream_model_events_parses_tool_calls_and_runs_no_tools() {
+    fn stream_chat_events_parses_tool_calls_and_runs_no_tools() {
         let vault = tempfile::tempdir().unwrap();
         let server = serve(vec![sse(&[
             r#"{"choices":[{"delta":{"content":"On it."}}]}"#,
@@ -1277,7 +1294,8 @@ mod tests {
         let mut request = compatible_request(&server.base_url);
         request.vault_path = Some(vault.path().to_string_lossy().into_owned());
 
-        let events = collect_events(&request);
+        let tools = vec![crate::ai_model_tools::openai_create_note_tool()];
+        let events = collect_events_with_tools(&request, tools);
 
         assert_eq!(
             events,
@@ -1310,7 +1328,7 @@ mod tests {
     }
 
     #[test]
-    fn stream_model_events_accepts_a_whole_json_completion() {
+    fn stream_chat_events_accepts_a_whole_json_completion() {
         let server = serve(vec![http_response(
             "200 OK",
             &["Content-Type: application/json"],
@@ -1331,7 +1349,7 @@ mod tests {
     }
 
     #[test]
-    fn stream_model_events_stops_reading_when_emit_returns_false() {
+    fn stream_chat_events_stops_reading_when_emit_returns_false() {
         let server = serve(vec![sse(&[
             r#"{"choices":[{"delta":{"content":"one"}}]}"#,
             r#"{"choices":[{"delta":{"content":"two"}}]}"#,
@@ -1340,16 +1358,22 @@ mod tests {
         let mut events = Vec::new();
 
         let request = compatible_request(&server.base_url);
-        stream_model_events_with(&request, TEST_LIMITS, &mut |event| {
-            events.push(event);
-            false
-        });
+        stream_chat_events_with(
+            &request,
+            user_message(&request),
+            Vec::new(),
+            TEST_LIMITS,
+            &mut |event| {
+                events.push(event);
+                false
+            },
+        );
 
         assert_eq!(events, vec![ModelEvent::TextDelta { text: "one".into() }]);
     }
 
     #[test]
-    fn stream_model_events_reports_an_http_failure_as_one_error() {
+    fn stream_chat_events_reports_an_http_failure_as_one_error() {
         let server = serve(vec![http_response(
             "429 Too Many Requests",
             &["Retry-After: 3", "Content-Type: application/json"],
@@ -1370,7 +1394,7 @@ mod tests {
     }
 
     #[test]
-    fn stream_model_events_reports_a_connect_failure_as_unavailable() {
+    fn stream_chat_events_reports_a_connect_failure_as_unavailable() {
         let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let base_url = format!("http://{}/v1", closed.local_addr().unwrap());
         drop(closed);
@@ -1379,10 +1403,16 @@ mod tests {
         // A refused connect returns at once, so the production limits are
         // safe to use here.
         let mut events = Vec::new();
-        stream_model_events(&request, &mut |event| {
-            events.push(event);
-            true
-        });
+        stream_chat_events_with(
+            &request,
+            user_message(&request),
+            Vec::new(),
+            HttpLimits::STREAM,
+            &mut |event| {
+                events.push(event);
+                true
+            },
+        );
         let discover = discover_ai_model_ids(&request.provider, None).unwrap_err();
 
         assert_eq!(only_error(&events).kind, ModelErrorKind::Unavailable);
@@ -1404,7 +1434,7 @@ mod tests {
     }
 
     #[test]
-    fn stream_model_events_rejects_a_bad_base_url_and_anthropic() {
+    fn stream_chat_events_rejects_a_bad_base_url_and_anthropic() {
         let bad_url = collect_events(&compatible_request("localhost:1234"));
         assert_eq!(only_error(&bad_url).kind, ModelErrorKind::Rejected);
 
