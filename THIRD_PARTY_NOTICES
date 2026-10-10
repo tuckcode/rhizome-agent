@@ -1,0 +1,37 @@
+# Third-party notices
+
+Rhizome Agent is AGPL-3.0. This file lists third-party material copied or
+ported into this tree, with each source's licence text. Library
+dependencies stay in `package.json` and `Cargo.toml`. The index of copied
+paths and pins is `docs/vendored-sources.md`.
+
+## OmniRoute
+
+- Source: https://github.com/diegosouzapw/OmniRoute
+- Pin: `fc5e2bccd4f70fecf5aab94dfb8136c74ab5a21b` (2026-09-30)
+- Used in: `src-tauri/src/rhizome_routing/free_catalog.json` (ported free-tier
+  catalog rows and provider registry facts) and
+  `src-tauri/src/rhizome_routing/health.rs` (cooldown rules, rebuilt in Rust)
+- Decision: ADR-0182
+
+MIT License
+
+Copyright (c) 2026 diegosouzapw
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

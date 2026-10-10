@@ -1,75 +1,54 @@
 //! Rhizome loop `Model` backed by an OpenAI-compatible provider (harness
 //! plan Phase 4).
 //!
-//! Test builds only, the same as `rhizome_loop`. Chat does not call it.
+//! Compiles in normal builds, like `rhizome_loop`. Chat does not call it
+//! until Phase 6.
 //!
 //! The adapter forwards provider `ModelEvent`s to the loop unchanged. Tool
 //! calls and approvals stay with the loop: its policy decides, and its
 //! driver runs the tool. This file maps the loop's `ModelView` to OpenAI
 //! chat messages and runs no tools.
 //!
-//! `ModelView` does not say where the current turn starts, because the
-//! driver adds the admitted user message to history only when the turn
-//! ends. `ProviderModel` therefore tracks the start itself. See
-//! `turn_start`.
+//! The driver adds the admitted user message to history only when the turn
+//! ends. `ModelView::turn_start` says where it belongs in the meantime.
 
 use std::collections::HashSet;
 
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
-use crate::ai_models::{stream_chat_events_with, AiModelStreamRequest, HttpLimits};
+use crate::ai_models::{stream_chat_events_with_params, AiModelStreamRequest, HttpLimits};
 use crate::model_events::ModelEvent;
 use crate::rhizome_loop::{HistoryItem, Model, ModelView};
 
 /// Calls the provider once per loop step. Runs no tools.
-pub(crate) struct ProviderModel {
+pub struct ProviderModel {
     /// Provider, model, API key, and system prompt. `message` is not sent.
     request: AiModelStreamRequest,
+    /// Body fields sent only when the step offers tools.
+    tool_params: Map<String, Value>,
     limits: HttpLimits,
-    turn: Option<TurnMark>,
-}
-
-/// Where the current turn's items start in `ModelView::history`.
-struct TurnMark {
-    admitted: String,
-    start: usize,
 }
 
 impl ProviderModel {
-    pub(crate) fn new(request: AiModelStreamRequest, limits: HttpLimits) -> Self {
+    pub fn new(request: AiModelStreamRequest, limits: HttpLimits) -> Self {
         Self {
             request,
+            tool_params: Map::new(),
             limits,
-            turn: None,
         }
     }
 
-    /// The first history index that belongs to the current turn.
-    ///
-    /// A new turn starts at the end of history. Within a turn the driver
-    /// only appends, so the mark holds. When a turn ends, the driver puts
-    /// that turn's user message at the mark. So a `User` item at the mark,
-    /// or new admitted text, means a new turn.
-    fn turn_start(&mut self, view: &ModelView) -> usize {
-        let same_turn = self.turn.as_ref().is_some_and(|mark| {
-            mark.admitted == view.admitted
-                && mark.start <= view.history.len()
-                && !matches!(view.history.get(mark.start), Some(HistoryItem::User { .. }))
-        });
-        if !same_turn {
-            self.turn = Some(TurnMark {
-                admitted: view.admitted.clone(),
-                start: view.history.len(),
-            });
-        }
-        self.turn.as_ref().map_or(0, |mark| mark.start)
+    /// Sends later steps to another provider or model. A router can switch
+    /// targets inside one turn, because the turn start comes from the view.
+    pub fn retarget(&mut self, request: AiModelStreamRequest, tool_params: Map<String, Value>) {
+        self.request = request;
+        self.tool_params = tool_params;
     }
 }
 
 impl Model for ProviderModel {
     fn complete(&mut self, view: &ModelView, emit: &mut dyn FnMut(ModelEvent) -> bool) -> bool {
-        let start = self.turn_start(view);
-        let messages = openai_messages(view, start);
+        let messages = openai_messages(view, view.turn_start);
         let tools = tool_definitions(&view.offered_tools);
         // The loop calls this from inside a tokio runtime, and reqwest's
         // blocking client panics when it drops there. So the HTTP call runs
@@ -78,12 +57,18 @@ impl Model for ProviderModel {
         // worker's next send fails, and the worker stops reading.
         let (sender, receiver) = std::sync::mpsc::sync_channel::<ModelEvent>(0);
         let request = &self.request;
+        let tool_params = &self.tool_params;
         let limits = self.limits;
         std::thread::scope(|scope| {
             scope.spawn(move || {
-                stream_chat_events_with(request, messages, tools, limits, &mut |event| {
-                    sender.send(event).is_ok()
-                });
+                stream_chat_events_with_params(
+                    request,
+                    messages,
+                    tools,
+                    tool_params,
+                    limits,
+                    &mut |event| sender.send(event).is_ok(),
+                );
             });
             for event in receiver.iter() {
                 if !emit(event) {
@@ -103,7 +88,7 @@ impl Model for ProviderModel {
 /// Every assistant tool call gets a `role: "tool"` message, because the
 /// provider rejects a call id with no answer. A denied call answers with the
 /// reason. A call that never ran answers that the turn stopped first.
-pub(crate) fn openai_messages(view: &ModelView, turn_start: usize) -> Vec<Value> {
+pub fn openai_messages(view: &ModelView, turn_start: usize) -> Vec<Value> {
     let split = turn_start.min(view.history.len());
     let admitted = HistoryItem::User {
         text: view.admitted.clone(),
@@ -334,44 +319,6 @@ mod tests {
     }
 
     #[test]
-    fn turn_start_follows_the_driver_across_steps_and_turns() {
-        let mut model = ProviderModel::new(request("http://127.0.0.1:9/v1"), TEST_LIMITS);
-        let calls = HistoryItem::Assistant {
-            text: String::new(),
-            tool_calls: vec![call("call_1", "echo", "{}")],
-        };
-        let result = HistoryItem::ToolResult {
-            id: "call_1".into(),
-            name: "echo".into(),
-            output: "{}".into(),
-        };
-        let reply = HistoryItem::Assistant {
-            text: "done".into(),
-            tool_calls: vec![],
-        };
-
-        // Turn 1, step 1, then step 2 after the tool ran.
-        assert_eq!(model.turn_start(&view("go", vec![])), 0);
-        assert_eq!(
-            model.turn_start(&view("go", vec![calls.clone(), result.clone()])),
-            0
-        );
-        // Turn 2 with the same text. The driver put turn 1's user message
-        // at index 0 when turn 1 ended.
-        let after_turn_one = vec![
-            HistoryItem::User { text: "go".into() },
-            calls,
-            result,
-            reply,
-        ];
-        assert_eq!(model.turn_start(&view("go", after_turn_one.clone())), 4);
-        // Turn 3 with other text.
-        let mut after_turn_two = after_turn_one;
-        after_turn_two.insert(4, HistoryItem::User { text: "go".into() });
-        assert_eq!(model.turn_start(&view("next", after_turn_two)), 5);
-    }
-
-    #[test]
     fn loop_runs_a_tool_round_trip_against_the_local_server() {
         let server = serve(vec![
             sse(&[
@@ -489,5 +436,79 @@ mod tests {
         );
         assert_eq!(definitions[1]["function"]["name"], "echo");
         assert_eq!(definitions[1]["function"]["parameters"]["type"], "object");
+    }
+
+    #[test]
+    fn retarget_sends_later_steps_to_the_new_target_with_tool_params() {
+        let first = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"a"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ])]);
+        let second = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"b"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ])]);
+        let mut model = ProviderModel::new(request(&first.base_url), TEST_LIMITS);
+        let history = vec![HistoryItem::User {
+            text: "earlier".into(),
+        }];
+        let step = ModelView {
+            turn_start: 1,
+            ..view("go", history)
+        };
+        model.complete(&step, &mut |_| true);
+
+        let mut params = serde_json::Map::new();
+        params.insert("parallel_tool_calls".into(), json!(false));
+        model.retarget(request(&second.base_url), params);
+        model.complete(&step, &mut |_| true);
+
+        let requests = second.requests.lock().unwrap();
+        let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+        assert_eq!(body["parallel_tool_calls"], json!(false));
+        assert_eq!(
+            body["messages"],
+            json!([
+                { "role": "user", "content": "earlier" },
+                { "role": "user", "content": "go" },
+            ])
+        );
+    }
+
+    #[test]
+    fn the_admitted_message_goes_where_the_view_says_the_turn_starts() {
+        // A fresh adapter joins mid-turn, for example after a router
+        // failover. Only `ModelView::turn_start` knows the turn began at 0.
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ])]);
+        let mut model = ProviderModel::new(request(&server.base_url), TEST_LIMITS);
+        let mid_turn = ModelView {
+            turn_start: 0,
+            ..view(
+                "go",
+                vec![
+                    HistoryItem::Assistant {
+                        text: String::new(),
+                        tool_calls: vec![call("call_1", "echo", "{}")],
+                    },
+                    HistoryItem::ToolResult {
+                        id: "call_1".into(),
+                        name: "echo".into(),
+                        output: "{}".into(),
+                    },
+                ],
+            )
+        };
+
+        model.complete(&mid_turn, &mut |_| true);
+
+        let requests = server.requests.lock().unwrap();
+        let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+        assert_eq!(
+            body["messages"][0],
+            json!({ "role": "user", "content": "go" })
+        );
     }
 }

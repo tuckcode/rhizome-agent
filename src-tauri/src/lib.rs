@@ -70,9 +70,10 @@ pub mod rhizome_research_formats;
 // Loop and engines compile now. Chat must not call them until Phase 6.
 pub mod engines;
 pub mod rhizome_loop;
-// Provider adapter from #105. Still test-only; Chat does not call it.
-#[cfg(test)]
-mod rhizome_provider_model;
+// Provider adapter and free-tier routing. They compile now. Chat must not
+// call them until Phase 6.
+pub mod rhizome_provider_model;
+pub mod rhizome_routing;
 pub mod rhizome_search;
 pub mod rhizome_vault_seed;
 pub mod rhizome_write_location;
