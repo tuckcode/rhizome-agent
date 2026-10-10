@@ -2,7 +2,8 @@ use crate::ai_agents::AiAgentStreamEvent;
 use crate::ai_models::{AiModelProviderKind, AiModelStreamRequest};
 use std::path::{Path, PathBuf};
 
-const CREATE_NOTE_TOOL_NAME: &str = "create_note";
+/// The tool name the loop offers and the policy rules on.
+pub const CREATE_NOTE_TOOL_NAME: &str = "create_note";
 const CREATE_NOTE_TOOL_JSON: &str = r#"{
   "type": "function",
   "function": {
@@ -245,6 +246,32 @@ pub(crate) fn create_note(
         summary: format!("Created note: {note_path}"),
         output,
     })
+}
+
+/// The loop's `create_note` tool. `raw_args` is the JSON argument string
+/// the model sent. Returns the model-visible tool output (JSON with `path`
+/// and `vaultPath`), or the error text for the tool result.
+pub fn run_create_note_tool(
+    raw_args: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+) -> Result<String, String> {
+    let args = parse_raw_tool_arguments(raw_args)?;
+    create_note(&args, vault_path, vault_paths).map(|created| created.output)
+}
+
+/// An empty string means no arguments. Anything else must be a JSON object.
+fn parse_raw_tool_arguments(raw_args: &str) -> Result<serde_json::Value, String> {
+    if raw_args.trim().is_empty() {
+        return Ok(serde_json::json!({}));
+    }
+    let args: serde_json::Value = serde_json::from_str(raw_args)
+        .map_err(|error| format!("Failed to parse create_note arguments: {error}"))?;
+    if args.is_object() {
+        Ok(args)
+    } else {
+        Err("create_note arguments must be a JSON object.".into())
+    }
 }
 
 fn tool_vault_path<'a>(
@@ -680,5 +707,72 @@ mod tests {
 
         assert!(error.starts_with("Vault is not active in Rhizome:"));
         assert!(!inactive.path().join("inactive.md").exists());
+    }
+
+    #[test]
+    fn run_create_note_tool_writes_a_note_from_raw_json_args() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        let raw = json!({ "path": CREATED_NOTE_PATH, "content": CREATED_NOTE_CONTENT }).to_string();
+
+        let output = run_create_note_tool(&raw, Some(&vault_path), &[]).unwrap();
+
+        assert_note_created(vault.path());
+        let output: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(output["path"], CREATED_NOTE_PATH);
+        assert_eq!(output["vaultPath"], vault_path);
+    }
+
+    #[test]
+    fn run_create_note_tool_refuses_a_path_outside_the_vault() {
+        let parent = tempfile::tempdir().unwrap();
+        let vault = parent.path().join("vault");
+        fs::create_dir(&vault).unwrap();
+        let vault_path = vault.to_string_lossy().into_owned();
+        let raw = json!({ "path": "../escape.md", "content": "# Escape\n" }).to_string();
+
+        let result = run_create_note_tool(&raw, Some(&vault_path), &[]);
+
+        assert!(result.is_err());
+        assert!(!parent.path().join("escape.md").exists());
+    }
+
+    #[test]
+    fn run_create_note_tool_does_not_overwrite() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        fs::write(vault.path().join("kept.md"), "# Kept\n").unwrap();
+        let raw = json!({ "path": "kept.md", "content": "# Replaced\n" }).to_string();
+
+        let result = run_create_note_tool(&raw, Some(&vault_path), &[]);
+
+        assert!(result.is_err());
+        assert_eq!(
+            fs::read_to_string(vault.path().join("kept.md")).unwrap(),
+            "# Kept\n"
+        );
+    }
+
+    #[test]
+    fn run_create_note_tool_rejects_malformed_and_non_object_args() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+
+        let malformed = run_create_note_tool("{\"path\":", Some(&vault_path), &[]).unwrap_err();
+        let not_object = run_create_note_tool("[\"a.md\"]", Some(&vault_path), &[]).unwrap_err();
+
+        assert!(malformed.starts_with("Failed to parse create_note arguments:"));
+        assert_eq!(not_object, "create_note arguments must be a JSON object.");
+        assert_eq!(fs::read_dir(vault.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn run_create_note_tool_with_empty_args_asks_for_a_path() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+
+        let error = run_create_note_tool("  ", Some(&vault_path), &[]).unwrap_err();
+
+        assert_eq!(error, "create_note requires path.");
     }
 }
