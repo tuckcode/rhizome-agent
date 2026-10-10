@@ -15,9 +15,9 @@
 
 use std::collections::HashSet;
 
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
-use crate::ai_models::{stream_chat_events_with, AiModelStreamRequest, HttpLimits};
+use crate::ai_models::{stream_chat_events_with_params, AiModelStreamRequest, HttpLimits};
 use crate::model_events::ModelEvent;
 use crate::rhizome_loop::{HistoryItem, Model, ModelView};
 
@@ -25,6 +25,8 @@ use crate::rhizome_loop::{HistoryItem, Model, ModelView};
 pub(crate) struct ProviderModel {
     /// Provider, model, API key, and system prompt. `message` is not sent.
     request: AiModelStreamRequest,
+    /// Body fields sent only when the step offers tools.
+    tool_params: Map<String, Value>,
     limits: HttpLimits,
     turn: Option<TurnMark>,
 }
@@ -39,9 +41,21 @@ impl ProviderModel {
     pub(crate) fn new(request: AiModelStreamRequest, limits: HttpLimits) -> Self {
         Self {
             request,
+            tool_params: Map::new(),
             limits,
             turn: None,
         }
+    }
+
+    /// Sends later steps to another provider or model. The turn mark stays,
+    /// so a router can switch targets inside one turn.
+    pub(crate) fn retarget(
+        &mut self,
+        request: AiModelStreamRequest,
+        tool_params: Map<String, Value>,
+    ) {
+        self.request = request;
+        self.tool_params = tool_params;
     }
 
     /// The first history index that belongs to the current turn.
@@ -78,12 +92,18 @@ impl Model for ProviderModel {
         // worker's next send fails, and the worker stops reading.
         let (sender, receiver) = std::sync::mpsc::sync_channel::<ModelEvent>(0);
         let request = &self.request;
+        let tool_params = &self.tool_params;
         let limits = self.limits;
         std::thread::scope(|scope| {
             scope.spawn(move || {
-                stream_chat_events_with(request, messages, tools, limits, &mut |event| {
-                    sender.send(event).is_ok()
-                });
+                stream_chat_events_with_params(
+                    request,
+                    messages,
+                    tools,
+                    tool_params,
+                    limits,
+                    &mut |event| sender.send(event).is_ok(),
+                );
             });
             for event in receiver.iter() {
                 if !emit(event) {
@@ -489,5 +509,38 @@ mod tests {
         );
         assert_eq!(definitions[1]["function"]["name"], "echo");
         assert_eq!(definitions[1]["function"]["parameters"]["type"], "object");
+    }
+
+    #[test]
+    fn retarget_keeps_the_turn_and_sends_tool_params_with_tools() {
+        let first = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"a"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ])]);
+        let second = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"b"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ])]);
+        let mut model = ProviderModel::new(request(&first.base_url), TEST_LIMITS);
+        let history = vec![HistoryItem::User {
+            text: "earlier".into(),
+        }];
+        model.complete(&view("go", history.clone()), &mut |_| true);
+
+        let mut params = serde_json::Map::new();
+        params.insert("parallel_tool_calls".into(), json!(false));
+        model.retarget(request(&second.base_url), params);
+        model.complete(&view("go", history), &mut |_| true);
+
+        let requests = second.requests.lock().unwrap();
+        let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+        assert_eq!(body["parallel_tool_calls"], json!(false));
+        assert_eq!(
+            body["messages"],
+            json!([
+                { "role": "user", "content": "earlier" },
+                { "role": "user", "content": "go" },
+            ])
+        );
     }
 }

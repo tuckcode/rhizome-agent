@@ -353,6 +353,21 @@ pub fn stream_chat_events_with(
     limits: HttpLimits,
     emit: &mut dyn FnMut(ModelEvent) -> bool,
 ) {
+    let no_params = serde_json::Map::new();
+    stream_chat_events_with_params(request, messages, tools, &no_params, limits, emit);
+}
+
+/// `stream_chat_events_with`, plus body fields that go out only when
+/// `tools` is not empty. NVIDIA NIM, for example, needs
+/// `parallel_tool_calls: false`.
+pub fn stream_chat_events_with_params(
+    request: &AiModelStreamRequest,
+    messages: Vec<serde_json::Value>,
+    tools: Vec<serde_json::Value>,
+    tool_params: &serde_json::Map<String, serde_json::Value>,
+    limits: HttpLimits,
+    emit: &mut dyn FnMut(ModelEvent) -> bool,
+) {
     let system = non_empty_option(request.system_prompt.as_deref())
         .map(|prompt| serde_json::json!({ "role": "system", "content": prompt }));
     let mut payload = serde_json::json!({
@@ -362,6 +377,9 @@ pub fn stream_chat_events_with(
     if !tools.is_empty() {
         payload["tools"] = serde_json::Value::Array(tools);
         payload["tool_choice"] = serde_json::Value::String("auto".into());
+        for (key, value) in tool_params {
+            payload[key] = value.clone();
+        }
     }
     stream_payload(request, payload, limits, emit);
 }
