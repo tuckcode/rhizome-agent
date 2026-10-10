@@ -15,7 +15,8 @@ with the same source, pin, and licence.
 
 | Path | Source | Pin (commit or version) | Licence | Copied |
 |---|---|---|---|---|
-| _(none yet)_ | | | | |
+| `src-tauri/src/rhizome_routing/free_catalog.json` | OmniRoute `open-sse/config/freeModelCatalog.data.ts` and `open-sse/config/providers/registry/<id>/index.ts` (rows for the ADR-0182 v1 providers, curated 2026-09-12) | `fc5e2bccd4f70fecf5aab94dfb8136c74ab5a21b` | MIT | 2026-10-10 |
+| `src-tauri/src/rhizome_routing/health.rs` | OmniRoute `docs/architecture/RESILIENCE_GUIDE.md` (rules only, rebuilt in Rust) | `fc5e2bccd4f70fecf5aab94dfb8136c74ab5a21b` | MIT | 2026-10-10 |
 
 When a later session updates a copied piece, change the pin and the date
 in this row. Diff against the recorded commit first.

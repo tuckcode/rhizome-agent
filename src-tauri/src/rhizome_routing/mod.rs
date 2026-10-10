@@ -562,13 +562,8 @@ mod tests {
         catalog.providers[0]
             .tool_params
             .insert("parallel_tool_calls".into(), json!(false));
-        let keys = FakeKeys(HashMap::from([(
-            "cf".to_string(),
-            Credential {
-                api_key: "test-cf".into(),
-                account_id: Some("acct".into()),
-            },
-        )]));
+        let mut keys = keys(&["cf"]);
+        keys.0.get_mut("cf").unwrap().account_id = Some("acct".into());
         let mut router = RoutingModel::new(catalog, keys, FakeClock::at(T0), TEST_LIMITS);
         let with_tools = ModelView {
             offered_tools: vec!["echo".into()],
