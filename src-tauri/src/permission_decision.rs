@@ -49,7 +49,8 @@ impl OptionClass {
         let id = option.id.as_str();
         match self {
             Self::AllowOnce => {
-                kind_is(kind, &["allow_once"]) || id_is(id, &["allow_once", "allow-once"])
+                !is_allow_session(option)
+                    && (kind_is(kind, &["allow_once"]) || id_is(id, &["allow_once", "allow-once"]))
             }
             Self::Reject => {
                 kind_is(kind, &["reject_once", "reject_always"])

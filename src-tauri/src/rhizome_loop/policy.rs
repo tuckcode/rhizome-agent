@@ -65,9 +65,26 @@ pub fn offered_tools(mode: AiAgentPermissionMode) -> Vec<String> {
 /// A session grant covers later calls of the same tool.
 /// Bash matches the exact command only so a session cannot
 /// become "run any shell".
-pub fn session_matches(name: &str, _granted_args: &str, _call_args: &str) -> bool {
-    let _ = name;
-    true
+pub fn session_matches(name: &str, granted_args: &str, call_args: &str) -> bool {
+    if name == "bash" {
+        granted_args == call_args
+    } else {
+        true
+    }
+}
+
+fn allow_once_option() -> PolicyOption {
+    PolicyOption {
+        id: "allow_once".into(),
+        kind: Some("allow_once".into()),
+    }
+}
+
+fn deny_option() -> PolicyOption {
+    PolicyOption {
+        id: "deny".into(),
+        kind: Some("reject_once".into()),
+    }
 }
 
 #[cfg(test)]
@@ -84,19 +101,5 @@ mod tests {
     fn session_grant_bash_matches_exact_command_only() {
         assert!(session_matches("bash", "ls", "ls"));
         assert!(!session_matches("bash", "ls", "pwd"));
-    }
-}
-
-fn allow_once_option() -> PolicyOption {
-    PolicyOption {
-        id: "allow_once".into(),
-        kind: Some("allow_once".into()),
-    }
-}
-
-fn deny_option() -> PolicyOption {
-    PolicyOption {
-        id: "deny".into(),
-        kind: Some("reject_once".into()),
     }
 }

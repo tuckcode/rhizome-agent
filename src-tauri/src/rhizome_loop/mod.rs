@@ -1,7 +1,9 @@
-//! Rhizome-owned agent loop (ADR-0180, harness plan Phases 1–2).
+//! Rhizome-owned agent loop (ADR-0180, harness plan Phases 1–2.5).
 //!
 //! Chat does not call this module. `lib.rs` compiles it only for tests.
 //! One inbox, one turn at a time. A step is one model request.
+//! Allow-once is spent. Allow-session matches the tool (bash: exact
+//! command) and clears on `end_session`. Quit is `stop_and_drain`.
 //! The turn / inbox vocabulary is the DeepSeek Harness idea. No DeepSeek
 //! code is copied.
 
@@ -448,7 +450,9 @@ mod tests {
         let edits = agent
             .events()
             .iter()
-            .filter(|event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit"))
+            .filter(
+                |event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit"),
+            )
             .count();
         assert_eq!(edits, 2);
     }
@@ -555,7 +559,9 @@ mod tests {
         let edits = agent
             .events()
             .iter()
-            .filter(|event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit"))
+            .filter(
+                |event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit"),
+            )
             .count();
         assert_eq!(edits, 3);
     }
@@ -586,12 +592,15 @@ mod tests {
         let echoes = agent
             .events()
             .iter()
-            .filter(|event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "echo"))
+            .filter(
+                |event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "echo"),
+            )
             .count();
         assert_eq!(echoes, 2);
-        assert!(!agent.events().iter().any(
-            |event| matches!(event, DurableEvent::Assistant { text } if text == "never")
-        ));
+        assert!(!agent
+            .events()
+            .iter()
+            .any(|event| matches!(event, DurableEvent::Assistant { text } if text == "never")));
         assert!(agent
             .events()
             .iter()
@@ -627,9 +636,7 @@ mod tests {
             .events()
             .iter()
             .filter_map(|event| match event {
-                DurableEvent::ToolResult { name, output } if name == "echo" => {
-                    Some(output.clone())
-                }
+                DurableEvent::ToolResult { name, output } if name == "echo" => Some(output.clone()),
                 _ => None,
             })
             .collect();
@@ -643,10 +650,8 @@ mod tests {
     fn stop_and_drain_drops_the_inbox_and_does_not_start_the_next_turn() {
         let agent = AgentLoop::new();
         let stop = agent.clone();
-        let mut model = FakeModel::streaming(vec![
-            vec!["one".into(), "two".into()],
-            vec!["bee".into()],
-        ]);
+        let mut model =
+            FakeModel::streaming(vec![vec!["one".into(), "two".into()], vec!["bee".into()]]);
         model.on_after_chunk(move |index| {
             if index == 0 {
                 stop.stop_and_drain("quit");

@@ -21,6 +21,7 @@ pub enum ApprovalReply {
 pub const DEFAULT_STEP_CAP: usize = 8;
 
 type ApprovalWaiter = Box<dyn FnMut(&str) -> ApprovalReply + Send>;
+type AfterToolHook = Box<dyn FnMut(&str, &str) + Send>;
 
 struct Shared {
     inbox: VecDeque<String>,
@@ -40,7 +41,7 @@ struct Shared {
     waiter: Option<ApprovalWaiter>,
     stopped: bool,
     step_cap: usize,
-    after_tool: Option<Box<dyn FnMut(&str, &str) + Send>>,
+    after_tool: Option<AfterToolHook>,
 }
 
 /// Clears `step_active` when the step returns, including on cancel.
@@ -116,15 +117,24 @@ impl AgentLoop {
 
     /// Records a session grant. The waiter uses this when the human
     /// picks allow-for-this-session. Tests may call it directly.
-    pub fn grant_for_session(&self, _name: impl Into<String>, _args: impl Into<String>) {}
+    pub fn grant_for_session(&self, name: impl Into<String>, args: impl Into<String>) {
+        self.lock().session_grants.push((name.into(), args.into()));
+    }
 
     /// Drops session grants. Allow-once spends stay until they are used.
-    pub fn end_session(&self) {}
+    pub fn end_session(&self) {
+        self.lock().session_grants.clear();
+    }
 
     /// Quit path: cancel an in-flight turn, drop the inbox, and refuse
     /// later submits. Distinct from `cancel`, which ends one turn only.
     pub fn stop_and_drain(&self, cause: impl Into<String>) {
-        self.cancel(cause);
+        let mut shared = self.lock();
+        shared.stopped = true;
+        shared.inbox.clear();
+        if shared.step_active && shared.cancel_cause.is_none() {
+            shared.cancel_cause = Some(cause.into());
+        }
     }
 
     pub fn set_step_cap(&self, cap: usize) {
@@ -152,9 +162,16 @@ impl AgentLoop {
     }
 
     /// Drain the inbox. One turn at a time. A cancel ends that turn only.
+    /// `stop_and_drain` ends the agent: no further inbox item runs.
     pub fn run_until_idle(&self, model: &mut FakeModel) {
         loop {
-            let admitted = self.lock().inbox.pop_front();
+            let admitted = {
+                let mut shared = self.lock();
+                if shared.stopped {
+                    return;
+                }
+                shared.inbox.pop_front()
+            };
             let Some(admitted) = admitted else {
                 return;
             };
@@ -178,8 +195,13 @@ impl AgentLoop {
         };
 
         let mut assistant = String::new();
+        let cap = self.lock().step_cap;
+        let mut steps = 0;
         loop {
             if self.is_cancelled() {
+                break;
+            }
+            if steps >= cap {
                 break;
             }
             let view = self.model_view(&admitted);
@@ -196,11 +218,15 @@ impl AgentLoop {
             if !had_round {
                 break;
             }
+            steps += 1;
             let mut saw_tool = false;
             for part in parts {
                 match part {
                     ScriptPart::Text(chunk) => assistant.push_str(&chunk),
                     ScriptPart::Tool { name, args } => {
+                        if self.is_cancelled() {
+                            break;
+                        }
                         saw_tool = true;
                         self.dispatch_tool(&name, &args);
                     }
@@ -249,6 +275,12 @@ impl AgentLoop {
         };
         if !offered.iter().any(|tool| tool == name) {
             self.record_denial(name, "not offered".into());
+            self.fire_after_tool(name, args);
+            return;
+        }
+        if self.session_allows(name, args) {
+            self.record_run(name, args, false);
+            self.fire_after_tool(name, args);
             return;
         }
         let grant_spent = self
@@ -262,6 +294,15 @@ impl AgentLoop {
             Ruling::Ask => self.ask_then_finish(name, args),
         }
         self.fire_after_tool(name, args);
+    }
+
+    fn session_allows(&self, name: &str, args: &str) -> bool {
+        self.lock()
+            .session_grants
+            .iter()
+            .any(|(granted_name, granted_args)| {
+                granted_name == name && policy::session_matches(name, granted_args, args)
+            })
     }
 
     fn fire_after_tool(&self, name: &str, args: &str) {
@@ -281,7 +322,10 @@ impl AgentLoop {
         self.lock().waiter = waiter;
         match reply {
             ApprovalReply::AllowOnce => self.record_run(name, args, true),
-            ApprovalReply::AllowSession => self.record_run(name, args, true),
+            ApprovalReply::AllowSession => {
+                self.grant_for_session(name, args);
+                self.record_run(name, args, false);
+            }
             ApprovalReply::Deny | ApprovalReply::Cancelled => {
                 self.record_denial(name, "approval cancelled".into());
             }
