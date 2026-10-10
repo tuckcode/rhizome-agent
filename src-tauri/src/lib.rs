@@ -1,7 +1,7 @@
 mod acp_client;
 mod ai_agent_processes;
 pub mod ai_agents;
-pub mod ai_model_tools;
+pub(crate) mod ai_model_tools;
 pub mod ai_models;
 pub mod ai_run_target;
 pub mod antigravity_cli;
