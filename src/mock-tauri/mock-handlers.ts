@@ -625,6 +625,11 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   prime_session_new_session: () => 'mock-session',
   abort_prime_session_turn: () => false,
   stream_prime_session: () => 'mock-session',
+  native_chat_start: () => 'mock-native-session',
+  native_chat_send: () => null,
+  native_chat_cancel: () => null,
+  native_chat_approval_reply: () => null,
+  native_chat_end: () => null,
   list_prime_sessions: () => [
     {
       name: [

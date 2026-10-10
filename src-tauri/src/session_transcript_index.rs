@@ -50,6 +50,49 @@ pub fn load() -> Result<SessionTranscriptIndexDocument, String> {
     load_from(index_path()?)
 }
 
+/// Append user and assistant turns for a native session path.
+pub fn append_native_turns(
+    path: &str,
+    id: &str,
+    title: &str,
+    new_turns: Vec<IndexedTranscriptTurn>,
+) -> Result<(), String> {
+    let mut document = load()?;
+    if let Some(session) = document
+        .sessions
+        .iter_mut()
+        .find(|session| session.path == path)
+    {
+        let next = session
+            .turns
+            .last()
+            .map(|turn| turn.message_index + 1)
+            .unwrap_or(0);
+        for (offset, mut turn) in new_turns.into_iter().enumerate() {
+            turn.message_index = next + offset as u32;
+            session.turns.push(turn);
+        }
+        session.stamp = session.turns.len().to_string();
+    } else {
+        let turns = new_turns
+            .into_iter()
+            .enumerate()
+            .map(|(index, mut turn)| {
+                turn.message_index = index as u32;
+                turn
+            })
+            .collect();
+        document.sessions.push(PersistedSessionRecord {
+            path: path.to_string(),
+            stamp: "1".into(),
+            id: id.to_string(),
+            title: title.to_string(),
+            turns,
+        });
+    }
+    save(&document)
+}
+
 /// Replace the persisted index with an atomic write.
 pub fn save(document: &SessionTranscriptIndexDocument) -> Result<(), String> {
     if document.version != INDEX_VERSION {

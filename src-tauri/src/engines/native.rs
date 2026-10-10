@@ -10,7 +10,7 @@ use crate::rhizome_routing::ProviderAttempt;
 
 use super::{Engine, EngineEvent};
 
-type ApprovalTx = Arc<Mutex<Option<mpsc::SyncSender<(String, ApprovalReply)>>>>;
+type ApprovalTx = Arc<Mutex<Option<mpsc::Sender<(String, ApprovalReply)>>>>;
 
 /// Default wait for a Chat approval. Tests shorten this.
 const DEFAULT_APPROVAL_TIMEOUT: Duration = Duration::from_secs(10 * 60);
@@ -44,8 +44,10 @@ impl<M: Model> NativeEngine<M> {
     pub fn from_parts(agent: AgentLoop, model: M) -> Self {
         Self::from_model(agent, model)
     }
+}
 
-    pub fn with_provider_pair(
+impl<M: Model> NativeEngine<M> {
+    pub(crate) fn with_provider_pair(
         agent: AgentLoop,
         model: M,
         provider_tx: mpsc::Sender<ProviderAttempt>,
@@ -190,7 +192,7 @@ impl<M: Model> Engine for NativeEngine<M> {
             }
         });
 
-        let (approval_tx, approval_rx) = mpsc::sync_channel(8);
+        let (approval_tx, approval_rx) = mpsc::channel();
         *self.approval_tx.lock().expect("approval tx") = Some(approval_tx);
         let approval_rx = Arc::new(Mutex::new(approval_rx));
         let live_prompt = Arc::clone(&self.live_prompt);
@@ -260,9 +262,7 @@ impl<M: Model> Engine for NativeEngine<M> {
     }
 
     fn reply_approval(&mut self, prompt_id: &str, reply: ApprovalReply) {
-        if let Some(tx) = self.approval_tx.lock().expect("approval tx").as_ref() {
-            let _ = tx.try_send((prompt_id.to_string(), reply));
-        }
+        enqueue_approval(&self.approval_tx, &self.live_prompt, prompt_id, reply);
     }
 
     fn settle_on_quit(&mut self) {
@@ -275,6 +275,7 @@ impl<M: Model> Engine for NativeEngine<M> {
 pub struct NativeControl {
     agent: AgentLoop,
     approval_tx: ApprovalTx,
+    live_prompt: Arc<Mutex<Option<String>>>,
 }
 
 impl<M: Model> NativeEngine<M> {
@@ -282,6 +283,7 @@ impl<M: Model> NativeEngine<M> {
         NativeControl {
             agent: self.agent.clone(),
             approval_tx: Arc::clone(&self.approval_tx),
+            live_prompt: Arc::clone(&self.live_prompt),
         }
     }
 }
@@ -296,12 +298,25 @@ impl NativeControl {
     }
 
     pub fn reply_approval(&self, prompt_id: &str, reply: ApprovalReply) {
-        if let Some(tx) = self.approval_tx.lock().expect("approval tx").as_ref() {
-            let _ = tx.try_send((prompt_id.to_string(), reply));
-        }
+        enqueue_approval(&self.approval_tx, &self.live_prompt, prompt_id, reply);
     }
 
     pub fn settle_on_quit(&self) {
         self.agent.stop_and_drain("quit");
+    }
+}
+
+fn enqueue_approval(
+    approval_tx: &ApprovalTx,
+    live_prompt: &Arc<Mutex<Option<String>>>,
+    prompt_id: &str,
+    reply: ApprovalReply,
+) {
+    let live = live_prompt.lock().expect("live prompt").clone();
+    if live.as_deref() != Some(prompt_id) {
+        return;
+    }
+    if let Some(tx) = approval_tx.lock().expect("approval tx").as_ref() {
+        let _ = tx.send((prompt_id.to_string(), reply));
     }
 }

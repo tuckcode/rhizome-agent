@@ -65,7 +65,8 @@ impl Clock for SystemClock {
 /// One routing fact for the UI: which provider the router tried, and what
 /// happened. It is live coordination. The model does not see it, so the
 /// loop does not log it. `reason` is an error class, never a response body.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(tag = "outcome", rename_all = "snake_case")]
 pub enum ProviderAttempt {
     /// The router sent the step to this target.
     Trying {

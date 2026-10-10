@@ -4,14 +4,21 @@
 //! These commands exist so the toggle has a backend to call.
 
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::mpsc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
 use crate::ai_agents::AiAgentPermissionMode;
-use crate::ai_models::AiModelProviderKind;
-use crate::engines::{EngineEvent, NativeControl, NativeEngine};
-use crate::rhizome_loop::{ApprovalReply, Model};
+use crate::ai_models::{
+    AiModelApiKeyStorage, AiModelProvider, AiModelProviderKind, AiModelStreamRequest, HttpLimits,
+};
+use crate::engines::{Engine, EngineEvent, NativeControl, NativeEngine};
+use crate::rhizome_loop::{AgentLoop, ApprovalReply, Model};
+use crate::rhizome_provider_model::ProviderModel;
+use crate::rhizome_routing::{Catalog, Credential, KeyStore, RoutingModel, SystemClock};
+use crate::session_transcript_index::{self, IndexedTranscriptTurn};
+use crate::settings;
 
 /// Scoped event channel for one native session.
 pub fn native_chat_channel(session_id: &str) -> String {
@@ -38,19 +45,52 @@ pub enum NativeChatTarget {
     },
 }
 
-/// Stub: every target looks like an OpenAI catalog model.
+enum ChatOp {
+    Turn(String),
+    End,
+}
+
 pub fn resolve_native_target(target: &str) -> Result<NativeChatTarget, String> {
+    let trimmed = target.trim();
+    if trimmed.eq_ignore_ascii_case(FREE_TIER_TARGET)
+        || trimmed.eq_ignore_ascii_case(FREE_TIER_LABEL)
+    {
+        return Ok(NativeChatTarget::FreeTier);
+    }
+    let (provider_id, model_id) = match trimmed.split_once('/') {
+        Some((provider, model)) => (provider.to_string(), model.to_string()),
+        None => ("openai".into(), trimmed.to_string()),
+    };
+    let provider_kind = provider_kind_from_id(&provider_id);
+    if provider_kind == AiModelProviderKind::Anthropic {
+        return Err(
+            "Anthropic catalog models are not available on the native engine until 6a.".into(),
+        );
+    }
     Ok(NativeChatTarget::Catalog {
-        provider_kind: AiModelProviderKind::OpenAi,
-        provider_id: "openai".into(),
-        model_id: target.to_string(),
+        provider_kind,
+        provider_id,
+        model_id,
     })
 }
 
+#[cfg(test)]
 pub fn model_kind_for_target(target: &NativeChatTarget) -> &'static str {
     match target {
         NativeChatTarget::FreeTier => "routing",
         NativeChatTarget::Catalog { .. } => "provider",
+    }
+}
+
+fn provider_kind_from_id(id: &str) -> AiModelProviderKind {
+    match id.to_ascii_lowercase().as_str() {
+        "anthropic" => AiModelProviderKind::Anthropic,
+        "openai" => AiModelProviderKind::OpenAi,
+        "ollama" => AiModelProviderKind::Ollama,
+        "lmstudio" | "lm_studio" => AiModelProviderKind::LmStudio,
+        "openrouter" => AiModelProviderKind::OpenRouter,
+        "gemini" => AiModelProviderKind::Gemini,
+        _ => AiModelProviderKind::OpenAiCompatible,
     }
 }
 
@@ -60,10 +100,9 @@ pub struct NativeChats {
     sessions: Mutex<HashMap<String, LiveNativeChat>>,
 }
 
-#[allow(dead_code)]
 struct LiveNativeChat {
     control: NativeControl,
-    path: String,
+    ops: mpsc::Sender<ChatOp>,
     worker: Option<thread::JoinHandle<()>>,
 }
 
@@ -72,24 +111,110 @@ impl NativeChats {
         Self::default()
     }
 
+    #[cfg(test)]
     pub fn start_with_engine<M: Model + Send + 'static>(
         &self,
         prompt: &str,
         engine: NativeEngine<M>,
-        _emit: impl FnMut(EngineEvent) + Send + 'static,
+        emit: impl FnMut(EngineEvent) + Send + 'static,
     ) -> Result<String, String> {
-        let _ = (prompt, engine);
-        Ok("unused".into())
+        self.start_named(uuid::Uuid::new_v4().to_string(), prompt, engine, emit)
+    }
+
+    pub fn start_named<M: Model + Send + 'static>(
+        &self,
+        id: String,
+        prompt: &str,
+        engine: NativeEngine<M>,
+        emit: impl FnMut(EngineEvent) + Send + 'static,
+    ) -> Result<String, String> {
+        let path = format!("{NATIVE_SESSION_PREFIX}{id}");
+        let control = engine.control();
+        let (ops, op_rx) = mpsc::channel();
+        let emit = Arc::new(Mutex::new(emit));
+        let index_path = path.clone();
+        let index_id = id.clone();
+        let user_text = prompt.to_string();
+        let worker = thread::spawn(move || {
+            let mut engine = engine;
+            while let Ok(op) = op_rx.recv() {
+                match op {
+                    ChatOp::Turn(prompt) => {
+                        let emit = Arc::clone(&emit);
+                        let index_path = index_path.clone();
+                        let index_id = index_id.clone();
+                        let user_text = prompt.clone();
+                        let assistant = Arc::new(Mutex::new(String::new()));
+                        let _ = engine.start(
+                            &prompt,
+                            Box::new(move |event| {
+                                match &event {
+                                    EngineEvent::TextDelta { text } => {
+                                        assistant.lock().expect("assistant").push_str(text);
+                                    }
+                                    EngineEvent::TurnEnd => {
+                                        let assistant =
+                                            assistant.lock().expect("assistant").clone();
+                                        let _ = session_transcript_index::append_native_turns(
+                                            &index_path,
+                                            &index_id,
+                                            &user_text,
+                                            vec![
+                                                IndexedTranscriptTurn {
+                                                    message_index: 0,
+                                                    role: "user".into(),
+                                                    text: user_text.clone(),
+                                                },
+                                                IndexedTranscriptTurn {
+                                                    message_index: 1,
+                                                    role: "assistant".into(),
+                                                    text: assistant,
+                                                },
+                                            ],
+                                        );
+                                    }
+                                    _ => {}
+                                }
+                                (emit.lock().expect("native sink"))(event);
+                            }),
+                        );
+                    }
+                    ChatOp::End => break,
+                }
+            }
+        });
+        ops.send(ChatOp::Turn(user_text))
+            .map_err(|_| "native chat worker closed".to_string())?;
+        self.sessions.lock().expect("native chats").insert(
+            id.clone(),
+            LiveNativeChat {
+                control,
+                ops,
+                worker: Some(worker),
+            },
+        );
+        Ok(id)
     }
 
     pub fn send(&self, session_id: &str, text: &str) -> Result<(), String> {
-        let _ = (session_id, text);
-        Err("no session".into())
+        let sessions = self.sessions.lock().expect("native chats");
+        let session = sessions
+            .get(session_id)
+            .ok_or_else(|| format!("unknown native session {session_id}"))?;
+        session
+            .ops
+            .send(ChatOp::Turn(text.to_string()))
+            .map_err(|_| "native chat worker closed".to_string())?;
+        Ok(())
     }
 
     pub fn cancel(&self, session_id: &str, cause: &str) -> Result<(), String> {
-        let _ = (session_id, cause);
-        Err("no session".into())
+        let sessions = self.sessions.lock().expect("native chats");
+        let session = sessions
+            .get(session_id)
+            .ok_or_else(|| format!("unknown native session {session_id}"))?;
+        session.control.cancel(cause);
+        Ok(())
     }
 
     pub fn reply_approval(
@@ -98,27 +223,102 @@ impl NativeChats {
         prompt_id: &str,
         reply: ApprovalReply,
     ) -> Result<(), String> {
-        let _ = (session_id, prompt_id, reply);
-        Err("no session".into())
+        let sessions = self.sessions.lock().expect("native chats");
+        let session = sessions
+            .get(session_id)
+            .ok_or_else(|| format!("unknown native session {session_id}"))?;
+        session.control.reply_approval(prompt_id, reply);
+        Ok(())
     }
 
     pub fn end(&self, session_id: &str) -> Result<(), String> {
-        let _ = session_id;
-        Err("no session".into())
+        let mut session = self
+            .sessions
+            .lock()
+            .expect("native chats")
+            .remove(session_id)
+            .ok_or_else(|| format!("unknown native session {session_id}"))?;
+        session.control.settle_on_quit();
+        let _ = session.ops.send(ChatOp::End);
+        if let Some(worker) = session.worker.take() {
+            join_with_bound(worker, NATIVE_QUIT_BOUND);
+        }
+        Ok(())
     }
 
     pub fn settle_all(&self, bound: Duration) {
-        let _ = bound;
-        thread::sleep(Duration::from_millis(500));
+        let sessions: Vec<LiveNativeChat> = {
+            let mut guard = self.sessions.lock().expect("native chats");
+            guard.drain().map(|(_, session)| session).collect()
+        };
+        for mut session in sessions {
+            session.control.settle_on_quit();
+            let _ = session.ops.send(ChatOp::End);
+            if let Some(worker) = session.worker.take() {
+                join_with_bound(worker, bound);
+            }
+        }
     }
 
+    #[cfg(test)]
     pub fn path_for(&self, session_id: &str) -> Option<String> {
-        let _ = session_id;
-        None
+        self.sessions
+            .lock()
+            .expect("native chats")
+            .contains_key(session_id)
+            .then(|| format!("{NATIVE_SESSION_PREFIX}{session_id}"))
     }
 }
 
-#[cfg(desktop)]
+fn join_with_bound(worker: thread::JoinHandle<()>, bound: Duration) -> bool {
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+        let _ = worker.join();
+        let _ = tx.send(());
+    });
+    rx.recv_timeout(bound).is_ok()
+}
+
+struct SecretsKeyStore;
+
+impl KeyStore for SecretsKeyStore {
+    fn credential(&self, provider_id: &str) -> Option<Credential> {
+        let path = settings::preferred_app_config_path("ai-provider-secrets.json").ok()?;
+        let data = std::fs::read_to_string(path).ok()?;
+        let parsed: serde_json::Value = serde_json::from_str(&data).ok()?;
+        let key = parsed
+            .get("provider_api_keys")?
+            .get(provider_id)?
+            .as_str()?
+            .trim();
+        if key.is_empty() {
+            None
+        } else {
+            Some(Credential {
+                api_key: key.to_string(),
+                account_id: None,
+            })
+        }
+    }
+}
+
+fn composed_system_prompt(existing: Option<&str>) -> Option<String> {
+    settings::compose_agent_profile(settings::saved_agent_profile().as_deref(), existing)
+}
+
+fn catalog_provider(kind: AiModelProviderKind, id: &str) -> AiModelProvider {
+    AiModelProvider {
+        id: id.to_string(),
+        name: id.to_string(),
+        kind,
+        base_url: None,
+        api_key_storage: Some(AiModelApiKeyStorage::LocalFile),
+        api_key_env_var: None,
+        headers: None,
+        models: Vec::new(),
+    }
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeChatStartRequest {
@@ -135,11 +335,71 @@ pub struct NativeChatStartRequest {
 #[cfg(desktop)]
 #[tauri::command]
 pub fn native_chat_start(
+    app: tauri::AppHandle,
     chats: tauri::State<NativeChats>,
     request: NativeChatStartRequest,
 ) -> Result<String, String> {
-    let _ = (chats, request);
-    Err("native chat start is not wired".into())
+    use tauri::Emitter;
+    let id = uuid::Uuid::new_v4().to_string();
+    let channel = native_chat_channel(&id);
+    start_named_request(&chats, id, request, move |event| {
+        let _ = app.emit(&channel, &event);
+    })
+}
+
+fn start_named_request(
+    chats: &NativeChats,
+    id: String,
+    request: NativeChatStartRequest,
+    emit: impl FnMut(EngineEvent) + Send + 'static,
+) -> Result<String, String> {
+    let target = resolve_native_target(&request.target)?;
+    let system = composed_system_prompt(request.system_prompt.as_deref());
+    let vault_path = request
+        .vault_path
+        .as_deref()
+        .map(|path| crate::commands::expand_tilde(path).into_owned());
+    let vault_paths = request.vault_paths.clone();
+    let mode = request.permission_mode;
+    match target {
+        NativeChatTarget::FreeTier => {
+            let (tx, rx) = mpsc::channel();
+            let reporter = tx.clone();
+            let model = RoutingModel::new(
+                Catalog::pinned(),
+                SecretsKeyStore,
+                SystemClock,
+                HttpLimits::STREAM,
+            )
+            .with_observer(move |attempt| {
+                let _ = reporter.send(attempt);
+            });
+            let mut engine = NativeEngine::with_provider_pair(AgentLoop::new(), model, tx, rx);
+            engine.set_vault(vault_path, vault_paths);
+            engine.set_permission_mode(mode);
+            chats.start_named(id, &request.prompt, engine, emit)
+        }
+        NativeChatTarget::Catalog {
+            provider_kind,
+            provider_id,
+            model_id,
+        } => {
+            let stream = AiModelStreamRequest {
+                provider: catalog_provider(provider_kind, &provider_id),
+                model_id,
+                message: request.prompt.clone(),
+                system_prompt: system,
+                vault_path: vault_path.clone(),
+                vault_paths: vault_paths.clone(),
+                api_key_override: None,
+                event_name: None,
+            };
+            let mut engine = NativeEngine::new(ProviderModel::new(stream, HttpLimits::STREAM));
+            engine.set_vault(vault_path, vault_paths);
+            engine.set_permission_mode(mode);
+            chats.start_named(id, &request.prompt, engine, emit)
+        }
+    }
 }
 
 #[cfg(desktop)]
@@ -174,10 +434,7 @@ pub fn native_chat_approval_reply(
 
 #[cfg(desktop)]
 #[tauri::command]
-pub fn native_chat_end(
-    chats: tauri::State<NativeChats>,
-    session_id: String,
-) -> Result<(), String> {
+pub fn native_chat_end(chats: tauri::State<NativeChats>, session_id: String) -> Result<(), String> {
     chats.end(&session_id)
 }
 
@@ -199,13 +456,9 @@ mod tests {
         let chats = NativeChats::new();
         let (tx, rx) = mpsc::channel();
         let id = chats
-            .start_with_engine(
-                "hi",
-                NativeEngine::saying("hello"),
-                move |event| {
-                    let _ = tx.send(event);
-                },
-            )
+            .start_with_engine("hi", NativeEngine::saying("hello"), move |event| {
+                let _ = tx.send(event);
+            })
             .expect("start");
         assert_eq!(native_chat_channel(&id), format!("native-chat:{id}"));
         let mut seen = Vec::new();
@@ -255,10 +508,12 @@ mod tests {
     fn quit_cancels_native_chat_turn() {
         let chats = NativeChats::new();
         let (chunk_tx, chunk_rx) = mpsc::channel();
+        let (hold_tx, hold_rx) = mpsc::channel::<()>();
         let mut model = FakeModel::streaming(vec![vec!["one".into(), "two".into()]]);
         model.on_after_chunk(move |index| {
             if index == 0 {
                 let _ = chunk_tx.send(());
+                let _ = hold_rx.recv();
             }
         });
         let (tx, rx) = mpsc::channel();
@@ -275,15 +530,17 @@ mod tests {
             .recv_timeout(Duration::from_secs(2))
             .expect("first chunk");
         chats.cancel(&id, "quit").expect("cancel");
+        drop(hold_tx);
         let mut seen = Vec::new();
         let deadline = Instant::now() + Duration::from_secs(2);
         while Instant::now() < deadline {
             if let Ok(event) = rx.recv_timeout(Duration::from_millis(20)) {
                 seen.push(event);
             }
-            if seen.iter().any(|event| {
-                matches!(event, EngineEvent::Cancelled { cause } if cause == "quit")
-            }) {
+            if seen
+                .iter()
+                .any(|event| matches!(event, EngineEvent::Cancelled { cause } if cause == "quit"))
+            {
                 break;
             }
         }
@@ -340,9 +597,10 @@ mod tests {
                 .turns
                 .iter()
                 .any(|turn| turn.role == "user" && turn.text.contains("hello vault")));
-            assert!(record.turns.iter().any(|turn| {
-                turn.role == "assistant" && turn.text == "ok"
-            }));
+            assert!(record
+                .turns
+                .iter()
+                .any(|turn| { turn.role == "assistant" && turn.text == "ok" }));
             let _ = IndexedTranscriptTurn {
                 message_index: 0,
                 role: "user".into(),

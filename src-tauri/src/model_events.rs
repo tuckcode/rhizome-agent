@@ -68,7 +68,8 @@ pub struct ModelError {
 
 /// Failure classes. The fallback router (Phase 4b) chooses on these, so
 /// each class maps to one routing action.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ModelErrorKind {
     /// HTTP 429 or the provider's equivalent. `retry_after_secs` comes
     /// from a `Retry-After` header when one is present.
