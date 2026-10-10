@@ -249,6 +249,34 @@ mod tests {
     }
 
     #[test]
+    fn step_two_history_starts_with_the_assistant_tool_call() {
+        let agent = AgentLoop::new();
+        let mut model = FakeModel::script(vec![
+            vec![ScriptPart::Tool {
+                name: "echo".into(),
+                args: "ping".into(),
+            }],
+            vec![ScriptPart::Text("done".into())],
+        ]);
+        agent.submit("hi");
+        agent.run_until_idle(&mut model);
+
+        assert!(
+            model.seen.len() >= 2,
+            "the tool round must be followed by a text round"
+        );
+        let first = model.seen[1]
+            .history
+            .first()
+            .expect("step two must see history");
+        assert!(
+            matches!(first, HistoryItem::Assistant { .. }),
+            "step order: the model must see its own tool call before the result, got {first:?}"
+        );
+    }
+
+
+    #[test]
     fn limited_tools_denies_shell() {
         let agent = AgentLoop::new();
         agent.set_permission_mode(AiAgentPermissionMode::Safe);
