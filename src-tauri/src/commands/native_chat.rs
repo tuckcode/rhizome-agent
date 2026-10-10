@@ -4,6 +4,7 @@
 //! These commands exist so the toggle has a backend to call.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -106,6 +107,15 @@ struct LiveNativeChat {
     ops: mpsc::Sender<ChatOp>,
     worker: Option<thread::JoinHandle<()>>,
     read_only: bool,
+    turn_busy: Arc<AtomicBool>,
+}
+
+fn claim_turn(busy: &AtomicBool) -> Result<(), String> {
+    if busy.swap(true, Ordering::SeqCst) {
+        Err("another turn is already running in this chat".into())
+    } else {
+        Ok(())
+    }
 }
 
 impl NativeChats {
@@ -136,11 +146,13 @@ impl NativeChats {
         let emit = Arc::new(Mutex::new(emit));
         let index_path = path.clone();
         let index_id = id.clone();
-        let user_text = prompt.to_string();
+        let turn_busy = Arc::new(AtomicBool::new(false));
+        let worker_busy = Arc::clone(&turn_busy);
         let worker = thread::spawn(move || {
             let mut engine = engine;
             if let Err(error) = engine.ensure_log(&index_id) {
                 (emit.lock().expect("native sink"))(EngineEvent::Error { message: error });
+                worker_busy.store(false, Ordering::SeqCst);
                 return;
             }
             while let Ok(op) = op_rx.recv() {
@@ -151,9 +163,16 @@ impl NativeChats {
                         let index_id = index_id.clone();
                         let user_text = prompt.clone();
                         let assistant = Arc::new(Mutex::new(String::new()));
+                        let busy = Arc::clone(&worker_busy);
                         let _ = engine.start(
                             &prompt,
                             Box::new(move |event| {
+                                if matches!(
+                                    event,
+                                    EngineEvent::TurnEnd | EngineEvent::Cancelled { .. }
+                                ) {
+                                    busy.store(false, Ordering::SeqCst);
+                                }
                                 match &event {
                                     EngineEvent::TextDelta { text } => {
                                         assistant.lock().expect("assistant").push_str(text);
@@ -184,13 +203,17 @@ impl NativeChats {
                                 (emit.lock().expect("native sink"))(event);
                             }),
                         );
+                        worker_busy.store(false, Ordering::SeqCst);
                     }
                     ChatOp::End => break,
                 }
             }
         });
-        ops.send(ChatOp::Turn(user_text))
-            .map_err(|_| "native chat worker closed".to_string())?;
+        claim_turn(&turn_busy)?;
+        if ops.send(ChatOp::Turn(prompt.to_string())).is_err() {
+            turn_busy.store(false, Ordering::SeqCst);
+            return Err("native chat worker closed".into());
+        }
         self.sessions.lock().expect("native chats").insert(
             id.clone(),
             LiveNativeChat {
@@ -198,6 +221,7 @@ impl NativeChats {
                 ops,
                 worker: Some(worker),
                 read_only: false,
+                turn_busy,
             },
         );
         Ok(id)
@@ -221,11 +245,19 @@ impl NativeChats {
         if session.read_only {
             return Err("native session is read-only".into());
         }
-        session
-            .ops
-            .send(ChatOp::Turn(text.to_string()))
-            .map_err(|_| "native chat worker closed".to_string())?;
+        claim_turn(&session.turn_busy)?;
+        if session.ops.send(ChatOp::Turn(text.to_string())).is_err() {
+            session.turn_busy.store(false, Ordering::SeqCst);
+            return Err("native chat worker closed".into());
+        }
         Ok(())
+    }
+
+    pub fn is_live(&self, session_id: &str) -> bool {
+        self.sessions
+            .lock()
+            .expect("native chats")
+            .contains_key(session_id)
     }
 
     pub fn open_with_engine<M: Model + Send + 'static>(
@@ -234,6 +266,9 @@ impl NativeChats {
         engine: NativeEngine<M>,
         emit: impl FnMut(EngineEvent) + Send + 'static,
     ) -> Result<String, String> {
+        if self.is_live(&id) {
+            return Ok(id);
+        }
         let opened = crate::engines::native_log::open_session_log(&id)?;
         if opened.read_only {
             self.note_read_only(&id);
@@ -245,10 +280,13 @@ impl NativeChats {
         let emit = Arc::new(Mutex::new(emit));
         let index_path = path.clone();
         let index_id = id.clone();
+        let turn_busy = Arc::new(AtomicBool::new(false));
+        let worker_busy = Arc::clone(&turn_busy);
         let worker = thread::spawn(move || {
             let mut engine = engine;
             if let Err(error) = engine.ensure_log(&index_id) {
                 (emit.lock().expect("native sink"))(EngineEvent::Error { message: error });
+                worker_busy.store(false, Ordering::SeqCst);
                 return;
             }
             while let Ok(op) = op_rx.recv() {
@@ -259,9 +297,16 @@ impl NativeChats {
                         let index_id = index_id.clone();
                         let user_text = prompt.clone();
                         let assistant = Arc::new(Mutex::new(String::new()));
+                        let busy = Arc::clone(&worker_busy);
                         let _ = engine.start(
                             &prompt,
                             Box::new(move |event| {
+                                if matches!(
+                                    event,
+                                    EngineEvent::TurnEnd | EngineEvent::Cancelled { .. }
+                                ) {
+                                    busy.store(false, Ordering::SeqCst);
+                                }
                                 match &event {
                                     EngineEvent::TextDelta { text } => {
                                         assistant.lock().expect("assistant").push_str(text);
@@ -292,6 +337,7 @@ impl NativeChats {
                                 (emit.lock().expect("native sink"))(event);
                             }),
                         );
+                        worker_busy.store(false, Ordering::SeqCst);
                     }
                     ChatOp::End => break,
                 }
@@ -304,6 +350,7 @@ impl NativeChats {
                 ops,
                 worker: Some(worker),
                 read_only: false,
+                turn_busy,
             },
         );
         Ok(id)
@@ -317,9 +364,24 @@ impl NativeChats {
     }
 
     pub fn note_open(&self, opened: &NativeChatOpenResult) {
-        if opened.read_only {
+        if opened.read_only && !self.is_live(&opened.session_id) {
             self.note_read_only(&opened.session_id);
         }
+    }
+
+    /// Display an existing chat. A chat that is already open stays writable.
+    /// An unknown log version is the case that stays read-only.
+    pub fn attach_open(&self, session_id: &str) -> Result<NativeChatOpenResult, String> {
+        let record = open_native_session_record(session_id)?;
+        let live_id = record
+            .successor_id
+            .clone()
+            .unwrap_or_else(|| session_id.to_string());
+        if self.is_live(session_id) || self.is_live(&live_id) {
+            return Ok(record);
+        }
+        self.note_open(&record);
+        Ok(record)
     }
 
     pub fn cancel(&self, session_id: &str, cause: &str) -> Result<(), String> {
@@ -554,13 +616,20 @@ fn start_named_request(
         NativeChatTarget::FreeTier => {
             let (tx, rx) = mpsc::channel();
             let reporter = tx.clone();
-            let model = free_tier_routing_model(system, move |attempt| {
+            let model = free_tier_routing_model(system.clone(), move |attempt| {
                 let _ = reporter.send(attempt);
             });
             let mut engine = NativeEngine::with_provider_pair(AgentLoop::new(), model, tx, rx);
             engine.set_vault(vault_path.clone(), vault_paths.clone());
             engine.set_permission_mode(mode);
-            engine.set_log_meta(&id, FREE_TIER_TARGET, mode, vault_path);
+            engine.set_log_meta(
+                &id,
+                FREE_TIER_TARGET,
+                mode,
+                vault_path.clone(),
+                vault_paths.clone(),
+                system.clone(),
+            );
             chats.start_named(id, &request.prompt, engine, emit)
         }
         NativeChatTarget::Catalog {
@@ -572,16 +641,23 @@ fn start_named_request(
                 provider: catalog_provider(provider_kind, &provider_id),
                 model_id,
                 message: request.prompt.clone(),
-                system_prompt: system,
+                system_prompt: system.clone(),
                 vault_path: vault_path.clone(),
                 vault_paths: vault_paths.clone(),
                 api_key_override: None,
                 event_name: None,
             };
             let mut engine = NativeEngine::new(ProviderModel::new(stream, HttpLimits::STREAM));
-            engine.set_vault(vault_path.clone(), vault_paths);
+            engine.set_vault(vault_path.clone(), vault_paths.clone());
             engine.set_permission_mode(mode);
-            engine.set_log_meta(&id, &request.target, mode, vault_path);
+            engine.set_log_meta(
+                &id,
+                &request.target,
+                mode,
+                vault_path.clone(),
+                vault_paths.clone(),
+                system.clone(),
+            );
             chats.start_named(id, &request.prompt, engine, emit)
         }
     }
@@ -637,8 +713,7 @@ pub fn native_chat_open(
     session_id: String,
 ) -> Result<NativeChatOpenResult, String> {
     use tauri::Emitter;
-    let record = open_native_session_record(&session_id)?;
-    chats.note_open(&record);
+    let record = chats.attach_open(&session_id)?;
     if record.read_only || record.error.is_some() {
         return Ok(record);
     }
@@ -646,6 +721,9 @@ pub fn native_chat_open(
         .successor_id
         .clone()
         .unwrap_or_else(|| session_id.clone());
+    if chats.is_live(&session_id) || chats.is_live(&live_id) {
+        return Ok(record);
+    }
     let opened = crate::engines::native_log::open_session_log(&live_id).unwrap_or_else(|_| {
         crate::engines::native_log::OpenedNativeLog {
             header: crate::engines::native_log::SessionHeader {
@@ -655,6 +733,8 @@ pub fn native_chat_open(
                 target: String::new(),
                 permission_mode: "safe".into(),
                 vault_path: None,
+                vault_paths: Vec::new(),
+                system_prompt: None,
             },
             events: record.events.clone(),
             warning: record.warning.clone(),
@@ -667,9 +747,9 @@ pub fn native_chat_open(
     let request = NativeChatStartRequest {
         target: opened.header.target.clone(),
         prompt: String::new(),
-        system_prompt: None,
+        system_prompt: opened.header.system_prompt.clone(),
         vault_path: opened.header.vault_path.clone(),
-        vault_paths: Vec::new(),
+        vault_paths: opened.header.vault_paths.clone(),
         permission_mode: match opened.header.permission_mode.as_str() {
             "power_user" => AiAgentPermissionMode::PowerUser,
             _ => AiAgentPermissionMode::Safe,
@@ -685,7 +765,11 @@ pub fn native_chat_open(
             });
         }
     };
-    let system = composed_system_prompt(None);
+    let system = opened
+        .header
+        .system_prompt
+        .clone()
+        .or_else(|| composed_system_prompt(None));
     let emit = {
         let app = app.clone();
         move |event| {
@@ -696,7 +780,7 @@ pub fn native_chat_open(
         NativeChatTarget::FreeTier => {
             let (tx, rx) = mpsc::channel();
             let reporter = tx.clone();
-            let model = free_tier_routing_model(system, move |attempt| {
+            let model = free_tier_routing_model(system.clone(), move |attempt| {
                 let _ = reporter.send(attempt);
             });
             let mut engine = NativeEngine::with_provider_pair(agent, model, tx, rx);
@@ -706,7 +790,9 @@ pub fn native_chat_open(
                 &live_id,
                 FREE_TIER_TARGET,
                 request.permission_mode,
-                request.vault_path,
+                request.vault_path.clone(),
+                request.vault_paths.clone(),
+                request.system_prompt.clone(),
             );
             chats.open_with_engine(live_id, engine, emit)?;
         }
@@ -719,7 +805,7 @@ pub fn native_chat_open(
                 provider: catalog_provider(provider_kind, &provider_id),
                 model_id,
                 message: String::new(),
-                system_prompt: system,
+                system_prompt: system.clone(),
                 vault_path: request.vault_path.clone(),
                 vault_paths: request.vault_paths.clone(),
                 api_key_override: None,
@@ -727,13 +813,15 @@ pub fn native_chat_open(
             };
             let mut engine =
                 NativeEngine::from_parts(agent, ProviderModel::new(stream, HttpLimits::STREAM));
-            engine.set_vault(request.vault_path.clone(), request.vault_paths);
+            engine.set_vault(request.vault_path.clone(), request.vault_paths.clone());
             engine.set_permission_mode(request.permission_mode);
             engine.set_log_meta(
                 &live_id,
                 &request.target,
                 request.permission_mode,
-                request.vault_path,
+                request.vault_path.clone(),
+                request.vault_paths.clone(),
+                request.system_prompt.clone(),
             );
             chats.open_with_engine(live_id, engine, emit)?;
         }
@@ -767,6 +855,9 @@ mod tests {
     static HOME_LOCK: Mutex<()> = Mutex::new(());
 
     fn with_temp_home<T>(body: impl FnOnce(&tempfile::TempDir) -> T) -> T {
+        let _shared = crate::app_config::TEST_CONFIG_ENV
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let _guard = HOME_LOCK
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -1040,6 +1131,34 @@ mod tests {
         );
     }
 
+    fn log_id(label: &str) -> String {
+        if crate::engines::native_log::validate_session_id(label).is_ok() {
+            return label.to_string();
+        }
+        use sha2::Digest;
+        let digest = sha2::Sha256::digest(label.as_bytes());
+        let bytes = &digest[..16];
+        format!(
+            "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+            bytes[0],
+            bytes[1],
+            bytes[2],
+            bytes[3],
+            bytes[4],
+            bytes[5],
+            0x40 | (bytes[6] & 0x0f),
+            bytes[7],
+            0x80 | (bytes[8] & 0x3f),
+            bytes[9],
+            bytes[10],
+            bytes[11],
+            bytes[12],
+            bytes[13],
+            bytes[14],
+            bytes[15]
+        )
+    }
+
     fn write_native_log(name: &str, version: u32, target: &str, event_json: &[&str]) {
         write_native_log_lines(name, version, target, event_json, &[]);
     }
@@ -1057,11 +1176,13 @@ mod tests {
             .collect();
         let header = crate::engines::native_log::SessionHeader {
             version,
-            session_id: name.to_string(),
+            session_id: log_id(name),
             created_at: "2026-10-10T00:00:00Z".into(),
             target: target.to_string(),
             permission_mode: "safe".into(),
             vault_path: None,
+            vault_paths: Vec::new(),
+            system_prompt: None,
         };
         crate::engines::native_log::write_fixture(&header, &events, extra_lines).expect("fixture");
     }
@@ -1103,23 +1224,24 @@ mod tests {
                 "openai/gpt-4o-mini",
                 &two_turn_events(),
             );
-            let opened =
-                crate::engines::native_log::open_session_log("resume-history").expect("open log");
+            let opened = crate::engines::native_log::open_session_log(&log_id("resume-history"))
+                .expect("open log");
             let agent = AgentLoop::from_log(opened.events);
             let seen = std::sync::Arc::new(Mutex::new(Vec::<ModelView>::new()));
             let model = FakeModel::saying("third").share_seen(std::sync::Arc::clone(&seen));
             let chats = NativeChats::new();
             let (tx, rx) = mpsc::channel();
+            let id = log_id("resume-history");
             chats
                 .open_with_engine(
-                    "resume-history".into(),
+                    id.clone(),
                     NativeEngine::from_parts(agent, model),
                     move |event| {
                         let _ = tx.send(event);
                     },
                 )
                 .expect("open");
-            chats.send("resume-history", "three").expect("send");
+            chats.send(&id, "three").expect("send");
             let events = wait_for_turn_end(&rx);
             assert!(
                 events.iter().any(
@@ -1156,7 +1278,8 @@ mod tests {
                     r#"{"Assistant":{"text":"partial"}}"#,
                 ],
             );
-            let opened = crate::engines::native_log::open_session_log("cut-off").expect("open");
+            let opened =
+                crate::engines::native_log::open_session_log(&log_id("cut-off")).expect("open");
             let agent = AgentLoop::from_log(opened.events);
             assert!(
                 agent.events().iter().any(|event| {
@@ -1182,7 +1305,8 @@ mod tests {
                     r#""TurnEnd""#,
                 ],
             );
-            let opened = crate::engines::native_log::open_session_log("no-grants").expect("open");
+            let opened =
+                crate::engines::native_log::open_session_log(&log_id("no-grants")).expect("open");
             let agent = AgentLoop::from_log(opened.events);
             assert!(
                 agent.session_grants().is_empty(),
@@ -1195,13 +1319,9 @@ mod tests {
     fn reopen_warning_says_grants_do_not_carry_over() {
         with_temp_home(|_| {
             write_native_log("d13", 1, "openai/gpt-4o-mini", &two_turn_events());
-            let opened = super::open_native_session_record("d13").expect("open record");
+            let opened = super::open_native_session_record(&log_id("d13")).expect("open record");
             let warning = opened.warning.expect("D13 warning");
-            assert!(
-                warning.to_lowercase().contains("permission")
-                    && warning.to_lowercase().contains("no longer apply"),
-                "D13 warning missing required permission/no-longer-apply text"
-            );
+            assert_eq!(warning, crate::engines::native_log::REOPEN_WARNING);
         });
     }
 
@@ -1217,7 +1337,8 @@ mod tests {
                     r#"{"ToolCall":{"id":"call_1","name":"create_note","args":"{\"path\":\"a.md\"}"}}"#,
                 ],
             );
-            let opened = crate::engines::native_log::open_session_log("pending").expect("open");
+            let opened =
+                crate::engines::native_log::open_session_log(&log_id("pending")).expect("open");
             let agent = AgentLoop::from_log(opened.events);
             assert!(
                 !agent.has_live_approval(),
@@ -1241,8 +1362,8 @@ mod tests {
                     r#"{"ToolCall":{"id":"call_9","name":"echo","args":"ping"}}"#,
                 ],
             );
-            let opened =
-                crate::engines::native_log::open_session_log("stopped-tool").expect("open");
+            let opened = crate::engines::native_log::open_session_log(&log_id("stopped-tool"))
+                .expect("open");
             let agent = AgentLoop::from_log(opened.events);
             let view = agent.model_view_for_resume();
             let messages = crate::rhizome_provider_model::openai_messages(&view, view.turn_start);
@@ -1270,7 +1391,11 @@ mod tests {
                 ],
                 &["this is not json{{{"],
             );
-            let opened = crate::engines::native_log::open_session_log("bad-tail").expect("open");
+            let path =
+                crate::engines::native_log::session_log_path(&log_id("bad-tail")).expect("path");
+            let before = std::fs::read(&path).expect("original");
+            let opened =
+                crate::engines::native_log::open_session_log(&log_id("bad-tail")).expect("open");
             assert!(opened.warning.is_some(), "damaged tail must warn");
             assert!(
                 opened
@@ -1280,8 +1405,13 @@ mod tests {
                 "must keep the last good line"
             );
             assert!(
-                opened.successor_id.is_none(),
-                "tail damage stays on the same session"
+                opened.successor_id.is_some(),
+                "tail damage continues in a new session"
+            );
+            assert_eq!(
+                std::fs::read(&path).expect("preserved"),
+                before,
+                "tail damage must leave the original file untouched"
             );
         });
     }
@@ -1304,11 +1434,11 @@ mod tests {
                     r#"{"seq":5,"checksum":"beef","event":{"Assistant":{"text":"should-not-load"}}}"#,
                 ],
             );
-            let original =
-                crate::engines::native_log::session_log_path("middle-damage").expect("path");
+            let original = crate::engines::native_log::session_log_path(&log_id("middle-damage"))
+                .expect("path");
             let before = std::fs::read_to_string(&original).expect("original");
-            let opened =
-                crate::engines::native_log::open_session_log("middle-damage").expect("open");
+            let opened = crate::engines::native_log::open_session_log(&log_id("middle-damage"))
+                .expect("open");
             assert!(opened.warning.is_some(), "middle damage must warn");
             assert!(
                 !opened.events.iter().any(
@@ -1345,14 +1475,15 @@ mod tests {
     fn unknown_version_opens_read_only() {
         with_temp_home(|_| {
             write_native_log("future", 99, "openai/gpt-4o-mini", &two_turn_events());
-            let opened = crate::engines::native_log::open_session_log("future").expect("open");
+            let opened =
+                crate::engines::native_log::open_session_log(&log_id("future")).expect("open");
             assert!(opened.read_only, "unknown version must be read-only");
-            let record = super::open_native_session_record("future").expect("open record");
+            let record = super::open_native_session_record(&log_id("future")).expect("open record");
             assert!(record.read_only);
             let chats = NativeChats::new();
             chats.note_open(&record);
             let err = chats
-                .send("future", "later")
+                .send(&log_id("future"), "later")
                 .expect_err("read-only session rejects send");
             assert!(
                 err.to_lowercase().contains("read-only")
@@ -1371,7 +1502,8 @@ mod tests {
                 "anthropic/claude-opus-4",
                 &two_turn_events(),
             );
-            let opened = super::open_native_session_record("missing-target").expect("open");
+            let opened =
+                super::open_native_session_record(&log_id("missing-target")).expect("open");
             assert!(
                 opened
                     .events
@@ -1435,17 +1567,101 @@ mod tests {
     }
 
     #[test]
-    fn second_window_opens_read_only() {
+    fn second_window_can_display_while_one_writer_holds_the_lock() {
         with_temp_home(|_| {
             write_native_log("locked", 1, "openai/gpt-4o-mini", &two_turn_events());
-            let first =
-                crate::engines::native_log::try_lock_session("locked").expect("first window lock");
-            let second = crate::engines::native_log::open_session_log("locked").expect("second");
+            let first = crate::engines::native_log::try_lock_session(&log_id("locked"))
+                .expect("first window lock");
+            let second =
+                crate::engines::native_log::open_session_log(&log_id("locked")).expect("second");
+            assert!(!second.read_only, "a second window may display the chat");
+            assert!(second
+                .events
+                .iter()
+                .any(|event| matches!(event, DurableEvent::User { text } if text == "one")));
             assert!(
-                second.read_only,
-                "second window must be read-only while the first holds the lock"
+                crate::engines::native_log::try_lock_session(&log_id("locked")).is_err(),
+                "a second writer is refused"
             );
             drop(first);
+        });
+    }
+
+    #[test]
+    fn opening_a_live_chat_does_not_freeze_send() {
+        with_temp_home(|_| {
+            let chats = NativeChats::new();
+            let (tx, rx) = mpsc::channel();
+            let id = chats
+                .start_with_engine("hi", NativeEngine::saying("ok"), move |event| {
+                    let _ = tx.send(event);
+                })
+                .expect("start");
+            let _ = wait_for_turn_end(&rx);
+            let record = chats.attach_open(&id).expect("open");
+            assert!(!record.read_only, "a live chat stays writable");
+            chats.send(&id, "still open").expect("send");
+        });
+    }
+
+    #[test]
+    fn second_turn_is_refused_while_one_runs() {
+        with_temp_home(|_| {
+            let chats = NativeChats::new();
+            let (chunk_tx, chunk_rx) = mpsc::channel();
+            let (hold_tx, hold_rx) = mpsc::channel::<()>();
+            let mut model = FakeModel::streaming(vec![vec!["one".into()]]);
+            model.on_after_chunk(move |_| {
+                let _ = chunk_tx.send(());
+                let _ = hold_rx.recv();
+            });
+            let id = chats
+                .start_with_engine(
+                    "hi",
+                    NativeEngine::from_parts(AgentLoop::new(), model),
+                    |_| {},
+                )
+                .expect("start");
+            chunk_rx
+                .recv_timeout(Duration::from_secs(2))
+                .expect("first chunk");
+            let error = chats.send(&id, "second").expect_err("second turn");
+            assert!(
+                error.to_lowercase().contains("turn"),
+                "a concurrent second turn must be refused"
+            );
+            drop(hold_tx);
+        });
+    }
+
+    #[test]
+    fn path_traversal_is_rejected() {
+        let open_error = super::open_native_session_record("../x").expect_err("open");
+        assert!(open_error.to_lowercase().contains("uuid"));
+        let delete_error =
+            super::delete_native_session(&NativeChats::new(), "../x").expect_err("delete");
+        assert!(delete_error.to_lowercase().contains("uuid"));
+    }
+
+    #[test]
+    fn resumed_log_keeps_vault_folders_and_system_prompt() {
+        with_temp_home(|_| {
+            let id = uuid::Uuid::new_v4().to_string();
+            let mut engine = NativeEngine::saying("ok");
+            engine.set_log_meta(
+                &id,
+                "openai/gpt-4o-mini",
+                AiAgentPermissionMode::Safe,
+                Some("/vault".into()),
+                vec!["/extra".into()],
+                Some("Be brief".into()),
+            );
+            engine.ensure_log(&id).expect("log");
+            drop(engine);
+            let opened = crate::engines::native_log::open_session_log(&id).expect("open");
+            assert_eq!(opened.header.vault_path.as_deref(), Some("/vault"));
+            assert_eq!(opened.header.vault_paths, vec!["/extra".to_string()]);
+            assert_eq!(opened.header.system_prompt.as_deref(), Some("Be brief"));
         });
     }
 }

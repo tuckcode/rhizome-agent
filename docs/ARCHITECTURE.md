@@ -467,8 +467,11 @@ with a 2s bound. Native transcripts use `rhizome-native:<uuid>` and never
 write under `~/.prime`. Step 2c stores one append-only JSONL log per
 session at `<app config dir>/native-sessions/<id>.jsonl` (ADR-0183): flush
 every line, 100 MiB / 1 MiB caps, owner-only file, known-credential
-scrub, reopen as cancelled with no restored grants (D13 warning). Chat
-still does not call these until the Settings toggle.
+scrub, reopen as cancelled with no restored grants. The id is a UUID.
+An OS file lock covers a second process and dies with it. Both windows
+may display a chat; only one turn runs. Damage and a full log keep the
+original and continue in a new session. Chat still does not call these
+until the Settings toggle.
 `rhizome_provider_model.rs` is the native loop's OpenAI-compatible `Model`.
 `rhizome_routing/` wraps it with free-tier fallback over a pinned OmniRoute
 catalog (ADR-0182). Chat still does not call these until the Settings toggle.

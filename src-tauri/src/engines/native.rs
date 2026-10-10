@@ -93,6 +93,8 @@ impl<M: Model> NativeEngine<M> {
         target: &str,
         mode: AiAgentPermissionMode,
         vault_path: Option<String>,
+        vault_paths: Vec<String>,
+        system_prompt: Option<String>,
     ) {
         self.log_meta = Some(native_log::SessionHeader {
             version: native_log::NATIVE_LOG_VERSION,
@@ -101,6 +103,8 @@ impl<M: Model> NativeEngine<M> {
             target: target.to_string(),
             permission_mode: native_log::permission_mode_label(mode),
             vault_path,
+            vault_paths,
+            system_prompt,
         });
     }
 
@@ -118,13 +122,24 @@ impl<M: Model> NativeEngine<M> {
                 target: "test/fake".into(),
                 permission_mode: native_log::permission_mode_label(self.mode),
                 vault_path: self.vault_path.clone(),
+                vault_paths: self.vault_paths.clone(),
+                system_prompt: None,
             });
         let path = native_log::session_log_path(session_id)?;
         let writer = if path.exists() {
             let opened = native_log::open_session_log(session_id)?;
-            native_log::persist_missing_suffix(session_id, &opened.events, &self.agent.events())?;
+            let live_id = opened
+                .successor_id
+                .clone()
+                .unwrap_or_else(|| session_id.to_string());
+            let disk = if live_id == session_id {
+                opened.events
+            } else {
+                native_log::open_session_log(&live_id)?.events
+            };
+            native_log::persist_missing_suffix(&live_id, &disk, &self.agent.events())?;
             native_log::open_session_writer(
-                session_id,
+                &live_id,
                 native_log::next_seq_after(&self.agent.events()),
             )?
         } else {
@@ -216,7 +231,11 @@ impl<M: Model> Engine for NativeEngine<M> {
         self.agent.set_durable_listener(move |event| {
             if let Some(log) = &session_log {
                 if let Ok(mut writer) = log.lock() {
-                    let _ = writer.append(&event);
+                    match native_log::append_or_roll(&mut writer, &event) {
+                        Ok(None) => {}
+                        Ok(Some(message)) => live_emit(EngineEvent::Error { message }),
+                        Err(message) => live_emit(EngineEvent::Error { message }),
+                    }
                 }
             }
             if let Some(mapped) = Self::map_durable(event) {
