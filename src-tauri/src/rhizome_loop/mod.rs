@@ -1117,6 +1117,67 @@ mod tests {
         );
     }
 
+    #[test]
+    fn waiter_is_asked_again_after_a_cancelled_wait() {
+        let agent = AgentLoop::new();
+        agent.offer_extra_tool_for_test("edit");
+        let asks = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&asks);
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (hold_tx, hold_rx) = mpsc::channel::<()>();
+        agent.set_approval_waiter(move |_| {
+            let n = count.fetch_add(1, Ordering::SeqCst);
+            if n == 0 {
+                entered_tx.send(()).ok();
+                let _ = hold_rx.recv();
+            }
+            ApprovalReply::AllowOnce
+        });
+        let mut first = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "edit".into(),
+            args: "note".into(),
+        }]]);
+        agent.submit("one");
+        let runner = agent.clone();
+        let (done_tx, done_rx) = mpsc::channel();
+        thread::spawn(move || {
+            runner.run_until_idle(&mut first);
+            done_tx.send(()).ok();
+        });
+        entered_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("the first wait should block");
+        agent.cancel("quit");
+        done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("cancel must end the first turn");
+        drop(hold_tx);
+
+        let mut second = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "edit".into(),
+            args: "note".into(),
+        }]]);
+        agent.submit("two");
+        agent.run_until_idle(&mut second);
+
+        assert_eq!(
+            asks.load(Ordering::SeqCst),
+            2,
+            "the same waiter must be asked again after a mid-wait cancel"
+        );
+        assert!(
+            agent.events().iter().any(|event| {
+                matches!(
+                    event,
+                    DurableEvent::ToolResult { name, output, .. }
+                        if name == "edit" && output == "note"
+                )
+            }),
+            "AllowOnce on the next turn must run the tool: {:?}",
+            agent.events()
+        );
+    }
+
     /// Blocks in the waiter until `on_entered` runs, then expects the loop
     /// to finish without the waiter returning. Times out if cancel/quit
     /// cannot end the wait.
