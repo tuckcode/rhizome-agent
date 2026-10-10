@@ -208,8 +208,12 @@ function UserBubble({ content, images, references, onOpenNote, createdAtMs }: {
 /** Same slack as the transcript: one deliberate scroll up releases the tail. */
 const REASONING_FOLLOW_THRESHOLD_PX = 48
 
-function ReasoningBlock({ locale, text, expanded, onToggle }: {
-  locale: AppLocale; text: string; expanded: boolean; onToggle: () => void
+function ReasoningBlock({ locale, text, tools, expanded, onToggle }: {
+  locale: AppLocale
+  text: string
+  tools?: readonly string[]
+  expanded: boolean
+  onToggle: () => void
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const followingRef = useRef(true)
@@ -252,7 +256,18 @@ function ReasoningBlock({ locale, text, expanded, onToggle }: {
           onScroll={noteReadingPosition}
           data-testid="reasoning-content"
         >
-          <MarkdownContent content={normalizeReasoningDisplay(text)} />
+          {normalizeReasoningDisplay(text).trim() ? (
+            <MarkdownContent content={normalizeReasoningDisplay(text)} />
+          ) : null}
+          {tools && tools.length > 0 ? (
+            <ul className="m-0 list-none p-0" data-testid="reasoning-tools">
+              {tools.map((tool, index) => (
+                <li key={`${tool}-${index}`} data-testid="reasoning-tool">
+                  {tool}
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       )}
     </div>
@@ -646,7 +661,11 @@ function ConversationMessage({ userMessage, images, references, locale = 'en', m
   // streaming re-opened itself the moment reasoningDone flipped.
   const autoExpanded = !reasoningDone
   const reasoningExpanded = userOverride ?? autoExpanded
-  const reasoningVisible = Boolean(reasoning && normalizeReasoningDisplay(reasoning).trim())
+  const toolNames = actions.map((action) => action.tool).filter((tool) => tool.trim().length > 0)
+  const reasoningVisible = Boolean(
+    (reasoning && normalizeReasoningDisplay(reasoning).trim())
+    || toolNames.length > 0,
+  )
 
   const toggleAction = useCallback((toolId: string) => {
     setExpandedActions(prev => {
@@ -678,10 +697,11 @@ function ConversationMessage({ userMessage, images, references, locale = 'en', m
           createdAtMs={createdAtMs}
         />
       </TranscriptHitAnchor>
-      {reasoningVisible && reasoning ? (
+      {reasoningVisible ? (
         <ReasoningBlock
           locale={locale}
-          text={reasoning}
+          text={reasoning ?? ''}
+          tools={toolNames}
           expanded={reasoningExpanded}
           onToggle={() => setUserOverride(prev => !(prev ?? autoExpanded))}
         />

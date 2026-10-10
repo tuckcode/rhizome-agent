@@ -606,6 +606,47 @@ describe('aiAgentStreamCallbacks', () => {
     expect(marker?.localMarker).toBe('Removed 2 credentials before saving this turn to the wiki')
   })
 
+  it('returns to idle after a tool then a sealed reply once Done arrives', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'Are you still there?',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const status = createStatusStore('thinking')
+    const responseAccRef = { current: '' }
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: status.setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef,
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+
+    callbacks.onToolStart('ipython', 'ipy-1', '{"code":"1+1"}')
+    expect(status.getStatus()).toBe('tool-executing')
+    callbacks.onToolDone('ipy-1', '2')
+    callbacks.onText('Hi — still here.')
+    callbacks.onTurnBoundary()
+
+    // The host may still be in the follow-up grace. Working stays until Done.
+    expect(status.getStatus()).toBe('thinking')
+    expect(messages.getMessages()[0]).toMatchObject({
+      id: 'msg-1',
+      response: 'Hi — still here.',
+      isStreaming: false,
+    })
+
+    callbacks.onDone()
+    expect(status.getStatus()).toBe('done')
+  })
+
   it('seals the first turn and streams the follow-up into its own bubble', () => {
     const messages = createMessageStore([
       {

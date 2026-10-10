@@ -324,6 +324,30 @@ describe('AiMessage', () => {
     expect(screen.queryByTestId('reasoning-content')).toBeNull()
   })
 
+  it('lists each tool call inside collapsed-by-default Reasoning', () => {
+    render(
+      <AiMessage
+        userMessage="Ask"
+        reasoningDone
+        actions={[
+          { tool: 'ipython', toolId: 't1', label: 'Ran code', status: 'done' },
+          { tool: 'get_note', toolId: 't2', label: 'Read note', status: 'done' },
+        ]}
+        response="Hi — still here."
+      />,
+    )
+
+    expect(screen.getByTestId('reasoning-toggle')).toBeTruthy()
+    expect(screen.queryByTestId('reasoning-content')).toBeNull()
+    expect(screen.queryByTestId('reasoning-tools')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('reasoning-toggle'))
+    const tools = screen.getAllByTestId('reasoning-tool')
+    expect(tools).toHaveLength(2)
+    expect(tools[0]).toHaveTextContent('ipython')
+    expect(tools[1]).toHaveTextContent('get_note')
+  })
+
   it('expands collapsed reasoning on toggle click', () => {
     render(<AiMessage userMessage="Ask" reasoning="Thinking..." reasoningDone actions={[]} />)
     // Starts collapsed (reasoningDone=true)
