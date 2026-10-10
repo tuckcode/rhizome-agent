@@ -89,19 +89,20 @@ function useFreeTierSettings() {
     }
   }, [])
 
-  const run = async (work: () => Promise<FreeTierOverview>) => {
-    try {
-      setOverview(await work())
-      setError(null)
-    } catch (workError) {
-      setError(messageOf(workError))
-    }
-  }
+  /** Applies one change. The returned promise never rejects: errors show in the card. */
+  const run = (work: () => Promise<FreeTierOverview>): Promise<void> =>
+    work().then(
+      (next) => {
+        setOverview(next)
+        setError(null)
+      },
+      (workError: unknown) => setError(messageOf(workError)),
+    )
 
   const setEnabled = (row: FreeTierProviderRow, enabled: boolean) => {
     if (!overview) return
     trackEvent('free_tier_provider_toggled', { provider_id: row.id, enabled: enabled ? 1 : 0 })
-    void run(() => saveFreeTierSettings(withProvider(settingsFromOverview(overview), row, enabled)))
+    run(() => saveFreeTierSettings(withProvider(settingsFromOverview(overview), row, enabled)))
   }
 
   return {
@@ -121,12 +122,12 @@ function useFreeTierSettings() {
     setStrict: (strict: boolean) => {
       if (!overview) return
       trackEvent('free_tier_strict_toggled', { enabled: strict ? 1 : 0 })
-      void run(() => saveFreeTierSettings({ ...settingsFromOverview(overview), strict }))
+      run(() => saveFreeTierSettings({ ...settingsFromOverview(overview), strict }))
     },
     setOwnEndpoint: (ownEndpoint: string | null) => {
       if (!overview) return
       trackEvent('free_tier_own_endpoint_set', { chosen: ownEndpoint ? 1 : 0 })
-      void run(() => saveFreeTierSettings({ ...settingsFromOverview(overview), ownEndpoint }))
+      run(() => saveFreeTierSettings({ ...settingsFromOverview(overview), ownEndpoint }))
     },
     saveSecret: (account: string, value: string) =>
       run(async () => {
@@ -312,9 +313,8 @@ function SecretField({
 }) {
   const id = useId()
   const [value, setValue] = useState('')
-  const submit = async () => {
-    await onSave(value)
-    setValue('')
+  const submit = () => {
+    onSave(value).then(() => setValue(''), () => undefined)
   }
   return (
     <div className="flex items-center gap-2">
@@ -327,7 +327,7 @@ function SecretField({
         onChange={(event) => setValue(event.target.value)}
         className="h-7 text-xs"
       />
-      <Button type="button" size="sm" variant="outline" disabled={!value.trim()} onClick={() => void submit()}>
+      <Button type="button" size="sm" variant="outline" disabled={!value.trim()} onClick={submit}>
         {buttonLabel}
       </Button>
     </div>
