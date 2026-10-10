@@ -1,6 +1,7 @@
 //! Free-tier provider routing (harness plan Phase 4b, ADR-0182).
 //!
-//! Test builds only, the same as `rhizome_loop`. Chat does not call it.
+//! Compiles in normal builds, like `rhizome_loop`. Chat does not call it
+//! until Phase 6.
 //!
 //! `RoutingModel` is one loop `Model`. Each step it walks the pinned
 //! catalog in fixed priority order and skips any target that a health layer
@@ -23,33 +24,35 @@ use crate::model_events::{ModelError, ModelErrorKind, ModelEvent};
 use crate::rhizome_loop::{Model, ModelView};
 use crate::rhizome_provider_model::ProviderModel;
 
-use catalog::CatalogProvider;
-pub(crate) use catalog::{Catalog, RoutingOptions, UserEndpoint};
+pub use catalog::{
+    Catalog, CatalogModel, CatalogProvider, CatalogSource, RoutingOptions, Target, UserEndpoint,
+    USER_ENDPOINT_ID,
+};
 use health::{Attempt, Health, Millis};
 
 /// freellmapi checklist: the overall retry budget for one step.
-pub(crate) const RETRY_BUDGET: Millis = 45_000;
+pub const RETRY_BUDGET: Millis = 45_000;
 
 /// One provider's secret. Cloudflare also needs the account id.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Credential {
-    pub(crate) api_key: String,
-    pub(crate) account_id: Option<String>,
+pub struct Credential {
+    pub api_key: String,
+    pub account_id: Option<String>,
 }
 
 /// Where keys come from. One key per provider (ADR-0182 decision 4). The OS
 /// keychain implements this later. Tests use a map.
-pub(crate) trait KeyStore: Send {
+pub trait KeyStore: Send {
     fn credential(&self, provider_id: &str) -> Option<Credential>;
 }
 
 /// Wall time in milliseconds since the Unix epoch. Daily limits reset at
 /// UTC midnight, so this is wall time, not a monotonic clock.
-pub(crate) trait Clock: Send {
+pub trait Clock: Send {
     fn now_ms(&self) -> Millis;
 }
 
-pub(crate) struct SystemClock;
+pub struct SystemClock;
 
 impl Clock for SystemClock {
     fn now_ms(&self) -> Millis {
@@ -60,7 +63,7 @@ impl Clock for SystemClock {
 }
 
 /// Routes each loop step to the first healthy free-tier target.
-pub(crate) struct RoutingModel<K: KeyStore, C: Clock> {
+pub struct RoutingModel<K: KeyStore, C: Clock> {
     catalog: Catalog,
     options: RoutingOptions,
     keys: K,
@@ -72,7 +75,7 @@ pub(crate) struct RoutingModel<K: KeyStore, C: Clock> {
 }
 
 impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
-    pub(crate) fn new(catalog: Catalog, keys: K, clock: C, limits: HttpLimits) -> Self {
+    pub fn new(catalog: Catalog, keys: K, clock: C, limits: HttpLimits) -> Self {
         Self {
             catalog,
             options: RoutingOptions::default(),
@@ -87,7 +90,7 @@ impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
 
     /// Opt-in providers and strict mode. The default routes the default-on
     /// providers in the default mode.
-    pub(crate) fn with_options(mut self, options: RoutingOptions) -> Self {
+    pub fn with_options(mut self, options: RoutingOptions) -> Self {
         self.options = options;
         self
     }
@@ -382,6 +385,7 @@ mod tests {
         ModelView {
             admitted: "hi".into(),
             history: vec![],
+            turn_start: 0,
             offered_tools: vec![],
         }
     }

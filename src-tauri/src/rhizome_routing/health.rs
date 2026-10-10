@@ -13,7 +13,7 @@ use std::collections::HashMap;
 
 use crate::model_events::{ModelError, ModelErrorKind};
 
-pub(crate) type Millis = u64;
+pub type Millis = u64;
 
 /// Upstream API-key breaker profile.
 const DEGRADED_AT: u32 = 7;
@@ -27,7 +27,7 @@ const COOLDOWN_CAP: Millis = 1_800_000;
 const DAY: Millis = 86_400_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum BreakerState {
+pub enum BreakerState {
     Closed,
     /// Traffic still goes through. Failures are elevated.
     Degraded,
@@ -45,13 +45,13 @@ struct Breaker {
 
 /// One routing attempt, as the health layers see it.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct Attempt<'a> {
-    pub(crate) provider: &'a str,
-    pub(crate) model: &'a str,
-    pub(crate) family: &'a str,
-    pub(crate) per_model_quota: bool,
+pub struct Attempt<'a> {
+    pub provider: &'a str,
+    pub model: &'a str,
+    pub family: &'a str,
+    pub per_model_quota: bool,
     /// A fingerprint of the key. A new key clears a dead-key mark.
-    pub(crate) key: u64,
+    pub key: u64,
 }
 
 /// Layer 2 state for one provider's key.
@@ -80,14 +80,14 @@ struct Lock {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct Health {
+pub struct Health {
     breakers: HashMap<String, Breaker>,
     keys: HashMap<String, KeyState>,
     locks: HashMap<(String, LockScope), Lock>,
 }
 
 impl Health {
-    pub(crate) fn breaker_state(&self, provider: &str, now: Millis) -> BreakerState {
+    pub fn breaker_state(&self, provider: &str, now: Millis) -> BreakerState {
         let Some(breaker) = self.breakers.get(provider) else {
             return BreakerState::Closed;
         };
@@ -101,11 +101,14 @@ impl Health {
 
     /// When the attempt is blocked, the time it opens again. A refused key
     /// gives `Millis::MAX`.
-    pub(crate) fn blocked_until(&self, attempt: &Attempt, now: Millis) -> Option<Millis> {
-        let breaker = self
-            .breakers
-            .get(attempt.provider)
-            .and_then(|breaker| breaker.open_until);
+    pub fn blocked_until(&self, attempt: &Attempt, now: Millis) -> Option<Millis> {
+        let breaker = match self.breaker_state(attempt.provider, now) {
+            BreakerState::Open => self
+                .breakers
+                .get(attempt.provider)
+                .and_then(|breaker| breaker.open_until),
+            _ => None,
+        };
         let key = self.keys.get(attempt.provider).map(|key| {
             if key.dead == Some(attempt.key) {
                 Millis::MAX
@@ -127,7 +130,7 @@ impl Health {
             .max()
     }
 
-    pub(crate) fn record_success(&mut self, attempt: &Attempt) {
+    pub fn record_success(&mut self, attempt: &Attempt) {
         self.breakers.remove(attempt.provider);
         self.keys.remove(attempt.provider);
         for scope in [
@@ -138,7 +141,7 @@ impl Health {
         }
     }
 
-    pub(crate) fn record_failure(&mut self, attempt: &Attempt, error: &ModelError, now: Millis) {
+    pub fn record_failure(&mut self, attempt: &Attempt, error: &ModelError, now: Millis) {
         if trips_breaker(error) {
             let breaker = self
                 .breakers

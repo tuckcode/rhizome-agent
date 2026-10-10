@@ -12,57 +12,57 @@ use serde_json::{Map, Value};
 
 /// The provider list and its upstream pin.
 #[derive(Debug, Clone, Deserialize)]
-pub(crate) struct Catalog {
-    pub(crate) source: CatalogSource,
+pub struct Catalog {
+    pub source: CatalogSource,
     /// In priority order. The router tries the first provider first.
-    pub(crate) providers: Vec<CatalogProvider>,
+    pub providers: Vec<CatalogProvider>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub(crate) struct CatalogSource {
-    pub(crate) commit: String,
-    pub(crate) curated_at: String,
+pub struct CatalogSource {
+    pub commit: String,
+    pub curated_at: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub(crate) struct CatalogProvider {
-    pub(crate) id: String,
-    pub(crate) name: String,
+pub struct CatalogProvider {
+    pub id: String,
+    pub name: String,
     /// OpenAI-compatible base URL, without `/chat/completions`. The text
     /// `{account_id}` takes the account id from the credential.
-    pub(crate) base_url: String,
+    pub base_url: String,
     /// One key serves many upstream models, each with its own quota. A 429
     /// then locks the quota family, not the key.
     #[serde(default)]
-    pub(crate) per_model_quota: bool,
+    pub per_model_quota: bool,
     /// When set, only model ids that end with this text route.
     #[serde(default)]
-    pub(crate) free_suffix: Option<String>,
+    pub free_suffix: Option<String>,
     #[serde(default)]
-    pub(crate) headers: BTreeMap<String, String>,
+    pub headers: BTreeMap<String, String>,
     /// Body fields sent only when the request offers tools.
     #[serde(default)]
-    pub(crate) tool_params: Map<String, Value>,
+    pub tool_params: Map<String, Value>,
     /// False only for the user-supplied endpoint, which may be keyless.
     #[serde(default = "key_required_default")]
-    pub(crate) key_required: bool,
+    pub key_required: bool,
     /// The user-supplied endpoint skips the free-tier gate.
     #[serde(default)]
-    pub(crate) user_supplied: bool,
+    pub user_supplied: bool,
     /// False for an opt-in provider. It routes only when the user turns it
     /// on (ADR-0182 decision 1).
     #[serde(default = "default_on_default")]
-    pub(crate) default_on: bool,
+    pub default_on: bool,
     /// Shown before the user turns on an opt-in provider.
     #[serde(default)]
-    pub(crate) billing_warning: Option<String>,
+    pub billing_warning: Option<String>,
     /// Replaces a stale upstream `free_type` for every row of this
     /// provider. The upstream label stays in the row as ported.
     #[serde(default)]
-    pub(crate) free_type_override: Option<String>,
+    pub free_type_override: Option<String>,
     #[serde(default)]
-    pub(crate) evidence: String,
-    pub(crate) models: Vec<CatalogModel>,
+    pub evidence: String,
+    pub models: Vec<CatalogModel>,
 }
 
 fn key_required_default() -> bool {
@@ -75,62 +75,62 @@ fn default_on_default() -> bool {
 
 /// The user's routing choices.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct RoutingOptions {
+pub struct RoutingOptions {
     /// Opt-in provider ids the user turned on.
-    pub(crate) opt_in: BTreeSet<String>,
+    pub opt_in: BTreeSet<String>,
     /// Route only rows with a documented hard stop, plus the user endpoint.
     /// Upstream `freeAccessPolicy=strict`. A missing flag means "not
     /// established", so the default mode does not check it.
-    pub(crate) strict: bool,
+    pub strict: bool,
 }
 
 /// One upstream free-model row.
 #[derive(Debug, Clone, Deserialize)]
-pub(crate) struct CatalogModel {
-    pub(crate) id: String,
+pub struct CatalogModel {
+    pub id: String,
     /// Upstream `freeType`, for example `recurring-daily`.
-    pub(crate) free_type: String,
+    pub free_type: String,
     /// Upstream ToS rating: `ok`, `caution`, `ambiguous`, or `avoid`.
-    pub(crate) tos: String,
+    pub tos: String,
     /// Upstream `poolKey`: models that share one quota. `None` means the
     /// model has its own quota.
     #[serde(default)]
-    pub(crate) pool: Option<String>,
+    pub pool: Option<String>,
     /// Upstream `hardStopGuaranteed`. Recorded, not gated (see the PR).
     #[serde(default)]
-    pub(crate) hard_stop: bool,
+    pub hard_stop: bool,
     #[serde(default)]
-    pub(crate) trains_on_prompts: bool,
+    pub trains_on_prompts: bool,
 }
 
 /// One provider and model the router can try.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Target {
-    pub(crate) provider: usize,
-    pub(crate) model: String,
+pub struct Target {
+    pub provider: usize,
+    pub model: String,
     /// The quota family: the upstream pool, or the model id.
-    pub(crate) family: String,
+    pub family: String,
 }
 
 /// A user-run OpenAI-compatible endpoint, tried after the catalog.
 #[derive(Debug, Clone)]
-pub(crate) struct UserEndpoint {
-    pub(crate) base_url: String,
-    pub(crate) model: String,
+pub struct UserEndpoint {
+    pub base_url: String,
+    pub model: String,
 }
 
 /// The provider id the router uses for the user endpoint and its key.
-pub(crate) const USER_ENDPOINT_ID: &str = "custom";
+pub const USER_ENDPOINT_ID: &str = "custom";
 
 impl Catalog {
     /// The catalog compiled into the app.
-    pub(crate) fn pinned() -> Self {
+    pub fn pinned() -> Self {
         serde_json::from_str(include_str!("free_catalog.json"))
             .expect("the pinned free catalog must be valid JSON")
     }
 
     /// Adds the user endpoint last, after every catalog provider.
-    pub(crate) fn with_user_endpoint(mut self, endpoint: UserEndpoint) -> Self {
+    pub fn with_user_endpoint(mut self, endpoint: UserEndpoint) -> Self {
         self.providers.push(CatalogProvider {
             id: USER_ENDPOINT_ID.into(),
             name: "Custom endpoint".into(),
@@ -159,7 +159,7 @@ impl Catalog {
 
     /// Opt-in providers and the warning to show before the user turns one
     /// on.
-    pub(crate) fn opt_in_warnings(&self) -> Vec<(&str, &str)> {
+    pub fn opt_in_warnings(&self) -> Vec<(&str, &str)> {
         self.providers
             .iter()
             .filter(|provider| !provider.default_on)
@@ -173,7 +173,7 @@ impl Catalog {
     }
 
     /// Every routable provider and model, in priority order.
-    pub(crate) fn targets(&self, options: &RoutingOptions) -> Vec<Target> {
+    pub fn targets(&self, options: &RoutingOptions) -> Vec<Target> {
         self.providers
             .iter()
             .enumerate()
@@ -198,7 +198,7 @@ impl Catalog {
 
 /// Why a row does not route, or `None` when it does (ADR-0182 decisions 2
 /// and 3).
-pub(crate) fn exclusion(provider: &CatalogProvider, model: &CatalogModel) -> Option<&'static str> {
+pub fn exclusion(provider: &CatalogProvider, model: &CatalogModel) -> Option<&'static str> {
     if provider.user_supplied {
         return None;
     }
