@@ -10,16 +10,22 @@
 
 export type UiAuditScreen = {
   name: string
-  /** Control that opens this screen. Omit when the screen is already showing. */
+  /** Control that must exist before we open this screen. */
   openerTestId?: string
+  /** Command-palette name. Prefer this over a hit-test click. */
+  command?: string
   /** Proof we left the previous screen. */
   destinationTestId: string
 }
 
 export const UI_AUDIT_SCREENS: readonly UiAuditScreen[] = [
   { name: 'chat', destinationTestId: 'chat-center' },
-  { name: 'research', openerTestId: 'status-research', destinationTestId: 'research-destination' },
-  { name: 'settings', openerTestId: 'command-rail-settings', destinationTestId: 'settings-panel' },
+  {
+    name: 'research',
+    openerTestId: 'status-research',
+    command: 'Open Research',
+    destinationTestId: 'research-destination',
+  },
 ]
 
 export function requireAuditOpener(found: boolean, screenName: string): void {

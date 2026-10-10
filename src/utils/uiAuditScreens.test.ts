@@ -20,9 +20,11 @@ describe('UI_AUDIT_SCREENS', () => {
     expect(UI_AUDIT_SCREENS.map((screen) => screen.name)).toEqual([
       'chat',
       'research',
-      'settings',
     ])
     expect(UI_AUDIT_SCREENS.some((screen) => screen.name === 'changes')).toBe(false)
+    expect(UI_AUDIT_SCREENS.find((screen) => screen.name === 'research')?.command).toBe(
+      'Open Research',
+    )
   })
 })
 

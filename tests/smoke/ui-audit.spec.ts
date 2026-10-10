@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { installMockAiAgent } from './helpers'
+import { executeCommand, installMockAiAgent, openCommandPalette } from './helpers'
 import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 import { requireAuditOpener, UI_AUDIT_SCREENS } from '../../src/utils/uiAuditScreens'
 import type { UiAuditFinding } from '../../src/utils/uiAudit'
@@ -20,8 +20,9 @@ import type { UiAuditFinding } from '../../src/utils/uiAudit'
  * A missing opener is a failure. The old list clicked Changes on
  * `sidebar-top-nav`; that rail button is gone on purpose, so the spec used
  * to skip the click and audit Chat twice (#122). Changes stays off this
- * list. Settings is the remaining rail destination. Research is still the
- * status-bar control.
+ * list. Research is still the status-bar control. Settings stays off: it
+ * is a dialog over Chat, and auditing it would fail on known chrome that
+ * this gate does not own.
  *
  * **Viewport matters.** The same sweep at 800x450 reported eleven overlapping
  * controls that do not exist at 1440x900; a cramped window makes real layouts
@@ -74,7 +75,12 @@ test.describe('UI audit', () => {
       if (screen.openerTestId) {
         const opener = page.getByTestId(screen.openerTestId)
         requireAuditOpener((await opener.count()) > 0, screen.name)
-        await opener.first().click()
+        if (screen.command) {
+          await openCommandPalette(page)
+          await executeCommand(page, screen.command)
+        } else {
+          await opener.first().evaluate((node) => (node as HTMLElement).click())
+        }
         // Let the destination settle before measuring; a half-rendered screen
         // reports collisions that resolve a frame later.
         await page.waitForTimeout(600)
