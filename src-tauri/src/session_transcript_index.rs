@@ -93,6 +93,13 @@ pub fn append_native_turns(
     save(&document)
 }
 
+/// Remove a native session from the index. Missing is success.
+pub fn remove_session(path: &str) -> Result<(), String> {
+    let mut document = load()?;
+    document.sessions.retain(|session| session.path != path);
+    save(&document)
+}
+
 /// Replace the persisted index with an atomic write.
 pub fn save(document: &SessionTranscriptIndexDocument) -> Result<(), String> {
     if document.version != INDEX_VERSION {

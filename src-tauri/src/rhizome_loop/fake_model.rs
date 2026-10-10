@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 
 use super::model::Model;
 use super::types::ModelView;
@@ -28,6 +29,7 @@ pub struct FakeModel {
     pub unread: usize,
     before_chunk: Option<Box<dyn FnMut(usize) + Send>>,
     after_chunk: Option<Box<dyn FnMut(usize) + Send>>,
+    shared_seen: Option<Arc<Mutex<Vec<ModelView>>>>,
 }
 
 impl FakeModel {
@@ -52,6 +54,7 @@ impl FakeModel {
             unread: 0,
             before_chunk: None,
             after_chunk: None,
+            shared_seen: None,
         }
     }
 
@@ -64,7 +67,13 @@ impl FakeModel {
             unread: 0,
             before_chunk: None,
             after_chunk: None,
+            shared_seen: None,
         }
+    }
+
+    pub fn share_seen(mut self, slot: Arc<Mutex<Vec<ModelView>>>) -> Self {
+        self.shared_seen = Some(slot);
+        self
     }
 
     pub fn on_before_chunk(&mut self, hook: impl FnMut(usize) + Send + 'static) {
@@ -79,6 +88,9 @@ impl FakeModel {
 impl Model for FakeModel {
     fn complete(&mut self, view: &ModelView, emit: &mut dyn FnMut(ModelEvent) -> bool) -> bool {
         self.seen.push(view.clone());
+        if let Some(shared) = &self.shared_seen {
+            shared.lock().expect("shared seen").push(view.clone());
+        }
         let Some(round) = self.rounds.pop_front() else {
             return false;
         };

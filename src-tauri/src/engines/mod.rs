@@ -5,6 +5,7 @@
 
 mod hermes;
 mod native;
+pub mod native_log;
 mod prime;
 
 pub use hermes::HermesEngine;

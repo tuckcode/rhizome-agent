@@ -5,6 +5,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::ai_agents::AiAgentPermissionMode;
+use crate::engines::native_log::{self, SharedWriter};
 use crate::rhizome_loop::{approval_options, AgentLoop, ApprovalReply, DurableEvent, Model};
 use crate::rhizome_routing::ProviderAttempt;
 
@@ -30,6 +31,8 @@ pub struct NativeEngine<M: Model> {
     provider_rx: Arc<Mutex<mpsc::Receiver<ProviderAttempt>>>,
     prompt_seq: Arc<AtomicU64>,
     events: Vec<EngineEvent>,
+    session_log: Option<SharedWriter>,
+    log_meta: Option<native_log::SessionHeader>,
 }
 
 #[cfg(test)]
@@ -39,7 +42,6 @@ impl NativeEngine<crate::rhizome_loop::FakeModel> {
     }
 }
 
-#[cfg(test)]
 impl<M: Model> NativeEngine<M> {
     pub fn from_parts(agent: AgentLoop, model: M) -> Self {
         Self::from_model(agent, model)
@@ -80,7 +82,56 @@ impl<M: Model> NativeEngine<M> {
             provider_rx: Arc::new(Mutex::new(provider_rx)),
             prompt_seq: Arc::new(AtomicU64::new(0)),
             events: Vec::new(),
+            session_log: None,
+            log_meta: None,
         }
+    }
+
+    pub fn set_log_meta(
+        &mut self,
+        session_id: &str,
+        target: &str,
+        mode: AiAgentPermissionMode,
+        vault_path: Option<String>,
+    ) {
+        self.log_meta = Some(native_log::SessionHeader {
+            version: native_log::NATIVE_LOG_VERSION,
+            session_id: session_id.to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            target: target.to_string(),
+            permission_mode: native_log::permission_mode_label(mode),
+            vault_path,
+        });
+    }
+
+    pub fn ensure_log(&mut self, session_id: &str) -> Result<(), String> {
+        if self.session_log.is_some() {
+            return Ok(());
+        }
+        let header = self
+            .log_meta
+            .clone()
+            .unwrap_or_else(|| native_log::SessionHeader {
+                version: native_log::NATIVE_LOG_VERSION,
+                session_id: session_id.to_string(),
+                created_at: chrono::Utc::now().to_rfc3339(),
+                target: "test/fake".into(),
+                permission_mode: native_log::permission_mode_label(self.mode),
+                vault_path: self.vault_path.clone(),
+            });
+        let path = native_log::session_log_path(session_id)?;
+        let writer = if path.exists() {
+            let opened = native_log::open_session_log(session_id)?;
+            native_log::persist_missing_suffix(session_id, &opened.events, &self.agent.events())?;
+            native_log::open_session_writer(
+                session_id,
+                native_log::next_seq_after(&self.agent.events()),
+            )?
+        } else {
+            native_log::create_session_log(&header)?
+        };
+        self.session_log = Some(Arc::new(Mutex::new(writer)));
+        Ok(())
     }
 
     pub fn agent(&self) -> &AgentLoop {
@@ -161,7 +212,13 @@ impl<M: Model> Engine for NativeEngine<M> {
         self.agent.set_permission_mode(self.mode);
 
         let live_emit = emit.clone();
+        let session_log = self.session_log.clone();
         self.agent.set_durable_listener(move |event| {
+            if let Some(log) = &session_log {
+                if let Ok(mut writer) = log.lock() {
+                    let _ = writer.append(&event);
+                }
+            }
             if let Some(mapped) = Self::map_durable(event) {
                 live_emit(mapped);
             }
