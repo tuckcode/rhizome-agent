@@ -27,7 +27,7 @@ pub use types::{DurableEvent, HistoryItem, ModelView, ToolCall};
 mod tests {
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::mpsc;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
     use std::thread;
     use std::time::Duration;
 
@@ -1125,11 +1125,12 @@ mod tests {
         let count = Arc::clone(&asks);
         let (entered_tx, entered_rx) = mpsc::channel();
         let (hold_tx, hold_rx) = mpsc::channel::<()>();
+        let hold_rx = Mutex::new(hold_rx);
         agent.set_approval_waiter(move |_| {
             let n = count.fetch_add(1, Ordering::SeqCst);
             if n == 0 {
                 entered_tx.send(()).ok();
-                let _ = hold_rx.recv();
+                let _ = hold_rx.lock().expect("hold").recv();
             }
             ApprovalReply::AllowOnce
         });
@@ -1184,18 +1185,24 @@ mod tests {
         agent.offer_extra_tool_for_test("edit");
         let asks = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asks);
+        let dismissed = Arc::new(AtomicUsize::new(0));
+        let dismiss_count = Arc::clone(&dismissed);
         let (entered_tx, entered_rx) = mpsc::channel();
         let (hold_tx, hold_rx) = mpsc::channel::<()>();
+        let hold_rx = Mutex::new(hold_rx);
         let (second_tx, second_rx) = mpsc::channel();
         agent.set_approval_waiter(move |_| {
             let n = count.fetch_add(1, Ordering::SeqCst);
             if n == 0 {
                 entered_tx.send(()).ok();
-                let _ = hold_rx.recv();
+                let _ = hold_rx.lock().expect("hold").recv();
                 return ApprovalReply::AllowOnce;
             }
             second_tx.send(()).ok();
             ApprovalReply::AllowOnce
+        });
+        agent.set_approval_dismiss(move || {
+            dismiss_count.fetch_add(1, Ordering::SeqCst);
         });
         let mut first = FakeModel::script(vec![vec![ScriptPart::Tool {
             name: "edit".into(),
@@ -1215,6 +1222,11 @@ mod tests {
         done_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("cancel must end the first turn");
+        assert_eq!(
+            dismissed.load(Ordering::SeqCst),
+            1,
+            "cancel must dismiss the stale prompt"
+        );
 
         let mut second = FakeModel::script(vec![vec![ScriptPart::Tool {
             name: "edit".into(),
@@ -1267,9 +1279,10 @@ mod tests {
         agent.offer_extra_tool_for_test("edit");
         let (entered_tx, entered_rx) = mpsc::channel();
         let (hold_tx, hold_rx) = mpsc::channel::<()>();
+        let hold_rx = Mutex::new(hold_rx);
         agent.set_approval_waiter(move |_| {
             entered_tx.send(()).ok();
-            let _ = hold_rx.recv();
+            let _ = hold_rx.lock().expect("hold").recv();
             ApprovalReply::AllowOnce
         });
         let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {
