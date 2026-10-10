@@ -70,6 +70,9 @@ pub mod rhizome_research_formats;
 // Phase 1 loop is test-only. Chat must not call it until the engine toggle.
 #[cfg(test)]
 mod rhizome_loop;
+// The provider-backed loop model. Test-only while `rhizome_loop` is.
+#[cfg(test)]
+mod rhizome_provider_model;
 pub mod rhizome_search;
 pub mod rhizome_vault_seed;
 pub mod rhizome_write_location;
