@@ -22,9 +22,7 @@ describe('UI_AUDIT_SCREENS', () => {
       'research',
     ])
     expect(UI_AUDIT_SCREENS.some((screen) => screen.name === 'changes')).toBe(false)
-    expect(UI_AUDIT_SCREENS.find((screen) => screen.name === 'research')?.command).toBe(
-      'Open Research',
-    )
+    expect(UI_AUDIT_SCREENS.find((screen) => screen.name === 'research')?.chrome).toBe('research')
   })
 })
 

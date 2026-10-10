@@ -12,8 +12,8 @@ export type UiAuditScreen = {
   name: string
   /** Control that must exist before we open this screen. */
   openerTestId?: string
-  /** Command-palette name. Prefer this over a hit-test click. */
-  command?: string
+  /** `rhizome:notes-chrome` detail. Same event the status-bar control fires. */
+  chrome?: 'research'
   /** Proof we left the previous screen. */
   destinationTestId: string
 }
@@ -23,7 +23,7 @@ export const UI_AUDIT_SCREENS: readonly UiAuditScreen[] = [
   {
     name: 'research',
     openerTestId: 'status-research',
-    command: 'Open Research',
+    chrome: 'research',
     destinationTestId: 'research-destination',
   },
 ]

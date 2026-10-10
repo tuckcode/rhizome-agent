@@ -1,12 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import {
-  executeCommand,
-  installMockAiAgent,
-  openCommandPalette,
-  SMOKE_UI_READY_TIMEOUT,
-} from './helpers'
+import { installMockAiAgent, SMOKE_UI_READY_TIMEOUT } from './helpers'
 import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 import { requireAuditOpener, UI_AUDIT_SCREENS } from '../../src/utils/uiAuditScreens'
 import type { UiAuditFinding } from '../../src/utils/uiAudit'
@@ -80,9 +75,10 @@ test.describe('UI audit', () => {
       if (screen.openerTestId) {
         const opener = page.getByTestId(screen.openerTestId)
         requireAuditOpener((await opener.count()) > 0, screen.name)
-        if (screen.command) {
-          await openCommandPalette(page)
-          await executeCommand(page, screen.command)
+        if (screen.chrome) {
+          await page.evaluate((destination) => {
+            window.dispatchEvent(new CustomEvent('rhizome:notes-chrome', { detail: destination }))
+          }, screen.chrome)
         } else {
           await opener.first().evaluate((node) => (node as HTMLElement).click())
         }
