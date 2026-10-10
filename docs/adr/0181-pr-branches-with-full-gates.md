@@ -40,6 +40,9 @@ runs it against made-up push input.
 Pushing straight to `main` stays allowed. This ADR does not require PRs. It
 makes them possible without skipping gates.
 
+If the hook refuses a push, stop and ask knispo. Don't change
+`core.hooksPath` or use `--no-verify` to get past it.
+
 ## Options considered
 
 * **Keep ADR-0021 and push agents' work to `main`.** Rejected. The harness
