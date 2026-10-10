@@ -111,6 +111,17 @@ test.describe('pnpm live-ui', () => {
     expect(stdout).toMatch(/canScroll=(true|false)/u)
   })
 
+  test('walks every screen when no screen is named', async ({ baseURL }) => {
+    test.setTimeout(120_000)
+    const { code, stdout, stderr } = await runLiveUi([], baseURL!)
+
+    expect(code, stderr).toBe(0)
+    for (const screen of ['chat', 'research', 'changes']) {
+      expect(stdout).toContain(`## Screen: ${screen}`)
+    }
+    expect(stdout.match(/^### Scroll wells$/gmu)).toHaveLength(3)
+  })
+
   test('says how to start the dev app when nothing is running', async () => {
     const { code, stdout, stderr } = await runLiveUi([], 'http://127.0.0.1:9')
 
