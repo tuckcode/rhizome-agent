@@ -219,3 +219,4 @@ proposed → active → superseded
 | [0180](0180-rhizome-is-its-own-harness.md) | Rhizome is its own harness. Phase names: [harness plan](../plans/2026-10-09-rhizome-harness-plan.md) §4 (Plan Phase 3 = plugin seam, still skipped; #101 "phase 3" = loop Model trait, on main; Phase 5 done in #107; Phase 4b = ADR-0182 + #108) | active |
 | [0181](0181-pr-branches-with-full-gates.md) | PR branches with full pre-push gates | active |
 | [0182](0182-free-tier-provider-routing.md) | Free-tier provider routing ports OmniRoute rules | active |
+| [0183](0183-save-native-chat-sessions.md) | Save native chat sessions (plan step 2c) | active |
