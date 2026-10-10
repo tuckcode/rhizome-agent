@@ -1,7 +1,8 @@
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use crate::ai_agents::AiAgentPermissionMode;
 use crate::rhizome_loop::{approval_options, AgentLoop, ApprovalReply, DurableEvent, Model};
@@ -25,7 +26,7 @@ pub struct NativeEngine<M: Model> {
     approval_timeout: Duration,
     approval_tx: ApprovalTx,
     live_prompt: Arc<Mutex<Option<String>>>,
-    provider_tx: mpsc::SyncSender<ProviderAttempt>,
+    provider_tx: mpsc::Sender<ProviderAttempt>,
     provider_rx: Arc<Mutex<mpsc::Receiver<ProviderAttempt>>>,
     prompt_seq: Arc<AtomicU64>,
     events: Vec<EngineEvent>,
@@ -47,7 +48,7 @@ impl<M: Model> NativeEngine<M> {
     pub fn with_provider_pair(
         agent: AgentLoop,
         model: M,
-        provider_tx: mpsc::SyncSender<ProviderAttempt>,
+        provider_tx: mpsc::Sender<ProviderAttempt>,
         provider_rx: mpsc::Receiver<ProviderAttempt>,
     ) -> Self {
         let mut engine = Self::from_model(agent, model);
@@ -63,7 +64,7 @@ impl<M: Model> NativeEngine<M> {
     }
 
     fn from_model(agent: AgentLoop, model: M) -> Self {
-        let (provider_tx, provider_rx) = mpsc::sync_channel(64);
+        let (provider_tx, provider_rx) = mpsc::channel();
         Self {
             agent,
             model,
@@ -103,19 +104,11 @@ impl<M: Model> NativeEngine<M> {
     }
 
     /// Non-blocking reporter for `RoutingModel::with_observer`.
-    /// `try_send` never waits on the Chat listener.
+    /// Unbounded `send` plus a drain thread keep every report.
     pub fn provider_reporter(&self) -> impl FnMut(ProviderAttempt) + Send + 'static {
         let tx = self.provider_tx.clone();
         move |attempt| {
-            // try_send never waits. A slow Chat listener cannot freeze the answer.
-            let _ = tx.try_send(attempt);
-        }
-    }
-
-    fn emit_provider_reports(&self, emit: &mut impl FnMut(EngineEvent)) {
-        let rx = self.provider_rx.lock().expect("provider rx");
-        while let Ok(attempt) = rx.try_recv() {
-            emit(EngineEvent::Provider(attempt));
+            let _ = tx.send(attempt);
         }
     }
 
@@ -152,7 +145,7 @@ impl<M: Model> Engine for NativeEngine<M> {
         self.events.clear();
         let collected = Arc::new(Mutex::new(Vec::new()));
         let emit_live = Arc::new(Mutex::new(sink));
-        let mut emit = {
+        let emit = {
             let emit_live = Arc::clone(&emit_live);
             let collected = Arc::clone(&collected);
             move |event: EngineEvent| {
@@ -165,6 +158,34 @@ impl<M: Model> Engine for NativeEngine<M> {
             .set_vault(self.vault_path.clone(), self.vault_paths.clone());
         self.agent.set_permission_mode(self.mode);
 
+        let live_emit = emit.clone();
+        self.agent.set_durable_listener(move |event| {
+            if let Some(mapped) = Self::map_durable(event) {
+                live_emit(mapped);
+            }
+        });
+
+        let stop_drain = Arc::new(AtomicBool::new(false));
+        let drain_flag = Arc::clone(&stop_drain);
+        let drain_rx = Arc::clone(&self.provider_rx);
+        let drain_emit = emit.clone();
+        let drain = thread::spawn(move || {
+            while !drain_flag.load(Ordering::SeqCst) {
+                let attempt = drain_rx.lock().expect("provider rx").try_recv();
+                match attempt {
+                    Ok(attempt) => drain_emit(EngineEvent::Provider(attempt)),
+                    Err(mpsc::TryRecvError::Empty) => {
+                        thread::sleep(Duration::from_millis(1));
+                    }
+                    Err(mpsc::TryRecvError::Disconnected) => break,
+                }
+            }
+            let rx = drain_rx.lock().expect("provider rx");
+            while let Ok(attempt) = rx.try_recv() {
+                drain_emit(EngineEvent::Provider(attempt));
+            }
+        });
+
         let (approval_tx, approval_rx) = mpsc::sync_channel(8);
         *self.approval_tx.lock().expect("approval tx") = Some(approval_tx);
         let approval_rx = Arc::new(Mutex::new(approval_rx));
@@ -172,14 +193,7 @@ impl<M: Model> Engine for NativeEngine<M> {
         let mode = self.mode;
         let timeout = self.approval_timeout;
         let prompt_seq = Arc::clone(&self.prompt_seq);
-        let emit_for_wait = {
-            let emit_live = Arc::clone(&emit_live);
-            let collected = Arc::clone(&collected);
-            move |event: EngineEvent| {
-                collected.lock().expect("engine events").push(event.clone());
-                (emit_live.lock().expect("engine sink"))(event);
-            }
-        };
+        let emit_for_wait = emit.clone();
         let wait_prompt = Arc::clone(&live_prompt);
         self.agent.set_approval_waiter(move |name, args| {
             let id = format!("prompt_{}", prompt_seq.fetch_add(1, Ordering::SeqCst) + 1);
@@ -190,28 +204,25 @@ impl<M: Model> Engine for NativeEngine<M> {
                 args: args.to_string(),
                 options: approval_options(mode, name),
             });
-            let reply = match approval_rx
-                .lock()
-                .expect("approval rx")
-                .recv_timeout(timeout)
-            {
-                Ok((reply_id, reply)) if reply_id == id => reply,
-                Ok(_) | Err(RecvTimeoutError::Timeout) | Err(RecvTimeoutError::Disconnected) => {
-                    ApprovalReply::Cancelled
+            let deadline = Instant::now() + timeout;
+            let reply = loop {
+                let left = deadline.saturating_duration_since(Instant::now());
+                if left.is_zero() {
+                    break ApprovalReply::Cancelled;
+                }
+                match approval_rx.lock().expect("approval rx").recv_timeout(left) {
+                    Ok((reply_id, reply)) if reply_id == id => break reply,
+                    Ok(_) => {}
+                    Err(RecvTimeoutError::Timeout) | Err(RecvTimeoutError::Disconnected) => {
+                        break ApprovalReply::Cancelled;
+                    }
                 }
             };
             *wait_prompt.lock().expect("live prompt") = None;
             reply
         });
         let dismiss_prompt = Arc::clone(&live_prompt);
-        let emit_dismiss = {
-            let emit_live = Arc::clone(&emit_live);
-            let collected = Arc::clone(&collected);
-            move |event: EngineEvent| {
-                collected.lock().expect("engine events").push(event.clone());
-                (emit_live.lock().expect("engine sink"))(event);
-            }
-        };
+        let emit_dismiss = emit;
         self.agent.set_approval_dismiss(move || {
             if let Some(prompt_id) = dismiss_prompt.lock().expect("live prompt").take() {
                 emit_dismiss(EngineEvent::ApprovalDismissed { prompt_id });
@@ -220,12 +231,9 @@ impl<M: Model> Engine for NativeEngine<M> {
 
         self.agent.submit(prompt);
         self.agent.run_until_idle(&mut self.model);
-        self.emit_provider_reports(&mut emit);
-        for event in self.agent.events() {
-            if let Some(mapped) = Self::map_durable(event) {
-                emit(mapped);
-            }
-        }
+        stop_drain.store(true, Ordering::SeqCst);
+        let _ = drain.join();
+        self.agent.clear_durable_listener();
         *self.approval_tx.lock().expect("approval tx") = None;
         self.events = collected.lock().expect("engine events").clone();
         Ok(())

@@ -27,6 +27,7 @@ pub const DEFAULT_STEP_CAP: usize = 8;
 type ApprovalWaiter = Arc<dyn Fn(&str, &str) -> ApprovalReply + Send + Sync>;
 type ApprovalDismiss = Arc<dyn Fn() + Send + Sync>;
 type AfterToolHook = Box<dyn FnMut(&str, &str) + Send>;
+type DurableHook = Arc<dyn Fn(DurableEvent) + Send + Sync>;
 
 struct Shared {
     inbox: VecDeque<String>,
@@ -60,6 +61,8 @@ struct Shared {
     stopped: bool,
     step_cap: usize,
     after_tool: Option<AfterToolHook>,
+    /// Live sink for the native engine. Fired after each log push.
+    on_durable: Option<DurableHook>,
 }
 
 /// Clears `step_active` when the step returns, including on cancel.
@@ -124,6 +127,7 @@ impl AgentLoop {
                 stopped: false,
                 step_cap: DEFAULT_STEP_CAP,
                 after_tool: None,
+                on_durable: None,
             })),
         }
     }
@@ -202,6 +206,27 @@ impl AgentLoop {
         self.lock().after_tool = Some(Box::new(hook));
     }
 
+    /// Called after each durable log push. The native engine uses this
+    /// so Chat sees text and tools while the turn is still running.
+    pub fn set_durable_listener(&self, hook: impl Fn(DurableEvent) + Send + Sync + 'static) {
+        self.lock().on_durable = Some(Arc::new(hook));
+    }
+
+    pub fn clear_durable_listener(&self) {
+        self.lock().on_durable = None;
+    }
+
+    fn push_log(&self, event: DurableEvent) {
+        let hook = {
+            let mut shared = self.lock();
+            shared.log.push(event.clone());
+            shared.on_durable.clone()
+        };
+        if let Some(hook) = hook {
+            hook(event);
+        }
+    }
+
     /// Adds a name to this loop's offered set. Production `offered_tools`
     /// is Safe = echo and create_note, Power User = echo, bash, and
     /// create_note.
@@ -258,11 +283,11 @@ impl AgentLoop {
             let mut shared = self.lock();
             let mark = shared.history.len();
             shared.turn_start = mark;
-            shared.log.push(DurableEvent::User {
-                text: admitted.clone(),
-            });
             mark
         };
+        self.push_log(DurableEvent::User {
+            text: admitted.clone(),
+        });
 
         let cap = self.lock().step_cap;
         let mut steps = 0;
@@ -284,15 +309,18 @@ impl AgentLoop {
             }
         }
 
-        let mut shared = self.lock();
-        let cause = shared.cancel_cause.take();
-        shared
-            .history
-            .insert(history_mark, HistoryItem::User { text: admitted });
+        let cause = {
+            let mut shared = self.lock();
+            let cause = shared.cancel_cause.take();
+            shared
+                .history
+                .insert(history_mark, HistoryItem::User { text: admitted });
+            cause
+        };
         if let Some(cause) = cause {
-            shared.log.push(DurableEvent::Cancelled { cause });
+            self.push_log(DurableEvent::Cancelled { cause });
         } else {
-            shared.log.push(DurableEvent::TurnEnd);
+            self.push_log(DurableEvent::TurnEnd);
         }
     }
 
@@ -358,13 +386,11 @@ impl AgentLoop {
             });
         }
         if !text.is_empty() {
-            self.lock()
-                .log
-                .push(DurableEvent::Assistant { text: text.clone() });
+            self.push_log(DurableEvent::Assistant { text: text.clone() });
         }
 
         if let Some(message) = failed {
-            self.lock().log.push(DurableEvent::ModelFailed { message });
+            self.push_log(DurableEvent::ModelFailed { message });
             return false;
         }
         if self.is_cancelled() || completed.is_empty() {
@@ -375,7 +401,7 @@ impl AgentLoop {
             if self.is_cancelled() {
                 return false;
             }
-            self.lock().log.push(DurableEvent::ToolCall {
+            self.push_log(DurableEvent::ToolCall {
                 id: call.id.clone(),
                 name: call.name.clone(),
                 args: call.args.clone(),
@@ -544,16 +570,18 @@ impl AgentLoop {
             Ok(output) => output,
             Err(error) => error,
         };
-        let mut shared = self.lock();
-        if spend_grant {
-            shared.grants.push((name.to_string(), args.to_string()));
+        {
+            let mut shared = self.lock();
+            if spend_grant {
+                shared.grants.push((name.to_string(), args.to_string()));
+            }
+            shared.history.push(HistoryItem::ToolResult {
+                id: id.to_string(),
+                name: name.to_string(),
+                output: output.clone(),
+            });
         }
-        shared.log.push(DurableEvent::ToolResult {
-            id: id.to_string(),
-            name: name.to_string(),
-            output: output.clone(),
-        });
-        shared.history.push(HistoryItem::ToolResult {
+        self.push_log(DurableEvent::ToolResult {
             id: id.to_string(),
             name: name.to_string(),
             output,
@@ -561,13 +589,15 @@ impl AgentLoop {
     }
 
     fn record_denial(&self, id: &str, name: &str, reason: String) {
-        let mut shared = self.lock();
-        shared.log.push(DurableEvent::ToolDenied {
-            id: id.to_string(),
-            name: name.to_string(),
-            reason: reason.clone(),
-        });
-        shared.history.push(HistoryItem::ToolDenied {
+        {
+            let mut shared = self.lock();
+            shared.history.push(HistoryItem::ToolDenied {
+                id: id.to_string(),
+                name: name.to_string(),
+                reason: reason.clone(),
+            });
+        }
+        self.push_log(DurableEvent::ToolDenied {
             id: id.to_string(),
             name: name.to_string(),
             reason,

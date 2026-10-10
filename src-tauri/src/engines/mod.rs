@@ -92,7 +92,7 @@ mod tests {
     use std::sync::mpsc;
     use std::sync::{Arc, Mutex};
     use std::thread;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     #[test]
     fn native_engine_start_stop() {
@@ -197,9 +197,68 @@ mod tests {
 
     #[test]
     fn native_engine_streams_text_before_turn_end() {
-        let mut engine = NativeEngine::saying("hello");
-        start_quiet(&mut engine, "hi").expect("start");
-        let events = engine.events();
+        let (provider_tx, provider_rx) = mpsc::channel();
+        let (held_tx, held_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let (sink_tx, sink_rx) = mpsc::channel();
+        let model = HoldAfterFirstRound {
+            tx: provider_tx.clone(),
+            held: held_tx,
+            release: release_rx,
+            round: 0,
+        };
+        let mut engine =
+            NativeEngine::with_provider_pair(AgentLoop::new(), model, provider_tx, provider_rx);
+        let (done_tx, done_rx) = mpsc::channel();
+        thread::spawn(move || {
+            engine
+                .start(
+                    "hi",
+                    Box::new(move |event| {
+                        let _ = sink_tx.send(event);
+                    }),
+                )
+                .ok();
+            let _ = done_tx.send(engine.events());
+        });
+        held_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("second round holds start open");
+        assert!(
+            done_rx.try_recv().is_err(),
+            "start must still be running when the sink sees live events"
+        );
+
+        let mut seen = Vec::new();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while Instant::now() < deadline {
+            if let Ok(event) = sink_rx.recv_timeout(Duration::from_millis(20)) {
+                seen.push(event);
+            }
+            if has_live_text(&seen) && has_trying(&seen, "a") {
+                break;
+            }
+        }
+        assert!(
+            has_live_text(&seen),
+            "sink must receive text before start returns: {seen:?}"
+        );
+        assert!(
+            has_trying(&seen, "a"),
+            "sink must receive Trying before start returns: {seen:?}"
+        );
+        assert!(
+            !seen
+                .iter()
+                .any(|event| matches!(event, EngineEvent::TurnEnd)),
+            "turn must still be open: {seen:?}"
+        );
+        assert!(done_rx.try_recv().is_err());
+
+        let _ = release_tx.send(());
+        let events = done_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("start returns after release");
         let text = events
             .iter()
             .position(|event| matches!(event, EngineEvent::TextDelta { text } if text == "hello"))
@@ -209,6 +268,58 @@ mod tests {
             .position(|event| matches!(event, EngineEvent::TurnEnd))
             .expect("turn end");
         assert!(text < end, "{events:?}");
+    }
+
+    #[test]
+    fn native_engine_second_turn_does_not_replay_first() {
+        let mut engine = NativeEngine::from_parts(
+            AgentLoop::new(),
+            FakeModel::streaming(vec![vec!["first".into()], vec!["second".into()]]),
+        );
+        let first_sink = Arc::new(Mutex::new(Vec::new()));
+        let seen = Arc::clone(&first_sink);
+        engine
+            .start(
+                "one",
+                Box::new(move |event| seen.lock().expect("turn 1 sink").push(event)),
+            )
+            .expect("turn 1");
+        let turn1 = first_sink.lock().expect("turn 1 sink").clone();
+        assert!(turn1
+            .iter()
+            .any(|event| matches!(event, EngineEvent::TextDelta { text } if text == "first")));
+        assert!(!turn1
+            .iter()
+            .any(|event| matches!(event, EngineEvent::TextDelta { text } if text == "second")));
+
+        let second_sink = Arc::new(Mutex::new(Vec::new()));
+        let seen = Arc::clone(&second_sink);
+        engine
+            .start(
+                "two",
+                Box::new(move |event| seen.lock().expect("turn 2 sink").push(event)),
+            )
+            .expect("turn 2");
+        let turn2 = second_sink.lock().expect("turn 2 sink").clone();
+        assert!(
+            !turn2
+                .iter()
+                .any(|event| matches!(event, EngineEvent::TextDelta { text } if text == "first")),
+            "turn 1 text must not replay on turn 2: {turn2:?}"
+        );
+        assert!(
+            turn2
+                .iter()
+                .any(|event| matches!(event, EngineEvent::TextDelta { text } if text == "second")),
+            "turn 2 missing its own text: {turn2:?}"
+        );
+        assert_eq!(
+            turn2
+                .iter()
+                .filter(|event| matches!(event, EngineEvent::TextDelta { .. }))
+                .count(),
+            1
+        );
     }
 
     #[test]
@@ -391,8 +502,32 @@ mod tests {
     }
 
     #[test]
+    fn native_engine_ignores_stale_approval_id() {
+        let vault = tempfile::tempdir().unwrap();
+        let note = vault.path().join("stale.md");
+        let requested = run_until_create_note_prompt(&vault, "stale.md");
+        requested
+            .control
+            .reply_approval("prompt_999", ApprovalReply::Deny);
+        thread::sleep(Duration::from_millis(80));
+        assert!(
+            requested.done.try_recv().is_err(),
+            "a reply for another prompt must keep waiting"
+        );
+        assert!(!note.exists());
+        requested
+            .control
+            .reply_approval(&requested.prompt_id, ApprovalReply::AllowOnce);
+        requested
+            .done
+            .recv_timeout(Duration::from_secs(2))
+            .expect("matching allow finishes the turn");
+        assert_eq!(std::fs::read_to_string(&note).unwrap(), "# Note\n");
+    }
+
+    #[test]
     fn native_engine_reports_provider_failover() {
-        let (tx, rx) = mpsc::sync_channel(64);
+        let (tx, rx) = mpsc::channel();
         let model = FailoverModel { tx: tx.clone() };
         let mut engine = NativeEngine::with_provider_pair(AgentLoop::new(), model, tx, rx);
         start_quiet(&mut engine, "hi").expect("start");
@@ -423,30 +558,28 @@ mod tests {
 
     #[test]
     fn native_engine_provider_trying_then_cancel_means_stopped() {
-        let (tx, rx) = mpsc::sync_channel(64);
-        let (entered_tx, entered_rx) = mpsc::channel();
+        let (tx, rx) = mpsc::channel();
+        let control = Arc::new(Mutex::new(None::<super::NativeControl>));
+        let slot = Arc::clone(&control);
         let mut model = FakeModel::streaming(vec![vec!["one".into(), "two".into()]]);
         let report = tx.clone();
         model.on_before_chunk(move |index| {
             if index == 0 {
-                let _ = report.try_send(trying("a"));
-                let _ = entered_tx.send(());
+                let _ = report.send(trying("a"));
+            }
+        });
+        model.on_after_chunk(move |index| {
+            if index != 0 {
+                return;
+            }
+            if let Some(control) = slot.lock().expect("control").as_ref() {
+                control.cancel("quit");
             }
         });
         let mut engine = NativeEngine::with_provider_pair(AgentLoop::new(), model, tx, rx);
-        let control = engine.control();
-        let (done_tx, done_rx) = mpsc::channel();
-        thread::spawn(move || {
-            start_quiet(&mut engine, "hi").ok();
-            let _ = done_tx.send(engine.events());
-        });
-        entered_rx
-            .recv_timeout(Duration::from_secs(2))
-            .expect("Trying was sent");
-        control.cancel("quit");
-        let events = done_rx
-            .recv_timeout(Duration::from_secs(2))
-            .expect("cancel ends the turn");
+        *control.lock().expect("control") = Some(engine.control());
+        start_quiet(&mut engine, "hi").expect("start");
+        let events = engine.events();
         let providers: Vec<&ProviderAttempt> = events
             .iter()
             .filter_map(|event| match event {
@@ -466,7 +599,7 @@ mod tests {
 
     #[test]
     fn native_engine_provider_reports_do_not_block_the_answer() {
-        let (tx, rx) = mpsc::sync_channel(2);
+        let (tx, rx) = mpsc::channel();
         let model = FloodModel { tx: tx.clone() };
         let mut engine = NativeEngine::with_provider_pair(AgentLoop::new(), model, tx, rx);
         start_quiet(&mut engine, "hi").expect("start must not wait on a full channel");
@@ -474,6 +607,34 @@ mod tests {
             .events()
             .iter()
             .any(|event| matches!(event, EngineEvent::TextDelta { text } if text == "ok")));
+    }
+
+    #[test]
+    fn native_engine_keeps_every_provider_report() {
+        let (tx, rx) = mpsc::channel();
+        let model = LongFailoverModel {
+            tx: tx.clone(),
+            count: 200,
+        };
+        let mut engine = NativeEngine::with_provider_pair(AgentLoop::new(), model, tx, rx);
+        start_quiet(&mut engine, "hi").expect("start");
+        let events = engine.events();
+        let providers: Vec<&ProviderAttempt> = events
+            .iter()
+            .filter_map(|event| match event {
+                EngineEvent::Provider(attempt) => Some(attempt),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            providers.len(),
+            201,
+            "unbounded drain must keep every report: {}",
+            providers.len()
+        );
+        assert_eq!(providers[0], &trying("p0"));
+        assert_eq!(providers[199], &trying("p199"));
+        assert_eq!(providers[200], &answered("last"));
     }
 
     #[test]
@@ -596,6 +757,22 @@ mod tests {
         panic!("expected ApprovalRequested");
     }
 
+    fn has_live_text(events: &[EngineEvent]) -> bool {
+        events
+            .iter()
+            .any(|event| matches!(event, EngineEvent::TextDelta { text } if text == "hello"))
+    }
+
+    fn has_trying(events: &[EngineEvent], id: &str) -> bool {
+        events.iter().any(|event| {
+            matches!(
+                event,
+                EngineEvent::Provider(ProviderAttempt::Trying { provider_id, .. })
+                    if provider_id == id
+            )
+        })
+    }
+
     fn trying(id: &str) -> ProviderAttempt {
         ProviderAttempt::Trying {
             provider_id: id.into(),
@@ -611,7 +788,7 @@ mod tests {
     }
 
     struct FailoverModel {
-        tx: mpsc::SyncSender<ProviderAttempt>,
+        tx: mpsc::Sender<ProviderAttempt>,
     }
 
     impl Model for FailoverModel {
@@ -620,16 +797,16 @@ mod tests {
             _view: &ModelView,
             emit: &mut dyn FnMut(ModelEvent) -> bool,
         ) -> bool {
-            let _ = self.tx.try_send(trying("a"));
-            let _ = self.tx.try_send(ProviderAttempt::FailedOver {
+            let _ = self.tx.send(trying("a"));
+            let _ = self.tx.send(ProviderAttempt::FailedOver {
                 provider_id: "a".into(),
                 model_id: "a-model".into(),
                 reason: ModelErrorKind::RateLimited {
                     retry_after_secs: Some(30),
                 },
             });
-            let _ = self.tx.try_send(trying("b"));
-            let _ = self.tx.try_send(answered("b"));
+            let _ = self.tx.send(trying("b"));
+            let _ = self.tx.send(answered("b"));
             let _ = emit(ModelEvent::TextDelta { text: "ok".into() });
             let _ = emit(ModelEvent::Finish {
                 reason: FinishReason::Stop,
@@ -639,7 +816,7 @@ mod tests {
     }
 
     struct FloodModel {
-        tx: mpsc::SyncSender<ProviderAttempt>,
+        tx: mpsc::Sender<ProviderAttempt>,
     }
 
     impl Model for FloodModel {
@@ -649,9 +826,79 @@ mod tests {
             emit: &mut dyn FnMut(ModelEvent) -> bool,
         ) -> bool {
             for _ in 0..16 {
-                let _ = self.tx.try_send(trying("a"));
+                let _ = self.tx.send(trying("a"));
             }
             let _ = emit(ModelEvent::TextDelta { text: "ok".into() });
+            let _ = emit(ModelEvent::Finish {
+                reason: FinishReason::Stop,
+            });
+            true
+        }
+    }
+
+    struct LongFailoverModel {
+        tx: mpsc::Sender<ProviderAttempt>,
+        count: usize,
+    }
+
+    impl Model for LongFailoverModel {
+        fn complete(
+            &mut self,
+            _view: &ModelView,
+            emit: &mut dyn FnMut(ModelEvent) -> bool,
+        ) -> bool {
+            for index in 0..self.count {
+                let _ = self.tx.send(trying(&format!("p{index}")));
+            }
+            let _ = self.tx.send(answered("last"));
+            let _ = emit(ModelEvent::TextDelta { text: "ok".into() });
+            let _ = emit(ModelEvent::Finish {
+                reason: FinishReason::Stop,
+            });
+            true
+        }
+    }
+
+    struct HoldAfterFirstRound {
+        tx: mpsc::Sender<ProviderAttempt>,
+        held: mpsc::Sender<()>,
+        release: mpsc::Receiver<()>,
+        round: usize,
+    }
+
+    impl Model for HoldAfterFirstRound {
+        fn complete(
+            &mut self,
+            _view: &ModelView,
+            emit: &mut dyn FnMut(ModelEvent) -> bool,
+        ) -> bool {
+            self.round += 1;
+            if self.round == 1 {
+                let _ = self.tx.send(trying("a"));
+                let _ = emit(ModelEvent::TextDelta {
+                    text: "hello".into(),
+                });
+                let _ = emit(ModelEvent::ToolCallStart {
+                    id: "call_1".into(),
+                    name: "echo".into(),
+                });
+                let _ = emit(ModelEvent::ToolCallArgsDelta {
+                    id: "call_1".into(),
+                    delta: "ping".into(),
+                });
+                let _ = emit(ModelEvent::ToolCallEnd {
+                    id: "call_1".into(),
+                });
+                let _ = emit(ModelEvent::Finish {
+                    reason: FinishReason::ToolCalls,
+                });
+                return true;
+            }
+            let _ = self.held.send(());
+            let _ = self.release.recv();
+            let _ = emit(ModelEvent::TextDelta {
+                text: "done".into(),
+            });
             let _ = emit(ModelEvent::Finish {
                 reason: FinishReason::Stop,
             });
