@@ -458,6 +458,8 @@ worker expires after Prime's reconnect grace. Active close asks, with
 **Stop and close** as the default and **Keep working** as an explicit
 `promote_owned_session`. The daemon may stay available; that is not the same
 as an agent still working. ADR-0180 is the identity: Rhizome owns the loop.
+`src-tauri/src/engines/` holds the Phase 5 trait and the native / Prime /
+Hermes wrappers. Chat still calls Prime directly (Phase 6 toggle).
 ADR-0168 (amended) is the borrow-care rule. Prime is an optional engine
 (ADR-0163). See `docs/design/harness-doctrine.md`.
 

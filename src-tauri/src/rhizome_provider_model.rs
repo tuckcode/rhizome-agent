@@ -225,6 +225,7 @@ mod tests {
         ModelView {
             admitted: admitted.into(),
             history,
+            turn_start: 0,
             offered_tools: vec!["echo".into()],
         }
     }

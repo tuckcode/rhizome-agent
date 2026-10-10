@@ -69,5 +69,9 @@ pub struct ModelView {
     /// Ordered user, assistant, and tool facts already logged.
     /// The current admitted message is not repeated here.
     pub history: Vec<HistoryItem>,
+    /// Index in `history` where this turn's items begin. The admitted
+    /// user line is inserted at this index only when the turn ends.
+    pub turn_start: usize,
+    /// Names only. Schemas stay with the provider adapter (#105).
     pub offered_tools: Vec<String>,
 }

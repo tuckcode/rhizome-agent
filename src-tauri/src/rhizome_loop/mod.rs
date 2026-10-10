@@ -1,6 +1,6 @@
 //! Rhizome-owned agent loop (ADR-0180, harness plan Phases 1–2.5).
 //!
-//! Chat does not call this module. `lib.rs` compiles it only for tests.
+//! Chat does not call this module. The engine toggle is Phase 6.
 //! One inbox, one turn at a time. A step is one model request plus
 //! the tools it called. The loop consumes `ModelEvent`. Cancel stops
 //! reading; the model has no `Cancelled` event. Tool-call `id`s stay
@@ -12,6 +12,7 @@
 //! code is copied.
 
 mod driver;
+#[cfg(test)]
 mod fake_model;
 mod model;
 mod policy;
@@ -19,6 +20,7 @@ mod tools;
 mod types;
 
 pub use driver::{AgentLoop, ApprovalReply, DEFAULT_STEP_CAP};
+#[cfg(test)]
 pub use fake_model::{FakeModel, ScriptPart};
 pub use model::Model;
 pub use types::{DurableEvent, HistoryItem, ModelView, ToolCall};
@@ -27,7 +29,7 @@ pub use types::{DurableEvent, HistoryItem, ModelView, ToolCall};
 mod tests {
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::mpsc;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
     use std::thread;
     use std::time::Duration;
 
@@ -115,6 +117,7 @@ mod tests {
                 ModelView {
                     admitted: "A".into(),
                     history: vec![],
+                    turn_start: 0,
                     offered_tools: vec!["echo".into()],
                 },
                 ModelView {
@@ -126,6 +129,7 @@ mod tests {
                             tool_calls: vec![],
                         },
                     ],
+                    turn_start: 2,
                     offered_tools: vec!["echo".into()],
                 },
             ]
@@ -1125,11 +1129,12 @@ mod tests {
         let count = Arc::clone(&asks);
         let (entered_tx, entered_rx) = mpsc::channel();
         let (hold_tx, hold_rx) = mpsc::channel::<()>();
+        let hold_rx = Mutex::new(hold_rx);
         agent.set_approval_waiter(move |_| {
             let n = count.fetch_add(1, Ordering::SeqCst);
             if n == 0 {
                 entered_tx.send(()).ok();
-                let _ = hold_rx.recv();
+                let _ = hold_rx.lock().expect("hold").recv();
             }
             ApprovalReply::AllowOnce
         });
@@ -1178,6 +1183,96 @@ mod tests {
         );
     }
 
+    #[test]
+    fn cancelled_wait_does_not_hold_the_next_approval() {
+        let agent = AgentLoop::new();
+        agent.offer_extra_tool_for_test("edit");
+        let asks = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&asks);
+        let dismissed = Arc::new(AtomicUsize::new(0));
+        let dismiss_count = Arc::clone(&dismissed);
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (hold_tx, hold_rx) = mpsc::channel::<()>();
+        let hold_rx = Mutex::new(hold_rx);
+        let (second_tx, second_rx) = mpsc::channel();
+        agent.set_approval_waiter(move |_| {
+            let n = count.fetch_add(1, Ordering::SeqCst);
+            if n == 0 {
+                entered_tx.send(()).ok();
+                let _ = hold_rx.lock().expect("hold").recv();
+                return ApprovalReply::AllowOnce;
+            }
+            second_tx.send(()).ok();
+            ApprovalReply::AllowOnce
+        });
+        agent.set_approval_dismiss(move || {
+            dismiss_count.fetch_add(1, Ordering::SeqCst);
+        });
+        let mut first = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "edit".into(),
+            args: "note".into(),
+        }]]);
+        agent.submit("one");
+        let runner = agent.clone();
+        let (done_tx, done_rx) = mpsc::channel();
+        thread::spawn(move || {
+            runner.run_until_idle(&mut first);
+            done_tx.send(()).ok();
+        });
+        entered_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("the first wait should block");
+        agent.cancel("quit");
+        done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("cancel must end the first turn");
+        assert_eq!(
+            dismissed.load(Ordering::SeqCst),
+            1,
+            "cancel must dismiss the stale prompt"
+        );
+
+        let mut second = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "edit".into(),
+            args: "later".into(),
+        }]]);
+        agent.submit("two");
+        let runner = agent.clone();
+        let (second_done_tx, second_done_rx) = mpsc::channel();
+        thread::spawn(move || {
+            runner.run_until_idle(&mut second);
+            second_done_tx.send(runner.events()).ok();
+        });
+        second_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("the next wait must not sit on the cancelled lock");
+        let events = second_done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("the second turn must finish while the first waiter is still held");
+        assert_eq!(asks.load(Ordering::SeqCst), 2);
+        assert!(
+            events.iter().any(|event| {
+                matches!(
+                    event,
+                    DurableEvent::ToolResult { name, output, .. }
+                        if name == "edit" && output == "later"
+                )
+            }),
+            "AllowOnce on the live prompt must run: {events:?}"
+        );
+        drop(hold_tx);
+        assert!(
+            !events.iter().any(|event| {
+                matches!(
+                    event,
+                    DurableEvent::ToolResult { name, output, .. }
+                        if name == "edit" && output == "note"
+                )
+            }),
+            "a stale AllowOnce must not run after dismiss: {events:?}"
+        );
+    }
+
     /// Blocks in the waiter until `on_entered` runs, then expects the loop
     /// to finish without the waiter returning. Times out if cancel/quit
     /// cannot end the wait.
@@ -1188,9 +1283,10 @@ mod tests {
         agent.offer_extra_tool_for_test("edit");
         let (entered_tx, entered_rx) = mpsc::channel();
         let (hold_tx, hold_rx) = mpsc::channel::<()>();
+        let hold_rx = Mutex::new(hold_rx);
         agent.set_approval_waiter(move |_| {
             entered_tx.send(()).ok();
-            let _ = hold_rx.recv();
+            let _ = hold_rx.lock().expect("hold").recv();
             ApprovalReply::AllowOnce
         });
         let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {

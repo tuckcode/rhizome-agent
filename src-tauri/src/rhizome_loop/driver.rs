@@ -24,13 +24,15 @@ pub enum ApprovalReply {
 /// Default model rounds in one turn. A runaway tool loop stops here.
 pub const DEFAULT_STEP_CAP: usize = 8;
 
-type ApprovalWaiter = Box<dyn FnMut(&str) -> ApprovalReply + Send>;
+type ApprovalWaiter = Arc<dyn Fn(&str) -> ApprovalReply + Send + Sync>;
+type ApprovalDismiss = Arc<dyn Fn() + Send + Sync>;
 type AfterToolHook = Box<dyn FnMut(&str, &str) + Send>;
 
 struct Shared {
     inbox: VecDeque<String>,
     log: Vec<DurableEvent>,
     history: Vec<HistoryItem>,
+    turn_start: usize,
     step_active: bool,
     cancel_cause: Option<String>,
     mode: AiAgentPermissionMode,
@@ -42,9 +44,15 @@ struct Shared {
     /// Names a test adds on top of `policy::offered_tools`. Production
     /// modes do not use this list.
     extra_offered: Vec<String>,
-    /// Shared so a mid-wait cancel does not move the waiter onto a
-    /// thread we then drop. The spawned wait only borrows it.
-    waiter: Option<Arc<Mutex<ApprovalWaiter>>>,
+    /// Shared and not mutexed for the whole wait. A cancelled prompt
+    /// must not block the next ask.
+    waiter: Option<ApprovalWaiter>,
+    /// Host closes a cancelled approval UI. Invoked once per live prompt.
+    dismiss: Option<ApprovalDismiss>,
+    /// Bumped for each wait. A late reply from a dismissed prompt
+    /// does not run the tool.
+    prompt_gen: u64,
+    live_prompt: Option<u64>,
     stopped: bool,
     step_cap: usize,
     after_tool: Option<AfterToolHook>,
@@ -83,6 +91,12 @@ pub struct AgentLoop {
     shared: Arc<Mutex<Shared>>,
 }
 
+impl Default for AgentLoop {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AgentLoop {
     pub fn new() -> Self {
         Self {
@@ -90,6 +104,7 @@ impl AgentLoop {
                 inbox: VecDeque::new(),
                 log: Vec::new(),
                 history: Vec::new(),
+                turn_start: 0,
                 step_active: false,
                 cancel_cause: None,
                 mode: AiAgentPermissionMode::Safe,
@@ -97,6 +112,9 @@ impl AgentLoop {
                 session_grants: Vec::new(),
                 extra_offered: Vec::new(),
                 waiter: None,
+                dismiss: None,
+                prompt_gen: 0,
+                live_prompt: None,
                 stopped: false,
                 step_cap: DEFAULT_STEP_CAP,
                 after_tool: None,
@@ -118,14 +136,25 @@ impl AgentLoop {
         if shared.cancel_cause.is_none() {
             shared.cancel_cause = Some(cause.into());
         }
+        drop(shared);
+        self.dismiss_live_prompt();
     }
 
     pub fn set_permission_mode(&self, mode: AiAgentPermissionMode) {
         self.lock().mode = mode;
     }
 
-    pub fn set_approval_waiter(&self, waiter: impl FnMut(&str) -> ApprovalReply + Send + 'static) {
-        self.lock().waiter = Some(Arc::new(Mutex::new(Box::new(waiter))));
+    pub fn set_approval_waiter(
+        &self,
+        waiter: impl Fn(&str) -> ApprovalReply + Send + Sync + 'static,
+    ) {
+        self.lock().waiter = Some(Arc::new(waiter));
+    }
+
+    /// Called once when cancel or quit ends a live approval. The host
+    /// should drop the prompt so a later turn cannot accept it.
+    pub fn set_approval_dismiss(&self, dismiss: impl Fn() + Send + Sync + 'static) {
+        self.lock().dismiss = Some(Arc::new(dismiss));
     }
 
     /// Records a session grant. The waiter uses this when the human
@@ -148,6 +177,8 @@ impl AgentLoop {
         if shared.step_active && shared.cancel_cause.is_none() {
             shared.cancel_cause = Some(cause.into());
         }
+        drop(shared);
+        self.dismiss_live_prompt();
     }
 
     pub fn set_step_cap(&self, cap: usize) {
@@ -212,6 +243,7 @@ impl AgentLoop {
         let history_mark = {
             let mut shared = self.lock();
             let mark = shared.history.len();
+            shared.turn_start = mark;
             shared.log.push(DurableEvent::User {
                 text: admitted.clone(),
             });
@@ -344,6 +376,7 @@ impl AgentLoop {
         ModelView {
             admitted: admitted.to_string(),
             history: shared.history.clone(),
+            turn_start: shared.turn_start,
             offered_tools: offered_names(&shared),
         }
     }
@@ -427,31 +460,59 @@ impl AgentLoop {
     }
 
     /// Runs the waiter off-thread so cancel/quit can end the wait
-    /// without waiting for a human reply. The waiter stays on Shared.
+    /// without waiting for a human reply. The waiter is not locked
+    /// for the whole wait, so a later turn can ask again.
     fn wait_for_approval(&self, name: &str) -> ApprovalReply {
         let Some(waiter) = self.lock().waiter.clone() else {
             return ApprovalReply::Cancelled;
         };
+        let gen = {
+            let mut shared = self.lock();
+            shared.prompt_gen += 1;
+            shared.live_prompt = Some(shared.prompt_gen);
+            shared.prompt_gen
+        };
         let (tx, rx) = mpsc::channel();
         let asked = name.to_string();
         thread::spawn(move || {
-            let reply = waiter.lock().expect("rhizome loop waiter")(&asked);
-            let _ = tx.send(reply);
+            let reply = waiter(&asked);
+            let _ = tx.send((gen, reply));
         });
         loop {
             if self.is_cancelled() {
+                self.dismiss_live_prompt();
                 return ApprovalReply::Cancelled;
             }
             // 10ms poll: cancel/quit must end the wait without a human
             // reply. A condvar would wake faster; this is enough while
             // the loop is test-only.
             match rx.recv_timeout(Duration::from_millis(10)) {
-                Ok(reply) => return reply,
+                Ok((reply_gen, reply)) => {
+                    let live = self.lock().live_prompt;
+                    if live == Some(reply_gen) {
+                        self.lock().live_prompt = None;
+                        return reply;
+                    }
+                }
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
                 Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    self.dismiss_live_prompt();
                     return ApprovalReply::Cancelled;
                 }
             }
+        }
+    }
+
+    fn dismiss_live_prompt(&self) {
+        let hook = {
+            let mut shared = self.lock();
+            if shared.live_prompt.take().is_none() {
+                return;
+            }
+            shared.dismiss.clone()
+        };
+        if let Some(hook) = hook {
+            hook();
         }
     }
 
