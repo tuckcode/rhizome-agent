@@ -170,14 +170,18 @@ impl<M: Model> Engine for NativeEngine<M> {
         let drain_rx = Arc::clone(&self.provider_rx);
         let drain_emit = emit.clone();
         let drain = thread::spawn(move || {
-            while !drain_flag.load(Ordering::SeqCst) {
-                let attempt = drain_rx.lock().expect("provider rx").try_recv();
+            loop {
+                if drain_flag.load(Ordering::SeqCst) {
+                    break;
+                }
+                let attempt = drain_rx
+                    .lock()
+                    .expect("provider rx")
+                    .recv_timeout(Duration::from_millis(50));
                 match attempt {
                     Ok(attempt) => drain_emit(EngineEvent::Provider(attempt)),
-                    Err(mpsc::TryRecvError::Empty) => {
-                        thread::sleep(Duration::from_millis(1));
-                    }
-                    Err(mpsc::TryRecvError::Disconnected) => break,
+                    Err(RecvTimeoutError::Timeout) => {}
+                    Err(RecvTimeoutError::Disconnected) => break,
                 }
             }
             let rx = drain_rx.lock().expect("provider rx");
