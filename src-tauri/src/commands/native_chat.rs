@@ -525,23 +525,25 @@ mod tests {
 
     #[test]
     fn free_tier_start_sends_composed_system_prompt() {
-        let request = NativeChatStartRequest {
-            target: FREE_TIER_LABEL.to_string(),
-            prompt: "hi".into(),
-            system_prompt: Some("Use the vault.".into()),
-            vault_path: None,
-            vault_paths: Vec::new(),
-            permission_mode: AiAgentPermissionMode::default(),
-        };
-        let expected = composed_system_prompt(request.system_prompt.as_deref());
-        assert!(
-            expected
-                .as_deref()
-                .is_some_and(|text| text.contains("Use the vault.")),
-            "compose must keep the turn system prompt"
-        );
-        let model = free_tier_routing_model(expected.clone(), |_| {});
-        assert_eq!(model.system_prompt(), expected.as_deref());
+        with_temp_home(|_| {
+            let request = NativeChatStartRequest {
+                target: FREE_TIER_LABEL.to_string(),
+                prompt: "hi".into(),
+                system_prompt: Some("Use the vault.".into()),
+                vault_path: None,
+                vault_paths: Vec::new(),
+                permission_mode: AiAgentPermissionMode::default(),
+            };
+            let expected = composed_system_prompt(request.system_prompt.as_deref());
+            assert!(
+                expected
+                    .as_deref()
+                    .is_some_and(|text| text.contains("Use the vault.")),
+                "compose must keep the turn system prompt"
+            );
+            let model = free_tier_routing_model(expected.clone(), |_| {});
+            assert_eq!(model.system_prompt(), expected.as_deref());
+        });
     }
 
     #[test]
