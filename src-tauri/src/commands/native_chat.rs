@@ -958,7 +958,7 @@ mod tests {
             }
             assert!(
                 Instant::now() < deadline,
-                "index never got the native session {path}"
+                "index never got the native session"
             );
             thread::sleep(Duration::from_millis(20));
         }
@@ -970,7 +970,7 @@ mod tests {
             if path.exists() {
                 return;
             }
-            assert!(Instant::now() < deadline, "path never appeared: {path:?}");
+            assert!(Instant::now() < deadline, "path never appeared");
             thread::sleep(Duration::from_millis(20));
         }
     }
@@ -1162,8 +1162,7 @@ mod tests {
                 agent.events().iter().any(|event| {
                     matches!(event, DurableEvent::Cancelled { cause } if cause == "restart")
                 }),
-                "cut-off turn must close as cancelled restart: {:?}",
-                agent.events()
+                "cut-off turn must close as cancelled restart"
             );
         });
     }
@@ -1187,8 +1186,7 @@ mod tests {
             let agent = AgentLoop::from_log(opened.events);
             assert!(
                 agent.session_grants().is_empty(),
-                "D13: grants must not come back: {:?}",
-                agent.session_grants()
+                "D13: grants must not come back"
             );
         });
     }
@@ -1253,7 +1251,7 @@ mod tests {
                     message.get("content").and_then(|value| value.as_str())
                         == Some("Not run: the turn stopped first.")
                 }),
-                "unanswered tool must get the stopped answer: {messages:?}"
+                "unanswered tool must get the stopped answer"
             );
         });
     }
@@ -1273,18 +1271,13 @@ mod tests {
                 &["this is not json{{{"],
             );
             let opened = crate::engines::native_log::open_session_log("bad-tail").expect("open");
-            assert!(
-                opened.warning.is_some(),
-                "damaged tail must warn: {:?}",
-                opened.warning
-            );
+            assert!(opened.warning.is_some(), "damaged tail must warn");
             assert!(
                 opened
                     .events
                     .iter()
                     .any(|event| matches!(event, DurableEvent::Assistant { text } if text == "ok")),
-                "must keep the last good line: {:?}",
-                opened.events
+                "must keep the last good line"
             );
             assert!(
                 opened.successor_id.is_none(),
@@ -1321,8 +1314,7 @@ mod tests {
                 !opened.events.iter().any(
                     |event| matches!(event, DurableEvent::User { text } if text == "after-damage")
                 ),
-                "must stop at the first invalid line: {:?}",
-                opened.events
+                "must stop at the first invalid line"
             );
             assert!(
                 opened
@@ -1365,7 +1357,7 @@ mod tests {
             assert!(
                 err.to_lowercase().contains("read-only")
                     || err.to_lowercase().contains("unknown version"),
-                "send error must name read-only: {err}"
+                "send error must name read-only"
             );
         });
     }
@@ -1385,14 +1377,13 @@ mod tests {
                     .events
                     .iter()
                     .any(|event| matches!(event, DurableEvent::User { text } if text == "one")),
-                "events must still come back: {:?}",
-                opened.events
+                "events must still come back"
             );
             let error = opened.error.expect("missing target error");
             assert!(
                 error.contains("anthropic/claude-opus-4")
                     || error.to_lowercase().contains("anthropic"),
-                "error must name the missing target: {error}"
+                "error must name the missing target"
             );
         });
     }
@@ -1413,12 +1404,9 @@ mod tests {
             let log_text = std::fs::read_to_string(&log_path).expect("read log");
             assert!(
                 !log_path.starts_with(home.path().join(".prime")),
-                "log path leaked into Prime home: {log_path:?}"
+                "log path leaked into Prime home"
             );
-            assert!(
-                log_text.contains(&id),
-                "header must name the session: {log_text}"
-            );
+            assert!(log_text.contains(&id), "header must name the session");
         });
     }
 
@@ -1441,8 +1429,7 @@ mod tests {
                     .sessions
                     .iter()
                     .all(|session| session.path != path && session.id != id),
-                "delete must drop the index entry: {:?}",
-                document.sessions
+                "delete must drop the index entry"
             );
         });
     }
