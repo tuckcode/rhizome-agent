@@ -8,6 +8,7 @@ date: 2026-10-10
 
 **Origin:** Cursor Grok 4.6 · 2026-10-10 · Phase 4b of the harness plan; comparison of OmniRoute and freellmapi
 **Decisions confirmed:** knispo · 2026-10-10 · the six catalog and key rows below
+**Updated:** knispo · 2026-10-10 · default-on set and provider-curation stance
 
 ## Context
 
@@ -49,6 +50,13 @@ notices in `THIRD_PARTY_NOTICES`. Do not ship a sidecar.
 - A user-run freellmapi (or any other OpenAI-compatible) `base_url`
   stays optional. It is not bundled.
 - No new Cargo or npm dependency for this phase.
+
+## Provider curation
+
+Default-on providers are curated for quality. They are not taken
+wholesale from OmniRoute. The default-on set must still be large
+enough that free-tier flakiness or one provider going down does not
+starve the routing loop.
 
 ## Licence
 
@@ -153,12 +161,27 @@ knispo, 2026-10-10. Coding agents treat these as settled. The repo ADR
 status values are `proposed | active | superseded | retired` (no
 Accepted). Status is `active`.
 
-1. **v1 providers.** Keyed, recurring, ToS ok or caution,
-   `hardStopGuaranteed`: Groq, Cerebras, Mistral, Cloudflare Workers AI,
-   OpenRouter `:free`, NVIDIA NIM, GitHub Models, LLM7, plus a
-   user-supplied OpenAI-compatible endpoint. The listed sequence is the
-   v1 membership and the starting priority list. Do not invent a
-   different rank.
+1. **v1 default-on.** Groq, Mistral, LLM7, OpenRouter (`:free` model
+   ids only), NVIDIA NIM, plus a user-supplied OpenAI-compatible
+   endpoint. The listed sequence is the starting priority list. Do not
+   invent a different rank. Methodology follows OmniRoute
+   `FREE_TIERS.md`: a missing `hardStop` flag means "not established",
+   not "bills you". Optional strict mode keeps only flagged hard-stop
+   providers.
+
+   NVIDIA NIM is default-on and rate-limited (~40 req/min, no token
+   cap). OmniRoute's catalog still labels its rows one-time-initial;
+   `FREE_TIERS.md` says that credit pool was removed, so treat the
+   catalog label as stale. OmniRoute rates NVIDIA ToS `caution`
+   (prototyping / dev / research / eval only, not serving real end
+   users). That fits Rhizome's own use.
+
+   Cloudflare Workers AI stays opt-in, with a "card on file could be
+   billed" warning.
+
+   Dropped: Cerebras (one-time $5 credit, needs a card) and GitHub
+   Models (no OmniRoute catalog source; revisit from GitHub's own
+   docs).
 2. **Exclusions.** ToS avoid; `*-web` scrapers; OAuth subscription
    providers; TLS-stealth; one-time signup credits. One-time signup
    credits stay excluded and may be revisited later.
@@ -174,6 +197,11 @@ Accepted). Status is `active`.
    draft PR only when something changed, same pattern as the weekly
    docs-sync drafts. knispo merges those drafts. This docs PR does not
    add that job.
+
+## Open follow-up
+
+GLM 5.3 is not on OmniRoute's NVIDIA model list. Check NVIDIA's own
+catalog separately.
 
 ## Consequences
 
@@ -197,7 +225,9 @@ copy time.
 
 knispo, 2026-10-10, confirmed the six catalog and key rows in
 [Decisions](#decisions). Row 6 changed from manual PRs to a weekly
-Nightly Audit draft.
+Nightly Audit draft. Same day: default-on set narrowed (drop Cerebras
+and GitHub Models; Cloudflare opt-in); NVIDIA catalog
+`one-time-initial` treated as stale per `FREE_TIERS.md`.
 
 [[0180-rhizome-is-its-own-harness]]
 [[0181-pr-branches-with-full-gates]]
