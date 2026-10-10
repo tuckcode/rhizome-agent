@@ -12,8 +12,8 @@
 //! next read finds the same value in both places and finishes the removal.
 //! If the write or the read-back fails, the file copy stays and still works.
 //!
-//! Key values are never logged or put in an error message. Messages name the
-//! provider id only.
+//! Nothing here writes to a log. Key values never appear in an error
+//! message. Errors and `MigrationReport` name the provider id only.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -77,12 +77,10 @@ impl ProviderKeys {
         let id = normalize_id(provider_id)?;
         let stored = match self.backend.get(&id) {
             Ok(stored) => stored.filter(|key| !key.trim().is_empty()),
-            Err(error) => {
-                // A locked or missing keychain must not break a key that
-                // still sits in the legacy file.
-                log::warn!("provider key lookup for {id} fell back to the legacy file: {error}");
-                return self.legacy.key(&id);
-            }
+            // A locked or missing keychain must not break a key that still
+            // sits in the legacy file. Nothing is logged: this module never
+            // writes provider data to a log.
+            Err(_) => return self.legacy.key(&id),
         };
         match self.migrate_one(&id, stored.as_deref())? {
             Step::Moved(key) | Step::Kept(key, _) => Ok(Some(key)),
@@ -155,7 +153,6 @@ impl ProviderKeys {
             None => {}
         }
         if let Err(error) = self.backend.set(id, &file_key) {
-            log::warn!("provider key for {id} stays in the legacy file: {error}");
             return Ok(Step::Kept(file_key, error));
         }
         match self.backend.get(id) {
@@ -163,13 +160,10 @@ impl ProviderKeys {
                 self.legacy.remove(id)?;
                 Ok(Step::Moved(file_key))
             }
-            Ok(_) => {
-                log::warn!("provider key for {id} did not read back. The file copy stays.");
-                Ok(Step::Kept(
-                    file_key,
-                    "The keychain did not return the key just written.".into(),
-                ))
-            }
+            Ok(_) => Ok(Step::Kept(
+                file_key,
+                "The keychain did not return the key just written.".into(),
+            )),
             Err(error) => Ok(Step::Kept(file_key, error)),
         }
     }
