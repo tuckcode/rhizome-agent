@@ -112,7 +112,7 @@ Optional later ideas (do not schedule): OmniRoute usage dashboard; Block Goose t
 
 ## 4. Phases
 
-**Names.** Plan Phase 3 is the plugin seam. It is still skipped (one hook: policy). Merged [PR #101](https://github.com/tuckcode/rhizome-agent/pull/101) used "phase 3" for loop-side `Model` trait / tool-call identity / step order; that work is on `main` and is not the plugin seam. Plan Phase 5 is the engine trait. It is done: [PR #107](https://github.com/tuckcode/rhizome-agent/pull/107) merged and closes #104. Plan Phase 4b is [ADR-0182](../adr/0182-free-tier-provider-routing.md) plus Claude's [PR #108](https://github.com/tuckcode/rhizome-agent/pull/108).
+**Names.** Plan Phase 3 is the plugin seam. It is still skipped (one hook: policy). Merged [PR #101](https://github.com/tuckcode/rhizome-agent/pull/101) used "phase 3" for loop-side `Model` trait / tool-call identity / step order; that work is on `main` and is not the plugin seam. Plan Phase 5 is the engine trait. It is done: [PR #107](https://github.com/tuckcode/rhizome-agent/pull/107) merged and closes #104. Plan Phase 4b is [ADR-0182](../adr/0182-free-tier-provider-routing.md) plus Claude's [PR #108](https://github.com/tuckcode/rhizome-agent/pull/108). Remaining-threads 1a–1c are on `main` (#110/#113, #111, #112). Living map: [`ARCHITECTURE.md`](../ARCHITECTURE.md) § Rhizome-owned loop.
 
 One phase per PR. Each phase deletes the path it replaced in that same PR. Coverage: new Rust stays inside `cargo llvm-cov --fail-under-lines 85` (GitHub Actions `rust-quality` on every PR). Frontend leftover locks in `src/lib/parked-organs.test.ts` and `src/lib/leftover-*.test.ts` stay green until Phase 6, when Chat gains the engine toggle.
 

@@ -3,7 +3,7 @@
 **Origin:** Claude Code (Opus 5.5) · 2026-10-10 · plan for the threads left after #108
 **Updated:** Claude Code (Opus 5.5) · 2026-10-10 · knispo's Q1 to Q10 answers locked in. A resume step (2c) is added.
 **Updated:** Claude Code (Opus 5.5) · 2026-10-10 · knispo said yes to notes N1 to N3. They are now D11 to D13.
-**Status:** locked by knispo, 2026-10-10 (D1 to D13). This file writes no product code. Each step ships as its own draft PR. knispo merges.
+**Status:** locked by knispo, 2026-10-10 (D1 to D13). **Progress (verified 2026-10-10 on `main` at `009e153`):** 1a, 1b, and 1c are done ([#110](https://github.com/tuckcode/rhizome-agent/pull/110) helper, [#113](https://github.com/tuckcode/rhizome-agent/pull/113) loop hookup, [#111](https://github.com/tuckcode/rhizome-agent/pull/111) delete `stream_model_events`, [#112](https://github.com/tuckcode/rhizome-agent/pull/112) provider attempts). Next is 2a. 2c waits for knispo. Living map: [`ARCHITECTURE.md`](../ARCHITECTURE.md) § Rhizome-owned loop.
 **Binding:** [ADR-0180](../adr/0180-rhizome-is-its-own-harness.md) (Rhizome is its own harness), [ADR-0182](../adr/0182-free-tier-provider-routing.md) (free-tier routing). ADR-0177 is superseded. ADR-0168 borrow rules still apply.
 **Parent plan:** [2026-10-09-rhizome-harness-plan.md](2026-10-09-rhizome-harness-plan.md) §4 to §6. That file stays the source for phase scope. This file adds steps, owners, and order for what is left.
 
@@ -11,18 +11,18 @@
 
 ## 0. Ground truth
 
-Checked on `main` at `dbd94b96` (the #108 merge), 2026-10-10. Each line names what was read.
+Re-checked on `main` at `009e153` (the #113 merge), 2026-10-10. Each line names what was read. The first check was `dbd94b96` (#108).
 
 | Fact | Evidence |
 |---|---|
-| #101, #102, #103, #105, #106, #107, #108 are on `main`. #103 names plan Phase 3 (plugin seam) apart from #101. | `git log origin/main` |
+| #101–#113 are on `main` except the remaining-threads plan itself (#109). 1a / 1b / 1c shipped as #110 + #113 / #111 / #112. | `git log origin/main` |
 | `Engine` has `kind`, `start`, `stop`, `events`. `EngineEvent` has `Text` and `Cancelled` only. `events()` returns a `Vec` after the run. | `src-tauri/src/engines/mod.rs` |
 | No command reaches `engines::`, `rhizome_loop`, or `rhizome_routing`. | `grep` over `src-tauri/src/commands/` |
-| Loop tools are `echo` and `bash`. `tools::execute_allowed` returns its input. | `rhizome_loop/tools.rs` (6 lines), `rhizome_loop/policy.rs:63` |
-| `set_approval_dismiss` exists. `prompt_gen` and `live_prompt` drop a late reply. | `rhizome_loop/driver.rs:156` |
+| Loop tools are `echo`, `create_note`, and Power User `bash`. `execute_allowed` dispatches `create_note` to `run_create_note_tool`; other names return their args. `bash` is not a process. | `rhizome_loop/tools.rs`, `policy.rs` `offered_tools` |
+| `set_approval_dismiss` exists. `prompt_gen` and `live_prompt` drop a late reply. | `rhizome_loop/driver.rs` |
 | `on_after_tool_for_test` is the only other hook. It is test-only. | `driver.rs` |
 | The loop keeps its durable log in memory only (`Shared.log: Vec<DurableEvent>`). `DurableEvent` has no serde derive. | `rhizome_loop/driver.rs`, `rhizome_loop/types.rs` |
-| `stream_model_events` and `stream_model_events_with` have test callers only. | `ai_models.rs:246`, `:254`, tests at `:1148` to `:1407` |
+| `stream_model_events` and `stream_model_events_with` are **deleted**. Tests run through `stream_chat_events_with`. Anthropic is rejected. | `ai_models.rs` `stream_chat_events_with`, `open_model_event_stream` |
 | The old path is `run_ai_model_stream` → `send_model_message` → `send_openai_compatible_message` → `execute_openai_tool_calls`. It is not a stream: one blocking request, then one `TextDelta`. | `ai_models.rs:169`, `:528`, `:536` |
 | `send_anthropic_message` is one blocking request. It sends no tools. | `ai_models.rs:556` |
 | Old-path callers: `commands/ai.rs:226` (`stream_ai_model`), `commands/ai.rs:254` → `ai_models::test_ai_model_provider` (`ai_models.rs:184`), `ai_run_target.rs:70`, `rhizome_distill.rs:222`, `rhizome_import.rs:314`. | `grep` |
@@ -45,9 +45,9 @@ Not checked: whether `ai_run_target` callers set `vault_path`. If they do, the o
 
 | Step | Thread | PR | Lane |
 |---|---|---|---|
-| 1a | 3 prep | `create_note` becomes a real loop tool | Cursor (loop) with a Claude-owned helper |
-| 1b | 3 prep | Delete `stream_model_events`. Port its tests. | Claude |
-| 1c | 3 prep | `RoutingModel` reports each provider attempt | Claude |
+| 1a | 3 prep | **DONE** `create_note` is a real loop tool (#110 helper, #113 hookup) | Cursor (loop) with a Claude-owned helper |
+| 1b | 3 prep | **DONE** `stream_model_events` deleted; tests on `stream_chat_events_with` (#111) | Claude |
+| 1c | 3 prep | **DONE** `RoutingModel::with_observer` + `ProviderAttempt` (#112) | Claude |
 | 2a | 2 backend | Wider `Engine` trait and a live event sink | Cursor |
 | 2b | 2 backend | Native Chat Tauri commands, quit cancel, transcript index | Cursor |
 | **2c** | 2 backend | **Durable loop log and resume after restart** | Cursor |
@@ -87,7 +87,7 @@ Not checked: whether `ai_run_target` callers set `vault_path`. If they do, the o
 
 ## 3. Thread 3 prep (steps 1a, 1b, 1c)
 
-Phase 6 needs all three. They change no user-facing behaviour.
+**Done on `main`.** Phase 6 still needs them as prerequisites. They change no user-facing behaviour. Specs below stay as the shipped contract.
 
 ### 1a. `create_note` as a real loop tool
 

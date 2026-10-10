@@ -515,7 +515,24 @@ Verified against source 2026-09-14. Longer landmine list:
   “host is not running” catalog.
 - **Chat default stays Prime.** Settings must not present Prime as an
   optional local-agent alternative. An API-model default must say it
-  skips Prime sessions and vault tools.
+  skips Prime sessions and vault tools. The Rhizome loop
+  (`rhizome_loop/`, `rhizome_routing/`, `engines/`) compiles but no
+  Chat command calls it. Do not wire Chat to `NativeEngine` until
+  remaining-threads step 4. `leftover-prime-keep.test.ts` locks the
+  chrome. Map: [`ARCHITECTURE.md`](ARCHITECTURE.md) § Rhizome-owned loop.
+- **`stream_model_events` is gone.** Native streaming is
+  `stream_chat_events_with`. Anthropic is rejected until step 6a.
+  Do not restore the deleted wrappers.
+- **Loop `bash` is not a shell.** `execute_allowed` returns the args
+  string. Do not treat a Power User `bash` result as process output.
+- **`reqwest::blocking` panics inside tokio.** `ProviderModel` already
+  runs HTTP on a worker thread. Do not call the blocking client from
+  a Tauri command without that pattern.
+- **OmniRoute leftover is a phrase lock.**
+  `leftover-omniroute-parked.test.ts` reads
+  `docs/plans/handoffs/2026-09-14-1617-issue-48-findings.md`. It does
+  not mean `rhizome_routing/` must not exist. ADR-0182 ported catalog
+  rows and cooldown rules; no OmniRoute runtime was copied.
 - **Red X quits unless Keep in taskbar.** Default close exits and
   `release_helpers_on_quit` stops the app-owned MCP bridge, Mindwalk,
   and a Prime daemon this process spawned (ADR-0179). Keep in taskbar
@@ -594,7 +611,12 @@ pnpm test
 pnpm test:coverage
 
 # Rust tests
-cargo test
+cargo test --manifest-path src-tauri/Cargo.toml
+
+# Native loop / routing / engines only (no Chat, no daemon)
+cargo test --manifest-path src-tauri/Cargo.toml rhizome_loop
+cargo test --manifest-path src-tauri/Cargo.toml rhizome_routing
+cargo test --manifest-path src-tauri/Cargo.toml engines::
 
 # Rust coverage (must pass ≥85% line coverage)
 cargo llvm-cov --manifest-path src-tauri/Cargo.toml --no-clean --ignore-filename-regex "lib\.rs|main\.rs|menu\.rs" --fail-under-lines 85

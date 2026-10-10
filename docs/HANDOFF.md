@@ -47,7 +47,7 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Grok 4.6 · 2026-10-10 · Plan Phase 3 is the plugin seam (still skipped). #101's "phase 3" is loop Model trait, on main. Plan Phase 5 is done (#107, closes #104). Phase 4b is ADR-0182 + Claude #108. [Plan](plans/2026-10-09-rhizome-harness-plan.md) §4. [Handoff](plans/handoffs/2026-10-10-1530-cursor-grok-4-6-phase-names.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-10 · Native loop 1a–1c on main (#110/#113, #111, #112). Chat still Prime. Living map: [ARCHITECTURE](ARCHITECTURE.md) § Rhizome-owned loop. Remaining: 2a next; 2c waits. [Plan](plans/2026-10-10-harness-remaining-threads.md). [Handoff](plans/handoffs/2026-10-10-2355-cursor-grok-4-6-docs-native-loop.md).
 **Origin:** Cursor Grok 4.7 · 2026-10-10 · Phase 2 Rhizome loop: tools, Limited tools vs Power User, cancel reset. Chat stays on Prime. Not installed. [Handoff](plans/handoffs/2026-10-10-0135-cursor-grok-4-7-harness-phase-2.md).
 **Origin:** Cursor Grok 4.7 · 2026-10-10 · Phase 1 Rhizome loop (fake model, four behavior tests). Chat stays on Prime. Not installed. [Handoff](plans/handoffs/2026-10-10-0045-cursor-grok-4-7-harness-phase-1.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-09 · Chat stays Working after agent_end when Prime keeps emitting agent_status. Host ignores that noise; composer spinner only. [Handoff](plans/handoffs/2026-10-09-2335-cursor-grok-4-6-stuck-working.md).
@@ -133,7 +133,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
-- [2026-10-10 · phase names](plans/handoffs/2026-10-10-1530-cursor-grok-4-6-phase-names.md) — Plan Phase 3 = plugin seam (skipped). #101 "phase 3" = loop Model trait. Phase 5 done (#107; [0945](plans/handoffs/2026-10-10-0945-cursor-grok-4-6-harness-phase-5.md)). Phase 4b = ADR-0182 + #108.
+- [2026-10-10 · native-loop docs](plans/handoffs/2026-10-10-2355-cursor-grok-4-6-docs-native-loop.md) — Living docs match 1a–1c. Chat still Prime. `stream_model_events` gone.
 - [2026-10-10 · phase 2 tools](plans/handoffs/2026-10-10-0135-cursor-grok-4-7-harness-phase-2.md) — loop tools, Limited tools vs Power User, cancel reset. Chat stays on Prime.
 - [2026-10-10 · phase 1 loop](plans/handoffs/2026-10-10-0045-cursor-grok-4-7-harness-phase-1.md) — bare Rhizome loop and four behavior tests. Chat stays on Prime. Not in the app.
 - [2026-10-09 · stuck Working](plans/handoffs/2026-10-09-2335-cursor-grok-4-6-stuck-working.md) — post-`agent_end` status noise cancelled the follow-up grace; composer no longer prints last tool.
@@ -159,7 +159,6 @@ Do not paste leftover paper here.
 - [2026-09-26 · macOS title bar](plans/handoffs/2026-09-26-0635-cursor-grok-4-7-macos-titlebar.md) — 32px MacOSTitlebar, y=9, Command Palette docked; packaged app not checked.
 - [2026-09-26 · public prep](plans/handoffs/2026-09-26-0559-claude-opus-5-5-public-prep.md) — secret scan clean; AGPL confirmed, Tolaria credited; Gmail-in-history open.
 - [2026-09-26 · Astra redesign](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md) — redesign + login-note skip + list markers pushed as `d0a55f8`; app rebuilt; native QA not done.
-- [2026-09-26 · handy wrap](plans/handoffs/2026-09-26-0227-cursor-grok-4-7-handy.md) — app is `18eb5ba`; rail fix local; staged login skip and list markers are separate.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)
@@ -189,7 +188,7 @@ push is not a release — releases are tagged builds with signed installers.
 
 ## Rhizome Agent — identity
 
-**This is `tuckcode/rhizome-agent` (private), not `knispo/rhizome`.** See `docs/IDENTITY.md`. Desktop history below is inherited from the Option C bootstrap snapshot and is useful background; product direction here is Prime harness chat.
+**This is `tuckcode/rhizome-agent` (public), not `knispo/rhizome`.** See `docs/IDENTITY.md`. Desktop history below is inherited from the Option C bootstrap snapshot and is useful background; Rhizome owns the loop (ADR-0180). Chat still uses Prime.
 
 ## Current state
 

@@ -33,14 +33,17 @@ This is **Rhizome Agent** (`tuckcode/rhizome-agent`, `ai.rhizome.agent`).
 It is **not** Rhizome Desktop (`knispo/rhizome`). Do not “fix branding
 back to Desktop.” Details: [`IDENTITY.md`](IDENTITY.md).
 
-**Rhizome is the desk and durable memory. Prime is the engine.**
+**Rhizome owns the loop (ADR-0180). Chat still uses Prime.**
 Chat first, vault on purpose. Memory is gated; execution is not.
+The native loop, provider adapter, and free-tier router compile in
+normal builds. No Chat command calls them until Phase 6. Map:
+[`ARCHITECTURE.md`](ARCHITECTURE.md) § Rhizome-owned loop.
 
-If Prime already has a mechanism, use Prime’s. Do not build a Rhizome
-twin beside it. Vault knowledge still lands as markdown — Prime’s
-`~/.prime/agent` is harness state, not the memory store. In-app Chat
-gets Hermes/Pi *manners* from the vault skill (answer first, CLI not
-IPython), not a second runtime.
+If Prime already has a mechanism **and Prime is the attached engine**,
+use Prime’s. Do not build a Rhizome twin beside it. Vault knowledge
+still lands as markdown — Prime’s `~/.prime/agent` is harness state,
+not the memory store. In-app Chat gets Hermes/Pi *manners* from the
+vault skill (answer first, CLI not IPython), not a second runtime.
 
 This machine’s Prime is **0.9.3** (106 public daemon commands). Recheck
 with `pnpm prime:surface` / `pnpm prime:surface:github`. Snapshot:
@@ -105,10 +108,11 @@ unless a row below is the task.
 
 - **ADR-0168** / [`harness-doctrine.md`](design/harness-doctrine.md):
   selective doctrine. Borrow contracts and artifacts. Never a second
-  runtime or memory store. Option 2 is the intended shape (Rhizome
-  harness, Prime engine) and is **not ratified** as composition.
-  **Amended 2026-10-09:** ADR-0180 — Rhizome owns the loop. 0168
-  borrow-care remains.
+  runtime or memory store. **Amended 2026-10-09:** ADR-0180 — Rhizome
+  owns the loop. 0168 borrow-care remains. Phases 1–5 and 4b are on
+  `main`. Chat stays on Prime. Remaining steps:
+  [`2026-10-10-harness-remaining-threads.md`](plans/2026-10-10-harness-remaining-threads.md)
+  (1a–1c done). Do not restore `stream_model_events`.
 - Working notes: [`harness-composition.md`](design/harness-composition.md).
   Proposed first slice if ratified: native Prime `extension_ui`
   (select / confirm / input — Rhizome auto-cancels those today).

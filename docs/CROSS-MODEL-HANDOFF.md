@@ -683,3 +683,41 @@ older briefing (including closed drafts #66–#68):
   read must not invent finishes. Do not close #52 from units.
 - **Blank window.** `main.tsx` lazy-loads `App` behind `BootSplash`.
   `Suspense fallback={null}` is the defect C75 removed. Do not restore it.
+
+## 26. Native loop traps (2026-10-10) — compiled, not Chat
+
+**Origin:** Cursor Grok 4.6 · 2026-10-10 · verified against
+`rhizome_loop/`, `rhizome_routing/`, `engines/`, `ai_models.rs`.
+
+These look like unfinished work and are easy to "finish" wrong:
+
+- **Chat is still Prime.** `commands/` does not call `engines::`,
+  `rhizome_loop`, or `rhizome_routing`. Phase 6 is remaining-threads
+  step 4. Do not add a composer engine control. Do not strip Prime
+  chrome when Settings default is an API model
+  (`leftover-prime-keep.test.ts`).
+- **`stream_model_events` is deleted (#111).** Use
+  `stream_chat_events_with`. Anthropic: `This provider does not
+  stream model events yet.` The old blocking `stream_ai_model` path
+  still serves Chat API models. Do not restore the wrappers.
+- **`reqwest::blocking` panics in tokio.** `ProviderModel` already
+  hops to a worker thread (`rhizome_provider_model.rs`). A new
+  command that calls the blocking client on the Tauri runtime will
+  panic when the client drops.
+- **Loop `bash` returns its args.** It is not a process. Limited
+  tools never offers it. Power User asks unless a session grant
+  matches the exact command.
+- **`create_note` in the loop is not the old API path.** Limited
+  tools asks every call (Allow once and Deny; no session grant).
+  Power User runs with no prompt. The write is vault-bounded and
+  never overwrites. `stream_ai_model` still runs the same helper
+  with no loop approval.
+- **OmniRoute leftover is a phrase lock**, not "no routing module."
+  `leftover-omniroute-parked.test.ts` reads the 2026-09-14 findings
+  file. ADR-0182 ported rows and rules. Do not delete
+  `rhizome_routing/` to satisfy that test, and do not edit the test
+  unless OmniRoute runtime is copied.
+- **1a–1c are done.** Next is 2a (wider `Engine` + live sink). 2c
+  waits for knispo. Plan:
+  [`docs/plans/2026-10-10-harness-remaining-threads.md`](plans/2026-10-10-harness-remaining-threads.md).
+  Map: [`ARCHITECTURE.md`](ARCHITECTURE.md) § Rhizome-owned loop.
