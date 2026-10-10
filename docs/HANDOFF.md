@@ -47,6 +47,7 @@ file.
 ---
 
 ## State
+**Origin:** Cursor Grok 4.7 · 2026-10-10 · Phase 1 Rhizome loop (fake model, four behavior tests). Chat stays on Prime. Not installed. [Handoff](plans/handoffs/2026-10-10-0045-cursor-grok-4-7-harness-phase-1.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-09 · Chat stays Working after agent_end when Prime keeps emitting agent_status. Host ignores that noise; composer spinner only. [Handoff](plans/handoffs/2026-10-09-2335-cursor-grok-4-6-stuck-working.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-09 · #80: spawned-daemon process-group stop retries via `kill(2)`. [Handoff](plans/handoffs/2026-10-09-2222-cursor-grok-4-6-issue-80-process-group-flake.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-06 · standing-rule inventory (inherited / one-night / Atticus / still in code). Evidence only. [Inventory](plans/2026-10-06-standing-rule-inventory.md).
@@ -60,7 +61,6 @@ file.
 **Origin:** Claude Opus 5.5 · 2026-10-04 · vault-memory MCP fixes merged locally as `bf22be8`, not pushed. Claude Code's `rhizome` MCP now runs this checkout's `mcp-server` and release `rhizome-tool`. [Handoff](plans/handoffs/2026-10-04-1548-claude-opus-5-5-vault-memory-mcp.md).
 **Origin:** Astra through Hermes desktop · 2026-10-04 · browser design audit at `9a48e00`.
 Browser evidence identifies C89–C92. No product code changed. Native Windows and MacBook checks remain open. [Review](design/2026-10-04-ui-audit.md).
-**Origin:** GPT-6 Codex · 2026-09-20 · reviewed Astra landing.
 **Origin:** Cursor Grok 4.6 · 2026-09-21 · C75 living-docs; #66–#68 closed.
 **Origin:** Cursor Grok 4.7 · 2026-09-21 · evening wrap. Local main unpushed.
 **Origin:** Cursor Grok 4.7 · 2026-09-21 · Astra next-phase input.
@@ -130,6 +130,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-10-10 · phase 1 loop](plans/handoffs/2026-10-10-0045-cursor-grok-4-7-harness-phase-1.md) — bare Rhizome loop and four behavior tests. Chat stays on Prime. Not in the app.
 - [2026-10-09 · stuck Working](plans/handoffs/2026-10-09-2335-cursor-grok-4-6-stuck-working.md) — post-`agent_end` status noise cancelled the follow-up grace; composer no longer prints last tool.
 - [2026-10-09 · #80 process-group flake](plans/handoffs/2026-10-09-2222-cursor-grok-4-6-issue-80-process-group-flake.md) — `kill(2)` retry; test polls a live group.
 - [2026-10-06 · rule inventory](plans/handoffs/2026-10-06-0155-cursor-grok-4-6-standing-rule-inventory.md) — inherited / one-night / Atticus / still in code. Evidence only.
@@ -158,7 +159,6 @@ Do not paste leftover paper here.
 - [2026-09-25 · Astra frontend audit brief](plans/handoffs/2026-09-25-1926-gpt-6-codex-astra-frontend-audit-brief.md) — native audit instructions and the sidebar clipping report.
 - [2026-09-21 · Astra next phase](plans/handoffs/2026-09-21-2104-cursor-grok-4-7-astra-next-phase.md) — origin `2a24eed`; app `b7264d6`; planning only.
 - [2026-09-21 · C75 living docs](plans/handoffs/2026-09-21-0215-cursor-grok-4-6-c75-docs.md) — hide leaves spawned Prime warm; #66–#68 closed.
-- [2026-09-20 · Astra combined handoff](plans/handoffs/2026-09-20-1234-claude-opus-5-astra-combined-handoff.md) — D1–D7 audit, plugin rescope, ADR findings, and the Edit-list completion contract.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)
