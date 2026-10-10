@@ -2,7 +2,8 @@ use crate::ai_agents::AiAgentStreamEvent;
 use crate::ai_models::{AiModelProviderKind, AiModelStreamRequest};
 use std::path::{Path, PathBuf};
 
-const CREATE_NOTE_TOOL_NAME: &str = "create_note";
+/// The tool name the loop offers and the policy rules on.
+pub const CREATE_NOTE_TOOL_NAME: &str = "create_note";
 const CREATE_NOTE_TOOL_JSON: &str = r#"{
   "type": "function",
   "function": {
@@ -255,8 +256,22 @@ pub fn run_create_note_tool(
     vault_path: Option<&str>,
     vault_paths: &[String],
 ) -> Result<String, String> {
-    let _ = (raw_args, vault_path, vault_paths);
-    Err("not built".into())
+    let args = parse_raw_tool_arguments(raw_args)?;
+    create_note(&args, vault_path, vault_paths).map(|created| created.output)
+}
+
+/// An empty string means no arguments. Anything else must be a JSON object.
+fn parse_raw_tool_arguments(raw_args: &str) -> Result<serde_json::Value, String> {
+    if raw_args.trim().is_empty() {
+        return Ok(serde_json::json!({}));
+    }
+    let args: serde_json::Value = serde_json::from_str(raw_args)
+        .map_err(|error| format!("Failed to parse create_note arguments: {error}"))?;
+    if args.is_object() {
+        Ok(args)
+    } else {
+        Err("create_note arguments must be a JSON object.".into())
+    }
 }
 
 fn tool_vault_path<'a>(
