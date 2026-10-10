@@ -16,55 +16,19 @@ pub(crate) fn decide_permission(
     mode: AiAgentPermissionMode,
     options: &[PermissionOption],
 ) -> PermissionDecision {
-    if options.is_empty() {
-        return PermissionDecision::Cancelled;
-    }
-
-    let wanted = match mode {
-        AiAgentPermissionMode::Safe => OptionClass::Reject,
-        AiAgentPermissionMode::PowerUser => OptionClass::AllowOnce,
-    };
-
-    if let Some(option) = options.iter().find(|option| wanted.matches(option)) {
-        return PermissionDecision::Selected(option.option_id.clone());
-    }
-
-    PermissionDecision::Cancelled
-}
-
-#[derive(Clone, Copy)]
-enum OptionClass {
-    AllowOnce,
-    Reject,
-}
-
-impl OptionClass {
-    fn matches(self, option: &PermissionOption) -> bool {
-        let kind = option.kind.as_deref().unwrap_or("");
-        let id = option.option_id.as_str();
-        match self {
-            Self::AllowOnce => {
-                kind_is(kind, &["allow_once"])
-                    || id_is(id, &["allow_once", "allow-once", "allow_session"])
-            }
-            Self::Reject => {
-                kind_is(kind, &["reject_once", "reject_always"])
-                    || id_is(id, &["deny", "deny_always", "reject-once", "reject_once"])
-            }
+    let mapped: Vec<crate::permission_decision::PolicyOption> = options
+        .iter()
+        .map(|option| crate::permission_decision::PolicyOption {
+            id: option.option_id.clone(),
+            kind: option.kind.clone(),
+        })
+        .collect();
+    match crate::permission_decision::decide(mode, &mapped) {
+        crate::permission_decision::PolicyDecision::Selected(id) => {
+            PermissionDecision::Selected(id)
         }
+        crate::permission_decision::PolicyDecision::Cancelled => PermissionDecision::Cancelled,
     }
-}
-
-fn kind_is(kind: &str, allowed: &[&str]) -> bool {
-    allowed
-        .iter()
-        .any(|candidate| kind.eq_ignore_ascii_case(candidate))
-}
-
-fn id_is(id: &str, allowed: &[&str]) -> bool {
-    allowed
-        .iter()
-        .any(|candidate| id.eq_ignore_ascii_case(candidate))
 }
 
 /// Power User maps Hermes edit-approval session modes to auto-allow workspace
