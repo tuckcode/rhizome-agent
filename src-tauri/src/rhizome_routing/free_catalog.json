@@ -10,7 +10,7 @@
     "licence": "MIT, Copyright (c) 2026 diegosouzapw",
     "curated_at": "2026-09-12",
     "ported_at": "2026-10-10",
-    "note": "Model rows keep the upstream free_type, tos, pool, hard_stop and trains_on_prompts facts unchanged. Rhizome's gate (catalog.rs) decides which rows route. Provider order is ADR-0182 decision 1."
+    "note": "Model rows keep the upstream free_type, tos, pool, hard_stop and trains_on_prompts facts unchanged. Provider fields default_on, billing_warning and free_type_override are Rhizome's. Rhizome's gate (catalog.rs) decides which rows route. Provider order is ADR-0182 decision 1: default-on providers in the listed order, then opt-in providers. Cerebras and GitHub Models are dropped."
   },
   "providers": [
     {
@@ -28,16 +28,6 @@
       ]
     },
     {
-      "id": "cerebras",
-      "name": "Cerebras",
-      "base_url": "https://api.cerebras.ai/v1",
-      "evidence": "Upstream #11773: cerebras.ai/pricing (2026-09-03) is a one-time $5 signup credit gated on a payment method, 30-day expiry. hardStopGuaranteed must stay unset because a stored card can bill.",
-      "models": [
-        { "id": "zai-glm-4.7", "free_type": "one-time-initial", "tos": "caution", "pool": "cerebras" },
-        { "id": "gpt-oss-120b", "free_type": "one-time-initial", "tos": "caution", "pool": "cerebras" }
-      ]
-    },
-    {
       "id": "mistral",
       "name": "Mistral",
       "base_url": "https://api.mistral.ai/v1",
@@ -49,6 +39,50 @@
         { "id": "devstral-latest", "free_type": "recurring-monthly", "tos": "caution", "pool": "mistral" },
         { "id": "codestral-latest", "free_type": "recurring-monthly", "tos": "caution", "pool": "mistral" }
       ]
+    },
+    {
+      "id": "llm7",
+      "name": "LLM7",
+      "base_url": "https://api.llm7.io/v1",
+      "evidence": "Upstream rows only. No dated evidence comment on this block, so it inherits the 2026-06-17 research pass.",
+      "models": [
+        { "id": "gpt-4o-mini-2024-07-18", "free_type": "recurring-daily", "tos": "caution", "pool": "llm7-free" },
+        { "id": "gpt-4.1-nano-2025-04-14", "free_type": "recurring-daily", "tos": "caution", "pool": "llm7-free" },
+        { "id": "deepseek-r1-0528", "free_type": "recurring-daily", "tos": "caution", "pool": "llm7-free" },
+        { "id": "qwen2.5-coder-32b-instruct", "free_type": "recurring-daily", "tos": "caution", "pool": "llm7-free" }
+      ]
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "base_url": "https://openrouter.ai/api/v1",
+      "per_model_quota": true,
+      "free_suffix": ":free",
+      "headers": {
+        "X-Title": "Rhizome"
+      },
+      "evidence": "Upstream registry #11226 and passthroughModels: one key multiplexes many upstream models, so a 404 for one model locks only that model. ADR-0182 admits only ':free' ids.",
+      "models": [
+        { "id": "auto", "free_type": "recurring-daily", "tos": "caution", "pool": "openrouter-free" },
+        { "id": "stealth/ox-alpha", "free_type": "recurring-daily", "tos": "caution", "pool": "openrouter-free" },
+        { "id": "liquid/lfm-2.5-2.6b:free", "free_type": "recurring-daily", "tos": "caution", "pool": "openrouter-free" }
+      ]
+    },
+    {
+      "id": "nvidia",
+      "name": "NVIDIA NIM",
+      "base_url": "https://integrate.api.nvidia.com/v1",
+      "per_model_quota": true,
+      "tool_params": {
+        "parallel_tool_calls": false
+      },
+      "evidence": "Upstream registry #6773: one connection multiplexes several vendors, so a 404 locks only that model. Tool names are limited to 64 characters. Upstream docs/reference/FREE_TIERS.md at the pin: about 40 RPM, no published token cap, and 'the old one-time credit pool has been removed', so the rows' one-time-initial label is stale. ToS caution: prototyping, dev, research and evaluation only. freellmapi checklist: NIM needs parallel_tool_calls=false. GLM 5.3 is not on the upstream NVIDIA list and is not added here.",
+      "models": [
+        { "id": "google/gemma-4-31b-it", "free_type": "one-time-initial", "tos": "caution", "pool": "nvidia" },
+        { "id": "nvidia/nemotron-3-super-120b-a12b", "free_type": "one-time-initial", "tos": "caution", "pool": "nvidia" },
+        { "id": "openai/gpt-oss-120b", "free_type": "one-time-initial", "tos": "caution", "pool": "nvidia" }
+      ],
+      "free_type_override": "recurring-uncapped"
     },
     {
       "id": "cloudflare-ai",
@@ -65,53 +99,9 @@
         { "id": "@cf/zai-org/glm-4.7-flash", "free_type": "recurring-daily", "tos": "caution", "pool": "cloudflare-ai" },
         { "id": "@cf/moonshotai/kimi-k2.6", "free_type": "recurring-daily", "tos": "caution", "pool": "cloudflare-ai" },
         { "id": "@cf/google/gemma-4-26b-a4b-it", "free_type": "recurring-daily", "tos": "caution", "pool": "cloudflare-ai" }
-      ]
-    },
-    {
-      "id": "openrouter",
-      "name": "OpenRouter",
-      "base_url": "https://openrouter.ai/api/v1",
-      "per_model_quota": true,
-      "free_suffix": ":free",
-      "headers": { "X-Title": "Rhizome" },
-      "evidence": "Upstream registry #11226 and passthroughModels: one key multiplexes many upstream models, so a 404 for one model locks only that model. ADR-0182 admits only ':free' ids.",
-      "models": [
-        { "id": "auto", "free_type": "recurring-daily", "tos": "caution", "pool": "openrouter-free" },
-        { "id": "stealth/ox-alpha", "free_type": "recurring-daily", "tos": "caution", "pool": "openrouter-free" },
-        { "id": "liquid/lfm-2.5-2.6b:free", "free_type": "recurring-daily", "tos": "caution", "pool": "openrouter-free" }
-      ]
-    },
-    {
-      "id": "nvidia",
-      "name": "NVIDIA NIM",
-      "base_url": "https://integrate.api.nvidia.com/v1",
-      "per_model_quota": true,
-      "tool_params": { "parallel_tool_calls": false },
-      "evidence": "Upstream registry #6773: one connection multiplexes several vendors, so a 404 locks only that model. Tool names are limited to 64 characters. freellmapi checklist: NIM needs parallel_tool_calls=false.",
-      "models": [
-        { "id": "google/gemma-4-31b-it", "free_type": "one-time-initial", "tos": "caution", "pool": "nvidia" },
-        { "id": "nvidia/nemotron-3-super-120b-a12b", "free_type": "one-time-initial", "tos": "caution", "pool": "nvidia" },
-        { "id": "openai/gpt-oss-120b", "free_type": "one-time-initial", "tos": "caution", "pool": "nvidia" }
-      ]
-    },
-    {
-      "id": "github-models",
-      "name": "GitHub Models",
-      "base_url": "https://models.github.ai/inference",
-      "evidence": "Not in the OmniRoute pin. Upstream 'github' is GitHub Copilot over device-flow OAuth, which ADR-0182 excludes. The base URL comes from GitHub's own documentation and was not probed in this port. No model rows until a free-tier source is recorded.",
-      "models": []
-    },
-    {
-      "id": "llm7",
-      "name": "LLM7",
-      "base_url": "https://api.llm7.io/v1",
-      "evidence": "Upstream rows only. No dated evidence comment on this block, so it inherits the 2026-06-17 research pass.",
-      "models": [
-        { "id": "gpt-4o-mini-2024-07-18", "free_type": "recurring-daily", "tos": "caution", "pool": "llm7-free" },
-        { "id": "gpt-4.1-nano-2025-04-14", "free_type": "recurring-daily", "tos": "caution", "pool": "llm7-free" },
-        { "id": "deepseek-r1-0528", "free_type": "recurring-daily", "tos": "caution", "pool": "llm7-free" },
-        { "id": "qwen2.5-coder-32b-instruct", "free_type": "recurring-daily", "tos": "caution", "pool": "llm7-free" }
-      ]
+      ],
+      "default_on": false,
+      "billing_warning": "A card on file with Cloudflare could be billed when Workers AI use passes the free 10K Neurons per day. Turn this on only if you accept that."
     }
   ]
 }

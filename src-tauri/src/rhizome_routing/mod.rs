@@ -24,7 +24,7 @@ use crate::rhizome_loop::{Model, ModelView};
 use crate::rhizome_provider_model::ProviderModel;
 
 use catalog::CatalogProvider;
-pub(crate) use catalog::{Catalog, UserEndpoint};
+pub(crate) use catalog::{Catalog, RoutingOptions, UserEndpoint};
 use health::{Attempt, Health, Millis};
 
 /// freellmapi checklist: the overall retry budget for one step.
@@ -62,6 +62,7 @@ impl Clock for SystemClock {
 /// Routes each loop step to the first healthy free-tier target.
 pub(crate) struct RoutingModel<K: KeyStore, C: Clock> {
     catalog: Catalog,
+    options: RoutingOptions,
     keys: K,
     clock: C,
     health: Health,
@@ -74,6 +75,7 @@ impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
     pub(crate) fn new(catalog: Catalog, keys: K, clock: C, limits: HttpLimits) -> Self {
         Self {
             catalog,
+            options: RoutingOptions::default(),
             keys,
             clock,
             health: Health::default(),
@@ -81,6 +83,13 @@ impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
             limits,
             inner: None,
         }
+    }
+
+    /// Opt-in providers and strict mode. The default routes the default-on
+    /// providers in the default mode.
+    pub(crate) fn with_options(mut self, options: RoutingOptions) -> Self {
+        self.options = options;
+        self
     }
 
     #[cfg(test)]
@@ -94,6 +103,7 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
     fn complete(&mut self, view: &ModelView, emit: &mut dyn FnMut(ModelEvent) -> bool) -> bool {
         let Self {
             catalog,
+            options,
             keys,
             clock,
             health,
@@ -107,7 +117,7 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
         let mut reopens_at: Option<Millis> = None;
         let mut last_error: Option<ModelError> = None;
 
-        for target in catalog.targets() {
+        for target in catalog.targets(options) {
             let provider = &catalog.providers[target.provider];
             let credential = keys.credential(&provider.id);
             if provider.key_required && credential.is_none() {
@@ -642,7 +652,7 @@ mod tests {
     #[test]
     fn the_pinned_catalog_routes_groq_first() {
         let catalog = Catalog::pinned();
-        let first = &catalog.targets()[0];
+        let first = &catalog.targets(&RoutingOptions::default())[0];
 
         assert_eq!(catalog.providers[first.provider].id, "groq");
         assert_eq!(first.model, "openai/gpt-oss-120b");
@@ -652,5 +662,60 @@ mod tests {
     fn the_system_clock_reads_wall_time() {
         // 2026-01-01T00:00:00Z. Daily resets need wall time, not uptime.
         assert!(SystemClock.now_ms() > 1_767_225_600_000);
+    }
+
+    #[test]
+    fn an_opt_in_provider_routes_only_after_the_user_turns_it_on() {
+        let down = || serve(vec![http_response("503 Service Unavailable", &[], "down")]);
+        let opt_in = serve(vec![reply("opted")]);
+        let first = down();
+        let mut catalog = catalog(&[("a", &first.base_url), ("cf", &opt_in.base_url)]);
+        catalog.providers[1].default_on = false;
+        let mut router = RoutingModel::new(
+            catalog.clone(),
+            keys(&["a", "cf"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        );
+
+        assert_eq!(
+            error_kind(&run(&mut router)),
+            Some(ModelErrorKind::Unavailable)
+        );
+        assert!(opt_in.requests.lock().unwrap().is_empty());
+
+        let first = down();
+        catalog.providers[0].base_url = first.base_url.clone();
+        let options = RoutingOptions {
+            opt_in: ["cf".to_string()].into(),
+            strict: false,
+        };
+        let mut router =
+            RoutingModel::new(catalog, keys(&["a", "cf"]), FakeClock::at(T0), TEST_LIMITS)
+                .with_options(options);
+
+        assert_eq!(run(&mut router), done("opted"));
+    }
+
+    #[test]
+    fn strict_mode_skips_a_provider_without_a_hard_stop() {
+        let soft = serve(vec![]);
+        let hard = serve(vec![reply("hard")]);
+        let mut catalog = catalog(&[("soft", &soft.base_url), ("hard", &hard.base_url)]);
+        catalog.providers[1].models[0].hard_stop = true;
+        let options = RoutingOptions {
+            strict: true,
+            ..RoutingOptions::default()
+        };
+        let mut router = RoutingModel::new(
+            catalog,
+            keys(&["soft", "hard"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        )
+        .with_options(options);
+
+        assert_eq!(run(&mut router), done("hard"));
+        assert!(soft.requests.lock().unwrap().is_empty());
     }
 }
