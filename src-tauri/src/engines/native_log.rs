@@ -269,60 +269,11 @@ fn set_owner_only(path: &Path) -> Result<(), String> {
 }
 
 fn lock_exclusive(file: &File) -> bool {
-    #[cfg(unix)]
-    {
-        use std::os::unix::io::AsRawFd;
-        const LOCK_EX: i32 = 2;
-        const LOCK_NB: i32 = 4;
-        extern "C" {
-            fn flock(fd: i32, operation: i32) -> i32;
-        }
-        unsafe { flock(file.as_raw_fd(), LOCK_EX | LOCK_NB) == 0 }
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::io::AsRawHandle;
-        use windows_sys::Win32::Foundation::TRUE;
-        use windows_sys::Win32::Storage::FileSystem::{
-            LockFileEx, LOCKFILE_EXCLUSIVE_LOCK, LOCKFILE_FAIL_IMMEDIATELY,
-        };
-        use windows_sys::Win32::System::IO::OVERLAPPED;
-        let mut overlapped: OVERLAPPED = unsafe { std::mem::zeroed() };
-        unsafe {
-            LockFileEx(
-                file.as_raw_handle(),
-                LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
-                0,
-                u32::MAX,
-                u32::MAX,
-                &mut overlapped,
-            ) == TRUE
-        }
-    }
+    fs2::FileExt::try_lock_exclusive(file).is_ok()
 }
 
 fn unlock_exclusive(file: &File) {
-    #[cfg(unix)]
-    {
-        use std::os::unix::io::AsRawFd;
-        const LOCK_UN: i32 = 8;
-        extern "C" {
-            fn flock(fd: i32, operation: i32) -> i32;
-        }
-        unsafe {
-            flock(file.as_raw_fd(), LOCK_UN);
-        }
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::io::AsRawHandle;
-        use windows_sys::Win32::Storage::FileSystem::UnlockFileEx;
-        use windows_sys::Win32::System::IO::OVERLAPPED;
-        let mut overlapped: OVERLAPPED = unsafe { std::mem::zeroed() };
-        unsafe {
-            UnlockFileEx(file.as_raw_handle(), 0, u32::MAX, u32::MAX, &mut overlapped);
-        }
-    }
+    let _ = fs2::FileExt::unlock(file);
 }
 
 pub fn try_lock_session(session_id: &str) -> Result<SessionLock, String> {
