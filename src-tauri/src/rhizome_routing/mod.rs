@@ -62,6 +62,39 @@ impl Clock for SystemClock {
     }
 }
 
+/// One routing fact for the UI: which provider the router tried, and what
+/// happened. It is live coordination. The model does not see it, so the
+/// loop does not log it. `reason` is an error class, never a response body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProviderAttempt {
+    /// The router sent the step to this target.
+    Trying {
+        provider_id: String,
+        model_id: String,
+    },
+    /// The target failed before any output, so the router moves on.
+    FailedOver {
+        provider_id: String,
+        model_id: String,
+        reason: ModelErrorKind,
+    },
+    /// The first output from this target reached the loop.
+    Answered {
+        provider_id: String,
+        model_id: String,
+    },
+    /// The target failed after the loop saw output. No failover follows.
+    FailedAfterOutput {
+        provider_id: String,
+        model_id: String,
+        reason: ModelErrorKind,
+    },
+    /// No target finished the step.
+    Exhausted { reason: ModelErrorKind },
+}
+
+type AttemptObserver = Box<dyn FnMut(ProviderAttempt) + Send>;
+
 /// Routes each loop step to the first healthy free-tier target.
 pub struct RoutingModel<K: KeyStore, C: Clock> {
     catalog: Catalog,
@@ -72,6 +105,7 @@ pub struct RoutingModel<K: KeyStore, C: Clock> {
     budget: Millis,
     limits: HttpLimits,
     inner: Option<ProviderModel>,
+    observer: Option<AttemptObserver>,
 }
 
 impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
@@ -85,7 +119,15 @@ impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
             budget: RETRY_BUDGET,
             limits,
             inner: None,
+            observer: None,
         }
+    }
+
+    /// Reports each provider attempt, for the Chat activity line (step
+    /// 4c). Without an observer, routing is unchanged.
+    pub fn with_observer(mut self, observer: impl FnMut(ProviderAttempt) + Send + 'static) -> Self {
+        self.observer = Some(Box::new(observer));
+        self
     }
 
     /// Opt-in providers and strict mode. The default routes the default-on
@@ -113,6 +155,7 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             budget,
             limits,
             inner,
+            observer: _,
         } = self;
         let started = clock.now_ms();
         let mut tried = 0;
@@ -721,5 +764,146 @@ mod tests {
 
         assert_eq!(run(&mut router), done("hard"));
         assert!(soft.requests.lock().unwrap().is_empty());
+    }
+
+    fn observed(
+        router: RoutingModel<FakeKeys, FakeClock>,
+    ) -> (
+        RoutingModel<FakeKeys, FakeClock>,
+        Arc<std::sync::Mutex<Vec<ProviderAttempt>>>,
+    ) {
+        let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let log = Arc::clone(&seen);
+        let router = router.with_observer(move |attempt| log.lock().unwrap().push(attempt));
+        (router, seen)
+    }
+
+    fn trying(id: &str) -> ProviderAttempt {
+        ProviderAttempt::Trying {
+            provider_id: id.into(),
+            model_id: format!("{id}-model"),
+        }
+    }
+
+    fn answered(id: &str) -> ProviderAttempt {
+        ProviderAttempt::Answered {
+            provider_id: id.into(),
+            model_id: format!("{id}-model"),
+        }
+    }
+
+    #[test]
+    fn observer_sees_failover_then_answer() {
+        let first = serve(vec![http_response(
+            "429 Too Many Requests",
+            &["Retry-After: 30"],
+            "slow down",
+        )]);
+        let second = serve(vec![reply("ok")]);
+        let (mut router, seen) = observed(RoutingModel::new(
+            catalog(&[("a", &first.base_url), ("b", &second.base_url)]),
+            keys(&["a", "b"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        ));
+
+        assert_eq!(run(&mut router), done("ok"));
+
+        assert_eq!(
+            *seen.lock().unwrap(),
+            vec![
+                trying("a"),
+                ProviderAttempt::FailedOver {
+                    provider_id: "a".into(),
+                    model_id: "a-model".into(),
+                    reason: ModelErrorKind::RateLimited {
+                        retry_after_secs: Some(30)
+                    },
+                },
+                trying("b"),
+                answered("b"),
+            ]
+        );
+    }
+
+    #[test]
+    fn observer_reason_has_no_response_body() {
+        let first = serve(vec![http_response(
+            "503 Service Unavailable",
+            &[],
+            "secret-upstream-detail",
+        )]);
+        let second = serve(vec![reply("ok")]);
+        let (mut router, seen) = observed(RoutingModel::new(
+            catalog(&[("a", &first.base_url), ("b", &second.base_url)]),
+            keys(&["a", "b"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        ));
+
+        run(&mut router);
+
+        let seen = format!("{:?}", seen.lock().unwrap());
+        assert!(seen.contains("FailedOver"), "{seen}");
+        assert!(!seen.contains("secret-upstream-detail"), "{seen}");
+    }
+
+    #[test]
+    fn observer_sees_a_failure_after_output_and_no_failover() {
+        let first = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"part"}}]}"#,
+            r#"{"error":{"message":"boom"}}"#,
+        ])]);
+        let second = serve(vec![]);
+        let (mut router, seen) = observed(RoutingModel::new(
+            catalog(&[("a", &first.base_url), ("b", &second.base_url)]),
+            keys(&["a", "b"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        ));
+
+        run(&mut router);
+
+        assert_eq!(
+            *seen.lock().unwrap(),
+            vec![
+                trying("a"),
+                answered("a"),
+                ProviderAttempt::FailedAfterOutput {
+                    provider_id: "a".into(),
+                    model_id: "a-model".into(),
+                    reason: ModelErrorKind::Unavailable,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn observer_sees_exhausted_and_no_attempt_for_a_keyless_provider() {
+        let first = serve(vec![]);
+        let second = serve(vec![http_response("503 Service Unavailable", &[], "down")]);
+        let (mut router, seen) = observed(RoutingModel::new(
+            catalog(&[("a", &first.base_url), ("b", &second.base_url)]),
+            keys(&["b"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        ));
+
+        run(&mut router);
+
+        assert_eq!(
+            *seen.lock().unwrap(),
+            vec![
+                trying("b"),
+                ProviderAttempt::FailedOver {
+                    provider_id: "b".into(),
+                    model_id: "b-model".into(),
+                    reason: ModelErrorKind::Unavailable,
+                },
+                ProviderAttempt::Exhausted {
+                    reason: ModelErrorKind::Unavailable,
+                },
+            ]
+        );
     }
 }
