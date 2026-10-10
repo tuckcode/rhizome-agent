@@ -2,7 +2,9 @@
 //!
 //! ACP (`acp_client::permission`) and the Rhizome loop both use this.
 //! Safe selects a reject option. Power User selects allow-once, not
-//! allow-always. An empty option list cancels (fail-closed).
+//! allow-session or allow-always. An empty option list cancels
+//! (fail-closed). `is_allow_session` classifies the wider grant so a
+//! waiter can apply it; `decide` never picks it.
 
 use crate::ai_agents::AiAgentPermissionMode;
 
@@ -47,8 +49,7 @@ impl OptionClass {
         let id = option.id.as_str();
         match self {
             Self::AllowOnce => {
-                kind_is(kind, &["allow_once"])
-                    || id_is(id, &["allow_once", "allow-once", "allow_session"])
+                kind_is(kind, &["allow_once"]) || id_is(id, &["allow_once", "allow-once"])
             }
             Self::Reject => {
                 kind_is(kind, &["reject_once", "reject_always"])
