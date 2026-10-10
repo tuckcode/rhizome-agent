@@ -95,7 +95,7 @@ describe('FreeTierSettings', () => {
     )
     expect(trackEventMock).toHaveBeenCalledWith('free_tier_provider_toggled', {
       provider_id: 'mistral',
-      enabled: false,
+      enabled: 0,
     })
   })
 

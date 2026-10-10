@@ -21,6 +21,35 @@ import type {
 import { MOCK_CONTENT } from './mock-content'
 import { MOCK_ENTRIES } from './mock-entries'
 
+/** Browser-dev stand-in for the free-tier settings commands (step 3b). */
+const MOCK_FREE_TIER_PROVIDERS = [
+  { id: 'groq', name: 'Groq', defaultOn: true, hardStop: true },
+  { id: 'mistral', name: 'Mistral', defaultOn: true, hardStop: false },
+  { id: 'llm7', name: 'LLM7', defaultOn: true, hardStop: false },
+  { id: 'openrouter', name: 'OpenRouter', defaultOn: true, hardStop: false },
+  { id: 'nvidia', name: 'NVIDIA NIM', defaultOn: true, hardStop: false },
+  { id: 'cloudflare-ai', name: 'Cloudflare Workers AI', defaultOn: false, hardStop: false },
+]
+let mockFreeTierSettings = { disabled: [] as string[], optIn: [] as string[], strict: false }
+
+function mockFreeTierOverview() {
+  const providers = MOCK_FREE_TIER_PROVIDERS.map((provider) => ({
+    ...provider,
+    enabled: (provider.defaultOn || mockFreeTierSettings.optIn.includes(provider.id))
+      && !mockFreeTierSettings.disabled.includes(provider.id),
+    hasKey: false,
+    needsAccountId: provider.id === 'cloudflare-ai',
+    hasAccountId: false,
+    billingWarning: provider.id === 'cloudflare-ai'
+      ? 'A card on file with Cloudflare could be billed when Workers AI use passes the free 10K Neurons per day. Turn this on only if you accept that.'
+      : null,
+  }))
+  const routeOrder = providers
+    .filter((provider) => provider.enabled && (!mockFreeTierSettings.strict || provider.hardStop))
+    .map((provider) => provider.id)
+  return { providers, strict: mockFreeTierSettings.strict, routeOrder, usable: false }
+}
+
 function syncWindowContent(): void {
   if (typeof window !== 'undefined') {
     window.__mockContent = MOCK_CONTENT
@@ -641,6 +670,11 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     successorId: null,
   }),
   native_chat_delete: () => null,
+  get_free_tier_overview: () => mockFreeTierOverview(),
+  save_free_tier_settings: (args: { settings?: typeof mockFreeTierSettings }) => {
+    if (args?.settings) mockFreeTierSettings = args.settings
+    return mockFreeTierOverview()
+  },
   list_prime_sessions: () => [
     {
       name: [
