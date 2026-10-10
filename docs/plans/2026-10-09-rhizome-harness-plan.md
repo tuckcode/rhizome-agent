@@ -2,6 +2,7 @@
 
 **Origin:** Cursor Grok 4.6 · 2026-10-09 · implements ADR-0180
 **Updated:** Cursor Grok 4.6 · 2026-10-10 · knispo answers folded in as decisions
+**Updated:** Cursor Grok 4.6 · 2026-10-10 · Phase 4b points at ADR-0182
 **Status:** plan only. This PR writes no product code.
 **Binding decision:** [ADR-0180](../adr/0180-rhizome-is-its-own-harness.md) — Rhizome is its own harness. That ADR is on `main`.
 
@@ -228,13 +229,15 @@ Live LAN dogfood is **not** a CI gate. Note it in the PR if someone ran it.
 
 ### Phase 4b — Free providers + fallback routing
 
+**Decision:** [ADR-0182](../adr/0182-free-tier-provider-routing.md) (proposed). Option A: port OmniRoute provider entries, free-model rows, and three-layer cooldown rules into a small Rust `Model` / provider-routing module with fixed-priority fallback. freellmapi is a checklist only. Do not copy the hosted catalog at `freellmapi.co`. No shipped sidecar. Catalog membership and the six defaults in that ADR are proposals pending knispo.
+
 **Scope.** Rebuild OmniRoute’s *goal* in Rhizome’s Rust model layer: (a) a catalog of free providers/models, and (b) automatic fallback to the next provider/model when one fails, is rate-limited, or its free quota is exhausted. Idea-only port. Check the MIT licence and record the source commit in `docs/vendored-sources.md` if any file is copied.
 
 Not in this phase: an outward OpenAI-compatible server; a usage dashboard; OmniRoute’s TypeScript process; serving other apps.
 
 **Files likely touched.**
 
-- `src-tauri/src/ai_models.rs` or new `src-tauri/src/rhizome_loop/routing.rs`
+- New routing module beside `ai_models` / `ProviderModel` (#105). Do not edit `rhizome_loop` or `stream_model_events`. See ADR-0182.
 - A free-tier catalog next to `src/shared/aiModelProviderCatalog.json` (or a `free: true` / `keyless: true` mark on rows)
 - Tests beside the router. No Chat wiring.
 
@@ -325,7 +328,7 @@ knispo, 2026-10-09. Coding agents treat these as settled.
 **Still open (ask if the phase cannot pick a default)**
 
 - Toggle surface in Phase 6: Settings, composer, or both? If unclear at implementation time, stop and ask. Do not ship two controls.
-- Phase 4b first catalog: which free providers, and in what fallback order?
+- Phase 4b first catalog: which free providers, and in what fallback order? Proposed defaults are in [ADR-0182](../adr/0182-free-tier-provider-routing.md) (pending knispo).
 - Native keep-running / Keep working: later, not this plan.
 - OmniRoute-shaped usage dashboard: later, not scheduled.
 
@@ -349,6 +352,7 @@ knispo, 2026-10-09. Coding agents treat these as settled.
 ## Pointers
 
 - ADR-0180 (binding, on `main`): [`docs/adr/0180-rhizome-is-its-own-harness.md`](../adr/0180-rhizome-is-its-own-harness.md)
+- ADR-0182 (Phase 4b routing, proposed): [`docs/adr/0182-free-tier-provider-routing.md`](../adr/0182-free-tier-provider-routing.md)
 - ADR-0179 close/quit: [PR #88](https://github.com/tuckcode/rhizome-agent/pull/88) (may still be open)
 - ADR-0163 Prime transport, ADR-0167 client-owned sessions, ADR-0178 ACP
 - Vendored index: [`docs/vendored-sources.md`](../vendored-sources.md)

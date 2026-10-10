@@ -218,3 +218,4 @@ proposed → active → superseded
 | [0179](0179-red-close-quits-unless-keep-in-taskbar.md) | Red close quits unless keep in taskbar | active |
 | [0180](0180-rhizome-is-its-own-harness.md) | Rhizome is its own harness | active |
 | [0181](0181-pr-branches-with-full-gates.md) | PR branches with full pre-push gates | active |
+| [0182](0182-free-tier-provider-routing.md) | Free-tier provider routing ports OmniRoute rules | proposed |
