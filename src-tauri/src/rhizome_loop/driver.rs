@@ -1,16 +1,33 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use super::fake_model::FakeModel;
-use super::types::{DurableEvent, ModelView};
+use crate::ai_agents::AiAgentPermissionMode;
+
+use super::fake_model::{FakeModel, ScriptPart};
+use super::policy::{self, Ruling};
+use super::tools;
+use super::types::{DurableEvent, HistoryItem, ModelView};
+
+/// Reply from a human approval wait. `Cancelled` is timeout or no UI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApprovalReply {
+    AllowOnce,
+    Deny,
+    Cancelled,
+}
+
+type ApprovalWaiter = Box<dyn FnMut(&str) -> ApprovalReply + Send>;
 
 struct Shared {
     inbox: VecDeque<String>,
     log: Vec<DurableEvent>,
+    history: Vec<HistoryItem>,
     step_active: bool,
     cancel_cause: Option<String>,
-    /// User texts whose turns already logged `TurnEnd`.
-    prior_users: Vec<String>,
+    mode: AiAgentPermissionMode,
+    /// Name and args already consumed by an allow-once grant.
+    grants: Vec<(String, String)>,
+    waiter: Option<ApprovalWaiter>,
 }
 
 /// Clears `step_active` when the step returns, including on cancel.
@@ -45,9 +62,12 @@ impl AgentLoop {
             shared: Arc::new(Mutex::new(Shared {
                 inbox: VecDeque::new(),
                 log: Vec::new(),
+                history: Vec::new(),
                 step_active: false,
                 cancel_cause: None,
-                prior_users: Vec::new(),
+                mode: AiAgentPermissionMode::Safe,
+                grants: Vec::new(),
+                waiter: None,
             })),
         }
     }
@@ -56,11 +76,24 @@ impl AgentLoop {
         self.lock().inbox.push_back(text.into());
     }
 
+    /// Sets a cancel cause while a step is running.
+    /// A cancel while idle does not stick.
     pub fn cancel(&self, cause: impl Into<String>) {
         let mut shared = self.lock();
+        if !shared.step_active {
+            return;
+        }
         if shared.cancel_cause.is_none() {
             shared.cancel_cause = Some(cause.into());
         }
+    }
+
+    pub fn set_permission_mode(&self, mode: AiAgentPermissionMode) {
+        self.lock().mode = mode;
+    }
+
+    pub fn set_approval_waiter(&self, waiter: impl FnMut(&str) -> ApprovalReply + Send + 'static) {
+        self.lock().waiter = Some(Box::new(waiter));
     }
 
     /// True when the inbox is empty and no step is running.
@@ -73,53 +106,154 @@ impl AgentLoop {
         self.lock().log.clone()
     }
 
-    /// Drain the inbox. One turn at a time. Cancel stops this run.
+    /// Drain the inbox. One turn at a time. A cancel ends that turn only.
     pub fn run_until_idle(&self, model: &mut FakeModel) {
         loop {
             let admitted = self.lock().inbox.pop_front();
             let Some(admitted) = admitted else {
                 return;
             };
-            if self.drive_turn(model, admitted) {
-                return;
+            self.drive_turn(model, admitted);
+        }
+    }
+
+    fn drive_turn(&self, model: &mut FakeModel, admitted: String) {
+        {
+            let mut shared = self.lock();
+            shared.cancel_cause = None;
+        }
+        let _step = StepGuard::enter(&self.shared);
+        let history_mark = {
+            let mut shared = self.lock();
+            let mark = shared.history.len();
+            shared.log.push(DurableEvent::User {
+                text: admitted.clone(),
+            });
+            mark
+        };
+
+        let mut assistant = String::new();
+        loop {
+            if self.is_cancelled() {
+                break;
+            }
+            let view = self.model_view(&admitted);
+            let mut parts = Vec::new();
+            let shared = Arc::clone(&self.shared);
+            let had_round = model.complete(&view, &mut |part| {
+                let cancelled = shared.lock().expect("rhizome loop").cancel_cause.is_some();
+                if cancelled {
+                    return false;
+                }
+                parts.push(part);
+                true
+            });
+            if !had_round {
+                break;
+            }
+            let mut saw_tool = false;
+            for part in parts {
+                match part {
+                    ScriptPart::Text(chunk) => assistant.push_str(&chunk),
+                    ScriptPart::Tool { name, args } => {
+                        saw_tool = true;
+                        self.dispatch_tool(&name, &args);
+                    }
+                }
+            }
+            if self.is_cancelled() || !saw_tool {
+                break;
+            }
+        }
+
+        let mut shared = self.lock();
+        let cause = shared.cancel_cause.take();
+        if !assistant.is_empty() {
+            shared.history.push(HistoryItem::Assistant {
+                text: assistant.clone(),
+            });
+            shared.log.push(DurableEvent::Assistant { text: assistant });
+        }
+        shared
+            .history
+            .insert(history_mark, HistoryItem::User { text: admitted });
+        if let Some(cause) = cause {
+            shared.log.push(DurableEvent::Cancelled { cause });
+        } else {
+            shared.log.push(DurableEvent::TurnEnd);
+        }
+    }
+
+    fn model_view(&self, admitted: &str) -> ModelView {
+        let shared = self.lock();
+        ModelView {
+            admitted: admitted.to_string(),
+            history: shared.history.clone(),
+            offered_tools: policy::offered_tools(shared.mode),
+        }
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.lock().cancel_cause.is_some()
+    }
+
+    fn dispatch_tool(&self, name: &str, args: &str) {
+        let (mode, grant_spent) = {
+            let shared = self.lock();
+            let grant_spent = shared
+                .grants
+                .iter()
+                .any(|(spent_name, spent_args)| spent_name == name && spent_args == args);
+            (shared.mode, grant_spent)
+        };
+        match policy::rule_tool(mode, name, grant_spent) {
+            Ruling::Run { spend_grant } => self.record_run(name, args, spend_grant),
+            Ruling::Deny { reason } => self.record_denial(name, reason),
+            Ruling::Ask => self.ask_then_finish(name, args),
+        }
+    }
+
+    fn ask_then_finish(&self, name: &str, args: &str) {
+        let mut waiter = self.lock().waiter.take();
+        let reply = match waiter.as_mut() {
+            Some(wait) => wait(name),
+            None => ApprovalReply::Cancelled,
+        };
+        self.lock().waiter = waiter;
+        match reply {
+            ApprovalReply::AllowOnce => self.record_run(name, args, true),
+            ApprovalReply::Deny | ApprovalReply::Cancelled => {
+                self.record_denial(name, "approval cancelled".into());
             }
         }
     }
 
-    /// Returns true when the turn was cancelled.
-    fn drive_turn(&self, model: &mut FakeModel, admitted: String) -> bool {
-        let _step = StepGuard::enter(&self.shared);
-        let view = {
-            let mut shared = self.lock();
-            let view = ModelView {
-                admitted: admitted.clone(),
-                prior_users: shared.prior_users.clone(),
-            };
-            shared.log.push(DurableEvent::User { text: admitted });
-            view
-        };
-
-        let mut chunks = Vec::new();
-        let shared = Arc::clone(&self.shared);
-        model.complete(&view, &mut |chunk| {
-            let cancelled = shared.lock().expect("rhizome loop").cancel_cause.is_some();
-            if cancelled {
-                return false;
-            }
-            chunks.push(chunk.to_string());
-            true
-        });
-
+    fn record_run(&self, name: &str, args: &str, spend_grant: bool) {
+        let output = tools::execute_allowed(args);
         let mut shared = self.lock();
-        let text = chunks.concat();
-        shared.log.push(DurableEvent::Assistant { text });
-        if let Some(cause) = shared.cancel_cause.clone() {
-            shared.log.push(DurableEvent::Cancelled { cause });
-            return true;
+        if spend_grant {
+            shared.grants.push((name.to_string(), args.to_string()));
         }
-        shared.prior_users.push(view.admitted);
-        shared.log.push(DurableEvent::TurnEnd);
-        false
+        shared.log.push(DurableEvent::ToolResult {
+            name: name.to_string(),
+            output: output.clone(),
+        });
+        shared.history.push(HistoryItem::ToolResult {
+            name: name.to_string(),
+            output,
+        });
+    }
+
+    fn record_denial(&self, name: &str, reason: String) {
+        let mut shared = self.lock();
+        shared.log.push(DurableEvent::ToolDenied {
+            name: name.to_string(),
+            reason: reason.clone(),
+        });
+        shared.history.push(HistoryItem::ToolDenied {
+            name: name.to_string(),
+            reason,
+        });
     }
 
     fn lock(&self) -> MutexGuard<'_, Shared> {

@@ -3,14 +3,27 @@
 pub enum DurableEvent {
     User { text: String },
     Assistant { text: String },
+    ToolResult { name: String, output: String },
+    ToolDenied { name: String, reason: String },
     TurnEnd,
     Cancelled { cause: String },
+}
+
+/// One model-visible fact from earlier in the session.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HistoryItem {
+    User { text: String },
+    Assistant { text: String },
+    ToolResult { name: String, output: String },
+    ToolDenied { name: String, reason: String },
 }
 
 /// What one model call is allowed to see. Inbox items are not included.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelView {
     pub admitted: String,
-    /// User texts from turns that already logged `TurnEnd`.
-    pub prior_users: Vec<String>,
+    /// Ordered user, assistant, and tool facts already logged.
+    /// The current admitted message is not repeated here.
+    pub history: Vec<HistoryItem>,
+    pub offered_tools: Vec<String>,
 }
