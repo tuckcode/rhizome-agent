@@ -2,8 +2,9 @@
 type: ADR
 id: "0021"
 title: "Push directly to main (no PRs or branches)"
-status: active
+status: superseded
 date: 2026-03-02
+superseded_by: "0181"
 ---
 
 ## Context

@@ -110,57 +110,16 @@ ensure_node_tooling() {
   fi
 }
 
-# A `prototype/*` branch is throwaway code kept as a primary source: the
-# measurement or spike that settled a decision, parked out of main so the
-# number can be re-run later instead of re-derived. It never merges, so the
-# main-only rule does not need to cover it — and the full gate suite does not
-# either, since prototype code is written without tests or error handling by
-# design. See `docs/adr/` and the `prototype` skill.
-IS_PROTOTYPE_BRANCH=false
-
-require_main_push() {
-  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-  case "$CURRENT_BRANCH" in
-    prototype/*)
-      IS_PROTOTYPE_BRANCH=true
-      ;;
-    main | HEAD)
-      ;;
-    *)
-      echo "❌ Pushes must happen from main, a detached HEAD pushed directly to main, or a prototype/* branch. Current branch: $CURRENT_BRANCH"
-      exit 1
-      ;;
-  esac
-
-  while IFS=' ' read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
-    [ -z "$LOCAL_REF" ] && continue
-
-    case "$LOCAL_REF:$REMOTE_REF" in
-      refs/heads/main:refs/heads/main)
-        ;;
-      HEAD:refs/heads/main)
-        ;;
-      refs/tags/*:refs/tags/*)
-        ;;
-      refs/heads/prototype/*:refs/heads/prototype/*)
-        ;;
-      *)
-        echo "❌ Pushes must be main -> main, a tag, or prototype/* -> the same prototype/*."
-        echo "   Attempted: ${LOCAL_REF:-<none>} -> ${REMOTE_REF:-<none>}"
-        exit 1
-        ;;
-    esac
-  done <<EOF
-$PUSH_INPUT
-EOF
-}
+# shellcheck disable=SC1091
+. "$HOOK_DIR/push-refs.sh"
 
 if [ -t 0 ]; then
   PUSH_INPUT=""
 else
   PUSH_INPUT=$(cat)
 fi
-require_main_push
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+check_push_refs
 
 if [ "$IS_PROTOTYPE_BRANCH" = true ]; then
   echo ""

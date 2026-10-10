@@ -2,7 +2,9 @@
 //!
 //! ACP (`acp_client::permission`) and the Rhizome loop both use this.
 //! Safe selects a reject option. Power User selects allow-once, not
-//! allow-always. An empty option list cancels (fail-closed).
+//! allow-session or allow-always. An empty option list cancels
+//! (fail-closed). `is_allow_session` classifies the wider grant so a
+//! waiter can apply it; `decide` never picks it.
 
 use crate::ai_agents::AiAgentPermissionMode;
 
@@ -47,8 +49,8 @@ impl OptionClass {
         let id = option.id.as_str();
         match self {
             Self::AllowOnce => {
-                kind_is(kind, &["allow_once"])
-                    || id_is(id, &["allow_once", "allow-once", "allow_session"])
+                !is_allow_session(option)
+                    && (kind_is(kind, &["allow_once"]) || id_is(id, &["allow_once", "allow-once"]))
             }
             Self::Reject => {
                 kind_is(kind, &["reject_once", "reject_always"])
@@ -68,4 +70,51 @@ fn id_is(id: &str, allowed: &[&str]) -> bool {
     allowed
         .iter()
         .any(|candidate| id.eq_ignore_ascii_case(candidate))
+}
+
+/// Session-scoped allow. Not allow-once and not allow-always.
+/// Power User does not auto-select this option.
+pub(crate) fn is_allow_session(option: &PolicyOption) -> bool {
+    id_is(option.id.as_str(), &["allow_session", "allow-session"])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn option(id: &str, kind: &str) -> PolicyOption {
+        PolicyOption {
+            id: id.into(),
+            kind: Some(kind.into()),
+        }
+    }
+
+    #[test]
+    fn power_user_picks_allow_once_when_session_is_listed_first() {
+        let options = [
+            option("allow_session", "allow_always"),
+            option("allow_once", "allow_once"),
+            option("deny", "reject_once"),
+        ];
+        assert_eq!(
+            decide(AiAgentPermissionMode::PowerUser, &options),
+            PolicyDecision::Selected("allow_once".into())
+        );
+    }
+
+    #[test]
+    fn power_user_does_not_treat_allow_session_as_allow_once() {
+        let options = [option("allow_session", "allow_always")];
+        assert_eq!(
+            decide(AiAgentPermissionMode::PowerUser, &options),
+            PolicyDecision::Cancelled
+        );
+    }
+
+    #[test]
+    fn allow_session_is_its_own_class() {
+        let session = option("allow_session", "allow_always");
+        assert!(is_allow_session(&session));
+        assert!(!OptionClass::AllowOnce.matches(&session));
+    }
 }
