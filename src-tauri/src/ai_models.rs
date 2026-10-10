@@ -7,6 +7,8 @@ use std::path::Path;
 use std::sync::OnceLock;
 
 mod openai_stream;
+#[cfg(test)]
+pub(crate) mod test_server;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -254,7 +256,18 @@ pub fn stream_model_events_with(
     limits: HttpLimits,
     emit: &mut dyn FnMut(ModelEvent) -> bool,
 ) {
-    let response = match open_model_event_stream(request, limits) {
+    let payload = crate::ai_model_tools::openai_chat_payload(request);
+    stream_payload(request, payload, limits, emit);
+}
+
+fn stream_payload(
+    request: &AiModelStreamRequest,
+    mut payload: serde_json::Value,
+    limits: HttpLimits,
+    emit: &mut dyn FnMut(ModelEvent) -> bool,
+) {
+    payload["stream"] = serde_json::Value::Bool(true);
+    let response = match open_model_event_stream(request, &payload, limits) {
         Ok(response) => response,
         Err(error) => {
             emit(ModelEvent::Error(error));
@@ -327,8 +340,35 @@ pub fn discover_ai_model_ids_with(
         .collect())
 }
 
+/// Streams a chat that the caller built, as `ModelEvent`s. Runs no tools.
+///
+/// `messages` are OpenAI chat messages in order, after the system prompt.
+/// The system prompt, provider, model, and API key come from `request`.
+/// `request.message` is not sent. `tools` are OpenAI tool definitions.
+/// Error and stop rules are the same as `stream_model_events`.
+pub fn stream_chat_events_with(
+    request: &AiModelStreamRequest,
+    messages: Vec<serde_json::Value>,
+    tools: Vec<serde_json::Value>,
+    limits: HttpLimits,
+    emit: &mut dyn FnMut(ModelEvent) -> bool,
+) {
+    let system = non_empty_option(request.system_prompt.as_deref())
+        .map(|prompt| serde_json::json!({ "role": "system", "content": prompt }));
+    let mut payload = serde_json::json!({
+        "model": request.model_id,
+        "messages": system.into_iter().chain(messages).collect::<Vec<_>>(),
+    });
+    if !tools.is_empty() {
+        payload["tools"] = serde_json::Value::Array(tools);
+        payload["tool_choice"] = serde_json::Value::String("auto".into());
+    }
+    stream_payload(request, payload, limits, emit);
+}
+
 fn open_model_event_stream(
     request: &AiModelStreamRequest,
+    payload: &serde_json::Value,
     limits: HttpLimits,
 ) -> Result<reqwest::blocking::Response, ModelError> {
     if request.provider.kind == AiModelProviderKind::Anthropic {
@@ -338,11 +378,9 @@ fn open_model_event_stream(
         ));
     }
     let endpoint = rejected_on_err(chat_completions_url(request))?;
-    let mut payload = crate::ai_model_tools::openai_chat_payload(request);
-    payload["stream"] = serde_json::Value::Bool(true);
     let client = http_client(limits)?;
     let builder = auth_on_err(apply_auth_headers(
-        client.post(endpoint).json(&payload),
+        client.post(endpoint).json(payload),
         request,
     ))?;
     send_checked(apply_provider_headers(builder, request))
@@ -770,6 +808,7 @@ fn truncate_error(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::test_server::{http_response, serve, serve_silent, sse, TEST_LIMITS};
     use super::*;
     use serde_json::json;
 
@@ -1075,102 +1114,6 @@ mod tests {
         assert_eq!(read_secrets_at(&path).unwrap(), secrets);
     }
 
-    const TEST_IO_LIMIT: std::time::Duration = std::time::Duration::from_secs(3);
-
-    /// Short client limits, so a stuck HTTP test fails in seconds. The
-    /// production limits stay `HttpLimits::STREAM` and `DISCOVER`.
-    const TEST_LIMITS: HttpLimits = HttpLimits {
-        connect: std::time::Duration::from_secs(2),
-        total: std::time::Duration::from_secs(5),
-    };
-
-    /// A local HTTP server that answers each connection with the next
-    /// canned response, then closes. It records "METHOD PATH" and the body.
-    /// It binds port 0, so the OS picks a free port.
-    struct TestServer {
-        base_url: String,
-        requests: std::sync::Arc<std::sync::Mutex<Vec<(String, String)>>>,
-    }
-
-    fn serve(responses: Vec<String>) -> TestServer {
-        use std::io::{BufRead, BufReader, Read, Write};
-
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let base_url = format!("http://{}/v1", listener.local_addr().unwrap());
-        let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-        let seen = std::sync::Arc::clone(&requests);
-        std::thread::spawn(move || {
-            for response in responses {
-                let Ok((mut stream, _)) = listener.accept() else {
-                    return;
-                };
-                // A stuck client ends this connection in seconds. The
-                // dropped stream then fails the client side fast too.
-                stream.set_read_timeout(Some(TEST_IO_LIMIT)).unwrap();
-                stream.set_write_timeout(Some(TEST_IO_LIMIT)).unwrap();
-                let mut reader = BufReader::new(stream.try_clone().unwrap());
-                let mut request_line = String::new();
-                reader.read_line(&mut request_line).unwrap();
-                let mut content_length = 0;
-                loop {
-                    let mut header = String::new();
-                    reader.read_line(&mut header).unwrap();
-                    if header.trim().is_empty() {
-                        break;
-                    }
-                    if let Some(value) = header.to_ascii_lowercase().strip_prefix("content-length:")
-                    {
-                        content_length = value.trim().parse().unwrap();
-                    }
-                }
-                let mut body = vec![0; content_length];
-                reader.read_exact(&mut body).unwrap();
-                let target = request_line
-                    .split_whitespace()
-                    .take(2)
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                seen.lock()
-                    .unwrap()
-                    .push((target, String::from_utf8(body).unwrap()));
-                stream.write_all(response.as_bytes()).unwrap();
-            }
-        });
-        TestServer { base_url, requests }
-    }
-
-    /// Accepts one connection and never answers it.
-    fn serve_silent() -> String {
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let base_url = format!("http://{}/v1", listener.local_addr().unwrap());
-        std::thread::spawn(move || {
-            if let Ok((stream, _)) = listener.accept() {
-                std::thread::sleep(std::time::Duration::from_secs(30));
-                drop(stream);
-            }
-        });
-        base_url
-    }
-
-    fn http_response(status: &str, headers: &[&str], body: &str) -> String {
-        let mut response = format!("HTTP/1.1 {status}\r\nConnection: close\r\n");
-        for header in headers {
-            response.push_str(header);
-            response.push_str("\r\n");
-        }
-        response.push_str("\r\n");
-        response.push_str(body);
-        response
-    }
-
-    fn sse(lines: &[&str]) -> String {
-        let body = lines
-            .iter()
-            .map(|line| format!("data: {line}\n\n"))
-            .collect::<String>();
-        http_response("200 OK", &["Content-Type: text/event-stream"], &body)
-    }
-
     fn compatible_request(base_url: &str) -> AiModelStreamRequest {
         let mut provider = provider(AiModelProviderKind::LmStudio);
         provider.base_url = Some(base_url.into());
@@ -1189,6 +1132,77 @@ mod tests {
             true
         });
         events
+    }
+
+    #[test]
+    fn stream_chat_events_sends_the_caller_messages_and_tools() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}"#,
+        ])]);
+        let request = compatible_request(&server.base_url);
+        let messages = vec![
+            json!({ "role": "user", "content": "first" }),
+            json!({ "role": "assistant", "content": "reply" }),
+            json!({ "role": "user", "content": "second" }),
+        ];
+        let tools = vec![json!({ "type": "function", "function": { "name": "echo" } })];
+        let mut events = Vec::new();
+
+        stream_chat_events_with(&request, messages, tools, TEST_LIMITS, &mut |event| {
+            events.push(event);
+            true
+        });
+
+        assert_eq!(
+            events,
+            vec![
+                ModelEvent::TextDelta { text: "ok".into() },
+                ModelEvent::Finish {
+                    reason: crate::model_events::FinishReason::Stop
+                },
+            ]
+        );
+        let requests = server.requests.lock().unwrap();
+        let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+        assert_eq!(body["model"], "demo-model");
+        assert_eq!(body["stream"], true);
+        assert_eq!(
+            body["messages"],
+            json!([
+                { "role": "system", "content": "Be concise." },
+                { "role": "user", "content": "first" },
+                { "role": "assistant", "content": "reply" },
+                { "role": "user", "content": "second" },
+            ])
+        );
+        assert_eq!(body["tools"][0]["function"]["name"], "echo");
+        assert_eq!(body["tool_choice"], "auto");
+    }
+
+    #[test]
+    fn stream_chat_events_without_tools_sends_no_tool_fields() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{},"finish_reason":"stop"}]}"#,
+        ])]);
+        let mut request = compatible_request(&server.base_url);
+        request.system_prompt = None;
+
+        stream_chat_events_with(
+            &request,
+            vec![json!({ "role": "user", "content": "hi" })],
+            Vec::new(),
+            TEST_LIMITS,
+            &mut |_| true,
+        );
+
+        let requests = server.requests.lock().unwrap();
+        let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+        assert_eq!(
+            body["messages"],
+            json!([{ "role": "user", "content": "hi" }])
+        );
+        assert!(body.get("tools").is_none());
+        assert!(body.get("tool_choice").is_none());
     }
 
     #[test]
