@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { trackEvent } from '../lib/telemetry'
 import { saveAiModelProviderApiKey } from '../utils/aiProviderSecrets'
 import {
@@ -8,6 +8,7 @@ import {
   settingsFromOverview,
   type FreeTierOverview,
   type FreeTierProviderRow,
+  type FreeTierSettings as FreeTierSettingsValue,
 } from '../utils/freeTierSettings'
 import { Button } from './ui/button'
 import {
@@ -29,18 +30,41 @@ import { Switch } from './ui/switch'
  * is shown and cannot be changed here.
  */
 export function FreeTierSettings() {
+  const state = useFreeTierSettings()
+  const { overview, error } = state
+  if (!overview) {
+    return error ? <ErrorLine error={error} /> : null
+  }
+  return (
+    <div data-testid="free-tier-settings" className="flex flex-col gap-3 rounded-md border border-border bg-card p-3">
+      <div>
+        <div className="text-sm font-medium text-foreground">Free tier (auto)</div>
+        <div className="mt-1 text-xs leading-5 text-muted-foreground">
+          Native Chat can try these free providers in order and move to the next one when a provider fails
+          or runs out of free use. Each needs its own key. Keys are kept in this computer's keychain.
+        </div>
+      </div>
+      {overview.providers.map((row) => (
+        <ProviderRow key={row.id} row={row} onToggle={state.requestToggle} onSaveSecret={state.saveSecret} />
+      ))}
+      <StrictModeRow strict={overview.strict} onChange={state.setStrict} />
+      <FallbackOrder overview={overview} />
+      {overview.usable ? null : (
+        <div className="text-xs text-muted-foreground">
+          Add a key to at least one provider to use Free tier (auto).
+        </div>
+      )}
+      {error ? <ErrorLine error={error} /> : null}
+      <OptInConfirmDialog row={state.pendingOptIn} onCancel={state.cancelOptIn} onConfirm={state.confirmOptIn} />
+    </div>
+  )
+}
+
+/** Loads the overview and owns every change to it. */
+function useFreeTierSettings() {
   const [overview, setOverview] = useState<FreeTierOverview | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pendingOptIn, setPendingOptIn] = useState<FreeTierProviderRow | null>(null)
-
-  const reload = useCallback(async () => {
-    try {
-      setOverview(await getFreeTierOverview())
-      setError(null)
-    } catch (loadError) {
-      setError(messageOf(loadError))
-    }
-  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -57,124 +81,124 @@ export function FreeTierSettings() {
     }
   }, [])
 
-  if (!overview) {
-    return error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null
-  }
-
-  const save = async (next: ReturnType<typeof settingsFromOverview>) => {
+  const run = async (work: () => Promise<FreeTierOverview>) => {
     try {
-      setOverview(await saveFreeTierSettings(next))
+      setOverview(await work())
       setError(null)
-    } catch (saveError) {
-      setError(messageOf(saveError))
+    } catch (workError) {
+      setError(messageOf(workError))
     }
   }
 
-  const setEnabled = async (row: FreeTierProviderRow, enabled: boolean) => {
-    const current = settingsFromOverview(overview)
-    const others = (ids: string[]) => ids.filter((id) => id !== row.id)
-    const next = row.defaultOn
-      ? { ...current, disabled: enabled ? others(current.disabled) : [...others(current.disabled), row.id] }
-      : { ...current, optIn: enabled ? [...others(current.optIn), row.id] : others(current.optIn) }
+  const setEnabled = (row: FreeTierProviderRow, enabled: boolean) => {
+    if (!overview) return
     trackEvent('free_tier_provider_toggled', { provider_id: row.id, enabled: enabled ? 1 : 0 })
-    await save(next)
+    void run(() => saveFreeTierSettings(withProvider(settingsFromOverview(overview), row, enabled)))
   }
 
-  const requestToggle = (row: FreeTierProviderRow, enabled: boolean) => {
-    if (enabled && !row.defaultOn && row.billingWarning) {
-      setPendingOptIn(row)
-      return
-    }
-    void setEnabled(row, enabled)
+  return {
+    overview,
+    error,
+    pendingOptIn,
+    requestToggle: (row: FreeTierProviderRow, enabled: boolean) => {
+      if (enabled && !row.defaultOn && row.billingWarning) setPendingOptIn(row)
+      else setEnabled(row, enabled)
+    },
+    cancelOptIn: () => setPendingOptIn(null),
+    confirmOptIn: () => {
+      const row = pendingOptIn
+      setPendingOptIn(null)
+      if (row) setEnabled(row, true)
+    },
+    setStrict: (strict: boolean) => {
+      if (!overview) return
+      trackEvent('free_tier_strict_toggled', { enabled: strict ? 1 : 0 })
+      void run(() => saveFreeTierSettings({ ...settingsFromOverview(overview), strict }))
+    },
+    saveSecret: (account: string, value: string) =>
+      run(async () => {
+        await saveAiModelProviderApiKey(account, value.trim())
+        return getFreeTierOverview()
+      }),
   }
+}
 
-  const confirmOptIn = () => {
-    const row = pendingOptIn
-    setPendingOptIn(null)
-    if (row) void setEnabled(row, true)
+/** The settings with one provider switched on or off. */
+function withProvider(current: FreeTierSettingsValue, row: FreeTierProviderRow, enabled: boolean): FreeTierSettingsValue {
+  const others = (ids: string[]) => ids.filter((id) => id !== row.id)
+  if (row.defaultOn) {
+    return { ...current, disabled: enabled ? others(current.disabled) : [...others(current.disabled), row.id] }
   }
+  return { ...current, optIn: enabled ? [...others(current.optIn), row.id] : others(current.optIn) }
+}
 
-  const setStrict = (strict: boolean) => {
-    trackEvent('free_tier_strict_toggled', { enabled: strict ? 1 : 0 })
-    void save({ ...settingsFromOverview(overview), strict })
-  }
-
-  const saveSecret = async (account: string, value: string) => {
-    try {
-      await saveAiModelProviderApiKey(account, value.trim())
-      await reload()
-    } catch (saveError) {
-      setError(messageOf(saveError))
-    }
-  }
-
-  const nameOf = (id: string) => overview.providers.find((row) => row.id === id)?.name ?? id
-
+function StrictModeRow({ strict, onChange }: { strict: boolean; onChange: (strict: boolean) => void }) {
   return (
-    <div data-testid="free-tier-settings" className="flex flex-col gap-3 rounded-md border border-border bg-card p-3">
+    <div className="flex items-start justify-between gap-3">
       <div>
-        <div className="text-sm font-medium text-foreground">Free tier (auto)</div>
-        <div className="mt-1 text-xs leading-5 text-muted-foreground">
-          Native Chat can try these free providers in order and move to the next one when a provider fails
-          or runs out of free use. Each needs its own key. Keys are kept in this computer's keychain.
+        <div className="text-xs font-medium text-foreground">Strict mode</div>
+        <div className="text-xs leading-5 text-muted-foreground">
+          Use only providers that document a hard stop at the free limit (Groq today), plus your own endpoint.
         </div>
       </div>
-
-      {overview.providers.map((row) => (
-        <ProviderRow key={row.id} row={row} onToggle={requestToggle} onSaveSecret={saveSecret} />
-      ))}
-
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-xs font-medium text-foreground">Strict mode</div>
-          <div className="text-xs leading-5 text-muted-foreground">
-            Use only providers that document a hard stop at the free limit (Groq today), plus your own endpoint.
-          </div>
-        </div>
-        <Switch aria-label="Strict mode" checked={overview.strict} onCheckedChange={setStrict} />
-      </div>
-
-      <div>
-        <div className="text-xs font-medium text-foreground">Fallback order</div>
-        {overview.routeOrder.length > 0 ? (
-          <ol data-testid="free-tier-route-order" className="mt-1 list-decimal pl-5 text-xs leading-5 text-muted-foreground">
-            {overview.routeOrder.map((id) => (
-              <li key={id}>{nameOf(id)}</li>
-            ))}
-          </ol>
-        ) : (
-          <div data-testid="free-tier-route-order" className="mt-1 text-xs text-muted-foreground">
-            No provider is on.
-          </div>
-        )}
-        <div className="mt-1 text-xs leading-5 text-muted-foreground">The order is fixed.</div>
-      </div>
-
-      {overview.usable ? null : (
-        <div className="text-xs text-muted-foreground">
-          Add a key to at least one provider to use Free tier (auto).
-        </div>
-      )}
-      {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
-
-      <Dialog open={pendingOptIn !== null} onOpenChange={(open) => { if (!open) setPendingOptIn(null) }}>
-        <DialogContent data-testid="free-tier-opt-in-confirm">
-          <DialogHeader>
-            <DialogTitle>Turn on {pendingOptIn?.name}?</DialogTitle>
-            <DialogDescription>{pendingOptIn?.billingWarning}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setPendingOptIn(null)}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={confirmOptIn}>
-              Turn on
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Switch aria-label="Strict mode" checked={strict} onCheckedChange={onChange} />
     </div>
   )
+}
+
+/** Read-only (ADR-0182 decision 5). */
+function FallbackOrder({ overview }: { overview: FreeTierOverview }) {
+  const nameOf = (id: string) => overview.providers.find((row) => row.id === id)?.name ?? id
+  return (
+    <div>
+      <div className="text-xs font-medium text-foreground">Fallback order</div>
+      {overview.routeOrder.length > 0 ? (
+        <ol data-testid="free-tier-route-order" className="mt-1 list-decimal pl-5 text-xs leading-5 text-muted-foreground">
+          {overview.routeOrder.map((id) => (
+            <li key={id}>{nameOf(id)}</li>
+          ))}
+        </ol>
+      ) : (
+        <div data-testid="free-tier-route-order" className="mt-1 text-xs text-muted-foreground">
+          No provider is on.
+        </div>
+      )}
+      <div className="mt-1 text-xs leading-5 text-muted-foreground">The order is fixed.</div>
+    </div>
+  )
+}
+
+function OptInConfirmDialog({
+  row,
+  onCancel,
+  onConfirm,
+}: {
+  row: FreeTierProviderRow | null
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <Dialog open={row !== null} onOpenChange={(open) => { if (!open) onCancel() }}>
+      <DialogContent data-testid="free-tier-opt-in-confirm">
+        <DialogHeader>
+          <DialogTitle>Turn on {row?.name}?</DialogTitle>
+          <DialogDescription>{row?.billingWarning}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="button" onClick={onConfirm}>
+            Turn on
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ErrorLine({ error }: { error: string }) {
+  return <p role="alert" className="text-xs text-destructive">{error}</p>
 }
 
 function ProviderRow({
