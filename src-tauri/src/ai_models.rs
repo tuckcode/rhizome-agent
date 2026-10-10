@@ -236,30 +236,6 @@ impl HttpLimits {
     };
 }
 
-/// Streams one model request as `ModelEvent`s (harness plan Phase 4), with
-/// `HttpLimits::STREAM`.
-///
-/// Runs no tools: a tool call is only data for the Rhizome loop. Every
-/// failure arrives as one `ModelEvent::Error`. `emit` returns false to stop
-/// reading. Then no terminal event follows, because cancel belongs to the
-/// loop. Only OpenAI-compatible providers stream events so far.
-pub fn stream_model_events(
-    request: &AiModelStreamRequest,
-    emit: &mut dyn FnMut(ModelEvent) -> bool,
-) {
-    stream_model_events_with(request, HttpLimits::STREAM, emit);
-}
-
-/// `stream_model_events` with caller-set time limits.
-pub fn stream_model_events_with(
-    request: &AiModelStreamRequest,
-    limits: HttpLimits,
-    emit: &mut dyn FnMut(ModelEvent) -> bool,
-) {
-    let payload = crate::ai_model_tools::openai_chat_payload(request);
-    stream_payload(request, payload, limits, emit);
-}
-
 fn stream_payload(
     request: &AiModelStreamRequest,
     mut payload: serde_json::Value,
@@ -340,12 +316,16 @@ pub fn discover_ai_model_ids_with(
         .collect())
 }
 
-/// Streams a chat that the caller built, as `ModelEvent`s. Runs no tools.
+/// Streams a chat that the caller built, as `ModelEvent`s (harness plan
+/// Phase 4). Runs no tools: a tool call is only data for the Rhizome loop.
 ///
 /// `messages` are OpenAI chat messages in order, after the system prompt.
 /// The system prompt, provider, model, and API key come from `request`.
 /// `request.message` is not sent. `tools` are OpenAI tool definitions.
-/// Error and stop rules are the same as `stream_model_events`.
+///
+/// Every failure arrives as one `ModelEvent::Error`. `emit` returns false
+/// to stop reading. Then no terminal event follows, because cancel belongs
+/// to the loop. Only OpenAI-compatible providers stream events so far.
 pub fn stream_chat_events_with(
     request: &AiModelStreamRequest,
     messages: Vec<serde_json::Value>,
