@@ -453,14 +453,23 @@ Three more answers, from notes N1 to N3 in the second draft:
 | D12 | Step 6 if 6a slips (was N2) | Step 6 still moves the OpenAI-compatible callers to the native engine. The old Anthropic call stays until 6a lands. | 6a, 6 |
 | D13 | Grants after a restart (was N3) | Grants do not carry over. A reopened session starts with no grants, so `bash` is asked again. The reopen warning says so. | 2c, 4 |
 
-**Held for the 2c Cursor PR and its ADR.** Do not start 2c until knispo releases Cursor's build brief. These questions stay open until then. The 2c PR or its ADR answers each one:
+**2c ADR (knispo, 2026-10-10).** The held list is decided in
+[ADR-0183](../adr/0183-save-native-chat-sessions.md). Status `active`.
 
-- Removing secrets from the log before it is written.
-- Two windows that open the same session.
-- Damage in the middle of a log file (2c step 7 covers only a bad last line).
-- Log file size and any cap.
-- A crash during key migration (step 3) between the keychain write and the file update.
-- The 2c ADR itself. 2c adds a storage format, so it needs one (`AGENTS.md` §ADRs).
+- Secrets: known-credential filter on messages and tool results. No
+  encryption and no user-picked exclusions before release. The filter
+  cannot catch every secret.
+- Two windows: the native engine owns writes. One turn at a time.
+  Process lock against a second instance.
+- Damage: stop at the first invalid line, including middle damage. Show
+  the verified prefix. Continue in a new session. Never skip damaged
+  lines.
+- Size: 100 MiB per session log, 1 MiB per tool result. Mark truncated
+  results. Require a new session before the cap. Do not silently drop
+  history.
+- Key migration crash (step 3): write to the keychain, verify retrieval,
+  then remove the old copy. On crash, verify then finish removal. If
+  verify fails, keep the old copy. Never log key values.
 
 ---
 
