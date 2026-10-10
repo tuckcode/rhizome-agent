@@ -196,7 +196,7 @@
   unreachable from the app. A gate staying green is not evidence of health if
   nothing routes through the thing it's gating.
 - Pre-commit is a lightweight lint gate only. Pre-push runs the full check suite (build + tests + coverage + core Playwright smoke), preferably on three Chunk sidecar lanes for automatic test/coverage work: frontend lint/build/coverage, Rust coverage, and Playwright smoke. The goal is lower wall-clock time than local hooks while keeping each heavy gate isolated; keep local Playwright mainly for authoring, focused reproduction, or sidecar outages.
-- **A task is NOT done until it is committed locally and pre-push checks pass locally (`git push --dry-run` style verification, or just running the check suite below manually).** If a hook blocks: read the error, fix it (clippy, tests, build), commit the fix, re-verify. **⛔ NEVER use --no-verify**
+- **A task is NOT done until it is committed locally and pre-push checks pass locally (`git push --dry-run` style verification, or just running the check suite below manually).** If a hook blocks on lint/tests/coverage: read the error, fix it, commit the fix, re-verify. If the pre-push hook **refuses the push** (branch policy, missing `_/pre-push`, or any refusal you cannot satisfy by fixing the tree), **stop and ask knispo.** **⛔ NEVER use --no-verify.** Do not change `core.hooksPath` to get past it — switching the hooks path is the same as skipping the hook.
 - **Commit often, push in batches.** The full suite runs once per *push*, not per commit, and with the Chunk sidecars unavailable it runs serially on the local machine — measured 2026-08-21: **~4.5 minutes**, of which ~2 min is the Playwright smoke lane and ~1.5 min is `cargo llvm-cov`. Pushing after each of eight commits spent ~35 minutes on gates that one push at the end would have covered in under five.
 
   So: commit at every checkpoint, and push when a piece of work is *finished* — or when the user asks, or when something needs to be off this machine. While iterating, run the specific gate your change touches (`pnpm lint`, `pnpm typecheck`, the relevant `npx vitest run <file>`); that is seconds, and it catches nearly everything the push gate would. Do not batch so far that unpushed work becomes a risk — a day's work sitting only on one laptop is its own problem.
@@ -556,6 +556,9 @@ mega-bullets. Do not move these into Learned.
   Kern (getkern/kern) is Linux/WSL2 only.
 - **Rhizome is its own harness (ADR-0180).** It owns the agent loop, tool
   runner, plugins, and model routing. Prime and Hermes are optional engines.
+- If the pre-push hook refuses a push, stop and ask knispo. Do not
+  change `core.hooksPath` and do not `--no-verify`. Switching the hooks
+  path is the same as skipping the hook.
 
 ## Continual-learning (Cursor plugin)
 
