@@ -21,7 +21,7 @@ The free-tier router (`rhizome_routing`) reads keys through its `KeyStore` trait
 
 - macOS: Keychain (`apple-native`). Windows: Credential Manager (`windows-native`). Linux: Secret Service (`sync-secret-service`, `crypto-rust`). `dbus` is already in the lock file.
 - Cloudflare's account id is a second entry, `<provider id>:account`.
-- **Migration:** a key still in the legacy file moves the first time it is read. Rhizome writes it to the keychain, reads it back, and removes it from the file only on a match. The file is deleted when it holds no keys. A crash between the steps is safe: the next read finds the same value in both places and finishes the removal. If the write or the read-back fails, the file copy stays and keeps working, and the provider id (never the key) is logged.
+- **Migration:** a key still in the legacy file moves the first time it is read. Rhizome writes it to the keychain, reads it back, and removes it from the file only on a match. The file is deleted when it holds no keys. A crash between the steps is safe: the next read finds the same value in both places and finishes the removal. If the write or the read-back fails, the file copy stays and keeps working, and the failure is reported by provider id (never the key) and nothing is logged.
 - A keychain entry that differs from the file copy wins. The file copy is kept and reported rather than removed on a guess.
 - Saving a key reads it back, then removes any legacy file copy, so an old key cannot shadow the new one.
 - The stored setting name `api_key_storage: "local_file"` stays as-is, because settings on disk use it. It now means "a key Rhizome holds".
