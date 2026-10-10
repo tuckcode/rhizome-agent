@@ -3,9 +3,11 @@ import { trackEvent } from '../lib/telemetry'
 import { saveAiModelProviderApiKey } from '../utils/aiProviderSecrets'
 import {
   accountIdKeyFor,
+  OWN_ENDPOINT_ROUTE_ID,
   getFreeTierOverview,
   saveFreeTierSettings,
   settingsFromOverview,
+  type EndpointChoice,
   type FreeTierOverview,
   type FreeTierProviderRow,
   type FreeTierSettings as FreeTierSettingsValue,
@@ -20,6 +22,7 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { Input } from './ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Switch } from './ui/switch'
 
 /**
@@ -47,6 +50,11 @@ export function FreeTierSettings() {
       {overview.providers.map((row) => (
         <ProviderRow key={row.id} row={row} onToggle={state.requestToggle} onSaveSecret={state.saveSecret} />
       ))}
+      <OwnEndpointRow
+        value={overview.ownEndpoint}
+        choices={overview.endpointChoices}
+        onChange={state.setOwnEndpoint}
+      />
       <StrictModeRow strict={overview.strict} onChange={state.setStrict} />
       <FallbackOrder overview={overview} />
       {overview.usable ? null : (
@@ -115,6 +123,11 @@ function useFreeTierSettings() {
       trackEvent('free_tier_strict_toggled', { enabled: strict ? 1 : 0 })
       void run(() => saveFreeTierSettings({ ...settingsFromOverview(overview), strict }))
     },
+    setOwnEndpoint: (ownEndpoint: string | null) => {
+      if (!overview) return
+      trackEvent('free_tier_own_endpoint_set', { chosen: ownEndpoint ? 1 : 0 })
+      void run(() => saveFreeTierSettings({ ...settingsFromOverview(overview), ownEndpoint }))
+    },
     saveSecret: (account: string, value: string) =>
       run(async () => {
         await saveAiModelProviderApiKey(account, value.trim())
@@ -130,6 +143,46 @@ function withProvider(current: FreeTierSettingsValue, row: FreeTierProviderRow, 
     return { ...current, disabled: enabled ? others(current.disabled) : [...others(current.disabled), row.id] }
   }
   return { ...current, optIn: enabled ? [...others(current.optIn), row.id] : others(current.optIn) }
+}
+
+/** Radix Select cannot use an empty value, so "None" has its own. */
+const NO_OWN_ENDPOINT = 'none'
+
+function OwnEndpointRow({
+  value,
+  choices,
+  onChange,
+}: {
+  value: string | null
+  choices: EndpointChoice[]
+  onChange: (ownEndpoint: string | null) => void
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <div className="text-xs font-medium text-foreground">Own endpoint</div>
+        <div className="text-xs leading-5 text-muted-foreground">
+          {choices.length > 0
+            ? 'Tried last, after the free providers. It needs no key unless you saved one for it.'
+            : 'Add a local or OpenAI-compatible provider above to pick it here.'}
+        </div>
+      </div>
+      <Select
+        value={value ?? NO_OWN_ENDPOINT}
+        onValueChange={(next) => onChange(next === NO_OWN_ENDPOINT ? null : next)}
+      >
+        <SelectTrigger aria-label="Own endpoint" className="h-7 w-48 text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={NO_OWN_ENDPOINT}>None</SelectItem>
+          {choices.map((choice) => (
+            <SelectItem key={choice.id} value={choice.id}>{choice.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
 }
 
 function StrictModeRow({ strict, onChange }: { strict: boolean; onChange: (strict: boolean) => void }) {
@@ -148,7 +201,12 @@ function StrictModeRow({ strict, onChange }: { strict: boolean; onChange: (stric
 
 /** Read-only (ADR-0182 decision 5). */
 function FallbackOrder({ overview }: { overview: FreeTierOverview }) {
-  const nameOf = (id: string) => overview.providers.find((row) => row.id === id)?.name ?? id
+  const nameOf = (id: string) => {
+    if (id === OWN_ENDPOINT_ROUTE_ID) {
+      return overview.endpointChoices.find((choice) => choice.id === overview.ownEndpoint)?.name ?? 'Own endpoint'
+    }
+    return overview.providers.find((row) => row.id === id)?.name ?? id
+  }
   return (
     <div>
       <div className="text-xs font-medium text-foreground">Fallback order</div>

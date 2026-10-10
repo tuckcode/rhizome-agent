@@ -30,7 +30,7 @@ const MOCK_FREE_TIER_PROVIDERS = [
   { id: 'nvidia', name: 'NVIDIA NIM', defaultOn: true, hardStop: false },
   { id: 'cloudflare-ai', name: 'Cloudflare Workers AI', defaultOn: false, hardStop: false },
 ]
-let mockFreeTierSettings = { disabled: [] as string[], optIn: [] as string[], strict: false }
+let mockFreeTierSettings = { disabled: [] as string[], optIn: [] as string[], strict: false, ownEndpoint: null as string | null }
 
 function mockFreeTierOverview() {
   const providers = MOCK_FREE_TIER_PROVIDERS.map((provider) => ({
@@ -47,7 +47,14 @@ function mockFreeTierOverview() {
   const routeOrder = providers
     .filter((provider) => provider.enabled && (!mockFreeTierSettings.strict || provider.hardStop))
     .map((provider) => provider.id)
-  return { providers, strict: mockFreeTierSettings.strict, routeOrder, usable: false }
+  return {
+    providers,
+    strict: mockFreeTierSettings.strict,
+    routeOrder: mockFreeTierSettings.ownEndpoint ? [...routeOrder, 'custom'] : routeOrder,
+    usable: Boolean(mockFreeTierSettings.ownEndpoint),
+    ownEndpoint: mockFreeTierSettings.ownEndpoint,
+    endpointChoices: [{ id: 'lm_studio-mock', name: 'LM Studio (mock)' }],
+  }
 }
 
 function syncWindowContent(): void {
