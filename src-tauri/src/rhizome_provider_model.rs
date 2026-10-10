@@ -210,10 +210,6 @@ fn tool_definitions(names: &[String]) -> Vec<Value> {
 mod tests {
     use super::*;
     use crate::ai_models::test_server::{serve, sse, TEST_LIMITS};
-    use crate::ai_models::{
-        AiModelApiKeyStorage, AiModelCapabilities, AiModelDefinition, AiModelProvider,
-        AiModelProviderKind,
-    };
     use crate::rhizome_loop::{AgentLoop, DurableEvent, ToolCall};
     use serde_json::json;
 
@@ -233,38 +229,31 @@ mod tests {
         }
     }
 
+    /// A keyless LAN provider. Optional fields that are left out read as
+    /// `None`.
     fn request(base_url: &str) -> AiModelStreamRequest {
-        AiModelStreamRequest {
-            provider: AiModelProvider {
-                id: "lan".into(),
-                name: "LAN".into(),
-                kind: AiModelProviderKind::OpenAiCompatible,
-                base_url: Some(base_url.into()),
-                api_key_storage: Some(AiModelApiKeyStorage::None),
-                api_key_env_var: None,
-                headers: None,
-                models: vec![AiModelDefinition {
-                    id: "qwen".into(),
-                    display_name: None,
-                    context_window: None,
-                    max_output_tokens: None,
-                    capabilities: AiModelCapabilities {
-                        streaming: true,
-                        tools: true,
-                        vision: false,
-                        json_mode: false,
-                        reasoning: false,
-                    },
-                }],
+        serde_json::from_value(json!({
+            "provider": {
+                "id": "lan",
+                "name": "LAN",
+                "kind": "open_ai_compatible",
+                "base_url": base_url,
+                "api_key_storage": "none",
+                "models": [{
+                    "id": "qwen",
+                    "capabilities": {
+                        "streaming": true,
+                        "tools": true,
+                        "vision": false,
+                        "json_mode": false,
+                        "reasoning": false
+                    }
+                }]
             },
-            model_id: "qwen".into(),
-            message: String::new(),
-            system_prompt: None,
-            vault_path: None,
-            vault_paths: Vec::new(),
-            api_key_override: None,
-            event_name: None,
-        }
+            "model_id": "qwen",
+            "message": ""
+        }))
+        .expect("test provider request must deserialize")
     }
 
     #[test]
