@@ -1,20 +1,28 @@
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { installMockAiAgent } from './helpers'
+import { installMockAiAgent, SMOKE_UI_READY_TIMEOUT } from './helpers'
 import { pinNotesShellLaunch } from '../helpers/fixtureVault'
+import { requireAuditOpener, UI_AUDIT_SCREENS } from '../../src/utils/uiAuditScreens'
 import type { UiAuditFinding } from '../../src/utils/uiAudit'
 
 /**
- * Walks every screen and checks it for the defects that do not need an eye:
- * controls styled as pressable that are not, two controls a user would read
- * as the same thing, targets too small to hit, and controls drawn on top of
- * each other.
+ * Walks every current top-level screen and checks it for the defects that
+ * do not need an eye: controls styled as pressable that are not, two
+ * controls a user would read as the same thing, targets too small to hit,
+ * and controls drawn on top of each other.
  *
  * It exists because every one of those was found the slow way first — the
  * user pointing at a screenshot, or me measuring one element after a report.
- * Each is a property of the rendered page, so noticing them should not depend
- * on anyone remembering to look.
+ * Each is a property of the rendered page, so noticing them should not
+ * depend on anyone remembering to look.
+ *
+ * A missing opener is a failure. The old list clicked Changes on
+ * `sidebar-top-nav`; that rail button is gone on purpose, so the spec used
+ * to skip the click and audit Chat twice (#122). Changes stays off this
+ * list. Research is still the status-bar control. Settings stays off: it
+ * is a dialog over Chat, and auditing it would fail on known chrome that
+ * this gate does not own.
  *
  * **Viewport matters.** The same sweep at 800x450 reported eleven overlapping
  * controls that do not exist at 1440x900; a cramped window makes real layouts
@@ -36,12 +44,6 @@ const BASELINE: Record<string, string[]> = JSON.parse(
 /** The rail and the sessions column are on every screen, so their findings
  *  are too. Listing them once beats repeating them per screen and drifting. */
 const SHARED = BASELINE._shared ?? []
-
-const SCREENS = [
-  { name: 'chat', testId: 'chat-center' },
-  { name: 'research', testId: 'status-research' },
-  { name: 'changes', testId: 'sidebar-top-nav', buttonName: 'Changes' },
-] as const
 
 /** `rule: label`, which is what the baseline stores — stable across runs in a
  *  way a pixel count is not. */
@@ -68,13 +70,25 @@ test.describe('UI audit', () => {
     await expect(page.getByTestId('chat-center')).toBeVisible({ timeout: 10_000 })
   })
 
-  for (const screen of SCREENS) {
+  for (const screen of UI_AUDIT_SCREENS) {
     test(`${screen.name} has no new UI defects`, async ({ page }) => {
-      const rail = 'buttonName' in screen
-        ? page.getByTestId(screen.testId).getByRole('button', { name: screen.buttonName, exact: true })
-        : page.getByTestId(screen.testId)
-      if (await rail.count()) {
-        await rail.first().click()
+      if (screen.openerTestId) {
+        const opener = page.getByTestId(screen.openerTestId)
+        requireAuditOpener((await opener.count()) > 0, screen.name)
+        if (screen.chrome) {
+          await page.evaluate((destination) => {
+            window.dispatchEvent(new CustomEvent('rhizome:notes-chrome', { detail: destination }))
+          }, screen.chrome)
+        } else {
+          await opener.first().evaluate((node) => (node as HTMLElement).click())
+        }
+      }
+
+      await expect(
+        page.getByTestId(screen.destinationTestId),
+        `UI audit claimed "${screen.name}" but never reached ${screen.destinationTestId}`,
+      ).toBeVisible({ timeout: SMOKE_UI_READY_TIMEOUT })
+      if (screen.openerTestId) {
         // Let the destination settle before measuring; a half-rendered screen
         // reports collisions that resolve a frame later.
         await page.waitForTimeout(600)
