@@ -76,7 +76,7 @@ proposed → active → superseded
 | [0018](0018-codescene-code-health-gates.md) | CodeScene code health gates in CI | superseded → [0149](0149-drop-codescene-quality-gate.md) |
 | [0019](0019-github-device-flow-oauth.md) | GitHub device flow OAuth for vault sync | superseded → [0056](0056-system-git-cli-auth-no-provider-oauth.md) |
 | [0020](0020-keyboard-first-design.md) | Keyboard-first design principle | active |
-| [0021](0021-push-to-main-workflow.md) | Push directly to main (no PRs) | active |
+| [0021](0021-push-to-main-workflow.md) | Push directly to main (no PRs) | superseded → [0181](0181-pr-branches-with-full-gates.md) |
 | [0022](0022-blocknote-rich-text-editor.md) | BlockNote as the rich text editor | active |
 | [0023](0023-repair-vault-auto-bootstrap.md) | Repair Vault auto-bootstrap pattern | active |
 | [0024](0024-cache-outside-vault.md) | Vault cache stored outside vault directory | active |
@@ -216,3 +216,4 @@ proposed → active → superseded
 | [0177](0177-rhizome-is-a-client-of-harnesses.md) | Rhizome is a client of harnesses | superseded → [0180](0180-rhizome-is-its-own-harness.md) |
 | [0178](0178-generic-acp-client.md) | Generic ACP client; Hermes one-shot is fallback | active |
 | [0180](0180-rhizome-is-its-own-harness.md) | Rhizome is its own harness | active |
+| [0181](0181-pr-branches-with-full-gates.md) | PR branches with full pre-push gates | active |
