@@ -21,8 +21,10 @@ const OPEN_AT: u32 = 12;
 const HALF_OPEN_AFTER: Millis = 30_000;
 /// Upstream API-key connection cooldown base.
 const KEY_COOLDOWN_BASE: Millis = 3_000;
-/// Upstream model-lockout cap. Rhizome uses it for key cooldowns too.
+/// Upstream model-lockout base and cap. Rhizome caps key cooldowns there too.
+const LOCKOUT_BASE: Millis = 120_000;
 const COOLDOWN_CAP: Millis = 1_800_000;
+const DAY: Millis = 86_400_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum BreakerState {
@@ -62,10 +64,26 @@ struct KeyState {
     dead: Option<u64>,
 }
 
+/// What a layer 3 lock covers. With one key per provider, upstream's
+/// "exact" scope and its "bare model" scope are the same thing.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum LockScope {
+    /// Every model that shares the quota.
+    Family(String),
+    Model(String),
+}
+
+#[derive(Debug, Default)]
+struct Lock {
+    until: Millis,
+    level: u32,
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct Health {
     breakers: HashMap<String, Breaker>,
     keys: HashMap<String, KeyState>,
+    locks: HashMap<(String, LockScope), Lock>,
 }
 
 impl Health {
@@ -95,7 +113,14 @@ impl Health {
                 key.cooldown_until
             }
         });
-        [breaker, key]
+        let lock = |scope: LockScope| {
+            self.locks
+                .get(&(attempt.provider.to_string(), scope))
+                .map(|lock| lock.until)
+        };
+        let family = lock(LockScope::Family(attempt.family.to_string()));
+        let model = lock(LockScope::Model(attempt.model.to_string()));
+        [breaker, key, family, model]
             .into_iter()
             .flatten()
             .filter(|until| *until > now)
@@ -105,6 +130,12 @@ impl Health {
     pub(crate) fn record_success(&mut self, attempt: &Attempt) {
         self.breakers.remove(attempt.provider);
         self.keys.remove(attempt.provider);
+        for scope in [
+            LockScope::Family(attempt.family.to_string()),
+            LockScope::Model(attempt.model.to_string()),
+        ] {
+            self.locks.remove(&(attempt.provider.to_string(), scope));
+        }
     }
 
     pub(crate) fn record_failure(&mut self, attempt: &Attempt, error: &ModelError, now: Millis) {
@@ -118,18 +149,60 @@ impl Health {
                 breaker.open_until = Some(now + HALF_OPEN_AFTER);
             }
         }
+        let family = LockScope::Family(attempt.family.to_string());
+        let model = LockScope::Model(attempt.model.to_string());
         match (&error.kind, error.status) {
+            // freellmapi checklist: a daily quota stays benched until UTC
+            // midnight.
+            (ModelErrorKind::RateLimited { .. }, _) if is_daily_limit(error) => {
+                self.lock_until(attempt.provider, family, next_utc_midnight(now));
+            }
+            (ModelErrorKind::RateLimited { retry_after_secs }, _) if attempt.per_model_quota => {
+                self.lock(attempt.provider, family, *retry_after_secs, now);
+            }
             (ModelErrorKind::RateLimited { retry_after_secs }, _) => {
                 self.cool_key(attempt.provider, *retry_after_secs, now);
             }
-            (ModelErrorKind::Auth, status) if status != Some(403) => {
+            (ModelErrorKind::QuotaExhausted, _) => {
+                self.lock_until(attempt.provider, family, next_utc_midnight(now));
+            }
+            // A 403 is an entitlement signal for the quota family.
+            (ModelErrorKind::Auth, Some(403)) => self.lock(attempt.provider, family, None, now),
+            (ModelErrorKind::Auth, _) => {
                 self.keys
                     .entry(attempt.provider.to_string())
                     .or_default()
                     .dead = Some(attempt.key);
             }
-            _ => {}
+            (ModelErrorKind::Rejected, Some(404))
+            | (ModelErrorKind::Unavailable, _)
+            | (ModelErrorKind::Protocol, _) => self.lock(attempt.provider, model, None, now),
+            // Another 4xx is about this request, not the model's health.
+            (ModelErrorKind::Rejected, _) => {}
         }
+    }
+
+    /// Upstream lockout: `Retry-After` when sent, else 120 s doubling to 30
+    /// min.
+    fn lock(
+        &mut self,
+        provider: &str,
+        scope: LockScope,
+        retry_after_secs: Option<u64>,
+        now: Millis,
+    ) {
+        let lock = self.locks.entry((provider.to_string(), scope)).or_default();
+        let wait = match retry_after_secs {
+            Some(secs) => secs.saturating_mul(1_000),
+            None => backoff(LOCKOUT_BASE, lock.level),
+        };
+        lock.level += 1;
+        lock.until = lock.until.max(now.saturating_add(wait));
+    }
+
+    fn lock_until(&mut self, provider: &str, scope: LockScope, until: Millis) {
+        let lock = self.locks.entry((provider.to_string(), scope)).or_default();
+        lock.until = lock.until.max(until);
     }
 
     /// Upstream: honor `Retry-After`, else 3 s doubling per cooldown.
@@ -142,6 +215,19 @@ impl Health {
         key.level += 1;
         key.cooldown_until = key.cooldown_until.max(now.saturating_add(wait));
     }
+}
+
+fn next_utc_midnight(now: Millis) -> Millis {
+    (now / DAY + 1) * DAY
+}
+
+/// A 429 whose text names a per-day limit, such as Groq's "tokens per day
+/// (TPD)".
+fn is_daily_limit(error: &ModelError) -> bool {
+    let message = error.message.to_ascii_lowercase();
+    ["per day", "per-day", "daily"]
+        .iter()
+        .any(|needle| message.contains(needle))
 }
 
 /// `base` doubled `level` times, capped at `COOLDOWN_CAP`.
@@ -169,6 +255,15 @@ mod tests {
             family: "m",
             per_model_quota: false,
             key: 1,
+        }
+    }
+
+    /// Another model on the same provider. Only the breaker blocks it.
+    fn sibling(attempt: Attempt<'static>) -> Attempt<'static> {
+        Attempt {
+            model: "other",
+            family: "other",
+            ..attempt
         }
     }
 
@@ -201,7 +296,8 @@ mod tests {
         }
 
         assert_eq!(health.breaker_state("groq", T0), BreakerState::Open);
-        assert_eq!(health.blocked_until(&groq, T0), Some(T0 + 30_000));
+        // Each 5xx also locks the failing model, so check a sibling.
+        assert_eq!(health.blocked_until(&sibling(groq), T0), Some(T0 + 30_000));
         assert_eq!(health.blocked_until(&mistral, T0), None);
     }
 
@@ -215,11 +311,14 @@ mod tests {
         let later = T0 + 30_000;
 
         assert_eq!(health.breaker_state("groq", later), BreakerState::HalfOpen);
-        assert_eq!(health.blocked_until(&groq, later), None);
+        assert_eq!(health.blocked_until(&sibling(groq), later), None);
 
         // A failed probe opens the breaker again for 30 s.
         health.record_failure(&groq, &unavailable(504), later);
-        assert_eq!(health.blocked_until(&groq, later), Some(later + 30_000));
+        assert_eq!(
+            health.blocked_until(&sibling(groq), later),
+            Some(later + 30_000)
+        );
 
         // A good probe closes it.
         health.record_success(&groq);
@@ -297,5 +396,110 @@ mod tests {
         );
         let new_key = Attempt { key: 2, ..mistral };
         assert_eq!(health.blocked_until(&new_key, T0), None);
+    }
+
+    fn model(
+        provider: &'static str,
+        model: &'static str,
+        family: &'static str,
+    ) -> Attempt<'static> {
+        Attempt {
+            provider,
+            model,
+            family,
+            per_model_quota: true,
+            key: 1,
+        }
+    }
+
+    fn next_midnight(now: Millis) -> Millis {
+        (now / DAY + 1) * DAY
+    }
+
+    #[test]
+    fn a_per_model_quota_429_locks_the_family_and_not_the_key() {
+        let mut health = Health::default();
+        let lfm = model("openrouter", "lfm:free", "openrouter-free");
+        let sibling = model("openrouter", "other:free", "openrouter-free");
+        let elsewhere = model("openrouter", "solo:free", "solo:free");
+
+        health.record_failure(&lfm, &rate_limited(Some(20)), T0);
+
+        assert_eq!(health.blocked_until(&sibling, T0), Some(T0 + 20_000));
+        assert_eq!(health.blocked_until(&elsewhere, T0), None);
+    }
+
+    #[test]
+    fn exhausted_quota_and_a_daily_429_bench_the_family_until_utc_midnight() {
+        let mut health = Health::default();
+        let mistral = Attempt {
+            per_model_quota: false,
+            ..model("mistral", "mistral-small-latest", "mistral")
+        };
+        let groq = model("groq", "openai/gpt-oss-20b", "openai/gpt-oss-20b");
+        let daily = ModelError {
+            message: "Rate limit reached on tokens per day (TPD): Limit 200000".into(),
+            ..rate_limited(Some(5))
+        };
+
+        health.record_failure(
+            &mistral,
+            &error(ModelErrorKind::QuotaExhausted, Some(402)),
+            T0,
+        );
+        health.record_failure(&groq, &daily, T0);
+
+        assert_eq!(health.blocked_until(&mistral, T0), Some(next_midnight(T0)));
+        assert_eq!(health.blocked_until(&groq, T0), Some(next_midnight(T0)));
+        assert_eq!(health.blocked_until(&groq, next_midnight(T0)), None);
+    }
+
+    #[test]
+    fn a_404_locks_only_that_model_and_escalates_to_a_cap() {
+        let mut health = Health::default();
+        let gone = model("nvidia", "old/model", "nvidia");
+        let sibling = model("nvidia", "new/model", "nvidia");
+        let not_found = error(ModelErrorKind::Rejected, Some(404));
+
+        health.record_failure(&gone, &not_found, T0);
+        assert_eq!(health.blocked_until(&gone, T0), Some(T0 + 120_000));
+        assert_eq!(health.blocked_until(&sibling, T0), None);
+
+        health.record_failure(&gone, &not_found, T0);
+        assert_eq!(health.blocked_until(&gone, T0), Some(T0 + 240_000));
+        for _ in 0..10 {
+            health.record_failure(&gone, &not_found, T0);
+        }
+        assert_eq!(health.blocked_until(&gone, T0), Some(T0 + 1_800_000));
+
+        health.record_success(&gone);
+        assert_eq!(health.blocked_until(&gone, T0), None);
+    }
+
+    #[test]
+    fn a_403_locks_the_family_and_a_5xx_locks_the_exact_model() {
+        let mut health = Health::default();
+        let a = model("mistral", "a", "mistral");
+        let b = model("mistral", "b", "mistral");
+        let c = model("groq", "c", "c");
+        let d = model("groq", "d", "d");
+
+        health.record_failure(&a, &error(ModelErrorKind::Auth, Some(403)), T0);
+        health.record_failure(&c, &unavailable(503), T0);
+        health.record_failure(&c, &error(ModelErrorKind::Protocol, None), T0 + 1);
+
+        assert_eq!(health.blocked_until(&b, T0), Some(T0 + 120_000));
+        assert!(health.blocked_until(&c, T0 + 1).is_some());
+        assert_eq!(health.blocked_until(&d, T0), None);
+    }
+
+    #[test]
+    fn a_plain_400_locks_nothing() {
+        let mut health = Health::default();
+        let a = model("mistral", "a", "mistral");
+
+        health.record_failure(&a, &error(ModelErrorKind::Rejected, Some(400)), T0);
+
+        assert_eq!(health.blocked_until(&a, T0), None);
     }
 }
