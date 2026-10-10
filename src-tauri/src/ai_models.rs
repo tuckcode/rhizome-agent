@@ -5,6 +5,8 @@ use std::fs;
 use std::path::Path;
 use std::sync::OnceLock;
 
+mod openai_stream;
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum AiModelProviderKind {
