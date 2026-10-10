@@ -319,6 +319,74 @@ mod tests {
     }
 
     #[test]
+    fn power_user_bash_asks_for_a_new_command() {
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        let asks = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&asks);
+        agent.set_approval_waiter(move |_| {
+            count.fetch_add(1, Ordering::SeqCst);
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "bash".into(),
+            args: "ls".into(),
+        }]]);
+        agent.submit("go");
+        agent.run_until_idle(&mut model);
+
+        assert_eq!(asks.load(Ordering::SeqCst), 1);
+        assert!(agent.events().iter().any(|event| {
+            matches!(
+                event,
+                DurableEvent::ToolResult { name, output }
+                    if name == "bash" && output == "ls"
+            )
+        }));
+    }
+
+    #[test]
+    fn power_user_bash_asks_again_for_a_repeat() {
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        let asks = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&asks);
+        agent.set_approval_waiter(move |_| {
+            count.fetch_add(1, Ordering::SeqCst);
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![vec![
+            ScriptPart::Tool {
+                name: "bash".into(),
+                args: "ls".into(),
+            },
+            ScriptPart::Tool {
+                name: "bash".into(),
+                args: "ls".into(),
+            },
+        ]]);
+        agent.submit("go");
+        agent.run_until_idle(&mut model);
+
+        assert_eq!(asks.load(Ordering::SeqCst), 2);
+        let runs = agent
+            .events()
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event,
+                    DurableEvent::ToolResult { name, output }
+                        if name == "bash" && output == "ls"
+                )
+            })
+            .count();
+        assert_eq!(runs, 2);
+        assert!(!agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolDenied { name, .. } if name == "bash")
+        }));
+    }
+
+    #[test]
     fn no_ui_timeout_denies() {
         let agent = AgentLoop::new();
         agent.offer_extra_tool_for_test("edit");
@@ -458,24 +526,24 @@ mod tests {
     }
 
     #[test]
-    fn allow_session_bash_matches_exact_command_only() {
+    fn allow_session_stops_asking_for_that_exact_bash_command_only() {
         let agent = AgentLoop::new();
         agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
-        let mut prep = FakeModel::script(vec![vec![
+        let asks = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&asks);
+        agent.set_approval_waiter(move |_| {
+            let n = count.fetch_add(1, Ordering::SeqCst);
+            if n == 0 {
+                ApprovalReply::AllowSession
+            } else {
+                ApprovalReply::AllowOnce
+            }
+        });
+        let mut model = FakeModel::script(vec![vec![
             ScriptPart::Tool {
                 name: "bash".into(),
                 args: "ls".into(),
             },
-            ScriptPart::Tool {
-                name: "bash".into(),
-                args: "pwd".into(),
-            },
-        ]]);
-        agent.submit("prep");
-        agent.run_until_idle(&mut prep);
-
-        agent.grant_for_session("bash", "ls");
-        let mut model = FakeModel::script(vec![vec![
             ScriptPart::Tool {
                 name: "bash".into(),
                 args: "ls".into(),
@@ -488,6 +556,7 @@ mod tests {
         agent.submit("go");
         agent.run_until_idle(&mut model);
 
+        assert_eq!(asks.load(Ordering::SeqCst), 2);
         let ls_runs = agent
             .events()
             .iter()
@@ -512,9 +581,6 @@ mod tests {
             .count();
         assert_eq!(ls_runs, 2);
         assert_eq!(pwd_runs, 1);
-        assert!(agent.events().iter().any(|event| {
-            matches!(event, DurableEvent::ToolDenied { name, .. } if name == "bash")
-        }));
     }
 
     #[test]
