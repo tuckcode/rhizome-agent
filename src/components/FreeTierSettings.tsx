@@ -96,7 +96,9 @@ function useFreeTierSettings() {
         setOverview(next)
         setError(null)
       },
-      (workError: unknown) => setError(messageOf(workError)),
+      (workError: unknown) => {
+        setError(messageOf(workError))
+      },
     )
 
   const setEnabled = (row: FreeTierProviderRow, enabled: boolean) => {
@@ -113,7 +115,9 @@ function useFreeTierSettings() {
       if (enabled && !row.defaultOn && row.billingWarning) setPendingOptIn(row)
       else setEnabled(row, enabled)
     },
-    cancelOptIn: () => setPendingOptIn(null),
+    cancelOptIn: () => {
+      setPendingOptIn(null)
+    },
     confirmOptIn: () => {
       const row = pendingOptIn
       setPendingOptIn(null)
@@ -170,7 +174,9 @@ function OwnEndpointRow({
       </div>
       <Select
         value={value ?? NO_OWN_ENDPOINT}
-        onValueChange={(next) => onChange(next === NO_OWN_ENDPOINT ? null : next)}
+        onValueChange={(next) => {
+          onChange(next === NO_OWN_ENDPOINT ? null : next)
+        }}
       >
         <SelectTrigger aria-label="Own endpoint" className="h-7 w-48 text-xs">
           <SelectValue />
@@ -280,7 +286,9 @@ function ProviderRow({
         <Switch
           aria-label={`Use ${row.name}`}
           checked={row.enabled}
-          onCheckedChange={(enabled) => onToggle(row, enabled)}
+          onCheckedChange={(enabled) => {
+            onToggle(row, enabled)
+          }}
         />
       </div>
       <SecretField
@@ -314,7 +322,12 @@ function SecretField({
   const id = useId()
   const [value, setValue] = useState('')
   const submit = () => {
-    onSave(value).then(() => setValue(''), () => undefined)
+    onSave(value).then(
+      () => {
+        setValue('')
+      },
+      () => undefined,
+    )
   }
   return (
     <div className="flex items-center gap-2">
@@ -324,7 +337,9 @@ function SecretField({
         type={secret ? 'password' : 'text'}
         placeholder={label}
         value={value}
-        onChange={(event) => setValue(event.target.value)}
+        onChange={(event) => {
+          setValue(event.target.value)
+        }}
         className="h-7 text-xs"
       />
       <Button type="button" size="sm" variant="outline" disabled={!value.trim()} onClick={submit}>
