@@ -4,6 +4,7 @@
 **Updated:** Cursor Grok 4.6 · 2026-10-10 · knispo answers folded in as decisions
 **Updated:** Cursor Grok 4.6 · 2026-10-10 · Phase 4b points at ADR-0182
 **Updated:** Cursor Grok 4.6 · 2026-10-10 · ADR-0182 six rows confirmed by knispo
+**Updated:** Cursor Grok 4.6 · 2026-10-10 · phase-name mismatch (#101 vs plan Phase 3); Phase 5 done
 **Status:** plan only. This PR writes no product code.
 **Binding decision:** [ADR-0180](../adr/0180-rhizome-is-its-own-harness.md) — Rhizome is its own harness. That ADR is on `main`.
 
@@ -111,6 +112,8 @@ Optional later ideas (do not schedule): OmniRoute usage dashboard; Block Goose t
 
 ## 4. Phases
 
+**Names.** Plan Phase 3 is the plugin seam. It is still skipped (one hook: policy). Merged [PR #101](https://github.com/tuckcode/rhizome-agent/pull/101) used "phase 3" for loop-side `Model` trait / tool-call identity / step order; that work is on `main` and is not the plugin seam. Plan Phase 5 is the engine trait. It is done: [PR #107](https://github.com/tuckcode/rhizome-agent/pull/107) merged and closes #104. Plan Phase 4b is [ADR-0182](../adr/0182-free-tier-provider-routing.md) plus Claude's [PR #108](https://github.com/tuckcode/rhizome-agent/pull/108).
+
 One phase per PR. Each phase deletes the path it replaced in that same PR. Coverage: new Rust stays inside `cargo llvm-cov --fail-under-lines 85` (GitHub Actions `rust-quality` on every PR). Frontend leftover locks in `src/lib/parked-organs.test.ts` and `src/lib/leftover-*.test.ts` stay green until Phase 6, when Chat gains the engine toggle.
 
 ### Phase 1 — Bare loop + CI behavior tests
@@ -176,6 +179,8 @@ Paste the failing `cargo test` (red) and the passing run (green) in the PR body.
 
 ### Phase 3 — Plugin seam (only when the second plugin needs it)
 
+**Status.** Skipped. Only one hook exists (policy). [PR #101](https://github.com/tuckcode/rhizome-agent/pull/101) is not this phase.
+
 **Scope.** Do not open this phase with a framework. Ship Phase 2 with one in-line hook if needed (policy *is* that hook). Open Phase 3 when a **second** caller wants the same point (example: persona/skills injector + policy, or a logging interceptor + policy).
 
 Then extract, do not speculate:
@@ -230,7 +235,7 @@ Live LAN dogfood is **not** a CI gate. Note it in the PR if someone ran it.
 
 ### Phase 4b — Free providers + fallback routing
 
-**Decision:** [ADR-0182](../adr/0182-free-tier-provider-routing.md) (active; knispo 2026-10-10). Option A: port OmniRoute provider entries, free-model rows, and three-layer cooldown rules into a small Rust `Model` / provider-routing module with fixed-priority fallback. freellmapi is a checklist only. Do not copy the hosted catalog at `freellmapi.co`. No shipped sidecar. Catalog membership, exclusions, keys, routing, and weekly Nightly Audit refresh are decided in that ADR.
+**Decision:** [ADR-0182](../adr/0182-free-tier-provider-routing.md) (active; knispo 2026-10-10). Option A: port OmniRoute provider entries, free-model rows, and three-layer cooldown rules into a small Rust `Model` / provider-routing module with fixed-priority fallback. freellmapi is a checklist only. Do not copy the hosted catalog at `freellmapi.co`. No shipped sidecar. Catalog membership, exclusions, keys, routing, and weekly Nightly Audit refresh are decided in that ADR. Implementation is Claude's [PR #108](https://github.com/tuckcode/rhizome-agent/pull/108).
 
 **Scope.** Rebuild OmniRoute’s *goal* in Rhizome’s Rust model layer: (a) a catalog of free providers/models, and (b) automatic fallback to the next provider/model when one fails, is rate-limited, or its free quota is exhausted. Idea-only port. Check the MIT licence and record the source commit in `docs/vendored-sources.md` if any file is copied.
 
@@ -260,6 +265,8 @@ Not in this phase: an outward OpenAI-compatible server; a usage dashboard; OmniR
 If the first catalog’s membership or order is unclear, stop and ask (remaining question in §5). Do not scrape OmniRoute’s live catalog into this tree without a licence-and-pin pass.
 
 ### Phase 5 — Optional engines behind one interface
+
+**Status.** Done. [PR #107](https://github.com/tuckcode/rhizome-agent/pull/107) merged; closes #104. `engines/native.rs` is on `main`.
 
 **Scope.** One trait. Three implementors: `RhizomeEngine` (native loop), `PrimeEngine` (`prime_session_host.rs`), `HermesEngine` (`acp_client/`). Chat still calls Prime directly. This phase only introduces the trait and adapters, plus tests.
 
@@ -338,7 +345,7 @@ knispo, 2026-10-09. Coding agents treat these as settled.
 ## 6. How a coding agent should work this plan
 
 1. Read ADR-0180 on `main`, then this file, then the leftover tests named in the phase you are in. Identity is 0180. Vault-layer ownership from 0177 still holds. Close/quit follows ADR-0179 / PR #88. Product calls in §5 are decisions.
-2. **One phase per PR.** Title `feat: rhizome loop phase N — <short>` (use `4b` for the fallback phase). Base `main`. Draft until the owner says ready. **Never merge.**
+2. **One phase per PR.** Title `feat: rhizome loop phase N — <short>` (use `4b` for the fallback phase). `N` is this file's phase number, not the count of loop PRs. [PR #101](https://github.com/tuckcode/rhizome-agent/pull/101) titled itself "phase 3" for Model trait work; that is not Plan Phase 3. Base `main`. Draft until the owner says ready. **Never merge.**
 3. TDD: write the behavior tests first. Push a commit where they fail. Paste that run in the PR. Then implement. Paste the green run.
 4. Small diffs. Do not rewrite `prime_session_host.rs` or Chat chrome in Phase 1–5.
 5. Stage files by name. `git commit -- path/to/file`. Co-Authored-By trailer for the model that wrote the change. Never `--no-verify`.
