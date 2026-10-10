@@ -42,7 +42,9 @@ struct Shared {
     /// Names a test adds on top of `policy::offered_tools`. Production
     /// modes do not use this list.
     extra_offered: Vec<String>,
-    waiter: Option<ApprovalWaiter>,
+    /// Shared so a mid-wait cancel does not move the waiter onto a
+    /// thread we then drop. The spawned wait only borrows it.
+    waiter: Option<Arc<Mutex<ApprovalWaiter>>>,
     stopped: bool,
     step_cap: usize,
     after_tool: Option<AfterToolHook>,
@@ -123,7 +125,7 @@ impl AgentLoop {
     }
 
     pub fn set_approval_waiter(&self, waiter: impl FnMut(&str) -> ApprovalReply + Send + 'static) {
-        self.lock().waiter = Some(Box::new(waiter));
+        self.lock().waiter = Some(Arc::new(Mutex::new(Box::new(waiter))));
     }
 
     /// Records a session grant. The waiter uses this when the human
@@ -425,29 +427,26 @@ impl AgentLoop {
     }
 
     /// Runs the waiter off-thread so cancel/quit can end the wait
-    /// without waiting for a human reply.
+    /// without waiting for a human reply. The waiter stays on Shared.
     fn wait_for_approval(&self, name: &str) -> ApprovalReply {
-        let Some(mut wait) = self.lock().waiter.take() else {
+        let Some(waiter) = self.lock().waiter.clone() else {
             return ApprovalReply::Cancelled;
         };
         let (tx, rx) = mpsc::channel();
         let asked = name.to_string();
         thread::spawn(move || {
-            let reply = wait(&asked);
-            let _ = tx.send((wait, reply));
+            let reply = waiter.lock().expect("rhizome loop waiter")(&asked);
+            let _ = tx.send(reply);
         });
         loop {
             if self.is_cancelled() {
-                if let Ok((wait, _)) = rx.try_recv() {
-                    self.lock().waiter = Some(wait);
-                }
                 return ApprovalReply::Cancelled;
             }
+            // 10ms poll: cancel/quit must end the wait without a human
+            // reply. A condvar would wake faster; this is enough while
+            // the loop is test-only.
             match rx.recv_timeout(Duration::from_millis(10)) {
-                Ok((wait, reply)) => {
-                    self.lock().waiter = Some(wait);
-                    return reply;
-                }
+                Ok(reply) => return reply,
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
                 Err(mpsc::RecvTimeoutError::Disconnected) => {
                     return ApprovalReply::Cancelled;
