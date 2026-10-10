@@ -19,6 +19,10 @@ pub(crate) type Millis = u64;
 const DEGRADED_AT: u32 = 7;
 const OPEN_AT: u32 = 12;
 const HALF_OPEN_AFTER: Millis = 30_000;
+/// Upstream API-key connection cooldown base.
+const KEY_COOLDOWN_BASE: Millis = 3_000;
+/// Upstream model-lockout cap. Rhizome uses it for key cooldowns too.
+const COOLDOWN_CAP: Millis = 1_800_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum BreakerState {
@@ -48,9 +52,20 @@ pub(crate) struct Attempt<'a> {
     pub(crate) key: u64,
 }
 
+/// Layer 2 state for one provider's key.
+#[derive(Debug, Default)]
+struct KeyState {
+    cooldown_until: Millis,
+    /// Consecutive cooldowns without a success. The next one doubles.
+    level: u32,
+    /// The fingerprint of a key the provider refused (HTTP 401).
+    dead: Option<u64>,
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct Health {
     breakers: HashMap<String, Breaker>,
+    keys: HashMap<String, KeyState>,
 }
 
 impl Health {
@@ -66,19 +81,30 @@ impl Health {
         }
     }
 
-    /// When the attempt is blocked, the time it opens again.
+    /// When the attempt is blocked, the time it opens again. A refused key
+    /// gives `Millis::MAX`.
     pub(crate) fn blocked_until(&self, attempt: &Attempt, now: Millis) -> Option<Millis> {
-        if self.breaker_state(attempt.provider, now) == BreakerState::Open {
-            return self
-                .breakers
-                .get(attempt.provider)
-                .and_then(|breaker| breaker.open_until);
-        }
-        None
+        let breaker = self
+            .breakers
+            .get(attempt.provider)
+            .and_then(|breaker| breaker.open_until);
+        let key = self.keys.get(attempt.provider).map(|key| {
+            if key.dead == Some(attempt.key) {
+                Millis::MAX
+            } else {
+                key.cooldown_until
+            }
+        });
+        [breaker, key]
+            .into_iter()
+            .flatten()
+            .filter(|until| *until > now)
+            .max()
     }
 
     pub(crate) fn record_success(&mut self, attempt: &Attempt) {
         self.breakers.remove(attempt.provider);
+        self.keys.remove(attempt.provider);
     }
 
     pub(crate) fn record_failure(&mut self, attempt: &Attempt, error: &ModelError, now: Millis) {
@@ -92,7 +118,35 @@ impl Health {
                 breaker.open_until = Some(now + HALF_OPEN_AFTER);
             }
         }
+        match (&error.kind, error.status) {
+            (ModelErrorKind::RateLimited { retry_after_secs }, _) => {
+                self.cool_key(attempt.provider, *retry_after_secs, now);
+            }
+            (ModelErrorKind::Auth, status) if status != Some(403) => {
+                self.keys
+                    .entry(attempt.provider.to_string())
+                    .or_default()
+                    .dead = Some(attempt.key);
+            }
+            _ => {}
+        }
     }
+
+    /// Upstream: honor `Retry-After`, else 3 s doubling per cooldown.
+    fn cool_key(&mut self, provider: &str, retry_after_secs: Option<u64>, now: Millis) {
+        let key = self.keys.entry(provider.to_string()).or_default();
+        let wait = match retry_after_secs {
+            Some(secs) => secs.saturating_mul(1_000),
+            None => backoff(KEY_COOLDOWN_BASE, key.level),
+        };
+        key.level += 1;
+        key.cooldown_until = key.cooldown_until.max(now.saturating_add(wait));
+    }
+}
+
+/// `base` doubled `level` times, capped at `COOLDOWN_CAP`.
+fn backoff(base: Millis, level: u32) -> Millis {
+    base.saturating_mul(1 << level.min(20)).min(COOLDOWN_CAP)
 }
 
 /// Upstream trip codes. A failure with no status is Rhizome's own timeout
@@ -194,5 +248,54 @@ mod tests {
         }
 
         assert_eq!(health.breaker_state("groq", T0), BreakerState::Closed);
+    }
+
+    fn rate_limited(retry_after_secs: Option<u64>) -> ModelError {
+        error(ModelErrorKind::RateLimited { retry_after_secs }, Some(429))
+    }
+
+    #[test]
+    fn key_cooldown_honors_retry_after_and_spares_other_providers() {
+        let mut health = Health::default();
+        let mistral = attempt("mistral");
+
+        health.record_failure(&mistral, &rate_limited(Some(7)), T0);
+
+        assert_eq!(health.blocked_until(&mistral, T0), Some(T0 + 7_000));
+        assert_eq!(health.blocked_until(&mistral, T0 + 7_000), None);
+        assert_eq!(health.blocked_until(&attempt("llm7"), T0), None);
+    }
+
+    #[test]
+    fn key_cooldown_starts_at_three_seconds_and_doubles_until_a_success() {
+        let mut health = Health::default();
+        let mistral = attempt("mistral");
+
+        health.record_failure(&mistral, &rate_limited(None), T0);
+        assert_eq!(health.blocked_until(&mistral, T0), Some(T0 + 3_000));
+        health.record_failure(&mistral, &rate_limited(None), T0 + 3_000);
+        assert_eq!(health.blocked_until(&mistral, T0 + 3_000), Some(T0 + 9_000));
+
+        health.record_success(&mistral);
+        health.record_failure(&mistral, &rate_limited(None), T0 + 9_000);
+        assert_eq!(
+            health.blocked_until(&mistral, T0 + 9_000),
+            Some(T0 + 12_000)
+        );
+    }
+
+    #[test]
+    fn a_rejected_key_stays_skipped_until_the_key_changes() {
+        let mut health = Health::default();
+        let mistral = attempt("mistral");
+
+        health.record_failure(&mistral, &error(ModelErrorKind::Auth, Some(401)), T0);
+
+        assert_eq!(
+            health.blocked_until(&mistral, T0 + 86_400_000),
+            Some(Millis::MAX)
+        );
+        let new_key = Attempt { key: 2, ..mistral };
+        assert_eq!(health.blocked_until(&new_key, T0), None);
     }
 }
