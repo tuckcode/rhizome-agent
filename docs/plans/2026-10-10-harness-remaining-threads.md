@@ -252,7 +252,7 @@ The log is a session transcript. It is not memory. The vault stays the one memor
 **Risks.**
 
 - `DurableEvent` becomes a file format. A later rename breaks old logs. The `version` field and a round-trip test guard it.
-- The log holds full chat text in the app config folder. The transcript index already holds turn text there, so this adds no new class of data.
+- The log holds full chat text in the app config folder. It also holds tool output, such as `bash` output and note contents that `create_note` wrote. The transcript index holds user and assistant turn text only. So the log adds a new class of data on disk. Secret scrubbing is open for the 2c ADR (§8, held list).
 - One write per event adds disk work. Text deltas are not durable events, so the count is one line per message, tool call, or result.
 
 ### 4. Phase 6 frontend: the toggle (Cursor)
