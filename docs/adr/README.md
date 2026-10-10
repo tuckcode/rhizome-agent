@@ -216,6 +216,6 @@ proposed → active → superseded
 | [0177](0177-rhizome-is-a-client-of-harnesses.md) | Rhizome is a client of harnesses | superseded → [0180](0180-rhizome-is-its-own-harness.md) |
 | [0178](0178-generic-acp-client.md) | Generic ACP client; Hermes one-shot is fallback | active |
 | [0179](0179-red-close-quits-unless-keep-in-taskbar.md) | Red close quits unless keep in taskbar | active |
-| [0180](0180-rhizome-is-its-own-harness.md) | Rhizome is its own harness | active |
+| [0180](0180-rhizome-is-its-own-harness.md) | Rhizome is its own harness. Phase names: [harness plan](../plans/2026-10-09-rhizome-harness-plan.md) §4 (Plan Phase 3 = plugin seam, still skipped; #101 "phase 3" = loop Model trait, on main; Phase 5 done in #107; Phase 4b = ADR-0182 + #108) | active |
 | [0181](0181-pr-branches-with-full-gates.md) | PR branches with full pre-push gates | active |
 | [0182](0182-free-tier-provider-routing.md) | Free-tier provider routing ports OmniRoute rules | active |

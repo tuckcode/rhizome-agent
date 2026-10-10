@@ -47,7 +47,7 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Grok 4.6 · 2026-10-10 · Phase 5 loop: stale approval dismiss + native engine. Chat stays on Prime. Not installed. [Handoff](plans/handoffs/2026-10-10-0945-cursor-grok-4-6-harness-phase-5.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-10 · Plan Phase 3 is the plugin seam (still skipped). #101's "phase 3" is loop Model trait, on main. Plan Phase 5 is done (#107, closes #104). Phase 4b is ADR-0182 + Claude #108. [Plan](plans/2026-10-09-rhizome-harness-plan.md) §4. [Handoff](plans/handoffs/2026-10-10-1530-cursor-grok-4-6-phase-names.md).
 **Origin:** Cursor Grok 4.7 · 2026-10-10 · Phase 2 Rhizome loop: tools, Limited tools vs Power User, cancel reset. Chat stays on Prime. Not installed. [Handoff](plans/handoffs/2026-10-10-0135-cursor-grok-4-7-harness-phase-2.md).
 **Origin:** Cursor Grok 4.7 · 2026-10-10 · Phase 1 Rhizome loop (fake model, four behavior tests). Chat stays on Prime. Not installed. [Handoff](plans/handoffs/2026-10-10-0045-cursor-grok-4-7-harness-phase-1.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-09 · Chat stays Working after agent_end when Prime keeps emitting agent_status. Host ignores that noise; composer spinner only. [Handoff](plans/handoffs/2026-10-09-2335-cursor-grok-4-6-stuck-working.md).
@@ -133,7 +133,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
-- [2026-10-10 · phase 5 engines](plans/handoffs/2026-10-10-0945-cursor-grok-4-6-harness-phase-5.md) — stale approval dismiss; native/Prime/Hermes engines. Chat stays on Prime.
+- [2026-10-10 · phase names](plans/handoffs/2026-10-10-1530-cursor-grok-4-6-phase-names.md) — Plan Phase 3 = plugin seam (skipped). #101 "phase 3" = loop Model trait. Phase 5 done (#107; [0945](plans/handoffs/2026-10-10-0945-cursor-grok-4-6-harness-phase-5.md)). Phase 4b = ADR-0182 + #108.
 - [2026-10-10 · phase 2 tools](plans/handoffs/2026-10-10-0135-cursor-grok-4-7-harness-phase-2.md) — loop tools, Limited tools vs Power User, cancel reset. Chat stays on Prime.
 - [2026-10-10 · phase 1 loop](plans/handoffs/2026-10-10-0045-cursor-grok-4-7-harness-phase-1.md) — bare Rhizome loop and four behavior tests. Chat stays on Prime. Not in the app.
 - [2026-10-09 · stuck Working](plans/handoffs/2026-10-09-2335-cursor-grok-4-6-stuck-working.md) — post-`agent_end` status noise cancelled the follow-up grace; composer no longer prints last tool.
