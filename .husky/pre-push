@@ -110,71 +110,16 @@ ensure_node_tooling() {
   fi
 }
 
-# A `prototype/*` branch is throwaway code kept as a primary source: the
-# measurement or spike that settled a decision, parked out of main so the
-# number can be re-run later instead of re-derived. It never merges, so the
-# main-only rule does not need to cover it — and the full gate suite does not
-# either, since prototype code is written without tests or error handling by
-# design. See `docs/adr/` and the `prototype` skill.
-IS_PROTOTYPE_BRANCH=false
-
-# Any other branch is a PR branch. Agents open PRs and knispo merges them
-# (harness plan §6), so a PR branch must be pushable. It gets the full gate
-# suite, the same as main. It may only push to the remote branch of the same
-# name, so it can never write main. Before 2026-10-10 this hook refused every
-# PR branch. PRs reached GitHub only on clones where `.husky/_/pre-push` was
-# missing, which also skipped every gate.
-reject_push_ref() {
-  echo "❌ Pushes must be main -> main, a tag, or a branch -> the remote branch of the same name."
-  echo "   Attempted: ${LOCAL_REF:-<none>} -> ${REMOTE_REF:-<none>}"
-  exit 1
-}
-
-require_main_push() {
-  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-  case "$CURRENT_BRANCH" in
-    prototype/*)
-      IS_PROTOTYPE_BRANCH=true
-      ;;
-  esac
-
-  while IFS=' ' read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
-    [ -z "$LOCAL_REF" ] && continue
-
-    # Skip the gates only when every pushed ref is a prototype ref. From a
-    # prototype checkout, `git push origin main` still runs the full suite.
-    case "$REMOTE_REF" in
-      refs/heads/prototype/*) ;;
-      *) IS_PROTOTYPE_BRANCH=false ;;
-    esac
-
-    case "$LOCAL_REF:$REMOTE_REF" in
-      refs/heads/main:refs/heads/main)
-        ;;
-      HEAD:refs/heads/main)
-        ;;
-      refs/tags/*:refs/tags/*)
-        ;;
-      refs/heads/*:refs/heads/*)
-        # main -> main matched above, so a name mismatch here includes
-        # every attempt to write main from another branch.
-        [ "$LOCAL_REF" = "$REMOTE_REF" ] || reject_push_ref
-        ;;
-      *)
-        reject_push_ref
-        ;;
-    esac
-  done <<EOF
-$PUSH_INPUT
-EOF
-}
+# shellcheck disable=SC1091
+. "$HOOK_DIR/push-refs.sh"
 
 if [ -t 0 ]; then
   PUSH_INPUT=""
 else
   PUSH_INPUT=$(cat)
 fi
-require_main_push
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+check_push_refs
 
 if [ "$IS_PROTOTYPE_BRANCH" = true ]; then
   echo ""
