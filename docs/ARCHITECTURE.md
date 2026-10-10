@@ -458,13 +458,9 @@ worker expires after Prime's reconnect grace. Active close asks, with
 **Stop and close** as the default and **Keep working** as an explicit
 `promote_owned_session`. The daemon may stay available; that is not the same
 as an agent still working. ADR-0180 is the identity: Rhizome owns the loop.
-`src-tauri/src/engines/` holds the Phase 5 trait and the native / Prime /
-Hermes wrappers. Chat still calls Prime directly (Phase 6 toggle).
-`rhizome_provider_model.rs` is the native loop's OpenAI-compatible `Model`.
-`rhizome_routing/` wraps it with free-tier fallback over a pinned OmniRoute
-catalog (ADR-0182). Chat calls neither yet.
-ADR-0168 (amended) is the borrow-care rule. Prime is an optional engine
-(ADR-0163). See `docs/design/harness-doctrine.md`.
+Prime is an optional engine (ADR-0163). ADR-0168 (amended) is the
+borrow-care rule. See `docs/design/harness-doctrine.md`. The native loop
+and routing compile in normal builds; Chat does not call them yet.
 
 #### The two modules, and why confusing them is the classic mistake
 
@@ -733,6 +729,114 @@ one user-asked write is Settings → Add to Chat list for Nous Portal, which
 merges that provider into `models.json` without storing a key. The session log
 format carries no field identifying which client wrote it, so "which app made
 this session" is not a question the data can answer.
+
+### Rhizome-owned loop (compiled, not Chat)
+
+**Origin:** Cursor Grok 4.6 · 2026-10-10 · verified against `rhizome_loop/`,
+`rhizome_routing/`, `engines/`, `ai_model_tools.rs`, `ai_models.rs`.
+
+Rhizome owns the agent loop (ADR-0180). Chat still talks to Prime
+directly. Phase 6 adds a Settings toggle. Until then, no command under
+`src-tauri/src/commands/` reaches `engines::`, `rhizome_loop`, or
+`rhizome_routing`. `leftover-prime-keep.test.ts` locks that a Settings
+API default must not strip Prime chrome.
+
+| Module | Role | Chat? |
+|---|---|---|
+| `rhizome_loop/` | One inbox, one turn, `ModelEvent` in, `DurableEvent` in memory | No |
+| `rhizome_provider_model.rs` | OpenAI-compatible `Model`. Runs no tools. | No |
+| `rhizome_routing/` | `RoutingModel` walks the pinned free catalog (ADR-0182) | No |
+| `engines/` | Phase 5 trait: native / Prime / Hermes | No |
+| `commands/ai.rs` `stream_ai_model` | Old blocking path. Still the API-model Chat target. | Yes |
+
+A step is one model request plus the tools it called. Follow-ups wait
+in the inbox until idle. Cancel stops reading; the model has no
+`Cancelled` event. Default step cap is 8 (`DEFAULT_STEP_CAP`).
+`DurableEvent` has no serde and no disk file. Resume after restart is
+remaining-threads step 2c and waits for a Cursor brief.
+
+#### Tools and policy
+
+`policy::offered_tools` is the allow-list. A name outside it is denied
+as `not offered` before the waiter runs. `tools::execute_allowed` is
+the body. **`bash` is not a process:** it returns its args string.
+Unknown names return a result; they do not panic.
+
+| Tool | Limited tools (`Safe`) | Power User |
+|---|---|---|
+| `echo` | Auto-runs | Auto-runs once from the shared table |
+| `create_note` | Ask every call (Allow once and Deny). No session grant. | Runs with no prompt |
+| `bash` | Not offered | Ask each call unless a session grant matches the **exact** command |
+
+`create_note` is one vault-bounded helper:
+`ai_model_tools::run_create_note_tool(raw_args, vault_path, vault_paths)`.
+The model sends a JSON object. Constraints, checked in
+`rhizome_loop/mod.rs` and `ai_model_tools.rs`:
+
+- Required `path`. Optional `content`, `title`, `type` / `is_a`, `vaultPath`.
+- Writes through `create_note_content`. An existing file is never overwritten.
+- A path outside the vault is refused. An explicit `vaultPath` must be an active vault.
+- Limited tools asks before the write. A deny writes no file.
+- The old `stream_ai_model` path still runs this helper with **no** loop approval.
+
+Example Limited-tools call the loop accepts after Allow once:
+
+```json
+{ "path": "inbox/20261010-short-slug.md", "content": "# Title\n" }
+```
+
+#### Provider stream and routing
+
+`stream_chat_events_with` (and `_with_params`) is the native stream.
+It emits `ModelEvent`s and runs no tools. Anthropic is rejected with
+`This provider does not stream model events yet.`
+`stream_model_events` / `stream_model_events_with` are **deleted**
+(#111). Do not restore them. The old blocking path
+(`run_ai_model_stream` → `send_openai_compatible_message` /
+`send_anthropic_message`) still serves Chat API models, distill,
+import, and the connection test.
+
+`ProviderModel` maps `ModelView` to OpenAI messages (`tool_calls[].id`,
+`role: "tool"`). It offloads `reqwest::blocking` onto a worker thread
+because that client panics when dropped inside a tokio runtime.
+
+`RoutingModel` is one `Model`. Each step it walks
+`free_catalog.json` in fixed order: Groq, Mistral, LLM7, OpenRouter,
+NVIDIA NIM, then Cloudflare Workers AI only when opted in, then the
+keyless `custom` user endpoint. Failover happens only **before** the
+first event reaches the loop. After text or a tool call went out, a
+later error is `FailedAfterOutput` and ends the step. Retry budget is
+45s; the first try and one failover always run.
+
+`RoutingModel::with_observer` reports `ProviderAttempt`
+(`Trying`, `FailedOver`, `Answered`, `FailedAfterOutput`, `Exhausted`).
+`reason` is a `ModelErrorKind`, never a response body. The loop does
+not log attempts: they are not model-visible. `KeyStore` has a test
+map only. Live keys still sit in `ai-provider-secrets.json`. Keychain
+is remaining-threads step 3.
+
+OmniRoute rows and cooldown **rules** are vendored
+(`docs/vendored-sources.md`). No OmniRoute runtime was copied.
+`leftover-omniroute-parked.test.ts` locks that 2026-09-14 phrase; do
+not "fix" it because `rhizome_routing/` exists.
+
+`Engine` today has `kind`, `start`, `stop`, and `events()`.
+`EngineEvent` is `Text` and `Cancelled` only. Native maps quit to
+`stop_and_drain`. Prime detaches (never `shutdown`). Hermes uses ACP.
+A live sink and approval events are remaining-threads step 2a.
+
+**How to test (no Chat, no daemon):**
+
+```bash
+cargo test --manifest-path src-tauri/Cargo.toml rhizome_loop
+cargo test --manifest-path src-tauri/Cargo.toml rhizome_routing
+cargo test --manifest-path src-tauri/Cargo.toml engines::
+```
+
+Next steps, owners, and decisions D1–D13:
+[`docs/plans/2026-10-10-harness-remaining-threads.md`](plans/2026-10-10-harness-remaining-threads.md).
+1a (`create_note` loop tool), 1b (delete `stream_model_events`), and
+1c (provider-attempt observer) are on `main`.
 
 ### Context Building
 
