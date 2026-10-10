@@ -3,7 +3,7 @@ use crate::ai_models::{AiModelProviderKind, AiModelStreamRequest};
 use std::path::{Path, PathBuf};
 
 /// The tool name the loop offers and the policy rules on.
-pub const CREATE_NOTE_TOOL_NAME: &str = "create_note";
+pub(crate) const CREATE_NOTE_TOOL_NAME: &str = "create_note";
 const CREATE_NOTE_TOOL_JSON: &str = r#"{
   "type": "function",
   "function": {
@@ -774,5 +774,33 @@ mod tests {
         let error = run_create_note_tool("  ", Some(&vault_path), &[]).unwrap_err();
 
         assert_eq!(error, "create_note requires path.");
+    }
+
+    #[test]
+    fn run_create_note_tool_refuses_an_absolute_path_outside_the_vault() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        let outside = std::path::Path::new("/tmp/x.md");
+        let existed = outside.exists();
+        let before = existed.then(|| fs::read_to_string(outside).ok()).flatten();
+        let raw = json!({ "path": "/tmp/x.md", "content": "# Escape\n" }).to_string();
+
+        let result = run_create_note_tool(&raw, Some(&vault_path), &[]);
+
+        assert!(result.is_err());
+        if let Some(before) = before {
+            assert_eq!(fs::read_to_string(outside).unwrap(), before);
+        } else {
+            assert!(!outside.exists());
+        }
+    }
+
+    #[test]
+    fn run_create_note_tool_requires_a_vault() {
+        let raw = json!({ "path": "a.md", "content": "# A\n" }).to_string();
+
+        let error = run_create_note_tool(&raw, None, &[]).unwrap_err();
+
+        assert_eq!(error, "No active vault is available for create_note.");
     }
 }

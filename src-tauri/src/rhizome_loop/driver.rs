@@ -44,6 +44,10 @@ struct Shared {
     /// Names a test adds on top of `policy::offered_tools`. Production
     /// modes do not use this list.
     extra_offered: Vec<String>,
+    /// Vault roots for this run. Set once when the engine starts.
+    /// Not part of `ModelView`.
+    vault_path: Option<String>,
+    vault_paths: Vec<String>,
     /// Shared and not mutexed for the whole wait. A cancelled prompt
     /// must not block the next ask.
     waiter: Option<ApprovalWaiter>,
@@ -111,6 +115,8 @@ impl AgentLoop {
                 grants: Vec::new(),
                 session_grants: Vec::new(),
                 extra_offered: Vec::new(),
+                vault_path: None,
+                vault_paths: Vec::new(),
                 waiter: None,
                 dismiss: None,
                 prompt_gen: 0,
@@ -142,6 +148,13 @@ impl AgentLoop {
 
     pub fn set_permission_mode(&self, mode: AiAgentPermissionMode) {
         self.lock().mode = mode;
+    }
+
+    /// Vault for this run. `create_note` uses it; it is not on `ModelView`.
+    pub fn set_vault(&self, vault_path: Option<String>, vault_paths: Vec<String>) {
+        let mut shared = self.lock();
+        shared.vault_path = vault_path;
+        shared.vault_paths = vault_paths;
     }
 
     pub fn set_approval_waiter(
@@ -190,7 +203,8 @@ impl AgentLoop {
     }
 
     /// Adds a name to this loop's offered set. Production `offered_tools`
-    /// stays Safe = echo, Power User = echo and bash.
+    /// is Safe = echo and create_note, Power User = echo, bash, and
+    /// create_note.
     pub fn offer_extra_tool_for_test(&self, name: impl Into<String>) {
         self.lock().extra_offered.push(name.into());
     }
@@ -448,9 +462,13 @@ impl AgentLoop {
             return;
         }
         match reply {
-            ApprovalReply::AllowOnce => self.record_run(id, name, args, name != "bash"),
+            ApprovalReply::AllowOnce => {
+                self.record_run(id, name, args, name != "bash" && name != "create_note")
+            }
             ApprovalReply::AllowSession => {
-                self.grant_for_session(name, args);
+                if name != "create_note" {
+                    self.grant_for_session(name, args);
+                }
                 self.record_run(id, name, args, false);
             }
             ApprovalReply::Deny | ApprovalReply::Cancelled => {
@@ -517,7 +535,14 @@ impl AgentLoop {
     }
 
     fn record_run(&self, id: &str, name: &str, args: &str, spend_grant: bool) {
-        let output = tools::execute_allowed(args);
+        let (vault_path, vault_paths) = {
+            let shared = self.lock();
+            (shared.vault_path.clone(), shared.vault_paths.clone())
+        };
+        let output = match tools::execute_allowed(name, args, vault_path.as_deref(), &vault_paths) {
+            Ok(output) => output,
+            Err(error) => error,
+        };
         let mut shared = self.lock();
         if spend_grant {
             shared.grants.push((name.to_string(), args.to_string()));

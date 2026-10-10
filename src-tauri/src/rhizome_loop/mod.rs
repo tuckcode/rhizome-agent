@@ -5,7 +5,9 @@
 //! the tools it called. The loop consumes `ModelEvent`. Cancel stops
 //! reading; the model has no `Cancelled` event. Tool-call `id`s stay
 //! on the history items that go back to the model.
-//! Allow-once is spent for echo. Power User bash asks each call
+//! Allow-once is spent for echo. `create_note` is offered in both
+//! modes: Limited tools asks every call (Allow once and Deny);
+//! Power User runs it with no prompt. Power User bash asks each call
 //! unless a session grant matches the exact command. Quit is
 //! `stop_and_drain`.
 //! The turn / inbox vocabulary is the DeepSeek Harness idea. No DeepSeek
@@ -118,7 +120,7 @@ mod tests {
                     admitted: "A".into(),
                     history: vec![],
                     turn_start: 0,
-                    offered_tools: vec!["echo".into()],
+                    offered_tools: vec!["echo".into(), "create_note".into()],
                 },
                 ModelView {
                     admitted: "B".into(),
@@ -130,7 +132,7 @@ mod tests {
                         },
                     ],
                     turn_start: 2,
-                    offered_tools: vec!["echo".into()],
+                    offered_tools: vec!["echo".into(), "create_note".into()],
                 },
             ]
         );
@@ -304,6 +306,352 @@ mod tests {
             matches!(first, HistoryItem::Assistant { .. }),
             "step order: the model must see its own tool call before the result, got {first:?}"
         );
+    }
+
+    #[test]
+    fn limited_tools_asks_before_create_note_writes() {
+        let vault = tempfile::tempdir().unwrap();
+        let note = vault.path().join("asked.md");
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::Safe);
+        agent.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&asked);
+        let note_path = note.clone();
+        agent.set_approval_waiter(move |name| {
+            assert_eq!(name, "create_note");
+            assert!(!note_path.exists(), "create_note must ask before writing");
+            flag.store(true, Ordering::SeqCst);
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![
+            vec![ScriptPart::Tool {
+                name: "create_note".into(),
+                args: serde_json::json!({
+                    "path": "asked.md",
+                    "content": "# Asked\n",
+                })
+                .to_string(),
+            }],
+            vec![ScriptPart::Text("done".into())],
+        ]);
+        agent.submit("write a note");
+        agent.run_until_idle(&mut model);
+
+        assert!(
+            asked.load(Ordering::SeqCst),
+            "Limited tools must ask before create_note writes: {:?}",
+            agent.events()
+        );
+    }
+
+    #[test]
+    fn denied_create_note_writes_no_note() {
+        let vault = tempfile::tempdir().unwrap();
+        let note = vault.path().join("denied.md");
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::Safe);
+        agent.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&asked);
+        agent.set_approval_waiter(move |_| {
+            flag.store(true, Ordering::SeqCst);
+            ApprovalReply::Deny
+        });
+        let mut model = FakeModel::script(vec![
+            vec![ScriptPart::Tool {
+                name: "create_note".into(),
+                args: serde_json::json!({
+                    "path": "denied.md",
+                    "content": "# Denied\n",
+                })
+                .to_string(),
+            }],
+            vec![ScriptPart::Text("after".into())],
+        ]);
+        agent.submit("write a note");
+        agent.run_until_idle(&mut model);
+
+        assert!(
+            asked.load(Ordering::SeqCst),
+            "Limited tools must ask before denying create_note: {:?}",
+            agent.events()
+        );
+        assert!(!note.exists(), "a denied create_note must write no file");
+        assert!(agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolDenied { name, .. } if name == "create_note")
+        }));
+        assert!(!agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolResult { name, .. } if name == "create_note")
+        }));
+    }
+
+    #[test]
+    fn approved_create_note_writes_the_note_in_the_vault() {
+        let vault = tempfile::tempdir().unwrap();
+        let note = vault.path().join("approved.md");
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::Safe);
+        agent.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&asked);
+        agent.set_approval_waiter(move |_| {
+            flag.store(true, Ordering::SeqCst);
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![
+            vec![ScriptPart::Tool {
+                name: "create_note".into(),
+                args: serde_json::json!({
+                    "path": "approved.md",
+                    "content": "# Approved\n",
+                })
+                .to_string(),
+            }],
+            vec![ScriptPart::Text("done".into())],
+        ]);
+        agent.submit("write a note");
+        agent.run_until_idle(&mut model);
+
+        assert!(
+            asked.load(Ordering::SeqCst),
+            "Limited tools must ask before an approved create_note: {:?}",
+            agent.events()
+        );
+        assert_eq!(
+            std::fs::read_to_string(&note).expect("approved create_note must write the note"),
+            "# Approved\n"
+        );
+        assert!(agent.events().iter().any(|event| {
+            matches!(
+                event,
+                DurableEvent::ToolResult { name, .. } if name == "create_note"
+            )
+        }));
+    }
+
+    #[test]
+    fn create_note_refuses_a_path_outside_the_vault() {
+        let parent = tempfile::tempdir().unwrap();
+        let vault = parent.path().join("vault");
+        std::fs::create_dir(&vault).unwrap();
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        agent.set_vault(Some(vault.to_string_lossy().into_owned()), Vec::new());
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&asked);
+        agent.set_approval_waiter(move |_| {
+            flag.store(true, Ordering::SeqCst);
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![
+            vec![ScriptPart::Tool {
+                name: "create_note".into(),
+                args: serde_json::json!({
+                    "path": "../escape.md",
+                    "content": "# Escape\n",
+                })
+                .to_string(),
+            }],
+            vec![ScriptPart::Text("after".into())],
+        ]);
+        agent.submit("escape");
+        agent.run_until_idle(&mut model);
+
+        assert!(
+            !asked.load(Ordering::SeqCst),
+            "Power User must not prompt for create_note"
+        );
+        assert!(!parent.path().join("escape.md").exists());
+        assert!(agent.events().iter().any(|event| {
+            matches!(
+                event,
+                DurableEvent::ToolResult { name, output, .. }
+                    if name == "create_note" && !output.starts_with('{')
+            )
+        }));
+    }
+
+    #[test]
+    fn create_note_does_not_overwrite() {
+        let vault = tempfile::tempdir().unwrap();
+        let note = vault.path().join("kept.md");
+        std::fs::write(&note, "# Kept\n").unwrap();
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        agent.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let mut model = FakeModel::script(vec![
+            vec![ScriptPart::Tool {
+                name: "create_note".into(),
+                args: serde_json::json!({
+                    "path": "kept.md",
+                    "content": "# Replaced\n",
+                })
+                .to_string(),
+            }],
+            vec![ScriptPart::Text("after".into())],
+        ]);
+        agent.submit("overwrite");
+        agent.run_until_idle(&mut model);
+
+        assert_eq!(std::fs::read_to_string(&note).unwrap(), "# Kept\n");
+        assert!(agent.events().iter().any(|event| {
+            matches!(
+                event,
+                DurableEvent::ToolResult { name, output, .. }
+                    if name == "create_note" && output.contains("already exists")
+            )
+        }));
+    }
+
+    #[test]
+    fn limited_tools_asks_for_every_create_note() {
+        let vault = tempfile::tempdir().unwrap();
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::Safe);
+        agent.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let asks = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&asks);
+        agent.set_approval_waiter(move |_| {
+            count.fetch_add(1, Ordering::SeqCst);
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![
+            vec![
+                ScriptPart::Tool {
+                    name: "create_note".into(),
+                    args: serde_json::json!({
+                        "path": "one.md",
+                        "content": "# One\n",
+                    })
+                    .to_string(),
+                },
+                ScriptPart::Tool {
+                    name: "create_note".into(),
+                    args: serde_json::json!({
+                        "path": "two.md",
+                        "content": "# Two\n",
+                    })
+                    .to_string(),
+                },
+            ],
+            vec![ScriptPart::Text("done".into())],
+        ]);
+        agent.submit("two notes");
+        agent.run_until_idle(&mut model);
+
+        assert_eq!(asks.load(Ordering::SeqCst), 2);
+        assert!(vault.path().join("one.md").exists());
+        assert!(vault.path().join("two.md").exists());
+    }
+
+    #[test]
+    fn limited_tools_create_note_offers_no_session_grant() {
+        let vault = tempfile::tempdir().unwrap();
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::Safe);
+        agent.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        agent.grant_for_session("create_note", "{}");
+        let asks = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&asks);
+        agent.set_approval_waiter(move |_| {
+            let n = count.fetch_add(1, Ordering::SeqCst);
+            if n == 0 {
+                ApprovalReply::AllowSession
+            } else {
+                ApprovalReply::AllowOnce
+            }
+        });
+        let mut model = FakeModel::script(vec![
+            vec![
+                ScriptPart::Tool {
+                    name: "create_note".into(),
+                    args: serde_json::json!({
+                        "path": "first.md",
+                        "content": "# First\n",
+                    })
+                    .to_string(),
+                },
+                ScriptPart::Tool {
+                    name: "create_note".into(),
+                    args: serde_json::json!({
+                        "path": "second.md",
+                        "content": "# Second\n",
+                    })
+                    .to_string(),
+                },
+            ],
+            vec![ScriptPart::Text("done".into())],
+        ]);
+        agent.submit("two notes");
+        agent.run_until_idle(&mut model);
+
+        assert_eq!(
+            asks.load(Ordering::SeqCst),
+            2,
+            "create_note must not match or store a session grant"
+        );
+        assert!(vault.path().join("first.md").exists());
+        assert!(vault.path().join("second.md").exists());
+    }
+
+    #[test]
+    fn power_user_runs_create_note_without_a_prompt() {
+        let vault = tempfile::tempdir().unwrap();
+        let note = vault.path().join("power.md");
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        agent.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&asked);
+        agent.set_approval_waiter(move |_| {
+            flag.store(true, Ordering::SeqCst);
+            ApprovalReply::Deny
+        });
+        let mut model = FakeModel::script(vec![
+            vec![ScriptPart::Tool {
+                name: "create_note".into(),
+                args: serde_json::json!({
+                    "path": "power.md",
+                    "content": "# Power\n",
+                })
+                .to_string(),
+            }],
+            vec![ScriptPart::Text("done".into())],
+        ]);
+        agent.submit("write");
+        agent.run_until_idle(&mut model);
+
+        assert!(
+            !asked.load(Ordering::SeqCst),
+            "Power User create_note must not ask: {:?}",
+            agent.events()
+        );
+        assert_eq!(std::fs::read_to_string(&note).unwrap(), "# Power\n");
+        assert!(agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolResult { name, .. } if name == "create_note")
+        }));
     }
 
     #[test]
