@@ -66,12 +66,15 @@ Origin is `https://github.com/tuckcode/rhizome-agent.git` (private).
 1. Confirm there are local commits to push:
    `git log --oneline origin/main..HEAD`.
 2. `git push` to `origin`. Pre-push is the CI. It sets LLVM tools on
-   macOS when unset.
+   macOS when unset. On a PR branch, push it to the origin branch with
+   the same name. The hook refuses any other name (ADR-0181). Do not
+   merge the PR.
 3. If Playwright fails on a sandbox browser cache, retry **outside**
    the sandbox. That is not a reason to skip hooks.
 4. Never force-push main. Never buy CI.
 
-**Done when:** `git status` shows in sync with `origin/main`, or still
+**Done when:** `git status` shows in sync with `origin/main` (or with
+the origin PR branch), or still
 ahead only if the push was refused and you reported why.
 
 ---

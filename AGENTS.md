@@ -75,7 +75,13 @@
 
 ### Commits & pushes
 
-- origin = `https://github.com/tuckcode/rhizome-agent.git` (**PUBLIC** — `gh repo view` said so on 2026-10-04; this line said PRIVATE until then). Commit locally, push to origin main when pre-push gates pass.
+- origin = `https://github.com/tuckcode/rhizome-agent.git` (**PUBLIC** — `gh repo view` said so on 2026-10-04; this line said PRIVATE until then). Commit locally. Push when the pre-push gates pass, by one of two paths (ADR-0181):
+  - `main` to origin `main`.
+  - A branch to the origin branch with the **same name**, for a PR. The hook runs the full gate suite on it. A push to `main` from another branch name, or to a different remote name, is refused. Open the PR, get CI green, and stop. knispo merges.
+
+  If the hook refuses a push, stop and ask knispo. Don't change `core.hooksPath` or use `--no-verify` to get past it.
+
+  `prototype/*` branches skip the gates, and only when every pushed ref is a prototype ref. They never merge. The ref check is `.husky/push-refs.sh`, tested by `src/lib/prePushRefs.test.ts`.
 - **Everything committed is published.** Write `~/…`, `<repo>/…` or `%LOCALAPPDATA%\…`, never your home path; use made-up names (`mock`, `test`) in fixtures; no personal email addresses. Keep screenshots, traces and probe output out of the tree (`docs/design/*-ui-audit/` is ignored). `scripts/check-personal-info.mjs` blocks this machine's username in added lines at pre-commit; set `PERSONAL_INFO_NAMES` for other names. A line that must keep a real value carries `personal-info: allow`.
   **⛔ Never add `knispo/rhizome` as a remote in this repo.** That is Rhizome Desktop — a different product with a different bundle id and its own history. See the STOP block at the top of this file and `docs/IDENTITY.md`. (This line said `knispo/rhizome` until 2026-08-09; it was inherited verbatim from the Desktop rules during the fork and directly contradicted both.)
 - **The pre-push hook now sets `LLVM_COV` / `LLVM_PROFDATA` itself** on macOS
