@@ -1202,7 +1202,7 @@ mod tests {
             assert!(
                 warning.to_lowercase().contains("permission")
                     && warning.to_lowercase().contains("no longer apply"),
-                "D13 warning missing: {warning}"
+                "D13 warning missing required permission/no-longer-apply text"
             );
         });
     }
