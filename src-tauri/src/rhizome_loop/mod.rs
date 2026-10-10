@@ -70,16 +70,23 @@ mod tests {
         let probe = agent.clone();
         let mut model = FakeModel::streaming(vec![vec!["from-a".into()], vec!["from-b".into()]]);
         model.on_after_chunk(move |index| {
-            if index == 0 {
-                assert!(
-                    !probe.events().iter().any(|event| {
-                        matches!(event, DurableEvent::TurnEnd)
-                            || matches!(event, DurableEvent::User { text } if text == "B")
-                    }),
-                    "B must stay in the inbox until A's turn ends"
-                );
-                probe.submit("B");
+            if index != 0 {
+                return;
             }
+            let events = probe.events();
+            let first_turn_open = !events
+                .iter()
+                .any(|event| matches!(event, DurableEvent::TurnEnd));
+            if !first_turn_open {
+                return;
+            }
+            assert!(
+                !events
+                    .iter()
+                    .any(|event| matches!(event, DurableEvent::User { text } if text == "B")),
+                "B must stay in the inbox until A's turn ends"
+            );
+            probe.submit("B");
         });
         agent.submit("A");
         agent.run_until_idle(&mut model);
