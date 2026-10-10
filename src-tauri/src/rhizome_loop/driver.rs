@@ -24,7 +24,7 @@ pub enum ApprovalReply {
 /// Default model rounds in one turn. A runaway tool loop stops here.
 pub const DEFAULT_STEP_CAP: usize = 8;
 
-type ApprovalWaiter = Arc<dyn Fn(&str) -> ApprovalReply + Send + Sync>;
+type ApprovalWaiter = Arc<dyn Fn(&str, &str) -> ApprovalReply + Send + Sync>;
 type ApprovalDismiss = Arc<dyn Fn() + Send + Sync>;
 type AfterToolHook = Box<dyn FnMut(&str, &str) + Send>;
 
@@ -159,7 +159,7 @@ impl AgentLoop {
 
     pub fn set_approval_waiter(
         &self,
-        waiter: impl Fn(&str) -> ApprovalReply + Send + Sync + 'static,
+        waiter: impl Fn(&str, &str) -> ApprovalReply + Send + Sync + 'static,
     ) {
         self.lock().waiter = Some(Arc::new(waiter));
     }
@@ -454,7 +454,7 @@ impl AgentLoop {
             self.record_denial(id, name, "cancelled".into());
             return;
         }
-        let reply = self.wait_for_approval(name);
+        let reply = self.wait_for_approval(name, args);
         // Cancel or quit can land while the waiter is blocked, or just
         // after it returns. Either way the tool does not run.
         if self.is_cancelled() {
@@ -480,7 +480,7 @@ impl AgentLoop {
     /// Runs the waiter off-thread so cancel/quit can end the wait
     /// without waiting for a human reply. The waiter is not locked
     /// for the whole wait, so a later turn can ask again.
-    fn wait_for_approval(&self, name: &str) -> ApprovalReply {
+    fn wait_for_approval(&self, name: &str, args: &str) -> ApprovalReply {
         let Some(waiter) = self.lock().waiter.clone() else {
             return ApprovalReply::Cancelled;
         };
@@ -492,8 +492,9 @@ impl AgentLoop {
         };
         let (tx, rx) = mpsc::channel();
         let asked = name.to_string();
+        let asked_args = args.to_string();
         thread::spawn(move || {
-            let reply = waiter(&asked);
+            let reply = waiter(&asked, &asked_args);
             let _ = tx.send((gen, reply));
         });
         loop {

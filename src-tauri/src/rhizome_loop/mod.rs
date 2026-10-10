@@ -25,6 +25,7 @@ pub use driver::{AgentLoop, ApprovalReply, DEFAULT_STEP_CAP};
 #[cfg(test)]
 pub use fake_model::{FakeModel, ScriptPart};
 pub use model::Model;
+pub use policy::{approval_options, ApprovalOption};
 pub use types::{DurableEvent, HistoryItem, ModelView, ToolCall};
 
 #[cfg(test)]
@@ -321,7 +322,7 @@ mod tests {
         let asked = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&asked);
         let note_path = note.clone();
-        agent.set_approval_waiter(move |name| {
+        agent.set_approval_waiter(move |name, _| {
             assert_eq!(name, "create_note");
             assert!(!note_path.exists(), "create_note must ask before writing");
             flag.store(true, Ordering::SeqCst);
@@ -360,7 +361,7 @@ mod tests {
         );
         let asked = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&asked);
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             flag.store(true, Ordering::SeqCst);
             ApprovalReply::Deny
         });
@@ -404,7 +405,7 @@ mod tests {
         );
         let asked = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&asked);
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             flag.store(true, Ordering::SeqCst);
             ApprovalReply::AllowOnce
         });
@@ -449,7 +450,7 @@ mod tests {
         agent.set_vault(Some(vault.to_string_lossy().into_owned()), Vec::new());
         let asked = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&asked);
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             flag.store(true, Ordering::SeqCst);
             ApprovalReply::AllowOnce
         });
@@ -527,7 +528,7 @@ mod tests {
         );
         let asks = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asks);
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             count.fetch_add(1, Ordering::SeqCst);
             ApprovalReply::AllowOnce
         });
@@ -572,7 +573,7 @@ mod tests {
         agent.grant_for_session("create_note", "{}");
         let asks = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asks);
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             let n = count.fetch_add(1, Ordering::SeqCst);
             if n == 0 {
                 ApprovalReply::AllowSession
@@ -625,7 +626,7 @@ mod tests {
         );
         let asked = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&asked);
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             flag.store(true, Ordering::SeqCst);
             ApprovalReply::Deny
         });
@@ -731,7 +732,7 @@ mod tests {
         agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
         let asks = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asks);
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             count.fetch_add(1, Ordering::SeqCst);
             ApprovalReply::AllowOnce
         });
@@ -758,7 +759,7 @@ mod tests {
         agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
         let asks = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asks);
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             count.fetch_add(1, Ordering::SeqCst);
             ApprovalReply::AllowOnce
         });
@@ -799,7 +800,7 @@ mod tests {
         agent.offer_extra_tool_for_test("edit");
         let asked = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&asked);
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             flag.store(true, Ordering::SeqCst);
             ApprovalReply::Cancelled
         });
@@ -832,7 +833,7 @@ mod tests {
         agent.set_permission_mode(AiAgentPermissionMode::Safe);
         let asked = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&asked);
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             flag.store(true, Ordering::SeqCst);
             ApprovalReply::AllowOnce
         });
@@ -863,7 +864,7 @@ mod tests {
     fn waiter_allow_once_runs_and_deny_does_not() {
         let allowed = AgentLoop::new();
         allowed.offer_extra_tool_for_test("edit");
-        allowed.set_approval_waiter(|_| ApprovalReply::AllowOnce);
+        allowed.set_approval_waiter(|_, _| ApprovalReply::AllowOnce);
         let mut allow_model = FakeModel::script(vec![vec![ScriptPart::Tool {
             name: "edit".into(),
             args: "note".into(),
@@ -880,7 +881,7 @@ mod tests {
 
         let denied = AgentLoop::new();
         denied.offer_extra_tool_for_test("edit");
-        denied.set_approval_waiter(|_| ApprovalReply::Deny);
+        denied.set_approval_waiter(|_, _| ApprovalReply::Deny);
         let mut deny_model = FakeModel::script(vec![vec![ScriptPart::Tool {
             name: "edit".into(),
             args: "note".into(),
@@ -901,7 +902,7 @@ mod tests {
         agent.offer_extra_tool_for_test("edit");
         let asks = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asks);
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             count.fetch_add(1, Ordering::SeqCst);
             ApprovalReply::AllowSession
         });
@@ -938,7 +939,7 @@ mod tests {
         agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
         let asks = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asks);
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             let n = count.fetch_add(1, Ordering::SeqCst);
             if n == 0 {
                 ApprovalReply::AllowSession
@@ -996,7 +997,7 @@ mod tests {
         agent.offer_extra_tool_for_test("edit");
         let asks = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asks);
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             count.fetch_add(1, Ordering::SeqCst);
             ApprovalReply::AllowSession
         });
@@ -1407,7 +1408,7 @@ mod tests {
         let agent = AgentLoop::new();
         agent.offer_extra_tool_for_test("edit");
         let cancel = agent.clone();
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             cancel.cancel("quit");
             ApprovalReply::AllowOnce
         });
@@ -1437,7 +1438,7 @@ mod tests {
         let cancel = agent.clone();
         let asks = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asks);
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             let n = count.fetch_add(1, Ordering::SeqCst);
             if n == 0 {
                 cancel.cancel("quit");
@@ -1478,7 +1479,7 @@ mod tests {
         let (entered_tx, entered_rx) = mpsc::channel();
         let (hold_tx, hold_rx) = mpsc::channel::<()>();
         let hold_rx = Mutex::new(hold_rx);
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             let n = count.fetch_add(1, Ordering::SeqCst);
             if n == 0 {
                 entered_tx.send(()).ok();
@@ -1543,7 +1544,7 @@ mod tests {
         let (hold_tx, hold_rx) = mpsc::channel::<()>();
         let hold_rx = Mutex::new(hold_rx);
         let (second_tx, second_rx) = mpsc::channel();
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             let n = count.fetch_add(1, Ordering::SeqCst);
             if n == 0 {
                 entered_tx.send(()).ok();
@@ -1632,7 +1633,7 @@ mod tests {
         let (entered_tx, entered_rx) = mpsc::channel();
         let (hold_tx, hold_rx) = mpsc::channel::<()>();
         let hold_rx = Mutex::new(hold_rx);
-        agent.set_approval_waiter(move |_| {
+        agent.set_approval_waiter(move |_, _| {
             entered_tx.send(()).ok();
             let _ = hold_rx.lock().expect("hold").recv();
             ApprovalReply::AllowOnce

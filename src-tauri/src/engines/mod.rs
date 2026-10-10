@@ -1,4 +1,4 @@
-//! Optional engines behind one trait (ADR-0180, harness plan Phase 5).
+//! Optional engines behind one trait (ADR-0180, harness plan Phase 5–2a).
 //!
 //! Chat still talks to Prime directly. Phase 6 adds the toggle.
 //! Native maps quit to cancel. Prime detaches. Hermes uses ACP.
@@ -8,37 +8,104 @@ mod native;
 mod prime;
 
 pub use hermes::HermesEngine;
-pub use native::NativeEngine;
+pub use native::{NativeControl, NativeEngine};
 pub use prime::PrimeEngine;
 
-/// One event an engine surfaces to a later Chat path.
+use crate::rhizome_loop::{ApprovalOption, ApprovalReply};
+use crate::rhizome_routing::ProviderAttempt;
+
+/// One event an engine surfaces to Chat.
+///
+/// `Provider(Trying)` with no later `Provider` event means that attempt
+/// was stopped (cancel or quit). The activity line must not wait for a
+/// follow-up after `Cancelled`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EngineEvent {
-    Text(String),
-    Cancelled { cause: String },
+    TextDelta {
+        text: String,
+    },
+    ToolCall {
+        id: String,
+        name: String,
+        args: String,
+    },
+    ToolResult {
+        id: String,
+        name: String,
+        output: String,
+    },
+    ToolDenied {
+        id: String,
+        name: String,
+        reason: String,
+    },
+    ApprovalRequested {
+        prompt_id: String,
+        tool: String,
+        args: String,
+        options: Vec<ApprovalOption>,
+    },
+    ApprovalDismissed {
+        prompt_id: String,
+    },
+    Provider(ProviderAttempt),
+    TurnEnd,
+    Cancelled {
+        cause: String,
+    },
+    Error {
+        message: String,
+    },
 }
 
-/// Start, one stream, then stop. No Chat import yet.
+/// Start with a live sink. Control methods work while a turn runs.
 pub trait Engine {
     fn kind(&self) -> &'static str;
-    fn start(&mut self, prompt: &str) -> Result<(), String>;
+    fn start(
+        &mut self,
+        prompt: &str,
+        sink: Box<dyn FnMut(EngineEvent) + Send>,
+    ) -> Result<(), String>;
     fn stop(&mut self);
     fn events(&self) -> Vec<EngineEvent>;
+    fn steer(&mut self, text: &str);
+    fn cancel(&mut self, cause: &str);
+    fn reply_approval(&mut self, prompt_id: &str, reply: ApprovalReply);
+    fn settle_on_quit(&mut self);
+}
+
+#[cfg(test)]
+fn start_quiet(engine: &mut dyn Engine, prompt: &str) -> Result<(), String> {
+    engine.start(prompt, Box::new(|_| {}))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Engine, EngineEvent, HermesEngine, NativeEngine, PrimeEngine};
+    use super::{start_quiet, Engine, EngineEvent, HermesEngine, NativeEngine, PrimeEngine};
+    use crate::ai_agents::AiAgentPermissionMode;
+    use crate::model_events::{FinishReason, ModelErrorKind, ModelEvent};
     use crate::prime_session_host::QuitDisposition;
-    use crate::rhizome_loop::{AgentLoop, DurableEvent, FakeModel};
+    use crate::rhizome_loop::{
+        AgentLoop, ApprovalReply, DurableEvent, FakeModel, Model, ModelView, ScriptPart,
+    };
+    use crate::rhizome_routing::ProviderAttempt;
+    use std::sync::mpsc;
     use std::sync::{Arc, Mutex};
+    use std::thread;
+    use std::time::Duration;
 
     #[test]
     fn native_engine_start_stop() {
         let mut engine = NativeEngine::saying("ok");
-        engine.start("hi").expect("native start");
+        start_quiet(&mut engine, "hi").expect("native start");
         assert_eq!(engine.kind(), "native");
-        assert_eq!(engine.events(), vec![EngineEvent::Text("ok".into())]);
+        assert_eq!(
+            engine.events(),
+            vec![
+                EngineEvent::TextDelta { text: "ok".into() },
+                EngineEvent::TurnEnd,
+            ]
+        );
         engine.stop();
         assert!(engine.agent().when_idle());
     }
@@ -54,7 +121,7 @@ mod tests {
             }
         });
         let mut engine = NativeEngine::from_parts(agent, model);
-        engine.start("hello").expect("native start");
+        start_quiet(&mut engine, "hello").expect("native start");
         engine.stop();
         assert!(engine
             .events()
@@ -94,13 +161,12 @@ mod tests {
     #[test]
     fn hermes_engine_uses_acp_client() {
         let mut engine = HermesEngine::fake_agent();
-        engine.start("Summarize the note").expect("acp fixture");
+        start_quiet(&mut engine, "Summarize the note").expect("acp fixture");
         assert_eq!(engine.kind(), "hermes");
         assert!(
-            engine
-                .events()
-                .iter()
-                .any(|event| matches!(event, EngineEvent::Text(text) if text == "Hello from ACP")),
+            engine.events().iter().any(
+                |event| matches!(event, EngineEvent::TextDelta { text } if text == "Hello from ACP")
+            ),
             "fixture text missing: {:?}",
             engine.events()
         );
@@ -115,17 +181,481 @@ mod tests {
             ("hermes", Box::new(HermesEngine::fake_agent())),
         ];
         for (kind, mut engine) in cases {
-            engine.start("hi").expect(kind);
+            start_quiet(engine.as_mut(), "hi").expect(kind);
             assert_eq!(engine.kind(), kind);
             assert!(
                 engine
                     .events()
                     .iter()
-                    .any(|event| matches!(event, EngineEvent::Text(_))),
+                    .any(|event| matches!(event, EngineEvent::TextDelta { .. })),
                 "{kind} must emit one text event: {:?}",
                 engine.events()
             );
             engine.stop();
+        }
+    }
+
+    #[test]
+    fn native_engine_streams_text_before_turn_end() {
+        let mut engine = NativeEngine::saying("hello");
+        start_quiet(&mut engine, "hi").expect("start");
+        let events = engine.events();
+        let text = events
+            .iter()
+            .position(|event| matches!(event, EngineEvent::TextDelta { text } if text == "hello"))
+            .expect("text");
+        let end = events
+            .iter()
+            .position(|event| matches!(event, EngineEvent::TurnEnd))
+            .expect("turn end");
+        assert!(text < end, "{events:?}");
+    }
+
+    #[test]
+    fn native_engine_reports_tool_call_and_result() {
+        let model = FakeModel::script(vec![
+            vec![ScriptPart::Tool {
+                name: "echo".into(),
+                args: "ping".into(),
+            }],
+            vec![ScriptPart::Text("done".into())],
+        ]);
+        let mut engine = NativeEngine::from_parts(AgentLoop::new(), model);
+        start_quiet(&mut engine, "hi").expect("start");
+        assert!(engine.events().iter().any(|event| {
+            matches!(
+                event,
+                EngineEvent::ToolCall { name, args, .. } if name == "echo" && args == "ping"
+            )
+        }));
+        assert!(engine.events().iter().any(|event| {
+            matches!(
+                event,
+                EngineEvent::ToolResult { name, output, .. } if name == "echo" && output == "ping"
+            )
+        }));
+    }
+
+    #[test]
+    fn native_engine_sets_vault_for_create_note() {
+        let vault = tempfile::tempdir().unwrap();
+        let note = vault.path().join("from-engine.md");
+        let mut engine = NativeEngine::from_parts(
+            AgentLoop::new(),
+            FakeModel::script(vec![
+                vec![ScriptPart::Tool {
+                    name: "create_note".into(),
+                    args: serde_json::json!({
+                        "path": "from-engine.md",
+                        "content": "# Engine\n",
+                    })
+                    .to_string(),
+                }],
+                vec![ScriptPart::Text("done".into())],
+            ]),
+        );
+        engine.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        engine.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        start_quiet(&mut engine, "write").expect("start");
+        assert_eq!(std::fs::read_to_string(&note).unwrap(), "# Engine\n");
+    }
+
+    #[test]
+    fn native_engine_create_note_allow_writes_and_deny_does_not() {
+        let vault = tempfile::tempdir().unwrap();
+        let allowed = vault.path().join("allowed.md");
+        let denied = vault.path().join("denied.md");
+
+        run_create_note_through_chat(&vault, "allowed.md", ApprovalReply::AllowOnce);
+        assert_eq!(std::fs::read_to_string(&allowed).unwrap(), "# Note\n");
+
+        run_create_note_through_chat(&vault, "denied.md", ApprovalReply::Deny);
+        assert!(!denied.exists());
+    }
+
+    #[test]
+    fn native_engine_create_note_prompt_is_allow_once_and_deny() {
+        let vault = tempfile::tempdir().unwrap();
+        let requested = run_until_create_note_prompt(&vault, "opts.md");
+        let ids: Vec<&str> = requested
+            .options
+            .iter()
+            .map(|option| option.id.as_str())
+            .collect();
+        assert_eq!(ids, vec!["allow_once", "deny"]);
+        assert!(!ids.contains(&"allow_session"));
+    }
+
+    #[test]
+    fn native_engine_approval_timeout_denies() {
+        let vault = tempfile::tempdir().unwrap();
+        let note = vault.path().join("late.md");
+        let mut engine = NativeEngine::from_parts(
+            AgentLoop::new(),
+            FakeModel::script(vec![vec![ScriptPart::Tool {
+                name: "create_note".into(),
+                args: serde_json::json!({
+                    "path": "late.md",
+                    "content": "# Late\n",
+                })
+                .to_string(),
+            }]]),
+        );
+        engine.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        engine.set_approval_timeout(Duration::from_millis(30));
+        start_quiet(&mut engine, "write").expect("start");
+        assert!(!note.exists());
+        assert!(engine.events().iter().any(|event| {
+            matches!(event, EngineEvent::ToolDenied { name, .. } if name == "create_note")
+        }));
+    }
+
+    #[test]
+    fn native_engine_cancel_during_approval_dismisses_prompt() {
+        let vault = tempfile::tempdir().unwrap();
+        let (tx, rx) = mpsc::channel();
+        let mut engine = NativeEngine::from_parts(
+            AgentLoop::new(),
+            FakeModel::script(vec![vec![ScriptPart::Tool {
+                name: "create_note".into(),
+                args: serde_json::json!({
+                    "path": "cancel.md",
+                    "content": "# Cancel\n",
+                })
+                .to_string(),
+            }]]),
+        );
+        engine.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let control = engine.control();
+        let (done_tx, done_rx) = mpsc::channel();
+        thread::spawn(move || {
+            engine
+                .start(
+                    "write",
+                    Box::new(move |event| {
+                        let _ = tx.send(event);
+                    }),
+                )
+                .ok();
+            let _ = done_tx.send(engine.events());
+        });
+        let requested = wait_for_approval(&rx);
+        control.cancel("quit");
+        let events = done_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("cancel must end start");
+        assert!(events.iter().any(|event| {
+            matches!(
+                event,
+                EngineEvent::ApprovalDismissed { prompt_id } if prompt_id == &requested.prompt_id
+            )
+        }));
+        assert!(!vault.path().join("cancel.md").exists());
+    }
+
+    #[test]
+    fn native_engine_steer_waits_for_idle() {
+        let control = Arc::new(Mutex::new(None::<super::NativeControl>));
+        let slot = Arc::clone(&control);
+        let mut model = FakeModel::streaming(vec![vec!["from-a".into()], vec!["from-b".into()]]);
+        model.on_after_chunk(move |index| {
+            if index != 0 {
+                return;
+            }
+            if let Some(control) = slot.lock().expect("control").as_ref() {
+                control.steer("B");
+            }
+        });
+        let mut engine = NativeEngine::from_parts(AgentLoop::new(), model);
+        *control.lock().expect("control") = Some(engine.control());
+        start_quiet(&mut engine, "A").expect("start");
+        let events = engine.events();
+        let end_a = events
+            .iter()
+            .position(|event| matches!(event, EngineEvent::TurnEnd))
+            .expect("A turn end");
+        let text_b = events
+            .iter()
+            .position(|event| matches!(event, EngineEvent::TextDelta { text } if text == "from-b"))
+            .expect("B text");
+        assert!(end_a < text_b, "{events:?}");
+    }
+
+    #[test]
+    fn native_engine_reports_provider_failover() {
+        let (tx, rx) = mpsc::sync_channel(64);
+        let model = FailoverModel { tx: tx.clone() };
+        let mut engine = NativeEngine::with_provider_pair(AgentLoop::new(), model, tx, rx);
+        start_quiet(&mut engine, "hi").expect("start");
+        let events = engine.events();
+        let providers: Vec<&ProviderAttempt> = events
+            .iter()
+            .filter_map(|event| match event {
+                EngineEvent::Provider(attempt) => Some(attempt),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            providers,
+            vec![
+                &trying("a"),
+                &ProviderAttempt::FailedOver {
+                    provider_id: "a".into(),
+                    model_id: "a-model".into(),
+                    reason: ModelErrorKind::RateLimited {
+                        retry_after_secs: Some(30)
+                    },
+                },
+                &trying("b"),
+                &answered("b"),
+            ]
+        );
+    }
+
+    #[test]
+    fn native_engine_provider_trying_then_cancel_means_stopped() {
+        let (tx, rx) = mpsc::sync_channel(64);
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let mut model = FakeModel::streaming(vec![vec!["one".into(), "two".into()]]);
+        let report = tx.clone();
+        model.on_before_chunk(move |index| {
+            if index == 0 {
+                let _ = report.try_send(trying("a"));
+                let _ = entered_tx.send(());
+            }
+        });
+        let mut engine = NativeEngine::with_provider_pair(AgentLoop::new(), model, tx, rx);
+        let control = engine.control();
+        let (done_tx, done_rx) = mpsc::channel();
+        thread::spawn(move || {
+            start_quiet(&mut engine, "hi").ok();
+            let _ = done_tx.send(engine.events());
+        });
+        entered_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("Trying was sent");
+        control.cancel("quit");
+        let events = done_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("cancel ends the turn");
+        let providers: Vec<&ProviderAttempt> = events
+            .iter()
+            .filter_map(|event| match event {
+                EngineEvent::Provider(attempt) => Some(attempt),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(providers, vec![&trying("a")]);
+        assert!(events
+            .iter()
+            .any(|event| matches!(event, EngineEvent::Cancelled { cause } if cause == "quit")));
+        assert!(!events.iter().any(|event| matches!(
+            event,
+            EngineEvent::Provider(ProviderAttempt::Answered { .. })
+        )));
+    }
+
+    #[test]
+    fn native_engine_provider_reports_do_not_block_the_answer() {
+        let (tx, rx) = mpsc::sync_channel(2);
+        let model = FloodModel { tx: tx.clone() };
+        let mut engine = NativeEngine::with_provider_pair(AgentLoop::new(), model, tx, rx);
+        start_quiet(&mut engine, "hi").expect("start must not wait on a full channel");
+        assert!(engine
+            .events()
+            .iter()
+            .any(|event| matches!(event, EngineEvent::TextDelta { text } if text == "ok")));
+    }
+
+    #[test]
+    fn native_settle_on_quit_cancels_and_refuses_submit() {
+        let (chunk_tx, chunk_rx) = mpsc::channel();
+        let mut model = FakeModel::streaming(vec![vec!["one".into(), "two".into()]]);
+        model.on_after_chunk(move |index| {
+            if index == 0 {
+                let _ = chunk_tx.send(());
+            }
+        });
+        let mut engine = NativeEngine::from_parts(AgentLoop::new(), model);
+        let control = engine.control();
+        let (done_tx, done_rx) = mpsc::channel();
+        thread::spawn(move || {
+            start_quiet(&mut engine, "A").ok();
+            let _ = done_tx.send(engine);
+        });
+        chunk_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("first chunk");
+        control.settle_on_quit();
+        let mut engine = done_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("quit ends start");
+        assert!(engine
+            .events()
+            .iter()
+            .any(|event| matches!(event, EngineEvent::Cancelled { cause } if cause == "quit")));
+        control.steer("later");
+        start_quiet(&mut engine, "later").expect("start after quit");
+        assert!(
+            !engine
+                .events()
+                .iter()
+                .any(|event| matches!(event, EngineEvent::TextDelta { text } if text == "later")),
+            "quit must refuse later submits: {:?}",
+            engine.events()
+        );
+    }
+
+    fn run_create_note_through_chat(vault: &tempfile::TempDir, path: &str, reply: ApprovalReply) {
+        let requested = run_until_create_note_prompt(vault, path);
+        requested
+            .control
+            .reply_approval(&requested.prompt_id, reply);
+        requested
+            .done
+            .recv_timeout(Duration::from_secs(2))
+            .expect("turn finishes");
+    }
+
+    struct PendingPrompt {
+        prompt_id: String,
+        options: Vec<crate::rhizome_loop::ApprovalOption>,
+        control: super::NativeControl,
+        done: mpsc::Receiver<Vec<EngineEvent>>,
+    }
+
+    fn run_until_create_note_prompt(vault: &tempfile::TempDir, path: &str) -> PendingPrompt {
+        let (tx, rx) = mpsc::channel();
+        let mut engine = NativeEngine::from_parts(
+            AgentLoop::new(),
+            FakeModel::script(vec![
+                vec![ScriptPart::Tool {
+                    name: "create_note".into(),
+                    args: serde_json::json!({
+                        "path": path,
+                        "content": "# Note\n",
+                    })
+                    .to_string(),
+                }],
+                vec![ScriptPart::Text("done".into())],
+            ]),
+        );
+        engine.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let control = engine.control();
+        let (done_tx, done_rx) = mpsc::channel();
+        thread::spawn(move || {
+            engine
+                .start(
+                    "write",
+                    Box::new(move |event| {
+                        let _ = tx.send(event);
+                    }),
+                )
+                .ok();
+            let _ = done_tx.send(engine.events());
+        });
+        let requested = wait_for_approval(&rx);
+        PendingPrompt {
+            prompt_id: requested.prompt_id,
+            options: requested.options,
+            control,
+            done: done_rx,
+        }
+    }
+
+    struct Requested {
+        prompt_id: String,
+        options: Vec<crate::rhizome_loop::ApprovalOption>,
+    }
+
+    fn wait_for_approval(rx: &mpsc::Receiver<EngineEvent>) -> Requested {
+        let started = std::time::Instant::now();
+        while started.elapsed() < Duration::from_secs(2) {
+            match rx.recv_timeout(Duration::from_millis(50)) {
+                Ok(EngineEvent::ApprovalRequested {
+                    prompt_id, options, ..
+                }) => {
+                    return Requested { prompt_id, options };
+                }
+                Ok(_) => {}
+                Err(_) => {}
+            }
+        }
+        panic!("expected ApprovalRequested");
+    }
+
+    fn trying(id: &str) -> ProviderAttempt {
+        ProviderAttempt::Trying {
+            provider_id: id.into(),
+            model_id: format!("{id}-model"),
+        }
+    }
+
+    fn answered(id: &str) -> ProviderAttempt {
+        ProviderAttempt::Answered {
+            provider_id: id.into(),
+            model_id: format!("{id}-model"),
+        }
+    }
+
+    struct FailoverModel {
+        tx: mpsc::SyncSender<ProviderAttempt>,
+    }
+
+    impl Model for FailoverModel {
+        fn complete(
+            &mut self,
+            _view: &ModelView,
+            emit: &mut dyn FnMut(ModelEvent) -> bool,
+        ) -> bool {
+            let _ = self.tx.try_send(trying("a"));
+            let _ = self.tx.try_send(ProviderAttempt::FailedOver {
+                provider_id: "a".into(),
+                model_id: "a-model".into(),
+                reason: ModelErrorKind::RateLimited {
+                    retry_after_secs: Some(30),
+                },
+            });
+            let _ = self.tx.try_send(trying("b"));
+            let _ = self.tx.try_send(answered("b"));
+            let _ = emit(ModelEvent::TextDelta { text: "ok".into() });
+            let _ = emit(ModelEvent::Finish {
+                reason: FinishReason::Stop,
+            });
+            true
+        }
+    }
+
+    struct FloodModel {
+        tx: mpsc::SyncSender<ProviderAttempt>,
+    }
+
+    impl Model for FloodModel {
+        fn complete(
+            &mut self,
+            _view: &ModelView,
+            emit: &mut dyn FnMut(ModelEvent) -> bool,
+        ) -> bool {
+            for _ in 0..16 {
+                let _ = self.tx.try_send(trying("a"));
+            }
+            let _ = emit(ModelEvent::TextDelta { text: "ok".into() });
+            let _ = emit(ModelEvent::Finish {
+                reason: FinishReason::Stop,
+            });
+            true
         }
     }
 }

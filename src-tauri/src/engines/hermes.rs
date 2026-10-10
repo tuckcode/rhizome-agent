@@ -35,7 +35,11 @@ impl Engine for HermesEngine {
         "hermes"
     }
 
-    fn start(&mut self, prompt: &str) -> Result<(), String> {
+    fn start(
+        &mut self,
+        prompt: &str,
+        mut sink: Box<dyn FnMut(EngineEvent) + Send>,
+    ) -> Result<(), String> {
         let vault = tempfile::tempdir().map_err(|err| err.to_string())?;
         let request = AcpSessionRequest {
             cwd: vault.path().to_string_lossy().into_owned(),
@@ -48,7 +52,9 @@ impl Engine for HermesEngine {
         let mut events = Vec::new();
         run_acp_prompt(self.launch.clone(), request, |event| {
             if let AiAgentStreamEvent::TextDelta { text } = event {
-                events.push(EngineEvent::Text(text));
+                let mapped = EngineEvent::TextDelta { text };
+                events.push(mapped.clone());
+                sink(mapped);
             }
         })?;
         self.events = events;
@@ -61,5 +67,15 @@ impl Engine for HermesEngine {
 
     fn events(&self) -> Vec<EngineEvent> {
         self.events.clone()
+    }
+
+    fn steer(&mut self, _text: &str) {}
+
+    fn cancel(&mut self, _cause: &str) {}
+
+    fn reply_approval(&mut self, _prompt_id: &str, _reply: crate::rhizome_loop::ApprovalReply) {}
+
+    fn settle_on_quit(&mut self) {
+        // run_acp_prompt already detaches when the prompt returns.
     }
 }
