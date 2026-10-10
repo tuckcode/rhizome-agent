@@ -2,11 +2,12 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use crate::ai_agents::AiAgentPermissionMode;
+use crate::model_events::ModelEvent;
 
-use super::fake_model::{FakeModel, ScriptPart};
+use super::model::Model;
 use super::policy::{self, Ruling};
 use super::tools;
-use super::types::{DurableEvent, HistoryItem, ModelView};
+use super::types::{DurableEvent, HistoryItem, ModelView, ToolCall};
 
 /// Reply from a human approval wait. `Cancelled` is timeout or no UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,6 +63,13 @@ impl Drop for StepGuard<'_> {
             shared.step_active = false;
         }
     }
+}
+
+struct OpenCall {
+    id: String,
+    name: String,
+    args: String,
+    ended: bool,
 }
 
 /// One inbox and one driver. A follow-up waits in the inbox.
@@ -163,7 +171,18 @@ impl AgentLoop {
 
     /// Drain the inbox. One turn at a time. A cancel ends that turn only.
     /// `stop_and_drain` ends the agent: no further inbox item runs.
-    pub fn run_until_idle(&self, model: &mut FakeModel) {
+    pub fn run_until_idle(&self, model: &mut impl Model) {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("rhizome loop runtime");
+        runtime.block_on(self.run_until_idle_async(model));
+    }
+
+    /// Async form. Cancel is checked between events and between tools.
+    /// Stopping the read drops unread model events; the model does not
+    /// emit `Cancelled`.
+    pub async fn run_until_idle_async(&self, model: &mut impl Model) {
         loop {
             let admitted = {
                 let mut shared = self.lock();
@@ -175,11 +194,11 @@ impl AgentLoop {
             let Some(admitted) = admitted else {
                 return;
             };
-            self.drive_turn(model, admitted);
+            self.drive_turn(model, admitted).await;
         }
     }
 
-    fn drive_turn(&self, model: &mut FakeModel, admitted: String) {
+    async fn drive_turn(&self, model: &mut impl Model, admitted: String) {
         {
             let mut shared = self.lock();
             shared.cancel_cause = None;
@@ -194,7 +213,6 @@ impl AgentLoop {
             mark
         };
 
-        let mut assistant = String::new();
         let cap = self.lock().step_cap;
         let mut steps = 0;
         loop {
@@ -205,46 +223,18 @@ impl AgentLoop {
                 break;
             }
             let view = self.model_view(&admitted);
-            let mut parts = Vec::new();
-            let shared = Arc::clone(&self.shared);
-            let had_round = model.complete(&view, &mut |part| {
-                let cancelled = shared.lock().expect("rhizome loop").cancel_cause.is_some();
-                if cancelled {
-                    return false;
-                }
-                parts.push(part);
-                true
-            });
-            if !had_round {
+            let Some(accepted) = self.take_round(model, &view) else {
                 break;
-            }
+            };
             steps += 1;
-            let mut saw_tool = false;
-            for part in parts {
-                match part {
-                    ScriptPart::Text(chunk) => assistant.push_str(&chunk),
-                    ScriptPart::Tool { name, args } => {
-                        if self.is_cancelled() {
-                            break;
-                        }
-                        saw_tool = true;
-                        self.dispatch_tool(&name, &args);
-                    }
-                }
-            }
-            if self.is_cancelled() || !saw_tool {
+            tokio::task::yield_now().await;
+            if !self.apply_round(accepted) {
                 break;
             }
         }
 
         let mut shared = self.lock();
         let cause = shared.cancel_cause.take();
-        if !assistant.is_empty() {
-            shared.history.push(HistoryItem::Assistant {
-                text: assistant.clone(),
-            });
-            shared.log.push(DurableEvent::Assistant { text: assistant });
-        }
         shared
             .history
             .insert(history_mark, HistoryItem::User { text: admitted });
@@ -253,6 +243,95 @@ impl AgentLoop {
         } else {
             shared.log.push(DurableEvent::TurnEnd);
         }
+    }
+
+    fn take_round(&self, model: &mut impl Model, view: &ModelView) -> Option<Vec<ModelEvent>> {
+        let mut accepted = Vec::new();
+        let shared = Arc::clone(&self.shared);
+        let had_round = model.complete(view, &mut |event| {
+            if shared.lock().expect("rhizome loop").cancel_cause.is_some() {
+                return false;
+            }
+            let terminal = event.is_terminal();
+            accepted.push(event);
+            !terminal && shared.lock().expect("rhizome loop").cancel_cause.is_none()
+        });
+        had_round.then_some(accepted)
+    }
+
+    /// Returns true when another model round should run (tools ran).
+    fn apply_round(&self, events: Vec<ModelEvent>) -> bool {
+        let mut text = String::new();
+        let mut calls: Vec<OpenCall> = Vec::new();
+        let mut failed: Option<String> = None;
+        // Apply every event the loop already accepted. Cancel stops
+        // the next read and later tools, not text that already arrived.
+        for event in events {
+            match event {
+                ModelEvent::TextDelta { text: delta } => text.push_str(&delta),
+                ModelEvent::ToolCallStart { id, name } => calls.push(OpenCall {
+                    id,
+                    name,
+                    args: String::new(),
+                    ended: false,
+                }),
+                ModelEvent::ToolCallArgsDelta { id, delta } => {
+                    if let Some(call) = calls.iter_mut().rev().find(|call| call.id == id) {
+                        call.args.push_str(&delta);
+                    }
+                }
+                ModelEvent::ToolCallEnd { id } => {
+                    if let Some(call) = calls.iter_mut().rev().find(|call| call.id == id) {
+                        call.ended = true;
+                    }
+                }
+                ModelEvent::Finish { .. } => {}
+                ModelEvent::Error(error) => failed = Some(error.message),
+            }
+        }
+
+        let completed: Vec<OpenCall> = calls.into_iter().filter(|call| call.ended).collect();
+        let tool_calls: Vec<ToolCall> = completed
+            .iter()
+            .map(|call| ToolCall {
+                id: call.id.clone(),
+                name: call.name.clone(),
+                args: call.args.clone(),
+            })
+            .collect();
+
+        if !text.is_empty() || !tool_calls.is_empty() {
+            self.lock().history.push(HistoryItem::Assistant {
+                text: text.clone(),
+                tool_calls,
+            });
+        }
+        if !text.is_empty() {
+            self.lock()
+                .log
+                .push(DurableEvent::Assistant { text: text.clone() });
+        }
+
+        if let Some(message) = failed {
+            self.lock().log.push(DurableEvent::ModelFailed { message });
+            return false;
+        }
+        if self.is_cancelled() || completed.is_empty() {
+            return false;
+        }
+
+        for call in completed {
+            if self.is_cancelled() {
+                return false;
+            }
+            self.lock().log.push(DurableEvent::ToolCall {
+                id: call.id.clone(),
+                name: call.name.clone(),
+                args: call.args.clone(),
+            });
+            self.dispatch_tool(&call.id, &call.name, &call.args);
+        }
+        !self.is_cancelled()
     }
 
     fn model_view(&self, admitted: &str) -> ModelView {
@@ -268,18 +347,23 @@ impl AgentLoop {
         self.lock().cancel_cause.is_some()
     }
 
-    fn dispatch_tool(&self, name: &str, args: &str) {
+    fn dispatch_tool(&self, id: &str, name: &str, args: &str) {
+        if let Err(reason) = parsed_tool_args(args) {
+            self.record_denial(id, name, reason);
+            self.fire_after_tool(name, args);
+            return;
+        }
         let (mode, offered) = {
             let shared = self.lock();
             (shared.mode, offered_names(&shared))
         };
         if !offered.iter().any(|tool| tool == name) {
-            self.record_denial(name, "not offered".into());
+            self.record_denial(id, name, "not offered".into());
             self.fire_after_tool(name, args);
             return;
         }
         if self.session_allows(name, args) {
-            self.record_run(name, args, false);
+            self.record_run(id, name, args, false);
             self.fire_after_tool(name, args);
             return;
         }
@@ -289,9 +373,9 @@ impl AgentLoop {
             .iter()
             .any(|(spent_name, spent_args)| spent_name == name && spent_args == args);
         match policy::rule_tool(mode, name, grant_spent) {
-            Ruling::Run { spend_grant } => self.record_run(name, args, spend_grant),
-            Ruling::Deny { reason } => self.record_denial(name, reason),
-            Ruling::Ask => self.ask_then_finish(name, args),
+            Ruling::Run { spend_grant } => self.record_run(id, name, args, spend_grant),
+            Ruling::Deny { reason } => self.record_denial(id, name, reason),
+            Ruling::Ask => self.ask_then_finish(id, name, args),
         }
         self.fire_after_tool(name, args);
     }
@@ -313,7 +397,7 @@ impl AgentLoop {
         self.lock().after_tool = hook;
     }
 
-    fn ask_then_finish(&self, name: &str, args: &str) {
+    fn ask_then_finish(&self, id: &str, name: &str, args: &str) {
         let mut waiter = self.lock().waiter.take();
         let reply = match waiter.as_mut() {
             Some(wait) => wait(name),
@@ -321,40 +405,44 @@ impl AgentLoop {
         };
         self.lock().waiter = waiter;
         match reply {
-            ApprovalReply::AllowOnce => self.record_run(name, args, name != "bash"),
+            ApprovalReply::AllowOnce => self.record_run(id, name, args, name != "bash"),
             ApprovalReply::AllowSession => {
                 self.grant_for_session(name, args);
-                self.record_run(name, args, false);
+                self.record_run(id, name, args, false);
             }
             ApprovalReply::Deny | ApprovalReply::Cancelled => {
-                self.record_denial(name, "approval cancelled".into());
+                self.record_denial(id, name, "approval cancelled".into());
             }
         }
     }
 
-    fn record_run(&self, name: &str, args: &str, spend_grant: bool) {
+    fn record_run(&self, id: &str, name: &str, args: &str, spend_grant: bool) {
         let output = tools::execute_allowed(args);
         let mut shared = self.lock();
         if spend_grant {
             shared.grants.push((name.to_string(), args.to_string()));
         }
         shared.log.push(DurableEvent::ToolResult {
+            id: id.to_string(),
             name: name.to_string(),
             output: output.clone(),
         });
         shared.history.push(HistoryItem::ToolResult {
+            id: id.to_string(),
             name: name.to_string(),
             output,
         });
     }
 
-    fn record_denial(&self, name: &str, reason: String) {
+    fn record_denial(&self, id: &str, name: &str, reason: String) {
         let mut shared = self.lock();
         shared.log.push(DurableEvent::ToolDenied {
+            id: id.to_string(),
             name: name.to_string(),
             reason: reason.clone(),
         });
         shared.history.push(HistoryItem::ToolDenied {
+            id: id.to_string(),
             name: name.to_string(),
             reason,
         });
@@ -362,6 +450,19 @@ impl AgentLoop {
 
     fn lock(&self) -> MutexGuard<'_, Shared> {
         self.shared.lock().expect("rhizome loop")
+    }
+}
+
+/// Raw args stay a string. JSON that does not parse is a tool error
+/// the model can see, not a stream error.
+fn parsed_tool_args(raw: &str) -> Result<(), String> {
+    let trimmed = raw.trim();
+    if trimmed.starts_with('{') || trimmed.starts_with('[') {
+        serde_json::from_str::<serde_json::Value>(trimmed)
+            .map(|_| ())
+            .map_err(|err| format!("malformed arguments: {err}"))
+    } else {
+        Ok(())
     }
 }
 
