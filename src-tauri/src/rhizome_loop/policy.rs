@@ -2,7 +2,9 @@
 //!
 //! Limited tools (`Safe`) may run `echo` and must not run `bash`.
 //! Power User allow-once comes from the shared permission table.
-//! An unknown tool asks a human. No waiter, or a cancelled wait, denies.
+//! A name outside `offered_tools` is denied by the driver before this
+//! function runs. An offered name that this function does not decide
+//! asks a human. No waiter, or a cancelled wait, denies.
 
 use crate::ai_agents::AiAgentPermissionMode;
 use crate::permission_decision::{decide, PolicyDecision, PolicyOption};

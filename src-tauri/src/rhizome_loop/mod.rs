@@ -318,7 +318,13 @@ mod tests {
     #[test]
     fn no_ui_timeout_denies() {
         let agent = AgentLoop::new();
-        agent.set_approval_waiter(|_| ApprovalReply::Cancelled);
+        agent.offer_extra_tool_for_test("edit");
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&asked);
+        agent.set_approval_waiter(move |_| {
+            flag.store(true, Ordering::SeqCst);
+            ApprovalReply::Cancelled
+        });
         let mut model = FakeModel::script(vec![
             vec![ScriptPart::Tool {
                 name: "edit".into(),
@@ -329,17 +335,56 @@ mod tests {
         agent.submit("please");
         agent.run_until_idle(&mut model);
 
+        assert!(asked.load(Ordering::SeqCst));
         assert!(!agent.events().iter().any(|event| {
             matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit")
         }));
         assert!(agent.events().iter().any(|event| {
-            matches!(event, DurableEvent::ToolDenied { name, .. } if name == "edit")
+            matches!(
+                event,
+                DurableEvent::ToolDenied { name, reason }
+                    if name == "edit" && reason == "approval cancelled"
+            )
+        }));
+    }
+
+    #[test]
+    fn safe_mode_denies_unoffered_edit_even_when_waiter_allows_once() {
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::Safe);
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&asked);
+        agent.set_approval_waiter(move |_| {
+            flag.store(true, Ordering::SeqCst);
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "edit".into(),
+            args: "note".into(),
+        }]]);
+        agent.submit("go");
+        agent.run_until_idle(&mut model);
+
+        assert!(
+            !asked.load(Ordering::SeqCst),
+            "an unoffered tool must be denied before the waiter runs"
+        );
+        assert!(!agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit")
+        }));
+        assert!(agent.events().iter().any(|event| {
+            matches!(
+                event,
+                DurableEvent::ToolDenied { name, reason }
+                    if name == "edit" && reason == "not offered"
+            )
         }));
     }
 
     #[test]
     fn waiter_allow_once_runs_and_deny_does_not() {
         let allowed = AgentLoop::new();
+        allowed.offer_extra_tool_for_test("edit");
         allowed.set_approval_waiter(|_| ApprovalReply::AllowOnce);
         let mut allow_model = FakeModel::script(vec![vec![ScriptPart::Tool {
             name: "edit".into(),
@@ -356,6 +401,7 @@ mod tests {
         }));
 
         let denied = AgentLoop::new();
+        denied.offer_extra_tool_for_test("edit");
         denied.set_approval_waiter(|_| ApprovalReply::Deny);
         let mut deny_model = FakeModel::script(vec![vec![ScriptPart::Tool {
             name: "edit".into(),

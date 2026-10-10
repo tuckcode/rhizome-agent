@@ -27,6 +27,9 @@ struct Shared {
     mode: AiAgentPermissionMode,
     /// Name and args already consumed by an allow-once grant.
     grants: Vec<(String, String)>,
+    /// Names a test adds on top of `policy::offered_tools`. Production
+    /// modes do not use this list.
+    extra_offered: Vec<String>,
     waiter: Option<ApprovalWaiter>,
 }
 
@@ -67,6 +70,7 @@ impl AgentLoop {
                 cancel_cause: None,
                 mode: AiAgentPermissionMode::Safe,
                 grants: Vec::new(),
+                extra_offered: Vec::new(),
                 waiter: None,
             })),
         }
@@ -94,6 +98,12 @@ impl AgentLoop {
 
     pub fn set_approval_waiter(&self, waiter: impl FnMut(&str) -> ApprovalReply + Send + 'static) {
         self.lock().waiter = Some(Box::new(waiter));
+    }
+
+    /// Adds a name to this loop's offered set. Production `offered_tools`
+    /// stays Safe = echo, Power User = echo and bash.
+    pub fn offer_extra_tool_for_test(&self, name: impl Into<String>) {
+        self.lock().extra_offered.push(name.into());
     }
 
     /// True when the inbox is empty and no step is running.
@@ -189,7 +199,7 @@ impl AgentLoop {
         ModelView {
             admitted: admitted.to_string(),
             history: shared.history.clone(),
-            offered_tools: policy::offered_tools(shared.mode),
+            offered_tools: offered_names(&shared),
         }
     }
 
@@ -198,14 +208,19 @@ impl AgentLoop {
     }
 
     fn dispatch_tool(&self, name: &str, args: &str) {
-        let (mode, grant_spent) = {
+        let (mode, offered) = {
             let shared = self.lock();
-            let grant_spent = shared
-                .grants
-                .iter()
-                .any(|(spent_name, spent_args)| spent_name == name && spent_args == args);
-            (shared.mode, grant_spent)
+            (shared.mode, offered_names(&shared))
         };
+        if !offered.iter().any(|tool| tool == name) {
+            self.record_denial(name, "not offered".into());
+            return;
+        }
+        let grant_spent = self
+            .lock()
+            .grants
+            .iter()
+            .any(|(spent_name, spent_args)| spent_name == name && spent_args == args);
         match policy::rule_tool(mode, name, grant_spent) {
             Ruling::Run { spend_grant } => self.record_run(name, args, spend_grant),
             Ruling::Deny { reason } => self.record_denial(name, reason),
@@ -259,4 +274,14 @@ impl AgentLoop {
     fn lock(&self) -> MutexGuard<'_, Shared> {
         self.shared.lock().expect("rhizome loop")
     }
+}
+
+fn offered_names(shared: &Shared) -> Vec<String> {
+    let mut names = policy::offered_tools(shared.mode);
+    for extra in &shared.extra_offered {
+        if !names.iter().any(|name| name == extra) {
+            names.push(extra.clone());
+        }
+    }
+    names
 }
