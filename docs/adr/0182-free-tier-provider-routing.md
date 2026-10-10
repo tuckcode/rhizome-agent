@@ -2,11 +2,12 @@
 type: ADR
 id: "0182"
 title: "Free-tier provider routing ports OmniRoute rules"
-status: proposed
+status: active
 date: 2026-10-10
 ---
 
 **Origin:** Cursor Grok 4.6 · 2026-10-10 · Phase 4b of the harness plan; comparison of OmniRoute and freellmapi
+**Decisions confirmed:** knispo · 2026-10-10 · the six catalog and key rows below
 
 ## Context
 
@@ -146,34 +147,43 @@ This ADR writes no Rust. The later Phase 4b code PR:
   #102 already classified failures for a router. The 2026-10-10
   comparison settled licence and source. Waiting adds no new fact.
 
-## Open decisions for knispo
+## Decisions
 
-These six items are **proposals**. They are not decided until knispo
-calls them. Silence is not approval. An implementation PR must not
-invent a different default; it stops and asks if a row is still open.
+knispo, 2026-10-10. Coding agents treat these as settled. The repo ADR
+status values are `proposed | active | superseded | retired` (no
+Accepted). Status is `active`.
 
-| # | Topic | Proposed default (pending knispo) |
-|---|---|---|
-| 1 | v1 providers | Keyed, recurring, ToS ok or caution, `hardStopGuaranteed`: Groq, Cerebras, Mistral, Cloudflare Workers AI, OpenRouter `:free`, NVIDIA NIM, GitHub Models, LLM7, plus the user's OpenAI-compatible endpoint. |
-| 2 | Exclude | ToS avoid; `*-web` scrapers; OAuth subscription providers; TLS-stealth; one-time signup credits. |
-| 3 | `trainsOnPrompts` | Off by default. |
-| 4 | Keys | User keys in the OS keychain via Tauri. One key per provider in v1. |
-| 5 | Routing | Fixed priority list. No learning scorer. |
-| 6 | Catalog refresh | Manual PRs that track OmniRoute `FREE_CATALOG_CURATED_AT`. A scheduled check is later, not v1. |
-
-Fallback **order** among the v1 providers is still open if knispo accepts
-row 1 without an order. Stop and ask; do not invent a rank.
+1. **v1 providers.** Keyed, recurring, ToS ok or caution,
+   `hardStopGuaranteed`: Groq, Cerebras, Mistral, Cloudflare Workers AI,
+   OpenRouter `:free`, NVIDIA NIM, GitHub Models, LLM7, plus a
+   user-supplied OpenAI-compatible endpoint. The listed sequence is the
+   v1 membership and the starting priority list. Do not invent a
+   different rank.
+2. **Exclusions.** ToS avoid; `*-web` scrapers; OAuth subscription
+   providers; TLS-stealth; one-time signup credits. One-time signup
+   credits stay excluded and may be revisited later.
+3. **`trainsOnPrompts`.** Those providers are excluded (off). They are
+   not in the v1 catalog.
+4. **Keys.** User keys live in the OS keychain via Tauri. One key per
+   provider. No multi-key rotation in v1.
+5. **Routing.** Fixed priority order with fallback. No learning scorer
+   in v1.
+6. **Catalog refresh.** A weekly scheduled check, owned by the Nightly
+   Audit bot, compares OmniRoute's `FREE_CATALOG_CURATED_AT` /
+   `freeModelCatalog` data against Rhizome's pinned copy and opens a
+   draft PR only when something changed, same pattern as the weekly
+   docs-sync drafts. knispo merges those drafts. This docs PR does not
+   add that job.
 
 ## Consequences
 
 - Phase 4b implementation follows this ADR. The harness plan's Phase 4b
   section points here and is not rewritten.
-- Status stays `proposed` until knispo calls the six defaults (or
-  rejects a row). Option A vs B/C/D does not wait on that call.
 - Leftover locks that say there is no OmniRoute *code* in the tree
   (`leftover-omniroute-parked.test.ts`) stay until the implementation
   PR, and only change if that PR copies code. This docs PR does not
   touch them.
+- The weekly catalog check is a later bot job, not this PR.
 - Usage dashboard, outward gateway, and a shipped sidecar remain out of
   scope.
 - Chat stays on Prime until Phase 6.
@@ -184,6 +194,10 @@ row 1 without an order. Stop and ask; do not invent a rank.
 checklist only. OmniRoute pin read by the harness plan:
 `fc5e2bccd4f70fecf5aab94dfb8136c74ab5a21b` (2026-09-30). Re-check at
 copy time.
+
+knispo, 2026-10-10, confirmed the six catalog and key rows in
+[Decisions](#decisions). Row 6 changed from manual PRs to a weekly
+Nightly Audit draft.
 
 [[0180-rhizome-is-its-own-harness]]
 [[0181-pr-branches-with-full-gates]]
