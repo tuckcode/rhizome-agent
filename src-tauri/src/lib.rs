@@ -814,6 +814,11 @@ macro_rules! app_invoke_handler {
             commands::start_mindwalk_sidecar,
             commands::stop_mindwalk_sidecar,
             commands::stream_ai_model,
+            commands::native_chat_start,
+            commands::native_chat_send,
+            commands::native_chat_cancel,
+            commands::native_chat_approval_reply,
+            commands::native_chat_end,
             commands::save_ai_model_provider_api_key,
             commands::delete_ai_model_provider_api_key,
             commands::test_ai_model_provider,
@@ -912,6 +917,10 @@ fn handle_run_event(app_handle: &tauri::AppHandle, event: &tauri::RunEvent) {
     }
 
     if let tauri::RunEvent::Exit = event {
+        use tauri::Manager;
+        if let Some(chats) = app_handle.try_state::<crate::commands::NativeChats>() {
+            crate::commands::settle_native_chats_on_quit(&chats);
+        }
         // Quitting settles this client's session (ADR-0167): foreground-owned
         // work stops; explicitly promoted work stays resident. A daemon this
         // process started is stopped unless Keep working left it resident.
@@ -958,7 +967,8 @@ pub fn run() {
         .manage(window_state::MainWindowFrameState::default())
         .manage(vault_watcher::VaultWatcherState::new())
         .manage(inbox_watcher::InboxWatcherState::default())
-        .manage(rhizome_search::service::RhizomeSearchService::default());
+        .manage(rhizome_search::service::RhizomeSearchService::default())
+        .manage(commands::NativeChats::new());
 
     with_invoke_handler(builder)
         .on_window_event(|window, event| {

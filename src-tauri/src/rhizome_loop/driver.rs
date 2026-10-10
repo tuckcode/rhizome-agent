@@ -13,7 +13,8 @@ use super::tools;
 use super::types::{DurableEvent, HistoryItem, ModelView, ToolCall};
 
 /// Reply from a human approval wait. `Cancelled` is timeout or no UI.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ApprovalReply {
     AllowOnce,
     AllowSession,

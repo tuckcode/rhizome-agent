@@ -14,7 +14,7 @@ use crate::permission_decision::{decide, PolicyDecision, PolicyOption};
 
 /// One choice on an approval prompt. Limited-tools `create_note` offers
 /// Allow once and Deny only — never Allow for session.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ApprovalOption {
     pub id: String,
     pub label: String,
