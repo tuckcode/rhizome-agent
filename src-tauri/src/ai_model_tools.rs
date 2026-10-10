@@ -109,7 +109,7 @@ fn selected_model_supports_tools(request: &AiModelStreamRequest) -> bool {
         .is_some_and(|model| model.capabilities.tools)
 }
 
-fn openai_create_note_tool() -> serde_json::Value {
+pub(crate) fn openai_create_note_tool() -> serde_json::Value {
     serde_json::from_str(CREATE_NOTE_TOOL_JSON).expect("create_note tool schema must be valid JSON")
 }
 
