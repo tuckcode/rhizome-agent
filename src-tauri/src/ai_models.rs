@@ -215,7 +215,27 @@ pub fn normalize_base_url(raw: &str) -> Result<String, String> {
     Ok(base.to_string())
 }
 
-/// Streams one model request as `ModelEvent`s (harness plan Phase 4).
+/// Connect and total time limits for one provider HTTP call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HttpLimits {
+    pub connect: std::time::Duration,
+    pub total: std::time::Duration,
+}
+
+impl HttpLimits {
+    /// A slow LAN model can take minutes on one reply, so the total is long.
+    pub const STREAM: Self = Self {
+        connect: std::time::Duration::from_secs(15),
+        total: std::time::Duration::from_secs(600),
+    };
+    pub const DISCOVER: Self = Self {
+        connect: std::time::Duration::from_secs(15),
+        total: std::time::Duration::from_secs(30),
+    };
+}
+
+/// Streams one model request as `ModelEvent`s (harness plan Phase 4), with
+/// `HttpLimits::STREAM`.
 ///
 /// Runs no tools: a tool call is only data for the Rhizome loop. Every
 /// failure arrives as one `ModelEvent::Error`. `emit` returns false to stop
@@ -225,7 +245,16 @@ pub fn stream_model_events(
     request: &AiModelStreamRequest,
     emit: &mut dyn FnMut(ModelEvent) -> bool,
 ) {
-    let response = match open_model_event_stream(request) {
+    stream_model_events_with(request, HttpLimits::STREAM, emit);
+}
+
+/// `stream_model_events` with caller-set time limits.
+pub fn stream_model_events_with(
+    request: &AiModelStreamRequest,
+    limits: HttpLimits,
+    emit: &mut dyn FnMut(ModelEvent) -> bool,
+) {
+    let response = match open_model_event_stream(request, limits) {
         Ok(response) => response,
         Err(error) => {
             emit(ModelEvent::Error(error));
@@ -247,13 +276,23 @@ pub fn stream_model_events(
     read_event_stream(std::io::BufReader::new(response), &mut parser, emit);
 }
 
-/// Lists model ids from `GET {base_url}/models`.
+/// Lists model ids from `GET {base_url}/models`, with
+/// `HttpLimits::DISCOVER`.
 ///
 /// Keeps no cache, so a failure is never remembered: the next call asks the
 /// server again.
 pub fn discover_ai_model_ids(
     provider: &AiModelProvider,
     api_key_override: Option<&str>,
+) -> Result<Vec<String>, ModelError> {
+    discover_ai_model_ids_with(provider, api_key_override, HttpLimits::DISCOVER)
+}
+
+/// `discover_ai_model_ids` with caller-set time limits.
+pub fn discover_ai_model_ids_with(
+    provider: &AiModelProvider,
+    api_key_override: Option<&str>,
+    limits: HttpLimits,
 ) -> Result<Vec<String>, ModelError> {
     let request = AiModelStreamRequest {
         provider: provider.clone(),
@@ -266,7 +305,7 @@ pub fn discover_ai_model_ids(
         event_name: None,
     };
     let endpoint = format!("{}/models", rejected_on_err(normalized_base_url(&request))?);
-    let client = http_client(std::time::Duration::from_secs(30))?;
+    let client = http_client(limits)?;
     let builder = auth_on_err(apply_auth_headers(client.get(endpoint), &request))?;
     let response = send_checked(apply_provider_headers(builder, &request))?;
     let json = response.json::<serde_json::Value>().map_err(|error| {
@@ -290,6 +329,7 @@ pub fn discover_ai_model_ids(
 
 fn open_model_event_stream(
     request: &AiModelStreamRequest,
+    limits: HttpLimits,
 ) -> Result<reqwest::blocking::Response, ModelError> {
     if request.provider.kind == AiModelProviderKind::Anthropic {
         return Err(model_error(
@@ -300,8 +340,7 @@ fn open_model_event_stream(
     let endpoint = rejected_on_err(chat_completions_url(request))?;
     let mut payload = crate::ai_model_tools::openai_chat_payload(request);
     payload["stream"] = serde_json::Value::Bool(true);
-    // A local model can take minutes on one reply, so the total limit is long.
-    let client = http_client(std::time::Duration::from_secs(600))?;
+    let client = http_client(limits)?;
     let builder = auth_on_err(apply_auth_headers(
         client.post(endpoint).json(&payload),
         request,
@@ -348,10 +387,10 @@ fn is_json_response(response: &reqwest::blocking::Response) -> bool {
         .is_some_and(|value| value.contains("application/json"))
 }
 
-fn http_client(timeout: std::time::Duration) -> Result<reqwest::blocking::Client, ModelError> {
+fn http_client(limits: HttpLimits) -> Result<reqwest::blocking::Client, ModelError> {
     reqwest::blocking::Client::builder()
-        .connect_timeout(std::time::Duration::from_secs(15))
-        .timeout(timeout)
+        .connect_timeout(limits.connect)
+        .timeout(limits.total)
         .build()
         .map_err(|error| {
             model_error(
@@ -1036,8 +1075,18 @@ mod tests {
         assert_eq!(read_secrets_at(&path).unwrap(), secrets);
     }
 
+    const TEST_IO_LIMIT: std::time::Duration = std::time::Duration::from_secs(3);
+
+    /// Short client limits, so a stuck HTTP test fails in seconds. The
+    /// production limits stay `HttpLimits::STREAM` and `DISCOVER`.
+    const TEST_LIMITS: HttpLimits = HttpLimits {
+        connect: std::time::Duration::from_secs(2),
+        total: std::time::Duration::from_secs(5),
+    };
+
     /// A local HTTP server that answers each connection with the next
     /// canned response, then closes. It records "METHOD PATH" and the body.
+    /// It binds port 0, so the OS picks a free port.
     struct TestServer {
         base_url: String,
         requests: std::sync::Arc<std::sync::Mutex<Vec<(String, String)>>>,
@@ -1055,6 +1104,10 @@ mod tests {
                 let Ok((mut stream, _)) = listener.accept() else {
                     return;
                 };
+                // A stuck client ends this connection in seconds. The
+                // dropped stream then fails the client side fast too.
+                stream.set_read_timeout(Some(TEST_IO_LIMIT)).unwrap();
+                stream.set_write_timeout(Some(TEST_IO_LIMIT)).unwrap();
                 let mut reader = BufReader::new(stream.try_clone().unwrap());
                 let mut request_line = String::new();
                 reader.read_line(&mut request_line).unwrap();
@@ -1084,6 +1137,19 @@ mod tests {
             }
         });
         TestServer { base_url, requests }
+    }
+
+    /// Accepts one connection and never answers it.
+    fn serve_silent() -> String {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base_url = format!("http://{}/v1", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            if let Ok((stream, _)) = listener.accept() {
+                std::thread::sleep(std::time::Duration::from_secs(30));
+                drop(stream);
+            }
+        });
+        base_url
     }
 
     fn http_response(status: &str, headers: &[&str], body: &str) -> String {
@@ -1118,11 +1184,19 @@ mod tests {
 
     fn collect_events(request: &AiModelStreamRequest) -> Vec<ModelEvent> {
         let mut events = Vec::new();
-        stream_model_events(request, &mut |event| {
+        stream_model_events_with(request, TEST_LIMITS, &mut |event| {
             events.push(event);
             true
         });
         events
+    }
+
+    #[test]
+    fn production_http_limits_stay_long_enough_for_slow_models() {
+        assert_eq!(HttpLimits::STREAM.connect.as_secs(), 15);
+        assert_eq!(HttpLimits::STREAM.total.as_secs(), 600);
+        assert_eq!(HttpLimits::DISCOVER.connect.as_secs(), 15);
+        assert_eq!(HttpLimits::DISCOVER.total.as_secs(), 30);
     }
 
     fn only_error(events: &[ModelEvent]) -> &ModelError {
@@ -1233,7 +1307,8 @@ mod tests {
         ])]);
         let mut events = Vec::new();
 
-        stream_model_events(&compatible_request(&server.base_url), &mut |event| {
+        let request = compatible_request(&server.base_url);
+        stream_model_events_with(&request, TEST_LIMITS, &mut |event| {
             events.push(event);
             false
         });
@@ -1267,10 +1342,33 @@ mod tests {
         let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let base_url = format!("http://{}/v1", closed.local_addr().unwrap());
         drop(closed);
+        let request = compatible_request(&base_url);
 
-        let events = collect_events(&compatible_request(&base_url));
+        // A refused connect returns at once, so the production limits are
+        // safe to use here.
+        let mut events = Vec::new();
+        stream_model_events(&request, &mut |event| {
+            events.push(event);
+            true
+        });
+        let discover = discover_ai_model_ids(&request.provider, None).unwrap_err();
 
         assert_eq!(only_error(&events).kind, ModelErrorKind::Unavailable);
+        assert_eq!(discover.kind, ModelErrorKind::Unavailable);
+    }
+
+    #[test]
+    fn a_server_that_never_answers_fails_fast_in_tests() {
+        let started = std::time::Instant::now();
+
+        let events = collect_events(&compatible_request(&serve_silent()));
+
+        assert_eq!(only_error(&events).kind, ModelErrorKind::Unavailable);
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(10),
+            "took {:?}",
+            started.elapsed()
+        );
     }
 
     #[test]
@@ -1326,8 +1424,8 @@ mod tests {
         ]);
         let provider = compatible_request(&server.base_url).provider;
 
-        let first = discover_ai_model_ids(&provider, None).unwrap_err();
-        let second = discover_ai_model_ids(&provider, None).unwrap();
+        let first = discover_ai_model_ids_with(&provider, None, TEST_LIMITS).unwrap_err();
+        let second = discover_ai_model_ids_with(&provider, None, TEST_LIMITS).unwrap();
 
         assert_eq!(first.kind, ModelErrorKind::Unavailable);
         assert_eq!(second, vec!["qwen3-32b", "llama3.2"]);
@@ -1347,7 +1445,7 @@ mod tests {
         )]);
         let provider = compatible_request(&server.base_url).provider;
 
-        let error = discover_ai_model_ids(&provider, None).unwrap_err();
+        let error = discover_ai_model_ids_with(&provider, None, TEST_LIMITS).unwrap_err();
 
         assert_eq!(error.kind, ModelErrorKind::Protocol);
     }
