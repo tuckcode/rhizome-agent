@@ -15,6 +15,8 @@ The [inventory](plans/2026-09-20-public-readiness-inventory.md) preserves all
 are closed.
 **Origin:** Composer 2.5 Fast · 2026-09-27 · snapshot refresh (swarm Wave 1).
 
+**Harness plan (2026-10-09):** [`plans/2026-10-09-rhizome-harness-plan.md`](plans/2026-10-09-rhizome-harness-plan.md) — ADR-0180 phases. knispo decisions (2026-10-09) are in that file §5. Phase 1 is unblocked.
+
 `origin/main` = **`5c37d28`**; local HEAD matches; nothing unpushed. Installed
 app = **`d0a55f8`**. Rebuild remains a separate verb from commit/push.
 
@@ -258,7 +260,7 @@ composition doc — do not restate them here.
 | **What ⌘1/⌘2/⌘3 and "Full Layout" mean once Chat is the centre** | — | **Settled 2026-09-19 (ADR-0173).** ⌘1 Chat, ⌘2 Notes, ⌘3 Workbench, ⌘4 Read. Reset layout returns to Chat. Fresh launch is Chat. Stored `viewMode` values remain compatibility mirrors. |
 | **Does Wiki Graph replace the canvas or feed a side panel** | #39 | **Settled 2026-09-06 (ADR-0170).** Graph and Mycelium sit under Notes in the right column. They no longer replace Chat. #39 (graph as an agent tool vs a place) is still open for the *agent* interface. |
 | **Right panel composition** | — | **ADR-0170 settled the stack** (Notes heavy + Graph/Mycelium below). **ADR-0173** names the four layouts. Inbox stays the folder. Right icon rail still undecided. In `/Applications` as **`6860762`**. |
-| **C66 agent profile / instructions in Settings** | chat personality UX | **Agreed, not built 2026-09-06.** How the agent should respond, rules, for whichever agent. Not vault `AGENTS.md`, not the model picker, not tool-allowlist profiles. Awaiting: one vs per-agent; app vs vault. |
+| **C66 agent profile / instructions in Settings** | chat personality UX | **One app-wide profile** (knispo 2026-10-09). `compose_agent_profile` / C66, same across engines. Per-vault `AGENTS.md` may layer later. [Harness plan §5](plans/2026-10-09-rhizome-harness-plan.md). |
 | **C67 sessions-list context menu** | session row actions | **Shipped 2026-09-06** (`a309a17`). Open / Rename / Archive·Restore / View in Mycelium / Copy path. |
 | **C68 restore note lock** | accidental edits while reading | **Shipped 2026-09-06** (`a309a17`). Default editable; breadcrumb + Cmd+K; not vault `editor_mode`. Layout lock 2026-09-14: `EditorContentLayout.test.tsx` (rich + raw read-only). |
 | **TokenJuice + Switchyard** | later stacked system; not a Rhizome organ | **Wanted 2026-08-26, not started.** Discuss/plan only. TokenJuice-shaped tool-output shrink first (Prime owns what the model sees). Switchyard-shaped model hop second (sidecar behind Prime; halfway house is `set_scoped_models`). Write-up: [`token-routing-and-compression.md`](design/token-routing-and-compression.md). Do not vendor either in this tree. |
@@ -344,8 +346,8 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 **Models and providers**
 | | |
 |---|---|
-| #45 | Model settings: connect providers and curate the model dropdown — allow-list step shipped; remainder open |
-| #48 | OmniRoute as a managed local gateway |
+| #45 | Model settings: Rhizome catalog (`ai_models.rs`) is the main list. Prime `models.json` only when the Prime engine is picked. [Harness plan](plans/2026-10-09-rhizome-harness-plan.md) Phase 4. |
+| #48 | OmniRoute goal kept, not the program: free catalog + fallback in Rhizome Rust. No outward gateway. Phase 4b. |
 | #46 | **Security — still open.** Local **`4416411`** refuses HOME aliases (`~/`, `$HOME/`, symlink-to-HOME). Seed / MCP / `save_vault_list` already drop HOME roots. Connect scrubs only a Rhizome-authored global `rhizome-vault`. **Leftover:** live Chat-without-vault (no global skill returns). Source lock: ChatHome still mounts with empty vault ([1456](plans/handoffs/2026-09-14-1456-cursor-grok-4-6-chat-no-vault.md)). Host status still polls with empty path ([1466](plans/handoffs/2026-09-14-1466-cursor-grok-4-6-host-no-vault.md)). Do not close from units. Do not invent a Prime sandbox. Do not change `normalize_cwd("")` — empty vault → Prime cwd `$HOME` is Chat-without-vault, not MCP scope. |
 
 **First-run and cleanup**

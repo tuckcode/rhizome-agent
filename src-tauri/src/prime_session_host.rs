@@ -47,6 +47,16 @@ const TURN_IDLE_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const FOLLOW_UP_DRAIN_GRACE_EMPTY: Duration = Duration::from_secs(2);
 const FOLLOW_UP_DRAIN_GRACE_QUEUED: Duration = Duration::from_secs(120);
 
+/// Spinner / flag chatter Prime keeps writing after a turn is already over.
+///
+/// `agent_status` dominates a real session log (thousands of lines). After
+/// `agent_end` it is not a new turn. If the drain loop treats it as one, the
+/// 2s follow-up grace is cancelled and Chat stays Working until the 15 min
+/// idle timeout — the sealed reply, red Stop, and "last tool ipython" hang.
+fn is_post_turn_noise(event_type: &str) -> bool {
+    matches!(event_type, "agent_status" | "session_state" | "tool_status")
+}
+
 /// Protocol Rhizome speaks. Verified against `prime-agent` 0.7.1, whose
 /// `DAEMON_PROTOCOL_VERSION` is 7 — the first version accepting the command
 /// envelope (`DAEMON_COMMAND_ENVELOPE_MIN_PROTOCOL_VERSION`).
@@ -2918,6 +2928,11 @@ fn stream_until_turn_complete(mut on_event: impl FnMut(&serde_json::Value)) -> R
             }
             OutboundLine::Event(json) => {
                 let ty = json["type"].as_str().unwrap_or_default();
+                // After agent_end, only a real follow-up (agent_start, text,
+                // a new tool) should cancel the grace. Spinner lines must not.
+                if awaiting_follow_up && is_post_turn_noise(ty) {
+                    continue;
+                }
                 awaiting_follow_up = false;
                 if ty == "agent_end" {
                     on_event(&json);
@@ -6172,6 +6187,138 @@ mod tests {
         assert!(!get_status().is_streaming);
 
         let _ = shutdown_host();
+    }
+
+    /// Prime keeps emitting `agent_status` (and `session_state`) after the
+    /// last tool and `agent_end` — spinner noise, not a new turn. Treating
+    /// those as "the turn continued" cancelled the 2s follow-up grace and
+    /// left the stream open until `TURN_IDLE_TIMEOUT` (15 min). Chat then
+    /// showed Stop + "Working · last tool ipython" after the reply had
+    /// already sealed (Atticus 2026-10-09).
+    #[test]
+    fn prompt_emits_done_when_status_noise_follows_the_last_tool() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| {
+            (command["type"].as_str() == Some("prompt")).then(|| {
+                vec![
+                    ok(id, "prompt", serde_json::Value::Null),
+                    session_event(serde_json::json!({ "type": "agent_start" })),
+                    session_event(serde_json::json!({
+                        "type": "tool_execution_start",
+                        "toolCallId": "ipy-1",
+                        "toolName": "ipython",
+                        "args": { "code": "1+1" }
+                    })),
+                    session_event(serde_json::json!({
+                        "type": "tool_execution_end",
+                        "toolCallId": "ipy-1",
+                        "result": "2"
+                    })),
+                    session_event(text_delta("Hi — still here.")),
+                    session_event(serde_json::json!({ "type": "agent_end", "messages": [] })),
+                    // The hang: any post-end event used to clear awaiting_follow_up.
+                    session_event(
+                        serde_json::json!({ "type": "agent_status", "status": "thinking" }),
+                    ),
+                    session_event(serde_json::json!({ "type": "session_state", "state": "idle" })),
+                    session_event(serde_json::json!({ "type": "tool_status", "status": "idle" })),
+                    session_event(serde_json::json!({ "type": "agent_status", "status": "idle" })),
+                ]
+            })
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let (tx, rx) = mpsc::channel();
+        let request = prompt_request(vault.path(), false);
+        thread::spawn(move || {
+            let mut events = Vec::new();
+            let result = run_prompt_stream(request, |e| events.push(e));
+            let _ = tx.send((result, events));
+        });
+
+        // Before the fix this waited out TURN_IDLE_TIMEOUT (15 min). Fail
+        // well before that so the regression is cheap to run.
+        let (result, events) = rx
+            .recv_timeout(Duration::from_secs(8))
+            .expect("turn must finish once agent_end lands; status noise is not a follow-up");
+        let session = result.expect("prompt stream");
+
+        assert_eq!(session, "sess-a");
+        assert!(
+            events.iter().any(
+                |e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "Hi — still here.")
+            ),
+            "final reply must reach Chat: {events:?}"
+        );
+        assert!(events.iter().any(
+            |e| matches!(e, AiAgentStreamEvent::ToolStart { tool_name, .. } if tool_name == "ipython")
+        ));
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, AiAgentStreamEvent::TurnBoundary)),
+            "agent_end must still seal the bubble: {events:?}"
+        );
+        assert!(
+            matches!(events.last(), Some(AiAgentStreamEvent::Done)),
+            "composer returns to idle only after Done: {events:?}"
+        );
+        assert!(!get_status().is_streaming);
+
+        let _ = shutdown_host();
+    }
+
+    /// `agent_status` between `agent_end` and a real follow-up must not
+    /// swallow the second turn. The grace stays armed until `agent_start`
+    /// (or text / a new tool) actually begins work.
+    #[test]
+    fn prompt_still_drains_a_follow_up_after_status_noise() {
+        let _guard = host_guard();
+        let vault = tempfile::tempdir().unwrap();
+        let daemon = FakeDaemon::start(|command, id| {
+            (command["type"].as_str() == Some("prompt")).then(|| {
+                vec![
+                    ok(id, "prompt", serde_json::Value::Null),
+                    session_event(text_delta("first-turn-done")),
+                    session_event(serde_json::json!({ "type": "agent_end", "messages": [] })),
+                    session_event(
+                        serde_json::json!({ "type": "agent_status", "status": "thinking" }),
+                    ),
+                    session_event(serde_json::json!({ "type": "agent_start" })),
+                    session_event(text_delta("follow-up-ack")),
+                    session_event(serde_json::json!({ "type": "agent_end", "messages": [] })),
+                ]
+            })
+        });
+        daemon.install();
+        connect_host(vault.path()).unwrap();
+
+        let mut events = Vec::new();
+        run_prompt_stream(prompt_request(vault.path(), false), |e| events.push(e)).unwrap();
+
+        assert!(
+            events.iter().any(
+                |e| matches!(e, AiAgentStreamEvent::TextDelta { text } if text == "follow-up-ack")
+            ),
+            "follow-up after spinner noise must still stream: {events:?}"
+        );
+        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
+        assert!(!get_status().is_streaming);
+
+        let _ = shutdown_host();
+    }
+
+    #[test]
+    fn post_turn_noise_is_the_spinner_and_state_chatter() {
+        assert!(is_post_turn_noise("agent_status"));
+        assert!(is_post_turn_noise("session_state"));
+        assert!(is_post_turn_noise("tool_status"));
+        assert!(!is_post_turn_noise("agent_start"));
+        assert!(!is_post_turn_noise("agent_end"));
+        assert!(!is_post_turn_noise("message_update"));
+        assert!(!is_post_turn_noise("tool_execution_start"));
     }
 
     #[test]

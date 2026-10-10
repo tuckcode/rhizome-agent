@@ -24,7 +24,6 @@ interface ChatComposerBarProps {
   /** Live turn controls from ChatHome: model, thinking, context note, active agents. */
   deck?: ReactNode
   working?: boolean
-  lastToolName?: string | null
   /** Shown in the status slot when a Prime worker failed to start. */
   failureReason?: string | null
   stats: PrimeSessionStats
@@ -98,7 +97,6 @@ export function ChatComposerBar({
   locale = 'en',
   deck,
   working = false,
-  lastToolName = null,
   failureReason = null,
   stats,
 }: ChatComposerBarProps) {
@@ -109,9 +107,7 @@ export function ChatComposerBar({
       </div>
       {(working || failureReason) ? (
         <ChatComposerFoot
-          locale={locale}
           working={working}
-          lastToolName={lastToolName}
           failureReason={failureReason}
         />
       ) : null}

@@ -47,6 +47,7 @@ file.
 ---
 
 ## State
+**Origin:** Cursor Grok 4.6 · 2026-10-09 · Chat stays Working after agent_end when Prime keeps emitting agent_status. Host ignores that noise; composer spinner only. [Handoff](plans/handoffs/2026-10-09-2335-cursor-grok-4-6-stuck-working.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-09 · PR #88 merged with main. Close path unchanged. Native red-X live-check still not run. [Handoff](plans/handoffs/2026-10-09-2225-cursor-grok-4-6-red-close-merge.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-09 · #80: spawned-daemon process-group stop retries via `kill(2)`. [Handoff](plans/handoffs/2026-10-09-2222-cursor-grok-4-6-issue-80-process-group-flake.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-06 · ADR-0179: red X quits unless Keep in taskbar. [Handoff](plans/handoffs/2026-10-06-0225-cursor-grok-4-6-red-close-quits.md).
@@ -131,6 +132,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-10-09 · stuck Working](plans/handoffs/2026-10-09-2335-cursor-grok-4-6-stuck-working.md) — post-`agent_end` status noise cancelled the follow-up grace; composer no longer prints last tool.
 - [2026-10-09 · #88 merge](plans/handoffs/2026-10-09-2225-cursor-grok-4-6-red-close-merge.md) — main merged into ADR-0179 close/quit. Hermes ACP is per-turn; native red-X not run.
 - [2026-10-09 · #80 process-group flake](plans/handoffs/2026-10-09-2222-cursor-grok-4-6-issue-80-process-group-flake.md) — `kill(2)` retry; test polls a live group.
 - [2026-10-06 · red X quits](plans/handoffs/2026-10-06-0225-cursor-grok-4-6-red-close-quits.md) — ADR-0179: default close exits and stops Rhizome-owned helpers; Keep in taskbar restores hide.
@@ -146,7 +148,6 @@ Do not paste leftover paper here.
 - [2026-10-04 · Split handoffs](plans/handoffs/2026-10-04-1423-astra-audit-continuation.md) — Astra owns audit completion and independent review. [Cursor assignment](plans/handoffs/2026-10-04-1422-astra-cursor-implementation.md) covers bounded fixes. No product edits started.
 - [2026-10-04 · Design audit](plans/handoffs/2026-10-04-1417-astra-design-audit.md) — splash/theme/Settings findings, 83 focused tests passed, no product fixes; native checks open.
 - [2026-10-03 · Windows pipe freeze](plans/handoffs/2026-10-03-1015-claude-opus-5-5-windows-pipe-freeze.md) — freeze fixed, test target compiles, File > Exit; C83–C85 opened; not pushed.
-- [2026-09-30 · open issues](plans/2026-09-30-open-issues-plan.md) — closed #46, #13, #52, #51 as already built. #23 stays open: search hits are not wired. #40 and #56 stay a product call.
 - [2026-10-03 · Nous catalog fields](plans/handoffs/2026-10-03-0942-cursor-grok-4-7-nous-catalog-fields.md) — Add to Chat list copies reasoning and input modalities from each Nous record. Name guesses are gone. Not in the installed app.
 - [2026-10-03 · Nous catalog and stall sample](plans/handoffs/2026-10-03-0921-cursor-grok-4-7-nous-catalog-handy.md) — stall sampled; shell waits, skills, lights, and image bubble are uncommitted. Nous already sends reasoning and image modalities. No automatic model refresh.
 - [2026-10-02 · stall and empty reply](plans/handoffs/2026-10-02-1649-cursor-grok-4-7-stall-and-empty-reply.md) — run the stall sample, then the empty chat line. #26 closed: Update now installs Prime.
