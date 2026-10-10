@@ -780,19 +780,18 @@ mod tests {
     fn run_create_note_tool_refuses_an_absolute_path_outside_the_vault() {
         let vault = tempfile::tempdir().unwrap();
         let vault_path = vault.path().to_string_lossy().into_owned();
-        let outside = std::path::Path::new("/tmp/x.md");
-        let existed = outside.exists();
-        let before = existed.then(|| fs::read_to_string(outside).ok()).flatten();
-        let raw = json!({ "path": "/tmp/x.md", "content": "# Escape\n" }).to_string();
+        let outside_dir = tempfile::tempdir().unwrap();
+        let outside = outside_dir.path().join("x.md");
+        let raw = json!({
+            "path": outside.to_string_lossy(),
+            "content": "# Escape\n",
+        })
+        .to_string();
 
         let result = run_create_note_tool(&raw, Some(&vault_path), &[]);
 
         assert!(result.is_err());
-        if let Some(before) = before {
-            assert_eq!(fs::read_to_string(outside).unwrap(), before);
-        } else {
-            assert!(!outside.exists());
-        }
+        assert!(!outside.exists());
     }
 
     #[test]

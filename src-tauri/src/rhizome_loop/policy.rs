@@ -12,6 +12,14 @@ use crate::ai_agents::AiAgentPermissionMode;
 use crate::ai_model_tools::CREATE_NOTE_TOOL_NAME;
 use crate::permission_decision::{decide, PolicyDecision, PolicyOption};
 
+/// One choice on an approval prompt. Limited-tools `create_note` offers
+/// Allow once and Deny only — never Allow for session.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApprovalOption {
+    pub id: String,
+    pub label: String,
+}
+
 pub enum Ruling {
     /// Run the tool. When `spend_grant` is set, the same name and args
     /// are denied the next time.
@@ -92,6 +100,38 @@ pub fn session_matches(name: &str, granted_args: &str, call_args: &str) -> bool 
     }
 }
 
+/// Choices the engine passes to Chat for this tool. `create_note` in
+/// Limited tools is Allow once and Deny. Other asks also offer
+/// Allow for session.
+pub fn approval_options(mode: AiAgentPermissionMode, name: &str) -> Vec<ApprovalOption> {
+    if name == CREATE_NOTE_TOOL_NAME {
+        return vec![allow_once_choice(), deny_choice()];
+    }
+    let _ = mode;
+    vec![allow_once_choice(), allow_session_choice(), deny_choice()]
+}
+
+fn allow_once_choice() -> ApprovalOption {
+    ApprovalOption {
+        id: "allow_once".into(),
+        label: "Allow once".into(),
+    }
+}
+
+fn allow_session_choice() -> ApprovalOption {
+    ApprovalOption {
+        id: "allow_session".into(),
+        label: "Allow for session".into(),
+    }
+}
+
+fn deny_choice() -> ApprovalOption {
+    ApprovalOption {
+        id: "deny".into(),
+        label: "Deny".into(),
+    }
+}
+
 fn allow_once_option() -> PolicyOption {
     PolicyOption {
         id: "allow_once".into(),
@@ -121,5 +161,16 @@ mod tests {
     fn session_grant_bash_matches_exact_command_only() {
         assert!(session_matches("bash", "ls", "ls"));
         assert!(!session_matches("bash", "ls", "pwd"));
+    }
+
+    #[test]
+    fn create_note_options_are_allow_once_and_deny() {
+        use super::approval_options;
+        use crate::ai_agents::AiAgentPermissionMode;
+
+        let options = approval_options(AiAgentPermissionMode::Safe, "create_note");
+        let ids: Vec<&str> = options.iter().map(|option| option.id.as_str()).collect();
+        assert_eq!(ids, vec!["allow_once", "deny"]);
+        assert!(!ids.contains(&"allow_session"));
     }
 }

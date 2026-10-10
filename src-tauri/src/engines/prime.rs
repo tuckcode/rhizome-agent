@@ -34,7 +34,7 @@ impl PrimeEngine {
     pub fn with_text(text: impl Into<String>) -> Self {
         Self {
             settle: Box::new(|_| Ok(QuitDisposition::KeepSessionRunning)),
-            events: vec![EngineEvent::Text(text.into())],
+            events: vec![EngineEvent::TextDelta { text: text.into() }],
             settled: false,
         }
     }
@@ -65,8 +65,14 @@ impl Engine for PrimeEngine {
         "prime"
     }
 
-    fn start(&mut self, _prompt: &str) -> Result<(), String> {
-        // Phase 6 sends. This wrapper only owns settle-on-drop.
+    fn start(
+        &mut self,
+        _prompt: &str,
+        mut sink: Box<dyn FnMut(EngineEvent) + Send>,
+    ) -> Result<(), String> {
+        for event in &self.events {
+            sink(event.clone());
+        }
         Ok(())
     }
 
@@ -76,5 +82,15 @@ impl Engine for PrimeEngine {
 
     fn events(&self) -> Vec<EngineEvent> {
         self.events.clone()
+    }
+
+    fn steer(&mut self, _text: &str) {}
+
+    fn cancel(&mut self, _cause: &str) {}
+
+    fn reply_approval(&mut self, _prompt_id: &str, _reply: crate::rhizome_loop::ApprovalReply) {}
+
+    fn settle_on_quit(&mut self) {
+        self.detach();
     }
 }
