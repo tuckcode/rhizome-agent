@@ -1,7 +1,12 @@
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { executeCommand, installMockAiAgent, openCommandPalette } from './helpers'
+import {
+  executeCommand,
+  installMockAiAgent,
+  openCommandPalette,
+  SMOKE_UI_READY_TIMEOUT,
+} from './helpers'
 import { pinNotesShellLaunch } from '../helpers/fixtureVault'
 import { requireAuditOpener, UI_AUDIT_SCREENS } from '../../src/utils/uiAuditScreens'
 import type { UiAuditFinding } from '../../src/utils/uiAudit'
@@ -81,15 +86,17 @@ test.describe('UI audit', () => {
         } else {
           await opener.first().evaluate((node) => (node as HTMLElement).click())
         }
-        // Let the destination settle before measuring; a half-rendered screen
-        // reports collisions that resolve a frame later.
-        await page.waitForTimeout(600)
       }
 
       await expect(
         page.getByTestId(screen.destinationTestId),
         `UI audit claimed "${screen.name}" but never reached ${screen.destinationTestId}`,
-      ).toBeVisible()
+      ).toBeVisible({ timeout: SMOKE_UI_READY_TIMEOUT })
+      if (screen.openerTestId) {
+        // Let the destination settle before measuring; a half-rendered screen
+        // reports collisions that resolve a frame later.
+        await page.waitForTimeout(600)
+      }
 
       const findings = await auditCurrentScreen(page)
       const known = new Set([...SHARED, ...(BASELINE[screen.name] ?? [])])
