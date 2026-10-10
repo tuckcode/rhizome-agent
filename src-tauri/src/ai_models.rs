@@ -1,9 +1,12 @@
 use crate::ai_agents::AiAgentStreamEvent;
+use crate::model_events::{ModelError, ModelErrorKind, ModelEvent};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::sync::OnceLock;
+
+mod openai_stream;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -193,6 +196,279 @@ pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<Str
     send_model_message(&request, &mut |_| {})
 }
 
+/// Trims a base URL and strips trailing slashes. The host stays as written,
+/// so a LAN address (`http://<PC LAN IP>:8080/v1`) is never rewritten to
+/// loopback.
+pub fn normalize_base_url(raw: &str) -> Result<String, String> {
+    let base = raw.trim().trim_end_matches('/');
+    if base.is_empty() {
+        return Err("Custom API providers need a base URL.".into());
+    }
+    let has_web_scheme = reqwest::Url::parse(base)
+        .map(|url| matches!(url.scheme(), "http" | "https"))
+        .unwrap_or(false);
+    if !has_web_scheme {
+        return Err(format!(
+            "Base URL must start with http:// or https://: {base}"
+        ));
+    }
+    Ok(base.to_string())
+}
+
+/// Connect and total time limits for one provider HTTP call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HttpLimits {
+    pub connect: std::time::Duration,
+    pub total: std::time::Duration,
+}
+
+impl HttpLimits {
+    /// A slow LAN model can take minutes on one reply, so the total is long.
+    pub const STREAM: Self = Self {
+        connect: std::time::Duration::from_secs(15),
+        total: std::time::Duration::from_secs(600),
+    };
+    pub const DISCOVER: Self = Self {
+        connect: std::time::Duration::from_secs(15),
+        total: std::time::Duration::from_secs(30),
+    };
+}
+
+/// Streams one model request as `ModelEvent`s (harness plan Phase 4), with
+/// `HttpLimits::STREAM`.
+///
+/// Runs no tools: a tool call is only data for the Rhizome loop. Every
+/// failure arrives as one `ModelEvent::Error`. `emit` returns false to stop
+/// reading. Then no terminal event follows, because cancel belongs to the
+/// loop. Only OpenAI-compatible providers stream events so far.
+pub fn stream_model_events(
+    request: &AiModelStreamRequest,
+    emit: &mut dyn FnMut(ModelEvent) -> bool,
+) {
+    stream_model_events_with(request, HttpLimits::STREAM, emit);
+}
+
+/// `stream_model_events` with caller-set time limits.
+pub fn stream_model_events_with(
+    request: &AiModelStreamRequest,
+    limits: HttpLimits,
+    emit: &mut dyn FnMut(ModelEvent) -> bool,
+) {
+    let response = match open_model_event_stream(request, limits) {
+        Ok(response) => response,
+        Err(error) => {
+            emit(ModelEvent::Error(error));
+            return;
+        }
+    };
+    let mut parser = openai_stream::OpenAiStreamParser::default();
+    if is_json_response(&response) {
+        let events = match response.json::<serde_json::Value>() {
+            Ok(json) => parser.push_completion(&json),
+            Err(error) => vec![ModelEvent::Error(model_error(
+                ModelErrorKind::Protocol,
+                format!("Failed to parse AI provider response: {error}"),
+            ))],
+        };
+        emit_all(events, emit);
+        return;
+    }
+    read_event_stream(std::io::BufReader::new(response), &mut parser, emit);
+}
+
+/// Lists model ids from `GET {base_url}/models`, with
+/// `HttpLimits::DISCOVER`.
+///
+/// Keeps no cache, so a failure is never remembered: the next call asks the
+/// server again.
+pub fn discover_ai_model_ids(
+    provider: &AiModelProvider,
+    api_key_override: Option<&str>,
+) -> Result<Vec<String>, ModelError> {
+    discover_ai_model_ids_with(provider, api_key_override, HttpLimits::DISCOVER)
+}
+
+/// `discover_ai_model_ids` with caller-set time limits.
+pub fn discover_ai_model_ids_with(
+    provider: &AiModelProvider,
+    api_key_override: Option<&str>,
+    limits: HttpLimits,
+) -> Result<Vec<String>, ModelError> {
+    let request = AiModelStreamRequest {
+        provider: provider.clone(),
+        model_id: String::new(),
+        message: String::new(),
+        system_prompt: None,
+        vault_path: None,
+        vault_paths: Vec::new(),
+        api_key_override: api_key_override.map(str::to_string),
+        event_name: None,
+    };
+    let endpoint = format!("{}/models", rejected_on_err(normalized_base_url(&request))?);
+    let client = http_client(limits)?;
+    let builder = auth_on_err(apply_auth_headers(client.get(endpoint), &request))?;
+    let response = send_checked(apply_provider_headers(builder, &request))?;
+    let json = response.json::<serde_json::Value>().map_err(|error| {
+        model_error(
+            ModelErrorKind::Protocol,
+            format!("Failed to parse AI provider model list: {error}"),
+        )
+    })?;
+    let models = json["data"].as_array().ok_or_else(|| {
+        model_error(
+            ModelErrorKind::Protocol,
+            "AI provider model list did not include data.".into(),
+        )
+    })?;
+    Ok(models
+        .iter()
+        .filter_map(|model| model["id"].as_str())
+        .map(str::to_string)
+        .collect())
+}
+
+fn open_model_event_stream(
+    request: &AiModelStreamRequest,
+    limits: HttpLimits,
+) -> Result<reqwest::blocking::Response, ModelError> {
+    if request.provider.kind == AiModelProviderKind::Anthropic {
+        return Err(model_error(
+            ModelErrorKind::Rejected,
+            "This provider does not stream model events yet.".into(),
+        ));
+    }
+    let endpoint = rejected_on_err(chat_completions_url(request))?;
+    let mut payload = crate::ai_model_tools::openai_chat_payload(request);
+    payload["stream"] = serde_json::Value::Bool(true);
+    let client = http_client(limits)?;
+    let builder = auth_on_err(apply_auth_headers(
+        client.post(endpoint).json(&payload),
+        request,
+    ))?;
+    send_checked(apply_provider_headers(builder, request))
+}
+
+fn read_event_stream(
+    reader: impl std::io::BufRead,
+    parser: &mut openai_stream::OpenAiStreamParser,
+    emit: &mut dyn FnMut(ModelEvent) -> bool,
+) {
+    for line in reader.lines() {
+        let line = match line {
+            Ok(line) => line,
+            Err(error) => {
+                emit(ModelEvent::Error(model_error(
+                    ModelErrorKind::Unavailable,
+                    format!("AI provider stream failed: {error}"),
+                )));
+                return;
+            }
+        };
+        let Some(data) = line.strip_prefix("data:") else {
+            continue;
+        };
+        if !emit_all(parser.push_data(data), emit) || parser.is_finished() {
+            return;
+        }
+    }
+    emit_all(parser.end_of_stream(), emit);
+}
+
+/// Returns false when `emit` asked to stop.
+fn emit_all(events: Vec<ModelEvent>, emit: &mut dyn FnMut(ModelEvent) -> bool) -> bool {
+    events.into_iter().all(emit)
+}
+
+fn is_json_response(response: &reqwest::blocking::Response) -> bool {
+    response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.contains("application/json"))
+}
+
+fn http_client(limits: HttpLimits) -> Result<reqwest::blocking::Client, ModelError> {
+    reqwest::blocking::Client::builder()
+        .connect_timeout(limits.connect)
+        .timeout(limits.total)
+        .build()
+        .map_err(|error| {
+            model_error(
+                ModelErrorKind::Unavailable,
+                format!("Failed to create HTTP client: {error}"),
+            )
+        })
+}
+
+fn send_checked(
+    builder: reqwest::blocking::RequestBuilder,
+) -> Result<reqwest::blocking::Response, ModelError> {
+    let response = builder.send().map_err(|error| {
+        model_error(
+            ModelErrorKind::Unavailable,
+            format!("AI provider request failed: {error}"),
+        )
+    })?;
+    let status = response.status();
+    if status.is_success() {
+        return Ok(response);
+    }
+    let retry_after = response
+        .headers()
+        .get(reqwest::header::RETRY_AFTER)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string);
+    let body = response.text().unwrap_or_default();
+    Err(classify_http_failure(
+        status.as_u16(),
+        retry_after.as_deref(),
+        &body,
+    ))
+}
+
+fn chat_completions_url(request: &AiModelStreamRequest) -> Result<String, String> {
+    Ok(format!(
+        "{}/chat/completions",
+        normalized_base_url(request)?
+    ))
+}
+
+/// One routing class per failure (harness plan Phase 4b decides on these).
+fn classify_http_failure(status: u16, retry_after: Option<&str>, body: &str) -> ModelError {
+    let kind = match status {
+        429 if body.contains("insufficient_quota") => ModelErrorKind::QuotaExhausted,
+        429 => ModelErrorKind::RateLimited {
+            retry_after_secs: retry_after.and_then(|value| value.trim().parse().ok()),
+        },
+        402 => ModelErrorKind::QuotaExhausted,
+        401 | 403 => ModelErrorKind::Auth,
+        408 | 500..=599 => ModelErrorKind::Unavailable,
+        _ => ModelErrorKind::Rejected,
+    };
+    ModelError {
+        kind,
+        status: Some(status),
+        message: format!("AI provider returned {status}: {}", truncate_error(body)),
+    }
+}
+
+fn model_error(kind: ModelErrorKind, message: String) -> ModelError {
+    ModelError {
+        kind,
+        status: None,
+        message,
+    }
+}
+
+fn rejected_on_err<T>(result: Result<T, String>) -> Result<T, ModelError> {
+    result.map_err(|message| model_error(ModelErrorKind::Rejected, message))
+}
+
+/// A missing or unreadable API key.
+fn auth_on_err<T>(result: Result<T, String>) -> Result<T, ModelError> {
+    result.map_err(|message| model_error(ModelErrorKind::Auth, message))
+}
+
 fn send_model_message<F>(request: &AiModelStreamRequest, emit: &mut F) -> Result<String, String>
 where
     F: FnMut(AiAgentStreamEvent),
@@ -210,7 +486,7 @@ fn send_openai_compatible_message<F>(
 where
     F: FnMut(AiAgentStreamEvent),
 {
-    let endpoint = format!("{}/chat/completions", normalized_base_url(request)?);
+    let endpoint = chat_completions_url(request)?;
     let payload = crate::ai_model_tools::openai_chat_payload(request);
     let json = send_json_request(request, endpoint, payload)?;
     if let Some(tool_summary) =
@@ -254,12 +530,8 @@ fn normalized_base_url(request: &AiModelStreamRequest) -> Result<String, String>
         .base_url
         .as_deref()
         .and_then(non_empty_str)
-        .unwrap_or(fallback)
-        .trim_end_matches('/');
-    if base.is_empty() {
-        return Err("Custom API providers need a base URL.".into());
-    }
-    Ok(base.to_string())
+        .unwrap_or(fallback);
+    normalize_base_url(base)
 }
 
 fn send_json_request(
@@ -801,6 +1073,381 @@ mod tests {
         assert!(raw.contains("fixture-only"));
         assert!(serde_json::from_str::<AiProviderSecrets>(&raw).is_ok());
         assert_eq!(read_secrets_at(&path).unwrap(), secrets);
+    }
+
+    const TEST_IO_LIMIT: std::time::Duration = std::time::Duration::from_secs(3);
+
+    /// Short client limits, so a stuck HTTP test fails in seconds. The
+    /// production limits stay `HttpLimits::STREAM` and `DISCOVER`.
+    const TEST_LIMITS: HttpLimits = HttpLimits {
+        connect: std::time::Duration::from_secs(2),
+        total: std::time::Duration::from_secs(5),
+    };
+
+    /// A local HTTP server that answers each connection with the next
+    /// canned response, then closes. It records "METHOD PATH" and the body.
+    /// It binds port 0, so the OS picks a free port.
+    struct TestServer {
+        base_url: String,
+        requests: std::sync::Arc<std::sync::Mutex<Vec<(String, String)>>>,
+    }
+
+    fn serve(responses: Vec<String>) -> TestServer {
+        use std::io::{BufRead, BufReader, Read, Write};
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base_url = format!("http://{}/v1", listener.local_addr().unwrap());
+        let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let seen = std::sync::Arc::clone(&requests);
+        std::thread::spawn(move || {
+            for response in responses {
+                let Ok((mut stream, _)) = listener.accept() else {
+                    return;
+                };
+                // A stuck client ends this connection in seconds. The
+                // dropped stream then fails the client side fast too.
+                stream.set_read_timeout(Some(TEST_IO_LIMIT)).unwrap();
+                stream.set_write_timeout(Some(TEST_IO_LIMIT)).unwrap();
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut request_line = String::new();
+                reader.read_line(&mut request_line).unwrap();
+                let mut content_length = 0;
+                loop {
+                    let mut header = String::new();
+                    reader.read_line(&mut header).unwrap();
+                    if header.trim().is_empty() {
+                        break;
+                    }
+                    if let Some(value) = header.to_ascii_lowercase().strip_prefix("content-length:")
+                    {
+                        content_length = value.trim().parse().unwrap();
+                    }
+                }
+                let mut body = vec![0; content_length];
+                reader.read_exact(&mut body).unwrap();
+                let target = request_line
+                    .split_whitespace()
+                    .take(2)
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                seen.lock()
+                    .unwrap()
+                    .push((target, String::from_utf8(body).unwrap()));
+                stream.write_all(response.as_bytes()).unwrap();
+            }
+        });
+        TestServer { base_url, requests }
+    }
+
+    /// Accepts one connection and never answers it.
+    fn serve_silent() -> String {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base_url = format!("http://{}/v1", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            if let Ok((stream, _)) = listener.accept() {
+                std::thread::sleep(std::time::Duration::from_secs(30));
+                drop(stream);
+            }
+        });
+        base_url
+    }
+
+    fn http_response(status: &str, headers: &[&str], body: &str) -> String {
+        let mut response = format!("HTTP/1.1 {status}\r\nConnection: close\r\n");
+        for header in headers {
+            response.push_str(header);
+            response.push_str("\r\n");
+        }
+        response.push_str("\r\n");
+        response.push_str(body);
+        response
+    }
+
+    fn sse(lines: &[&str]) -> String {
+        let body = lines
+            .iter()
+            .map(|line| format!("data: {line}\n\n"))
+            .collect::<String>();
+        http_response("200 OK", &["Content-Type: text/event-stream"], &body)
+    }
+
+    fn compatible_request(base_url: &str) -> AiModelStreamRequest {
+        let mut provider = provider(AiModelProviderKind::LmStudio);
+        provider.base_url = Some(base_url.into());
+        provider.api_key_env_var = None;
+        provider.models = vec![model("demo-model")];
+        provider.models[0].capabilities.tools = true;
+        let mut request = request(provider);
+        request.provider.id = "demo".into();
+        request
+    }
+
+    fn collect_events(request: &AiModelStreamRequest) -> Vec<ModelEvent> {
+        let mut events = Vec::new();
+        stream_model_events_with(request, TEST_LIMITS, &mut |event| {
+            events.push(event);
+            true
+        });
+        events
+    }
+
+    #[test]
+    fn production_http_limits_stay_long_enough_for_slow_models() {
+        assert_eq!(HttpLimits::STREAM.connect.as_secs(), 15);
+        assert_eq!(HttpLimits::STREAM.total.as_secs(), 600);
+        assert_eq!(HttpLimits::DISCOVER.connect.as_secs(), 15);
+        assert_eq!(HttpLimits::DISCOVER.total.as_secs(), 30);
+    }
+
+    fn only_error(events: &[ModelEvent]) -> &ModelError {
+        match events {
+            [ModelEvent::Error(error)] => error,
+            other => panic!("expected one Error event, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn custom_base_url_is_used_verbatim() {
+        assert_eq!(
+            normalize_base_url(" http://192.168.1.50:8080/v1// ").unwrap(),
+            "http://192.168.1.50:8080/v1"
+        );
+        let request = compatible_request("http://192.168.1.50:8080/v1/");
+
+        assert_eq!(
+            chat_completions_url(&request).unwrap(),
+            "http://192.168.1.50:8080/v1/chat/completions"
+        );
+    }
+
+    #[test]
+    fn normalize_base_url_rejects_empty_and_schemeless_urls() {
+        assert_eq!(
+            normalize_base_url("  ").unwrap_err(),
+            "Custom API providers need a base URL."
+        );
+        assert!(normalize_base_url("192.168.1.50:8080/v1")
+            .unwrap_err()
+            .contains("http:// or https://"));
+        assert!(normalize_base_url("ftp://example.com/v1")
+            .unwrap_err()
+            .contains("http:// or https://"));
+    }
+
+    #[test]
+    fn stream_model_events_parses_tool_calls_and_runs_no_tools() {
+        let vault = tempfile::tempdir().unwrap();
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"On it."}}]}"#,
+            r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_a","function":{"name":"create_note","arguments":"{\"path\":\"a.md\"}"}}]},"finish_reason":"tool_calls"}]}"#,
+            "[DONE]",
+        ])]);
+        let mut request = compatible_request(&server.base_url);
+        request.vault_path = Some(vault.path().to_string_lossy().into_owned());
+
+        let events = collect_events(&request);
+
+        assert_eq!(
+            events,
+            vec![
+                ModelEvent::TextDelta {
+                    text: "On it.".into()
+                },
+                ModelEvent::ToolCallStart {
+                    id: "call_a".into(),
+                    name: "create_note".into()
+                },
+                ModelEvent::ToolCallArgsDelta {
+                    id: "call_a".into(),
+                    delta: "{\"path\":\"a.md\"}".into()
+                },
+                ModelEvent::ToolCallEnd {
+                    id: "call_a".into()
+                },
+                ModelEvent::Finish {
+                    reason: crate::model_events::FinishReason::ToolCalls
+                },
+            ]
+        );
+        assert!(!vault.path().join("a.md").exists(), "the tool must not run");
+        let requests = server.requests.lock().unwrap();
+        assert_eq!(requests[0].0, "POST /v1/chat/completions");
+        let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+        assert_eq!(body["stream"], true);
+        assert_eq!(body["tools"][0]["function"]["name"], "create_note");
+    }
+
+    #[test]
+    fn stream_model_events_accepts_a_whole_json_completion() {
+        let server = serve(vec![http_response(
+            "200 OK",
+            &["Content-Type: application/json"],
+            r#"{"choices":[{"message":{"content":"hi"},"finish_reason":"stop"}]}"#,
+        )]);
+
+        let events = collect_events(&compatible_request(&server.base_url));
+
+        assert_eq!(
+            events,
+            vec![
+                ModelEvent::TextDelta { text: "hi".into() },
+                ModelEvent::Finish {
+                    reason: crate::model_events::FinishReason::Stop
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn stream_model_events_stops_reading_when_emit_returns_false() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"one"}}]}"#,
+            r#"{"choices":[{"delta":{"content":"two"}}]}"#,
+            "[DONE]",
+        ])]);
+        let mut events = Vec::new();
+
+        let request = compatible_request(&server.base_url);
+        stream_model_events_with(&request, TEST_LIMITS, &mut |event| {
+            events.push(event);
+            false
+        });
+
+        assert_eq!(events, vec![ModelEvent::TextDelta { text: "one".into() }]);
+    }
+
+    #[test]
+    fn stream_model_events_reports_an_http_failure_as_one_error() {
+        let server = serve(vec![http_response(
+            "429 Too Many Requests",
+            &["Retry-After: 3", "Content-Type: application/json"],
+            r#"{"error":{"message":"slow down"}}"#,
+        )]);
+
+        let events = collect_events(&compatible_request(&server.base_url));
+        let error = only_error(&events);
+
+        assert_eq!(
+            error.kind,
+            ModelErrorKind::RateLimited {
+                retry_after_secs: Some(3)
+            }
+        );
+        assert_eq!(error.status, Some(429));
+        assert!(error.message.contains("slow down"));
+    }
+
+    #[test]
+    fn stream_model_events_reports_a_connect_failure_as_unavailable() {
+        let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base_url = format!("http://{}/v1", closed.local_addr().unwrap());
+        drop(closed);
+        let request = compatible_request(&base_url);
+
+        // A refused connect returns at once, so the production limits are
+        // safe to use here.
+        let mut events = Vec::new();
+        stream_model_events(&request, &mut |event| {
+            events.push(event);
+            true
+        });
+        let discover = discover_ai_model_ids(&request.provider, None).unwrap_err();
+
+        assert_eq!(only_error(&events).kind, ModelErrorKind::Unavailable);
+        assert_eq!(discover.kind, ModelErrorKind::Unavailable);
+    }
+
+    #[test]
+    fn a_server_that_never_answers_fails_fast_in_tests() {
+        let started = std::time::Instant::now();
+
+        let events = collect_events(&compatible_request(&serve_silent()));
+
+        assert_eq!(only_error(&events).kind, ModelErrorKind::Unavailable);
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(10),
+            "took {:?}",
+            started.elapsed()
+        );
+    }
+
+    #[test]
+    fn stream_model_events_rejects_a_bad_base_url_and_anthropic() {
+        let bad_url = collect_events(&compatible_request("localhost:1234"));
+        assert_eq!(only_error(&bad_url).kind, ModelErrorKind::Rejected);
+
+        let mut anthropic = provider(AiModelProviderKind::Anthropic);
+        anthropic.models = vec![model("demo-model")];
+        let anthropic = collect_events(&request(anthropic));
+        assert_eq!(only_error(&anthropic).kind, ModelErrorKind::Rejected);
+    }
+
+    #[test]
+    fn http_failures_map_to_routing_classes() {
+        let kind =
+            |status, retry_after, body| classify_http_failure(status, retry_after, body).kind;
+
+        assert_eq!(
+            kind(429, Some("7"), ""),
+            ModelErrorKind::RateLimited {
+                retry_after_secs: Some(7)
+            }
+        );
+        assert_eq!(
+            kind(429, Some("Wed, 21 Oct 2026 07:28:00 GMT"), ""),
+            ModelErrorKind::RateLimited {
+                retry_after_secs: None
+            }
+        );
+        assert_eq!(
+            kind(429, None, r#"{"error":{"code":"insufficient_quota"}}"#),
+            ModelErrorKind::QuotaExhausted
+        );
+        assert_eq!(kind(402, None, ""), ModelErrorKind::QuotaExhausted);
+        assert_eq!(kind(401, None, ""), ModelErrorKind::Auth);
+        assert_eq!(kind(403, None, ""), ModelErrorKind::Auth);
+        assert_eq!(kind(408, None, ""), ModelErrorKind::Unavailable);
+        assert_eq!(kind(503, None, ""), ModelErrorKind::Unavailable);
+        assert_eq!(kind(400, None, ""), ModelErrorKind::Rejected);
+        assert_eq!(classify_http_failure(400, None, "bad").status, Some(400));
+    }
+
+    #[test]
+    fn failed_discover_is_not_cached() {
+        let server = serve(vec![
+            http_response("500 Internal Server Error", &[], "down"),
+            http_response(
+                "200 OK",
+                &["Content-Type: application/json"],
+                r#"{"object":"list","data":[{"id":"qwen3-32b"},{"id":"llama3.2"}]}"#,
+            ),
+        ]);
+        let provider = compatible_request(&server.base_url).provider;
+
+        let first = discover_ai_model_ids_with(&provider, None, TEST_LIMITS).unwrap_err();
+        let second = discover_ai_model_ids_with(&provider, None, TEST_LIMITS).unwrap();
+
+        assert_eq!(first.kind, ModelErrorKind::Unavailable);
+        assert_eq!(second, vec!["qwen3-32b", "llama3.2"]);
+        let requests = server.requests.lock().unwrap();
+        assert_eq!(requests.len(), 2);
+        assert!(requests
+            .iter()
+            .all(|(target, _)| target == "GET /v1/models"));
+    }
+
+    #[test]
+    fn discover_reports_a_body_without_model_ids_as_protocol() {
+        let server = serve(vec![http_response(
+            "200 OK",
+            &["Content-Type: application/json"],
+            r#"{"unexpected":true}"#,
+        )]);
+        let provider = compatible_request(&server.base_url).provider;
+
+        let error = discover_ai_model_ids_with(&provider, None, TEST_LIMITS).unwrap_err();
+
+        assert_eq!(error.kind, ModelErrorKind::Protocol);
     }
 
     #[test]

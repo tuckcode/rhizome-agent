@@ -49,9 +49,11 @@ struct OpenAiToolCall {
     raw_arguments: String,
 }
 
-struct CreatedNoteToolResult {
-    summary: String,
-    output: String,
+pub(crate) struct CreatedNoteToolResult {
+    /// One line for the chat transcript.
+    pub(crate) summary: String,
+    /// JSON with `path` and `vaultPath`, for the model as the tool result.
+    pub(crate) output: String,
 }
 
 pub(crate) fn openai_chat_payload(request: &AiModelStreamRequest) -> serde_json::Value {
@@ -147,7 +149,11 @@ where
         input: Some(tool_call.raw_arguments.clone()),
     });
 
-    match create_note_from_tool_args(request, &tool_call.arguments) {
+    match create_note(
+        &tool_call.arguments,
+        request.vault_path.as_deref(),
+        &request.vault_paths,
+    ) {
         Ok(result) => {
             emit(AiAgentStreamEvent::ToolDone {
                 tool_id: tool_call.id.clone(),
@@ -210,13 +216,21 @@ fn parse_tool_arguments(value: &serde_json::Value) -> Result<(serde_json::Value,
     Ok((serde_json::json!({}), "{}".into()))
 }
 
-fn create_note_from_tool_args(
-    request: &AiModelStreamRequest,
+/// The `create_note` tool body, with no model request attached. The
+/// Rhizome loop can call it after its policy allows the call.
+///
+/// `vault_path` is the default vault. `vault_paths` are the other active
+/// vaults. An explicit `vaultPath` argument must be one of them. The note
+/// path is checked against the vault root by `create_note_content`, so a
+/// path outside the vault is refused. An existing file is never overwritten.
+pub(crate) fn create_note(
     args: &serde_json::Value,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
 ) -> Result<CreatedNoteToolResult, String> {
     let note_path = required_tool_string(args, "path")?;
     let content = create_note_tool_content(args, note_path);
-    let vault_path = tool_vault_path(request, args)?;
+    let vault_path = tool_vault_path(vault_path, vault_paths, args)?;
     crate::commands::create_note_content(
         PathBuf::from(note_path),
         content,
@@ -234,37 +248,24 @@ fn create_note_from_tool_args(
 }
 
 fn tool_vault_path<'a>(
-    request: &'a AiModelStreamRequest,
+    default_vault: Option<&'a str>,
+    vault_paths: &'a [String],
     args: &'a serde_json::Value,
 ) -> Result<&'a str, String> {
     if let Some(vault_path) = string_arg(args, "vaultPath") {
-        return active_tool_vault_path(request, vault_path);
+        let mut active = default_vault
+            .into_iter()
+            .chain(vault_paths.iter().map(String::as_str))
+            .filter_map(non_empty_str);
+        return if active.any(|candidate| candidate == vault_path) {
+            Ok(vault_path)
+        } else {
+            Err(format!("Vault is not active in Rhizome: {vault_path}"))
+        };
     }
-    request
-        .vault_path
-        .as_deref()
+    default_vault
         .and_then(non_empty_str)
         .ok_or_else(|| "No active vault is available for create_note.".to_string())
-}
-
-fn active_tool_vault_path<'a>(
-    request: &'a AiModelStreamRequest,
-    vault_path: &'a str,
-) -> Result<&'a str, String> {
-    if active_vault_paths(request).any(|active| active == vault_path) {
-        Ok(vault_path)
-    } else {
-        Err(format!("Vault is not active in Rhizome: {vault_path}"))
-    }
-}
-
-fn active_vault_paths(request: &AiModelStreamRequest) -> impl Iterator<Item = &str> {
-    request
-        .vault_path
-        .as_deref()
-        .into_iter()
-        .chain(request.vault_paths.iter().map(String::as_str))
-        .filter_map(non_empty_str)
 }
 
 fn create_note_tool_content(args: &serde_json::Value, note_path: &str) -> String {
@@ -597,6 +598,66 @@ mod tests {
         let error = create_note_error(json!("{}"));
 
         assert_eq!(error, "create_note requires path.");
+    }
+
+    #[test]
+    fn create_note_writes_inside_the_default_vault_without_a_model_request() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+
+        let created = create_note(
+            &json!({ "path": CREATED_NOTE_PATH, "content": CREATED_NOTE_CONTENT }),
+            Some(&vault_path),
+            &[],
+        )
+        .unwrap();
+
+        assert_note_created(vault.path());
+        assert_eq!(
+            created.summary,
+            format!("Created note: {CREATED_NOTE_PATH}")
+        );
+        assert!(created.output.contains(CREATED_NOTE_PATH));
+    }
+
+    #[test]
+    fn create_note_refuses_a_path_outside_the_vault() {
+        let parent = tempfile::tempdir().unwrap();
+        let vault = parent.path().join("vault");
+        fs::create_dir(&vault).unwrap();
+        let vault_path = vault.to_string_lossy().into_owned();
+
+        let result = create_note(
+            &json!({ "path": "../escape.md", "content": "# Escape\n" }),
+            Some(&vault_path),
+            &[],
+        );
+
+        assert!(result.is_err());
+        assert!(!parent.path().join("escape.md").exists());
+    }
+
+    #[test]
+    fn create_note_refuses_an_inactive_vault_and_a_missing_vault() {
+        let active = tempfile::tempdir().unwrap();
+        let inactive = tempfile::tempdir().unwrap();
+        let active_path = active.path().to_string_lossy().into_owned();
+        let args = json!({
+            "path": "inactive.md",
+            "vaultPath": inactive.path().to_string_lossy(),
+        });
+
+        let inactive_error = create_note(&args, Some(&active_path), &[]).err().unwrap();
+        let missing_error = create_note(&json!({ "path": "a.md" }), None, &[])
+            .err()
+            .unwrap();
+
+        assert!(inactive_error.starts_with("Vault is not active in Rhizome:"));
+        assert!(!inactive.path().join("inactive.md").exists());
+        assert_eq!(
+            missing_error,
+            "No active vault is available for create_note."
+        );
     }
 
     #[test]
