@@ -307,6 +307,137 @@ mod tests {
     }
 
     #[test]
+    fn limited_tools_asks_before_create_note_writes() {
+        let vault = tempfile::tempdir().unwrap();
+        let note = vault.path().join("asked.md");
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::Safe);
+        agent.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&asked);
+        let note_path = note.clone();
+        agent.set_approval_waiter(move |name| {
+            assert_eq!(name, "create_note");
+            assert!(!note_path.exists(), "create_note must ask before writing");
+            flag.store(true, Ordering::SeqCst);
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![
+            vec![ScriptPart::Tool {
+                name: "create_note".into(),
+                args: serde_json::json!({
+                    "path": "asked.md",
+                    "content": "# Asked\n",
+                })
+                .to_string(),
+            }],
+            vec![ScriptPart::Text("done".into())],
+        ]);
+        agent.submit("write a note");
+        agent.run_until_idle(&mut model);
+
+        assert!(
+            asked.load(Ordering::SeqCst),
+            "Limited tools must ask before create_note writes: {:?}",
+            agent.events()
+        );
+    }
+
+    #[test]
+    fn denied_create_note_writes_no_note() {
+        let vault = tempfile::tempdir().unwrap();
+        let note = vault.path().join("denied.md");
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::Safe);
+        agent.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&asked);
+        agent.set_approval_waiter(move |_| {
+            flag.store(true, Ordering::SeqCst);
+            ApprovalReply::Deny
+        });
+        let mut model = FakeModel::script(vec![
+            vec![ScriptPart::Tool {
+                name: "create_note".into(),
+                args: serde_json::json!({
+                    "path": "denied.md",
+                    "content": "# Denied\n",
+                })
+                .to_string(),
+            }],
+            vec![ScriptPart::Text("after".into())],
+        ]);
+        agent.submit("write a note");
+        agent.run_until_idle(&mut model);
+
+        assert!(
+            asked.load(Ordering::SeqCst),
+            "Limited tools must ask before denying create_note: {:?}",
+            agent.events()
+        );
+        assert!(!note.exists(), "a denied create_note must write no file");
+        assert!(agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolDenied { name, .. } if name == "create_note")
+        }));
+        assert!(!agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolResult { name, .. } if name == "create_note")
+        }));
+    }
+
+    #[test]
+    fn approved_create_note_writes_the_note_in_the_vault() {
+        let vault = tempfile::tempdir().unwrap();
+        let note = vault.path().join("approved.md");
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::Safe);
+        agent.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&asked);
+        agent.set_approval_waiter(move |_| {
+            flag.store(true, Ordering::SeqCst);
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![
+            vec![ScriptPart::Tool {
+                name: "create_note".into(),
+                args: serde_json::json!({
+                    "path": "approved.md",
+                    "content": "# Approved\n",
+                })
+                .to_string(),
+            }],
+            vec![ScriptPart::Text("done".into())],
+        ]);
+        agent.submit("write a note");
+        agent.run_until_idle(&mut model);
+
+        assert!(
+            asked.load(Ordering::SeqCst),
+            "Limited tools must ask before an approved create_note: {:?}",
+            agent.events()
+        );
+        assert_eq!(
+            std::fs::read_to_string(&note).expect("approved create_note must write the note"),
+            "# Approved\n"
+        );
+        assert!(agent.events().iter().any(|event| {
+            matches!(
+                event,
+                DurableEvent::ToolResult { name, .. } if name == "create_note"
+            )
+        }));
+    }
+
+    #[test]
     fn limited_tools_denies_shell() {
         let agent = AgentLoop::new();
         agent.set_permission_mode(AiAgentPermissionMode::Safe);

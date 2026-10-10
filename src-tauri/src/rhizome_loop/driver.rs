@@ -44,6 +44,12 @@ struct Shared {
     /// Names a test adds on top of `policy::offered_tools`. Production
     /// modes do not use this list.
     extra_offered: Vec<String>,
+    /// Vault roots for this run. Set once when the engine starts.
+    /// Not part of `ModelView`. Green `create_note` reads these.
+    #[allow(dead_code)]
+    vault_path: Option<String>,
+    #[allow(dead_code)]
+    vault_paths: Vec<String>,
     /// Shared and not mutexed for the whole wait. A cancelled prompt
     /// must not block the next ask.
     waiter: Option<ApprovalWaiter>,
@@ -111,6 +117,8 @@ impl AgentLoop {
                 grants: Vec::new(),
                 session_grants: Vec::new(),
                 extra_offered: Vec::new(),
+                vault_path: None,
+                vault_paths: Vec::new(),
                 waiter: None,
                 dismiss: None,
                 prompt_gen: 0,
@@ -142,6 +150,13 @@ impl AgentLoop {
 
     pub fn set_permission_mode(&self, mode: AiAgentPermissionMode) {
         self.lock().mode = mode;
+    }
+
+    /// Vault for this run. `create_note` uses it; it is not on `ModelView`.
+    pub fn set_vault(&self, vault_path: Option<String>, vault_paths: Vec<String>) {
+        let mut shared = self.lock();
+        shared.vault_path = vault_path;
+        shared.vault_paths = vault_paths;
     }
 
     pub fn set_approval_waiter(
