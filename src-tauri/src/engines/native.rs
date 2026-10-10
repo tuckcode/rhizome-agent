@@ -224,7 +224,7 @@ impl<M: Model> Engine for NativeEngine<M> {
                     }
                 }
             };
-            *wait_prompt.lock().expect("live prompt") = None;
+            release_live_prompt(&wait_prompt, &id);
             reply
         });
         let dismiss_prompt = Arc::clone(&live_prompt);
@@ -318,5 +318,36 @@ fn enqueue_approval(
     }
     if let Some(tx) = approval_tx.lock().expect("approval tx").as_ref() {
         let _ = tx.send((prompt_id.to_string(), reply));
+    }
+}
+
+/// Drop the live id only when it is still this waiter's prompt.
+/// An abandoned waiter must not clear a newer turn's id.
+fn release_live_prompt(live_prompt: &Arc<Mutex<Option<String>>>, prompt_id: &str) {
+    let mut live = live_prompt.lock().expect("live prompt");
+    if live.as_deref() == Some(prompt_id) {
+        *live = None;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn release_live_prompt_keeps_a_newer_id() {
+        let live = Arc::new(Mutex::new(Some("prompt_2".to_string())));
+        release_live_prompt(&live, "prompt_1");
+        assert_eq!(
+            live.lock().expect("live prompt").as_deref(),
+            Some("prompt_2")
+        );
+    }
+
+    #[test]
+    fn release_live_prompt_clears_its_own_id() {
+        let live = Arc::new(Mutex::new(Some("prompt_1".to_string())));
+        release_live_prompt(&live, "prompt_1");
+        assert_eq!(live.lock().expect("live prompt").as_deref(), None);
     }
 }

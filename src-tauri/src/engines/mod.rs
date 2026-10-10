@@ -476,6 +476,80 @@ mod tests {
     }
 
     #[test]
+    fn native_engine_later_approval_survives_abandoned_waiter() {
+        let vault = tempfile::tempdir().unwrap();
+        let note_b = vault.path().join("after.md");
+        let (tx_a, rx_a) = mpsc::channel();
+        let mut engine = NativeEngine::from_parts(
+            AgentLoop::new(),
+            FakeModel::script(vec![
+                vec![ScriptPart::Tool {
+                    name: "create_note".into(),
+                    args: serde_json::json!({
+                        "path": "first.md",
+                        "content": "# First\n",
+                    })
+                    .to_string(),
+                }],
+                vec![ScriptPart::Tool {
+                    name: "create_note".into(),
+                    args: serde_json::json!({
+                        "path": "after.md",
+                        "content": "# After\n",
+                    })
+                    .to_string(),
+                }],
+                vec![ScriptPart::Text("done".into())],
+            ]),
+        );
+        engine.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        engine.set_approval_timeout(Duration::from_millis(400));
+        let control = engine.control();
+        let (done_a, done_a_rx) = mpsc::channel();
+        thread::spawn(move || {
+            engine
+                .start(
+                    "first",
+                    Box::new(move |event| {
+                        let _ = tx_a.send(event);
+                    }),
+                )
+                .ok();
+            let _ = done_a.send(engine);
+        });
+        let _first = wait_for_approval(&rx_a);
+        control.cancel("quit");
+        let mut engine = done_a_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("cancelled first turn must end");
+        let (tx_b, rx_b) = mpsc::channel();
+        let (done_b, done_b_rx) = mpsc::channel();
+        let control = engine.control();
+        thread::spawn(move || {
+            engine
+                .start(
+                    "second",
+                    Box::new(move |event| {
+                        let _ = tx_b.send(event);
+                    }),
+                )
+                .ok();
+            let _ = done_b.send(engine.events());
+        });
+        let second = wait_for_approval(&rx_b);
+        thread::sleep(Duration::from_millis(80));
+        control.reply_approval(&second.prompt_id, ApprovalReply::AllowOnce);
+        done_b_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("second allow must finish after the abandoned waiter");
+        assert_eq!(std::fs::read_to_string(&note_b).unwrap(), "# After\n");
+        assert!(!vault.path().join("first.md").exists());
+    }
+
+    #[test]
     fn native_engine_steer_waits_for_idle() {
         let control = Arc::new(Mutex::new(None::<super::NativeControl>));
         let slot = Arc::clone(&control);
