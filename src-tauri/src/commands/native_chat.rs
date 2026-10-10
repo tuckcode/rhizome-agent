@@ -585,7 +585,7 @@ mod tests {
             let path = chats.path_for(&id).expect("native path");
             assert!(
                 path.starts_with(NATIVE_SESSION_PREFIX),
-                "path must be Rhizome-owned: {path}"
+                "path must be Rhizome-owned"
             );
             let document = session_transcript_index::load().expect("load");
             let record = document
