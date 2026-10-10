@@ -18,6 +18,7 @@
     "prime:surface": "node scripts/check-prime-surface.mjs",
     "prime:surface:github": "node scripts/check-prime-surface.mjs --github",
     "deadcode": "knip",
+    "live-ui": "node scripts/live-ui.mjs",
     "perf:editor": "node scripts/editor-performance-benchmark.mjs",
     "perf:editor:update": "node scripts/editor-performance-benchmark.mjs --update",
     "preview": "vite preview",

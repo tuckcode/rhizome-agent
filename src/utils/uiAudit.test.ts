@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { auditUi } from './uiAudit'
+import { auditUi, classifyWell } from './uiAudit'
 
 /**
  * Each case here is a defect that was actually found the slow way first —
@@ -171,5 +171,45 @@ describe('auditUi', () => {
     sized(b, { x: 80, y: 0, w: 60, h: 30 })
 
     expect(auditUi(host)).toEqual([])
+  })
+})
+
+/**
+ * The decision part of `snapshotUi`, given the numbers a browser measured.
+ * Real layout is tested in `tests/smoke/live-ui.spec.ts`, because jsdom has
+ * no layout engine and reports 0 for every height.
+ */
+describe('classifyWell', () => {
+  it('reports a scroller whose content fits as unable to scroll', () => {
+    // The Chat transcript bug: `overflow-y: auto`, but the box grew to fit.
+    expect(classifyWell({ overflowY: 'auto', scrollHeight: 640, clientHeight: 640 })).toEqual({
+      canScroll: false,
+      reason: 'no-overflow',
+    })
+  })
+
+  it('reports a scroller with taller content as able to scroll', () => {
+    expect(classifyWell({ overflowY: 'scroll', scrollHeight: 1000, clientHeight: 200 })).toEqual({
+      canScroll: true,
+      reason: 'scrolls',
+    })
+  })
+
+  it('reports a box that hides taller content as clipped', () => {
+    expect(classifyWell({ overflowY: 'hidden', scrollHeight: 1000, clientHeight: 200 })).toEqual({
+      canScroll: false,
+      reason: 'clipped',
+    })
+    expect(classifyWell({ overflowY: 'clip', scrollHeight: 1000, clientHeight: 200 })?.reason).toBe('clipped')
+  })
+
+  it('ignores a box that is not a scroller and hides nothing', () => {
+    expect(classifyWell({ overflowY: 'hidden', scrollHeight: 200, clientHeight: 200 })).toBeNull()
+    expect(classifyWell({ overflowY: 'visible', scrollHeight: 1000, clientHeight: 200 })).toBeNull()
+  })
+
+  it('treats a 1px rounding difference as no overflow', () => {
+    expect(classifyWell({ overflowY: 'auto', scrollHeight: 201, clientHeight: 200 })?.reason).toBe('no-overflow')
+    expect(classifyWell({ overflowY: 'hidden', scrollHeight: 201, clientHeight: 200 })).toBeNull()
   })
 })

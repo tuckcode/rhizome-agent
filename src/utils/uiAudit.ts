@@ -204,6 +204,121 @@ function overlappingControls(controls: HTMLElement[]): UiAuditFinding[] {
   return findings
 }
 
+/** Why a box is in the snapshot's well list. */
+export type UiWellReason = 'scrolls' | 'no-overflow' | 'clipped'
+
+export interface UiWellMetrics {
+  overflowY: string
+  scrollHeight: number
+  clientHeight: number
+}
+
+export interface UiWell extends UiWellMetrics {
+  label: string
+  testId?: string
+  width: number
+  height: number
+  canScroll: boolean
+  reason: UiWellReason
+}
+
+export interface UiControl {
+  role: string
+  label: string
+  testId?: string
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface UiSnapshot {
+  wells: UiWell[]
+  controls: UiControl[]
+}
+
+/** Sub-pixel layout can leave 1px between the two heights with nothing hidden. */
+const OVERFLOW_SLACK_PX = 1
+
+/**
+ * Whether a box scrolls, from the numbers a browser measured. `null` means the
+ * box is not worth reporting: it is not a scroller and it hides nothing.
+ *
+ * - `scrolls`: a scroller with more content than room.
+ * - `no-overflow`: a scroller whose content fits. Often fine (a short list).
+ *   It is also the Chat transcript bug: the box grew with its content, so
+ *   `overflow-y: auto` never had anything to overflow.
+ * - `clipped`: a box that hides content and cannot scroll. Whatever is below
+ *   the fold is out of reach.
+ */
+export function classifyWell(
+  metrics: UiWellMetrics,
+): { canScroll: boolean; reason: UiWellReason } | null {
+  const overflows = metrics.scrollHeight - metrics.clientHeight > OVERFLOW_SLACK_PX
+  if (metrics.overflowY === 'auto' || metrics.overflowY === 'scroll') {
+    return overflows ? { canScroll: true, reason: 'scrolls' } : { canScroll: false, reason: 'no-overflow' }
+  }
+  if ((metrics.overflowY === 'hidden' || metrics.overflowY === 'clip') && overflows) {
+    return { canScroll: false, reason: 'clipped' }
+  }
+  return null
+}
+
+/**
+ * What is on screen, as data an agent can read instead of a screenshot: every
+ * scroll well and every visible control, with sizes. `pnpm live-ui` (#50)
+ * prints it. Read-only, like `auditUi`. Run it in a real browser, because
+ * jsdom measures every box as 0.
+ */
+export function snapshotUi(root: ParentNode = document): UiSnapshot {
+  const wells = [...root.querySelectorAll<HTMLElement>('*')].filter(isVisible).flatMap((node) => {
+    const metrics = {
+      overflowY: getComputedStyle(node).overflowY,
+      scrollHeight: node.scrollHeight,
+      clientHeight: node.clientHeight,
+    }
+    const verdict = classifyWell(metrics)
+    if (!verdict) return []
+    const { width, height } = node.getBoundingClientRect()
+    return [
+      {
+        label: boxName(node),
+        testId: node.dataset.testid,
+        width: Math.round(width),
+        height: Math.round(height),
+        ...metrics,
+        ...verdict,
+      },
+    ]
+  })
+  const controls = [...root.querySelectorAll<HTMLElement>(INTERACTIVE_SELECTOR)]
+    .filter(isVisible)
+    .map((node) => {
+      const box = node.getBoundingClientRect()
+      return {
+        role: node.getAttribute('role') ?? node.tagName.toLowerCase(),
+        label: accessibleName(node),
+        testId: node.dataset.testid,
+        x: Math.round(box.x),
+        y: Math.round(box.y),
+        width: Math.round(box.width),
+        height: Math.round(box.height),
+      }
+    })
+  return { wells, controls }
+}
+
+/**
+ * A short name for a container. Not its text: a transcript's text is the
+ * whole conversation.
+ */
+function boxName(node: HTMLElement): string {
+  const named = node.getAttribute('aria-label') ?? node.dataset.testid ?? node.getAttribute('role')
+  if (named) return named
+  const firstClass = node.classList[0]
+  return firstClass ? `${node.tagName.toLowerCase()}.${firstClass}` : node.tagName.toLowerCase()
+}
+
 /**
  * The corner radius, however it was authored.
  *
