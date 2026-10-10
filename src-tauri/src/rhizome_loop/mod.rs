@@ -1044,7 +1044,10 @@ mod tests {
         let mut later = FakeModel::saying("nope");
         agent.submit("later");
         agent.run_until_idle(&mut later);
-        assert!(later.seen.is_empty(), "quit must keep refusing later submits");
+        assert!(
+            later.seen.is_empty(),
+            "quit must keep refusing later submits"
+        );
     }
 
     #[test]

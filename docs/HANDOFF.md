@@ -47,7 +47,7 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Grok 4.6 · 2026-10-10 · Phase 3 Rhizome loop: Model trait, cancel stops reading, tool-call ids, step order. Chat stays on Prime. Not installed. [Handoff](plans/handoffs/2026-10-10-0548-cursor-grok-4-6-harness-phase-3.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-10 · Phase 3 loop: cancel/quit end a pending approval. Chat stays on Prime. Not installed. [Handoff](plans/handoffs/2026-10-10-0648-cursor-grok-4-6-approval-cancel.md).
 **Origin:** Cursor Grok 4.7 · 2026-10-10 · Phase 2 Rhizome loop: tools, Limited tools vs Power User, cancel reset. Chat stays on Prime. Not installed. [Handoff](plans/handoffs/2026-10-10-0135-cursor-grok-4-7-harness-phase-2.md).
 **Origin:** Cursor Grok 4.7 · 2026-10-10 · Phase 1 Rhizome loop (fake model, four behavior tests). Chat stays on Prime. Not installed. [Handoff](plans/handoffs/2026-10-10-0045-cursor-grok-4-7-harness-phase-1.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-09 · Chat stays Working after agent_end when Prime keeps emitting agent_status. Host ignores that noise; composer spinner only. [Handoff](plans/handoffs/2026-10-09-2335-cursor-grok-4-6-stuck-working.md).
@@ -131,7 +131,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
-- [2026-10-10 · phase 3 loop](plans/handoffs/2026-10-10-0548-cursor-grok-4-6-harness-phase-3.md) — Model trait, cancel stops reading, tool-call ids, step order. Chat stays on Prime.
+- [2026-10-10 · approval cancel](plans/handoffs/2026-10-10-0648-cursor-grok-4-6-approval-cancel.md) — cancel/quit end a blocked approval wait. Chat stays on Prime.
 - [2026-10-10 · phase 2 tools](plans/handoffs/2026-10-10-0135-cursor-grok-4-7-harness-phase-2.md) — loop tools, Limited tools vs Power User, cancel reset. Chat stays on Prime.
 - [2026-10-10 · phase 1 loop](plans/handoffs/2026-10-10-0045-cursor-grok-4-7-harness-phase-1.md) — bare Rhizome loop and four behavior tests. Chat stays on Prime. Not in the app.
 - [2026-10-09 · stuck Working](plans/handoffs/2026-10-09-2335-cursor-grok-4-6-stuck-working.md) — post-`agent_end` status noise cancelled the follow-up grace; composer no longer prints last tool.

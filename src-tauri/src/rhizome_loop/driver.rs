@@ -1,5 +1,8 @@
 use std::collections::VecDeque;
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::thread;
+use std::time::Duration;
 
 use crate::ai_agents::AiAgentPermissionMode;
 use crate::model_events::ModelEvent;
@@ -398,12 +401,17 @@ impl AgentLoop {
     }
 
     fn ask_then_finish(&self, id: &str, name: &str, args: &str) {
-        let mut waiter = self.lock().waiter.take();
-        let reply = match waiter.as_mut() {
-            Some(wait) => wait(name),
-            None => ApprovalReply::Cancelled,
-        };
-        self.lock().waiter = waiter;
+        if self.is_cancelled() {
+            self.record_denial(id, name, "cancelled".into());
+            return;
+        }
+        let reply = self.wait_for_approval(name);
+        // Cancel or quit can land while the waiter is blocked, or just
+        // after it returns. Either way the tool does not run.
+        if self.is_cancelled() {
+            self.record_denial(id, name, "cancelled".into());
+            return;
+        }
         match reply {
             ApprovalReply::AllowOnce => self.record_run(id, name, args, name != "bash"),
             ApprovalReply::AllowSession => {
@@ -412,6 +420,38 @@ impl AgentLoop {
             }
             ApprovalReply::Deny | ApprovalReply::Cancelled => {
                 self.record_denial(id, name, "approval cancelled".into());
+            }
+        }
+    }
+
+    /// Runs the waiter off-thread so cancel/quit can end the wait
+    /// without waiting for a human reply.
+    fn wait_for_approval(&self, name: &str) -> ApprovalReply {
+        let Some(mut wait) = self.lock().waiter.take() else {
+            return ApprovalReply::Cancelled;
+        };
+        let (tx, rx) = mpsc::channel();
+        let asked = name.to_string();
+        thread::spawn(move || {
+            let reply = wait(&asked);
+            let _ = tx.send((wait, reply));
+        });
+        loop {
+            if self.is_cancelled() {
+                if let Ok((wait, _)) = rx.try_recv() {
+                    self.lock().waiter = Some(wait);
+                }
+                return ApprovalReply::Cancelled;
+            }
+            match rx.recv_timeout(Duration::from_millis(10)) {
+                Ok((wait, reply)) => {
+                    self.lock().waiter = Some(wait);
+                    return reply;
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    return ApprovalReply::Cancelled;
+                }
             }
         }
     }
