@@ -155,8 +155,13 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             budget,
             limits,
             inner,
-            observer: _,
+            observer,
         } = self;
+        let mut report = |attempt: ProviderAttempt| {
+            if let Some(observer) = observer.as_mut() {
+                observer(attempt);
+            }
+        };
         let started = clock.now_ms();
         let mut tried = 0;
         let mut keyed = false;
@@ -191,32 +196,53 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             }
             tried += 1;
 
+            let provider_id = provider.id.clone();
+            let model_id = target.model.clone();
+            report(ProviderAttempt::Trying {
+                provider_id: provider_id.clone(),
+                model_id: model_id.clone(),
+            });
             let request = provider_request(provider, &target.model, base_url, credential);
             let model = inner.get_or_insert_with(|| ProviderModel::new(request.clone(), *limits));
             model.retarget(request, provider.tool_params.clone());
-            match run_attempt(model, view, emit) {
+            let mut on_first_output = || {
+                report(ProviderAttempt::Answered {
+                    provider_id: provider_id.clone(),
+                    model_id: model_id.clone(),
+                })
+            };
+            match run_attempt(model, view, emit, &mut on_first_output) {
                 Outcome::Finished => {
                     health.record_success(&attempt);
                     return true;
                 }
                 Outcome::FailedAfterOutput(error) => {
                     health.record_failure(&attempt, &error, clock.now_ms());
+                    report(ProviderAttempt::FailedAfterOutput {
+                        provider_id,
+                        model_id,
+                        reason: error.kind,
+                    });
                     return true;
                 }
                 Outcome::Stopped => return true,
                 Outcome::FailedEarly(error) => {
                     health.record_failure(&attempt, &error, clock.now_ms());
+                    report(ProviderAttempt::FailedOver {
+                        provider_id,
+                        model_id,
+                        reason: error.kind.clone(),
+                    });
                     last_error = Some(error);
                 }
             }
         }
 
-        emit(ModelEvent::Error(exhausted(
-            last_error,
-            reopens_at,
-            keyed,
-            clock.now_ms(),
-        )));
+        let error = exhausted(last_error, reopens_at, keyed, clock.now_ms());
+        report(ProviderAttempt::Exhausted {
+            reason: error.kind.clone(),
+        });
+        emit(ModelEvent::Error(error));
         true
     }
 }
@@ -233,11 +259,13 @@ enum Outcome {
 }
 
 /// Holds back a first-event `Error` so the router can fail over. Every
-/// other event goes to the loop at once.
+/// other event goes to the loop at once. `on_first_output` runs once, when
+/// the first event reaches the loop.
 fn run_attempt(
     model: &mut ProviderModel,
     view: &ModelView,
     emit: &mut dyn FnMut(ModelEvent) -> bool,
+    on_first_output: &mut dyn FnMut(),
 ) -> Outcome {
     let mut started = false;
     let mut outcome = Outcome::Stopped;
@@ -248,6 +276,7 @@ fn run_attempt(
                 return false;
             }
             started = true;
+            on_first_output();
         }
         match &event {
             ModelEvent::Error(error) => outcome = Outcome::FailedAfterOutput(error.clone()),
