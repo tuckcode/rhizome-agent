@@ -5,6 +5,14 @@ export interface FreeTierSettings {
   disabled: string[]
   optIn: string[]
   strict: boolean
+  /** A saved provider id tried last, or null for none. */
+  ownEndpoint: string | null
+}
+
+/** A saved provider that can be the own endpoint. Mirrors `EndpointChoice`. */
+export interface EndpointChoice {
+  id: string
+  name: string
 }
 
 /** One provider row. Mirrors `FreeTierProviderRow`. Never holds a key. */
@@ -26,7 +34,12 @@ export interface FreeTierOverview {
   strict: boolean
   routeOrder: string[]
   usable: boolean
+  ownEndpoint: string | null
+  endpointChoices: EndpointChoice[]
 }
+
+/** The router's id for the own endpoint in `routeOrder`. Mirrors `USER_ENDPOINT_ID`. */
+export const OWN_ENDPOINT_ROUTE_ID = 'custom'
 
 export function getFreeTierOverview(): Promise<FreeTierOverview> {
   return callHost<FreeTierOverview>('get_free_tier_overview')
@@ -47,5 +60,6 @@ export function settingsFromOverview(overview: FreeTierOverview): FreeTierSettin
     disabled: overview.providers.filter((row) => row.defaultOn && !row.enabled).map((row) => row.id),
     optIn: overview.providers.filter((row) => !row.defaultOn && row.enabled).map((row) => row.id),
     strict: overview.strict,
+    ownEndpoint: overview.ownEndpoint,
   }
 }

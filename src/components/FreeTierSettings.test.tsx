@@ -56,6 +56,11 @@ function overview(patch: Partial<FreeTierOverview> = {}): FreeTierOverview {
     strict: false,
     routeOrder: ['groq'],
     usable: true,
+    ownEndpoint: null,
+    endpointChoices: [
+      { id: 'lm_studio-pc', name: 'LM Studio on PC' },
+      { id: 'ollama-home', name: 'Ollama' },
+    ],
     ...patch,
   }
 }
@@ -91,7 +96,7 @@ describe('FreeTierSettings', () => {
     fireEvent.click(within(screen.getByTestId('free-tier-row-mistral')).getByRole('switch'))
 
     await waitFor(() =>
-      expect(saveSettingsMock).toHaveBeenCalledWith({ disabled: ['mistral'], optIn: [], strict: false }),
+      expect(saveSettingsMock).toHaveBeenCalledWith({ disabled: ['mistral'], optIn: [], strict: false, ownEndpoint: null }),
     )
     expect(trackEventMock).toHaveBeenCalledWith('free_tier_provider_toggled', {
       provider_id: 'mistral',
@@ -108,7 +113,7 @@ describe('FreeTierSettings', () => {
     expect(saveSettingsMock).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Turn on' }))
     await waitFor(() =>
-      expect(saveSettingsMock).toHaveBeenCalledWith({ disabled: [], optIn: ['cloudflare-ai'], strict: false }),
+      expect(saveSettingsMock).toHaveBeenCalledWith({ disabled: [], optIn: ['cloudflare-ai'], strict: false, ownEndpoint: null }),
     )
   })
 
@@ -127,7 +132,7 @@ describe('FreeTierSettings', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'Strict mode' }))
 
     await waitFor(() =>
-      expect(saveSettingsMock).toHaveBeenCalledWith({ disabled: [], optIn: [], strict: true }),
+      expect(saveSettingsMock).toHaveBeenCalledWith({ disabled: [], optIn: [], strict: true, ownEndpoint: null }),
     )
   })
 
@@ -160,5 +165,51 @@ describe('FreeTierSettings', () => {
     await renderLoaded(overview({ usable: false, routeOrder: [] }))
 
     expect(screen.getByText('Add a key to at least one provider to use Free tier (auto).')).toBeInTheDocument()
+  })
+
+  it('picks the own endpoint from a dropdown of saved providers', async () => {
+    await renderLoaded()
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Own endpoint' }))
+    expect(screen.getByRole('option', { name: 'None' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('option', { name: 'LM Studio on PC' }))
+
+    await waitFor(() =>
+      expect(saveSettingsMock).toHaveBeenCalledWith({
+        disabled: [],
+        optIn: [],
+        strict: false,
+        ownEndpoint: 'lm_studio-pc',
+      }),
+    )
+  })
+
+  it('clears the own endpoint with None', async () => {
+    await renderLoaded(overview({ ownEndpoint: 'ollama-home' }))
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Own endpoint' }))
+    fireEvent.click(screen.getByRole('option', { name: 'None' }))
+
+    await waitFor(() =>
+      expect(saveSettingsMock).toHaveBeenCalledWith({ disabled: [], optIn: [], strict: false, ownEndpoint: null }),
+    )
+  })
+
+  it('names the own endpoint in the fallback order', async () => {
+    await renderLoaded(overview({ ownEndpoint: 'lm_studio-pc', routeOrder: ['groq', 'custom'] }))
+
+    const order = screen.getByTestId('free-tier-route-order')
+    expect(within(order).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'Groq',
+      'LM Studio on PC',
+    ])
+  })
+
+  it('explains where own endpoints come from when none is saved', async () => {
+    await renderLoaded(overview({ endpointChoices: [] }))
+
+    expect(
+      screen.getByText('Add a local or OpenAI-compatible provider above to pick it here.'),
+    ).toBeInTheDocument()
   })
 })
