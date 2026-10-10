@@ -107,6 +107,7 @@ pub struct RoutingModel<K: KeyStore, C: Clock> {
     limits: HttpLimits,
     inner: Option<ProviderModel>,
     observer: Option<AttemptObserver>,
+    system_prompt: Option<String>,
 }
 
 impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
@@ -121,7 +122,20 @@ impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
             limits,
             inner: None,
             observer: None,
+            system_prompt: None,
         }
+    }
+
+    /// Persona / profile for every attempt. Catalog `ProviderModel`
+    /// already takes this on the stream request; free-tier must too.
+    pub fn with_system_prompt(mut self, system_prompt: Option<String>) -> Self {
+        self.system_prompt = system_prompt;
+        self
+    }
+
+    #[cfg(test)]
+    pub fn system_prompt(&self) -> Option<&str> {
+        self.system_prompt.as_deref()
     }
 
     /// Reports each provider attempt, for the Chat activity line (step
@@ -157,6 +171,7 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             limits,
             inner,
             observer,
+            system_prompt,
         } = self;
         let mut report = |attempt: ProviderAttempt| {
             if let Some(observer) = observer.as_mut() {
@@ -203,7 +218,8 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
                 provider_id: provider_id.clone(),
                 model_id: model_id.clone(),
             });
-            let request = provider_request(provider, &target.model, base_url, credential);
+            let mut request = provider_request(provider, &target.model, base_url, credential);
+            request.system_prompt = system_prompt.clone();
             let model = inner.get_or_insert_with(|| ProviderModel::new(request.clone(), *limits));
             model.retarget(request, provider.tool_params.clone());
             let mut on_first_output = || {
@@ -521,6 +537,23 @@ mod tests {
         let sent = &second.requests.lock().unwrap()[0].1;
         let body: Value = serde_json::from_str(sent).unwrap();
         assert_eq!(body["model"], "b-model");
+    }
+
+    #[test]
+    fn a_system_prompt_is_prepended_to_the_first_request() {
+        let server = serve(vec![reply("ok")]);
+        let mut router = RoutingModel::new(
+            catalog(&[("a", &server.base_url)]),
+            keys(&["a"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        )
+        .with_system_prompt(Some("Be brief.".into()));
+        assert_eq!(run(&mut router), done("ok"));
+        let sent = &server.requests.lock().unwrap()[0].1;
+        let body: Value = serde_json::from_str(sent).unwrap();
+        assert_eq!(body["messages"][0]["role"], "system");
+        assert_eq!(body["messages"][0]["content"], "Be brief.");
     }
 
     #[test]

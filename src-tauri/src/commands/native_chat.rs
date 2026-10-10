@@ -306,6 +306,20 @@ fn composed_system_prompt(existing: Option<&str>) -> Option<String> {
     settings::compose_agent_profile(settings::saved_agent_profile().as_deref(), existing)
 }
 
+fn free_tier_routing_model(
+    system: Option<String>,
+    observer: impl FnMut(crate::rhizome_routing::ProviderAttempt) + Send + 'static,
+) -> RoutingModel<SecretsKeyStore, SystemClock> {
+    RoutingModel::new(
+        Catalog::pinned(),
+        SecretsKeyStore,
+        SystemClock,
+        HttpLimits::STREAM,
+    )
+    .with_observer(observer)
+    .with_system_prompt(system)
+}
+
 fn catalog_provider(kind: AiModelProviderKind, id: &str) -> AiModelProvider {
     AiModelProvider {
         id: id.to_string(),
@@ -365,13 +379,7 @@ fn start_named_request(
         NativeChatTarget::FreeTier => {
             let (tx, rx) = mpsc::channel();
             let reporter = tx.clone();
-            let model = RoutingModel::new(
-                Catalog::pinned(),
-                SecretsKeyStore,
-                SystemClock,
-                HttpLimits::STREAM,
-            )
-            .with_observer(move |attempt| {
+            let model = free_tier_routing_model(system, move |attempt| {
                 let _ = reporter.send(attempt);
             });
             let mut engine = NativeEngine::with_provider_pair(AgentLoop::new(), model, tx, rx);
@@ -448,8 +456,28 @@ mod tests {
     use crate::engines::{NativeEngine, PrimeEngine};
     use crate::rhizome_loop::{AgentLoop, FakeModel};
     use crate::session_transcript_index::{self, IndexedTranscriptTurn};
+    use std::panic::{catch_unwind, AssertUnwindSafe};
     use std::sync::mpsc;
     use std::time::Instant;
+
+    static HOME_LOCK: Mutex<()> = Mutex::new(());
+
+    fn with_temp_home<T>(body: impl FnOnce(&tempfile::TempDir) -> T) -> T {
+        let _guard = HOME_LOCK.lock().expect("home lock");
+        let home = tempfile::tempdir().unwrap();
+        let previous = std::env::var("HOME").ok();
+        std::env::set_var("HOME", home.path());
+        let result = catch_unwind(AssertUnwindSafe(|| body(&home)));
+        if let Some(value) = previous {
+            std::env::set_var("HOME", value);
+        } else {
+            std::env::remove_var("HOME");
+        }
+        match result {
+            Ok(value) => value,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
+    }
 
     #[test]
     fn native_chat_start_emits_text_on_the_scoped_channel() {
@@ -493,6 +521,27 @@ mod tests {
         assert_eq!(model_kind_for_target(&target), "routing");
         let auto = resolve_native_target(FREE_TIER_TARGET).expect("id");
         assert_eq!(auto, NativeChatTarget::FreeTier);
+    }
+
+    #[test]
+    fn free_tier_start_sends_composed_system_prompt() {
+        let request = NativeChatStartRequest {
+            target: FREE_TIER_LABEL.to_string(),
+            prompt: "hi".into(),
+            system_prompt: Some("Use the vault.".into()),
+            vault_path: None,
+            vault_paths: Vec::new(),
+            permission_mode: AiAgentPermissionMode::default(),
+        };
+        let expected = composed_system_prompt(request.system_prompt.as_deref());
+        assert!(
+            expected
+                .as_deref()
+                .is_some_and(|text| text.contains("Use the vault.")),
+            "compose must keep the turn system prompt"
+        );
+        let model = free_tier_routing_model(expected.clone(), |_| {});
+        assert_eq!(model.system_prompt(), expected.as_deref());
     }
 
     #[test]
@@ -611,23 +660,17 @@ mod tests {
 
     #[test]
     fn native_chat_writes_nothing_under_prime_home() {
-        let home = tempfile::tempdir().unwrap();
-        let previous = std::env::var("HOME").ok();
-        std::env::set_var("HOME", home.path());
-        let chats = NativeChats::new();
-        chats
-            .start_with_engine("hi", NativeEngine::saying("ok"), |_| {})
-            .expect("start");
-        thread::sleep(Duration::from_millis(80));
-        if let Some(value) = previous {
-            std::env::set_var("HOME", value);
-        } else {
-            std::env::remove_var("HOME");
-        }
-        assert!(
-            !home.path().join(".prime").exists(),
-            "native chat must not write under ~/.prime"
-        );
+        with_temp_home(|home| {
+            let chats = NativeChats::new();
+            chats
+                .start_with_engine("hi", NativeEngine::saying("ok"), |_| {})
+                .expect("start");
+            thread::sleep(Duration::from_millis(80));
+            assert!(
+                !home.path().join(".prime").exists(),
+                "native chat must not write under ~/.prime"
+            );
+        });
     }
 
     #[test]
