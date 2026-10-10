@@ -52,14 +52,14 @@ pub struct MigrationReport {
 
 pub struct ProviderKeys {
     backend: Box<dyn SecretBackend>,
-    legacy_file: PathBuf,
+    legacy: LegacyFile,
 }
 
 impl ProviderKeys {
     pub fn new(backend: Box<dyn SecretBackend>, legacy_file: PathBuf) -> Self {
         Self {
             backend,
-            legacy_file,
+            legacy: LegacyFile { path: legacy_file },
         }
     }
 
@@ -81,7 +81,7 @@ impl ProviderKeys {
                 // A locked or missing keychain must not break a key that
                 // still sits in the legacy file.
                 log::warn!("provider key lookup for {id} fell back to the legacy file: {error}");
-                return self.legacy_key(&id);
+                return self.legacy.key(&id);
             }
         };
         match self.migrate_one(&id, stored.as_deref())? {
@@ -104,24 +104,20 @@ impl ProviderKeys {
                 "The keychain did not return the key just saved for {id}. Nothing else changed."
             ));
         }
-        self.remove_from_legacy(&id)
+        self.legacy.remove(&id)
     }
 
     /// Removes the key from the keychain and from the legacy file.
     pub fn delete(&self, provider_id: &str) -> Result<(), String> {
         let id = normalize_id(provider_id)?;
         self.backend.delete(&id)?;
-        self.remove_from_legacy(&id)
+        self.legacy.remove(&id)
     }
 
     /// Moves every legacy file key into the keychain.
     pub fn migrate_all(&self) -> Result<MigrationReport, String> {
         let mut report = MigrationReport::default();
-        let ids: Vec<String> = read_legacy(&self.legacy_file)?
-            .provider_api_keys
-            .into_keys()
-            .collect();
-        for id in ids {
+        for id in self.legacy.ids()? {
             let stored = match self.backend.get(&id) {
                 Ok(stored) => stored,
                 Err(error) => {
@@ -141,13 +137,13 @@ impl ProviderKeys {
     /// One key: write, read back, then remove the file copy (ADR-0183).
     /// `stored` is what the keychain holds for `id` now.
     fn migrate_one(&self, id: &str, stored: Option<&str>) -> Result<Step, String> {
-        let Some(file_key) = self.legacy_key(id)? else {
+        let Some(file_key) = self.legacy.key(id)? else {
             return Ok(Step::NoFileKey);
         };
         match stored {
             // The crash case: the write landed, the file update did not.
             Some(stored) if stored == file_key => {
-                self.remove_from_legacy(id)?;
+                self.legacy.remove(id)?;
                 return Ok(Step::Moved(file_key));
             }
             Some(stored) => {
@@ -164,7 +160,7 @@ impl ProviderKeys {
         }
         match self.backend.get(id) {
             Ok(Some(read_back)) if read_back == file_key => {
-                self.remove_from_legacy(id)?;
+                self.legacy.remove(id)?;
                 Ok(Step::Moved(file_key))
             }
             Ok(_) => {
@@ -177,9 +173,24 @@ impl ProviderKeys {
             Err(error) => Ok(Step::Kept(file_key, error)),
         }
     }
+}
 
-    fn legacy_key(&self, id: &str) -> Result<Option<String>, String> {
-        Ok(read_legacy(&self.legacy_file)?
+/// The legacy `ai-provider-secrets.json` file: a compatibility path that
+/// only ever loses keys (ADR-0183, ADR-0184).
+struct LegacyFile {
+    path: PathBuf,
+}
+
+impl LegacyFile {
+    fn ids(&self) -> Result<Vec<String>, String> {
+        Ok(read_legacy(&self.path)?
+            .provider_api_keys
+            .into_keys()
+            .collect())
+    }
+
+    fn key(&self, id: &str) -> Result<Option<String>, String> {
+        Ok(read_legacy(&self.path)?
             .provider_api_keys
             .get(id)
             .map(|key| key.trim().to_string())
@@ -187,16 +198,16 @@ impl ProviderKeys {
     }
 
     /// Deletes the file when the last key leaves it.
-    fn remove_from_legacy(&self, id: &str) -> Result<(), String> {
-        let mut secrets = read_legacy(&self.legacy_file)?;
+    fn remove(&self, id: &str) -> Result<(), String> {
+        let mut secrets = read_legacy(&self.path)?;
         if secrets.provider_api_keys.remove(id).is_none() {
             return Ok(());
         }
         if secrets.provider_api_keys.is_empty() {
-            return std::fs::remove_file(&self.legacy_file)
+            return std::fs::remove_file(&self.path)
                 .map_err(|error| format!("Failed to remove the legacy key file: {error}"));
         }
-        write_legacy(&self.legacy_file, &secrets)
+        write_legacy(&self.path, &secrets)
     }
 }
 
@@ -394,6 +405,12 @@ mod tests {
                     .insert(account.to_string(), value.to_string());
             }
             backend
+        }
+    }
+
+    fn demo_secrets() -> LegacySecrets {
+        LegacySecrets {
+            provider_api_keys: BTreeMap::from([("demo".into(), "fixture-only".into())]),
         }
     }
 
@@ -649,9 +666,7 @@ mod tests {
     fn the_legacy_file_round_trips_and_is_owner_only() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("nested").join(LEGACY_FILE_NAME);
-        let secrets = LegacySecrets {
-            provider_api_keys: BTreeMap::from([("a".into(), "fixture-only".into())]),
-        };
+        let secrets = demo_secrets();
 
         write_legacy(&path, &secrets).unwrap();
 
@@ -695,9 +710,7 @@ mod tests {
         let path = dir.path().join(LEGACY_FILE_NAME);
         std::fs::write(&outside, "{\"marker\":\"RHIZOME_R3_OUTSIDE\"}\n").unwrap();
         symlink(&outside, &path).unwrap();
-        let secrets = LegacySecrets {
-            provider_api_keys: BTreeMap::from([("demo".into(), "fixture-only".into())]),
-        };
+        let secrets = demo_secrets();
 
         write_legacy(&path, &secrets).unwrap();
 
@@ -718,9 +731,7 @@ mod tests {
         let path = dir.path().join(LEGACY_FILE_NAME);
         std::fs::write(&path, "{}").unwrap();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
-        let secrets = LegacySecrets {
-            provider_api_keys: BTreeMap::from([("demo".into(), "fixture-only".into())]),
-        };
+        let secrets = demo_secrets();
 
         write_legacy(&path, &secrets).unwrap();
 
@@ -735,10 +746,11 @@ mod tests {
 
         assert!(
             !keys
-                .legacy_file
+                .legacy
+                .path
                 .ends_with(Path::new("com.rhizome.app").join(LEGACY_FILE_NAME)),
             "test builds must not point at the real key file: {}",
-            keys.legacy_file.display()
+            keys.legacy.path.display()
         );
         keys.save("groq", "gsk-test").unwrap();
         assert_eq!(keys.get("groq").unwrap().as_deref(), Some("gsk-test"));
