@@ -30,6 +30,7 @@ pub mod mcp;
 pub mod menu;
 mod menu_bar_capture;
 mod menu_bar_companion;
+pub mod model_events;
 pub mod mycelium;
 pub mod mycelium_judge;
 pub mod mycelium_skin;
