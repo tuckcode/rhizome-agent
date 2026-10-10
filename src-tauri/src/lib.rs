@@ -38,6 +38,7 @@ pub mod opencode_cli;
 mod opencode_config;
 mod opencode_discovery;
 mod opencode_events;
+mod permission_decision;
 pub mod pi_cli;
 mod pi_config;
 mod pi_discovery;
@@ -65,6 +66,9 @@ pub mod rhizome_import;
 pub mod rhizome_jobs;
 pub mod rhizome_repo_research;
 pub mod rhizome_research_formats;
+// Phase 1 loop is test-only. Chat must not call it until the engine toggle.
+#[cfg(test)]
+mod rhizome_loop;
 pub mod rhizome_search;
 pub mod rhizome_vault_seed;
 pub mod rhizome_write_location;
