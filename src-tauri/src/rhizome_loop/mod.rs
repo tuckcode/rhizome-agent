@@ -1,6 +1,6 @@
 //! Rhizome-owned agent loop (ADR-0180, harness plan Phases 1–2.5).
 //!
-//! Chat does not call this module. `lib.rs` compiles it only for tests.
+//! Chat does not call this module. The engine toggle is Phase 6.
 //! One inbox, one turn at a time. A step is one model request plus
 //! the tools it called. The loop consumes `ModelEvent`. Cancel stops
 //! reading; the model has no `Cancelled` event. Tool-call `id`s stay
@@ -12,6 +12,7 @@
 //! code is copied.
 
 mod driver;
+#[cfg(test)]
 mod fake_model;
 mod model;
 mod policy;
@@ -19,6 +20,7 @@ mod tools;
 mod types;
 
 pub use driver::{AgentLoop, ApprovalReply, DEFAULT_STEP_CAP};
+#[cfg(test)]
 pub use fake_model::{FakeModel, ScriptPart};
 pub use model::Model;
 pub use types::{DurableEvent, HistoryItem, ModelView, ToolCall};
@@ -115,6 +117,7 @@ mod tests {
                 ModelView {
                     admitted: "A".into(),
                     history: vec![],
+                    turn_start: 0,
                     offered_tools: vec!["echo".into()],
                 },
                 ModelView {
@@ -126,6 +129,7 @@ mod tests {
                             tool_calls: vec![],
                         },
                     ],
+                    turn_start: 2,
                     offered_tools: vec!["echo".into()],
                 },
             ]

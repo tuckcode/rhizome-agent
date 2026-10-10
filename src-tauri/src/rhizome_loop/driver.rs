@@ -32,6 +32,7 @@ struct Shared {
     inbox: VecDeque<String>,
     log: Vec<DurableEvent>,
     history: Vec<HistoryItem>,
+    turn_start: usize,
     step_active: bool,
     cancel_cause: Option<String>,
     mode: AiAgentPermissionMode,
@@ -90,6 +91,12 @@ pub struct AgentLoop {
     shared: Arc<Mutex<Shared>>,
 }
 
+impl Default for AgentLoop {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AgentLoop {
     pub fn new() -> Self {
         Self {
@@ -97,6 +104,7 @@ impl AgentLoop {
                 inbox: VecDeque::new(),
                 log: Vec::new(),
                 history: Vec::new(),
+                turn_start: 0,
                 step_active: false,
                 cancel_cause: None,
                 mode: AiAgentPermissionMode::Safe,
@@ -235,6 +243,7 @@ impl AgentLoop {
         let history_mark = {
             let mut shared = self.lock();
             let mark = shared.history.len();
+            shared.turn_start = mark;
             shared.log.push(DurableEvent::User {
                 text: admitted.clone(),
             });
@@ -367,6 +376,7 @@ impl AgentLoop {
         ModelView {
             admitted: admitted.to_string(),
             history: shared.history.clone(),
+            turn_start: shared.turn_start,
             offered_tools: offered_names(&shared),
         }
     }

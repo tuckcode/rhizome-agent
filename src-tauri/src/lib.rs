@@ -67,10 +67,10 @@ pub mod rhizome_import;
 pub mod rhizome_jobs;
 pub mod rhizome_repo_research;
 pub mod rhizome_research_formats;
-// Phase 1 loop is test-only. Chat must not call it until the engine toggle.
-#[cfg(test)]
-mod rhizome_loop;
-// The provider-backed loop model. Test-only while `rhizome_loop` is.
+// Loop and engines compile now. Chat must not call them until Phase 6.
+pub mod engines;
+pub mod rhizome_loop;
+// Provider adapter from #105. Still test-only; Chat does not call it.
 #[cfg(test)]
 mod rhizome_provider_model;
 pub mod rhizome_search;
