@@ -607,6 +607,7 @@ mod tests {
         let catalog = catalog(&[("a", "http://a.test/v1")]).with_user_endpoint(UserEndpoint {
             base_url: "http://192.168.1.50:8080/v1".into(),
             model: "local".into(),
+            ..Default::default()
         });
 
         assert!(has_usable_target(
@@ -614,6 +615,22 @@ mod tests {
             &RoutingOptions::default(),
             &keys(&[])
         ));
+    }
+
+    #[test]
+    fn an_own_endpoint_reads_the_key_saved_under_its_own_provider_id() {
+        let catalog = catalog(&[]).with_user_endpoint(UserEndpoint {
+            base_url: "https://hosted.test/v1".into(),
+            model: "m".into(),
+            name: "Hosted".into(),
+            key_id: Some("open_ai_compatible-abc".into()),
+        });
+        let endpoint = catalog.providers.last().unwrap();
+
+        let (credential, _) = reachable(endpoint, &keys(&["open_ai_compatible-abc"])).unwrap();
+
+        assert_eq!(credential.unwrap().api_key, "test-open_ai_compatible-abc");
+        assert_eq!(endpoint.name, "Hosted");
     }
 
     #[test]
@@ -792,6 +809,7 @@ mod tests {
         let catalog = catalog(&[("a", &first.base_url)]).with_user_endpoint(UserEndpoint {
             base_url: lan.base_url.clone(),
             model: "qwen".into(),
+            ..Default::default()
         });
         let mut router = RoutingModel::new(catalog, keys(&["a"]), FakeClock::at(T0), TEST_LIMITS);
 

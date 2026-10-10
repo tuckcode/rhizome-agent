@@ -14,6 +14,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use super::{has_usable_target, Catalog, KeyStore, RoutingOptions};
+use crate::ai_models::AiModelProvider;
 
 /// The settings file name in the app config folder.
 pub const SETTINGS_FILE_NAME: &str = "free-tier-settings.json";
@@ -28,6 +29,35 @@ pub struct FreeTierSettings {
     /// Route only providers with a documented hard stop, plus the user
     /// endpoint.
     pub strict: bool,
+    /// The saved provider (Settings → AI) tried last, after the catalog.
+    /// `None` means no own endpoint.
+    pub own_endpoint: Option<String>,
+}
+
+/// A saved provider that can be the own endpoint.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EndpointChoice {
+    pub id: String,
+    pub name: String,
+}
+
+/// Saved providers that speak the OpenAI API with a model set: custom
+/// OpenAI-compatible, LM Studio, and Ollama. Hosted vendors stay out.
+pub fn endpoint_choices(providers: &[AiModelProvider]) -> Vec<EndpointChoice> {
+    let _ = providers;
+    Vec::new()
+}
+
+/// `catalog` with the chosen own endpoint added last. An id that no longer
+/// matches a usable saved provider is ignored.
+pub fn with_own_endpoint(
+    catalog: Catalog,
+    settings: &FreeTierSettings,
+    providers: &[AiModelProvider],
+) -> Catalog {
+    let _ = (settings, providers);
+    catalog
 }
 
 impl FreeTierSettings {
@@ -70,13 +100,17 @@ pub struct FreeTierOverview {
     pub route_order: Vec<String>,
     /// The router can try at least one provider (D11).
     pub usable: bool,
+    pub own_endpoint: Option<String>,
+    pub endpoint_choices: Vec<EndpointChoice>,
 }
 
 pub fn overview(
     catalog: &Catalog,
     settings: &FreeTierSettings,
+    providers_saved: &[AiModelProvider],
     keys: &impl KeyStore,
 ) -> FreeTierOverview {
+    let _ = providers_saved;
     let options = settings.to_options();
     let providers = catalog
         .providers
@@ -110,6 +144,8 @@ pub fn overview(
         strict: settings.strict,
         route_order,
         usable: has_usable_target(catalog, &options, keys),
+        own_endpoint: settings.own_endpoint.clone(),
+        endpoint_choices: Vec::new(),
     }
 }
 
@@ -187,6 +223,7 @@ mod tests {
             disabled: ["groq".to_string()].into(),
             opt_in: ["cloudflare-ai".to_string()].into(),
             strict: true,
+            own_endpoint: Some("lm_studio-abc".into()),
         };
 
         save_at(&path, &settings).unwrap();
@@ -202,6 +239,7 @@ mod tests {
             disabled: ["groq".to_string()].into(),
             opt_in: ["cloudflare-ai".to_string()].into(),
             strict: true,
+            own_endpoint: None,
         };
 
         let options = settings.to_options();
@@ -213,7 +251,7 @@ mod tests {
 
     #[test]
     fn the_overview_lists_every_provider_in_the_fixed_order() {
-        let view = overview(&Catalog::pinned(), &FreeTierSettings::default(), &keys(&[]));
+        let view = overview(&Catalog::pinned(), &FreeTierSettings::default(), &[], &keys(&[]));
 
         let ids: Vec<&str> = view.providers.iter().map(|row| row.id.as_str()).collect();
         assert_eq!(
@@ -234,13 +272,14 @@ mod tests {
 
     #[test]
     fn cloudflare_is_off_until_opted_in_and_carries_its_warning() {
-        let off = overview(&Catalog::pinned(), &FreeTierSettings::default(), &keys(&[]));
+        let off = overview(&Catalog::pinned(), &FreeTierSettings::default(), &[], &keys(&[]));
         let on = overview(
             &Catalog::pinned(),
             &FreeTierSettings {
                 opt_in: ["cloudflare-ai".to_string()].into(),
                 ..Default::default()
             },
+            &[],
             &keys(&[]),
         );
 
@@ -265,6 +304,7 @@ mod tests {
                 disabled: ["cloudflare-ai".to_string()].into(),
                 ..Default::default()
             },
+            &[],
             &keys(&[]),
         );
 
@@ -276,6 +316,7 @@ mod tests {
         let view = overview(
             &Catalog::pinned(),
             &FreeTierSettings::default(),
+            &[],
             &keys(&[("groq", None), ("cloudflare-ai", Some("acct"))]),
         );
 
@@ -292,15 +333,16 @@ mod tests {
     #[test]
     fn usable_and_route_order_follow_keys_switches_and_strict_mode() {
         let catalog = Catalog::pinned();
-        let none = overview(&catalog, &FreeTierSettings::default(), &keys(&[]));
+        let none = overview(&catalog, &FreeTierSettings::default(), &[], &keys(&[]));
         let both = keys(&[("groq", None), ("mistral", None)]);
-        let normal = overview(&catalog, &FreeTierSettings::default(), &both);
+        let normal = overview(&catalog, &FreeTierSettings::default(), &[], &both);
         let strict = overview(
             &catalog,
             &FreeTierSettings {
                 strict: true,
                 ..Default::default()
             },
+            &[],
             &both,
         );
         let groq_off = overview(
@@ -309,6 +351,7 @@ mod tests {
                 disabled: ["groq".to_string()].into(),
                 ..Default::default()
             },
+            &[],
             &both,
         );
 
@@ -323,6 +366,101 @@ mod tests {
         assert_eq!(
             groq_off.route_order.first().map(String::as_str),
             Some("mistral")
+        );
+    }
+
+    fn saved(id: &str, kind: &str, base_url: Option<&str>, model: Option<&str>) -> AiModelProvider {
+        serde_json::from_value(serde_json::json!({
+            "id": id,
+            "name": format!("Saved {id}"),
+            "kind": kind,
+            "base_url": base_url,
+            "api_key_storage": "none",
+            "models": model.map(|model| vec![serde_json::json!({
+                "id": model,
+                "capabilities": {"streaming": true, "tools": true, "vision": false, "json_mode": false, "reasoning": false}
+            })]).unwrap_or_default(),
+        }))
+        .unwrap()
+    }
+
+    fn saved_providers() -> Vec<AiModelProvider> {
+        vec![
+            saved("lm_studio-pc", "lm_studio", Some("http://192.168.1.50:8080/v1"), Some("qwen")),
+            saved("ollama-home", "ollama", None, Some("llama3.2")),
+            saved("open_ai_compatible-x", "open_ai_compatible", Some("https://hosted.test/v1"), Some("m")),
+            saved("open_ai-main", "open_ai", None, Some("gpt-5-nano")),
+            saved("lm_studio-empty", "lm_studio", Some("http://127.0.0.1:1234/v1"), None),
+        ]
+    }
+
+    #[test]
+    fn own_endpoint_choices_are_compatible_providers_with_a_model() {
+        let choices = endpoint_choices(&saved_providers());
+
+        let ids: Vec<&str> = choices.iter().map(|choice| choice.id.as_str()).collect();
+        assert_eq!(ids, ["lm_studio-pc", "ollama-home", "open_ai_compatible-x"]);
+        assert_eq!(choices[0].name, "Saved lm_studio-pc");
+    }
+
+    #[test]
+    fn the_chosen_endpoint_routes_last_under_its_own_name_and_key_id() {
+        let settings = FreeTierSettings {
+            own_endpoint: Some("lm_studio-pc".into()),
+            ..Default::default()
+        };
+
+        let catalog = with_own_endpoint(Catalog::pinned(), &settings, &saved_providers());
+
+        let last = catalog.providers.last().unwrap();
+        assert!(last.user_supplied);
+        assert_eq!(last.name, "Saved lm_studio-pc");
+        assert_eq!(last.base_url, "http://192.168.1.50:8080/v1");
+        assert_eq!(last.key_id.as_deref(), Some("lm_studio-pc"));
+        assert_eq!(last.models[0].id, "qwen");
+    }
+
+    #[test]
+    fn an_ollama_endpoint_without_a_url_uses_the_ollama_default() {
+        let settings = FreeTierSettings {
+            own_endpoint: Some("ollama-home".into()),
+            ..Default::default()
+        };
+
+        let catalog = with_own_endpoint(Catalog::pinned(), &settings, &saved_providers());
+
+        assert!(catalog.providers.last().unwrap().base_url.contains("11434"));
+    }
+
+    #[test]
+    fn an_unknown_or_unusable_endpoint_is_ignored() {
+        let plain = Catalog::pinned().providers.len();
+        for id in ["gone", "open_ai-main", "lm_studio-empty"] {
+            let settings = FreeTierSettings {
+                own_endpoint: Some(id.into()),
+                ..Default::default()
+            };
+            let catalog = with_own_endpoint(Catalog::pinned(), &settings, &saved_providers());
+            assert_eq!(catalog.providers.len(), plain, "{id} must not route");
+        }
+    }
+
+    #[test]
+    fn a_keyless_own_endpoint_alone_makes_free_tier_usable() {
+        let settings = FreeTierSettings {
+            own_endpoint: Some("lm_studio-pc".into()),
+            ..Default::default()
+        };
+
+        let view = overview(&Catalog::pinned(), &settings, &saved_providers(), &keys(&[]));
+
+        assert!(view.usable);
+        assert_eq!(view.route_order.last().map(String::as_str), Some(crate::rhizome_routing::USER_ENDPOINT_ID));
+        assert_eq!(view.own_endpoint.as_deref(), Some("lm_studio-pc"));
+        assert_eq!(view.endpoint_choices.len(), 3);
+        assert!(
+            view.providers.iter().all(|row| row.id != crate::rhizome_routing::USER_ENDPOINT_ID),
+            "the own endpoint is a dropdown, not a provider row"
         );
     }
 }

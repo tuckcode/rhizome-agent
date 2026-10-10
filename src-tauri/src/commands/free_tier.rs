@@ -18,11 +18,19 @@ pub(crate) fn saved_free_tier_settings() -> Result<FreeTierSettings, String> {
     free_tier::load_at(&free_tier_settings_path()?)
 }
 
+/// The providers saved under Settings → AI. One may be the own endpoint.
+pub(crate) fn saved_model_providers() -> Result<Vec<crate::ai_models::AiModelProvider>, String> {
+    Ok(crate::settings::get_settings()?
+        .ai_model_providers
+        .unwrap_or_default())
+}
+
 #[tauri::command]
 pub fn get_free_tier_overview() -> Result<FreeTierOverview, String> {
     Ok(free_tier::overview(
         &Catalog::pinned(),
         &saved_free_tier_settings()?,
+        &saved_model_providers()?,
         &ProviderKeys::for_app()?,
     ))
 }
