@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { execFile } from 'node:child_process'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { fileURLToPath } from 'node:url'
 import type { UiSnapshot } from '../../src/utils/uiAudit'
 
@@ -117,6 +119,22 @@ test.describe('pnpm live-ui', () => {
     expect(stderr).toContain('http://127.0.0.1:9')
     expect(stderr).toContain('pnpm dev')
     expect(stderr).toContain('does not start')
+  })
+
+  test('says so when the server is not the Rhizome dev app', async () => {
+    const server = createServer((_request, response) => response.end('not rhizome'))
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const { port } = server.address() as AddressInfo
+    try {
+      const { code, stdout, stderr } = await runLiveUi(['--screen', 'chat'], `http://127.0.0.1:${port}`)
+
+      expect(code).toBe(1)
+      expect(stdout).toBe('')
+      expect(stderr).toContain('is not the Rhizome dev app')
+      expect(stderr).toContain('/src/utils/uiAudit.ts')
+    } finally {
+      server.close()
+    }
   })
 
   test('rejects an unknown screen name', async ({ baseURL }) => {
