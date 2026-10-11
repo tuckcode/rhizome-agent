@@ -303,6 +303,11 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       }))
     },
 
+    onNotice: (notice: string) => {
+      if (abortRef.current.aborted) return
+      appendLocalMarker(setMessages, notice)
+    },
+
     onError: (error: StreamErrorMessage) => {
       if (abortRef.current.aborted) return
 

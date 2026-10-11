@@ -307,6 +307,57 @@ describe('aiAgentStreamCallbacks', () => {
     expect(trackEventMock).not.toHaveBeenCalledWith('ai_agent_response_completed', expect.anything())
   })
 
+  it('shows a non-fatal notice without ending the turn or disabling Send', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'Question',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const status = createStatusStore('thinking')
+    const responseAccRef = { current: 'Partial reply' }
+
+    const callbacks = createStreamCallbacks({
+      agent: 'claude_code',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: status.setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef,
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+
+    callbacks.onNotice?.('flush native session line: disk error')
+    callbacks.onText(' more')
+    callbacks.onDone()
+
+    expect(status.getStatus()).toBe('done')
+    expect(responseAccRef.current).toBe('Partial reply more')
+    expect(messages.getMessages()).toEqual([
+      {
+        id: 'msg-1',
+        userMessage: 'Question',
+        actions: [],
+        isStreaming: false,
+        reasoningDone: true,
+        response: 'Partial reply more',
+      },
+      {
+        userMessage: '',
+        localMarker: 'flush native session line: disk error',
+        actions: [],
+        id: expect.any(String),
+      },
+    ])
+    expect(trackEventMock).toHaveBeenCalledWith('ai_agent_response_completed', expect.objectContaining({
+      agent: 'claude_code',
+    }))
+  })
+
   it('localizes Pi empty-output stream errors with diagnostic output', () => {
     const messages = createMessageStore([
       {

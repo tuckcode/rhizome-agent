@@ -108,6 +108,13 @@ impl<M: Model> NativeEngine<M> {
         });
     }
 
+    #[cfg(test)]
+    pub fn fail_next_session_log_io(&self) {
+        if let Some(log) = &self.session_log {
+            log.lock().expect("session log").fail_next_io();
+        }
+    }
+
     pub fn ensure_log(&mut self, session_id: &str) -> Result<(), String> {
         if self.session_log.is_some() {
             return Ok(());
@@ -192,7 +199,7 @@ impl<M: Model> NativeEngine<M> {
             DurableEvent::ToolDenied { id, name, reason } => {
                 Some(EngineEvent::ToolDenied { id, name, reason })
             }
-            DurableEvent::ModelFailed { message } => Some(EngineEvent::Error { message }),
+            DurableEvent::ModelFailed { message } => Some(EngineEvent::error(message, true)),
             DurableEvent::TurnEnd => Some(EngineEvent::TurnEnd),
             DurableEvent::Cancelled { cause } => Some(EngineEvent::Cancelled { cause }),
             DurableEvent::User { .. } => None,
@@ -233,8 +240,8 @@ impl<M: Model> Engine for NativeEngine<M> {
                 if let Ok(mut writer) = log.lock() {
                     match native_log::append_or_roll(&mut writer, &event) {
                         Ok(None) => {}
-                        Ok(Some(message)) => live_emit(EngineEvent::Error { message }),
-                        Err(message) => live_emit(EngineEvent::Error { message }),
+                        Ok(Some(message)) => live_emit(EngineEvent::error(message, false)),
+                        Err(message) => live_emit(EngineEvent::error(message, false)),
                     }
                 }
             }
@@ -409,6 +416,103 @@ fn release_live_prompt(live_prompt: &Arc<Mutex<Option<String>>>, prompt_id: &str
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model_events::{ModelError, ModelErrorKind};
+    use crate::rhizome_loop::{AgentLoop, FakeModel, ScriptPart};
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    fn with_temp_home<T>(body: impl FnOnce() -> T) -> T {
+        let _lock = crate::app_config::TEST_CONFIG_ENV
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let home = tempfile::tempdir().unwrap();
+        let previous_home = std::env::var("HOME").ok();
+        let previous_xdg = std::env::var("XDG_CONFIG_HOME").ok();
+        std::env::set_var("HOME", home.path());
+        std::env::remove_var("XDG_CONFIG_HOME");
+        let result = catch_unwind(AssertUnwindSafe(body));
+        if let Some(value) = previous_home {
+            std::env::set_var("HOME", value);
+        } else {
+            std::env::remove_var("HOME");
+        }
+        if let Some(value) = previous_xdg {
+            std::env::set_var("XDG_CONFIG_HOME", value);
+        } else {
+            std::env::remove_var("XDG_CONFIG_HOME");
+        }
+        match result {
+            Ok(value) => value,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
+    }
+
+    #[test]
+    fn log_save_failure_mid_turn_is_non_fatal_and_the_turn_completes() {
+        with_temp_home(|| {
+            let mut engine = NativeEngine::saying("hello");
+            let session_id = uuid::Uuid::new_v4().to_string();
+            engine.ensure_log(&session_id).expect("log");
+            engine.fail_next_session_log_io();
+            engine.start("hi", Box::new(|_| {})).expect("start");
+            let events = engine.events();
+            assert!(
+                events.iter().any(|event| {
+                    matches!(
+                        event,
+                        EngineEvent::Error {
+                            fatal: false,
+                            message
+                        } if message.contains("disk error")
+                    )
+                }),
+                "log-save failure must be a non-fatal error: {events:?}"
+            );
+            assert!(
+                events.iter().any(
+                    |event| matches!(event, EngineEvent::TextDelta { text } if text == "hello")
+                ),
+                "the reply must continue after a log-save failure: {events:?}"
+            );
+            assert!(
+                events
+                    .iter()
+                    .any(|event| matches!(event, EngineEvent::TurnEnd)),
+                "the turn must still complete: {events:?}"
+            );
+        });
+    }
+
+    #[test]
+    fn model_failure_emits_a_fatal_error_and_ends_the_turn() {
+        let mut engine = NativeEngine::from_parts(
+            AgentLoop::new(),
+            FakeModel::script(vec![vec![ScriptPart::Fail(ModelError {
+                kind: ModelErrorKind::Unavailable,
+                status: Some(503),
+                message: "down".into(),
+            })]]),
+        );
+        engine.start("hi", Box::new(|_| {})).expect("start");
+        let events = engine.events();
+        assert!(
+            events.iter().any(|event| {
+                matches!(
+                    event,
+                    EngineEvent::Error {
+                        fatal: true,
+                        message
+                    } if message == "down"
+                )
+            }),
+            "a provider failure must be fatal: {events:?}"
+        );
+        assert!(
+            events
+                .iter()
+                .any(|event| matches!(event, EngineEvent::TurnEnd)),
+            "a fatal model error must end the turn: {events:?}"
+        );
+    }
 
     #[test]
     fn release_live_prompt_keeps_a_newer_id() {

@@ -152,7 +152,7 @@ impl NativeChats {
         let worker = thread::spawn(move || {
             let mut engine = engine;
             if let Err(error) = engine.ensure_log(&index_id) {
-                (emit.lock().expect("native sink"))(EngineEvent::Error { message: error });
+                (emit.lock().expect("native sink"))(EngineEvent::error(error, true));
                 worker_busy.store(false, Ordering::SeqCst);
                 return;
             }
@@ -286,7 +286,7 @@ impl NativeChats {
         let worker = thread::spawn(move || {
             let mut engine = engine;
             if let Err(error) = engine.ensure_log(&index_id) {
-                (emit.lock().expect("native sink"))(EngineEvent::Error { message: error });
+                (emit.lock().expect("native sink"))(EngineEvent::error(error, true));
                 worker_busy.store(false, Ordering::SeqCst);
                 return;
             }

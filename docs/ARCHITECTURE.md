@@ -468,7 +468,10 @@ or show Prime chrome. Native no-key errors point at Settings → AI Agents
 → API models.
 `commands/native_chat.rs` is the backend for that toggle: start / send /
 cancel / approval_reply / end / list / open / delete, events on
-`native-chat:<session_id>`. Quit settles every native engine before Prime,
+`native-chat:<session_id>`. Native `Error` events carry `fatal`: log-save
+failures and the 100 MiB rollover notice are non-fatal; missing keys,
+provider failures, and `ensure_log` failures are fatal. The Chat stream
+ends only on a fatal error or `TurnEnd`. Quit settles every native engine before Prime,
 with a 2s bound. Native transcripts use `rhizome-native:<uuid>` and never
 write under `~/.prime`. Step 2c stores one append-only JSONL log per
 session at `<app config dir>/native-sessions/<id>.jsonl` (ADR-0183): flush
