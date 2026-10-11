@@ -6,6 +6,7 @@
 > Source project: Web Prototype (`621bdf82-31ff-4f99-9555-2cf380d245c9`) · linked code `<repo>`
 > Name: the product is **Rhizome**. The repository and some identifiers are still `rhizome-agent`; don't rename paths, bundle ids or package names from this document.
 > Revision: 2026-10-10 Earth palette, accessibility fixes, brand mark and graph direction. Previous palette names (Mycelium, Ledger) remain as aliases in `colors_and_type.css`.
+> **Origin (shipped-app facts):** Cursor Grok 4.6 · 2026-10-11 · knispo: IBM Plex Mono is `font-mono`; JetBrains Mono 600 is wordmark-only; radii 3/5/7/11px as used in the app (inputs/buttons 5px, dialogs 7px, cards 11px); 3px `ring/50` focus halo; six-node mark until the dithered root mark lands.
 
 ## 1. Product Context
 
@@ -142,7 +143,8 @@ Dracula, Nord, Gruvbox and similar fixed themes may exist in the app's theme gen
 |------|-------|-------|
 | Display / UI | Inter, SF Pro Text, system-ui | 500 weight titles; letter-spacing −0.03em at 26px |
 | Body | Inter | 13px base in harness; product CSS uses 14px root |
-| Mono / telemetry | JetBrains Mono (bundled 600 woff2), IBM Plex Mono | Kickers, chips, tool names, session ids, branch and paths |
+| Mono / code / telemetry | IBM Plex Mono (`--font-mono`) | Kickers, chips, tool names, session ids, branch and paths, agent code. This is what `font-mono` renders. |
+| Wordmark | JetBrains Mono 600 (bundled woff2 in `src/assets/fonts/`) | Lowercase "rhizome" lockup only. Not `font-mono`. |
 
 Scale (harness), which maps to the size tokens:
 
@@ -177,6 +179,8 @@ Use only the token sizes (10, 11, 12, 13, 14, 16, 20, 26). No half-pixel sizes. 
 
 Density: chrome is compact; the conversation column breathes with generous vertical rhythm.
 
+**Radii (shipped):** `--radius` is `0.5rem` at the 14px root (7px). The Tailwind ladder is `--radius-sm` 3px, `--radius-md` 5px, `--radius-lg` 7px, `--radius-xl` 11px. Inputs and buttons use `rounded-md` (5px). Dialogs use `rounded-lg` (7px). Cards use `rounded-xl` (11px).
+
 ## 5. Layout & Composition
 
 ### Agent window (primary kit)
@@ -206,7 +210,7 @@ Density: chrome is compact; the conversation column breathes with generous verti
 
 ### Buttons
 
-- **Default**: surface-2 fill, strong border, fg text, 8px radius
+- **Default**: surface-2 fill, strong border, fg text, 5px radius (`rounded-md`)
 - **Primary**: solid accent fill, accent-ink text; hover → accent-hot (keep the ink). One per viewport.
 - **Danger / Stop**: danger text on danger-bg; hover increases fill opacity
 - **Ghost**: transparent, `--fg-secondary` text → fg on hover
@@ -261,7 +265,7 @@ Traffic lights (decorative), brand mark, wordmark "rhizome" (mono 600), run-stat
 - Stream caret blinks while generating
 - `@media (prefers-reduced-motion: reduce)`: stop animations and drop transforms; animated art renders its final frame statically
 
-**Focus:** every interactive element, including `textarea`, `contenteditable` composers, graph canvas and list rows, shows `:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px }`. Never `outline: none` without an equivalent ring.
+**Focus:** every interactive element, including `textarea`, `contenteditable` composers, graph canvas and list rows, shows the shipped 3px ring halo: `focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]`. `--ring` aliases `--state-focus-ring`. Never `outline: none` or `ring-0` without an equivalent ring.
 
 **Live regions:**
 - The transcript is `role="log"` with `aria-live="polite"`. A streaming message sets `aria-busy="true"` until it completes.
@@ -283,7 +287,8 @@ Hover never reduces text contrast. Focus-visible always shows the ring.
 
 ### Brand mark
 
-- The mark is an **asymmetric grown root line**: a single line that branches unevenly the way a rhizome spreads, with one node, ending in a flat dot. It's not a symmetric star, molecule or network badge.
+- **Current in-app mark:** `BrandMark` ships the six-node 3c Network (one core + five satellites). A dithered root-line mark is planned and is not in the app yet. Do not replace the six-node mark until that work lands.
+- The planned mark is an **asymmetric grown root line**: a single line that branches unevenly the way a rhizome spreads, with one node, ending in a flat dot. It's not a symmetric star, molecule or network badge.
 - **Flat**: one color (mint on dark, forest on light, or `--fg` mono), no gloss, no 3D, no gradients, no glow, no bevel. Must read at 16px.
 - **Texture**: a dithered, one-hue texture of the root line is allowed for the website and hero art only, never in app icons, favicons, the dock icon or UI chrome.
 - **No sparkles, robots, brains or chat bubbles** in or around the mark, and no AI-art renders as brand imagery.
@@ -298,10 +303,10 @@ Hover never reduces text contrast. Focus-visible always shows the ring.
 5. Emoji as functional icons; prefer 16px stroke glyphs
 6. Hover that greys out labels or lightens fg toward bg
 7. Multiple solid primary CTAs in one viewport
-8. Inter-only mono (use JetBrains Mono for telemetry)
+8. Inter-only mono (use IBM Plex Mono for code and telemetry; JetBrains Mono 600 is the wordmark only)
 9. Soft cream marketing backgrounds for agent chrome. Earth light's paper is a reading surface with soil-dark text, not a marketing wash.
 10. Invented metrics or fake "AI confidence scores"
-11. Rounded-pill consumer chat bubbles; keep restrained 8px cards
+11. Rounded-pill consumer chat bubbles; keep restrained card radii (`rounded-xl`, 11px)
 12. Replacing the brand mark with generic robot or sparkle logos; sparkle as the "AI" icon anywhere
 13. Disabling the composer while the agent works
 14. Informational text below 11px, or faint text tokens used for decoration
