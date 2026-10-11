@@ -13,7 +13,7 @@ const SHEET_COLOR_ALIASES = new Map<string, string>([
   ['orange', '#d9730d'],
   ['yellow', '#d69e2e'],
   ['green', '#3d6a1e'],
-  ['blue', '#2c6a4d'],
+  ['blue', '#155dff'],
   ['purple', '#805ad5'],
   ['teal', '#319795'],
   ['pink', '#d53f8c'],

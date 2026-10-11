@@ -8,6 +8,8 @@ import { COLOR_THEMES, DEFAULT_COLOR_THEME, DEFAULT_THEME_MODE } from './themeMo
 const indexCss = readFileSync(join(process.cwd(), 'src/index.css'), 'utf8')
 const themesCss = readFileSync(join(process.cwd(), 'src/themes.css'), 'utf8')
 const generator = readFileSync(join(process.cwd(), 'scripts/generate-themes-css.mjs'), 'utf8')
+const sheetSelectionChrome = readFileSync(join(process.cwd(), 'src/utils/sheetSelectionChrome.ts'), 'utf8')
+const blockReorder = readFileSync(join(process.cwd(), 'src/components/rhizomeBlockReorder.ts'), 'utf8')
 
 function themeBlock(css: string, header: string): string {
   const start = css.indexOf(header)
@@ -400,5 +402,13 @@ describe('Earth theme tokens', () => {
         ).toBeGreaterThanOrEqual(4.5)
       }
     }
+  })
+
+  it('replaces leftover Tolaria blues on sheet selection and block reorder with Earth tokens', () => {
+    expect(sheetSelectionChrome).toContain("SHEET_SELECTION_ACCENT_FALLBACK = '#2C6A4D'")
+    expect(sheetSelectionChrome).not.toContain('#155DFF')
+    expect(blockReorder).not.toContain('21, 93, 255')
+    expect(blockReorder).toContain('var(--accent-blue-light)')
+    expect(blockReorder).toContain('var(--accent-blue-bg)')
   })
 })

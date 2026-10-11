@@ -253,7 +253,7 @@
   "settings.bridgeToken.copied": "Copied to clipboard.",
   "settings.bridgeToken.copyFailed": "Could not copy the token. Show it and copy it by hand.",
   "settings.appearance.title": "Appearance",
-  "settings.appearance.description": "Earth dark is the default. Light, Dark, or Match system follow the Mac appearance for Earth light and Earth dark.",
+  "settings.appearance.description": "Earth dark is the default. Match system follows your computer's light or dark setting.",
   "settings.colorTheme.label": "Color theme",
   "settings.colorTheme.description": "Pick a color theme. Rhizome Light/Dark follow the Light/Dark/Match system toggle below and support a custom accent; every other theme is a fixed skin.",
   "settings.theme.label": "Theme",

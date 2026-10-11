@@ -90,7 +90,7 @@ function createDropIndicator(ownerDocument: Document): HTMLElement {
   indicator.style.pointerEvents = 'none'
   indicator.style.background = 'var(--border-focus, #2C6A4D)'
   indicator.style.borderRadius = '999px'
-  indicator.style.boxShadow = '0 0 0 1px rgba(21, 93, 255, 0.12), 0 0 10px rgba(21, 93, 255, 0.28)'
+  indicator.style.boxShadow = '0 0 0 1px var(--accent-blue-light), 0 0 10px var(--accent-blue-bg)'
   indicator.style.zIndex = '14001'
   indicator.style.display = 'none'
   ownerDocument.body.appendChild(indicator)

@@ -546,6 +546,9 @@ describe('SettingsPanel', () => {
     expect(screen.getByRole('radio', { name: 'Light' })).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByRole('radio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByRole('radio', { name: 'Match system' })).toHaveAttribute('aria-checked', 'false')
+    expect(
+      screen.getAllByText("Earth dark is the default. Match system follows your computer's light or dark setting.").length,
+    ).toBeGreaterThan(0)
   })
 
   it('defaults the color theme to rhizome and shows an accent picker', () => {
