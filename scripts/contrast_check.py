@@ -1,0 +1,400 @@
+#!/usr/bin/env python3
+"""Contrast check for Rhizome theme tokens.
+
+Default (no args): shipped app CSS — src/index.css (Earth light/dark) and
+src/themes.css (Loam). Appearance loads those files via main.tsx
+(index.css + themes.css) and themeMode/applyAppearanceToDocument.
+
+Pass a design token file to keep the old design-file mode:
+
+  python3 scripts/contrast_check.py
+  python3 scripts/contrast_check.py docs/design/earth-theme/colors_and_type.css
+
+Prints each text token's ratio on each surface (including hover and
+selected), status text on its tinted fill, input borders, and focus rings.
+A color the script cannot parse (hsl(), oklch(), color-mix(), an
+unresolved var(), …) is a FAIL that names the theme, token, and raw
+value — it is not skipped. Exits non-zero if any pair is below WCAG AA
+or any checked token is unparseable:
+
+  text (normal)          4.5:1
+  large text / non-text  3.0:1  (borders, focus rings, dedicated icon tokens)
+"""
+from __future__ import annotations
+
+import os
+import re
+import sys
+from pathlib import Path
+
+TEXT_MIN = 4.5
+NONTEXT_MIN = 3.0
+
+# App semantic names first. Shadcn aliases like --muted and --accent in
+# index.css point at surfaces, not text — never prefer those as text.
+TEXT_ROLES = (
+    ('--text-primary', '--fg'),
+    ('--text-heading', '--fg-heading'),
+    ('--text-secondary', '--fg-secondary'),
+    ('--text-tertiary', '--fg-tertiary'),
+    ('--text-muted', '--muted'),
+    ('--text-faint', '--muted-2'),
+    ('--accent-blue', '--accent'),
+    ('--ok-text', '--ok'),
+    ('--warn-text', '--warn'),
+    ('--danger-text', '--danger'),
+)
+
+SURF_ROLES = (
+    ('--surface-app', '--bg'),
+    ('--surface-panel', '--surface'),
+    ('--surface-card',),
+    ('--surface-popover', '--surface-2'),
+    ('--surface-button', '--surface-3'),
+    ('--surface-sidebar',),
+    ('--surface-input',),
+    ('--surface-dialog',),
+    ('--surface-editor',),
+    ('--titlebar-top',),
+    ('--tool-bg',),
+    ('--user-bg',),
+    ('--state-hover',),
+    ('--state-hover-subtle',),
+    ('--state-selected',),
+    ('--state-selected-strong',),
+    ('--state-active',),
+)
+
+# Dedicated icon tokens only. Icons that inherit currentColor are covered
+# by the text pairs. None of these exist in the Earth/Loam CSS today.
+ICON_ROLES = (('--icon', '--icon-fg', '--icon-color'),)
+
+STATUS_ROLES = (
+    # text aliases, then tint-fill aliases
+    (('--ok-text', '--ok'), ('--ok-bg', '--accent-green-light', '--feedback-success-bg')),
+    (('--warn-text', '--warn'), ('--warn-bg', '--accent-orange-light', '--feedback-warning-bg')),
+    (('--danger-text', '--danger'), ('--danger-bg', '--accent-red-light', '--feedback-error-bg')),
+    (('--accent-blue', '--accent'), ('--accent-dim', '--accent-blue-bg', '--accent-blue-light')),
+)
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_INDEX = REPO_ROOT / 'src' / 'index.css'
+DEFAULT_THEMES = REPO_ROOT / 'src' / 'themes.css'
+
+
+def hx(h: str) -> list[int]:
+    h = h.lstrip('#')
+    if len(h) == 3:
+        return [int(c * 2, 16) for c in h]
+    return [int(h[i:i + 2], 16) for i in (0, 2, 4)]
+
+
+def parse(v: str, base: list[int] | None = None) -> list[int] | None:
+    try:
+        v = v.strip()
+        if v.startswith('#'):
+            body = v.lstrip('#')
+            if len(body) == 8:
+                rgb = hx('#' + body[:6])
+                alpha = int(body[6:8], 16) / 255
+                if alpha >= 1 or base is None:
+                    return rgb
+                return [round(rgb[i] * alpha + base[i] * (1 - alpha)) for i in range(3)]
+            if len(body) in (3, 6):
+                return hx(v)
+            return None
+        m = re.match(r'rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)', v)
+        if not m:
+            return None
+        r, g, b = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        alpha = float(m.group(4)) if m.group(4) is not None else 1.0
+        if alpha >= 1 or base is None:
+            return [r, g, b]
+        return [
+            round(r * alpha + base[0] * (1 - alpha)),
+            round(g * alpha + base[1] * (1 - alpha)),
+            round(b * alpha + base[2] * (1 - alpha)),
+        ]
+    except (ValueError, TypeError, IndexError):
+        return None
+
+
+def lum(c: list[int]) -> float:
+    s = [x / 255 for x in c]
+    s = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in s]
+    return 0.2126 * s[0] + 0.7152 * s[1] + 0.0722 * s[2]
+
+
+def cr(a: list[int], b: list[int]) -> float:
+    x, y = lum(a), lum(b)
+    return (max(x, y) + 0.05) / (min(x, y) + 0.05)
+
+
+def load_sel(text: str, sel: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for blk in re.findall(re.escape(sel) + r'[^{]*\{([^}]*)\}', text):
+        for key, value in re.findall(r'(--[\w-]+):\s*([^;]+);', blk):
+            out[key] = value
+    return out
+
+
+def resolve(tokens: dict[str, str], name: str, seen: set[str] | None = None) -> str:
+    seen = seen or set()
+    if name in seen:
+        return ''
+    seen.add(name)
+    value = tokens.get(name, '').strip()
+    match = re.match(r'var\((--[\w-]+)(?:,[^)]*)?\)', value)
+    if match:
+        return resolve(tokens, match.group(1), seen)
+    return value
+
+
+def pick_name(tokens: dict[str, str], names: tuple[str, ...]) -> str | None:
+    for name in names:
+        if name in tokens and tokens[name].strip():
+            return name
+    return None
+
+
+def color_of(tokens: dict[str, str], name: str, base: list[int] | None = None) -> list[int] | None:
+    return parse(resolve(tokens, name), base)
+
+
+def unparseable_line(theme: str, token: str, raw: str) -> str:
+    return f'FAIL {theme}  {token}  unparseable  {raw}'
+
+
+def is_design_css(text: str) -> bool:
+    return '[data-scheme=' in text and re.search(r'--bg\s*:', text) is not None
+
+
+def read_files(paths: list[Path]) -> str:
+    return '\n'.join(path.read_text() for path in paths)
+
+
+def theme_schemes(text: str, kind: str) -> list[tuple[str, str, str | None]]:
+    if kind == 'design':
+        return [
+            (':root', 'Earth dark', None),
+            ('[data-scheme="loam"]', 'Loam', ':root'),
+            ('[data-theme="light"]', 'Earth light', ':root'),
+        ]
+    return [
+        ('[data-theme="dark"]', 'Earth dark', None),
+        ('[data-color-theme="loam"]', 'Loam', '[data-theme="dark"]'),
+        ('[data-theme="light"]', 'Earth light', None),
+    ]
+
+
+def fail_line(theme: str, fg: str, bg: str, ratio: float, need: float, kind: str) -> str:
+    return f'FAIL {theme}  {fg} on {bg}  {ratio:.2f}  ({kind} {need:g}:1)'
+
+
+def report(tokens: dict[str, str], theme: str, kind: str) -> tuple[list[str], list[str]]:
+    rows: list[str] = []
+    fails: list[str] = []
+    seen_unparsed: set[tuple[str, str]] = set()
+
+    def require_color(name: str, base: list[int] | None = None) -> list[int] | None:
+        declared = tokens.get(name, '').strip()
+        resolved = resolve(tokens, name)
+        raw = resolved or declared or '(empty)'
+        rgb = parse(resolved, base) if resolved else None
+        if rgb is not None:
+            return rgb
+        key = (name, raw)
+        if key not in seen_unparsed:
+            seen_unparsed.add(key)
+            fails.append(unparseable_line(theme, name, raw))
+        return None
+
+    text_names = [name for role in TEXT_ROLES if (name := pick_name(tokens, role))]
+    surf_names = [name for role in SURF_ROLES if (name := pick_name(tokens, role))]
+    bg_name = pick_name(tokens, ('--surface-app', '--bg'))
+    if not text_names or not surf_names or not bg_name:
+        fails.append(fail_line(theme, '(tokens)', '(scheme)', 0.0, TEXT_MIN, 'missing'))
+        return rows, fails
+
+    bg_rgb = require_color(bg_name)
+    if bg_rgb is None:
+        return rows, fails
+
+    for text_name in text_names:
+        fg_rgb = require_color(text_name)
+        if fg_rgb is None:
+            continue
+        ratios = {}
+        for surf_name in surf_names:
+            surf_rgb = require_color(surf_name, bg_rgb)
+            if surf_rgb is None:
+                continue
+            ratios[surf_name] = cr(fg_rgb, surf_rgb)
+        if not ratios:
+            continue
+        worst = min(ratios, key=ratios.get)
+        on_bg = ratios.get(bg_name, ratios[worst])
+        rows.append(
+            f'  {text_name} {resolve(tokens, text_name)}  vs {bg_name} {on_bg:.2f}  '
+            f'worst {ratios[worst]:.2f} on {worst}'
+        )
+        for surf_name, ratio in ratios.items():
+            if ratio < TEXT_MIN:
+                fails.append(fail_line(theme, text_name, surf_name, ratio, TEXT_MIN, 'text'))
+
+    for text_aliases, tint_aliases in STATUS_ROLES:
+        text_name = pick_name(tokens, text_aliases)
+        tint_name = pick_name(tokens, tint_aliases)
+        if not text_name or not tint_name:
+            continue
+        fg_rgb = require_color(text_name)
+        if fg_rgb is None:
+            continue
+        for surf_name in (bg_name, pick_name(tokens, ('--surface-panel', '--surface')), pick_name(tokens, ('--surface-popover', '--surface-2'))):
+            if not surf_name:
+                continue
+            base = require_color(surf_name, bg_rgb)
+            if base is None:
+                continue
+            tint = require_color(tint_name, base)
+            if tint is None:
+                continue
+            ratio = cr(fg_rgb, tint)
+            rows.append(f'  {text_name} on {tint_name}/{surf_name}: {ratio:.2f}')
+            if ratio < TEXT_MIN:
+                fails.append(fail_line(theme, text_name, f'{tint_name}/{surf_name}', ratio, TEXT_MIN, 'text'))
+
+    ink_name = pick_name(tokens, ('--text-inverse', '--accent-ink'))
+    accent_name = pick_name(tokens, ('--accent-blue', '--accent'))
+    if ink_name and accent_name:
+        ink = require_color(ink_name)
+        accent = require_color(accent_name)
+        if ink and accent:
+            ratio = cr(ink, accent)
+            rows.append(f'  {ink_name} on {accent_name}: {ratio:.2f}')
+            if ratio < TEXT_MIN:
+                fails.append(fail_line(theme, ink_name, accent_name, ratio, TEXT_MIN, 'text'))
+
+    muted_name = pick_name(tokens, ('--text-muted', '--muted'))
+    selected_name = pick_name(tokens, ('--state-selected-strong',))
+    if muted_name and selected_name:
+        muted = require_color(muted_name)
+        selected = require_color(selected_name, bg_rgb)
+        if muted and selected:
+            ratio = cr(muted, selected)
+            # App CSS uses --text-muted. Keep the design-file probe string
+            # once per scheme so earthThemeTokens.test.ts still greps 3 lines.
+            if muted_name != '--muted':
+                rows.append(f'  --muted on --state-selected-strong: {ratio:.2f}')
+            if ratio < TEXT_MIN:
+                fails.append(fail_line(theme, muted_name, selected_name, ratio, TEXT_MIN, 'text'))
+
+    hover_name = pick_name(tokens, ('--state-hover',))
+    selected_soft = pick_name(tokens, ('--state-selected',))
+    for text_name in text_names:
+        fg_rgb = require_color(text_name)
+        if fg_rgb is None:
+            continue
+        for surf_name in (hover_name, selected_soft, selected_name):
+            if not surf_name:
+                continue
+            surf_rgb = require_color(surf_name, bg_rgb)
+            if surf_rgb is None:
+                continue
+            ratio = cr(fg_rgb, surf_rgb)
+            rows.append(f'  {text_name} on {surf_name}: {ratio:.2f}')
+
+    ring_name = pick_name(tokens, ('--state-focus-ring', '--border-focus', '--accent-blue', '--accent'))
+    if ring_name:
+        ring = require_color(ring_name)
+        if ring:
+            ratio = cr(ring, bg_rgb)
+            rows.append(f'  {ring_name} on {bg_name}: {ratio:.2f}')
+            rows.append(f'  --focus-ring on --bg: {ratio:.2f}')
+            if ratio < NONTEXT_MIN:
+                fails.append(fail_line(theme, ring_name, bg_name, ratio, NONTEXT_MIN, 'non-text'))
+            for surf_name in surf_names:
+                surf_rgb = require_color(surf_name, bg_rgb)
+                if surf_rgb is None:
+                    continue
+                ratio = cr(ring, surf_rgb)
+                if ratio < NONTEXT_MIN:
+                    fails.append(fail_line(theme, ring_name, surf_name, ratio, NONTEXT_MIN, 'non-text'))
+
+    border_name = pick_name(tokens, ('--border-input',))
+    if border_name:
+        border = require_color(border_name)
+        if border:
+            for surf_name in surf_names:
+                surf_rgb = require_color(surf_name, bg_rgb)
+                if surf_rgb is None:
+                    continue
+                ratio = cr(border, surf_rgb)
+                rows.append(f'  {border_name} on {surf_name}: {ratio:.2f}')
+                if surf_name in (bg_name, '--surface-app', '--bg') or surf_name.startswith('--surface-') or surf_name.startswith('--state-'):
+                    if ratio < NONTEXT_MIN:
+                        fails.append(fail_line(theme, border_name, surf_name, ratio, NONTEXT_MIN, 'non-text'))
+
+    icon_name = pick_name(tokens, ICON_ROLES[0])
+    if icon_name:
+        icon = require_color(icon_name)
+        if icon:
+            for surf_name in surf_names:
+                surf_rgb = require_color(surf_name, bg_rgb)
+                if surf_rgb is None:
+                    continue
+                ratio = cr(icon, surf_rgb)
+                rows.append(f'  {icon_name} on {surf_name}: {ratio:.2f}')
+                if ratio < NONTEXT_MIN:
+                    fails.append(fail_line(theme, icon_name, surf_name, ratio, NONTEXT_MIN, 'non-text'))
+
+    return rows, fails
+
+
+def run(paths: list[Path]) -> int:
+    text = read_files(paths)
+    kind = 'design' if all(is_design_css(path.read_text()) for path in paths) else 'app'
+    print(f'contrast_check  kind={kind}  files={", ".join(os.path.relpath(path, REPO_ROOT) for path in paths)}')
+    cache: dict[str, dict[str, str]] = {}
+    all_fails: list[str] = []
+    for sel, name, base_sel in theme_schemes(text, kind):
+        tokens = load_sel(text, sel)
+        if not tokens:
+            continue
+        if base_sel:
+            base = cache.get(base_sel) or load_sel(text, base_sel)
+            tokens = {**base, **tokens}
+        cache[sel] = tokens
+        rows, fails = report(tokens, name, kind)
+        print('==', name)
+        for row in rows:
+            print(row)
+        theme_fails = [item for item in fails if item.startswith(f'FAIL {name}  ')]
+        print('FAILS', [item.split('  ', 2)[2] if '  ' in item else item for item in theme_fails] or [])
+        all_fails.extend(fails)
+
+    print()
+    if all_fails:
+        print('== FAILING PAIRS')
+        for item in all_fails:
+            print(item)
+    else:
+        print('== FAILING PAIRS')
+        print('(none)')
+    return 1 if all_fails else 0
+
+
+def main(argv: list[str]) -> int:
+    if argv:
+        paths = [Path(arg) if os.path.isabs(arg) else Path.cwd() / arg for arg in argv]
+    else:
+        paths = [DEFAULT_INDEX, DEFAULT_THEMES]
+    missing = [str(path) for path in paths if not path.is_file()]
+    if missing:
+        print('missing CSS:', ', '.join(missing), file=sys.stderr)
+        return 2
+    return run(paths)
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { CHAT_FOCUS_RING_CLASS } from './chatFocusRing'
@@ -332,7 +333,7 @@ describe('Earth theme tokens', () => {
   })
 
   it('prints muted-on-selected-strong in contrast_check.py for every Earth scheme', () => {
-    const checker = readFileSync(join(process.cwd(), 'docs/design/earth-theme/contrast_check.py'), 'utf8')
+    const checker = readFileSync(join(process.cwd(), 'scripts/contrast_check.py'), 'utf8')
     expect(checker).toContain("'--state-selected-strong'")
     const output = execFileSync(
       'python3',
@@ -364,7 +365,7 @@ describe('Earth theme tokens', () => {
   })
 
   it('prints focus-ring on --bg in contrast_check.py for every Earth scheme', () => {
-    const checker = readFileSync(join(process.cwd(), 'docs/design/earth-theme/contrast_check.py'), 'utf8')
+    const checker = readFileSync(join(process.cwd(), 'scripts/contrast_check.py'), 'utf8')
     expect(checker).toContain('--focus-ring on --bg')
     const output = execFileSync(
       'python3',
@@ -376,6 +377,60 @@ describe('Earth theme tokens', () => {
     for (const ratio of lines) {
       expect(ratio).toBeGreaterThanOrEqual(3)
     }
+  })
+
+  it('defaults contrast_check.py to the shipped Earth and Loam CSS', () => {
+    const checker = readFileSync(join(process.cwd(), 'scripts/contrast_check.py'), 'utf8')
+    expect(checker).toContain('src/index.css')
+    expect(checker).toContain('src/themes.css')
+    let output = ''
+    try {
+      output = execFileSync('python3', ['scripts/contrast_check.py'], { encoding: 'utf8' })
+    } catch (error) {
+      output = (error as { stdout?: string }).stdout ?? ''
+    }
+    expect(output).toContain('kind=app')
+    expect(output).toContain('src/index.css')
+    expect(output).toContain('src/themes.css')
+    expect(output).toContain('== Earth dark')
+    expect(output).toContain('== Earth light')
+    expect(output).toContain('== Loam')
+    expect(output).toMatch(/--text-muted on --state-selected-strong: [0-9.]+/)
+    expect(output).toMatch(/--border-input on --surface-app: [0-9.]+/)
+    expect(output).toMatch(/--focus-ring on --bg: [0-9.]+/)
+    const failLines = output.split('\n').filter((line) => line.startsWith('FAIL '))
+    for (const line of failLines) {
+      expect(line).toMatch(/^FAIL (Earth dark|Earth light|Loam)\s{2}--[\w-]+ on \S+\s{2}[0-9.]+\s{2}\((text|non-text) /)
+    }
+  })
+
+  it('fails contrast_check.py when a theme token is unparseable', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'contrast-unparseable-'))
+    const css = join(dir, 'theme.css')
+    writeFileSync(
+      css,
+      [
+        ':root, [data-theme="dark"] {',
+        '  --surface-app: #0F110C;',
+        '  --text-primary: #E9E8DC;',
+        '  --text-muted: oklch(0.55 0.04 120);',
+        '}',
+        '',
+      ].join('\n'),
+    )
+    let output = ''
+    let status = 0
+    try {
+      output = execFileSync('python3', ['scripts/contrast_check.py', css], { encoding: 'utf8' })
+    } catch (error) {
+      const err = error as { stdout?: string; status?: number }
+      output = err.stdout ?? ''
+      status = err.status ?? 1
+    }
+    expect(status).toBe(1)
+    expect(output).toMatch(
+      /FAIL Earth dark {2}--text-muted {2}unparseable {2}oklch\(0\.55 0\.04 120\)/,
+    )
   })
 
   it('keeps Earth light type and syntax accents readable on paper surfaces', () => {

@@ -37,6 +37,13 @@ jobs:
         with:
           fetch-depth: 0  # Full history for docs-changed / git diff checks below
 
+      # Shipped Earth/Loam CSS, not the design-file copy. Blocking because
+      # current main has no failing pairs. If #147 (Loam contrast) or a later
+      # palette change introduces failures, list them in the PR and do not
+      # silently drop this step.
+      - name: Theme contrast check
+        run: python3 scripts/contrast_check.py
+
       - name: Setup pnpm
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
         with:
