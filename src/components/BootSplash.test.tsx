@@ -52,4 +52,51 @@ describe('BootSplash', () => {
     expect(face).toContain("url('../assets/fonts/jetbrains-mono-600-latin.woff2')")
     expect(face).not.toMatch(/url\(\s*['"]?https?:/)
   })
+
+  it('keeps every arm visible when the user asks for reduced motion', () => {
+    const noPref = mediaBlock(splashCss, 'prefers-reduced-motion: no-preference')
+    const reduce = mediaBlock(splashCss, 'prefers-reduced-motion: reduce')
+    expect(noPref).toContain('boot-branch-grow')
+    expect(noPref).toContain('boot-node-grow')
+    expect(noPref).toContain('path:nth-of-type(4)')
+    expect(noPref).toContain('path:nth-of-type(5)')
+    expect(noPref).toContain('circle:nth-of-type(5)')
+    expect(noPref).toContain('circle:nth-of-type(6)')
+    expect(reduce).toMatch(/animation:\s*none/)
+    expect(reduce).not.toContain('opacity: 0')
+    expect(splashCss).toMatch(/\.boot-splash path\s*\{[^}]*opacity:\s*0\.65/)
+  })
+
+  it('paused motion never holds the grow-in arms at the invisible first frame', () => {
+    expect(splashCss).toContain('from { opacity: 0; transform: scale(0); }')
+    expect(splashCss).toContain('animation-play-state: var(--boot-motion-state, running)')
+    expect(splashCss).toMatch(/\[data-boot-motion="paused"\][^{]*path:nth-of-type\(4\)/)
+    expect(splashCss).toMatch(/\[data-boot-motion="paused"\][^{]*path:nth-of-type\(5\)/)
+    expect(splashCss).toMatch(/\[data-boot-motion="paused"\][^{]*circle:nth-of-type\(5\)/)
+    expect(splashCss).toMatch(/\[data-boot-motion="paused"\][^{]*circle:nth-of-type\(6\)/)
+    const pausedAt = splashCss.indexOf('[data-boot-motion="paused"]')
+    expect(pausedAt).toBeGreaterThanOrEqual(0)
+    const paused = braceBlock(splashCss, splashCss.indexOf('{', pausedAt))
+    expect(paused).toMatch(/animation:\s*none/)
+    expect(paused).not.toContain('opacity: 0')
+  })
 })
+
+function mediaBlock(css: string, query: string): string {
+  const start = css.indexOf(`@media (${query})`)
+  if (start < 0) throw new Error(`missing @media (${query})`)
+  return braceBlock(css, css.indexOf('{', start))
+}
+
+function braceBlock(source: string, openAt: number): string {
+  if (openAt < 0 || source[openAt] !== '{') throw new Error('missing opening brace')
+  let depth = 0
+  for (let index = openAt; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1
+    if (source[index] === '}') {
+      depth -= 1
+      if (depth === 0) return source.slice(openAt, index + 1)
+    }
+  }
+  throw new Error('unclosed block')
+}
