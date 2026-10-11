@@ -12,8 +12,9 @@ commits: HEAD
 
 ## What landed
 
-Stacked on `cursor/earth-theme-9eab` (#144). #144 stays as approved.
-Do not retarget until #144 merges.
+#144 merged. This branch is now on `origin/main`.
+See [0715](2026-10-11-0715-cursor-grok-4-6-earth-theme-nits-restack.md)
+for the restack.
 
 1. Splash card, `index.html` startup accents, Mycelium window skin,
    and sheet wikilink green use Earth surfaces and `#2C6A4D` /
