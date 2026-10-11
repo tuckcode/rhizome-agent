@@ -1,13 +1,11 @@
-# Spreadsheet File Format
+# Spreadsheet file format
 
 Source: reference/spreadsheet-format.md
 URL: /reference/spreadsheet-format
 
-# Spreadsheet File Format
-
 Sheet notes are Markdown files with YAML frontmatter and a CSV-like body. The note uses `_display: sheet` when it should open in the spreadsheet editor. The `type` field remains ordinary semantic metadata.
 
-For editing workflows, see [Use Spreadsheets](/guides/use-spreadsheets). For formula syntax and function references, see [Spreadsheet Formulas](/reference/spreadsheet-functions).
+For editing workflows, see [Use Spreadsheets](../guides/use-spreadsheets.md). For formula syntax and function references, see [Spreadsheet Formulas](spreadsheet-functions.md).
 
 ## Structure
 
@@ -68,7 +66,7 @@ The body is CSV-like text:
 
 Any cell whose input starts with `=` is treated as a formula. Other cells are treated as literal values.
 
-## `_sheet` Metadata
+## `_sheet` metadata
 
 Rhizome stores spreadsheet presentation state in `_sheet` as plain YAML.
 
@@ -103,7 +101,7 @@ Border values are stored as a style name with an optional color, for example:
 border_bottom: "thin #d0d7de"
 ```
 
-## Number Formats
+## Number formats
 
 Number formats are stored in `num_fmt` using spreadsheet-style format codes. Common examples:
 
@@ -117,7 +115,7 @@ Number formats are stored in `num_fmt` using spreadsheet-style format codes. Com
 
 These formats affect presentation, not the underlying cell input in the CSV body.
 
-## Markdown Style Import
+## Markdown style import
 
 When Rhizome imports a non-formula CSV cell, simple Markdown wrappers can seed initial styles:
 
@@ -149,7 +147,7 @@ Formula cells can reference another sheet note with Rhizome's cross-sheet syntax
 
 Cross-sheet references resolve another sheet note by wikilink target, then read a single A1-style cell. Circular references and very deep chains are treated as unresolved.
 
-## Guidance For Agents And Scripts
+## Guidance for agents and scripts
 
 When editing a sheet note programmatically:
 

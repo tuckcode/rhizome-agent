@@ -1,27 +1,35 @@
-# AI Agent Not Found
+# AI agent not found
 
 Source: troubleshooting/ai-agent-not-found.md
 URL: /troubleshooting/ai-agent-not-found
 
-# AI Agent Not Found
+Rhizome runs Prime Agent as a separate program. It can only use Prime when Prime is installed and Rhizome can find it.
 
-Rhizome can only launch local CLI agents that are installed and discoverable.
+You don't need Prime if you use Rhizome's own engine. Turn on **Chat engine** in Settings → AI Agents.
 
 ## Symptoms
 
-- The AI panel says no supported agent is available.
-- Claude Code or another agent works in one shell but not in Rhizome.
+- Chat says Prime is missing.
+- Settings → AI Agents shows Prime Agent as **missing**.
+- `prime-agent` works in one terminal but not from Rhizome.
 
 ## Checks
 
-Open a terminal and run the agent command directly. For Claude Code:
+1. Open a terminal and run:
 
-```bash
-claude --version
-```
+   ```bash
+   prime-agent status
+   ```
 
-If the command fails, install or repair the agent first.
+2. If the command isn't found, run `./install.sh` in your `rhizome-agent` folder. It installs Prime when it's missing.
+3. If Prime is installed but not running, start the daemon:
 
-## Path Issues
+   ```bash
+   (prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
+   ```
 
-Desktop apps can inherit a different `PATH` from your interactive shell. Rhizome checks common install locations, but shell setup can still vary. Prefer installing CLI tools in standard locations or making them available from your login shell.
+4. Look at Settings → AI Agents → Local agent → **Recognized local agents**. Prime Agent should show as installed, with its version.
+
+## Path issues
+
+Desktop apps can get a different `PATH` from your terminal. Rhizome checks common install locations, but shell setup varies. Install command-line tools in standard locations, or make them available from your login shell.

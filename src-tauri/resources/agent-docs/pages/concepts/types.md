@@ -3,11 +3,9 @@
 Source: concepts/types.md
 URL: /concepts/types
 
-# Types
-
 Types describe what kind of thing a note represents: Project, Person, Topic, Procedure, Event, or any category you create.
 
-## Type Field
+## Type field
 
 The `type:` field assigns a note to a type.
 
@@ -17,13 +15,13 @@ type: Project
 
 Rhizome does not infer type from folder location. Moving a file into another folder does not change its type.
 
-## Prefer Types Over Folders
+## Prefer types over folders
 
 Types are the preferred way to group notes in Rhizome. Folders are supported for existing vaults and fallback organization, but Rhizome is built around types and relationships because they carry stronger meaning than file paths.
 
 Use types for semantic groups such as Projects, People, Topics, Procedures, Events, and Essays. Use relationships to connect notes across those groups. This gives Rhizome better structure for navigation, filtering, properties, templates, and future automation than folder location alone.
 
-## Type Documents
+## Type documents
 
 Type documents are Markdown notes with `type: Type` in frontmatter. They describe how a type should appear and what new notes of that type should start with.
 Use Phosphor icon names in kebab-case for `_icon`, such as `folder` or `briefcase`.
@@ -42,7 +40,7 @@ _order: 10
 
 Type templates can live in the Type document's `template` frontmatter field. When a hand-edited Type body contains template-like structure after its own `# TypeName` heading, Rhizome also uses that body content as the new-note template. Plain descriptive body text stays documentation-only.
 
-## What Types Control
+## What types control
 
 - Sidebar grouping.
 - Type icon and color.
@@ -50,7 +48,7 @@ Type templates can live in the Type document's `template` frontmatter field. Whe
 - Pinned properties.
 - New-note templates.
 
-## New Note Defaults
+## New note defaults
 
 Type documents can define empty properties and relationships. When you create a new note of that type, Rhizome shows placeholders for those fields so you can fill them in from the Properties panel.
 

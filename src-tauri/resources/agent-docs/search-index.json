@@ -1,442 +1,582 @@
 [
   {
-    "title": "Index",
+    "title": "Rhizome",
+    "description": "Rhizome is a desktop app for an AI agent whose memory is a folder of Markdown notes you own.",
     "path": "pages/index.md",
     "url": "/",
     "section": "home",
-    "headings": []
+    "headings": [
+      "What you get",
+      "Where to go next",
+      "Origins"
+    ]
   },
   {
-    "title": "First Launch",
+    "title": "First launch",
+    "description": "Open a vault, send your first message and save your first note.",
     "path": "pages/start/first-launch.md",
     "url": "/start/first-launch",
     "section": "start",
     "headings": [
-      "What You Choose",
-      "What Rhizome Creates",
-      "First Commands To Try",
-      "AI Setup Prompt"
+      "1. Choose about telemetry",
+      "2. Chat opens",
+      "3. Open or create a vault",
+      "4. Send one message",
+      "5. Save something to the vault",
+      "Where things are kept",
+      "Next"
     ]
   },
   {
-    "title": "Getting Started Vault",
-    "path": "pages/start/getting-started-vault.md",
-    "url": "/start/getting-started-vault",
-    "section": "start",
-    "headings": [
-      "What It Demonstrates",
-      "Local-Only By Default",
-      "Use It Alongside Your Own Vaults",
-      "When To Move On"
-    ]
-  },
-  {
-    "title": "Install Rhizome",
+    "title": "Install",
+    "description": "Build and run the Rhizome developer preview from source on macOS.",
     "path": "pages/start/install.md",
     "url": "/start/install",
     "section": "start",
     "headings": [
-      "Download",
-      "Homebrew",
-      "Platform Status",
-      "Managed Windows Devices",
-      "After Installing"
+      "Before you start",
+      "Build and run",
+      "Pick an engine",
+      "Set up Prime",
+      "If you already have a built copy",
+      "Look at the interface without an engine",
+      "Next"
     ]
   },
   {
-    "title": "Open Or Create A Vault",
+    "title": "Open or create a vault",
+    "description": "Point Rhizome at a folder of Markdown notes, or start a new one. That folder is also the agent's memory.",
     "path": "pages/start/open-or-create-vault.md",
     "url": "/start/open-or-create-vault",
     "section": "start",
     "headings": [
-      "Open An Existing Folder",
-      "Create A New Vault",
-      "Use More Than One Vault",
-      "Git Is Recommended, Not Required"
+      "Open an existing folder",
+      "Create a new vault",
+      "Use more than one vault",
+      "Git is recommended, not required"
     ]
   },
   {
-    "title": "AI",
+    "title": "Why Rhizome",
+    "description": "What makes Rhizome different from other agent harnesses, and what will feel familiar.",
+    "path": "pages/start/why-rhizome.md",
+    "url": "/start/why-rhizome",
+    "section": "start",
+    "headings": [
+      "The problem it solves",
+      "Memory is a folder of Markdown",
+      "Git is the undo button",
+      "See where the agent went",
+      "Free models, routed for you",
+      "Rhizome runs its own loop",
+      "What will feel familiar",
+      "What it isn't yet"
+    ]
+  },
+  {
+    "title": "Agents, engines and models",
+    "description": "The agent loop, Chat engines (Prime and Rhizome's own), models, tools and permission modes.",
     "path": "pages/concepts/ai.md",
     "url": "/concepts/ai",
     "section": "concepts",
     "headings": [
-      "Coding Agents",
-      "Direct Models",
-      "External MCP Setup",
-      "Why Git Matters For AI"
+      "Terms on this page",
+      "Engines for Chat",
+      "Rhizome's engine",
+      "Prime Agent",
+      "Permission modes",
+      "Plugins",
+      "Let other apps use your vault (MCP)",
+      "Review what the agent changed"
     ]
   },
   {
     "title": "Editor",
+    "description": "Write in the rich editor or in raw Markdown. Both edit the same file.",
     "path": "pages/concepts/editor.md",
     "url": "/concepts/editor",
     "section": "concepts",
     "headings": [
-      "Rich Editing",
-      "Raw Mode",
-      "Table Of Contents",
+      "Rich editing",
+      "Raw mode",
+      "Table of contents",
       "Width"
     ]
   },
   {
-    "title": "Files And Media",
+    "title": "Files, PDFs and media",
+    "description": "Images, PDFs, media, whiteboards and diagrams in your vault, and how to preview them.",
     "path": "pages/concepts/files-and-media.md",
     "url": "/concepts/files-and-media",
     "section": "concepts",
     "headings": [
-      "Mermaid Diagrams",
-      "Attachments",
       "Previews",
+      "Attachments",
+      "Diagrams",
       "Whiteboards",
-      "Git Boundary"
+      "Git boundary"
+    ]
+  },
+  {
+    "title": "Free models and routing",
+    "description": "How Rhizome routes Chat across free hosted models and falls back when one fails.",
+    "path": "pages/concepts/free-models-and-routing.md",
+    "url": "/concepts/free-models-and-routing",
+    "section": "concepts",
+    "headings": [
+      "What you get",
+      "The providers",
+      "Set it up",
+      "How a provider gets skipped",
+      "Things to know",
+      "Credits",
+      "Related"
     ]
   },
   {
     "title": "Git",
+    "description": "Git gives your vault history, diffs, undo and sync, including for changes the agent makes.",
     "path": "pages/concepts/git.md",
     "url": "/concepts/git",
     "section": "concepts",
     "headings": [
-      "What Rhizome Uses Git For",
-      "History And Diffs",
-      "Local Commits",
+      "What Rhizome uses Git for",
+      "History and diffs",
+      "Local commits",
+      "Review what the agent changed",
       "Remotes"
     ]
   },
   {
     "title": "Inbox",
+    "description": "The Inbox holds notes you captured but haven't organized yet.",
     "path": "pages/concepts/inbox.md",
     "url": "/concepts/inbox",
     "section": "concepts",
     "headings": [
-      "Why It Exists",
-      "Organizing Inbox Notes",
-      "Healthy Inbox Habit"
+      "Why it exists",
+      "Organizing Inbox notes",
+      "Keep it small"
+    ]
+  },
+  {
+    "title": "Mycelium",
+    "description": "Replay where a Prime run went, meaning which files it searched, read and edited. Uses Mindwalk.",
+    "path": "pages/concepts/mycelium.md",
+    "url": "/concepts/mycelium",
+    "section": "concepts",
+    "headings": [
+      "What you see",
+      "Before you start",
+      "Open it",
+      "Find what touched a broken file",
+      "What it needs",
+      "What it isn't",
+      "Related"
     ]
   },
   {
     "title": "Notes",
+    "description": "A note is a Markdown file with optional YAML frontmatter. Its first H1 is its title.",
     "path": "pages/concepts/notes.md",
     "url": "/concepts/notes",
     "section": "concepts",
     "headings": [
       "Anatomy",
       "Titles",
-      "Body Links",
+      "Body links",
       "Frontmatter"
     ]
   },
   {
     "title": "Properties",
+    "description": "Properties are frontmatter fields Rhizome can show, filter and edit.",
     "path": "pages/concepts/properties.md",
     "url": "/concepts/properties",
     "section": "concepts",
     "headings": [
-      "Suggested Properties",
-      "System Properties",
-      "Property Editing"
+      "Suggested properties",
+      "System properties",
+      "Property editing"
     ]
   },
   {
     "title": "Relationships",
+    "description": "Link notes with wikilinks in the body or in frontmatter fields, and navigate the links both ways.",
     "path": "pages/concepts/relationships.md",
     "url": "/concepts/relationships",
     "section": "concepts",
     "headings": [
-      "Relationship Fields",
-      "Body Links Versus Relationship Fields",
+      "Relationship fields",
+      "Wikilinks",
+      "Body links versus relationship fields",
       "Backlinks"
     ]
   },
   {
     "title": "Spreadsheets",
+    "description": "Sheet notes are spreadsheets stored as Markdown files, with formulas, wikilinks and cross-sheet references.",
     "path": "pages/concepts/spreadsheets.md",
     "url": "/concepts/spreadsheets",
     "section": "concepts",
     "headings": [
-      "Read Next",
-      "Why Sheet Notes",
-      "One Note, One Sheet",
+      "Read next",
+      "Why sheet notes",
+      "One note, one sheet",
       "Editing",
-      "Wikilinks In Cells",
-      "Cross-Sheet Formulas",
+      "Wikilinks in cells",
+      "Cross-sheet formulas",
       "Storage",
       "Formulas"
     ]
   },
   {
     "title": "Types",
+    "description": "Types say what kind of thing a note is, such as Project or Person, and control how it looks and starts.",
     "path": "pages/concepts/types.md",
     "url": "/concepts/types",
     "section": "concepts",
     "headings": [
-      "Type Field",
-      "Prefer Types Over Folders",
-      "Type Documents",
-      "What Types Control",
-      "New Note Defaults"
+      "Type field",
+      "Prefer types over folders",
+      "Type documents",
+      "What types control",
+      "New note defaults"
+    ]
+  },
+  {
+    "title": "Your vault is the agent's memory",
+    "description": "How the agent's memory lives in your vault, and how you save, recall and revert it.",
+    "path": "pages/concepts/vault-as-memory.md",
+    "url": "/concepts/vault-as-memory",
+    "section": "concepts",
+    "headings": [
+      "What you get",
+      "The memory loop",
+      "Save to vault",
+      "Automatic saves are off by default",
+      "Bring in past chats",
+      "Why Git matters here",
+      "What the agent reads first",
+      "Where things live",
+      "Related"
     ]
   },
   {
     "title": "Vaults",
+    "description": "A vault is the folder Rhizome reads and writes. Files on disk are the source of truth.",
     "path": "pages/concepts/vaults.md",
     "url": "/concepts/vaults",
     "section": "concepts",
     "headings": [
-      "Core Rules",
-      "Why Local Files Matter",
-      "Git Is A Capability",
-      "Multiple Vaults At The Same Time",
-      "App State Versus Vault State"
+      "Core rules",
+      "Why local files matter",
+      "Git is a capability",
+      "Multiple vaults at the same time",
+      "App state versus vault state"
     ]
   },
   {
-    "title": "Build Custom Views",
+    "title": "Wiki Graph",
+    "description": "See your notes as a map of links, find notes that are linked but not written yet, and open any note from the graph.",
+    "path": "pages/concepts/wiki-graph.md",
+    "url": "/concepts/wiki-graph",
+    "section": "concepts",
+    "headings": [
+      "Open it",
+      "What you see",
+      "Find and focus",
+      "Keyboard",
+      "Related"
+    ]
+  },
+  {
+    "title": "Build custom views",
+    "description": "Save a filter as a view that answers one recurring question.",
     "path": "pages/guides/build-custom-views.md",
     "url": "/guides/build-custom-views",
     "section": "guides",
     "headings": [
-      "Good View Candidates",
-      "View Definition",
-      "Filters",
-      "Design The Question First"
+      "Design the question first",
+      "Good view candidates",
+      "View definition",
+      "Filters"
     ]
   },
   {
-    "title": "Capture A Note",
+    "title": "Capture a note",
+    "description": "Get an idea into the vault fast, and organize it later.",
     "path": "pages/guides/capture-a-note.md",
     "url": "/guides/capture-a-note",
     "section": "guides",
     "headings": [
       "Steps",
-      "Capture Well",
-      "When To Add Structure Immediately"
+      "Capture well",
+      "When to add structure immediately"
     ]
   },
   {
-    "title": "Manage Git Manually Or With AutoGit",
+    "title": "Coming from another harness",
+    "description": "Map what you know from Claude Code, Hermes Agent, Cursor and Prime onto Rhizome.",
+    "path": "pages/guides/coming-from-other-harnesses.md",
+    "url": "/guides/coming-from-other-harnesses",
+    "section": "guides",
+    "headings": [
+      "The one big difference",
+      "From Claude Code",
+      "From Hermes Agent",
+      "From Cursor",
+      "From Prime Agent",
+      "Bring your own model",
+      "Plugins"
+    ]
+  },
+  {
+    "title": "Commit, push and AutoGit",
+    "description": "Commit and push vault changes yourself, or let AutoGit make checkpoints for you.",
     "path": "pages/guides/commit-and-push.md",
     "url": "/guides/commit-and-push",
     "section": "guides",
     "headings": [
       "Manual Git",
       "AutoGit",
-      "Use Small Commits"
+      "Use small commits"
     ]
   },
   {
-    "title": "Configure AI Models",
+    "title": "Set up models and keys",
+    "description": "Add model providers, store keys in the system keychain, test the connection and use free models.",
     "path": "pages/guides/configure-ai-models.md",
     "url": "/guides/configure-ai-models",
     "section": "guides",
     "headings": [
-      "Local Models",
-      "API Models",
-      "Test The Connection",
-      "Select The Target"
+      "Choose an engine first",
+      "Add a provider",
+      "Store the key",
+      "Test the connection",
+      "Use free models",
+      "Pick the model for Chat",
+      "If it doesn't connect"
     ]
   },
   {
-    "title": "Connect A Git Remote",
+    "title": "Connect a Git remote",
+    "description": "Back up or sync a vault by connecting it to a Git remote.",
     "path": "pages/guides/connect-a-git-remote.md",
     "url": "/guides/connect-a-git-remote",
     "section": "guides",
     "headings": [
-      "Before You Start",
+      "Before you start",
       "Steps",
-      "Recommended Auth"
+      "Recommended auth"
     ]
   },
   {
-    "title": "Create Types",
+    "title": "Create types",
+    "description": "Make a type for notes that share a role, with an icon, colour, fields and a template.",
     "path": "pages/guides/create-types.md",
     "url": "/guides/create-types",
     "section": "guides",
     "headings": [
       "Steps",
-      "Use Types Sparingly",
+      "Use types sparingly",
       "Templates"
     ]
   },
   {
-    "title": "Manage Display Preferences",
+    "title": "Import Claude Code history",
+    "description": "Bring your Claude Code chats into the vault as Markdown notes.",
+    "path": "pages/guides/import-a-session.md",
+    "url": "/guides/import-a-session",
+    "section": "guides",
+    "headings": [
+      "Import",
+      "Run it again",
+      "Limits",
+      "Related"
+    ]
+  },
+  {
+    "title": "Display and themes",
+    "description": "Pick a theme and accent colour, set note width, and choose what shows in All Notes.",
     "path": "pages/guides/manage-display-preferences.md",
     "url": "/guides/manage-display-preferences",
     "section": "guides",
     "headings": [
       "Theme",
-      "Note Width",
-      "Sidebar Labels",
-      "Vault Content"
+      "Note width",
+      "Sidebar labels",
+      "What shows in All Notes",
+      "Closing the window",
+      "Language"
     ]
   },
   {
-    "title": "Organize The Inbox",
+    "title": "Organize the Inbox",
+    "description": "Turn quick captures into organized notes, then clear them from the Inbox.",
     "path": "pages/guides/organize-inbox.md",
     "url": "/guides/organize-inbox",
     "section": "guides",
     "headings": [
-      "Remove A Note From Inbox",
-      "Review Checklist",
-      "Make Notes Navigable",
-      "Avoid Over-Structuring"
+      "Remove a note from Inbox",
+      "Review checklist",
+      "Make notes navigable",
+      "Avoid over-structuring"
     ]
   },
   {
-    "title": "Use The AI",
+    "title": "Sessions",
+    "description": "Find, resume, fork and archive chats, and where each engine keeps its chat logs.",
+    "path": "pages/guides/sessions.md",
+    "url": "/guides/sessions",
+    "section": "guides",
+    "headings": [
+      "Two kinds of session",
+      "Resume a chat",
+      "Fork and archive",
+      "What's not saved in a session",
+      "Bring in chats from Claude Code"
+    ]
+  },
+  {
+    "title": "Structure a vault with Portent",
+    "description": "Portent gives a vault default types, relationships and a capture, organize, archive lifecycle.",
+    "path": "pages/guides/structure-with-portent.md",
+    "url": "/guides/structure-with-portent",
+    "section": "guides",
+    "headings": [
+      "Core questions",
+      "Types",
+      "Relationships",
+      "Lifecycle",
+      "Why use it",
+      "In Rhizome",
+      "Start from the template",
+      "Learn more"
+    ]
+  },
+  {
+    "title": "Chat with the agent",
+    "description": "Start a chat, keep typing while it runs, save what matters to the vault and resume later.",
     "path": "pages/guides/use-ai-panel.md",
     "url": "/guides/use-ai-panel",
     "section": "guides",
     "headings": [
-      "Choose How To Prompt",
-      "Choose A Target",
-      "Permission Mode",
-      "Good Requests",
-      "Review Changes"
+      "Start a chat",
+      "While a reply is running",
+      "Ask from the editor or about a note",
+      "Keep what matters",
+      "Come back to a chat",
+      "Approve tools",
+      "See what the agent did",
+      "Requests that work well"
     ]
   },
   {
-    "title": "Use The Command Palette",
+    "title": "Use the command palette",
+    "description": "Open any command, note or setting from the keyboard with ⌘K.",
     "path": "pages/guides/use-command-palette.md",
     "url": "/guides/use-command-palette",
     "section": "guides",
     "headings": [
-      "Common Commands",
-      "Keyboard-First Workflow"
+      "Ask the agent from the palette",
+      "Common commands",
+      "Keyboard-first"
     ]
   },
   {
-    "title": "Use Media Previews",
-    "path": "pages/guides/use-media-previews.md",
-    "url": "/guides/use-media-previews",
-    "section": "guides",
-    "headings": [
-      "Open A File",
-      "All Notes Visibility",
-      "Attachments",
-      "Troubleshooting"
-    ]
-  },
-  {
-    "title": "Use Spreadsheets",
+    "title": "Use spreadsheets",
+    "description": "Create sheet notes, enter values and formulas, format cells and link to other notes.",
     "path": "pages/guides/use-spreadsheets.md",
     "url": "/guides/use-spreadsheets",
     "section": "guides",
     "headings": [
-      "Create A Sheet",
-      "Enter Values",
-      "Enter Formulas",
-      "Select And Edit Ranges",
-      "Format Cells",
-      "Add Wikilinks",
-      "Reference Another Sheet Note",
-      "Work With The Raw File"
-    ]
-  },
-  {
-    "title": "Use The Table Of Contents",
-    "path": "pages/guides/use-table-of-contents.md",
-    "url": "/guides/use-table-of-contents",
-    "section": "guides",
-    "headings": [
-      "Open It",
-      "How It Works",
-      "Good Uses"
-    ]
-  },
-  {
-    "title": "Use Wikilinks",
-    "path": "pages/guides/use-wikilinks.md",
-    "url": "/guides/use-wikilinks",
-    "section": "guides",
-    "headings": [
-      "Link From The Body",
-      "Link From Frontmatter",
-      "Keep Links Stable"
-    ]
-  },
-  {
-    "title": "Portent",
-    "path": "pages/templates/portent.md",
-    "url": "/templates/portent",
-    "section": "templates",
-    "headings": [
-      "Core Questions",
-      "Types",
-      "Relationships",
-      "Lifecycle",
-      "Why Use It",
-      "Start From The Template",
-      "Learn More"
+      "Create a sheet",
+      "Enter values",
+      "Enter formulas",
+      "Select and edit ranges",
+      "Format cells",
+      "Add wikilinks",
+      "Reference another sheet note",
+      "Work with the raw file"
     ]
   },
   {
     "title": "Contribute",
+    "description": "Report a bug, suggest a feature, report a security issue or send a pull request.",
     "path": "pages/reference/contribute.md",
     "url": "/reference/contribute",
     "section": "reference",
     "headings": [
-      "Sponsor Or Support",
-      "Feature Requests",
-      "Questions",
-      "Contribute Code",
-      "Report A Bug"
+      "Report a bug",
+      "Suggest a feature",
+      "Report a security issue",
+      "Contribute code",
+      "Origins"
     ]
   },
   {
-    "title": "Docs Maintenance",
-    "path": "pages/reference/docs-maintenance.md",
-    "url": "/reference/docs-maintenance",
-    "section": "reference",
-    "headings": [
-      "Update Docs When You Change",
-      "Suggested Workflow",
-      "Page Types",
-      "Review Checklist"
-    ]
-  },
-  {
-    "title": "File Layout",
-    "path": "pages/reference/file-layout.md",
-    "url": "/reference/file-layout",
-    "section": "reference",
-    "headings": [
-      "Root Notes",
-      "Special Folders",
-      "Git Files"
-    ]
-  },
-  {
-    "title": "Frontmatter Fields",
-    "path": "pages/reference/frontmatter-fields.md",
-    "url": "/reference/frontmatter-fields",
-    "section": "reference",
-    "headings": [
-      "Custom Fields",
-      "System Fields"
-    ]
-  },
-  {
-    "title": "Keyboard Shortcuts",
-    "path": "pages/reference/keyboard-shortcuts.md",
-    "url": "/reference/keyboard-shortcuts",
+    "title": "Credits and licences",
+    "description": "Open-source projects Rhizome is built on or borrows from, and their licences.",
+    "path": "pages/reference/credits.md",
+    "url": "/reference/credits",
     "section": "reference",
     "headings": []
   },
   {
-    "title": "Release Channels",
-    "path": "pages/reference/release-channels.md",
-    "url": "/reference/release-channels",
+    "title": "File layout",
+    "description": "Where Rhizome keeps notes, views, attachments, imports and agent files inside a vault.",
+    "path": "pages/reference/file-layout.md",
+    "url": "/reference/file-layout",
     "section": "reference",
     "headings": [
-      "Stable",
-      "Alpha",
-      "Before Switching"
+      "Root notes",
+      "Special folders",
+      "Agent files",
+      "Git files"
     ]
   },
   {
-    "title": "Spreadsheet File Format",
+    "title": "Frontmatter fields",
+    "description": "The frontmatter fields Rhizome understands, including system fields that start with an underscore.",
+    "path": "pages/reference/frontmatter-fields.md",
+    "url": "/reference/frontmatter-fields",
+    "section": "reference",
+    "headings": [
+      "Custom fields",
+      "System fields"
+    ]
+  },
+  {
+    "title": "Keyboard shortcuts",
+    "description": "Every keyboard shortcut in Rhizome, for macOS and for Windows and Linux.",
+    "path": "pages/reference/keyboard-shortcuts.md",
+    "url": "/reference/keyboard-shortcuts",
+    "section": "reference",
+    "headings": [
+      "General",
+      "Layouts and Views",
+      "Notes",
+      "Editing",
+      "Navigation and zoom",
+      "Not on a shortcut"
+    ]
+  },
+  {
+    "title": "Platforms and updates",
+    "description": "Which platforms the Rhizome developer preview runs on, and how to update it.",
+    "path": "pages/reference/platforms-and-updates.md",
+    "url": "/reference/platforms-and-updates",
+    "section": "reference",
+    "headings": [
+      "Update Rhizome",
+      "Update Prime",
+      "Report a platform bug"
+    ]
+  },
+  {
+    "title": "Spreadsheet file format",
+    "description": "How sheet notes are stored as plain text: frontmatter, a CSV-like body and _sheet metadata.",
     "path": "pages/reference/spreadsheet-format.md",
     "url": "/reference/spreadsheet-format",
     "section": "reference",
@@ -444,22 +584,23 @@
       "Structure",
       "Frontmatter",
       "Body",
-      "`_sheet` Metadata",
-      "Number Formats",
-      "Markdown Style Import",
+      "`_sheet` metadata",
+      "Number formats",
+      "Markdown style import",
       "Wikilinks",
-      "Guidance For Agents And Scripts"
+      "Guidance for agents and scripts"
     ]
   },
   {
-    "title": "Spreadsheet Formulas",
+    "title": "Spreadsheet formulas",
+    "description": "Formula syntax, cross-sheet references and the IronCalc function families Rhizome autocompletes.",
     "path": "pages/reference/spreadsheet-functions.md",
     "url": "/reference/spreadsheet-functions",
     "section": "reference",
     "headings": [
-      "Basic Syntax",
-      "Rhizome Cross-Sheet References",
-      "Autocomplete Functions",
+      "Basic syntax",
+      "Rhizome cross-sheet references",
+      "Autocomplete functions",
       "Logical",
       "Math and trigonometry",
       "Lookup and reference",
@@ -471,87 +612,98 @@
       "Engineering",
       "Examples",
       "Totals",
-      "Growth And Percentages",
-      "Conditional Logic",
+      "Growth and percentages",
+      "Conditional logic",
       "Dates",
       "Text",
       "Lookup",
-      "Cross-Sheet Model",
-      "IronCalc Function Families"
+      "Cross-sheet model",
+      "IronCalc function families"
     ]
   },
   {
-    "title": "Supported Platforms",
-    "path": "pages/reference/supported-platforms.md",
-    "url": "/reference/supported-platforms",
-    "section": "reference",
-    "headings": [
-      "Support Policy",
-      "Reporting Platform Bugs"
-    ]
-  },
-  {
-    "title": "View Filters",
+    "title": "View filters",
+    "description": "Filters, operators and sorts for saved views.",
     "path": "pages/reference/view-filters.md",
     "url": "/reference/view-filters",
     "section": "reference",
     "headings": [
-      "Common Filter Ideas",
+      "Common filter ideas",
       "Sorting",
       "Operators",
-      "Keep Views Focused"
+      "Keep views focused"
     ]
   },
   {
-    "title": "AI Agent Not Found",
+    "title": "AI agent not found",
+    "description": "Fix \"Prime is missing\" when Prime Agent is installed but Rhizome can't find it.",
     "path": "pages/troubleshooting/ai-agent-not-found.md",
     "url": "/troubleshooting/ai-agent-not-found",
     "section": "troubleshooting",
     "headings": [
       "Symptoms",
       "Checks",
-      "Path Issues"
+      "Path issues"
     ]
   },
   {
-    "title": "Git Authentication",
+    "title": "Chat doesn't answer",
+    "description": "What to do when a message gets no reply, for Prime and for Rhizome's own engine.",
+    "path": "pages/troubleshooting/chat-doesnt-answer.md",
+    "url": "/troubleshooting/chat-doesnt-answer",
+    "section": "troubleshooting",
+    "headings": [
+      "Prime Agent",
+      "Rhizome's engine",
+      "Either engine"
+    ]
+  },
+  {
+    "title": "Git authentication",
+    "description": "Fix push and pull failures caused by Git sign-in.",
     "path": "pages/troubleshooting/git-auth.md",
     "url": "/troubleshooting/git-auth",
     "section": "troubleshooting",
     "headings": [
       "Symptoms",
       "Checks",
-      "Common Fixes"
+      "Common fixes"
     ]
   },
   {
-    "title": "Model Provider Connection",
+    "title": "Model provider connection",
+    "description": "What to check when a local or hosted model provider won't connect.",
     "path": "pages/troubleshooting/model-provider-connection.md",
     "url": "/troubleshooting/model-provider-connection",
     "section": "troubleshooting",
     "headings": [
-      "Local Providers",
-      "API Providers",
-      "Chat Mode Boundary"
+      "Local providers",
+      "Hosted providers",
+      "Keychain problems",
+      "Free tier (auto) can't route",
+      "No file tools"
     ]
   },
   {
-    "title": "Sync Conflicts",
+    "title": "Sync conflicts",
+    "description": "Resolve conflicts when local and remote changes touch the same note.",
     "path": "pages/troubleshooting/sync-conflicts.md",
     "url": "/troubleshooting/sync-conflicts",
     "section": "troubleshooting",
     "headings": [
-      "What To Do",
-      "Prevent Conflicts"
+      "What to do",
+      "Prevent conflicts"
     ]
   },
   {
-    "title": "Vault Not Loading",
+    "title": "Vault not loading",
+    "description": "What to check when Rhizome can't open or refresh a vault.",
     "path": "pages/troubleshooting/vault-not-loading.md",
     "url": "/troubleshooting/vault-not-loading",
     "section": "troubleshooting",
     "headings": [
-      "Check The Folder",
+      "Check the folder",
+      "macOS folder permission",
       "Check Git",
       "Reload"
     ]

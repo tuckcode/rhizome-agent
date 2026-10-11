@@ -3,19 +3,17 @@
 Source: concepts/spreadsheets.md
 URL: /concepts/spreadsheets
 
-# Spreadsheets
-
 Rhizome sheets are spreadsheet notes. They keep the same file-first model as other notes, but a note with `_display: sheet` opens in a spreadsheet editor instead of the rich text editor. The note's `type` remains available for organization.
 
 The durable file is still Markdown with YAML frontmatter. The body is CSV-like text containing cell inputs and formulas, and spreadsheet presentation state is stored as plain YAML under `_sheet`.
 
-## Read Next
+## Read next
 
-- [Use Spreadsheets](/guides/use-spreadsheets) for the editing workflow.
-- [Spreadsheet File Format](/reference/spreadsheet-format) for the plain-text storage contract.
-- [Spreadsheet Formulas](/reference/spreadsheet-functions) for formula syntax, autocomplete, and IronCalc function families.
+- [Use Spreadsheets](../guides/use-spreadsheets.md) for the editing workflow.
+- [Spreadsheet File Format](../reference/spreadsheet-format.md) for the plain-text storage contract.
+- [Spreadsheet Formulas](../reference/spreadsheet-functions.md) for formula syntax, autocomplete, and IronCalc function families.
 
-## Why Sheet Notes
+## Why sheet notes
 
 Sheets are useful when information is better modeled as rows, columns, and formulas than as prose. Examples include budgets, revenue models, inventories, editorial calendars, lightweight trackers, and analytical scratchpads.
 
@@ -27,7 +25,7 @@ Rhizome does not store sheets as opaque workbook binaries. A sheet should remain
 - available offline
 - connected to the rest of the vault through types, properties, relationships, and wikilinks
 
-## One Note, One Sheet
+## One note, one sheet
 
 A sheet note is a single sheet. Rhizome does not expose multiple tabs inside one note.
 
@@ -62,7 +60,7 @@ Keyboard basics follow spreadsheet conventions:
 - `Delete` or `Backspace` clears the selected range
 - copy and paste should preserve formulas, including Rhizome cross-sheet references
 
-## Wikilinks In Cells
+## Wikilinks in cells
 
 Wikilinks in non-formula cells are stored as normal Rhizome wikilinks:
 
@@ -74,7 +72,7 @@ Project,Owner,Status
 
 The cell still behaves like a spreadsheet cell, but the value remains a vault link that Rhizome can understand.
 
-## Cross-Sheet Formulas
+## Cross-sheet formulas
 
 Rhizome adds a sheet-note reference syntax on top of IronCalc formulas:
 
@@ -127,8 +125,8 @@ Growth,,=(C5-B5)/B5,=(D5-C5)/C5,=(E5-B5)/B5
 
 Normal frontmatter stays normal Rhizome metadata. `_sheet` is system metadata for the spreadsheet editor and is hidden from normal property editing.
 
-For the full storage contract, see [Spreadsheet File Format](/reference/spreadsheet-format).
+For the full storage contract, see [Spreadsheet File Format](../reference/spreadsheet-format.md).
 
 ## Formulas
 
-Rhizome delegates formula calculation to IronCalc. IronCalc aims for Excel-compatible formulas, while its project documentation still describes it as work in progress. For Rhizome-specific formula behavior and the autocomplete function catalog, see [Spreadsheet Formulas](/reference/spreadsheet-functions).
+Rhizome delegates formula calculation to IronCalc. IronCalc aims for Excel-compatible formulas, while its project documentation still describes it as work in progress. For Rhizome-specific formula behavior and the autocomplete function catalog, see [Spreadsheet Formulas](../reference/spreadsheet-functions.md).

@@ -1,9 +1,7 @@
-# Frontmatter Fields
+# Frontmatter fields
 
 Source: reference/frontmatter-fields.md
 URL: /reference/frontmatter-fields
-
-# Frontmatter Fields
 
 Rhizome uses conventions instead of a required schema.
 
@@ -11,7 +9,7 @@ Rhizome uses conventions instead of a required schema.
 | --- | --- |
 | `type` | The note's entity type. |
 | `status` | Lifecycle state. |
-| `icon` | Per-note icon. |
+| `icon` | Per-note icon you set as a normal property. |
 | `url` | External URL. |
 | `date` | Single date. |
 | `belongs_to` | Parent relationship. |
@@ -24,11 +22,13 @@ Rhizome uses conventions instead of a required schema.
 | `_pinned_properties` | Properties pinned for a type. |
 | `_sheet` | Sheet-note presentation metadata such as grid settings, column widths, row heights, and cell formatting. |
 
-## Custom Fields
+`icon` is an ordinary property you can see and edit. `_icon` is the system field Rhizome writes when you pick an icon from the app, and it's hidden from property editing.
+
+## Custom fields
 
 You can add your own fields. If a field contains wikilinks, Rhizome can treat it as a relationship.
 
-## System Fields
+## System fields
 
 Fields starting with `_` are reserved for system behavior and hidden from standard property editing. They remain plain YAML, so they can still be inspected or changed in raw mode when needed.
 

@@ -1,39 +1,82 @@
-# AI Agent Not Found
+# AI agent not found
 
 Source: troubleshooting/ai-agent-not-found.md
 URL: /troubleshooting/ai-agent-not-found
 
-# AI Agent Not Found
+Rhizome runs Prime Agent as a separate program. It can only use Prime when Prime is installed and Rhizome can find it.
 
-Rhizome can only launch local CLI agents that are installed and discoverable.
+You don't need Prime if you use Rhizome's own engine. Turn on **Chat engine** in Settings → AI Agents.
 
 ## Symptoms
 
-- The AI panel says no supported agent is available.
-- Claude Code or another agent works in one shell but not in Rhizome.
+- Chat says Prime is missing.
+- Settings → AI Agents shows Prime Agent as **missing**.
+- `prime-agent` works in one terminal but not from Rhizome.
 
 ## Checks
 
-Open a terminal and run the agent command directly. For Claude Code:
+1. Open a terminal and run:
 
-```bash
-claude --version
-```
+   ```bash
+   prime-agent status
+   ```
 
-If the command fails, install or repair the agent first.
+2. If the command isn't found, run `./install.sh` in your `rhizome-agent` folder. It installs Prime when it's missing.
+3. If Prime is installed but not running, start the daemon:
 
-## Path Issues
+   ```bash
+   (prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
+   ```
 
-Desktop apps can inherit a different `PATH` from your interactive shell. Rhizome checks common install locations, but shell setup can still vary. Prefer installing CLI tools in standard locations or making them available from your login shell.
+4. Look at Settings → AI Agents → Local agent → **Recognized local agents**. Prime Agent should show as installed, with its version.
+
+## Path issues
+
+Desktop apps can get a different `PATH` from your terminal. Rhizome checks common install locations, but shell setup varies. Install command-line tools in standard locations, or make them available from your login shell.
 
 ---
 
-# Git Authentication
+# Chat doesn't answer
+
+Source: troubleshooting/chat-doesnt-answer.md
+URL: /troubleshooting/chat-doesnt-answer
+
+First check which engine runs Chat: Settings → AI Agents → **Chat engine**. Off means Prime Agent. On means Rhizome's own engine.
+
+## Prime Agent
+
+| You see | Do this |
+|---|---|
+| Prime is missing | Install Prime with `./install.sh`, run `prime-agent` once, and start the daemon (see [Install](../start/install.md#set-up-prime)). Or turn on **Chat engine** to use Rhizome's engine, which doesn't need Prime |
+| Prime is installed, but Chat still says it's missing | Wait a few seconds. The check repeats. If it keeps failing, see [AI agent not found](ai-agent-not-found.md) |
+| Chat stopped answering after you closed a terminal | Prime stops with the terminal that started it. Start it as a daemon: `(prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status` |
+| The provider login expired | Settings → AI Agents → Local agent → **Reconnect** on that provider. Or run `prime-agent`, then `/login` |
+
+## Rhizome's engine
+
+| You see | Do this |
+|---|---|
+| No key for the model | Add the key in Settings → AI Agents → API model (or Local model). Settings points you there |
+| "No free-tier provider key is set." | Turn on at least one provider under **Free tier (auto)** and paste its key |
+| A provider row says **Keychain error** | Unlock the keychain, or allow Rhizome to use it, then reopen Settings |
+| A notice appears, but the reply goes on | Something went wrong that didn't stop the turn, such as part of the chat not being saved. Read the notice; the chat still works |
+| The model can't be reached | Click **Test model** on the provider. See [Model provider connection](model-provider-connection.md) |
+| Enter does nothing while a reply runs | Rhizome's engine takes one turn at a time. Wait for the reply, or press Stop |
+| Another window is already running this chat | Only one turn can run at a time. Wait, or continue in that window |
+
+## Either engine
+
+| You see | Do this |
+|---|---|
+| No network | Notes on disk still open. Chat can't answer until the network is back, unless you use a local model |
+| The window disappeared | The red button quits Rhizome unless **Keep in taskbar** is on. Reopen the app, or click the Dock icon |
+
+---
+
+# Git authentication
 
 Source: troubleshooting/git-auth.md
 URL: /troubleshooting/git-auth
-
-# Git Authentication
 
 Rhizome uses system Git authentication. It does not manage provider passwords directly.
 
@@ -52,7 +95,7 @@ Rhizome uses system Git authentication. It does not manage provider passwords di
 
 If `git fetch` fails in the terminal, fix system Git auth first.
 
-## Common Fixes
+## Common fixes
 
 - Sign in with GitHub CLI.
 - Configure SSH keys.
@@ -61,49 +104,53 @@ If `git fetch` fails in the terminal, fix system Git auth first.
 
 ---
 
-# Model Provider Connection
+# Model provider connection
 
 Source: troubleshooting/model-provider-connection.md
 URL: /troubleshooting/model-provider-connection
 
-# Model Provider Connection
+Use this checklist when a model provider doesn't answer. It applies to Rhizome's own engine. Prime handles its own providers; see [Chat doesn't answer](chat-doesnt-answer.md).
 
-Use this checklist when a local or API model provider does not connect.
-
-## Local Providers
+## Local providers
 
 For Ollama or LM Studio:
 
 1. Start the local model server.
-2. Confirm the base URL in Rhizome matches the server.
-3. Confirm the model ID is installed and loaded by the provider.
-4. Use the Settings test action again.
+2. Check that the base URL in Settings → AI Agents → Local model matches the server.
+3. Check that the model ID is installed and loaded.
+4. Click **Test model** again.
 
-## API Providers
+## Hosted providers
 
-For hosted providers:
+1. Check the provider kind and endpoint.
+2. Check that the model ID exists for your account.
+3. Check the key. With **Save locally in Rhizome**, the key is in the system keychain. With **Read from env var**, the variable must be set for the app, not only in your terminal.
+4. Click **Test model**. It sends one short request with no tools.
 
-1. Confirm the provider kind and endpoint.
-2. Confirm the model ID exists for your account.
-3. Confirm the API key is saved locally or available in the configured environment variable.
-4. Avoid storing secrets in the vault.
+Never store keys in the vault. Vault notes are committed and can be pushed.
 
-## Chat Mode Boundary
+## Keychain problems
 
-Direct model targets run in chat mode. If you need file-editing tools, use a coding agent target such as Claude Code, Codex, OpenCode, Pi, or Antigravity CLI.
+If a Free tier provider row says **Keychain error**, the system keychain is locked or Rhizome isn't allowed to use it. Unlock it or allow access, then reopen Settings. Keys from older versions move to the keychain the first time they're read; don't edit a key file by hand.
+
+## Free tier (auto) can't route
+
+If no free provider has a key, Settings says "Add a key to at least one provider to use Free tier (auto)." Turn on a provider and paste its key. With **Strict mode** on, only Groq and your own endpoint are used. See [Free models and routing](../concepts/free-models-and-routing.md).
+
+## No file tools
+
+Rhizome's engine can create notes, but it can't read, search or edit files yet. If you need an agent that edits files, use Prime as the engine. See [Agents, engines and models](../concepts/ai.md).
 
 ---
 
-# Sync Conflicts
+# Sync conflicts
 
 Source: troubleshooting/sync-conflicts.md
 URL: /troubleshooting/sync-conflicts
 
-# Sync Conflicts
-
 Sync conflicts happen when local and remote changes touch the same content.
 
-## What To Do
+## What to do
 
 1. Stop editing the conflicted note.
 2. Open the conflict resolver if Rhizome presents it.
@@ -112,7 +159,7 @@ Sync conflicts happen when local and remote changes touch the same content.
 5. Commit the resolved file.
 6. Push again.
 
-## Prevent Conflicts
+## Prevent conflicts
 
 - Pull before starting work on another device.
 - Push after meaningful sessions.
@@ -121,21 +168,23 @@ Sync conflicts happen when local and remote changes touch the same content.
 
 ---
 
-# Vault Not Loading
+# Vault not loading
 
 Source: troubleshooting/vault-not-loading.md
 URL: /troubleshooting/vault-not-loading
 
-# Vault Not Loading
-
 Use this checklist when Rhizome cannot open or refresh a vault.
 
-## Check The Folder
+## Check the folder
 
 - Confirm the folder exists.
 - Confirm the folder contains readable files.
 - Confirm Rhizome has permission to access the folder.
 - Try opening a smaller test vault to isolate the issue.
+
+## macOS folder permission
+
+If the vault is in Documents, Desktop or Downloads, macOS must allow Rhizome to read it. Allow access when macOS asks, or turn it on in System Settings → Privacy & Security → Files and Folders. Or move the vault to another folder.
 
 ## Check Git
 

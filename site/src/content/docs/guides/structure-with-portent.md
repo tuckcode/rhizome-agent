@@ -1,15 +1,13 @@
-# Portent
-
-Source: templates/portent.md
-URL: /templates/portent
-
-# Portent
+---
+title: Structure a vault with Portent
+description: Portent gives a vault default types, relationships and a capture, organize, archive lifecycle.
+---
 
 [Portent](https://portent.md) is an open specification and template for work and personal knowledge bases.
 
 It gives a Rhizome vault a small set of defaults for organizing information: clear types, generic graph-like relationships, and a simple lifecycle for captured knowledge. The goal is to make a knowledge base useful to humans and AI agents without forcing every person or team to design a private ontology first.
 
-## Core Questions
+## Core questions
 
 Portent favors convention over configuration. Instead of asking "where should this go?", it asks:
 
@@ -58,20 +56,24 @@ Portent separates capture from organization:
 
 Rhizome supports that lifecycle directly: the Inbox holds captured notes, organizing a note marks it ready for normal views, and archiving hides old or obsolete notes from active surfaces while keeping them available.
 
-## Why Use It
+## Why use it
 
 A blank vault is flexible, but it also asks you to make structural decisions before you have momentum. Portent gives you enough structure to start capturing, organizing, and retrieving notes immediately.
 
-Because Portent is file-friendly and portable, the same model can work across local Markdown vaults, note apps, docs tools, and agent-readable knowledge bases. Rhizome is the first intended implementation, but the spec is not tied to Rhizome internals.
+Because Portent is file-friendly and portable, the same model can work across local Markdown vaults, note apps, docs tools, and agent-readable knowledge bases. The spec isn't tied to Rhizome.
 
-## Start From The Template
+## In Rhizome
 
-The fastest starting point is the Portent template vault:
+New vaults already include Portent's work types: Project, Operation, Responsibility, Task, Event, Topic and Person. On an older vault, use **Add default work types** in Settings → Workflow to add any that are missing. Existing types are never overwritten.
+
+## Start from the template
+
+You can also start from the Portent template vault:
 
 - [refactoringhq/portent-vault-template](https://github.com/refactoringhq/portent-vault-template)
 
 Use it as-is, rename pieces to match your language, or treat it as a reference model for your own Rhizome setup.
 
-## Learn More
+## Learn more
 
 Visit [portent.md](https://portent.md) for the full spec, examples, and implementation notes.

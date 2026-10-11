@@ -121,3 +121,8 @@ rhizome-agent/
 # Audit evidence (screenshots, measurements, probe scripts) stays local.
 # The repository is public; reports note the evidence is not committed.
 docs/design/*-ui-audit/
+
+# Starlight docs site
+site/node_modules/
+site/dist/
+site/.astro/

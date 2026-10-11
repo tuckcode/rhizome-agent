@@ -1,15 +1,13 @@
-# Use Spreadsheets
+# Use spreadsheets
 
 Source: guides/use-spreadsheets.md
 URL: /guides/use-spreadsheets
-
-# Use Spreadsheets
 
 Rhizome spreadsheets are sheet notes: Markdown files with frontmatter and a CSV-like body that open in a spreadsheet editor when their `Display as` value is `Sheet`.
 
 Use a sheet note when a model needs rows, columns, calculations, or repeated numeric editing. Use a normal note when the main artifact is prose.
 
-## Create A Sheet
+## Create a sheet
 
 Use the command palette action `New Sheet`, or create/open a note and set its `Display as` to `Sheet` from the Properties panel. `Type` remains separate and can still be `Note`, `Project`, `Responsibility`, or any other Rhizome type.
 
@@ -21,7 +19,7 @@ When a note is a sheet:
 - there is no rich-text body around the table
 - the editor switches from the text editor to the spreadsheet editor
 
-## Enter Values
+## Enter values
 
 Click a cell and type a value. Non-formula values can be text, numbers, dates, or wikilinks.
 
@@ -29,7 +27,7 @@ Press `Enter` on a selected cell to edit the cell. Press `Escape` while editing 
 
 Use `Delete` or `Backspace` to clear the selected cell or range.
 
-## Enter Formulas
+## Enter formulas
 
 Formulas start with `=`.
 
@@ -42,9 +40,9 @@ Formulas start with `=`.
 
 Rhizome shows inline formula autocomplete while you type. The autocomplete list is built from the implemented function catalog in the bundled IronCalc engine; formula evaluation is still handled by IronCalc.
 
-See [Spreadsheet Formulas](/reference/spreadsheet-functions) for syntax, supported examples, and links to the full IronCalc formula reference.
+See [Spreadsheet Formulas](../reference/spreadsheet-functions.md) for syntax, supported examples, and links to the full IronCalc formula reference.
 
-## Select And Edit Ranges
+## Select and edit ranges
 
 The sheet editor follows spreadsheet conventions:
 
@@ -57,7 +55,7 @@ The sheet editor follows spreadsheet conventions:
 
 Right-click actions apply to the current selection. Keep a multi-cell selection active before opening the context menu when you want to format several cells together.
 
-## Format Cells
+## Format cells
 
 Use the context menu for common formatting:
 
@@ -75,9 +73,9 @@ _sheet:
       num_fmt: "0.00%"
 ```
 
-See [Spreadsheet File Format](/reference/spreadsheet-format) for the full storage model.
+See [Spreadsheet File Format](../reference/spreadsheet-format.md) for the full storage model.
 
-## Add Wikilinks
+## Add wikilinks
 
 Type `[[` in a cell to open note autocomplete.
 
@@ -91,7 +89,7 @@ When the cell is not being edited, Rhizome renders the wikilink like other note 
 
 Command-click a wikilink in a sheet cell to open the linked note.
 
-## Reference Another Sheet Note
+## Reference another sheet note
 
 Formulas can read a cell from another sheet note with Rhizome's wikilink cell syntax:
 
@@ -114,7 +112,7 @@ Use absolute markers when copying formulas:
 
 Cross-sheet references currently resolve single cells. Keep range formulas inside one sheet note.
 
-## Work With The Raw File
+## Work with the raw file
 
 A sheet file remains readable text:
 

@@ -1,18 +1,20 @@
-# Vault Not Loading
+# Vault not loading
 
 Source: troubleshooting/vault-not-loading.md
 URL: /troubleshooting/vault-not-loading
 
-# Vault Not Loading
-
 Use this checklist when Rhizome cannot open or refresh a vault.
 
-## Check The Folder
+## Check the folder
 
 - Confirm the folder exists.
 - Confirm the folder contains readable files.
 - Confirm Rhizome has permission to access the folder.
 - Try opening a smaller test vault to isolate the issue.
+
+## macOS folder permission
+
+If the vault is in Documents, Desktop or Downloads, macOS must allow Rhizome to read it. Allow access when macOS asks, or turn it on in System Settings → Privacy & Security → Files and Folders. Or move the vault to another folder.
 
 ## Check Git
 

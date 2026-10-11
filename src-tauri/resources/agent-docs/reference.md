@@ -3,84 +3,54 @@
 Source: reference/contribute.md
 URL: /reference/contribute
 
-# Contribute
+Rhizome is free and open source under AGPL-3.0-or-later. All of these happen on GitHub.
 
-Rhizome is free and open source, and any kind of help is useful. Pick the path that matches what you want to do.
+## Report a bug
 
-## Sponsor Or Support
+Open an issue on [GitHub Issues](https://github.com/tuckcode/rhizome-agent/issues). Include what happened, what you expected, and the steps to reproduce it.
 
-The best way to support Rhizome is to subscribe to [Refactoring](https://refactoring.fm/), Luca's newsletter and community about running good teams and shipping software with AI.
+From inside Rhizome, open **Contribute** from the command palette or Settings → About. It can copy diagnostics with personal details removed, for you to paste into the issue.
 
-## Feature Requests
+## Suggest a feature
 
-Use the [product board](https://rhizome.canny.io/) for feature ideas. Search first, upvote existing ideas, and create a new post when the request is genuinely new.
+Search [GitHub Issues](https://github.com/tuckcode/rhizome-agent/issues) first. Comment on an existing request, or open a new one if yours is new.
 
-## Questions
+## Report a security issue
 
-Use [GitHub Issues](https://github.com/tuckcode/rhizome-agent/issues) for questions, conversations, show and tell, and broader community context.
+Don't open a public issue. Follow [SECURITY.md](https://github.com/tuckcode/rhizome-agent/blob/main/SECURITY.md).
 
-## Contribute Code
+## Contribute code
 
-Small, focused pull requests are welcome. Check the product board first so you build the right thing, then open a PR on [GitHub](https://github.com/tuckcode/rhizome-agent/pulls). The [contributing guide](https://github.com/tuckcode/rhizome-agent/blob/main/CONTRIBUTING.md) explains the local workflow.
+Small, focused pull requests are welcome. Read [CONTRIBUTING.md](https://github.com/tuckcode/rhizome-agent/blob/main/CONTRIBUTING.md) for the local workflow, then open a pull request on [GitHub](https://github.com/tuckcode/rhizome-agent/pulls).
 
-## Report A Bug
+## Origins
 
-Use [GitHub Issues](https://github.com/tuckcode/rhizome-agent/issues) for bugs. Include what happened, what you expected, and clear reproduction steps. If you are reporting from inside Rhizome, use the Contribute panel to copy sanitized diagnostics and attach them to the issue.
-
----
-
-# Docs Maintenance
-
-Source: reference/docs-maintenance.md
-URL: /reference/docs-maintenance
-
-# Docs Maintenance
-
-The public docs live in the app repo so documentation changes can ship with behavior changes.
-
-## Update Docs When You Change
-
-- A Tauri command.
-- A new component or hook that changes user behavior.
-- A data model or frontmatter convention.
-- Git, AI, onboarding, or release behavior.
-- Public release pages, download metadata, or updater channels.
-- Platform support.
-- Keyboard shortcuts.
-
-## Suggested Workflow
-
-1. Make the code change.
-2. Update the matching concept, guide, or reference page.
-3. Add a troubleshooting page if the change creates a new failure mode.
-4. Run `pnpm docs:build`.
-5. Check the home page, search, release/download links, and changed docs pages in a browser.
-
-## Page Types
-
-| Type | Purpose |
-| --- | --- |
-| Start | Helps a new user get into the app. |
-| Concepts | Explains mental models. |
-| Guides | Teaches workflows. |
-| Reference | Gives stable facts and tables. |
-| Troubleshooting | Starts from a symptom and ends with recovery. |
-
-## Review Checklist
-
-- Does the page describe current behavior?
-- Does it mention macOS primary and Windows/Linux supported-early status when platform support matters?
-- Are links relative and VitePress-compatible?
-- Can a user discover the page with local search?
+Rhizome is a modified version of [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi. See [Credits and licences](credits.md).
 
 ---
 
-# File Layout
+# Credits and licences
+
+Source: reference/credits.md
+URL: /reference/credits
+
+Rhizome is free software under AGPL-3.0-or-later. It builds on the projects below. Copied or ported code is also listed in the repository's `THIRD_PARTY_NOTICES` and `docs/vendored-sources.md`.
+
+| Project | Licence | What Rhizome uses |
+|---|---|---|
+| [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi | AGPL-3.0 | Rhizome is a modified version of Tolaria: the vault, editor and note model |
+| [Mindwalk](https://github.com/cosmtrek/mindwalk) © 2026 Ricko Yu | MIT | The map engine behind [Mycelium](../concepts/mycelium.md). You install it separately; Rhizome calls it |
+| [OmniRoute](https://github.com/diegosouzapw/OmniRoute) © 2026 diegosouzapw | MIT | [Free tier (auto)](../concepts/free-models-and-routing.md): the provider catalog data and cooldown rules are ported from it |
+| [freellmapi](https://github.com/tashfeenahmed/freellmapi) | MIT | Free tier (auto): used as an edge-case checklist for retries and failover. No code or hosted catalog is copied |
+| [Portent](https://portent.md) | See the project | The default work types for new vaults. See [Structure a vault with Portent](../guides/structure-with-portent.md) |
+| [IronCalc](https://github.com/ironcalc/IronCalc) | MIT or Apache-2.0 | Spreadsheet engine for sheet notes |
+
+---
+
+# File layout
 
 Source: reference/file-layout.md
 URL: /reference/file-layout
-
-# File Layout
 
 Rhizome is not opinionated about folder structure. It finds notes recursively across the whole vault, stores new notes in the root by default, and uses types and relationships for real organization.
 
@@ -99,18 +69,29 @@ my-vault/
     active-projects.yml
 ```
 
-## Root Notes
+## Root notes
 
 Rhizome works well with a flat vault. Folders are optional and can be useful for compatibility with other tools, but they are not required for people, projects, topics, or any other note category.
 
 Type is not inferred from folder location. It comes from frontmatter, and relationships are expressed with wikilinks in fields. That is what Rhizome uses for the sidebar, Properties panel, search, custom views, and neighborhood navigation.
 
-## Special Folders
+## Special folders
 
 | Folder | Purpose |
 | --- | --- |
 | `views/` | Saved custom views. |
 | `attachments/` | Images and other attached files. |
+| `Imports/` | Chats brought in with **Import chat history**, for example `Imports/claude-code/`. |
+| `.rhizome/` | Rhizome's own vault files, such as the activity log `events.jsonl`. |
+
+## Agent files
+
+| File | Purpose |
+| --- | --- |
+| `AGENTS.md` | Your conventions for AI agents working in this vault. |
+| `CLAUDE.md` | A compatibility copy for tools that look for that name. |
+
+Chats from Rhizome's engine aren't kept in the vault. They're in `native-sessions/` in the app config folder. Prime keeps its sessions in `~/.prime/agent/sessions/`.
 
 PDFs, images, and other non-Markdown files stay as normal files. Folder browsing can show them in place, and Settings controls whether PDFs, images, and unsupported files appear in All Notes.
 
@@ -120,18 +101,16 @@ Spreadsheets are also Markdown files. A note with `_display: sheet` stores ordin
 
 Type definitions are Markdown notes with `type: Type` in frontmatter. New type documents are normal notes, and existing type documents in older folders still work.
 
-## Git Files
+## Git files
 
 If the vault is a Git repository, `.git/` belongs to Git. Rhizome reads Git state but does not treat `.git/` as notes.
 
 ---
 
-# Frontmatter Fields
+# Frontmatter fields
 
 Source: reference/frontmatter-fields.md
 URL: /reference/frontmatter-fields
-
-# Frontmatter Fields
 
 Rhizome uses conventions instead of a required schema.
 
@@ -139,7 +118,7 @@ Rhizome uses conventions instead of a required schema.
 | --- | --- |
 | `type` | The note's entity type. |
 | `status` | Lifecycle state. |
-| `icon` | Per-note icon. |
+| `icon` | Per-note icon you set as a normal property. |
 | `url` | External URL. |
 | `date` | Single date. |
 | `belongs_to` | Parent relationship. |
@@ -152,11 +131,13 @@ Rhizome uses conventions instead of a required schema.
 | `_pinned_properties` | Properties pinned for a type. |
 | `_sheet` | Sheet-note presentation metadata such as grid settings, column widths, row heights, and cell formatting. |
 
-## Custom Fields
+`icon` is an ordinary property you can see and edit. `_icon` is the system field Rhizome writes when you pick an icon from the app, and it's hidden from property editing.
+
+## Custom fields
 
 You can add your own fields. If a field contains wikilinks, Rhizome can treat it as a relationship.
 
-## System Fields
+## System fields
 
 Fields starting with `_` are reserved for system behavior and hidden from standard property editing. They remain plain YAML, so they can still be inspected or changed in raw mode when needed.
 
@@ -164,92 +145,127 @@ Nested keys under a system field are also system-owned. For example, `_sheet.cel
 
 ---
 
-# Keyboard Shortcuts
+# Keyboard shortcuts
 
 Source: reference/keyboard-shortcuts.md
 URL: /reference/keyboard-shortcuts
 
-# Keyboard Shortcuts
+Shortcuts are listed for macOS and for Windows and Linux. This list comes from the app's command manifest (`src/shared/appCommandManifest.json`). Press ⌘/ in the app to see the current list.
 
-| Shortcut | Action |
-| --- | --- |
-| `Cmd+K` / `Ctrl+K` | Open command palette. |
-| `Cmd+P` / `Ctrl+P` | Quick open notes and files. |
-| `Cmd+N` / `Ctrl+N` | Create a new note. |
-| `Cmd+S` / `Ctrl+S` | Save current note. |
-| `Cmd+F` / `Ctrl+F` | Find in the current note. |
-| `Cmd+Shift+F` / `Ctrl+Shift+F` | Search the vault. |
-| `Cmd+Shift+V` / `Ctrl+Shift+V` | Paste without formatting. |
-| `Cmd+\` / `Ctrl+\` | Toggle raw Markdown mode. |
-| `Cmd+Shift+T` / `Ctrl+Shift+T` | Toggle table of contents. |
-| `Cmd+Shift+I` / `Ctrl+Shift+I` | Toggle Properties panel. |
-| `Cmd+Shift+L` / `Ctrl+Shift+L` | Toggle AI panel. |
-| `Cmd+[` / `Alt+Left` | Navigate back when available. |
-| `Cmd+]` / `Alt+Right` | Navigate forward when available. |
-| `Cmd+Shift+O` / `Ctrl+Shift+O` | Open current note in a new window. |
-| `Cmd+D` / `Ctrl+D` | Toggle favorite for the current note. |
-| `Cmd+E` / `Ctrl+E` | Mark the current Inbox note organized. |
+## General
 
-Some shortcuts vary by platform because macOS, Linux, and Windows reserve different key combinations.
+| Action | macOS | Windows and Linux |
+| --- | --- | --- |
+| Open the command palette | `Cmd+K` | `Ctrl+K` |
+| Quick open notes and files | `Cmd+P` or `Cmd+O` | `Ctrl+P` or `Ctrl+O` |
+| Open Settings | `Cmd+,` | `Ctrl+,` |
+| Show keyboard shortcuts | `Cmd+/` | `Ctrl+/` |
+| Reload the vault | `Cmd+Shift+R` | `Ctrl+Shift+R` |
 
-Use the command palette to discover the current command set.
+## Layouts and Views
 
----
+| Action | macOS | Windows and Linux |
+| --- | --- | --- |
+| Chat layout | `Cmd+1` | `Ctrl+1` |
+| Notes layout | `Cmd+2` | `Ctrl+2` |
+| Workbench layout | `Cmd+3` | `Ctrl+3` |
+| Read layout | `Cmd+4` | `Ctrl+4` |
+| Open Research (Views) | `Ctrl+Cmd+1` | `Ctrl+Shift+1` |
+| Open Graph (Views) | `Ctrl+Cmd+2` | `Ctrl+Shift+2` |
+| Open Mycelium (Views) | `Ctrl+Cmd+3` | `Ctrl+Shift+3` |
+| Open History (Views) | `Ctrl+Cmd+4` | `Ctrl+Shift+4` |
+| Show or hide Chat beside your notes | `Cmd+Shift+L` | `Ctrl+Shift+L` |
 
-# Release Channels
+## Notes
 
-Source: reference/release-channels.md
-URL: /reference/release-channels
+| Action | macOS | Windows and Linux |
+| --- | --- | --- |
+| Create a new note | `Cmd+N` | `Ctrl+N` |
+| Save the current note | `Cmd+S` | `Ctrl+S` |
+| Mark the current Inbox note organized | `Cmd+E` | `Ctrl+E` |
+| Toggle favorite for the current note | `Cmd+D` | `Ctrl+D` |
+| Open the current note in a new window | `Cmd+Shift+O` | `Ctrl+Shift+O` |
+| Delete the current note | `Cmd+Backspace` | `Ctrl+Backspace` |
 
-# Release Channels
+## Editing
 
-Rhizome publishes Stable and Alpha release metadata to GitHub Pages.
+| Action | macOS | Windows and Linux |
+| --- | --- | --- |
+| Undo | `Cmd+Z` | `Ctrl+Z` |
+| Redo | `Cmd+Shift+Z` | `Ctrl+Shift+Z` |
+| Find in the current note | `Cmd+F` | `Ctrl+F` |
+| Search the vault | `Cmd+Shift+F` | `Ctrl+Shift+F` |
+| Paste without formatting | `Cmd+Shift+V` | `Ctrl+Shift+V` |
+| Toggle raw Markdown mode | `Cmd+\` | `Ctrl+\` |
+| Toggle the Properties panel | `Cmd+Shift+I` | `Ctrl+Shift+I` |
+| Toggle the table of contents | `Cmd+Shift+T` | `Ctrl+Shift+T` |
 
-## Stable
+## Navigation and zoom
 
-Stable follows manually promoted releases. This is the right channel for normal use.
+| Action | macOS | Windows and Linux |
+| --- | --- | --- |
+| Go back | `Cmd+←` | `Ctrl+←` |
+| Go forward | `Cmd+→` | `Ctrl+→` |
+| Zoom in | `Cmd+=` | `Ctrl+=` |
+| Zoom out | `Cmd+-` | `Ctrl+-` |
+| Actual size | `Cmd+0` | `Ctrl+0` |
 
-The stable updater metadata lives at:
+## Not on a shortcut
 
-```txt
-/stable/latest.json
-```
+**Go to Changes** has no shortcut. Run it from the command palette, or click Changes next to All Notes in the sidebar.
 
-The public download page points at the latest stable release.
-
-## Alpha
-
-Alpha follows pushes to `main`. It receives fixes and features earlier, but it can be rougher than Stable.
-
-The alpha updater metadata lives at:
-
-```txt
-/alpha/latest.json
-```
-
-Compatibility endpoints also point to the alpha metadata:
-
-```txt
-/latest.json
-/latest-canary.json
-```
-
-## Before Switching
-
-Commit or push important vault changes before changing release channel or installing an update. Your notes are local files, but a clean Git state makes recovery simpler.
+Some shortcuts differ by platform because macOS, Windows and Linux reserve different key combinations.
 
 ---
 
-# Spreadsheet File Format
+# Platforms and updates
+
+Source: reference/platforms-and-updates.md
+URL: /reference/platforms-and-updates
+
+Rhizome is a developer preview. It's built and tested on macOS, from source.
+
+| Platform | Status |
+|---|---|
+| macOS | The preview platform. Build from source; see [Install](../start/install.md) |
+| Windows | Builds from source, but isn't supported for daily use yet |
+| Linux | Builds from source, but hasn't been checked as an install for someone new |
+
+There is no signed download, no Homebrew package, and no release channel yet. The app reports version `0.1.0`. That's the bundle version, not a promise about every macOS release.
+
+## Update Rhizome
+
+There's no in-app updater. To update:
+
+1. Commit or push important vault changes first. Your notes are local files, but a clean Git state makes recovery simpler.
+2. Pull the latest code: `git pull` in your `rhizome-agent` folder.
+3. Run `./install.sh`, then `pnpm tauri dev`.
+
+If you built an `.app` before, replace it with a new build.
+
+## Update Prime
+
+If you use Prime as the Chat engine, Rhizome checks for Prime updates but never installs one on its own. When an update is ready, click **Update now**. If it fails, update Prime from a terminal.
+
+## Report a platform bug
+
+Open an issue on [GitHub](https://github.com/tuckcode/rhizome-agent/issues) and include:
+
+- Rhizome version.
+- Operating system, version and CPU architecture.
+- Whether the vault is local-only or connected to a remote.
+- Steps to reproduce.
+
+---
+
+# Spreadsheet file format
 
 Source: reference/spreadsheet-format.md
 URL: /reference/spreadsheet-format
 
-# Spreadsheet File Format
-
 Sheet notes are Markdown files with YAML frontmatter and a CSV-like body. The note uses `_display: sheet` when it should open in the spreadsheet editor. The `type` field remains ordinary semantic metadata.
 
-For editing workflows, see [Use Spreadsheets](/guides/use-spreadsheets). For formula syntax and function references, see [Spreadsheet Formulas](/reference/spreadsheet-functions).
+For editing workflows, see [Use Spreadsheets](../guides/use-spreadsheets.md). For formula syntax and function references, see [Spreadsheet Formulas](spreadsheet-functions.md).
 
 ## Structure
 
@@ -310,7 +326,7 @@ The body is CSV-like text:
 
 Any cell whose input starts with `=` is treated as a formula. Other cells are treated as literal values.
 
-## `_sheet` Metadata
+## `_sheet` metadata
 
 Rhizome stores spreadsheet presentation state in `_sheet` as plain YAML.
 
@@ -345,7 +361,7 @@ Border values are stored as a style name with an optional color, for example:
 border_bottom: "thin #d0d7de"
 ```
 
-## Number Formats
+## Number formats
 
 Number formats are stored in `num_fmt` using spreadsheet-style format codes. Common examples:
 
@@ -359,7 +375,7 @@ Number formats are stored in `num_fmt` using spreadsheet-style format codes. Com
 
 These formats affect presentation, not the underlying cell input in the CSV body.
 
-## Markdown Style Import
+## Markdown style import
 
 When Rhizome imports a non-formula CSV cell, simple Markdown wrappers can seed initial styles:
 
@@ -391,7 +407,7 @@ Formula cells can reference another sheet note with Rhizome's cross-sheet syntax
 
 Cross-sheet references resolve another sheet note by wikilink target, then read a single A1-style cell. Circular references and very deep chains are treated as unresolved.
 
-## Guidance For Agents And Scripts
+## Guidance for agents and scripts
 
 When editing a sheet note programmatically:
 
@@ -409,18 +425,16 @@ If a script cannot safely preserve `_sheet`, it should leave that block untouche
 
 ---
 
-# Spreadsheet Formulas
+# Spreadsheet formulas
 
 Source: reference/spreadsheet-functions.md
 URL: /reference/spreadsheet-functions
-
-# Spreadsheet Formulas
 
 Formula cells start with `=` and are evaluated by IronCalc through Rhizome's sheet editor.
 
 Rhizome adds vault-aware sheet references on top of the normal spreadsheet formula model. Everything else should be treated as IronCalc formula behavior. IronCalc aims for Excel-compatible formulas, but the upstream project is still evolving, so verify advanced formulas against the IronCalc docs when precision matters.
 
-## Basic Syntax
+## Basic syntax
 
 | Syntax | Meaning |
 | --- | --- |
@@ -440,7 +454,7 @@ Use parentheses when a model depends on precedence:
 =(B2+B3-B4)/B5
 ```
 
-## Rhizome Cross-Sheet References
+## Rhizome cross-sheet references
 
 Rhizome supports wikilink cell references for values that live in another sheet note:
 
@@ -463,7 +477,7 @@ Absolute markers follow spreadsheet copy behavior:
 
 Cross-sheet references currently resolve single cells. Keep range formulas inside one sheet note until cross-note ranges are explicitly supported.
 
-## Autocomplete Functions
+## Autocomplete functions
 
 Rhizome's formula autocomplete exposes the implemented function catalog from the bundled IronCalc engine. The current catalog has 195 functions.
 
@@ -515,7 +529,7 @@ The dropdown shows a small ranked set of matches while you type. Keep typing to 
 =SUM(B2:D2)-SUM(B4:D4)
 ```
 
-### Growth And Percentages
+### Growth and percentages
 
 ```txt
 =(C5-B5)/B5
@@ -525,7 +539,7 @@ The dropdown shows a small ranked set of matches while you type. Keep typing to 
 
 Format the result as a percentage with a cell `num_fmt` such as `0.00%`.
 
-### Conditional Logic
+### Conditional logic
 
 ```txt
 =IF(E5>10000, "On track", "Review")
@@ -560,7 +574,7 @@ Format the result as a percentage with a cell `num_fmt` such as `0.00%`.
 =XLOOKUP("Revenue", A2:A20, E2:E20)
 ```
 
-### Cross-Sheet Model
+### Cross-sheet model
 
 ```txt
 =[[newsletter-revenue]].E5
@@ -568,7 +582,7 @@ Format the result as a percentage with a cell `num_fmt` such as `0.00%`.
 =IF([[business-plan]].$E$12>0, [[business-plan]].$E$12, 0)
 ```
 
-## IronCalc Function Families
+## IronCalc function families
 
 IronCalc documents formulas by category. Use these upstream pages for detailed syntax and examples. The upstream documentation may include newer functions that are not yet present in Rhizome's bundled IronCalc version.
 
@@ -591,47 +605,14 @@ For current upstream gaps, see IronCalc's [unsupported features](https://docs.ir
 
 ---
 
-# Supported Platforms
-
-Source: reference/supported-platforms.md
-URL: /reference/supported-platforms
-
-# Supported Platforms
-
-Rhizome is a desktop app built with Tauri. Releases currently target macOS, Windows, and Linux.
-
-| Platform | Current support | Notes |
-| --- | --- | --- |
-| macOS | Primary | Main development and QA target. Apple Silicon and Intel artifacts are published. |
-| Windows | Supported, early | NSIS installers and signed updater bundles are published. Menu, shell-path, and credential-helper behavior receive platform-specific fixes as they appear. |
-| Linux | Supported, early | AppImage, deb, and RPM artifacts are published. Behavior can depend on distro WebKitGTK packages, Wayland/X11 details, and input-method setup. |
-
-## Support Policy
-
-Primary support means the platform is part of normal development and release validation. Supported, early means release artifacts exist and the app is expected to work, but platform-specific bugs can take longer to diagnose than macOS issues.
-
-## Reporting Platform Bugs
-
-Include:
-
-- Rhizome version.
-- Operating system and version.
-- CPU architecture.
-- Whether the vault is local-only or connected to a remote.
-- Steps to reproduce.
-
----
-
-# View Filters
+# View filters
 
 Source: reference/view-filters.md
 URL: /reference/view-filters
 
-# View Filters
-
 View filters define saved lists of notes.
 
-## Common Filter Ideas
+## Common filter ideas
 
 | Goal | Filter direction |
 | --- | --- |
@@ -655,7 +636,7 @@ Saved views can combine filters for text, dates, relationship fields, and frontm
 
 Regex filters are available for power-user cases. Keep them narrow and test them on a small view first.
 
-## Keep Views Focused
+## Keep views focused
 
 A view should answer one recurring question. If it becomes too broad, split it into two views.
 

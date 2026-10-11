@@ -1,15 +1,13 @@
-# Spreadsheet Formulas
+# Spreadsheet formulas
 
 Source: reference/spreadsheet-functions.md
 URL: /reference/spreadsheet-functions
-
-# Spreadsheet Formulas
 
 Formula cells start with `=` and are evaluated by IronCalc through Rhizome's sheet editor.
 
 Rhizome adds vault-aware sheet references on top of the normal spreadsheet formula model. Everything else should be treated as IronCalc formula behavior. IronCalc aims for Excel-compatible formulas, but the upstream project is still evolving, so verify advanced formulas against the IronCalc docs when precision matters.
 
-## Basic Syntax
+## Basic syntax
 
 | Syntax | Meaning |
 | --- | --- |
@@ -29,7 +27,7 @@ Use parentheses when a model depends on precedence:
 =(B2+B3-B4)/B5
 ```
 
-## Rhizome Cross-Sheet References
+## Rhizome cross-sheet references
 
 Rhizome supports wikilink cell references for values that live in another sheet note:
 
@@ -52,7 +50,7 @@ Absolute markers follow spreadsheet copy behavior:
 
 Cross-sheet references currently resolve single cells. Keep range formulas inside one sheet note until cross-note ranges are explicitly supported.
 
-## Autocomplete Functions
+## Autocomplete functions
 
 Rhizome's formula autocomplete exposes the implemented function catalog from the bundled IronCalc engine. The current catalog has 195 functions.
 
@@ -104,7 +102,7 @@ The dropdown shows a small ranked set of matches while you type. Keep typing to 
 =SUM(B2:D2)-SUM(B4:D4)
 ```
 
-### Growth And Percentages
+### Growth and percentages
 
 ```txt
 =(C5-B5)/B5
@@ -114,7 +112,7 @@ The dropdown shows a small ranked set of matches while you type. Keep typing to 
 
 Format the result as a percentage with a cell `num_fmt` such as `0.00%`.
 
-### Conditional Logic
+### Conditional logic
 
 ```txt
 =IF(E5>10000, "On track", "Review")
@@ -149,7 +147,7 @@ Format the result as a percentage with a cell `num_fmt` such as `0.00%`.
 =XLOOKUP("Revenue", A2:A20, E2:E20)
 ```
 
-### Cross-Sheet Model
+### Cross-sheet model
 
 ```txt
 =[[newsletter-revenue]].E5
@@ -157,7 +155,7 @@ Format the result as a percentage with a cell `num_fmt` such as `0.00%`.
 =IF([[business-plan]].$E$12>0, [[business-plan]].$E$12, 0)
 ```
 
-## IronCalc Function Families
+## IronCalc function families
 
 IronCalc documents formulas by category. Use these upstream pages for detailed syntax and examples. The upstream documentation may include newer functions that are not yet present in Rhizome's bundled IronCalc version.
 

@@ -1,45 +1,68 @@
-# Install Rhizome
+# Install
 
 Source: start/install.md
 URL: /start/install
 
-# Install Rhizome
+You build Rhizome from source on a Mac and run it from there. This takes a few minutes, mostly for the first build.
 
-Rhizome publishes desktop builds for macOS, Windows, and Linux. macOS is the primary day-to-day development target, with Windows and Linux builds supported through the release pipeline and fixed as platform issues are found.
+> **Developer preview.** macOS only. There is no signed download, no Homebrew package and no in-app updater yet. See [Platforms and updates](../reference/platforms-and-updates.md).
 
-## Download
+## Before you start
 
-Use the latest stable release unless you are intentionally testing pre-release builds:
+You need:
 
-- <a href="https://github.com/tuckcode/rhizome-agent/releases" target="_self">Download the latest build</a>
-- [Browse all GitHub releases](https://github.com/tuckcode/rhizome-agent/releases)
-- <a href="https://github.com/tuckcode/rhizome-agent/releases" target="_self">Read the release notes</a>
+1. macOS with the Xcode Command Line Tools (`xcode-select --install`).
+2. Node.js `^20.19.0` or `>=22.12.0`.
+3. pnpm.
+4. Rust `1.77.2` or newer.
+5. git.
 
-## Homebrew
+Prime Agent is optional. You need it only if you keep Prime as the Chat engine, which is the default.
 
-On macOS you can install the cask:
+## Build and run
 
 ```bash
-brew install --cask rhizome
+git clone https://github.com/tuckcode/rhizome-agent.git
+cd rhizome-agent
+./install.sh
+pnpm tauri dev
 ```
 
-## Platform Status
+`./install.sh` installs the project's dependencies. If Prime Agent isn't on the machine, it also downloads Prime's command-line tool, because Prime is still the default Chat engine. Rhizome doesn't include a copy of Prime or Node.
 
-| Platform | Status | Notes |
-| --- | --- | --- |
-| macOS | Primary | Apple Silicon and Intel builds are published. Homebrew is available. |
-| Windows | Supported, early | NSIS installers and updater bundles are Tauri-signed. Authenticode publisher signing will be added after Windows certificate provisioning; company-managed SmartScreen, Defender, or WDAC policies can still require IT approval before install. |
-| Linux | Supported, early | AppImage, deb, and RPM artifacts are published. Desktop behavior depends on distribution WebKitGTK and input-method integration. |
+`pnpm tauri dev` builds the app and opens it.
 
-See [Supported Platforms](/reference/supported-platforms) for the current support policy.
+## Pick an engine
 
-## Managed Windows Devices
+Chat runs on one of two engines. You can switch at any time with **Chat engine** in Settings → AI Agents.
 
-Do not disable SmartScreen or Windows Security to install Rhizome. On a managed Windows device, install Rhizome through your normal software approval path if policy blocks unsigned or unknown-publisher installers. After Authenticode provisioning is complete, validate that the downloaded installer has a valid Rhizome publisher signature before installing.
+- **Prime Agent (default).** Prime runs Chat. Set it up below.
+- **Rhizome's own engine.** Turn **Chat engine** on. It doesn't need Prime. Add a provider key, or use **Free tier (auto)**. See [Set up models and keys](../guides/configure-ai-models.md).
 
-## After Installing
+## Set up Prime
 
-1. Open Rhizome.
-2. Choose the Getting Started vault if you want a guided sample.
-3. Or open an existing folder of Markdown files as a vault.
-4. Use the command palette with `Cmd+K` on macOS or `Ctrl+K` on Linux and Windows.
+Skip this section if you use Rhizome's own engine.
+
+The first time `prime-agent` runs in a terminal, it asks you to run `/login` and choose a model provider. You can also sign in from Settings → AI Agents → Local agent: each provider card has a **Sign in** button that runs Prime's login for you.
+
+Prime stops when the terminal that started it closes. To keep it running in the background:
+
+```bash
+(prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
+```
+
+## If you already have a built copy
+
+Quit `/Applications/Rhizome Agent.app` before you run `pnpm tauri dev`. Both use the bundle id `ai.rhizome.agent`, so a second launch attaches to the copy that's already open.
+
+## Look at the interface without an engine
+
+```bash
+pnpm dev
+```
+
+Then open `http://localhost:5202`. This runs the interface in a browser. Chat doesn't answer.
+
+## Next
+
+[First launch](first-launch.md): open a vault and send your first message.

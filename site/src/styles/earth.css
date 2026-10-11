@@ -1,0 +1,44 @@
+/*
+ * Earth theme for the Rhizome docs.
+ * Values come from the app's tokens in src/index.css (Earth dark and Earth light),
+ * mapped onto Starlight's --sl-color-* scale. Keep them in sync when index.css changes.
+ */
+
+/* Earth dark (default for the app; Starlight follows the reader's system setting) */
+:root {
+  --sl-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --sl-font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --sl-color-accent-low: #1a2619;   /* --state-selected */
+  --sl-color-accent: #7df0ae;       /* --accent-blue (Earth dark mint) */
+  --sl-color-accent-high: #9af5c2;  /* --accent-blue-hover */
+  --sl-color-white: #f4f2e8;        /* --text-heading */
+  --sl-color-gray-1: #e9e8dc;       /* --text-primary */
+  --sl-color-gray-2: #bdbaa8;       /* --text-secondary */
+  --sl-color-gray-3: #999784;       /* --text-muted */
+  --sl-color-gray-4: #75705c;       /* --border-input */
+  --sl-color-gray-5: #2a281d;       /* --border-default */
+  --sl-color-gray-6: #16170f;       /* --surface-panel */
+  --sl-color-black: #0f110c;        /* --surface-app */
+}
+
+/* Earth light */
+:root[data-theme='light'] {
+  --sl-color-accent-low: #dbe7dc;
+  --sl-color-accent: #2c6a4d;       /* --accent-blue (Earth light forest) */
+  --sl-color-accent-high: #22573f;  /* --accent-blue-hover */
+  --sl-color-white: #1e1a15;        /* --text-heading */
+  --sl-color-gray-1: #2a251e;       /* --text-primary */
+  --sl-color-gray-2: #4e473c;       /* --text-secondary */
+  --sl-color-gray-3: #625a4d;       /* --text-muted */
+  --sl-color-gray-4: #857b66;       /* --border-input */
+  --sl-color-gray-5: #c8bda8;       /* --border-strong */
+  --sl-color-gray-6: #ece6da;       /* --surface-sidebar */
+  --sl-color-gray-7: #f8f5ee;       /* --surface-panel */
+  --sl-color-black: #f1ece2;        /* --surface-app */
+}
+
+/* Dark text on the mint accent keeps buttons readable (13.5:1 on #0F110C). */
+:root:not([data-theme='light']) {
+  --sl-color-text-invert: #0f110c;
+}

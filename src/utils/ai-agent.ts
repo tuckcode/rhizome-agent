@@ -67,7 +67,7 @@ ${agentDocsPath}
 
 ${searchInstruction} Prefer bundled docs over guesses for Rhizome behavior.
 
-When the user asks how to improve a knowledge base, make it better organized, choose better types, model relationships, or make the vault easier for humans and agents to use, treat Portent as Rhizome's default best-practice model. Read ${agentDocsPath}/pages/templates/portent.md and combine it with Rhizome concepts for types, relationships, properties, Inbox, archive, and custom views.`
+When the user asks how to improve a knowledge base, make it better organized, choose better types, model relationships, or make the vault easier for humans and agents to use, treat Portent as Rhizome's default best-practice model. Read ${agentDocsPath}/pages/guides/structure-with-portent.md and combine it with Rhizome concepts for types, relationships, properties, Inbox, archive, and custom views.`
 }
 
 function vaultScopeInstructions(vaultPaths?: string[]): string {

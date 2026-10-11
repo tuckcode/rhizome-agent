@@ -1,31 +1,31 @@
-# Use The Command Palette
+# Use the command palette
 
 Source: guides/use-command-palette.md
 URL: /guides/use-command-palette
 
-# Use The Command Palette
-
 The command palette is the fastest way to move around Rhizome.
 
-Open it with:
+Open it with `Cmd+K` on macOS, or `Ctrl+K` on Windows and Linux.
 
-- `Cmd+K` on macOS.
-- `Ctrl+K` on Linux and Windows.
+## Ask the agent from the palette
 
-## Common Commands
+Type a space first to switch the palette to a prompt. It sends the prompt to Chat with the current note as context.
 
-- New Note.
-- Search.
-- Open Settings.
-- Reload Vault.
-- Add Remote.
-- Open Getting Started Vault.
-- Toggle Raw Mode.
-- Toggle Table of Contents.
-- Toggle AI Panel.
-- Use Light, Dark, or System theme.
-- Open in New Window.
+## Common commands
 
-## Keyboard-First Workflow
+- **New Note** and **Search Notes**.
+- **Go to Inbox**, **Go to All Notes**, **Go to Changes** and **Go to History**.
+- **Open Research**.
+- **Toggle AI Panel** and **New AI chat**.
+- **Ask the agent about this note**.
+- **Toggle Raw Editor**.
+- **Open in New Window**.
+- **Use Light Mode**, **Use Dark Mode** and **Match System**.
+- **Add Remote to Current Vault** and **View Pending Changes**.
+- **Reload Vault**, **Repair Vault** and **Restore Getting Started Vault**.
+- **Set Up External AI Tools…** to connect Claude Code, Cursor and other MCP clients to your vault.
+- **Open Settings**, **Open AI Agents** and **Keyboard Shortcuts**.
 
-Use the palette when you know what you want to do but do not want to hunt through panels. It is also the best place to discover commands as the app grows.
+## Keyboard-first
+
+Use the palette when you know what you want but don't want to hunt through panels. It's also the place to discover commands as the app grows. For shortcuts, see [Keyboard shortcuts](../reference/keyboard-shortcuts.md).
