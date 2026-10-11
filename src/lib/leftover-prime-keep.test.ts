@@ -12,5 +12,10 @@ describe('leftover Prime keep chrome', () => {
     )
     expect(chatHome).toContain("if (defaultAiTarget?.kind === 'api_model')")
     expect(chatHome).toContain("target.agent === 'prime'")
+    const settings = readFileSync(
+      `${process.cwd()}/src/components/SettingsPanel.tsx`,
+      'utf8',
+    )
+    expect(settings.match(/<ChatEngineSettings /g)?.length).toBe(1)
   })
 })

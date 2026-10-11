@@ -11,6 +11,8 @@ import {
   normalizeAiModelProviders,
   type AiModelProvider,
 } from '../lib/aiTargets'
+import { ChatEngineSettings } from './ChatEngineSettings'
+import { NativeChatModelPicker } from './NativeChatModelPicker'
 import {
   useCallback,
   useEffect,
@@ -142,6 +144,8 @@ interface SettingsDraft {
   celebrationsEnabled: boolean
   keepInTaskbarOnClose: boolean
   agentProfile: string
+  chatEngine: 'prime' | 'native'
+  nativeChatTarget: string | null
   aiModelProviders: AiModelProvider[]
   releaseChannel: ReleaseChannel
   automaticUpdateChecksEnabled: boolean
@@ -184,6 +188,10 @@ interface SettingsBodyProps {
   setKeepInTaskbarOnClose: (value: boolean) => void
   agentProfile: string
   setAgentProfile: (value: string) => void
+  chatEngine: 'prime' | 'native'
+  setChatEngine: (value: 'prime' | 'native') => void
+  nativeChatTarget: string | null
+  setNativeChatTarget: (value: string) => void
   aiAgentsStatus: AiAgentsStatus
   aiModelProviders: AiModelProvider[]
   setAiModelProviders: (value: AiModelProvider[]) => void
@@ -277,6 +285,8 @@ function createSettingsDraft(
     celebrationsEnabled: readCelebrationsEnabled(settings.celebrations_enabled),
     keepInTaskbarOnClose: settings.keep_in_taskbar_on_close === true,
     agentProfile: settings.agent_profile?.trim() ?? '',
+    chatEngine: settings.chat_engine === 'native' ? 'native' : 'prime',
+    nativeChatTarget: settings.native_chat_target ?? null,
     aiModelProviders: normalizeAiModelProviders(settings.ai_model_providers),
     releaseChannel: normalizeReleaseChannel(settings.release_channel),
     automaticUpdateChecksEnabled: areAutomaticUpdateChecksEnabled(settings),
@@ -357,6 +367,8 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     celebrations_enabled: draft.celebrationsEnabled,
     keep_in_taskbar_on_close: draft.keepInTaskbarOnClose ? true : null,
     agent_profile: draft.agentProfile.trim() || null,
+    chat_engine: draft.chatEngine === 'native' ? 'native' : null,
+    native_chat_target: draft.nativeChatTarget,
     default_ai_agent: DEFAULT_AI_AGENT,
     default_ai_target: agentTargetId(DEFAULT_AI_AGENT),
     ai_model_providers: draft.aiModelProviders.length > 0 ? draft.aiModelProviders : null,
@@ -767,6 +779,10 @@ function SettingsBodyFromDraft({
       setKeepInTaskbarOnClose={(value) => updateDraft('keepInTaskbarOnClose', value)}
       agentProfile={draft.agentProfile}
       setAgentProfile={(value) => updateDraft('agentProfile', value)}
+      chatEngine={draft.chatEngine}
+      setChatEngine={(value) => updateDraft('chatEngine', value)}
+      nativeChatTarget={draft.nativeChatTarget}
+      setNativeChatTarget={(value) => updateDraft('nativeChatTarget', value)}
       aiAgentsStatus={aiAgentsStatus}
       aiModelProviders={draft.aiModelProviders}
       setAiModelProviders={onAiModelProvidersChange}
@@ -1045,6 +1061,10 @@ function SettingsAgentWorkflowSections({
   setCelebrationsEnabled,
   agentProfile,
   setAgentProfile,
+  chatEngine,
+  setChatEngine,
+  nativeChatTarget,
+  setNativeChatTarget,
   aiAgentsStatus,
   aiModelProviders,
   setAiModelProviders,
@@ -1074,6 +1094,10 @@ function SettingsAgentWorkflowSections({
           setCelebrationsEnabled={setCelebrationsEnabled}
           agentProfile={agentProfile}
           setAgentProfile={setAgentProfile}
+          chatEngine={chatEngine}
+          setChatEngine={setChatEngine}
+          nativeChatTarget={nativeChatTarget}
+          setNativeChatTarget={setNativeChatTarget}
           aiAgentsStatus={aiAgentsStatus}
           aiModelProviders={aiModelProviders}
           setAiModelProviders={setAiModelProviders}
@@ -1449,6 +1473,10 @@ function AiAgentSettingsSection({
   setCelebrationsEnabled,
   agentProfile,
   setAgentProfile,
+  chatEngine,
+  setChatEngine,
+  nativeChatTarget,
+  setNativeChatTarget,
   aiAgentsStatus,
   aiModelProviders,
   setAiModelProviders,
@@ -1462,6 +1490,10 @@ function AiAgentSettingsSection({
   | 'setCelebrationsEnabled'
   | 'agentProfile'
   | 'setAgentProfile'
+  | 'chatEngine'
+  | 'setChatEngine'
+  | 'nativeChatTarget'
+  | 'setNativeChatTarget'
   | 'aiAgentsStatus'
   | 'aiModelProviders'
   | 'setAiModelProviders'
@@ -1497,21 +1529,17 @@ function AiAgentSettingsSection({
       </SettingsGroup>
 
       <SettingsGroup>
-        <SettingsRow
-          label="Chat engine"
-          description="Prime Agent runs Chat with vault tools. Choose Claude, Grok, DeepSeek, and Nous in Chat's model menu."
-          controlWidth="wide"
-        >
-          <div className="flex min-h-10 items-center gap-2 rounded-md border border-border bg-muted px-3 text-sm text-foreground" data-testid="settings-prime-chat-engine">
-            <AiAgentIcon agent={DEFAULT_AI_AGENT} size={18} />
-            <span className="font-medium">Prime Agent</span>
-            <span className="text-muted-foreground">
-              {primeStatus.status === 'installed'
-                ? `(${t('settings.aiAgents.installed')}${primeStatus.version ? ` ${primeStatus.version}` : ''})`
-                : `(${t('settings.aiAgents.missing')})`}
-            </span>
+        <ChatEngineSettings engine={chatEngine} onChange={setChatEngine} />
+        {chatEngine === 'native' ? (
+          <NativeChatModelPicker value={nativeChatTarget} onChange={setNativeChatTarget} />
+        ) : (
+          <div className="px-3 pb-3 text-xs text-muted-foreground" data-testid="settings-prime-chat-engine">
+            Prime Agent
+            {primeStatus.status === 'installed'
+              ? ` (${t('settings.aiAgents.installed')}${primeStatus.version ? ` ${primeStatus.version}` : ''})`
+              : ` (${t('settings.aiAgents.missing')})`}
           </div>
-        </SettingsRow>
+        )}
       </SettingsGroup>
 
       <SettingsGroup>

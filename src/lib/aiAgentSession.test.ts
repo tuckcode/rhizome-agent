@@ -10,6 +10,7 @@ const {
   nextMessageIdMock,
   streamAiAgentMock,
   streamAiModelMock,
+  streamNativeChatMock,
   trackEventMock,
   trimHistoryMock,
 } = vi.hoisted(() => ({
@@ -20,6 +21,7 @@ const {
   nextMessageIdMock: vi.fn(),
   streamAiAgentMock: vi.fn(async () => {}),
   streamAiModelMock: vi.fn(async () => {}),
+  streamNativeChatMock: vi.fn(async () => {}),
   trackEventMock: vi.fn(),
   trimHistoryMock: vi.fn((history: unknown) => history),
 }))
@@ -41,6 +43,10 @@ vi.mock('./aiAgentStreamCallbacks', () => ({
 
 vi.mock('../utils/streamAiAgent', () => ({
   streamAiAgent: streamAiAgentMock,
+}))
+
+vi.mock('../utils/streamNativeChat', () => ({
+  streamNativeChat: streamNativeChatMock,
 }))
 
 vi.mock('../utils/streamAiModel', () => ({
@@ -221,6 +227,7 @@ describe('aiAgentSession', () => {
     formatMessageWithHistoryMock.mockImplementation((_history: unknown, prompt: string) => `formatted:${prompt}`)
     trimHistoryMock.mockImplementation((history: unknown) => history)
     streamAiAgentMock.mockResolvedValue(undefined)
+    streamNativeChatMock.mockResolvedValue(undefined)
     hydrateNoteReferencesMock.mockImplementation(async (references: unknown) => references)
     trackEventMock.mockClear()
   })
@@ -433,5 +440,44 @@ describe('aiAgentSession', () => {
       had_partial_response: 0,
       tool_count: 0,
     })
+  })
+
+  it('chat_default_engine_is_prime', async () => {
+    nextMessageIdMock.mockReturnValue('msg-prime')
+    const session = createRuntime()
+    await sendAgentMessage({
+      runtime: session.runtime,
+      context: {
+        agent: 'prime',
+        ready: true,
+        vaultPath: '/vault',
+        permissionMode: 'power_user',
+      },
+      prompt: { text: 'Hello' },
+    })
+    expect(streamAiAgentMock).toHaveBeenCalled()
+    expect(streamNativeChatMock).not.toHaveBeenCalled()
+  })
+
+  it('chat_toggle_native_uses_rhizome_loop', async () => {
+    nextMessageIdMock.mockReturnValue('msg-native')
+    const session = createRuntime()
+    await sendAgentMessage({
+      runtime: session.runtime,
+      context: {
+        agent: 'prime',
+        ready: true,
+        vaultPath: '/vault',
+        permissionMode: 'safe',
+        chatEngine: 'native',
+        nativeTarget: 'open_ai/gpt-4.1-mini',
+      },
+      prompt: { text: 'Hello native' },
+    })
+    expect(streamNativeChatMock).toHaveBeenCalledWith(expect.objectContaining({
+      target: 'open_ai/gpt-4.1-mini',
+      permissionMode: 'safe',
+    }))
+    expect(streamAiAgentMock).not.toHaveBeenCalled()
   })
 })

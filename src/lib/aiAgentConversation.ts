@@ -73,6 +73,10 @@ export interface AgentExecutionContext {
   systemPromptOverride?: string
   /** Post-turn wiki auto-distill. Default ON when unset. */
   sessionAutoDistillEnabled?: boolean
+  /** Settings engine. Absent means Prime. */
+  chatEngine?: 'prime' | 'native'
+  /** Target string for `native_chat_start` when `chatEngine` is native. */
+  nativeTarget?: string
 }
 
 export interface PendingUserPrompt {

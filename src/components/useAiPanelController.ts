@@ -42,6 +42,8 @@ interface UseAiPanelControllerArgs {
   onFileModified?: (relativePath: string) => void
   onVaultChanged?: () => void
   sessionId?: string
+  chatEngine?: 'prime' | 'native'
+  nativeTarget?: string
 }
 
 export interface AiPanelController {
@@ -127,6 +129,8 @@ function usePanelAgent({
   onFileModified,
   onVaultChanged,
   sessionId,
+  chatEngine,
+  nativeTarget,
 }: Pick<
   UseAiPanelControllerArgs,
   | 'vaultPath'
@@ -140,6 +144,8 @@ function usePanelAgent({
   | 'onFileModified'
   | 'onVaultChanged'
   | 'sessionId'
+  | 'chatEngine'
+  | 'nativeTarget'
 > & { contextPrompt?: string }) {
   const fileCallbacks = useAgentFileCallbacks({ onFileCreated, onFileModified, onVaultChanged })
   const storedPermissionMode = useVaultAiAgentPermissionMode()
@@ -153,6 +159,8 @@ function usePanelAgent({
     permissionMode,
     sessionId,
     sessionAutoDistillEnabled,
+    chatEngine,
+    nativeTarget,
   })
   return { agent, permissionMode }
 }
@@ -176,6 +184,8 @@ export function useAiPanelController({
   onFileModified,
   onVaultChanged,
   sessionId,
+  chatEngine,
+  nativeTarget,
 }: UseAiPanelControllerArgs): AiPanelController {
   const [input, setInput] = useState('')
   const { linkedEntries, contextPrompt } = useAiPanelContextSnapshot({
@@ -188,7 +198,7 @@ export function useAiPanelController({
     noteListFilter,
   })
 
-  const { agent, permissionMode } = usePanelAgent({ vaultPath, vaultPaths, contextPrompt, defaultAiAgent, defaultAiTarget, defaultAiAgentReady, defaultAiAgentReadiness, locale, onFileCreated, onFileModified, onVaultChanged, sessionId })
+  const { agent, permissionMode } = usePanelAgent({ vaultPath, vaultPaths, contextPrompt, defaultAiAgent, defaultAiTarget, defaultAiAgentReady, defaultAiAgentReadiness, locale, onFileCreated, onFileModified, onVaultChanged, sessionId, chatEngine, nativeTarget })
   const isActive = agent.status === 'thinking' || agent.status === 'tool-executing'
 
   const handleSend = useCallback((

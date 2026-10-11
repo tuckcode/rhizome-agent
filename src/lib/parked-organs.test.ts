@@ -246,11 +246,30 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/ChatHome.tsx`,
       'utf8',
     )
+    // 2026-10-09: Prime stays the Chat default. Phase 6 adds a Settings
+    // toggle to pick the native Rhizome engine.
+    // 2026-10-10: that toggle lives in Settings, once.
     expect(chatHome).toContain(
       'global default must not strip Prime chrome or route chat away from Prime',
     )
     expect(chatHome).toContain("if (defaultAiTarget?.kind === 'api_model')")
     expect(chatHome).toContain("target.agent === 'prime'")
+    const settings = readFileSync(
+      `${process.cwd()}/src/components/SettingsPanel.tsx`,
+      'utf8',
+    )
+    const toggle = readFileSync(
+      `${process.cwd()}/src/components/ChatEngineSettings.tsx`,
+      'utf8',
+    )
+    const composer = readFileSync(
+      `${process.cwd()}/src/components/ChatComposerBar.tsx`,
+      'utf8',
+    )
+    expect(settings.match(/<ChatEngineSettings /g)?.length).toBe(1)
+    expect(toggle).toContain('settings-chat-engine')
+    expect(composer).not.toContain('settings-chat-engine')
+    expect(composer).not.toContain('ChatEngineSettings')
   })
 
   it('keeps hide Cancel, session filter fields, and composer ArrowUp history', () => {
@@ -292,9 +311,11 @@ describe('parked organs leftover', () => {
     expect(settings).toContain(
       "if (id === SETTINGS_SECTION_IDS.extensions) setLoadExtensionCatalog(true)",
     )
-    expect(settings).toContain(
-      'Prime Agent runs Chat with vault tools. Choose Claude, Grok, DeepSeek, and Nous in Chat\'s model menu.',
+    const toggle = readFileSync(
+      `${process.cwd()}/src/components/ChatEngineSettings.tsx`,
+      'utf8',
     )
+    expect(toggle).toContain('Prime Agent runs Chat.')
   })
 
   it('mounts Graph and Mycelium only on Changes, not Inbox', () => {

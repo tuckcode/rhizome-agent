@@ -20,6 +20,7 @@ import { agentTargets, type AiTarget } from '../lib/aiTargets'
 import type { AiAgentId, AiAgentReadiness } from '../lib/aiAgents'
 import type { AppLocale } from '../lib/i18n'
 import type { VaultEntry } from '../types'
+import { NativeChatModelPicker } from './NativeChatModelPicker'
 
 interface ChatHomeProps {
   locale: AppLocale
@@ -27,6 +28,9 @@ interface ChatHomeProps {
   defaultAiTarget?: AiTarget | null
   defaultAiAgentReadiness: AiAgentReadiness
   defaultAiAgentReady: boolean
+  chatEngine?: 'prime' | 'native'
+  nativeTarget?: string | null
+  onNativeTargetChange?: (target: string) => void
   vaultPath: string
   vaultPaths: string[]
   entries: VaultEntry[]
@@ -75,6 +79,9 @@ export default function ChatHome({
   defaultAiTarget,
   defaultAiAgentReadiness,
   defaultAiAgentReady,
+  chatEngine = 'prime',
+  nativeTarget,
+  onNativeTargetChange,
   vaultPath,
   vaultPaths,
   entries,
@@ -169,6 +176,9 @@ export default function ChatHome({
         enabled={isPrimeTarget}
         liveSessionId={primeHost?.sessionId ?? null}
       />
+      {chatEngine === 'native' ? (
+        <NativeChatModelPicker value={nativeTarget} onChange={(target) => onNativeTargetChange?.(target)} />
+      ) : null}
       <div className="flex min-h-0 flex-1">
         <AiPanel
           locale={locale}
@@ -176,6 +186,8 @@ export default function ChatHome({
           defaultAiTarget={chatTarget}
           defaultAiAgentReadiness={defaultAiAgentReadiness}
           defaultAiAgentReady={defaultAiAgentReady}
+          chatEngine={chatEngine}
+          nativeTarget={nativeTarget ?? undefined}
           vaultPath={vaultPath}
           vaultPaths={vaultPaths}
           entries={entries}
