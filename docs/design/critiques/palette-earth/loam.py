@@ -1,5 +1,5 @@
 import re
-from pal import load,hx,cr,parse,SURF,TEXT,report
+from pal import load,hx,cr,report
 LOAM={
  '--bg':'#15110C','--surface':'#1D1811','--fg':'#EDE6D8','--muted':'#A3987F','--border':'#352C20','--accent':'#6FE3A0',
  '--surface-2':'#241E15','--surface-3':'#2B2419','--surface-sidebar':'#19150F','--surface-popover':'#241E15','--surface-input':'#15110C',
@@ -30,7 +30,9 @@ i=s.index(':root,'); j=s.index('}',i)+1
 blk=s[i:j]
 blk=blk.split('{',1)[1]
 for k,v in LOAM.items():
-    blk,n=re.subn(r'(\s'+re.escape(k)+r':\s*)[^;]+;',lambda m:m.group(1)+v+';',blk); assert n==1,(k,n)
+    blk,n=re.subn(r'(\s'+re.escape(k)+r':\s*)[^;]+;',lambda m:m.group(1)+v+';',blk)
+    if n != 1:
+        raise AssertionError((k, n))
 loam='\n/* Earth dark, warm ("loam"): browner soil surfaces, same mint accent. Opt-in scheme. */\n[data-scheme="loam"],\n[data-theme="dark-warm"] {'+blk+'\n'
 s=re.sub(r'\n/\* Earth dark, warm.*?\n\}\n','\n',s,flags=re.S)
 k=s.index('\n[data-theme="light"],'); s=s[:k]+'\n'+loam+s[k:]

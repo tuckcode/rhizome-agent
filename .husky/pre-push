@@ -267,7 +267,7 @@ if ! run_sidecar_automatic_checks; then
   if [ "${LAPUTA_FULL_COVERAGE:-0}" = "1" ]; then
     RUST_COV_FLAGS=""
   fi
-  RUST_LANE="unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE; cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings && cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check && cargo llvm-cov --manifest-path src-tauri/Cargo.toml ${RUST_COV_FLAGS} --ignore-filename-regex \"lib\\.rs|main\\.rs|menu\\.rs\" --fail-under-lines 85 -- --test-threads=1"
+  RUST_LANE="unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE; cargo clippy --manifest-path=src-tauri/Cargo.toml --all-targets -- -D warnings && cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check && cargo llvm-cov --manifest-path src-tauri/Cargo.toml ${RUST_COV_FLAGS} --ignore-filename-regex \"lib\\.rs|main\\.rs|menu\\.rs\" --fail-under-lines 85 -- --test-threads=1"
 
   SMOKE_FILES=$(find tests/smoke tests/integration -name '*.spec.ts' 2>/dev/null | head -1)
   PLAYWRIGHT_LANE="pnpm playwright:smoke"

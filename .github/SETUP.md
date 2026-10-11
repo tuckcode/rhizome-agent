@@ -84,7 +84,7 @@ pnpm test:coverage
 
 # Lint
 pnpm lint
-cargo clippy --manifest-path=src-tauri/Cargo.toml
+cargo clippy --manifest-path=src-tauri/Cargo.toml --all-targets -- -D warnings
 
 # Format check
 cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check

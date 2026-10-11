@@ -1,4 +1,4 @@
-import re,json,sys
+import re,sys
 def hx(h):
     h=h.lstrip('#');return [int(h[i:i+2],16) for i in (0,2,4)]
 def parse(v,base=None):
@@ -37,7 +37,10 @@ def report(t,name):
     if r<4.5: fails.append('accent-ink')
     for nb in ['--border','--border-strong']:
         rows.append((nb+' vs bg (non-text)',t[nb],'',round(cr(hx(t[nb]),hx(t['--bg'])),2),''))
-    print('==',name); [print(r) for r in rows]; print('FAILS',fails)
+    print('==',name)
+    for r in rows:
+        print(r)
+    print('FAILS',fails)
     return rows,fails
 if __name__=='__main__':
     for path,sel,name in [(sys.argv[1],':root',sys.argv[2]+' dark'),(sys.argv[1],'[data-theme="light"]',sys.argv[2]+' light')]:

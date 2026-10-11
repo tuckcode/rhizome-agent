@@ -35,7 +35,7 @@ acceptable — see comments in each YAML.
 |---|---|---|
 | **Frontend Static Quality Checks** | `macos-15` | `tsc --noEmit`, `vite build`, optional `pnpm docs:build`, docs reminder (warning only), `pnpm lint` |
 | **Frontend Tests & Coverage** | `macos-15` | `pnpm test:coverage` — **≥70%** lines/functions/branches/statements (`vite.config.ts`) |
-| **Rust Tests & Quality Checks** | `macos-15` | `cargo llvm-cov` **≥85%** lines (ignores `lib.rs`, `main.rs`, `menu.rs`), `cargo clippy -D warnings`, `cargo fmt --check` |
+| **Rust Tests & Quality Checks** | `macos-15` | `cargo llvm-cov` **≥85%** lines (ignores `lib.rs`, `main.rs`, `menu.rs`), `cargo clippy --all-targets -D warnings`, `cargo fmt --check` |
 | **Linux build verification** | `ubuntu-22.04` | PR / manual only — `pnpm build`, `cargo check`, `cargo clippy` |
 
 **CodeScene:** not used. Dropped 2026-07-09 (ADR-0149); no gate on private repo.
@@ -94,7 +94,7 @@ pnpm test:mcp
 cargo test
 cargo llvm-cov --manifest-path src-tauri/Cargo.toml --no-clean \
   --ignore-filename-regex 'lib\.rs|main\.rs|menu\.rs' --fail-under-lines 85
-cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings
+cargo clippy --manifest-path=src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check
 ```
 

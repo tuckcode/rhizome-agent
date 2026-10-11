@@ -475,7 +475,7 @@ fn app_legacy_file() -> Result<PathBuf, String> {
 
 #[cfg(test)]
 fn app_backend() -> Box<dyn SecretBackend> {
-    Box::new(test_backend::MemoryOnly::default())
+    Box::new(test_backend::MemoryOnly)
 }
 
 #[cfg(test)]

@@ -208,7 +208,7 @@ jobs:
         # Codecov step above.
 
       - name: Clippy (Rust)
-        run: cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings
+        run: cargo clippy --manifest-path=src-tauri/Cargo.toml --all-targets -- -D warnings
 
       - name: Format check (Rust)
         run: cargo fmt --manifest-path=src-tauri/Cargo.toml -- --check
@@ -277,4 +277,4 @@ jobs:
         run: cargo check --manifest-path=src-tauri/Cargo.toml
 
       - name: Clippy
-        run: cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings
+        run: cargo clippy --manifest-path=src-tauri/Cargo.toml --all-targets -- -D warnings
