@@ -638,7 +638,7 @@ fn send_provider_request(
         .map_err(|error| format!("AI provider request failed: {error}"))
 }
 
-/// Saves a provider key in the OS keychain (ADR-0184).
+/// Saves a provider key in the OS keychain (ADR-0185).
 pub fn save_provider_api_key(provider_id: String, api_key: String) -> Result<(), String> {
     crate::provider_keys::ProviderKeys::for_app()?.save(&provider_id, &api_key)
 }

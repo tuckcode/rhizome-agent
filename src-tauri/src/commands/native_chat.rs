@@ -460,7 +460,7 @@ fn composed_system_prompt(existing: Option<&str>) -> Option<String> {
     settings::compose_agent_profile(settings::saved_agent_profile().as_deref(), existing)
 }
 
-/// Free-tier keys come from the OS keychain (step 3a, ADR-0184).
+/// Free-tier keys come from the OS keychain (step 3a, ADR-0185).
 fn free_tier_routing_model(
     system: Option<String>,
     observer: impl FnMut(crate::rhizome_routing::ProviderAttempt) + Send + 'static,
@@ -958,11 +958,9 @@ mod tests {
             successor_id: None,
         };
 
-        let result = model_or_open_error::<()>(
-            Err("Keychain read failed for groq: locked".into()),
-            &record,
-        )
-        .unwrap_err();
+        let result =
+            model_or_open_error::<()>(Err("Keychain read failed for groq: locked".into()), &record)
+                .unwrap_err();
 
         assert_eq!(result.events, record.events);
         assert!(result.read_only);

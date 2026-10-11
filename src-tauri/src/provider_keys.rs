@@ -199,7 +199,7 @@ impl ProviderKeys {
 }
 
 /// The legacy `ai-provider-secrets.json` file: a compatibility path that
-/// only ever loses keys (ADR-0183, ADR-0184).
+/// only ever loses keys (ADR-0183, ADR-0185).
 struct LegacyFile {
     path: PathBuf,
 }

@@ -1,6 +1,6 @@
 ---
 type: ADR
-id: "0184"
+id: "0185"
 title: "Provider keys live in the OS keychain through the keyring crate"
 status: active
 date: 2026-10-10
@@ -24,6 +24,7 @@ The free-tier router (`rhizome_routing`) reads keys through its `KeyStore` trait
 - **Migration:** a key still in the legacy file moves the first time it is read. Rhizome writes it to the keychain, reads it back, and removes it from the file only on a match. The file is deleted when it holds no keys. A crash between the steps is safe: the next read finds the same value in both places and finishes the removal. If the write or the read-back fails, the file copy stays and keeps working, and the failure is reported by provider id (never the key) and nothing is logged.
 - A keychain entry that differs from the file copy wins. The file copy is kept and reported rather than removed on a guess.
 - Saving a key reads it back, then removes any legacy file copy, so an old key cannot shadow the new one.
+- The native session-log filter (ADR-0183) reads saved keys through `ProviderKeys` (keychain plus any legacy file copy), not the JSON file, so it keeps scrubbing keys after they move.
 - The stored setting name `api_key_storage: "local_file"` stays as-is, because settings on disk use it. It now means "a key Rhizome holds".
 - **Test builds cannot reach the real keychain or the real key file.** `ProviderKeys::for_app()` returns an in-memory backend and a legacy path that never exists when `cfg(test)`. A real-keychain round trip exists only as an `#[ignore]` test run by hand.
 
