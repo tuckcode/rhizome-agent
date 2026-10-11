@@ -50,19 +50,19 @@
     <style>
       :root {
         color-scheme: light;
-        background: #E9ECE5;
-        color: #23281F;
-        --primary: #2E6B4F;
-        --text-primary: #23281F;
-        --text-muted: #77806E;
+        background: #ECE6DA;
+        color: #2A251E;
+        --primary: #2C6A4D;
+        --text-primary: #2A251E;
+        --text-muted: #625A4D;
       }
       :root[data-theme="dark"] {
         color-scheme: dark;
-        background: #10150E;
-        color: #E6EBE0;
+        background: #121410;
+        color: #E9E8DC;
         --primary: #6FE3A0;
-        --text-primary: #E6EBE0;
-        --text-muted: #79836F;
+        --text-primary: #E9E8DC;
+        --text-muted: #999784;
       }
       :root[data-accent="red"] { --primary: #C03D30; }
       :root[data-accent="orange"] { --primary: #B4552D; }
@@ -96,8 +96,8 @@
         padding: 20px;
       }
       :root.ai-workspace-native-window #root {
-        background: #EFF1EC;
-        border: 1px solid #D6DBCF;
+        background: #F1ECE2;
+        border: 1px solid #DDD4C3;
         border-radius: 12px;
         box-sizing: border-box;
         box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.10);
@@ -106,8 +106,8 @@
         width: 100%;
       }
       :root.ai-workspace-native-window[data-theme="dark"] #root {
-        background: #0E120C;
-        border-color: #232A1F;
+        background: #0F110C;
+        border-color: #2A281D;
         box-shadow: 0 12px 26px rgba(0, 0, 0, 0.30), 0 1px 4px rgba(0, 0, 0, 0.22);
       }
     </style>
@@ -133,6 +133,7 @@
           'solarized-light': 'light', 'solarized-dark': 'dark', 'catppuccin-mocha': 'dark',
           'catppuccin-latte': 'light', 'tokyo-night': 'dark', 'one-dark': 'dark',
           'rose-pine': 'dark', 'github-light': 'light', everforest: 'dark', 'monokai-pro': 'dark',
+          loam: 'dark',
         };
         var ACCENT_KEYS = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'gray'];
         function normalizeTheme(value) {

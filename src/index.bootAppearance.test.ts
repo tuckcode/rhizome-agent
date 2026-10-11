@@ -86,6 +86,13 @@ describe('HTML boot appearance', () => {
     expect(document.documentElement).toHaveAttribute('data-color-theme', 'catppuccin-mocha')
   })
 
+  it('pins Loam to dark before React even when the mode toggle says light', () => {
+    paint({ 'rhizome-theme': 'light', 'rhizome-color-theme': 'loam' }, false)
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'loam')
+    expect(document.documentElement).toHaveClass('dark')
+  })
+
   it('ignores invalid values and still paints when storage throws', () => {
     paint({ 'rhizome-theme': 'sepia', 'rhizome-color-theme': 'nope', 'rhizome-accent': 'nope' })
     expect(document.documentElement).toHaveAttribute('data-theme', 'light')
