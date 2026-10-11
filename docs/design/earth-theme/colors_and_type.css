@@ -74,6 +74,7 @@
   --state-hover: #1C1D14;
   --state-selected: #1A2619;
   --state-active: #1C291B;
+  --state-selected-strong: #1C291B;
   --state-disabled: #15160F;
   --user-bg: #1A2619;
   --tool-bg: #121410;
@@ -199,6 +200,7 @@
   --state-hover: #241E15;
   --state-selected: #1F2719;
   --state-active: #212A1A;
+  --state-selected-strong: #212A1A;
   --state-disabled: #1A1610;
   --user-bg: #1F2719;
   --tool-bg: #19150F;
@@ -314,6 +316,7 @@
   --state-hover: #EAE3D6;
   --state-selected: #E1E6DA;
   --state-active: #DCE3D5;
+  --state-selected-strong: #DCE3D5;
   --state-disabled: #EEE9DF;
   --user-bg: #E1E6DA;
   --tool-bg: #EFEADF;

@@ -2,7 +2,8 @@
 
 Usage:  python3 contrast_check.py path/to/colors_and_type.css
 Prints, for each scheme, every text token's ratio vs --bg and its worst ratio across all surface
-tokens, plus status text on its own tinted fill. Exits non-zero if anything is below 4.5:1 or if
+tokens (including --state-selected-strong), plus status text on its own tinted fill and the
+--muted on --state-selected-strong pair. Exits non-zero if anything is below 4.5:1 or if
 --border-input is below 3:1 on bg/surface/surface-2/surface-3.
 """
 import re,sys
@@ -25,7 +26,7 @@ def load(path,sel):
     for blk in re.findall(re.escape(sel)+r'[^{]*\{([^}]*)\}',s):
         for k,v in re.findall(r'(--[\w-]+):\s*([^;]+);',blk): out[k]=v
     return out
-SURF=['--bg','--surface','--surface-2','--surface-3','--surface-sidebar','--surface-popover','--surface-input','--surface-dialog','--titlebar-top','--tool-bg','--user-bg','--state-selected','--state-hover']
+SURF=['--bg','--surface','--surface-2','--surface-3','--surface-sidebar','--surface-popover','--surface-input','--surface-dialog','--titlebar-top','--tool-bg','--user-bg','--state-selected','--state-selected-strong','--state-hover']
 TEXT=['--fg','--fg-heading','--fg-secondary','--fg-tertiary','--muted','--muted-2','--accent','--ok','--warn','--danger']
 def report(t,name):
     rows=[];fails=[]
@@ -57,6 +58,10 @@ if __name__=='__main__':
         if not t: continue
         if sel!=':root': t={**dark,**t}
         rows,fails=report(t,name); bad+=len(fails)
+        if '--state-selected-strong' in t and '--muted' in t:
+            r=cr(hx(t['--muted']),hx(t['--state-selected-strong']))
+            print(f'  --muted on --state-selected-strong: {r:.2f}')
+            if r<4.5: bad+=1; print('  FAIL muted-on-selected-strong')
         if '--border-input' in t:
             for s in ['--bg','--surface','--surface-2','--surface-3']:
                 r=cr(hx(t['--border-input']),hx(t[s])); print(f'  --border-input on {s}: {r:.2f}')

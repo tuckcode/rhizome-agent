@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -216,6 +217,7 @@ const SURFACES = [
   '--surface-popover',
   '--surface-button',
   '--surface-sidebar',
+  '--state-selected-strong',
 ] as const
 
 function expectTokens(block: string, expected: Record<string, string>): void {
@@ -290,6 +292,29 @@ describe('Earth theme tokens', () => {
     expectReadableText(light)
     expectReadableText(dark)
     expectReadableText(loam)
+  })
+
+  it('keeps muted text at 4.5:1 on --state-selected-strong in all three themes', () => {
+    for (const block of [light, dark, loam]) {
+      expect(
+        contrastRatio(token(block, '--text-muted'), token(block, '--state-selected-strong')),
+      ).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  it('prints muted-on-selected-strong in contrast_check.py for every Earth scheme', () => {
+    const checker = readFileSync(join(process.cwd(), 'docs/design/earth-theme/contrast_check.py'), 'utf8')
+    expect(checker).toContain("'--state-selected-strong'")
+    const output = execFileSync(
+      'python3',
+      ['docs/design/earth-theme/contrast_check.py', 'docs/design/earth-theme/colors_and_type.css'],
+      { encoding: 'utf8' },
+    )
+    const lines = [...output.matchAll(/--muted on --state-selected-strong: ([0-9.]+)/g)].map((match) => Number(match[1]))
+    expect(lines).toHaveLength(3)
+    for (const ratio of lines) {
+      expect(ratio).toBeGreaterThanOrEqual(4.5)
+    }
   })
 
   it('keeps Earth light type and syntax accents readable on paper surfaces', () => {
