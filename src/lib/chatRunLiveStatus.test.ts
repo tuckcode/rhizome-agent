@@ -5,6 +5,9 @@ import {
   type ChatRunSnapshot,
 } from './chatRunLiveStatus'
 
+const LOG_SAVE_NOTICE =
+  "This part of the chat couldn't be saved, so it won't be there after a restart."
+
 function snap(partial: Partial<ChatRunSnapshot> = {}): ChatRunSnapshot {
   return {
     isActive: false,
@@ -93,14 +96,27 @@ describe('chatRunSnapshotFromMessages', () => {
     const next = chatRunSnapshotFromMessages(
       [
         { actions: [{ tool: 'get_note', toolId: 't1', status: 'done' }], response: 'found it' },
-        { id: 'notice-1', localMarker: 'flush native session line: disk error', localMarkerTone: 'warning' },
+        { id: 'notice-1', localMarker: LOG_SAVE_NOTICE, localMarkerTone: 'warning' },
       ],
       true,
     )
     expect(next.hasResponse).toBe(true)
-    expect(next.notice).toBe('flush native session line: disk error')
-    expect(nextChatRunAnnouncement(previous, next)).toBe('flush native session line: disk error')
+    expect(next.notice).toBe(LOG_SAVE_NOTICE)
+    expect(nextChatRunAnnouncement(previous, next)).toBe(LOG_SAVE_NOTICE)
     expect(nextChatRunAnnouncement(next, next)).toBeNull()
+  })
+
+  it('returns the notice and the end-of-turn line together in one render', () => {
+    const previous = snap({ isActive: true, hasResponse: true })
+    const next = snap({
+      isActive: false,
+      hasResponse: true,
+      notice: LOG_SAVE_NOTICE,
+      noticeId: 'notice-1',
+    })
+    expect(nextChatRunAnnouncement(previous, next)).toBe(
+      `${LOG_SAVE_NOTICE} Response complete`,
+    )
   })
 
   it('ignores a previous turn when the latest message has no reply', () => {

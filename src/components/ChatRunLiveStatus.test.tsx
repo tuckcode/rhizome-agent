@@ -2,6 +2,9 @@ import { act, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ChatRunLiveStatus } from './ChatRunLiveStatus'
 
+const LOG_SAVE_NOTICE =
+  "This part of the chat couldn't be saved, so it won't be there after a restart."
+
 async function nextFrame() {
   await act(async () => {
     await new Promise<void>((resolve) => {
@@ -80,7 +83,7 @@ describe('ChatRunLiveStatus repeated announcements', () => {
       ...running,
       {
         id: 'notice-1',
-        localMarker: 'flush native session line: disk error',
+        localMarker: LOG_SAVE_NOTICE,
         localMarkerTone: 'warning' as const,
       },
     ]
@@ -95,6 +98,30 @@ describe('ChatRunLiveStatus repeated announcements', () => {
     const region = screen.getByTestId('chat-run-live-status')
     expect(region).toHaveAttribute('role', 'status')
     expect(region).toHaveAttribute('aria-live', 'polite')
-    expect(region).toHaveTextContent('flush native session line: disk error')
+    expect(region).toHaveTextContent(LOG_SAVE_NOTICE)
+  })
+
+  it('reads a notice then Response complete within two frames as one announcement', async () => {
+    const running = [{ userMessage: 'hi', response: 'hello' }]
+    const withNotice = [
+      ...running,
+      {
+        id: 'notice-1',
+        localMarker: LOG_SAVE_NOTICE,
+        localMarkerTone: 'warning' as const,
+      },
+    ]
+
+    const { rerender } = render(
+      <ChatRunLiveStatus messages={running} isActive />,
+    )
+    rerender(<ChatRunLiveStatus messages={withNotice} isActive />)
+    rerender(<ChatRunLiveStatus messages={withNotice} isActive={false} />)
+    await nextFrame()
+    await nextFrame()
+
+    expect(screen.getByTestId('chat-run-live-status')).toHaveTextContent(
+      `${LOG_SAVE_NOTICE} Response complete`,
+    )
   })
 })

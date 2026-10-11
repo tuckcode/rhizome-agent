@@ -331,8 +331,12 @@ describe('aiAgentStreamCallbacks', () => {
       fileCallbacksRef: { current: undefined },
     })
 
-    callbacks.onNotice?.('flush native session line: disk error')
-    callbacks.onNotice?.('flush native session line: disk error')
+    callbacks.onNotice?.(
+      "This part of the chat couldn't be saved, so it won't be there after a restart.",
+    )
+    callbacks.onNotice?.(
+      "This part of the chat couldn't be saved, so it won't be there after a restart.",
+    )
     callbacks.onText(' more')
     callbacks.onDone()
 
@@ -346,7 +350,8 @@ describe('aiAgentStreamCallbacks', () => {
         response: 'Partial reply more',
       },
       {
-        localMarker: 'flush native session line: disk error',
+        localMarker:
+          "This part of the chat couldn't be saved, so it won't be there after a restart.",
         localMarkerTone: 'warning',
       },
     ])

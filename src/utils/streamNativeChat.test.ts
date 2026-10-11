@@ -80,10 +80,12 @@ describe('native stream events', () => {
     expect(applyNativeEvent({
       kind: 'error',
       fatal: false,
-      message: 'flush native session line: disk error',
+      message: "This part of the chat couldn't be saved, so it won't be there after a restart.",
     }, next)).toBe(false)
     expect(next.onError).not.toHaveBeenCalled()
-    expect(next.onNotice).toHaveBeenCalledWith('flush native session line: disk error')
+    expect(next.onNotice).toHaveBeenCalledWith(
+      "This part of the chat couldn't be saved, so it won't be there after a restart.",
+    )
     expect(applyNativeEvent({ kind: 'text_delta', text: 'later' }, next)).toBe(false)
     expect(next.onText).toHaveBeenCalledWith('later')
   })

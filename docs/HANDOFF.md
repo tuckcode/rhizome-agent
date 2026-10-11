@@ -70,15 +70,6 @@ file.
 **Origin:** Claude Opus 5.5 · 2026-10-04 · vault-memory MCP fixes merged locally as `bf22be8`, not pushed. Claude Code's `rhizome` MCP now runs this checkout's `mcp-server` and release `rhizome-tool`. [Handoff](plans/handoffs/2026-10-04-1548-claude-opus-5-5-vault-memory-mcp.md).
 **Origin:** Astra through Hermes desktop · 2026-10-04 · browser design audit at `9a48e00`.
 Browser evidence identifies C89–C92. No product code changed. Native Windows and MacBook checks remain open. [Review](design/2026-10-04-ui-audit.md).
-**Origin:** Cursor Grok 4.6 · 2026-09-21 · C75 living-docs; #66–#68 closed.
-**Origin:** Cursor Grok 4.7 · 2026-09-21 · Astra next-phase input.
-**Origin:** Cursor Grok 4.7 · 2026-09-21 · launch slice. He will open the new app.
-**Origin:** Cursor Grok 4.7 · 2026-09-26 02:27 CDT · handy wrap.
-**Origin:** Claude Opus 5.5 · 2026-09-26 04:25 CDT · Astra redesign pushed, `/Applications` rebuilt from `d0a55f8`.
-**Origin:** Cursor Grok 4.7 · 2026-09-26 · thin macOS title bar + Command Palette (local, unpushed).
-**Origin:** Cursor Grok 4.7 · 2026-09-26 · retargeted Chunk vcs + release Pages URLs off refactoringhq (local, unpushed).
-**Origin:** GPT-6 Codex · 2026-09-26 · splash grows two branches, then breathes with shaded nodes. Browser checks passed. Installed app unchanged.
-**Origin:** Cursor Grok 4.7 · 2026-09-28 · stall plan only. Vault-index gate and Source control are local and uncommitted. Installed app unchanged.
 **Origin:** Cursor Grok 4.7 · 2026-10-03 · Chat waits leave the UI thread. Add to Chat list copies Nous reasoning and input modalities. Installed app unchanged.
 **Origin:** Hermes Agent · 2026-10-03 · Windows and macOS merge in a separate worktree.
 The merge combines Windows `004989d` with macOS `c8b5db2`. Main and the installed apps stay unchanged. Windows gates pass, Rust coverage included (C87 fixed). Native macOS QA not run. The prior macOS report lists installed app **`d0a55f8`**, **2026-09-26 04:21 CDT**. Windows test detail: [`2026-10-03-1533`](plans/handoffs/2026-10-03-1533-hermes-glm-c83-windows-tests-closed.md).

@@ -1681,6 +1681,8 @@ mod tests {
         with_temp_home(|_| {
             let chats = NativeChats::new();
             let (tx, rx) = mpsc::channel();
+            let (fatal_tx, fatal_rx) = mpsc::channel();
+            let (hold_tx, hold_rx) = mpsc::channel::<()>();
             let model = FakeModel::script(vec![vec![ScriptPart::Fail(ModelError {
                 kind: ModelErrorKind::Auth,
                 status: None,
@@ -1691,22 +1693,25 @@ mod tests {
                     "hi",
                     NativeEngine::from_parts(AgentLoop::new(), model),
                     move |event| {
+                        let fatal = matches!(
+                            &event,
+                            EngineEvent::Error { fatal: true, message }
+                                if message.contains("No free-tier provider key")
+                        );
                         let _ = tx.send(event);
+                        if fatal {
+                            let _ = fatal_tx.send(());
+                            let _ = hold_rx.recv();
+                        }
                     },
                 )
                 .expect("start");
-            let seen = wait_for_turn_end(&rx);
-            assert!(
-                seen.iter().any(|event| {
-                    matches!(
-                        event,
-                        EngineEvent::Error { fatal: true, message }
-                            if message.contains("No free-tier provider key")
-                    )
-                }),
-                "no-key must be a fatal error: {seen:?}"
-            );
+            fatal_rx
+                .recv_timeout(Duration::from_secs(2))
+                .expect("fatal no-key error before TurnEnd");
             let result = chats.send(&id, "retry");
+            let _ = hold_tx.send(());
+            let _ = wait_for_turn_end(&rx);
             assert!(
                 result.as_ref().err().is_none_or(|error| {
                     !error.to_lowercase().contains("already running")

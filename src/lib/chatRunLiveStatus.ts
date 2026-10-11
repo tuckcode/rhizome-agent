@@ -33,12 +33,15 @@ export function nextChatRunAnnouncement(
 ): string | null {
   if (!previous) return null
 
+  const lines: string[] = []
   if (next.notice && next.noticeId && next.noticeId !== previous.noticeId) {
-    return next.notice
+    lines.push(next.notice)
   }
-
   if (previous.isActive && !next.isActive) {
-    return next.hasResponse ? 'Response complete' : 'Stopped'
+    lines.push(next.hasResponse ? 'Response complete' : 'Stopped')
+  }
+  if (lines.length > 0) {
+    return lines.join(' ')
   }
 
   for (const tool of next.tools) {

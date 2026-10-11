@@ -462,7 +462,7 @@ mod tests {
                         EngineEvent::Error {
                             fatal: false,
                             message
-                        } if message.contains("disk error")
+                        } if message == native_log::LOG_SAVE_NOTICE
                     )
                 }),
                 "log-save failure must be a non-fatal error: {events:?}"

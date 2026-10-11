@@ -22,6 +22,9 @@ pub const SESSION_SIZE_CAP: u64 = 100 * 1024 * 1024;
 pub const TOOL_RESULT_CAP: usize = 1024 * 1024;
 /// Reserved so a full session can still record cancel/completion.
 const COMPLETION_RESERVE: u64 = 4096;
+/// User-facing notice when a mid-turn log append fails. The turn continues.
+pub const LOG_SAVE_NOTICE: &str =
+    "This part of the chat couldn't be saved, so it won't be there after a restart.";
 
 /// ADR-0183 reopen warning, exact wording.
 pub const REOPEN_WARNING: &str =
@@ -661,7 +664,7 @@ pub fn append_or_roll(
                 "This chat reached its 100 MiB log. Rhizome continued in a new session.".into(),
             ))
         }
-        Err(AppendError::Io(message)) => Err(message),
+        Err(AppendError::Io(_)) => Err(LOG_SAVE_NOTICE.to_string()),
     }
 }
 
@@ -1064,8 +1067,8 @@ mod tests {
                 text: "nope".into(),
             },
         )
-        .expect_err("disk error");
-        assert!(error.contains("disk error"));
+        .expect_err("log-save notice");
+        assert_eq!(error, LOG_SAVE_NOTICE);
         let opened = open_session_log(&id).unwrap();
         assert!(
             !opened

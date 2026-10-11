@@ -46,7 +46,7 @@ describe('AiMessage', () => {
       <AiMessage
         userMessage=""
         actions={[]}
-        localMarker="flush native session line: disk error"
+        localMarker="This part of the chat couldn't be saved, so it won't be there after a restart."
         localMarkerTone="warning"
       />,
     )
