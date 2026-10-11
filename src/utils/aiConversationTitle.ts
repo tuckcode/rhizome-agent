@@ -1,7 +1,7 @@
 import type { AiAgentPermissionMode } from '../lib/aiAgentPermissionMode'
 import type { AiTarget } from '../lib/aiTargets'
 import { streamAiAgent, type AgentStreamCallbacks } from './streamAiAgent'
-import { streamAiModel } from './streamAiModel'
+import { completeAiModelText } from './completeAiModelText'
 
 const TITLE_WORD_LIMIT = 4
 const TITLE_CHAR_LIMIT = 48
@@ -212,21 +212,20 @@ function createTitleStreamCallbacks(onText: (text: string) => void): AgentStream
 }
 
 async function generateAiTitleText(request: GenerateAiConversationTitleRequest): Promise<string | null> {
-  let title = ''
-  const callbacks = createTitleStreamCallbacks((text) => {
-    title += text
-  })
-
   if (request.target.kind === 'api_model') {
-    await streamAiModel({
+    const title = await completeAiModelText({
       provider: request.target.provider,
       model: request.target.model,
       message: titlePrompt(request),
       systemPrompt: TITLE_SYSTEM_PROMPT,
-      callbacks,
     })
     return normalizeAiConversationTitle(title)
   }
+
+  let title = ''
+  const callbacks = createTitleStreamCallbacks((text) => {
+    title += text
+  })
 
   await streamAiAgent({
     agent: request.target.agent,
