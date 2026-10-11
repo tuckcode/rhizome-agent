@@ -1,9 +1,9 @@
 //! Wave 3 (ADR-0156): the engine that powers a research *write* verb
 //! (distill/import) — either a locally installed CLI agent, or a direct-API
 //! model configured with just a key. Distill/Import build+parse+write in
-//! Rust, and `ai_models::run_ai_model_stream` emits the same
-//! `AiAgentStreamEvent` enum the agent-stream callback consumes, so an
-//! API-only call slots in behind the agent path with no event-mapping work.
+//! Rust. The direct-API arm is one plain completion (`ai_models::complete_text`):
+//! no tools and no `create_note`. Distill and import save their own result as
+//! a note, so the model never writes to the vault itself.
 //!
 //! Out of scope by design: `repo_research`/`generate_wiki` need an agentic
 //! file-writing loop an API-only call can't do — those stay agent-only.
@@ -66,9 +66,18 @@ pub fn run_prompt_via_target(
     prompt: String,
     on_line: &mut dyn FnMut(&str),
 ) -> Result<String, String> {
-    run_prompt_via_target_with_model_runner(vault_path, target, prompt, on_line, |req, emit| {
-        crate::ai_models::run_ai_model_stream(req, emit)
-    })
+    run_prompt_via_target_with_model_runner(vault_path, target, prompt, on_line, complete_plain)
+}
+
+/// The production direct-API runner: one plain completion with no tools,
+/// forwarded as a single text event.
+pub(crate) fn complete_plain(
+    request: AiModelStreamRequest,
+    emit: &mut dyn FnMut(AiAgentStreamEvent),
+) -> Result<String, String> {
+    let text = crate::ai_models::complete_text(&request)?;
+    emit(AiAgentStreamEvent::TextDelta { text: text.clone() });
+    Ok(text)
 }
 
 /// Same as [`run_prompt_via_target`] with the direct-API model runner
@@ -108,7 +117,8 @@ where
                 model_id: model_id.clone(),
                 message: prompt,
                 system_prompt: None,
-                vault_path: Some(vault_path.to_string_lossy().to_string()),
+                // No vault: the model gets no tools. The caller writes the note.
+                vault_path: None,
                 vault_paths: Vec::new(),
                 api_key_override: None,
                 event_name: None,
@@ -257,6 +267,35 @@ mod tests {
 
         assert_eq!(response, "TITLE: X\n---\nbody");
         assert_eq!(lines, vec!["TITLE: X\n---\nbody".to_string()]);
+    }
+
+    #[test]
+    fn api_model_arm_sends_no_tools() {
+        use crate::ai_models::test_server::{serve, sse};
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"TITLE: X\n---\nbody"},"finish_reason":"stop"}]}"#,
+        ])]);
+        let mut provider = provider();
+        provider.kind = AiModelProviderKind::LmStudio;
+        provider.base_url = Some(server.base_url.clone());
+        provider.models[0].capabilities.tools = true;
+        let target = AiRunTarget::ApiModel {
+            provider,
+            model_id: "gpt-4o".into(),
+        };
+        let vault = tempfile::tempdir().unwrap();
+
+        let response =
+            run_prompt_via_target(vault.path(), &target, "prompt".into(), &mut |_| {}).unwrap();
+
+        assert_eq!(response, "TITLE: X\n---\nbody");
+        let requests = server.requests.lock().unwrap();
+        let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+        assert!(
+            body.get("tools").is_none(),
+            "distill and import send no tools"
+        );
+        assert_eq!(body["stream"], true);
     }
 
     #[test]

@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { streamAiAgentMock, streamAiModelMock } = vi.hoisted(() => ({
+const { completeAiModelTextMock, streamAiAgentMock } = vi.hoisted(() => ({
+  completeAiModelTextMock: vi.fn(),
   streamAiAgentMock: vi.fn(),
-  streamAiModelMock: vi.fn(),
 }))
 
 vi.mock('./streamAiAgent', () => ({
   streamAiAgent: streamAiAgentMock,
 }))
 
-vi.mock('./streamAiModel', () => ({
-  streamAiModel: streamAiModelMock,
+vi.mock('./completeAiModelText', () => ({
+  completeAiModelText: completeAiModelTextMock,
 }))
 
 import {
@@ -23,7 +23,7 @@ describe('generateAiConversationTitle', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     streamAiAgentMock.mockResolvedValue(undefined)
-    streamAiModelMock.mockResolvedValue(undefined)
+    completeAiModelTextMock.mockResolvedValue('')
   })
 
   it('creates a sentence-case fallback title from the first prompt', () => {
@@ -75,7 +75,7 @@ describe('generateAiConversationTitle', () => {
     }))
   })
 
-  it('asks the selected API model for a short chat title', async () => {
+  it('uses a plain completion for an API model title', async () => {
     const provider = {
       id: 'openai',
       name: 'OpenAI',
@@ -89,10 +89,7 @@ describe('generateAiConversationTitle', () => {
       display_name: 'GPT-4.1',
       capabilities: { streaming: true, tools: false, vision: false, json_mode: false, reasoning: false },
     }
-    streamAiModelMock.mockImplementation(async ({ callbacks }) => {
-      callbacks.onText('Review Sidebar Spacing')
-      callbacks.onDone()
-    })
+    completeAiModelTextMock.mockResolvedValue('Review Sidebar Spacing')
 
     await expect(generateAiConversationTitleForTarget({
       assistantResponse: 'The sidebar needs tighter spacing and clearer grouping.',
@@ -110,9 +107,33 @@ describe('generateAiConversationTitle', () => {
       vaultPath: '/vault',
     })).resolves.toBe('Review sidebar spacing')
 
-    expect(streamAiModelMock).toHaveBeenCalledWith(expect.objectContaining({
+    expect(completeAiModelTextMock).toHaveBeenCalledWith(expect.objectContaining({
       provider,
       model,
+      systemPrompt: expect.stringContaining('Do not inspect files or use tools.'),
     }))
+    expect(completeAiModelTextMock.mock.calls[0][0]).not.toHaveProperty('vaultPath')
+  })
+
+  it('falls back to the prompt title when the API model completion fails', async () => {
+    completeAiModelTextMock.mockRejectedValue(new Error('AI provider returned 500'))
+
+    await expect(generateAiConversationTitleForTarget({
+      permissionMode: 'safe',
+      prompt: 'Please review the spacing in the sidebar',
+      target: {
+        kind: 'api_model',
+        provider: { id: 'openai', name: 'OpenAI', kind: 'open_ai', models: [] },
+        model: {
+          id: 'gpt-4.1',
+          capabilities: { streaming: true, tools: false, vision: false, json_mode: false, reasoning: false },
+        },
+        id: 'model:openai/gpt-4.1',
+        label: 'OpenAI · GPT-4.1',
+        shortLabel: 'GPT-4.1',
+      },
+      targetReady: true,
+      vaultPath: '/vault',
+    })).resolves.toBe('Review spacing in sidebar')
   })
 })

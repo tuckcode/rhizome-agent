@@ -188,7 +188,43 @@ pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<Str
         api_key_override: normalize_optional_string(request.api_key_override),
         event_name: None,
     };
-    send_model_message(&request, &mut |_| {})
+    complete_text(&request)
+}
+
+/// One plain reply to `request.message`, with no tools and no loop.
+///
+/// OpenAI-compatible providers stream through `stream_chat_events_with`,
+/// and the text deltas are joined. Anthropic uses the old blocking call
+/// until Anthropic streaming lands (plan step 6a).
+pub fn complete_text(request: &AiModelStreamRequest) -> Result<String, String> {
+    complete_text_with(request, HttpLimits::STREAM)
+}
+
+fn complete_text_with(
+    request: &AiModelStreamRequest,
+    limits: HttpLimits,
+) -> Result<String, String> {
+    if request.provider.kind == AiModelProviderKind::Anthropic {
+        return send_anthropic_message(request);
+    }
+    let mut text = String::new();
+    let mut failure = None;
+    let message = serde_json::json!({ "role": "user", "content": request.message });
+    stream_chat_events_with(request, vec![message], Vec::new(), limits, &mut |event| {
+        match event {
+            ModelEvent::TextDelta { text: delta } => text.push_str(&delta),
+            ModelEvent::Error(error) => failure = Some(error.message),
+            _ => {}
+        }
+        true
+    });
+    if let Some(message) = failure {
+        return Err(message);
+    }
+    if text.trim().is_empty() {
+        return Err("AI provider response did not include assistant text.".into());
+    }
+    Ok(text)
 }
 
 /// Trims a base URL and strips trailing slashes. The host stays as written,
@@ -1088,6 +1124,119 @@ mod tests {
         );
         assert!(body.get("tools").is_none());
         assert!(body.get("tool_choice").is_none());
+    }
+
+    #[test]
+    fn connection_test_streams_without_tools() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"OK"},"finish_reason":"stop"}]}"#,
+        ])]);
+        let provider = compatible_request(&server.base_url).provider;
+
+        let reply = test_ai_model_provider(AiModelProviderTestRequest {
+            provider,
+            model_id: "demo-model".into(),
+            api_key_override: None,
+        })
+        .unwrap();
+
+        assert_eq!(reply, "OK");
+        let requests = server.requests.lock().unwrap();
+        let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+        assert_eq!(body["stream"], true);
+        assert_eq!(body["messages"][1]["content"], "Reply with exactly OK.");
+        assert!(body.get("tools").is_none());
+    }
+
+    #[test]
+    fn complete_text_accumulates_streamed_text_without_tools() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"Hello "}}]}"#,
+            r#"{"choices":[{"delta":{"content":"there."},"finish_reason":"stop"}]}"#,
+        ])]);
+        let request = compatible_request(&server.base_url);
+
+        let text = complete_text_with(&request, TEST_LIMITS).unwrap();
+
+        assert_eq!(text, "Hello there.");
+        let requests = server.requests.lock().unwrap();
+        assert_eq!(requests[0].0, "POST /v1/chat/completions");
+        let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+        assert_eq!(body["stream"], true);
+        assert_eq!(
+            body["messages"],
+            json!([
+                { "role": "system", "content": "Be concise." },
+                { "role": "user", "content": "Hello" },
+            ])
+        );
+        assert!(body.get("tools").is_none());
+    }
+
+    #[test]
+    fn complete_text_returns_the_model_error_message() {
+        let server = serve(vec![http_response(
+            "401 Unauthorized",
+            &["Content-Type: application/json"],
+            r#"{"error":{"message":"bad key"}}"#,
+        )]);
+
+        let error =
+            complete_text_with(&compatible_request(&server.base_url), TEST_LIMITS).unwrap_err();
+
+        assert!(error.contains("bad key"), "{error}");
+    }
+
+    #[test]
+    fn complete_text_rejects_an_empty_reply() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"  "},"finish_reason":"stop"}]}"#,
+        ])]);
+
+        let error =
+            complete_text_with(&compatible_request(&server.base_url), TEST_LIMITS).unwrap_err();
+
+        assert_eq!(
+            error,
+            "AI provider response did not include assistant text."
+        );
+    }
+
+    #[test]
+    fn complete_text_rejects_an_empty_anthropic_reply() {
+        let server = serve(vec![http_response(
+            "200 OK",
+            &["Content-Type: application/json"],
+            r#"{"content":[{"type":"text","text":"  "}]}"#,
+        )]);
+        let mut request = compatible_request(&server.base_url);
+        request.provider.kind = AiModelProviderKind::Anthropic;
+        request.api_key_override = Some("test-key".into());
+
+        let error = complete_text_with(&request, TEST_LIMITS).unwrap_err();
+
+        assert_eq!(error, "Anthropic response did not include assistant text.");
+    }
+
+    #[test]
+    fn complete_text_sends_anthropic_to_the_messages_endpoint() {
+        let server = serve(vec![http_response(
+            "200 OK",
+            &["Content-Type: application/json"],
+            r#"{"content":[{"type":"text","text":"OK"}]}"#,
+        )]);
+        let mut request = compatible_request(&server.base_url);
+        request.provider.kind = AiModelProviderKind::Anthropic;
+        request.api_key_override = Some("test-key".into());
+
+        let text = complete_text_with(&request, TEST_LIMITS).unwrap();
+
+        assert_eq!(text, "OK");
+        let requests = server.requests.lock().unwrap();
+        assert_eq!(requests[0].0, "POST /v1/messages");
+        let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+        assert_eq!(body["system"], "Be concise.");
+        assert!(body.get("tools").is_none());
     }
 
     #[test]

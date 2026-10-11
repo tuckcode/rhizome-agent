@@ -219,7 +219,7 @@ pub fn run_distill_via_target(
         trigger,
         target,
         on_line,
-        |req, emit| crate::ai_models::run_ai_model_stream(req, emit),
+        crate::ai_run_target::complete_plain,
     )
 }
 

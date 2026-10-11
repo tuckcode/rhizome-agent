@@ -255,6 +255,13 @@ pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<Str
     crate::ai_models::test_ai_model_provider(request)
 }
 
+/// One plain reply with no tools, for batch callers such as chat titles.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn complete_ai_model_text(request: AiModelStreamRequest) -> Result<String, String> {
+    run_blocking(move || crate::ai_models::complete_text(&request)).await?
+}
+
 // ── Claude CLI (mobile stubs) ───────────────────────────────────────────────
 
 #[cfg(mobile)]
@@ -361,6 +368,14 @@ pub fn test_ai_model_provider(
     _request: crate::ai_models::AiModelProviderTestRequest,
 ) -> Result<String, String> {
     Err("Direct AI model tests are not available in this mobile build yet.".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn complete_ai_model_text(
+    _request: crate::ai_models::AiModelStreamRequest,
+) -> Result<String, String> {
+    Err("Direct AI model chat is not available in this mobile build yet.".into())
 }
 
 /// Run a synchronous host or shell call off the UI thread.
