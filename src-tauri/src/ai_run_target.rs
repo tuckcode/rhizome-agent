@@ -260,6 +260,32 @@ mod tests {
     }
 
     #[test]
+    fn api_model_arm_sends_no_tools() {
+        use crate::ai_models::test_server::{serve, sse};
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"TITLE: X\n---\nbody"},"finish_reason":"stop"}]}"#,
+        ])]);
+        let mut provider = provider();
+        provider.kind = AiModelProviderKind::LmStudio;
+        provider.base_url = Some(server.base_url.clone());
+        provider.models[0].capabilities.tools = true;
+        let target = AiRunTarget::ApiModel {
+            provider,
+            model_id: "gpt-4o".into(),
+        };
+        let vault = tempfile::tempdir().unwrap();
+
+        let response =
+            run_prompt_via_target(vault.path(), &target, "prompt".into(), &mut |_| {}).unwrap();
+
+        assert_eq!(response, "TITLE: X\n---\nbody");
+        let requests = server.requests.lock().unwrap();
+        let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+        assert!(body.get("tools").is_none(), "distill and import send no tools");
+        assert_eq!(body["stream"], true);
+    }
+
+    #[test]
     fn api_model_arm_propagates_runner_errors() {
         let target = AiRunTarget::ApiModel {
             provider: provider(),
