@@ -64,7 +64,7 @@ describe('SheetEditor', () => {
     expect(formulaInput.value).toBe('[[project-alpha]]')
     expect(ironCalcMock.state.lastModel?.getCellContent(0, 1, 1)).toBe('[[project-alpha]]')
     expect(ironCalcMock.state.lastModel?.styleUpdates).toEqual(expect.arrayContaining([
-      expect.objectContaining({ stylePath: 'font.color', value: '#155dff' }),
+      expect.objectContaining({ stylePath: 'font.color', value: '#2c6a4d' }),
       expect.objectContaining({ stylePath: 'font.u', value: 'true' }),
     ]))
     expect(screen.queryByTestId('sheet-wikilink-autocomplete')).not.toBeInTheDocument()
@@ -170,7 +170,7 @@ describe('SheetEditor', () => {
 
     expect(formulaInput.value).toBe('=[[revenue-sheet]]')
     expect(ironCalcMock.state.lastModel?.styleUpdates).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ stylePath: 'font.color', value: '#155dff' }),
+      expect.objectContaining({ stylePath: 'font.color', value: '#2c6a4d' }),
     ]))
   })
 
@@ -549,7 +549,7 @@ describe('SheetEditor', () => {
     await screen.findByTestId('ironcalc-workbook')
 
     expect(ironCalcMock.state.lastModel?.styleUpdates).toEqual(expect.arrayContaining([
-      expect.objectContaining({ stylePath: 'font.color', value: '#155dff' }),
+      expect.objectContaining({ stylePath: 'font.color', value: '#2c6a4d' }),
       expect.objectContaining({ stylePath: 'font.u', value: 'true' }),
     ]))
 

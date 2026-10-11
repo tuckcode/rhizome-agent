@@ -49,6 +49,14 @@
     </script>
     <style>
       :root {
+        color-scheme: dark;
+        background: #0F110C;
+        color: #E9E8DC;
+        --primary: #6FE3A0;
+        --text-primary: #E9E8DC;
+        --text-muted: #999784;
+      }
+      :root[data-theme="light"] {
         color-scheme: light;
         background: #ECE6DA;
         color: #2A251E;
@@ -58,16 +66,24 @@
       }
       :root[data-theme="dark"] {
         color-scheme: dark;
-        background: #121410;
+        background: #0F110C;
         color: #E9E8DC;
         --primary: #6FE3A0;
         --text-primary: #E9E8DC;
         --text-muted: #999784;
       }
+      :root[data-color-theme="loam"] {
+        color-scheme: dark;
+        background: #15110C;
+        color: #EDE6D8;
+        --primary: #6FE3A0;
+        --text-primary: #EDE6D8;
+        --text-muted: #A3987F;
+      }
       :root[data-accent="red"] { --primary: #C03D30; }
       :root[data-accent="orange"] { --primary: #B4552D; }
       :root[data-accent="yellow"] { --primary: #B08A25; }
-      :root[data-accent="green"] { --primary: #38A169; }
+      :root[data-accent="green"] { --primary: #3D6A1E; }
       :root[data-accent="purple"] { --primary: #7C5CB8; }
       :root[data-accent="pink"] { --primary: #B84A7E; }
       :root[data-accent="gray"] { --primary: #6E7867; }
@@ -96,19 +112,28 @@
         padding: 20px;
       }
       :root.ai-workspace-native-window #root {
-        background: #F1ECE2;
-        border: 1px solid #DDD4C3;
+        background: #0F110C;
+        border: 1px solid #2A281D;
         border-radius: 12px;
         box-sizing: border-box;
-        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.10);
+        box-shadow: 0 12px 26px rgba(0, 0, 0, 0.30), 0 1px 4px rgba(0, 0, 0, 0.22);
         height: 100%;
         overflow: hidden;
         width: 100%;
+      }
+      :root.ai-workspace-native-window[data-theme="light"] #root {
+        background: #F1ECE2;
+        border-color: #DDD4C3;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.10);
       }
       :root.ai-workspace-native-window[data-theme="dark"] #root {
         background: #0F110C;
         border-color: #2A281D;
         box-shadow: 0 12px 26px rgba(0, 0, 0, 0.30), 0 1px 4px rgba(0, 0, 0, 0.22);
+      }
+      :root.ai-workspace-native-window[data-color-theme="loam"] #root {
+        background: #15110C;
+        border-color: #352C20;
       }
     </style>
     <title>Rhizome Agent</title>
@@ -147,13 +172,14 @@
         }
         function prefersDarkTheme() {
           try {
-            return typeof window.matchMedia === 'function' && window.matchMedia(systemDarkQuery).matches;
+            if (typeof window.matchMedia !== 'function') return true;
+            return window.matchMedia(systemDarkQuery).matches;
           } catch {
-            return false;
+            return true;
           }
         }
         function resolveTheme(value) {
-          var mode = normalizeTheme(value) || 'light';
+          var mode = normalizeTheme(value) || 'dark';
           return mode === 'system' ? (prefersDarkTheme() ? 'dark' : 'light') : mode;
         }
         function applyTheme(modeValue, colorThemeValue, accentValue) {
@@ -195,7 +221,7 @@
             readStored(accentKey, legacyAccentKey, normalizeAccent)
           );
         } catch {
-          applyTheme('light', null, null);
+          applyTheme('dark', null, null);
         }
       })();
     </script>

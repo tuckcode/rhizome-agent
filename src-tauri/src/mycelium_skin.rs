@@ -52,27 +52,27 @@ pub const EXPECTED_MINDWALK_VARS: &[&str] = &[
 /// live on `:root` itself — not on a later `html[data-rhizome-theme]` rule.
 const DARK_TOKENS: &str = r#"
 :root {
-  --sky: #0E120C;
-  --panel: #151A12;
-  --panel-raised: #1B2117;
-  --hairline: #232A1F;
-  --hairline-strong: #333D2B;
-  --ink: #E6EBE0;
-  --muted: #ADB6A3;
-  --faint: #79836F;
+  --sky: #0F110C;
+  --panel: #16170F;
+  --panel-raised: #1C1D14;
+  --hairline: #2A281D;
+  --hairline-strong: #3B3828;
+  --ink: #E9E8DC;
+  --muted: #999784;
+  --faint: #8F8D7B;
   --moss: #6FE3A0;
-  --pine: #4FBF80;
+  --pine: #9BCF7E;
   --moon: #8FEBB4;
-  --amber: #E3C46F;
-  --ember: #E39F6F;
-  --alarm: #E36F6F;
-  --act-read: #8FB4EB;
-  --act-edit: #E3C46F;
-  --act-exec: #79836F;
-  --act-search: #6FD8E3;
+  --amber: #E9B04F;
+  --ember: #E5B171;
+  --alarm: #EE8B7E;
+  --act-read: #8FBEDB;
+  --act-edit: #E9B04F;
+  --act-exec: #8F8D7B;
+  --act-search: #8FBEDB;
   --act-verify: #6FE3A0;
-  --mark-compaction: #E3806F;
-  --mark-subagent: #B98FEB;
+  --mark-compaction: #EE8B7E;
+  --mark-subagent: #C3B2F0;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
@@ -80,27 +80,27 @@ const DARK_TOKENS: &str = r#"
 
 const LIGHT_TOKENS: &str = r#"
 :root {
-  --sky: #EFF1EC;
-  --panel: #F7F8F5;
-  --panel-raised: #FBFCFA;
-  --hairline: #D6DBCF;
-  --hairline-strong: #C2C9B8;
-  --ink: #23281F;
-  --muted: #4C5546;
-  --faint: #97A08D;
-  --moss: #2E6B4F;
-  --pine: #38A169;
-  --moon: #245741;
-  --amber: #9A7B1F;
-  --ember: #C07A3A;
-  --alarm: #C03D30;
-  --act-read: #3A6BA5;
-  --act-edit: #9A7B1F;
-  --act-exec: #77806E;
-  --act-search: #1F7E8A;
-  --act-verify: #2E6B4F;
-  --mark-compaction: #C07A3A;
-  --mark-subagent: #6B4FA5;
+  --sky: #F1ECE2;
+  --panel: #F8F5EE;
+  --panel-raised: #FCFAF6;
+  --hairline: #DDD4C3;
+  --hairline-strong: #C8BDA8;
+  --ink: #2A251E;
+  --muted: #625A4D;
+  --faint: #6B6354;
+  --moss: #2C6A4D;
+  --pine: #3D6A1E;
+  --moon: #22573F;
+  --amber: #8A5208;
+  --ember: #9E4A27;
+  --alarm: #A3342A;
+  --act-read: #286C68;
+  --act-edit: #8A5208;
+  --act-exec: #6B6354;
+  --act-search: #286C68;
+  --act-verify: #2C6A4D;
+  --mark-compaction: #A3342A;
+  --mark-subagent: #714EB2;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
@@ -312,7 +312,7 @@ mod tests {
         let style_at = out.find("data-rhizome-skin").expect("skin injected");
         let head_at = out.find("</head>").expect("head preserved");
         assert!(style_at < head_at, "skin must win the cascade");
-        assert!(out.contains("--sky: #0E120C"));
+        assert!(out.contains("--sky: #0F110C"));
     }
 
     #[test]
@@ -331,9 +331,9 @@ mod tests {
     #[test]
     fn light_theme_paints_root_tokens_not_dark_defaults() {
         let out = inject_skin("<head></head>", "light");
-        assert!(out.contains("--sky: #EFF1EC"));
+        assert!(out.contains("--sky: #F1ECE2"));
         assert!(
-            !out.contains("--sky: #0E120C"),
+            !out.contains("--sky: #0F110C"),
             "light skin must not leave the dark sky on :root; the city samples :root"
         );
     }

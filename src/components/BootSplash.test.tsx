@@ -34,6 +34,18 @@ describe('BootSplash', () => {
     expect(splashCss).toContain('calc(720ms - var(--boot-elapsed, 0ms))')
   })
 
+  it('paints the splash card from the Earth palette', () => {
+    expect(splashCss).toMatch(/\.boot-splash-card\s*\{[^}]*background:\s*#16170F/)
+    expect(splashCss).toMatch(/\.boot-splash-card\s*\{[^}]*border:\s*1px solid #2A281D/)
+    expect(splashCss).toMatch(/\[data-theme="light"\] \.boot-splash-card\s*\{[^}]*background:\s*#F8F5EE/)
+    expect(splashCss).toMatch(/\[data-theme="dark"\] \.boot-splash-card\s*\{[^}]*background:\s*#16170F/)
+    expect(splashCss).toMatch(/\[data-theme="dark"\] \.boot-splash-card\s*\{[^}]*border-color:\s*#2A281D/)
+    expect(splashCss).not.toContain('#F7F8F5')
+    expect(splashCss).not.toContain('#151A12')
+    expect(splashCss).not.toContain('#3b9e83')
+    expect(splashCss).toContain('var(--primary, #2C6A4D)')
+  })
+
   it('exposes the local JetBrains face to the bootstrap stylesheet', () => {
     const face = splashCss.slice(splashCss.indexOf('@font-face'), splashCss.indexOf('.boot-splash {'))
     expect(face).toMatch(/font-family:\s*'JetBrains Mono'/)

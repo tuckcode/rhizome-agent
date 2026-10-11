@@ -93,9 +93,26 @@ describe('HTML boot appearance', () => {
     expect(document.documentElement).toHaveClass('dark')
   })
 
+  it('starts a fresh install in Earth dark when nothing is saved', () => {
+    paint({})
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveClass('dark')
+    const html = readFileSync(join(process.cwd(), 'index.html'), 'utf8')
+    expect(html).toMatch(/:root\s*\{[^}]*background:\s*#0F110C/)
+    expect(html).toMatch(/normalizeTheme\(value\) \|\| 'dark'/)
+  })
+
+  it('gives Loam its own first-paint background so relaunch does not flash Earth dark', () => {
+    const html = readFileSync(join(process.cwd(), 'index.html'), 'utf8')
+    expect(html).toMatch(/\[data-color-theme="loam"\][^{]*\{[^}]*background:\s*#15110C/)
+    expect(html).not.toMatch(/:root\[data-theme="dark"\][^{]*\{[^}]*background:\s*#15110C/)
+    expect(html).not.toContain('#38A169')
+    expect(html).not.toContain('#3b9e83')
+  })
+
   it('ignores invalid values and still paints when storage throws', () => {
     paint({ 'rhizome-theme': 'sepia', 'rhizome-color-theme': 'nope', 'rhizome-accent': 'nope' })
-    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     expect(document.documentElement).not.toHaveAttribute('data-color-theme')
     expect(document.documentElement).not.toHaveAttribute('data-accent')
 
@@ -107,7 +124,7 @@ describe('HTML boot appearance', () => {
       document.documentElement.setAttribute('data-theme', 'dark')
       const run = new Function(bootAppearanceScript())
       run()
-      expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+      expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     } finally {
       Storage.prototype.getItem = originalGetItem
     }

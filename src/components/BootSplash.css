@@ -29,10 +29,10 @@
 
 .boot-splash-card {
   align-items: center;
-  background: #F7F8F5;
-  border: 1px solid #E3E7DE;
+  background: #16170F;
+  border: 1px solid #2A281D;
   border-radius: 16px;
-  box-shadow: 0 16px 40px rgb(15 23 42 / 0.12), 0 1px 3px rgb(15 23 42 / 0.08);
+  box-shadow: 0 18px 44px rgb(0 0 0 / 0.35), 0 1px 4px rgb(0 0 0 / 0.22);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -41,9 +41,15 @@
   width: 240px;
 }
 
+:root[data-theme="light"] .boot-splash-card {
+  background: #F8F5EE;
+  border-color: #DDD4C3;
+  box-shadow: 0 16px 40px rgb(15 23 42 / 0.12), 0 1px 3px rgb(15 23 42 / 0.08);
+}
+
 :root[data-theme="dark"] .boot-splash-card {
-  background: #151A12;
-  border-color: #232A1F;
+  background: #16170F;
+  border-color: #2A281D;
   box-shadow: 0 18px 44px rgb(0 0 0 / 0.35), 0 1px 4px rgb(0 0 0 / 0.22);
 }
 
@@ -69,15 +75,15 @@
 
 .boot-splash circle:first-of-type {
   fill: url(#boot-core-material);
-  stroke: color-mix(in srgb, var(--primary, #3b9e83) 72%, black);
+  stroke: color-mix(in srgb, var(--primary, #2C6A4D) 72%, black);
 }
 
 .boot-node-highlight { stop-color: color-mix(in srgb, var(--text-primary, currentColor) 72%, white); }
 .boot-node-color { stop-color: var(--text-primary, currentColor); }
 .boot-node-shade { stop-color: color-mix(in srgb, var(--text-primary, currentColor) 68%, black); }
-.boot-core-highlight { stop-color: color-mix(in srgb, var(--primary, #3b9e83) 58%, white); }
-.boot-core-color { stop-color: var(--primary, #3b9e83); }
-.boot-core-shade { stop-color: color-mix(in srgb, var(--primary, #3b9e83) 62%, black); }
+.boot-core-highlight { stop-color: color-mix(in srgb, var(--primary, #2C6A4D) 58%, white); }
+.boot-core-color { stop-color: var(--primary, #2C6A4D); }
+.boot-core-shade { stop-color: color-mix(in srgb, var(--primary, #2C6A4D) 62%, black); }
 
 .boot-splash-wordmark {
   font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;

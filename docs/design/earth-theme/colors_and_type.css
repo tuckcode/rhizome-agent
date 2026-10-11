@@ -176,13 +176,13 @@
   --fg-heading: #F7F1E5;
   --fg-secondary: #C6BBA6;
   --fg-tertiary: #B2A791;
-  --muted-2: #9A8F78;
+  --muted-2: #998D74;
   --accent-ink: #15110C;
 
   /* Borders / accent variants */
   --border-subtle: #272017;
   --border-strong: #4A3D2C;
-  --border-input: #7E6F59; /* >=3:1 non-text boundary for inputs/controls */
+  --border-input: #8A7A62; /* >=3:1 non-text boundary, with margin on selected rows */
   --border-focus: var(--accent);
   --state-focus-ring: var(--accent);
   --accent-dim: rgba(111, 227, 160, 0.14);

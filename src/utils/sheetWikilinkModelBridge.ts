@@ -8,7 +8,7 @@ import {
   sheetWikilinkDisplayValue,
 } from './sheetWikilinks'
 
-export const SHEET_WIKILINK_FONT_COLOR = '#155dff'
+export const SHEET_WIKILINK_FONT_COLOR = '#2c6a4d'
 
 const SHEET_WIKILINK_FORMATTED_VALUE_BRIDGE = Symbol('sheetWikilinkFormattedValueBridge')
 

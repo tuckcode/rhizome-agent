@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ACCENT_COLOR_STORAGE_KEY, COLOR_THEME_STORAGE_KEY, THEME_MODE_STORAGE_KEY } from '../lib/themeMode'
+import { ACCENT_COLOR_STORAGE_KEY, COLOR_THEME_STORAGE_KEY, THEME_MODE_STORAGE_KEY, type ThemeMode } from '../lib/themeMode'
 import { useThemeMode } from './useThemeMode'
 
 function createStorageMock(): Storage {
@@ -40,6 +40,13 @@ describe('useThemeMode', () => {
     expect(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)).toBe('dark')
   })
 
+  it('starts a fresh install in Earth dark when nothing is saved', () => {
+    renderHook(() => useThemeMode(null, true))
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveClass('dark')
+  })
+
   it('uses the storage mirror when persisted settings are empty', () => {
     window.localStorage.setItem(THEME_MODE_STORAGE_KEY, 'dark')
 
@@ -68,6 +75,28 @@ describe('useThemeMode', () => {
     expect(document.documentElement).not.toHaveClass('dark')
 
     unmount()
+    act(() => media.setMatches(true))
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+  })
+
+  it('removes the Match system prefers-color-scheme listener on cleanup and when leaving system mode', () => {
+    const media = installMatchMedia(true)
+    const { rerender, unmount } = renderHook(
+      ({ mode }: { mode: ThemeMode }) => useThemeMode(mode, true),
+      { initialProps: { mode: 'system' as ThemeMode } },
+    )
+
+    expect(media.listenerCount()).toBe(1)
+
+    rerender({ mode: 'dark' })
+    expect(media.listenerCount()).toBe(0)
+    act(() => media.setMatches(false))
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+
+    rerender({ mode: 'system' })
+    expect(media.listenerCount()).toBe(1)
+    unmount()
+    expect(media.listenerCount()).toBe(0)
     act(() => media.setMatches(true))
     expect(document.documentElement).toHaveAttribute('data-theme', 'light')
   })
@@ -101,6 +130,21 @@ describe('useThemeMode', () => {
     act(() => media.setMatches(false))
     expect(document.documentElement).toHaveAttribute('data-theme', 'light')
   })
+
+  it('Loam stays dark when Match system follows prefers-color-scheme', () => {
+    const media = installMatchMedia(false)
+
+    renderHook(() => useThemeMode('system', true, 'loam', 'blue'))
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'loam')
+    expect(document.documentElement).toHaveClass('dark')
+    expect(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)).toBe('system')
+
+    act(() => media.setMatches(true))
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'loam')
+  })
 })
 
 function installMatchMedia(initialMatches: boolean) {
@@ -130,6 +174,9 @@ function installMatchMedia(initialMatches: boolean) {
   })
 
   return {
+    listenerCount() {
+      return listeners.size
+    },
     setMatches(nextMatches: boolean) {
       matches = nextMatches
       const event = new Event('change') as MediaQueryListEvent

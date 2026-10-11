@@ -3,11 +3,13 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { CHAT_FOCUS_RING_CLASS } from './chatFocusRing'
-import { COLOR_THEMES, DEFAULT_COLOR_THEME } from './themeMode'
+import { COLOR_THEMES, DEFAULT_COLOR_THEME, DEFAULT_THEME_MODE } from './themeMode'
 
 const indexCss = readFileSync(join(process.cwd(), 'src/index.css'), 'utf8')
 const themesCss = readFileSync(join(process.cwd(), 'src/themes.css'), 'utf8')
 const generator = readFileSync(join(process.cwd(), 'scripts/generate-themes-css.mjs'), 'utf8')
+const sheetSelectionChrome = readFileSync(join(process.cwd(), 'src/utils/sheetSelectionChrome.ts'), 'utf8')
+const blockReorder = readFileSync(join(process.cwd(), 'src/components/rhizomeBlockReorder.ts'), 'utf8')
 
 function themeBlock(css: string, header: string): string {
   const start = css.indexOf(header)
@@ -90,7 +92,7 @@ const EARTH_DARK = {
   '--ok-text': '#9BCF7E',
   '--danger-text': '#EE8B7E',
   '--warn-text': '#E9B04F',
-  '--syntax-highlight-comment': '#848F77',
+  '--syntax-highlight-comment': '#88917B',
 } as const
 
 const EARTH_LIGHT = {
@@ -166,13 +168,13 @@ const LOAM = {
   '--text-secondary': '#C6BBA6',
   '--text-tertiary': '#B2A791',
   '--text-muted': '#A3987F',
-  '--text-faint': '#9A8F78',
+  '--text-faint': '#998D74',
   '--text-heading': '#F7F1E5',
   '--text-inverse': '#15110C',
   '--border-default': '#352C20',
   '--border-subtle': '#272017',
   '--border-strong': '#4A3D2C',
-  '--border-input': '#7E6F59',
+  '--border-input': '#8A7A62',
   '--border-dialog': '#4A3D2C',
   '--border-focus': 'var(--accent-blue)',
   '--state-hover': '#241E15',
@@ -257,6 +259,7 @@ describe('Earth theme tokens', () => {
   )
 
   it('keeps rhizome as the default color theme and adds Loam', () => {
+    expect(DEFAULT_THEME_MODE).toBe('dark')
     expect(DEFAULT_COLOR_THEME).toBe('rhizome')
     const loamTheme = COLOR_THEMES.find((theme) => theme.slug === 'loam')
     expect(loamTheme).toEqual({
@@ -301,6 +304,31 @@ describe('Earth theme tokens', () => {
         contrastRatio(token(block, '--text-muted'), token(block, '--state-selected-strong')),
       ).toBeGreaterThanOrEqual(4.5)
     }
+  })
+
+  it('dims Loam faint below muted while staying at 4.5:1 on every Loam surface', () => {
+    const faint = token(loam, '--text-faint')
+    const muted = token(loam, '--text-muted')
+    expect(faint).not.toBe(muted)
+    expect(relativeLuminance(faint)).toBeLessThan(relativeLuminance(muted))
+    for (const surfaceName of SURFACES) {
+      expect(
+        contrastRatio(faint, token(loam, surfaceName)),
+        `--text-faint on ${surfaceName}`,
+      ).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  it('gives Loam --border-input margin above 3:1 on the selected row', () => {
+    expect(
+      contrastRatio(token(loam, '--border-input'), token(loam, '--state-selected-strong')),
+    ).toBeGreaterThanOrEqual(3.3)
+  })
+
+  it('keeps Earth dark comment color at 4.5:1 on the selected row', () => {
+    expect(
+      contrastRatio(token(dark, '--syntax-highlight-comment'), token(dark, '--state-selected-strong')),
+    ).toBeGreaterThanOrEqual(4.5)
   })
 
   it('prints muted-on-selected-strong in contrast_check.py for every Earth scheme', () => {
@@ -374,5 +402,13 @@ describe('Earth theme tokens', () => {
         ).toBeGreaterThanOrEqual(4.5)
       }
     }
+  })
+
+  it('replaces leftover Tolaria blues on sheet selection and block reorder with Earth tokens', () => {
+    expect(sheetSelectionChrome).toContain("SHEET_SELECTION_ACCENT_FALLBACK = '#2C6A4D'")
+    expect(sheetSelectionChrome).not.toContain('#155DFF')
+    expect(blockReorder).not.toContain('21, 93, 255')
+    expect(blockReorder).toContain('var(--accent-blue-light)')
+    expect(blockReorder).toContain('var(--accent-blue-bg)')
   })
 })

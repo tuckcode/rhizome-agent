@@ -87,11 +87,11 @@ describe('buildSettingsCommands', () => {
     })
     expect(darkMode?.keywords).toEqual(expect.arrayContaining(['theme', 'dark mode']))
     expect(systemMode).toMatchObject({
-      label: 'Use System Theme',
+      label: 'Match System',
       enabled: true,
       group: 'Settings',
     })
-    expect(systemMode?.keywords).toEqual(expect.arrayContaining(['theme', 'system theme']))
+    expect(systemMode?.keywords).toEqual(expect.arrayContaining(['theme', 'match system', 'system theme']))
 
     lightMode?.execute()
     darkMode?.execute()
@@ -114,7 +114,7 @@ describe('buildSettingsCommands', () => {
       enabled: false,
     })
     expect(commands.find((item) => item.id === 'use-system-theme-mode')).toMatchObject({
-      label: 'Use System Theme',
+      label: 'Match System',
       enabled: false,
     })
   })
