@@ -1376,8 +1376,7 @@ mod tests {
                     .events
                     .iter()
                     .any(|event| matches!(event, DurableEvent::User { text } if text == "one")),
-                "saved history missing: {:?}",
-                record.events
+                "saved history missing the first user turn"
             );
             assert!(!chats.is_live(&log_id("keychain")));
         });
