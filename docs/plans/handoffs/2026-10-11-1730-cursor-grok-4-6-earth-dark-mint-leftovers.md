@@ -4,7 +4,8 @@ model: Cursor Grok 4.6
 description: >-
   Follow-up on #154: leftover Earth dark mint copies in index.html,
   Mycelium skin, and companion fallback. Loam and themeMode swatches
-  stay #6FE3A0. #153 was still open; no rebase.
+  stay #6FE3A0. Rebased onto main after #153 merged; DESIGN.md
+  kept #153 shipped-app facts and this PR's brighter mint.
 commits: HEAD
 ---
 
@@ -28,5 +29,6 @@ Left alone (listed, not Earth-dark accent paint):
 - Earth dark `--info` in `docs/design/earth-theme/colors_and_type.css`
 - Historical critiques / website hero-mock
 
-#153 was still open, so this landed on the existing branch without a
-rebase.
+#153 merged as `5f4911d`. Rebase onto `origin/main` was clean: DESIGN.md
+kept #153's shipped-app facts (Plex mono, radii, 3px ring, live region,
+six-node mark) and this PR's Earth dark accent `#7DF0AE` / `#9AF5C2`.
