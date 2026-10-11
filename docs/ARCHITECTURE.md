@@ -461,9 +461,17 @@ as an agent still working. ADR-0180 is the identity: Rhizome owns the loop.
 `src-tauri/src/engines/` holds the Phase 5 trait and the native / Prime /
 Hermes wrappers. Chat still calls Prime directly (Phase 6 toggle).
 `commands/native_chat.rs` is the backend for that toggle: start / send /
-cancel / approval_reply / end, events on `native-chat:<session_id>`. Quit
-settles every native engine before Prime, with a 2s bound. Native
-transcripts use `rhizome-native:<uuid>` and never write under `~/.prime`.
+cancel / approval_reply / end / list / open / delete, events on
+`native-chat:<session_id>`. Quit settles every native engine before Prime,
+with a 2s bound. Native transcripts use `rhizome-native:<uuid>` and never
+write under `~/.prime`. Step 2c stores one append-only JSONL log per
+session at `<app config dir>/native-sessions/<id>.jsonl` (ADR-0183): flush
+every line, 100 MiB / 1 MiB caps, owner-only file, known-credential
+scrub, reopen as cancelled with no restored grants. The id is a UUID.
+An OS file lock covers a second process and dies with it. Both windows
+may display a chat; only one turn runs. Damage and a full log keep the
+original and continue in a new session. Chat still does not call these
+until the Settings toggle.
 `rhizome_provider_model.rs` is the native loop's OpenAI-compatible `Model`.
 `rhizome_routing/` wraps it with free-tier fallback over a pinned OmniRoute
 catalog (ADR-0182). Chat still does not call these until the Settings toggle.

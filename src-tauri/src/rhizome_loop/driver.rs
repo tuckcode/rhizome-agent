@@ -106,6 +106,108 @@ impl Default for AgentLoop {
 }
 
 impl AgentLoop {
+    /// Rebuild history from a durable log. Grants and pending approvals
+    /// are not restored. An unfinished last turn is closed as
+    /// `Cancelled { cause: "restart" }`.
+    pub fn from_log(events: Vec<DurableEvent>) -> Self {
+        let agent = Self::new();
+        let mut history = Vec::new();
+        let mut log = Vec::new();
+        let mut last_assistant: Option<usize> = None;
+        let mut turn_closed = true;
+
+        for event in events {
+            log.push(event.clone());
+            match &event {
+                DurableEvent::User { text } => {
+                    history.push(HistoryItem::User { text: text.clone() });
+                    last_assistant = None;
+                    turn_closed = false;
+                }
+                DurableEvent::Assistant { text } => {
+                    history.push(HistoryItem::Assistant {
+                        text: text.clone(),
+                        tool_calls: Vec::new(),
+                    });
+                    last_assistant = Some(history.len() - 1);
+                    turn_closed = false;
+                }
+                DurableEvent::ToolCall { id, name, args } => {
+                    let call = ToolCall {
+                        id: id.clone(),
+                        name: name.clone(),
+                        args: args.clone(),
+                    };
+                    if let Some(index) = last_assistant {
+                        if let HistoryItem::Assistant { tool_calls, .. } = &mut history[index] {
+                            tool_calls.push(call);
+                        }
+                    } else {
+                        history.push(HistoryItem::Assistant {
+                            text: String::new(),
+                            tool_calls: vec![call],
+                        });
+                        last_assistant = Some(history.len() - 1);
+                    }
+                    turn_closed = false;
+                }
+                DurableEvent::ToolResult { id, name, output } => {
+                    history.push(HistoryItem::ToolResult {
+                        id: id.clone(),
+                        name: name.clone(),
+                        output: output.clone(),
+                    });
+                    turn_closed = false;
+                }
+                DurableEvent::ToolDenied { id, name, reason } => {
+                    history.push(HistoryItem::ToolDenied {
+                        id: id.clone(),
+                        name: name.clone(),
+                        reason: reason.clone(),
+                    });
+                    turn_closed = false;
+                }
+                DurableEvent::ModelFailed { .. } => {
+                    turn_closed = false;
+                }
+                DurableEvent::TurnEnd | DurableEvent::Cancelled { .. } => {
+                    turn_closed = true;
+                    last_assistant = None;
+                }
+            }
+        }
+
+        if !turn_closed {
+            log.push(DurableEvent::Cancelled {
+                cause: "restart".into(),
+            });
+        }
+
+        {
+            let mut shared = agent.lock();
+            shared.log = log;
+            shared.history = history;
+            shared.turn_start = shared.history.len();
+            shared.grants.clear();
+            shared.session_grants.clear();
+            shared.live_prompt = None;
+        }
+        agent
+    }
+
+    pub fn session_grants(&self) -> Vec<(String, String)> {
+        self.lock().session_grants.clone()
+    }
+
+    pub fn has_live_approval(&self) -> bool {
+        self.lock().live_prompt.is_some()
+    }
+
+    /// Model view of the restored history. Used to check unanswered tools.
+    pub fn model_view_for_resume(&self) -> ModelView {
+        self.model_view("")
+    }
+
     pub fn new() -> Self {
         Self {
             shared: Arc::new(Mutex::new(Shared {

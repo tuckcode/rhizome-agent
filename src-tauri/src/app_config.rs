@@ -1,4 +1,7 @@
 use std::path::{Path, PathBuf};
+/// Serializes tests that change `HOME` / `XDG_CONFIG_HOME`.
+#[cfg(test)]
+pub static TEST_CONFIG_ENV: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 const APP_CONFIG_DIR: &str = "com.rhizome.app";
 // Order matters: most-recently-current name first, since that's most likely

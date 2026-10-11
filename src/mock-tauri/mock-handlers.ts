@@ -630,6 +630,17 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   native_chat_cancel: () => null,
   native_chat_approval_reply: () => null,
   native_chat_end: () => null,
+  native_chat_list: () => [],
+  native_chat_open: () => ({
+    sessionId: 'mock-native-session',
+    events: [],
+    warning:
+      'Rhizome restarted. Permissions you gave earlier in this chat no longer apply, so Rhizome asks again.',
+    readOnly: false,
+    error: null,
+    successorId: null,
+  }),
+  native_chat_delete: () => null,
   list_prime_sessions: () => [
     {
       name: [

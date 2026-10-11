@@ -1,5 +1,6 @@
 /// Durable facts for one agent. Live coordination stays out of this list.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Variant names are the on-disk JSON keys for native session logs (2c).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DurableEvent {
     User {
         text: String,

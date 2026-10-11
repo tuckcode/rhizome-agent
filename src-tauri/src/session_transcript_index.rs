@@ -93,6 +93,13 @@ pub fn append_native_turns(
     save(&document)
 }
 
+/// Remove a native session from the index. Missing is success.
+pub fn remove_session(path: &str) -> Result<(), String> {
+    let mut document = load()?;
+    document.sessions.retain(|session| session.path != path);
+    save(&document)
+}
+
 /// Replace the persisted index with an atomic write.
 pub fn save(document: &SessionTranscriptIndexDocument) -> Result<(), String> {
     if document.version != INDEX_VERSION {
@@ -179,12 +186,17 @@ mod tests {
     }
 
     fn with_cache_dir<T>(body: impl FnOnce(&TempDir) -> T) -> T {
-        let _guard = ENV_LOCK.lock().expect("cache dir lock");
+        let _guard = ENV_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let dir = TempDir::new().expect("temp cache dir");
         std::env::set_var("RHIZOME_CACHE_DIR", dir.path());
-        let result = body(&dir);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| body(&dir)));
         std::env::remove_var("RHIZOME_CACHE_DIR");
-        result
+        match result {
+            Ok(value) => value,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
     }
 
     fn sample_document() -> SessionTranscriptIndexDocument {
