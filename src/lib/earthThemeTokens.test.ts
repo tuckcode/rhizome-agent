@@ -332,7 +332,7 @@ describe('Earth theme tokens', () => {
   })
 
   it('prints muted-on-selected-strong in contrast_check.py for every Earth scheme', () => {
-    const checker = readFileSync(join(process.cwd(), 'docs/design/earth-theme/contrast_check.py'), 'utf8')
+    const checker = readFileSync(join(process.cwd(), 'scripts/contrast_check.py'), 'utf8')
     expect(checker).toContain("'--state-selected-strong'")
     const output = execFileSync(
       'python3',
@@ -364,7 +364,7 @@ describe('Earth theme tokens', () => {
   })
 
   it('prints focus-ring on --bg in contrast_check.py for every Earth scheme', () => {
-    const checker = readFileSync(join(process.cwd(), 'docs/design/earth-theme/contrast_check.py'), 'utf8')
+    const checker = readFileSync(join(process.cwd(), 'scripts/contrast_check.py'), 'utf8')
     expect(checker).toContain('--focus-ring on --bg')
     const output = execFileSync(
       'python3',
@@ -375,6 +375,31 @@ describe('Earth theme tokens', () => {
     expect(lines).toHaveLength(3)
     for (const ratio of lines) {
       expect(ratio).toBeGreaterThanOrEqual(3)
+    }
+  })
+
+  it('defaults contrast_check.py to the shipped Earth and Loam CSS', () => {
+    const checker = readFileSync(join(process.cwd(), 'scripts/contrast_check.py'), 'utf8')
+    expect(checker).toContain('src/index.css')
+    expect(checker).toContain('src/themes.css')
+    let output = ''
+    try {
+      output = execFileSync('python3', ['scripts/contrast_check.py'], { encoding: 'utf8' })
+    } catch (error) {
+      output = (error as { stdout?: string }).stdout ?? ''
+    }
+    expect(output).toContain('kind=app')
+    expect(output).toContain('src/index.css')
+    expect(output).toContain('src/themes.css')
+    expect(output).toContain('== Earth dark')
+    expect(output).toContain('== Earth light')
+    expect(output).toContain('== Loam')
+    expect(output).toMatch(/--text-muted on --state-selected-strong: [0-9.]+/)
+    expect(output).toMatch(/--border-input on --surface-app: [0-9.]+/)
+    expect(output).toMatch(/--focus-ring on --bg: [0-9.]+/)
+    const failLines = output.split('\n').filter((line) => line.startsWith('FAIL '))
+    for (const line of failLines) {
+      expect(line).toMatch(/^FAIL (Earth dark|Earth light|Loam)\s{2}--[\w-]+ on \S+\s{2}[0-9.]+\s{2}\((text|non-text) /)
     }
   })
 
