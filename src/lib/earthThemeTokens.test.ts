@@ -90,7 +90,7 @@ const EARTH_DARK = {
   '--ok-text': '#9BCF7E',
   '--danger-text': '#EE8B7E',
   '--warn-text': '#E9B04F',
-  '--syntax-highlight-comment': '#848F77',
+  '--syntax-highlight-comment': '#88917B',
 } as const
 
 const EARTH_LIGHT = {
@@ -166,13 +166,13 @@ const LOAM = {
   '--text-secondary': '#C6BBA6',
   '--text-tertiary': '#B2A791',
   '--text-muted': '#A3987F',
-  '--text-faint': '#9A8F78',
+  '--text-faint': '#998D74',
   '--text-heading': '#F7F1E5',
   '--text-inverse': '#15110C',
   '--border-default': '#352C20',
   '--border-subtle': '#272017',
   '--border-strong': '#4A3D2C',
-  '--border-input': '#7E6F59',
+  '--border-input': '#8A7A62',
   '--border-dialog': '#4A3D2C',
   '--border-focus': 'var(--accent-blue)',
   '--state-hover': '#241E15',
@@ -301,6 +301,31 @@ describe('Earth theme tokens', () => {
         contrastRatio(token(block, '--text-muted'), token(block, '--state-selected-strong')),
       ).toBeGreaterThanOrEqual(4.5)
     }
+  })
+
+  it('dims Loam faint below muted while staying at 4.5:1 on every Loam surface', () => {
+    const faint = token(loam, '--text-faint')
+    const muted = token(loam, '--text-muted')
+    expect(faint).not.toBe(muted)
+    expect(relativeLuminance(faint)).toBeLessThan(relativeLuminance(muted))
+    for (const surfaceName of SURFACES) {
+      expect(
+        contrastRatio(faint, token(loam, surfaceName)),
+        `--text-faint on ${surfaceName}`,
+      ).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  it('gives Loam --border-input margin above 3:1 on the selected row', () => {
+    expect(
+      contrastRatio(token(loam, '--border-input'), token(loam, '--state-selected-strong')),
+    ).toBeGreaterThanOrEqual(3.3)
+  })
+
+  it('keeps Earth dark comment color at 4.5:1 on the selected row', () => {
+    expect(
+      contrastRatio(token(dark, '--syntax-highlight-comment'), token(dark, '--state-selected-strong')),
+    ).toBeGreaterThanOrEqual(4.5)
   })
 
   it('prints muted-on-selected-strong in contrast_check.py for every Earth scheme', () => {
