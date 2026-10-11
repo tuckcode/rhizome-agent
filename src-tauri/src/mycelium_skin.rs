@@ -60,9 +60,9 @@ const DARK_TOKENS: &str = r#"
   --ink: #E9E8DC;
   --muted: #999784;
   --faint: #8F8D7B;
-  --moss: #6FE3A0;
+  --moss: #7DF0AE;
   --pine: #9BCF7E;
-  --moon: #8FEBB4;
+  --moon: #9AF5C2;
   --amber: #E9B04F;
   --ember: #E5B171;
   --alarm: #EE8B7E;
@@ -70,7 +70,7 @@ const DARK_TOKENS: &str = r#"
   --act-edit: #E9B04F;
   --act-exec: #8F8D7B;
   --act-search: #8FBEDB;
-  --act-verify: #6FE3A0;
+  --act-verify: #7DF0AE;
   --mark-compaction: #EE8B7E;
   --mark-subagent: #C3B2F0;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -313,6 +313,13 @@ mod tests {
         let head_at = out.find("</head>").expect("head preserved");
         assert!(style_at < head_at, "skin must win the cascade");
         assert!(out.contains("--sky: #0F110C"));
+        assert!(out.contains("--moss: #7DF0AE"));
+        assert!(out.contains("--moon: #9AF5C2"));
+        assert!(out.contains("--act-verify: #7DF0AE"));
+        assert!(
+            !out.contains("--moss: #6FE3A0"),
+            "Earth dark Mycelium accent must match index.css --accent-blue"
+        );
     }
 
     #[test]
@@ -332,9 +339,15 @@ mod tests {
     fn light_theme_paints_root_tokens_not_dark_defaults() {
         let out = inject_skin("<head></head>", "light");
         assert!(out.contains("--sky: #F1ECE2"));
+        assert!(out.contains("--moss: #2C6A4D"));
+        assert!(out.contains("--moon: #22573F"));
         assert!(
             !out.contains("--sky: #0F110C"),
             "light skin must not leave the dark sky on :root; the city samples :root"
+        );
+        assert!(
+            !out.contains("--moss: #7DF0AE"),
+            "Earth light Mycelium moss stays forest, not the brighter dark mint"
         );
     }
 

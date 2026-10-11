@@ -56,9 +56,9 @@ A green-black forest floor with a subtle soil tint in surfaces and borders, plus
 | Subtle border | `--border-subtle` | `#1F1E16` | decorative |
 | Strong border | `--border-strong` | `#3B3828` | 1.61 (decorative) |
 | Input / control border | `--border-input` | `#75705C` | 3.82 vs bg · 3.19 on surface-3 |
-| Accent (mint) | `--accent` | `#6FE3A0` | 11.91 / 9.86 |
-| Accent hot | `--accent-hot` | `#8FEBB4` | |
-| Accent on solid | `--accent-ink` | `#0F110C` | 11.91 on accent |
+| Accent (mint) | `--accent` | `#7DF0AE` | 13.52 / 11.19 |
+| Accent hot | `--accent-hot` | `#9AF5C2` | |
+| Accent on solid | `--accent-ink` | `#0F110C` | 13.52 on accent |
 | OK | `--ok` | `#9BCF7E` | 10.51 / 8.70 |
 | Warn (amber) | `--warn` | `#E9B04F` | 9.76 / 8.08 |
 | Danger | `--danger` | `#EE8B7E` | 7.80 / 6.46 |

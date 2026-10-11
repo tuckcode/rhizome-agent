@@ -78,12 +78,12 @@ const EARTH_DARK = {
   '--state-selected-strong': '#1C291B',
   '--state-active': '#1C291B',
   '--state-focus-ring': 'var(--accent-blue)',
-  '--state-drag-target': 'rgba(111, 227, 160, 0.18)',
+  '--state-drag-target': 'rgba(125, 240, 174, 0.18)',
   '--state-disabled': '#15160F',
-  '--accent-blue': '#6FE3A0',
-  '--accent-blue-hover': '#8FEBB4',
-  '--accent-blue-bg': 'rgba(111, 227, 160, 0.18)',
-  '--accent-blue-light': 'rgba(111, 227, 160, 0.14)',
+  '--accent-blue': '#7DF0AE',
+  '--accent-blue-hover': '#9AF5C2',
+  '--accent-blue-bg': 'rgba(125, 240, 174, 0.18)',
+  '--accent-blue-light': 'rgba(125, 240, 174, 0.14)',
   '--accent-green': '#9BCF7E',
   '--accent-green-light': 'rgba(155, 207, 126, 0.14)',
   '--accent-orange': '#E9B04F',
@@ -465,5 +465,22 @@ describe('Earth theme tokens', () => {
     expect(blockReorder).not.toContain('21, 93, 255')
     expect(blockReorder).toContain('var(--accent-blue-light)')
     expect(blockReorder).toContain('var(--accent-blue-bg)')
+  })
+
+  it('keeps leftover Earth dark accent copies in sync with --accent-blue', () => {
+    const bootHtml = readFileSync(join(process.cwd(), 'index.html'), 'utf8')
+    const mycelium = readFileSync(join(process.cwd(), 'src-tauri/src/mycelium_skin.rs'), 'utf8')
+    const companion = readFileSync(join(process.cwd(), 'src/components/MenuBarCompanionApp.tsx'), 'utf8')
+    const darkBoot = bootHtml.slice(
+      bootHtml.indexOf(':root[data-theme="dark"]'),
+      bootHtml.indexOf(':root[data-color-theme="loam"]'),
+    )
+    expect(darkBoot).toContain('--primary: #7DF0AE')
+    expect(darkBoot).not.toContain('#6FE3A0')
+    expect(mycelium).toContain('--moss: #7DF0AE')
+    expect(mycelium).toContain('--moon: #9AF5C2')
+    expect(mycelium).toContain('--act-verify: #7DF0AE')
+    expect(companion).toContain('rgba(125,240,174,0.14)')
+    expect(companion).not.toContain('rgba(111,227,160,0.14)')
   })
 })

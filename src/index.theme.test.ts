@@ -28,7 +28,7 @@ describe('index.css default theme tokens', () => {
 
   it('keeps the Rhizome phosphor-mint accent in the default dark theme', () => {
     const darkBlock = /:root\.dark,\s*\n\[data-theme="dark"\]\s*\{/
-    expect(extractAccentBlue(darkBlock).toUpperCase()).toBe('#6FE3A0')
+    expect(extractAccentBlue(darkBlock).toUpperCase()).toBe('#7DF0AE')
   })
 })
 
