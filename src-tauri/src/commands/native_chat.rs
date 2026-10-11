@@ -460,19 +460,35 @@ fn composed_system_prompt(existing: Option<&str>) -> Option<String> {
     settings::compose_agent_profile(settings::saved_agent_profile().as_deref(), existing)
 }
 
-/// Free-tier keys come from the OS keychain (step 3a, ADR-0184).
+/// Free-tier keys come from the OS keychain (step 3a, ADR-0185). The user's
+/// switches and strict mode come from free-tier settings (step 3b).
 fn free_tier_routing_model(
     system: Option<String>,
     observer: impl FnMut(crate::rhizome_routing::ProviderAttempt) + Send + 'static,
 ) -> Result<RoutingModel<ProviderKeys, SystemClock>, String> {
-    Ok(RoutingModel::new(
+    free_tier_routing_model_with(ProviderKeys::for_app(), system, observer)
+}
+
+/// `free_tier_routing_model` with the key store passed in, so a test can
+/// give it a keychain error.
+fn free_tier_routing_model_with(
+    keys: Result<ProviderKeys, String>,
+    system: Option<String>,
+    observer: impl FnMut(crate::rhizome_routing::ProviderAttempt) + Send + 'static,
+) -> Result<RoutingModel<ProviderKeys, SystemClock>, String> {
+    let keys = keys?;
+    let settings = super::saved_free_tier_settings()?;
+    let catalog = crate::rhizome_routing::free_tier::with_own_endpoint(
         Catalog::pinned(),
-        ProviderKeys::for_app()?,
-        SystemClock,
-        HttpLimits::STREAM,
+        &settings,
+        &super::saved_model_providers()?,
+    );
+    Ok(
+        RoutingModel::new(catalog, keys, SystemClock, HttpLimits::STREAM)
+            .with_options(settings.to_options())
+            .with_observer(observer)
+            .with_system_prompt(system),
     )
-    .with_observer(observer)
-    .with_system_prompt(system))
 }
 
 fn catalog_provider(kind: AiModelProviderKind, id: &str) -> AiModelProvider {
@@ -932,6 +948,23 @@ mod tests {
             let model = free_tier_routing_model(expected.clone(), |_| {}).unwrap();
             assert_eq!(model.system_prompt(), expected.as_deref());
         });
+    }
+
+    /// The new-chat call site: `start_named_request` returns this error with
+    /// `?`, so a keychain failure refuses the chat instead of starting it
+    /// with no keys.
+    #[test]
+    fn a_keychain_error_stops_a_new_free_tier_chat() {
+        let result = free_tier_routing_model_with(
+            Err("Keychain read failed for groq: locked".into()),
+            None,
+            |_| {},
+        );
+
+        assert_eq!(
+            result.err().as_deref(),
+            Some("Keychain read failed for groq: locked")
+        );
     }
 
     #[test]
