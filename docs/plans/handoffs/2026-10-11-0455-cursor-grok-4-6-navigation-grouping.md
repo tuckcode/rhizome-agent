@@ -3,7 +3,8 @@ session: 2026-10-11T04:55Z
 model: Grok 4.6
 description: >-
   PLAN item 4 first slice: one Views group on the command rail
-  (Research, Graph, Mycelium, Changes, History), Option+Cmd+1-5, Go + Cmd+K.
+  (Research, Graph, Mycelium, History), Ctrl+Cmd+1-4 (Mac) /
+  Ctrl+Shift+1-4 (Windows/Linux), Go + Cmd+K.
   Leftover primary buttons removed. A-W8 / A-M1 / A-M3 / A-M4 deferred.
 commits: cursor/navigation-grouping-d32a
 ---
@@ -18,7 +19,7 @@ the grouping work that makes the home real).
 - `src/lib/railViews.ts` is the catalog. Order and nouns are the same on
   the rail, in the Go menu, and in Cmd+K.
 - Command rail always shows Views. Icons when collapsed; labels and
-  Option+Cmd+1-5 when expanded. Changes carries the muted count badge.
+  Ctrl+Cmd+1–4 / Ctrl+Shift+1–4 when expanded. Changes sits next to Notes.
 - Go menu and Cmd+K "Views" are the second path. Research left Settings.
   Duplicate `view-changes` left Git.
 - Removed `NotesChromeShortcuts`, sidebar Changes, composer Research /

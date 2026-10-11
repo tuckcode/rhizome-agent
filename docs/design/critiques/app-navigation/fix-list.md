@@ -10,7 +10,7 @@ Source critique: [2026-10-10-design.md](./2026-10-10-design.md). When a new vers
 | A-W1 | worth fixing | hierarchy and layout | `NotesChromeShortcuts` in the list header mixes 3 destinations + Settings; collapses into the overflow | Remove the group; header keeps sort/columns | fixed | 2026-10-10 |
 | A-W2 | worth fixing | copy | Graph has 4 names, Mycelium 3, Changes 2 commands | Research · Graph · Mycelium · Changes · History; "Show in …" for context actions | fixed | 2026-10-10 |
 | A-W3 | worth fixing | hierarchy and layout | Status bar carries destination buttons; contents change with pill mode | Status only; counts may link | fixed | 2026-10-10 |
-| A-W4 | worth fixing | interaction and states | No tool shortcuts; Research filed under Settings in ⌘K; Go menu incomplete | ⌥⌘1–5 in the manifest, Go menu, ⌘K "Views" group, ⌘/ sheet | fixed | 2026-10-10 |
+| A-W4 | worth fixing | interaction and states | No tool shortcuts; Research filed under Settings in ⌘K; Go menu incomplete | Ctrl+Cmd+1–4 (Mac) / Ctrl+Shift+1–4 (Windows/Linux) in the manifest, Go menu, ⌘K "Views" group, ⌘/ sheet | fixed | 2026-10-10 |
 | A-W5 | worth fixing | interaction and states | Session "Node map" and note "Mycelium report" ignore their target | Pass the path, or remove | fixed | 2026-10-10 |
 | A-W6 | worth fixing | hierarchy and layout | Composer + menu mixes attach with Research/Mycelium | + menu = message inputs only | fixed | 2026-10-10 |
 | A-W7 | worth fixing | visual design | Research = Sparkle (anti-pattern); Graph = ShareNetwork | MagnifyingGlassPlus/Books; Phosphor `Graph`; GitDiff; ClockCounterClockwise | fixed | 2026-10-10 |

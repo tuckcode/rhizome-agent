@@ -2,7 +2,7 @@
 session: 2026-10-11T05:45Z
 model: Grok 4.6
 description: >-
-  knispo shortcut call on #143: Mac Ctrl+Cmd+1-5, Windows/Linux Ctrl+Shift+1-5.
+  knispo shortcut call on #143: Mac Ctrl+Cmd+1-4, Windows/Linux Ctrl+Shift+1-4.
   Native menu platform accelerators. Option+Cmd left to BlockNote headings.
 commits: cursor/navigation-grouping-d32a
 ---

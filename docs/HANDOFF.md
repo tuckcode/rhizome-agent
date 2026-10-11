@@ -142,7 +142,7 @@ Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
 - [2026-10-11 · #143 Changes](plans/handoffs/2026-10-11-0555-cursor-grok-4-6-navigation-changes.md) — Changes next to Notes in the sidebar. Views are four: Ctrl+Cmd/Ctrl+Shift+1–4.
-- [2026-10-11 · navigation grouping](plans/handoffs/2026-10-11-0455-cursor-grok-4-6-navigation-grouping.md) — PLAN item 4 first slice: Views group on the rail, ⌥⌘1–5, Go + ⌘K. A-W8 / A-M3 / A-M4 deferred.
+- [2026-10-11 · navigation grouping](plans/handoffs/2026-10-11-0455-cursor-grok-4-6-navigation-grouping.md) — PLAN item 4 first slice: Views group on the rail, Ctrl+Cmd+1–4 / Ctrl+Shift+1–4, Go + ⌘K. A-W8 / A-M3 / A-M4 deferred.
 - [2026-10-11 · #142 reread](plans/handoffs/2026-10-11-0526-cursor-grok-4-6-chat-a11y-reread.md) — pending status frames survive streamed re-renders. [Review](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md) — status beside log, Stop-before-reply, re-announce identical lines. #143 also touches AiPanelChrome.
 - [2026-10-11 · native send without Prime](plans/handoffs/2026-10-11-0520-cursor-grok-4-6-native-send-without-prime.md) — Native engine can send when Prime is missing. Prime-targeted chats still show install guidance.
 - [2026-10-11 · Earth theme](plans/handoffs/2026-10-11-0505-cursor-grok-4-6-earth-theme.md) — Earth dark/light default contract, Loam extra, `--border-input` at 3:1. Stacked on a11y B1–B5.

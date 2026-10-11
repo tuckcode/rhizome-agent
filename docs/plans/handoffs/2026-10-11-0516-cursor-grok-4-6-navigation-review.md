@@ -19,10 +19,9 @@ branch. Did not touch `AiPanelChrome.tsx` (#142 still open) or ADR-0171.
   name (`Changes, 4`), and expose `aria-keyshortcuts`.
 - Classic shell (`ff_shell_command_rail=false`) shows Graph and Mycelium next
   to Research on the status bar.
-- `src/lib/railViewShortcuts.ts` is the swap point. Mac stays Option+Cmd.
-  Windows/Linux renderer uses Ctrl+Shift+1–5 and rejects Ctrl+Alt+digit
-  (AltGr). Native Win menu still inherits `CmdOrCtrl+Alt` from the JSON
-  until knispo's Mac call allows a Rust/manifest change.
+- `src/lib/railViewShortcuts.ts` is the swap point. Later call: Mac
+  Ctrl+Cmd+1–4, Windows/Linux Ctrl+Shift+1–4. This review held Option+Cmd
+  and used Ctrl+Shift+1–4 on Win/Linux (no Ctrl+Alt+digit / AltGr).
 
 ## Hold
 
