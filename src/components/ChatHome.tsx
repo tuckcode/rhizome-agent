@@ -113,7 +113,7 @@ export default function ChatHome({
     }
     return defaultAiTarget ?? undefined
   }, [defaultAiTarget, isPrimeChat])
-  const isPrimeTarget = isPrimeChat && chatTarget?.kind !== 'api_model'
+  const isPrimeTarget = isPrimeChat && chatTarget?.kind !== 'api_model' && chatEngine !== 'native'
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
   const sessionTitle = usePrimeActiveSessionTitle(primeHost?.sessionPath ?? null, primeHost?.isStreaming)
   const newChatRef = useRef<(() => void) | null>(null)

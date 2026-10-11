@@ -376,6 +376,12 @@ describe('ChatHome composer wiring', () => {
     expect(chatHomeSource).toContain("target.kind === 'agent' && target.agent === 'prime'")
   })
 
+  it('does not poll Prime or show Prime banners when the Chat engine is native', () => {
+    expect(chatHomeSource).toContain(
+      "const isPrimeTarget = isPrimeChat && chatTarget?.kind !== 'api_model' && chatEngine !== 'native'",
+    )
+  })
+
   it('polls Prime host status from whatever vaultPath Chat has, including empty', () => {
     expect(chatHomeSource).toContain('usePrimeHostStatus(isPrimeTarget, vaultPath)')
     expect(chatHomeSource).not.toMatch(/usePrimeHostStatus\([^)]*vaultPath\s*&&/)

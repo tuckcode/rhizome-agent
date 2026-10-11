@@ -9,6 +9,25 @@ import type { AgentStreamCallbacks } from './streamAiAgent'
 export const ANTHROPIC_NATIVE_REFUSAL =
   'Anthropic catalog models are not available on the native engine until 6a.'
 
+/** Where hosted native-engine keys are stored. */
+export const NATIVE_NO_KEY_GUIDANCE =
+  'Add a key in Settings → AI Agents → API models.'
+
+/**
+ * Native auth failures must name Settings, never Prime install copy.
+ */
+export function nativeChatUserError(message: string): string {
+  const trimmed = message.trim()
+  if (/prime.?agent is not available|npm i -g prime-agent/i.test(trimmed)) {
+    return `This native chat needs an API key. ${NATIVE_NO_KEY_GUIDANCE}`
+  }
+  if (/no (local )?api key/i.test(trimmed)) {
+    const withStop = /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`
+    return `${withStop} ${NATIVE_NO_KEY_GUIDANCE}`
+  }
+  return trimmed
+}
+
 export interface StreamNativeChatRequest {
   target: string
   message: string
@@ -41,8 +60,8 @@ function applyNativeEvent(event: NativeEngineEvent, callbacks: AgentStreamCallba
     case 'tool_result':
       callbacks.onToolDone(event.id ?? '', event.output)
       return false
-    case 'error':
-      callbacks.onError(event.message ?? 'Native chat failed')
+      case 'error':
+      callbacks.onError(nativeChatUserError(event.message ?? 'Native chat failed'))
       return false
     case 'turn_end':
     case 'cancelled':
@@ -109,7 +128,9 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
       })
     })
   } catch (error) {
-    request.callbacks.onError(error instanceof Error ? error.message : String(error))
+    request.callbacks.onError(
+      nativeChatUserError(error instanceof Error ? error.message : String(error)),
+    )
     request.callbacks.onDone()
   }
 }

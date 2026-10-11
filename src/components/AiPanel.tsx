@@ -109,6 +109,7 @@ interface AiPanelViewProps {
   defaultAiTarget?: AiTarget
   defaultAiAgentReadiness?: AiAgentReadiness
   defaultAiAgentReady?: boolean
+  chatEngine?: 'prime' | 'native'
   locale?: AppLocale
   activeEntry?: VaultEntry | null
   entries?: VaultEntry[]
@@ -223,6 +224,7 @@ export function AiPanelView({
   defaultAiTarget,
   defaultAiAgentReadiness: providedDefaultAiAgentReadiness,
   defaultAiAgentReady: providedDefaultAiAgentReady,
+  chatEngine,
   locale = 'en',
   entries,
   interactive = true,
@@ -267,7 +269,7 @@ export function AiPanelView({
     handlePermissionModeChange,
     handleNewChat,
   } = controller
-  const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime'
+  const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime' && chatEngine !== 'native'
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath ?? undefined)
   const modelLabel = isPrimeTarget ? primeModelLabel(primeHost) : null
   // Refresh when a turn finishes rather than only on the interval, so context
@@ -686,6 +688,7 @@ export function AiPanel({
       defaultAiTarget={defaultAiTarget}
       defaultAiAgentReadiness={defaultAiAgentReadiness}
       defaultAiAgentReady={providedDefaultAiAgentReady}
+      chatEngine={chatEngine}
       locale={locale}
       vaultPath={vaultPath}
       activeEntry={activeEntry}

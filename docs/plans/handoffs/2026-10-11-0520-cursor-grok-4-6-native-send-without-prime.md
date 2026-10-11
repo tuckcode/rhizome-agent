@@ -2,8 +2,8 @@
 session: 2026-10-11T05:20Z
 model: Grok 4.6
 description: >-
-  Native Chat engine can send when Prime is not installed. Prime-targeted
-  chats still show install-Prime guidance. Draft PR off main.
+  Native Chat engine can send when Prime is not installed. Review follow-up:
+  rebase, Cmd+K gate, native isPrimeTarget, no-key Settings copy.
 commits: HEAD
 ---
 
@@ -20,6 +20,11 @@ Prime-targeted chats with Prime missing still block and show install copy.
 
 Draft PR may overlap #142 on the chat panel. This change does not edit
 `AiPanelChrome.tsx`.
+
+Review follow-up on the same branch: rebase onto main (keep both
+HANDOFF entries). Cmd+K uses `settings.chat_engine === 'native' ||
+aiTargetReady(...)`. `isPrimeTarget` is false on the native engine.
+Native no-key errors point at Settings → AI Agents → API models.
 
 ## Not in this change
 

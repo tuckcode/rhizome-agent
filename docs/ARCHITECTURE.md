@@ -463,6 +463,9 @@ Hermes wrappers. Settings `chat_engine` chooses Prime or the native engine.
 Absent means Prime, so Chat stays on Prime until that switch is on.
 A native-engine chat can send when Prime is not installed. A Prime-targeted
 chat still shows the install-Prime guidance until Prime is present.
+Cmd+K uses the same native-or-ready gate. Native mode does not poll Prime
+or show Prime chrome. Native no-key errors point at Settings → AI Agents
+→ API models.
 `commands/native_chat.rs` is the backend for that toggle: start / send /
 cancel / approval_reply / end / list / open / delete, events on
 `native-chat:<session_id>`. Quit settles every native engine before Prime,

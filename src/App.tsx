@@ -478,7 +478,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     settingsLoaded,
   })
   const quickPromptTarget = lastAiWorkspaceTarget ?? aiAgentPreferences.defaultAiTarget
-  const quickPromptTargetReady = aiTargetReady(quickPromptTarget, aiAgentsStatus)
+  const quickPromptTargetReady = settings.chat_engine === 'native' || aiTargetReady(quickPromptTarget, aiAgentsStatus)
 
   useVaultOpenedTelemetry({
     entryCount: vault.entries.length,
