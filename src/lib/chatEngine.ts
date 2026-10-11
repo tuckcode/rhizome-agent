@@ -7,6 +7,14 @@ export function readChatEngine(value: string | null | undefined): ChatEngine {
   return value === 'native' ? 'native' : 'prime'
 }
 
+/**
+ * Native chats use Rhizome's engine. A missing Prime install must not
+ * block send. Prime-targeted chats still need Prime.
+ */
+export function chatEngineAllowsSendWithoutPrime(engine: ChatEngine | undefined): boolean {
+  return engine === 'native'
+}
+
 export function chatEngineFromSettings(settings: Pick<Settings, 'chat_engine'> | null | undefined): ChatEngine {
   return readChatEngine(settings?.chat_engine)
 }

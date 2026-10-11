@@ -403,6 +403,49 @@ describe('AiPanel', () => {
     expect(screen.getByTestId('agent-input')).toHaveAttribute('aria-placeholder', 'Ask Codex')
   })
 
+  it('lets the native engine send when Prime is not installed', () => {
+    render(
+      <AiPanel
+        onClose={vi.fn()}
+        vaultPath="/tmp/vault"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="missing"
+        defaultAiAgentReady={false}
+        chatEngine="native"
+      />,
+    )
+
+    const input = screen.getByTestId('agent-input')
+    input.textContent = 'hello native'
+    fireEvent.input(input)
+
+    expect(screen.getByTestId('agent-send')).toBeEnabled()
+    expect(screen.queryByText('Prime Agent is not available on this machine')).toBeNull()
+  })
+
+  it('keeps Prime-targeted chat blocked and shows install guidance when Prime is missing', () => {
+    render(
+      <AiPanel
+        onClose={vi.fn()}
+        vaultPath="/tmp/vault"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="missing"
+        defaultAiAgentReady={false}
+      />,
+    )
+
+    expect(screen.getByText('Prime Agent is not available on this machine')).toBeTruthy()
+    expect(screen.getByTestId('agent-input')).toHaveAttribute(
+      'aria-placeholder',
+      'Prime Agent is not installed. Install prime-agent and log in once.',
+    )
+
+    const input = screen.getByTestId('agent-input')
+    input.textContent = 'hello prime'
+    fireEvent.input(input)
+    expect(screen.getByTestId('agent-send')).toBeDisabled()
+  })
+
   it('disables sending while the selected AI agent is still loading', () => {
     render(
       <AiPanel

@@ -47,6 +47,7 @@ file.
 ---
 
 ## State
+**Origin:** Cursor Grok 4.6 · 2026-10-11 · Native Chat engine can send when Prime is not installed. Prime-targeted chats still show install guidance. [Handoff](plans/handoffs/2026-10-11-0520-cursor-grok-4-6-native-send-without-prime.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · #142 review: status beside log, Stop-before-reply, re-announce identical lines. On `cursor/a11y-chat-b1-b5-8b31`. #143 also touches `AiPanelChrome.tsx`. [Handoff](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-10 · Plan Phase 3 is the plugin seam (still skipped). #101's "phase 3" is loop Model trait, on main. Plan Phase 5 is done (#107, closes #104). Phase 4b is ADR-0182 + Claude #108. [Plan](plans/2026-10-09-rhizome-harness-plan.md) §4. [Handoff](plans/handoffs/2026-10-10-1530-cursor-grok-4-6-phase-names.md).
 **Origin:** Cursor Grok 4.7 · 2026-10-10 · Phase 2 Rhizome loop: tools, Limited tools vs Power User, cancel reset. Chat stays on Prime. Not installed. [Handoff](plans/handoffs/2026-10-10-0135-cursor-grok-4-7-harness-phase-2.md).
@@ -134,6 +135,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-10-11 · native send without Prime](plans/handoffs/2026-10-11-0520-cursor-grok-4-6-native-send-without-prime.md) — Native engine can send when Prime is missing. Prime-targeted chats still show install guidance.
 - [2026-10-11 · #142 review](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md) — status beside log, Stop-before-reply, re-announce identical lines. #143 also touches AiPanelChrome.
 - [2026-10-11 · chat a11y B1–B5](plans/handoffs/2026-10-11-0440-cursor-grok-4-6-chat-a11y-b1-b5.md) — live run status, muted/faint contrast, status text tokens, model chip, composer stays focusable.
 - [2026-10-10 · phase names](plans/handoffs/2026-10-10-1530-cursor-grok-4-6-phase-names.md) — Plan Phase 3 = plugin seam (skipped). #101 "phase 3" = loop Model trait. Phase 5 done (#107; [0945](plans/handoffs/2026-10-10-0945-cursor-grok-4-6-harness-phase-5.md)). Phase 4b = ADR-0182 + #108.

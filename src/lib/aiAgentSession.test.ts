@@ -459,6 +459,49 @@ describe('aiAgentSession', () => {
     expect(streamNativeChatMock).not.toHaveBeenCalled()
   })
 
+  it('sends on the native engine when Prime is not installed', async () => {
+    nextMessageIdMock.mockReturnValue('msg-native-missing-prime')
+    const session = createRuntime()
+    await sendAgentMessage({
+      runtime: session.runtime,
+      context: {
+        agent: 'prime',
+        ready: false,
+        vaultPath: '/vault',
+        permissionMode: 'safe',
+        chatEngine: 'native',
+        nativeTarget: 'open_ai/gpt-4.1-mini',
+      },
+      prompt: { text: 'Hello without Prime' },
+    })
+    expect(streamNativeChatMock).toHaveBeenCalledWith(expect.objectContaining({
+      target: 'open_ai/gpt-4.1-mini',
+    }))
+    expect(streamAiAgentMock).not.toHaveBeenCalled()
+    expect(trackEventMock).not.toHaveBeenCalledWith(
+      'ai_agent_message_blocked',
+      expect.anything(),
+    )
+  })
+
+  it('still blocks a Prime-targeted chat when Prime is not installed', async () => {
+    nextMessageIdMock.mockReturnValue('msg-prime-missing')
+    const session = createRuntime()
+    await sendAgentMessage({
+      runtime: session.runtime,
+      context: {
+        agent: 'prime',
+        ready: false,
+        vaultPath: '/vault',
+        permissionMode: 'safe',
+      },
+      prompt: { text: 'Hello' },
+    })
+    expect(streamNativeChatMock).not.toHaveBeenCalled()
+    expect(streamAiAgentMock).not.toHaveBeenCalled()
+    expect(session.getMessages()[0]?.response).toContain('Install it with `npm i -g prime-agent`')
+  })
+
   it('chat_toggle_native_uses_rhizome_loop', async () => {
     nextMessageIdMock.mockReturnValue('msg-native')
     const session = createRuntime()

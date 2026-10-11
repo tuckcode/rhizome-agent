@@ -28,6 +28,7 @@ import {
   type AiAgentId,
   type AiAgentReadiness,
 } from '../lib/aiAgents'
+import { chatEngineAllowsSendWithoutPrime } from '../lib/chatEngine'
 import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
 import { type NoteListItem } from '../utils/ai-context'
@@ -631,8 +632,10 @@ export function AiPanel({
   onRailSessionPicked,
   onOpenMycelium,
 }: AiPanelProps) {
-  const defaultAiAgentReadiness = providedDefaultAiAgentReadiness
-    ?? readinessFromReadyFlag(providedDefaultAiAgentReady)
+  const defaultAiAgentReadiness = chatEngineAllowsSendWithoutPrime(chatEngine)
+    ? 'ready'
+    : providedDefaultAiAgentReadiness
+      ?? readinessFromReadyFlag(providedDefaultAiAgentReady)
   const controller = useAiPanelController({
     vaultPath,
     vaultPaths,
