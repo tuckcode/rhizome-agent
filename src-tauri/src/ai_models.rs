@@ -1203,6 +1203,22 @@ mod tests {
     }
 
     #[test]
+    fn complete_text_rejects_an_empty_anthropic_reply() {
+        let server = serve(vec![http_response(
+            "200 OK",
+            &["Content-Type: application/json"],
+            r#"{"content":[{"type":"text","text":"  "}]}"#,
+        )]);
+        let mut request = compatible_request(&server.base_url);
+        request.provider.kind = AiModelProviderKind::Anthropic;
+        request.api_key_override = Some("test-key".into());
+
+        let error = complete_text_with(&request, TEST_LIMITS).unwrap_err();
+
+        assert_eq!(error, "Anthropic response did not include assistant text.");
+    }
+
+    #[test]
     fn complete_text_sends_anthropic_to_the_messages_endpoint() {
         let server = serve(vec![http_response(
             "200 OK",
