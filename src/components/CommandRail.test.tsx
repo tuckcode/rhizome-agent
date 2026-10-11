@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommandRail } from './CommandRail'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
@@ -338,26 +338,43 @@ describe('a hover-expanded rail does not steal Chat clicks', () => {
   })
 
   it('closes the overlay when the pointer is over Chat rather than rail chrome', async () => {
-    renderRail()
-    const rail = screen.getByTestId('command-rail')
-    vi.spyOn(rail, 'getBoundingClientRect').mockReturnValue({
-      bottom: 600,
-      height: 600,
-      left: 0,
-      right: 240,
-      top: 0,
-      width: 240,
-      x: 0,
-      y: 0,
-      toJSON: () => ({}),
-    })
+    // Must match RAIL_HOVER_*_DELAY_MS in CommandRail.tsx.
+    const hoverOpenDelayMs = 150
+    const hoverCloseDelayMs = 180
+    vi.useFakeTimers()
+    try {
+      renderRail()
+      const rail = screen.getByTestId('command-rail')
+      vi.spyOn(rail, 'getBoundingClientRect').mockReturnValue({
+        bottom: 600,
+        height: 600,
+        left: 0,
+        right: 240,
+        top: 0,
+        width: 240,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      })
 
-    fireEvent.mouseEnter(rail)
-    await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'true'))
-    fireEvent.mouseMove(window, { clientX: 120, clientY: 220 })
+      await act(async () => {
+        fireEvent.mouseEnter(rail)
+        await vi.advanceTimersByTimeAsync(hoverOpenDelayMs)
+      })
+      expect(rail).toHaveAttribute('data-expanded', 'true')
 
-    await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'false'))
-    expect(screen.queryByTestId('command-rail-sessions')).not.toBeInTheDocument()
+      // Flush the mousemove effect, then advance past the close delay.
+      await act(async () => {
+        fireEvent.mouseMove(document.body, { clientX: 120, clientY: 220 })
+        await Promise.resolve()
+        fireEvent.mouseMove(document.body, { clientX: 120, clientY: 220 })
+        await vi.advanceTimersByTimeAsync(hoverCloseDelayMs)
+      })
+      expect(rail).toHaveAttribute('data-expanded', 'false')
+      expect(screen.queryByTestId('command-rail-sessions')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps Sessions mounted while a control inside it still has focus', async () => {
