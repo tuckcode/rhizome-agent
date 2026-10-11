@@ -490,6 +490,9 @@ That browser harness is a deterministic desktop command bridge, not real native 
 Verified against source 2026-09-14. Longer landmine list:
 [`CROSS-MODEL-HANDOFF.md`](CROSS-MODEL-HANDOFF.md).
 
+- **Do not append a line to `docs/HANDOFF.md` from a PR.** Add a file under
+  `docs/plans/handoffs/` instead. Parallel PRs that stamp State or Recent
+  conflict on merge (#142, #143, #145, #148).
 - **One Rhizome at a time.** Debug bundle and `/Applications/Rhizome Agent.app`
   share `ai.rhizome.agent`. Launching a second copy silently forwards to the
   first. Quit the installed app before `pnpm tauri dev`.

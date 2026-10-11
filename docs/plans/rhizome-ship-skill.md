@@ -33,7 +33,7 @@ Atticus ships this private repo himself. Agents already know `git commit` / `git
 |---|---|---|
 | **commit** | Stage intended files. Commit with a why-message. Run repo hooks. | Push. Rebuild. `--no-verify`. Amend unless the usual amend rules hold. |
 | **push** | `git push` to `tuckcode/rhizome-agent` after pre-push passes. | Skip hooks. Force-push main. Add remotes. Buy CI. |
-| **rebuild** | Quit the installed app if needed, then package into `/Applications/Rhizome Agent.app`. Delete leftover `.app` copies. Stamp HANDOFF/BOARD with commit + time. | Rebuild “while we’re here.” Vite/`pnpm tauri:dev` is not this verb. |
+| **rebuild** | Quit the installed app if needed, then package into `/Applications/Rhizome Agent.app`. Delete leftover `.app` copies. Stamp BOARD and add a `docs/plans/handoffs/` file with commit + time. Do not edit `HANDOFF.md`. | Rebuild “while we’re here.” Vite/`pnpm tauri:dev` is not this verb. |
 
 Commit, push, and rebuild stay **three jobs**. Rebuild only when he will use the packaged app.
 
@@ -69,7 +69,7 @@ Each verb’s completion criterion:
 
 1. **commit** — `git status` clean for the intended files; `git log -1` is the new commit.
 2. **push** — `git status` shows in sync with `origin/main` (or ahead only if push was not requested).
-3. **rebuild** — `/Applications/Rhizome Agent.app` mtime/commit matches HEAD; HANDOFF State line updated.
+3. **rebuild** — `/Applications/Rhizome Agent.app` mtime/commit matches HEAD; BOARD updated; ship note in `docs/plans/handoffs/`.
 
 ---
 

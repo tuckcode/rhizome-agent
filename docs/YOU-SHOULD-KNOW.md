@@ -317,9 +317,8 @@ Vault twins exist as notes, not code.
 - Living docs are palimpsests. `NEXT.md` was Claude `b8dc8fb`, then
   Grok `2b5daba` inserted composition. Read **Origin:** lines. `rg`
   cannot attribute a section.
-- Session handoffs: one new file in `docs/plans/handoffs/`, one line
-  in `HANDOFF.md` Recent sessions. Do not paste the session into
-  `HANDOFF.md`.
+- Session handoffs: one new file in `docs/plans/handoffs/`. Do not add a
+  line to `HANDOFF.md` Recent sessions or State.
 - After a named handoff task, pick next work from `NEXT.md`. Do not
   invent a Prime verb because the surface is nearby.
 

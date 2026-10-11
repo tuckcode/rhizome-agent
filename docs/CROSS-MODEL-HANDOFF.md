@@ -9,7 +9,8 @@ re-verify rather than trust this doc blindly. If something here goes stale,
 fix the doc, don't just work around it silently.
 
 For general project state, read `docs/HANDOFF.md` first — this file is
-narrower: traps and landmines, not status.
+narrower: traps and landmines, not status. Per-PR notes go in
+`docs/plans/handoffs/`. Do not append a line to `HANDOFF.md`.
 
 ---
 
