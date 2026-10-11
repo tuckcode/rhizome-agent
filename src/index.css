@@ -231,14 +231,14 @@
   --state-selected-strong: #1C291B;
   --state-active: #1C291B;
   --state-focus-ring: var(--accent-blue);
-  --state-drag-target: rgba(111, 227, 160, 0.18);
+  --state-drag-target: rgba(125, 240, 174, 0.18);
   --state-disabled: #15160F;
 
   /* --- Accent roles (Earth dark) --- */
-  --accent-blue: #6FE3A0;
-  --accent-blue-bg: rgba(111, 227, 160, 0.18);
-  --accent-blue-hover: #8FEBB4;
-  --accent-blue-light: rgba(111, 227, 160, 0.14);
+  --accent-blue: #7DF0AE;
+  --accent-blue-bg: rgba(125, 240, 174, 0.18);
+  --accent-blue-hover: #9AF5C2;
+  --accent-blue-light: rgba(125, 240, 174, 0.14);
   --accent-green: #9BCF7E;
   --accent-green-light: rgba(155, 207, 126, 0.14);
   --accent-orange: #E9B04F;

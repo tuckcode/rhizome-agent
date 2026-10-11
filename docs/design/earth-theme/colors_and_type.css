@@ -33,7 +33,7 @@
   --fg: #E9E8DC;
   --muted: #999784;
   --border: #2A281D;
-  --accent: #6FE3A0;
+  --accent: #7DF0AE;
 
   /* Surface ladder */
   --surface-2: #1C1D14;
@@ -58,9 +58,9 @@
   --border-input: #75705C; /* >=3:1 non-text boundary for inputs/controls */
   --border-focus: var(--accent);
   --state-focus-ring: var(--accent);
-  --accent-dim: rgba(111, 227, 160, 0.14);
-  --accent-hot: #8FEBB4;
-  --accent-bg: rgba(111, 227, 160, 0.18);
+  --accent-dim: rgba(125, 240, 174, 0.14);
+  --accent-hot: #9AF5C2;
+  --accent-bg: rgba(125, 240, 174, 0.18);
 
   /* Semantic feedback */
   --ok: #9BCF7E;

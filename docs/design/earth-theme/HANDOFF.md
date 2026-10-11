@@ -50,12 +50,12 @@ Everything not listed keeps its current value or is an alias of something listed
 | `--state-selected-strong` | `#1C291B` | `#DCE3D5` | `#212A1A` |
 | `--state-active` | `#1C291B` | `#DCE3D5` | `#212A1A` |
 | `--state-focus-ring` | `var(--accent)` / `var(--accent-blue)` | `var(--accent)` / `var(--accent-blue)` | `var(--accent)` / `var(--accent-blue)` |
-| `--state-drag-target` | `rgba(111, 227, 160, 0.18)` | `rgba(44, 106, 77, 0.11)` | `rgba(111, 227, 160, 0.18)` |
+| `--state-drag-target` | `rgba(125, 240, 174, 0.18)` | `rgba(44, 106, 77, 0.11)` | `rgba(111, 227, 160, 0.18)` |
 | `--state-disabled` | `#15160F` | `#EEE9DF` | `#1A1610` |
-| `--accent-blue (main accent)` | `#6FE3A0` | `#2C6A4D` | `#6FE3A0` |
-| `--accent-blue-hover` | `#8FEBB4` | `#22573F` | `#8FEBB4` |
-| `--accent-blue-bg` | `rgba(111, 227, 160, 0.18)` | `rgba(44, 106, 77, 0.11)` | `rgba(111, 227, 160, 0.18)` |
-| `--accent-blue-light` | `rgba(111, 227, 160, 0.14)` | `rgba(44, 106, 77, 0.11)` | `rgba(111, 227, 160, 0.14)` |
+| `--accent-blue (main accent)` | `#7DF0AE` | `#2C6A4D` | `#6FE3A0` |
+| `--accent-blue-hover` | `#9AF5C2` | `#22573F` | `#8FEBB4` |
+| `--accent-blue-bg` | `rgba(125, 240, 174, 0.18)` | `rgba(44, 106, 77, 0.11)` | `rgba(111, 227, 160, 0.18)` |
+| `--accent-blue-light` | `rgba(125, 240, 174, 0.14)` | `rgba(44, 106, 77, 0.11)` | `rgba(111, 227, 160, 0.14)` |
 | `--accent-green` | `#9BCF7E` | `#3D6A1E` | `#A6D282` |
 | `--accent-green-light` | `rgba(155, 207, 126, 0.14)` | `rgba(61, 106, 30, 0.10)` | `rgba(166, 210, 130, 0.13)` |
 | `--accent-orange` | `#E9B04F` | `#8A5208` | `#EDB451` |
