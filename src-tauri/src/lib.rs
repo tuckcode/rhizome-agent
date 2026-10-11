@@ -823,6 +823,8 @@ macro_rules! app_invoke_handler {
             commands::native_chat_list,
             commands::native_chat_open,
             commands::native_chat_delete,
+            commands::get_free_tier_overview,
+            commands::save_free_tier_settings,
             commands::save_ai_model_provider_api_key,
             commands::delete_ai_model_provider_api_key,
             commands::test_ai_model_provider,
