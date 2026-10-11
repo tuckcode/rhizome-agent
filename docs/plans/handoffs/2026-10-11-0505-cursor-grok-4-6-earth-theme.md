@@ -32,6 +32,7 @@ Stacked on the a11y B1–B5 branch (`cursor/a11y-chat-b1-b5-8b31`).
    (Earth dark 11.91, Earth light 5.44, Loam 11.79).
 7. Rebased onto #142 `0adab44`. Earth muted/faint/tertiary stay on the
    paper/forest ladder and still meet 4.5:1 on `--state-selected-strong`.
+8. Draft PR #144 against `main`.
 
 ## Checks
 
