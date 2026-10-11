@@ -320,7 +320,7 @@ describe('Earth theme tokens', () => {
 
   it('takes the 2px focus ring from each theme accent token at 3:1', () => {
     expect(CHAT_FOCUS_RING_CLASS).toContain('outline-2')
-    expect(CHAT_FOCUS_RING_CLASS).toContain('var(--accent-blue)')
+    expect(CHAT_FOCUS_RING_CLASS).toContain('var(--state-focus-ring)')
     expect(CHAT_FOCUS_RING_CLASS).not.toMatch(/#[0-9A-Fa-f]{3,8}/)
     for (const block of [light, dark, loam]) {
       expect(token(block, '--state-focus-ring')).toBe('var(--accent-blue)')
