@@ -188,7 +188,7 @@ pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<Str
         api_key_override: normalize_optional_string(request.api_key_override),
         event_name: None,
     };
-    send_model_message(&request, &mut |_| {})
+    complete_text(&request)
 }
 
 /// One plain reply to `request.message`, with no tools and no loop.
@@ -1124,6 +1124,28 @@ mod tests {
         );
         assert!(body.get("tools").is_none());
         assert!(body.get("tool_choice").is_none());
+    }
+
+    #[test]
+    fn connection_test_streams_without_tools() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"OK"},"finish_reason":"stop"}]}"#,
+        ])]);
+        let provider = compatible_request(&server.base_url).provider;
+
+        let reply = test_ai_model_provider(AiModelProviderTestRequest {
+            provider,
+            model_id: "demo-model".into(),
+            api_key_override: None,
+        })
+        .unwrap();
+
+        assert_eq!(reply, "OK");
+        let requests = server.requests.lock().unwrap();
+        let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+        assert_eq!(body["stream"], true);
+        assert_eq!(body["messages"][1]["content"], "Reply with exactly OK.");
+        assert!(body.get("tools").is_none());
     }
 
     #[test]
