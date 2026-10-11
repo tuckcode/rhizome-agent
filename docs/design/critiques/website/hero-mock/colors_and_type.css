@@ -1,0 +1,203 @@
+/* Rhizome Agent — design tokens
+   Source: rhizome-agent src/index.css + desktop harness (Mycelium dark default, Ledger light).
+   Default :root is Mycelium (product dark). Toggle [data-theme="light"] for Ledger. */
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/jetbrains-mono-600-latin.woff2") format("woff2");
+}
+
+:root,
+[data-theme="dark"],
+[data-scheme="mycelium"] {
+  color-scheme: dark;
+
+  /* Core six (Open Design contract aliases) */
+  --bg: #0E120C;
+  --surface: #151A12;
+  --fg: #E6EBE0;
+  --muted: #79836F;
+  --border: #232A1F;
+  --accent: #6FE3A0;
+
+  /* Surface ladder */
+  --surface-2: #1B2117;
+  --surface-3: #222A1C;
+  --surface-sidebar: #10150E;
+  --surface-popover: #1B2117;
+  --surface-input: #0E120C;
+  --surface-dialog: #181E14;
+  --page-wash: #080A07;
+  --titlebar-top: #181E14;
+
+  /* Text ladder */
+  --fg-heading: #F2F6ED;
+  --fg-secondary: #ADB6A3;
+  --fg-tertiary: #929C86;
+  --muted-2: #5C6553;
+  --accent-ink: #0E120C;
+
+  /* Borders / accent variants */
+  --border-subtle: #1A2016;
+  --border-strong: #333D2B;
+  --border-focus: #6FE3A0;
+  --accent-dim: rgba(111, 227, 160, 0.14);
+  --accent-hot: #8FEBB4;
+  --accent-bg: rgba(111, 227, 160, 0.18);
+
+  /* Semantic feedback */
+  --ok: #9BCF7E;
+  --ok-bg: rgba(155, 207, 126, 0.16);
+  --warn: #E0A458;
+  --warn-bg: rgba(224, 164, 88, 0.14);
+  --danger: #E8837C;
+  --danger-bg: rgba(232, 131, 124, 0.12);
+  --info: #6FE3A0;
+
+  /* Interaction states */
+  --state-hover: #1B2117;
+  --state-selected: #1B2E22;
+  --state-active: #1E3326;
+  --state-disabled: #161B12;
+  --user-bg: #1B2E22;
+  --tool-bg: #10150E;
+
+  /* Shadows */
+  --shadow: rgba(0, 0, 0, 0.45);
+  --shadow-dialog: rgba(0, 0, 0, 0.55);
+  --shadow-window: 0 28px 70px rgba(0, 0, 0, 0.45);
+
+  /* Typography */
+  --font-display: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-md: 12px;
+  --font-size-base: 13px;
+  --font-size-lg: 14px;
+  --font-size-xl: 16px;
+  --font-size-2xl: 20px;
+  --font-size-3xl: 26px;
+  --line-height-tight: 1.15;
+  --line-height-body: 1.45;
+  --line-height-prose: 1.55;
+  --letter-tight: -0.03em;
+  --letter-mono: 0.04em;
+  --letter-kicker: 0.12em;
+
+  /* Spacing scale (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --gap-rail: 4px;
+  --gap-msg: 18px;
+  --pad-transcript-x: 32px;
+  --pad-transcript-y: 22px;
+  --rail-w: 48px;
+  --session-w: 228px;
+  --frame-w: 1440px;
+  --frame-h: 900px;
+  --titlebar-h: 40px;
+  --subhead-h: 30px;
+  --chip-h: 24px;
+  --btn-h: 32px;
+  --icon-btn: 32px;
+  --touch-min: 36px;
+
+  /* Radius */
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-pill: 999px;
+  --r: var(--radius);
+  --r-sm: var(--radius-sm);
+
+  /* Motion */
+  --t: 140ms ease;
+  --t-scheme: 180ms ease;
+  --t-pulse: 1.2s ease-in-out;
+}
+
+[data-theme="light"],
+[data-scheme="ledger"] {
+  color-scheme: light;
+  --bg: #EFF1EC;
+  --surface: #F7F8F5;
+  --fg: #23281F;
+  --muted: #77806E;
+  --border: #D6DBCF;
+  --accent: #2E6B4F;
+
+  --surface-2: #FBFCFA;
+  --surface-3: #E3E7DE;
+  --surface-sidebar: #E9ECE5;
+  --surface-popover: #FBFCFA;
+  --surface-input: #FBFCFA;
+  --surface-dialog: #F9FAF7;
+  --page-wash: #E3E7DE;
+  --titlebar-top: #F9FAF7;
+
+  --fg-heading: #1B2017;
+  --fg-secondary: #4C5546;
+  --fg-tertiary: #616A59;
+  --muted-2: #97A08D;
+  --accent-ink: #F7F8F5;
+
+  --border-subtle: #E1E5DA;
+  --border-strong: #C2C9B8;
+  --border-focus: #2E6B4F;
+  --accent-dim: rgba(46, 107, 79, 0.12);
+  --accent-hot: #245741;
+  --accent-bg: rgba(46, 107, 79, 0.12);
+
+  --ok: #38A169;
+  --ok-bg: rgba(56, 161, 105, 0.1);
+  --warn: #B4552D;
+  --warn-bg: #F2E8CE;
+  --danger: #C03D30;
+  --danger-bg: rgba(192, 61, 48, 0.1);
+  --info: #2E6B4F;
+
+  --state-hover: #E5E9DF;
+  --state-selected: #DFE9E2;
+  --state-active: #DFE9E2;
+  --state-disabled: #EBEEE6;
+  --user-bg: #DFE9E2;
+  --tool-bg: #E9ECE5;
+
+  --shadow: rgba(26, 30, 22, 0.18);
+  --shadow-dialog: rgba(26, 30, 22, 0.15);
+  --shadow-window: 0 28px 70px rgba(26, 30, 22, 0.18);
+}
+
+/* Utility classes for previews / kits */
+.od-body {
+  margin: 0;
+  background: var(--page-wash);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-body);
+  -webkit-font-smoothing: antialiased;
+}
+.od-mono { font-family: var(--font-mono); letter-spacing: var(--letter-mono); }
+.od-kicker {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-kicker);
+  text-transform: uppercase;
+  color: var(--muted);
+}

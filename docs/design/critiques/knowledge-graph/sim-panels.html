@@ -1,0 +1,38 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--bg:#0F120D;--panel:#161A13;--border:#232A1F;--fg:#E6EBE0;--muted:#79836F;--radius:8px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080A07;font:11px Inter,system-ui,sans-serif;color:var(--fg)}
+#host{position:relative;overflow:hidden;background:var(--bg);background-image:radial-gradient(circle at 60% 45%,#3b5a3b 0 3px,transparent 4px),radial-gradient(circle at 55% 50%,#7a5a3a 0 5px,transparent 6px),radial-gradient(circle at 63% 40%,#8a4a4a 0 4px,transparent 5px);}
+.panel{border:1px solid var(--border);background:var(--panel);border-radius:var(--radius)}
+#legend{position:absolute;bottom:12px;left:12px;z-index:10;display:flex;flex-direction:column;max-height:40%;max-width:240px;font-size:11px;color:var(--muted)}
+#legend button.h{display:flex;width:100%;justify-content:space-between;padding:6px 10px;background:none;border:0;color:var(--fg);font:500 11px Inter}
+#lbody{display:flex;flex-direction:column;gap:10px;overflow-y:auto;padding:0 10px 10px;min-height:0}
+#lbody ul{list-style:none;display:flex;flex-direction:column;gap:4px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+#controls{position:absolute;bottom:12px;right:12px;z-index:10;display:flex;flex-direction:column-reverse;gap:8px;max-height:min(40%,12rem);max-width:min(260px,calc(100% - 1.5rem))}
+.find{display:flex;gap:4px;padding:6px;align-items:center}
+.find input{height:28px;width:176px;max-width:100%;background:#0E120C;border:1px solid var(--border);border-radius:6px;color:var(--fg);padding:0 28px;font-size:12px}
+.find .x{width:28px;height:28px;flex-shrink:0}
+#filters{display:flex;flex-direction:column;gap:8px;overflow-y:auto;padding:8px;min-height:0}
+.pills{display:flex;flex-wrap:wrap;gap:4px}
+.pill{display:flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:999px;padding:2px 8px;font-size:11px;background:var(--panel)}
+#exit{position:absolute;right:12px;top:12px;z-index:10;padding:4px 8px;font-size:12px;color:var(--muted)}
+</style></head><body><div id="host"></div>
+<script>
+const types=['Untyped','concept','entity','Event','Note','Operation','Person','plugin','Project','research','Responsibility','source','Task','Topic','Type','wiki'];
+const cols=['#aaa','#d9a35f','#9cd27e','#e3cf75','#d9a35f','#e07f78','#e3cf75','#d98bc0','#e07f78','#9aa092','#a99be0','#e07f78','#d98bc0','#9cd27e','#7fdca0','#7fdca0'];
+function build(w,h,legendOpen,controlsOpen){
+ const host=document.getElementById('host'); host.style.width=w+'px'; host.style.height=h+'px';
+ host.innerHTML=`<div id="exit" class="panel">✕ Exit graph</div>
+ <div id="controls">
+  <div class="panel find"><input placeholder="Find a note…" value="${controlsOpen?'':''}"><div class="x"></div></div>
+  ${controlsOpen?`<div id="filters" class="panel"><div class="pills">${types.map((t,i)=>`<span class="pill"><span class="dot" style="background:${cols[i]};margin:0"></span>${t}</span>`).join('')}<span class="pill">Not created yet</span></div><div>Showing 120 of 143</div></div>`:''}
+ </div>
+ <div id="legend" class="panel"><button class="h">Key <span>${legendOpen?'▾':'▴'}</span></button>
+ ${legendOpen?`<div id="lbody"><div>143 notes · 184 links · 32 not created</div><div><div style="text-transform:uppercase;opacity:.7;margin-bottom:4px">Notes</div><ul>${types.map((t,i)=>`<li><span class="dot" style="background:${cols[i]}"></span>${t}</li>`).join('')}<li><span class="dot" style="background:#777"></span>Not created yet</li></ul></div><div><div style="text-transform:uppercase;opacity:.7;margin-bottom:4px">Links</div><ul><li>— Wikilink</li><li>— Belongs to</li><li>— Related to</li><li>— Relationship</li></ul></div><div style="opacity:.7">Arrows move · Enter opens · Esc backs out</div></div>`:''}</div>`;
+ const r=id=>{const b=document.getElementById(id).getBoundingClientRect();return {x:b.left,y:b.top,w:b.width,h:b.height}};
+ const L=r('legend'),C=r('controls'),E=r('exit');
+ const ov=(a,b)=>Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
+ const area=w*h; return {w,h,legendOpen,controlsOpen,legend:[L.w,L.h].map(Math.round),controls:[C.w,C.h].map(Math.round),overlapPx:Math.round(ov(L,C)),coveredPct:+(((L.w*L.h)+(C.w*C.h)+(E.w*E.h)-ov(L,C))/area*100).toFixed(1)};
+}
+</script></body></html>

@@ -1,0 +1,343 @@
+/* Rhizome — design tokens (Earth, 2026-10-10)
+   Drop-in replacement for the previous colors_and_type.css. Every earlier token name is kept;
+   --border-input is new (>= 3:1 non-text boundary for inputs and outlined controls).
+
+   Schemes
+   - Earth dark (default):  :root, [data-theme="dark"], [data-scheme="earth"]
+                            [data-scheme="mycelium"] is kept as an alias and now resolves to Earth dark.
+   - Loam (optional, warm): [data-scheme="loam"], [data-theme="dark-warm"]
+   - Earth light:           [data-theme="light"], [data-scheme="earth-light"]
+                            [data-scheme="ledger"] is kept as an alias and now resolves to Earth light.
+
+   Contrast contract: every text token (--fg, --fg-heading, --fg-secondary, --fg-tertiary, --muted,
+   --muted-2, --accent, --ok, --warn, --danger) is >= 4.5:1 on every surface token of its scheme,
+   and ok/warn/danger/accent stay >= 4.5:1 on their own tinted fills. Decorative lines use borders. */
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/jetbrains-mono-600-latin.woff2") format("woff2");
+}
+
+:root,
+[data-theme="dark"],
+[data-scheme="earth"],
+[data-scheme="mycelium"] {
+  color-scheme: dark;
+
+  /* Core six (Open Design contract aliases) */
+  --bg: #0F110C;
+  --surface: #16170F;
+  --fg: #E9E8DC;
+  --muted: #999784;
+  --border: #2A281D;
+  --accent: #6FE3A0;
+
+  /* Surface ladder */
+  --surface-2: #1C1D14;
+  --surface-3: #23231A;
+  --surface-sidebar: #121410;
+  --surface-popover: #1C1D14;
+  --surface-input: #0F110C;
+  --surface-dialog: #19190F;
+  --page-wash: #090A07;
+  --titlebar-top: #19190F;
+
+  /* Text ladder */
+  --fg-heading: #F4F2E8;
+  --fg-secondary: #BDBAA8;
+  --fg-tertiary: #A8A592;
+  --muted-2: #8F8D7B;
+  --accent-ink: #0F110C;
+
+  /* Borders / accent variants */
+  --border-subtle: #1F1E16;
+  --border-strong: #3B3828;
+  --border-input: #75705C; /* >=3:1 non-text boundary for inputs/controls */
+  --border-focus: #6FE3A0;
+  --accent-dim: rgba(111, 227, 160, 0.14);
+  --accent-hot: #8FEBB4;
+  --accent-bg: rgba(111, 227, 160, 0.18);
+
+  /* Semantic feedback */
+  --ok: #9BCF7E;
+  --ok-bg: rgba(155, 207, 126, 0.14);
+  --warn: #E9B04F;
+  --warn-bg: rgba(233, 176, 79, 0.13);
+  --danger: #EE8B7E;
+  --danger-bg: rgba(238, 139, 126, 0.12);
+  --info: #6FE3A0;
+
+  /* Interaction states */
+  --state-hover: #1C1D14;
+  --state-selected: #1A2619;
+  --state-active: #1C291B;
+  --state-disabled: #15160F;
+  --user-bg: #1A2619;
+  --tool-bg: #121410;
+
+  /* Shadows */
+  --shadow: rgba(0, 0, 0, 0.5);
+  --shadow-dialog: rgba(0, 0, 0, 0.58);
+  --shadow-window: 0 28px 70px rgba(0, 0, 0, 0.5);
+
+  /* Typography */
+  --font-display: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-md: 12px;
+  --font-size-base: 13px;
+  --font-size-lg: 14px;
+  --font-size-xl: 16px;
+  --font-size-2xl: 20px;
+  --font-size-3xl: 26px;
+  --line-height-tight: 1.15;
+  --line-height-body: 1.45;
+  --line-height-prose: 1.55;
+  --letter-tight: -0.03em;
+  --letter-mono: 0.04em;
+  --letter-kicker: 0.12em;
+
+  /* Spacing scale (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --gap-rail: 4px;
+  --gap-msg: 18px;
+  --pad-transcript-x: 32px;
+  --pad-transcript-y: 22px;
+  --rail-w: 48px;
+  --session-w: 228px;
+  --frame-w: 1440px;
+  --frame-h: 900px;
+  --titlebar-h: 40px;
+  --subhead-h: 30px;
+  --chip-h: 24px;
+  --btn-h: 32px;
+  --icon-btn: 32px;
+  --touch-min: 36px;
+
+  /* Radius */
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-pill: 999px;
+  --r: var(--radius);
+  --r-sm: var(--radius-sm);
+
+  /* Motion */
+  --t: 140ms ease;
+  --t-scheme: 180ms ease;
+  --t-pulse: 1.2s ease-in-out;
+}
+
+
+
+
+/* Loam: optional warm dark. Browner soil surfaces, same mint accent. */
+[data-scheme="loam"],
+[data-theme="dark-warm"] {
+  color-scheme: dark;
+
+  /* Core six (Open Design contract aliases) */
+  --bg: #15110C;
+  --surface: #1D1811;
+  --fg: #EDE6D8;
+  --muted: #A3987F;
+  --border: #352C20;
+  --accent: #6FE3A0;
+
+  /* Surface ladder */
+  --surface-2: #241E15;
+  --surface-3: #2B2419;
+  --surface-sidebar: #19150F;
+  --surface-popover: #241E15;
+  --surface-input: #15110C;
+  --surface-dialog: #211B13;
+  --page-wash: #0C0A07;
+  --titlebar-top: #211B13;
+
+  /* Text ladder */
+  --fg-heading: #F7F1E5;
+  --fg-secondary: #C6BBA6;
+  --fg-tertiary: #B2A791;
+  --muted-2: #9A8F78;
+  --accent-ink: #15110C;
+
+  /* Borders / accent variants */
+  --border-subtle: #272017;
+  --border-strong: #4A3D2C;
+  --border-input: #7E6F59; /* >=3:1 non-text boundary for inputs/controls */
+  --border-focus: #6FE3A0;
+  --accent-dim: rgba(111, 227, 160, 0.14);
+  --accent-hot: #8FEBB4;
+  --accent-bg: rgba(111, 227, 160, 0.18);
+
+  /* Semantic feedback */
+  --ok: #A6D282;
+  --ok-bg: rgba(166, 210, 130, 0.13);
+  --warn: #EDB451;
+  --warn-bg: rgba(237, 180, 81, 0.13);
+  --danger: #F2917F;
+  --danger-bg: rgba(242, 145, 127, 0.12);
+  --info: #6FE3A0;
+
+  /* Interaction states */
+  --state-hover: #241E15;
+  --state-selected: #1F2719;
+  --state-active: #212A1A;
+  --state-disabled: #1A1610;
+  --user-bg: #1F2719;
+  --tool-bg: #19150F;
+
+  /* Shadows */
+  --shadow: rgba(0, 0, 0, 0.5);
+  --shadow-dialog: rgba(0, 0, 0, 0.58);
+  --shadow-window: 0 28px 70px rgba(0, 0, 0, 0.5);
+
+  /* Typography */
+  --font-display: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-md: 12px;
+  --font-size-base: 13px;
+  --font-size-lg: 14px;
+  --font-size-xl: 16px;
+  --font-size-2xl: 20px;
+  --font-size-3xl: 26px;
+  --line-height-tight: 1.15;
+  --line-height-body: 1.45;
+  --line-height-prose: 1.55;
+  --letter-tight: -0.03em;
+  --letter-mono: 0.04em;
+  --letter-kicker: 0.12em;
+
+  /* Spacing scale (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --gap-rail: 4px;
+  --gap-msg: 18px;
+  --pad-transcript-x: 32px;
+  --pad-transcript-y: 22px;
+  --rail-w: 48px;
+  --session-w: 228px;
+  --frame-w: 1440px;
+  --frame-h: 900px;
+  --titlebar-h: 40px;
+  --subhead-h: 30px;
+  --chip-h: 24px;
+  --btn-h: 32px;
+  --icon-btn: 32px;
+  --touch-min: 36px;
+
+  /* Radius */
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-pill: 999px;
+  --r: var(--radius);
+  --r-sm: var(--radius-sm);
+
+  /* Motion */
+  --t: 140ms ease;
+  --t-scheme: 180ms ease;
+  --t-pulse: 1.2s ease-in-out;
+}
+
+[data-theme="light"],
+[data-scheme="earth-light"],
+[data-scheme="ledger"] {
+  color-scheme: light;
+  --bg: #F1ECE2;
+  --surface: #F8F5EE;
+  --fg: #2A251E;
+  --muted: #625A4D;
+  --border: #DDD4C3;
+  --accent: #2C6A4D;
+
+  --surface-2: #FCFAF6;
+  --surface-3: #E7E0D2;
+  --surface-sidebar: #ECE6DA;
+  --surface-popover: #FCFAF6;
+  --surface-input: #FCFAF6;
+  --surface-dialog: #FAF7F1;
+  --page-wash: #E7E0D2;
+  --titlebar-top: #FAF7F1;
+
+  --fg-heading: #1E1A15;
+  --fg-secondary: #4E473C;
+  --fg-tertiary: #575043;
+  --muted-2: #6B6354;
+  --accent-ink: #F8F5EE;
+
+  --border-subtle: #E6DFD1;
+  --border-strong: #C8BDA8;
+  --border-input: #857B66; /* >=3:1 non-text boundary for inputs/controls */
+  --border-focus: #2C6A4D;
+  --accent-dim: rgba(44, 106, 77, 0.11);
+  --accent-hot: #22573F;
+  --accent-bg: rgba(44, 106, 77, 0.11);
+
+  --ok: #3D6A1E;
+  --ok-bg: rgba(61, 106, 30, 0.10);
+  --warn: #8A5208;
+  --warn-bg: #F3E4C4;
+  --danger: #A3342A;
+  --danger-bg: rgba(163, 52, 42, 0.09);
+  --info: #2C6A4D;
+
+  --state-hover: #EAE3D6;
+  --state-selected: #E1E6DA;
+  --state-active: #DCE3D5;
+  --state-disabled: #EEE9DF;
+  --user-bg: #E1E6DA;
+  --tool-bg: #EFEADF;
+
+  --shadow: rgba(42, 34, 22, 0.16);
+  --shadow-dialog: rgba(42, 34, 22, 0.14);
+  --shadow-window: 0 28px 70px rgba(42, 34, 22, 0.16);
+}
+
+/* Utility classes for previews / kits */
+.od-body {
+  margin: 0;
+  background: var(--page-wash);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-body);
+  -webkit-font-smoothing: antialiased;
+}
+.od-mono { font-family: var(--font-mono); letter-spacing: var(--letter-mono); }
+.od-kicker {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-kicker);
+  text-transform: uppercase;
+  color: var(--muted);
+}
