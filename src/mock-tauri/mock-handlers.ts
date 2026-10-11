@@ -30,16 +30,25 @@ const MOCK_FREE_TIER_PROVIDERS = [
   { id: 'nvidia', name: 'NVIDIA NIM', defaultOn: true, hardStop: false },
   { id: 'cloudflare-ai', name: 'Cloudflare Workers AI', defaultOn: false, hardStop: false },
 ]
-let mockFreeTierSettings = { disabled: [] as string[], optIn: [] as string[], strict: false, ownEndpoint: null as string | null }
+let mockFreeTierSettings = {
+  disabled: [] as string[],
+  optIn: [] as string[],
+  strict: false,
+  ownEndpoint: null as string | null,
+  ownEndpointModel: null as string | null,
+}
+/** Keychain accounts the browser mock holds. Names only, never values. */
+const mockSavedKeys = new Set<string>()
 
 function mockFreeTierOverview() {
   const providers = MOCK_FREE_TIER_PROVIDERS.map((provider) => ({
     ...provider,
     enabled: (provider.defaultOn || mockFreeTierSettings.optIn.includes(provider.id))
       && !mockFreeTierSettings.disabled.includes(provider.id),
-    hasKey: false,
+    hasKey: mockSavedKeys.has(provider.id),
     needsAccountId: provider.id === 'cloudflare-ai',
-    hasAccountId: false,
+    hasAccountId: mockSavedKeys.has(`${provider.id}:account`),
+    keyError: null,
     billingWarning: provider.id === 'cloudflare-ai'
       ? 'A card on file with Cloudflare could be billed when Workers AI use passes the free 10K Neurons per day. Turn this on only if you accept that.'
       : null,
@@ -51,9 +60,10 @@ function mockFreeTierOverview() {
     providers,
     strict: mockFreeTierSettings.strict,
     routeOrder: mockFreeTierSettings.ownEndpoint ? [...routeOrder, 'custom'] : routeOrder,
-    usable: Boolean(mockFreeTierSettings.ownEndpoint),
+    usable: Boolean(mockFreeTierSettings.ownEndpoint) || providers.some((provider) => provider.enabled && provider.hasKey),
     ownEndpoint: mockFreeTierSettings.ownEndpoint,
-    endpointChoices: [{ id: 'lm_studio-mock', name: 'LM Studio (mock)' }],
+    ownEndpointModel: mockFreeTierSettings.ownEndpointModel,
+    endpointChoices: [{ id: 'lm_studio-mock', name: 'LM Studio (mock)', models: ['qwen', 'llama'] }],
   }
 }
 
@@ -681,6 +691,16 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   save_free_tier_settings: (args: { settings?: typeof mockFreeTierSettings }) => {
     if (args?.settings) mockFreeTierSettings = args.settings
     return mockFreeTierOverview()
+  },
+  save_ai_model_provider_api_key: (args: { providerId?: string }) => {
+    if (args?.providerId) mockSavedKeys.add(args.providerId)
+    return null
+  },
+  delete_ai_model_provider_api_key: (args: { providerId?: string }) => {
+    if (!args?.providerId) return null
+    mockSavedKeys.delete(args.providerId)
+    if (!args.providerId.endsWith(':account')) mockSavedKeys.delete(`${args.providerId}:account`)
+    return null
   },
   list_prime_sessions: () => [
     {

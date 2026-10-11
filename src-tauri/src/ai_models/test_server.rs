@@ -23,6 +23,8 @@ pub(crate) struct TestServer {
     pub(crate) base_url: String,
     /// "METHOD PATH" and the body of each request, in order.
     pub(crate) requests: Arc<Mutex<Vec<(String, String)>>>,
+    /// The header lines of each request, lowercased, in order.
+    pub(crate) headers: Arc<Mutex<Vec<String>>>,
 }
 
 pub(crate) fn serve(responses: Vec<String>) -> TestServer {
@@ -30,6 +32,8 @@ pub(crate) fn serve(responses: Vec<String>) -> TestServer {
     let base_url = format!("http://{}/v1", listener.local_addr().unwrap());
     let requests = Arc::new(Mutex::new(Vec::new()));
     let seen = Arc::clone(&requests);
+    let headers = Arc::new(Mutex::new(Vec::new()));
+    let seen_headers = Arc::clone(&headers);
     std::thread::spawn(move || {
         for response in responses {
             let Ok((mut stream, _)) = listener.accept() else {
@@ -43,12 +47,14 @@ pub(crate) fn serve(responses: Vec<String>) -> TestServer {
             let mut request_line = String::new();
             reader.read_line(&mut request_line).unwrap();
             let mut content_length = 0;
+            let mut lines = String::new();
             loop {
                 let mut header = String::new();
                 reader.read_line(&mut header).unwrap();
                 if header.trim().is_empty() {
                     break;
                 }
+                lines.push_str(&header.to_ascii_lowercase());
                 if let Some(value) = header.to_ascii_lowercase().strip_prefix("content-length:") {
                     content_length = value.trim().parse().unwrap();
                 }
@@ -60,13 +66,18 @@ pub(crate) fn serve(responses: Vec<String>) -> TestServer {
                 .take(2)
                 .collect::<Vec<_>>()
                 .join(" ");
+            seen_headers.lock().unwrap().push(lines);
             seen.lock()
                 .unwrap()
                 .push((target, String::from_utf8(body).unwrap()));
             stream.write_all(response.as_bytes()).unwrap();
         }
     });
-    TestServer { base_url, requests }
+    TestServer {
+        base_url,
+        requests,
+        headers,
+    }
 }
 
 /// Accepts one connection and never answers it.

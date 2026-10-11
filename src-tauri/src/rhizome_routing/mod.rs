@@ -45,6 +45,12 @@ pub struct Credential {
 /// keychain implements this later. Tests use a map.
 pub trait KeyStore: Send {
     fn credential(&self, provider_id: &str) -> Option<Credential>;
+
+    /// Like `credential`, but a store that cannot be read (a locked or
+    /// denied keychain) says so in place of reporting "no key".
+    fn try_credential(&self, provider_id: &str) -> Result<Option<Credential>, String> {
+        Ok(self.credential(provider_id))
+    }
 }
 
 /// Wall time in milliseconds since the Unix epoch. Daily limits reset at
@@ -204,8 +210,10 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
                 continue;
             }
             // The first try and one failover always run (freellmapi checklist).
-            if tried >= 2 && now.saturating_sub(started) >= *budget {
-                break;
+            // The user's own endpoint is last and always runs, so slow free
+            // providers cannot use up its turn.
+            if tried >= 2 && now.saturating_sub(started) >= *budget && !provider.user_supplied {
+                continue;
             }
             tried += 1;
 
@@ -282,7 +290,13 @@ fn reachable(
     provider: &CatalogProvider,
     keys: &impl KeyStore,
 ) -> Option<(Option<Credential>, String)> {
-    let credential = keys.credential(provider.key_id.as_deref().unwrap_or(&provider.id));
+    let credential = match &provider.api_key {
+        Some(api_key) => Some(Credential {
+            api_key: api_key.clone(),
+            account_id: None,
+        }),
+        None => keys.credential(provider.key_id.as_deref().unwrap_or(&provider.id)),
+    };
     if provider.key_required && credential.is_none() {
         return None;
     }
@@ -624,6 +638,7 @@ mod tests {
             model: "m".into(),
             name: "Hosted".into(),
             key_id: Some("open_ai_compatible-abc".into()),
+            ..Default::default()
         });
         let endpoint = catalog.providers.last().unwrap();
 
@@ -738,6 +753,64 @@ mod tests {
         assert!(c.requests.lock().unwrap().is_empty());
         assert_eq!(error_kind(&events), Some(ModelErrorKind::Unavailable));
         assert_eq!(RETRY_BUDGET, 45_000);
+    }
+
+    #[test]
+    fn a_spent_budget_still_tries_the_own_endpoint() {
+        let failing = || serve(vec![http_response("503 Service Unavailable", &[], "down")]);
+        let (a, b, c) = (failing(), failing(), failing());
+        let lan = serve(vec![reply("local")]);
+        let catalog = catalog(&[("a", &a.base_url), ("b", &b.base_url), ("c", &c.base_url)])
+            .with_user_endpoint(UserEndpoint {
+                base_url: lan.base_url.clone(),
+                model: "qwen".into(),
+                ..Default::default()
+            });
+        let mut router = RoutingModel::new(
+            catalog,
+            keys(&["a", "b", "c"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        )
+        .with_budget(0);
+
+        assert_eq!(run(&mut router), done("local"));
+        assert!(c.requests.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn an_own_endpoint_sends_its_env_key_and_custom_headers() {
+        let lan = serve(vec![reply("hosted")]);
+        let catalog = catalog(&[]).with_user_endpoint(UserEndpoint {
+            base_url: lan.base_url.clone(),
+            model: "m".into(),
+            api_key: Some("env-secret".into()),
+            key_required: true,
+            headers: [("X-Org".to_string(), "acme".to_string())].into(),
+            ..Default::default()
+        });
+        let mut router = RoutingModel::new(catalog, keys(&[]), FakeClock::at(T0), TEST_LIMITS);
+
+        assert_eq!(run(&mut router), done("hosted"));
+        let request = lan.headers.lock().unwrap()[0].clone();
+        assert!(request.contains("bearer env-secret"), "{request}");
+        assert!(request.contains("x-org: acme"), "{request}");
+    }
+
+    #[test]
+    fn an_own_endpoint_that_needs_a_missing_key_is_not_usable() {
+        let catalog = catalog(&[]).with_user_endpoint(UserEndpoint {
+            base_url: "https://hosted.test/v1".into(),
+            model: "m".into(),
+            key_required: true,
+            ..Default::default()
+        });
+
+        assert!(!has_usable_target(
+            &catalog,
+            &RoutingOptions::default(),
+            &keys(&[])
+        ));
     }
 
     #[test]

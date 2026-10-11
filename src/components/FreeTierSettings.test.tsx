@@ -3,10 +3,11 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { FreeTierSettings } from './FreeTierSettings'
 import type { FreeTierOverview, FreeTierProviderRow } from '../utils/freeTierSettings'
 
-const { getOverviewMock, saveSettingsMock, saveKeyMock, trackEventMock } = vi.hoisted(() => ({
+const { getOverviewMock, saveSettingsMock, saveKeyMock, deleteKeyMock, trackEventMock } = vi.hoisted(() => ({
   getOverviewMock: vi.fn(),
   saveSettingsMock: vi.fn(),
   saveKeyMock: vi.fn(),
+  deleteKeyMock: vi.fn(),
   trackEventMock: vi.fn(),
 }))
 
@@ -14,12 +15,8 @@ vi.mock('../utils/freeTierSettings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../utils/freeTierSettings')>()),
   getFreeTierOverview: getOverviewMock,
   saveFreeTierSettings: saveSettingsMock,
-}))
-
-vi.mock('../utils/aiProviderSecrets', () => ({
-  saveAiModelProviderApiKey: saveKeyMock,
-  deleteAiModelProviderApiKey: vi.fn(),
-  testAiModelProvider: vi.fn(),
+  saveFreeTierSecret: saveKeyMock,
+  deleteFreeTierSecret: deleteKeyMock,
 }))
 
 vi.mock('../lib/telemetry', () => ({ trackEvent: trackEventMock }))
@@ -33,6 +30,7 @@ function row(patch: Partial<FreeTierProviderRow> & Pick<FreeTierProviderRow, 'id
     hasKey: false,
     needsAccountId: false,
     hasAccountId: false,
+    keyError: null,
     billingWarning: null,
     hardStop: false,
     ...patch,
@@ -57,9 +55,10 @@ function overview(patch: Partial<FreeTierOverview> = {}): FreeTierOverview {
     routeOrder: ['groq'],
     usable: true,
     ownEndpoint: null,
+    ownEndpointModel: null,
     endpointChoices: [
-      { id: 'lm_studio-pc', name: 'LM Studio on PC' },
-      { id: 'ollama-home', name: 'Ollama' },
+      { id: 'lm_studio-pc', name: 'LM Studio on PC', models: ['qwen', 'llama'] },
+      { id: 'ollama-home', name: 'Ollama', models: ['llama3.2'] },
     ],
     ...patch,
   }
@@ -76,6 +75,7 @@ describe('FreeTierSettings', () => {
     getOverviewMock.mockReset()
     saveSettingsMock.mockReset().mockImplementation(async () => overview())
     saveKeyMock.mockReset().mockResolvedValue(undefined)
+    deleteKeyMock.mockReset().mockResolvedValue(undefined)
     trackEventMock.mockReset()
   })
 
@@ -96,7 +96,7 @@ describe('FreeTierSettings', () => {
     fireEvent.click(within(screen.getByTestId('free-tier-row-mistral')).getByRole('switch'))
 
     await waitFor(() =>
-      expect(saveSettingsMock).toHaveBeenCalledWith({ disabled: ['mistral'], optIn: [], strict: false, ownEndpoint: null }),
+      expect(saveSettingsMock).toHaveBeenCalledWith({ disabled: ['mistral'], optIn: [], strict: false, ownEndpoint: null, ownEndpointModel: null }),
     )
     expect(trackEventMock).toHaveBeenCalledWith('free_tier_provider_toggled', {
       provider_id: 'mistral',
@@ -113,7 +113,7 @@ describe('FreeTierSettings', () => {
     expect(saveSettingsMock).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Turn on' }))
     await waitFor(() =>
-      expect(saveSettingsMock).toHaveBeenCalledWith({ disabled: [], optIn: ['cloudflare-ai'], strict: false, ownEndpoint: null }),
+      expect(saveSettingsMock).toHaveBeenCalledWith({ disabled: [], optIn: ['cloudflare-ai'], strict: false, ownEndpoint: null, ownEndpointModel: null }),
     )
   })
 
@@ -132,7 +132,7 @@ describe('FreeTierSettings', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'Strict mode' }))
 
     await waitFor(() =>
-      expect(saveSettingsMock).toHaveBeenCalledWith({ disabled: [], optIn: [], strict: true, ownEndpoint: null }),
+      expect(saveSettingsMock).toHaveBeenCalledWith({ disabled: [], optIn: [], strict: true, ownEndpoint: null, ownEndpointModel: null }),
     )
   })
 
@@ -180,6 +180,7 @@ describe('FreeTierSettings', () => {
         optIn: [],
         strict: false,
         ownEndpoint: 'lm_studio-pc',
+        ownEndpointModel: null,
       }),
     )
   })
@@ -191,7 +192,7 @@ describe('FreeTierSettings', () => {
     fireEvent.click(screen.getByRole('option', { name: 'None' }))
 
     await waitFor(() =>
-      expect(saveSettingsMock).toHaveBeenCalledWith({ disabled: [], optIn: [], strict: false, ownEndpoint: null }),
+      expect(saveSettingsMock).toHaveBeenCalledWith({ disabled: [], optIn: [], strict: false, ownEndpoint: null, ownEndpointModel: null }),
     )
   })
 
@@ -211,5 +212,99 @@ describe('FreeTierSettings', () => {
     expect(
       screen.getByText('Add a local or OpenAI-compatible provider above to pick it here.'),
     ).toBeInTheDocument()
+  })
+
+  it('allows one save at a time, so a rapid second toggle cannot undo the first', async () => {
+    let finish: (view: FreeTierOverview) => void = () => undefined
+    saveSettingsMock.mockImplementation(
+      () => new Promise<FreeTierOverview>((resolve) => { finish = resolve }),
+    )
+    await renderLoaded()
+
+    const mistral = within(screen.getByTestId('free-tier-row-mistral')).getByRole('switch')
+    fireEvent.click(mistral)
+    fireEvent.click(screen.getByRole('switch', { name: 'Strict mode' }))
+
+    expect(saveSettingsMock).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Strict mode' })).toBeDisabled())
+    finish(overview())
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Strict mode' })).toBeEnabled())
+  })
+
+  it('shows a failed save and sends no telemetry', async () => {
+    saveSettingsMock.mockRejectedValue(new Error('disk full'))
+    await renderLoaded()
+
+    fireEvent.click(within(screen.getByTestId('free-tier-row-mistral')).getByRole('switch'))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('disk full')
+    expect(trackEventMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps the typed key when the keychain save fails', async () => {
+    saveKeyMock.mockRejectedValue(new Error('keychain refused'))
+    await renderLoaded()
+
+    const mistral = screen.getByTestId('free-tier-row-mistral')
+    const input = within(mistral).getByLabelText('Mistral API key')
+    fireEvent.change(input, { target: { value: 'msk' } })
+    fireEvent.click(within(mistral).getByRole('button', { name: 'Save key' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('keychain refused')
+    expect(input).toHaveValue('msk')
+  })
+
+  it('shows a keychain error in place of No key', async () => {
+    await renderLoaded(
+      overview({ providers: [row({ id: 'groq', name: 'Groq', keyError: 'The keychain is locked.' })] }),
+    )
+
+    const groq = screen.getByTestId('free-tier-row-groq')
+    expect(within(groq).getByText('Keychain error')).toBeInTheDocument()
+    expect(within(groq).queryByText('No key')).toBeNull()
+    expect(within(groq).getByRole('alert')).toHaveTextContent('The keychain is locked.')
+  })
+
+  it('removes a saved key and a Cloudflare account id', async () => {
+    await renderLoaded(
+      overview({
+        providers: [
+          row({ id: 'groq', name: 'Groq', hasKey: true }),
+          row({ id: 'cloudflare-ai', name: 'Cloudflare Workers AI', needsAccountId: true, hasKey: true, hasAccountId: true }),
+        ],
+      }),
+    )
+
+    const cloudflare = screen.getByTestId('free-tier-row-cloudflare-ai')
+    expect(within(cloudflare).getByText('Account ID saved')).toBeInTheDocument()
+    fireEvent.click(within(cloudflare).getByRole('button', { name: 'Remove account ID' }))
+    await waitFor(() => expect(deleteKeyMock).toHaveBeenCalledWith('cloudflare-ai:account'))
+    await waitFor(() => expect(within(cloudflare).getByRole('button', { name: 'Remove key' })).toBeEnabled())
+    fireEvent.click(within(cloudflare).getByRole('button', { name: 'Remove key' }))
+    await waitFor(() => expect(deleteKeyMock).toHaveBeenCalledWith('cloudflare-ai'))
+  })
+
+  it('offers no remove button when nothing is saved', async () => {
+    await renderLoaded()
+
+    expect(within(screen.getByTestId('free-tier-row-mistral')).queryByRole('button', { name: 'Remove key' })).toBeNull()
+    expect(within(screen.getByTestId('free-tier-row-cloudflare-ai')).getByText('No account ID')).toBeInTheDocument()
+  })
+
+  it('picks the own endpoint model when the provider has several', async () => {
+    await renderLoaded(overview({ ownEndpoint: 'lm_studio-pc' }))
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Own endpoint model' }))
+    fireEvent.click(screen.getByRole('option', { name: 'llama' }))
+
+    await waitFor(() =>
+      expect(saveSettingsMock).toHaveBeenCalledWith({
+        disabled: [],
+        optIn: [],
+        strict: false,
+        ownEndpoint: 'lm_studio-pc',
+        ownEndpointModel: 'llama',
+      }),
+    )
   })
 })

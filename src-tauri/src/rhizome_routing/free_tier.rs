@@ -15,7 +15,9 @@ use serde::{Deserialize, Serialize};
 
 use super::UserEndpoint;
 use super::{has_usable_target, Catalog, KeyStore, RoutingOptions};
-use crate::ai_models::{provider_base_url, AiModelProvider, AiModelProviderKind};
+use crate::ai_models::{
+    provider_base_url, AiModelApiKeyStorage, AiModelProvider, AiModelProviderKind,
+};
 
 /// The settings file name in the app config folder.
 pub const SETTINGS_FILE_NAME: &str = "free-tier-settings.json";
@@ -33,6 +35,9 @@ pub struct FreeTierSettings {
     /// The saved provider (Settings → AI) tried last, after the catalog.
     /// `None` means no own endpoint.
     pub own_endpoint: Option<String>,
+    /// The own endpoint's model. `None`, or a model the provider no longer
+    /// has, means its first model.
+    pub own_endpoint_model: Option<String>,
 }
 
 /// A saved provider that can be the own endpoint.
@@ -41,6 +46,8 @@ pub struct FreeTierSettings {
 pub struct EndpointChoice {
     pub id: String,
     pub name: String,
+    /// Model ids, in the saved order. The first is the default.
+    pub models: Vec<String>,
 }
 
 /// Saved providers that speak the OpenAI API with a model set: custom
@@ -48,36 +55,86 @@ pub struct EndpointChoice {
 pub fn endpoint_choices(providers: &[AiModelProvider]) -> Vec<EndpointChoice> {
     providers
         .iter()
-        .filter_map(own_endpoint_for)
-        .map(|(provider, _)| EndpointChoice {
+        .filter(|provider| own_endpoint_base_url(provider).is_some())
+        .map(|provider| EndpointChoice {
             id: provider.id.clone(),
             name: provider.name.clone(),
+            models: provider
+                .models
+                .iter()
+                .map(|model| model.id.clone())
+                .collect(),
         })
         .collect()
 }
 
-/// The provider and its endpoint, when it can be the own endpoint.
-fn own_endpoint_for(provider: &AiModelProvider) -> Option<(&AiModelProvider, UserEndpoint)> {
+/// The base URL, when the provider can be the own endpoint.
+fn own_endpoint_base_url(provider: &AiModelProvider) -> Option<String> {
     let compatible = matches!(
         provider.kind,
         AiModelProviderKind::OpenAiCompatible
             | AiModelProviderKind::LmStudio
             | AiModelProviderKind::Ollama
     );
-    if !compatible {
+    if !compatible || provider.models.is_empty() {
         return None;
     }
-    let model = provider.models.first()?.id.clone();
-    let base_url = provider_base_url(provider).ok()?;
-    Some((
-        provider,
-        UserEndpoint {
-            base_url,
-            model,
-            name: provider.name.clone(),
-            key_id: Some(provider.id.clone()),
-        },
-    ))
+    provider_base_url(provider).ok()
+}
+
+/// The endpoint for one saved provider. Its key follows the same rule as
+/// a direct call (`ai_models::api_key_from_provider`): `local_file` is the
+/// keychain, `env` is the named environment variable. Both need a key.
+fn own_endpoint_for(
+    provider: &AiModelProvider,
+    model: Option<&str>,
+    env: &dyn Fn(&str) -> Option<String>,
+) -> Option<UserEndpoint> {
+    let base_url = own_endpoint_base_url(provider)?;
+    let model = model
+        .filter(|wanted| provider.models.iter().any(|known| known.id == *wanted))
+        .map(str::to_string)
+        .or_else(|| provider.models.first().map(|model| model.id.clone()))?;
+    let from_env = matches!(provider.api_key_storage, Some(AiModelApiKeyStorage::Env));
+    let api_key = if from_env {
+        provider
+            .api_key_env_var
+            .as_deref()
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .and_then(env)
+            .filter(|key| !key.trim().is_empty())
+    } else {
+        None
+    };
+    let headers = provider
+        .headers
+        .iter()
+        .flatten()
+        .filter(|(name, value)| {
+            !name.eq_ignore_ascii_case("authorization") && !value.trim().is_empty()
+        })
+        .map(|(name, value)| (name.clone(), value.clone()))
+        .collect();
+    Some(UserEndpoint {
+        base_url,
+        model,
+        name: provider.name.clone(),
+        key_id: (!from_env).then(|| provider.id.clone()),
+        api_key,
+        key_required: from_env
+            || matches!(
+                provider.api_key_storage,
+                Some(AiModelApiKeyStorage::LocalFile)
+            ),
+        headers,
+    })
+}
+
+/// Reads an environment variable the way a direct provider call does.
+fn app_env(name: &str) -> Option<String> {
+    crate::cli_agent_runtime::EnvName::new(name)
+        .and_then(crate::cli_agent_runtime::env_value_from_process_or_user_shell)
 }
 
 /// `catalog` with the chosen own endpoint added last. An id that no longer
@@ -87,14 +144,26 @@ pub fn with_own_endpoint(
     settings: &FreeTierSettings,
     providers: &[AiModelProvider],
 ) -> Catalog {
+    with_own_endpoint_using(catalog, settings, providers, &app_env)
+}
+
+/// `with_own_endpoint` with the environment passed in, for tests.
+fn with_own_endpoint_using(
+    catalog: Catalog,
+    settings: &FreeTierSettings,
+    providers: &[AiModelProvider],
+    env: &dyn Fn(&str) -> Option<String>,
+) -> Catalog {
     let chosen = settings.own_endpoint.as_deref().and_then(|id| {
         providers
             .iter()
             .filter(|provider| provider.id == id)
-            .find_map(own_endpoint_for)
+            .find_map(|provider| {
+                own_endpoint_for(provider, settings.own_endpoint_model.as_deref(), env)
+            })
     });
     match chosen {
-        Some((_, endpoint)) => catalog.with_user_endpoint(endpoint),
+        Some(endpoint) => catalog.with_user_endpoint(endpoint),
         None => catalog,
     }
 }
@@ -122,6 +191,9 @@ pub struct FreeTierProviderRow {
     /// The base URL needs an account id (Cloudflare).
     pub needs_account_id: bool,
     pub has_account_id: bool,
+    /// The keychain could not be read (locked, or access denied). Key
+    /// state is unknown then, so Settings shows this in place of "No key".
+    pub key_error: Option<String>,
     /// Shown before an opt-in provider is turned on.
     pub billing_warning: Option<String>,
     /// At least one model has a documented hard stop, so strict mode keeps it.
@@ -139,7 +211,10 @@ pub struct FreeTierOverview {
     pub route_order: Vec<String>,
     /// The router can try at least one provider (D11).
     pub usable: bool,
+    /// The chosen saved provider. `None` when it was deleted.
     pub own_endpoint: Option<String>,
+    /// The chosen model, when it is still one of the provider's models.
+    pub own_endpoint_model: Option<String>,
     pub endpoint_choices: Vec<EndpointChoice>,
 }
 
@@ -156,7 +231,10 @@ pub fn overview(
         .iter()
         .filter(|provider| !provider.user_supplied)
         .map(|provider| {
-            let credential = keys.credential(&provider.id);
+            let (credential, key_error) = match keys.try_credential(&provider.id) {
+                Ok(credential) => (credential, None),
+                Err(error) => (None, Some(error)),
+            };
             FreeTierProviderRow {
                 id: provider.id.clone(),
                 name: provider.name.clone(),
@@ -167,6 +245,7 @@ pub fn overview(
                 needs_account_id: provider.base_url.contains("{account_id}"),
                 has_account_id: credential
                     .is_some_and(|credential| credential.account_id.is_some()),
+                key_error,
                 billing_warning: provider.billing_warning.clone(),
                 hard_stop: provider.models.iter().any(|model| model.hard_stop),
             }
@@ -179,25 +258,36 @@ pub fn overview(
             route_order.push(id.clone());
         }
     }
+    let choices = endpoint_choices(providers_saved);
+    let chosen = settings
+        .own_endpoint
+        .as_deref()
+        .and_then(|id| choices.iter().find(|choice| choice.id == id));
     FreeTierOverview {
         providers,
         strict: settings.strict,
         route_order,
         usable: has_usable_target(catalog, &options, keys),
-        own_endpoint: settings.own_endpoint.clone(),
-        endpoint_choices: endpoint_choices(providers_saved),
+        own_endpoint: chosen.map(|choice| choice.id.clone()),
+        own_endpoint_model: chosen.and_then(|choice| {
+            settings
+                .own_endpoint_model
+                .clone()
+                .filter(|model| choice.models.contains(model))
+        }),
+        endpoint_choices: choices,
     }
 }
 
-/// Defaults when the file does not exist.
+/// Defaults when the file does not exist or cannot be parsed. A corrupt
+/// file must not lock the user out of Settings. The next save replaces it.
 pub fn load_at(path: &Path) -> Result<FreeTierSettings, String> {
     if !path.exists() {
         return Ok(FreeTierSettings::default());
     }
     let raw = std::fs::read_to_string(path)
         .map_err(|error| format!("Failed to read free-tier settings: {error}"))?;
-    serde_json::from_str(&raw)
-        .map_err(|error| format!("Failed to parse free-tier settings: {error}"))
+    Ok(serde_json::from_str(&raw).unwrap_or_default())
 }
 
 pub fn save_at(path: &Path, settings: &FreeTierSettings) -> Result<(), String> {
@@ -222,6 +312,18 @@ mod tests {
     impl KeyStore for Keys {
         fn credential(&self, provider_id: &str) -> Option<Credential> {
             self.0.get(provider_id).cloned()
+        }
+    }
+
+    struct LockedKeys;
+
+    impl KeyStore for LockedKeys {
+        fn credential(&self, _: &str) -> Option<Credential> {
+            None
+        }
+
+        fn try_credential(&self, _: &str) -> Result<Option<Credential>, String> {
+            Err("The keychain is locked.".into())
         }
     }
 
@@ -264,6 +366,7 @@ mod tests {
             opt_in: ["cloudflare-ai".to_string()].into(),
             strict: true,
             own_endpoint: Some("lm_studio-abc".into()),
+            own_endpoint_model: Some("qwen".into()),
         };
 
         save_at(&path, &settings).unwrap();
@@ -279,7 +382,7 @@ mod tests {
             disabled: ["groq".to_string()].into(),
             opt_in: ["cloudflare-ai".to_string()].into(),
             strict: true,
-            own_endpoint: None,
+            ..Default::default()
         };
 
         let options = settings.to_options();
@@ -531,11 +634,148 @@ mod tests {
         );
         assert_eq!(view.own_endpoint.as_deref(), Some("lm_studio-pc"));
         assert_eq!(view.endpoint_choices.len(), 3);
+        assert_eq!(view.endpoint_choices[0].models, ["qwen"]);
         assert!(
             view.providers
                 .iter()
                 .all(|row| row.id != crate::rhizome_routing::USER_ENDPOINT_ID),
             "the own endpoint is a dropdown, not a provider row"
         );
+    }
+
+    fn hosted(storage: &str) -> AiModelProvider {
+        serde_json::from_value(serde_json::json!({
+            "id": "open_ai_compatible-h",
+            "name": "Hosted",
+            "kind": "open_ai_compatible",
+            "base_url": "https://hosted.test/v1",
+            "api_key_storage": storage,
+            "api_key_env_var": "HOSTED_KEY",
+            "headers": {"X-Org": "acme", "Authorization": "Bearer leak", "X-Empty": " "},
+            "models": (["first", "second"].iter().map(|id| serde_json::json!({
+                "id": id,
+                "capabilities": {"streaming": true, "tools": true, "vision": false, "json_mode": false, "reasoning": false}
+            })).collect::<Vec<_>>()),
+        }))
+        .unwrap()
+    }
+
+    fn chosen(model: Option<&str>) -> FreeTierSettings {
+        FreeTierSettings {
+            own_endpoint: Some("open_ai_compatible-h".into()),
+            own_endpoint_model: model.map(str::to_string),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn an_env_key_endpoint_takes_its_key_from_the_env_var_and_keeps_its_headers() {
+        let env = |name: &str| (name == "HOSTED_KEY").then(|| "env-secret".to_string());
+
+        let catalog =
+            with_own_endpoint_using(Catalog::pinned(), &chosen(None), &[hosted("env")], &env);
+
+        let last = catalog.providers.last().unwrap();
+        assert_eq!(last.api_key.as_deref(), Some("env-secret"));
+        assert!(last.key_required);
+        assert_eq!(last.key_id, None);
+        assert_eq!(
+            last.headers,
+            [("X-Org".to_string(), "acme".to_string())].into()
+        );
+    }
+
+    #[test]
+    fn an_env_key_endpoint_with_the_var_unset_is_not_usable() {
+        let catalog =
+            with_own_endpoint_using(Catalog::pinned(), &chosen(None), &[hosted("env")], &|_| {
+                None
+            });
+
+        assert!(!has_usable_target(
+            &catalog,
+            &RoutingOptions::default(),
+            &keys(&[])
+        ));
+    }
+
+    #[test]
+    fn a_keychain_key_endpoint_needs_its_saved_key() {
+        let catalog = with_own_endpoint_using(
+            Catalog::pinned(),
+            &chosen(None),
+            &[hosted("local_file")],
+            &|_| None,
+        );
+        let options = RoutingOptions::default();
+
+        assert!(!has_usable_target(&catalog, &options, &keys(&[])));
+        assert!(has_usable_target(
+            &catalog,
+            &options,
+            &keys(&[("open_ai_compatible-h", None)])
+        ));
+    }
+
+    #[test]
+    fn the_picked_model_routes_and_an_unknown_one_falls_back_to_the_first() {
+        let route = |model| {
+            with_own_endpoint_using(
+                Catalog::pinned(),
+                &chosen(model),
+                &[hosted("none")],
+                &|_| None,
+            )
+            .providers
+            .last()
+            .unwrap()
+            .models[0]
+                .id
+                .clone()
+        };
+
+        assert_eq!(route(Some("second")), "second");
+        assert_eq!(route(Some("gone")), "first");
+        assert_eq!(route(None), "first");
+    }
+
+    #[test]
+    fn a_deleted_own_endpoint_is_not_reported_back() {
+        let view = overview(
+            &Catalog::pinned(),
+            &FreeTierSettings {
+                own_endpoint: Some("deleted-provider".into()),
+                own_endpoint_model: Some("m".into()),
+                ..Default::default()
+            },
+            &saved_providers(),
+            &keys(&[]),
+        );
+
+        assert_eq!(view.own_endpoint, None);
+        assert_eq!(view.own_endpoint_model, None);
+    }
+
+    #[test]
+    fn a_corrupt_settings_file_gives_the_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(SETTINGS_FILE_NAME);
+        std::fs::write(&path, "{ not json").unwrap();
+
+        assert_eq!(load_at(&path).unwrap(), FreeTierSettings::default());
+    }
+
+    #[test]
+    fn a_locked_keychain_shows_on_each_row() {
+        let view = overview(
+            &Catalog::pinned(),
+            &FreeTierSettings::default(),
+            &[],
+            &LockedKeys,
+        );
+
+        let groq = row(&view, "groq");
+        assert!(!groq.has_key);
+        assert_eq!(groq.key_error.as_deref(), Some("The keychain is locked."));
     }
 }
