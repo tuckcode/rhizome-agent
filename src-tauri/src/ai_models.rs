@@ -2,8 +2,6 @@ use crate::ai_agents::AiAgentStreamEvent;
 use crate::model_events::{ModelError, ModelErrorKind, ModelEvent};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::fs;
-use std::path::Path;
 use std::sync::OnceLock;
 
 mod openai_stream;
@@ -85,11 +83,6 @@ pub struct AiModelProviderTestRequest {
 struct AiModelProviderCatalogEntry {
     kind: AiModelProviderKind,
     runtime_base_url: Option<String>,
-}
-
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
-struct AiProviderSecrets {
-    provider_api_keys: BTreeMap<String, String>,
 }
 
 static AI_MODEL_PROVIDER_CATALOG: OnceLock<Vec<AiModelProviderCatalogEntry>> = OnceLock::new();
@@ -645,71 +638,21 @@ fn send_provider_request(
         .map_err(|error| format!("AI provider request failed: {error}"))
 }
 
+/// Saves a provider key in the OS keychain (ADR-0184).
 pub fn save_provider_api_key(provider_id: String, api_key: String) -> Result<(), String> {
-    let provider_id = normalize_secret_provider_id(&provider_id)?;
-    let api_key = api_key.trim().to_string();
-    if api_key.is_empty() {
-        return Err("API key cannot be empty.".into());
-    }
-    let path = secrets_path()?;
-    let mut secrets = read_secrets_at(&path)?;
-    secrets.provider_api_keys.insert(provider_id, api_key);
-    write_secrets_at(&path, &secrets)
+    crate::provider_keys::ProviderKeys::for_app()?.save(&provider_id, &api_key)
 }
 
+/// Removes a provider key from the keychain and from the legacy key file.
 pub fn delete_provider_api_key(provider_id: String) -> Result<(), String> {
-    let provider_id = normalize_secret_provider_id(&provider_id)?;
-    let path = secrets_path()?;
-    let mut secrets = read_secrets_at(&path)?;
-    secrets.provider_api_keys.remove(&provider_id);
-    write_secrets_at(&path, &secrets)
+    crate::provider_keys::ProviderKeys::for_app()?.delete(&provider_id)
 }
 
-fn normalize_secret_provider_id(provider_id: &str) -> Result<String, String> {
-    let provider_id = provider_id.trim().to_ascii_lowercase();
-    if provider_id.is_empty() {
-        Err("Provider ID cannot be empty.".into())
-    } else {
-        Ok(provider_id)
-    }
-}
-
-fn secrets_path() -> Result<std::path::PathBuf, String> {
-    crate::settings::preferred_app_config_path("ai-provider-secrets.json")
-}
-
-fn read_secrets_at(path: &Path) -> Result<AiProviderSecrets, String> {
-    if !path.exists() {
-        return Ok(AiProviderSecrets::default());
-    }
-    let content = fs::read_to_string(path)
-        .map_err(|error| format!("Failed to read AI provider secrets: {error}"))?;
-    serde_json::from_str(&content)
-        .map_err(|error| format!("Failed to parse AI provider secrets: {error}"))
-}
-
-fn write_secrets_at(path: &Path, secrets: &AiProviderSecrets) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|error| format!("Failed to create AI provider secrets directory: {error}"))?;
-    }
-    let json = serde_json::to_string_pretty(secrets)
-        .map_err(|error| format!("Failed to serialize AI provider secrets: {error}"))?;
-    write_secret_file(path, json)
-}
-
-fn write_secret_file(path: &Path, content: String) -> Result<(), String> {
-    crate::secure_fs::write_owner_only_atomic(path, &content)
-        .map_err(|error| format!("Failed to write AI provider secrets: {error}"))
-}
-
+/// The key for a provider whose storage is `local_file`. The stored name
+/// predates the keychain. It now means "a key Rhizome holds", which lives in
+/// the OS keychain. A key still in the legacy file moves there on this read.
 fn api_key_from_local_file(request: &AiModelStreamRequest) -> Result<Option<String>, String> {
-    let secrets = read_secrets_at(&secrets_path()?)?;
-    let api_key = secrets
-        .provider_api_keys
-        .get(&request.provider.id)
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty());
+    let api_key = crate::provider_keys::ProviderKeys::for_app()?.get(&request.provider.id)?;
     if api_key.is_none() {
         return Err(format!(
             "No local API key is saved for {}.",
@@ -1033,83 +976,6 @@ mod tests {
             extract_anthropic_text(&json!({ "content": [{ "type": "thinking" }] })).unwrap_err(),
             "Anthropic response did not include assistant text.",
         );
-    }
-
-    #[test]
-    fn saves_reads_and_validates_local_provider_secrets() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("nested/secrets.json");
-        let secrets = AiProviderSecrets {
-            provider_api_keys: BTreeMap::from([("demo".into(), "secret".into())]),
-        };
-
-        write_secrets_at(&path, &secrets).unwrap();
-
-        assert_eq!(read_secrets_at(&path).unwrap(), secrets);
-        assert_eq!(
-            read_secrets_at(&dir.path().join("missing.json")).unwrap(),
-            AiProviderSecrets::default()
-        );
-        assert_eq!(normalize_secret_provider_id(" Demo ").unwrap(), "demo");
-        assert_eq!(
-            normalize_secret_provider_id(" ").unwrap_err(),
-            "Provider ID cannot be empty.",
-        );
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-
-            let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
-            assert_eq!(mode, 0o600);
-        }
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn secret_write_does_not_follow_a_symlink() {
-        use std::os::unix::fs::symlink;
-
-        let dir = tempfile::tempdir().unwrap();
-        let outside = dir.path().join("outside-secrets.json");
-        let path = dir.path().join("secrets.json");
-        fs::write(&outside, "{\"marker\":\"RHIZOME_R3_OUTSIDE\"}\n").unwrap();
-        symlink(&outside, &path).unwrap();
-
-        let secrets = AiProviderSecrets {
-            provider_api_keys: BTreeMap::from([("demo".into(), "fixture-only".into())]),
-        };
-        write_secrets_at(&path, &secrets).unwrap();
-
-        assert_eq!(
-            fs::read_to_string(&outside).unwrap(),
-            "{\"marker\":\"RHIZOME_R3_OUTSIDE\"}\n"
-        );
-        assert!(!path.symlink_metadata().unwrap().file_type().is_symlink());
-        assert_eq!(read_secrets_at(&path).unwrap(), secrets);
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn secret_write_tightens_a_permissive_file_and_keeps_complete_json() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("secrets.json");
-        fs::write(&path, "{}").unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
-
-        let secrets = AiProviderSecrets {
-            provider_api_keys: BTreeMap::from([("demo".into(), "fixture-only".into())]),
-        };
-        write_secrets_at(&path, &secrets).unwrap();
-
-        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
-        assert_eq!(mode, 0o600);
-        let raw = fs::read_to_string(&path).unwrap();
-        assert!(raw.contains("fixture-only"));
-        assert!(serde_json::from_str::<AiProviderSecrets>(&raw).is_ok());
-        assert_eq!(read_secrets_at(&path).unwrap(), secrets);
     }
 
     fn compatible_request(base_url: &str) -> AiModelStreamRequest {
