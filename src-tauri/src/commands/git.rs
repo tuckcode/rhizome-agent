@@ -527,6 +527,9 @@ mod tests {
     #[tokio::test]
     async fn is_git_repo_accepts_vault_nested_inside_parent_worktree() {
         let parent = TempDir::new().unwrap();
+        let _home = crate::app_config::TEST_CONFIG_ENV
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         fs::write(parent.path().join("README.md"), "# Parent\n").unwrap();
         crate::git::init_repo(parent.path()).unwrap();
 
@@ -541,6 +544,9 @@ mod tests {
     #[test]
     fn init_git_repo_rejects_nested_worktree_vault_without_direct_git_metadata() {
         let parent = TempDir::new().unwrap();
+        let _home = crate::app_config::TEST_CONFIG_ENV
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         fs::write(parent.path().join("README.md"), "# Parent\n").unwrap();
         crate::git::init_repo(parent.path()).unwrap();
 
