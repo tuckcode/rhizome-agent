@@ -1,17 +1,28 @@
 # Getting Started
 
-How to navigate the **Rhizome Agent** codebase, run the app, and find what you need.
+How to navigate the **Rhizome** codebase, run the app, and find what you need.
 
-> This is Rhizome Agent (`ai.rhizome.agent`, `tuckcode/rhizome-agent`), not Rhizome Desktop (`knispo/rhizome`, `ai.rhizome.desktop`). See [`IDENTITY.md`](IDENTITY.md). Product overview: [README.md](../README.md). Some filenames still use older internal names (`tolaria_*`). Those names are implementation identifiers, not the product name.
+> This is Rhizome (`ai.rhizome.agent`, `tuckcode/rhizome-agent`), not Rhizome Desktop (`knispo/rhizome`, `ai.rhizome.desktop`). See [`IDENTITY.md`](IDENTITY.md). Product overview: [README.md](../README.md). Some filenames still use older internal names (`tolaria_*`). Those names are implementation identifiers, not the product name.
 >
 > First-run install and recovery: [`PUBLIC-PREVIEW.md`](PUBLIC-PREVIEW.md). This page is the developer path.
+
+## What ships now
+
+User-facing name is **Rhizome**. The bundle is still `ai.rhizome.agent` / `Rhizome Agent.app`.
+
+- Rhizome owns the agent loop (ADR-0180). Native chat works without Prime. Settings still starts Chat on Prime until you switch **Chat engine**. Hermes is not a usable engine in the app today.
+- Free-tier routing appears as **Free tier (auto)**. The name Taproot is not on main.
+- Earth dark is the default theme. Earth light, Loam, and Match system are in Settings.
+- Left rail Views are Research, Graph, Mycelium, and History (Ctrl+Cmd+1–4 on Mac, Ctrl+Shift+1–4 on Windows). Changes sits next to Notes.
+- You read and diff notes in the vault. Mycelium replays builds. The agent cannot search the vault or old Mycelium sessions yet.
+- Provider keys live in the system keychain. A leftover `ai-provider-secrets.json` migrates on first read. Do not tell a user to edit that file.
 
 ## Prerequisites
 
 - **Node.js** `^20.19.0` or `>=22.12.0` (Vite 7) and **pnpm**
 - **Rust** 1.77.2+ (for the Tauri backend)
 - **git** CLI (required by the git integration features)
-- **Prime Agent** on `PATH` for live Chat. `./install.sh` fetches it when it is missing. Not vendored.
+- **Prime Agent** on `PATH` only if Chat stays on the Prime engine. Native chat does not need it. `./install.sh` still fetches Prime because Settings still defaults to that engine. Not vendored.
 
 ### Linux system dependencies
 
@@ -561,7 +572,8 @@ Verified against source 2026-09-14. Longer landmine list:
   `glpat-`. It still does not scrub `ghr_` or `sk_test_` / `sk_live_` —
   do not widen rust this window.
 - **Settings and secrets writes** go through `secure_fs::write_owner_only_atomic`.
-  Do not write the real app-support settings or key file in tests.
+  Provider keys live in the OS keychain (ADR-0185). Do not write the real
+  app-support settings or the legacy key file in tests.
 - **Session-list import** stays blocked until Atticus types **`1`**.
   Do not speak `import_jsonl`. Vault `Imports/` writer already exists.
 - **Chat still mounts with no vault** (`ChatHome.test.tsx`). Preflight

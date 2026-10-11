@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Rhizome Agent</title>
-  <meta name="description" content="A harness that doesn't forget. A macOS chat app for Prime Agent that keeps your work as plain Markdown in a vault you own." />
-  <meta property="og:title" content="Rhizome Agent" />
-  <meta property="og:description" content="A harness that doesn't forget. Your work. Your memory." />
+  <title>Rhizome</title>
+  <meta name="description" content="A harness that doesn't forget. Rhizome runs its own agent loop. Notes stay as plain Markdown in a vault you own." />
+  <meta property="og:title" content="Rhizome" />
+  <meta property="og:description" content="A harness that doesn't forget. Rhizome runs its own agent loop." />
   <meta property="og:url" content="https://tuckcode.github.io/rhizome-agent/" />
   <meta property="og:image" content="https://tuckcode.github.io/rhizome-agent/assets/og.png" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -156,16 +156,16 @@
 
   <section class="hero">
     <img class="art" src="assets/hero.png" width="1774" height="887"
-         alt="Rhizome Agent. Your work. Your memory. Chat with Prime. Keep what matters." />
+         alt="Rhizome mark. Branching nodes over dark earth." />
     <div class="fade"></div>
   </section>
 
   <div class="wrap">
     <div class="intro">
       <div>
-        <span class="eyebrow">Rhizome Agent · developer preview · macOS</span>
+        <span class="eyebrow">Rhizome · developer preview · macOS</span>
         <h1>A harness that doesn't forget.</h1>
-        <p>A chat app built around Prime Agent, with a vault that works as your memory, wiki, and second brain. What you keep stays as plain Markdown on your disk.</p>
+        <p>Rhizome runs its own agent loop. Chat works without Prime. What you keep stays as plain Markdown in a local vault you own.</p>
         <div class="actions">
           <a class="btn solid" href="https://github.com/tuckcode/rhizome-agent">View on GitHub <span class="arrow">↗</span></a>
           <a class="btn" href="#demo">Watch the demo</a>
@@ -173,16 +173,16 @@
         <div class="term"><b>$</b> git clone https://github.com/tuckcode/rhizome-agent.git<span class="caret"></span></div>
       </div>
       <div class="aside">
-        <strong>Your work. Your memory.</strong>
-        Bring your own model through Prime. Open notes beside the conversation. Keep what matters in a folder you own.
+        <strong>Rhizome is the harness.</strong>
+        Prime is an optional engine you can switch to. Hermes is a planned adapter, not a usable engine today. Provider keys live in the system keychain.
       </div>
     </div>
 
     <div class="strip" aria-label="Built with">
-      <div><span>Harness</span>Prime Agent</div>
-      <div><span>Tools from</span>Claude Code</div>
-      <div><span>Tools from</span>Hermes Agent</div>
-      <div><span>Models</span>DeepSeek and more</div>
+      <div><span>Harness</span>Rhizome</div>
+      <div><span>Optional engine</span>Prime Agent</div>
+      <div><span>Models</span>Free tier (auto)</div>
+      <div><span>Theme</span>Earth dark</div>
     </div>
 
     <section class="section" id="features">
@@ -200,14 +200,14 @@
               <rect x="40" y="30" width="230" height="44" rx="3" /><rect x="150" y="96" width="230" height="44" rx="3" stroke="#86e3a8" />
               <rect x="40" y="162" width="190" height="30" rx="3" stroke-dasharray="3 4" />
               <text x="54" y="57" fill="rgb(241 236 226 / 0.6)" stroke="none" font-family="Geist Mono" font-size="12">you › what did we decide?</text>
-              <text x="164" y="123" fill="#86e3a8" stroke="none" font-family="Geist Mono" font-size="12">prime › from notes/launch.md …</text>
+              <text x="164" y="123" fill="#86e3a8" stroke="none" font-family="Geist Mono" font-size="12">rhizome › from launch.md …</text>
               <text x="54" y="182" fill="rgb(241 236 226 / 0.45)" stroke="none" font-family="Geist Mono" font-size="12">model ▾  think  tools ▾</text>
             </svg>
           </div>
-          <h3><span class="n">01</span>Chat with Prime</h3>
+          <h3><span class="n">01</span>Chat on Rhizome's engine</h3>
           <div class="body">
-            <p>Prime Agent runs the session: tools, skills, and provider login. Pick the model you want.</p>
-            <ol><li><span>1.1</span>Bring your own model</li><li><span>1.2</span>One compact composer</li><li><span>1.3</span>Sessions in a sidebar</li></ol>
+            <p>Rhizome owns the agent loop. A non-fatal error shows a notice; it does not cut off the reply. VoiceOver hears run status.</p>
+            <ol><li><span>1.1</span>Works without Prime</li><li><span>1.2</span>Free tier (auto)</li><li><span>1.3</span>Prime is optional</li></ol>
           </div>
         </article>
         <article class="cell">
@@ -227,8 +227,8 @@
           </div>
           <h3><span class="n">02</span>A vault you own</h3>
           <div class="body">
-            <p>Notes are plain Markdown in a local folder. No database and no lock-in. Open them in any editor.</p>
-            <ol><li><span>2.1</span>Plain files on disk</li><li><span>2.2</span>Agent reads it through MCP</li><li><span>2.3</span>Git-friendly by design</li></ol>
+            <p>Notes are plain Markdown in a local folder. You read and diff them in the app. The agent cannot search the vault yet.</p>
+            <ol><li><span>2.1</span>Plain files on disk</li><li><span>2.2</span>Read and diff notes</li><li><span>2.3</span>Git-friendly by design</li></ol>
           </div>
         </article>
         <article class="cell">
@@ -246,8 +246,8 @@
           </div>
           <h3><span class="n">03</span>Notes beside the chat</h3>
           <div class="body">
-            <p>Open a note next to the conversation. In a small window, Chat and Notes become tabs instead of squeezing both.</p>
-            <ol><li><span>3.1</span>Side-by-side research desk</li><li><span>3.2</span>Focused tabs when narrow</li><li><span>3.3</span>Save a reply as a note</li></ol>
+            <p>Open a note next to the conversation. Changes sits next to Notes. In a small window, Chat and Notes become tabs instead of squeezing both.</p>
+            <ol><li><span>3.1</span>Side-by-side research desk</li><li><span>3.2</span>Changes next to Notes</li><li><span>3.3</span>Save a reply as a note</li></ol>
           </div>
         </article>
         <article class="cell">
@@ -260,10 +260,10 @@
               <path d="M110 60l-40-22M320 56l46-18M96 170l-44 26M318 168l50 24" stroke="rgb(241 236 226 / 0.25)" stroke-dasharray="3 4" />
             </svg>
           </div>
-          <h3><span class="n">04</span>Research and links</h3>
+          <h3><span class="n">04</span>Views on the left rail</h3>
           <div class="body">
-            <p>A research panel and a graph of how your notes connect, so findings land next to what you already know.</p>
-            <ol><li><span>4.1</span>Research panel</li><li><span>4.2</span>Note graph</li><li><span>4.3</span>Wikilinks in chat</li></ol>
+            <p>Research, Graph, Mycelium, and History sit on the left rail. Mycelium replays builds. It does not search old sessions for the agent.</p>
+            <ol><li><span>4.1</span>Ctrl+Cmd+1–4 on Mac</li><li><span>4.2</span>Ctrl+Shift+1–4 on Windows</li><li><span>4.3</span>Earth dark, light, Loam</li></ol>
           </div>
         </article>
       </div>
@@ -278,7 +278,7 @@
       </div>
       <div class="frame">
         <video src="assets/demo.mp4#t=0.5" controls muted playsinline preload="metadata"></video>
-        <div class="fig"><span>FIG. 05 — RHIZOME AGENT, MACOS</span><span>0:20</span></div>
+        <div class="fig"><span>FIG. 05 — RHIZOME, MACOS</span><span>0:20</span></div>
       </div>
     </section>
 
@@ -291,12 +291,12 @@
       </div>
       <div class="run">
         <div>
-          You need macOS, Node <code>^20.19.0</code> or <code>&gt;=22.12.0</code>, pnpm, Rust, and the Tauri toolchain. <code>./install.sh</code> fetches Prime Agent for chat. There is no signed download yet.
+          You need macOS, Node <code>^20.19.0</code> or <code>&gt;=22.12.0</code>, pnpm, Rust, and the Tauri toolchain. Chat on Rhizome's engine does not need Prime. Settings still starts Chat on Prime until you switch the Chat engine. <code>./install.sh</code> still fetches Prime for that default. There is no signed download yet.
           <p style="margin:16px 0 0"><a href="https://github.com/tuckcode/rhizome-agent/blob/main/docs/start/README.md">Getting started →</a></p>
           <p style="margin:8px 0 0"><a href="https://github.com/tuckcode/rhizome-agent/blob/main/docs/for-agents/README.md">Agent instructions →</a></p>
         </div>
         <div>
-<pre><span class="c"># install Rhizome. The script fetches Prime for chat.</span>
+<pre><span class="c"># install Rhizome. The script still fetches Prime.</span>
 <span class="p">$</span> git clone https://github.com/tuckcode/rhizome-agent.git
 <span class="p">$</span> cd rhizome-agent &amp;&amp; ./install.sh
 <span class="p">$</span> pnpm tauri dev</pre>
@@ -308,7 +308,7 @@
   <footer>
     <div class="wrap foot">
       <div>
-        <span class="eyebrow">Rhizome Agent</span>
+        <span class="eyebrow">Rhizome</span>
         <p>AGPL-3.0-or-later. A modified version of <a style="display:inline" href="https://github.com/refactoringhq/tolaria">Tolaria</a> by Luca Rossi.</p>
         <p>The Mycelium view embeds Mindwalk (MIT) © 2026 Ricko Yu.</p>
       </div>

@@ -2,6 +2,12 @@ name: Landing page
 
 # Publishes website/ to GitHub Pages. Release workflows run the same
 # website/build.sh, so a release deploy keeps the landing page.
+#
+# This job only queues when one of the paths below changes. That is why
+# it last ran on 2026-09-27 (8ed9817) while main kept moving: no later
+# commit touched website/, the hero assets, or this file. GitHub did not
+# disable Pages and the last run succeeded. A merge that touches these
+# paths deploys; Actions → Landing page → Run workflow also deploys.
 on:
   push:
     branches: [main]
