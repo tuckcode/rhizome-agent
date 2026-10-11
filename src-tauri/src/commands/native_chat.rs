@@ -15,9 +15,10 @@ use crate::ai_models::{
     AiModelApiKeyStorage, AiModelProvider, AiModelProviderKind, AiModelStreamRequest, HttpLimits,
 };
 use crate::engines::{Engine, EngineEvent, NativeControl, NativeEngine};
+use crate::provider_keys::ProviderKeys;
 use crate::rhizome_loop::{AgentLoop, ApprovalReply, Model};
 use crate::rhizome_provider_model::ProviderModel;
-use crate::rhizome_routing::{Catalog, Credential, KeyStore, RoutingModel, SystemClock};
+use crate::rhizome_routing::{Catalog, RoutingModel, SystemClock};
 use crate::session_transcript_index::{self, IndexedTranscriptTurn};
 use crate::settings;
 
@@ -455,45 +456,23 @@ fn join_with_bound(worker: thread::JoinHandle<()>, bound: Duration) -> bool {
     rx.recv_timeout(bound).is_ok()
 }
 
-struct SecretsKeyStore;
-
-impl KeyStore for SecretsKeyStore {
-    fn credential(&self, provider_id: &str) -> Option<Credential> {
-        let path = settings::preferred_app_config_path("ai-provider-secrets.json").ok()?;
-        let data = std::fs::read_to_string(path).ok()?;
-        let parsed: serde_json::Value = serde_json::from_str(&data).ok()?;
-        let key = parsed
-            .get("provider_api_keys")?
-            .get(provider_id)?
-            .as_str()?
-            .trim();
-        if key.is_empty() {
-            None
-        } else {
-            Some(Credential {
-                api_key: key.to_string(),
-                account_id: None,
-            })
-        }
-    }
-}
-
 fn composed_system_prompt(existing: Option<&str>) -> Option<String> {
     settings::compose_agent_profile(settings::saved_agent_profile().as_deref(), existing)
 }
 
+/// Free-tier keys come from the OS keychain (step 3a, ADR-0184).
 fn free_tier_routing_model(
     system: Option<String>,
     observer: impl FnMut(crate::rhizome_routing::ProviderAttempt) + Send + 'static,
-) -> RoutingModel<SecretsKeyStore, SystemClock> {
-    RoutingModel::new(
+) -> Result<RoutingModel<ProviderKeys, SystemClock>, String> {
+    Ok(RoutingModel::new(
         Catalog::pinned(),
-        SecretsKeyStore,
+        ProviderKeys::for_app()?,
         SystemClock,
         HttpLimits::STREAM,
     )
     .with_observer(observer)
-    .with_system_prompt(system)
+    .with_system_prompt(system))
 }
 
 fn catalog_provider(kind: AiModelProviderKind, id: &str) -> AiModelProvider {
@@ -618,7 +597,7 @@ fn start_named_request(
             let reporter = tx.clone();
             let model = free_tier_routing_model(system.clone(), move |attempt| {
                 let _ = reporter.send(attempt);
-            });
+            })?;
             let mut engine = NativeEngine::with_provider_pair(AgentLoop::new(), model, tx, rx);
             engine.set_vault(vault_path.clone(), vault_paths.clone());
             engine.set_permission_mode(mode);
@@ -941,7 +920,7 @@ mod tests {
                     .is_some_and(|text| text.contains("Use the vault.")),
                 "compose must keep the turn system prompt"
             );
-            let model = free_tier_routing_model(expected.clone(), |_| {});
+            let model = free_tier_routing_model(expected.clone(), |_| {}).unwrap();
             assert_eq!(model.system_prompt(), expected.as_deref());
         });
     }
