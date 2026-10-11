@@ -18,10 +18,22 @@ interface ChatRunLiveStatusProps {
  * Mounted empty so screen readers hear injected text (B1). Identical
  * consecutive lines are cleared, then restored on the next frame, so
  * VoiceOver re-reads "Response complete" on later turns.
+ *
+ * Frame ids live in refs. Streaming re-renders must not cancel a pending
+ * announcement; only a newer line, or unmount, may.
  */
 export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps) {
   const previousRef = useRef<ChatRunSnapshot | null>(null)
+  const clearFrameRef = useRef(0)
+  const restoreFrameRef = useRef(0)
   const [announcement, setAnnouncement] = useState('')
+
+  useEffect(() => {
+    return () => {
+      cancelAnimationFrame(clearFrameRef.current)
+      cancelAnimationFrame(restoreFrameRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     const next = chatRunSnapshotFromMessages(messages, isActive)
@@ -29,21 +41,14 @@ export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps
     previousRef.current = next
     if (!text) return
 
-    let cancelled = false
-    let restoreFrame = 0
-    const clearFrame = requestAnimationFrame(() => {
-      if (cancelled) return
+    cancelAnimationFrame(clearFrameRef.current)
+    cancelAnimationFrame(restoreFrameRef.current)
+    clearFrameRef.current = requestAnimationFrame(() => {
       setAnnouncement('')
-      restoreFrame = requestAnimationFrame(() => {
-        if (cancelled) return
+      restoreFrameRef.current = requestAnimationFrame(() => {
         setAnnouncement(text)
       })
     })
-    return () => {
-      cancelled = true
-      cancelAnimationFrame(clearFrame)
-      cancelAnimationFrame(restoreFrame)
-    }
   }, [isActive, messages])
 
   return (

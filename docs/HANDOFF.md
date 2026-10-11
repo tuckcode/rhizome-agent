@@ -47,6 +47,7 @@ file.
 ---
 
 ## State
+**Origin:** Cursor Grok 4.6 · 2026-10-11 · #142 review: status beside log, Stop-before-reply, re-announce identical lines; pending frames survive streamed re-renders. #143 also touches `AiPanelChrome.tsx`. [Handoff](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md) · [Handoff](plans/handoffs/2026-10-11-0526-cursor-grok-4-6-chat-a11y-reread.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · Native Chat engine can send when Prime is not installed. Prime-targeted chats still show install guidance. [Handoff](plans/handoffs/2026-10-11-0520-cursor-grok-4-6-native-send-without-prime.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · Earth theme: Earth dark/light in `index.css`, Loam in the generator. Stacked on a11y B1–B5. [Handoff](plans/handoffs/2026-10-11-0505-cursor-grok-4-6-earth-theme.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · #142 review: status beside log, Stop-before-reply, re-announce identical lines. On `cursor/a11y-chat-b1-b5-8b31`. #143 also touches `AiPanelChrome.tsx`. [Handoff](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md).
@@ -137,6 +138,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-10-11 · #142 reread](plans/handoffs/2026-10-11-0526-cursor-grok-4-6-chat-a11y-reread.md) — pending status frames survive streamed re-renders. [Review](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md) — status beside log, Stop-before-reply, re-announce identical lines. #143 also touches AiPanelChrome.
 - [2026-10-11 · native send without Prime](plans/handoffs/2026-10-11-0520-cursor-grok-4-6-native-send-without-prime.md) — Native engine can send when Prime is missing. Prime-targeted chats still show install guidance.
 - [2026-10-11 · Earth theme](plans/handoffs/2026-10-11-0505-cursor-grok-4-6-earth-theme.md) — Earth dark/light default contract, Loam extra, `--border-input` at 3:1. Stacked on a11y B1–B5.
 - [2026-10-11 · #142 review](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md) — status beside log, Stop-before-reply, re-announce identical lines. #143 also touches AiPanelChrome.

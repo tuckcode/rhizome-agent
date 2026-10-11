@@ -34,4 +34,43 @@ describe('ChatRunLiveStatus repeated announcements', () => {
     await nextFrame()
     expect(screen.getByTestId('chat-run-live-status')).toHaveTextContent('Response complete')
   })
+
+  it('keeps a pending Response complete when the turn re-renders between frames', async () => {
+    const turn = [{ response: 'hello' }]
+    const { rerender } = render(
+      <ChatRunLiveStatus messages={turn} isActive />,
+    )
+    rerender(<ChatRunLiveStatus messages={turn} isActive={false} />)
+    rerender(<ChatRunLiveStatus messages={[{ response: 'hello' }]} isActive={false} />)
+    await nextFrame()
+    await nextFrame()
+    expect(screen.getByTestId('chat-run-live-status')).toHaveTextContent('Response complete')
+  })
+
+  it('keeps Running get_note when a streamed chunk arrives before the frames fire', async () => {
+    const { rerender } = render(
+      <ChatRunLiveStatus messages={[{ response: '' }]} isActive />,
+    )
+    rerender(
+      <ChatRunLiveStatus
+        messages={[{
+          response: '',
+          actions: [{ tool: 'get_note', toolId: 't1', status: 'pending' }],
+        }]}
+        isActive
+      />,
+    )
+    rerender(
+      <ChatRunLiveStatus
+        messages={[{
+          response: 'h',
+          actions: [{ tool: 'get_note', toolId: 't1', status: 'pending' }],
+        }]}
+        isActive
+      />,
+    )
+    await nextFrame()
+    await nextFrame()
+    expect(screen.getByTestId('chat-run-live-status')).toHaveTextContent('Running get_note')
+  })
 })
