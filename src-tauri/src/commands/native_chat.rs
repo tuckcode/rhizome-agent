@@ -708,6 +708,28 @@ pub fn native_chat_open(
     session_id: String,
 ) -> Result<NativeChatOpenResult, String> {
     use tauri::Emitter;
+    open_named_session(&chats, &session_id, ProviderKeys::for_app(), |live_id| {
+        let channel = native_chat_channel(live_id);
+        move |event| {
+            let _ = app.emit(&channel, &event);
+        }
+    })
+}
+
+/// `native_chat_open` with the key store and the event sink passed in, so a
+/// test can give it a keychain error. A free-tier session whose model cannot
+/// be built still returns its saved history, read-only, with the reason in
+/// `error`.
+fn open_named_session<E>(
+    chats: &NativeChats,
+    session_id: &str,
+    keys: Result<ProviderKeys, String>,
+    emit_for: impl FnOnce(&str) -> E,
+) -> Result<NativeChatOpenResult, String>
+where
+    E: FnMut(EngineEvent) + Send + 'static,
+{
+    let session_id = session_id.to_string();
     let record = chats.attach_open(&session_id)?;
     if record.read_only || record.error.is_some() {
         return Ok(record);
@@ -738,7 +760,6 @@ pub fn native_chat_open(
         }
     });
     let agent = AgentLoop::from_log(opened.events.clone());
-    let channel = native_chat_channel(&live_id);
     let request = NativeChatStartRequest {
         target: opened.header.target.clone(),
         prompt: String::new(),
@@ -765,17 +786,12 @@ pub fn native_chat_open(
         .system_prompt
         .clone()
         .or_else(|| composed_system_prompt(None));
-    let emit = {
-        let app = app.clone();
-        move |event| {
-            let _ = app.emit(&channel, &event);
-        }
-    };
+    let emit = emit_for(&live_id);
     match target {
         NativeChatTarget::FreeTier => {
             let (tx, rx) = mpsc::channel();
             let reporter = tx.clone();
-            let model = match free_tier_routing_model(system.clone(), move |attempt| {
+            let model = match free_tier_routing_model_with(keys, system.clone(), move |attempt| {
                 let _ = reporter.send(attempt);
             }) {
                 Ok(model) => model,
@@ -1333,6 +1349,37 @@ mod tests {
                 agent.session_grants().is_empty(),
                 "D13: grants must not come back"
             );
+        });
+    }
+
+    #[test]
+    fn a_keychain_error_on_reopen_keeps_the_saved_history_read_only() {
+        with_temp_home(|_| {
+            write_native_log("keychain", 1, FREE_TIER_TARGET, &two_turn_events());
+            let chats = NativeChats::new();
+
+            let record = open_named_session(
+                &chats,
+                &log_id("keychain"),
+                Err("Keychain read failed for groq: locked".into()),
+                |_| |_| {},
+            )
+            .expect("open");
+
+            assert!(record.read_only);
+            assert_eq!(
+                record.error.as_deref(),
+                Some("Keychain read failed for groq: locked")
+            );
+            assert!(
+                record
+                    .events
+                    .iter()
+                    .any(|event| matches!(event, DurableEvent::User { text } if text == "one")),
+                "saved history missing: {:?}",
+                record.events
+            );
+            assert!(!chats.is_live(&log_id("keychain")));
         });
     }
 
