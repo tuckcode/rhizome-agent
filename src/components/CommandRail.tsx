@@ -19,7 +19,11 @@ import { trackRailViewSelected, trackSessionsDrawerOpened } from '../lib/product
 import { RAIL_VIEWS, type RailViewId } from '../lib/railViews'
 import { startResizeDrag } from '../utils/startResizeDrag'
 import { COMMAND_RAIL_EXPANDED_WIDTH_PX } from '../utils/trafficLights'
-import { formatShortcutDisplay } from '../hooks/appCommandCatalog'
+import {
+  railButtonAccessibleName,
+  railViewShortcutAria,
+  railViewShortcutDisplay,
+} from '../lib/railViewShortcuts'
 
 interface CommandRailProps {
   locale: AppLocale
@@ -79,6 +83,7 @@ function RailButton({
   label,
   onClick,
   shortcut,
+  shortcutAria,
   testId,
 }: {
   active: boolean
@@ -89,6 +94,7 @@ function RailButton({
   label: string
   onClick: () => void
   shortcut?: string
+  shortcutAria?: string
   testId: string
 }) {
   const showLabel = expanded && !iconOnly
@@ -98,8 +104,9 @@ function RailButton({
       variant="ghost"
       size="icon-sm"
       onClick={onClick}
-      aria-label={label}
-      aria-pressed={active}
+      aria-label={railButtonAccessibleName(label, badge)}
+      aria-current={active ? 'page' : undefined}
+      aria-keyshortcuts={shortcutAria}
       data-testid={testId}
       className={
         showLabel
@@ -125,7 +132,7 @@ function RailButton({
           className={expanded
             ? 'ml-auto min-w-[18px] rounded-full bg-muted px-1.5 text-center text-[10px] leading-[18px] text-muted-foreground'
             : 'absolute right-0 top-0 min-w-[14px] rounded-full bg-muted px-1 text-center text-[9px] leading-[14px] text-muted-foreground'}
-          aria-label={`${badge}`}
+          aria-hidden="true"
         >
           {badge > 99 ? '99+' : badge}
         </span>
@@ -493,7 +500,8 @@ export function CommandRail({
             expanded={expanded}
             icon={VIEW_ICONS[view.id]}
             label={view.label}
-            shortcut={formatShortcutDisplay({ display: `⌥⌘${view.shortcutNumber}` })}
+            shortcut={railViewShortcutDisplay(view.shortcutNumber)}
+            shortcutAria={railViewShortcutAria(view.shortcutNumber)}
             onClick={() => {
               trackRailViewSelected(view.id)
               onSelectView(view.id)

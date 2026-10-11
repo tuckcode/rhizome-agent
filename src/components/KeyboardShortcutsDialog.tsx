@@ -9,6 +9,8 @@ import {
 import {
   APP_COMMAND_DEFINITIONS,
   formatShortcutDisplay,
+  getAppCommandShortcutDisplay,
+  type AppCommandId,
 } from '../hooks/appCommandCatalog'
 import { createTranslator, type AppLocale, type TranslationKey } from '../lib/i18n'
 
@@ -110,7 +112,7 @@ function collectShortcutRows(): ShortcutRow[] {
     rows.push({
       id,
       label: LABEL_OVERRIDES[id] ?? id.replace(/-/g, ' '),
-      shortcut: formatShortcutDisplay(shortcut),
+      shortcut: getAppCommandShortcutDisplay(id as AppCommandId) ?? formatShortcutDisplay(shortcut),
       group: groupForCommandId(id),
     })
   }

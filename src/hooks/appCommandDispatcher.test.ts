@@ -13,6 +13,7 @@ import {
 } from './appCommandDispatcher'
 import {
   APP_COMMAND_DEFINITIONS,
+  getAppCommandShortcutDisplay,
   getDeterministicShortcutQaDefinition,
   APP_COMMAND_MENU_SECTIONS,
   APP_COMMAND_MENU_STATE_GROUPS,
@@ -212,6 +213,48 @@ describe('appCommandDispatcher', () => {
       shiftKey: false,
     })
     expect(getShortcutEventInit(APP_COMMAND_IDS.appCheckForUpdates)).toBeNull()
+  })
+
+  it('uses Ctrl+Shift for Views on Windows/Linux and keeps Option+Cmd on Mac', () => {
+    setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
+    expect(getAppCommandShortcutDisplay(APP_COMMAND_IDS.goResearch)).toBe('Ctrl+Shift+1')
+    expect(getShortcutEventInit(APP_COMMAND_IDS.goResearch, { preferControl: true })).toMatchObject({
+      key: '1',
+      code: 'Digit1',
+      altKey: false,
+      ctrlKey: true,
+      metaKey: false,
+      shiftKey: true,
+    })
+    expectShortcutEventCommand({
+      key: '2',
+      code: 'Digit2',
+      ctrlKey: true,
+      shiftKey: true,
+    }, APP_COMMAND_IDS.goGraph)
+    expectShortcutEventCommand({
+      key: '2',
+      code: 'Digit2',
+      ctrlKey: true,
+      altKey: true,
+    }, null)
+
+    setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')
+    expect(getAppCommandShortcutDisplay(APP_COMMAND_IDS.goResearch)).toBe('⌥⌘1')
+    expect(getShortcutEventInit(APP_COMMAND_IDS.goMycelium)).toMatchObject({
+      key: '3',
+      code: 'Digit3',
+      altKey: true,
+      ctrlKey: false,
+      metaKey: true,
+      shiftKey: false,
+    })
+    expectShortcutEventCommand({
+      key: '1',
+      code: 'Digit1',
+      metaKey: true,
+      altKey: true,
+    }, APP_COMMAND_IDS.goResearch)
   })
 
   it('resolves event modifiers through the shared shortcut catalog', () => {

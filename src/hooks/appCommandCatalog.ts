@@ -1,4 +1,10 @@
 import appCommandManifest from '../shared/appCommandManifest.json' with { type: 'json' }
+import {
+  isRailViewCommandId,
+  matchRailViewShortcutEvent,
+  railViewShortcutDisplayForCommand,
+  viewShortcutEventModifiers,
+} from '../lib/railViewShortcuts'
 import type { SidebarFilter } from '../types'
 import { isMac } from '../utils/platform'
 import type { ViewMode } from './useViewMode'
@@ -304,6 +310,8 @@ function menuShortcutForCommand(
   item: Extract<AppCommandMenuManifestItem, { kind: 'command' }>,
   command: AppCommandManifestDefinition,
 ): string | undefined {
+  const viewShortcut = railViewShortcutDisplayForCommand(command.id)
+  if (viewShortcut) return viewShortcut
   if (typeof item.accelerator === 'string') return formatAcceleratorDisplay(item.accelerator)
   if (command.shortcut) return formatShortcutDisplay(command.shortcut)
   return undefined
@@ -454,16 +462,19 @@ export function getShortcutEventInit(
   if (!shortcut) return null
 
   const useControl = options.preferControl ?? false
+  const viewModifiers = isRailViewCommandId(id) ? viewShortcutEventModifiers() : null
 
   return {
     key: shortcut.key,
     code: shortcut.code,
-    altKey: shortcut.combo === 'command-or-ctrl-alt',
+    altKey: viewModifiers ? viewModifiers.altKey : shortcut.combo === 'command-or-ctrl-alt',
     bubbles: true,
     cancelable: true,
     ctrlKey: useControl,
     metaKey: !useControl,
-    shiftKey: shortcut.combo === 'command-or-ctrl-shift' || shortcut.combo === 'command-shift',
+    shiftKey: viewModifiers
+      ? viewModifiers.shiftKey
+      : shortcut.combo === 'command-or-ctrl-shift' || shortcut.combo === 'command-shift',
   }
 }
 
@@ -502,8 +513,13 @@ export function findShortcutCommandId(
 export function findShortcutCommandIdForEvent(event: ShortcutEventLike): AppCommandId | null {
   if (isPlatformRedoAlternate(event)) return APP_COMMAND_IDS.editRedo
 
+  const railMatch = matchRailViewShortcutEvent(event)
+  if (railMatch === null) return null
+  if (railMatch && isAppCommandId(railMatch)) return railMatch
+
   for (const combo of shortcutCombosForEvent(event)) {
     const commandId = findShortcutCommandId(combo, event.key, event.code)
+    if (commandId && isRailViewCommandId(commandId)) continue
     if (commandId) return commandId
   }
   return null
@@ -527,6 +543,8 @@ export function formatShortcutDisplay(
 }
 
 export function getAppCommandShortcutDisplay(id: AppCommandId): string | undefined {
+  const viewShortcut = railViewShortcutDisplayForCommand(id)
+  if (viewShortcut) return viewShortcut
   const shortcut = (Reflect.get(APP_COMMAND_DEFINITIONS, id) as AppCommandDefinition).shortcut
   return shortcut ? formatShortcutDisplay(shortcut) : undefined
 }

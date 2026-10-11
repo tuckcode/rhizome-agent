@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommandRail } from './CommandRail'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
+import { railViewShortcutAria } from '../lib/railViewShortcuts'
 
 const { trackSessionsDrawerOpened } = vi.hoisted(() => ({ trackSessionsDrawerOpened: vi.fn() }))
 vi.mock('../lib/productAnalytics', () => ({
@@ -61,9 +62,17 @@ describe('CommandRail', () => {
 
     expect(props.onSelectView).toHaveBeenCalledWith('research')
     expect(props.onSelectView).toHaveBeenCalledWith('changes')
-    expect(screen.getByTestId('command-rail-graph')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('command-rail-research')).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByLabelText('4')).toBeInTheDocument()
+    expect(screen.getByTestId('command-rail-graph')).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByTestId('command-rail-research')).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('button', { name: 'Changes, 4' })).toBeInTheDocument()
+    expect(screen.getByTestId('command-rail-research')).toHaveAttribute(
+      'aria-keyshortcuts',
+      railViewShortcutAria(1),
+    )
+    expect(screen.getByTestId('command-rail-graph')).toHaveAttribute(
+      'aria-keyshortcuts',
+      railViewShortcutAria(2),
+    )
   })
 
   it('opens settings from the gear', () => {

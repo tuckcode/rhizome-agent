@@ -47,7 +47,7 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Grok 4.6 · 2026-10-11 · PLAN item 4 first slice: Views group on the command rail (Research → Graph → Mycelium → Changes → History), ⌥⌘1–5, Go + ⌘K. A-W8 / A-M1 / A-M3 / A-M4 still open. [Handoff](plans/handoffs/2026-10-11-0455-cursor-grok-4-6-navigation-grouping.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-11 · PLAN item 4 + Ricky #143: Views group on the rail; `aria-current` + Changes count; classic Graph/Mycelium; Win/Linux Ctrl+Shift (Mac Option+Cmd held). A-W8 / A-M1 / A-M3 / A-M4 still open. [First slice](plans/handoffs/2026-10-11-0455-cursor-grok-4-6-navigation-grouping.md). [Review](plans/handoffs/2026-10-11-0516-cursor-grok-4-6-navigation-review.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · #142 review: status beside log, Stop-before-reply, re-announce identical lines; pending frames survive streamed re-renders. #143 also touches `AiPanelChrome.tsx`. [Handoff](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md) · [Handoff](plans/handoffs/2026-10-11-0526-cursor-grok-4-6-chat-a11y-reread.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · Native Chat engine can send when Prime is not installed. Prime-targeted chats still show install guidance. [Handoff](plans/handoffs/2026-10-11-0520-cursor-grok-4-6-native-send-without-prime.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · Earth theme: Earth dark/light in `index.css`, Loam in the generator. Stacked on a11y B1–B5. [Handoff](plans/handoffs/2026-10-11-0505-cursor-grok-4-6-earth-theme.md).
@@ -89,8 +89,9 @@ Detail: [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-
 Install/claims: [`GETTING-STARTED.md`](GETTING-STARTED.md) § Public preview. Inventory: [`plans/2026-09-20-public-readiness-inventory.md`](plans/2026-09-20-public-readiness-inventory.md).
 Notes is a right panel from **Show Notes** (or View / Cmd+2), not a left-rail
 button. Left rail is **sessions + Views + Settings**. Views (Research, Graph,
-Mycelium, Changes, History) sit on the rail with ⌥⌘1–5; Go and ⌘K are the
-second path. Classic shell still shows Research on the status bar. ADR-0173: Chat / Notes /
+Mycelium, Changes, History) sit on the rail with ⌥⌘1–5 on Mac and Ctrl+Shift+1–5
+on Windows/Linux; Go and ⌘K are the
+second path. Classic shell still shows Graph, Mycelium, and Research on the status bar. ADR-0173: Chat / Notes /
 Read / Workbench; fresh launch is Chat. Vault skill uses a resolved Node binary
 and a GUI-safe PATH. Traffic lights sit in a 32px `MacOSTitlebar` (`x: 14`, `y: 9`). Import
 waits for **`1`**. Drafts **#66–#68** are closed. Native W4 / #46 still open. Windows ship
@@ -140,6 +141,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-10-11 · #143 review](plans/handoffs/2026-10-11-0516-cursor-grok-4-6-navigation-review.md) — rail a11y, classic Graph/Mycelium, Win/Linux Ctrl+Shift. Mac Option+Cmd held.
 - [2026-10-11 · navigation grouping](plans/handoffs/2026-10-11-0455-cursor-grok-4-6-navigation-grouping.md) — PLAN item 4 first slice: Views group on the rail, ⌥⌘1–5, Go + ⌘K. A-W8 / A-M3 / A-M4 deferred.
 - [2026-10-11 · #142 reread](plans/handoffs/2026-10-11-0526-cursor-grok-4-6-chat-a11y-reread.md) — pending status frames survive streamed re-renders. [Review](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md) — status beside log, Stop-before-reply, re-announce identical lines. #143 also touches AiPanelChrome.
 - [2026-10-11 · native send without Prime](plans/handoffs/2026-10-11-0520-cursor-grok-4-6-native-send-without-prime.md) — Native engine can send when Prime is missing. Prime-targeted chats still show install guidance.
@@ -163,14 +165,6 @@ Do not paste leftover paper here.
 - [2026-10-05 · #57 ghost-compat](plans/handoffs/2026-10-05-0320-cursor-grok-4-6-issue-57-is-a-open.md) — `is_a:` rewrite now runs on `list_vault` / `reload_vault`; leftover file is on Atticus's machine.
 - [2026-10-04 · Vault memory MCP](plans/handoffs/2026-10-04-1548-claude-opus-5-5-vault-memory-mcp.md) — one listing per vault, MCP server instructions, distill SKIP; merged `bf22be8`, not pushed.
 - [2026-10-04 · Split handoffs](plans/handoffs/2026-10-04-1423-astra-audit-continuation.md) — Astra owns audit completion and independent review. [Cursor assignment](plans/handoffs/2026-10-04-1422-astra-cursor-implementation.md) covers bounded fixes. No product edits started.
-- [2026-10-03 · Windows pipe freeze](plans/handoffs/2026-10-03-1015-claude-opus-5-5-windows-pipe-freeze.md) — freeze fixed, test target compiles, File > Exit; C83–C85 opened; not pushed.
-- [2026-10-03 · Nous catalog fields](plans/handoffs/2026-10-03-0942-cursor-grok-4-7-nous-catalog-fields.md) — Add to Chat list copies reasoning and input modalities from each Nous record. Name guesses are gone. Not in the installed app.
-- [2026-10-03 · Nous catalog and stall sample](plans/handoffs/2026-10-03-0921-cursor-grok-4-7-nous-catalog-handy.md) — stall sampled; shell waits, skills, lights, and image bubble are uncommitted. Nous already sends reasoning and image modalities. No automatic model refresh.
-- [2026-10-02 · stall and empty reply](plans/handoffs/2026-10-02-1649-cursor-grok-4-7-stall-and-empty-reply.md) — run the stall sample, then the empty chat line. #26 closed: Update now installs Prime.
-- [2026-09-27 · BlockNote 0.55 + cleanup](plans/handoffs/2026-09-27-0951-claude-opus-5-5-blocknote-055-and-cleanup.md) — BlockNote 0.55/tiptap 3.31.3 with patches ported; Dependabot, C80/C82, stranded files pushed; native QA not done; swarm plan written.
-- [2026-09-26 · animated splash](plans/handoffs/2026-09-26-0818-gpt-6-splash-logo.md) — shaded mark grows two branches, then breathes. Dither artwork and original Codex chat located. Source only.
-- [2026-09-26 · macOS title bar](plans/handoffs/2026-09-26-0635-cursor-grok-4-7-macos-titlebar.md) — 32px MacOSTitlebar, y=9, Command Palette docked; packaged app not checked.
-- [2026-09-26 · Astra redesign](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md) — redesign + login-note skip + list markers pushed as `d0a55f8`; app rebuilt; native QA not done.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)

@@ -99,10 +99,11 @@ describe('status bar pills (wave 5.4b, gated on the command rail)', () => {
     expect(screen.queryByTestId('vault-menu-conflicts')).not.toBeInTheDocument()
   })
 
-  it('hides the graph badge because the rail owns that destination', () => {
+  it('hides the graph and mycelium entries because the rail owns those destinations', () => {
     renderPillStatusBar()
 
     expect(screen.queryByTestId('status-graph')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('status-mycelium')).not.toBeInTheDocument()
   })
 
   it('does not put the agents pill on the status bar; the composer owns it', () => {
@@ -121,6 +122,7 @@ describe('status bar pills (wave 5.4b, gated on the command rail)', () => {
     expect(screen.getByTestId('status-commit-push')).toBeInTheDocument()
     expect(screen.getByTestId('status-pulse')).toBeInTheDocument()
     expect(screen.getByTestId('status-graph')).toBeInTheDocument()
+    expect(screen.getByTestId('status-mycelium')).toBeInTheDocument()
     expect(screen.queryByTestId('status-agents-pill')).not.toBeInTheDocument()
   })
 })
