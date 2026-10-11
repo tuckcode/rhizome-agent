@@ -17,6 +17,8 @@ import type { ToolInvocation } from './aiAgentMessageState'
 import { trackAiAgentMessageBlocked, trackAiAgentMessageSent, trackAiAgentResponseStopped } from './productAnalytics'
 import { streamAiAgent } from '../utils/streamAiAgent'
 import { streamAiModel } from '../utils/streamAiModel'
+import { streamNativeChat } from '../utils/streamNativeChat'
+import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
 import { hydrateNoteReferences } from '../utils/ai-reference-content'
 import { createTranslator } from './i18n'
 
@@ -99,6 +101,20 @@ async function streamWithSelectedTarget({
   callbacks,
   signal,
 }: SelectedTargetStreamRequest): Promise<void> {
+  if (context.chatEngine === 'native') {
+    await streamNativeChat({
+      target: resolveNativeChatTarget(context.nativeTarget),
+      message: formattedMessage,
+      systemPrompt,
+      vaultPath: context.vaultPath,
+      vaultPaths: context.vaultPaths,
+      permissionMode: context.permissionMode,
+      callbacks,
+      signal,
+    })
+    return
+  }
+
   if (context.target?.kind === 'api_model') {
     await streamAiModel({
       provider: context.target.provider,

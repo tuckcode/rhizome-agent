@@ -459,7 +459,8 @@ worker expires after Prime's reconnect grace. Active close asks, with
 `promote_owned_session`. The daemon may stay available; that is not the same
 as an agent still working. ADR-0180 is the identity: Rhizome owns the loop.
 `src-tauri/src/engines/` holds the Phase 5 trait and the native / Prime /
-Hermes wrappers. Chat still calls Prime directly (Phase 6 toggle).
+Hermes wrappers. Settings `chat_engine` chooses Prime or the native engine.
+Absent means Prime, so Chat stays on Prime until that switch is on.
 `commands/native_chat.rs` is the backend for that toggle: start / send /
 cancel / approval_reply / end / list / open / delete, events on
 `native-chat:<session_id>`. Quit settles every native engine before Prime,
@@ -470,11 +471,11 @@ every line, 100 MiB / 1 MiB caps, owner-only file, known-credential
 scrub, reopen as cancelled with no restored grants. The id is a UUID.
 An OS file lock covers a second process and dies with it. Both windows
 may display a chat; only one turn runs. Damage and a full log keep the
-original and continue in a new session. Chat still does not call these
-until the Settings toggle.
+original and continue in a new session. With the Settings switch on,
+new chats call `native_chat_start` and pick a catalog model or Free tier (auto).
 `rhizome_provider_model.rs` is the native loop's OpenAI-compatible `Model`.
 `rhizome_routing/` wraps it with free-tier fallback over a pinned OmniRoute
-catalog (ADR-0182). Chat still does not call these until the Settings toggle.
+catalog (ADR-0182). Anthropic models stay refused until step 6a.
 ADR-0168 (amended) is the borrow-care rule. Prime is an optional engine
 (ADR-0163). See `docs/design/harness-doctrine.md`.
 

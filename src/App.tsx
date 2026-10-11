@@ -2082,6 +2082,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         defaultAiTarget={aiAgentPreferences.defaultAiTarget}
         defaultAiAgentReadiness={aiAgentPreferences.defaultAiAgentReadiness}
         defaultAiAgentReady={aiAgentPreferences.defaultAiAgentReady}
+        chatEngine={settings.chat_engine === 'native' ? 'native' : 'prime'}
+        nativeTarget={settings.native_chat_target}
+        onNativeTargetChange={(target) => saveSettings({ ...settings, native_chat_target: target })}
         onExit={() => handleSetViewMode(chatCentered ? 'all' : 'editor-list')}
         vaultPath={activeEditorVaultPath}
         vaultPaths={writableVaultPaths}

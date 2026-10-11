@@ -175,6 +175,12 @@ export interface Settings {
    * Not per agent and not per vault. Blank is unset.
    */
   agent_profile?: string | null
+  /**
+   * `native` sends new chats through Rhizome's engine. Absent means Prime.
+   */
+  chat_engine?: string | null
+  /** Native picker value. Absent uses the catalog default. */
+  native_chat_target?: string | null
   /** Models shown first in Chat, as `provider/id`. Empty means the whole catalog. */
   prime_model_allow_list?: string[] | null
 }

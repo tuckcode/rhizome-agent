@@ -207,6 +207,14 @@ pub struct Settings {
     /// `AGENTS.md` and it is not Prime `USER.md`.
     #[serde(default)]
     pub agent_profile: Option<String>,
+    /// Chat engine. Absent or anything other than `native` means Prime.
+    /// Phase 6 (plan step 4). No migration: nothing on disk is `native` yet.
+    #[serde(default)]
+    pub chat_engine: Option<String>,
+    /// Model id for a native Chat session, `provider/model` or `free_tier_auto`.
+    /// Absent uses the catalog default. Anthropic ids are dropped until 6a.
+    #[serde(default)]
+    pub native_chat_target: Option<String>,
 }
 
 /// Return the persisted bridge token, generating and saving one the first
@@ -474,7 +482,30 @@ fn normalize_settings(settings: Settings) -> Settings {
         all_notes_show_unsupported: settings.all_notes_show_unsupported,
         multi_workspace_enabled: settings.multi_workspace_enabled,
         agent_profile: normalize_agent_profile(settings.agent_profile),
+        chat_engine: normalize_chat_engine(settings.chat_engine),
+        native_chat_target: normalize_native_chat_target(settings.native_chat_target),
     }
+}
+
+fn normalize_chat_engine(value: Option<String>) -> Option<String> {
+    match value.as_deref().map(str::trim) {
+        Some("native") => Some("native".into()),
+        _ => None,
+    }
+}
+
+fn normalize_native_chat_target(value: Option<String>) -> Option<String> {
+    let Some(target) = value
+        .as_deref()
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+    else {
+        return None;
+    };
+    if target.to_ascii_lowercase().starts_with("anthropic/") {
+        return None;
+    }
+    Some(target.to_string())
 }
 
 fn normalize_ai_workspace_conversations(
@@ -689,6 +720,31 @@ mod tests {
             ..Settings::default()
         });
         assert_eq!(cleared.agent_profile, None);
+    }
+
+    #[test]
+    fn chat_engine_defaults_to_prime_and_native_persists() {
+        let fresh = save_and_reload(Settings::default());
+        assert_eq!(fresh.chat_engine, None);
+
+        let kept = save_and_reload(Settings {
+            chat_engine: Some("native".into()),
+            native_chat_target: Some("open_ai/gpt-4.1-mini".into()),
+            ..Settings::default()
+        });
+        assert_eq!(kept.chat_engine.as_deref(), Some("native"));
+        assert_eq!(
+            kept.native_chat_target.as_deref(),
+            Some("open_ai/gpt-4.1-mini")
+        );
+
+        let dropped = save_and_reload(Settings {
+            chat_engine: Some("prime".into()),
+            native_chat_target: Some("anthropic/claude-3-5-sonnet-latest".into()),
+            ..Settings::default()
+        });
+        assert_eq!(dropped.chat_engine, None);
+        assert_eq!(dropped.native_chat_target, None);
     }
 
     #[test]
@@ -957,6 +1013,8 @@ mod tests {
             all_notes_show_unsupported: Some(false),
             bridge_token: Some("deadbeefdeadbeefdeadbeefdeadbeef".to_string()),
             agent_profile: Some("Be brief.".to_string()),
+            chat_engine: None,
+            native_chat_target: None,
         };
         let json = serde_json::to_string(&settings).unwrap();
         let parsed: Settings = serde_json::from_str(&json).unwrap();

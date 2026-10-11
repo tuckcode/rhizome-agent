@@ -39,6 +39,8 @@ interface UseCliAiAgentOptions {
   permissionMode: AiAgentPermissionMode
   sessionId?: string
   sessionAutoDistillEnabled?: boolean
+  chatEngine?: 'prime' | 'native'
+  nativeTarget?: string
 }
 
 interface UseCliAiAgentRuntime extends AiAgentSessionRuntime {
@@ -123,7 +125,7 @@ export function useCliAiAgent(
   fileCallbacks: AgentFileCallbacks | undefined,
   options: UseCliAiAgentOptions,
 ) {
-  const { agent, agentReady, sessionId, target } = options
+  const { agent, agentReady, sessionId, target, chatEngine, nativeTarget } = options
   const locale = options.locale ?? 'en'
   const { permissionMode } = options
   const sessionAutoDistillEnabled = options.sessionAutoDistillEnabled
@@ -146,6 +148,8 @@ export function useCliAiAgent(
       permissionMode,
       systemPromptOverride: contextPrompt,
       sessionAutoDistillEnabled,
+      chatEngine,
+      nativeTarget,
     }
   }
 

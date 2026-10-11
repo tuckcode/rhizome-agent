@@ -56,6 +56,8 @@ interface AiPanelProps {
   defaultAiTarget?: AiTarget
   defaultAiAgentReadiness?: AiAgentReadiness
   defaultAiAgentReady?: boolean
+  chatEngine?: 'prime' | 'native'
+  nativeTarget?: string
   locale?: AppLocale
   onFileCreated?: (relativePath: string) => void
   onFileModified?: (relativePath: string) => void
@@ -607,6 +609,8 @@ export function AiPanel({
   defaultAiTarget,
   defaultAiAgentReadiness: providedDefaultAiAgentReadiness,
   defaultAiAgentReady: providedDefaultAiAgentReady,
+  chatEngine,
+  nativeTarget,
   locale = 'en',
   onFileCreated,
   onFileModified,
@@ -647,6 +651,8 @@ export function AiPanel({
     onFileCreated,
     onFileModified,
     onVaultChanged,
+    chatEngine,
+    nativeTarget,
   })
 
   useEffect(() => {
