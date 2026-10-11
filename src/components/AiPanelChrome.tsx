@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { CirclesThree, ImageSquare, PaperPlaneRight, Plugs, Plus, Sparkle, Stop, X } from '@phosphor-icons/react'
+import { ImageSquare, PaperPlaneRight, Plugs, Plus, Sparkle, Stop, X } from '@phosphor-icons/react'
 import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
 import {
@@ -33,7 +33,6 @@ import { primeQueueIsEmpty, primeQueueItems, type PrimeQueue } from '../lib/prim
 import { PrimeQueueItemActions } from './PrimeQueueItemActions'
 import { cn } from '@/lib/utils'
 import { requestMcpSetupToggle } from '../hooks/useMcpSetupDialogController'
-import { dispatchNotesChrome } from '../lib/notesChrome'
 import { expandReplyQuotes } from '../lib/replyQuote'
 import { suggestReply } from '../lib/replySuggestions'
 import { latestAssistantMessageIndex } from '../lib/latestAssistantMessage'
@@ -791,8 +790,6 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
 function ComposerPlusMenu({
   locale,
   onAttachImages,
-  sessionPath,
-  onOpenMycelium,
   skillsLabel,
   skills = [],
   onPickSkill,
@@ -802,8 +799,6 @@ function ComposerPlusMenu({
   AiPanelComposerProps,
   | 'locale'
   | 'onAttachImages'
-  | 'sessionPath'
-  | 'onOpenMycelium'
   | 'skillsLabel'
   | 'skills'
   | 'onPickSkill'
@@ -812,9 +807,8 @@ function ComposerPlusMenu({
 >) {
   const attachInputRef = useRef<HTMLInputElement>(null)
   const t = createTranslator(locale ?? 'en')
-  const canMycelium = Boolean(sessionPath && onOpenMycelium)
   const hasTools = Boolean(onOpenGoal || onOpenSchedule || skillsLabel)
-  if (!onAttachImages && !canMycelium && !hasTools) return null
+  if (!onAttachImages && !hasTools) return null
 
   return (
     <>
@@ -860,24 +854,6 @@ function ComposerPlusMenu({
               Attach image
             </DropdownMenuItem>
           ) : null}
-          {canMycelium ? (
-            <DropdownMenuItem
-              className="text-[12px]"
-              data-testid="composer-plus-mycelium"
-              onSelect={() => onOpenMycelium?.(sessionPath ?? '')}
-            >
-              <CirclesThree size={14} aria-hidden="true" />
-              View in Mycelium
-            </DropdownMenuItem>
-          ) : null}
-          <DropdownMenuItem
-            className="text-[12px]"
-            data-testid="composer-plus-research"
-            onSelect={() => dispatchNotesChrome('research')}
-          >
-            <Sparkle size={14} aria-hidden="true" />
-            Research
-          </DropdownMenuItem>
           <DropdownMenuItem
             className="text-[12px]"
             data-testid="composer-plus-external-ai"
@@ -969,8 +945,6 @@ export function AiPanelComposer({
   commandInstantLabel,
   onCommandAction,
   lastAgentMessage,
-  sessionPath,
-  onOpenMycelium,
   skillsLabel,
   skills,
   onPickSkill,
@@ -1167,8 +1141,6 @@ export function AiPanelComposer({
         <ComposerPlusMenu
           locale={locale}
           onAttachImages={onAttachImages}
-          sessionPath={sessionPath}
-          onOpenMycelium={onOpenMycelium}
           skillsLabel={skillsLabel}
           skills={skills}
           onPickSkill={onPickSkill}

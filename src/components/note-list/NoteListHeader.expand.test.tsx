@@ -84,35 +84,29 @@ describe('NoteListHeader Inbox title (C78)', () => {
     expect(search.className).toMatch(/!w-\[32px\]/)
   })
 
-  it('groups Research, Settings, Mycelium, and Wiki Graph as icon shortcuts', () => {
+  it('keeps sort and columns in the header and leaves views to the rail', () => {
     renderHeader({ title: 'Inbox' })
 
-    const group = screen.getByTestId('notes-chrome-shortcuts')
-    expect(group).toHaveAttribute('aria-label', 'Workspace shortcuts')
-    expect(screen.getByRole('button', { name: 'Open the Research panel' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Open settings' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Mycelium' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Wiki Graph' })).toBeInTheDocument()
+    expect(screen.queryByTestId('notes-chrome-shortcuts')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Open the Research panel' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('sort-button-__list__')).toBeInTheDocument()
   })
 
-  it('never lets the shortcuts group sit out of flow ahead of the title', () => {
+  it('never lets optional tools sit out of flow ahead of the title', () => {
     renderHeader({ title: 'Notes' })
 
     const title = screen.getByRole('heading', { name: 'Notes' })
-    const shortcuts = screen.getByTestId('notes-chrome-shortcuts')
-    // Regression for the half-screen repro: the shortcuts box must be a
-    // normal flex sibling *after* the title in DOM order, not absolutely
-    // positioned on top of it.
-    expect(shortcuts.className).not.toMatch(/\babsolute\b/)
-    expect(title.compareDocumentPosition(shortcuts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(shortcuts.closest('[data-testid="note-list-header-optional-tools"]')).toHaveClass('shrink-0')
+    const tools = screen.getByTestId('note-list-header-optional-tools')
+    expect(tools.className).not.toMatch(/\babsolute\b/)
+    expect(title.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(tools).toHaveClass('shrink-0')
   })
 })
 
 /**
  * Simulates the title actually being truncated (scrollWidth > clientWidth),
- * the same signal `useNoteListHeaderOverflow` uses to move the workspace
- * shortcuts / sort / columns group into the "…" menu. jsdom has no layout,
+ * the same signal `useNoteListHeaderOverflow` uses to move sort / columns
+ * into the "…" menu. jsdom has no layout,
  * so both widths are mocked directly on whichever element the hook measures.
  */
 function mockCollapsedNoteListHeaderOverflow() {
@@ -133,7 +127,7 @@ function mockCollapsedNoteListHeaderOverflow() {
 }
 
 describe('NoteListHeader — optional tools move into overflow when the title is truncated', () => {
-  it('keeps shortcuts, sort, and columns inline by default', () => {
+  it('keeps sort and columns inline by default', () => {
     renderHeader({ title: 'Inbox' })
 
     expect(screen.getByTestId('note-list-header-optional-tools')).toBeInTheDocument()
@@ -141,7 +135,7 @@ describe('NoteListHeader — optional tools move into overflow when the title is
     expect(screen.queryByTestId('note-list-header-overflow-trigger')).not.toBeInTheDocument()
   })
 
-  it('moves shortcuts, sort, and columns into the overflow menu once the title truncates', async () => {
+  it('moves sort and columns into the overflow menu once the title truncates', async () => {
     const restoreMeasurement = mockCollapsedNoteListHeaderOverflow()
 
     try {
@@ -155,7 +149,7 @@ describe('NoteListHeader — optional tools move into overflow when the title is
       fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false })
       const menu = await screen.findByTestId('note-list-header-overflow-menu')
 
-      expect(within(menu).getByTestId('notes-chrome-shortcuts')).toBeInTheDocument()
+      expect(within(menu).queryByTestId('notes-chrome-shortcuts')).not.toBeInTheDocument()
       expect(within(menu).getByTestId('sort-button-__list__')).toBeInTheDocument()
     } finally {
       restoreMeasurement()

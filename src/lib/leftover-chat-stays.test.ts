@@ -17,8 +17,11 @@ describe('leftover chat stays', () => {
     expect(rail).not.toContain('active={notesOpen}')
   })
 
-  it('does not put Changes on the command rail', () => {
-    expect(rail).not.toContain('command-rail-changes')
+  it('puts Changes in the rail Views group, not as a Chat destination', () => {
+    const views = readFileSync(`${process.cwd()}/src/lib/railViews.ts`, 'utf8')
+    expect(views).toContain("testId: 'command-rail-changes'")
+    expect(rail).toContain('testId={view.testId}')
+    expect(rail).toContain('command-rail-views')
     expect(rail).not.toContain('onSelectChanges')
   })
 

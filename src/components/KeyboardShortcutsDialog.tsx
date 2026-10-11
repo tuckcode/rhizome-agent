@@ -51,6 +51,11 @@ const LABEL_OVERRIDES: Record<string, string> = {
   'view-zoom-reset': 'Actual size',
   'view-go-back': 'Go back',
   'view-go-forward': 'Go forward',
+  'go-research': 'Research',
+  'go-graph': 'Graph',
+  'go-mycelium': 'Mycelium',
+  'go-changes': 'Changes',
+  'go-pulse': 'History',
   'note-toggle-favorite': 'Toggle favorite',
   'note-toggle-organized': 'Toggle organized',
   'note-delete': 'Delete note',
@@ -60,6 +65,7 @@ const LABEL_OVERRIDES: Record<string, string> = {
 }
 
 function groupForCommandId(id: string): string {
+  if (id.startsWith('go-')) return 'Go'
   if (id.startsWith('file-') || id === 'app-settings') return id === 'app-settings' ? 'Edit' : 'File'
   if (id.startsWith('edit-')) return 'Edit'
   if (id.startsWith('view-')) {

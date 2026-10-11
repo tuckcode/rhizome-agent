@@ -1,4 +1,5 @@
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../appCommandCatalog'
+import { RAIL_VIEWS } from '../../lib/railViews'
 import type { CommandAction } from './types'
 import type { SidebarSelection } from '../../types'
 
@@ -92,9 +93,26 @@ function buildBaseCommands(config: NavigationCommandsConfig): CommandAction[] {
     { id: 'search-notes', label: 'Search Notes', group: 'Navigation', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.fileQuickOpen), keywords: ['find', 'open', 'quick'], enabled: true, execute: onQuickOpen },
     { id: 'go-all', label: 'Go to All Notes', group: 'Navigation', keywords: ['filter'], enabled: true, execute: () => onSelect({ kind: 'filter', filter: 'all' }) },
     { id: 'go-archived', label: 'Go to Archived', group: 'Navigation', keywords: [], enabled: true, execute: () => onSelect({ kind: 'filter', filter: 'archived' }) },
-    { id: 'go-changes', label: 'Go to Changes', group: 'Navigation', keywords: ['git', 'modified', 'pending'], enabled: true, execute: () => onSelect({ kind: 'filter', filter: 'changes' }) },
-    { id: 'go-pulse', label: 'Go to History', group: 'Navigation', keywords: ['activity', 'history', 'commits', 'git', 'feed'], enabled: true, execute: () => onSelect({ kind: 'filter', filter: 'pulse' }) },
-    { id: 'go-graph', label: 'Go to Wiki Graph', group: 'Navigation', keywords: ['graph', 'network', 'links', 'wiki', 'visualization'], enabled: true, execute: () => onSelect({ kind: 'filter', filter: 'graph' }) },
+    ...RAIL_VIEWS.map((view) => ({
+      id: view.commandId,
+      label: view.goLabel,
+      group: 'Views' as const,
+      shortcut: getAppCommandShortcutDisplay(view.commandId as typeof APP_COMMAND_IDS.goChanges),
+      keywords: view.id === 'research'
+        ? ['research', 'search', 'ask']
+        : view.id === 'graph'
+          ? ['graph', 'network', 'links', 'wiki', 'visualization']
+          : view.id === 'mycelium'
+            ? ['mycelium', 'sessions', 'runs', 'activity']
+            : view.id === 'changes'
+              ? ['git', 'modified', 'pending']
+              : ['activity', 'history', 'commits', 'git', 'feed'],
+      enabled: true,
+      execute: () => onSelect({
+        kind: 'filter',
+        filter: view.id === 'history' ? 'pulse' : view.id,
+      }),
+    })),
     { id: 'go-back', label: 'Go Back', group: 'Navigation', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewGoBack), keywords: ['previous', 'history', 'back'], enabled: !!canGoBack, execute: () => onGoBack?.() },
     { id: 'go-forward', label: 'Go Forward', group: 'Navigation', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewGoForward), keywords: ['next', 'history', 'forward'], enabled: !!canGoForward, execute: () => onGoForward?.() },
   ]
@@ -103,7 +121,7 @@ function buildBaseCommands(config: NavigationCommandsConfig): CommandAction[] {
 function insertInboxCommand(commands: CommandAction[], showInbox: boolean, onSelect: (sel: SidebarSelection) => void) {
   if (!showInbox) return commands
 
-  commands.splice(5, 0, {
+  commands.splice(3, 0, {
     id: 'go-inbox',
     label: 'Go to Inbox',
     group: 'Navigation',

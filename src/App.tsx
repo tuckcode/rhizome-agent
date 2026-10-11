@@ -8,6 +8,7 @@ import { startResizeDrag } from './utils/startResizeDrag'
 import { COMMAND_RAIL_WIDTH_PX, overlayTitleBarBandStyle, railConsumesExpandedWidth, reportedCommandRailLayoutWidth, subheadTrafficLightInset } from './utils/trafficLights'
 import { Sidebar } from './components/Sidebar'
 import { CommandRail } from './components/CommandRail'
+import type { RailViewId } from './lib/railViews'
 import { NoteList } from './components/NoteList'
 import {
   VaultPanel,
@@ -577,8 +578,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     }
     handleSetSelection({ kind: 'filter', filter: 'research' })
   }, [handleRailSelectChat, handleSetSelection, isResearchDestination])
-  // Graph and Mycelium live under Notes on the Changes tab only. Inbox
-  // keeps the full notes list. Classic shell still uses the old toggle.
+  // Graph, Mycelium, and Research are rail View destinations (full-page
+  // canvas). Contextual "Show in Graph / Mycelium" still uses Connections.
   const connectionsPanelRef = useRef<ConnectionsPanelHandle>(null)
   const connectionsRequestSeq = useRef(0)
   const [connectionsRequest, setConnectionsRequest] = useState<ConnectionsViewRequest | null>(null)
@@ -594,6 +595,49 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const handleRailSelectChanges = useCallback(() => {
     handleSetSelection({ kind: 'filter', filter: 'changes' })
   }, [handleSetSelection])
+  const handleRailSelectHistory = useCallback(() => {
+    handleSetSelection({ kind: 'filter', filter: 'pulse' })
+  }, [handleSetSelection])
+  const handleRailSelectMycelium = useCallback(() => {
+    handleSetSelection({ kind: 'filter', filter: 'mycelium' })
+  }, [handleSetSelection])
+  const handleSelectRailView = useCallback((view: RailViewId) => {
+    if (view === 'research') {
+      handleRailSelectResearch()
+      return
+    }
+    if (view === 'graph') {
+      handleSetSelection({ kind: 'filter', filter: 'graph' })
+      return
+    }
+    if (view === 'mycelium') {
+      handleRailSelectMycelium()
+      return
+    }
+    if (view === 'changes') {
+      handleRailSelectChanges()
+      return
+    }
+    handleRailSelectHistory()
+  }, [
+    handleRailSelectChanges,
+    handleRailSelectHistory,
+    handleRailSelectMycelium,
+    handleRailSelectResearch,
+    handleSetSelection,
+  ])
+  const activeRailView: RailViewId | null =
+    isResearchDestination
+      ? 'research'
+      : isGraphDestination
+        ? 'graph'
+        : isMyceliumDestination
+          ? 'mycelium'
+          : effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'changes'
+            ? 'changes'
+            : effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse'
+              ? 'history'
+              : null
 
   const handleOpenVaultSettings = useCallback(() => {
     setSettingsInitialSectionId(SETTINGS_SECTION_IDS.workspaces)
@@ -1777,7 +1821,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     redoLabel: notes.redoLabel,
     onOpenSettings: handleOpenSettings,
     onOpenFeedback: openFeedback,
-    onOpenResearch: handleRailSelectResearch,
     onDeleteNote: deleteActions.handleDeleteNote,
     onArchiveNote: entryActions.handleArchiveNote, onUnarchiveNote: entryActions.handleUnarchiveNote,
     onCommitPush: handleCommitPush,
@@ -2138,6 +2181,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               width={chatCentered ? paneWidths.rail : undefined}
               onWidthChange={chatCentered ? delta => resizeColumn('rail', delta) : undefined}
               onOpenSettings={handleOpenSettings}
+              onSelectView={handleSelectRailView}
+              activeView={activeRailView}
+              changeCount={gitModifiedCount}
               onSessionsSlotReady={setSessionRailSlot}
             />
           )}

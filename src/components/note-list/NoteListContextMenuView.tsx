@@ -4,14 +4,13 @@ import {
   ArrowSquareOut,
   ChatTeardropText,
   CheckCircle,
-  CirclesThree,
   ClipboardText,
   FilePdf,
   FolderOpen,
   GitBranch,
+  Graph,
   MapTrifold,
   PencilSimple,
-  ShareNetwork,
   Star,
   Trash,
   type Icon,
@@ -164,13 +163,8 @@ function connectionItems(entry: VaultEntry, selectAction: SelectContextAction): 
   if (entry.fileKind === 'binary') return []
   return [
     {
-      icon: CirclesThree,
-      label: 'Mycelium report',
-      onSelect: () => selectAction('mycelium_report', () => openConnections('mycelium')),
-    },
-    {
-      icon: ShareNetwork,
-      label: 'Node map',
+      icon: Graph,
+      label: 'Show in Graph',
       onSelect: () => selectAction('node_map', () => openConnections('graph', entry.path)),
     },
   ]

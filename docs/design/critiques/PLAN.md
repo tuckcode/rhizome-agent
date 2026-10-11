@@ -30,6 +30,7 @@ Note: the vault, knowledge-graph, tool-log and navigation critiques came from sc
    - Research, Graph, Mycelium, Changes, History open from 2-6 places each under different names, none has a shortcut.
    - One "Views" group in the left rail in that fixed order, Option+Cmd+1-5, Cmd+K and the Go menu as the second path.
    - One name per tool; status bar shows status only; composer + menu holds message inputs only.
+   - **First slice (2026-10-11):** Views group on the rail + Go/⌘K/⌥⌘1–5; leftover primary buttons removed. Still open: A-W8 container unification, A-M1 extra Settings, A-M3 placement-off, A-M4 View-menu re-key.
 
 5. **Agent window design** (agent-window/2026-10-10-design.md, D-B1, D-B2, D-W*)
    - Session list shows the empty state instead of the selected session's transcript.

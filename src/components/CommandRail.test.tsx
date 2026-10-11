@@ -7,6 +7,7 @@ const { trackSessionsDrawerOpened } = vi.hoisted(() => ({ trackSessionsDrawerOpe
 vi.mock('../lib/productAnalytics', () => ({
   trackCommandRailPinChanged: () => {},
   trackSessionsDrawerOpened,
+  trackRailViewSelected: () => {},
 }))
 
 // ActionTooltip wraps its trigger in a Radix Tooltip; render children directly
@@ -19,6 +20,7 @@ function renderRail(overrides: Partial<React.ComponentProps<typeof CommandRail>>
   const props: React.ComponentProps<typeof CommandRail> = {
     locale: 'en',
     onOpenSettings: vi.fn(),
+    onSelectView: vi.fn(),
     ...overrides,
   }
   render(<CommandRail {...props} />)
@@ -26,13 +28,42 @@ function renderRail(overrides: Partial<React.ComponentProps<typeof CommandRail>>
 }
 
 describe('CommandRail', () => {
-  it('renders Sessions space and settings gear without Chat or Research destinations', () => {
+  it('keeps a Views group on the collapsed rail, before Settings', () => {
     renderRail()
     expect(screen.getByTestId('command-rail')).toBeInTheDocument()
     expect(screen.queryByTestId('command-rail-chat')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('command-rail-research')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
+    const views = screen.getByRole('group', { name: 'Views' })
+    const buttons = views.querySelectorAll('button')
+    expect([...buttons].map((button) => button.getAttribute('data-testid'))).toEqual([
+      'command-rail-research',
+      'command-rail-graph',
+      'command-rail-mycelium',
+      'command-rail-changes',
+      'command-rail-history',
+    ])
+    expect(screen.getByRole('button', { name: 'Research' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Graph' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Mycelium' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Changes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'History' })).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-settings')).toBeInTheDocument()
+    expect(
+      views.compareDocumentPosition(screen.getByTestId('command-rail-settings'))
+        & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('opens the chosen view from the rail and marks the current one', () => {
+    const props = renderRail({ activeView: 'graph', changeCount: 4 })
+
+    fireEvent.click(screen.getByTestId('command-rail-research'))
+    fireEvent.click(screen.getByTestId('command-rail-changes'))
+
+    expect(props.onSelectView).toHaveBeenCalledWith('research')
+    expect(props.onSelectView).toHaveBeenCalledWith('changes')
+    expect(screen.getByTestId('command-rail-graph')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('command-rail-research')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByLabelText('4')).toBeInTheDocument()
   })
 
   it('opens settings from the gear', () => {
@@ -84,7 +115,8 @@ describe('the rail puts sessions in its open middle', () => {
 
     expect(screen.queryByTestId('command-rail-chat')).not.toBeInTheDocument()
     expect(screen.queryByTestId('command-rail-inbox')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
+    expect(screen.getByTestId('command-rail-changes')).toBeInTheDocument()
+    expect(screen.getByText('Views')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-settings')).not.toHaveTextContent('Settings')
 

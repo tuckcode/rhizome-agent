@@ -354,6 +354,30 @@ describe('dispatchMenuEvent', () => {
     expect(h.onSelectFilter).toHaveBeenCalledWith('changes')
   })
 
+  it('go-research selects research filter', () => {
+    const h = makeHandlers()
+    dispatchMenuEvent('go-research', h)
+    expect(h.onSelectFilter).toHaveBeenCalledWith('research')
+  })
+
+  it('go-graph selects graph filter', () => {
+    const h = makeHandlers()
+    dispatchMenuEvent('go-graph', h)
+    expect(h.onSelectFilter).toHaveBeenCalledWith('graph')
+  })
+
+  it('go-mycelium selects mycelium filter', () => {
+    const h = makeHandlers()
+    dispatchMenuEvent('go-mycelium', h)
+    expect(h.onSelectFilter).toHaveBeenCalledWith('mycelium')
+  })
+
+  it('go-pulse selects pulse filter', () => {
+    const h = makeHandlers()
+    dispatchMenuEvent('go-pulse', h)
+    expect(h.onSelectFilter).toHaveBeenCalledWith('pulse')
+  })
+
   it('go-inbox selects inbox filter', () => {
     const h = makeHandlers()
     dispatchMenuEvent('go-inbox', h)

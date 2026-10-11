@@ -4,7 +4,6 @@ import {
   GitCommit,
   Moon,
   Package,
-  Pulse,
   Sparkle,
   Sun,
   Warning as AlertTriangle,
@@ -106,9 +105,8 @@ interface StatusBarSecondarySectionProps {
   versionUpdateIndicator?: ReactNode
   onOpenResearch?: () => void
   onOpenSettings?: () => void
-  /** When the command rail is active it owns Settings, so the duplicate
-   *  status-bar Settings entry is hidden. Research stays on the status bar
-   *  because the rail is sessions-only. */
+  /** When the command rail is active it owns Settings and Views, so the
+   *  duplicate status-bar Settings and Research entries are hidden. */
   commandRailActive?: boolean
   stacked?: boolean
   compact?: boolean
@@ -317,17 +315,17 @@ function ResearchButton({
 
 /**
  * Wave 5.4b §2.6: the controls the vault·git pill absorbs — sync now, commit,
- * history, conflicts — rendered as dropdown entries instead of strip buttons.
+ * conflicts — rendered as dropdown entries instead of strip buttons. History
+ * lives in the rail Views group.
  */
 function buildGitPillActions({
   conflictCount,
   onCommitPush,
-  onClickPulse,
   onOpenConflictResolver,
   onTriggerSync,
 }: Pick<
   StatusBarPrimarySectionProps,
-  'conflictCount' | 'onCommitPush' | 'onClickPulse' | 'onOpenConflictResolver' | 'onTriggerSync'
+  'conflictCount' | 'onCommitPush' | 'onOpenConflictResolver' | 'onTriggerSync'
 >): VaultAction[] {
   const actions: VaultAction[] = []
 
@@ -348,16 +346,6 @@ function buildGitPillActions({
       labelKey: 'status.commit.label',
       testId: 'vault-menu-commit',
       onClick: onCommitPush,
-    })
-  }
-
-  if (onClickPulse) {
-    actions.push({
-      key: 'history',
-      icon: <Pulse size={12} />,
-      labelKey: 'status.history.label',
-      testId: 'vault-menu-history',
-      onClick: onClickPulse,
     })
   }
 
@@ -526,7 +514,7 @@ export function StatusBarPrimarySection({
 }: StatusBarPrimarySectionProps) {
   const pillMode = commandRailActive
   const gitPillActions = pillMode
-    ? buildGitPillActions({ conflictCount, onCommitPush, onClickPulse, onOpenConflictResolver, onTriggerSync })
+    ? buildGitPillActions({ conflictCount, onCommitPush, onOpenConflictResolver, onTriggerSync })
     : undefined
 
   return (
@@ -633,7 +621,7 @@ export function StatusBarSecondarySection({
           </Button>
         </ActionTooltip>
       )}
-      {onOpenResearch ? <ResearchButton compact={compact} locale={locale} onOpenResearch={onOpenResearch} /> : null}
+      {!commandRailActive && onOpenResearch ? <ResearchButton compact={compact} locale={locale} onOpenResearch={onOpenResearch} /> : null}
       <BuildNumberButton buildNumber={buildNumber} onCheckForUpdates={onCheckForUpdates} compact={compact} locale={locale} />
       {versionUpdateIndicator}
       <ActionTooltip copy={themeTooltip} side="top" align="end" contentTestId="status-theme-mode-tooltip">

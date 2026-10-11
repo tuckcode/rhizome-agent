@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 
 vi.mock('../lib/productAnalytics', () => ({
   trackCommandRailPinChanged: vi.fn(),
+  trackRailViewSelected: vi.fn(),
 }))
 vi.mock('../mock-tauri', () => ({ isTauri: () => true }))
 const platform = vi.hoisted(() => ({ mac: true }))
@@ -25,6 +26,7 @@ function renderRail() {
     <CommandRail
       locale="en"
       onOpenSettings={vi.fn()}
+      onSelectView={vi.fn()}
     />
   )
   return screen.getByTestId('command-rail')

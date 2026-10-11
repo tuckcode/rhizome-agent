@@ -145,6 +145,11 @@ describe('appCommandDispatcher', () => {
     expect(findShortcutCommandId('command-or-ctrl-shift', '¬', 'KeyL')).toBe(APP_COMMAND_IDS.viewToggleAiChat)
     expect(findShortcutCommandId('command-or-ctrl-shift', 'T', 'KeyT')).toBe(APP_COMMAND_IDS.viewToggleTableOfContents)
     expect(findShortcutCommandId('command-or-ctrl-shift', 'v', 'KeyV')).toBe(APP_COMMAND_IDS.editPastePlainText)
+    expect(findShortcutCommandId('command-or-ctrl-alt', '1', 'Digit1')).toBe(APP_COMMAND_IDS.goResearch)
+    expect(findShortcutCommandId('command-or-ctrl-alt', '2', 'Digit2')).toBe(APP_COMMAND_IDS.goGraph)
+    expect(findShortcutCommandId('command-or-ctrl-alt', '3', 'Digit3')).toBe(APP_COMMAND_IDS.goMycelium)
+    expect(findShortcutCommandId('command-or-ctrl-alt', '4', 'Digit4')).toBe(APP_COMMAND_IDS.goChanges)
+    expect(findShortcutCommandId('command-or-ctrl-alt', '5', 'Digit5')).toBe(APP_COMMAND_IDS.goHistory)
   })
 
   it('routes every shortcut-capable command through the dispatcher', () => {

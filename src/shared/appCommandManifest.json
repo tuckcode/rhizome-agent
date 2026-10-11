@@ -407,7 +407,84 @@
         "kind": "filter",
         "value": "changes"
       },
-      "menuOwned": true
+      "menuOwned": true,
+      "shortcut": {
+        "combo": "command-or-ctrl-alt",
+        "key": "4",
+        "code": "Digit4",
+        "display": "⌥⌘4",
+        "accelerator": "CmdOrCtrl+Alt+4",
+        "requiresManualNativeAcceleratorQa": true
+      },
+      "preferredShortcutQaMode": "renderer-shortcut-event"
+    },
+    "goResearch": {
+      "id": "go-research",
+      "route": {
+        "kind": "filter",
+        "value": "research"
+      },
+      "menuOwned": true,
+      "shortcut": {
+        "combo": "command-or-ctrl-alt",
+        "key": "1",
+        "code": "Digit1",
+        "display": "⌥⌘1",
+        "accelerator": "CmdOrCtrl+Alt+1",
+        "requiresManualNativeAcceleratorQa": true
+      },
+      "preferredShortcutQaMode": "renderer-shortcut-event"
+    },
+    "goGraph": {
+      "id": "go-graph",
+      "route": {
+        "kind": "filter",
+        "value": "graph"
+      },
+      "menuOwned": true,
+      "shortcut": {
+        "combo": "command-or-ctrl-alt",
+        "key": "2",
+        "code": "Digit2",
+        "display": "⌥⌘2",
+        "accelerator": "CmdOrCtrl+Alt+2",
+        "requiresManualNativeAcceleratorQa": true
+      },
+      "preferredShortcutQaMode": "renderer-shortcut-event"
+    },
+    "goMycelium": {
+      "id": "go-mycelium",
+      "route": {
+        "kind": "filter",
+        "value": "mycelium"
+      },
+      "menuOwned": true,
+      "shortcut": {
+        "combo": "command-or-ctrl-alt",
+        "key": "3",
+        "code": "Digit3",
+        "display": "⌥⌘3",
+        "accelerator": "CmdOrCtrl+Alt+3",
+        "requiresManualNativeAcceleratorQa": true
+      },
+      "preferredShortcutQaMode": "renderer-shortcut-event"
+    },
+    "goHistory": {
+      "id": "go-pulse",
+      "route": {
+        "kind": "filter",
+        "value": "pulse"
+      },
+      "menuOwned": true,
+      "shortcut": {
+        "combo": "command-or-ctrl-alt",
+        "key": "5",
+        "code": "Digit5",
+        "display": "⌥⌘5",
+        "accelerator": "CmdOrCtrl+Alt+5",
+        "requiresManualNativeAcceleratorQa": true
+      },
+      "preferredShortcutQaMode": "renderer-shortcut-event"
     },
     "goInbox": {
       "id": "go-inbox",
@@ -829,6 +906,34 @@
       "items": [
         {
           "kind": "command",
+          "command": "goResearch",
+          "label": "Research"
+        },
+        {
+          "kind": "command",
+          "command": "goGraph",
+          "label": "Graph"
+        },
+        {
+          "kind": "command",
+          "command": "goMycelium",
+          "label": "Mycelium"
+        },
+        {
+          "kind": "command",
+          "command": "goChanges",
+          "label": "Changes"
+        },
+        {
+          "kind": "command",
+          "command": "goHistory",
+          "label": "History"
+        },
+        {
+          "kind": "separator"
+        },
+        {
+          "kind": "command",
           "command": "goAllNotes",
           "label": "All Notes"
         },
@@ -836,11 +941,6 @@
           "kind": "command",
           "command": "goArchived",
           "label": "Archived"
-        },
-        {
-          "kind": "command",
-          "command": "goChanges",
-          "label": "Changes"
         },
         {
           "kind": "command",

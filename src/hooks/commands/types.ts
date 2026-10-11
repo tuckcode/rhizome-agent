@@ -1,4 +1,4 @@
-export type CommandGroup = 'Navigation' | 'Note' | 'Git' | 'View' | 'Settings'
+export type CommandGroup = 'Views' | 'Navigation' | 'Note' | 'Git' | 'View' | 'Settings'
 
 export interface CommandAction {
   id: string
@@ -10,7 +10,7 @@ export interface CommandAction {
   execute: () => void
 }
 
-const GROUP_ORDER: CommandGroup[] = ['Navigation', 'Note', 'Git', 'View', 'Settings']
+const GROUP_ORDER: CommandGroup[] = ['Views', 'Navigation', 'Note', 'Git', 'View', 'Settings']
 
 export function groupSortKey(group: CommandGroup): number {
   return GROUP_ORDER.indexOf(group)

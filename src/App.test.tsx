@@ -37,9 +37,10 @@ vi.mock('./components/ResearchPanel', () => ({
 }))
 
 vi.mock('./components/graph/GraphView', () => ({
-  default: ({ onOpenNote }: { onOpenNote: (path: string) => void }) => (
+  default: ({ onOpenNote, onExit }: { onOpenNote: (path: string) => void; onExit?: () => void }) => (
     <div data-testid="graph-view">
       <button onClick={() => onOpenNote('project/test.md')}>Open note</button>
+      {onExit ? <button type="button" data-testid="graph-exit" onClick={onExit}>Back to chat</button> : null}
     </div>
   ),
 }))
@@ -296,7 +297,7 @@ function getHeaderForNoteList(noteListContainer: HTMLElement) {
   return within(noteListContainer.parentElement as HTMLElement).getByRole('heading', { level: 3 })
 }
 
-async function selectFilterInVaultPanel(label: 'Inbox' | 'Changes') {
+async function selectFilterInVaultPanel(label: 'Inbox') {
   if (!screen.queryByTestId('vault-panel')) {
     fireEvent.click(await screen.findByTestId('vault-panel-restore'))
   }
@@ -312,10 +313,6 @@ async function selectFilterInVaultPanel(label: 'Inbox' | 'Changes') {
 
 async function selectInboxInVaultPanel() {
   await selectFilterInVaultPanel('Inbox')
-}
-
-async function selectChangesInVaultPanel() {
-  await selectFilterInVaultPanel('Changes')
 }
 
 async function clickNoteListItem(noteListContainer: HTMLElement, title: string, options?: MouseEventInit) {
@@ -709,23 +706,20 @@ describe('App', () => {
     const input = await screen.findByTestId('agent-input')
     input.textContent = 'Keep this unsent draft'
     fireEvent.input(input)
-    await selectChangesInVaultPanel()
-    fireEvent.click(await screen.findByRole('button', { name: 'Wiki Graph' }))
+    fireEvent.click(await screen.findByTestId('command-rail-graph'))
     await screen.findByTestId('graph-view')
-    fireEvent.click(screen.getByRole('button', { name: 'Close connections' }))
+    fireEvent.click(screen.getByTestId('graph-exit'))
     expect(await screen.findByTestId('agent-input')).toHaveTextContent('Keep this unsent draft')
   })
 
-  it('leaves the expanded graph overlay and displays the note when Open note is clicked', async () => {
+  it('opens Graph as the center canvas from the rail Views group', async () => {
     localStorage.setItem('rhizome:command-rail-expanded', '1')
     render(<App />)
     await screen.findByTestId('chat-home')
-    await selectChangesInVaultPanel()
-    fireEvent.click(await screen.findByRole('button', { name: 'Wiki Graph' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Open note' }))
-    await waitFor(() => expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument())
-    await waitFor(() => expect(window.__rhizomeTest?.activeTabPath).toBe('/vault/project/test.md'))
-    expect(await screen.findByTestId('blocknote-view')).toBeVisible()
+    fireEvent.click(await screen.findByTestId('command-rail-graph'))
+    expect(await screen.findByTestId('graph-view')).toBeInTheDocument()
+    expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
+    expect(screen.getByTestId('chat-center')).toHaveStyle({ display: 'none' })
   })
 
   it('opens the session-footprint chip into Connections, not the full-page Mycelium destination', async () => {
@@ -758,8 +752,7 @@ describe('App', () => {
     await screen.findByTestId('chat-home')
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
     expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Wiki Graph' }))
-    expect(await screen.findByTestId('connections-panel')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('command-rail-graph'))
     expect(await screen.findByTestId('graph-view')).toBeInTheDocument()
   })
 
@@ -768,7 +761,7 @@ describe('App', () => {
     render(<App />)
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByTestId('status-research'))
+    fireEvent.click(screen.getByTestId('command-rail-research'))
 
     expect(await screen.findByTestId('research-destination')).toBeInTheDocument()
     expect(screen.getByTestId('research-panel-stub')).toBeInTheDocument()
@@ -777,7 +770,7 @@ describe('App', () => {
       screen.getByTestId('chat-home'),
     )
 
-    fireEvent.click(screen.getByTestId('status-research'))
+    fireEvent.click(screen.getByTestId('command-rail-research'))
     expect(screen.queryByTestId('research-destination')).not.toBeInTheDocument()
   })
 
@@ -831,7 +824,7 @@ describe('App', () => {
 
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByTestId('command-rail-inbox')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
+    expect(screen.getByTestId('command-rail-changes')).toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     expect(screen.getByTestId('vault-panel-restore')).toBeVisible()
   })

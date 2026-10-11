@@ -826,7 +826,7 @@ describe('PrimeSessionList — context menu (C67)', () => {
     expect(onOpenMycelium).toHaveBeenCalledWith('/sessions/a.jsonl')
   })
 
-  it('hides View in Mycelium when the caller did not wire it', async () => {
+  it('hides Show in Mycelium when the caller did not wire it', async () => {
     invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: 'No map' })]
 
     render(<PrimeSessionList now={NOW} />)

@@ -41,7 +41,7 @@ test.describe('Unified shell geometry', () => {
     await page.getByTestId('command-rail').hover()
     await expect(page.getByTestId('command-rail')).toBeVisible()
     await expect(page.getByTestId('command-rail-chat')).toHaveCount(0)
-    await expect(page.getByTestId('command-rail-research')).toHaveCount(0)
+    await expect(page.getByTestId('command-rail-research')).toHaveCount(1)
     await expect(page.getByTestId('command-rail-inbox')).toHaveCount(0)
     // Fresh launch is Chat with the existing Show Notes restore strip.
     await expect(page.getByTestId('vault-panel')).toHaveCount(0)

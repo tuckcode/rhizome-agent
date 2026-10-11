@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { GearSix, Sidebar } from '@phosphor-icons/react'
+import {
+  CirclesThree,
+  ClockCounterClockwise,
+  GearSix,
+  GitDiff,
+  Graph,
+  MagnifyingGlassPlus,
+  Sidebar,
+} from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { ActionTooltip } from './ui/action-tooltip'
 import { Button } from './ui/button'
@@ -7,9 +15,11 @@ import { createTranslator, type AppLocale } from '../lib/i18n'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import { readStoredBooleanPreference, writeStoredBooleanPreference } from '../lib/uiPreference'
 import { usePanelWidth } from '../hooks/usePanelWidth'
-import { trackSessionsDrawerOpened } from '../lib/productAnalytics'
+import { trackRailViewSelected, trackSessionsDrawerOpened } from '../lib/productAnalytics'
+import { RAIL_VIEWS, type RailViewId } from '../lib/railViews'
 import { startResizeDrag } from '../utils/startResizeDrag'
 import { COMMAND_RAIL_EXPANDED_WIDTH_PX } from '../utils/trafficLights'
+import { formatShortcutDisplay } from '../hooks/appCommandCatalog'
 
 interface CommandRailProps {
   locale: AppLocale
@@ -19,6 +29,9 @@ interface CommandRailProps {
   width?: number
   onWidthChange?: (delta: number) => void
   onOpenSettings: () => void
+  onSelectView: (view: RailViewId) => void
+  activeView?: RailViewId | null
+  changeCount?: number
   /** Expanded rail's open middle, where Chat mounts its session list. */
   onSessionsSlotReady?: (slot: HTMLDivElement | null) => void
   /** Current layout width. Collapsed is 46. Open, including hover, is the wide rail. */
@@ -30,6 +43,14 @@ interface CommandRailProps {
   drawer?: boolean
   /** Bump to close an open drawer — the shell does this after a session is picked. */
   drawerCloseSignal?: number
+}
+
+const VIEW_ICONS: Record<RailViewId, Icon> = {
+  research: MagnifyingGlassPlus,
+  graph: Graph,
+  mycelium: CirclesThree,
+  changes: GitDiff,
+  history: ClockCounterClockwise,
 }
 
 const RAIL_BUTTON_SIZE = 30
@@ -57,6 +78,7 @@ function RailButton({
   iconOnly = false,
   label,
   onClick,
+  shortcut,
   testId,
 }: {
   active: boolean
@@ -66,6 +88,7 @@ function RailButton({
   iconOnly?: boolean
   label: string
   onClick: () => void
+  shortcut?: string
   testId: string
 }) {
   const showLabel = expanded && !iconOnly
@@ -90,8 +113,9 @@ function RailButton({
       style={{
         width: showLabel ? '100%' : RAIL_BUTTON_SIZE,
         height: RAIL_BUTTON_SIZE,
-        color: active ? 'var(--accent-blue)' : 'var(--text-muted)',
-        backgroundColor: active ? 'var(--accent-blue-bg)' : undefined,
+        color: active ? 'var(--foreground)' : 'var(--text-muted)',
+        backgroundColor: active ? 'var(--state-selected)' : undefined,
+        boxShadow: active ? 'inset 2px 0 0 var(--accent-blue)' : undefined,
       }}
     >
       <IconComponent size={RAIL_ICON_SIZE} weight={active ? 'fill' : 'regular'} />
@@ -99,11 +123,16 @@ function RailButton({
       {badge && badge > 0 ? (
         <span
           className={expanded
-            ? 'ml-auto min-w-[18px] rounded-full bg-muted px-1.5 text-center text-[10px] leading-[18px]'
-            : 'absolute right-0 top-0 min-w-[14px] rounded-full bg-muted px-1 text-center text-[9px] leading-[14px]'}
+            ? 'ml-auto min-w-[18px] rounded-full bg-muted px-1.5 text-center text-[10px] leading-[18px] text-muted-foreground'
+            : 'absolute right-0 top-0 min-w-[14px] rounded-full bg-muted px-1 text-center text-[9px] leading-[14px] text-muted-foreground'}
           aria-label={`${badge}`}
         >
           {badge > 99 ? '99+' : badge}
+        </span>
+      ) : null}
+      {showLabel && shortcut ? (
+        <span className={`${badge && badge > 0 ? 'ml-1' : 'ml-auto'} shrink-0 font-mono text-[10px] text-muted-foreground`}>
+          {shortcut}
         </span>
       ) : null}
     </Button>
@@ -113,21 +142,24 @@ function RailButton({
   // the pointer from a target the user can already read. The Settings gear is
   // icon-only in both rail widths, so it keeps the tooltip.
   return showLabel ? button : (
-    <ActionTooltip copy={{ label }} side="right">
+    <ActionTooltip copy={{ label, shortcut }} side="right">
       {button}
     </ActionTooltip>
   )
 }
 
 /**
- * Sessions rail — behind `shell_command_rail`. Settings and the sidebar
- * control live in the footer. Research opens from the status bar and command palette. Chat is
- * the conversation itself; leave Research/Graph/Mycelium with "Back to chat".
+ * Sessions rail — behind `shell_command_rail`. The Views group is the home
+ * for Research, Graph, Mycelium, Changes, and History. Settings and the
+ * sidebar control live in the footer.
  */
 export function CommandRail({
   locale,
   pinned, autoCollapsed = false, onPinnedChange, width, onWidthChange,
   onOpenSettings,
+  onSelectView,
+  activeView = null,
+  changeCount = 0,
   onSessionsSlotReady,
   onLayoutWidthChange,
   drawer = false,
@@ -426,7 +458,7 @@ export function CommandRail({
         />
       ) : null}
 
-      {/* Sessions are the rail. Destinations like Research live elsewhere. */}
+      {/* Sessions fill the open middle. Views stay visible in both rail widths. */}
       <div className="min-h-0 flex-1 overflow-hidden">
         {expanded ? (
           <div
@@ -436,6 +468,39 @@ export function CommandRail({
             style={{ pointerEvents: overlaying ? 'none' : undefined }}
           />
         ) : null}
+      </div>
+
+      <div
+        role="group"
+        aria-label="Views"
+        data-testid="command-rail-views"
+        className={expanded ? 'flex flex-col items-stretch gap-0.5 pt-1' : 'flex flex-col items-center gap-0.5'}
+        style={{ pointerEvents: overlaying ? 'auto' : undefined }}
+      >
+        {expanded ? (
+          <div
+            className="px-2 pb-1 text-[11px] font-medium text-muted-foreground"
+            data-testid="command-rail-views-heading"
+          >
+            Views
+          </div>
+        ) : null}
+        {RAIL_VIEWS.map((view) => (
+          <RailButton
+            key={view.id}
+            active={activeView === view.id}
+            badge={view.id === 'changes' ? changeCount : undefined}
+            expanded={expanded}
+            icon={VIEW_ICONS[view.id]}
+            label={view.label}
+            shortcut={formatShortcutDisplay({ display: `⌥⌘${view.shortcutNumber}` })}
+            onClick={() => {
+              trackRailViewSelected(view.id)
+              onSelectView(view.id)
+            }}
+            testId={view.testId}
+          />
+        ))}
       </div>
 
       <div
