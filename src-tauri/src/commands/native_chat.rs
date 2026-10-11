@@ -475,15 +475,11 @@ fn free_tier_routing_model_with(
     system: Option<String>,
     observer: impl FnMut(crate::rhizome_routing::ProviderAttempt) + Send + 'static,
 ) -> Result<RoutingModel<ProviderKeys, SystemClock>, String> {
-    let _ = keys;
-    Ok(RoutingModel::new(
-        Catalog::pinned(),
-        ProviderKeys::for_app()?,
-        SystemClock,
-        HttpLimits::STREAM,
+    Ok(
+        RoutingModel::new(Catalog::pinned(), keys?, SystemClock, HttpLimits::STREAM)
+            .with_observer(observer)
+            .with_system_prompt(system),
     )
-    .with_observer(observer)
-    .with_system_prompt(system))
 }
 
 fn catalog_provider(kind: AiModelProviderKind, id: &str) -> AiModelProvider {

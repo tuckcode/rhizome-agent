@@ -330,9 +330,19 @@ impl ValueCache {
         ttl: Duration,
         load: impl FnOnce(&[String]) -> Vec<String>,
     ) -> Vec<String> {
-        let _ = (generation, now, ttl);
+        if let Some(entry) = &self.entry {
+            let fresh = now.saturating_duration_since(entry.loaded_at) < ttl;
+            if fresh && entry.generation == generation && entry.ids == ids {
+                return entry.values.clone();
+            }
+        }
         let values = load(&ids);
-        self.entry = None;
+        self.entry = Some(CachedValues {
+            generation,
+            ids,
+            loaded_at: now,
+            values: values.clone(),
+        });
         values
     }
 }
@@ -745,11 +755,31 @@ mod tests {
         let ids = || vec!["groq".to_string()];
 
         cache.get(1, ids(), start, ttl, counting_loader(&calls));
-        cache.get(1, ids(), start + Duration::from_secs(59), ttl, counting_loader(&calls));
-        assert_eq!(calls.get(), 1, "inside the ttl the keychain is not read again");
+        cache.get(
+            1,
+            ids(),
+            start + Duration::from_secs(59),
+            ttl,
+            counting_loader(&calls),
+        );
+        assert_eq!(
+            calls.get(),
+            1,
+            "inside the ttl the keychain is not read again"
+        );
 
-        cache.get(1, ids(), start + Duration::from_secs(61), ttl, counting_loader(&calls));
-        assert_eq!(calls.get(), 2, "after the ttl an outside key change is picked up");
+        cache.get(
+            1,
+            ids(),
+            start + Duration::from_secs(61),
+            ttl,
+            counting_loader(&calls),
+        );
+        assert_eq!(
+            calls.get(),
+            2,
+            "after the ttl an outside key change is picked up"
+        );
     }
 
     #[test]
