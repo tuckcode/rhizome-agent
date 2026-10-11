@@ -16,6 +16,7 @@ export type AppCommandShortcutCombo =
   | 'command-or-ctrl'
   | 'command-or-ctrl-shift'
   | 'command-or-ctrl-alt'
+  | 'command-and-ctrl'
   | 'command-shift'
 export type AppCommandDeterministicQaMode =
   | 'renderer-shortcut-event'
@@ -98,8 +99,15 @@ interface AppCommandShortcutDefinition {
   display: string
 }
 
+type ManifestPlatformAccelerator = string | {
+  macos?: string
+  windows?: string
+  linux?: string
+  default: string
+}
+
 interface AppCommandManifestShortcutDefinition extends AppCommandShortcutDefinition {
-  accelerator: string
+  accelerator: ManifestPlatformAccelerator
   requiresManualNativeAcceleratorQa?: boolean
 }
 
@@ -387,6 +395,7 @@ const shortcutKeyMaps = {
   'command-or-ctrl': new Map<string, AppCommandId>(),
   'command-or-ctrl-shift': new Map<string, AppCommandId>(),
   'command-or-ctrl-alt': new Map<string, AppCommandId>(),
+  'command-and-ctrl': new Map<string, AppCommandId>(),
   'command-shift': new Map<string, AppCommandId>(),
 } satisfies Record<AppCommandShortcutCombo, Map<string, AppCommandId>>
 
@@ -394,6 +403,7 @@ const shortcutCodeMaps = {
   'command-or-ctrl': new Map<string, AppCommandId>(),
   'command-or-ctrl-shift': new Map<string, AppCommandId>(),
   'command-or-ctrl-alt': new Map<string, AppCommandId>(),
+  'command-and-ctrl': new Map<string, AppCommandId>(),
   'command-shift': new Map<string, AppCommandId>(),
 } satisfies Record<AppCommandShortcutCombo, Map<string, AppCommandId>>
 
@@ -401,6 +411,7 @@ const COMMAND_ONLY_COMBOS: readonly AppCommandShortcutCombo[] = ['command-or-ctr
 const COMMAND_SHIFT_COMBOS: readonly AppCommandShortcutCombo[] = ['command-shift', 'command-or-ctrl-shift']
 const COMMAND_OR_CTRL_SHIFT_COMBOS: readonly AppCommandShortcutCombo[] = ['command-or-ctrl-shift']
 const COMMAND_OR_CTRL_ALT_COMBOS: readonly AppCommandShortcutCombo[] = ['command-or-ctrl-alt']
+const COMMAND_AND_CTRL_COMBOS: readonly AppCommandShortcutCombo[] = ['command-and-ctrl']
 const NO_SHORTCUT_COMBOS: readonly AppCommandShortcutCombo[] = []
 
 function normalizeShortcutKey(key: string): string {
@@ -470,8 +481,8 @@ export function getShortcutEventInit(
     altKey: viewModifiers ? viewModifiers.altKey : shortcut.combo === 'command-or-ctrl-alt',
     bubbles: true,
     cancelable: true,
-    ctrlKey: useControl,
-    metaKey: !useControl,
+    ctrlKey: viewModifiers ? viewModifiers.ctrlKey : useControl,
+    metaKey: viewModifiers ? viewModifiers.metaKey : !useControl,
     shiftKey: viewModifiers
       ? viewModifiers.shiftKey
       : shortcut.combo === 'command-or-ctrl-shift' || shortcut.combo === 'command-shift',
@@ -485,7 +496,10 @@ export function shortcutCombosForEvent({
   shiftKey,
 }: Pick<ShortcutEventLike, 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'>): readonly AppCommandShortcutCombo[] {
   if (!metaKey && !ctrlKey) return NO_SHORTCUT_COMBOS
-  if (isMac() && ctrlKey) return NO_SHORTCUT_COMBOS
+  if (isMac() && ctrlKey) {
+    if (metaKey && !altKey && !shiftKey) return COMMAND_AND_CTRL_COMBOS
+    return NO_SHORTCUT_COMBOS
+  }
   if (altKey && shiftKey) return NO_SHORTCUT_COMBOS
   if (altKey) return COMMAND_OR_CTRL_ALT_COMBOS
   if (shiftKey) {

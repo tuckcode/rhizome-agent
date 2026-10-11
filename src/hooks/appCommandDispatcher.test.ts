@@ -146,11 +146,11 @@ describe('appCommandDispatcher', () => {
     expect(findShortcutCommandId('command-or-ctrl-shift', '¬', 'KeyL')).toBe(APP_COMMAND_IDS.viewToggleAiChat)
     expect(findShortcutCommandId('command-or-ctrl-shift', 'T', 'KeyT')).toBe(APP_COMMAND_IDS.viewToggleTableOfContents)
     expect(findShortcutCommandId('command-or-ctrl-shift', 'v', 'KeyV')).toBe(APP_COMMAND_IDS.editPastePlainText)
-    expect(findShortcutCommandId('command-or-ctrl-alt', '1', 'Digit1')).toBe(APP_COMMAND_IDS.goResearch)
-    expect(findShortcutCommandId('command-or-ctrl-alt', '2', 'Digit2')).toBe(APP_COMMAND_IDS.goGraph)
-    expect(findShortcutCommandId('command-or-ctrl-alt', '3', 'Digit3')).toBe(APP_COMMAND_IDS.goMycelium)
-    expect(findShortcutCommandId('command-or-ctrl-alt', '4', 'Digit4')).toBe(APP_COMMAND_IDS.goChanges)
-    expect(findShortcutCommandId('command-or-ctrl-alt', '5', 'Digit5')).toBe(APP_COMMAND_IDS.goHistory)
+    expect(findShortcutCommandId('command-and-ctrl', '1', 'Digit1')).toBe(APP_COMMAND_IDS.goResearch)
+    expect(findShortcutCommandId('command-and-ctrl', '2', 'Digit2')).toBe(APP_COMMAND_IDS.goGraph)
+    expect(findShortcutCommandId('command-and-ctrl', '3', 'Digit3')).toBe(APP_COMMAND_IDS.goMycelium)
+    expect(findShortcutCommandId('command-and-ctrl', '4', 'Digit4')).toBe(APP_COMMAND_IDS.goChanges)
+    expect(findShortcutCommandId('command-and-ctrl', '5', 'Digit5')).toBe(APP_COMMAND_IDS.goHistory)
   })
 
   it('routes every shortcut-capable command through the dispatcher', () => {
@@ -215,7 +215,7 @@ describe('appCommandDispatcher', () => {
     expect(getShortcutEventInit(APP_COMMAND_IDS.appCheckForUpdates)).toBeNull()
   })
 
-  it('uses Ctrl+Shift for Views on Windows/Linux and keeps Option+Cmd on Mac', () => {
+  it('uses Ctrl+Shift for Views on Windows/Linux and Ctrl+Cmd on Mac', () => {
     setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
     expect(getAppCommandShortcutDisplay(APP_COMMAND_IDS.goResearch)).toBe('Ctrl+Shift+1')
     expect(getShortcutEventInit(APP_COMMAND_IDS.goResearch, { preferControl: true })).toMatchObject({
@@ -240,12 +240,12 @@ describe('appCommandDispatcher', () => {
     }, null)
 
     setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')
-    expect(getAppCommandShortcutDisplay(APP_COMMAND_IDS.goResearch)).toBe('⌥⌘1')
+    expect(getAppCommandShortcutDisplay(APP_COMMAND_IDS.goResearch)).toBe('⌃⌘1')
     expect(getShortcutEventInit(APP_COMMAND_IDS.goMycelium)).toMatchObject({
       key: '3',
       code: 'Digit3',
-      altKey: true,
-      ctrlKey: false,
+      altKey: false,
+      ctrlKey: true,
       metaKey: true,
       shiftKey: false,
     })
@@ -253,8 +253,19 @@ describe('appCommandDispatcher', () => {
       key: '1',
       code: 'Digit1',
       metaKey: true,
-      altKey: true,
+      ctrlKey: true,
     }, APP_COMMAND_IDS.goResearch)
+    expectShortcutEventCommand({
+      key: '1',
+      code: 'Digit1',
+      metaKey: true,
+      altKey: true,
+    }, null)
+    expectShortcutEventCommand({
+      key: '1',
+      code: 'Digit1',
+      metaKey: true,
+    }, APP_COMMAND_IDS.viewEditorOnly)
   })
 
   it('resolves event modifiers through the shared shortcut catalog', () => {

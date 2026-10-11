@@ -5,14 +5,9 @@ import { RAIL_VIEWS, type RailViewId } from './railViews'
 /**
  * View shortcut policy.
  *
- * knispo is still choosing the Mac combo. Option+Cmd+1–5 collides with
- * BlockNote headings because the native menu grabs it first. Swap
- * `MAC_VIEW_SHORTCUT_POLICY` when he calls it. Until then Mac stays
- * Option+Cmd.
- *
- * Windows/Linux must not use Ctrl+Alt+digit. That chord is AltGr on many
- * layouts and eats characters (superscript 2 and 3). Those platforms use
- * Ctrl+Shift+1–5.
+ * Mac is Ctrl+Cmd+1–5 (knispo, 2026-10-11). That leaves BlockNote's
+ * Option+Cmd heading shortcuts alone. Windows/Linux stay Ctrl+Shift+1–5;
+ * Ctrl+Alt+digit is AltGr on many layouts and must not be used.
  */
 export interface ViewShortcutPolicy {
   combo: AppCommandShortcutCombo
@@ -21,9 +16,9 @@ export interface ViewShortcutPolicy {
 }
 
 export const MAC_VIEW_SHORTCUT_POLICY: ViewShortcutPolicy = {
-  combo: 'command-or-ctrl-alt',
-  displayPrefix: '⌥⌘',
-  ariaPrefix: 'Alt+Meta+',
+  combo: 'command-and-ctrl',
+  displayPrefix: '⌃⌘',
+  ariaPrefix: 'Control+Meta+',
 }
 
 export const OTHER_VIEW_SHORTCUT_POLICY: ViewShortcutPolicy = {
@@ -70,19 +65,31 @@ export function railViewShortcutDisplayForCommand(commandId: string): string | n
   return view ? railViewShortcutDisplay(view.shortcutNumber) : null
 }
 
-/** Modifiers for a synthesized view chord. Swap happens in the policy objects. */
-export function viewShortcutEventModifiers(): { altKey: boolean; shiftKey: boolean } {
-  const combo = viewShortcutPolicy().combo
-  return {
-    altKey: combo === 'command-or-ctrl-alt',
-    shiftKey: combo === 'command-or-ctrl-shift',
+/** Modifiers for a synthesized view chord. */
+export function viewShortcutEventModifiers(): {
+  altKey: boolean
+  shiftKey: boolean
+  ctrlKey: boolean
+  metaKey: boolean
+} {
+  if (viewShortcutPolicy().combo === 'command-and-ctrl') {
+    return { altKey: false, shiftKey: false, ctrlKey: true, metaKey: true }
   }
+  return { altKey: false, shiftKey: true, ctrlKey: true, metaKey: false }
 }
 
 function eventCombo(event: Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'>): AppCommandShortcutCombo | null {
-  const commandHeld = isMac() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
-  if (!commandHeld) return null
   if (event.altKey && event.shiftKey) return null
+
+  if (isMac()) {
+    if (event.metaKey && event.ctrlKey && !event.altKey && !event.shiftKey) return 'command-and-ctrl'
+    if (!event.metaKey || event.ctrlKey) return null
+    if (event.altKey) return 'command-or-ctrl-alt'
+    if (event.shiftKey) return 'command-or-ctrl-shift'
+    return 'command-or-ctrl'
+  }
+
+  if (!event.ctrlKey || event.metaKey) return null
   if (event.altKey) return 'command-or-ctrl-alt'
   if (event.shiftKey) return 'command-or-ctrl-shift'
   return 'command-or-ctrl'
@@ -95,8 +102,8 @@ function digitFromEvent(event: Pick<KeyboardEvent, 'key' | 'code'>): string | nu
 }
 
 /**
- * Match a view chord, or reject Ctrl+Alt+digit on non-Mac so AltGr cannot
- * fall through to the shared catalog map.
+ * Match a view chord. Rejects Option+Cmd+digit on Mac (BlockNote headings)
+ * and Ctrl+Alt+digit on Windows/Linux (AltGr).
  */
 export function matchRailViewShortcutEvent(
   event: Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'key' | 'code'>,
@@ -109,6 +116,6 @@ export function matchRailViewShortcutEvent(
 
   const policy = viewShortcutPolicy()
   if (combo === policy.combo) return railViewCommandIdForNumber(digit)
-  if (combo === 'command-or-ctrl-alt' && policy.combo !== 'command-or-ctrl-alt') return null
+  if (combo === 'command-or-ctrl-alt') return null
   return undefined
 }

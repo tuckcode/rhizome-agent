@@ -409,11 +409,14 @@
       },
       "menuOwned": true,
       "shortcut": {
-        "combo": "command-or-ctrl-alt",
+        "combo": "command-and-ctrl",
         "key": "4",
         "code": "Digit4",
-        "display": "⌥⌘4",
-        "accelerator": "CmdOrCtrl+Alt+4",
+        "display": "⌃⌘4",
+        "accelerator": {
+          "macos": "Ctrl+Cmd+4",
+          "default": "Ctrl+Shift+4"
+        },
         "requiresManualNativeAcceleratorQa": true
       },
       "preferredShortcutQaMode": "renderer-shortcut-event"
@@ -426,11 +429,14 @@
       },
       "menuOwned": true,
       "shortcut": {
-        "combo": "command-or-ctrl-alt",
+        "combo": "command-and-ctrl",
         "key": "1",
         "code": "Digit1",
-        "display": "⌥⌘1",
-        "accelerator": "CmdOrCtrl+Alt+1",
+        "display": "⌃⌘1",
+        "accelerator": {
+          "macos": "Ctrl+Cmd+1",
+          "default": "Ctrl+Shift+1"
+        },
         "requiresManualNativeAcceleratorQa": true
       },
       "preferredShortcutQaMode": "renderer-shortcut-event"
@@ -443,11 +449,14 @@
       },
       "menuOwned": true,
       "shortcut": {
-        "combo": "command-or-ctrl-alt",
+        "combo": "command-and-ctrl",
         "key": "2",
         "code": "Digit2",
-        "display": "⌥⌘2",
-        "accelerator": "CmdOrCtrl+Alt+2",
+        "display": "⌃⌘2",
+        "accelerator": {
+          "macos": "Ctrl+Cmd+2",
+          "default": "Ctrl+Shift+2"
+        },
         "requiresManualNativeAcceleratorQa": true
       },
       "preferredShortcutQaMode": "renderer-shortcut-event"
@@ -460,11 +469,14 @@
       },
       "menuOwned": true,
       "shortcut": {
-        "combo": "command-or-ctrl-alt",
+        "combo": "command-and-ctrl",
         "key": "3",
         "code": "Digit3",
-        "display": "⌥⌘3",
-        "accelerator": "CmdOrCtrl+Alt+3",
+        "display": "⌃⌘3",
+        "accelerator": {
+          "macos": "Ctrl+Cmd+3",
+          "default": "Ctrl+Shift+3"
+        },
         "requiresManualNativeAcceleratorQa": true
       },
       "preferredShortcutQaMode": "renderer-shortcut-event"
@@ -477,11 +489,14 @@
       },
       "menuOwned": true,
       "shortcut": {
-        "combo": "command-or-ctrl-alt",
+        "combo": "command-and-ctrl",
         "key": "5",
         "code": "Digit5",
-        "display": "⌥⌘5",
-        "accelerator": "CmdOrCtrl+Alt+5",
+        "display": "⌃⌘5",
+        "accelerator": {
+          "macos": "Ctrl+Cmd+5",
+          "default": "Ctrl+Shift+5"
+        },
         "requiresManualNativeAcceleratorQa": true
       },
       "preferredShortcutQaMode": "renderer-shortcut-event"

@@ -24,11 +24,11 @@ afterEach(() => {
 })
 
 describe('view shortcut policy', () => {
-  it('keeps Option+Cmd on Mac so knispo can swap that object later', () => {
+  it('uses Ctrl+Cmd on Mac', () => {
     expect(MAC_VIEW_SHORTCUT_POLICY).toMatchObject({
-      combo: 'command-or-ctrl-alt',
-      displayPrefix: '⌥⌘',
-      ariaPrefix: 'Alt+Meta+',
+      combo: 'command-and-ctrl',
+      displayPrefix: '⌃⌘',
+      ariaPrefix: 'Control+Meta+',
     })
   })
 
@@ -40,14 +40,25 @@ describe('view shortcut policy', () => {
     expect(railViewShortcutDisplay(2)).toBe('Ctrl+Shift+2')
     expect(railViewShortcutAria(2)).toBe('Control+Shift+2')
     expect(railViewShortcutDisplayForCommand('go-mycelium')).toBe('Ctrl+Shift+3')
-    expect(viewShortcutEventModifiers()).toEqual({ altKey: false, shiftKey: true })
+    expect(viewShortcutEventModifiers()).toEqual({
+      altKey: false,
+      shiftKey: true,
+      ctrlKey: true,
+      metaKey: false,
+    })
   })
 
-  it('still reports Option+Cmd when the platform is Mac', () => {
+  it('reports Ctrl+Cmd when the platform is Mac', () => {
     isMacMock.mockReturnValue(true)
     expect(viewShortcutPolicy()).toEqual(MAC_VIEW_SHORTCUT_POLICY)
-    expect(railViewShortcutDisplay(1)).toBe('⌥⌘1')
-    expect(railViewShortcutAria(1)).toBe('Alt+Meta+1')
+    expect(railViewShortcutDisplay(1)).toBe('⌃⌘1')
+    expect(railViewShortcutAria(1)).toBe('Control+Meta+1')
+    expect(viewShortcutEventModifiers()).toEqual({
+      altKey: false,
+      shiftKey: false,
+      ctrlKey: true,
+      metaKey: true,
+    })
   })
 })
 
@@ -71,8 +82,16 @@ describe('matchRailViewShortcutEvent', () => {
     })).toBeNull()
   })
 
-  it('opens Views with Option+Cmd+digit on Mac', () => {
+  it('opens Views with Ctrl+Cmd+digit on Mac and leaves Option+Cmd for BlockNote', () => {
     isMacMock.mockReturnValue(true)
+    expect(matchRailViewShortcutEvent({
+      altKey: false,
+      ctrlKey: true,
+      metaKey: true,
+      shiftKey: false,
+      key: '1',
+      code: 'Digit1',
+    })).toBe('go-research')
     expect(matchRailViewShortcutEvent({
       altKey: true,
       ctrlKey: false,
@@ -80,7 +99,7 @@ describe('matchRailViewShortcutEvent', () => {
       shiftKey: false,
       key: '1',
       code: 'Digit1',
-    })).toBe('go-research')
+    })).toBeNull()
   })
 })
 

@@ -13,7 +13,7 @@ describe('rail view grouping', () => {
     ])
   })
 
-  it('gives each view one noun, a Go-to label, and Option+Cmd 1–5', () => {
+  it('gives each view one noun, a Go-to label, and digits 1–5', () => {
     expect(RAIL_VIEWS.map((view) => view.shortcutNumber)).toEqual([1, 2, 3, 4, 5])
     expect(RAIL_VIEWS.map((view) => view.goLabel)).toEqual([
       'Go to Research',

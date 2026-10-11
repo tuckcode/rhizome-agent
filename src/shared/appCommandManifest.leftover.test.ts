@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import appCommandManifest from './appCommandManifest.json'
 
@@ -8,7 +9,8 @@ function commandByKey(key: keyof typeof appCommandManifest.commands): ManifestCo
 }
 
 function commandShortcutAccelerator(command: ManifestCommand): string | undefined {
-  return 'shortcut' in command ? command.shortcut?.accelerator : undefined
+  const accelerator = 'shortcut' in command ? command.shortcut?.accelerator : undefined
+  return typeof accelerator === 'string' ? accelerator : undefined
 }
 
 function commandsWithAccelerator(accelerator: string): Array<[string, ManifestCommand]> {
@@ -68,5 +70,33 @@ describe('appCommandManifest leftover shortcuts', () => {
     expect(command.route).toEqual({ kind: 'handler', handler: 'onCreateNote' })
     expect(fileMenuLabel('fileNewNote')).toBe('New Note')
     expect(commandsWithAccelerator('CmdOrCtrl+N')).toEqual([['fileNewNote', command]])
+  })
+
+  it('gives Views Ctrl+Cmd on Mac and Ctrl+Shift elsewhere, never CmdOrCtrl+Alt', () => {
+    const views = ['goResearch', 'goGraph', 'goMycelium', 'goChanges', 'goHistory'] as const
+    for (const key of views) {
+      const command = commandByKey(key)
+      if (!('shortcut' in command) || !command.shortcut) {
+        throw new Error(`missing shortcut for ${key}`)
+      }
+      expect(command.shortcut.combo).toBe('command-and-ctrl')
+      expect(command.shortcut.accelerator).toEqual({
+        macos: expect.stringMatching(/^Ctrl\+Cmd\+[1-5]$/),
+        default: expect.stringMatching(/^Ctrl\+Shift\+[1-5]$/),
+      })
+    }
+    expect(JSON.stringify(appCommandManifest)).not.toContain('CmdOrCtrl+Alt')
+  })
+
+  it('keeps Ctrl+Cmd+digit off Chat/Notes and BlockNote heading shortcuts', () => {
+    expect(commandShortcutAccelerator(commandByKey('viewEditorOnly'))).toBe('CmdOrCtrl+1')
+    expect(commandShortcutAccelerator(commandByKey('viewEditorList'))).toBe('CmdOrCtrl+2')
+    expect(commandShortcutAccelerator(commandByKey('viewAll'))).toBe('CmdOrCtrl+3')
+    const heading = readFileSync(
+      `${process.cwd()}/node_modules/@blocknote/core/src/blocks/Heading/block.ts`,
+      'utf8',
+    )
+    expect(heading).toContain('Mod-Alt-${level}')
+    expect(heading).not.toMatch(/Mod-Ctrl|Ctrl-Mod|Mod-Control/)
   })
 })

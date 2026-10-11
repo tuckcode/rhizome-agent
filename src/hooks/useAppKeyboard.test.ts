@@ -110,6 +110,17 @@ describe('useAppKeyboard', () => {
     expect(actions.onSetViewMode).not.toHaveBeenCalled()
   })
 
+  it('does not take Option+Cmd+1 from the note editor for Views', () => {
+    setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')
+    const actions = makeActions()
+    renderHook(() => useAppKeyboard(actions))
+    withFocusedEditorSurface((editable) => {
+      const event = fireKeyOnTarget(editable, '1', { metaKey: true, altKey: true, code: 'Digit1' })
+      expect(event.defaultPrevented).toBe(false)
+      expect(actions.onSetViewMode).not.toHaveBeenCalled()
+    })
+  })
+
   it('Cmd+P triggers quick open', () => {
     const actions = makeActions()
     renderHook(() => useAppKeyboard(actions))
