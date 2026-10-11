@@ -200,7 +200,7 @@ export function MenuBarCompanionApp() {
         <div className="border-b border-[var(--border-subtle,var(--border))] px-3.5 pb-2.5 pt-3">
           <input
             autoFocus
-            className="w-full rounded-[10px] border border-[var(--border-input,var(--border))] bg-[var(--surface-input,var(--background))] px-3 py-2 text-[13px] text-[var(--text-primary,var(--foreground))] outline-none placeholder:italic placeholder:text-[var(--text-faint,var(--muted-foreground))] focus:border-[var(--border-focus,var(--ring))] focus:shadow-[0_0_0_3px_var(--accent-blue-light,rgba(111,227,160,0.14))]"
+            className="w-full rounded-[10px] border border-[var(--border-input,var(--border))] bg-[var(--surface-input,var(--background))] px-3 py-2 text-[13px] text-[var(--text-primary,var(--foreground))] outline-none placeholder:italic placeholder:text-[var(--text-faint,var(--muted-foreground))] focus:border-[var(--border-focus,var(--ring))] focus:shadow-[0_0_0_3px_var(--accent-blue-light,rgba(125,240,174,0.14))]"
             data-testid="menu-bar-companion-capture"
             placeholder={t('menuBarCompanion.capturePlaceholder')}
             spellCheck={false}

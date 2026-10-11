@@ -466,4 +466,21 @@ describe('Earth theme tokens', () => {
     expect(blockReorder).toContain('var(--accent-blue-light)')
     expect(blockReorder).toContain('var(--accent-blue-bg)')
   })
+
+  it('keeps leftover Earth dark accent copies in sync with --accent-blue', () => {
+    const bootHtml = readFileSync(join(process.cwd(), 'index.html'), 'utf8')
+    const mycelium = readFileSync(join(process.cwd(), 'src-tauri/src/mycelium_skin.rs'), 'utf8')
+    const companion = readFileSync(join(process.cwd(), 'src/components/MenuBarCompanionApp.tsx'), 'utf8')
+    const darkBoot = bootHtml.slice(
+      bootHtml.indexOf(':root[data-theme="dark"]'),
+      bootHtml.indexOf(':root[data-color-theme="loam"]'),
+    )
+    expect(darkBoot).toContain('--primary: #7DF0AE')
+    expect(darkBoot).not.toContain('#6FE3A0')
+    expect(mycelium).toContain('--moss: #7DF0AE')
+    expect(mycelium).toContain('--moon: #9AF5C2')
+    expect(mycelium).toContain('--act-verify: #7DF0AE')
+    expect(companion).toContain('rgba(125,240,174,0.14)')
+    expect(companion).not.toContain('rgba(111,227,160,0.14)')
+  })
 })
