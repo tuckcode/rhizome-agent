@@ -95,8 +95,12 @@ export function NativeChatModelPicker({
           <div className="px-1.5 pb-1 pt-0.5">
             <Input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => event.stopPropagation()}
+              onChange={(event) => {
+                setQuery(event.target.value)
+              }}
+              onKeyDown={(event) => {
+                event.stopPropagation()
+              }}
               placeholder="Filter models"
               className="h-8 font-mono text-[11px]"
               aria-label="Filter models"
