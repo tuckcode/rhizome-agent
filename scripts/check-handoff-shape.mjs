@@ -2,11 +2,11 @@
 /**
  * Keeps `docs/HANDOFF.md` an index rather than an archive.
  *
- * The file grew to 2156 lines of stacked session sections, always loaded in
- * full, and the newest one drifted to third place because sessions inserted
- * next to whichever heading they were reading. A prose convention did not stop
- * that — three sessions in a row wrote the rule down and the file kept
- * growing. This does.
+ * Per-PR notes belong in `docs/plans/handoffs/` (one new file each). A PR
+ * must not append a State, Recent, or Open-threads line to HANDOFF.md —
+ * that is how parallel PRs conflicted on merge. This check still forbids
+ * inline `## Session handoff` sections, caps the index at 900 lines, and
+ * requires frontmatter on each handoff file.
  */
 import { readFileSync, readdirSync } from 'node:fs'
 
@@ -16,6 +16,13 @@ const MAX_LINES = 900
 
 const problems = []
 const handoff = readFileSync(HANDOFF, 'utf8')
+
+if (!handoff.includes('New PRs must not edit this file')) {
+  problems.push(
+    `${HANDOFF} is missing the per-PR pointer.`,
+    `  New PRs add a file under ${HANDOFF_DIR}/; they must not append a line here.`,
+  )
+}
 
 const sessionSections = handoff.match(/^## Session handoff/gm) ?? []
 if (sessionSections.length > 0) {
@@ -58,4 +65,6 @@ if (problems.length > 0) {
   process.exit(1)
 }
 
-console.log(`Handoff shape OK — ${lines} lines, no session sections inline.`)
+console.log(
+  `Handoff shape OK — ${lines} lines, no session sections inline, per-PR files in ${HANDOFF_DIR}/.`,
+)

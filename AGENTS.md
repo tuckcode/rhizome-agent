@@ -65,7 +65,7 @@
   ls docs/plans/handoffs | grep -v archive | tail -1   # the latest handoff
   ```
 
-  Open that one, and any older one whose `description:` frontmatter sounds relevant — that field exists so you can skip the rest. **Write your own session as a new file there** (`YYYY-MM-DD-HHMM-<model>-<topic>.md`, frontmatter with `session`, `model`, `description`), and update `HANDOFF.md` in place rather than pasting into it. `pnpm handoff:check` enforces the shape and runs in pre-commit.
+  Open that one, and any older one whose `description:` frontmatter sounds relevant — that field exists so you can skip the rest. **Write your own session as a new file there** (`YYYY-MM-DD-HHMM-<model>-<topic>.md`, frontmatter with `session`, `model`, `description`). Do **not** edit `HANDOFF.md` for a PR — that is how #142, #143, #145, and #148 conflicted. `pnpm handoff:check` enforces the per-file frontmatter and a 900-line cap on the index, and runs in pre-commit.
 
   Restructured 2026-08-21: the file had reached 2156 lines of stacked sessions, and because each session inserted next to whichever heading it was reading, the newest handoff had drifted to third place — "read the latest handoff" pointed at the wrong one. Read it directly; the wiki's search-first rule does not apply to repo docs.
 - Check `docs/plans/handoffs/` for the latest session file (newest by filename) — dated detail behind the handoff summary. The old `*-session-status.md` dumps are gone.
@@ -176,7 +176,7 @@
   **Why:** git's `author` field is `Atticus` on every commit in this repo regardless of who or what wrote it, so it carries no provenance. Without the trailer, the only record of which model did what is `HANDOFF.md`'s prose — written by the agents about themselves. This repo runs several models by design (see `docs/CROSS-MODEL-HANDOFF.md`), and self-reported claims here have a track record of not surviving verification. One trailer turns "who wrote this?" into `git log --pretty='%h %s %(trailers:key=Co-Authored-By,valueonly)'` instead of a document you have to trust.
 
   Commits before 2026-07-31 are mostly unsigned; the 2026-07-27 session was Hermes and the 2026-07-31 sessions were Claude Opus 5. Don't retro-stamp them — history is pushed or about to be.
-- **If you write the words "pre-existing" (or "not introduced by this session" / "unrelated to this change" / "was never..."), open or update a `C`-number in `HANDOFF.md`'s Open threads, in the same commit.** A note buried in a session-status doc is not tracked — it is only findable by a session that happens to reopen that exact file. Don't split the difference with a one-line mention elsewhere in the doc; the C-number entry is the whole fix, because it's the one place a fresh session is guaranteed to look.
+- **If you write the words "pre-existing" (or "not introduced by this session" / "unrelated to this change" / "was never..."), open or update a `C`-number in your `docs/plans/handoffs/` file, in the same commit.** Do not append that C-number to `HANDOFF.md` Open threads from a PR. A note buried only in chat is not tracked. The handoff file is what a fresh session reads after the index.
 
   **Why:** the same finding gets rediscovered by session after session and
   fixed by none, because "pre-existing" reads as a reason to stop looking
@@ -184,9 +184,9 @@
   `wiki/`-prefix mismatch was logged that way three separate times, and
   `pnpm l10n:validate`'s locale gap three more; both are tracked now as C17 and
   C18. A note buried in a session-status doc is not tracked — it is findable
-  only by a session that happens to reopen that exact file. The C-number entry
-  is the whole fix, because it is the one place a fresh session is guaranteed
-  to look.
+  only by a session that happens to reopen that exact file. The C-number in
+  the handoff file is the whole fix. Do not also stamp `HANDOFF.md` from the
+  same PR.
 
   **On the evidence:** those incidents happened in Rhizome Desktop before this
   repo existed — the sweep is dated 2026-08-02 and the files it cites
@@ -435,7 +435,7 @@ ADRs live in `docs/adr/`. Create in the same commit as the code. Never edit exis
 
 After any Tauri command, new component/hook, data model change, or new integration: update `docs/ARCHITECTURE.md`, `docs/ABSTRACTIONS.md`, and/or `docs/GETTING-STARTED.md` in the same commit.
 
-**Origin tags on living docs.** This repo is several models and at least two harnesses (Claude Code subscription, Cursor). The chat that wrote a paragraph is not in `rg`. When you add a section to `HANDOFF.md`, `NEXT.md`, or a design note other agents will treat as current, put one visible line under the heading:
+**Origin tags on living docs.** This repo is several models and at least two harnesses (Claude Code subscription, Cursor). The chat that wrote a paragraph is not in `rg`. When you add a section to `NEXT.md` or a design note other agents will treat as current, put one visible line under the heading. Do not add an Origin line to `HANDOFF.md` from a PR:
 
 ```
 **Origin:** <model> · <date> · <commit or session id>
@@ -587,8 +587,9 @@ not a session log, not billing notes, not a second HANDOFF.
 5. **Never store:** SHAs, clocks, burn windows, usage %, invoices,
    secrets, ENV, one-off chores, “what we did today,” docked answers
    that belong in BOARD/HANDOFF, or Cursor/xAI subscription chatter.
-6. Session / ship / native-check / issue status → `docs/HANDOFF.md`,
-   `docs/BOARD.md`, `docs/NEXT.md`, `docs/plans/handoffs/`.
+6. Session / ship / native-check / issue status → a new file in
+   `docs/plans/handoffs/`, plus `docs/BOARD.md` / `docs/NEXT.md` when
+   those indexes change. Do not append a line to `docs/HANDOFF.md`.
 7. Long product chrome → living docs or an ADR, not Learned.
 8. If the only candidate is stale, transient, or already in Section 1,
    leave Learned empty and refresh the transcript index only.

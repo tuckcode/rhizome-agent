@@ -19,13 +19,13 @@ Produces two things: the handoff files this repo requires, and a
    the topic was. That description is what a future session reads to decide
    whether to open the file at all.
 
-3. **Update `docs/HANDOFF.md` in place** — the state line if it moved, any
-   affected Open threads, and one line in Recent sessions. Never paste the
-   session into that file; it is an index.
+3. **Do not edit `docs/HANDOFF.md`.** The new file in `docs/plans/handoffs/`
+   is the record. Parallel PRs that stamp State or Recent conflict on merge
+   (#142, #143, #145, #148).
 
-4. **Run `pnpm handoff:check`.** It enforces the shape and a 900-line cap on
-   `docs/HANDOFF.md`. Over the cap, prune a *resolved* thread down to its
-   outcome — git holds the detail.
+4. **Run `pnpm handoff:check`.** It checks handoff-file frontmatter and a
+   900-line cap on `docs/HANDOFF.md`. Over the cap, prune a *resolved*
+   thread in a dedicated index edit — not as part of a product PR.
 
 5. **Emit the copy-paste block** (below). This is part of the deliverable, not
    an extra; a handoff without it is incomplete.

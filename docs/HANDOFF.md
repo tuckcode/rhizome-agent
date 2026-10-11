@@ -1,6 +1,10 @@
 # Handoff — read this first
 **What is true right now.** Not a history log: per-session records live in
 `docs/plans/handoffs/`, one file each, newest by filename.
+
+**New PRs must not edit this file.** Add a file under `docs/plans/handoffs/`
+instead (`YYYY-MM-DD-HHMM-<agent>-<topic>.md`). A State or Recent line here
+is why #142, #143, #145, and #148 conflicted on merge.
 ```bash
 ls docs/plans/handoffs | grep -v archive | tail -1    # the latest handoff
 ```
@@ -21,8 +25,10 @@ commits: abc1234..def5678
 ---
 ```
 
-Then update this file **in place**: the state line below, Open threads, and one
-line in Recent sessions. Do not paste your session into this file.
+Do **not** then edit this file. Do not add a State Origin line, a Recent
+sessions line, or an Open-threads C-number as part of a PR. The new file
+is the record. `pnpm handoff:check` still keeps this file under 900 lines
+and forbids `## Session handoff` sections here.
 
 **Why it works this way.** This file was 2156 lines of stacked sessions, always
 loaded in full, mostly restating commit messages and `docs/plans/*-session-status.md`

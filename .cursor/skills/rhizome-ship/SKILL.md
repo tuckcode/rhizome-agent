@@ -95,8 +95,9 @@ Only when the user will **use** `/Applications/Rhizome Agent.app`.
 3. Package into `/Applications/Rhizome Agent.app` using this repo’s
    documented Tauri build path (`pnpm tauri build` / the ship docs
    in `AGENTS.md`). Vite / `pnpm tauri dev` is **not** this verb.
-4. Stamp `docs/HANDOFF.md` State and `docs/BOARD.md` with the new
-   commit + install time. Keep three SHAs: origin, local, app.
+4. Add a ship note under `docs/plans/handoffs/` and stamp `docs/BOARD.md`
+   with the new commit + install time. Keep three SHAs: origin, local, app.
+   Do not append a line to `docs/HANDOFF.md`.
 
 **Done when:** the installed app’s commit/mtime matches the intended
 HEAD, leftovers are gone, and living docs name the new app SHA.
