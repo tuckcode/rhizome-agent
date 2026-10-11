@@ -460,7 +460,8 @@ fn composed_system_prompt(existing: Option<&str>) -> Option<String> {
     settings::compose_agent_profile(settings::saved_agent_profile().as_deref(), existing)
 }
 
-/// Free-tier keys come from the OS keychain (step 3a, ADR-0185).
+/// Free-tier keys come from the OS keychain (step 3a, ADR-0185). The user's
+/// switches and strict mode come from free-tier settings (step 3b).
 fn free_tier_routing_model(
     system: Option<String>,
     observer: impl FnMut(crate::rhizome_routing::ProviderAttempt) + Send + 'static,
@@ -475,8 +476,16 @@ fn free_tier_routing_model_with(
     system: Option<String>,
     observer: impl FnMut(crate::rhizome_routing::ProviderAttempt) + Send + 'static,
 ) -> Result<RoutingModel<ProviderKeys, SystemClock>, String> {
+    let keys = keys?;
+    let settings = super::saved_free_tier_settings()?;
+    let catalog = crate::rhizome_routing::free_tier::with_own_endpoint(
+        Catalog::pinned(),
+        &settings,
+        &super::saved_model_providers()?,
+    );
     Ok(
-        RoutingModel::new(Catalog::pinned(), keys?, SystemClock, HttpLimits::STREAM)
+        RoutingModel::new(catalog, keys, SystemClock, HttpLimits::STREAM)
+            .with_options(settings.to_options())
             .with_observer(observer)
             .with_system_prompt(system),
     )
