@@ -73,4 +73,28 @@ describe('ChatRunLiveStatus repeated announcements', () => {
     await nextFrame()
     expect(screen.getByTestId('chat-run-live-status')).toHaveTextContent('Running get_note')
   })
+
+  it('announces a warning notice in the existing polite region', async () => {
+    const running = [{ userMessage: 'hi', response: 'hello', isStreaming: true }]
+    const withNotice = [
+      ...running,
+      {
+        id: 'notice-1',
+        localMarker: 'flush native session line: disk error',
+        localMarkerTone: 'warning' as const,
+      },
+    ]
+
+    const { rerender } = render(
+      <ChatRunLiveStatus messages={running} isActive />,
+    )
+    rerender(<ChatRunLiveStatus messages={withNotice} isActive />)
+    await nextFrame()
+    await nextFrame()
+
+    const region = screen.getByTestId('chat-run-live-status')
+    expect(region).toHaveAttribute('role', 'status')
+    expect(region).toHaveAttribute('aria-live', 'polite')
+    expect(region).toHaveTextContent('flush native session line: disk error')
+  })
 })

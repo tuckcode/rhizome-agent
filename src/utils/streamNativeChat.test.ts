@@ -88,6 +88,18 @@ describe('native stream events', () => {
     expect(next.onText).toHaveBeenCalledWith('later')
   })
 
+  it('treats an error event with no fatal field as fatal', () => {
+    const next = callbacks()
+    expect(applyNativeEvent({
+      kind: 'error',
+      message: 'No free-tier provider key is set.',
+    }, next)).toBe(true)
+    expect(next.onError).toHaveBeenCalledWith(
+      `No free-tier provider key is set. ${NATIVE_NO_KEY_GUIDANCE}`,
+    )
+    expect(next.onNotice).not.toHaveBeenCalled()
+  })
+
   it('does not end the stream on a text delta', () => {
     const next = callbacks()
     expect(applyNativeEvent({ kind: 'text_delta', text: 'hi' }, next)).toBe(false)

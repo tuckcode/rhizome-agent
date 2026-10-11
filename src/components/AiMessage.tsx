@@ -49,6 +49,7 @@ export interface AiMessageProps {
   userMessage: string
   references?: NoteReference[]
   localMarker?: string
+  localMarkerTone?: 'warning'
   locale?: AppLocale
   messageId?: string
   /** Entry to fork from; hosts differ, see ResponseActions. */
@@ -74,21 +75,29 @@ export interface AiMessageProps {
   onPromoteToVault?: (text: string) => void
 }
 
-function LocalMarker({ text }: { text: string }) {
+function LocalMarker({ text, tone }: { text: string; tone?: 'warning' }) {
   const [title, ...rest] = text.split('\n')
   const detail = rest.join('\n').trim()
+  const isWarning = tone === 'warning'
+  const markerClass = [
+    'mx-auto flex w-full max-w-[85%] flex-col items-center gap-1 text-center font-mono text-[11px] tracking-[0.02em]',
+    isWarning ? 'text-[var(--feedback-warning-text)]' : 'text-muted-foreground',
+  ].join(' ')
+  const ruleClass = isWarning
+    ? 'h-px min-w-4 flex-1 bg-[var(--feedback-warning-border)]'
+    : 'h-px min-w-4 flex-1 bg-border'
   return (
     <div
-      className="mx-auto flex w-full max-w-[85%] flex-col items-center gap-1 text-center font-mono text-[11px] tracking-[0.02em] text-muted-foreground"
+      className={markerClass}
       style={{ margin: '12px 0 16px' }}
       data-testid="ai-local-marker"
       data-no-drag
       role="note"
     >
       <span className="flex w-full items-center gap-2">
-        <span className="h-px min-w-4 flex-1 bg-border" aria-hidden="true" />
+        <span className={ruleClass} aria-hidden="true" />
         <span className="shrink-0">{title}</span>
-        <span className="h-px min-w-4 flex-1 bg-border" aria-hidden="true" />
+        <span className={ruleClass} aria-hidden="true" />
       </span>
       {detail ? <span className="max-w-full truncate">{detail}</span> : null}
     </div>
@@ -641,7 +650,7 @@ function StreamingIndicator({ isLatestReply = false }: { isLatestReply?: boolean
 
 export function AiMessage(props: AiMessageProps) {
   if (props.localMarker) {
-    return <LocalMarker text={props.localMarker} />
+    return <LocalMarker text={props.localMarker} tone={props.localMarkerTone} />
   }
 
   return <ConversationMessage {...props} />

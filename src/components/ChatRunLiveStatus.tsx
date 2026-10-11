@@ -7,8 +7,11 @@ import {
 
 interface ChatRunLiveStatusProps {
   messages: Array<{
+    id?: string
     actions?: Array<{ tool: string; toolId?: string; status: string }>
     response?: string
+    localMarker?: string
+    localMarkerTone?: 'warning'
   }>
   isActive: boolean
 }
@@ -54,6 +57,7 @@ export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps
   return (
     <div
       role="status"
+      aria-live="polite"
       data-testid="chat-run-live-status"
       className="sr-only"
     >

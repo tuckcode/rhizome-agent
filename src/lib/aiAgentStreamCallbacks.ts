@@ -177,6 +177,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
   let failureTracked = false
   let streamFailed = false
   let workerFailureReason: string | null = null
+  const noticesThisTurn = new Set<string>()
   // Retargeted after each Prime TurnBoundary so a queued follow-up owns its
   // own bubble instead of merging into the first turn's reply.
   let activeMessageId = messageId
@@ -305,7 +306,9 @@ export function createStreamCallbacks(context: StreamMutationContext) {
 
     onNotice: (notice: string) => {
       if (abortRef.current.aborted) return
-      appendLocalMarker(setMessages, notice)
+      if (noticesThisTurn.has(notice)) return
+      noticesThisTurn.add(notice)
+      appendLocalMarker(setMessages, notice, 'warning')
     },
 
     onError: (error: StreamErrorMessage) => {

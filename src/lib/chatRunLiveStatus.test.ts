@@ -80,7 +80,27 @@ describe('chatRunSnapshotFromMessages', () => {
       isActive: true,
       hasResponse: true,
       tools: [{ id: 't1', name: 'get_note', status: 'done' }],
+      notice: undefined,
+      noticeId: undefined,
     })
+  })
+
+  it('announces a new warning notice without treating the marker as the turn', () => {
+    const previous = chatRunSnapshotFromMessages(
+      [{ actions: [{ tool: 'get_note', toolId: 't1', status: 'done' }], response: 'found it' }],
+      true,
+    )
+    const next = chatRunSnapshotFromMessages(
+      [
+        { actions: [{ tool: 'get_note', toolId: 't1', status: 'done' }], response: 'found it' },
+        { id: 'notice-1', localMarker: 'flush native session line: disk error', localMarkerTone: 'warning' },
+      ],
+      true,
+    )
+    expect(next.hasResponse).toBe(true)
+    expect(next.notice).toBe('flush native session line: disk error')
+    expect(nextChatRunAnnouncement(previous, next)).toBe('flush native session line: disk error')
+    expect(nextChatRunAnnouncement(next, next)).toBeNull()
   })
 
   it('ignores a previous turn when the latest message has no reply', () => {

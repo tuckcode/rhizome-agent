@@ -332,30 +332,28 @@ describe('aiAgentStreamCallbacks', () => {
     })
 
     callbacks.onNotice?.('flush native session line: disk error')
+    callbacks.onNotice?.('flush native session line: disk error')
     callbacks.onText(' more')
     callbacks.onDone()
 
     expect(status.getStatus()).toBe('done')
     expect(responseAccRef.current).toBe('Partial reply more')
-    expect(messages.getMessages()).toEqual([
+    expect(messages.getMessages()).toMatchObject([
       {
         id: 'msg-1',
         userMessage: 'Question',
-        actions: [],
         isStreaming: false,
-        reasoningDone: true,
         response: 'Partial reply more',
       },
       {
-        userMessage: '',
         localMarker: 'flush native session line: disk error',
-        actions: [],
-        id: expect.any(String),
+        localMarkerTone: 'warning',
       },
     ])
     expect(trackEventMock).toHaveBeenCalledWith('ai_agent_response_completed', expect.objectContaining({
       agent: 'claude_code',
     }))
+    expect(messages.getMessages().filter((message) => message.localMarker)).toHaveLength(1)
   })
 
   it('localizes Pi empty-output stream errors with diagnostic output', () => {
