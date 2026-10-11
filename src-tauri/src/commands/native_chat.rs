@@ -152,7 +152,7 @@ impl NativeChats {
         let worker = thread::spawn(move || {
             let mut engine = engine;
             if let Err(error) = engine.ensure_log(&index_id) {
-                (emit.lock().expect("native sink"))(EngineEvent::Error { message: error });
+                (emit.lock().expect("native sink"))(EngineEvent::error(error, true));
                 worker_busy.store(false, Ordering::SeqCst);
                 return;
             }
@@ -170,7 +170,9 @@ impl NativeChats {
                             Box::new(move |event| {
                                 if matches!(
                                     event,
-                                    EngineEvent::TurnEnd | EngineEvent::Cancelled { .. }
+                                    EngineEvent::TurnEnd
+                                        | EngineEvent::Cancelled { .. }
+                                        | EngineEvent::Error { fatal: true, .. }
                                 ) {
                                     busy.store(false, Ordering::SeqCst);
                                 }
@@ -286,7 +288,7 @@ impl NativeChats {
         let worker = thread::spawn(move || {
             let mut engine = engine;
             if let Err(error) = engine.ensure_log(&index_id) {
-                (emit.lock().expect("native sink"))(EngineEvent::Error { message: error });
+                (emit.lock().expect("native sink"))(EngineEvent::error(error, true));
                 worker_busy.store(false, Ordering::SeqCst);
                 return;
             }
@@ -304,7 +306,9 @@ impl NativeChats {
                             Box::new(move |event| {
                                 if matches!(
                                     event,
-                                    EngineEvent::TurnEnd | EngineEvent::Cancelled { .. }
+                                    EngineEvent::TurnEnd
+                                        | EngineEvent::Cancelled { .. }
+                                        | EngineEvent::Error { fatal: true, .. }
                                 ) {
                                     busy.store(false, Ordering::SeqCst);
                                 }
@@ -866,7 +870,8 @@ pub fn settle_native_chats_on_quit(chats: &NativeChats) {
 mod tests {
     use super::*;
     use crate::engines::{EngineEvent, NativeEngine, PrimeEngine};
-    use crate::rhizome_loop::{AgentLoop, DurableEvent, FakeModel, ModelView};
+    use crate::model_events::{ModelError, ModelErrorKind};
+    use crate::rhizome_loop::{AgentLoop, DurableEvent, FakeModel, ModelView, ScriptPart};
     use crate::session_transcript_index::{self, IndexedTranscriptTurn};
     use std::panic::{catch_unwind, AssertUnwindSafe};
     use std::sync::mpsc;
@@ -1668,6 +1673,52 @@ mod tests {
             let record = chats.attach_open(&id).expect("open");
             assert!(!record.read_only, "a live chat stays writable");
             chats.send(&id, "still open").expect("send");
+        });
+    }
+
+    #[test]
+    fn send_after_a_fatal_no_key_error_is_not_already_running() {
+        with_temp_home(|_| {
+            let chats = NativeChats::new();
+            let (tx, rx) = mpsc::channel();
+            let (fatal_tx, fatal_rx) = mpsc::channel();
+            let (hold_tx, hold_rx) = mpsc::channel::<()>();
+            let model = FakeModel::script(vec![vec![ScriptPart::Fail(ModelError {
+                kind: ModelErrorKind::Auth,
+                status: None,
+                message: "No free-tier provider key is set.".into(),
+            })]]);
+            let id = chats
+                .start_with_engine(
+                    "hi",
+                    NativeEngine::from_parts(AgentLoop::new(), model),
+                    move |event| {
+                        let fatal = matches!(
+                            &event,
+                            EngineEvent::Error { fatal: true, message }
+                                if message.contains("No free-tier provider key")
+                        );
+                        let _ = tx.send(event);
+                        if fatal {
+                            let _ = fatal_tx.send(());
+                            let _ = hold_rx.recv();
+                        }
+                    },
+                )
+                .expect("start");
+            fatal_rx
+                .recv_timeout(Duration::from_secs(2))
+                .expect("fatal no-key error before TurnEnd");
+            let result = chats.send(&id, "retry");
+            let _ = hold_tx.send(());
+            let _ = wait_for_turn_end(&rx);
+            assert!(
+                result.as_ref().err().is_none_or(|error| {
+                    !error.to_lowercase().contains("already running")
+                }),
+                "an immediate resend after a fatal no-key error must not say already running: {result:?}"
+            );
+            result.expect("send after fatal no-key");
         });
     }
 

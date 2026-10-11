@@ -58,7 +58,19 @@ pub enum EngineEvent {
     },
     Error {
         message: String,
+        /// False for log-save failures and the 100 MiB rollover notice.
+        /// True when the turn cannot continue (no key, provider down, ensure_log).
+        fatal: bool,
     },
+}
+
+impl EngineEvent {
+    pub fn error(message: impl Into<String>, fatal: bool) -> Self {
+        Self::Error {
+            message: message.into(),
+            fatal,
+        }
+    }
 }
 
 /// Start with a live sink. Control methods work while a turn runs.

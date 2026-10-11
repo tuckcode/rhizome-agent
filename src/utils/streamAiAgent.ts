@@ -26,6 +26,8 @@ export interface AgentStreamCallbacks {
   onToolStart: (toolName: string, toolId: string, input?: string) => void
   onToolDone: (toolId: string, output?: string) => void
   onError: (message: string) => void
+  /** Non-fatal native notice. Optional so existing callers are unaffected. */
+  onNotice?: (message: string) => void
   /** Context compaction. Optional so existing callers are unaffected. */
   onCompaction?: (phase: string, reason?: string, tokensBefore?: number) => void
   /** Steering/follow-up queue depth changed. Optional. */

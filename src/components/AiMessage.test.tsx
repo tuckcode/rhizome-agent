@@ -41,6 +41,23 @@ describe('AiMessage', () => {
     expect(screen.queryByTestId('ai-message')).not.toBeInTheDocument()
   })
 
+  it('styles a warning notice with the warning token and no live region', () => {
+    render(
+      <AiMessage
+        userMessage=""
+        actions={[]}
+        localMarker="This part of the chat couldn't be saved, so it won't be there after a restart."
+        localMarkerTone="warning"
+      />,
+    )
+    const marker = screen.getByTestId('ai-local-marker')
+    expect(marker.className).toContain('--feedback-warning-text')
+    expect(marker.className).not.toMatch(/destructive|danger-text|feedback-error/)
+    expect(marker).not.toHaveAttribute('aria-live')
+    expect(marker.getAttribute('role')).not.toBe('alert')
+    expect(marker.getAttribute('role')).not.toBe('status')
+  })
+
   it('renders user message', () => {
     render(<AiMessage userMessage="Hello AI" actions={[]} />)
     expect(screen.getByText('Hello AI')).toBeTruthy()

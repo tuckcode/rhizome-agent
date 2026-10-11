@@ -20,6 +20,8 @@ export interface AiAgentMessage {
   userMessage: string
   references?: NoteReference[]
   localMarker?: string
+  /** Warning notices (native non-fatal log errors) use amber, not muted. */
+  localMarkerTone?: 'warning'
   reasoning?: string
   reasoningDone?: boolean
   actions: AiAction[]
@@ -102,12 +104,14 @@ function toChatHistory(messages: AiAgentMessage[]): ChatMessage[] {
 export function appendLocalMarker(
   setMessages: Dispatch<SetStateAction<AiAgentMessage[]>>,
   text: string,
+  tone?: AiAgentMessage['localMarkerTone'],
 ): void {
   setMessages((current) => [
     ...current,
     {
       userMessage: '',
       localMarker: text,
+      ...(tone ? { localMarkerTone: tone } : {}),
       actions: [],
       id: nextMessageId(),
     },

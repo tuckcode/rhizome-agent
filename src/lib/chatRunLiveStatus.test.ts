@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   chatRunSnapshotFromMessages,
+  joinChatRunLines,
   nextChatRunAnnouncement,
   type ChatRunSnapshot,
 } from './chatRunLiveStatus'
+
+const LOG_SAVE_NOTICE =
+  "This part of the chat couldn't be saved, so it won't be there after a restart."
 
 function snap(partial: Partial<ChatRunSnapshot> = {}): ChatRunSnapshot {
   return {
@@ -80,7 +84,49 @@ describe('chatRunSnapshotFromMessages', () => {
       isActive: true,
       hasResponse: true,
       tools: [{ id: 't1', name: 'get_note', status: 'done' }],
+      notice: undefined,
+      noticeId: undefined,
     })
+  })
+
+  it('announces a new warning notice without treating the marker as the turn', () => {
+    const previous = chatRunSnapshotFromMessages(
+      [{ actions: [{ tool: 'get_note', toolId: 't1', status: 'done' }], response: 'found it' }],
+      true,
+    )
+    const next = chatRunSnapshotFromMessages(
+      [
+        { actions: [{ tool: 'get_note', toolId: 't1', status: 'done' }], response: 'found it' },
+        { id: 'notice-1', localMarker: LOG_SAVE_NOTICE, localMarkerTone: 'warning' },
+      ],
+      true,
+    )
+    expect(next.hasResponse).toBe(true)
+    expect(next.notice).toBe(LOG_SAVE_NOTICE)
+    expect(nextChatRunAnnouncement(previous, next)).toBe(LOG_SAVE_NOTICE)
+    expect(nextChatRunAnnouncement(next, next)).toBeNull()
+  })
+
+  it('joins appended lines with a period unless one is already there', () => {
+    expect(joinChatRunLines('Running get_note', 'get_note done')).toBe(
+      'Running get_note. get_note done',
+    )
+    expect(joinChatRunLines(LOG_SAVE_NOTICE, 'Response complete')).toBe(
+      `${LOG_SAVE_NOTICE} Response complete`,
+    )
+  })
+
+  it('returns the notice and the end-of-turn line together in one render', () => {
+    const previous = snap({ isActive: true, hasResponse: true })
+    const next = snap({
+      isActive: false,
+      hasResponse: true,
+      notice: LOG_SAVE_NOTICE,
+      noticeId: 'notice-1',
+    })
+    expect(nextChatRunAnnouncement(previous, next)).toBe(
+      `${LOG_SAVE_NOTICE} Response complete`,
+    )
   })
 
   it('ignores a previous turn when the latest message has no reply', () => {

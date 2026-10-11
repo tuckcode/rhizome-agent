@@ -307,6 +307,60 @@ describe('aiAgentStreamCallbacks', () => {
     expect(trackEventMock).not.toHaveBeenCalledWith('ai_agent_response_completed', expect.anything())
   })
 
+  it('shows a non-fatal notice without ending the turn or disabling Send', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'Question',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const status = createStatusStore('thinking')
+    const responseAccRef = { current: 'Partial reply' }
+
+    const callbacks = createStreamCallbacks({
+      agent: 'claude_code',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: status.setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef,
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+
+    callbacks.onNotice?.(
+      "This part of the chat couldn't be saved, so it won't be there after a restart.",
+    )
+    callbacks.onNotice?.(
+      "This part of the chat couldn't be saved, so it won't be there after a restart.",
+    )
+    callbacks.onText(' more')
+    callbacks.onDone()
+
+    expect(status.getStatus()).toBe('done')
+    expect(responseAccRef.current).toBe('Partial reply more')
+    expect(messages.getMessages()).toMatchObject([
+      {
+        id: 'msg-1',
+        userMessage: 'Question',
+        isStreaming: false,
+        response: 'Partial reply more',
+      },
+      {
+        localMarker:
+          "This part of the chat couldn't be saved, so it won't be there after a restart.",
+        localMarkerTone: 'warning',
+      },
+    ])
+    expect(trackEventMock).toHaveBeenCalledWith('ai_agent_response_completed', expect.objectContaining({
+      agent: 'claude_code',
+    }))
+    expect(messages.getMessages().filter((message) => message.localMarker)).toHaveLength(1)
+  })
+
   it('localizes Pi empty-output stream errors with diagnostic output', () => {
     const messages = createMessageStore([
       {

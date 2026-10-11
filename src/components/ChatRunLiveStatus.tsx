@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   chatRunSnapshotFromMessages,
+  joinChatRunLines,
   nextChatRunAnnouncement,
   type ChatRunSnapshot,
 } from '../lib/chatRunLiveStatus'
 
 interface ChatRunLiveStatusProps {
   messages: Array<{
+    id?: string
     actions?: Array<{ tool: string; toolId?: string; status: string }>
     response?: string
+    localMarker?: string
+    localMarkerTone?: 'warning'
   }>
   isActive: boolean
 }
@@ -20,10 +24,12 @@ interface ChatRunLiveStatusProps {
  * VoiceOver re-reads "Response complete" on later turns.
  *
  * Frame ids live in refs. Streaming re-renders must not cancel a pending
- * announcement; only a newer line, or unmount, may.
+ * announcement. A newer line while frames are scheduled is appended
+ * ("notice. Response complete") so VoiceOver hears both. Unmount cancels.
  */
 export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps) {
   const previousRef = useRef<ChatRunSnapshot | null>(null)
+  const pendingRef = useRef<string | null>(null)
   const clearFrameRef = useRef(0)
   const restoreFrameRef = useRef(0)
   const [announcement, setAnnouncement] = useState('')
@@ -32,6 +38,7 @@ export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps
     return () => {
       cancelAnimationFrame(clearFrameRef.current)
       cancelAnimationFrame(restoreFrameRef.current)
+      pendingRef.current = null
     }
   }, [])
 
@@ -41,12 +48,18 @@ export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps
     previousRef.current = next
     if (!text) return
 
-    cancelAnimationFrame(clearFrameRef.current)
-    cancelAnimationFrame(restoreFrameRef.current)
+    if (pendingRef.current) {
+      pendingRef.current = joinChatRunLines(pendingRef.current, text)
+      return
+    }
+
+    pendingRef.current = text
     clearFrameRef.current = requestAnimationFrame(() => {
       setAnnouncement('')
       restoreFrameRef.current = requestAnimationFrame(() => {
-        setAnnouncement(text)
+        const pending = pendingRef.current
+        pendingRef.current = null
+        if (pending) setAnnouncement(pending)
       })
     })
   }, [isActive, messages])
@@ -54,6 +67,7 @@ export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps
   return (
     <div
       role="status"
+      aria-live="polite"
       data-testid="chat-run-live-status"
       className="sr-only"
     >

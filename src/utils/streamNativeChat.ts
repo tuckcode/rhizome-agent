@@ -47,6 +47,7 @@ export interface NativeEngineEvent {
   id?: string
   args?: string
   output?: string
+  fatal?: boolean
 }
 
 export function applyNativeEvent(event: NativeEngineEvent, callbacks: AgentStreamCallbacks): boolean {
@@ -60,9 +61,15 @@ export function applyNativeEvent(event: NativeEngineEvent, callbacks: AgentStrea
     case 'tool_result':
       callbacks.onToolDone(event.id ?? '', event.output)
       return false
-    case 'error':
-      callbacks.onError(nativeChatUserError(event.message ?? 'Native chat failed'))
+    case 'error': {
+      const message = nativeChatUserError(event.message ?? 'Native chat failed')
+      if (event.fatal === false) {
+        callbacks.onNotice?.(message)
+        return false
+      }
+      callbacks.onError(message)
       return true
+    }
     case 'turn_end':
     case 'cancelled':
       return true
@@ -121,6 +128,7 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
         return
       }
       void listen<NativeEngineEvent>(`native-chat:${sessionId}`, (event) => {
+        if (settled) return
         if (applyNativeEvent(event.payload, request.callbacks)) finish()
       }).then((stop) => {
         unlisten = stop
