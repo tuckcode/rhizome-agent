@@ -422,7 +422,7 @@ rhizome-agent/
 
 | File | Why it matters |
 |------|---------------|
-| `src/index.css` | Semantic CSS custom properties for app-owned light/dark themes; System mode resolves to one of these at runtime. |
+| `src/index.css` | Semantic CSS custom properties for the default Earth light/dark contract; System mode resolves to one of these at runtime. Loam is an optional warm-dark skin in `src/themes.css`. |
 | `src/theme.json` | Editor-specific typography theme (fonts, headings, lists, code blocks). |
 
 ### Settings & Config

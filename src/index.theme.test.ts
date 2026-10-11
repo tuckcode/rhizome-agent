@@ -23,7 +23,7 @@ function extractAccentBlue(blockSelectorRegex: RegExp): string {
 describe('index.css default theme tokens', () => {
   it('keeps the Rhizome green accent in the default light theme', () => {
     const lightBlock = /:root,\s*\n\[data-theme="light"\]\s*\{/
-    expect(extractAccentBlue(lightBlock).toUpperCase()).toBe('#2E6B4F')
+    expect(extractAccentBlue(lightBlock).toUpperCase()).toBe('#2C6A4D')
   })
 
   it('keeps the Rhizome phosphor-mint accent in the default dark theme', () => {
@@ -46,8 +46,8 @@ describe('theme picker swatch stays in sync with the default theme tokens', () =
       )
     expect(swatchMatch).not.toBeNull()
     const [, sidebar, app, accent] = swatchMatch!
-    expect(sidebar.toUpperCase()).toBe('#E9ECE5')
-    expect(app.toUpperCase()).toBe('#EFF1EC')
-    expect(accent.toUpperCase()).toBe('#2E6B4F')
+    expect(sidebar.toUpperCase()).toBe('#ECE6DA')
+    expect(app.toUpperCase()).toBe('#F1ECE2')
+    expect(accent.toUpperCase()).toBe('#2C6A4D')
   })
 })

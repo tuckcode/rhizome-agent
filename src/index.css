@@ -18,7 +18,9 @@
 }
 
 /* ============================================================
-   Theme Variables — app-owned light/dark contract
+   Theme Variables — app-owned Earth light/dark contract
+   Earth dark is :root.dark; Earth light is :root / [data-theme="light"].
+   Loam lives in themes.css as data-color-theme="loam".
    ============================================================ */
 
 :root {
@@ -38,102 +40,102 @@
 [data-theme="light"] {
   color-scheme: light;
 
-  /* --- Semantic surfaces (light mode) --- */
-  --surface-app: #EFF1EC;
-  --surface-sidebar: #E9ECE5;
-  --surface-panel: #F7F8F5;
-  --surface-card: #F7F8F5;
-  --surface-popover: #FBFCFA;
-  --surface-input: #FBFCFA;
-  --surface-button: #E3E7DE;
-  --surface-dialog: #F9FAF7;
-  --surface-editor: #EFF1EC;
+  /* --- Semantic surfaces (Earth light) --- */
+  --surface-app: #F1ECE2;
+  --surface-sidebar: #ECE6DA;
+  --surface-panel: #F8F5EE;
+  --surface-card: #F8F5EE;
+  --surface-popover: #FCFAF6;
+  --surface-input: #FCFAF6;
+  --surface-button: #E7E0D2;
+  --surface-dialog: #FAF7F1;
+  --surface-editor: #F1ECE2;
   --surface-overlay: rgba(26, 30, 22, 0.3);
 
-  /* --- Semantic text (light mode) --- */
-  --text-primary: #23281F;
-  --text-secondary: #4C5546;
-  --text-tertiary: #5A6353;
-  --text-muted: #5A6353;
-  --text-faint: #5A6353;
-  --text-heading: #1B2017;
-  --text-inverse: #F7F8F5;
+  /* --- Semantic text (Earth light) --- */
+  --text-primary: #2A251E;
+  --text-secondary: #4E473C;
+  --text-tertiary: #575043;
+  --text-muted: #625A4D;
+  --text-faint: #6B6354;
+  --text-heading: #1E1A15;
+  --text-inverse: #F8F5EE;
 
-  /* --- Semantic borders (light mode) --- */
-  --border-default: #D6DBCF;
-  --border-subtle: #E1E5DA;
-  --border-strong: #C2C9B8;
-  --border-input: #CBD2C2;
-  --border-dialog: #D6DBCF;
-  --border-focus: #2E6B4F;
+  /* --- Semantic borders (Earth light) --- */
+  --border-default: #DDD4C3;
+  --border-subtle: #E6DFD1;
+  --border-strong: #C8BDA8;
+  --border-input: #857B66;
+  --border-dialog: #C8BDA8;
+  --border-focus: #2C6A4D;
 
-  /* --- Interaction states (light mode) --- */
-  --state-hover: #E5E9DF;
-  --state-hover-subtle: #EBEEE6;
-  --state-selected: #DFE9E2;
-  --state-selected-strong: #CFDFD4;
-  --state-active: #DFE9E2;
-  --state-focus-ring: #2E6B4F;
-  --state-drag-target: #2E6B4F18;
-  --state-disabled: #EBEEE6;
+  /* --- Interaction states (Earth light) --- */
+  --state-hover: #EAE3D6;
+  --state-hover-subtle: #EEE9DF;
+  --state-selected: #E1E6DA;
+  --state-selected-strong: #DCE3D5;
+  --state-active: #DCE3D5;
+  --state-focus-ring: #2C6A4D;
+  --state-drag-target: rgba(44, 106, 77, 0.11);
+  --state-disabled: #EEE9DF;
 
-  /* --- Accent roles (light mode) --- */
-  --accent-blue: #2E6B4F;
-  --accent-blue-bg: #2E6B4F18;
-  --accent-blue-hover: #245741;
-  --accent-blue-light: #2E6B4F14;
-  --accent-green: #38A169;
-  --accent-green-light: rgba(56, 161, 105, 0.1);
-  --accent-orange: #B4552D;
-  --accent-orange-light: rgba(180, 85, 45, 0.12);
-  --accent-red: #C03D30;
-  --accent-red-light: rgba(192, 61, 48, 0.1);
-  --accent-purple: #7C5CB8;
-  --accent-purple-light: rgba(124, 92, 184, 0.1);
-  --accent-yellow: #B08A25;
-  --accent-yellow-light: rgba(176, 138, 37, 0.12);
-  --accent-teal: #2E7D78;
-  --accent-teal-light: rgba(46, 125, 120, 0.1);
-  --accent-pink: #B84A7E;
-  --accent-pink-light: rgba(184, 74, 126, 0.1);
-  --accent-gray: #6E7867;
-  --accent-gray-light: rgba(110, 120, 103, 0.1);
+  /* --- Accent roles (Earth light) --- */
+  --accent-blue: #2C6A4D;
+  --accent-blue-bg: rgba(44, 106, 77, 0.11);
+  --accent-blue-hover: #22573F;
+  --accent-blue-light: rgba(44, 106, 77, 0.11);
+  --accent-green: #3D6A1E;
+  --accent-green-light: rgba(61, 106, 30, 0.10);
+  --accent-orange: #8A5208;
+  --accent-orange-light: #F3E4C4;
+  --accent-red: #A3342A;
+  --accent-red-light: rgba(163, 52, 42, 0.09);
+  --accent-purple: #714EB2;
+  --accent-purple-light: rgba(113, 78, 178, 0.1);
+  --accent-yellow: #795F19;
+  --accent-yellow-light: rgba(121, 95, 25, 0.12);
+  --accent-teal: #286C68;
+  --accent-teal-light: rgba(40, 108, 104, 0.1);
+  --accent-pink: #A13F6E;
+  --accent-pink-light: rgba(161, 63, 110, 0.1);
+  --accent-gray: #5C6557;
+  --accent-gray-light: rgba(92, 101, 87, 0.1);
 
-  /* --- Feedback roles (light mode) --- */
-  --ok-text: #276E45;
-  --danger-text: #A3352A;
-  --warn-text: #9A4524;
+  /* --- Feedback roles (Earth light) --- */
+  --ok-text: #3D6A1E;
+  --danger-text: #A3342A;
+  --warn-text: #8A5208;
   --feedback-info-text: var(--accent-blue);
   --feedback-info-bg: var(--accent-blue-light);
   --feedback-success-text: var(--ok-text);
   --feedback-success-bg: var(--accent-green-light);
   --feedback-warning-text: var(--warn-text);
-  --feedback-warning-bg: #F2E8CE;
-  --feedback-warning-border: #B4552D;
+  --feedback-warning-bg: #F3E4C4;
+  --feedback-warning-border: #8A5208;
   --feedback-error-text: var(--danger-text);
   --feedback-error-bg: var(--accent-red-light);
 
-  /* --- Syntax and diff roles (light mode) --- */
-  --syntax-heading: #2E6B4F;
-  --syntax-link: #2E6B4F;
-  --syntax-monospace: #B4552D;
+  /* --- Syntax and diff roles (Earth light) --- */
+  --syntax-heading: #2C6A4D;
+  --syntax-link: #2C6A4D;
+  --syntax-monospace: #9E4A27;
   --syntax-monospace-bg: rgba(119, 128, 110, 0.14);
-  --syntax-muted: #616A59;
-  --syntax-frontmatter-key: #B4552D;
-  --syntax-frontmatter-value: #2E6B4F;
-  --syntax-highlight-comment: #77806E;
+  --syntax-muted: #5C6454;
+  --syntax-frontmatter-key: #9E4A27;
+  --syntax-frontmatter-value: #2C6A4D;
+  --syntax-highlight-comment: #5D6556;
   --syntax-highlight-keyword: #A6403C;
   --syntax-highlight-string: #23503C;
-  --syntax-highlight-number: #2E6E7D;
+  --syntax-highlight-number: #2C6977;
   --syntax-highlight-title: #6B4FA3;
-  --syntax-highlight-type: #96551F;
+  --syntax-highlight-type: #90511E;
   --syntax-highlight-deletion: #A8322E;
   --syntax-highlight-deletion-bg: #F5E2DE;
-  --diff-added-text: #2F7D4F;
-  --diff-added-bg: rgba(47, 125, 79, 0.12);
-  --diff-removed-text: #BF4136;
-  --diff-removed-bg: rgba(191, 65, 54, 0.12);
-  --diff-hunk-bg: rgba(46, 107, 79, 0.08);
+  --diff-added-text: #296E46;
+  --diff-added-bg: rgba(41, 110, 70, 0.12);
+  --diff-removed-text: #AD3B31;
+  --diff-removed-bg: rgba(173, 59, 49, 0.12);
+  --diff-hunk-bg: rgba(44, 106, 77, 0.08);
   --editor-code-block-background: var(--surface-sidebar);
   --editor-code-block-border: var(--border-subtle);
   --editor-code-block-text: var(--text-primary);
@@ -193,56 +195,56 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* --- Semantic surfaces (dark mode) --- */
-  --surface-app: #0E120C;
-  --surface-sidebar: #10150E;
-  --surface-panel: #151A12;
-  --surface-card: #151A12;
-  --surface-popover: #1B2117;
-  --surface-input: #0E120C;
-  --surface-button: #222A1C;
-  --surface-dialog: #181E14;
-  --surface-editor: #0E120C;
+  /* --- Semantic surfaces (Earth dark) --- */
+  --surface-app: #0F110C;
+  --surface-sidebar: #121410;
+  --surface-panel: #16170F;
+  --surface-card: #16170F;
+  --surface-popover: #1C1D14;
+  --surface-input: #0F110C;
+  --surface-button: #23231A;
+  --surface-dialog: #19190F;
+  --surface-editor: #0F110C;
   --surface-overlay: rgba(4, 6, 3, 0.6);
 
-  /* --- Semantic text (dark mode) --- */
-  --text-primary: #E6EBE0;
-  --text-secondary: #ADB6A3;
-  --text-tertiary: #97A18B;
-  --text-muted: #97A18B;
-  --text-faint: #97A18B;
-  --text-heading: #F2F6ED;
-  --text-inverse: #0E120C;
+  /* --- Semantic text (Earth dark) --- */
+  --text-primary: #E9E8DC;
+  --text-secondary: #BDBAA8;
+  --text-tertiary: #A8A592;
+  --text-muted: #999784;
+  --text-faint: #8F8D7B;
+  --text-heading: #F4F2E8;
+  --text-inverse: #0F110C;
 
-  /* --- Semantic borders (dark mode) --- */
-  --border-default: #232A1F;
-  --border-subtle: #1A2016;
-  --border-strong: #333D2B;
-  --border-input: #2A3224;
-  --border-dialog: #2A3224;
+  /* --- Semantic borders (Earth dark) --- */
+  --border-default: #2A281D;
+  --border-subtle: #1F1E16;
+  --border-strong: #3B3828;
+  --border-input: #75705C;
+  --border-dialog: #3B3828;
   --border-focus: #6FE3A0;
 
-  /* --- Interaction states (dark mode) --- */
-  --state-hover: #1B2117;
-  --state-hover-subtle: #161C12;
-  --state-selected: #1B2E22;
-  --state-selected-strong: #223A2B;
-  --state-active: #1E3326;
+  /* --- Interaction states (Earth dark) --- */
+  --state-hover: #1C1D14;
+  --state-hover-subtle: #16170F;
+  --state-selected: #1A2619;
+  --state-selected-strong: #1C291B;
+  --state-active: #1C291B;
   --state-focus-ring: #6FE3A0;
   --state-drag-target: rgba(111, 227, 160, 0.18);
-  --state-disabled: #161B12;
+  --state-disabled: #15160F;
 
-  /* --- Accent roles (dark mode) --- */
+  /* --- Accent roles (Earth dark) --- */
   --accent-blue: #6FE3A0;
   --accent-blue-bg: rgba(111, 227, 160, 0.18);
   --accent-blue-hover: #8FEBB4;
   --accent-blue-light: rgba(111, 227, 160, 0.14);
   --accent-green: #9BCF7E;
-  --accent-green-light: rgba(155, 207, 126, 0.16);
-  --accent-orange: #E0A458;
-  --accent-orange-light: rgba(224, 164, 88, 0.16);
-  --accent-red: #E8837C;
-  --accent-red-light: rgba(232, 131, 124, 0.16);
+  --accent-green-light: rgba(155, 207, 126, 0.14);
+  --accent-orange: #E9B04F;
+  --accent-orange-light: rgba(233, 176, 79, 0.13);
+  --accent-red: #EE8B7E;
+  --accent-red-light: rgba(238, 139, 126, 0.12);
   --accent-purple: #B4A0E8;
   --accent-purple-light: rgba(180, 160, 232, 0.16);
   --accent-yellow: #E4C97A;
@@ -254,45 +256,45 @@
   --accent-gray: #9AA491;
   --accent-gray-light: rgba(154, 164, 145, 0.14);
 
-  /* --- Feedback roles (dark mode) --- */
+  /* --- Feedback roles (Earth dark) --- */
   --ok-text: #9BCF7E;
-  --danger-text: #E8837C;
-  --warn-text: #E0A458;
+  --danger-text: #EE8B7E;
+  --warn-text: #E9B04F;
   --feedback-info-text: var(--accent-blue);
   --feedback-info-bg: var(--accent-blue-light);
   --feedback-success-text: var(--ok-text);
   --feedback-success-bg: var(--accent-green-light);
   --feedback-warning-text: var(--warn-text);
-  --feedback-warning-bg: rgba(224, 164, 88, 0.14);
-  --feedback-warning-border: #B87F35;
+  --feedback-warning-bg: rgba(233, 176, 79, 0.13);
+  --feedback-warning-border: #E9B04F;
   --feedback-error-text: var(--danger-text);
   --feedback-error-bg: var(--accent-red-light);
 
-  /* --- Syntax and diff roles (dark mode) --- */
+  /* --- Syntax and diff roles (Earth dark) --- */
   --syntax-heading: #6FE3A0;
   --syntax-link: #6FE3A0;
-  --syntax-monospace: #E0A458;
+  --syntax-monospace: #E9B04F;
   --syntax-monospace-bg: rgba(121, 131, 111, 0.16);
-  --syntax-muted: #929C86;
-  --syntax-frontmatter-key: #E0A458;
+  --syntax-muted: #999784;
+  --syntax-frontmatter-key: #E9B04F;
   --syntax-frontmatter-value: #8CDFA6;
-  --syntax-highlight-comment: #6E7863;
+  --syntax-highlight-comment: #848F77;
   --syntax-highlight-keyword: #E8938A;
   --syntax-highlight-string: #A5D8C8;
   --syntax-highlight-number: #8FBEDB;
   --syntax-highlight-title: #C3B2F0;
   --syntax-highlight-type: #E5B171;
   --syntax-highlight-deletion: #E8938A;
-  --syntax-highlight-deletion-bg: rgba(232, 131, 124, 0.15);
+  --syntax-highlight-deletion-bg: rgba(238, 139, 126, 0.15);
   --diff-added-text: #6FE3A0;
   --diff-added-bg: rgba(111, 227, 160, 0.13);
-  --diff-removed-text: #E8837C;
-  --diff-removed-bg: rgba(232, 131, 124, 0.14);
-  --diff-hunk-bg: rgba(224, 164, 88, 0.12);
-  --editor-code-block-background: #0A0D08;
+  --diff-removed-text: #EE8B7E;
+  --diff-removed-bg: rgba(238, 139, 126, 0.14);
+  --diff-hunk-bg: rgba(233, 176, 79, 0.12);
+  --editor-code-block-background: #090A07;
   --editor-code-block-border: transparent;
-  --editor-code-block-text: #E6EBE0;
-  --editor-code-block-language: rgba(230, 235, 224, 0.65);
+  --editor-code-block-text: #E9E8DC;
+  --editor-code-block-language: rgba(233, 232, 220, 0.65);
 
   /* --- Overlays and shadows (dark mode) --- */
   --shadow-overlay: var(--surface-overlay);

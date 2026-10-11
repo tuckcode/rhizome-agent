@@ -39,26 +39,34 @@ describe('chat theme contrast tokens (B2–B4)', () => {
   const light = themeBlock(css, ':root,\n[data-theme="light"]')
   const dark = themeBlock(css, ':root.dark,\n[data-theme="dark"]')
 
-  it('keeps muted and faint aligned with tertiary in both themes', () => {
-    expect(token(light, '--text-muted')).toBe(token(light, '--text-tertiary'))
-    expect(token(light, '--text-faint')).toBe(token(light, '--text-tertiary'))
-    expect(token(dark, '--text-muted')).toBe(token(dark, '--text-tertiary'))
-    expect(token(dark, '--text-faint')).toBe(token(dark, '--text-tertiary'))
+  it('keeps Earth light muted and faint text on the paper-safe ladder', () => {
+    expect(token(light, '--text-muted')).toBe('#625A4D')
+    expect(token(light, '--text-faint')).toBe('#6B6354')
+    expect(token(light, '--text-tertiary')).toBe('#575043')
   })
 
-  it('gives muted text at least 4.5:1 on selected-strong in both themes', () => {
-    expect(contrastRatio(token(light, '--text-muted'), token(light, '--state-selected-strong')))
-      .toBeGreaterThanOrEqual(4.5)
-    expect(contrastRatio(token(dark, '--text-muted'), token(dark, '--state-selected-strong')))
-      .toBeGreaterThanOrEqual(4.5)
+  it('keeps Earth dark muted and faint text on the forest-safe ladder', () => {
+    expect(token(dark, '--text-muted')).toBe('#999784')
+    expect(token(dark, '--text-faint')).toBe('#8F8D7B')
+    expect(token(dark, '--text-tertiary')).toBe('#A8A592')
   })
 
-  it('gives light status text dedicated ok/warn/danger tokens', () => {
-    expect(token(light, '--ok-text')).toBe('#276E45')
-    expect(token(light, '--danger-text')).toBe('#A3352A')
-    expect(token(light, '--warn-text')).toBe('#9A4524')
+  it('gives muted, faint, and tertiary at least 4.5:1 on selected-strong', () => {
+    for (const block of [light, dark]) {
+      const selected = token(block, '--state-selected-strong')
+      for (const name of ['--text-muted', '--text-faint', '--text-tertiary'] as const) {
+        expect(contrastRatio(token(block, name), selected), name).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  })
+
+  it('gives light status text dedicated Earth ok/warn/danger tokens', () => {
+    expect(token(light, '--ok-text')).toBe('#3D6A1E')
+    expect(token(light, '--danger-text')).toBe('#A3342A')
+    expect(token(light, '--warn-text')).toBe('#8A5208')
     expect(token(light, '--feedback-success-text')).toBe('var(--ok-text)')
     expect(token(light, '--feedback-error-text')).toBe('var(--danger-text)')
     expect(token(light, '--feedback-warning-text')).toBe('var(--warn-text)')
   })
 })
+

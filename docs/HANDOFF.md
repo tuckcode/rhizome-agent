@@ -48,7 +48,9 @@ file.
 
 ## State
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · Native Chat engine can send when Prime is not installed. Prime-targeted chats still show install guidance. [Handoff](plans/handoffs/2026-10-11-0520-cursor-grok-4-6-native-send-without-prime.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-11 · Earth theme: Earth dark/light in `index.css`, Loam in the generator. Stacked on a11y B1–B5. [Handoff](plans/handoffs/2026-10-11-0505-cursor-grok-4-6-earth-theme.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · #142 review: status beside log, Stop-before-reply, re-announce identical lines. On `cursor/a11y-chat-b1-b5-8b31`. #143 also touches `AiPanelChrome.tsx`. [Handoff](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-11 · Chat a11y B1–B5: live run status, contrast tokens, model chip, composer stays focusable. On `cursor/a11y-chat-b1-b5-8b31`. [Handoff](plans/handoffs/2026-10-11-0440-cursor-grok-4-6-chat-a11y-b1-b5.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-10 · Plan Phase 3 is the plugin seam (still skipped). #101's "phase 3" is loop Model trait, on main. Plan Phase 5 is done (#107, closes #104). Phase 4b is ADR-0182 + Claude #108. [Plan](plans/2026-10-09-rhizome-harness-plan.md) §4. [Handoff](plans/handoffs/2026-10-10-1530-cursor-grok-4-6-phase-names.md).
 **Origin:** Cursor Grok 4.7 · 2026-10-10 · Phase 2 Rhizome loop: tools, Limited tools vs Power User, cancel reset. Chat stays on Prime. Not installed. [Handoff](plans/handoffs/2026-10-10-0135-cursor-grok-4-7-harness-phase-2.md).
 **Origin:** Cursor Grok 4.7 · 2026-10-10 · Phase 1 Rhizome loop (fake model, four behavior tests). Chat stays on Prime. Not installed. [Handoff](plans/handoffs/2026-10-10-0045-cursor-grok-4-7-harness-phase-1.md).
@@ -136,6 +138,7 @@ Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
 - [2026-10-11 · native send without Prime](plans/handoffs/2026-10-11-0520-cursor-grok-4-6-native-send-without-prime.md) — Native engine can send when Prime is missing. Prime-targeted chats still show install guidance.
+- [2026-10-11 · Earth theme](plans/handoffs/2026-10-11-0505-cursor-grok-4-6-earth-theme.md) — Earth dark/light default contract, Loam extra, `--border-input` at 3:1. Stacked on a11y B1–B5.
 - [2026-10-11 · #142 review](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md) — status beside log, Stop-before-reply, re-announce identical lines. #143 also touches AiPanelChrome.
 - [2026-10-11 · chat a11y B1–B5](plans/handoffs/2026-10-11-0440-cursor-grok-4-6-chat-a11y-b1-b5.md) — live run status, muted/faint contrast, status text tokens, model chip, composer stays focusable.
 - [2026-10-10 · phase names](plans/handoffs/2026-10-10-1530-cursor-grok-4-6-phase-names.md) — Plan Phase 3 = plugin seam (skipped). #101 "phase 3" = loop Model trait. Phase 5 done (#107; [0945](plans/handoffs/2026-10-10-0945-cursor-grok-4-6-harness-phase-5.md)). Phase 4b = ADR-0182 + #108.
@@ -159,6 +162,10 @@ Do not paste leftover paper here.
 - [2026-10-03 · Nous catalog fields](plans/handoffs/2026-10-03-0942-cursor-grok-4-7-nous-catalog-fields.md) — Add to Chat list copies reasoning and input modalities from each Nous record. Name guesses are gone. Not in the installed app.
 - [2026-10-03 · Nous catalog and stall sample](plans/handoffs/2026-10-03-0921-cursor-grok-4-7-nous-catalog-handy.md) — stall sampled; shell waits, skills, lights, and image bubble are uncommitted. Nous already sends reasoning and image modalities. No automatic model refresh.
 - [2026-10-02 · stall and empty reply](plans/handoffs/2026-10-02-1649-cursor-grok-4-7-stall-and-empty-reply.md) — run the stall sample, then the empty chat line. #26 closed: Update now installs Prime.
+- [2026-09-27 · BlockNote 0.55 + cleanup](plans/handoffs/2026-09-27-0951-claude-opus-5-5-blocknote-055-and-cleanup.md) — BlockNote 0.55/tiptap 3.31.3 with patches ported; Dependabot, C80/C82, stranded files pushed; native QA not done; swarm plan written.
+- [2026-09-26 · animated splash](plans/handoffs/2026-09-26-0818-gpt-6-splash-logo.md) — shaded mark grows two branches, then breathes. Dither artwork and original Codex chat located. Source only.
+- [2026-09-26 · macOS title bar](plans/handoffs/2026-09-26-0635-cursor-grok-4-7-macos-titlebar.md) — 32px MacOSTitlebar, y=9, Command Palette docked; packaged app not checked.
+- [2026-09-26 · Astra redesign](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md) — redesign + login-note skip + list markers pushed as `d0a55f8`; app rebuilt; native QA not done.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)

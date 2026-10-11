@@ -151,6 +151,21 @@ describe('color themes and accent', () => {
     }
   })
 
+  it('registers Loam as an optional warm dark theme', () => {
+    expect(normalizeColorTheme('loam')).toBe('loam')
+    expect(COLOR_THEMES.find((theme) => theme.slug === 'loam')).toEqual({
+      slug: 'loam',
+      name: 'Loam',
+      polarity: 'dark',
+      swatch: ['#15110C', '#1D1811', '#6FE3A0'],
+    })
+    expect(
+      applyAppearanceToDocument(document, { mode: 'light', colorTheme: 'loam', accentColor: 'blue' }),
+    ).toBe('dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'loam')
+    expect(document.documentElement).toHaveClass('dark')
+  })
+
   it('round-trips stored color theme and accent, rejecting junk', () => {
     const storage = makeStorage({ [COLOR_THEME_STORAGE_KEY]: 'nord', [ACCENT_COLOR_STORAGE_KEY]: 'pink' })
     expect(readStoredColorTheme(storage)).toBe('nord')

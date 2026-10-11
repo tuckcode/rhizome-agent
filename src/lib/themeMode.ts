@@ -113,12 +113,12 @@ export function readStoredAppearance(storage: ThemeStorage): AppearanceSelection
 }
 
 // ── Color themes and accent ──────────────────────────────────────────────────
-// The default `rhizome` theme is the hand-tuned light/dark contract in
-// index.css and follows the Light/Dark/System mode toggle. Fixed themes
-// (from the brand handoff) are single-polarity skins in themes.css; picking
-// one pins the resolved mode to its polarity so every existing
-// dark-conditional keeps working. The accent swap only applies on the
-// rhizome theme — fixed themes own their accent.
+// The default `rhizome` theme is the hand-tuned Earth light/dark contract in
+// index.css and follows the Light/Dark/System mode toggle. Loam is an optional
+// warm-dark Earth skin. Other fixed themes (from the brand handoff) are
+// single-polarity skins in themes.css; picking one pins the resolved mode to
+// its polarity so every existing dark-conditional keeps working. The accent
+// swap only applies on the rhizome theme — fixed themes own their accent.
 
 export const COLOR_THEME_STORAGE_KEY = 'rhizome-color-theme'
 export const ACCENT_COLOR_STORAGE_KEY = 'rhizome-accent'
@@ -139,7 +139,8 @@ export interface ColorThemeDefinition {
 }
 
 export const COLOR_THEMES: readonly ColorThemeDefinition[] = [
-  { slug: 'rhizome', name: 'Rhizome', polarity: null, swatch: ['#E9ECE5', '#EFF1EC', '#2E6B4F'] },
+  { slug: 'rhizome', name: 'Rhizome', polarity: null, swatch: ['#ECE6DA', '#F1ECE2', '#2C6A4D'] },
+  { slug: 'loam', name: 'Loam', polarity: 'dark', swatch: ['#15110C', '#1D1811', '#6FE3A0'] },
   { slug: 'dracula', name: 'Dracula', polarity: 'dark', swatch: ['#21222C', '#282A36', '#BD93F9'] },
   { slug: 'nord', name: 'Nord', polarity: 'dark', swatch: ['#3B4252', '#2E3440', '#88C0D0'] },
   { slug: 'gruvbox-dark', name: 'Gruvbox Dark', polarity: 'dark', swatch: ['#32302F', '#282828', '#FE8019'] },
