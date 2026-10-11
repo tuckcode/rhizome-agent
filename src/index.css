@@ -54,8 +54,8 @@
   --text-primary: #23281F;
   --text-secondary: #4C5546;
   --text-tertiary: #616A59;
-  --text-muted: #77806E;
-  --text-faint: #97A08D;
+  --text-muted: #616A59;
+  --text-faint: #616A59;
   --text-heading: #1B2017;
   --text-inverse: #F7F8F5;
 
@@ -100,14 +100,17 @@
   --accent-gray-light: rgba(110, 120, 103, 0.1);
 
   /* --- Feedback roles (light mode) --- */
+  --ok-text: #276E45;
+  --danger-text: #A3352A;
+  --warn-text: #9A4524;
   --feedback-info-text: var(--accent-blue);
   --feedback-info-bg: var(--accent-blue-light);
-  --feedback-success-text: var(--accent-green);
+  --feedback-success-text: var(--ok-text);
   --feedback-success-bg: var(--accent-green-light);
-  --feedback-warning-text: #8A4A16;
+  --feedback-warning-text: var(--warn-text);
   --feedback-warning-bg: #F2E8CE;
   --feedback-warning-border: #B4552D;
-  --feedback-error-text: var(--accent-red);
+  --feedback-error-text: var(--danger-text);
   --feedback-error-bg: var(--accent-red-light);
 
   /* --- Syntax and diff roles (light mode) --- */
@@ -206,8 +209,8 @@
   --text-primary: #E6EBE0;
   --text-secondary: #ADB6A3;
   --text-tertiary: #929C86;
-  --text-muted: #79836F;
-  --text-faint: #5C6553;
+  --text-muted: #929C86;
+  --text-faint: #929C86;
   --text-heading: #F2F6ED;
   --text-inverse: #0E120C;
 
@@ -252,14 +255,17 @@
   --accent-gray-light: rgba(154, 164, 145, 0.14);
 
   /* --- Feedback roles (dark mode) --- */
+  --ok-text: #9BCF7E;
+  --danger-text: #E8837C;
+  --warn-text: #E0A458;
   --feedback-info-text: var(--accent-blue);
   --feedback-info-bg: var(--accent-blue-light);
-  --feedback-success-text: var(--accent-green);
+  --feedback-success-text: var(--ok-text);
   --feedback-success-bg: var(--accent-green-light);
-  --feedback-warning-text: #E0A458;
+  --feedback-warning-text: var(--warn-text);
   --feedback-warning-bg: rgba(224, 164, 88, 0.14);
   --feedback-warning-border: #B87F35;
-  --feedback-error-text: var(--accent-red);
+  --feedback-error-text: var(--danger-text);
   --feedback-error-bg: var(--accent-red-light);
 
   /* --- Syntax and diff roles (dark mode) --- */
@@ -456,6 +462,9 @@
   --color-border-subtle: var(--border-subtle);
   --color-border-strong: var(--border-strong);
   --color-feedback-success-text: var(--feedback-success-text);
+  --color-ok-text: var(--ok-text);
+  --color-danger-text: var(--danger-text);
+  --color-warn-text: var(--warn-text);
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);

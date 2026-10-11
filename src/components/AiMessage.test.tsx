@@ -262,6 +262,16 @@ describe('AiMessage', () => {
     expect(screen.getByTestId('latest-assistant-reply-marker')).toBeInTheDocument()
   })
 
+  it('marks the streaming message busy for assistive tech', () => {
+    const { rerender } = render(
+      <AiMessage userMessage="Ask" actions={[]} isStreaming />,
+    )
+    expect(screen.getByTestId('ai-message')).toHaveAttribute('aria-busy', 'true')
+
+    rerender(<AiMessage userMessage="Ask" actions={[]} response="Done" />)
+    expect(screen.getByTestId('ai-message')).not.toHaveAttribute('aria-busy')
+  })
+
   it('shows assistant message actions with response', () => {
     render(<AiMessage userMessage="Ask" actions={[]} response="Done" />)
     expect(screen.getByTestId('ai-message-actions')).toBeTruthy()

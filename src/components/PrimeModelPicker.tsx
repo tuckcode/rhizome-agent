@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { callHost, callHostOr } from '../lib/callHost'
 import { CaretDown } from '@phosphor-icons/react'
 import {
@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { CHAT_FOCUS_RING_CLASS } from '../lib/chatFocusRing'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import {
   activeModelKey,
@@ -251,14 +252,24 @@ export function PrimeModelPicker({
   const triggerLabel = strip
     ? (modelThinkingLabel(label, thinkingLevel) ?? t('ai.composer.modelUnknown'))
     : (label ?? t('ai.composer.modelUnknown'))
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const setTriggerRef = useCallback((node: HTMLButtonElement | null) => {
+    triggerRef.current = node
+    node?.setAttribute('aria-haspopup', 'listbox')
+  }, [])
+  useLayoutEffect(() => {
+    triggerRef.current?.setAttribute('aria-haspopup', 'listbox')
+  }, [open, triggerLabel])
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild disabled={disabled}>
         <button
+          ref={setTriggerRef}
           type="button"
           className={cn(
             'inline-flex items-center gap-1 transition-colors',
+            CHAT_FOCUS_RING_CLASS,
             strip
               ? 'min-w-0 rounded-sm px-1 py-0.5 font-mono text-[11px] font-medium text-foreground hover:bg-accent'
               : cn(
@@ -268,7 +279,8 @@ export function PrimeModelPicker({
                 ),
             disabled && 'cursor-not-allowed opacity-60',
           )}
-          aria-label={strip ? t('ai.subhead.modelAndThinking') : t('ai.composer.model')}
+          aria-haspopup="listbox"
+          aria-label={`Model: ${triggerLabel}`}
           data-testid={strip ? 'prime-model-thinking-control' : 'prime-model-chip'}
         >
           <span className="max-w-[180px] truncate">{triggerLabel}</span>

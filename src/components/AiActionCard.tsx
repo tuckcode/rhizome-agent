@@ -166,7 +166,7 @@ function DetailBlock({ label, content, isError }: {
           padding: '4px 6px',
           borderRadius: 4,
           background: 'var(--muted)',
-          color: isError ? 'var(--destructive)' : 'var(--foreground)',
+          color: isError ? 'var(--danger-text, var(--destructive))' : 'var(--foreground)',
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
           maxHeight: 200,

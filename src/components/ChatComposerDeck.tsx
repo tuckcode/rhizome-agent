@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { CaretDown } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
+import { CHAT_FOCUS_RING_CLASS } from '../lib/chatFocusRing'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +33,7 @@ function pillClass(accent = false) {
   return cn(
     'inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border px-2 py-0.5',
     'font-mono text-[11px] transition-colors',
+    CHAT_FOCUS_RING_CLASS,
     'border-[var(--border-default,var(--border))]',
     'hover:bg-[var(--state-hover,var(--accent))] hover:text-foreground',
     accent ? 'border-[var(--accent-green)]/40 text-foreground' : 'text-muted-foreground',

@@ -30,6 +30,8 @@ describe('ChatComposerDeck', () => {
 
     expect(screen.getByTestId('prime-model-chip')).toHaveTextContent('Grok 4.5')
     expect(screen.getByTestId('prime-thinking-toggle')).toHaveTextContent('Off')
+    expect(screen.getByTestId('prime-model-chip').tagName).toBe('BUTTON')
+    expect(screen.getByTestId('prime-thinking-toggle').tagName).toBe('BUTTON')
   })
 
   it('drops the Prime label chip and the skills chip (native audit 2026-09-26)', () => {

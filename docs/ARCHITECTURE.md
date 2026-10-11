@@ -611,7 +611,10 @@ Composer Enter mid-turn is **not** a new turn. `useAiPanelSendPolicy` +
 `sendToRunningTurn` is tri-state: accepted (follow-up stays visibly queued),
 no longer running (fallback starts a new turn only from the latest idle UI
 state), or transport failure. Steer is a separate control. Escape leaves
-Chat; Stop is click-only.
+Chat; Stop is click-only. The composer stays focusable while a turn runs;
+only unreadiness disables it. The transcript is a polite `role="log"`;
+`ChatRunLiveStatus` injects throttled tool/complete/stop lines into one
+empty `role="status"` region (`chatRunLiveStatus.ts`).
 
 Assistant actions on `AiMessage` are icon-only (`size="icon"`) with hover
 tooltips: regenerate, copy, save to vault, fork. Accessible names stay on

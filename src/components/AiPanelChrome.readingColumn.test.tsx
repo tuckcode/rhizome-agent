@@ -30,6 +30,53 @@ describe('chat reading column', () => {
     expect(column?.textContent).toContain('hello')
   })
 
+  it('exposes the transcript as a polite log with an empty run-status live region', () => {
+    Element.prototype.scrollIntoView = vi.fn()
+    render(
+      <AiPanelMessageHistory
+        agentLabel="Prime"
+        agentReadiness="ready"
+        messages={[{ userMessage: 'hi', response: 'hello', actions: [] }]}
+        isActive={false}
+        hasContext={false}
+      />,
+    )
+    const history = screen.getByTestId('ai-panel-message-history')
+    expect(history).toHaveAttribute('role', 'log')
+    expect(history).toHaveAttribute('aria-live', 'polite')
+    expect(history).toHaveAttribute('aria-relevant', 'additions')
+    const status = screen.getByTestId('chat-run-live-status')
+    expect(status).toHaveAttribute('role', 'status')
+    expect(status).toHaveTextContent('')
+  })
+
+  it('announces a newly started tool in the run-status live region', () => {
+    Element.prototype.scrollIntoView = vi.fn()
+    const { rerender } = render(
+      <AiPanelMessageHistory
+        agentLabel="Prime"
+        agentReadiness="ready"
+        messages={[{ userMessage: 'hi', actions: [], isStreaming: true }]}
+        isActive
+        hasContext={false}
+      />,
+    )
+    rerender(
+      <AiPanelMessageHistory
+        agentLabel="Prime"
+        agentReadiness="ready"
+        messages={[{
+          userMessage: 'hi',
+          isStreaming: true,
+          actions: [{ tool: 'get_note', toolId: 't1', label: 'get_note', status: 'pending' }],
+        }]}
+        isActive
+        hasContext={false}
+      />,
+    )
+    expect(screen.getByTestId('chat-run-live-status')).toHaveTextContent('Running get_note')
+  })
+
   it('puts the composer inside the same reading column', () => {
     render(
       <AiPanelComposer

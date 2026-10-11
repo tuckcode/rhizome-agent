@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { callHost, callHostOr } from '../lib/callHost'
 import { cn } from '@/lib/utils'
+import { CHAT_FOCUS_RING_CLASS } from '../lib/chatFocusRing'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { offeredThinkingLevels, thinkingLevelIsLoud, thinkingLevelLabel } from '../lib/primeThinkingLevels'
 import { trackPrimeThinkingLevelChanged } from '../lib/productAnalytics'
@@ -106,6 +107,7 @@ export function PrimeThinkingToggle({
           className={cn(
             'inline-flex shrink-0 items-center rounded-full border px-2 py-0.5',
             'font-mono text-[11px] transition-colors',
+            CHAT_FOCUS_RING_CLASS,
             'border-[var(--border-default,var(--border))]',
             loud
               ? 'border-[var(--accent-green)]/40 bg-[var(--accent-green)]/10 text-foreground'
