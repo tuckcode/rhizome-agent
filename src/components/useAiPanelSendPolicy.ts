@@ -29,9 +29,7 @@ interface UseAiPanelSendPolicyResult {
    */
   handleComposerSend: (text: string, references: SendReferences) => void
   /**
-   * Redirect the running turn. Only wired for Prime — this is a daemon verb,
-   * and the composer locks itself when no handler is supplied, which is what
-   * every non-Prime target should keep doing.
+   * Redirect the running turn. Only wired for Prime — this is a daemon verb.
    */
   handleSteer: (text: string, references: SendReferences) => void
 }
