@@ -35,8 +35,9 @@ describe('BootSplash', () => {
   })
 
   it('paints the splash card from the Earth palette', () => {
-    expect(splashCss).toMatch(/\.boot-splash-card\s*\{[^}]*background:\s*#F8F5EE/)
-    expect(splashCss).toMatch(/\.boot-splash-card\s*\{[^}]*border:\s*1px solid #DDD4C3/)
+    expect(splashCss).toMatch(/\.boot-splash-card\s*\{[^}]*background:\s*#16170F/)
+    expect(splashCss).toMatch(/\.boot-splash-card\s*\{[^}]*border:\s*1px solid #2A281D/)
+    expect(splashCss).toMatch(/\[data-theme="light"\] \.boot-splash-card\s*\{[^}]*background:\s*#F8F5EE/)
     expect(splashCss).toMatch(/\[data-theme="dark"\] \.boot-splash-card\s*\{[^}]*background:\s*#16170F/)
     expect(splashCss).toMatch(/\[data-theme="dark"\] \.boot-splash-card\s*\{[^}]*border-color:\s*#2A281D/)
     expect(splashCss).not.toContain('#F7F8F5')

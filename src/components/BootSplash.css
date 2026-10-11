@@ -29,16 +29,22 @@
 
 .boot-splash-card {
   align-items: center;
-  background: #F8F5EE;
-  border: 1px solid #DDD4C3;
+  background: #16170F;
+  border: 1px solid #2A281D;
   border-radius: 16px;
-  box-shadow: 0 16px 40px rgb(15 23 42 / 0.12), 0 1px 3px rgb(15 23 42 / 0.08);
+  box-shadow: 0 18px 44px rgb(0 0 0 / 0.35), 0 1px 4px rgb(0 0 0 / 0.22);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 28px 32px 22px;
   width: 240px;
+}
+
+:root[data-theme="light"] .boot-splash-card {
+  background: #F8F5EE;
+  border-color: #DDD4C3;
+  box-shadow: 0 16px 40px rgb(15 23 42 / 0.12), 0 1px 3px rgb(15 23 42 / 0.08);
 }
 
 :root[data-theme="dark"] .boot-splash-card {
