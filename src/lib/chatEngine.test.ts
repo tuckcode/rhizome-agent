@@ -37,5 +37,6 @@ describe('native chat picker', () => {
     expect(defaultNativeChatTarget()).not.toBe('free_tier_auto')
     expect(defaultNativeChatTarget().includes('/')).toBe(true)
     expect(resolveNativeChatTarget(null)).toBe(defaultNativeChatTarget())
+    expect(resolveNativeChatTarget('open_ai/gpt-4o')).toBe('open_ai/gpt-4o')
   })
 })

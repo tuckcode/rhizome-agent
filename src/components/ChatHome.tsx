@@ -16,11 +16,10 @@ import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 import { usePrimeActiveSessionTitle } from '../hooks/usePrimeActiveSessionTitle'
 import { resolveChatOpenNote } from '../utils/resolveChatOpenNote'
-import { agentTargets, type AiTarget } from '../lib/aiTargets'
+import { agentTargets, type AiModelProvider, type AiTarget } from '../lib/aiTargets'
 import type { AiAgentId, AiAgentReadiness } from '../lib/aiAgents'
 import type { AppLocale } from '../lib/i18n'
 import type { VaultEntry } from '../types'
-import { NativeChatModelPicker } from './NativeChatModelPicker'
 
 interface ChatHomeProps {
   locale: AppLocale
@@ -31,6 +30,7 @@ interface ChatHomeProps {
   chatEngine?: 'prime' | 'native'
   nativeTarget?: string | null
   onNativeTargetChange?: (target: string) => void
+  aiModelProviders?: AiModelProvider[] | null
   vaultPath: string
   vaultPaths: string[]
   entries: VaultEntry[]
@@ -82,6 +82,7 @@ export default function ChatHome({
   chatEngine = 'prime',
   nativeTarget,
   onNativeTargetChange,
+  aiModelProviders,
   vaultPath,
   vaultPaths,
   entries,
@@ -115,6 +116,8 @@ export default function ChatHome({
   }, [defaultAiTarget, isPrimeChat])
   const isPrimeTarget = isPrimeChat && chatTarget?.kind !== 'api_model' && chatEngine !== 'native'
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
+  const primeLive = isPrimeTarget && Boolean(primeHost?.running)
+  const effectiveEngine = primeLive ? 'prime' : 'native'
   const sessionTitle = usePrimeActiveSessionTitle(primeHost?.sessionPath ?? null, primeHost?.isStreaming)
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
@@ -176,9 +179,6 @@ export default function ChatHome({
         enabled={isPrimeTarget}
         liveSessionId={primeHost?.sessionId ?? null}
       />
-      {chatEngine === 'native' ? (
-        <NativeChatModelPicker value={nativeTarget} onChange={(target) => onNativeTargetChange?.(target)} />
-      ) : null}
       <div className="flex min-h-0 flex-1">
         <AiPanel
           locale={locale}
@@ -186,7 +186,7 @@ export default function ChatHome({
           defaultAiTarget={chatTarget}
           defaultAiAgentReadiness={defaultAiAgentReadiness}
           defaultAiAgentReady={defaultAiAgentReady}
-          chatEngine={chatEngine}
+          chatEngine={effectiveEngine}
           nativeTarget={nativeTarget ?? undefined}
           vaultPath={vaultPath}
           vaultPaths={vaultPaths}
@@ -255,11 +255,15 @@ export default function ChatHome({
               </>
             ) : undefined
           }
-          composerDeck={isPrimeTarget ? (
+          composerDeck={
             <ChatComposerDeck
               locale={locale}
               vaultPath={vaultPath}
               hostReady={Boolean(primeHost?.running)}
+              catalog={primeLive ? 'prime' : 'rhizome'}
+              nativeTarget={nativeTarget}
+              onNativeTargetChange={onNativeTargetChange}
+              providers={aiModelProviders}
               contextLabel={openNote ? openNote.label.split('/').filter(Boolean).at(-1) ?? openNote.label : null}
               onCloseContext={() => {
                 setOpenNote(null)
@@ -278,7 +282,7 @@ export default function ChatHome({
                 ) : null
               }
             />
-          ) : undefined}
+          }
           composerSkillsLabel="rhizome-vault"
           onClose={onExit}
         />

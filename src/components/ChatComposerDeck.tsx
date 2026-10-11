@@ -9,8 +9,10 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import type { AiModelProvider } from '../lib/aiTargets'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { trackComposerPillOpened } from '../lib/productAnalytics'
+import { NativeChatModelPicker } from './NativeChatModelPicker'
 import { PrimeModelPicker } from './PrimeModelPicker'
 import { PrimeThinkingToggle } from './PrimeThinkingToggle'
 
@@ -27,6 +29,11 @@ interface ChatComposerDeckProps {
   hostReady?: boolean
   /** Agent activity — idle/working pill, sits next to thinking. */
   activity?: ReactNode
+  /** Prime catalog when the host is live; Rhizome catalog otherwise. */
+  catalog?: 'prime' | 'rhizome'
+  nativeTarget?: string | null
+  onNativeTargetChange?: (target: string) => void
+  providers?: AiModelProvider[] | null
 }
 
 function pillClass(accent = false) {
@@ -83,30 +90,46 @@ export function ChatComposerDeck({
   vaultPath,
   hostReady = false,
   activity,
+  catalog = 'prime',
+  nativeTarget,
+  onNativeTargetChange,
+  providers,
 }: ChatComposerDeckProps) {
   const t = createTranslator(locale)
+  const rhizome = catalog === 'rhizome'
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1.5" data-testid="chat-composer-deck">
       <span
         onPointerDown={() => trackComposerPillOpened('model')}
       >
-        <PrimeModelPicker
-          locale={locale}
-          label={model}
-          thinkingLevel={thinkingLevel}
-          side="top"
-          variant="chip"
-          vaultPath={vaultPath}
-          hostReady={hostReady}
-        />
+        {rhizome ? (
+          <NativeChatModelPicker
+            value={nativeTarget}
+            onChange={(target) => onNativeTargetChange?.(target)}
+            providers={providers}
+            variant="chip"
+          />
+        ) : (
+          <PrimeModelPicker
+            locale={locale}
+            label={model}
+            thinkingLevel={thinkingLevel}
+            side="top"
+            variant="chip"
+            vaultPath={vaultPath}
+            hostReady={hostReady}
+          />
+        )}
       </span>
 
-      <PrimeThinkingToggle
-        locale={locale}
-        thinkingLevel={thinkingLevel}
-        vaultPath={vaultPath}
-      />
+      {rhizome ? null : (
+        <PrimeThinkingToggle
+          locale={locale}
+          thinkingLevel={thinkingLevel}
+          vaultPath={vaultPath}
+        />
+      )}
 
       {activity}
 

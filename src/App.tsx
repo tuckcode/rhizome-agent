@@ -2121,6 +2121,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         chatEngine={settings.chat_engine === 'native' ? 'native' : 'prime'}
         nativeTarget={settings.native_chat_target}
         onNativeTargetChange={(target) => saveSettings({ ...settings, native_chat_target: target })}
+        aiModelProviders={settings.ai_model_providers}
         onExit={() => handleSetViewMode(chatCentered ? 'all' : 'editor-list')}
         vaultPath={activeEditorVaultPath}
         vaultPaths={writableVaultPaths}

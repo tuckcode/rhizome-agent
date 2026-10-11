@@ -875,7 +875,7 @@ describe('SettingsPanel', () => {
     expect(screen.getByTestId('settings-chat-engine')).toHaveTextContent('Chat engine')
     expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByTestId('settings-prime-chat-engine')).toHaveTextContent('Prime Agent')
-    expect(screen.queryByTestId('native-chat-model-picker')).not.toBeInTheDocument()
+    expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
     expect(screen.queryByTestId('settings-default-ai-agent')).not.toBeInTheDocument()
   })
 

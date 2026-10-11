@@ -382,6 +382,13 @@ describe('ChatHome composer wiring', () => {
     )
   })
 
+  it('sends through the Rhizome catalog when Prime is not live', () => {
+    expect(chatHomeSource).toContain('const primeLive = isPrimeTarget && Boolean(primeHost?.running)')
+    expect(chatHomeSource).toContain("const effectiveEngine = primeLive ? 'prime' : 'native'")
+    expect(chatHomeSource).toContain("catalog={primeLive ? 'prime' : 'rhizome'}")
+    expect(chatHomeSource).toContain('chatEngine={effectiveEngine}')
+  })
+
   it('polls Prime host status from whatever vaultPath Chat has, including empty', () => {
     expect(chatHomeSource).toContain('usePrimeHostStatus(isPrimeTarget, vaultPath)')
     expect(chatHomeSource).not.toMatch(/usePrimeHostStatus\([^)]*vaultPath\s*&&/)

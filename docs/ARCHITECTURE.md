@@ -738,11 +738,22 @@ separate costs.
 `Done: {title}` for `FINISHED_ROW_KEEP_MS` (45s). A failed roster read
 must not invent finishes. Do not close #52 from units.
 
-Settings and Chat share one Prime model catalog (`loadPrimeModelCatalog`).
-A failed “host is not running” answer is **not** cached. Settings must
-not fetch that catalog — or `get_prime_provider_status` — until the
-Agents section is opened or scrolled into view. Fetching 501 models on
-every Settings open was the pinwheel.
+Settings and Chat share one Prime model catalog (`loadPrimeModelCatalog`)
+**when the Prime host is live.** A failed “host is not running” answer is
+**not** cached. Settings must not fetch that catalog — or
+`get_prime_provider_status` — until the Agents section is opened or
+scrolled into view. Fetching 501 models on every Settings open was the
+pinwheel.
+
+The **Rhizome catalog** is the main list from Settings through the
+composer dropdown when Chat is on the native engine, or when Prime is
+not running after a rebuild. It seeds from
+`aiModelProviderCatalog.json` plus `settings.ai_model_providers`, then
+asks `discover_ai_models` (`GET {base_url}/models`) for local and
+configured providers. A failed discover is dropped; the seed stays.
+Target ids use catalog kinds (`open_ai/…`, `open_router/…`) so native
+send hits the right provider. Prime’s `models.json` is only the Prime
+engine’s list.
 
 Native hide/reopen live-check is still **NOT RUN**. Do not mass-kill
 Prime-spawned `mcp-server/index.js` (ADR-0163). Do not recode hide to

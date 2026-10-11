@@ -255,6 +255,17 @@ pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<Str
     crate::ai_models::test_ai_model_provider(request)
 }
 
+/// `GET {base_url}/models` for one Rhizome provider. Failures are not cached.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn discover_ai_models(
+    provider: crate::ai_models::AiModelProvider,
+    api_key_override: Option<String>,
+) -> Result<Vec<String>, String> {
+    crate::ai_models::discover_ai_model_ids(&provider, api_key_override.as_deref())
+        .map_err(|error| error.message)
+}
+
 /// One plain reply with no tools, for batch callers such as chat titles.
 #[cfg(desktop)]
 #[tauri::command]
@@ -368,6 +379,15 @@ pub fn test_ai_model_provider(
     _request: crate::ai_models::AiModelProviderTestRequest,
 ) -> Result<String, String> {
     Err("Direct AI model tests are not available in this mobile build yet.".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub fn discover_ai_models(
+    _provider: crate::ai_models::AiModelProvider,
+    _api_key_override: Option<String>,
+) -> Result<Vec<String>, String> {
+    Err("Model discovery is not available in this mobile build yet.".into())
 }
 
 #[cfg(mobile)]
