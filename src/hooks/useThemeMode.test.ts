@@ -40,6 +40,13 @@ describe('useThemeMode', () => {
     expect(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)).toBe('dark')
   })
 
+  it('starts a fresh install in Earth dark when nothing is saved', () => {
+    renderHook(() => useThemeMode(null, true))
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveClass('dark')
+  })
+
   it('uses the storage mirror when persisted settings are empty', () => {
     window.localStorage.setItem(THEME_MODE_STORAGE_KEY, 'dark')
 

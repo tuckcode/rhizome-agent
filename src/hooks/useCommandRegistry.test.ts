@@ -603,7 +603,7 @@ describe('useCommandRegistry', () => {
       group: 'Settings',
     })
     expect(systemMode).toMatchObject({
-      label: 'Use System Theme',
+      label: 'Match System',
       enabled: true,
       group: 'Settings',
     })

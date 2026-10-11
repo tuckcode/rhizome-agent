@@ -2,7 +2,7 @@ import { APP_STORAGE_KEYS, LEGACY_APP_STORAGE_KEYS } from '../constants/appStora
 
 export const THEME_MODE_STORAGE_KEY = APP_STORAGE_KEYS.theme
 export const LEGACY_THEME_MODE_STORAGE_KEY = LEGACY_APP_STORAGE_KEYS.theme
-export const DEFAULT_THEME_MODE = 'light'
+export const DEFAULT_THEME_MODE = 'dark'
 export const SYSTEM_THEME_MODE = 'system'
 export const SYSTEM_THEME_MEDIA_QUERY = '(prefers-color-scheme: dark)'
 
@@ -114,11 +114,12 @@ export function readStoredAppearance(storage: ThemeStorage): AppearanceSelection
 
 // ── Color themes and accent ──────────────────────────────────────────────────
 // The default `rhizome` theme is the hand-tuned Earth light/dark contract in
-// index.css and follows the Light/Dark/System mode toggle. Loam is an optional
-// warm-dark Earth skin. Other fixed themes (from the brand handoff) are
-// single-polarity skins in themes.css; picking one pins the resolved mode to
-// its polarity so every existing dark-conditional keeps working. The accent
-// swap only applies on the rhizome theme — fixed themes own their accent.
+// index.css and follows the Light/Dark/Match system mode toggle. Fresh
+// installs start in Earth dark. Loam is an optional warm-dark Earth skin.
+// Other fixed themes (from the brand handoff) are single-polarity skins in
+// themes.css; picking one pins the resolved mode to its polarity so every
+// existing dark-conditional keeps working. The accent swap only applies on
+// the rhizome theme — fixed themes own their accent.
 
 export const COLOR_THEME_STORAGE_KEY = 'rhizome-color-theme'
 export const ACCENT_COLOR_STORAGE_KEY = 'rhizome-accent'

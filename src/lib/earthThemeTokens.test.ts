@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { CHAT_FOCUS_RING_CLASS } from './chatFocusRing'
-import { COLOR_THEMES, DEFAULT_COLOR_THEME } from './themeMode'
+import { COLOR_THEMES, DEFAULT_COLOR_THEME, DEFAULT_THEME_MODE } from './themeMode'
 
 const indexCss = readFileSync(join(process.cwd(), 'src/index.css'), 'utf8')
 const themesCss = readFileSync(join(process.cwd(), 'src/themes.css'), 'utf8')
@@ -257,6 +257,7 @@ describe('Earth theme tokens', () => {
   )
 
   it('keeps rhizome as the default color theme and adds Loam', () => {
+    expect(DEFAULT_THEME_MODE).toBe('dark')
     expect(DEFAULT_COLOR_THEME).toBe('rhizome')
     const loamTheme = COLOR_THEMES.find((theme) => theme.slug === 'loam')
     expect(loamTheme).toEqual({

@@ -47,7 +47,7 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Grok 4.6 · 2026-10-11 · Earth nits on #144: splash/startup/Mycelium/sheet greens, Loam first-paint, faint/border/comment contrast. [Handoff](plans/handoffs/2026-10-11-0615-cursor-grok-4-6-earth-theme-nits.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-11 · Earth nits on #144: leftover skins, Loam first-paint/contrast, Earth dark default, Match system. [Handoff](plans/handoffs/2026-10-11-0615-cursor-grok-4-6-earth-theme-nits.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · PLAN item 4 + #143: Views = Research/Graph/Mycelium/History; Changes next to Notes in the sidebar; Mac Ctrl+Cmd+1–4 / Win+Linux Ctrl+Shift+1–4 (no CmdOrCtrl+Alt). A-W8 / A-M1 / A-M3 / A-M4 still open. [First](plans/handoffs/2026-10-11-0455-cursor-grok-4-6-navigation-grouping.md). [Review](plans/handoffs/2026-10-11-0516-cursor-grok-4-6-navigation-review.md). [Shortcuts](plans/handoffs/2026-10-11-0545-cursor-grok-4-6-navigation-shortcuts.md). [Changes](plans/handoffs/2026-10-11-0555-cursor-grok-4-6-navigation-changes.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · #142 review: status beside log, Stop-before-reply, re-announce identical lines; pending frames survive streamed re-renders. #143 also touches `AiPanelChrome.tsx`. [Handoff](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md) · [Handoff](plans/handoffs/2026-10-11-0526-cursor-grok-4-6-chat-a11y-reread.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · Native Chat engine can send when Prime is not installed. Prime-targeted chats still show install guidance. [Handoff](plans/handoffs/2026-10-11-0520-cursor-grok-4-6-native-send-without-prime.md).
@@ -133,7 +133,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
-- [2026-10-11 · Earth theme nits](plans/handoffs/2026-10-11-0615-cursor-grok-4-6-earth-theme-nits.md) — splash/startup/Mycelium/sheet greens, Loam first-paint `#15110C`, faint `#998D74`, input `#8A7A62`, comment `#88917B`. Stacked on #144.
+- [2026-10-11 · Earth theme nits](plans/handoffs/2026-10-11-0615-cursor-grok-4-6-earth-theme-nits.md) — leftover skins, Loam first-paint/contrast, Earth dark default, Match system. Stacked on #144.
 - [2026-10-11 · #143 Changes](plans/handoffs/2026-10-11-0555-cursor-grok-4-6-navigation-changes.md) — Changes next to Notes in the sidebar. Views are four: Ctrl+Cmd/Ctrl+Shift+1–4.
 - [2026-10-11 · navigation grouping](plans/handoffs/2026-10-11-0455-cursor-grok-4-6-navigation-grouping.md) — PLAN item 4 first slice: Views group on the rail, Ctrl+Cmd+1–4 / Ctrl+Shift+1–4, Go + ⌘K. A-W8 / A-M3 / A-M4 deferred.
 - [2026-10-11 · #142 reread](plans/handoffs/2026-10-11-0526-cursor-grok-4-6-chat-a11y-reread.md) — pending status frames survive streamed re-renders. [Review](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md) — status beside log, Stop-before-reply, re-announce identical lines. #143 also touches AiPanelChrome.

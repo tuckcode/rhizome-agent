@@ -7,6 +7,7 @@ import {
   readStoredAppearance,
   applyThemeModeToDocument,
   buildStatusBarThemeTogglePatch,
+  DEFAULT_THEME_MODE,
   COLOR_THEME_STORAGE_KEY,
   COLOR_THEMES,
   LEGACY_ACCENT_COLOR_STORAGE_KEY,
@@ -44,7 +45,25 @@ describe('themeMode', () => {
     expect(normalizeThemeMode('system')).toBe('system')
     expect(resolveThemeMode('system', makeMatchMedia(true))).toBe('dark')
     expect(resolveThemeMode('system', makeMatchMedia(false))).toBe('light')
-    expect(resolveThemeMode('sepia')).toBe('light')
+    expect(resolveThemeMode('sepia')).toBe('dark')
+  })
+
+  it('starts a fresh install in Earth dark when nothing is saved', () => {
+    expect(DEFAULT_THEME_MODE).toBe('dark')
+    const storage = makeStorage()
+    expect(readStoredThemeMode(storage)).toBeNull()
+    expect(readStoredAppearance(storage).mode).toBe('dark')
+    expect(applyStoredAppearance(document, storage, makeMatchMedia(false))).toBe('dark')
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveClass('dark')
+  })
+
+  it('keeps a saved light choice instead of forcing Earth dark', () => {
+    const storage = makeStorage({ [THEME_MODE_STORAGE_KEY]: 'light' })
+    expect(readStoredThemeMode(storage)).toBe('light')
+    expect(applyStoredAppearance(document, storage, makeMatchMedia(true))).toBe('light')
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).not.toHaveClass('dark')
   })
 
   it('reads and writes the current storage key', () => {
@@ -208,7 +227,7 @@ describe('color themes and accent', () => {
     expect(document.documentElement).not.toHaveClass('dark')
   })
 
-  it('uses light defaults when storage is unavailable', () => {
+  it('uses Earth dark defaults when storage is unavailable', () => {
     const storage = {
       getItem: () => {
         throw new Error('blocked')
@@ -218,8 +237,8 @@ describe('color themes and accent', () => {
       },
     } as unknown as Storage
 
-    expect(applyStoredAppearance(document, storage)).toBe('light')
-    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(applyStoredAppearance(document, storage)).toBe('dark')
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     expect(document.documentElement).not.toHaveAttribute('data-color-theme')
   })
 

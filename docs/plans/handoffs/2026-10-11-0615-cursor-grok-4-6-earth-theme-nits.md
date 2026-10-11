@@ -25,8 +25,13 @@ Do not retarget until #144 merges.
 4. Loam `--border-input` is `#8A7A62` (3.573 on selected-strong).
 5. Earth dark `--syntax-highlight-comment` is `#88917B` (4.617 on
    selected-strong).
-6. `contrast_check.py` and its tests are unchanged. Default theme
-   mode is unchanged.
+6. `contrast_check.py` and its tests are unchanged.
+7. knispo: fresh installs start in Earth dark (`DEFAULT_THEME_MODE`
+   and the `index.html` fallback). Saved light/system stays.
+8. Settings → Appearance already had a system option. The control
+   is now **Match system**, and it still follows
+   `prefers-color-scheme` live for Earth light/dark. Loam still
+   pins dark.
 
 ## Contrast (from `contrast_check.py` plus the comment pair)
 

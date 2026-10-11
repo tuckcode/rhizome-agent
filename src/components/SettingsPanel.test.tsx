@@ -346,7 +346,7 @@ describe('SettingsPanel', () => {
       autogit_inactive_threshold_seconds: 30,
       release_channel: null,
       automatic_update_checks_enabled: null,
-      theme_mode: 'light',
+      theme_mode: 'dark',
       date_display_format: 'friendly',
       note_width_mode: 'normal',
       sidebar_type_pluralization_enabled: true,
@@ -537,15 +537,15 @@ describe('SettingsPanel', () => {
     )
   })
 
-  it('defaults the color mode control to light', () => {
+  it('defaults the color mode control to Earth dark', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
     expect(screen.getByTestId('settings-theme-mode')).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: 'Light' })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('radio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'false')
-    expect(screen.getByRole('radio', { name: 'System' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('radio', { name: 'Light' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('radio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('radio', { name: 'Match system' })).toHaveAttribute('aria-checked', 'false')
   })
 
   it('defaults the color theme to rhizome and shows an accent picker', () => {
@@ -742,11 +742,25 @@ describe('SettingsPanel', () => {
     installMatchMedia(true)
     renderOpenSettings()
 
-    selectThemeMode('System')
+    selectThemeMode('Match system')
     saveSettingsPanel()
 
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     expect(document.documentElement).toHaveClass('dark')
+    expect(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)).toBe('system')
+    expectSettingsSaved({
+      theme_mode: 'system',
+    })
+  })
+
+  it('Match system follows prefers-color-scheme for Earth light and Earth dark', () => {
+    installMatchMedia(false)
+    renderOpenSettings()
+
+    selectThemeMode('Match system')
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).not.toHaveClass('dark')
     expect(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)).toBe('system')
     expectSettingsSaved({
       theme_mode: 'system',
