@@ -80,7 +80,7 @@ objc2-app-kit = "0.3.2"
 objc2-foundation = "0.3.2"
 objc2-web-kit = { version = "0.3.2", features = ["WKWebView", "objc2-app-kit"] }
 
-# Provider keys use the Secret Service on Linux (ADR-0184).
+# Provider keys use the Secret Service on Linux (ADR-0185).
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3.6.3", features = ["sync-secret-service", "crypto-rust"] }
 

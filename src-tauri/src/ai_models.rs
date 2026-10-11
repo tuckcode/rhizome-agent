@@ -553,9 +553,13 @@ fn selected_max_tokens(request: &AiModelStreamRequest) -> u32 {
 }
 
 fn normalized_base_url(request: &AiModelStreamRequest) -> Result<String, String> {
-    let fallback = provider_default_base_url(&request.provider.kind).unwrap_or("");
-    let base = request
-        .provider
+    provider_base_url(&request.provider)
+}
+
+/// The provider's saved base URL, or its kind's default, normalized.
+pub fn provider_base_url(provider: &AiModelProvider) -> Result<String, String> {
+    let fallback = provider_default_base_url(&provider.kind).unwrap_or("");
+    let base = provider
         .base_url
         .as_deref()
         .and_then(non_empty_str)
@@ -638,7 +642,7 @@ fn send_provider_request(
         .map_err(|error| format!("AI provider request failed: {error}"))
 }
 
-/// Saves a provider key in the OS keychain (ADR-0184).
+/// Saves a provider key in the OS keychain (ADR-0185).
 pub fn save_provider_api_key(provider_id: String, api_key: String) -> Result<(), String> {
     crate::provider_keys::ProviderKeys::for_app()?.save(&provider_id, &api_key)
 }

@@ -17,6 +17,9 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
@@ -97,6 +100,7 @@ impl ProviderKeys {
             return Err("API key cannot be empty.".into());
         }
         self.backend.set(&id, key)?;
+        keys_changed();
         if self.backend.get(&id)?.as_deref() != Some(key) {
             return Err(format!(
                 "The keychain did not return the key just saved for {id}. Nothing else changed."
@@ -109,7 +113,33 @@ impl ProviderKeys {
     pub fn delete(&self, provider_id: &str) -> Result<(), String> {
         let id = normalize_id(provider_id)?;
         self.backend.delete(&id)?;
+        keys_changed();
         self.legacy.remove(&id)
+    }
+
+    /// Every saved key value for `ids`, plus any key still in the legacy
+    /// file, for scrubbing logs. Reads only: nothing moves.
+    pub fn saved_key_values(&self, ids: impl IntoIterator<Item = String>) -> Vec<String> {
+        let mut values: Vec<String> = Vec::new();
+        let mut keep = |value: String| {
+            let value = value.trim().to_string();
+            if !value.is_empty() && !values.contains(&value) {
+                values.push(value);
+            }
+        };
+        for id in ids {
+            if let Ok(id) = normalize_id(&id) {
+                if let Ok(Some(value)) = self.backend.get(&id) {
+                    keep(value);
+                }
+            }
+        }
+        for id in self.legacy.ids().unwrap_or_default() {
+            if let Ok(Some(value)) = self.legacy.key(&id) {
+                keep(value);
+            }
+        }
+        values
     }
 
     /// Moves every legacy file key into the keychain.
@@ -170,7 +200,7 @@ impl ProviderKeys {
 }
 
 /// The legacy `ai-provider-secrets.json` file: a compatibility path that
-/// only ever loses keys (ADR-0183, ADR-0184).
+/// only ever loses keys (ADR-0183, ADR-0185).
 struct LegacyFile {
     path: PathBuf,
 }
@@ -197,6 +227,7 @@ impl LegacyFile {
         if secrets.provider_api_keys.remove(id).is_none() {
             return Ok(());
         }
+        keys_changed();
         if secrets.provider_api_keys.is_empty() {
             return std::fs::remove_file(&self.path)
                 .map_err(|error| format!("Failed to remove the legacy key file: {error}"));
@@ -259,6 +290,71 @@ pub(crate) fn write_legacy(path: &Path, secrets: &LegacySecrets) -> Result<(), S
         .map_err(|error| format!("Failed to write the legacy key file: {error}"))
 }
 
+/// Saved key values for the session-log filter (ADR-0183). Cached until a
+/// key is saved, deleted, or moved here, the id list changes, or
+/// `CACHE_TTL` passes, so a key changed outside Rhizome is picked up too.
+pub fn cached_saved_key_values(ids: Vec<String>) -> Vec<String> {
+    static CACHE: Mutex<ValueCache> = Mutex::new(ValueCache { entry: None });
+    let generation = KEY_GENERATION.load(Ordering::SeqCst);
+    CACHE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .get(generation, ids, Instant::now(), CACHE_TTL, |ids| {
+            ProviderKeys::for_app()
+                .map(|keys| keys.saved_key_values(ids.to_vec()))
+                .unwrap_or_default()
+        })
+}
+
+/// How long scrub values may be reused before the keychain is read again.
+pub const CACHE_TTL: Duration = Duration::from_secs(60);
+
+struct CachedValues {
+    generation: u64,
+    ids: Vec<String>,
+    loaded_at: Instant,
+    values: Vec<String>,
+}
+
+/// The cache rule, with time passed in so tests can move it.
+struct ValueCache {
+    entry: Option<CachedValues>,
+}
+
+impl ValueCache {
+    fn get(
+        &mut self,
+        generation: u64,
+        ids: Vec<String>,
+        now: Instant,
+        ttl: Duration,
+        load: impl FnOnce(&[String]) -> Vec<String>,
+    ) -> Vec<String> {
+        if let Some(entry) = &self.entry {
+            let fresh = now.saturating_duration_since(entry.loaded_at) < ttl;
+            if fresh && entry.generation == generation && entry.ids == ids {
+                return entry.values.clone();
+            }
+        }
+        let values = load(&ids);
+        self.entry = Some(CachedValues {
+            generation,
+            ids,
+            loaded_at: now,
+            values: values.clone(),
+        });
+        values
+    }
+}
+
+/// Bumped whenever a key is saved, deleted, or moved, so cached values
+/// are never stale.
+static KEY_GENERATION: AtomicU64 = AtomicU64::new(0);
+
+fn keys_changed() {
+    KEY_GENERATION.fetch_add(1, Ordering::SeqCst);
+}
+
 /// The OS keychain: macOS Keychain, Windows Credential Manager, or the
 /// Secret Service on Linux.
 struct OsKeychain;
@@ -318,19 +414,26 @@ fn app_legacy_file() -> Result<PathBuf, String> {
 #[cfg(test)]
 mod test_backend {
     use std::collections::HashMap;
-    use std::sync::Mutex;
+    use std::sync::{Mutex, OnceLock};
 
-    /// The backend `ProviderKeys::for_app` gets in test builds.
+    /// The backend `ProviderKeys::for_app` gets in test builds: one
+    /// in-memory keychain shared by the test process, so a test can save a
+    /// key and then see it scrubbed from a session log.
     #[derive(Default)]
-    pub(super) struct MemoryOnly(Mutex<HashMap<String, String>>);
+    pub(super) struct MemoryOnly;
+
+    fn store() -> &'static Mutex<HashMap<String, String>> {
+        static STORE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+        STORE.get_or_init(Mutex::default)
+    }
 
     impl super::SecretBackend for MemoryOnly {
         fn get(&self, account: &str) -> Result<Option<String>, String> {
-            Ok(self.0.lock().expect("memory keys").get(account).cloned())
+            Ok(store().lock().expect("memory keys").get(account).cloned())
         }
 
         fn set(&self, account: &str, value: &str) -> Result<(), String> {
-            self.0
+            store()
                 .lock()
                 .expect("memory keys")
                 .insert(account.to_string(), value.to_string());
@@ -338,7 +441,7 @@ mod test_backend {
         }
 
         fn delete(&self, account: &str) -> Result<(), String> {
-            self.0.lock().expect("memory keys").remove(account);
+            store().lock().expect("memory keys").remove(account);
             Ok(())
         }
     }
@@ -634,6 +737,109 @@ mod tests {
         assert_eq!(keys.get("groq").unwrap().as_deref(), Some("gsk"));
         assert!(keys.save("  ", "gsk").is_err());
         assert!(keys.save("groq", "   ").is_err());
+    }
+
+    fn counting_loader(calls: &std::cell::Cell<u32>) -> impl FnOnce(&[String]) -> Vec<String> + '_ {
+        move |ids: &[String]| {
+            calls.set(calls.get() + 1);
+            ids.to_vec()
+        }
+    }
+
+    #[test]
+    fn the_value_cache_reuses_values_within_the_ttl_and_reloads_after() {
+        let mut cache = ValueCache { entry: None };
+        let calls = std::cell::Cell::new(0);
+        let start = Instant::now();
+        let ttl = Duration::from_secs(60);
+        let ids = || vec!["groq".to_string()];
+
+        cache.get(1, ids(), start, ttl, counting_loader(&calls));
+        cache.get(
+            1,
+            ids(),
+            start + Duration::from_secs(59),
+            ttl,
+            counting_loader(&calls),
+        );
+        assert_eq!(
+            calls.get(),
+            1,
+            "inside the ttl the keychain is not read again"
+        );
+
+        cache.get(
+            1,
+            ids(),
+            start + Duration::from_secs(61),
+            ttl,
+            counting_loader(&calls),
+        );
+        assert_eq!(
+            calls.get(),
+            2,
+            "after the ttl an outside key change is picked up"
+        );
+    }
+
+    #[test]
+    fn the_value_cache_reloads_on_a_key_change_or_new_ids() {
+        let mut cache = ValueCache { entry: None };
+        let calls = std::cell::Cell::new(0);
+        let now = Instant::now();
+        let ttl = Duration::from_secs(60);
+
+        cache.get(1, vec!["a".into()], now, ttl, counting_loader(&calls));
+        cache.get(2, vec!["a".into()], now, ttl, counting_loader(&calls));
+        cache.get(2, vec!["b".into()], now, ttl, counting_loader(&calls));
+
+        assert_eq!(calls.get(), 3);
+    }
+
+    #[test]
+    fn the_cache_refreshes_when_the_id_list_changes() {
+        ProviderKeys::for_app()
+            .unwrap()
+            .save("cache-late-provider", "cache-late-key-value")
+            .unwrap();
+        let without = cached_saved_key_values(vec!["something-else".into()]);
+
+        let with = cached_saved_key_values(vec!["cache-late-provider".into()]);
+
+        assert!(!without.contains(&"cache-late-key-value".to_string()));
+        assert!(with.contains(&"cache-late-key-value".to_string()));
+    }
+
+    #[test]
+    fn saved_key_values_cover_the_keychain_and_the_legacy_file_without_moving_keys() {
+        let fixture = Fixture::with_file(&[("old", "sk-file-only")]);
+        let keys = fixture.keys(MemoryBackend::with(&[
+            ("groq", "gsk-chain"),
+            ("other", "not-asked"),
+        ]));
+
+        let mut values = keys.saved_key_values(["groq".to_string(), "mistral".to_string()]);
+        values.sort();
+
+        assert_eq!(values, ["gsk-chain", "sk-file-only"]);
+        assert!(
+            fixture.file_keys().unwrap().contains_key("old"),
+            "scrubbing must not migrate"
+        );
+    }
+
+    #[test]
+    fn the_cache_refreshes_when_a_key_is_saved() {
+        let ids = || vec!["cache-test-provider".to_string()];
+        let before = cached_saved_key_values(ids());
+
+        ProviderKeys::for_app()
+            .unwrap()
+            .save("cache-test-provider", "cache-test-key-value")
+            .unwrap();
+
+        assert!(!before.contains(&"cache-test-key-value".to_string()));
+        assert!(cached_saved_key_values(ids()).contains(&"cache-test-key-value".to_string()));
     }
 
     #[test]

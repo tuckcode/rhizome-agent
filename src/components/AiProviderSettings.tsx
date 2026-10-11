@@ -13,6 +13,7 @@ import {
 import type { createTranslator } from '../lib/i18n'
 import { deleteAiModelProviderApiKey, saveAiModelProviderApiKey, testAiModelProvider } from '../utils/aiProviderSecrets'
 import { Button } from './ui/button'
+import { FreeTierSettings } from './FreeTierSettings'
 import {
   Dialog,
   DialogContent,
@@ -420,6 +421,7 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
           {testState === 'testing' ? t('settings.aiProviders.testing') : t('settings.aiProviders.test')}
         </Button>
       </div>
+      {mode === 'api' ? <FreeTierSettings /> : null}
     </div>
   )
 }

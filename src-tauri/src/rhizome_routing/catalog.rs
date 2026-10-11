@@ -49,6 +49,9 @@ pub struct CatalogProvider {
     /// The user-supplied endpoint skips the free-tier gate.
     #[serde(default)]
     pub user_supplied: bool,
+    /// The id its key is saved under, when that differs from `id`.
+    #[serde(default)]
+    pub key_id: Option<String>,
     /// False for an opt-in provider. It routes only when the user turns it
     /// on (ADR-0182 decision 1).
     #[serde(default = "default_on_default")]
@@ -82,6 +85,8 @@ pub struct RoutingOptions {
     /// Upstream `freeAccessPolicy=strict`. A missing flag means "not
     /// established", so the default mode does not check it.
     pub strict: bool,
+    /// Provider ids the user turned off, default-on or opt-in.
+    pub disabled: BTreeSet<String>,
 }
 
 /// One upstream free-model row.
@@ -113,10 +118,14 @@ pub struct Target {
 }
 
 /// A user-run OpenAI-compatible endpoint, tried after the catalog.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct UserEndpoint {
     pub base_url: String,
     pub model: String,
+    /// Shown in the fallback order. Empty means "Custom endpoint".
+    pub name: String,
+    /// The provider id its key is saved under, when it needs one.
+    pub key_id: Option<String>,
 }
 
 /// The provider id the router uses for the user endpoint and its key.
@@ -133,7 +142,11 @@ impl Catalog {
     pub fn with_user_endpoint(mut self, endpoint: UserEndpoint) -> Self {
         self.providers.push(CatalogProvider {
             id: USER_ENDPOINT_ID.into(),
-            name: "Custom endpoint".into(),
+            name: if endpoint.name.trim().is_empty() {
+                "Custom endpoint".into()
+            } else {
+                endpoint.name
+            },
             base_url: endpoint.base_url,
             per_model_quota: false,
             free_suffix: None,
@@ -141,6 +154,7 @@ impl Catalog {
             tool_params: Map::new(),
             key_required: false,
             user_supplied: true,
+            key_id: endpoint.key_id,
             default_on: true,
             billing_warning: None,
             free_type_override: None,
@@ -178,6 +192,7 @@ impl Catalog {
             .iter()
             .enumerate()
             .filter(|(_, provider)| provider.default_on || options.opt_in.contains(&provider.id))
+            .filter(|(_, provider)| !options.disabled.contains(&provider.id))
             .flat_map(|(index, provider)| {
                 provider
                     .models
@@ -256,6 +271,7 @@ mod tests {
         RoutingOptions {
             opt_in: ids.iter().map(|id| id.to_string()).collect(),
             strict: false,
+            ..Default::default()
         }
     }
 
@@ -357,10 +373,25 @@ mod tests {
     }
 
     #[test]
+    fn a_provider_the_user_turned_off_does_not_route() {
+        let catalog = Catalog::pinned();
+        let options = RoutingOptions {
+            disabled: ["groq".to_string()].into(),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            providers(&ids(&catalog, &options)),
+            ["mistral", "llm7", "openrouter", "nvidia"]
+        );
+    }
+
+    #[test]
     fn strict_mode_keeps_only_hard_stop_rows_and_the_user_endpoint() {
         let catalog = Catalog::pinned().with_user_endpoint(UserEndpoint {
             base_url: "http://lan:1234/v1".into(),
             model: "qwen".into(),
+            ..Default::default()
         });
         let strict = RoutingOptions {
             strict: true,
@@ -422,6 +453,7 @@ mod tests {
         let catalog = Catalog::pinned().with_user_endpoint(UserEndpoint {
             base_url: "http://lan:1234/v1".into(),
             model: "qwen".into(),
+            ..Default::default()
         });
 
         let targets = catalog.targets(&RoutingOptions::default());
