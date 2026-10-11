@@ -21,7 +21,7 @@ export function nativeChatUserError(message: string): string {
   if (/prime.?agent is not available|npm i -g prime-agent/i.test(trimmed)) {
     return `This native chat needs an API key. ${NATIVE_NO_KEY_GUIDANCE}`
   }
-  if (/no (local )?api key/i.test(trimmed)) {
+  if (/no (local |free-tier )?(api|provider) key/i.test(trimmed)) {
     const withStop = /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`
     return `${withStop} ${NATIVE_NO_KEY_GUIDANCE}`
   }

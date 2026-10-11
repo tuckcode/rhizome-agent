@@ -27,6 +27,12 @@ describe('native chat user errors', () => {
     )
     expect(NATIVE_NO_KEY_GUIDANCE).toContain('Settings → AI Agents → API models')
   })
+
+  it('points at Settings for the default Free tier missing-key error', () => {
+    expect(nativeChatUserError('No free-tier provider key is set.')).toBe(
+      `No free-tier provider key is set. ${NATIVE_NO_KEY_GUIDANCE}`,
+    )
+  })
 })
 
 describe('native stream events', () => {
