@@ -3,7 +3,8 @@
 // from the 12-channel palettes in the brand handoff
 // (design_handoff_rhizome_brand_shell/"Rhizome Style Sheets.dc.html", THEMES
 // array — copied verbatim below). The default "rhizome" theme is NOT here:
-// it is the hand-tuned light/dark contract in index.css.
+// it is the hand-tuned Earth light/dark contract in index.css. Loam is an
+// exact Earth extra (docs/design/earth-theme/HANDOFF.md) and uses `exact`.
 //
 // Derivation rules mirror the existing light/dark blocks: hover ≈ bg mixed
 // 7% toward fg, selected ≈ bg mixed 14% toward accent, soft accents at 15%
@@ -17,6 +18,65 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const THEMES = [
+  {
+    slug: 'loam',
+    name: 'Loam',
+    dark: true,
+    exact: {
+      '--surface-app': '#15110C',
+      '--surface-sidebar': '#19150F',
+      '--surface-panel': '#1D1811',
+      '--surface-card': '#1D1811',
+      '--surface-popover': '#241E15',
+      '--surface-input': '#15110C',
+      '--surface-button': '#2B2419',
+      '--surface-dialog': '#211B13',
+      '--surface-editor': '#15110C',
+      '--surface-overlay': 'rgba(8, 8, 7, 0.58)',
+      '--text-primary': '#EDE6D8',
+      '--text-secondary': '#C6BBA6',
+      '--text-tertiary': '#B2A791',
+      '--text-muted': '#A3987F',
+      '--text-faint': '#9A8F78',
+      '--text-heading': '#F7F1E5',
+      '--text-inverse': '#15110C',
+      '--border-default': '#352C20',
+      '--border-subtle': '#272017',
+      '--border-strong': '#4A3D2C',
+      '--border-input': '#7E6F59',
+      '--border-dialog': '#4A3D2C',
+      '--border-focus': 'var(--accent-blue)',
+      '--state-hover': '#241E15',
+      '--state-hover-subtle': '#1D1811',
+      '--state-selected': '#1F2719',
+      '--state-selected-strong': '#212A1A',
+      '--state-active': '#212A1A',
+      '--state-focus-ring': 'var(--accent-blue)',
+      '--state-drag-target': 'rgba(111, 227, 160, 0.18)',
+      '--state-disabled': '#1A1610',
+      '--accent-blue': '#6FE3A0',
+      '--accent-blue-bg': 'rgba(111, 227, 160, 0.18)',
+      '--accent-blue-hover': '#8FEBB4',
+      '--accent-blue-light': 'rgba(111, 227, 160, 0.14)',
+      '--accent-green': '#A6D282',
+      '--accent-green-light': 'rgba(166, 210, 130, 0.13)',
+      '--accent-orange': '#EDB451',
+      '--accent-orange-light': 'rgba(237, 180, 81, 0.13)',
+      '--accent-red': '#F2917F',
+      '--accent-red-light': 'rgba(242, 145, 127, 0.12)',
+      '--ok-text': '#A6D282',
+      '--danger-text': '#F2917F',
+      '--warn-text': '#EDB451',
+      '--feedback-success-text': 'var(--ok-text)',
+      '--feedback-error-text': 'var(--danger-text)',
+      '--feedback-warning-text': 'var(--warn-text)',
+      '--feedback-warning-bg': 'rgba(237, 180, 81, 0.13)',
+      '--feedback-warning-border': '#EDB451',
+      '--syntax-heading': '#6FE3A0',
+      '--syntax-link': '#6FE3A0',
+      '--syntax-highlight-comment': '#86917A',
+    },
+  },
   { slug: 'dracula', name: 'Dracula', dark: true, bg: '#282A36', panel: '#21222C', fg: '#F8F8F2', heading: '#F8F8F2', muted: '#6272A4', border: '#44475A', accent: '#BD93F9', onAccent: '#282A36', green: '#50FA7B', yellow: '#F1FA8C', red: '#FF5555', purple: '#FF79C6' },
   { slug: 'nord', name: 'Nord', dark: true, bg: '#2E3440', panel: '#3B4252', fg: '#D8DEE9', heading: '#ECEFF4', muted: '#7B88A1', border: '#434C5E', accent: '#88C0D0', onAccent: '#2E3440', green: '#A3BE8C', yellow: '#EBCB8B', red: '#BF616A', purple: '#B48EAD' },
   { slug: 'gruvbox-dark', name: 'Gruvbox Dark', dark: true, bg: '#282828', panel: '#32302F', fg: '#EBDBB2', heading: '#FBF1C7', muted: '#928374', border: '#504945', accent: '#FE8019', onAccent: '#282828', green: '#B8BB26', yellow: '#FABD2F', red: '#FB4934', purple: '#D3869B' },
@@ -50,6 +110,33 @@ const alpha = (h, a) => {
 }
 
 function themeBlock(t) {
+  if (t.exact) {
+    const lines = [
+      `  color-scheme: ${t.dark ? 'dark' : 'light'};`,
+      '',
+      ...Object.entries(t.exact).flatMap(([name, value], index, entries) => {
+        const previous = index === 0 ? null : entries[index - 1][0]
+        const groupChanged = previous && previous.split('-')[1] !== name.split('-')[1] && (
+          name.startsWith('--text-') ||
+          name.startsWith('--border-') ||
+          name.startsWith('--state-') ||
+          name.startsWith('--accent-') ||
+          name.startsWith('--ok-') ||
+          name.startsWith('--feedback-') ||
+          name.startsWith('--syntax-')
+        )
+        return groupChanged ? ['', `  ${name}: ${value};`] : [`  ${name}: ${value};`]
+      }),
+    ]
+    return [
+      `/* --- ${t.name} --- */`,
+      `:root[data-color-theme="${t.slug}"],`,
+      `:root.dark[data-color-theme="${t.slug}"] {`,
+      ...lines,
+      '}',
+    ].join('\n')
+  }
+
   const white = '#FFFFFF'
   const black = '#000000'
   const popover = t.dark ? mix(t.bg, white, 0.05) : mix(t.bg, white, 0.5)
@@ -92,14 +179,14 @@ function themeBlock(t) {
     `  --border-strong: ${borderStrong};`,
     `  --border-input: ${t.border};`,
     `  --border-dialog: ${t.border};`,
-    `  --border-focus: ${t.accent};`,
+    `  --border-focus: var(--accent-blue);`,
     '',
     `  --state-hover: ${hover};`,
     `  --state-hover-subtle: ${hoverSubtle};`,
     `  --state-selected: ${selected};`,
     `  --state-selected-strong: ${selectedStrong};`,
     `  --state-active: ${selected};`,
-    `  --state-focus-ring: ${t.accent};`,
+    `  --state-focus-ring: var(--accent-blue);`,
     `  --state-drag-target: ${alpha(t.accent, 0.18)};`,
     `  --state-disabled: ${hoverSubtle};`,
     '',
@@ -138,7 +225,8 @@ function themeBlock(t) {
 
 const header = `/* AUTO-GENERATED by scripts/generate-themes-css.mjs — do not edit by hand.
    Fixed color themes from the brand handoff. The default "rhizome" theme is
-   the light/dark contract in index.css (no data-color-theme attribute). */
+   the Earth light/dark contract in index.css (no data-color-theme attribute).
+   Loam is the optional warm-dark Earth extra. */
 `
 
 const css = header + '\n' + THEMES.map(themeBlock).join('\n\n') + '\n'
