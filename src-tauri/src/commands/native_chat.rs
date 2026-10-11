@@ -759,9 +759,18 @@ pub fn native_chat_open(
         NativeChatTarget::FreeTier => {
             let (tx, rx) = mpsc::channel();
             let reporter = tx.clone();
-            let model = free_tier_routing_model(system.clone(), move |attempt| {
+            let model = match free_tier_routing_model(system.clone(), move |attempt| {
                 let _ = reporter.send(attempt);
-            });
+            }) {
+                Ok(model) => model,
+                Err(error) => {
+                    return Ok(NativeChatOpenResult {
+                        error: Some(error),
+                        read_only: true,
+                        ..record
+                    });
+                }
+            };
             let mut engine = NativeEngine::with_provider_pair(agent, model, tx, rx);
             engine.set_vault(request.vault_path.clone(), request.vault_paths.clone());
             engine.set_permission_mode(request.permission_mode);

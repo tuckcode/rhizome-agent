@@ -168,8 +168,10 @@ pub fn scrub_secrets(text: &str) -> String {
         }
     }
     let patterns = [
-        r"(?:sk-proj-|sk-or-v1-|sk-ant-|gsk_|xai-|hf_)[A-Za-z0-9_-]{8,}",
-        r"(?:sk_live_|sk_test_|sk-|ghp_|gho_|ghs_|ghu_|ghr_|github_pat_|glpat-|xai-|gsk_|hf_|npm_|xox[abprse]-)[A-Za-z0-9_-]{20,}",
+        r"(?:sk-proj-|sk-or-v1-|sk-ant-|gsk_)[A-Za-z0-9_-]{8,}",
+        r"(?:sk_live_|sk_test_|sk-|ghp_|gho_|ghs_|ghu_|ghr_|github_pat_|glpat-|gsk_|npm_|xox[abprse]-)[A-Za-z0-9_-]{20,}",
+        r"hf_[A-Za-z0-9]{20,}",
+        r"xai-[A-Za-z0-9]{20,}",
         r"AKIA[0-9A-Z]{16}",
         r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
         r"(?i)bearer\s+[A-Za-z0-9._\-+/=]+",
@@ -269,11 +271,11 @@ fn set_owner_only(path: &Path) -> Result<(), String> {
 }
 
 fn lock_exclusive(file: &File) -> bool {
-    fs2::FileExt::try_lock_exclusive(file).is_ok()
+    fs4::FileExt::try_lock_exclusive(file).is_ok()
 }
 
 fn unlock_exclusive(file: &File) {
-    let _ = fs2::FileExt::unlock(file);
+    let _ = fs4::FileExt::unlock(file);
 }
 
 pub fn try_lock_session(session_id: &str) -> Result<SessionLock, String> {
@@ -429,13 +431,15 @@ pub fn open_session_log(session_id: &str) -> Result<OpenedNativeLog, String> {
     }
 
     let mut warning = None;
-    let mut successor_id = None;
+    let mut successor_id = if unknown_version {
+        None
+    } else {
+        read_successor_pointer(session_id).ok().flatten()
+    };
     if saw_damage && !writer_is_live {
         warning = Some(DAMAGE_WARNING.into());
-        if !unknown_version {
-            if let Ok(Some(existing)) = read_successor_pointer(session_id) {
-                successor_id = Some(existing);
-            } else if let Ok(id) = create_successor(&header, &events) {
+        if !unknown_version && successor_id.is_none() {
+            if let Ok(id) = create_successor(&header, &events) {
                 successor_id = Some(id.clone());
                 let _ = write_successor_pointer(session_id, &id);
             }
@@ -824,6 +828,21 @@ mod tests {
     }
 
     #[test]
+    fn scrub_secrets_leaves_code_names_and_redacts_long_tokens() {
+        let code = scrub_secrets("use hf_hub_download to fetch the file");
+        assert!(
+            code.contains("hf_hub_download"),
+            "a function name must stay"
+        );
+        let hf_key = format!("hf_{}", "Ab12".repeat(8));
+        let xai_key = format!("xai-{}", "Cd34".repeat(8));
+        let scrubbed = scrub_secrets(&format!("keys {hf_key} and {xai_key}"));
+        assert!(!scrubbed.contains(&hf_key));
+        assert!(!scrubbed.contains(&xai_key));
+        assert!(scrubbed.contains("[redacted]"));
+    }
+
+    #[test]
     fn scrub_secrets_redacts_a_saved_key_exactly() {
         let _home = temp_home();
         let path =
@@ -950,6 +969,41 @@ mod tests {
             .events
             .iter()
             .any(|item| matches!(item, DurableEvent::User { text } if text == "keep me")));
+    }
+
+    #[test]
+    fn reopen_follows_the_successor_after_a_size_rollover() {
+        let _home = temp_home();
+        let id = uuid::Uuid::new_v4().to_string();
+        let header = SessionHeader {
+            version: NATIVE_LOG_VERSION,
+            session_id: id.clone(),
+            created_at: "2026-10-10T00:00:00Z".into(),
+            target: "openai/gpt-4o-mini".into(),
+            permission_mode: "safe".into(),
+            vault_path: None,
+            vault_paths: Vec::new(),
+            system_prompt: None,
+        };
+        let mut writer = create_session_log(&header).unwrap();
+        writer.force_len(SESSION_SIZE_CAP);
+        let kept = DurableEvent::User {
+            text: "after the cap".into(),
+        };
+        append_or_roll(&mut writer, &kept).unwrap();
+        let successor = writer.session_id().to_string();
+        drop(writer);
+        let reopened = open_session_log(&id).unwrap();
+        assert_eq!(
+            reopened.successor_id.as_deref(),
+            Some(successor.as_str()),
+            "a full log must reopen on its successor"
+        );
+        let continued = open_session_log(&successor).unwrap();
+        assert!(continued
+            .events
+            .iter()
+            .any(|event| matches!(event, DurableEvent::User { text } if text == "after the cap")));
     }
 
     #[test]
