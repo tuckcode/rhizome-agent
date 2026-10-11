@@ -484,6 +484,12 @@ Default to `demo-vault-v2/`. If you must use `~/Laputa/` for testing:
 
 ### UI components — mandatory rules
 
+Before UI work, read `docs/design/ui-rules.md`, then `docs/design/components.md` for the control you are touching. Read `docs/design/earth-theme/DESIGN.md` for color and type direction.
+
+- Paint with role tokens from `src/index.css`. Never use raw hex in components.
+- Brand-colored UI binds to `primary` (or `sidebar-primary` / `link-color`), not `accent-blue`, so the accent picker keeps working.
+- Never remove the focus ring with `outline: none` or `ring-0`.
+
 **Always use shadcn/ui components.** Never use raw HTML form elements (`<input>`, `<select>`, `<button>`, native `<input type="date">`, etc.) for user-facing UI. Every interactive element must use the shadcn/ui equivalent:
 
 | Need | Use |
@@ -496,7 +502,7 @@ Default to `demo-vault-v2/`. If you must use `~/Laputa/` for testing:
 | Wikilink picker | Reuse the wikilink autocomplete component already used in the editor and Properties panel |
 | Note/type icon field | `IconEditableValue` — a typeahead over Phosphor icon names that also accepts a pasted emoji or image URL. **There is no emoji grid picker in the app.** A standalone `EmojiPicker.tsx` existed but was never imported by anything and was deleted 2026-07-24; the emoji dataset it used still lives in `src/utils/emoji.ts` if one is ever wanted. Do not tell yourself a picker exists — check first. |
 | Color picker | Reuse the color swatch picker used for type customization |
-| Toggle/switch | `Switch` or `ToggleGroup` from shadcn/ui |
+| Toggle/switch | `Switch` from shadcn/ui. There is no `ToggleGroup` in `src/components/ui/`. |
 | Dialog/modal | `Dialog` from shadcn/ui |
 
 **When in doubt:** search `src/components/` for an existing component before building new. **Visual language:** all new UI must feel native to Rhizome — if it looks like a browser default, it's wrong.
