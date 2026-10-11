@@ -33,6 +33,13 @@ export function nextChatRunAnnouncement(
 
   for (const tool of next.tools) {
     const before = previous.tools.find((item) => item.id === tool.id)
+    if (before && before.status !== 'error' && tool.status === 'error') {
+      return `${tool.name} failed`
+    }
+  }
+
+  for (const tool of next.tools) {
+    const before = previous.tools.find((item) => item.id === tool.id)
     if (before && before.status !== 'done' && tool.status === 'done') {
       return `${tool.name} done`
     }
@@ -52,9 +59,7 @@ export function chatRunSnapshotFromMessages(
   messages: ChatRunMessage[],
   isActive: boolean,
 ): ChatRunSnapshot {
-  const latest = [...messages].reverse().find((message) => (
-    (message.actions?.length ?? 0) > 0 || Boolean(message.response?.trim())
-  )) ?? messages.at(-1)
+  const latest = messages.at(-1)
 
   return {
     isActive,

@@ -547,7 +547,7 @@ describe('PrimeModelPicker — allow-list freshness (#45)', () => {
 
     const chip = screen.getByTestId('prime-model-chip')
     expect(chip.tagName).toBe('BUTTON')
-    expect(chip).toHaveAttribute('aria-haspopup', 'listbox')
+    expect(chip).toHaveAttribute('aria-haspopup', 'menu')
     expect(chip).toHaveAttribute('aria-expanded', 'false')
     expect(chip).toHaveAccessibleName('Model: Grok 4.5')
     expect(chip.className).toMatch(/outline-2/)

@@ -53,9 +53,9 @@
   /* --- Semantic text (light mode) --- */
   --text-primary: #23281F;
   --text-secondary: #4C5546;
-  --text-tertiary: #616A59;
-  --text-muted: #616A59;
-  --text-faint: #616A59;
+  --text-tertiary: #5A6353;
+  --text-muted: #5A6353;
+  --text-faint: #5A6353;
   --text-heading: #1B2017;
   --text-inverse: #F7F8F5;
 
@@ -208,9 +208,9 @@
   /* --- Semantic text (dark mode) --- */
   --text-primary: #E6EBE0;
   --text-secondary: #ADB6A3;
-  --text-tertiary: #929C86;
-  --text-muted: #929C86;
-  --text-faint: #929C86;
+  --text-tertiary: #97A18B;
+  --text-muted: #97A18B;
+  --text-faint: #97A18B;
   --text-heading: #F2F6ED;
   --text-inverse: #0E120C;
 

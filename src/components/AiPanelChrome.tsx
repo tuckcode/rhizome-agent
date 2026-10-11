@@ -746,41 +746,44 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
       onScroll={updateScrollState}
       onMouseDown={onDragRegionMouseDown}
       data-testid="ai-panel-message-history"
-      role="log"
-      aria-live="polite"
-      aria-relevant="additions"
     >
-      <ChatRunLiveStatus messages={messages} isActive={isActive} />
-      <div className="chat-column">
-        {messages.length === 0 && !isActive && (
-          <AiPanelEmptyState
-            agentLabel={agentLabel}
-            agentReadiness={agentReadiness}
-            locale={locale}
-            hasContext={hasContext}
-          />
-        )}
-        {messages.map((message, index) => (
-          <AiMessage
-            key={message.id ?? index}
-            {...message}
-            locale={locale}
-            isLatestReply={index === latestReplyIndex}
-            messageId={message.id}
-            focusedTranscriptIndex={focusedTranscriptIndex}
-            // ChatHome forks the Prime session and needs its entry id, which
-            // only replayed turns carry; the AI workspace copies its own
-            // conversation and uses the local id.
-            forkTargetId={forkTargetsPrimeEntry ? message.primeEntryId : message.id}
-            onFork={onForkMessage}
-            onOpenNote={onOpenNote}
-            onNavigateWikilink={onNavigateWikilink}
-            onRegenerate={onRegenerateMessage}
-            onPromoteToVault={onPromoteToVault}
-          />
-        ))}
-        <div ref={endRef} />
+      <div
+        role="log"
+        aria-live="off"
+        aria-relevant="additions"
+      >
+        <div className="chat-column">
+          {messages.length === 0 && !isActive && (
+            <AiPanelEmptyState
+              agentLabel={agentLabel}
+              agentReadiness={agentReadiness}
+              locale={locale}
+              hasContext={hasContext}
+            />
+          )}
+          {messages.map((message, index) => (
+            <AiMessage
+              key={message.id ?? index}
+              {...message}
+              locale={locale}
+              isLatestReply={index === latestReplyIndex}
+              messageId={message.id}
+              focusedTranscriptIndex={focusedTranscriptIndex}
+              // ChatHome forks the Prime session and needs its entry id, which
+              // only replayed turns carry; the AI workspace copies its own
+              // conversation and uses the local id.
+              forkTargetId={forkTargetsPrimeEntry ? message.primeEntryId : message.id}
+              onFork={onForkMessage}
+              onOpenNote={onOpenNote}
+              onNavigateWikilink={onNavigateWikilink}
+              onRegenerate={onRegenerateMessage}
+              onPromoteToVault={onPromoteToVault}
+            />
+          ))}
+          <div ref={endRef} />
+        </div>
       </div>
+      <ChatRunLiveStatus messages={messages} isActive={isActive} />
     </div>
   )
 })
@@ -1006,9 +1009,13 @@ export function AiPanelComposer({
 
   const handleSend = useCallback((text: string, references: NoteReference[]) => {
     const outgoing = expandReplyQuotes(text)
-    recordSent(outgoing)
+    // Mid-turn Enter with no steer handler is ignored by the send policy.
+    // Do not push that keystroke into prompt history.
+    if (!(isActive && typeof onSteer !== 'function')) {
+      recordSent(outgoing)
+    }
     onSend(outgoing, references)
-  }, [onSend, recordSent])
+  }, [isActive, onSend, onSteer, recordSent])
   const handleSteer = useCallback((text: string, references: NoteReference[]) => {
     if (!onSteer) return
     const outgoing = expandReplyQuotes(text)

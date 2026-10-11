@@ -51,6 +51,18 @@ describe('nextChatRunAnnouncement', () => {
     const next = snap({ isActive: false })
     expect(nextChatRunAnnouncement(previous, next)).toBe('Stopped')
   })
+
+  it('announces a failed tool', () => {
+    const previous = snap({
+      isActive: true,
+      tools: [{ id: 't1', name: 'get_note', status: 'pending' }],
+    })
+    const next = snap({
+      isActive: true,
+      tools: [{ id: 't1', name: 'get_note', status: 'error' }],
+    })
+    expect(nextChatRunAnnouncement(previous, next)).toBe('get_note failed')
+  })
 })
 
 describe('chatRunSnapshotFromMessages', () => {
@@ -69,5 +81,27 @@ describe('chatRunSnapshotFromMessages', () => {
       hasResponse: true,
       tools: [{ id: 't1', name: 'get_note', status: 'done' }],
     })
+  })
+
+  it('ignores a previous turn when the latest message has no reply', () => {
+    const snapshot = chatRunSnapshotFromMessages(
+      [
+        { response: 'old reply' },
+        { response: '' },
+      ],
+      false,
+    )
+    expect(snapshot.hasResponse).toBe(false)
+    expect(snapshot.tools).toEqual([])
+  })
+
+  it('announces Stopped when Stop lands before the latest turn has any text', () => {
+    const messages = [
+      { response: 'old reply' },
+      { response: '' },
+    ]
+    const previous = chatRunSnapshotFromMessages(messages, true)
+    const next = chatRunSnapshotFromMessages(messages, false)
+    expect(nextChatRunAnnouncement(previous, next)).toBe('Stopped')
   })
 })

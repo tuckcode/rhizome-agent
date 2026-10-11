@@ -15,7 +15,9 @@ interface ChatRunLiveStatusProps {
 
 /**
  * One empty polite status region that receives throttled run updates.
- * Mounted empty so screen readers hear injected text (B1).
+ * Mounted empty so screen readers hear injected text (B1). Identical
+ * consecutive lines are cleared, then restored on the next frame, so
+ * VoiceOver re-reads "Response complete" on later turns.
  */
 export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps) {
   const previousRef = useRef<ChatRunSnapshot | null>(null)
@@ -25,7 +27,23 @@ export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps
     const next = chatRunSnapshotFromMessages(messages, isActive)
     const text = nextChatRunAnnouncement(previousRef.current, next)
     previousRef.current = next
-    if (text) setAnnouncement(text)
+    if (!text) return
+
+    let cancelled = false
+    let restoreFrame = 0
+    const clearFrame = requestAnimationFrame(() => {
+      if (cancelled) return
+      setAnnouncement('')
+      restoreFrame = requestAnimationFrame(() => {
+        if (cancelled) return
+        setAnnouncement(text)
+      })
+    })
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(clearFrame)
+      cancelAnimationFrame(restoreFrame)
+    }
   }, [isActive, messages])
 
   return (

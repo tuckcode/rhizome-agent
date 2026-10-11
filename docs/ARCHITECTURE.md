@@ -612,9 +612,12 @@ Composer Enter mid-turn is **not** a new turn. `useAiPanelSendPolicy` +
 no longer running (fallback starts a new turn only from the latest idle UI
 state), or transport failure. Steer is a separate control. Escape leaves
 Chat; Stop is click-only. The composer stays focusable while a turn runs;
-only unreadiness disables it. The transcript is a polite `role="log"`;
-`ChatRunLiveStatus` injects throttled tool/complete/stop lines into one
-empty `role="status"` region (`chatRunLiveStatus.ts`).
+only unreadiness disables it. The transcript is a `role="log"` with `aria-live="off"` so streaming
+chunks are not double-spoken. `ChatRunLiveStatus` sits beside that log
+and injects throttled tool/complete/stop lines into one empty
+`role="status"` region (`chatRunLiveStatus.ts`). Stop before any reply
+on the latest turn announces "Stopped"; identical later lines are
+cleared and restored on the next frame so VoiceOver re-reads them.
 
 Assistant actions on `AiMessage` are icon-only (`size="icon"`) with hover
 tooltips: regenerate, copy, save to vault, fork. Accessible names stay on

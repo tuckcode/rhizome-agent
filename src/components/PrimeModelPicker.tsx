@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { callHost, callHostOr } from '../lib/callHost'
 import { CaretDown } from '@phosphor-icons/react'
 import {
@@ -252,20 +252,10 @@ export function PrimeModelPicker({
   const triggerLabel = strip
     ? (modelThinkingLabel(label, thinkingLevel) ?? t('ai.composer.modelUnknown'))
     : (label ?? t('ai.composer.modelUnknown'))
-  const triggerRef = useRef<HTMLButtonElement | null>(null)
-  const setTriggerRef = useCallback((node: HTMLButtonElement | null) => {
-    triggerRef.current = node
-    node?.setAttribute('aria-haspopup', 'listbox')
-  }, [])
-  useLayoutEffect(() => {
-    triggerRef.current?.setAttribute('aria-haspopup', 'listbox')
-  }, [open, triggerLabel])
-
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild disabled={disabled}>
         <button
-          ref={setTriggerRef}
           type="button"
           className={cn(
             'inline-flex items-center gap-1 transition-colors',
@@ -279,7 +269,6 @@ export function PrimeModelPicker({
                 ),
             disabled && 'cursor-not-allowed opacity-60',
           )}
-          aria-haspopup="listbox"
           aria-label={`Model: ${triggerLabel}`}
           data-testid={strip ? 'prime-model-thinking-control' : 'prime-model-chip'}
         >
