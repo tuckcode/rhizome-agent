@@ -1,7 +1,8 @@
-import { Archive, FileText, Tray } from '@phosphor-icons/react'
+import { Archive, FileText, GitBranch, Tray } from '@phosphor-icons/react'
 import type { SidebarSelection } from '../../types'
 import { isSelectionActive, NavItem } from '../SidebarParts'
 import { translate, type AppLocale } from '../../lib/i18n'
+import { railButtonAccessibleName } from '../../lib/railViewShortcuts'
 
 interface SidebarTopNavProps {
   selection: SidebarSelection
@@ -10,6 +11,7 @@ interface SidebarTopNavProps {
   inboxCount: number
   activeCount: number
   archivedCount: number
+  changeCount?: number
   locale?: AppLocale
   loading?: boolean
 }
@@ -21,6 +23,7 @@ export function SidebarTopNav({
   inboxCount,
   activeCount,
   archivedCount,
+  changeCount = 0,
   locale = 'en',
   loading = false,
 }: SidebarTopNavProps) {
@@ -49,6 +52,17 @@ export function SidebarTopNav({
         badgeStyle={{ background: 'var(--muted)' }}
         activeBadgeClassName="bg-primary text-primary-foreground"
         onClick={() => onSelect({ kind: 'filter', filter: 'all' })}
+      />
+      <NavItem
+        icon={GitBranch}
+        label="Changes"
+        count={changeCount}
+        ariaLabel={railButtonAccessibleName('Changes', changeCount)}
+        isActive={isSelectionActive(selection, { kind: 'filter', filter: 'changes' })}
+        badgeClassName="text-muted-foreground"
+        badgeStyle={{ background: 'var(--muted)' }}
+        activeBadgeClassName="bg-primary text-primary-foreground"
+        onClick={() => onSelect({ kind: 'filter', filter: 'changes' })}
       />
       <NavItem
         icon={Archive}

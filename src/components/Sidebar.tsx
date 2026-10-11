@@ -71,6 +71,7 @@ interface SidebarProps {
   workspaceOrder?: readonly string[]
   showInbox?: boolean
   inboxCount?: number
+  changeCount?: number
   allNotesFileVisibility?: AllNotesFileVisibility
   pluralizeTypeLabels?: boolean
   locale?: AppLocale
@@ -111,6 +112,7 @@ interface SidebarNavigationProps extends Pick<
   | 'workspaceOrder'
   | 'showInbox'
   | 'inboxCount'
+  | 'changeCount'
   | 'onCreateNewType'
   | 'locale'
   | 'loading'
@@ -393,6 +395,7 @@ function SidebarTopNavigation(props: SidebarNavigationProps) {
         inboxCount={props.inboxCount ?? 0}
         activeCount={props.activeCount}
         archivedCount={props.archivedCount}
+        changeCount={props.changeCount}
         locale={props.locale ?? 'en'}
         loading={props.loading ?? false}
       />
@@ -637,6 +640,7 @@ function SidebarRuntimeNavigation({
       workspaceOrder={props.workspaceOrder}
       showInbox={props.showInbox}
       inboxCount={props.inboxCount}
+      changeCount={props.changeCount}
       locale={props.locale}
       loading={props.loading}
       onCreateNewType={props.onCreateNewType}

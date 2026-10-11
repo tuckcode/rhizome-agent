@@ -407,19 +407,7 @@
         "kind": "filter",
         "value": "changes"
       },
-      "menuOwned": true,
-      "shortcut": {
-        "combo": "command-and-ctrl",
-        "key": "4",
-        "code": "Digit4",
-        "display": "⌃⌘4",
-        "accelerator": {
-          "macos": "Ctrl+Cmd+4",
-          "default": "Ctrl+Shift+4"
-        },
-        "requiresManualNativeAcceleratorQa": true
-      },
-      "preferredShortcutQaMode": "renderer-shortcut-event"
+      "menuOwned": true
     },
     "goResearch": {
       "id": "go-research",
@@ -490,12 +478,12 @@
       "menuOwned": true,
       "shortcut": {
         "combo": "command-and-ctrl",
-        "key": "5",
-        "code": "Digit5",
-        "display": "⌃⌘5",
+        "key": "4",
+        "code": "Digit4",
+        "display": "⌃⌘4",
         "accelerator": {
-          "macos": "Ctrl+Cmd+5",
-          "default": "Ctrl+Shift+5"
+          "macos": "Ctrl+Cmd+4",
+          "default": "Ctrl+Shift+4"
         },
         "requiresManualNativeAcceleratorQa": true
       },

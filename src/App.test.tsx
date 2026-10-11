@@ -824,7 +824,8 @@ describe('App', () => {
 
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByTestId('command-rail-inbox')).not.toBeInTheDocument()
-    expect(screen.getByTestId('command-rail-changes')).toBeInTheDocument()
+    expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
+    expect(screen.getByTestId('command-rail-history')).toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     expect(screen.getByTestId('vault-panel-restore')).toBeVisible()
   })

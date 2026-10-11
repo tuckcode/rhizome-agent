@@ -73,7 +73,7 @@ describe('appCommandManifest leftover shortcuts', () => {
   })
 
   it('gives Views Ctrl+Cmd on Mac and Ctrl+Shift elsewhere, never CmdOrCtrl+Alt', () => {
-    const views = ['goResearch', 'goGraph', 'goMycelium', 'goChanges', 'goHistory'] as const
+    const views = ['goResearch', 'goGraph', 'goMycelium', 'goHistory'] as const
     for (const key of views) {
       const command = commandByKey(key)
       if (!('shortcut' in command) || !command.shortcut) {
@@ -81,11 +81,12 @@ describe('appCommandManifest leftover shortcuts', () => {
       }
       expect(command.shortcut.combo).toBe('command-and-ctrl')
       expect(command.shortcut.accelerator).toEqual({
-        macos: expect.stringMatching(/^Ctrl\+Cmd\+[1-5]$/),
-        default: expect.stringMatching(/^Ctrl\+Shift\+[1-5]$/),
+        macos: expect.stringMatching(/^Ctrl\+Cmd\+[1-4]$/),
+        default: expect.stringMatching(/^Ctrl\+Shift\+[1-4]$/),
       })
     }
     expect(JSON.stringify(appCommandManifest)).not.toContain('CmdOrCtrl+Alt')
+    expect('shortcut' in commandByKey('goChanges')).toBe(false)
   })
 
   it('keeps Ctrl+Cmd+digit off Chat/Notes and BlockNote heading shortcuts', () => {

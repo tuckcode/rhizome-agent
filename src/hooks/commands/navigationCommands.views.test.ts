@@ -3,7 +3,7 @@ import { RAIL_VIEWS } from '../../lib/railViews'
 import { buildNavigationCommands } from './navigationCommands'
 
 describe('navigation Views commands', () => {
-  it('exposes the five rail views in order under the Views group', () => {
+  it('exposes the four rail views in order under the Views group', () => {
     const onSelect = vi.fn()
     const commands = buildNavigationCommands({
       onQuickOpen: vi.fn(),

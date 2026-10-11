@@ -39,13 +39,12 @@ describe('CommandRail', () => {
       'command-rail-research',
       'command-rail-graph',
       'command-rail-mycelium',
-      'command-rail-changes',
       'command-rail-history',
     ])
     expect(screen.getByRole('button', { name: 'Research' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Graph' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Mycelium' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Changes' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Changes' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'History' })).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-settings')).toBeInTheDocument()
     expect(
@@ -55,23 +54,23 @@ describe('CommandRail', () => {
   })
 
   it('opens the chosen view from the rail and marks the current one', () => {
-    const props = renderRail({ activeView: 'graph', changeCount: 4 })
+    const props = renderRail({ activeView: 'graph' })
 
     fireEvent.click(screen.getByTestId('command-rail-research'))
-    fireEvent.click(screen.getByTestId('command-rail-changes'))
+    fireEvent.click(screen.getByTestId('command-rail-history'))
 
     expect(props.onSelectView).toHaveBeenCalledWith('research')
-    expect(props.onSelectView).toHaveBeenCalledWith('changes')
+    expect(props.onSelectView).toHaveBeenCalledWith('history')
     expect(screen.getByTestId('command-rail-graph')).toHaveAttribute('aria-current', 'page')
     expect(screen.getByTestId('command-rail-research')).not.toHaveAttribute('aria-current')
-    expect(screen.getByRole('button', { name: 'Changes, 4' })).toBeInTheDocument()
+    expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
     expect(screen.getByTestId('command-rail-research')).toHaveAttribute(
       'aria-keyshortcuts',
       railViewShortcutAria(1),
     )
-    expect(screen.getByTestId('command-rail-graph')).toHaveAttribute(
+    expect(screen.getByTestId('command-rail-history')).toHaveAttribute(
       'aria-keyshortcuts',
-      railViewShortcutAria(2),
+      railViewShortcutAria(4),
     )
   })
 
@@ -124,7 +123,7 @@ describe('the rail puts sessions in its open middle', () => {
 
     expect(screen.queryByTestId('command-rail-chat')).not.toBeInTheDocument()
     expect(screen.queryByTestId('command-rail-inbox')).not.toBeInTheDocument()
-    expect(screen.getByTestId('command-rail-changes')).toBeInTheDocument()
+    expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
     expect(screen.getByText('Views')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-settings')).not.toHaveTextContent('Settings')

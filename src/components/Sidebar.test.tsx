@@ -295,7 +295,7 @@ describe('Sidebar', () => {
   it('does not render Pulse or Commit in sidebar', () => {
     render(<Sidebar entries={[]} selection={defaultSelection} onSelect={() => {}} />)
     expect(screen.getByText('All Notes')).toBeInTheDocument()
-    expect(screen.queryByText('Changes')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Changes' })).toBeInTheDocument()
     expect(screen.queryByText('Pulse')).not.toBeInTheDocument()
     expect(screen.queryByText('Commit & Push')).not.toBeInTheDocument()
   })
@@ -1004,7 +1004,17 @@ describe('Sidebar', () => {
     const items = topNav.children
     expect(items[0].textContent).toContain('Inbox')
     expect(items[1].textContent).toContain('All Notes')
-    expect(items[2].textContent).toContain('Archive')
+    expect(items[2].textContent).toContain('Changes')
+    expect(items[3].textContent).toContain('Archive')
+  })
+
+  it('puts the Changes count in the accessible name next to All Notes', () => {
+    const onSelect = vi.fn()
+    render(<Sidebar entries={[]} selection={defaultSelection} onSelect={onSelect} changeCount={4} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Changes, 4' }))
+    expect(onSelect).toHaveBeenCalledWith({ kind: 'filter', filter: 'changes' })
+    expect(screen.getByTestId('sidebar-top-nav').children[2].textContent).toMatch(/Changes/)
+    expect(screen.getByTestId('sidebar-top-nav').children[2].textContent).toMatch(/4/)
   })
 
   it('displays inbox count badge', () => {
@@ -1019,12 +1029,20 @@ describe('Sidebar', () => {
     expect(onSelect).toHaveBeenCalledWith({ kind: 'filter', filter: 'inbox' })
   })
 
+  it('calls onSelect with changes filter when clicking Changes', () => {
+    const onSelect = vi.fn()
+    render(<Sidebar entries={[]} selection={defaultSelection} onSelect={onSelect} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Changes' }))
+    expect(onSelect).toHaveBeenCalledWith({ kind: 'filter', filter: 'changes' })
+  })
+
   it('hides Inbox when explicit organization is disabled', () => {
     render(<Sidebar entries={[]} selection={defaultSelection} onSelect={() => {}} showInbox={false} inboxCount={3} />)
     expect(screen.queryByText('Inbox')).not.toBeInTheDocument()
     const topNav = screen.getByTestId('sidebar-top-nav')
     expect(topNav.children[0].textContent).toContain('All Notes')
-    expect(topNav.children[1].textContent).toContain('Archive')
+    expect(topNav.children[1].textContent).toContain('Changes')
+    expect(topNav.children[2].textContent).toContain('Archive')
   })
 
   it('excludes attachments-folder markdown from top-nav note totals', () => {
@@ -1106,7 +1124,8 @@ describe('Sidebar', () => {
 
     const topNav = screen.getByTestId('sidebar-top-nav')
     expect(topNav.children[1].textContent).toContain('All Notes1')
-    expect(topNav.children[2].textContent).toContain('Archive1')
+    expect(topNav.children[2].textContent).toContain('Changes')
+    expect(topNav.children[3].textContent).toContain('Archive1')
   })
 
   it('does not show inline entries — no child items in type sections', () => {

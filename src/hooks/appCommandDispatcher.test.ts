@@ -149,8 +149,8 @@ describe('appCommandDispatcher', () => {
     expect(findShortcutCommandId('command-and-ctrl', '1', 'Digit1')).toBe(APP_COMMAND_IDS.goResearch)
     expect(findShortcutCommandId('command-and-ctrl', '2', 'Digit2')).toBe(APP_COMMAND_IDS.goGraph)
     expect(findShortcutCommandId('command-and-ctrl', '3', 'Digit3')).toBe(APP_COMMAND_IDS.goMycelium)
-    expect(findShortcutCommandId('command-and-ctrl', '4', 'Digit4')).toBe(APP_COMMAND_IDS.goChanges)
-    expect(findShortcutCommandId('command-and-ctrl', '5', 'Digit5')).toBe(APP_COMMAND_IDS.goHistory)
+    expect(findShortcutCommandId('command-and-ctrl', '4', 'Digit4')).toBe(APP_COMMAND_IDS.goHistory)
+    expect(findShortcutCommandId('command-and-ctrl', '5', 'Digit5')).toBeNull()
   })
 
   it('routes every shortcut-capable command through the dispatcher', () => {

@@ -3,7 +3,6 @@ import {
   CirclesThree,
   ClockCounterClockwise,
   GearSix,
-  GitDiff,
   Graph,
   MagnifyingGlassPlus,
   Sidebar,
@@ -35,7 +34,6 @@ interface CommandRailProps {
   onOpenSettings: () => void
   onSelectView: (view: RailViewId) => void
   activeView?: RailViewId | null
-  changeCount?: number
   /** Expanded rail's open middle, where Chat mounts its session list. */
   onSessionsSlotReady?: (slot: HTMLDivElement | null) => void
   /** Current layout width. Collapsed is 46. Open, including hover, is the wide rail. */
@@ -53,7 +51,6 @@ const VIEW_ICONS: Record<RailViewId, Icon> = {
   research: MagnifyingGlassPlus,
   graph: Graph,
   mycelium: CirclesThree,
-  changes: GitDiff,
   history: ClockCounterClockwise,
 }
 
@@ -157,8 +154,8 @@ function RailButton({
 
 /**
  * Sessions rail — behind `shell_command_rail`. The Views group is the home
- * for Research, Graph, Mycelium, Changes, and History. Settings and the
- * sidebar control live in the footer.
+ * for Research, Graph, Mycelium, and History. Changes sits next to Notes
+ * in the sidebar. Settings and the sidebar control live in the footer.
  */
 export function CommandRail({
   locale,
@@ -166,7 +163,6 @@ export function CommandRail({
   onOpenSettings,
   onSelectView,
   activeView = null,
-  changeCount = 0,
   onSessionsSlotReady,
   onLayoutWidthChange,
   drawer = false,
@@ -496,7 +492,6 @@ export function CommandRail({
           <RailButton
             key={view.id}
             active={activeView === view.id}
-            badge={view.id === 'changes' ? changeCount : undefined}
             expanded={expanded}
             icon={VIEW_ICONS[view.id]}
             label={view.label}

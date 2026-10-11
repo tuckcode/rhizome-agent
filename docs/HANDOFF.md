@@ -47,7 +47,7 @@ file.
 ---
 
 ## State
-**Origin:** Cursor Grok 4.6 · 2026-10-11 · PLAN item 4 + #143: Views group; `aria-current` + Changes count; classic Graph/Mycelium; Mac Ctrl+Cmd+1–5 / Win+Linux Ctrl+Shift+1–5 (no CmdOrCtrl+Alt). A-W8 / A-M1 / A-M3 / A-M4 still open. [First](plans/handoffs/2026-10-11-0455-cursor-grok-4-6-navigation-grouping.md). [Review](plans/handoffs/2026-10-11-0516-cursor-grok-4-6-navigation-review.md). [Shortcuts](plans/handoffs/2026-10-11-0545-cursor-grok-4-6-navigation-shortcuts.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-11 · PLAN item 4 + #143: Views = Research/Graph/Mycelium/History; Changes next to Notes in the sidebar; Mac Ctrl+Cmd+1–4 / Win+Linux Ctrl+Shift+1–4 (no CmdOrCtrl+Alt). A-W8 / A-M1 / A-M3 / A-M4 still open. [First](plans/handoffs/2026-10-11-0455-cursor-grok-4-6-navigation-grouping.md). [Review](plans/handoffs/2026-10-11-0516-cursor-grok-4-6-navigation-review.md). [Shortcuts](plans/handoffs/2026-10-11-0545-cursor-grok-4-6-navigation-shortcuts.md). [Changes](plans/handoffs/2026-10-11-0555-cursor-grok-4-6-navigation-changes.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · #142 review: status beside log, Stop-before-reply, re-announce identical lines; pending frames survive streamed re-renders. #143 also touches `AiPanelChrome.tsx`. [Handoff](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md) · [Handoff](plans/handoffs/2026-10-11-0526-cursor-grok-4-6-chat-a11y-reread.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · Native Chat engine can send when Prime is not installed. Prime-targeted chats still show install guidance. [Handoff](plans/handoffs/2026-10-11-0520-cursor-grok-4-6-native-send-without-prime.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · Earth theme: Earth dark/light in `index.css`, Loam in the generator. Stacked on a11y B1–B5. [Handoff](plans/handoffs/2026-10-11-0505-cursor-grok-4-6-earth-theme.md).
@@ -89,8 +89,8 @@ Detail: [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-
 Install/claims: [`GETTING-STARTED.md`](GETTING-STARTED.md) § Public preview. Inventory: [`plans/2026-09-20-public-readiness-inventory.md`](plans/2026-09-20-public-readiness-inventory.md).
 Notes is a right panel from **Show Notes** (or View / Cmd+2), not a left-rail
 button. Left rail is **sessions + Views + Settings**. Views (Research, Graph,
-Mycelium, Changes, History) sit on the rail with Ctrl+Cmd+1–5 on Mac and Ctrl+Shift+1–5
-on Windows/Linux; Go and ⌘K are the
+Mycelium, History) sit on the rail with Ctrl+Cmd+1–4 on Mac and Ctrl+Shift+1–4
+on Windows/Linux; Changes sits next to All Notes in the sidebar. Go and ⌘K are the
 second path. Classic shell still shows Graph, Mycelium, and Research on the status bar. ADR-0173: Chat / Notes /
 Read / Workbench; fresh launch is Chat. Vault skill uses a resolved Node binary
 and a GUI-safe PATH. Traffic lights sit in a 32px `MacOSTitlebar` (`x: 14`, `y: 9`). Import
@@ -141,7 +141,7 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
-- [2026-10-11 · #143 shortcuts](plans/handoffs/2026-10-11-0545-cursor-grok-4-6-navigation-shortcuts.md) — knispo: Mac Ctrl+Cmd+1–5, Win/Linux Ctrl+Shift+1–5. No CmdOrCtrl+Alt. Option+Cmd stays with BlockNote.
+- [2026-10-11 · #143 Changes](plans/handoffs/2026-10-11-0555-cursor-grok-4-6-navigation-changes.md) — Changes next to Notes in the sidebar. Views are four: Ctrl+Cmd/Ctrl+Shift+1–4.
 - [2026-10-11 · navigation grouping](plans/handoffs/2026-10-11-0455-cursor-grok-4-6-navigation-grouping.md) — PLAN item 4 first slice: Views group on the rail, ⌥⌘1–5, Go + ⌘K. A-W8 / A-M3 / A-M4 deferred.
 - [2026-10-11 · #142 reread](plans/handoffs/2026-10-11-0526-cursor-grok-4-6-chat-a11y-reread.md) — pending status frames survive streamed re-renders. [Review](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md) — status beside log, Stop-before-reply, re-announce identical lines. #143 also touches AiPanelChrome.
 - [2026-10-11 · native send without Prime](plans/handoffs/2026-10-11-0520-cursor-grok-4-6-native-send-without-prime.md) — Native engine can send when Prime is missing. Prime-targeted chats still show install guidance.

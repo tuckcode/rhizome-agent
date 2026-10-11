@@ -719,7 +719,7 @@ describe('useCommandRegistry', () => {
     expect(onOpenFeedback).toHaveBeenCalledOnce()
   })
 
-  it('lists the five Views destinations in rail order', () => {
+  it('lists the four Views destinations in rail order', () => {
     const onSelect = vi.fn()
     const config = makeConfig({ onSelect })
     const { result } = renderHook(() => useCommandRegistry(config))
@@ -728,16 +728,15 @@ describe('useCommandRegistry', () => {
       'go-research',
       'go-graph',
       'go-mycelium',
-      'go-changes',
       'go-pulse',
     ])
     expect(views.map((command) => command.label)).toEqual([
       'Go to Research',
       'Go to Graph',
       'Go to Mycelium',
-      'Go to Changes',
       'Go to History',
     ])
+    expect(findCommand(result.current, 'go-changes')?.group).toBe('Navigation')
     expect(findCommand(result.current, 'open-research')).toBeUndefined()
 
     findCommand(result.current, 'go-research')!.execute()

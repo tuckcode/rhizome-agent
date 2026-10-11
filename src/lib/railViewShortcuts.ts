@@ -5,8 +5,8 @@ import { RAIL_VIEWS, type RailViewId } from './railViews'
 /**
  * View shortcut policy.
  *
- * Mac is Ctrl+Cmd+1–5 (knispo, 2026-10-11). That leaves BlockNote's
- * Option+Cmd heading shortcuts alone. Windows/Linux stay Ctrl+Shift+1–5;
+ * Mac is Ctrl+Cmd+1–4 (knispo, 2026-10-11). That leaves BlockNote's
+ * Option+Cmd heading shortcuts alone. Windows/Linux stay Ctrl+Shift+1–4;
  * Ctrl+Alt+digit is AltGr on many layouts and must not be used.
  */
 export interface ViewShortcutPolicy {
@@ -31,11 +31,11 @@ export function viewShortcutPolicy(): ViewShortcutPolicy {
   return isMac() ? MAC_VIEW_SHORTCUT_POLICY : OTHER_VIEW_SHORTCUT_POLICY
 }
 
-export function railViewShortcutDisplay(shortcutNumber: 1 | 2 | 3 | 4 | 5): string {
+export function railViewShortcutDisplay(shortcutNumber: 1 | 2 | 3 | 4): string {
   return `${viewShortcutPolicy().displayPrefix}${shortcutNumber}`
 }
 
-export function railViewShortcutAria(shortcutNumber: 1 | 2 | 3 | 4 | 5): string {
+export function railViewShortcutAria(shortcutNumber: 1 | 2 | 3 | 4): string {
   return `${viewShortcutPolicy().ariaPrefix}${shortcutNumber}`
 }
 
@@ -96,8 +96,8 @@ function eventCombo(event: Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'metaKey' 
 }
 
 function digitFromEvent(event: Pick<KeyboardEvent, 'key' | 'code'>): string | null {
-  if (/^[1-5]$/.test(event.key)) return event.key
-  const match = /^Digit([1-5])$/.exec(event.code ?? '')
+  if (/^[1-4]$/.test(event.key)) return event.key
+  const match = /^Digit([1-4])$/.exec(event.code ?? '')
   return match?.[1] ?? null
 }
 

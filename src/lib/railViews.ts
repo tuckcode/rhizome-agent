@@ -1,9 +1,9 @@
 /**
- * One home for the five peer views. Order is fixed and the same in the
+ * One home for the four peer views. Order is fixed and the same in the
  * command rail, the Go menu, and ⌘K: make knowledge → see knowledge →
- * see what the agent did → see what changed.
+ * see what the agent did. Changes sits next to Notes in the sidebar.
  */
-export const RAIL_VIEW_IDS = ['research', 'graph', 'mycelium', 'changes', 'history'] as const
+export const RAIL_VIEW_IDS = ['research', 'graph', 'mycelium', 'history'] as const
 
 export type RailViewId = (typeof RAIL_VIEW_IDS)[number]
 
@@ -14,7 +14,7 @@ export interface RailViewDefinition {
   /** Command-palette / Go-menu label. */
   goLabel: string
   commandId: string
-  shortcutNumber: 1 | 2 | 3 | 4 | 5
+  shortcutNumber: 1 | 2 | 3 | 4
   testId: string
 }
 
@@ -44,19 +44,11 @@ export const RAIL_VIEWS: readonly RailViewDefinition[] = [
     testId: 'command-rail-mycelium',
   },
   {
-    id: 'changes',
-    label: 'Changes',
-    goLabel: 'Go to Changes',
-    commandId: 'go-changes',
-    shortcutNumber: 4,
-    testId: 'command-rail-changes',
-  },
-  {
     id: 'history',
     label: 'History',
     goLabel: 'Go to History',
     commandId: 'go-pulse',
-    shortcutNumber: 5,
+    shortcutNumber: 4,
     testId: 'command-rail-history',
   },
 ]

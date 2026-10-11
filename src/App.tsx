@@ -614,13 +614,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       handleRailSelectMycelium()
       return
     }
-    if (view === 'changes') {
-      handleRailSelectChanges()
-      return
-    }
     handleRailSelectHistory()
   }, [
-    handleRailSelectChanges,
     handleRailSelectHistory,
     handleRailSelectMycelium,
     handleRailSelectResearch,
@@ -633,11 +628,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         ? 'graph'
         : isMyceliumDestination
           ? 'mycelium'
-          : effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'changes'
-            ? 'changes'
-            : effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse'
-              ? 'history'
-              : null
+          : effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse'
+            ? 'history'
+            : null
 
   const handleOpenVaultSettings = useCallback(() => {
     setSettingsInitialSectionId(SETTINGS_SECTION_IDS.workspaces)
@@ -2042,7 +2035,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   }
 
   const sidebarSurface = (unified: boolean) => (
-    <Sidebar entries={visibleEntries} isWikiVault={isWikiVault} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={unified ? handleVaultTreeSelect : handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onUpdateViewDefinition={handleSidebarUpdateViewDefinition} onReorderViews={canReorderSavedViews ? viewOrdering.onReorderViews : undefined} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} allNotesFileVisibility={allNotesFileVisibility} pluralizeTypeLabels={settings.sidebar_type_pluralization_enabled ?? true} dock={sidebarDock} showTitleBar={!unified} onCollapse={unified ? undefined : handleCollapseSidebar} onGoBack={handleGoBack} onGoForward={handleGoForward} canGoBack={canGoBack} canGoForward={canGoForward} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} workspaceOrder={vaultWorkspaceOrder} />
+    <Sidebar entries={visibleEntries} isWikiVault={isWikiVault} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={unified ? handleVaultTreeSelect : handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onUpdateViewDefinition={handleSidebarUpdateViewDefinition} onReorderViews={canReorderSavedViews ? viewOrdering.onReorderViews : undefined} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} changeCount={gitModifiedCount} allNotesFileVisibility={allNotesFileVisibility} pluralizeTypeLabels={settings.sidebar_type_pluralization_enabled ?? true} dock={sidebarDock} showTitleBar={!unified} onCollapse={unified ? undefined : handleCollapseSidebar} onGoBack={handleGoBack} onGoForward={handleGoForward} canGoBack={canGoBack} canGoForward={canGoForward} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} workspaceOrder={vaultWorkspaceOrder} />
   )
 
   const noteListSurface = effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse' ? (
@@ -2183,7 +2176,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               onOpenSettings={handleOpenSettings}
               onSelectView={handleSelectRailView}
               activeView={activeRailView}
-              changeCount={gitModifiedCount}
               onSessionsSlotReady={setSessionRailSlot}
             />
           )}

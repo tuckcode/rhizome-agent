@@ -680,6 +680,17 @@ mod tests {
             Some("Ctrl+Shift+2")
         );
 
+        let history = menu_item_by_id("go-pulse");
+        assert_eq!(history.accelerator(manifest(), "macos"), Some("Ctrl+Cmd+4"));
+        assert_eq!(
+            history.accelerator(manifest(), "windows"),
+            Some("Ctrl+Shift+4")
+        );
+        assert_eq!(
+            menu_item_by_id("go-changes").accelerator(manifest(), "macos"),
+            None
+        );
+
         for command in manifest().commands.values() {
             let Some(shortcut) = &command.shortcut else {
                 continue;

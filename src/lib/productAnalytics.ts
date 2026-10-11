@@ -374,7 +374,7 @@ export function trackSessionsDrawerOpened(): void {
   trackEvent('sessions_drawer_opened')
 }
 
-export function trackRailViewSelected(view: 'research' | 'graph' | 'mycelium' | 'changes' | 'history'): void {
+export function trackRailViewSelected(view: 'research' | 'graph' | 'mycelium' | 'history'): void {
   trackEvent('rail_view_selected', { view })
 }
 

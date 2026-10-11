@@ -92,21 +92,20 @@ function buildBaseCommands(config: NavigationCommandsConfig): CommandAction[] {
   return [
     { id: 'search-notes', label: 'Search Notes', group: 'Navigation', shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.fileQuickOpen), keywords: ['find', 'open', 'quick'], enabled: true, execute: onQuickOpen },
     { id: 'go-all', label: 'Go to All Notes', group: 'Navigation', keywords: ['filter'], enabled: true, execute: () => onSelect({ kind: 'filter', filter: 'all' }) },
+    { id: 'go-changes', label: 'Go to Changes', group: 'Navigation', keywords: ['git', 'modified', 'pending'], enabled: true, execute: () => onSelect({ kind: 'filter', filter: 'changes' }) },
     { id: 'go-archived', label: 'Go to Archived', group: 'Navigation', keywords: [], enabled: true, execute: () => onSelect({ kind: 'filter', filter: 'archived' }) },
     ...RAIL_VIEWS.map((view) => ({
       id: view.commandId,
       label: view.goLabel,
       group: 'Views' as const,
-      shortcut: getAppCommandShortcutDisplay(view.commandId as typeof APP_COMMAND_IDS.goChanges),
+      shortcut: getAppCommandShortcutDisplay(view.commandId as typeof APP_COMMAND_IDS.goResearch),
       keywords: view.id === 'research'
         ? ['research', 'search', 'ask']
         : view.id === 'graph'
           ? ['graph', 'network', 'links', 'wiki', 'visualization']
           : view.id === 'mycelium'
             ? ['mycelium', 'sessions', 'runs', 'activity']
-            : view.id === 'changes'
-              ? ['git', 'modified', 'pending']
-              : ['activity', 'history', 'commits', 'git', 'feed'],
+            : ['activity', 'history', 'commits', 'git', 'feed'],
       enabled: true,
       execute: () => onSelect({
         kind: 'filter',
@@ -121,7 +120,7 @@ function buildBaseCommands(config: NavigationCommandsConfig): CommandAction[] {
 function insertInboxCommand(commands: CommandAction[], showInbox: boolean, onSelect: (sel: SidebarSelection) => void) {
   if (!showInbox) return commands
 
-  commands.splice(3, 0, {
+  commands.splice(4, 0, {
     id: 'go-inbox',
     label: 'Go to Inbox',
     group: 'Navigation',
