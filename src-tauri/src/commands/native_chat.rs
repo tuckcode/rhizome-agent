@@ -521,6 +521,22 @@ pub struct NativeChatOpenResult {
     pub successor_id: Option<String>,
 }
 
+/// A reopened session whose model cannot be built (for example, the
+/// keychain refused a key) still shows its saved history, read-only, with
+/// the reason in `error`.
+fn model_or_open_error<M>(
+    built: Result<M, String>,
+    record: &NativeChatOpenResult,
+) -> Result<M, Box<NativeChatOpenResult>> {
+    built.map_err(|error| {
+        Box::new(NativeChatOpenResult {
+            error: Some(error),
+            read_only: true,
+            ..record.clone()
+        })
+    })
+}
+
 pub fn list_native_sessions() -> Result<Vec<NativeChatListItem>, String> {
     let headers = crate::engines::native_log::list_session_headers()?;
     Ok(headers
@@ -759,9 +775,13 @@ pub fn native_chat_open(
         NativeChatTarget::FreeTier => {
             let (tx, rx) = mpsc::channel();
             let reporter = tx.clone();
-            let model = free_tier_routing_model(system.clone(), move |attempt| {
+            let built = free_tier_routing_model(system.clone(), move |attempt| {
                 let _ = reporter.send(attempt);
             });
+            let model = match model_or_open_error(built, &record) {
+                Ok(model) => model,
+                Err(result) => return Ok(*result),
+            };
             let mut engine = NativeEngine::with_provider_pair(agent, model, tx, rx);
             engine.set_vault(request.vault_path.clone(), request.vault_paths.clone());
             engine.set_permission_mode(request.permission_mode);
@@ -923,6 +943,34 @@ mod tests {
             let model = free_tier_routing_model(expected.clone(), |_| {}).unwrap();
             assert_eq!(model.system_prompt(), expected.as_deref());
         });
+    }
+
+    #[test]
+    fn a_model_that_cannot_be_built_keeps_the_saved_history() {
+        let record = NativeChatOpenResult {
+            session_id: "s1".into(),
+            events: vec![crate::rhizome_loop::DurableEvent::User {
+                text: "earlier message".into(),
+            }],
+            warning: None,
+            read_only: false,
+            error: None,
+            successor_id: None,
+        };
+
+        let result = model_or_open_error::<()>(
+            Err("Keychain read failed for groq: locked".into()),
+            &record,
+        )
+        .unwrap_err();
+
+        assert_eq!(result.events, record.events);
+        assert!(result.read_only);
+        assert_eq!(
+            result.error.as_deref(),
+            Some("Keychain read failed for groq: locked")
+        );
+        assert_eq!(model_or_open_error(Ok(7), &record).unwrap(), 7);
     }
 
     #[test]
