@@ -465,6 +465,17 @@ fn free_tier_routing_model(
     system: Option<String>,
     observer: impl FnMut(crate::rhizome_routing::ProviderAttempt) + Send + 'static,
 ) -> Result<RoutingModel<ProviderKeys, SystemClock>, String> {
+    free_tier_routing_model_with(ProviderKeys::for_app(), system, observer)
+}
+
+/// `free_tier_routing_model` with the key store passed in, so a test can
+/// give it a keychain error.
+fn free_tier_routing_model_with(
+    keys: Result<ProviderKeys, String>,
+    system: Option<String>,
+    observer: impl FnMut(crate::rhizome_routing::ProviderAttempt) + Send + 'static,
+) -> Result<RoutingModel<ProviderKeys, SystemClock>, String> {
+    let _ = keys;
     Ok(RoutingModel::new(
         Catalog::pinned(),
         ProviderKeys::for_app()?,
@@ -943,6 +954,23 @@ mod tests {
             let model = free_tier_routing_model(expected.clone(), |_| {}).unwrap();
             assert_eq!(model.system_prompt(), expected.as_deref());
         });
+    }
+
+    /// The new-chat call site: `start_named_request` returns this error with
+    /// `?`, so a keychain failure refuses the chat instead of starting it
+    /// with no keys.
+    #[test]
+    fn a_keychain_error_stops_a_new_free_tier_chat() {
+        let result = free_tier_routing_model_with(
+            Err("Keychain read failed for groq: locked".into()),
+            None,
+            |_| {},
+        );
+
+        assert_eq!(
+            result.err().as_deref(),
+            Some("Keychain read failed for groq: locked")
+        );
     }
 
     #[test]

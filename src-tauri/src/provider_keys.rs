@@ -19,6 +19,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
@@ -290,25 +291,50 @@ pub(crate) fn write_legacy(path: &Path, secrets: &LegacySecrets) -> Result<(), S
 }
 
 /// Saved key values for the session-log filter (ADR-0183). Cached until a
-/// key is saved, deleted, or moved, or the id list changes (a provider
-/// saved in Settings after its key).
+/// key is saved, deleted, or moved here, the id list changes, or
+/// `CACHE_TTL` passes, so a key changed outside Rhizome is picked up too.
 pub fn cached_saved_key_values(ids: Vec<String>) -> Vec<String> {
-    type Cached = (u64, Vec<String>, Vec<String>);
-    static CACHE: Mutex<Option<Cached>> = Mutex::new(None);
+    static CACHE: Mutex<ValueCache> = Mutex::new(ValueCache { entry: None });
     let generation = KEY_GENERATION.load(Ordering::SeqCst);
-    let mut cache = CACHE
+    CACHE
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if let Some((cached_generation, cached_ids, values)) = cache.as_ref() {
-        if *cached_generation == generation && *cached_ids == ids {
-            return values.clone();
-        }
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .get(generation, ids, Instant::now(), CACHE_TTL, |ids| {
+            ProviderKeys::for_app()
+                .map(|keys| keys.saved_key_values(ids.to_vec()))
+                .unwrap_or_default()
+        })
+}
+
+/// How long scrub values may be reused before the keychain is read again.
+pub const CACHE_TTL: Duration = Duration::from_secs(60);
+
+struct CachedValues {
+    generation: u64,
+    ids: Vec<String>,
+    loaded_at: Instant,
+    values: Vec<String>,
+}
+
+/// The cache rule, with time passed in so tests can move it.
+struct ValueCache {
+    entry: Option<CachedValues>,
+}
+
+impl ValueCache {
+    fn get(
+        &mut self,
+        generation: u64,
+        ids: Vec<String>,
+        now: Instant,
+        ttl: Duration,
+        load: impl FnOnce(&[String]) -> Vec<String>,
+    ) -> Vec<String> {
+        let _ = (generation, now, ttl);
+        let values = load(&ids);
+        self.entry = None;
+        values
     }
-    let values = ProviderKeys::for_app()
-        .map(|keys| keys.saved_key_values(ids.clone()))
-        .unwrap_or_default();
-    *cache = Some((generation, ids, values.clone()));
-    values
 }
 
 /// Bumped whenever a key is saved, deleted, or moved, so cached values
@@ -701,6 +727,43 @@ mod tests {
         assert_eq!(keys.get("groq").unwrap().as_deref(), Some("gsk"));
         assert!(keys.save("  ", "gsk").is_err());
         assert!(keys.save("groq", "   ").is_err());
+    }
+
+    fn counting_loader(calls: &std::cell::Cell<u32>) -> impl FnOnce(&[String]) -> Vec<String> + '_ {
+        move |ids: &[String]| {
+            calls.set(calls.get() + 1);
+            ids.to_vec()
+        }
+    }
+
+    #[test]
+    fn the_value_cache_reuses_values_within_the_ttl_and_reloads_after() {
+        let mut cache = ValueCache { entry: None };
+        let calls = std::cell::Cell::new(0);
+        let start = Instant::now();
+        let ttl = Duration::from_secs(60);
+        let ids = || vec!["groq".to_string()];
+
+        cache.get(1, ids(), start, ttl, counting_loader(&calls));
+        cache.get(1, ids(), start + Duration::from_secs(59), ttl, counting_loader(&calls));
+        assert_eq!(calls.get(), 1, "inside the ttl the keychain is not read again");
+
+        cache.get(1, ids(), start + Duration::from_secs(61), ttl, counting_loader(&calls));
+        assert_eq!(calls.get(), 2, "after the ttl an outside key change is picked up");
+    }
+
+    #[test]
+    fn the_value_cache_reloads_on_a_key_change_or_new_ids() {
+        let mut cache = ValueCache { entry: None };
+        let calls = std::cell::Cell::new(0);
+        let now = Instant::now();
+        let ttl = Duration::from_secs(60);
+
+        cache.get(1, vec!["a".into()], now, ttl, counting_loader(&calls));
+        cache.get(2, vec!["a".into()], now, ttl, counting_loader(&calls));
+        cache.get(2, vec!["b".into()], now, ttl, counting_loader(&calls));
+
+        assert_eq!(calls.get(), 3);
     }
 
     #[test]
