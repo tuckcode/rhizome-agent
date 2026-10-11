@@ -830,10 +830,7 @@ mod tests {
     #[test]
     fn scrub_secrets_leaves_code_names_and_redacts_long_tokens() {
         let code = scrub_secrets("use hf_hub_download to fetch the file");
-        assert!(
-            code.contains("hf_hub_download"),
-            "a function name must stay: {code}"
-        );
+        assert!(code.contains("hf_hub_download"), "a function name must stay");
         let hf_key = format!("hf_{}", "Ab12".repeat(8));
         let xai_key = format!("xai-{}", "Cd34".repeat(8));
         let scrubbed = scrub_secrets(&format!("keys {hf_key} and {xai_key}"));
