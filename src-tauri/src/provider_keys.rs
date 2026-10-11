@@ -56,6 +56,18 @@ pub struct MigrationReport {
 pub struct ProviderKeys {
     backend: Box<dyn SecretBackend>,
     legacy: LegacyFile,
+    /// Credentials already read, so the router does not read the keychain
+    /// for every provider and model on every message. Emptied when any key
+    /// is saved, deleted, or moved (`KEY_GENERATION`), and after
+    /// `CACHE_TTL`, so a key changed outside Rhizome is picked up too.
+    credentials: Mutex<CredentialCache>,
+}
+
+#[derive(Default)]
+struct CredentialCache {
+    generation: u64,
+    loaded_at: Option<Instant>,
+    entries: BTreeMap<String, Option<Credential>>,
 }
 
 impl ProviderKeys {
@@ -63,6 +75,7 @@ impl ProviderKeys {
         Self {
             backend,
             legacy: LegacyFile { path: legacy_file },
+            credentials: Mutex::new(CredentialCache::default()),
         }
     }
 
@@ -109,12 +122,40 @@ impl ProviderKeys {
         self.legacy.remove(&id)
     }
 
-    /// Removes the key from the keychain and from the legacy file.
+    /// Removes the key from the keychain and from the legacy file. A
+    /// provider's account id (`<id>:account`) goes with its key: it is no
+    /// use alone.
     pub fn delete(&self, provider_id: &str) -> Result<(), String> {
         let id = normalize_id(provider_id)?;
         self.backend.delete(&id)?;
+        if !id.ends_with(ACCOUNT_SUFFIX) {
+            self.backend.delete(&format!("{id}{ACCOUNT_SUFFIX}"))?;
+        }
         keys_changed();
         self.legacy.remove(&id)
+    }
+
+    /// Reads one credential without the cache. A keychain that cannot be
+    /// read is an error, unless the legacy file still holds the key.
+    fn read_credential(&self, provider_id: &str) -> Result<Option<Credential>, String> {
+        let id = normalize_id(provider_id)?;
+        if let Err(error) = self.backend.get(&id) {
+            if self.legacy.key(&id)?.is_none() {
+                return Err(keychain_error(&id, &error));
+            }
+        }
+        let Some(api_key) = self.get(&id)? else {
+            return Ok(None);
+        };
+        let account_id = self
+            .backend
+            .get(&format!("{id}{ACCOUNT_SUFFIX}"))
+            .map_err(|error| keychain_error(&id, &error))?
+            .filter(|value| !value.trim().is_empty());
+        Ok(Some(Credential {
+            api_key,
+            account_id,
+        }))
     }
 
     /// Every saved key value for `ids`, plus any key still in the legacy
@@ -243,20 +284,55 @@ enum Step {
     NoFileKey,
 }
 
+/// The keychain account suffix for a provider's account id (Cloudflare).
+const ACCOUNT_SUFFIX: &str = ":account";
+
+/// Names the provider and the keychain failure. Never holds a key value.
+fn keychain_error(id: &str, error: &str) -> String {
+    format!(
+        "The keychain could not be read for {id}. It may be locked, or access was denied. {error}"
+    )
+}
+
 impl KeyStore for ProviderKeys {
     fn credential(&self, provider_id: &str) -> Option<Credential> {
-        let api_key = self.get(provider_id).ok().flatten()?;
-        let account = format!("{}:account", normalize_id(provider_id).ok()?);
-        let account_id = self
-            .backend
-            .get(&account)
-            .ok()
-            .flatten()
-            .filter(|value| !value.trim().is_empty());
-        Some(Credential {
-            api_key,
-            account_id,
-        })
+        self.try_credential(provider_id).ok().flatten()
+    }
+
+    /// Cached. Errors are not cached, so an unlocked keychain is read again.
+    fn try_credential(&self, provider_id: &str) -> Result<Option<Credential>, String> {
+        let id = normalize_id(provider_id)?;
+        let generation = KEY_GENERATION.load(Ordering::SeqCst);
+        let now = Instant::now();
+        {
+            let mut cache = self
+                .credentials
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let fresh = cache.generation == generation
+                && cache
+                    .loaded_at
+                    .is_some_and(|loaded| now.duration_since(loaded) < CACHE_TTL);
+            if !fresh {
+                *cache = CredentialCache {
+                    generation,
+                    loaded_at: Some(now),
+                    entries: BTreeMap::new(),
+                };
+            }
+            if let Some(entry) = cache.entries.get(&id) {
+                return Ok(entry.clone());
+            }
+        }
+        let credential = self.read_credential(&id)?;
+        let mut cache = self
+            .credentials
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if cache.generation == KEY_GENERATION.load(Ordering::SeqCst) {
+            cache.entries.insert(id, credential.clone());
+        }
+        Ok(credential)
     }
 }
 
@@ -459,10 +535,12 @@ mod tests {
         fail_set: bool,
         corrupt_read_back: bool,
         fail_get: bool,
+        reads: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     }
 
     impl SecretBackend for MemoryBackend {
         fn get(&self, account: &str) -> Result<Option<String>, String> {
+            self.reads.fetch_add(1, Ordering::SeqCst);
             if self.fail_get {
                 return Err(format!("keychain locked for {account}"));
             }
@@ -860,6 +938,69 @@ mod tests {
         );
         assert_eq!(keys.credential("groq").unwrap().account_id, None);
         assert_eq!(keys.credential("mistral"), None);
+    }
+
+    #[test]
+    fn a_locked_keychain_is_an_error_not_no_key() {
+        let fixture = Fixture::with_file(&[]);
+        let keys = fixture.keys(MemoryBackend {
+            fail_get: true,
+            ..Default::default()
+        });
+
+        let error = keys.try_credential("groq").unwrap_err();
+
+        assert!(
+            error.contains("keychain could not be read for groq"),
+            "{error}"
+        );
+        assert_eq!(keys.credential("groq"), None);
+    }
+
+    #[test]
+    fn deleting_a_key_also_deletes_its_account_id() {
+        let fixture = Fixture::with_file(&[]);
+        let keys = fixture.keys(MemoryBackend::with(&[
+            ("cloudflare-ai", "cf-key"),
+            ("cloudflare-ai:account", "acct"),
+        ]));
+
+        keys.delete("cloudflare-ai").unwrap();
+
+        assert_eq!(keys.backend.get("cloudflare-ai:account").unwrap(), None);
+        assert_eq!(keys.try_credential("cloudflare-ai").unwrap(), None);
+    }
+
+    #[test]
+    fn an_account_id_can_be_deleted_alone() {
+        let fixture = Fixture::with_file(&[]);
+        let keys = fixture.keys(MemoryBackend::with(&[
+            ("cloudflare-ai", "cf-key"),
+            ("cloudflare-ai:account", "acct"),
+        ]));
+
+        keys.delete("cloudflare-ai:account").unwrap();
+
+        let credential = keys.try_credential("cloudflare-ai").unwrap().unwrap();
+        assert_eq!(credential.api_key, "cf-key");
+        assert_eq!(credential.account_id, None);
+    }
+
+    #[test]
+    fn credentials_are_read_once_until_a_key_changes() {
+        let fixture = Fixture::with_file(&[]);
+        let backend = MemoryBackend::with(&[("groq", "gsk")]);
+        let reads = std::sync::Arc::clone(&backend.reads);
+        let keys = fixture.keys(backend);
+
+        keys.credential("groq");
+        let after_first = reads.load(Ordering::SeqCst);
+        keys.credential("groq");
+        keys.credential("groq");
+        assert_eq!(reads.load(Ordering::SeqCst), after_first);
+
+        keys.save("groq", "gsk-new").unwrap();
+        assert_eq!(keys.credential("groq").unwrap().api_key, "gsk-new");
     }
 
     #[test]

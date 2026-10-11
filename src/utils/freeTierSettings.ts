@@ -7,12 +7,16 @@ export interface FreeTierSettings {
   strict: boolean
   /** A saved provider id tried last, or null for none. */
   ownEndpoint: string | null
+  /** The own endpoint's model, or null for its first model. */
+  ownEndpointModel: string | null
 }
 
 /** A saved provider that can be the own endpoint. Mirrors `EndpointChoice`. */
 export interface EndpointChoice {
   id: string
   name: string
+  /** Model ids in saved order. The first is the default. */
+  models: string[]
 }
 
 /** One provider row. Mirrors `FreeTierProviderRow`. Never holds a key. */
@@ -24,6 +28,8 @@ export interface FreeTierProviderRow {
   hasKey: boolean
   needsAccountId: boolean
   hasAccountId: boolean
+  /** The keychain could not be read, so key state is unknown. */
+  keyError: string | null
   billingWarning: string | null
   hardStop: boolean
 }
@@ -34,7 +40,9 @@ export interface FreeTierOverview {
   strict: boolean
   routeOrder: string[]
   usable: boolean
+  /** Null when nothing is chosen, or the chosen provider was deleted. */
   ownEndpoint: string | null
+  ownEndpointModel: string | null
   endpointChoices: EndpointChoice[]
 }
 
@@ -49,6 +57,16 @@ export function saveFreeTierSettings(settings: FreeTierSettings): Promise<FreeTi
   return callHost<FreeTierOverview>('save_free_tier_settings', { settings })
 }
 
+/** Saves a key or account id in the OS keychain (`save_ai_model_provider_api_key`). */
+export function saveFreeTierSecret(account: string, value: string): Promise<void> {
+  return callHost<void>('save_ai_model_provider_api_key', { providerId: account, apiKey: value })
+}
+
+/** Removes a key or account id. Removing a provider key also removes its account id. */
+export function deleteFreeTierSecret(account: string): Promise<void> {
+  return callHost<void>('delete_ai_model_provider_api_key', { providerId: account })
+}
+
 /** The keychain account that holds a provider's account id (Cloudflare). */
 export function accountIdKeyFor(providerId: string): string {
   return `${providerId}:account`
@@ -61,5 +79,6 @@ export function settingsFromOverview(overview: FreeTierOverview): FreeTierSettin
     optIn: overview.providers.filter((row) => !row.defaultOn && row.enabled).map((row) => row.id),
     strict: overview.strict,
     ownEndpoint: overview.ownEndpoint,
+    ownEndpointModel: overview.ownEndpointModel,
   }
 }

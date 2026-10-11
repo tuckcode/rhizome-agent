@@ -66,6 +66,10 @@ pub struct CatalogProvider {
     #[serde(default)]
     pub evidence: String,
     pub models: Vec<CatalogModel>,
+    /// A key resolved before routing (the own endpoint's environment
+    /// variable). Never read from the catalog file.
+    #[serde(skip)]
+    pub api_key: Option<String>,
 }
 
 fn key_required_default() -> bool {
@@ -126,6 +130,12 @@ pub struct UserEndpoint {
     pub name: String,
     /// The provider id its key is saved under, when it needs one.
     pub key_id: Option<String>,
+    /// A key read from an environment variable, sent as is.
+    pub api_key: Option<String>,
+    /// The endpoint cannot be called without a key.
+    pub key_required: bool,
+    /// Custom request headers from the saved provider.
+    pub headers: BTreeMap<String, String>,
 }
 
 /// The provider id the router uses for the user endpoint and its key.
@@ -150,15 +160,16 @@ impl Catalog {
             base_url: endpoint.base_url,
             per_model_quota: false,
             free_suffix: None,
-            headers: BTreeMap::new(),
+            headers: endpoint.headers,
             tool_params: Map::new(),
-            key_required: false,
+            key_required: endpoint.key_required,
             user_supplied: true,
             key_id: endpoint.key_id,
             default_on: true,
             billing_warning: None,
             free_type_override: None,
             evidence: String::new(),
+            api_key: endpoint.api_key,
             models: vec![CatalogModel {
                 id: endpoint.model,
                 free_type: "user".into(),
