@@ -1,0 +1,114 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Rhizome — Earth palette comparison</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+.q-myc{--bg:#0E120C;--surface:#151A12;--fg:#E6EBE0;--muted:#79836F;--border:#232A1F;--accent:#6FE3A0;--surface-2:#1B2117;--surface-3:#222A1C;--surface-sidebar:#10150E;--surface-popover:#1B2117;--surface-input:#0E120C;--surface-dialog:#181E14;--page-wash:#080A07;--fg-heading:#F2F6ED;--fg-secondary:#ADB6A3;--fg-tertiary:#929C86;--muted-2:#5C6553;--accent-ink:#0E120C;--border-subtle:#1A2016;--border-strong:#333D2B;--border-focus:#6FE3A0;--accent-dim:rgba(111, 227, 160, 0.14);--accent-hot:#8FEBB4;--accent-bg:rgba(111, 227, 160, 0.18);--ok:#9BCF7E;--ok-bg:rgba(155, 207, 126, 0.16);--warn:#E0A458;--warn-bg:rgba(224, 164, 88, 0.14);--danger:#E8837C;--danger-bg:rgba(232, 131, 124, 0.12);--info:#6FE3A0;--state-hover:#1B2117;--state-selected:#1B2E22;--state-active:#1E3326;--state-disabled:#161B12;--user-bg:#1B2E22;--shadow:rgba(0, 0, 0, 0.45);--shadow-dialog:rgba(0, 0, 0, 0.55);--shadow-window:0 28px 70px rgba(0, 0, 0, 0.45);}
+.q-ed{--bg:#0F110C;--surface:#16170F;--fg:#E9E8DC;--muted:#999784;--border:#2A281D;--accent:#6FE3A0;--surface-2:#1C1D14;--surface-3:#23231A;--surface-sidebar:#121410;--surface-popover:#1C1D14;--surface-input:#0F110C;--surface-dialog:#19190F;--page-wash:#090A07;--fg-heading:#F4F2E8;--fg-secondary:#BDBAA8;--fg-tertiary:#A8A592;--muted-2:#8F8D7B;--accent-ink:#0F110C;--border-subtle:#1F1E16;--border-strong:#3B3828;--border-input:#75705C;--border-focus:#6FE3A0;--accent-dim:rgba(111, 227, 160, 0.14);--accent-hot:#8FEBB4;--accent-bg:rgba(111, 227, 160, 0.18);--ok:#9BCF7E;--ok-bg:rgba(155, 207, 126, 0.14);--warn:#E9B04F;--warn-bg:rgba(233, 176, 79, 0.13);--danger:#EE8B7E;--danger-bg:rgba(238, 139, 126, 0.12);--info:#6FE3A0;--state-hover:#1C1D14;--state-selected:#1A2619;--state-active:#1D2B1C;--state-disabled:#15160F;--user-bg:#1A2619;--shadow:rgba(0, 0, 0, 0.5);--shadow-dialog:rgba(0, 0, 0, 0.58);--shadow-window:0 28px 70px rgba(0, 0, 0, 0.5);}
+.q-loam{--bg:#15110C;--surface:#1D1811;--fg:#EDE6D8;--muted:#A3987F;--border:#352C20;--accent:#6FE3A0;--surface-2:#241E15;--surface-3:#2B2419;--surface-sidebar:#19150F;--surface-popover:#241E15;--surface-input:#15110C;--surface-dialog:#211B13;--page-wash:#0C0A07;--fg-heading:#F7F1E5;--fg-secondary:#C6BBA6;--fg-tertiary:#B2A791;--muted-2:#9A8F78;--accent-ink:#15110C;--border-subtle:#272017;--border-strong:#4A3D2C;--border-input:#7E6F59;--border-focus:#6FE3A0;--accent-dim:rgba(111, 227, 160, 0.14);--accent-hot:#8FEBB4;--accent-bg:rgba(111, 227, 160, 0.18);--ok:#A6D282;--ok-bg:rgba(166, 210, 130, 0.13);--warn:#EDB451;--warn-bg:rgba(237, 180, 81, 0.13);--danger:#F2917F;--danger-bg:rgba(242, 145, 127, 0.12);--info:#6FE3A0;--state-hover:#241E15;--state-selected:#1F2719;--state-active:#232D1C;--state-disabled:#1A1610;--user-bg:#1F2719;--shadow:rgba(0, 0, 0, 0.5);--shadow-dialog:rgba(0, 0, 0, 0.58);--shadow-window:0 28px 70px rgba(0, 0, 0, 0.5);}
+
+*{box-sizing:border-box;margin:0}
+body{background:#777;font:13px/1.45 Inter,system-ui,sans-serif;width:1600px}
+.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.q{background:var(--page-wash);color:var(--fg);padding:16px 20px 14px;height:640px;display:flex;flex-direction:column;gap:10px}
+.label{font:600 11px "JetBrains Mono";letter-spacing:.1em;text-transform:uppercase;color:var(--fg-tertiary)}
+.win{background:var(--bg);border:1px solid var(--border-strong);border-radius:10px;overflow:hidden;box-shadow:0 12px 30px var(--shadow);flex:1;display:flex;flex-direction:column}
+.tb{height:36px;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--titlebar-top);border-bottom:1px solid var(--border)}
+.lights{display:flex;gap:6px}.lights i{width:10px;height:10px;border-radius:50%;background:var(--border-strong)}
+.brand{display:flex;align-items:center;gap:6px;font:600 13px "JetBrains Mono";letter-spacing:.01em;color:var(--fg-heading)}
+.chip{font:12px "JetBrains Mono";color:var(--fg-secondary);border:1px solid var(--border);border-radius:6px;padding:1px 8px;background:var(--surface)}
+.sp{flex:1} .meta{font-size:12px;color:var(--muted)}
+.body{flex:1;display:grid;grid-template-columns:1fr 120px;min-height:0}
+.chat{padding:14px 16px;display:flex;flex-direction:column;gap:8px;border-right:1px solid var(--border)}
+.user{align-self:flex-end;background:var(--user-bg);border:1px solid var(--border);border-radius:8px;padding:7px 12px;max-width:80%}
+.tool{display:grid;grid-template-columns:8px auto 1fr auto;gap:8px;align-items:center;background:var(--tool-bg);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px}
+.tool .name{color:var(--fg);font-weight:600} .tool .path{color:var(--muted);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.dot{width:7px;height:7px;border-radius:50%} .dot.done{background:var(--ok)} .dot.run{background:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.st{font-size:11px;text-transform:uppercase;letter-spacing:.06em} .st.ok{color:var(--ok)} .st.run{color:var(--accent)}
+.msg{color:var(--fg);font-size:13px}
+.row{display:flex;align-items:center;gap:6px}
+.inp{margin-top:auto;display:flex;justify-content:space-between;background:var(--surface-input);border:1px solid var(--border-input,var(--border-strong));border-radius:8px;padding:7px 10px;color:var(--muted-2);font-size:13px} .inp .mono{font-size:11px;color:var(--muted)}
+.c{white-space:nowrap;font:12px "JetBrains Mono";border-radius:6px;padding:2px 8px;border:1px solid}
+.c.warn{color:var(--warn);background:var(--warn-bg);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+.c.danger{color:var(--danger);background:var(--danger-bg);border-color:color-mix(in srgb,var(--danger) 40%,transparent)}
+.btn{white-space:nowrap;flex-shrink:0;height:30px;padding:0 12px;border-radius:8px;border:0;background:var(--accent);color:var(--accent-ink);font:600 13px Inter}
+.btn2{height:30px;padding:0 12px;border-radius:8px;border:1px solid var(--border-strong);background:var(--surface);color:var(--fg-secondary);font:500 13px Inter}
+.graph{background:var(--surface-sidebar);padding:10px;display:flex;flex-direction:column}
+.gh{font-size:11px;letter-spacing:.08em;color:var(--fg-tertiary);display:flex;justify-content:space-between} .gh span{color:var(--muted)}
+.graph svg{flex:1;width:100%} .graph text{font:10px "JetBrains Mono";fill:var(--fg-secondary)}
+.sws{display:grid;grid-template-columns:repeat(6,1fr);row-gap:6px;gap:4px}
+.sw{display:flex;flex-direction:column;gap:1px;font:10px "JetBrains Mono";color:var(--fg-secondary)}
+.sw i{height:22px;border-radius:4px;border:1px solid var(--border-strong)} .sw b{font-weight:600;color:var(--fg)} .sw em{font-style:normal;color:var(--fg-tertiary)}
+.sw em.bad{color:var(--danger);font-weight:600} .sw em.bad::after{content:" ✕"}
+</style></head><body><div class="grid"><section class="q q-myc"><div class="label">Mycelium dark · current</div>
+<div class="win">
+ <div class="tb"><span class="lights"><i></i><i></i><i></i></span>
+  <span class="brand"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><g stroke="var(--accent)" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M9 9 3.5 4.5M9 9l5.5-4.5M9 9 4 14M9 9l5 5M9 9V2.5"/></g><circle cx="9" cy="9" r="2.3" fill="var(--accent)"/></svg>rhizome</span>
+  <span class="chip">laputa</span><span class="sp"></span><span class="meta mono">sess_7f2a · idle</span></div>
+ <div class="body">
+  <div class="chat">
+   <div class="user">Where did we land on promote vs auto-distill?</div>
+   <div class="tool"><span class="dot done"></span><span class="mono name">search_notes</span><span class="mono path">“promote distill” · 3 notes</span><span class="st ok mono">done</span></div>
+   <div class="tool"><span class="dot run"></span><span class="mono name">get_note</span><span class="mono path">wiki/decisions/memory-loop.md</span><span class="st mono run">running</span></div>
+   <p class="msg">Promote stays explicit. Distill runs only when you ask, so nothing lands in the vault without a reviewable change.</p>
+   <div class="meta">From your vault · memory-loop · 14:08 · 1.2s</div>
+   <div class="inp"><span>Ask Rhizome about this vault…</span><span class="mono">⌘↵</span></div>
+   <div class="row"><span class="c warn">⚠ needs vault</span><span class="c danger">✕ tool failed</span><span class="sp"></span><button class="btn">Save to vault</button></div>
+  </div>
+  <div class="graph"><div class="gh mono">GRAPH <span>+1</span></div>
+   <svg viewBox="0 0 200 150"><g stroke="var(--border-strong)" stroke-width="1" fill="none"><path d="M30 120 70 86 110 100 160 60 182 104M70 86 80 36M160 60 140 22M110 100 120 138M30 120 20 80"/></g>
+   <path d="M110 100 70 86M110 100 160 60" stroke="var(--accent)" stroke-width="1.4" fill="none"/>
+   <g fill="var(--muted)"><circle cx="30" cy="120" r="3"/><circle cx="80" cy="36" r="3"/><circle cx="140" cy="22" r="3"/><circle cx="182" cy="104" r="3"/><circle cx="120" cy="138" r="3"/><circle cx="20" cy="80" r="3"/></g>
+   <g fill="var(--fg-tertiary)"><circle cx="70" cy="86" r="4"/><circle cx="160" cy="60" r="4"/></g>
+   <circle cx="110" cy="100" r="9" fill="var(--accent-dim)"/><circle cx="110" cy="100" r="5" fill="var(--accent)"/>
+   <text x="110" y="118" text-anchor="middle">promote-vs-distill</text></svg></div>
+ </div>
+</div>
+<div class="sws"><div class="sw"><i style="background:#0E120C"></i><b>bg</b><span>#0E120C</span><em class="">—</em></div><div class="sw"><i style="background:#151A12"></i><b>surface</b><span>#151A12</span><em class="">1.07</em></div><div class="sw"><i style="background:#232A1F"></i><b>border</b><span>#232A1F</span><em class="">1.28</em></div><div class="sw"><i style="background:#E6EBE0"></i><b>fg</b><span>#E6EBE0</span><em class="ok">15.60 · min 11.86</em></div><div class="sw"><i style="background:#ADB6A3"></i><b>fg-2</b><span>#ADB6A3</span><em class="ok">9.00 · min 6.84</em></div><div class="sw"><i style="background:#79836F"></i><b>muted</b><span>#79836F</span><em class="bad">4.76 · min 3.62</em></div><div class="sw"><i style="background:#5C6553"></i><b>muted-2</b><span>#5C6553</span><em class="bad">3.10 · min 2.36</em></div><div class="sw"><i style="background:#6FE3A0"></i><b>accent</b><span>#6FE3A0</span><em class="ok">11.86 · min 9.02</em></div><div class="sw"><i style="background:#9BCF7E"></i><b>ok</b><span>#9BCF7E</span><em class="ok">10.46 · min 7.96</em></div><div class="sw"><i style="background:#E0A458"></i><b>warn</b><span>#E0A458</span><em class="ok">8.66 · min 6.59</em></div><div class="sw"><i style="background:#E8837C"></i><b>danger</b><span>#E8837C</span><em class="ok">7.18 · min 5.46</em></div></div></section><section class="q q-ed"><div class="label">Earth dark · subtle</div>
+<div class="win">
+ <div class="tb"><span class="lights"><i></i><i></i><i></i></span>
+  <span class="brand"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><g stroke="var(--accent)" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M9 9 3.5 4.5M9 9l5.5-4.5M9 9 4 14M9 9l5 5M9 9V2.5"/></g><circle cx="9" cy="9" r="2.3" fill="var(--accent)"/></svg>rhizome</span>
+  <span class="chip">laputa</span><span class="sp"></span><span class="meta mono">sess_7f2a · idle</span></div>
+ <div class="body">
+  <div class="chat">
+   <div class="user">Where did we land on promote vs auto-distill?</div>
+   <div class="tool"><span class="dot done"></span><span class="mono name">search_notes</span><span class="mono path">“promote distill” · 3 notes</span><span class="st ok mono">done</span></div>
+   <div class="tool"><span class="dot run"></span><span class="mono name">get_note</span><span class="mono path">wiki/decisions/memory-loop.md</span><span class="st mono run">running</span></div>
+   <p class="msg">Promote stays explicit. Distill runs only when you ask, so nothing lands in the vault without a reviewable change.</p>
+   <div class="meta">From your vault · memory-loop · 14:08 · 1.2s</div>
+   <div class="inp"><span>Ask Rhizome about this vault…</span><span class="mono">⌘↵</span></div>
+   <div class="row"><span class="c warn">⚠ needs vault</span><span class="c danger">✕ tool failed</span><span class="sp"></span><button class="btn">Save to vault</button></div>
+  </div>
+  <div class="graph"><div class="gh mono">GRAPH <span>+1</span></div>
+   <svg viewBox="0 0 200 150"><g stroke="var(--border-strong)" stroke-width="1" fill="none"><path d="M30 120 70 86 110 100 160 60 182 104M70 86 80 36M160 60 140 22M110 100 120 138M30 120 20 80"/></g>
+   <path d="M110 100 70 86M110 100 160 60" stroke="var(--accent)" stroke-width="1.4" fill="none"/>
+   <g fill="var(--muted)"><circle cx="30" cy="120" r="3"/><circle cx="80" cy="36" r="3"/><circle cx="140" cy="22" r="3"/><circle cx="182" cy="104" r="3"/><circle cx="120" cy="138" r="3"/><circle cx="20" cy="80" r="3"/></g>
+   <g fill="var(--fg-tertiary)"><circle cx="70" cy="86" r="4"/><circle cx="160" cy="60" r="4"/></g>
+   <circle cx="110" cy="100" r="9" fill="var(--accent-dim)"/><circle cx="110" cy="100" r="5" fill="var(--accent)"/>
+   <text x="110" y="118" text-anchor="middle">promote-vs-distill</text></svg></div>
+ </div>
+</div>
+<div class="sws"><div class="sw"><i style="background:#0F110C"></i><b>bg</b><span>#0F110C</span><em class="">—</em></div><div class="sw"><i style="background:#16170F"></i><b>surface</b><span>#16170F</span><em class="">1.05</em></div><div class="sw"><i style="background:#2A281D"></i><b>border</b><span>#2A281D</span><em class="">1.28</em></div><div class="sw"><i style="background:#E9E8DC"></i><b>fg</b><span>#E9E8DC</span><em class="ok">15.41 · min 12.76</em></div><div class="sw"><i style="background:#BDBAA8"></i><b>fg-2</b><span>#BDBAA8</span><em class="ok">9.72 · min 8.05</em></div><div class="sw"><i style="background:#999784"></i><b>muted</b><span>#999784</span><em class="ok">6.43 · min 5.33</em></div><div class="sw"><i style="background:#8F8D7B"></i><b>muted-2</b><span>#8F8D7B</span><em class="ok">5.66 · min 4.69</em></div><div class="sw"><i style="background:#6FE3A0"></i><b>accent</b><span>#6FE3A0</span><em class="ok">11.91 · min 9.86</em></div><div class="sw"><i style="background:#9BCF7E"></i><b>ok</b><span>#9BCF7E</span><em class="ok">10.51 · min 8.70</em></div><div class="sw"><i style="background:#E9B04F"></i><b>warn</b><span>#E9B04F</span><em class="ok">9.76 · min 8.08</em></div><div class="sw"><i style="background:#EE8B7E"></i><b>danger</b><span>#EE8B7E</span><em class="ok">7.80 · min 6.46</em></div></div></section><section class="q q-loam"><div class="label">Earth dark · warm (loam)</div>
+<div class="win">
+ <div class="tb"><span class="lights"><i></i><i></i><i></i></span>
+  <span class="brand"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><g stroke="var(--accent)" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M9 9 3.5 4.5M9 9l5.5-4.5M9 9 4 14M9 9l5 5M9 9V2.5"/></g><circle cx="9" cy="9" r="2.3" fill="var(--accent)"/></svg>rhizome</span>
+  <span class="chip">laputa</span><span class="sp"></span><span class="meta mono">sess_7f2a · idle</span></div>
+ <div class="body">
+  <div class="chat">
+   <div class="user">Where did we land on promote vs auto-distill?</div>
+   <div class="tool"><span class="dot done"></span><span class="mono name">search_notes</span><span class="mono path">“promote distill” · 3 notes</span><span class="st ok mono">done</span></div>
+   <div class="tool"><span class="dot run"></span><span class="mono name">get_note</span><span class="mono path">wiki/decisions/memory-loop.md</span><span class="st mono run">running</span></div>
+   <p class="msg">Promote stays explicit. Distill runs only when you ask, so nothing lands in the vault without a reviewable change.</p>
+   <div class="meta">From your vault · memory-loop · 14:08 · 1.2s</div>
+   <div class="inp"><span>Ask Rhizome about this vault…</span><span class="mono">⌘↵</span></div>
+   <div class="row"><span class="c warn">⚠ needs vault</span><span class="c danger">✕ tool failed</span><span class="sp"></span><button class="btn">Save to vault</button></div>
+  </div>
+  <div class="graph"><div class="gh mono">GRAPH <span>+1</span></div>
+   <svg viewBox="0 0 200 150"><g stroke="var(--border-strong)" stroke-width="1" fill="none"><path d="M30 120 70 86 110 100 160 60 182 104M70 86 80 36M160 60 140 22M110 100 120 138M30 120 20 80"/></g>
+   <path d="M110 100 70 86M110 100 160 60" stroke="var(--accent)" stroke-width="1.4" fill="none"/>
+   <g fill="var(--muted)"><circle cx="30" cy="120" r="3"/><circle cx="80" cy="36" r="3"/><circle cx="140" cy="22" r="3"/><circle cx="182" cy="104" r="3"/><circle cx="120" cy="138" r="3"/><circle cx="20" cy="80" r="3"/></g>
+   <g fill="var(--fg-tertiary)"><circle cx="70" cy="86" r="4"/><circle cx="160" cy="60" r="4"/></g>
+   <circle cx="110" cy="100" r="9" fill="var(--accent-dim)"/><circle cx="110" cy="100" r="5" fill="var(--accent)"/>
+   <text x="110" y="118" text-anchor="middle">promote-vs-distill</text></svg></div>
+ </div>
+</div>
+<div class="sws"><div class="sw"><i style="background:#15110C"></i><b>bg</b><span>#15110C</span><em class="">—</em></div><div class="sw"><i style="background:#1D1811"></i><b>surface</b><span>#1D1811</span><em class="">1.07</em></div><div class="sw"><i style="background:#352C20"></i><b>border</b><span>#352C20</span><em class="">1.37</em></div><div class="sw"><i style="background:#EDE6D8"></i><b>fg</b><span>#EDE6D8</span><em class="ok">15.13 · min 12.35</em></div><div class="sw"><i style="background:#C6BBA6"></i><b>fg-2</b><span>#C6BBA6</span><em class="ok">9.90 · min 8.08</em></div><div class="sw"><i style="background:#A3987F"></i><b>muted</b><span>#A3987F</span><em class="ok">6.58 · min 5.37</em></div><div class="sw"><i style="background:#9A8F78"></i><b>muted-2</b><span>#9A8F78</span><em class="ok">5.88 · min 4.80</em></div><div class="sw"><i style="background:#6FE3A0"></i><b>accent</b><span>#6FE3A0</span><em class="ok">11.79 · min 9.62</em></div><div class="sw"><i style="background:#A6D282"></i><b>ok</b><span>#A6D282</span><em class="ok">10.88 · min 8.88</em></div><div class="sw"><i style="background:#EDB451"></i><b>warn</b><span>#EDB451</span><em class="ok">10.07 · min 8.22</em></div><div class="sw"><i style="background:#F2917F"></i><b>danger</b><span>#F2917F</span><em class="ok">8.17 · min 6.67</em></div></div></section></div></body></html>

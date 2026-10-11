@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en" data-scheme="mycelium">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rhizome Agent — hero mock (critique 2026-10-10)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="colors_and_type.css">
+<style>
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);-webkit-font-smoothing:antialiased}
+.mono{font-family:var(--font-mono)}
+a{color:inherit}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 48px;border-bottom:1px solid var(--border)}
+.brand{display:flex;gap:8px;align-items:center;font:600 13px var(--font-mono);letter-spacing:.02em}
+.brand svg{display:block}
+nav{display:flex;gap:24px;font-size:13px;color:var(--fg-secondary)}
+nav a{text-decoration:none}
+main{max-width:1344px;margin:0 auto;padding:64px 48px 48px;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:56px;align-items:start}
+.kicker{font:600 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--fg-tertiary)}
+h1{font-size:48px;line-height:1.08;font-weight:600;letter-spacing:-.02em;margin:16px 0 20px;text-wrap:balance}
+.lede{font-size:18px;line-height:1.55;color:var(--fg-secondary);max-width:34em}
+.lede b{color:var(--fg);font-weight:500}
+.cta{display:flex;gap:20px;align-items:center;margin-top:32px}
+.btn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:var(--radius);background:var(--accent);color:#0E120C;font-weight:600;font-size:14px;text-decoration:none}
+.link{font-size:14px;color:var(--fg-secondary);text-underline-offset:3px}
+.facts{margin-top:40px;display:grid;grid-template-columns:repeat(3,auto);gap:8px 24px;justify-content:start;font:12px var(--font-mono);color:var(--fg-tertiary)}
+.facts span b{color:var(--fg-secondary);font-weight:400}
+/* figure */
+figure{position:relative}
+.stage{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.pane{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.pane h3{display:flex;justify-content:space-between;font:600 11px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--fg-tertiary);padding:10px 12px;border-bottom:1px solid var(--border)}
+.pane h3 i{font-style:normal;text-transform:none;letter-spacing:0;font-weight:400}
+.body{padding:12px;font-size:13px;line-height:1.5}
+.msg{margin-bottom:12px}
+.who{font:600 11px var(--font-mono);color:var(--fg-tertiary);margin-bottom:4px}
+.tool{display:grid;grid-template-columns:8px 1fr auto;gap:8px;align-items:center;border:1px solid var(--border);border-radius:6px;padding:6px 8px;margin:6px 0;font:12px var(--font-mono);color:var(--fg-secondary);background:var(--surface-2)}
+.tool .d{width:6px;height:6px;border-radius:50%;background:var(--ok)}
+.tool .r{color:var(--fg-tertiary)}
+.tool.promote{border-color:var(--accent);background:var(--accent-dim);color:var(--fg)}
+.tool.promote .d{background:var(--accent)}
+.prov{font:11px var(--font-mono);color:var(--fg-tertiary);margin-top:6px}
+.prov u{text-decoration-color:var(--border-strong)}
+.md{font:12px/1.65 var(--font-mono);color:var(--fg-secondary)}
+.md .h{color:var(--fg);font-weight:600}
+.md .wl{color:var(--accent-teal, #7FC8B8)}
+.md .fm{color:var(--fg-tertiary)}
+.diff{grid-column:auto}
+.diff .body{font:12px/1.7 var(--font-mono);color:var(--fg-tertiary);padding:10px 12px}
+.diff .add{color:var(--ok)}
+.diff .c{color:var(--fg-secondary)}
+svg.net{display:block;width:100%;height:auto}
+.net text{font:10px var(--font-mono);fill:var(--fg-tertiary)}
+figcaption{margin-top:12px;font:12px var(--font-mono);color:var(--fg-tertiary)}
+.connector{stroke:var(--accent);stroke-width:1.25;fill:none;stroke-dasharray:3 3}
+@media (max-width:900px){header{padding:12px 20px}nav a:not(:last-child){display:none}main{grid-template-columns:1fr;padding:32px 20px;gap:32px}h1{font-size:34px}.lede{font-size:16px}.stage{grid-template-columns:1fr}.facts{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+ <div class="brand"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><g stroke="#6FE3A0" stroke-width="1.4" fill="none"><path d="M9 9 3 4M9 9l6-5M9 9 3 14M9 9l6 5M9 9V2"/></g><circle cx="9" cy="9" r="2.4" fill="#6FE3A0"/></svg>rhizome agent</div>
+ <nav aria-label="Primary"><a href="#loop">How it works</a><a href="#vault">The vault</a><a href="#run">Run it</a><a href="#">GitHub ↗</a></nav>
+</header>
+<main>
+ <section aria-labelledby="h">
+  <p class="kicker">Developer preview · macOS · open source</p>
+  <h1 id="h">Every session leaves notes, not just a transcript.</h1>
+  <p class="lede">Rhizome Agent is a desktop agent harness. You chat, the agent works through tools you can see, and what's worth keeping is <b>promoted into Markdown notes</b> in a local, git-backed vault. The next session searches those notes first.</p>
+  <div class="cta"><a class="btn" href="#run">Get started</a><a class="link" href="#demo">Watch the 20-second loop</a></div>
+  <div class="facts"><span><b>Memory</b> · Markdown + git</span><span><b>Models</b> · bring your own</span><span><b>License</b> · AGPL-3.0</span></div>
+ </section>
+ <figure aria-label="One session: the agent searches the vault, answers, and promotes a decision into a note, committed to git">
+  <div class="stage">
+   <div class="pane">
+    <h3>Chat <i>sess_7f2a</i></h3>
+    <div class="body">
+     <div class="msg"><div class="who">you</div>Promote or auto-distill? Settle it and keep the decision.</div>
+     <div class="msg"><div class="who">agent</div>
+      <div class="tool"><span class="d"></span>search_notes “distill”<span class="r">3 notes</span></div>
+      <div class="tool"><span class="d"></span>get_note memory-loop.md<span class="r">done</span></div>
+      Promote stays explicit. Distill runs only when you ask, so nothing lands in the vault without a reviewable change.
+      <div class="prov">From your vault · <u>memory-loop</u> · <u>harness-doctrine</u></div>
+      <div class="tool promote"><span class="d"></span>promote → wiki/decisions/<span class="r">saved</span></div>
+     </div>
+    </div>
+   </div>
+   <div class="pane">
+    <h3>wiki/decisions/promote-vs-distill.md</h3>
+    <div class="body md">
+     <div class="fm">---<br>type: decision<br>session: sess_7f2a<br>---</div>
+     <div class="h"># Promote vs auto-distill</div>
+     Promote is an explicit step. No auto-wiki from every turn.<br><br>
+     Related: <span class="wl">[[memory-loop]]</span> · <span class="wl">[[harness-doctrine]]</span>
+    </div>
+   </div>
+   <div class="pane diff">
+    <h3>Changes <i>ready to commit</i></h3>
+    <div class="body"><span class="c">A wiki/decisions/promote-vs-distill.md</span><br><span class="add">+ # Promote vs auto-distill</span><br><span class="add">+ Promote is an explicit step.</span><br><span class="add">+ Related: [[memory-loop]]</span></div>
+   </div>
+   <div class="pane">
+    <h3>Graph <i>+1 note</i></h3>
+    <svg class="net" viewBox="0 0 300 130" aria-hidden="true">
+     <g stroke="#333D2B" stroke-width="1" fill="none"><path d="M40 98 92 66 150 80 214 44 266 84M92 66 112 26M214 44 176 16"/></g>
+     <path d="M150 80 92 66M150 80 214 44" stroke="#6FE3A0" stroke-width="1.25" fill="none"/>
+     <g fill="#5C6553"><circle cx="40" cy="98" r="3"/><circle cx="112" cy="26" r="3"/><circle cx="176" cy="16" r="3"/><circle cx="266" cy="84" r="3"/></g>
+     <g fill="#929C86"><circle cx="92" cy="66" r="4"/><circle cx="214" cy="44" r="4"/></g>
+     <circle cx="150" cy="80" r="5.5" fill="#6FE3A0"/>
+     <text x="20" y="58">memory-loop</text><text x="290" y="70" text-anchor="end">harness-doctrine</text><text x="112" y="104">promote-vs-distill</text>
+    </svg>
+   </div>
+  </div>
+  <figcaption>One real loop: tools in the thread → a note on disk → a diff you approve. The new note joins the vault graph.</figcaption>
+ </figure>
+</main>
+</body>
+</html>
