@@ -33,7 +33,9 @@ Checker and CI only. No theme CSS, component, or `docs/HANDOFF.md` edits.
 
 ## Checks
 
-- `python3 scripts/contrast_check.py` — exit 0, failing pairs none
+- `python3 scripts/contrast_check.py` on current main CSS — exit 0, failing pairs none
+- Same script on #147 head `842cc9a` CSS (fetched into a temp dir; that branch was not modified) — exit 0, failing pairs none. Loam `--text-faint` is `#998D74` (4.55 on selected-strong); `--border-input` is `#8A7A62` (3.57 on selected-strong).
 - `python3 docs/design/earth-theme/contrast_check.py docs/design/earth-theme/colors_and_type.css` — exit 0
+- `bash .husky/pre-push` with `LAPUTA_PREPUSH_LOCAL=1` — all lanes OK in 15m 59s
 - Localization: none — English only (C18)
 - PostHog: no event needed because this is a checker, not a user action
