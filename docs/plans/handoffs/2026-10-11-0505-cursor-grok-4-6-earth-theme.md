@@ -26,6 +26,10 @@ Stacked on the a11y B1–B5 branch (`cursor/a11y-chat-b1-b5-8b31`).
 5. `--muted` on `--state-selected-strong` is in `contrast_check.py` and
    stays ≥ 4.5:1 (Earth dark 5.15, Earth light 5.18, Loam 5.21). #142's
    mycelium pair was 4.08 / 4.29.
+6. Focus ring is `var(--accent-blue)` (design-system `var(--accent)`),
+   2px, never a hard-coded hex. `--focus-ring on --bg` is in
+   `contrast_check.py` and stays ≥ 3:1 (Earth dark 11.91, Earth light
+   5.44, Loam 11.79).
 
 ## Checks
 

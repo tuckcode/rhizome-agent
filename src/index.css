@@ -67,7 +67,7 @@
   --border-strong: #C8BDA8;
   --border-input: #857B66;
   --border-dialog: #C8BDA8;
-  --border-focus: #2C6A4D;
+  --border-focus: var(--accent-blue);
 
   /* --- Interaction states (Earth light) --- */
   --state-hover: #EAE3D6;
@@ -75,7 +75,7 @@
   --state-selected: #E1E6DA;
   --state-selected-strong: #DCE3D5;
   --state-active: #DCE3D5;
-  --state-focus-ring: #2C6A4D;
+  --state-focus-ring: var(--accent-blue);
   --state-drag-target: rgba(44, 106, 77, 0.11);
   --state-disabled: #EEE9DF;
 
@@ -222,7 +222,7 @@
   --border-strong: #3B3828;
   --border-input: #75705C;
   --border-dialog: #3B3828;
-  --border-focus: #6FE3A0;
+  --border-focus: var(--accent-blue);
 
   /* --- Interaction states (Earth dark) --- */
   --state-hover: #1C1D14;
@@ -230,7 +230,7 @@
   --state-selected: #1A2619;
   --state-selected-strong: #1C291B;
   --state-active: #1C291B;
-  --state-focus-ring: #6FE3A0;
+  --state-focus-ring: var(--accent-blue);
   --state-drag-target: rgba(111, 227, 160, 0.18);
   --state-disabled: #15160F;
 

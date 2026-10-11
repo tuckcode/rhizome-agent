@@ -56,7 +56,8 @@
   --border-subtle: #1F1E16;
   --border-strong: #3B3828;
   --border-input: #75705C; /* >=3:1 non-text boundary for inputs/controls */
-  --border-focus: #6FE3A0;
+  --border-focus: var(--accent);
+  --state-focus-ring: var(--accent);
   --accent-dim: rgba(111, 227, 160, 0.14);
   --accent-hot: #8FEBB4;
   --accent-bg: rgba(111, 227, 160, 0.18);
@@ -182,7 +183,8 @@
   --border-subtle: #272017;
   --border-strong: #4A3D2C;
   --border-input: #7E6F59; /* >=3:1 non-text boundary for inputs/controls */
-  --border-focus: #6FE3A0;
+  --border-focus: var(--accent);
+  --state-focus-ring: var(--accent);
   --accent-dim: rgba(111, 227, 160, 0.14);
   --accent-hot: #8FEBB4;
   --accent-bg: rgba(111, 227, 160, 0.18);
@@ -300,7 +302,8 @@
   --border-subtle: #E6DFD1;
   --border-strong: #C8BDA8;
   --border-input: #857B66; /* >=3:1 non-text boundary for inputs/controls */
-  --border-focus: #2C6A4D;
+  --border-focus: var(--accent);
+  --state-focus-ring: var(--accent);
   --accent-dim: rgba(44, 106, 77, 0.11);
   --accent-hot: #22573F;
   --accent-bg: rgba(44, 106, 77, 0.11);

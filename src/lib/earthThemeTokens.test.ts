@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { CHAT_FOCUS_RING_CLASS } from './chatFocusRing'
 import { COLOR_THEMES, DEFAULT_COLOR_THEME } from './themeMode'
 
 const indexCss = readFileSync(join(process.cwd(), 'src/index.css'), 'utf8')
@@ -67,13 +68,13 @@ const EARTH_DARK = {
   '--border-strong': '#3B3828',
   '--border-input': '#75705C',
   '--border-dialog': '#3B3828',
-  '--border-focus': '#6FE3A0',
+  '--border-focus': 'var(--accent-blue)',
   '--state-hover': '#1C1D14',
   '--state-hover-subtle': '#16170F',
   '--state-selected': '#1A2619',
   '--state-selected-strong': '#1C291B',
   '--state-active': '#1C291B',
-  '--state-focus-ring': '#6FE3A0',
+  '--state-focus-ring': 'var(--accent-blue)',
   '--state-drag-target': 'rgba(111, 227, 160, 0.18)',
   '--state-disabled': '#15160F',
   '--accent-blue': '#6FE3A0',
@@ -114,13 +115,13 @@ const EARTH_LIGHT = {
   '--border-strong': '#C8BDA8',
   '--border-input': '#857B66',
   '--border-dialog': '#C8BDA8',
-  '--border-focus': '#2C6A4D',
+  '--border-focus': 'var(--accent-blue)',
   '--state-hover': '#EAE3D6',
   '--state-hover-subtle': '#EEE9DF',
   '--state-selected': '#E1E6DA',
   '--state-selected-strong': '#DCE3D5',
   '--state-active': '#DCE3D5',
-  '--state-focus-ring': '#2C6A4D',
+  '--state-focus-ring': 'var(--accent-blue)',
   '--state-drag-target': 'rgba(44, 106, 77, 0.11)',
   '--state-disabled': '#EEE9DF',
   '--accent-blue': '#2C6A4D',
@@ -173,13 +174,13 @@ const LOAM = {
   '--border-strong': '#4A3D2C',
   '--border-input': '#7E6F59',
   '--border-dialog': '#4A3D2C',
-  '--border-focus': '#6FE3A0',
+  '--border-focus': 'var(--accent-blue)',
   '--state-hover': '#241E15',
   '--state-hover-subtle': '#1D1811',
   '--state-selected': '#1F2719',
   '--state-selected-strong': '#212A1A',
   '--state-active': '#212A1A',
-  '--state-focus-ring': '#6FE3A0',
+  '--state-focus-ring': 'var(--accent-blue)',
   '--state-drag-target': 'rgba(111, 227, 160, 0.18)',
   '--state-disabled': '#1A1610',
   '--accent-blue': '#6FE3A0',
@@ -314,6 +315,38 @@ describe('Earth theme tokens', () => {
     expect(lines).toHaveLength(3)
     for (const ratio of lines) {
       expect(ratio).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  it('takes the 2px focus ring from each theme accent token at 3:1', () => {
+    expect(CHAT_FOCUS_RING_CLASS).toContain('outline-2')
+    expect(CHAT_FOCUS_RING_CLASS).toContain('var(--accent-blue)')
+    expect(CHAT_FOCUS_RING_CLASS).not.toMatch(/#[0-9A-Fa-f]{3,8}/)
+    for (const block of [light, dark, loam]) {
+      expect(token(block, '--state-focus-ring')).toBe('var(--accent-blue)')
+      expect(token(block, '--border-focus')).toBe('var(--accent-blue)')
+      const ring = token(block, '--accent-blue')
+      for (const surfaceName of SURFACES) {
+        expect(
+          contrastRatio(ring, token(block, surfaceName)),
+          `--focus-ring on ${surfaceName}`,
+        ).toBeGreaterThanOrEqual(3)
+      }
+    }
+  })
+
+  it('prints focus-ring on --bg in contrast_check.py for every Earth scheme', () => {
+    const checker = readFileSync(join(process.cwd(), 'docs/design/earth-theme/contrast_check.py'), 'utf8')
+    expect(checker).toContain('--focus-ring on --bg')
+    const output = execFileSync(
+      'python3',
+      ['docs/design/earth-theme/contrast_check.py', 'docs/design/earth-theme/colors_and_type.css'],
+      { encoding: 'utf8' },
+    )
+    const lines = [...output.matchAll(/--focus-ring on --bg: ([0-9.]+)/g)].map((match) => Number(match[1]))
+    expect(lines).toHaveLength(3)
+    for (const ratio of lines) {
+      expect(ratio).toBeGreaterThanOrEqual(3)
     }
   })
 

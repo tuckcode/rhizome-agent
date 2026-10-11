@@ -43,13 +43,13 @@ Everything not listed keeps its current value or is an alias of something listed
 | `--border-strong` | `#3B3828` | `#C8BDA8` | `#4A3D2C` |
 | `--border-input` | `#75705C` | `#857B66` | `#7E6F59` |
 | `--border-dialog` | `#3B3828` | `#C8BDA8` | `#4A3D2C` |
-| `--border-focus` | `#6FE3A0` | `#2C6A4D` | `#6FE3A0` |
+| `--border-focus` | `var(--accent)` / `var(--accent-blue)` | `var(--accent)` / `var(--accent-blue)` | `var(--accent)` / `var(--accent-blue)` |
 | `--state-hover` | `#1C1D14` | `#EAE3D6` | `#241E15` |
 | `--state-hover-subtle` | `#16170F` | `#EEE9DF` | `#1D1811` |
 | `--state-selected` | `#1A2619` | `#E1E6DA` | `#1F2719` |
 | `--state-selected-strong` | `#1C291B` | `#DCE3D5` | `#212A1A` |
 | `--state-active` | `#1C291B` | `#DCE3D5` | `#212A1A` |
-| `--state-focus-ring` | `#6FE3A0` | `#2C6A4D` | `#6FE3A0` |
+| `--state-focus-ring` | `var(--accent)` / `var(--accent-blue)` | `var(--accent)` / `var(--accent-blue)` | `var(--accent)` / `var(--accent-blue)` |
 | `--state-drag-target` | `rgba(111, 227, 160, 0.18)` | `rgba(44, 106, 77, 0.11)` | `rgba(111, 227, 160, 0.18)` |
 | `--state-disabled` | `#15160F` | `#EEE9DF` | `#1A1610` |
 | `--accent-blue (main accent)` | `#6FE3A0` | `#2C6A4D` | `#6FE3A0` |
