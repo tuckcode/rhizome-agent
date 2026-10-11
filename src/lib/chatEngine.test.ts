@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { chatEngineForSave, chatEngineFromSettings, readChatEngine } from './chatEngine'
+import {
+  chatEngineAllowsSendWithoutPrime,
+  chatEngineForSave,
+  chatEngineFromSettings,
+  readChatEngine,
+} from './chatEngine'
 import { defaultNativeChatTarget, nativeChatTargetOptions, resolveNativeChatTarget } from './nativeChatTargets'
 
 describe('chat engine setting', () => {
@@ -9,6 +14,12 @@ describe('chat engine setting', () => {
     expect(readChatEngine('prime')).toBe('prime')
     expect(chatEngineFromSettings({})).toBe('prime')
     expect(chatEngineForSave('prime')).toBeNull()
+  })
+
+  it('lets native send without a Prime install and keeps Prime-targeted chats gated', () => {
+    expect(chatEngineAllowsSendWithoutPrime('native')).toBe(true)
+    expect(chatEngineAllowsSendWithoutPrime('prime')).toBe(false)
+    expect(chatEngineAllowsSendWithoutPrime(undefined)).toBe(false)
   })
 
   it('persists native and reads it back', () => {

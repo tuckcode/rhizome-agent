@@ -403,6 +403,49 @@ describe('AiPanel', () => {
     expect(screen.getByTestId('agent-input')).toHaveAttribute('aria-placeholder', 'Ask Codex')
   })
 
+  it('lets the native engine send when Prime is not installed', () => {
+    render(
+      <AiPanel
+        onClose={vi.fn()}
+        vaultPath="/tmp/vault"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="missing"
+        defaultAiAgentReady={false}
+        chatEngine="native"
+      />,
+    )
+
+    const input = screen.getByTestId('agent-input')
+    input.textContent = 'hello native'
+    fireEvent.input(input)
+
+    expect(screen.getByTestId('agent-send')).toBeEnabled()
+    expect(screen.queryByText('Prime Agent is not available on this machine')).toBeNull()
+  })
+
+  it('keeps Prime-targeted chat blocked and shows install guidance when Prime is missing', () => {
+    render(
+      <AiPanel
+        onClose={vi.fn()}
+        vaultPath="/tmp/vault"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="missing"
+        defaultAiAgentReady={false}
+      />,
+    )
+
+    expect(screen.getByText('Prime Agent is not available on this machine')).toBeTruthy()
+    expect(screen.getByTestId('agent-input')).toHaveAttribute(
+      'aria-placeholder',
+      'Prime Agent is not installed. Install prime-agent and log in once.',
+    )
+
+    const input = screen.getByTestId('agent-input')
+    input.textContent = 'hello prime'
+    fireEvent.input(input)
+    expect(screen.getByTestId('agent-send')).toBeDisabled()
+  })
+
   it('disables sending while the selected AI agent is still loading', () => {
     render(
       <AiPanel
@@ -792,6 +835,24 @@ describe('talking to a turn that is already running', () => {
    * Composer tests already lock when `onSteer` is omitted. This is the
    * panel gate those tests cannot see: Codex must not receive the handler.
    */
+  it('keeps Stop-only on the native engine even when the default target is Prime', () => {
+    render(
+      <AiPanelView
+        controller={primeController({ isActive: true, input: 'redirect please' })}
+        onClose={vi.fn()}
+        showHeader={false}
+        defaultAiAgent="prime"
+        defaultAiAgentReady
+        chatEngine="native"
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Stop response' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Steer response' })).toBeNull()
+    fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Enter' })
+    expect(sendToRunningTurnMock).not.toHaveBeenCalled()
+  })
+
   it('keeps Stop-only for a non-Prime agent even with typed text', () => {
     render(
       <AiPanelView
@@ -916,6 +977,12 @@ describe('AiPanel Prime permission toggle', () => {
 
   it('hides the Limited tools toggle on Prime — prompt text only', () => {
     expect(aiPanelSource).toContain('hidePermissionMode={isPrimeTarget}')
+  })
+
+  it('does not treat a native-engine chat as a Prime target', () => {
+    expect(aiPanelSource).toContain(
+      "const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime' && chatEngine !== 'native'",
+    )
   })
 })
 

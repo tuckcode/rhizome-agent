@@ -18,6 +18,7 @@ import { trackAiAgentMessageBlocked, trackAiAgentMessageSent, trackAiAgentRespon
 import { streamAiAgent } from '../utils/streamAiAgent'
 import { streamAiModel } from '../utils/streamAiModel'
 import { streamNativeChat } from '../utils/streamNativeChat'
+import { chatEngineAllowsSendWithoutPrime } from './chatEngine'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
 import { hydrateNoteReferences } from '../utils/ai-reference-content'
 import { createTranslator } from './i18n'
@@ -163,7 +164,7 @@ export async function sendAgentMessage({
     return
   }
 
-  if (!context.ready) {
+  if (!context.ready && !chatEngineAllowsSendWithoutPrime(context.chatEngine)) {
     blockUnavailableAgent(runtime, context, normalizedPrompt)
     return
   }
