@@ -13,6 +13,7 @@ import type {
 } from './inlineWikilinkText'
 import type { InlineWikilinkSuggestion } from './inlineWikilinkSuggestions'
 import { cn } from '@/lib/utils'
+import { CHAT_FOCUS_RING_CLASS } from '../lib/chatFocusRing'
 
 function withNativeEvent<T extends Event>(event: T): T & { nativeEvent: T } {
   const eventWithNativeEvent = event as T & { nativeEvent?: T }
@@ -260,7 +261,7 @@ export function InlineWikilinkEditorField({
       {value.length === 0 && placeholder && (
         <div
           className={cn(
-            'pointer-events-none absolute inset-0 text-muted-foreground',
+            'pointer-events-none absolute inset-0 text-[var(--text-muted)]',
             placeholderClassName ?? 'flex items-center',
           )}
           style={placeholderClassName ? undefined : { padding: '8px 10px', fontSize: 13 }}
@@ -276,7 +277,8 @@ export function InlineWikilinkEditorField({
         aria-disabled={disabled ? 'true' : undefined}
         data-testid={dataTestId}
         className={cn(
-          'min-h-[34px] w-full rounded-lg border border-border bg-transparent px-[10px] py-[8px] text-[13px] text-foreground outline-none',
+          'min-h-[34px] w-full rounded-lg border border-border bg-transparent px-[10px] py-[8px] text-[13px] text-foreground',
+          CHAT_FOCUS_RING_CLASS,
           disabled && 'cursor-not-allowed opacity-60',
           editorClassName,
         )}

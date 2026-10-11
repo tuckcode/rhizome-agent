@@ -36,4 +36,31 @@ describe('AiPanelComposer prompt history (C71)', () => {
     fireEvent.keyDown(editor, { key: 'ArrowUp' })
     expect(editor.textContent).toContain('first prompt')
   })
+
+  it('does not store an Enter that is ignored while a turn runs', () => {
+    function ActiveNoSteer() {
+      const [input, setInput] = useState('ignored mid-turn')
+      return (
+        <AiPanelComposer
+          entries={[]}
+          agentLabel="Prime"
+          agentReadiness="ready"
+          input={input}
+          inputRef={{ current: null }}
+          isActive
+          onChange={setInput}
+          onSend={() => setInput('')}
+          onStop={vi.fn()}
+        />
+      )
+    }
+
+    render(<ActiveNoSteer />)
+    const editor = screen.getByTestId('agent-input')
+    fireEvent.keyDown(editor, { key: 'Enter' })
+    expect(editor.textContent ?? '').toBe('')
+
+    fireEvent.keyDown(editor, { key: 'ArrowUp' })
+    expect(editor.textContent ?? '').not.toContain('ignored mid-turn')
+  })
 })

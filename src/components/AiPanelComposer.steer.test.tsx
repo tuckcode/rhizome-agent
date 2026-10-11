@@ -78,13 +78,22 @@ describe('AiPanelComposer steering', () => {
     expect(onStop).not.toHaveBeenCalled()
   })
 
-  /** Agents without steering support must keep the old locked behaviour rather
-   *  than offering an action their backend cannot honour. */
+  /** Agents without steering support keep Stop-only. The composer stays
+   *  focusable so the next message can be drafted during the run (B5 / W1). */
   it('falls back to Stop-only when the agent cannot steer', () => {
     renderComposer({ isActive: true, input: 'redirect please' })
 
     expect(screen.getByRole('button', { name: 'Stop response' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Steer response' })).toBeNull()
+  })
+
+  it('keeps the composer focusable while a turn is running', () => {
+    renderComposer({ isActive: true, input: 'draft the next ask' })
+
+    const editor = screen.getByTestId('agent-input')
+    expect(editor).toHaveAttribute('contenteditable', 'true')
+    expect(editor).not.toHaveAttribute('aria-disabled')
+    expect(editor.className).toMatch(/outline-2/)
   })
 
   it('still sends normally when no turn is running', () => {

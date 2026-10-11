@@ -682,6 +682,7 @@ function ConversationMessage({ userMessage, images, references, locale = 'en', m
       data-testid="ai-message"
       data-no-drag
       style={{ marginBottom: 16 }}
+      aria-busy={isStreaming || undefined}
     >
       <TranscriptHitAnchor
         index={transcriptUserIndex}

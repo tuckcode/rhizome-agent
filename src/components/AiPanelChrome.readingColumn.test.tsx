@@ -1,6 +1,14 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { AiPanelComposer, AiPanelMessageHistory } from './AiPanelChrome'
+
+async function nextFrame() {
+  await act(async () => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve())
+    })
+  })
+}
 
 vi.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: () => ({ startDragging: vi.fn() }),
@@ -28,6 +36,59 @@ describe('chat reading column', () => {
     const column = history.querySelector('.chat-column')
     expect(column).not.toBeNull()
     expect(column?.textContent).toContain('hello')
+  })
+
+  it('keeps the run-status region beside the log, not inside it', () => {
+    Element.prototype.scrollIntoView = vi.fn()
+    render(
+      <AiPanelMessageHistory
+        agentLabel="Prime"
+        agentReadiness="ready"
+        messages={[{ userMessage: 'hi', response: 'hello', actions: [] }]}
+        isActive={false}
+        hasContext={false}
+      />,
+    )
+    const history = screen.getByTestId('ai-panel-message-history')
+    const log = screen.getByRole('log')
+    expect(history).not.toHaveAttribute('role', 'log')
+    expect(log).toHaveAttribute('aria-live', 'off')
+    expect(log).toHaveAttribute('aria-relevant', 'additions')
+    const status = screen.getByTestId('chat-run-live-status')
+    expect(status).toHaveAttribute('role', 'status')
+    expect(status).toHaveTextContent('')
+    expect(log).not.toContainElement(status)
+    expect(history).toContainElement(status)
+    expect(history).toContainElement(log)
+  })
+
+  it('announces a newly started tool in the run-status live region', async () => {
+    Element.prototype.scrollIntoView = vi.fn()
+    const { rerender } = render(
+      <AiPanelMessageHistory
+        agentLabel="Prime"
+        agentReadiness="ready"
+        messages={[{ userMessage: 'hi', actions: [], isStreaming: true }]}
+        isActive
+        hasContext={false}
+      />,
+    )
+    rerender(
+      <AiPanelMessageHistory
+        agentLabel="Prime"
+        agentReadiness="ready"
+        messages={[{
+          userMessage: 'hi',
+          isStreaming: true,
+          actions: [{ tool: 'get_note', toolId: 't1', label: 'get_note', status: 'pending' }],
+        }]}
+        isActive
+        hasContext={false}
+      />,
+    )
+    await nextFrame()
+    await nextFrame()
+    expect(screen.getByTestId('chat-run-live-status')).toHaveTextContent('Running get_note')
   })
 
   it('puts the composer inside the same reading column', () => {

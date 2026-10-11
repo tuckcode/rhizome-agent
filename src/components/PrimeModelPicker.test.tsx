@@ -542,6 +542,17 @@ describe('PrimeModelPicker — allow-list freshness (#45)', () => {
     )
   })
 
+  it('is a keyboard-reachable button that names the current model', () => {
+    render(<PrimeModelPicker label="Grok 4.5" />)
+
+    const chip = screen.getByTestId('prime-model-chip')
+    expect(chip.tagName).toBe('BUTTON')
+    expect(chip).toHaveAttribute('aria-haspopup', 'menu')
+    expect(chip).toHaveAttribute('aria-expanded', 'false')
+    expect(chip).toHaveAccessibleName('Model: Grok 4.5')
+    expect(chip.className).toMatch(/outline-2/)
+  })
+
   it('gives the Edit list a wider menu than the picker', async () => {
     render(<PrimeModelPicker label="Grok 4.5" vaultPath="/v" />)
     open()

@@ -23,7 +23,7 @@ export function ChatComposerFoot({
       <span
         data-testid="chat-composer-foot"
         role="status"
-        className="min-w-0 truncate font-mono text-[12px] tracking-[0.03em] text-destructive"
+        className="min-w-0 truncate font-mono text-[12px] tracking-[0.03em] text-[var(--danger-text,var(--destructive))]"
       >
         {failureReason}
       </span>
