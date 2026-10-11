@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   chatRunSnapshotFromMessages,
+  joinChatRunLines,
   nextChatRunAnnouncement,
   type ChatRunSnapshot,
 } from '../lib/chatRunLiveStatus'
@@ -37,6 +38,7 @@ export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps
     return () => {
       cancelAnimationFrame(clearFrameRef.current)
       cancelAnimationFrame(restoreFrameRef.current)
+      pendingRef.current = null
     }
   }, [])
 
@@ -47,7 +49,7 @@ export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps
     if (!text) return
 
     if (pendingRef.current) {
-      pendingRef.current = `${pendingRef.current} ${text}`
+      pendingRef.current = joinChatRunLines(pendingRef.current, text)
       return
     }
 

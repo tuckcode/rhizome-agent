@@ -23,6 +23,17 @@ interface ChatRunMessage {
 }
 
 /**
+ * Join two live-status lines. A trailing period, question mark, or
+ * exclamation on the first line is kept; otherwise a period is added
+ * so "Running get_note" and "get_note done" do not run together.
+ */
+export function joinChatRunLines(pending: string, next: string): string {
+  const left = pending.trimEnd()
+  const sep = /[.!?]$/.test(left) ? ' ' : '. '
+  return `${left}${sep}${next}`
+}
+
+/**
  * Discrete run-status lines for a polite live region. Token streaming stays
  * off this channel — only tool start/finish, completion, stop, and a
  * non-fatal warning notice.

@@ -101,6 +101,35 @@ describe('ChatRunLiveStatus repeated announcements', () => {
     expect(region).toHaveTextContent(LOG_SAVE_NOTICE)
   })
 
+  it('joins two tool lines that land within two frames with a period', async () => {
+    const { rerender } = render(
+      <ChatRunLiveStatus messages={[{ response: '' }]} isActive />,
+    )
+    rerender(
+      <ChatRunLiveStatus
+        messages={[{
+          response: '',
+          actions: [{ tool: 'get_note', toolId: 't1', status: 'pending' }],
+        }]}
+        isActive
+      />,
+    )
+    rerender(
+      <ChatRunLiveStatus
+        messages={[{
+          response: '',
+          actions: [{ tool: 'get_note', toolId: 't1', status: 'done' }],
+        }]}
+        isActive
+      />,
+    )
+    await nextFrame()
+    await nextFrame()
+    expect(screen.getByTestId('chat-run-live-status')).toHaveTextContent(
+      'Running get_note. get_note done',
+    )
+  })
+
   it('reads a notice then Response complete within two frames as one announcement', async () => {
     const running = [{ userMessage: 'hi', response: 'hello' }]
     const withNotice = [

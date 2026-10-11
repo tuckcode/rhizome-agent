@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   chatRunSnapshotFromMessages,
+  joinChatRunLines,
   nextChatRunAnnouncement,
   type ChatRunSnapshot,
 } from './chatRunLiveStatus'
@@ -104,6 +105,15 @@ describe('chatRunSnapshotFromMessages', () => {
     expect(next.notice).toBe(LOG_SAVE_NOTICE)
     expect(nextChatRunAnnouncement(previous, next)).toBe(LOG_SAVE_NOTICE)
     expect(nextChatRunAnnouncement(next, next)).toBeNull()
+  })
+
+  it('joins appended lines with a period unless one is already there', () => {
+    expect(joinChatRunLines('Running get_note', 'get_note done')).toBe(
+      'Running get_note. get_note done',
+    )
+    expect(joinChatRunLines(LOG_SAVE_NOTICE, 'Response complete')).toBe(
+      `${LOG_SAVE_NOTICE} Response complete`,
+    )
   })
 
   it('returns the notice and the end-of-turn line together in one render', () => {
