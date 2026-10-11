@@ -837,10 +837,7 @@ mod tests {
 
         let scrubbed = scrub_secrets("the key is keychain-catalog-key-value today");
 
-        assert!(
-            !scrubbed.contains("keychain-catalog-key-value"),
-            "{scrubbed}"
-        );
+        assert!(!scrubbed.contains("keychain-catalog-key-value"));
         assert!(scrubbed.contains("[redacted]"));
     }
 
@@ -875,10 +872,7 @@ mod tests {
 
         let scrubbed = scrub_secrets("custom keychain-custom-key-value here");
 
-        assert!(
-            !scrubbed.contains("keychain-custom-key-value"),
-            "{scrubbed}"
-        );
+        assert!(!scrubbed.contains("keychain-custom-key-value"));
     }
 
     #[test]
