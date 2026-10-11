@@ -495,13 +495,10 @@ fn normalize_chat_engine(value: Option<String>) -> Option<String> {
 }
 
 fn normalize_native_chat_target(value: Option<String>) -> Option<String> {
-    let Some(target) = value
+    let target = value
         .as_deref()
         .map(str::trim)
-        .filter(|text| !text.is_empty())
-    else {
-        return None;
-    };
+        .filter(|text| !text.is_empty())?;
     if target.to_ascii_lowercase().starts_with("anthropic/") {
         return None;
     }
