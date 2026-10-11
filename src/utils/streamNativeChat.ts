@@ -39,7 +39,7 @@ export interface StreamNativeChatRequest {
   signal?: AbortSignal
 }
 
-interface NativeEngineEvent {
+export interface NativeEngineEvent {
   kind: string
   text?: string
   message?: string
@@ -49,7 +49,7 @@ interface NativeEngineEvent {
   output?: string
 }
 
-function applyNativeEvent(event: NativeEngineEvent, callbacks: AgentStreamCallbacks): boolean {
+export function applyNativeEvent(event: NativeEngineEvent, callbacks: AgentStreamCallbacks): boolean {
   switch (event.kind) {
     case 'text_delta':
       if (event.text) callbacks.onText(event.text)
@@ -60,9 +60,9 @@ function applyNativeEvent(event: NativeEngineEvent, callbacks: AgentStreamCallba
     case 'tool_result':
       callbacks.onToolDone(event.id ?? '', event.output)
       return false
-      case 'error':
+    case 'error':
       callbacks.onError(nativeChatUserError(event.message ?? 'Native chat failed'))
-      return false
+      return true
     case 'turn_end':
     case 'cancelled':
       return true
