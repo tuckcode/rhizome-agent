@@ -12,7 +12,10 @@ Pass a design token file to keep the old design-file mode:
 
 Prints each text token's ratio on each surface (including hover and
 selected), status text on its tinted fill, input borders, and focus rings.
-Exits non-zero if any pair is below WCAG AA:
+A color the script cannot parse (hsl(), oklch(), color-mix(), an
+unresolved var(), …) is a FAIL that names the theme, token, and raw
+value — it is not skipped. Exits non-zero if any pair is below WCAG AA
+or any checked token is unparseable:
 
   text (normal)          4.5:1
   large text / non-text  3.0:1  (borders, focus rings, dedicated icon tokens)
@@ -87,30 +90,33 @@ def hx(h: str) -> list[int]:
 
 
 def parse(v: str, base: list[int] | None = None) -> list[int] | None:
-    v = v.strip()
-    if v.startswith('#'):
-        body = v.lstrip('#')
-        if len(body) == 8:
-            rgb = hx('#' + body[:6])
-            alpha = int(body[6:8], 16) / 255
-            if alpha >= 1 or base is None:
-                return rgb
-            return [round(rgb[i] * alpha + base[i] * (1 - alpha)) for i in range(3)]
-        if len(body) in (3, 6):
-            return hx(v)
+    try:
+        v = v.strip()
+        if v.startswith('#'):
+            body = v.lstrip('#')
+            if len(body) == 8:
+                rgb = hx('#' + body[:6])
+                alpha = int(body[6:8], 16) / 255
+                if alpha >= 1 or base is None:
+                    return rgb
+                return [round(rgb[i] * alpha + base[i] * (1 - alpha)) for i in range(3)]
+            if len(body) in (3, 6):
+                return hx(v)
+            return None
+        m = re.match(r'rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)', v)
+        if not m:
+            return None
+        r, g, b = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        alpha = float(m.group(4)) if m.group(4) is not None else 1.0
+        if alpha >= 1 or base is None:
+            return [r, g, b]
+        return [
+            round(r * alpha + base[0] * (1 - alpha)),
+            round(g * alpha + base[1] * (1 - alpha)),
+            round(b * alpha + base[2] * (1 - alpha)),
+        ]
+    except (ValueError, TypeError, IndexError):
         return None
-    m = re.match(r'rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)', v)
-    if not m:
-        return None
-    r, g, b = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
-    alpha = float(m.group(4)) if m.group(4) is not None else 1.0
-    if alpha >= 1 or base is None:
-        return [r, g, b]
-    return [
-        round(r * alpha + base[0] * (1 - alpha)),
-        round(g * alpha + base[1] * (1 - alpha)),
-        round(b * alpha + base[2] * (1 - alpha)),
-    ]
 
 
 def lum(c: list[int]) -> float:
@@ -146,13 +152,17 @@ def resolve(tokens: dict[str, str], name: str, seen: set[str] | None = None) -> 
 
 def pick_name(tokens: dict[str, str], names: tuple[str, ...]) -> str | None:
     for name in names:
-        if name in tokens and resolve(tokens, name):
+        if name in tokens and tokens[name].strip():
             return name
     return None
 
 
 def color_of(tokens: dict[str, str], name: str, base: list[int] | None = None) -> list[int] | None:
     return parse(resolve(tokens, name), base)
+
+
+def unparseable_line(theme: str, token: str, raw: str) -> str:
+    return f'FAIL {theme}  {token}  unparseable  {raw}'
 
 
 def is_design_css(text: str) -> bool:
@@ -184,6 +194,21 @@ def fail_line(theme: str, fg: str, bg: str, ratio: float, need: float, kind: str
 def report(tokens: dict[str, str], theme: str, kind: str) -> tuple[list[str], list[str]]:
     rows: list[str] = []
     fails: list[str] = []
+    seen_unparsed: set[tuple[str, str]] = set()
+
+    def require_color(name: str, base: list[int] | None = None) -> list[int] | None:
+        declared = tokens.get(name, '').strip()
+        resolved = resolve(tokens, name)
+        raw = resolved or declared or '(empty)'
+        rgb = parse(resolved, base) if resolved else None
+        if rgb is not None:
+            return rgb
+        key = (name, raw)
+        if key not in seen_unparsed:
+            seen_unparsed.add(key)
+            fails.append(unparseable_line(theme, name, raw))
+        return None
+
     text_names = [name for role in TEXT_ROLES if (name := pick_name(tokens, role))]
     surf_names = [name for role in SURF_ROLES if (name := pick_name(tokens, role))]
     bg_name = pick_name(tokens, ('--surface-app', '--bg'))
@@ -191,18 +216,17 @@ def report(tokens: dict[str, str], theme: str, kind: str) -> tuple[list[str], li
         fails.append(fail_line(theme, '(tokens)', '(scheme)', 0.0, TEXT_MIN, 'missing'))
         return rows, fails
 
-    bg_rgb = color_of(tokens, bg_name)
+    bg_rgb = require_color(bg_name)
     if bg_rgb is None:
-        fails.append(fail_line(theme, '(tokens)', bg_name, 0.0, TEXT_MIN, 'missing'))
         return rows, fails
 
     for text_name in text_names:
-        fg_rgb = color_of(tokens, text_name)
+        fg_rgb = require_color(text_name)
         if fg_rgb is None:
             continue
         ratios = {}
         for surf_name in surf_names:
-            surf_rgb = color_of(tokens, surf_name, bg_rgb)
+            surf_rgb = require_color(surf_name, bg_rgb)
             if surf_rgb is None:
                 continue
             ratios[surf_name] = cr(fg_rgb, surf_rgb)
@@ -223,16 +247,16 @@ def report(tokens: dict[str, str], theme: str, kind: str) -> tuple[list[str], li
         tint_name = pick_name(tokens, tint_aliases)
         if not text_name or not tint_name:
             continue
-        fg_rgb = color_of(tokens, text_name)
+        fg_rgb = require_color(text_name)
         if fg_rgb is None:
             continue
         for surf_name in (bg_name, pick_name(tokens, ('--surface-panel', '--surface')), pick_name(tokens, ('--surface-popover', '--surface-2'))):
             if not surf_name:
                 continue
-            base = color_of(tokens, surf_name, bg_rgb)
+            base = require_color(surf_name, bg_rgb)
             if base is None:
                 continue
-            tint = color_of(tokens, tint_name, base)
+            tint = require_color(tint_name, base)
             if tint is None:
                 continue
             ratio = cr(fg_rgb, tint)
@@ -243,8 +267,8 @@ def report(tokens: dict[str, str], theme: str, kind: str) -> tuple[list[str], li
     ink_name = pick_name(tokens, ('--text-inverse', '--accent-ink'))
     accent_name = pick_name(tokens, ('--accent-blue', '--accent'))
     if ink_name and accent_name:
-        ink = color_of(tokens, ink_name)
-        accent = color_of(tokens, accent_name)
+        ink = require_color(ink_name)
+        accent = require_color(accent_name)
         if ink and accent:
             ratio = cr(ink, accent)
             rows.append(f'  {ink_name} on {accent_name}: {ratio:.2f}')
@@ -254,8 +278,8 @@ def report(tokens: dict[str, str], theme: str, kind: str) -> tuple[list[str], li
     muted_name = pick_name(tokens, ('--text-muted', '--muted'))
     selected_name = pick_name(tokens, ('--state-selected-strong',))
     if muted_name and selected_name:
-        muted = color_of(tokens, muted_name)
-        selected = color_of(tokens, selected_name, bg_rgb)
+        muted = require_color(muted_name)
+        selected = require_color(selected_name, bg_rgb)
         if muted and selected:
             ratio = cr(muted, selected)
             # App CSS uses --text-muted. Keep the design-file probe string
@@ -268,13 +292,13 @@ def report(tokens: dict[str, str], theme: str, kind: str) -> tuple[list[str], li
     hover_name = pick_name(tokens, ('--state-hover',))
     selected_soft = pick_name(tokens, ('--state-selected',))
     for text_name in text_names:
-        fg_rgb = color_of(tokens, text_name)
+        fg_rgb = require_color(text_name)
         if fg_rgb is None:
             continue
         for surf_name in (hover_name, selected_soft, selected_name):
             if not surf_name:
                 continue
-            surf_rgb = color_of(tokens, surf_name, bg_rgb)
+            surf_rgb = require_color(surf_name, bg_rgb)
             if surf_rgb is None:
                 continue
             ratio = cr(fg_rgb, surf_rgb)
@@ -282,7 +306,7 @@ def report(tokens: dict[str, str], theme: str, kind: str) -> tuple[list[str], li
 
     ring_name = pick_name(tokens, ('--state-focus-ring', '--border-focus', '--accent-blue', '--accent'))
     if ring_name:
-        ring = color_of(tokens, ring_name)
+        ring = require_color(ring_name)
         if ring:
             ratio = cr(ring, bg_rgb)
             rows.append(f'  {ring_name} on {bg_name}: {ratio:.2f}')
@@ -290,7 +314,7 @@ def report(tokens: dict[str, str], theme: str, kind: str) -> tuple[list[str], li
             if ratio < NONTEXT_MIN:
                 fails.append(fail_line(theme, ring_name, bg_name, ratio, NONTEXT_MIN, 'non-text'))
             for surf_name in surf_names:
-                surf_rgb = color_of(tokens, surf_name, bg_rgb)
+                surf_rgb = require_color(surf_name, bg_rgb)
                 if surf_rgb is None:
                     continue
                 ratio = cr(ring, surf_rgb)
@@ -299,10 +323,10 @@ def report(tokens: dict[str, str], theme: str, kind: str) -> tuple[list[str], li
 
     border_name = pick_name(tokens, ('--border-input',))
     if border_name:
-        border = color_of(tokens, border_name)
+        border = require_color(border_name)
         if border:
             for surf_name in surf_names:
-                surf_rgb = color_of(tokens, surf_name, bg_rgb)
+                surf_rgb = require_color(surf_name, bg_rgb)
                 if surf_rgb is None:
                     continue
                 ratio = cr(border, surf_rgb)
@@ -313,10 +337,10 @@ def report(tokens: dict[str, str], theme: str, kind: str) -> tuple[list[str], li
 
     icon_name = pick_name(tokens, ICON_ROLES[0])
     if icon_name:
-        icon = color_of(tokens, icon_name)
+        icon = require_color(icon_name)
         if icon:
             for surf_name in surf_names:
-                surf_rgb = color_of(tokens, surf_name, bg_rgb)
+                surf_rgb = require_color(surf_name, bg_rgb)
                 if surf_rgb is None:
                     continue
                 ratio = cr(icon, surf_rgb)

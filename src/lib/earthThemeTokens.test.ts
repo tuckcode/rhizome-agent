@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { CHAT_FOCUS_RING_CLASS } from './chatFocusRing'
@@ -401,6 +402,35 @@ describe('Earth theme tokens', () => {
     for (const line of failLines) {
       expect(line).toMatch(/^FAIL (Earth dark|Earth light|Loam)\s{2}--[\w-]+ on \S+\s{2}[0-9.]+\s{2}\((text|non-text) /)
     }
+  })
+
+  it('fails contrast_check.py when a theme token is unparseable', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'contrast-unparseable-'))
+    const css = join(dir, 'theme.css')
+    writeFileSync(
+      css,
+      [
+        ':root, [data-theme="dark"] {',
+        '  --surface-app: #0F110C;',
+        '  --text-primary: #E9E8DC;',
+        '  --text-muted: oklch(0.55 0.04 120);',
+        '}',
+        '',
+      ].join('\n'),
+    )
+    let output = ''
+    let status = 0
+    try {
+      output = execFileSync('python3', ['scripts/contrast_check.py', css], { encoding: 'utf8' })
+    } catch (error) {
+      const err = error as { stdout?: string; status?: number }
+      output = err.stdout ?? ''
+      status = err.status ?? 1
+    }
+    expect(status).toBe(1)
+    expect(output).toMatch(
+      /FAIL Earth dark {2}--text-muted {2}unparseable {2}oklch\(0\.55 0\.04 120\)/,
+    )
   })
 
   it('keeps Earth light type and syntax accents readable on paper surfaces', () => {

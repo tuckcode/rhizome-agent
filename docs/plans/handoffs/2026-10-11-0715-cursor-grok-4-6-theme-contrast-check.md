@@ -24,12 +24,13 @@ Checker and CI only. No theme CSS, component, or `docs/HANDOFF.md` edits.
    Dedicated `--icon*` tokens would use 3:1; none exist in Earth/Loam.
    Each failing pair prints theme, token names, and ratio.
 4. Shipped Earth dark, Earth light, and Loam have **no failing pairs**
-   on current main, so the new `Theme contrast check` step in
-   `frontend-static-quality` is blocking. #147 is still open for Loam
-   nits; it is not required to flip this gate.
-5. `docs/HANDOFF.md` was 908 lines. The pre-commit shape gate is 900.
-   Nine stale September State origin lines were removed so this commit
-   could land. No new State or Recent line was added here.
+   on current main (after #147), so the new `Theme contrast check` step
+   in `frontend-static-quality` is blocking.
+5. Rebased onto main after #147. `docs/HANDOFF.md` is unchanged on
+   this branch — the note lives only in this file.
+6. Unparseable colors (`hsl()`, `oklch()`, `color-mix()`, unresolved
+   `var()`, …) now FAIL with theme, token, and raw value. They are not
+   skipped. `earthThemeTokens.test.ts` proves an `oklch()` token exits 1.
 
 ## Checks
 
