@@ -110,10 +110,10 @@ An opt-in warmer dark (`data-scheme="loam"`) with rich loam-brown surfaces. Same
 | Secondary text | `--fg-secondary` | `#C6BBA6` | 9.90 / 8.08 |
 | Tertiary text | `--fg-tertiary` | `#B2A791` | 7.90 / 6.45 |
 | Muted | `--muted` | `#A3987F` | 6.58 / 5.37 |
-| Faint | `--muted-2` | `#9A8F78` | 5.88 / 4.80 |
+| Faint | `--muted-2` | `#998D74` | 5.74 / 4.55 |
 | Border | `--border` | `#352C20` | 1.37 (decorative) |
 | Strong border | `--border-strong` | `#4A3D2C` | 1.79 (decorative) |
-| Input / control border | `--border-input` | `#7E6F59` | 3.85 vs bg · 3.14 on surface-3 |
+| Input / control border | `--border-input` | `#8A7A62` | 4.51 vs bg · 3.68 on surface-3 · 3.57 on selected-strong |
 | Accent (mint) | `--accent` | `#6FE3A0` | 11.79 / 9.62 |
 | OK | `--ok` | `#A6D282` | 10.88 / 8.88 |
 | Warn | `--warn` | `#EDB451` | 10.07 / 8.22 |

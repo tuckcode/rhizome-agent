@@ -35,13 +35,13 @@ Everything not listed keeps its current value or is an alias of something listed
 | `--text-secondary` | `#BDBAA8` | `#4E473C` | `#C6BBA6` |
 | `--text-tertiary` | `#A8A592` | `#575043` | `#B2A791` |
 | `--text-muted` | `#999784` | `#625A4D` | `#A3987F` |
-| `--text-faint` | `#8F8D7B` | `#6B6354` | `#9A8F78` |
+| `--text-faint` | `#8F8D7B` | `#6B6354` | `#998D74` |
 | `--text-heading` | `#F4F2E8` | `#1E1A15` | `#F7F1E5` |
 | `--text-inverse` | `#0F110C` | `#F8F5EE` | `#15110C` |
 | `--border-default` | `#2A281D` | `#DDD4C3` | `#352C20` |
 | `--border-subtle` | `#1F1E16` | `#E6DFD1` | `#272017` |
 | `--border-strong` | `#3B3828` | `#C8BDA8` | `#4A3D2C` |
-| `--border-input` | `#75705C` | `#857B66` | `#7E6F59` |
+| `--border-input` | `#75705C` | `#857B66` | `#8A7A62` |
 | `--border-dialog` | `#3B3828` | `#C8BDA8` | `#4A3D2C` |
 | `--border-focus` | `var(--accent)` / `var(--accent-blue)` | `var(--accent)` / `var(--accent-blue)` | `var(--accent)` / `var(--accent-blue)` |
 | `--state-hover` | `#1C1D14` | `#EAE3D6` | `#241E15` |
@@ -82,7 +82,7 @@ Everything not listed keeps its current value or is an alias of something listed
 | `--diff-added-text` | `#2F7D4F` | `#296E46` |
 | `--diff-removed-text` | `#BF4136` | `#AD3B31` |
 
-**In Earth dark and Loam**, only `--syntax-highlight-comment` (`#6E7863`) falls short. Use `#848F77` for Earth dark and `#86917A` for Loam. Re-check the `[data-accent=…]` override blocks in `index.css` the same way.
+**In Earth dark and Loam**, only `--syntax-highlight-comment` (`#6E7863`) falls short. Use `#88917B` for Earth dark and `#86917A` for Loam. Re-check the `[data-accent=…]` override blocks in `index.css` the same way.
 
 `--border-input` already exists in the app (`--input` aliases it), but today it is decorative-strength (`#2A3224` dark, `#CBD2C2` light). The new values are at least 3:1, so inputs, selects, checkboxes and outlined chips become visible without focus.
 
