@@ -5,7 +5,7 @@ Prints, for each scheme, every text token's ratio vs --bg and its worst ratio ac
 tokens, plus status text on its own tinted fill. Exits non-zero if anything is below 4.5:1 or if
 --border-input is below 3:1 on bg/surface/surface-2/surface-3.
 """
-import re,json,sys
+import re,sys
 def hx(h):
     h=h.lstrip('#');return [int(h[i:i+2],16) for i in (0,2,4)]
 def parse(v,base=None):
@@ -44,7 +44,10 @@ def report(t,name):
     if r<4.5: fails.append('accent-ink')
     for nb in ['--border','--border-strong']:
         rows.append((nb+' vs bg (non-text)',t[nb],'',round(cr(hx(t[nb]),hx(t['--bg'])),2),''))
-    print('==',name); [print(r) for r in rows]; print('FAILS',fails)
+    print('==',name)
+    for r in rows:
+        print(r)
+    print('FAILS',fails)
     return rows,fails
 if __name__=='__main__':
     path=sys.argv[1]; bad=0

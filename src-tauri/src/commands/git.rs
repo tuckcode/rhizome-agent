@@ -527,15 +527,18 @@ mod tests {
     #[tokio::test]
     async fn is_git_repo_accepts_vault_nested_inside_parent_worktree() {
         let parent = TempDir::new().unwrap();
-        let _home = crate::app_config::TEST_CONFIG_ENV
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        fs::write(parent.path().join("README.md"), "# Parent\n").unwrap();
-        crate::git::init_repo(parent.path()).unwrap();
+        let nested_vault = {
+            let _home = crate::app_config::TEST_CONFIG_ENV
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            fs::write(parent.path().join("README.md"), "# Parent\n").unwrap();
+            crate::git::init_repo(parent.path()).unwrap();
 
-        let nested_vault = parent.path().join("demo-vault-v2");
-        fs::create_dir_all(&nested_vault).unwrap();
-        fs::write(nested_vault.join("note.md"), "# Nested\n").unwrap();
+            let nested_vault = parent.path().join("demo-vault-v2");
+            fs::create_dir_all(&nested_vault).unwrap();
+            fs::write(nested_vault.join("note.md"), "# Nested\n").unwrap();
+            nested_vault
+        };
 
         assert!(is_git_repo(nested_vault.to_string_lossy().into_owned()).await);
         assert!(!nested_vault.join(".git").exists());

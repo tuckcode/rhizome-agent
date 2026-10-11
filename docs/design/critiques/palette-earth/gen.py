@@ -29,7 +29,8 @@ LIGHT={
 def apply(block,vals):
     for k,v in vals.items():
         block,n=re.subn(r'(\s'+re.escape(k)+r':\s*)[^;]+;',lambda m:m.group(1)+v+';',block)
-        assert n==1,(k,n)
+        if n != 1:
+            raise AssertionError((k, n))
     return block
 i=base.index(':root,'); j=base.index('}',i)+1; k=base.index('\n[data-theme="light"],')+1; l=base.index('}',k)+1
 dark=apply(base[i:j],DARK); light=apply(base[k:l],LIGHT)

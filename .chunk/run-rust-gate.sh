@@ -13,7 +13,7 @@ mkdir -p "$HOME/Documents"
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}"
 
 log_rust 'clippy started'
-cargo clippy --manifest-path=src-tauri/Cargo.toml -- -D warnings
+cargo clippy --manifest-path=src-tauri/Cargo.toml --all-targets -- -D warnings
 log_rust 'clippy passed'
 
 log_rust 'rustfmt started'

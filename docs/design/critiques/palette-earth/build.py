@@ -1,5 +1,5 @@
-import re,json
-from pal import load,hx,cr,parse
+import re
+from pal import load,hx,cr
 cur='/workspace/rhizome-design/rhizome-agent-design-system/colors_and_type.css'; ear='earth-tokens.css'
 import sys
 MODE=sys.argv[1] if len(sys.argv)>1 else 'grid'
