@@ -1,14 +1,14 @@
-# Rhizome Agent
+# Rhizome
 
 [![repowise](https://api.repowise.dev/badge/wiki/tuckcode/rhizome-agent.svg)](https://repowise.dev/repo/tuckcode/rhizome-agent)
 [![Code health](https://api.repowise.dev/badge/health/tuckcode/rhizome-agent.svg)](https://repowise.dev/repo/tuckcode/rhizome-agent)
 
-![Rhizome Agent — Your work. Your memory.](src/assets/brand/rhizome-organic-hero.png)
+![Rhizome mark. Branching nodes over dark earth.](src/assets/brand/rhizome-organic-hero.png)
 
 **A harness that doesn't forget.**
-Built around [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent), with useful tools from Claude Code, Hermes Agent, and DeepSeek. The built-in vault is your memory, wiki, and second brain, beside a research panel. What you save stays as plain Markdown on your disk, where you and the agent can both read it.
+Rhizome runs its own agent loop. Chat works without [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent). Notes stay as plain Markdown in a local vault you own. You read and diff those notes in the app. The agent cannot search the vault or old Mycelium sessions yet.
 
-This is a developer preview. Prime Agent and Node are not bundled. There is no signed download.
+This is a developer preview. There is no signed download. Prime is an optional engine. Hermes is a planned adapter, not a usable engine in the app today.
 
 | | |
 |---|---|
@@ -24,11 +24,11 @@ cd rhizome-agent
 pnpm tauri dev
 ```
 
-`./install.sh` installs this repo and fetches Prime Agent when that program is not already on the machine. Chat needs Prime. The script downloads the command-line tool Prime publishes. There is no smaller copy inside Rhizome.
+`./install.sh` installs this repo and fetches Prime Agent when that program is not already on the machine. Settings still starts Chat on Prime until you switch **Chat engine** to Rhizome's own engine. Native chat does not need Prime. The script still downloads the Prime command-line tool because that default is Prime.
 
 The full list of tools, the first minute in the app, and what to do when it fails: [Getting started](docs/start/README.md).
 
-`prime-agent` stops when that terminal closes. To leave it running:
+`prime-agent` stops when that terminal closes. To leave it running (only if you use the Prime engine):
 
 ```bash
 (prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
@@ -36,17 +36,19 @@ The full list of tools, the first minute in the app, and what to do when it fail
 
 Quit `/Applications/Rhizome Agent.app` before `pnpm tauri dev`. Both use the bundle id `ai.rhizome.agent`, and a second launch attaches to the one already open.
 
-To look at the interface without a live Prime session: `pnpm dev`, then http://localhost:5202.
+To look at the interface without a live engine: `pnpm dev`, then http://localhost:5202.
 
 ### First minute
 
-1. The first launch may ask **Help improve Rhizome**. You can decline. Telemetry stays off until you accept, and a build without a Sentry or PostHog key sends nothing.
-2. Chat opens. The sessions list opens with it on a first launch.
+1. The first launch may ask **Help improve Rhizome**. You can decline. Telemetry stays off until you accept, and a build without a Sentry or PostHog key sends nothing. Earth dark is the default theme. Earth light, Loam, and Match system are in Settings.
+2. Chat opens. The sessions list opens with it on a first launch. The left rail holds sessions, Views (Research, Graph, Mycelium, History), and Settings. Changes sits next to Notes. Views use Ctrl+Cmd+1–4 on Mac and Ctrl+Shift+1–4 on Windows.
 3. Create a local vault, or open a folder you already have.
-4. Send one message. You should get an answer, or a clear failure: Prime is missing, the provider login expired, or the connection dropped.
+4. Send one message. On Rhizome's engine you should get an answer, a notice if a non-fatal error occurred, or a clear failure (no provider key, for example). Prime-targeted chats still need Prime installed.
 5. Show Notes (View menu, or Cmd+2). Save a note, quit, and reopen the same file.
 
-Notes live in the vault folder you opened. Chat transcripts live with Prime, under `~/.prime/agent/sessions/`.
+Notes live in the vault folder you opened. Native chat logs live in the app config folder (`com.rhizome.app/native-sessions`). Prime transcripts live under `~/.prime/agent/sessions/` when you use that engine.
+
+Provider keys live in the system keychain. Do not edit a JSON key file.
 
 If something fails, the longer recovery page is [`docs/PUBLIC-PREVIEW.md`](docs/PUBLIC-PREVIEW.md). Ports and tests are in [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md).
 
@@ -58,14 +60,14 @@ The copy-paste block, and a one-line version, live on their own page: [Agent ins
 
 The full rules for an agent that edits this tree are in [AGENTS.md](AGENTS.md).
 
-Prime Agent runs the chat: session, tools, skills, and provider login. Rhizome reaches the vault through MCP when a vault is attached.
+Rhizome owns the chat loop. Prime is an optional engine. Rhizome reaches the vault through MCP when a vault is attached and Prime is the engine. The native engine can create a note; it cannot search the vault yet.
 
 | | |
 |---|---|
-| Product | Rhizome Agent |
+| Product | Rhizome |
 | Bundle id | `ai.rhizome.agent` |
 | Package | `rhizome-agent` |
-| Chat | Prime Agent, plus tools from Claude Code, Hermes Agent, and DeepSeek |
+| Chat | Rhizome's engine, or Prime if you switch to it |
 | Notes | Plain Markdown, in a local vault you open |
 
 Names and remotes: [`docs/IDENTITY.md`](docs/IDENTITY.md).
@@ -79,6 +81,6 @@ Security reports: [SECURITY.md](SECURITY.md). Do not file a vulnerability as a p
 
 AGPL-3.0-or-later. See [LICENSE](LICENSE).
 
-Rhizome Agent is a modified version of
+Rhizome is a modified version of
 [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi (AGPL-3.0).
 The Mycelium view embeds Mindwalk (MIT) © 2026 Ricko Yu.
