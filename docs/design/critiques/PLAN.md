@@ -28,8 +28,9 @@ Note: the vault, knowledge-graph, tool-log and navigation critiques came from sc
 
 4. **Navigation: scattered tool buttons** (app-navigation/fix-list.md, A-B1)
    - Research, Graph, Mycelium, Changes, History open from 2-6 places each under different names, none has a shortcut.
-   - One "Views" group in the left rail in that fixed order, Option+Cmd+1-5, Cmd+K and the Go menu as the second path.
+   - One "Views" group in the left rail: Research, Graph, Mycelium, History. Ctrl+Cmd+1–4 on Mac and Ctrl+Shift+1–4 on Windows/Linux. Cmd+K and the Go menu as the second path. Changes sits next to Notes in the sidebar.
    - One name per tool; status bar shows status only; composer + menu holds message inputs only.
+   - **First slice (2026-10-11):** Views group on the rail + Go/⌘K/Ctrl+Cmd+1–4 (Mac) / Ctrl+Shift+1–4 (Windows/Linux); leftover primary buttons removed. Still open: A-W8 container unification, A-M1 extra Settings, A-M3 placement-off, A-M4 View-menu re-key.
 
 5. **Agent window design** (agent-window/2026-10-10-design.md, D-B1, D-B2, D-W*)
    - Session list shows the empty state instead of the selected session's transcript.

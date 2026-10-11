@@ -19,7 +19,6 @@ interface SettingsCommandsConfig {
   isGettingStartedHidden?: boolean
   onOpenSettings: () => void
   onOpenFeedback?: () => void
-  onOpenResearch?: () => void
   onOpenVault?: () => void
   onCreateEmptyVault?: () => void
   onRemoveActiveVault?: () => void
@@ -45,9 +44,8 @@ function buildPrimarySettingsCommands({
   locale = 'en',
   onOpenSettings,
   onOpenFeedback,
-  onOpenResearch,
   onCheckForUpdates,
-}: Pick<SettingsCommandsConfig, 'locale' | 'onOpenSettings' | 'onOpenFeedback' | 'onOpenResearch' | 'onCheckForUpdates'>): CommandAction[] {
+}: Pick<SettingsCommandsConfig, 'locale' | 'onOpenSettings' | 'onOpenFeedback' | 'onCheckForUpdates'>): CommandAction[] {
   const t = createTranslator(locale)
   return [
     {
@@ -77,14 +75,6 @@ function buildPrimarySettingsCommands({
         rememberFeedbackDialogOpener(document.activeElement instanceof HTMLElement ? document.activeElement : null)
         onOpenFeedback?.()
       },
-    },
-    {
-      id: 'open-research',
-      label: t('command.openResearch'),
-      group: 'Settings',
-      keywords: commandKeywords(t('command.openResearch.keywords')),
-      enabled: !!onOpenResearch,
-      execute: () => onOpenResearch?.(),
     },
     { id: 'check-updates', label: t('command.checkUpdates'), group: 'Settings', keywords: ['update', 'version', 'upgrade', 'release'], enabled: true, execute: () => onCheckForUpdates?.() },
   ]
@@ -226,13 +216,13 @@ function buildMaintenanceCommands({
 export function buildSettingsCommands(config: SettingsCommandsConfig): CommandAction[] {
   const {
     mcpStatus, vaultCount, isGettingStartedHidden,
-    onOpenSettings, onOpenFeedback, onOpenResearch, onOpenVault, onCreateEmptyVault, onRemoveActiveVault, onRestoreGettingStarted,
+    onOpenSettings, onOpenFeedback, onOpenVault, onCreateEmptyVault, onRemoveActiveVault, onRestoreGettingStarted,
     onCheckForUpdates, onInstallMcp, onReloadVault, onRepairVault, onToggleGitignoredFilesVisibility, onReopenAiOnboarding,
     locale = 'en', systemLocale = locale, selectedUiLanguage = SYSTEM_UI_LANGUAGE, onSetUiLanguage, onSetThemeMode,
   } = config
 
   return [
-    ...buildPrimarySettingsCommands({ locale, onOpenSettings, onOpenFeedback, onOpenResearch, onCheckForUpdates }),
+    ...buildPrimarySettingsCommands({ locale, onOpenSettings, onOpenFeedback, onCheckForUpdates }),
     ...buildThemeCommands({ locale, onSetThemeMode }),
     ...buildLanguageCommands({
       locale,

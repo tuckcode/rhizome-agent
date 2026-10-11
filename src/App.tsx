@@ -8,6 +8,7 @@ import { startResizeDrag } from './utils/startResizeDrag'
 import { COMMAND_RAIL_WIDTH_PX, overlayTitleBarBandStyle, railConsumesExpandedWidth, reportedCommandRailLayoutWidth, subheadTrafficLightInset } from './utils/trafficLights'
 import { Sidebar } from './components/Sidebar'
 import { CommandRail } from './components/CommandRail'
+import type { RailViewId } from './lib/railViews'
 import { NoteList } from './components/NoteList'
 import {
   VaultPanel,
@@ -577,8 +578,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     }
     handleSetSelection({ kind: 'filter', filter: 'research' })
   }, [handleRailSelectChat, handleSetSelection, isResearchDestination])
-  // Graph and Mycelium live under Notes on the Changes tab only. Inbox
-  // keeps the full notes list. Classic shell still uses the old toggle.
+  // Graph, Mycelium, and Research are rail View destinations (full-page
+  // canvas). Contextual "Show in Graph / Mycelium" still uses Connections.
   const connectionsPanelRef = useRef<ConnectionsPanelHandle>(null)
   const connectionsRequestSeq = useRef(0)
   const [connectionsRequest, setConnectionsRequest] = useState<ConnectionsViewRequest | null>(null)
@@ -594,6 +595,42 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const handleRailSelectChanges = useCallback(() => {
     handleSetSelection({ kind: 'filter', filter: 'changes' })
   }, [handleSetSelection])
+  const handleRailSelectHistory = useCallback(() => {
+    handleSetSelection({ kind: 'filter', filter: 'pulse' })
+  }, [handleSetSelection])
+  const handleRailSelectMycelium = useCallback(() => {
+    handleSetSelection({ kind: 'filter', filter: 'mycelium' })
+  }, [handleSetSelection])
+  const handleSelectRailView = useCallback((view: RailViewId) => {
+    if (view === 'research') {
+      handleRailSelectResearch()
+      return
+    }
+    if (view === 'graph') {
+      handleSetSelection({ kind: 'filter', filter: 'graph' })
+      return
+    }
+    if (view === 'mycelium') {
+      handleRailSelectMycelium()
+      return
+    }
+    handleRailSelectHistory()
+  }, [
+    handleRailSelectHistory,
+    handleRailSelectMycelium,
+    handleRailSelectResearch,
+    handleSetSelection,
+  ])
+  const activeRailView: RailViewId | null =
+    isResearchDestination
+      ? 'research'
+      : isGraphDestination
+        ? 'graph'
+        : isMyceliumDestination
+          ? 'mycelium'
+          : effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse'
+            ? 'history'
+            : null
 
   const handleOpenVaultSettings = useCallback(() => {
     setSettingsInitialSectionId(SETTINGS_SECTION_IDS.workspaces)
@@ -1777,7 +1814,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     redoLabel: notes.redoLabel,
     onOpenSettings: handleOpenSettings,
     onOpenFeedback: openFeedback,
-    onOpenResearch: handleRailSelectResearch,
     onDeleteNote: deleteActions.handleDeleteNote,
     onArchiveNote: entryActions.handleArchiveNote, onUnarchiveNote: entryActions.handleUnarchiveNote,
     onCommitPush: handleCommitPush,
@@ -1999,7 +2035,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   }
 
   const sidebarSurface = (unified: boolean) => (
-    <Sidebar entries={visibleEntries} isWikiVault={isWikiVault} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={unified ? handleVaultTreeSelect : handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onUpdateViewDefinition={handleSidebarUpdateViewDefinition} onReorderViews={canReorderSavedViews ? viewOrdering.onReorderViews : undefined} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} allNotesFileVisibility={allNotesFileVisibility} pluralizeTypeLabels={settings.sidebar_type_pluralization_enabled ?? true} dock={sidebarDock} showTitleBar={!unified} onCollapse={unified ? undefined : handleCollapseSidebar} onGoBack={handleGoBack} onGoForward={handleGoForward} canGoBack={canGoBack} canGoForward={canGoForward} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} workspaceOrder={vaultWorkspaceOrder} />
+    <Sidebar entries={visibleEntries} isWikiVault={isWikiVault} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={unified ? handleVaultTreeSelect : handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onUpdateViewDefinition={handleSidebarUpdateViewDefinition} onReorderViews={canReorderSavedViews ? viewOrdering.onReorderViews : undefined} showInbox={explicitOrganizationEnabled} inboxCount={inboxCount} changeCount={gitModifiedCount} allNotesFileVisibility={allNotesFileVisibility} pluralizeTypeLabels={settings.sidebar_type_pluralization_enabled ?? true} dock={sidebarDock} showTitleBar={!unified} onCollapse={unified ? undefined : handleCollapseSidebar} onGoBack={handleGoBack} onGoForward={handleGoForward} canGoBack={canGoBack} canGoForward={canGoForward} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} workspaceOrder={vaultWorkspaceOrder} />
   )
 
   const noteListSurface = effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse' ? (
@@ -2138,6 +2174,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               width={chatCentered ? paneWidths.rail : undefined}
               onWidthChange={chatCentered ? delta => resizeColumn('rail', delta) : undefined}
               onOpenSettings={handleOpenSettings}
+              onSelectView={handleSelectRailView}
+              activeView={activeRailView}
               onSessionsSlotReady={setSessionRailSlot}
             />
           )}
@@ -2412,7 +2450,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         </div>
         <UpdateBanner status={updateStatus} actions={updateActions} locale={appLocale} />
         <RenameDetectedBanner renames={detectedRenames} onUpdate={handleUpdateWikilinks} onDismiss={handleDismissRenames} />
-        <StatusBar noteCount={visibleEntries.length} modifiedCount={gitModifiedCount} vaultPath={resolvedPath} defaultWorkspacePath={defaultWorkspacePath} vaults={vaultSwitcher.allVaults} multiWorkspaceEnabled={multiWorkspaceEnabled} onSwitchVault={vaultSwitcher.switchVault} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onOpenSettings={handleOpenSettings} onOpenVaultSettings={handleOpenVaultSettings} onOpenResearch={handleRailSelectResearch} onOpenLocalFolder={vaultSwitcher.handleOpenLocalFolder} onCreateEmptyVault={vaultSwitcher.handleCreateEmptyVault} onCloneVault={dialogs.openCloneVault} onCloneGettingStarted={cloneGettingStartedVault} onClickPending={() => handleSetSelection({ kind: 'filter', filter: 'changes' })} onClickPulse={() => handleSetSelection({ kind: 'filter', filter: 'pulse' })} onClickGraph={handleRailSelectGraph} onCommitPush={handleCommitPush} commitActionPending={commitFlow.isOpeningCommitDialog} gitFeaturesEnabled={gitFeaturesEnabled} onInitializeGit={openGitSetupDialog} isOffline={networkStatus.isOffline} isGitVault={isGitVault} isVaultReloading={vault.isReloading || isVaultContentLoading} syncStatus={autoSync.syncStatus} lastSyncTime={autoSync.lastSyncTime} conflictCount={autoSync.conflictFiles.length} remoteStatus={autoSync.remoteStatus} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.syncRepositoryPath} onRepositoryChange={gitSurfaces.setSyncRepositoryPath} onTriggerSync={handlePullSelectedRepository} onPullAndPush={handlePullAndPushSelectedRepository} onOpenConflictResolver={conflictFlow.handleOpenConflictResolver} zoomLevel={zoom.zoomLevel} themeMode={documentThemeMode} onZoomReset={zoom.zoomReset} onToggleThemeMode={settingsLoaded ? handleToggleThemeMode : undefined} buildNumber={buildNumber} onCheckForUpdates={handleCheckForUpdates} versionUpdateIndicator={versionUpdateIndicator} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} mcpStatus={mcpSetupDialog.status} onInstallMcp={mcpSetupDialog.openDialog} commandRailActive={commandRailEnabled} locale={appLocale} />
+        <StatusBar noteCount={visibleEntries.length} modifiedCount={gitModifiedCount} vaultPath={resolvedPath} defaultWorkspacePath={defaultWorkspacePath} vaults={vaultSwitcher.allVaults} multiWorkspaceEnabled={multiWorkspaceEnabled} onSwitchVault={vaultSwitcher.switchVault} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onOpenSettings={handleOpenSettings} onOpenVaultSettings={handleOpenVaultSettings} onOpenResearch={handleRailSelectResearch} onOpenLocalFolder={vaultSwitcher.handleOpenLocalFolder} onCreateEmptyVault={vaultSwitcher.handleCreateEmptyVault} onCloneVault={dialogs.openCloneVault} onCloneGettingStarted={cloneGettingStartedVault} onClickPending={() => handleSetSelection({ kind: 'filter', filter: 'changes' })} onClickPulse={() => handleSetSelection({ kind: 'filter', filter: 'pulse' })} onClickGraph={handleRailSelectGraph} onClickMycelium={handleRailSelectMycelium} onCommitPush={handleCommitPush} commitActionPending={commitFlow.isOpeningCommitDialog} gitFeaturesEnabled={gitFeaturesEnabled} onInitializeGit={openGitSetupDialog} isOffline={networkStatus.isOffline} isGitVault={isGitVault} isVaultReloading={vault.isReloading || isVaultContentLoading} syncStatus={autoSync.syncStatus} lastSyncTime={autoSync.lastSyncTime} conflictCount={autoSync.conflictFiles.length} remoteStatus={autoSync.remoteStatus} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.syncRepositoryPath} onRepositoryChange={gitSurfaces.setSyncRepositoryPath} onTriggerSync={handlePullSelectedRepository} onPullAndPush={handlePullAndPushSelectedRepository} onOpenConflictResolver={conflictFlow.handleOpenConflictResolver} zoomLevel={zoom.zoomLevel} themeMode={documentThemeMode} onZoomReset={zoom.zoomReset} onToggleThemeMode={settingsLoaded ? handleToggleThemeMode : undefined} buildNumber={buildNumber} onCheckForUpdates={handleCheckForUpdates} versionUpdateIndicator={versionUpdateIndicator} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} mcpStatus={mcpSetupDialog.status} onInstallMcp={mcpSetupDialog.openDialog} commandRailActive={commandRailEnabled} locale={appLocale} />
         <GitSetupDialog open={gitFeaturesEnabled && shouldShowGitSetupDialog} onInitGit={handleInitGitRepo} onDismiss={dismissGitSetupDialog} onNeverForVault={neverForVaultGitSetupDialog} />
         <DeleteProgressNotice count={deleteActions.pendingDeleteCount} />
         <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />

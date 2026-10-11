@@ -374,6 +374,10 @@ export function trackSessionsDrawerOpened(): void {
   trackEvent('sessions_drawer_opened')
 }
 
+export function trackRailViewSelected(view: 'research' | 'graph' | 'mycelium' | 'history'): void {
+  trackEvent('rail_view_selected', { view })
+}
+
 /** Focused window: the user switched between the Chat and Notes tabs. */
 export function trackFocusedPaneSwitched(pane: 'chat' | 'note'): void {
   trackEvent('focused_pane_switched', { pane })

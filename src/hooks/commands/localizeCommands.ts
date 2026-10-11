@@ -9,7 +9,7 @@ const GROUP_LABEL_KEYS = {
   Git: 'command.group.git',
   View: 'command.group.view',
   Settings: 'command.group.settings',
-} satisfies Record<CommandGroup, TranslationKey>
+} satisfies Partial<Record<CommandGroup, TranslationKey>>
 
 const STATIC_LABEL_KEYS: Partial<Record<string, TranslationKey>> = {
   'search-notes': 'command.navigation.searchNotes',
@@ -210,7 +210,9 @@ function localizeTypeCommand(command: CommandAction, t: Translate): string | nul
 }
 
 export function localizeCommandGroup(group: CommandGroup, locale: AppLocale = 'en'): string {
-  return createTranslator(locale)(Reflect.get(GROUP_LABEL_KEYS, group) as keyof ReturnType<typeof createTranslator> extends never ? never : Parameters<ReturnType<typeof createTranslator>>[0])
+  if (group === 'Views') return 'Views'
+  const key = Reflect.get(GROUP_LABEL_KEYS, group) as TranslationKey | undefined
+  return key ? createTranslator(locale)(key) : group
 }
 
 export function localizeCommandActions(commands: CommandAction[], locale: AppLocale = 'en'): CommandAction[] {

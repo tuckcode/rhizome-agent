@@ -227,18 +227,18 @@ describe('parked organs leftover', () => {
     expect(breadcrumb).toContain('testId="breadcrumb-close-note"')
   })
 
-  it('keeps Research off the command rail and reachable from the status bar', () => {
+  it('keeps Research in the command-rail Views group', () => {
     const rail = readFileSync(
       `${process.cwd()}/src/components/CommandRail.tsx`,
       'utf8',
     )
-    expect(rail).not.toContain("label={t('rail.research')}")
-    expect(rail).not.toContain('testId="command-rail-research"')
+    expect(rail).toContain('command-rail-views')
+    expect(rail).toContain('testId={view.testId}')
     const status = readFileSync(
       `${process.cwd()}/src/components/status-bar/StatusBarSections.tsx`,
       'utf8',
     )
-    expect(status).toContain('testId="status-research"')
+    expect(status).toContain('!commandRailActive && onOpenResearch')
   })
 
   it('keeps Chat on Prime when Settings default is an API model', () => {
@@ -807,7 +807,7 @@ describe('parked organs leftover', () => {
     expect(rail).not.toContain("label={t('rail.notes')}")
     expect(rail).not.toContain("label={t('rail.inbox')}")
     expect(keys).toContain("if (event.key !== 'Enter' || event.shiftKey) return false")
-    expect(menu).toContain("label: 'View in Mycelium'")
+    expect(menu).toContain("label: 'Show in Mycelium'")
     expect(menu).toContain("label: 'Archive'")
     expect(rust).toContain('fn release_helpers_for_hidden_window')
   })
@@ -905,7 +905,8 @@ describe('parked organs leftover', () => {
     expect(app).toContain('const chatHomeSurface = (')
     expect(app).toContain('<ChatHome')
     expect(rail).not.toContain('command-rail-inbox')
-    expect(rail).not.toContain('command-rail-changes')
+    expect(rail).toContain('command-rail-views')
+    expect(rail).toContain('testId={view.testId}')
   })
 
   it('keeps #41 steer wired, hide-spawned daemon, and no Connections edge strip', () => {
@@ -1069,7 +1070,8 @@ describe('parked organs leftover', () => {
     expect(rail).toContain('<span className="ml-auto">{settingsButton}</span>')
     expect(rail).toContain('data-testid="command-rail-footer"')
     expect(rail).toContain('const overlaying = false')
-    expect(rail).toContain('Sessions are the rail. Destinations like Research live elsewhere.')
+    expect(rail).toContain('The Views group is the home')
+    expect(rail).toContain('Sessions fill the open middle. Views stay visible in both rail widths.')
   })
 
   it('falls unnamed session logs back to Untitled session', () => {

@@ -3,9 +3,8 @@
  * failure. The old spec skipped the click when `count()` was 0 and then
  * audited Chat again, so a gone control still passed (#122).
  *
- * Changes is not here. It was removed from the command rail on purpose
- * (`command-rail-changes` leftover). The Notes sidebar still has a Changes
- * filter; that is not a top-level screen. Do not put a rail button back.
+ * Research opens from the command-rail Views group. Changes and History
+ * live there too; the Notes sidebar keeps Inbox / All notes / Archive.
  */
 
 export type UiAuditScreen = {
@@ -22,7 +21,7 @@ export const UI_AUDIT_SCREENS: readonly UiAuditScreen[] = [
   { name: 'chat', destinationTestId: 'chat-center' },
   {
     name: 'research',
-    openerTestId: 'status-research',
+    openerTestId: 'command-rail-research',
     chrome: 'research',
     destinationTestId: 'research-destination',
   },

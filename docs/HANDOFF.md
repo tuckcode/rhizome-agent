@@ -47,10 +47,11 @@ file.
 ---
 
 ## State
+**Origin:** Cursor Grok 4.6 · 2026-10-11 · PLAN item 4 + #143: Views = Research/Graph/Mycelium/History; Changes next to Notes in the sidebar; Mac Ctrl+Cmd+1–4 / Win+Linux Ctrl+Shift+1–4 (no CmdOrCtrl+Alt). A-W8 / A-M1 / A-M3 / A-M4 still open. [First](plans/handoffs/2026-10-11-0455-cursor-grok-4-6-navigation-grouping.md). [Review](plans/handoffs/2026-10-11-0516-cursor-grok-4-6-navigation-review.md). [Shortcuts](plans/handoffs/2026-10-11-0545-cursor-grok-4-6-navigation-shortcuts.md). [Changes](plans/handoffs/2026-10-11-0555-cursor-grok-4-6-navigation-changes.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · #142 review: status beside log, Stop-before-reply, re-announce identical lines; pending frames survive streamed re-renders. #143 also touches `AiPanelChrome.tsx`. [Handoff](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md) · [Handoff](plans/handoffs/2026-10-11-0526-cursor-grok-4-6-chat-a11y-reread.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · Native Chat engine can send when Prime is not installed. Prime-targeted chats still show install guidance. [Handoff](plans/handoffs/2026-10-11-0520-cursor-grok-4-6-native-send-without-prime.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · Earth theme: Earth dark/light in `index.css`, Loam in the generator. Stacked on a11y B1–B5. [Handoff](plans/handoffs/2026-10-11-0505-cursor-grok-4-6-earth-theme.md).
-**Origin:** Cursor Grok 4.6 · 2026-10-11 · #142 review: status beside log, Stop-before-reply, re-announce identical lines. On `cursor/a11y-chat-b1-b5-8b31`. #143 also touches `AiPanelChrome.tsx`. [Handoff](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md).
+**Origin:** Cursor Grok 4.6 · 2026-10-11 · #142 review: status beside log, Stop-before-reply, re-announce identical lines. Merged via #142. [Handoff](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-11 · Chat a11y B1–B5: live run status, contrast tokens, model chip, composer stays focusable. On `cursor/a11y-chat-b1-b5-8b31`. [Handoff](plans/handoffs/2026-10-11-0440-cursor-grok-4-6-chat-a11y-b1-b5.md).
 **Origin:** Cursor Grok 4.6 · 2026-10-10 · Plan Phase 3 is the plugin seam (still skipped). #101's "phase 3" is loop Model trait, on main. Plan Phase 5 is done (#107, closes #104). Phase 4b is ADR-0182 + Claude #108. [Plan](plans/2026-10-09-rhizome-harness-plan.md) §4. [Handoff](plans/handoffs/2026-10-10-1530-cursor-grok-4-6-phase-names.md).
 **Origin:** Cursor Grok 4.7 · 2026-10-10 · Phase 2 Rhizome loop: tools, Limited tools vs Power User, cancel reset. Chat stays on Prime. Not installed. [Handoff](plans/handoffs/2026-10-10-0135-cursor-grok-4-7-harness-phase-2.md).
@@ -87,8 +88,10 @@ Recap: [`2026-09-20-1228`](plans/handoffs/2026-09-20-1228-cursor-grok-4-6-astra-
 Detail: [`2026-09-20-0438`](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md).
 Install/claims: [`GETTING-STARTED.md`](GETTING-STARTED.md) § Public preview. Inventory: [`plans/2026-09-20-public-readiness-inventory.md`](plans/2026-09-20-public-readiness-inventory.md).
 Notes is a right panel from **Show Notes** (or View / Cmd+2), not a left-rail
-button. Left rail is **sessions + Settings** (Chat/Research destinations
-removed; Research stays on the status bar). ADR-0173: Chat / Notes /
+button. Left rail is **sessions + Views + Settings**. Views (Research, Graph,
+Mycelium, History) sit on the rail with Ctrl+Cmd+1–4 on Mac and Ctrl+Shift+1–4
+on Windows/Linux; Changes sits next to All Notes in the sidebar. Go and ⌘K are the
+second path. Classic shell still shows Graph, Mycelium, and Research on the status bar. ADR-0173: Chat / Notes /
 Read / Workbench; fresh launch is Chat. Vault skill uses a resolved Node binary
 and a GUI-safe PATH. Traffic lights sit in a 32px `MacOSTitlebar` (`x: 14`, `y: 9`). Import
 waits for **`1`**. Drafts **#66–#68** are closed. Native W4 / #46 still open. Windows ship
@@ -138,10 +141,12 @@ No rebuild or issue closure occurred.
 Per-session files live in `docs/plans/handoffs/`. Newest by filename.
 Do not paste leftover paper here.
 
+- [2026-10-11 · #143 Changes](plans/handoffs/2026-10-11-0555-cursor-grok-4-6-navigation-changes.md) — Changes next to Notes in the sidebar. Views are four: Ctrl+Cmd/Ctrl+Shift+1–4.
+- [2026-10-11 · navigation grouping](plans/handoffs/2026-10-11-0455-cursor-grok-4-6-navigation-grouping.md) — PLAN item 4 first slice: Views group on the rail, Ctrl+Cmd+1–4 / Ctrl+Shift+1–4, Go + ⌘K. A-W8 / A-M3 / A-M4 deferred.
 - [2026-10-11 · #142 reread](plans/handoffs/2026-10-11-0526-cursor-grok-4-6-chat-a11y-reread.md) — pending status frames survive streamed re-renders. [Review](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md) — status beside log, Stop-before-reply, re-announce identical lines. #143 also touches AiPanelChrome.
 - [2026-10-11 · native send without Prime](plans/handoffs/2026-10-11-0520-cursor-grok-4-6-native-send-without-prime.md) — Native engine can send when Prime is missing. Prime-targeted chats still show install guidance.
 - [2026-10-11 · Earth theme](plans/handoffs/2026-10-11-0505-cursor-grok-4-6-earth-theme.md) — Earth dark/light default contract, Loam extra, `--border-input` at 3:1. Stacked on a11y B1–B5.
-- [2026-10-11 · #142 review](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md) — status beside log, Stop-before-reply, re-announce identical lines. #143 also touches AiPanelChrome.
+- [2026-10-11 · #142 review](plans/handoffs/2026-10-11-0510-cursor-grok-4-6-chat-a11y-review.md) — status beside log, Stop-before-reply, re-announce identical lines. Merged via #142.
 - [2026-10-11 · chat a11y B1–B5](plans/handoffs/2026-10-11-0440-cursor-grok-4-6-chat-a11y-b1-b5.md) — live run status, muted/faint contrast, status text tokens, model chip, composer stays focusable.
 - [2026-10-10 · phase names](plans/handoffs/2026-10-10-1530-cursor-grok-4-6-phase-names.md) — Plan Phase 3 = plugin seam (skipped). #101 "phase 3" = loop Model trait. Phase 5 done (#107; [0945](plans/handoffs/2026-10-10-0945-cursor-grok-4-6-harness-phase-5.md)). Phase 4b = ADR-0182 + #108.
 - [2026-10-10 · phase 2 tools](plans/handoffs/2026-10-10-0135-cursor-grok-4-7-harness-phase-2.md) — loop tools, Limited tools vs Power User, cancel reset. Chat stays on Prime.
@@ -156,18 +161,6 @@ Do not paste leftover paper here.
 - [2026-10-05 · Hermes ACP](plans/handoffs/2026-10-05-2005-cursor-grok-4-6-hermes-acp.md) — generic ACP client; Hermes one-shot is fallback. Fixture only.
 - [2026-10-09 · ADR-0180](plans/handoffs/2026-10-09-2239-cursor-grok-4-6-adr-0180-own-harness.md) — #40 reversed: Rhizome is its own harness. Docs only.
 - [2026-10-05 · dead links](plans/handoffs/2026-10-05-0440-cursor-grok-4-6-dead-links.md) — ARCHITECTURE.md and HANDOFF.md path drift only. No code.
-- [2026-10-05 · #23 open hit](plans/handoffs/2026-10-05-0325-cursor-grok-4-6-issue-23-open-hit.md) — search hit opens the session at `messageIndex`. On-disk index and real-log dogfood remain.
-- [2026-10-05 · #57 ghost-compat](plans/handoffs/2026-10-05-0320-cursor-grok-4-6-issue-57-is-a-open.md) — `is_a:` rewrite now runs on `list_vault` / `reload_vault`; leftover file is on Atticus's machine.
-- [2026-10-04 · Vault memory MCP](plans/handoffs/2026-10-04-1548-claude-opus-5-5-vault-memory-mcp.md) — one listing per vault, MCP server instructions, distill SKIP; merged `bf22be8`, not pushed.
-- [2026-10-04 · Split handoffs](plans/handoffs/2026-10-04-1423-astra-audit-continuation.md) — Astra owns audit completion and independent review. [Cursor assignment](plans/handoffs/2026-10-04-1422-astra-cursor-implementation.md) covers bounded fixes. No product edits started.
-- [2026-10-03 · Windows pipe freeze](plans/handoffs/2026-10-03-1015-claude-opus-5-5-windows-pipe-freeze.md) — freeze fixed, test target compiles, File > Exit; C83–C85 opened; not pushed.
-- [2026-10-03 · Nous catalog fields](plans/handoffs/2026-10-03-0942-cursor-grok-4-7-nous-catalog-fields.md) — Add to Chat list copies reasoning and input modalities from each Nous record. Name guesses are gone. Not in the installed app.
-- [2026-10-03 · Nous catalog and stall sample](plans/handoffs/2026-10-03-0921-cursor-grok-4-7-nous-catalog-handy.md) — stall sampled; shell waits, skills, lights, and image bubble are uncommitted. Nous already sends reasoning and image modalities. No automatic model refresh.
-- [2026-10-02 · stall and empty reply](plans/handoffs/2026-10-02-1649-cursor-grok-4-7-stall-and-empty-reply.md) — run the stall sample, then the empty chat line. #26 closed: Update now installs Prime.
-- [2026-09-27 · BlockNote 0.55 + cleanup](plans/handoffs/2026-09-27-0951-claude-opus-5-5-blocknote-055-and-cleanup.md) — BlockNote 0.55/tiptap 3.31.3 with patches ported; Dependabot, C80/C82, stranded files pushed; native QA not done; swarm plan written.
-- [2026-09-26 · animated splash](plans/handoffs/2026-09-26-0818-gpt-6-splash-logo.md) — shaded mark grows two branches, then breathes. Dither artwork and original Codex chat located. Source only.
-- [2026-09-26 · macOS title bar](plans/handoffs/2026-09-26-0635-cursor-grok-4-7-macos-titlebar.md) — 32px MacOSTitlebar, y=9, Command Palette docked; packaged app not checked.
-- [2026-09-26 · Astra redesign](plans/handoffs/2026-09-26-0425-claude-opus-5-5-astra-redesign.md) — redesign + login-note skip + list markers pushed as `d0a55f8`; app rebuilt; native QA not done.
 - Older sessions: search `docs/plans/handoffs/` by date, or the [archive](plans/handoffs/archive-through-2026-08-20.md).
 
 ## ⛔ Standing rule correction — pushing (2026-08-15)

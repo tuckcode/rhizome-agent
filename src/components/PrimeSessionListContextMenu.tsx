@@ -5,14 +5,12 @@ import {
   CirclesThree,
   ClipboardText,
   PencilSimple,
-  ShareNetwork,
   ChatTeardropText,
   type Icon,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { getContextMenuPositionStyle } from './contextMenuPosition'
 import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
-import { dispatchNotesChrome } from '../lib/notesChrome'
 
 export type PrimeSessionContextMenuState = {
   x: number
@@ -89,18 +87,11 @@ function buildItems({
   if (onOpenMycelium) {
     items.push({
       icon: CirclesThree,
-      label: 'View in Mycelium',
+      label: 'Show in Mycelium',
       testId: 'prime-session-ctx-mycelium',
       onSelect: () => selectAction(() => onOpenMycelium(session.path)),
     })
   }
-
-  items.push({
-    icon: ShareNetwork,
-    label: 'Node map',
-    testId: 'prime-session-ctx-node-map',
-    onSelect: () => selectAction(() => dispatchNotesChrome('graph')),
-  })
 
   items.push({
     icon: ClipboardText,

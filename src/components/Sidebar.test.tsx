@@ -294,7 +294,8 @@ describe('Sidebar', () => {
 
   it('does not render Pulse or Commit in sidebar', () => {
     render(<Sidebar entries={[]} selection={defaultSelection} onSelect={() => {}} />)
-    expect(screen.getByText('Changes')).toBeInTheDocument()
+    expect(screen.getByText('All Notes')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Changes' })).toBeInTheDocument()
     expect(screen.queryByText('Pulse')).not.toBeInTheDocument()
     expect(screen.queryByText('Commit & Push')).not.toBeInTheDocument()
   })
@@ -1007,6 +1008,15 @@ describe('Sidebar', () => {
     expect(items[3].textContent).toContain('Archive')
   })
 
+  it('puts the Changes count in the accessible name next to All Notes', () => {
+    const onSelect = vi.fn()
+    render(<Sidebar entries={[]} selection={defaultSelection} onSelect={onSelect} changeCount={4} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Changes, 4' }))
+    expect(onSelect).toHaveBeenCalledWith({ kind: 'filter', filter: 'changes' })
+    expect(screen.getByTestId('sidebar-top-nav').children[2].textContent).toMatch(/Changes/)
+    expect(screen.getByTestId('sidebar-top-nav').children[2].textContent).toMatch(/4/)
+  })
+
   it('displays inbox count badge', () => {
     render(<Sidebar entries={[]} selection={defaultSelection} onSelect={() => {}} inboxCount={12} />)
     expect(screen.getByText('12')).toBeInTheDocument()
@@ -1022,7 +1032,7 @@ describe('Sidebar', () => {
   it('calls onSelect with changes filter when clicking Changes', () => {
     const onSelect = vi.fn()
     render(<Sidebar entries={[]} selection={defaultSelection} onSelect={onSelect} />)
-    fireEvent.click(screen.getByText('Changes'))
+    fireEvent.click(screen.getByRole('button', { name: 'Changes' }))
     expect(onSelect).toHaveBeenCalledWith({ kind: 'filter', filter: 'changes' })
   })
 
@@ -1032,6 +1042,7 @@ describe('Sidebar', () => {
     const topNav = screen.getByTestId('sidebar-top-nav')
     expect(topNav.children[0].textContent).toContain('All Notes')
     expect(topNav.children[1].textContent).toContain('Changes')
+    expect(topNav.children[2].textContent).toContain('Archive')
   })
 
   it('excludes attachments-folder markdown from top-nav note totals', () => {

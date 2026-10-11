@@ -151,22 +151,26 @@ function NavItemCount({
   className,
   style,
   compact,
+  decorative,
 }: {
   count?: number
   countLoading?: boolean
   className?: string
   style?: React.CSSProperties
   compact?: boolean
+  decorative?: boolean
 }) {
   if (countLoading) return <SidebarLoadingCountPill compact={compact} />
   if (!hasSidebarCount(count)) return null
   return (
-    <SidebarCountPill
-      count={count}
-      className={className}
-      style={style}
-      compact={compact}
-    />
+    <span aria-hidden={decorative ? true : undefined}>
+      <SidebarCountPill
+        count={count}
+        className={className}
+        style={style}
+        compact={compact}
+      />
+    </span>
   )
 }
 
@@ -208,6 +212,7 @@ function ClickableNavItem({
   onClick,
   compact,
   padding,
+  ariaLabel,
 }: {
   Icon: ComponentType<IconProps>
   emoji?: string | null
@@ -223,6 +228,7 @@ function ClickableNavItem({
   onClick?: () => void
   compact?: boolean
   padding: ReturnType<typeof getNavItemPadding>
+  ariaLabel?: string
 }) {
   return (
     <Button
@@ -232,6 +238,7 @@ function ClickableNavItem({
       className={cn("h-auto w-full cursor-pointer select-none justify-start rounded text-left transition-colors", isActive ? activeClassName : "text-foreground hover:bg-accent")}
       style={{ padding, borderRadius: 4 }}
       onClick={onClick}
+      aria-label={ariaLabel}
     >
       <SidebarNavIcon Icon={Icon} emoji={emoji} iconSize={getNavItemIconSize(compact)} isActive={isActive} />
       <NavItemLabel label={label} compact={compact} />
@@ -241,12 +248,13 @@ function ClickableNavItem({
         className={resolveBadgeClassName(isActive, activeBadgeClassName, badgeClassName)}
         style={resolveBadgeStyle(isActive, activeBadgeClassName, activeBadgeStyle, badgeStyle)}
         compact={compact}
+        decorative={Boolean(ariaLabel)}
       />
     </Button>
   )
 }
 
-export function NavItem({ icon: Icon, emoji, label, count, countLoading, isActive, activeClassName = 'bg-primary/10 text-primary', badgeClassName, badgeStyle, activeBadgeClassName, activeBadgeStyle, onClick, disabled, disabledTooltip, compact }: {
+export function NavItem({ icon: Icon, emoji, label, count, countLoading, isActive, activeClassName = 'bg-primary/10 text-primary', badgeClassName, badgeStyle, activeBadgeClassName, activeBadgeStyle, onClick, disabled, disabledTooltip, compact, ariaLabel }: {
   icon: ComponentType<IconProps>
   emoji?: string | null
   label: string
@@ -262,6 +270,7 @@ export function NavItem({ icon: Icon, emoji, label, count, countLoading, isActiv
   disabled?: boolean
   disabledTooltip?: string
   compact?: boolean
+  ariaLabel?: string
 }) {
   const padding = getNavItemPadding(compact, countLoading || hasSidebarCount(count))
   if (disabled) {
@@ -293,6 +302,7 @@ export function NavItem({ icon: Icon, emoji, label, count, countLoading, isActiv
       onClick={onClick}
       compact={compact}
       padding={padding}
+      ariaLabel={ariaLabel}
     />
   )
 }

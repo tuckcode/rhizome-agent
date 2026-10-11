@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input'
 import { APP_COMMAND_EVENT_NAME, APP_COMMAND_IDS } from '../../hooks/appCommandDispatcher'
 import { trackEvent } from '../../lib/telemetry'
 import { useDragRegion } from '../../hooks/useDragRegion'
-import { NotesChromeShortcuts } from '../NotesChromeShortcuts'
 import { SortDropdown } from '../SortDropdown'
 import { ListPropertiesPopover, type ListPropertiesPopoverProps } from './ListPropertiesPopover'
 import { GitRepositorySelect } from '../GitRepositorySelect'
@@ -299,14 +298,12 @@ type OptionalToolsProps = Pick<
   collapsed: boolean
 }
 
-/** The workspace shortcuts group plus sort/columns — an "optional tools"
- * cluster (required-order step 2) that moves into the overflow menu before
- * the title has to shrink below its floor. */
+/** Sort and columns — an "optional tools" cluster that moves into the
+ * overflow menu before the title has to shrink below its floor. */
 function HeaderOptionalTools({ collapsed, locale, ...sortProps }: OptionalToolsProps) {
   if (collapsed) return null
   return (
     <div className="flex shrink-0 items-center gap-2" data-testid="note-list-header-optional-tools">
-      <NotesChromeShortcuts locale={locale} />
       <SortAndColumnsTools locale={locale} {...sortProps} />
     </div>
   )
@@ -333,7 +330,6 @@ function HeaderOverflowMenu({ collapsed, locale, ...sortProps }: OptionalToolsPr
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" data-testid="note-list-header-overflow-menu">
         <div className="flex flex-col gap-1 px-1 py-1" onClick={(event) => event.stopPropagation()}>
-          <NotesChromeShortcuts locale={locale} />
           <div className="flex items-center gap-2">
             <SortAndColumnsTools locale={locale} {...sortProps} />
           </div>

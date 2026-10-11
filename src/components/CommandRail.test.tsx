@@ -1,12 +1,14 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommandRail } from './CommandRail'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
+import { railViewShortcutAria } from '../lib/railViewShortcuts'
 
 const { trackSessionsDrawerOpened } = vi.hoisted(() => ({ trackSessionsDrawerOpened: vi.fn() }))
 vi.mock('../lib/productAnalytics', () => ({
   trackCommandRailPinChanged: () => {},
   trackSessionsDrawerOpened,
+  trackRailViewSelected: () => {},
 }))
 
 // ActionTooltip wraps its trigger in a Radix Tooltip; render children directly
@@ -19,6 +21,7 @@ function renderRail(overrides: Partial<React.ComponentProps<typeof CommandRail>>
   const props: React.ComponentProps<typeof CommandRail> = {
     locale: 'en',
     onOpenSettings: vi.fn(),
+    onSelectView: vi.fn(),
     ...overrides,
   }
   render(<CommandRail {...props} />)
@@ -26,13 +29,49 @@ function renderRail(overrides: Partial<React.ComponentProps<typeof CommandRail>>
 }
 
 describe('CommandRail', () => {
-  it('renders Sessions space and settings gear without Chat or Research destinations', () => {
+  it('keeps a Views group on the collapsed rail, before Settings', () => {
     renderRail()
     expect(screen.getByTestId('command-rail')).toBeInTheDocument()
     expect(screen.queryByTestId('command-rail-chat')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('command-rail-research')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
+    const views = screen.getByRole('group', { name: 'Views' })
+    const buttons = views.querySelectorAll('button')
+    expect([...buttons].map((button) => button.getAttribute('data-testid'))).toEqual([
+      'command-rail-research',
+      'command-rail-graph',
+      'command-rail-mycelium',
+      'command-rail-history',
+    ])
+    expect(screen.getByRole('button', { name: 'Research' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Graph' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Mycelium' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Changes' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'History' })).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-settings')).toBeInTheDocument()
+    expect(
+      views.compareDocumentPosition(screen.getByTestId('command-rail-settings'))
+        & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('opens the chosen view from the rail and marks the current one', () => {
+    const props = renderRail({ activeView: 'graph' })
+
+    fireEvent.click(screen.getByTestId('command-rail-research'))
+    fireEvent.click(screen.getByTestId('command-rail-history'))
+
+    expect(props.onSelectView).toHaveBeenCalledWith('research')
+    expect(props.onSelectView).toHaveBeenCalledWith('history')
+    expect(screen.getByTestId('command-rail-graph')).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByTestId('command-rail-research')).not.toHaveAttribute('aria-current')
+    expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
+    expect(screen.getByTestId('command-rail-research')).toHaveAttribute(
+      'aria-keyshortcuts',
+      railViewShortcutAria(1),
+    )
+    expect(screen.getByTestId('command-rail-history')).toHaveAttribute(
+      'aria-keyshortcuts',
+      railViewShortcutAria(4),
+    )
   })
 
   it('opens settings from the gear', () => {
@@ -85,6 +124,7 @@ describe('the rail puts sessions in its open middle', () => {
     expect(screen.queryByTestId('command-rail-chat')).not.toBeInTheDocument()
     expect(screen.queryByTestId('command-rail-inbox')).not.toBeInTheDocument()
     expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
+    expect(screen.getByText('Views')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByTestId('command-rail-settings')).not.toHaveTextContent('Settings')
 
@@ -298,26 +338,43 @@ describe('a hover-expanded rail does not steal Chat clicks', () => {
   })
 
   it('closes the overlay when the pointer is over Chat rather than rail chrome', async () => {
-    renderRail()
-    const rail = screen.getByTestId('command-rail')
-    vi.spyOn(rail, 'getBoundingClientRect').mockReturnValue({
-      bottom: 600,
-      height: 600,
-      left: 0,
-      right: 240,
-      top: 0,
-      width: 240,
-      x: 0,
-      y: 0,
-      toJSON: () => ({}),
-    })
+    // Must match RAIL_HOVER_*_DELAY_MS in CommandRail.tsx.
+    const hoverOpenDelayMs = 150
+    const hoverCloseDelayMs = 180
+    vi.useFakeTimers()
+    try {
+      renderRail()
+      const rail = screen.getByTestId('command-rail')
+      vi.spyOn(rail, 'getBoundingClientRect').mockReturnValue({
+        bottom: 600,
+        height: 600,
+        left: 0,
+        right: 240,
+        top: 0,
+        width: 240,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      })
 
-    fireEvent.mouseEnter(rail)
-    await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'true'))
-    fireEvent.mouseMove(window, { clientX: 120, clientY: 220 })
+      await act(async () => {
+        fireEvent.mouseEnter(rail)
+        await vi.advanceTimersByTimeAsync(hoverOpenDelayMs)
+      })
+      expect(rail).toHaveAttribute('data-expanded', 'true')
 
-    await waitFor(() => expect(rail).toHaveAttribute('data-expanded', 'false'))
-    expect(screen.queryByTestId('command-rail-sessions')).not.toBeInTheDocument()
+      // Flush the mousemove effect, then advance past the close delay.
+      await act(async () => {
+        fireEvent.mouseMove(document.body, { clientX: 120, clientY: 220 })
+        await Promise.resolve()
+        fireEvent.mouseMove(document.body, { clientX: 120, clientY: 220 })
+        await vi.advanceTimersByTimeAsync(hoverCloseDelayMs)
+      })
+      expect(rail).toHaveAttribute('data-expanded', 'false')
+      expect(screen.queryByTestId('command-rail-sessions')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps Sessions mounted while a control inside it still has focus', async () => {

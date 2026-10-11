@@ -719,26 +719,28 @@ describe('useCommandRegistry', () => {
     expect(onOpenFeedback).toHaveBeenCalledOnce()
   })
 
-  it('includes Open Research in the Settings group when available', () => {
-    const onOpenResearch = vi.fn()
-    const config = makeConfig({ onOpenResearch })
+  it('lists the four Views destinations in rail order', () => {
+    const onSelect = vi.fn()
+    const config = makeConfig({ onSelect })
     const { result } = renderHook(() => useCommandRegistry(config))
-    const cmd = findCommand(result.current, 'open-research')
-    expect(cmd).toBeDefined()
-    expect(cmd!.label).toBe('Open Research')
-    expect(cmd!.group).toBe('Settings')
-    expect(cmd!.enabled).toBe(true)
+    const views = result.current.filter((command) => command.group === 'Views')
+    expect(views.map((command) => command.id)).toEqual([
+      'go-research',
+      'go-graph',
+      'go-mycelium',
+      'go-pulse',
+    ])
+    expect(views.map((command) => command.label)).toEqual([
+      'Go to Research',
+      'Go to Graph',
+      'Go to Mycelium',
+      'Go to History',
+    ])
+    expect(findCommand(result.current, 'go-changes')?.group).toBe('Navigation')
+    expect(findCommand(result.current, 'open-research')).toBeUndefined()
 
-    cmd!.execute()
-    expect(onOpenResearch).toHaveBeenCalledOnce()
-  })
-
-  it('disables Open Research when no handler is provided', () => {
-    const config = makeConfig()
-    const { result } = renderHook(() => useCommandRegistry(config))
-    const cmd = findCommand(result.current, 'open-research')
-    expect(cmd).toBeDefined()
-    expect(cmd!.enabled).toBe(false)
+    findCommand(result.current, 'go-research')!.execute()
+    expect(onSelect).toHaveBeenCalledWith({ kind: 'filter', filter: 'research' })
   })
 
   it('keeps a single canonical New Note command when generic note types are present', () => {

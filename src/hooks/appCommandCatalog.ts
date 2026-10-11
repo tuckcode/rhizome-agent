@@ -1,4 +1,10 @@
 import appCommandManifest from '../shared/appCommandManifest.json' with { type: 'json' }
+import {
+  isRailViewCommandId,
+  matchRailViewShortcutEvent,
+  railViewShortcutDisplayForCommand,
+  viewShortcutEventModifiers,
+} from '../lib/railViewShortcuts'
 import type { SidebarFilter } from '../types'
 import { isMac } from '../utils/platform'
 import type { ViewMode } from './useViewMode'
@@ -9,6 +15,8 @@ type ShortcutEventLike = Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'metaKey' | 
 export type AppCommandShortcutCombo =
   | 'command-or-ctrl'
   | 'command-or-ctrl-shift'
+  | 'command-or-ctrl-alt'
+  | 'command-and-ctrl'
   | 'command-shift'
 export type AppCommandDeterministicQaMode =
   | 'renderer-shortcut-event'
@@ -91,8 +99,15 @@ interface AppCommandShortcutDefinition {
   display: string
 }
 
+type ManifestPlatformAccelerator = string | {
+  macos?: string
+  windows?: string
+  linux?: string
+  default: string
+}
+
 interface AppCommandManifestShortcutDefinition extends AppCommandShortcutDefinition {
-  accelerator: string
+  accelerator: ManifestPlatformAccelerator
   requiresManualNativeAcceleratorQa?: boolean
 }
 
@@ -286,7 +301,10 @@ function formatAcceleratorDisplay(accelerator: string): string {
   const commandPrefix = isMac() ? '⌘' : 'Ctrl+'
   const commandShiftPrefix = isMac() ? '⌘⇧' : 'Ctrl+Shift+'
 
+  const commandAltPrefix = isMac() ? '⌥⌘' : 'Ctrl+Alt+'
+
   return accelerator
+    .replaceAll('CmdOrCtrl+Alt+', commandAltPrefix)
     .replaceAll('CmdOrCtrl+Shift+', commandShiftPrefix)
     .replaceAll('CmdOrCtrl+', commandPrefix)
     .replaceAll('Backspace', isMac() ? '⌫' : 'Backspace')
@@ -300,6 +318,8 @@ function menuShortcutForCommand(
   item: Extract<AppCommandMenuManifestItem, { kind: 'command' }>,
   command: AppCommandManifestDefinition,
 ): string | undefined {
+  const viewShortcut = railViewShortcutDisplayForCommand(command.id)
+  if (viewShortcut) return viewShortcut
   if (typeof item.accelerator === 'string') return formatAcceleratorDisplay(item.accelerator)
   if (command.shortcut) return formatShortcutDisplay(command.shortcut)
   return undefined
@@ -374,18 +394,24 @@ const MANUAL_NATIVE_ACCELERATOR_QA_COMMAND_SET = new Set<AppCommandId>(
 const shortcutKeyMaps = {
   'command-or-ctrl': new Map<string, AppCommandId>(),
   'command-or-ctrl-shift': new Map<string, AppCommandId>(),
+  'command-or-ctrl-alt': new Map<string, AppCommandId>(),
+  'command-and-ctrl': new Map<string, AppCommandId>(),
   'command-shift': new Map<string, AppCommandId>(),
 } satisfies Record<AppCommandShortcutCombo, Map<string, AppCommandId>>
 
 const shortcutCodeMaps = {
   'command-or-ctrl': new Map<string, AppCommandId>(),
   'command-or-ctrl-shift': new Map<string, AppCommandId>(),
+  'command-or-ctrl-alt': new Map<string, AppCommandId>(),
+  'command-and-ctrl': new Map<string, AppCommandId>(),
   'command-shift': new Map<string, AppCommandId>(),
 } satisfies Record<AppCommandShortcutCombo, Map<string, AppCommandId>>
 
 const COMMAND_ONLY_COMBOS: readonly AppCommandShortcutCombo[] = ['command-or-ctrl']
 const COMMAND_SHIFT_COMBOS: readonly AppCommandShortcutCombo[] = ['command-shift', 'command-or-ctrl-shift']
 const COMMAND_OR_CTRL_SHIFT_COMBOS: readonly AppCommandShortcutCombo[] = ['command-or-ctrl-shift']
+const COMMAND_OR_CTRL_ALT_COMBOS: readonly AppCommandShortcutCombo[] = ['command-or-ctrl-alt']
+const COMMAND_AND_CTRL_COMBOS: readonly AppCommandShortcutCombo[] = ['command-and-ctrl']
 const NO_SHORTCUT_COMBOS: readonly AppCommandShortcutCombo[] = []
 
 function normalizeShortcutKey(key: string): string {
@@ -447,16 +473,19 @@ export function getShortcutEventInit(
   if (!shortcut) return null
 
   const useControl = options.preferControl ?? false
+  const viewModifiers = isRailViewCommandId(id) ? viewShortcutEventModifiers() : null
 
   return {
     key: shortcut.key,
     code: shortcut.code,
-    altKey: false,
+    altKey: viewModifiers ? viewModifiers.altKey : shortcut.combo === 'command-or-ctrl-alt',
     bubbles: true,
     cancelable: true,
-    ctrlKey: useControl,
-    metaKey: !useControl,
-    shiftKey: shortcut.combo !== 'command-or-ctrl',
+    ctrlKey: viewModifiers ? viewModifiers.ctrlKey : useControl,
+    metaKey: viewModifiers ? viewModifiers.metaKey : !useControl,
+    shiftKey: viewModifiers
+      ? viewModifiers.shiftKey
+      : shortcut.combo === 'command-or-ctrl-shift' || shortcut.combo === 'command-shift',
   }
 }
 
@@ -466,8 +495,13 @@ export function shortcutCombosForEvent({
   metaKey,
   shiftKey,
 }: Pick<ShortcutEventLike, 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'>): readonly AppCommandShortcutCombo[] {
-  if (altKey || (!metaKey && !ctrlKey)) return NO_SHORTCUT_COMBOS
-  if (isMac() && ctrlKey) return NO_SHORTCUT_COMBOS
+  if (!metaKey && !ctrlKey) return NO_SHORTCUT_COMBOS
+  if (isMac() && ctrlKey) {
+    if (metaKey && !altKey && !shiftKey) return COMMAND_AND_CTRL_COMBOS
+    return NO_SHORTCUT_COMBOS
+  }
+  if (altKey && shiftKey) return NO_SHORTCUT_COMBOS
+  if (altKey) return COMMAND_OR_CTRL_ALT_COMBOS
   if (shiftKey) {
     return metaKey && !ctrlKey ? COMMAND_SHIFT_COMBOS : COMMAND_OR_CTRL_SHIFT_COMBOS
   }
@@ -493,8 +527,13 @@ export function findShortcutCommandId(
 export function findShortcutCommandIdForEvent(event: ShortcutEventLike): AppCommandId | null {
   if (isPlatformRedoAlternate(event)) return APP_COMMAND_IDS.editRedo
 
+  const railMatch = matchRailViewShortcutEvent(event)
+  if (railMatch === null) return null
+  if (railMatch && isAppCommandId(railMatch)) return railMatch
+
   for (const combo of shortcutCombosForEvent(event)) {
     const commandId = findShortcutCommandId(combo, event.key, event.code)
+    if (commandId && isRailViewCommandId(commandId)) continue
     if (commandId) return commandId
   }
   return null
@@ -506,8 +545,10 @@ export function formatShortcutDisplay(
   if (isMac()) return shortcut.display
 
   return shortcut.display
+    .replaceAll('⌥⌘', 'Ctrl+Alt+')
     .replaceAll('⌘⇧', 'Ctrl+Shift+')
     .replaceAll('⌘', 'Ctrl+')
+    .replaceAll('⌥', 'Alt+')
     .replaceAll('⌫', 'Backspace')
     .replaceAll('⌦', 'Delete')
     .replaceAll('←', 'Left')
@@ -516,6 +557,8 @@ export function formatShortcutDisplay(
 }
 
 export function getAppCommandShortcutDisplay(id: AppCommandId): string | undefined {
+  const viewShortcut = railViewShortcutDisplayForCommand(id)
+  if (viewShortcut) return viewShortcut
   const shortcut = (Reflect.get(APP_COMMAND_DEFINITIONS, id) as AppCommandDefinition).shortcut
   return shortcut ? formatShortcutDisplay(shortcut) : undefined
 }

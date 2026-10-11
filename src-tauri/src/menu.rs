@@ -46,7 +46,7 @@ struct ManifestCommand {
 
 #[derive(Debug, Deserialize)]
 struct ManifestShortcut {
-    accelerator: String,
+    accelerator: PlatformAccelerator,
 }
 
 #[derive(Debug, Deserialize)]
@@ -82,6 +82,18 @@ enum ManifestMenuItem {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum PlatformLabel {
+    Plain(String),
+    Platform {
+        macos: Option<String>,
+        windows: Option<String>,
+        linux: Option<String>,
+        default: String,
+    },
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum PlatformAccelerator {
     Plain(String),
     Platform {
         macos: Option<String>,
@@ -135,6 +147,25 @@ impl PlatformLabel {
     }
 }
 
+impl PlatformAccelerator {
+    fn resolve(&self, target_os: &str) -> &str {
+        match self {
+            Self::Plain(accelerator) => accelerator.as_str(),
+            Self::Platform {
+                macos,
+                windows,
+                linux,
+                default,
+            } => match target_os {
+                "macos" => macos.as_deref().unwrap_or(default.as_str()),
+                "windows" => windows.as_deref().unwrap_or(default.as_str()),
+                "linux" => linux.as_deref().unwrap_or(default.as_str()),
+                _ => default.as_str(),
+            },
+        }
+    }
+}
+
 impl ManifestMenuItem {
     fn command_id<'a>(&'a self, manifest: &'a AppCommandManifest) -> Option<&'a str> {
         match self {
@@ -169,7 +200,11 @@ impl ManifestMenuItem {
         }
     }
 
-    fn accelerator<'a>(&'a self, manifest: &'a AppCommandManifest) -> Option<&'a str> {
+    fn accelerator<'a>(
+        &'a self,
+        manifest: &'a AppCommandManifest,
+        target_os: &str,
+    ) -> Option<&'a str> {
         match self {
             Self::Command {
                 command,
@@ -182,7 +217,7 @@ impl ManifestMenuItem {
                     .commands
                     .get(command)
                     .and_then(|command| command.shortcut.as_ref())
-                    .map(|shortcut| shortcut.accelerator.as_str()),
+                    .map(|shortcut| shortcut.accelerator.resolve(target_os)),
             },
             Self::MenuEvent { accelerator, .. } => match accelerator {
                 ManifestAccelerator::Explicit(accelerator) => Some(accelerator.as_str()),
@@ -277,7 +312,7 @@ fn build_manifest_menu_item(
     let mut builder = MenuItemBuilder::new(label.as_ref())
         .id(id)
         .enabled(item.enabled());
-    if let Some(accelerator) = item.accelerator(manifest()) {
+    if let Some(accelerator) = item.accelerator(manifest(), std::env::consts::OS) {
         builder = builder.accelerator(accelerator);
     }
     Ok(Some(builder.build(app)?))
@@ -608,7 +643,7 @@ mod tests {
     fn view_toggle_properties_keeps_renderer_owned_accelerator() {
         let item = menu_item_by_id("view-toggle-properties");
 
-        assert_eq!(item.accelerator(manifest()), None);
+        assert_eq!(item.accelerator(manifest(), "macos"), None);
     }
 
     #[test]
@@ -622,7 +657,53 @@ mod tests {
 
         assert_eq!(item.menu_item_id(manifest()), Some("view-toggle-ai-chat"));
         assert_eq!(item.label("macos"), Some("Toggle AI Panel"));
-        assert_eq!(item.accelerator(manifest()), Some("CmdOrCtrl+Shift+L"));
+        assert_eq!(
+            item.accelerator(manifest(), "macos"),
+            Some("CmdOrCtrl+Shift+L")
+        );
+    }
+
+    #[test]
+    fn view_shortcuts_use_ctrl_cmd_on_mac_and_ctrl_shift_elsewhere() {
+        let item = menu_item_by_id("go-research");
+        assert_eq!(item.accelerator(manifest(), "macos"), Some("Ctrl+Cmd+1"));
+        assert_eq!(
+            item.accelerator(manifest(), "windows"),
+            Some("Ctrl+Shift+1")
+        );
+        assert_eq!(item.accelerator(manifest(), "linux"), Some("Ctrl+Shift+1"));
+
+        let graph = menu_item_by_id("go-graph");
+        assert_eq!(graph.accelerator(manifest(), "macos"), Some("Ctrl+Cmd+2"));
+        assert_eq!(
+            graph.accelerator(manifest(), "windows"),
+            Some("Ctrl+Shift+2")
+        );
+
+        let history = menu_item_by_id("go-pulse");
+        assert_eq!(history.accelerator(manifest(), "macos"), Some("Ctrl+Cmd+4"));
+        assert_eq!(
+            history.accelerator(manifest(), "windows"),
+            Some("Ctrl+Shift+4")
+        );
+        assert_eq!(
+            menu_item_by_id("go-changes").accelerator(manifest(), "macos"),
+            None
+        );
+
+        for command in manifest().commands.values() {
+            let Some(shortcut) = &command.shortcut else {
+                continue;
+            };
+            let macos = shortcut.accelerator.resolve("macos");
+            let windows = shortcut.accelerator.resolve("windows");
+            let linux = shortcut.accelerator.resolve("linux");
+            assert!(
+                !macos.contains("Alt") && !windows.contains("Alt") && !linux.contains("Alt"),
+                "{} still uses Alt in a native accelerator",
+                command.id
+            );
+        }
     }
 
     #[test]
@@ -678,6 +759,6 @@ mod tests {
 
         assert_eq!(label, "Commit & Push");
         assert_eq!(native_menu_label(label), "Commit && Push");
-        assert_eq!(item.accelerator(manifest()), None);
+        assert_eq!(item.accelerator(manifest(), "windows"), None);
     }
 }

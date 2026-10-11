@@ -122,13 +122,17 @@ describe('StatusBar', () => {
 
   it('shows Research and Settings by default (legacy shell, no command rail)', () => {
     render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} onOpenResearch={vi.fn()} onOpenSettings={vi.fn()} />)
+    expect(screen.getByTestId('status-graph')).toBeInTheDocument()
+    expect(screen.getByTestId('status-mycelium')).toBeInTheDocument()
     expect(screen.getByTestId('status-research')).toBeInTheDocument()
     expect(screen.getByTestId('status-settings')).toBeInTheDocument()
   })
 
-  it('hides only the duplicate Settings entry when the command rail owns Settings', () => {
+  it('hides Research and Settings when the command rail owns those destinations', () => {
     render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} onOpenResearch={vi.fn()} onOpenSettings={vi.fn()} commandRailActive />)
-    expect(screen.getByTestId('status-research')).toBeInTheDocument()
+    expect(screen.queryByTestId('status-graph')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('status-mycelium')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('status-research')).not.toBeInTheDocument()
     expect(screen.queryByTestId('status-settings')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Switch vault' })).toBeInTheDocument()
   })
@@ -136,6 +140,7 @@ describe('StatusBar', () => {
   it('opens Research and Wiki Graph from the notes-chrome shortcut events', () => {
     const onOpenResearch = vi.fn()
     const onClickGraph = vi.fn()
+    const onClickMycelium = vi.fn()
     render(
       <StatusBar
         noteCount={100}
@@ -144,16 +149,40 @@ describe('StatusBar', () => {
         onSwitchVault={vi.fn()}
         onOpenResearch={onOpenResearch}
         onClickGraph={onClickGraph}
+        onClickMycelium={onClickMycelium}
       />,
     )
 
     act(() => {
       window.dispatchEvent(new CustomEvent('rhizome:notes-chrome', { detail: 'research' }))
       window.dispatchEvent(new CustomEvent('rhizome:notes-chrome', { detail: 'graph' }))
+      window.dispatchEvent(new CustomEvent('rhizome:notes-chrome', { detail: 'mycelium' }))
     })
 
     expect(onOpenResearch).toHaveBeenCalledOnce()
     expect(onClickGraph).toHaveBeenCalledOnce()
+    expect(onClickMycelium).toHaveBeenCalledOnce()
+  })
+
+  it('opens Graph and Mycelium from the classic status bar', () => {
+    const onClickGraph = vi.fn()
+    const onClickMycelium = vi.fn()
+    render(
+      <StatusBar
+        noteCount={100}
+        vaultPath="/Users/luca/Laputa"
+        vaults={vaults}
+        onSwitchVault={vi.fn()}
+        onClickGraph={onClickGraph}
+        onClickMycelium={onClickMycelium}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Graph' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Mycelium' }))
+
+    expect(onClickGraph).toHaveBeenCalledOnce()
+    expect(onClickMycelium).toHaveBeenCalledOnce()
   })
 
   it('shows a theme toggle instead of the notifications placeholder', () => {

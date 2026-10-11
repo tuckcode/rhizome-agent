@@ -237,13 +237,13 @@ describe('NoteList context menu — ask the agent', () => {
     expect(screen.queryByText('Ask the agent about this note')).not.toBeInTheDocument()
   })
 
-  it('opens the node map for that note, and the Mycelium report', () => {
+  it('opens Show in Graph for that note and leaves Mycelium to the session context', () => {
     const listener = vi.fn()
     window.addEventListener('rhizome:connections-open', listener)
     renderNoteListWithFullActionMenu()
     fireEvent.contextMenu(screen.getByText('Build Laputa App'))
-    expect(screen.getByText('Mycelium report')).toBeInTheDocument()
-    fireEvent.click(screen.getByText('Node map'))
+    expect(screen.queryByText('Mycelium report')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('Show in Graph'))
     expect((listener.mock.calls[0]?.[0] as CustomEvent<{ view: string, focusPath?: string }>).detail).toEqual({
       view: 'graph',
       focusPath: mockEntries[0].path,

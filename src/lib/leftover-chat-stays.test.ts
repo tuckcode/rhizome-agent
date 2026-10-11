@@ -17,9 +17,18 @@ describe('leftover chat stays', () => {
     expect(rail).not.toContain('active={notesOpen}')
   })
 
-  it('does not put Changes on the command rail', () => {
-    expect(rail).not.toContain('command-rail-changes')
+  it('keeps Changes next to Notes in the sidebar, not on the rail', () => {
+    const views = readFileSync(`${process.cwd()}/src/lib/railViews.ts`, 'utf8')
+    const sidebar = readFileSync(
+      `${process.cwd()}/src/components/sidebar/SidebarTopNav.tsx`,
+      'utf8',
+    )
+    expect(views).not.toContain("testId: 'command-rail-changes'")
+    expect(rail).toContain('testId={view.testId}')
+    expect(rail).toContain('command-rail-views')
     expect(rail).not.toContain('onSelectChanges')
+    expect(sidebar).toContain("filter: 'changes'")
+    expect(sidebar).toContain('sidebar.nav.allNotes')
   })
 
   it('does not hide Chat just because Notes is open', () => {

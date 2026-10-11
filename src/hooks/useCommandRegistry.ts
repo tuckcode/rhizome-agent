@@ -80,7 +80,6 @@ interface CommandRegistryConfig {
   onPastePlainText: () => void
   onOpenSettings: () => void
   onOpenFeedback?: () => void
-  onOpenResearch?: () => void
   onOpenVault?: () => void
   onCreateEmptyVault?: () => void
   onAddRemote?: () => void
@@ -156,7 +155,7 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
   const {
     activeTabPath, entries, modifiedCount,
     onQuickOpen, onCreateNote, onCreateNoteOfType, onSave, onUndo, onRedo, canUndo, canRedo, undoLabel, redoLabel,
-    onPastePlainText, onOpenSettings, onOpenFeedback, onOpenResearch,
+    onPastePlainText, onOpenSettings, onOpenFeedback,
     onDeleteNote, onArchiveNote, onUnarchiveNote,
     onCommitPush, onPull, onResolveConflicts, onSetViewMode, onReadLayout, onResetLayout, onToggleInspector, onToggleDiff, onToggleRawEditor, onToggleNoteLock, onFindInNote, onReplaceInNote,
     noteWidth, defaultNoteWidth, onSetNoteWidth, onSetDefaultNoteWidth, onToggleAIChat,
@@ -256,10 +255,9 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
     onPull,
     onPullRepository,
     onResolveConflicts,
-    onSelect,
   }), [
     modifiedCount, gitFeaturesEnabled, isGitVault, gitRepositories, config.canAddRemote, config.onAddRemote,
-    onCommitPush, onInitializeGit, onPull, onPullRepository, onResolveConflicts, onSelect,
+    onCommitPush, onInitializeGit, onPull, onPullRepository, onResolveConflicts,
   ])
 
   const viewCommands = useMemo(() => buildViewCommands({
@@ -277,11 +275,11 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
 
   const settingsCommands = useMemo(() => buildSettingsCommands({
     mcpStatus, vaultCount, isGettingStartedHidden,
-    onOpenSettings, onOpenFeedback, onOpenResearch, onOpenVault, onCreateEmptyVault, onRemoveActiveVault, onRestoreGettingStarted,
+    onOpenSettings, onOpenFeedback, onOpenVault, onCreateEmptyVault, onRemoveActiveVault, onRestoreGettingStarted,
     onCheckForUpdates, onInstallMcp, onReloadVault, onRepairVault, onReopenAiOnboarding,
     locale, systemLocale, selectedUiLanguage, onSetUiLanguage, onSetThemeMode,
   }), [
-    mcpStatus, vaultCount, isGettingStartedHidden, onOpenSettings, onOpenFeedback, onOpenResearch,
+    mcpStatus, vaultCount, isGettingStartedHidden, onOpenSettings, onOpenFeedback,
     onOpenVault, onCreateEmptyVault, onRemoveActiveVault, onRestoreGettingStarted,
     onCheckForUpdates, onInstallMcp, onReloadVault, onRepairVault, onReopenAiOnboarding,
     locale, systemLocale, selectedUiLanguage, onSetUiLanguage, onSetThemeMode,

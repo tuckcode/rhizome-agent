@@ -4,10 +4,11 @@ import {
   GitCommit,
   Moon,
   Package,
-  Pulse,
   Sparkle,
   Sun,
   Warning as AlertTriangle,
+  Graph,
+  CirclesThree,
   type IconProps,
 } from '@phosphor-icons/react'
 import type { ComponentType, MouseEventHandler, ReactNode } from 'react'
@@ -23,7 +24,6 @@ import {
   CommitButton,
   ConflictBadge,
   ChangesBadge,
-  GraphBadge,
   McpBadge,
   MissingGitBadge,
   NoRemoteBadge,
@@ -63,7 +63,6 @@ interface StatusBarPrimarySectionProps {
   onAddRemote?: () => void
   onClickPending?: () => void
   onClickPulse?: () => void
-  onClickGraph?: () => void
   onCommitPush?: () => void
   commitActionPending?: boolean
   gitFeaturesEnabled?: boolean
@@ -105,10 +104,11 @@ interface StatusBarSecondarySectionProps {
   /** Single Rhizome+Prime update indicator (issue #19). */
   versionUpdateIndicator?: ReactNode
   onOpenResearch?: () => void
+  onClickGraph?: () => void
+  onClickMycelium?: () => void
   onOpenSettings?: () => void
-  /** When the command rail is active it owns Settings, so the duplicate
-   *  status-bar Settings entry is hidden. Research stays on the status bar
-   *  because the rail is sessions-only. */
+  /** When the command rail is active it owns Settings and Views, so the
+   *  duplicate status-bar Settings and Research entries are hidden. */
   commandRailActive?: boolean
   stacked?: boolean
   compact?: boolean
@@ -170,7 +170,6 @@ function StatusBarPrimaryBadges({
   onOpenConflictResolver,
   conflictCount,
   onClickPulse,
-  onClickGraph,
   isGitVault,
   mcpStatus,
   onInstallMcp,
@@ -198,7 +197,6 @@ function StatusBarPrimaryBadges({
   onOpenConflictResolver?: () => void
   conflictCount: number
   onClickPulse?: () => void
-  onClickGraph?: () => void
   isGitVault: boolean
   mcpStatus?: McpStatus
   onInstallMcp?: () => void
@@ -243,8 +241,7 @@ function StatusBarPrimaryBadges({
         <MissingGitBadge onClick={onInitializeGit} showSeparator={!compact} compact={compact} locale={locale} />
       ) : null}
       {mcpStatus && <McpBadge status={mcpStatus} onInstall={onInstallMcp} showSeparator={!compact} compact={compact} locale={locale} />}
-      {/* The rail owns the Graph destination (§2.6.3). */}
-      {pillMode ? null : <GraphBadge onClick={onClickGraph} showSeparator={!compact} compact={compact} locale={locale} />}
+      {/* Graph and Mycelium sit with Research in the classic shell. */}
       {pillMode ? null : (
         <RhizomeJobsBadge jobs={rhizomeJobs.activeJobs} onCancelJob={rhizomeJobs.cancelJob} showSeparator={!compact} compact={compact} locale={locale} />
       )}
@@ -315,19 +312,54 @@ function ResearchButton({
   )
 }
 
+function ClassicViewButton({
+  compact,
+  icon: Icon,
+  label,
+  onClick,
+  testId,
+}: {
+  compact: boolean
+  icon: ComponentType<IconProps>
+  label: string
+  onClick?: () => void
+  testId: string
+}) {
+  const className = compact
+    ? 'h-7 w-7 rounded-sm p-0 text-muted-foreground hover:text-foreground'
+    : 'h-6 px-2 text-[12px] font-medium text-muted-foreground hover:text-foreground'
+
+  return (
+    <ActionTooltip copy={{ label }} side="top">
+      <Button
+        type="button"
+        variant="ghost"
+        size="xs"
+        className={className}
+        onClick={onClick}
+        aria-label={label}
+        data-testid={testId}
+      >
+        <Icon size={14} weight="regular" />
+        {compact ? null : label}
+      </Button>
+    </ActionTooltip>
+  )
+}
+
 /**
  * Wave 5.4b §2.6: the controls the vault·git pill absorbs — sync now, commit,
- * history, conflicts — rendered as dropdown entries instead of strip buttons.
+ * conflicts — rendered as dropdown entries instead of strip buttons. History
+ * lives in the rail Views group.
  */
 function buildGitPillActions({
   conflictCount,
   onCommitPush,
-  onClickPulse,
   onOpenConflictResolver,
   onTriggerSync,
 }: Pick<
   StatusBarPrimarySectionProps,
-  'conflictCount' | 'onCommitPush' | 'onClickPulse' | 'onOpenConflictResolver' | 'onTriggerSync'
+  'conflictCount' | 'onCommitPush' | 'onOpenConflictResolver' | 'onTriggerSync'
 >): VaultAction[] {
   const actions: VaultAction[] = []
 
@@ -348,16 +380,6 @@ function buildGitPillActions({
       labelKey: 'status.commit.label',
       testId: 'vault-menu-commit',
       onClick: onCommitPush,
-    })
-  }
-
-  if (onClickPulse) {
-    actions.push({
-      key: 'history',
-      icon: <Pulse size={12} />,
-      labelKey: 'status.history.label',
-      testId: 'vault-menu-history',
-      onClick: onClickPulse,
     })
   }
 
@@ -428,7 +450,6 @@ function StatusBarGitControls({
   onPullAndPush,
   onOpenConflictResolver,
   onClickPulse,
-  onClickGraph,
   mcpStatus,
   onInstallMcp,
   commandRailActive = false,
@@ -466,7 +487,6 @@ function StatusBarGitControls({
         onOpenConflictResolver={onOpenConflictResolver}
         conflictCount={conflictCount}
         onClickPulse={onClickPulse}
-        onClickGraph={onClickGraph}
         isGitVault={isGitVault !== false}
         mcpStatus={mcpStatus}
         onInstallMcp={onInstallMcp}
@@ -499,7 +519,7 @@ export function StatusBarPrimarySection({
   onCloneVault,
   onCloneGettingStarted,
   onAddRemote,
-  onClickPending, onClickPulse, onClickGraph,
+  onClickPending, onClickPulse,
   onCommitPush, commitActionPending = false,
   gitFeaturesEnabled = true,
   onInitializeGit,
@@ -526,7 +546,7 @@ export function StatusBarPrimarySection({
 }: StatusBarPrimarySectionProps) {
   const pillMode = commandRailActive
   const gitPillActions = pillMode
-    ? buildGitPillActions({ conflictCount, onCommitPush, onClickPulse, onOpenConflictResolver, onTriggerSync })
+    ? buildGitPillActions({ conflictCount, onCommitPush, onOpenConflictResolver, onTriggerSync })
     : undefined
 
   return (
@@ -573,7 +593,6 @@ export function StatusBarPrimarySection({
         onOpenConflictResolver={onOpenConflictResolver}
         conflictCount={conflictCount}
         onClickPulse={onClickPulse}
-        onClickGraph={onClickGraph}
         isGitVault={isGitVault}
         mcpStatus={mcpStatus}
         onInstallMcp={onInstallMcp}
@@ -595,6 +614,8 @@ export function StatusBarSecondarySection({
   onCheckForUpdates,
   versionUpdateIndicator,
   onOpenResearch,
+  onClickGraph,
+  onClickMycelium,
   onOpenSettings,
   commandRailActive = false,
   locale = 'en',
@@ -633,7 +654,13 @@ export function StatusBarSecondarySection({
           </Button>
         </ActionTooltip>
       )}
-      {onOpenResearch ? <ResearchButton compact={compact} locale={locale} onOpenResearch={onOpenResearch} /> : null}
+      {!commandRailActive ? (
+        <>
+          <ClassicViewButton compact={compact} icon={Graph} label="Graph" onClick={onClickGraph} testId="status-graph" />
+          <ClassicViewButton compact={compact} icon={CirclesThree} label="Mycelium" onClick={onClickMycelium} testId="status-mycelium" />
+        </>
+      ) : null}
+      {!commandRailActive && onOpenResearch ? <ResearchButton compact={compact} locale={locale} onOpenResearch={onOpenResearch} /> : null}
       <BuildNumberButton buildNumber={buildNumber} onCheckForUpdates={onCheckForUpdates} compact={compact} locale={locale} />
       {versionUpdateIndicator}
       <ActionTooltip copy={themeTooltip} side="top" align="end" contentTestId="status-theme-mode-tooltip">

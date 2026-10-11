@@ -74,6 +74,7 @@ interface StatusBarProps {
   onClickPending?: () => void
   onClickPulse?: () => void
   onClickGraph?: () => void
+  onClickMycelium?: () => void
   onCommitPush?: () => void
   commitActionPending?: boolean
   gitFeaturesEnabled?: boolean
@@ -128,7 +129,6 @@ function StatusBarPrimaryFromFooter({
   onCloneGettingStarted,
   onClickPending,
   onClickPulse,
-  onClickGraph,
   onCommitPush,
   commitActionPending = false,
   gitFeaturesEnabled = true,
@@ -172,7 +172,6 @@ function StatusBarPrimaryFromFooter({
       onCloneGettingStarted={onCloneGettingStarted}
       onClickPending={onClickPending}
       onClickPulse={onClickPulse}
-      onClickGraph={onClickGraph}
       onCommitPush={onCommitPush}
       commitActionPending={commitActionPending}
       gitFeaturesEnabled={gitFeaturesEnabled}
@@ -213,6 +212,8 @@ function StatusBarSecondaryFromFooter({
   onCheckForUpdates,
   versionUpdateIndicator,
   onOpenResearch,
+  onClickGraph,
+  onClickMycelium,
   onOpenSettings,
   commandRailActive,
   locale = 'en',
@@ -230,6 +231,8 @@ function StatusBarSecondaryFromFooter({
         onCheckForUpdates={onCheckForUpdates}
         versionUpdateIndicator={versionUpdateIndicator}
         onOpenResearch={onOpenResearch}
+        onClickGraph={onClickGraph}
+        onClickMycelium={onClickMycelium}
         onOpenSettings={onOpenSettings}
         commandRailActive={commandRailActive}
         locale={locale}
@@ -275,6 +278,7 @@ export function StatusBar(props: StatusBarProps) {
   useNotesChromeStatusBridge({
     onOpenResearch: props.onOpenResearch,
     onClickGraph: props.onClickGraph,
+    onClickMycelium: props.onClickMycelium,
   })
   const { compact, stacked } = useStatusBarLayout()
 

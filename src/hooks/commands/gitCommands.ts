@@ -1,5 +1,4 @@
 import type { CommandAction } from './types'
-import type { SidebarSelection } from '../../types'
 import type { GitRepositoryOption } from '../../utils/gitRepositories'
 
 interface GitCommandsConfig {
@@ -14,7 +13,6 @@ interface GitCommandsConfig {
   onPull?: () => void
   onPullRepository?: (path: string) => void
   onResolveConflicts?: () => void
-  onSelect: (sel: SidebarSelection) => void
 }
 
 function buildPullCommands({
@@ -36,7 +34,6 @@ export function buildGitCommands(config: GitCommandsConfig): CommandAction[] {
     onInitializeGit,
     onPull,
     onResolveConflicts,
-    onSelect,
   } = config
 
   if (!gitFeaturesEnabled) return []
@@ -59,6 +56,5 @@ export function buildGitCommands(config: GitCommandsConfig): CommandAction[] {
     { id: 'add-remote', label: 'Add Remote to Current Vault', group: 'Git', keywords: ['git', 'remote', 'connect', 'origin', 'no remote'], enabled: canAddRemote && !!onAddRemote, execute: () => onAddRemote?.() },
     ...buildPullCommands({ onPull }),
     { id: 'resolve-conflicts', label: 'Resolve Conflicts', group: 'Git', keywords: ['conflict', 'merge', 'git', 'sync'], enabled: true, execute: () => onResolveConflicts?.() },
-    { id: 'view-changes', label: 'View Pending Changes', group: 'Git', keywords: ['modified', 'diff'], enabled: true, execute: () => onSelect({ kind: 'filter', filter: 'changes' }) },
   ]
 }

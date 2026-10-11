@@ -95,7 +95,7 @@ describe('AiPanelComposer attachments', () => {
     expect(onAttachImages).toHaveBeenCalledTimes(1)
   })
 
-  it('offers this session in Mycelium and keeps Goal with the other tools', () => {
+  it('keeps Goal with the other message tools and leaves Mycelium off the plus menu', () => {
     const onOpenMycelium = vi.fn()
     const onOpenGoal = vi.fn()
     renderComposer({
@@ -109,17 +109,14 @@ describe('AiPanelComposer attachments', () => {
       screen.getByTestId('composer-plus'),
       new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
     )
-    fireEvent.click(screen.getByTestId('composer-plus-mycelium'))
-    expect(onOpenMycelium).toHaveBeenCalledWith('/sessions/a.jsonl')
-    fireEvent.pointerDown(
-      screen.getByTestId('composer-plus'),
-      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
-    )
+    expect(screen.queryByTestId('composer-plus-mycelium')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('composer-plus-research')).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId('prime-goal-trigger'))
     expect(onOpenGoal).toHaveBeenCalledTimes(1)
+    expect(onOpenMycelium).not.toHaveBeenCalled()
   })
 
-  it('puts Research and External AI tools in the plus menu', () => {
+  it('puts External AI tools in the plus menu and leaves Research to the rail', () => {
     const research = vi.fn()
     const external = vi.fn()
     window.addEventListener(NOTES_CHROME_EVENT, research)
@@ -129,13 +126,9 @@ describe('AiPanelComposer attachments', () => {
       screen.getByTestId('composer-plus'),
       new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
     )
-    fireEvent.click(screen.getByTestId('composer-plus-research'))
-    fireEvent.pointerDown(
-      screen.getByTestId('composer-plus'),
-      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
-    )
+    expect(screen.queryByTestId('composer-plus-research')).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId('composer-plus-external-ai'))
-    expect(research).toHaveBeenCalled()
+    expect(research).not.toHaveBeenCalled()
     expect(external).toHaveBeenCalled()
     window.removeEventListener(NOTES_CHROME_EVENT, research)
     window.removeEventListener(MCP_SETUP_TOGGLE_EVENT, external)
