@@ -265,11 +265,11 @@ Traffic lights (decorative), brand mark, wordmark "rhizome" (mono 600), run-stat
 - Stream caret blinks while generating
 - `@media (prefers-reduced-motion: reduce)`: stop animations and drop transforms; animated art renders its final frame statically
 
-**Focus:** every interactive element, including `textarea`, `contenteditable` composers, graph canvas and list rows, shows the shipped 3px ring halo: `focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]`. `--ring` aliases `--state-focus-ring`. Never `outline: none` or `ring-0` without an equivalent ring.
+**Focus:** every interactive element, including `textarea`, `contenteditable` composers, graph canvas and list rows, shows the shipped 3px ring halo: `focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]`. `--ring` aliases `--state-focus-ring`. The one exception is the dialog close X in `src/components/ui/dialog.tsx`: `focus:ring-2 focus:ring-offset-2` (2px ring + 2px offset). Never `outline: none` or `ring-0` without an equivalent ring.
 
 **Live regions:**
-- The transcript is `role="log"` with `aria-live="polite"`. A streaming message sets `aria-busy="true"` until it completes.
-- One visually hidden `role="status"` region announces run changes, throttled: tool started or finished, run complete, stopped, needs approval.
+- The transcript is `role="log"` with `aria-live="off"`. A streaming message sets `aria-busy="true"` until it completes. Do not set the log back to `aria-live="polite"`: that doubles announcements with the run-status region.
+- `ChatRunLiveStatus` is a separate visually hidden `role="status"` region with `aria-live="polite"`. It announces run changes, throttled: tool started or finished, run complete, stopped, needs approval.
 - Errors that block the user use `role="alert"`.
 
 Hover never reduces text contrast. Focus-visible always shows the ring.

@@ -14,13 +14,11 @@ Brand-colored UI uses `primary` (or `sidebar-primary` and `link-color`), not `ac
 
 ## Earth text tiers
 
-Every text token, including `text-muted` and `text-faint`, passes 4.5:1 on every surface of its scheme. CI enforces that with `scripts/contrast_check.py` (workflow step "Theme contrast check"). Use `text-faint` for hints and placeholders by convention. Use border tokens (`border`, `border-subtle`, `border-strong`), not faded text, for decorative lines. Informational text is 11px minimum. 10px is only for a decorative kicker that repeats information shown elsewhere.
-
-`text-muted-foreground` is a shadcn alias of `text-secondary`, not `text-faint`. New hint and placeholder copy should still use `text-faint`.
+Every text token, including `text-muted` and `text-faint`, passes 4.5:1 on every surface of its scheme. CI enforces that with `scripts/contrast_check.py` (workflow step "Theme contrast check"). Placeholders use `text-muted-foreground` (as `Input` and `Textarea` already do). Use `text-faint` for disabled text only. Use border tokens (`border`, `border-subtle`, `border-strong`), not faded text, for decorative lines. Informational text is 11px minimum. 10px is only for a decorative kicker that repeats information shown elsewhere.
 
 ## Keep the focus ring
 
-Every interactive control keeps a visible focus ring. The shipped shadcn halo is `focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]`. `--ring` aliases `--state-focus-ring`. Never remove it with `outline: none` or `ring-0` unless you replace it with an equivalent ring.
+Every interactive control keeps a visible focus ring. The shipped shadcn halo is `focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]`. `--ring` aliases `--state-focus-ring`. The one exception is the dialog close X in `src/components/ui/dialog.tsx`: `focus:ring-2 focus:ring-offset-2` (2px ring + 2px offset). Never remove a ring with `outline: none` or `ring-0` unless you replace it with an equivalent ring.
 
 ## State-true copy
 
