@@ -17,6 +17,8 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
@@ -97,6 +99,7 @@ impl ProviderKeys {
             return Err("API key cannot be empty.".into());
         }
         self.backend.set(&id, key)?;
+        keys_changed();
         if self.backend.get(&id)?.as_deref() != Some(key) {
             return Err(format!(
                 "The keychain did not return the key just saved for {id}. Nothing else changed."
@@ -109,14 +112,33 @@ impl ProviderKeys {
     pub fn delete(&self, provider_id: &str) -> Result<(), String> {
         let id = normalize_id(provider_id)?;
         self.backend.delete(&id)?;
+        keys_changed();
         self.legacy.remove(&id)
     }
 
     /// Every saved key value for `ids`, plus any key still in the legacy
     /// file, for scrubbing logs. Reads only: nothing moves.
     pub fn saved_key_values(&self, ids: impl IntoIterator<Item = String>) -> Vec<String> {
-        let _ = ids;
-        Vec::new()
+        let mut values: Vec<String> = Vec::new();
+        let mut keep = |value: String| {
+            let value = value.trim().to_string();
+            if !value.is_empty() && !values.contains(&value) {
+                values.push(value);
+            }
+        };
+        for id in ids {
+            if let Ok(id) = normalize_id(&id) {
+                if let Ok(Some(value)) = self.backend.get(&id) {
+                    keep(value);
+                }
+            }
+        }
+        for id in self.legacy.ids().unwrap_or_default() {
+            if let Ok(Some(value)) = self.legacy.key(&id) {
+                keep(value);
+            }
+        }
+        values
     }
 
     /// Moves every legacy file key into the keychain.
@@ -204,6 +226,7 @@ impl LegacyFile {
         if secrets.provider_api_keys.remove(id).is_none() {
             return Ok(());
         }
+        keys_changed();
         if secrets.provider_api_keys.is_empty() {
             return std::fs::remove_file(&self.path)
                 .map_err(|error| format!("Failed to remove the legacy key file: {error}"));
@@ -266,11 +289,34 @@ pub(crate) fn write_legacy(path: &Path, secrets: &LegacySecrets) -> Result<(), S
         .map_err(|error| format!("Failed to write the legacy key file: {error}"))
 }
 
-/// Saved key values for the session-log filter (ADR-0183), cached until a
-/// key is saved, deleted, or moved. `ids` names the providers to read.
-pub fn cached_saved_key_values(ids: impl FnOnce() -> Vec<String>) -> Vec<String> {
-    let _ = ids;
-    Vec::new()
+/// Saved key values for the session-log filter (ADR-0183). Cached until a
+/// key is saved, deleted, or moved, or the id list changes (a provider
+/// saved in Settings after its key).
+pub fn cached_saved_key_values(ids: Vec<String>) -> Vec<String> {
+    type Cached = (u64, Vec<String>, Vec<String>);
+    static CACHE: Mutex<Option<Cached>> = Mutex::new(None);
+    let generation = KEY_GENERATION.load(Ordering::SeqCst);
+    let mut cache = CACHE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some((cached_generation, cached_ids, values)) = cache.as_ref() {
+        if *cached_generation == generation && *cached_ids == ids {
+            return values.clone();
+        }
+    }
+    let values = ProviderKeys::for_app()
+        .map(|keys| keys.saved_key_values(ids.clone()))
+        .unwrap_or_default();
+    *cache = Some((generation, ids, values.clone()));
+    values
+}
+
+/// Bumped whenever a key is saved, deleted, or moved, so cached values
+/// are never stale.
+static KEY_GENERATION: AtomicU64 = AtomicU64::new(0);
+
+fn keys_changed() {
+    KEY_GENERATION.fetch_add(1, Ordering::SeqCst);
 }
 
 /// The OS keychain: macOS Keychain, Windows Credential Manager, or the
@@ -332,19 +378,26 @@ fn app_legacy_file() -> Result<PathBuf, String> {
 #[cfg(test)]
 mod test_backend {
     use std::collections::HashMap;
-    use std::sync::Mutex;
+    use std::sync::{Mutex, OnceLock};
 
-    /// The backend `ProviderKeys::for_app` gets in test builds.
+    /// The backend `ProviderKeys::for_app` gets in test builds: one
+    /// in-memory keychain shared by the test process, so a test can save a
+    /// key and then see it scrubbed from a session log.
     #[derive(Default)]
-    pub(super) struct MemoryOnly(Mutex<HashMap<String, String>>);
+    pub(super) struct MemoryOnly;
+
+    fn store() -> &'static Mutex<HashMap<String, String>> {
+        static STORE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+        STORE.get_or_init(Mutex::default)
+    }
 
     impl super::SecretBackend for MemoryOnly {
         fn get(&self, account: &str) -> Result<Option<String>, String> {
-            Ok(self.0.lock().expect("memory keys").get(account).cloned())
+            Ok(store().lock().expect("memory keys").get(account).cloned())
         }
 
         fn set(&self, account: &str, value: &str) -> Result<(), String> {
-            self.0
+            store()
                 .lock()
                 .expect("memory keys")
                 .insert(account.to_string(), value.to_string());
@@ -352,7 +405,7 @@ mod test_backend {
         }
 
         fn delete(&self, account: &str) -> Result<(), String> {
-            self.0.lock().expect("memory keys").remove(account);
+            store().lock().expect("memory keys").remove(account);
             Ok(())
         }
     }
@@ -651,21 +704,41 @@ mod tests {
     }
 
     #[test]
+    fn the_cache_refreshes_when_the_id_list_changes() {
+        ProviderKeys::for_app()
+            .unwrap()
+            .save("cache-late-provider", "cache-late-key-value")
+            .unwrap();
+        let without = cached_saved_key_values(vec!["something-else".into()]);
+
+        let with = cached_saved_key_values(vec!["cache-late-provider".into()]);
+
+        assert!(!without.contains(&"cache-late-key-value".to_string()));
+        assert!(with.contains(&"cache-late-key-value".to_string()));
+    }
+
+    #[test]
     fn saved_key_values_cover_the_keychain_and_the_legacy_file_without_moving_keys() {
         let fixture = Fixture::with_file(&[("old", "sk-file-only")]);
-        let keys = fixture.keys(MemoryBackend::with(&[("groq", "gsk-chain"), ("other", "not-asked")]));
+        let keys = fixture.keys(MemoryBackend::with(&[
+            ("groq", "gsk-chain"),
+            ("other", "not-asked"),
+        ]));
 
         let mut values = keys.saved_key_values(["groq".to_string(), "mistral".to_string()]);
         values.sort();
 
         assert_eq!(values, ["gsk-chain", "sk-file-only"]);
-        assert!(fixture.file_keys().unwrap().contains_key("old"), "scrubbing must not migrate");
+        assert!(
+            fixture.file_keys().unwrap().contains_key("old"),
+            "scrubbing must not migrate"
+        );
     }
 
     #[test]
     fn the_cache_refreshes_when_a_key_is_saved() {
         let ids = || vec!["cache-test-provider".to_string()];
-        let before = cached_saved_key_values(ids);
+        let before = cached_saved_key_values(ids());
 
         ProviderKeys::for_app()
             .unwrap()
@@ -673,7 +746,7 @@ mod tests {
             .unwrap();
 
         assert!(!before.contains(&"cache-test-key-value".to_string()));
-        assert!(cached_saved_key_values(ids).contains(&"cache-test-key-value".to_string()));
+        assert!(cached_saved_key_values(ids()).contains(&"cache-test-key-value".to_string()));
     }
 
     #[test]
