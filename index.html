@@ -227,20 +227,45 @@
     </script>
     <script>
       (function () {
+        /* rhizome-boot-motion */
         var readyEventName = 'tolaria:frontend-ready';
         var reloadAttemptKey = 'tolaria:startup-reload-attempted';
         var startupTimeoutMs = 10000;
         var isTauri = '__TAURI__' in window || '__TAURI_INTERNALS__' in window;
+        var seenVisible = false;
+
+        function applyBootMotion(state) {
+          document.documentElement.style.setProperty('--boot-motion-state', state);
+          document.documentElement.setAttribute('data-boot-motion', state);
+        }
 
         function syncBootMotion() {
-          document.documentElement.style.setProperty('--boot-motion-state', document.hidden ? 'paused' : 'running');
+          if (!document.hidden) seenVisible = true;
+          // WKWebView / Tauri often reports document.hidden at first paint.
+          // Pausing then, with fill:both grow-in, freezes two arms at opacity 0
+          // if visibilitychange never fires when the window is shown.
+          applyBootMotion(document.hidden && seenVisible ? 'paused' : 'running');
         }
-        syncBootMotion();
-        document.addEventListener('visibilitychange', syncBootMotion);
-        window.addEventListener(readyEventName, function () {
+
+        if (typeof window.__rhizomeUnbindBootMotion === 'function') {
+          window.__rhizomeUnbindBootMotion();
+        }
+
+        function releaseBootMotion() {
           document.removeEventListener('visibilitychange', syncBootMotion);
           document.documentElement.style.removeProperty('--boot-motion-state');
-        }, { once: true });
+          document.documentElement.removeAttribute('data-boot-motion');
+        }
+
+        window.__rhizomeUnbindBootMotion = function () {
+          document.removeEventListener('visibilitychange', syncBootMotion);
+          window.removeEventListener(readyEventName, releaseBootMotion);
+          delete window.__rhizomeUnbindBootMotion;
+        };
+
+        syncBootMotion();
+        document.addEventListener('visibilitychange', syncBootMotion);
+        window.addEventListener(readyEventName, releaseBootMotion, { once: true });
 
         if (!isTauri) return;
 

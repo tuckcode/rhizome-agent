@@ -123,6 +123,14 @@
   .boot-splash circle:nth-of-type(6) { animation-delay: calc(720ms - var(--boot-elapsed, 0ms)); }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .boot-splash-card > svg,
+  .boot-splash path,
+  .boot-splash circle {
+    animation: none;
+  }
+}
+
 @keyframes boot-breathe {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.055); }
@@ -143,4 +151,13 @@
 .boot-splash path,
 .boot-splash circle {
   animation-play-state: var(--boot-motion-state, running);
+}
+
+/* Paused / hidden must show the settled mark. fill:both + paused would
+   otherwise hold the grow-in from-keyframe (opacity 0). */
+:root[data-boot-motion="paused"] .boot-splash path:nth-of-type(4),
+:root[data-boot-motion="paused"] .boot-splash path:nth-of-type(5),
+:root[data-boot-motion="paused"] .boot-splash circle:nth-of-type(5),
+:root[data-boot-motion="paused"] .boot-splash circle:nth-of-type(6) {
+  animation: none;
 }
