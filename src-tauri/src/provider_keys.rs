@@ -112,6 +112,13 @@ impl ProviderKeys {
         self.legacy.remove(&id)
     }
 
+    /// Every saved key value for `ids`, plus any key still in the legacy
+    /// file, for scrubbing logs. Reads only: nothing moves.
+    pub fn saved_key_values(&self, ids: impl IntoIterator<Item = String>) -> Vec<String> {
+        let _ = ids;
+        Vec::new()
+    }
+
     /// Moves every legacy file key into the keychain.
     pub fn migrate_all(&self) -> Result<MigrationReport, String> {
         let mut report = MigrationReport::default();
@@ -257,6 +264,13 @@ pub(crate) fn write_legacy(path: &Path, secrets: &LegacySecrets) -> Result<(), S
         .map_err(|error| format!("Failed to serialize the legacy key file: {error}"))?;
     crate::secure_fs::write_owner_only_atomic(path, &json)
         .map_err(|error| format!("Failed to write the legacy key file: {error}"))
+}
+
+/// Saved key values for the session-log filter (ADR-0183), cached until a
+/// key is saved, deleted, or moved. `ids` names the providers to read.
+pub fn cached_saved_key_values(ids: impl FnOnce() -> Vec<String>) -> Vec<String> {
+    let _ = ids;
+    Vec::new()
 }
 
 /// The OS keychain: macOS Keychain, Windows Credential Manager, or the
@@ -634,6 +648,32 @@ mod tests {
         assert_eq!(keys.get("groq").unwrap().as_deref(), Some("gsk"));
         assert!(keys.save("  ", "gsk").is_err());
         assert!(keys.save("groq", "   ").is_err());
+    }
+
+    #[test]
+    fn saved_key_values_cover_the_keychain_and_the_legacy_file_without_moving_keys() {
+        let fixture = Fixture::with_file(&[("old", "sk-file-only")]);
+        let keys = fixture.keys(MemoryBackend::with(&[("groq", "gsk-chain"), ("other", "not-asked")]));
+
+        let mut values = keys.saved_key_values(["groq".to_string(), "mistral".to_string()]);
+        values.sort();
+
+        assert_eq!(values, ["gsk-chain", "sk-file-only"]);
+        assert!(fixture.file_keys().unwrap().contains_key("old"), "scrubbing must not migrate");
+    }
+
+    #[test]
+    fn the_cache_refreshes_when_a_key_is_saved() {
+        let ids = || vec!["cache-test-provider".to_string()];
+        let before = cached_saved_key_values(ids);
+
+        ProviderKeys::for_app()
+            .unwrap()
+            .save("cache-test-provider", "cache-test-key-value")
+            .unwrap();
+
+        assert!(!before.contains(&"cache-test-key-value".to_string()));
+        assert!(cached_saved_key_values(ids).contains(&"cache-test-key-value".to_string()));
     }
 
     #[test]

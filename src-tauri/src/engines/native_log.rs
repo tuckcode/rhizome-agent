@@ -823,20 +823,47 @@ mod tests {
         assert!(!json.contains("super-secret-value"));
     }
 
+    /// Keys live in the keychain after step 3a (ADR-0185), not in
+    /// `ai-provider-secrets.json`, so the filter must read the keychain.
     #[test]
-    fn scrub_secrets_redacts_a_saved_key_exactly() {
+    fn scrub_secrets_redacts_a_keychain_key_for_a_catalog_provider() {
         let _home = temp_home();
-        let path =
-            crate::app_config::preferred_app_config_path("ai-provider-secrets.json").unwrap();
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(
-            &path,
-            r#"{"provider_api_keys":{"openai":"exact-saved-key-value"}}"#,
-        )
-        .unwrap();
-        let scrubbed = scrub_secrets("the key is exact-saved-key-value today");
-        assert!(!scrubbed.contains("exact-saved-key-value"));
+        crate::provider_keys::ProviderKeys::for_app()
+            .unwrap()
+            .save("mistral", "keychain-catalog-key-value")
+            .unwrap();
+
+        let scrubbed = scrub_secrets("the key is keychain-catalog-key-value today");
+
+        assert!(!scrubbed.contains("keychain-catalog-key-value"), "{scrubbed}");
         assert!(scrubbed.contains("[redacted]"));
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_keychain_key_for_a_saved_provider() {
+        let _home = temp_home();
+        let provider: crate::ai_models::AiModelProvider = serde_json::from_value(serde_json::json!({
+            "id": "open_ai_compatible-scrubtest",
+            "name": "Scrub test",
+            "kind": "open_ai_compatible",
+            "base_url": "https://hosted.test/v1",
+            "api_key_storage": "local_file",
+            "models": [],
+        }))
+        .unwrap();
+        crate::settings::save_settings(crate::settings::Settings {
+            ai_model_providers: Some(vec![provider]),
+            ..Default::default()
+        })
+        .unwrap();
+        crate::provider_keys::ProviderKeys::for_app()
+            .unwrap()
+            .save("open_ai_compatible-scrubtest", "keychain-custom-key-value")
+            .unwrap();
+
+        let scrubbed = scrub_secrets("custom keychain-custom-key-value here");
+
+        assert!(!scrubbed.contains("keychain-custom-key-value"), "{scrubbed}");
     }
 
     #[test]
