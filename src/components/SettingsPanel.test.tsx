@@ -767,6 +767,19 @@ describe('SettingsPanel', () => {
     })
   })
 
+  it('Loam locks the mode toggle so Match system cannot flip Earth light', () => {
+    installMatchMedia(false)
+    renderOpenSettings()
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Loam' }))
+
+    expect(screen.getByTestId('settings-theme-mode')).toHaveAttribute('aria-disabled', 'true')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'loam')
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveClass('dark')
+    expectSettingsSaved({ color_theme: 'loam' })
+  })
+
   it('preserves a saved dark color mode until changed', () => {
     render(
       <SettingsPanel

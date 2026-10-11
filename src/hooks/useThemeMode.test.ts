@@ -108,6 +108,21 @@ describe('useThemeMode', () => {
     act(() => media.setMatches(false))
     expect(document.documentElement).toHaveAttribute('data-theme', 'light')
   })
+
+  it('Loam stays dark when Match system follows prefers-color-scheme', () => {
+    const media = installMatchMedia(false)
+
+    renderHook(() => useThemeMode('system', true, 'loam', 'blue'))
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'loam')
+    expect(document.documentElement).toHaveClass('dark')
+    expect(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)).toBe('system')
+
+    act(() => media.setMatches(true))
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'loam')
+  })
 })
 
 function installMatchMedia(initialMatches: boolean) {
