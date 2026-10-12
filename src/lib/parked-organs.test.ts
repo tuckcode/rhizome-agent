@@ -96,9 +96,10 @@ describe('parked organs leftover', () => {
     )
   })
 
-  it('keeps Welcome Download words in en.json — C18', () => {
+  it('keeps Welcome Rhizome Vault / Portent words in en.json — C18', () => {
     const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
-    expect(en).toContain('"Download the Getting Started vault"')
+    expect(en).toContain('"Create the Rhizome Vault from the Portent template"')
+    expect(en).not.toContain('"Download the Getting Started vault"')
   })
 
   it('keeps packaged MCP generated and gitignored', () => {
@@ -437,11 +438,11 @@ describe('parked organs leftover', () => {
     expect(gestures).not.toMatch(/switchPrimeSession|onSelectSession/)
   })
 
-  it('keeps Create Getting Started Vault and Inbox as a Notes folder mode', () => {
+  it('keeps Create Rhizome Vault and Inbox as a Notes folder mode', () => {
     const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
     const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
     expect(en).toContain(
-      '"status.vault.cloneGettingStarted": "Create Getting Started Vault"',
+      '"status.vault.cloneGettingStarted": "Create Rhizome Vault"',
     )
     expect(app).toContain('showInbox: explicitOrganizationEnabled')
   })

@@ -26,7 +26,7 @@ export function AboutSettingsSection({
       />
       <img
         src={rhizomeOrganicHero}
-        alt="Rhizome Agent. Your work. Your memory. Chat with Prime. Keep what matters."
+        alt="Rhizome"
         width={1774}
         height={887}
         loading="lazy"

@@ -24,7 +24,7 @@ export function useGettingStartedClone({
   return useCallback(async () => {
     let parentPath: string | null
     try {
-      parentPath = await pickFolder('Choose a parent folder for the Getting Started vault')
+      parentPath = await pickFolder('Choose a parent folder for the Rhizome Vault')
     } catch (err) {
       onError(formatFolderPickerActionError('Could not choose a parent folder', err))
       return

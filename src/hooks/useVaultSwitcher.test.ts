@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
-import { useVaultSwitcher, DEFAULT_VAULTS } from './useVaultSwitcher'
+import { useVaultSwitcher, DEFAULT_VAULTS, GETTING_STARTED_LABEL } from './useVaultSwitcher'
 import type { PersistedVaultList } from './useVaultSwitcher'
 
 const mockDefaultVaultPath = '/mock/Documents/Getting Started'
@@ -99,7 +99,7 @@ describe('useVaultSwitcher', () => {
   it('loads the default vault when the resolved path exists', async () => {
     const { result } = await renderLoadedVaultSwitcher()
 
-    expect(result.current.allVaults).toEqual([{ label: 'Getting Started', path: expectedDefaultVaultPath, managedDefault: true }])
+    expect(result.current.allVaults).toEqual([{ label: GETTING_STARTED_LABEL, path: expectedDefaultVaultPath, managedDefault: true }])
     expect(result.current.vaultPath).toBe(expectedDefaultVaultPath)
   })
 
@@ -224,7 +224,7 @@ describe('useVaultSwitcher', () => {
 
     expect(result.current.vaultPath).toBe(expectedDefaultVaultPath)
     expect(result.current.selectedVaultPath).toBe(expectedDefaultVaultPath)
-    expect(result.current.allVaults).toEqual([{ label: 'Getting Started', path: expectedDefaultVaultPath, managedDefault: true }])
+    expect(result.current.allVaults).toEqual([{ label: GETTING_STARTED_LABEL, path: expectedDefaultVaultPath, managedDefault: true }])
     expect(mockVaultListStore).toEqual({
       vaults: [],
       active_vault: expectedDefaultVaultPath,
@@ -381,7 +381,7 @@ describe('useVaultSwitcher', () => {
 
     // Should fall back to defaults
     expect(result.current.allVaults).toHaveLength(1)
-    expect(result.current.allVaults[0].label).toBe('Getting Started')
+    expect(result.current.allVaults[0].label).toBe(GETTING_STARTED_LABEL)
     expect(result.current.allVaults[0].path).toBe(expectedDefaultVaultPath)
     warnSpy.mockRestore()
   })

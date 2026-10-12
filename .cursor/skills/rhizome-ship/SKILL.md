@@ -81,7 +81,7 @@ ahead only if the push was refused and you reported why.
 
 ## 3. rebuild
 
-Only when the user will **use** `/Applications/Rhizome Agent.app`.
+Only when the user will **use** `/Applications/Rhizome.app`.
 
 1. Ask before quitting a live app — it may hold unsaved chat/note
    state (C65). If they already said rebuild and the app is open:
@@ -90,12 +90,21 @@ Only when the user will **use** `/Applications/Rhizome Agent.app`.
    osascript -e 'tell application id "ai.rhizome.agent" to quit'
    ```
 
-2. Remove leftover copies so Spotlight cannot open the wrong binary
-   (`Rhizome Agent.app`, `*.app.bak` extras).
-3. Package into `/Applications/Rhizome Agent.app` using this repo’s
+2. If `/Applications/Rhizome Agent.app` is still installed, move it to
+   an archive folder. Do not delete it. Both apps must not stay
+   installed, or Spotlight can open the old binary.
+
+   ```bash
+   mkdir -p ~/Documents/Rhizome\ archives
+   mv "/Applications/Rhizome Agent.app" ~/Documents/Rhizome\ archives/
+   ```
+
+3. Remove leftover `*.app.bak` copies so Spotlight cannot open the
+   wrong binary.
+4. Package into `/Applications/Rhizome.app` using this repo’s
    documented Tauri build path (`pnpm tauri build` / the ship docs
    in `AGENTS.md`). Vite / `pnpm tauri dev` is **not** this verb.
-4. Add a ship note under `docs/plans/handoffs/` and stamp `docs/BOARD.md`
+5. Add a ship note under `docs/plans/handoffs/` and stamp `docs/BOARD.md`
    with the new commit + install time. Keep three SHAs: origin, local, app.
    Do not append a line to `docs/HANDOFF.md`.
 
@@ -108,7 +117,9 @@ HEAD, leftovers are gone, and living docs name the new app SHA.
 
 - Push lanes and LLVM: `AGENTS.md` Commits & pushes.
 - App id: `ai.rhizome.agent`.
-- Installed path: `/Applications/Rhizome Agent.app`.
+- Installed path: `/Applications/Rhizome.app`.
+- Archive an older `/Applications/Rhizome Agent.app` before install;
+  do not delete it.
 - Ship rules: `docs/BOARD.md` “Ship rules”.
 - In-app updater (`app_updater.rs`) is a **different** path. Not a
   fourth verb.

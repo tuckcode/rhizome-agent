@@ -2,7 +2,8 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { APP_STORAGE_KEYS, LEGACY_APP_STORAGE_KEYS } from '../constants/appStorage'
 
-const DEFAULT_GETTING_STARTED_PATH = '/mock/Documents/Getting Started'
+const DEFAULT_RHIZOME_VAULT_PATH = '/mock/Documents/Rhizome Vault'
+const SAVED_GETTING_STARTED_PATH = '/mock/Documents/Getting Started'
 const DEFAULT_PARENT_PATH = '/mock/Documents'
 const MISSING_VAULT_PATH = '/vault/missing'
 
@@ -50,7 +51,7 @@ function mockCommands(overrides: Record<string, MockOverride> = {}) {
     if (override !== undefined) {
       return override
     }
-    if (cmd === 'get_default_vault_path') return DEFAULT_GETTING_STARTED_PATH
+    if (cmd === 'get_default_vault_path') return DEFAULT_RHIZOME_VAULT_PATH
     if (cmd === 'check_vault_exists') return false
     return null
   })
@@ -154,7 +155,35 @@ describe('useOnboarding', () => {
 
     const { result } = await renderOnboarding()
 
-    expect(result.current.state).toEqual({ status: 'welcome', defaultPath: DEFAULT_GETTING_STARTED_PATH })
+    expect(result.current.state).toEqual({ status: 'welcome', defaultPath: DEFAULT_RHIZOME_VAULT_PATH })
+  })
+
+  it('opens a saved Getting Started vault even when the new default is Rhizome Vault', async () => {
+    mockCommands({
+      check_vault_exists: (args?: MockArgs) =>
+        (args as { path?: string } | undefined)?.path === SAVED_GETTING_STARTED_PATH,
+    })
+
+    const { result } = await renderOnboarding(SAVED_GETTING_STARTED_PATH)
+
+    expect(result.current.state).toEqual({
+      status: 'ready',
+      vaultPath: SAVED_GETTING_STARTED_PATH,
+    })
+  })
+
+  it('opens any saved vault path that still exists on disk', async () => {
+    mockCommands({
+      check_vault_exists: (args?: MockArgs) =>
+        (args as { path?: string } | undefined)?.path === '/Users/mock/Documents/Work',
+    })
+
+    const { result } = await renderOnboarding('/Users/mock/Documents/Work')
+
+    expect(result.current.state).toEqual({
+      status: 'ready',
+      vaultPath: '/Users/mock/Documents/Work',
+    })
   })
 
   it('shows vault-missing when a previously configured active vault is missing', async () => {
@@ -172,7 +201,7 @@ describe('useOnboarding', () => {
     expect(result.current.state).toEqual({
       status: 'vault-missing',
       vaultPath: '/vault/deleted',
-      defaultPath: DEFAULT_GETTING_STARTED_PATH,
+      defaultPath: DEFAULT_RHIZOME_VAULT_PATH,
     })
   })
 
@@ -188,7 +217,7 @@ describe('useOnboarding', () => {
 
     const { result } = await renderOnboarding('/vault/deleted')
 
-    expect(result.current.state).toEqual({ status: 'welcome', defaultPath: DEFAULT_GETTING_STARTED_PATH })
+    expect(result.current.state).toEqual({ status: 'welcome', defaultPath: DEFAULT_RHIZOME_VAULT_PATH })
   })
 
   it('clears the persisted active vault when the saved path no longer exists', async () => {
@@ -229,16 +258,16 @@ describe('useOnboarding', () => {
       await result.current.handleCreateVault()
     })
 
-    expect(result.current.state).toEqual({ status: 'ready', vaultPath: DEFAULT_GETTING_STARTED_PATH })
+    expect(result.current.state).toEqual({ status: 'ready', vaultPath: DEFAULT_RHIZOME_VAULT_PATH })
     expect(mockInvokeFn).toHaveBeenCalledWith('create_getting_started_vault', {
-      targetPath: DEFAULT_GETTING_STARTED_PATH,
+      targetPath: DEFAULT_RHIZOME_VAULT_PATH,
     })
     expect(registerVault).toHaveBeenCalledWith(
-      DEFAULT_GETTING_STARTED_PATH,
-      'Getting Started',
+      DEFAULT_RHIZOME_VAULT_PATH,
+      'Rhizome Vault',
       { verifyAvailability: false },
     )
-    expect(onTemplateVaultReady).toHaveBeenCalledWith(DEFAULT_GETTING_STARTED_PATH)
+    expect(onTemplateVaultReady).toHaveBeenCalledWith(DEFAULT_RHIZOME_VAULT_PATH)
     expect(localStorage.getItem(APP_STORAGE_KEYS.welcomeDismissed)).toBe('1')
   })
 
@@ -291,9 +320,9 @@ describe('useOnboarding', () => {
       await result.current.retryCreateVault()
     })
 
-    expect(result.current.state).toEqual({ status: 'ready', vaultPath: DEFAULT_GETTING_STARTED_PATH })
+    expect(result.current.state).toEqual({ status: 'ready', vaultPath: DEFAULT_RHIZOME_VAULT_PATH })
     expect(mockInvokeFn).toHaveBeenLastCalledWith('create_getting_started_vault', {
-      targetPath: DEFAULT_GETTING_STARTED_PATH,
+      targetPath: DEFAULT_RHIZOME_VAULT_PATH,
     })
   })
 
@@ -375,7 +404,7 @@ describe('useOnboarding', () => {
       await result.current.handleOpenFolder()
     })
 
-    expect(result.current.state).toEqual({ status: 'welcome', defaultPath: DEFAULT_GETTING_STARTED_PATH })
+    expect(result.current.state).toEqual({ status: 'welcome', defaultPath: DEFAULT_RHIZOME_VAULT_PATH })
     expect(result.current.error).toBe('Could not open vault: Failed to write vault list')
   })
 

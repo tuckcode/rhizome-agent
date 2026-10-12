@@ -3,6 +3,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { formatFolderPickerActionError, pickFolder } from '../utils/vault-dialog'
+import { GETTING_STARTED_VAULT_NAME } from '../utils/gettingStartedVault'
 import { loadVaultList, saveVaultList } from '../utils/vaultListStore'
 import type { VaultOption } from '../components/StatusBar'
 import { trackEvent } from '../lib/telemetry'
@@ -13,7 +14,7 @@ import { sanitizeDefaultWorkspacePath } from './vaultSwitcherSanitization'
 
 export type { PersistedVaultList } from '../utils/vaultListStore'
 
-export const GETTING_STARTED_LABEL = 'Getting Started'
+export const GETTING_STARTED_LABEL = 'Rhizome Vault'
 
 declare const __DEMO_VAULT_PATH__: string | undefined
 
@@ -188,8 +189,12 @@ function isCanonicalGettingStartedPath(path: string, resolvedDefaultPath: string
   return path === resolvedDefaultPath
 }
 
+function isStarterVaultLabel(label: string | undefined): boolean {
+  return label === GETTING_STARTED_LABEL || label === GETTING_STARTED_VAULT_NAME
+}
+
 function isUnavailableGettingStartedVault(vault: VaultOption): boolean {
-  return vault.label === GETTING_STARTED_LABEL && vault.available === false
+  return isStarterVaultLabel(vault.label) && vault.available === false
 }
 
 function shouldDropPersistedGettingStartedVault(vault: VaultOption, resolvedDefaultPath: string): boolean {

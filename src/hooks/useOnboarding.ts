@@ -174,7 +174,7 @@ function useTemplateVaultCreation(
         await registerVaultSelection(options.registerVault, vaultPath, { verifyAvailability: false })
       } catch (err) {
         options.setError(formatOnboardingRegistrationError({
-          action: 'Could not register the Getting Started vault',
+          action: 'Could not register the Rhizome Vault',
           err,
         }))
         return
@@ -197,7 +197,7 @@ function useCreateVaultHandler(
     const parentPath = await pickFolderWithOnboardingError({
       action: 'Could not choose a parent folder',
       setError,
-      title: 'Choose a parent folder for the Getting Started vault',
+      title: 'Choose a parent folder for the Rhizome Vault',
     })
     if (!parentPath) return
 

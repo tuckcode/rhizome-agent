@@ -1132,7 +1132,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   },
   get_last_vault_path: () => mockLastVaultPath,
   set_last_vault_path: (args: { path: string }) => { mockLastVaultPath = args.path; return null },
-  get_default_vault_path: () => '/Users/mock/Documents/Getting Started',
+  get_default_vault_path: () => '/Users/mock/Documents/Rhizome Vault',
   check_vault_exists: (args: { path: string }) => {
     // In mock mode, the demo-vault-v2 path always "exists"
     return args.path.includes('demo-vault-v2')

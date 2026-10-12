@@ -12,6 +12,8 @@ describe('leftover identity — Agent not Desktop', () => {
     expect(identity).toContain('Do not rename the product back to Desktop.')
     expect(identity).toContain('`tuckcode/rhizome-agent`')
     expect(identity).toContain('`ai.rhizome.agent`')
+    expect(identity).toContain('user-facing product name is **Rhizome**')
+    expect(identity).toContain('`RhizomeAgent`')
     expect(identity).toContain(
       'Do **not** add `knispo/rhizome` as `origin`.',
     )

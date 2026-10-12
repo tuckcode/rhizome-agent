@@ -1379,7 +1379,7 @@ describe('App', () => {
     let templateExists = false
     const saveVaultList = vi.fn()
     const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('file:///Users/mock/Documents')
-    const expectedLabel = 'Getting Started'
+    const expectedLabel = 'Rhizome Vault'
 
     mockCommandResults.load_vault_list = { vaults: [], active_vault: null, hidden_defaults: [] }
     mockCommandResults.check_vault_exists = (args?: { path?: string }) => {

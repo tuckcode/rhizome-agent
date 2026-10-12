@@ -12,15 +12,15 @@ import {
 
 describe('gettingStartedVault', () => {
   it('builds a child vault path from a parent folder', () => {
-    expect(buildGettingStartedVaultPath('/Users/luca/Documents')).toBe('/Users/luca/Documents/Getting Started')
+    expect(buildGettingStartedVaultPath('/Users/luca/Documents')).toBe('/Users/luca/Documents/Rhizome Vault')
   })
 
   it('trims trailing separators when building the child vault path', () => {
-    expect(buildGettingStartedVaultPath('/Users/luca/Documents/')).toBe('/Users/luca/Documents/Getting Started')
+    expect(buildGettingStartedVaultPath('/Users/luca/Documents/')).toBe('/Users/luca/Documents/Rhizome Vault')
   })
 
   it('preserves windows separators when building the child vault path', () => {
-    expect(buildGettingStartedVaultPath('C:\\Users\\luca\\Documents\\')).toBe('C:\\Users\\luca\\Documents\\Getting Started')
+    expect(buildGettingStartedVaultPath('C:\\Users\\luca\\Documents\\')).toBe('C:\\Users\\luca\\Documents\\Rhizome Vault')
   })
 
   it('builds a default "Rhizome Vault" child path for new empty vaults', () => {

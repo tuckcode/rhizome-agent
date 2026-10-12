@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Rhizome Agent",
+  "productName": "Rhizome",
   "version": "0.1.0",
   "identifier": "ai.rhizome.agent",
   "build": {
@@ -14,7 +14,7 @@
     "macOSPrivateApi": true,
     "windows": [
       {
-        "title": "Rhizome Agent",
+        "title": "Rhizome",
         "width": 1400,
         "height": 900,
         "minWidth": 480,
@@ -77,7 +77,7 @@
       "icons/icon.ico"
     ],
     "shortDescription": "Chat shell powered by Prime Agent",
-    "longDescription": "Rhizome Agent is a separate app from Rhizome Desktop. It embeds a chat UI on the Prime Agent harness and uses Rhizome MCP for vault tools."
+    "longDescription": "Rhizome is a separate app from Rhizome Desktop. It embeds a chat UI on Rhizome's own harness, with Prime Agent as an optional engine, and uses Rhizome MCP for vault tools."
   },
   "plugins": {
     "deep-link": {

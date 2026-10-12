@@ -8,7 +8,7 @@ How to navigate the **Rhizome** codebase, run the app, and find what you need.
 
 ## What ships now
 
-User-facing name is **Rhizome**. The bundle is still `ai.rhizome.agent` / `Rhizome Agent.app`.
+User-facing name is **Rhizome**. The bundle is still `ai.rhizome.agent` / `Rhizome.app`.
 
 - Rhizome owns the agent loop (ADR-0180). Native chat works without Prime. Settings still starts Chat on Prime until you switch **Chat engine**. Hermes is not a usable engine in the app today.
 - Free-tier routing appears as **Free tier (auto)**. The name Taproot is not on main.
@@ -504,7 +504,7 @@ Verified against source 2026-09-14. Longer landmine list:
 - **Do not append a line to `docs/HANDOFF.md` from a PR.** Add a file under
   `docs/plans/handoffs/` instead. Parallel PRs that stamp State or Recent
   conflict on merge (#142, #143, #145, #148).
-- **One Rhizome at a time.** Debug bundle and `/Applications/Rhizome Agent.app`
+- **One Rhizome at a time.** Debug bundle and `/Applications/Rhizome.app`
   share `ai.rhizome.agent`. Launching a second copy silently forwards to the
   first. Quit the installed app before `pnpm tauri dev`.
 - **Chat default.** `useViewMode` returns the Chat preset (`editor-only`) when
