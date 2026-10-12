@@ -608,7 +608,7 @@ Type a space first to switch the palette to a prompt. It sends the prompt to Cha
 - **Open in New Window**.
 - **Use Light Mode**, **Use Dark Mode** and **Match System**.
 - **Add Remote to Current Vault** and **View Pending Changes**.
-- **Reload Vault**, **Repair Vault** and **Restore Getting Started Vault**.
+- **Reload Vault**, **Repair Vault** and **Restore Rhizome Vault**.
 - **Set Up External AI Tools…** to connect Claude Code, Cursor and other MCP clients to your vault.
 - **Open Settings**, **Open AI Agents** and **Keyboard Shortcuts**.
 

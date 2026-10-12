@@ -22,6 +22,7 @@ The template vault path is `~/Documents/Rhizome Vault`. The command
 name is **Restore Rhizome Vault**. Portent is MIT, © 2026 Refactoring,
 `portent-vault-template` commit `87c4adc`.
 
-No site page still uses **Restore Getting Started Vault**.
+No docs page still uses **Restore Getting Started Vault**. The in-app
+agent-docs bundle was regenerated with `pnpm docs:build`.
 
 Did not edit `docs/HANDOFF.md`. Did not merge.

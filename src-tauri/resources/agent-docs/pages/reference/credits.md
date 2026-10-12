@@ -11,5 +11,5 @@ Rhizome is free software under AGPL-3.0-or-later. It builds on the projects belo
 | [Mindwalk](https://github.com/cosmtrek/mindwalk) © 2026 Ricko Yu | MIT | The map engine behind [Mycelium](../concepts/mycelium.md). You install it separately; Rhizome calls it |
 | [OmniRoute](https://github.com/diegosouzapw/OmniRoute) © 2026 diegosouzapw | MIT | [Free tier (auto)](../concepts/free-models-and-routing.md): the provider catalog data and cooldown rules are ported from it |
 | [freellmapi](https://github.com/tashfeenahmed/freellmapi) | MIT | Free tier (auto): used as an edge-case checklist for retries and failover. No code or hosted catalog is copied |
-| [Portent](https://portent.md) | See the project | The default work types for new vaults. See [Structure a vault with Portent](../guides/structure-with-portent.md) |
+| [Portent](https://portent.md) ([portent-vault-template](https://github.com/refactoringhq/portent-vault-template) at commit `87c4adc`) © 2026 Refactoring | MIT | The default work types for new vaults, copied into `src-tauri/src/vault/config_seed.rs`. See [Structure a vault with Portent](../guides/structure-with-portent.md) |
 | [IronCalc](https://github.com/ironcalc/IronCalc) | MIT or Apache-2.0 | Spreadsheet engine for sheet notes |
