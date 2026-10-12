@@ -47,3 +47,11 @@ commits: HEAD
 ## Off-limits
 
 Did not edit the #155 files.
+
+## C95
+
+`tests/smoke/unified-shell-layout.spec.ts` still fails on
+`prime-session-list` visibility after opening a note beside Chat. Same
+Chat-rail leftover as PR #155. This session did not touch that spec or
+the #155 files. Four other smokes were flaky on first try and passed
+on retry. Frontend lint, typecheck, coverage, and mcp passed.
