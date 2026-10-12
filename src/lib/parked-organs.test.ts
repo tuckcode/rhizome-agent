@@ -438,11 +438,11 @@ describe('parked organs leftover', () => {
     expect(gestures).not.toMatch(/switchPrimeSession|onSelectSession/)
   })
 
-  it('keeps Create Getting Started Vault and Inbox as a Notes folder mode', () => {
+  it('keeps Create Rhizome Vault and Inbox as a Notes folder mode', () => {
     const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
     const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
     expect(en).toContain(
-      '"status.vault.cloneGettingStarted": "Create Getting Started Vault"',
+      '"status.vault.cloneGettingStarted": "Create Rhizome Vault"',
     )
     expect(app).toContain('showInbox: explicitOrganizationEnabled')
   })
