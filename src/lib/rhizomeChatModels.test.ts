@@ -134,6 +134,24 @@ describe('isWellFormedRhizomeTarget', () => {
     expect(isWellFormedRhizomeTarget('anthropic/claude-opus-4')).toBe(false)
     expect(isWellFormedRhizomeTarget('claude_code/claude-opus-4')).toBe(false)
     expect(isWellFormedRhizomeTarget('open_router/anthropic/claude-sonnet-4')).toBe(true)
+    expect(
+      isWellFormedRhizomeTarget('work-anthropic/claude-sonnet-4', [
+        {
+          id: 'work-anthropic',
+          name: 'Work Anthropic',
+          kind: 'anthropic',
+          base_url: 'https://api.anthropic.com/v1',
+          api_key_storage: 'local_file',
+          models: [
+            {
+              id: 'claude-sonnet-4',
+              display_name: 'Claude Sonnet 4',
+              capabilities,
+            },
+          ],
+        },
+      ]),
+    ).toBe(false)
     expect(isWellFormedRhizomeTarget('')).toBe(false)
   })
 })

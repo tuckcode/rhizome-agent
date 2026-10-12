@@ -25,8 +25,9 @@ Claude models never appeared in the Rhizome/native model list.
   or requested engine), not `chatEngine !== 'native'`.
 - Settings description is the reviewer text: changes apply to new chats,
   and an open chat keeps the engine it started with.
-- The catalog filter hides Anthropic / Claude Code / Prime ids only.
-  OpenRouter Claude models stay in the list.
+- The catalog filter hides Anthropic and Claude Code ids, including a
+  custom provider whose kind is anthropic. OpenRouter Claude stays.
+  There is no `prime/` catalog prefix; that claim was dropped.
 
 ## Tests
 
