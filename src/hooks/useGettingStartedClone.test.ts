@@ -40,9 +40,9 @@ describe('useGettingStartedClone', () => {
     expect(onError).not.toHaveBeenCalled()
   })
 
-  it('clones into a child Getting Started folder and reports the canonical path', async () => {
+  it('clones into a child Rhizome Vault folder and reports the canonical path', async () => {
     vi.mocked(pickFolder).mockResolvedValue('/Users/luca/Documents')
-    mockInvokeFn.mockResolvedValue('/Users/luca/Documents/Getting Started')
+    mockInvokeFn.mockResolvedValue('/Users/luca/Documents/Rhizome Vault')
 
     const onSuccess = vi.fn()
     const onError = vi.fn()
@@ -53,9 +53,9 @@ describe('useGettingStartedClone', () => {
     })
 
     expect(mockInvokeFn).toHaveBeenCalledWith('create_getting_started_vault', {
-      targetPath: '/Users/luca/Documents/Getting Started',
+      targetPath: '/Users/luca/Documents/Rhizome Vault',
     })
-    expect(onSuccess).toHaveBeenCalledWith('/Users/luca/Documents/Getting Started', 'Getting Started')
+    expect(onSuccess).toHaveBeenCalledWith('/Users/luca/Documents/Rhizome Vault', 'Rhizome Vault')
     expect(onError).not.toHaveBeenCalled()
   })
 
