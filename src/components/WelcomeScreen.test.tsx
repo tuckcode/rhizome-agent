@@ -168,7 +168,7 @@ describe('WelcomeScreen', () => {
 
     it('shows loading text on template button while creating', () => {
       render(<WelcomeScreen {...defaultProps} creatingAction="template" />)
-      expect(screen.getByTestId('welcome-create-vault')).toHaveTextContent(/Downloading template/)
+      expect(screen.getByTestId('welcome-create-vault')).toHaveTextContent(/Setting up the vault/)
       expect(screen.getByTestId('welcome-status')).toHaveAttribute('aria-live', 'polite')
     })
 
