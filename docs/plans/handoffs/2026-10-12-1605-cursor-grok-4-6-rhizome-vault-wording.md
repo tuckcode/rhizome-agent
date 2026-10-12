@@ -19,7 +19,8 @@ Vault:
 - create/open toasts in `App.tsx`
 - restore/error toasts in `useVaultSwitcher.ts`
 - create/download errors in `gettingStartedVault.ts`
-- command palette fallback and native menu restore label
+- command palette restore label reads `command.settings.restoreGettingStarted`
+  (`Restore Rhizome Vault`) instead of a hardcoded Getting Started string
 - Rust create-folder errors and the init commit message
 
 `GETTING_STARTED_VAULT_NAME` and `LEGACY_DEFAULT_VAULT_FOLDER_NAME`

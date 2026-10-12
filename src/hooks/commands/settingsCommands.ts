@@ -160,18 +160,20 @@ function buildThemeCommands({
 }
 
 function buildVaultSettingsCommands({
+  locale = 'en',
   vaultCount,
   isGettingStartedHidden,
   onOpenVault,
   onCreateEmptyVault,
   onRemoveActiveVault,
   onRestoreGettingStarted,
-}: Pick<SettingsCommandsConfig, 'vaultCount' | 'isGettingStartedHidden' | 'onOpenVault' | 'onCreateEmptyVault' | 'onRemoveActiveVault' | 'onRestoreGettingStarted'>): CommandAction[] {
+}: Pick<SettingsCommandsConfig, 'locale' | 'vaultCount' | 'isGettingStartedHidden' | 'onOpenVault' | 'onCreateEmptyVault' | 'onRemoveActiveVault' | 'onRestoreGettingStarted'>): CommandAction[] {
+  const t = createTranslator(locale)
   return [
     { id: 'create-empty-vault', label: 'Create Empty Vault…', group: 'Settings', keywords: ['vault', 'create', 'new', 'empty', 'folder'], enabled: !!onCreateEmptyVault, execute: () => onCreateEmptyVault?.() },
     { id: 'open-vault', label: 'Open Vault…', group: 'Settings', keywords: ['vault', 'folder', 'switch', 'open', 'workspace'], enabled: true, execute: () => onOpenVault?.() },
     { id: 'remove-vault', label: 'Remove Vault from List', group: 'Settings', keywords: ['vault', 'remove', 'disconnect', 'hide'], enabled: (vaultCount ?? 0) > 1 && !!onRemoveActiveVault, execute: () => onRemoveActiveVault?.() },
-    { id: 'restore-getting-started', label: 'Restore Rhizome Vault', group: 'Settings', keywords: ['vault', 'restore', 'demo', 'getting started', 'rhizome vault', 'reset'], enabled: !!isGettingStartedHidden && !!onRestoreGettingStarted, execute: () => onRestoreGettingStarted?.() },
+    { id: 'restore-getting-started', label: t('command.settings.restoreGettingStarted'), group: 'Settings', keywords: ['vault', 'restore', 'demo', 'getting started', 'rhizome vault', 'reset'], enabled: !!isGettingStartedHidden && !!onRestoreGettingStarted, execute: () => onRestoreGettingStarted?.() },
   ]
 }
 
@@ -232,6 +234,7 @@ export function buildSettingsCommands(config: SettingsCommandsConfig): CommandAc
       onSetUiLanguage,
     }),
     ...buildVaultSettingsCommands({
+      locale,
       vaultCount,
       isGettingStartedHidden,
       onOpenVault,
