@@ -102,8 +102,8 @@ pub fn resolve_default_vault_path_in(
 /// Default location for a new starter vault. Existing saved paths stay as
 /// they are; this does not move or rename a vault already on disk.
 pub fn default_vault_path() -> Result<PathBuf, String> {
-    let documents = documents_dir()
-        .ok_or_else(|| "Could not determine Documents directory".to_string())?;
+    let documents =
+        documents_dir().ok_or_else(|| "Could not determine Documents directory".to_string())?;
     Ok(resolve_default_vault_path_in(&documents, |path| {
         vault_exists_with_default_path(path, Some(path))
     }))
