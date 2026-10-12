@@ -675,13 +675,14 @@ export function AiPanel({
     nativeTarget,
   })
 
+  const handleNewChat = controller.handleNewChat
   useEffect(() => {
     if (!newChatRef) return
     newChatRef.current = () => {
       onConversationReset?.()
-      controller.handleNewChat()
+      handleNewChat()
     }
-  }, [controller.handleNewChat, newChatRef, onConversationReset])
+  }, [handleNewChat, newChatRef, onConversationReset])
 
   return (
     <AiPanelView
