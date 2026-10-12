@@ -33,9 +33,26 @@ export function isLegacyProviderKindId(id: string): boolean {
   return LEGACY_PROVIDER_KIND_IDS.has(id.trim().toLowerCase().replace(/-/g, '_'))
 }
 
-function isAnthropicTarget(id: string): boolean {
+/** Direct Anthropic / Claude Code ids. OpenRouter Claude stays visible. */
+export function isAnthropicTarget(
+  id: string,
+  providers?: AiModelProvider[] | null,
+): boolean {
   const value = id.trim().toLowerCase()
-  return value.startsWith('anthropic/') || value.includes('/claude')
+  if (
+    value.startsWith('anthropic/') ||
+    value.startsWith('claude_code/') ||
+    value.startsWith('claude-code/')
+  ) {
+    return true
+  }
+  const parts = splitTarget(id)
+  if (!parts) return false
+  const providerId = parts.provider.trim().toLowerCase()
+  return normalizeAiModelProviders(providers).some((provider) => {
+    if (provider.kind !== 'anthropic') return false
+    return providerKey(provider) === providerId || provider.kind === providerId
+  })
 }
 
 export interface RhizomeChatModel {
@@ -70,7 +87,7 @@ function splitTarget(id: string): { provider: string; modelId: string } | null {
 }
 
 function addModel(into: Map<string, RhizomeChatModel>, model: RhizomeChatModel): void {
-  if (isAnthropicTarget(model.id)) return
+  if (model.providerKind === 'anthropic' || isAnthropicTarget(model.id)) return
   into.set(model.id, model)
 }
 
@@ -203,11 +220,14 @@ export function filterRhizomeChatModels(
   })
 }
 
-export function isWellFormedRhizomeTarget(id: string): boolean {
+export function isWellFormedRhizomeTarget(
+  id: string,
+  providers?: AiModelProvider[] | null,
+): boolean {
   const trimmed = id.trim()
   if (!trimmed) return false
   if (trimmed === FREE_TIER_AUTO_TARGET) return true
-  if (isAnthropicTarget(trimmed)) return false
+  if (isAnthropicTarget(trimmed, providers)) return false
   return trimmed.includes('/')
 }
 

@@ -322,8 +322,7 @@ describe('parked organs leftover', () => {
     expect(en).toContain(
       "Off: new chats use Prime, and they switch to Rhizome's engine if Prime isn't installed",
     )
-    expect(en).toContain('An open chat stays on the engine it started with')
-    expect(en).toContain('Changes apply to new chats.')
+    expect(en).toContain('Changes apply to new chats, and an open chat keeps the engine it started with')
   })
 
   it('mounts Graph and Mycelium only on Changes, not Inbox', () => {

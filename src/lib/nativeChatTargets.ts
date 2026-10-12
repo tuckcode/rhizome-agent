@@ -1,5 +1,6 @@
 import type { AiModelProvider } from './aiTargets'
 import {
+  isAnthropicTarget,
   isWellFormedRhizomeTarget,
   migrateRhizomeChatTarget,
   seedRhizomeChatModels,
@@ -35,16 +36,18 @@ export function resolveNativeChatTarget(
 ): string {
   const models = seedRhizomeChatModels(providers)
   const value = stored?.trim()
-  if (value) {
+  if (value && !isAnthropicNativeTarget(value, providers)) {
     const migrated = migrateRhizomeChatTarget(models, value)
-    if (models.some((model) => model.id === migrated) || isWellFormedRhizomeTarget(value)) {
+    if (models.some((model) => model.id === migrated) || isWellFormedRhizomeTarget(value, providers)) {
       return migrated
     }
   }
   return defaultNativeChatTarget(providers)
 }
 
-export function isAnthropicNativeTarget(target: string): boolean {
-  const id = target.trim().toLowerCase()
-  return id.startsWith('anthropic/') || id.includes('/claude')
+export function isAnthropicNativeTarget(
+  target: string,
+  providers?: AiModelProvider[] | null,
+): boolean {
+  return isAnthropicTarget(target, providers)
 }

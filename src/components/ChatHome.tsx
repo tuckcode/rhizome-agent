@@ -122,23 +122,30 @@ export default function ChatHome({
     }
     return defaultAiTarget ?? undefined
   }, [defaultAiTarget, isPrimeChat])
-  const isPrimeTarget = isPrimeChat && chatTarget?.kind !== 'api_model' && chatEngine !== 'native'
-  const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
+  const isPrimeChatTarget = isPrimeChat && chatTarget?.kind !== 'api_model'
   const [conversationId, setConversationId] = useState(newChatConversationId)
   const [engineLock, setEngineLock] = useState<ChatEngineLock | null>(null)
-  const hostKnown = Boolean(primeHost.known)
-  const hostNotInstalled = primeHost.problem?.code === 'not_installed'
   const lockScope = {
     conversation: conversationId,
-    target: chatEngineLockTarget(
-      isPrimeChat && chatTarget?.kind !== 'api_model',
-      defaultAiAgent,
-    ),
+    target: chatEngineLockTarget(isPrimeChatTarget, defaultAiAgent),
   }
   const startedEngine = startedEngineFromLock(engineLock, lockScope)
+  // Poll from the open chat's engine, not the Settings switch. Host is still
+  // unknown here; an already-started Prime chat must keep its live status.
+  const effectiveEngineForStatus = resolveEffectiveChatEngine({
+    requestedEngine: chatEngine,
+    isPrimeTarget: isPrimeChatTarget,
+    hostKnown: false,
+    hostNotInstalled: false,
+    startedEngine,
+  })
+  const isPrimeTarget = isPrimeChatTarget && effectiveEngineForStatus === 'prime'
+  const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
+  const hostKnown = Boolean(primeHost.known)
+  const hostNotInstalled = primeHost.problem?.code === 'not_installed'
   const engineInput = {
     requestedEngine: chatEngine,
-    isPrimeTarget,
+    isPrimeTarget: isPrimeChatTarget,
     hostKnown,
     hostNotInstalled,
     startedEngine,

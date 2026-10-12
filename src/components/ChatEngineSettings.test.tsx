@@ -11,7 +11,6 @@ describe('ChatEngineSettings', () => {
     expect(row).toHaveTextContent(
       "Off: new chats use Prime, and they switch to Rhizome's engine if Prime isn't installed",
     )
-    expect(row).toHaveTextContent('An open chat stays on the engine it started with')
-    expect(row).toHaveTextContent('Changes apply to new chats.')
+    expect(row).toHaveTextContent('Changes apply to new chats, and an open chat keeps the engine it started with')
   })
 })
