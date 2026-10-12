@@ -172,6 +172,25 @@ describe('useOnboarding', () => {
     })
   })
 
+  it('opens an existing on-disk Getting Started folder when that is the resolved default path', async () => {
+    mockCommands({
+      get_default_vault_path: SAVED_GETTING_STARTED_PATH,
+      check_vault_exists: (args?: MockArgs) =>
+        (args as { path?: string } | undefined)?.path === SAVED_GETTING_STARTED_PATH,
+    })
+
+    const { result } = await renderOnboarding(SAVED_GETTING_STARTED_PATH)
+
+    expect(result.current.state).toEqual({
+      status: 'ready',
+      vaultPath: SAVED_GETTING_STARTED_PATH,
+    })
+    expect(mockInvokeFn).toHaveBeenCalledWith('get_default_vault_path', {})
+    expect(mockInvokeFn).toHaveBeenCalledWith('check_vault_exists', {
+      path: SAVED_GETTING_STARTED_PATH,
+    })
+  })
+
   it('opens any saved vault path that still exists on disk', async () => {
     mockCommands({
       check_vault_exists: (args?: MockArgs) =>
@@ -291,7 +310,7 @@ describe('useOnboarding', () => {
       await result.current.handleCreateVault()
     })
 
-    expect(result.current.error).toBe('Could not download Getting Started vault: git clone failed: fatal: unable to access')
+    expect(result.current.error).toBe('Could not download Rhizome Vault: git clone failed: fatal: unable to access')
     expect(result.current.state.status).toBe('welcome')
   })
 

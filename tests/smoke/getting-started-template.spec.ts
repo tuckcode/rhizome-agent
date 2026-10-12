@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 
 test('Getting Started template shows inline retry on clone failure and opens after retry @smoke', async ({ page }) => {
-  const clonedPath = '/Users/mock/Documents/Getting Started'
+  const clonedPath = '/Users/mock/Documents/Rhizome Vault'
 
   await page.addInitScript(() => {
     localStorage.clear()
@@ -19,8 +19,8 @@ test('Getting Started template shows inline retry on clone failure and opens aft
           active_vault: null,
           hidden_defaults: [],
         })
-        ref.get_default_vault_path = () => '/Users/mock/Documents/Getting Started'
-        ref.check_vault_exists = (args?: { path?: string }) => args?.path === '/Users/mock/Documents/Getting Started'
+        ref.get_default_vault_path = () => '/Users/mock/Documents/Rhizome Vault'
+        ref.check_vault_exists = (args?: { path?: string }) => args?.path === '/Users/mock/Documents/Rhizome Vault'
           ? cloneSucceeded
           : false
         ref.create_getting_started_vault = (args: { targetPath?: string | null }) => {
@@ -28,8 +28,8 @@ test('Getting Started template shows inline retry on clone failure and opens aft
           if (cloneAttempts === 1) {
             throw 'git clone failed: fatal: unable to access'
           }
-          if (args.targetPath !== '/Users/mock/Documents/Getting Started') {
-            throw new Error(`Unexpected Getting Started target: ${args.targetPath}`)
+          if (args.targetPath !== '/Users/mock/Documents/Rhizome Vault') {
+            throw new Error(`Unexpected Rhizome Vault target: ${args.targetPath}`)
           }
           cloneSucceeded = true
           return args.targetPath
@@ -53,14 +53,14 @@ test('Getting Started template shows inline retry on clone failure and opens aft
   await page.getByTestId('welcome-create-vault').click()
 
   await expect(page.getByTestId('welcome-error')).toContainText(
-    'Could not download Getting Started vault: git clone failed: fatal: unable to access',
+    'Could not download Rhizome Vault: git clone failed: fatal: unable to access',
   )
   await expect(page.getByTestId('welcome-retry-template')).toBeVisible()
 
   await page.getByTestId('welcome-retry-template').click()
 
   await expect(page.getByTestId('welcome-screen')).not.toBeVisible()
-  await expect(page.getByText(`Getting Started vault created and opened at ${clonedPath}`)).toBeVisible()
+  await expect(page.getByText(`Rhizome Vault created and opened at ${clonedPath}`)).toBeVisible()
   await expect(page.getByTestId('claude-onboarding-screen')).toBeVisible()
   await expect(page.getByText('Claude Code not detected')).toBeVisible()
   await page.getByTestId('claude-onboarding-continue').click()

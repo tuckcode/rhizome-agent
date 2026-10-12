@@ -239,6 +239,7 @@ const MENU_LABEL_KEYS = {
   'Open Vault…': 'command.settings.openVault',
   'Remove Vault from List': 'command.settings.removeVault',
   'Restore Getting Started': 'command.settings.restoreGettingStarted',
+  'Restore Rhizome Vault': 'command.settings.restoreGettingStarted',
   'Add Remote…': 'menu.vault.addRemote',
   'Commit & Push': 'command.git.commitPush',
   'Pull from Remote': 'command.git.pull',

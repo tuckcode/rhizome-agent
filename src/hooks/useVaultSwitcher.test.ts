@@ -591,7 +591,7 @@ describe('useVaultSwitcher', () => {
       })
 
       expect(result.current.vaultPath).toBe(expectedDefaultVaultPath)
-      expect(onToast).toHaveBeenCalledWith('Getting Started vault ready')
+      expect(onToast).toHaveBeenCalledWith('Rhizome Vault ready')
     })
 
     it('attempts to create vault on disk if it does not exist', async () => {
@@ -626,7 +626,7 @@ describe('useVaultSwitcher', () => {
 
       expect(result.current.vaultPath).toBe('/work/vault')
       expect(result.current.isGettingStartedHidden).toBe(true)
-      expect(onToast).toHaveBeenCalledWith('Getting Started requires internet. Clone it later.')
+      expect(onToast).toHaveBeenCalledWith('Rhizome Vault requires internet. Clone it later.')
     })
   })
 

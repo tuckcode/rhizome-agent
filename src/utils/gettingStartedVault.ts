@@ -33,12 +33,14 @@ const AUTH_ERRORS = [
 ]
 
 const LOCAL_SCAFFOLD_ERRORS = [
+  'Failed to create Rhizome Vault folder',
   'Failed to create Getting Started folder',
   'Failed to create scaffold folder',
   'Failed to write welcome.md',
   'Failed to write views/',
   'Failed to write imported-session.md',
   'Failed to write AGENTS.md',
+  'Failed to inspect Rhizome Vault folder',
   'Failed to inspect Getting Started folder',
 ]
 
@@ -99,25 +101,25 @@ export function formatGettingStartedCloneError(err: unknown): string {
   }
 
   if (LOCAL_SCAFFOLD_ERRORS.some(fragment => message.includes(fragment))) {
-    return `Could not create Getting Started vault: ${firstCloneErrorLine(message)}`
+    return `Could not create Rhizome Vault: ${firstCloneErrorLine(message)}`
   }
 
   const lower = message.toLowerCase()
   if (GIT_NOT_FOUND_ERRORS.some(fragment => lower.includes(fragment))) {
-    return 'Git is required to download the Getting Started vault. Install Git and try again.'
+    return 'Git is required to download the Rhizome Vault. Install Git and try again.'
   }
   if (AUTH_ERRORS.some(fragment => lower.includes(fragment))) {
-    return 'Could not download Getting Started vault. Check your GitHub access and try again.'
+    return 'Could not download Rhizome Vault. Check your GitHub access and try again.'
   }
   if (NETWORK_ERRORS.some(fragment => lower.includes(fragment))) {
-    return 'Could not download Getting Started vault. Check your connection and try again.'
+    return 'Could not download Rhizome Vault. Check your connection and try again.'
   }
 
   if (lower.includes('git clone') || lower.includes('git reported')) {
-    return `Could not download Getting Started vault: ${firstCloneErrorLine(message)}`
+    return `Could not download Rhizome Vault: ${firstCloneErrorLine(message)}`
   }
 
-  return `Could not create Getting Started vault: ${firstCloneErrorLine(message)}`
+  return `Could not create Rhizome Vault: ${firstCloneErrorLine(message)}`
 }
 
 function firstCloneErrorLine(message: string): string {

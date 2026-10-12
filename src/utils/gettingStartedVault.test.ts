@@ -50,17 +50,17 @@ describe('gettingStartedVault', () => {
 
   it('maps git-not-found clone failures to an installation message', () => {
     expect(formatGettingStartedCloneError('Failed to run git clone: The system cannot find the file specified. (os error 2)'))
-      .toBe('Git is required to download the Getting Started vault. Install Git and try again.')
+      .toBe('Git is required to download the Rhizome Vault. Install Git and try again.')
   })
 
   it('maps concrete network clone failures to the connection message', () => {
     expect(formatGettingStartedCloneError('git clone failed: fatal: unable to access: Could not resolve host: github.com'))
-      .toBe('Could not download Getting Started vault. Check your connection and try again.')
+      .toBe('Could not download Rhizome Vault. Check your connection and try again.')
   })
 
   it('preserves unexpected clone failure details', () => {
     expect(formatGettingStartedCloneError('git clone failed: fatal: unable to access'))
-      .toBe('Could not download Getting Started vault: git clone failed: fatal: unable to access')
+      .toBe('Could not download Rhizome Vault: git clone failed: fatal: unable to access')
   })
 
   it('first-run rust still seeds folders only — no personal notes', () => {
@@ -78,16 +78,26 @@ describe('gettingStartedVault', () => {
   it('names a local scaffold failure as create, not download', () => {
     expect(
       formatGettingStartedCloneError(
+        "Failed to create Rhizome Vault folder '/tmp/Rhizome Vault': Permission denied",
+      ),
+    ).toBe(
+      "Could not create Rhizome Vault: Failed to create Rhizome Vault folder '/tmp/Rhizome Vault': Permission denied",
+    )
+  })
+
+  it('still names leftover Getting Started folder errors as create, not download', () => {
+    expect(
+      formatGettingStartedCloneError(
         "Failed to create Getting Started folder '/tmp/Getting Started': Permission denied",
       ),
     ).toBe(
-      "Could not create Getting Started vault: Failed to create Getting Started folder '/tmp/Getting Started': Permission denied",
+      "Could not create Rhizome Vault: Failed to create Getting Started folder '/tmp/Getting Started': Permission denied",
     )
   })
 
   it('keeps git permission-denied clone failures as a GitHub access message', () => {
     expect(formatGettingStartedCloneError('git clone failed: Permission denied (publickey)')).toBe(
-      'Could not download Getting Started vault. Check your GitHub access and try again.',
+      'Could not download Rhizome Vault. Check your GitHub access and try again.',
     )
   })
 })

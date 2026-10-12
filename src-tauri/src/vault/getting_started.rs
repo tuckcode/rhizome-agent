@@ -657,7 +657,7 @@ fn create_local_rhizome_scaffold(target_path: &Path) -> Result<PathBuf, String> 
     ensure_getting_started_destination_is_usable(target_path)?;
     fs::create_dir_all(target_path).map_err(|e| {
         format!(
-            "Failed to create Getting Started folder '{}': {e}",
+            "Failed to create Rhizome Vault folder '{}': {e}",
             target_path.display()
         )
     })?;
@@ -712,7 +712,7 @@ fn create_local_rhizome_scaffold(target_path: &Path) -> Result<PathBuf, String> 
     })?;
 
     crate::git::ensure_author_config(target_path)?;
-    crate::git::git_commit(path_utf8, "Initialize Rhizome Getting Started vault")?;
+    crate::git::git_commit(path_utf8, "Initialize Rhizome Vault")?;
 
     canonical_vault_path(target_path)
 }
@@ -723,17 +723,17 @@ fn ensure_getting_started_destination_is_usable(target_path: &Path) -> Result<()
     }
     let metadata = fs::metadata(target_path).map_err(|e| {
         format!(
-            "Failed to inspect Getting Started folder '{}': {e}",
+            "Failed to inspect Rhizome Vault folder '{}': {e}",
             target_path.display()
         )
     })?;
     if !metadata.is_dir() {
-        return Err("Choose a folder path for Getting Started".to_string());
+        return Err("Choose a folder path for Rhizome Vault".to_string());
     }
     let has_entries = fs::read_dir(target_path)
         .map_err(|e| {
             format!(
-                "Failed to inspect Getting Started folder '{}': {e}",
+                "Failed to inspect Rhizome Vault folder '{}': {e}",
                 target_path.display()
             )
         })?
@@ -741,7 +741,7 @@ fn ensure_getting_started_destination_is_usable(target_path: &Path) -> Result<()
         .is_some();
     if has_entries {
         return Err(format!(
-            "Getting Started folder '{}' already exists and is not empty",
+            "Rhizome Vault folder '{}' already exists and is not empty",
             target_path.display()
         ));
     }
@@ -948,6 +948,26 @@ mod tests {
             candidate == Path::new("/mock/Documents/Getting Started")
         });
         assert_eq!(path, Path::new("/mock/Documents/Getting Started"));
+    }
+
+    #[test]
+    fn test_existing_on_disk_getting_started_folder_is_found_and_openable() {
+        let documents = tempfile::TempDir::new().unwrap();
+        let getting_started = documents.path().join("Getting Started");
+        fs::create_dir_all(&getting_started).unwrap();
+        fs::write(getting_started.join("type.md"), "type: Note\n").unwrap();
+        fs::write(getting_started.join("note.md"), "note: Note\n").unwrap();
+        fs::write(getting_started.join("welcome.md"), "# Welcome\n").unwrap();
+
+        let resolved = resolve_default_vault_path_in(documents.path(), |path| {
+            vault_exists_with_default_path(path, Some(path))
+        });
+
+        assert_eq!(resolved, getting_started);
+        assert!(vault_exists_with_default_path(
+            resolved.as_path(),
+            Some(resolved.as_path())
+        ));
     }
 
     #[test]

@@ -278,13 +278,13 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
 
   const handleGettingStartedVaultReady = useCallback((vaultPath: string) => {
     rememberVaultChoice(vaultPath)
-    setToastMessage(`Getting Started vault created and opened at ${vaultPath}`)
+    setToastMessage(`Rhizome Vault created and opened at ${vaultPath}`)
   }, [rememberVaultChoice])
 
   const handleOnboardingVaultReady = useCallback((vaultPath: string, source: 'template' | 'empty' | 'existing') => {
     rememberVaultChoice(vaultPath)
     if (source === 'template') {
-      setToastMessage(`Getting Started vault created and opened at ${vaultPath}`)
+      setToastMessage(`Rhizome Vault created and opened at ${vaultPath}`)
     }
   }, [rememberVaultChoice])
   const cloneGettingStartedVault = useGettingStartedClone({

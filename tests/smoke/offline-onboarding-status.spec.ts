@@ -16,11 +16,11 @@ async function installOnboardingMocks(page: Page, offline: boolean) {
           active_vault: null,
           hidden_defaults: [],
         })
-        ref.get_default_vault_path = () => '/Users/mock/Documents/Getting Started'
+        ref.get_default_vault_path = () => '/Users/mock/Documents/Rhizome Vault'
         ref.check_vault_exists = (args: { path?: string }) => args.path === createdVaultPath
         ref.create_getting_started_vault = (args: { targetPath?: string | null }) => {
-          if (args.targetPath !== '/Users/mock/Documents/Getting Started') {
-            throw new Error(`Unexpected Getting Started target: ${args.targetPath}`)
+          if (args.targetPath !== '/Users/mock/Documents/Rhizome Vault') {
+            throw new Error(`Unexpected Rhizome Vault target: ${args.targetPath}`)
           }
           createdVaultPath = args.targetPath
           return args.targetPath
@@ -63,7 +63,7 @@ test('status bar keeps a Getting Started clone entry available after onboarding'
 
   await page.getByTestId('welcome-create-vault').click()
 
-  await expect(page.getByText('Getting Started vault created and opened at /Users/mock/Documents/Getting Started')).toBeVisible()
+  await expect(page.getByText('Rhizome Vault created and opened at /Users/mock/Documents/Rhizome Vault')).toBeVisible()
   await expect(page.getByTestId('claude-onboarding-screen')).toBeVisible()
   await page.getByTestId('claude-onboarding-continue').click()
   await expect(page.locator('[data-testid="note-list-container"]')).toBeVisible()
