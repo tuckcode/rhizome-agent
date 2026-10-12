@@ -494,6 +494,11 @@ export function trackPrimeModelChanged(provider: string): void {
   trackEvent('prime_model_changed', { provider })
 }
 
+/** The user picked a Rhizome catalog model from Settings or the composer. */
+export function trackRhizomeModelChanged(provider: string): void {
+  trackEvent('rhizome_model_changed', { provider })
+}
+
 /** A `/` menu command ran. Slash name only — never the prompt body. */
 export function trackPrimeCommandRun(command: string, kind: 'skill' | 'instant'): void {
   trackEvent('prime_command_run', { command, kind })

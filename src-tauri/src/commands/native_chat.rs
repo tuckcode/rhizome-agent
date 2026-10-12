@@ -85,13 +85,16 @@ pub fn model_kind_for_target(target: &NativeChatTarget) -> &'static str {
 }
 
 fn provider_kind_from_id(id: &str) -> AiModelProviderKind {
-    match id.to_ascii_lowercase().as_str() {
+    match id.to_ascii_lowercase().replace('-', "_").as_str() {
         "anthropic" => AiModelProviderKind::Anthropic,
-        "openai" => AiModelProviderKind::OpenAi,
+        "openai" | "open_ai" => AiModelProviderKind::OpenAi,
         "ollama" => AiModelProviderKind::Ollama,
         "lmstudio" | "lm_studio" => AiModelProviderKind::LmStudio,
-        "openrouter" => AiModelProviderKind::OpenRouter,
+        "openrouter" | "open_router" => AiModelProviderKind::OpenRouter,
         "gemini" => AiModelProviderKind::Gemini,
+        "open_ai_compatible" | "openai_compatible" | "compatible" => {
+            AiModelProviderKind::OpenAiCompatible
+        }
         _ => AiModelProviderKind::OpenAiCompatible,
     }
 }
@@ -496,6 +499,16 @@ fn free_tier_routing_model_with(
 }
 
 fn catalog_provider(kind: AiModelProviderKind, id: &str) -> AiModelProvider {
+    let saved = super::saved_model_providers().unwrap_or_default();
+    if let Some(provider) = saved
+        .iter()
+        .find(|provider| provider.id.eq_ignore_ascii_case(id))
+    {
+        return provider.clone();
+    }
+    if let Some(provider) = saved.iter().find(|provider| provider.kind == kind) {
+        return provider.clone();
+    }
     AiModelProvider {
         id: id.to_string(),
         name: id.to_string(),
@@ -994,6 +1007,37 @@ mod tests {
         assert!(
             err.to_lowercase().contains("anthropic"),
             "error must name Anthropic: {err}"
+        );
+    }
+
+    #[test]
+    fn catalog_kind_ids_map_to_their_provider_kinds() {
+        let openai = resolve_native_target("open_ai/gpt-4.1-mini").expect("openai");
+        let openrouter = resolve_native_target("open_router/openai/gpt-4.1-mini").expect("router");
+        let ollama = resolve_native_target("ollama/llama3.2").expect("ollama");
+        assert_eq!(
+            openai,
+            NativeChatTarget::Catalog {
+                provider_kind: AiModelProviderKind::OpenAi,
+                provider_id: "open_ai".into(),
+                model_id: "gpt-4.1-mini".into(),
+            }
+        );
+        assert_eq!(
+            openrouter,
+            NativeChatTarget::Catalog {
+                provider_kind: AiModelProviderKind::OpenRouter,
+                provider_id: "open_router".into(),
+                model_id: "openai/gpt-4.1-mini".into(),
+            }
+        );
+        assert_eq!(
+            ollama,
+            NativeChatTarget::Catalog {
+                provider_kind: AiModelProviderKind::Ollama,
+                provider_id: "ollama".into(),
+                model_id: "llama3.2".into(),
+            }
         );
     }
 

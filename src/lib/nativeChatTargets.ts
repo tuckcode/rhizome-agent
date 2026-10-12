@@ -1,4 +1,5 @@
-import catalog from '../shared/aiModelProviderCatalog.json'
+import type { AiModelProvider } from './aiTargets'
+import { isWellFormedRhizomeTarget, seedRhizomeChatModels } from './rhizomeChatModels'
 
 export const FREE_TIER_AUTO_TARGET = 'free_tier_auto'
 export const FREE_TIER_AUTO_LABEL = 'Free tier (auto)'
@@ -8,34 +9,31 @@ export interface NativeChatTargetOption {
   label: string
 }
 
-interface CatalogEntry {
-  kind: string
-  name: string
-  default_model_id: string
+/** Catalog models plus configured models plus Free tier (auto). Anthropic stays hidden until 6a. */
+export function nativeChatTargetOptions(
+  providers?: AiModelProvider[] | null,
+): NativeChatTargetOption[] {
+  return seedRhizomeChatModels(providers).map((model) => ({
+    id: model.id,
+    label: model.label,
+  }))
 }
 
-/** Catalog models plus Free tier (auto). Anthropic stays hidden until 6a. */
-export function nativeChatTargetOptions(): NativeChatTargetOption[] {
-  const models = (catalog as CatalogEntry[])
-    .filter((entry) => entry.kind !== 'anthropic')
-    .map((entry) => ({
-      id: `${entry.kind}/${entry.default_model_id}`,
-      label: `${entry.name} · ${entry.default_model_id}`,
-    }))
-  return [
-    ...models,
-    { id: FREE_TIER_AUTO_TARGET, label: FREE_TIER_AUTO_LABEL },
-  ]
+export function defaultNativeChatTarget(
+  providers?: AiModelProvider[] | null,
+): string {
+  return nativeChatTargetOptions(providers)[0]?.id ?? FREE_TIER_AUTO_TARGET
 }
 
-export function defaultNativeChatTarget(): string {
-  return nativeChatTargetOptions()[0]?.id ?? FREE_TIER_AUTO_TARGET
-}
-
-export function resolveNativeChatTarget(stored: string | null | undefined): string {
-  const options = nativeChatTargetOptions()
-  if (stored && options.some((option) => option.id === stored)) return stored
-  return defaultNativeChatTarget()
+export function resolveNativeChatTarget(
+  stored: string | null | undefined,
+  providers?: AiModelProvider[] | null,
+): string {
+  const options = nativeChatTargetOptions(providers)
+  const value = stored?.trim()
+  if (value && options.some((option) => option.id === value)) return value
+  if (value && isWellFormedRhizomeTarget(value)) return value
+  return defaultNativeChatTarget(providers)
 }
 
 export function isAnthropicNativeTarget(target: string): boolean {

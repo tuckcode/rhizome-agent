@@ -91,6 +91,18 @@ describe('usePrimeHostStatus', () => {
     expect(ensures).toHaveLength(1)
   })
 
+  it('gives a late subscriber the last published host status', async () => {
+    const vault = '/Users/jdoe/Documents/Rhizome Vault'
+    const first = renderHook(() => usePrimeHostStatus(true, vault))
+    await waitFor(() => {
+      expect(first.result.current.running).toBe(true)
+    })
+
+    const second = renderHook(() => usePrimeHostStatus(true, vault))
+    expect(second.result.current.running).toBe(true)
+    expect(second.result.current.modelName).toBe('Grok 4.5')
+  })
+
   it('reconnects when a status poll finds the host down', async () => {
     invoked.running = false
     renderHook(() => usePrimeHostStatus(true, '/Users/jdoe/Documents/Rhizome Vault'))

@@ -1530,9 +1530,12 @@ function AiAgentSettingsSection({
 
       <SettingsGroup>
         <ChatEngineSettings engine={chatEngine} onChange={setChatEngine} />
-        {chatEngine === 'native' ? (
-          <NativeChatModelPicker value={nativeChatTarget} onChange={setNativeChatTarget} />
-        ) : (
+        <NativeChatModelPicker
+          value={nativeChatTarget}
+          onChange={setNativeChatTarget}
+          providers={aiModelProviders}
+        />
+        {chatEngine === 'native' ? null : (
           <div className="px-3 pb-3 text-xs text-muted-foreground" data-testid="settings-prime-chat-engine">
             Prime Agent
             {primeStatus.status === 'installed'

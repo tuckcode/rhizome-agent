@@ -67,6 +67,7 @@ type Listener = (status: PrimeHostStatus) => void
 type HostLoop = {
   listeners: Set<Listener>
   lastProblemCode: string | null
+  lastStatus: PrimeHostStatus | null
   intervalId: number
   onVisible: () => void
 }
@@ -90,6 +91,7 @@ function withCorroboratedProblem(
 }
 
 function publish(loop: HostLoop, status: PrimeHostStatus): void {
+  loop.lastStatus = status
   for (const listener of loop.listeners) listener(status)
 }
 
@@ -133,6 +135,7 @@ function subscribe(vaultPath: string, listener: Listener): () => void {
     loop = {
       listeners: new Set(),
       lastProblemCode: null,
+      lastStatus: null,
       intervalId: 0,
       onVisible: () => undefined,
     }
@@ -150,6 +153,7 @@ function subscribe(vaultPath: string, listener: Listener): () => void {
     void tick(vaultPath, loop)
   }
   loop.listeners.add(listener)
+  if (loop.lastStatus) listener(loop.lastStatus)
   return () => {
     loop.listeners.delete(listener)
     if (loop.listeners.size > 0) return

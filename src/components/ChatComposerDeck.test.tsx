@@ -7,6 +7,7 @@ vi.mock('../lib/productAnalytics', () => ({
   trackPrimeModelChanged: vi.fn(),
   trackPrimeThinkingLevelChanged: vi.fn(),
   trackPrimeModelsFreeOnly: vi.fn(),
+  trackRhizomeModelChanged: vi.fn(),
 }))
 
 describe('ChatComposerDeck', () => {
@@ -48,6 +49,20 @@ describe('ChatComposerDeck', () => {
 
     expect(screen.queryByTestId('composer-vault-pill')).not.toBeInTheDocument()
     expect(screen.getByTestId('chat-composer-deck')).not.toHaveTextContent('Laputa')
+  })
+
+  it('puts the Rhizome catalog chip on the composer when Prime is not live', () => {
+    render(
+      <ChatComposerDeck
+        catalog="rhizome"
+        nativeTarget="open_ai/gpt-4.1-mini"
+        onNativeTargetChange={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
+    expect(screen.queryByTestId('prime-model-chip')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('prime-thinking-toggle')).not.toBeInTheDocument()
   })
 
   it('hosts the agent activity pill next to thinking', () => {

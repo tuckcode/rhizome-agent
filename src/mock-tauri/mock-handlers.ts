@@ -702,6 +702,12 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     if (!args.providerId.endsWith(':account')) mockSavedKeys.delete(`${args.providerId}:account`)
     return null
   },
+  discover_ai_models: (args: { provider?: { kind?: string; default_model_id?: string } }) => {
+    const kind = args?.provider?.kind
+    if (kind === 'ollama') return ['llama3.2', 'qwen2.5']
+    if (kind === 'lm_studio') return ['llama3.2']
+    return []
+  },
   list_prime_sessions: () => [
     {
       name: [
