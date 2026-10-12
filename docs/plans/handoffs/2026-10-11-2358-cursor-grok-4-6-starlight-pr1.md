@@ -21,6 +21,13 @@ Applied `pr1-starlight-site-and-bundle.patch` from a design review
 against `main` at `d3b7edf`. `git apply --binary` was clean. Main had
 not moved.
 
+## Beyond the patch
+
+`eslint.config.js` now ignores `site/.astro/`, `site/dist/`, and
+`site/node_modules/`. A local `cd site && npm run build` writes
+generated `.d.ts` that `eslint .` otherwise fails on. Those paths are
+already in `.gitignore`.
+
 ## Files
 
 - `site/` — own npm package (`rhizome-docs`). Not in the pnpm
@@ -33,12 +40,25 @@ not moved.
   `pages/guides/structure-with-portent.md`.
 - `.github/workflows/ci.yml` — docs filter includes `site/`.
 - `.gitignore` — `site/node_modules/`, `site/dist/`, `site/.astro/`.
+- `eslint.config.js` — ignore those generated dirs (this session).
 
 Did not edit `docs/HANDOFF.md`. Did not apply the PR 2 patch.
 
 ## Checks
 
-Recorded after the commit. See the PR body for the live list.
+- `cd site && npm ci && npm run build` — 51 HTML pages. Links
+  validator: **All internal links are valid.** Expected warnings: empty
+  `i18n` collection, missing `404` docs entry. Node v22.22.2.
+- `node --test scripts/build-agent-docs.test.mjs` — 1 passed.
+- `pnpm docs:build` — Generated 50 agent docs. Bundle diff after
+  commit: clean.
+- `pnpm vitest run src/utils/ai-agent.test.ts src/lib/leftover-website-copy.test.ts`
+  — 2 files, **15 passed**.
+- `grep -c '<!--' src-tauri/resources/agent-docs/all.md` — **0**.
+- `pnpm lint` and `pnpm typecheck` — pass after the eslint ignore.
+- Pre-push hook: sidecar unavailable; frontend lane failed first on
+  `site/.astro/` (fixed). Rust and Playwright lanes reported no
+  failure in that run.
 
 ## knispo
 
