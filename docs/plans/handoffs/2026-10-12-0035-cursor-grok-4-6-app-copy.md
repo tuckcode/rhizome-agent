@@ -2,30 +2,35 @@
 session: 2026-10-12T00:35Z
 model: Cursor Grok 4.6
 description: >-
-  User-facing product name is Rhizome. Portent credited as the vault
-  template. Welcome, Contribute, and keychain copy updated. Identifiers
-  and the RhizomeAgent binary stay.
+  User-facing product name is Rhizome. Portent vault-template MIT pin.
+  New vaults create Rhizome Vault; existing Getting Started stays.
 commits: HEAD
 ---
 
-**Origin:** Cursor Grok 4.6 · 2026-10-12 · app-copy PR
+**Origin:** Cursor Grok 4.6 · 2026-10-12 · app-copy PR #157 follow-up
 
 ## What landed
 
-1. User-facing name is **Rhizome**. `productName` and the window title
-   in `src-tauri/tauri.conf.json` changed. macOS About/Hide/Quit labels
-   follow `productName`. `IDENTITY.md`, About alt text, ACP client
-   title, and locale strings that said "Rhizome Agent" now say Rhizome.
-2. Settings → About credits Portent as the source of the vault
-   structure template. `THIRD_PARTY_NOTICES` has the same one-line
-   credit. No Portent spec text was copied.
-3. Welcome template copy is now "Create the Rhizome Vault from the
-   Portent template".
-4. Contribute copy says the repo is public under AGPL-3.0 and names
-   `github.com/tuckcode/rhizome-agent`.
-5. API-key storage copy says the key is stored in the macOS keychain
-   (on other platforms, the OS keychain). Those strings live in
-   `en.json`, not in the #155 files.
+1. User-facing name is **Rhizome**. Bundle id `ai.rhizome.agent`,
+   keychain service, config dir, and Cargo binary `RhizomeAgent` stay.
+2. Settings → About credits Portent as the vault structure template.
+   `THIRD_PARTY_NOTICES` and `docs/vendored-sources.md` pin
+   `refactoringhq/portent-vault-template` at
+   `87c4adcb1ab031ec3b2eed9f0d3f5c61d6dc90bb` (MIT, Copyright (c) 2026
+   Refactoring). Used in `src-tauri/src/vault/config_seed.rs`. The
+   “no Portent text is copied” line is gone.
+3. Welcome copy is “Create the Rhizome Vault from the Portent template”.
+4. Contribute copy says public AGPL-3.0. Left “pull requests welcome”
+   vs hidden “Contribute code” alone.
+5. API keys: “Save in your system keychain.” Onboarding says keys live
+   in the system keychain, not in Rhizome’s files.
+6. New starter vaults create `~/Documents/Rhizome Vault`. An existing
+   `~/Documents/Getting Started` (or any saved path) is still picked up.
+7. Non-English catalogs dropped the stale keys so i18n falls back to
+   `en.json`.
+8. Ship skill and living docs install `/Applications/Rhizome.app` and
+   archive `/Applications/Rhizome Agent.app` to
+   `~/Documents/Rhizome archives` (move, not delete).
 
 ## Kept as "Rhizome Agent" on purpose
 
@@ -34,17 +39,11 @@ commits: HEAD
 | Bundle `identifier` `ai.rhizome.agent` | macOS identity; changing it makes a new app |
 | Keychain service `ai.rhizome.agent` | existing keys stay reachable |
 | Config dir `com.rhizome.app` | settings, vaults, native sessions |
-| Cargo binary `RhizomeAgent` | Desktop already ships `Rhizome` on PATH; scripts look for `RhizomeAgent` |
+| Cargo binary `RhizomeAgent` | Desktop already ships `Rhizome` on PATH |
 | Repo name `tuckcode/rhizome-agent` | GitHub identity |
 | ACP `CLIENT_NAME` `rhizome-agent` | protocol id, not a label |
-| Existing `/Applications/Rhizome Agent.app` paths in tests and comments | old installs; quoting-spaces fixtures |
-| Chat engine switch footnote in `VersionUpdateIndicator.tsx` | belongs to the #155 agent |
 | Historical plans and handoffs | session record, not product chrome |
-
-A new package is `Rhizome.app`. The executable inside stays
-`RhizomeAgent`. No CI or script in this tree launches a `Rhizome`
-binary for this app.
 
 ## Off-limits
 
-Did not edit the #155 files. Item 4 and 5 lived in `en.json`.
+Did not edit the #155 files.

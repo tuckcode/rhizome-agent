@@ -14,7 +14,7 @@ describe('AboutSettingsSection', () => {
     )
 
     const banner = screen.getByRole('img', {
-      name: 'Rhizome. Your work. Your memory. Chat with Prime. Keep what matters.',
+      name: 'Rhizome',
     })
     expect(banner).toHaveAttribute('width', '1774')
     expect(banner).toHaveAttribute('height', '887')
@@ -33,7 +33,7 @@ describe('AboutSettingsSection', () => {
   it('does not render Contribute or Docs when those actions are missing', () => {
     render(<AboutSettingsSection t={t} />)
 
-    expect(screen.getByRole('img', { name: /Your work\. Your memory/ })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Rhizome' })).toBeInTheDocument()
     expect(screen.queryByTestId('settings-about-contribute')).not.toBeInTheDocument()
     expect(screen.queryByTestId('settings-about-docs')).not.toBeInTheDocument()
   })

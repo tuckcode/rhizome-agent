@@ -53,7 +53,7 @@ function appendVaultFolderName(parentPath: string, name: string): string {
 }
 
 export function buildGettingStartedVaultPath(parentPath: string): string {
-  return appendVaultFolderName(parentPath, GETTING_STARTED_VAULT_NAME)
+  return appendVaultFolderName(parentPath, RHIZOME_VAULT_DEFAULT_NAME)
 }
 
 /**

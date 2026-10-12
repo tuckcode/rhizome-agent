@@ -78,11 +78,35 @@ Chat threads brought in from Claude Code, Cursor, or other harnesses.
 Created by Settings → Import chat history under `Imports/<source>/`.
 ";
 
-/// Default location for the Getting Started vault.
+/// Folder name for a newly created starter vault under Documents.
+pub const DEFAULT_VAULT_FOLDER_NAME: &str = "Rhizome Vault";
+
+/// Previous default folder name. Kept so an existing vault at this path is
+/// still picked up after the rename. Do not move or rewrite that folder.
+pub const LEGACY_DEFAULT_VAULT_FOLDER_NAME: &str = "Getting Started";
+
+/// Choose the starter path under `documents`. Prefer an existing
+/// `Getting Started` vault so an upgrade does not hide it. Otherwise use
+/// `Rhizome Vault` for a new create.
+pub fn resolve_default_vault_path_in(
+    documents: &Path,
+    existing_vault: impl Fn(&Path) -> bool,
+) -> PathBuf {
+    let legacy = documents.join(LEGACY_DEFAULT_VAULT_FOLDER_NAME);
+    if existing_vault(&legacy) {
+        return legacy;
+    }
+    documents.join(DEFAULT_VAULT_FOLDER_NAME)
+}
+
+/// Default location for a new starter vault. Existing saved paths stay as
+/// they are; this does not move or rename a vault already on disk.
 pub fn default_vault_path() -> Result<PathBuf, String> {
-    documents_dir()
-        .map(|d| d.join("Getting Started"))
-        .ok_or_else(|| "Could not determine Documents directory".to_string())
+    let documents = documents_dir()
+        .ok_or_else(|| "Could not determine Documents directory".to_string())?;
+    Ok(resolve_default_vault_path_in(&documents, |path| {
+        vault_exists_with_default_path(path, Some(path))
+    }))
 }
 
 fn documents_dir() -> Option<PathBuf> {
@@ -911,10 +935,38 @@ mod tests {
     }
 
     #[test]
-    fn test_default_vault_path_appends_getting_started() {
-        let path = default_vault_path().unwrap();
-        let path_str = path.to_string_lossy();
-        assert!(path_str.ends_with("Getting Started"));
+    fn test_default_vault_path_appends_rhizome_vault() {
+        let documents = Path::new("/mock/Documents");
+        let path = resolve_default_vault_path_in(documents, |_| false);
+        assert_eq!(path, Path::new("/mock/Documents/Rhizome Vault"));
+    }
+
+    #[test]
+    fn test_resolve_default_vault_path_picks_up_existing_getting_started() {
+        let documents = Path::new("/mock/Documents");
+        let path = resolve_default_vault_path_in(documents, |candidate| {
+            candidate == Path::new("/mock/Documents/Getting Started")
+        });
+        assert_eq!(path, Path::new("/mock/Documents/Getting Started"));
+    }
+
+    #[test]
+    fn test_saved_getting_started_path_still_exists_when_default_is_rhizome_vault() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let default_path = dir.path().join("Rhizome Vault");
+        let saved_getting_started = dir.path().join("Getting Started");
+        let saved_other = dir.path().join("Work Vault");
+        fs::create_dir_all(&saved_getting_started).unwrap();
+        fs::create_dir_all(&saved_other).unwrap();
+
+        assert!(vault_exists_with_default_path(
+            saved_getting_started.as_path(),
+            Some(default_path.as_path())
+        ));
+        assert!(vault_exists_with_default_path(
+            saved_other.as_path(),
+            Some(default_path.as_path())
+        ));
     }
 
     /// Pinned so the day this changes, it changes deliberately.

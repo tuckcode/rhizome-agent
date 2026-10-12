@@ -15,6 +15,7 @@ with the same source, pin, and licence.
 
 | Path | Source | Pin (commit or version) | Licence | Copied |
 |---|---|---|---|---|
+| `src-tauri/src/vault/config_seed.rs` | Portent vault template (`refactoringhq/portent-vault-template`) type definitions: `responsibility.md`, `operation.md`, `project.md`, `task.md`, `event.md`, `topic.md`, `person.md` | `87c4adcb1ab031ec3b2eed9f0d3f5c61d6dc90bb` | MIT | 2026-10-12 |
 | `src-tauri/src/rhizome_routing/free_catalog.json` | OmniRoute `open-sse/config/freeModelCatalog.data.ts` and `open-sse/config/providers/registry/<id>/index.ts` (rows for the ADR-0182 v1 providers, curated 2026-09-12) | `fc5e2bccd4f70fecf5aab94dfb8136c74ab5a21b` | MIT | 2026-10-10 |
 | `src-tauri/src/rhizome_routing/health.rs` | OmniRoute `docs/architecture/RESILIENCE_GUIDE.md` (rules only, rebuilt in Rust) | `fc5e2bccd4f70fecf5aab94dfb8136c74ab5a21b` | MIT | 2026-10-10 |
 

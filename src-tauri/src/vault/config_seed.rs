@@ -36,12 +36,13 @@ type: Type
 A Note is a general-purpose document — research notes, meeting notes, strategy docs, or anything that doesn't fit a more specific type.
 ";
 
-/// Portent (https://portent.md) default type set, ported from
-/// github.com/refactoringhq/portent-vault-template to Rhizome's bare-key
-/// type-frontmatter schema (`icon`/`color`/`order`/`sidebar label`, not
-/// Portent's own `_icon`/`_order` convention). Rhizome's own `Note` type
-/// (above) is kept as-is and not duplicated here — only the 7 other
-/// Portent types are listed.
+/// Portent default type set, copied from
+/// github.com/refactoringhq/portent-vault-template @
+/// `87c4adcb1ab031ec3b2eed9f0d3f5c61d6dc90bb` (MIT, Copyright (c) 2026
+/// Refactoring). Adapted to Rhizome's bare-key type-frontmatter schema
+/// (`icon`/`color`/`order`/`sidebar label`, not Portent's `_icon`/`_order`
+/// convention). Rhizome's own `Note` type (above) is kept as-is and not
+/// duplicated here — only the 7 other Portent types are listed.
 ///
 /// These are Rhizome's default vault skeleton (same type set as a cleaned
 /// Rhizome Vault): `seed_config_files` / repair write them with

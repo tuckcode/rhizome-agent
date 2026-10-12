@@ -13,7 +13,7 @@ import { sanitizeDefaultWorkspacePath } from './vaultSwitcherSanitization'
 
 export type { PersistedVaultList } from '../utils/vaultListStore'
 
-export const GETTING_STARTED_LABEL = 'Getting Started'
+export const GETTING_STARTED_LABEL = 'Rhizome Vault'
 
 declare const __DEMO_VAULT_PATH__: string | undefined
 

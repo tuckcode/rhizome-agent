@@ -11,7 +11,15 @@ const protocol = readFileSync(
   'utf8',
 )
 const notices = readFileSync(`${process.cwd()}/THIRD_PARTY_NOTICES`, 'utf8')
+const vendored = readFileSync(`${process.cwd()}/docs/vendored-sources.md`, 'utf8')
 const identity = readFileSync(`${process.cwd()}/docs/IDENTITY.md`, 'utf8')
+const gettingStarted = readFileSync(`${process.cwd()}/docs/GETTING-STARTED.md`, 'utf8')
+const startReadme = readFileSync(`${process.cwd()}/docs/start/README.md`, 'utf8')
+const preview = readFileSync(`${process.cwd()}/docs/PUBLIC-PREVIEW.md`, 'utf8')
+const shipSkill = readFileSync(
+  `${process.cwd()}/.cursor/skills/rhizome-ship/SKILL.md`,
+  'utf8',
+)
 
 describe('leftover app copy — Rhizome name, kept paths', () => {
   it('uses Rhizome as the user-facing product name', () => {
@@ -33,8 +41,30 @@ describe('leftover app copy — Rhizome name, kept paths', () => {
     expect(en).toContain(
       'The default vault structure comes from the Portent template.',
     )
-    expect(notices).toContain('Used as: the vault structure template')
+    expect(notices).toContain(
+      'https://github.com/refactoringhq/portent-vault-template',
+    )
+    expect(notices).toContain('87c4adcb1ab031ec3b2eed9f0d3f5c61d6dc90bb')
+    expect(notices).toContain('Used in: `src-tauri/src/vault/config_seed.rs`')
+    expect(notices).toContain('Copyright (c) 2026 Refactoring')
+    expect(notices).not.toMatch(/No Portent specification text is copied/)
     expect(notices).not.toMatch(/Portent favors convention/)
+    expect(vendored).toContain('src-tauri/src/vault/config_seed.rs')
+    expect(vendored).toContain('refactoringhq/portent-vault-template')
+    expect(vendored).toContain('87c4adcb1ab031ec3b2eed9f0d3f5c61d6dc90bb')
+  })
+
+  it('installs Rhizome.app and archives the old Agent.app name', () => {
+    expect(gettingStarted).toContain('`ai.rhizome.agent` / `Rhizome.app`')
+    expect(gettingStarted).toContain('/Applications/Rhizome.app')
+    expect(gettingStarted).not.toContain('Rhizome Agent.app')
+    expect(startReadme).toContain('/Applications/Rhizome.app')
+    expect(startReadme).not.toContain('Rhizome Agent.app')
+    expect(preview).toContain('/Applications/Rhizome.app')
+    expect(preview).not.toContain('Rhizome Agent.app')
+    expect(shipSkill).toContain('/Applications/Rhizome.app')
+    expect(shipSkill).toContain('~/Documents/Rhizome\\ archives')
+    expect(shipSkill).toMatch(/mv "\/Applications\/Rhizome Agent\.app"/)
   })
 
   it('says the repo is public AGPL-3.0 and names the GitHub repo', () => {
@@ -45,9 +75,13 @@ describe('leftover app copy — Rhizome name, kept paths', () => {
     expect(en).not.toContain('not open for outside contributions')
   })
 
-  it('says API keys go in the macOS / OS keychain', () => {
+  it('says API keys go in the system keychain, not Rhizome files', () => {
     expect(en).toContain(
-      '"settings.aiProviders.keyStorage.local": "Store in the macOS keychain (on other platforms, the OS keychain)"',
+      '"settings.aiProviders.keyStorage.local": "Save in your system keychain."',
     )
+    expect(en).toContain(
+      'Provider API keys are stored in the system keychain, not in Rhizome\'s files.',
+    )
+    expect(en).not.toContain('Rhizome does not store provider API keys.')
   })
 })

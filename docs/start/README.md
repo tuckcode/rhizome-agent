@@ -27,7 +27,7 @@ The first launch of `prime-agent` asks you to run `/login` and choose a provider
 (prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
 ```
 
-Quit `/Applications/Rhizome Agent.app` before `pnpm tauri dev`. Both use the bundle id `ai.rhizome.agent`, and a second launch attaches to the one already open.
+Quit `/Applications/Rhizome.app` before `pnpm tauri dev`. Both use the bundle id `ai.rhizome.agent`, and a second launch attaches to the one already open.
 
 To look at the interface without a live engine: `pnpm dev`, then http://localhost:5202.
 
