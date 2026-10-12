@@ -1,5 +1,6 @@
 import type { AiModelProvider } from './aiTargets'
 import {
+  isAnthropicTarget,
   isWellFormedRhizomeTarget,
   migrateRhizomeChatTarget,
   seedRhizomeChatModels,
@@ -45,6 +46,5 @@ export function resolveNativeChatTarget(
 }
 
 export function isAnthropicNativeTarget(target: string): boolean {
-  const id = target.trim().toLowerCase()
-  return id.startsWith('anthropic/') || id.includes('/claude')
+  return isAnthropicTarget(target)
 }

@@ -71,6 +71,43 @@ describe('seedRhizomeChatModels', () => {
     expect(listed.at(-1)?.id).toBe('free_tier_auto')
   })
 
+  it('lists OpenRouter Claude models and still hides Anthropic and Claude Code', () => {
+    const listed = seedRhizomeChatModels([
+      {
+        id: 'home-openrouter',
+        name: 'Home OpenRouter',
+        kind: 'open_router',
+        base_url: 'https://openrouter.ai/api/v1',
+        api_key_storage: 'local_file',
+        models: [
+          {
+            id: 'anthropic/claude-sonnet-4',
+            display_name: 'Claude Sonnet 4',
+            capabilities,
+          },
+        ],
+      },
+      {
+        id: 'work-anthropic',
+        name: 'Work Anthropic',
+        kind: 'anthropic',
+        base_url: 'https://api.anthropic.com/v1',
+        api_key_storage: 'local_file',
+        models: [
+          {
+            id: 'claude-sonnet-4',
+            display_name: 'Claude Sonnet 4',
+            capabilities,
+          },
+        ],
+      },
+    ])
+    expect(listed.some((model) => model.id === 'home-openrouter/anthropic/claude-sonnet-4')).toBe(true)
+    expect(listed.some((model) => model.id.startsWith('anthropic/'))).toBe(false)
+    expect(listed.some((model) => model.providerKind === 'anthropic')).toBe(false)
+    expect(listed.some((model) => model.id.startsWith('claude_code/'))).toBe(false)
+  })
+
   it('never returns an empty list', () => {
     expect(seedRhizomeChatModels([]).length).toBeGreaterThan(0)
     expect(seedRhizomeChatModels(null).length).toBeGreaterThan(0)
@@ -95,6 +132,8 @@ describe('isWellFormedRhizomeTarget', () => {
     expect(isWellFormedRhizomeTarget('open_ai/gpt-4o')).toBe(true)
     expect(isWellFormedRhizomeTarget('free_tier_auto')).toBe(true)
     expect(isWellFormedRhizomeTarget('anthropic/claude-opus-4')).toBe(false)
+    expect(isWellFormedRhizomeTarget('claude_code/claude-opus-4')).toBe(false)
+    expect(isWellFormedRhizomeTarget('open_router/anthropic/claude-sonnet-4')).toBe(true)
     expect(isWellFormedRhizomeTarget('')).toBe(false)
   })
 })

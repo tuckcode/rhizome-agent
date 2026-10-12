@@ -39,4 +39,33 @@ describe('native chat picker', () => {
     expect(resolveNativeChatTarget(null)).toBe(defaultNativeChatTarget())
     expect(resolveNativeChatTarget('open_ai/gpt-4o')).toBe('open_ai/gpt-4o')
   })
+
+  it('lists an OpenRouter Claude model and still hides a direct Anthropic target', () => {
+    const options = nativeChatTargetOptions([
+      {
+        id: 'home-openrouter',
+        name: 'Home OpenRouter',
+        kind: 'open_router',
+        base_url: 'https://openrouter.ai/api/v1',
+        api_key_storage: 'local_file',
+        models: [
+          {
+            id: 'anthropic/claude-sonnet-4',
+            display_name: 'Claude Sonnet 4',
+            capabilities: {
+              streaming: true,
+              tools: true,
+              vision: true,
+              json_mode: true,
+              reasoning: false,
+            },
+          },
+        ],
+      },
+    ])
+    expect(options.some((option) => option.id === 'home-openrouter/anthropic/claude-sonnet-4')).toBe(
+      true,
+    )
+    expect(options.some((option) => option.id.startsWith('anthropic/'))).toBe(false)
+  })
 })
