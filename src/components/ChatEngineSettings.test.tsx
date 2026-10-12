@@ -7,10 +7,10 @@ describe('ChatEngineSettings', () => {
     render(<ChatEngineSettings engine="prime" onChange={vi.fn()} />)
 
     const row = screen.getByTestId('settings-chat-engine')
-    expect(row).toHaveTextContent("New chats use Prime unless you turn this on for Rhizome's engine")
+    expect(row).toHaveTextContent("On: new chats use Rhizome's engine")
     expect(row).toHaveTextContent(
-      'Prime chats fall back to Rhizome only after we know Prime is not installed',
+      "Off: new chats use Prime, and they switch to Rhizome's engine if Prime isn't installed",
     )
-    expect(row).toHaveTextContent('an open chat stays on the engine it started on')
+    expect(row).toHaveTextContent('An open chat stays on the engine it started with')
   })
 })

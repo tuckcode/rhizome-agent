@@ -315,7 +315,11 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/ChatEngineSettings.tsx`,
       'utf8',
     )
-    expect(toggle).toContain('New chats use Prime unless you turn this on for Rhizome')
+    expect(toggle).toContain("On: new chats use Rhizome's engine")
+    expect(toggle).toContain(
+      "Off: new chats use Prime, and they switch to Rhizome's engine if Prime isn't installed",
+    )
+    expect(toggle).toContain('An open chat stays on the engine it started with')
   })
 
   it('mounts Graph and Mycelium only on Changes, not Inbox', () => {

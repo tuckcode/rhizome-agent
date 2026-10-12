@@ -898,8 +898,9 @@ describe('SettingsPanel', () => {
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
-    expect(screen.getByText(/New chats use Prime unless you turn this on/)).toBeInTheDocument()
-    expect(screen.getByText(/fall back to Rhizome only after we know Prime is not installed/)).toBeInTheDocument()
+    expect(screen.getByText(/On: new chats use Rhizome's engine/)).toBeInTheDocument()
+    expect(screen.getByText(/Off: new chats use Prime, and they switch to Rhizome's engine if Prime isn't installed/)).toBeInTheDocument()
+    expect(screen.getByText(/An open chat stays on the engine it started with/)).toBeInTheDocument()
     expect(screen.queryByText(/Prime Agent runs Chat/)).not.toBeInTheDocument()
     expect(screen.queryByText(/skips Prime sessions and vault tools/)).not.toBeInTheDocument()
   })
