@@ -1,4 +1,5 @@
 import type { ChatEngine } from './chatEngine'
+import type { AiAgentId } from './aiAgents'
 
 export interface EffectiveChatEngineInput {
   requestedEngine: ChatEngine
@@ -6,6 +7,31 @@ export interface EffectiveChatEngineInput {
   hostKnown: boolean
   hostNotInstalled: boolean
   startedEngine: ChatEngine | null
+}
+
+export interface ChatEngineLock {
+  engine: ChatEngine
+  conversation: string
+  target: string
+  requestedEngine: ChatEngine
+}
+
+export function chatEngineLockTarget(
+  isPrimeTarget: boolean,
+  defaultAiAgent: AiAgentId,
+): string {
+  return isPrimeTarget ? 'prime' : defaultAiAgent
+}
+
+export function startedEngineFromLock(
+  lock: ChatEngineLock | null,
+  scope: Pick<ChatEngineLock, 'conversation' | 'target' | 'requestedEngine'>,
+): ChatEngine | null {
+  if (!lock) return null
+  if (lock.conversation !== scope.conversation) return null
+  if (lock.target !== scope.target) return null
+  if (lock.requestedEngine !== scope.requestedEngine) return null
+  return lock.engine
 }
 
 /**

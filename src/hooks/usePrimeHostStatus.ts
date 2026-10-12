@@ -97,8 +97,12 @@ function withCorroboratedProblem(
   }
 }
 
+function statusIsKnown(status: PrimeHostStatus): boolean {
+  return Boolean(status.running || status.problem)
+}
+
 function publish(loop: HostLoop, status: PrimeHostStatus): void {
-  const next = { ...status, known: true }
+  const next = { ...status, known: statusIsKnown(status) }
   loop.lastStatus = next
   for (const listener of loop.listeners) listener(next)
 }

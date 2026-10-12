@@ -25,6 +25,7 @@ vi.mock('./AiPanel', () => ({
   AiPanel: ({
     newChatRef,
     onOpenNote,
+    onConversationReset,
     notePane,
     activeEntry,
     activeNoteContent,
@@ -33,6 +34,7 @@ vi.mock('./AiPanel', () => ({
   }: {
     newChatRef?: MutableRefObject<(() => void) | null>
     onOpenNote?: (path: string) => void
+    onConversationReset?: () => void
     notePane?: React.ReactNode
     activeEntry?: { path: string } | null
     activeNoteContent?: string | null
@@ -48,6 +50,9 @@ vi.mock('./AiPanel', () => ({
         <span data-testid="composer-controls">{composerControls ? 'yes' : 'no'}</span>
         <button type="button" onClick={() => onOpenNote?.('/Users/jdoe/Documents/Laputa/wiki/decisions/memory-loop.md')}>
           Open
+        </button>
+        <button type="button" onClick={() => onConversationReset?.()}>
+          Pick session
         </button>
         {notePane}
       </div>
@@ -508,6 +513,114 @@ describe('ChatHome composer wiring', () => {
       />,
     )
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
+  })
+
+  it('falls back after a later poll confirms Prime is not installed', () => {
+    primeHostMock.status = {
+      ...primeHostMock.status,
+      known: false,
+      installed: false,
+      running: false,
+      problem: null,
+    }
+    const props = {
+      locale: 'en' as const,
+      defaultAiAgent: 'prime' as const,
+      defaultAiAgentReadiness: 'ready' as const,
+      defaultAiAgentReady: true,
+      vaultPath: '/Users/jdoe/Documents/Laputa',
+      vaultPaths: ['/Users/jdoe/Documents/Laputa'],
+      entries: [],
+      onExit: vi.fn(),
+    }
+    const { rerender } = render(<ChatHome {...props} />)
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+
+    primeHostMock.status = {
+      ...primeHostMock.status,
+      known: true,
+      installed: false,
+      running: false,
+      problem: { code: 'not_installed' },
+    }
+    rerender(<ChatHome {...props} />)
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
+  })
+
+  it('re-resolves after New Chat once Settings flips off native', () => {
+    const props = {
+      locale: 'en' as const,
+      defaultAiAgent: 'prime' as const,
+      defaultAiAgentReadiness: 'ready' as const,
+      defaultAiAgentReady: true,
+      vaultPath: '/Users/jdoe/Documents/Laputa',
+      vaultPaths: ['/Users/jdoe/Documents/Laputa'],
+      entries: [],
+      onExit: vi.fn(),
+    }
+    const { rerender } = render(<ChatHome {...props} chatEngine="native" />)
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
+
+    rerender(<ChatHome {...props} chatEngine="prime" />)
+    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+  })
+
+  it('re-resolves after a session pick', () => {
+    primeHostMock.status = {
+      ...primeHostMock.status,
+      known: true,
+      installed: false,
+      running: false,
+      problem: { code: 'not_installed' },
+    }
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
+
+    primeHostMock.status = {
+      ...primeHostMock.status,
+      known: true,
+      installed: true,
+      running: true,
+      problem: null,
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Pick session' }))
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+  })
+
+  it('does not leak a native lock onto Codex', () => {
+    primeHostMock.status = {
+      ...primeHostMock.status,
+      known: true,
+      installed: false,
+      running: false,
+      problem: { code: 'not_installed' },
+    }
+    const props = {
+      locale: 'en' as const,
+      defaultAiAgentReadiness: 'ready' as const,
+      defaultAiAgentReady: true,
+      vaultPath: '/Users/jdoe/Documents/Laputa',
+      vaultPaths: ['/Users/jdoe/Documents/Laputa'],
+      entries: [],
+      onExit: vi.fn(),
+    }
+    const { rerender } = render(<ChatHome {...props} defaultAiAgent="prime" />)
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
+
+    rerender(<ChatHome {...props} defaultAiAgent="codex" />)
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
   })
 
   it('keeps an already-open Prime chat on Prime when the host later says it is missing', () => {

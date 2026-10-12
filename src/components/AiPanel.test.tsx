@@ -1030,7 +1030,7 @@ describe('AiPanel last-conversation restore', () => {
   it('restores the last Prime conversation only on the Prime path', () => {
     expect(aiPanelSource).toContain('usePrimeSessionRestore({')
     expect(aiPanelSource).toContain('enabled: isPrimeTarget')
-    expect(aiPanelSource).toContain('onOpen: handleSelectSession')
+    expect(aiPanelSource).toContain('onOpen: pickSession')
   })
 
   it('does not gate the Prime panel on an empty vault path', () => {
@@ -1047,7 +1047,7 @@ describe('AiPanel last-conversation restore', () => {
   it('does not pass a vault path into last-conversation restore', () => {
     const block = aiPanelSource.slice(
       aiPanelSource.indexOf('usePrimeSessionRestore({'),
-      aiPanelSource.indexOf('onOpen: handleSelectSession'),
+      aiPanelSource.indexOf('onOpen: pickSession'),
     )
     expect(block).not.toContain('vaultPath')
   })

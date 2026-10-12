@@ -17,10 +17,12 @@ import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus
 import { usePrimeActiveSessionTitle } from '../hooks/usePrimeActiveSessionTitle'
 import { resolveChatOpenNote } from '../utils/resolveChatOpenNote'
 import { agentTargets, type AiModelProvider, type AiTarget } from '../lib/aiTargets'
-import type { ChatEngine } from '../lib/chatEngine'
 import {
+  chatEngineLockTarget,
   resolveEffectiveChatEngine,
   shouldLockEffectiveChatEngine,
+  startedEngineFromLock,
+  type ChatEngineLock,
 } from '../lib/effectiveChatEngine'
 import type { AiAgentId, AiAgentReadiness } from '../lib/aiAgents'
 import type { AppLocale } from '../lib/i18n'
@@ -121,9 +123,15 @@ export default function ChatHome({
   }, [defaultAiTarget, isPrimeChat])
   const isPrimeTarget = isPrimeChat && chatTarget?.kind !== 'api_model' && chatEngine !== 'native'
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
-  const [startedEngine, setStartedEngine] = useState<ChatEngine | null>(null)
+  const [engineLock, setEngineLock] = useState<ChatEngineLock | null>(null)
   const hostKnown = Boolean(primeHost.known)
   const hostNotInstalled = primeHost.problem?.code === 'not_installed'
+  const lockScope = {
+    conversation: primeHost.sessionPath ?? primeHost.sessionId ?? '',
+    target: chatEngineLockTarget(isPrimeTarget, defaultAiAgent),
+    requestedEngine: chatEngine,
+  }
+  const startedEngine = startedEngineFromLock(engineLock, lockScope)
   const engineInput = {
     requestedEngine: chatEngine,
     isPrimeTarget,
@@ -134,8 +142,9 @@ export default function ChatHome({
   const effectiveEngine = resolveEffectiveChatEngine(engineInput)
   const rhizomeCatalog = effectiveEngine === 'native'
   if (startedEngine === null && shouldLockEffectiveChatEngine(engineInput)) {
-    setStartedEngine(effectiveEngine)
+    setEngineLock({ engine: effectiveEngine, ...lockScope })
   }
+  const clearEngineLock = () => setEngineLock(null)
   const sessionTitle = usePrimeActiveSessionTitle(primeHost?.sessionPath ?? null, primeHost?.isStreaming)
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
@@ -187,7 +196,7 @@ export default function ChatHome({
           problem={primeHost?.problem ?? null}
           sessionTitle={sessionTitle}
           onNewChat={() => {
-            setStartedEngine(null)
+            clearEngineLock()
             newChatRef.current?.()
           }}
           onOpenFootprint={
@@ -231,6 +240,7 @@ export default function ChatHome({
           sessionsAutoCollapsed={sessionsAutoCollapsed}
           sessionsRailSlot={sessionsRailSlot}
           onRailSessionPicked={onRailSessionPicked}
+          onConversationReset={clearEngineLock}
           forkTargetsPrimeEntry
           newChatRef={newChatRef}
           onOpenMycelium={onOpenSessionFootprint}

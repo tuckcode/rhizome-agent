@@ -1008,7 +1008,7 @@ describe('parked organs leftover', () => {
       'utf8',
     )
     expect(home).toContain('newChatRef.current?.()')
-    expect(home).toContain('setStartedEngine(null)')
+    expect(home).toContain('clearEngineLock()')
     expect(home).toContain('thinkingLevel={primeHost?.thinkingLevel ?? null}')
     expect(home).not.toMatch(/if \(!vaultPath\) return/)
     expect(picker).toContain('if (!hostReady && vaultPath)')

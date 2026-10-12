@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  chatEngineLockTarget,
   resolveEffectiveChatEngine,
   shouldLockEffectiveChatEngine,
+  startedEngineFromLock,
 } from './effectiveChatEngine'
 
 const primeTarget = {
@@ -83,5 +85,23 @@ describe('shouldLockEffectiveChatEngine', () => {
     expect(
       shouldLockEffectiveChatEngine({ ...primeTarget, hostKnown: true, startedEngine: 'prime' }),
     ).toBe(false)
+  })
+})
+
+describe('startedEngineFromLock', () => {
+  const lock = {
+    engine: 'native' as const,
+    conversation: 'sess-1',
+    target: 'prime',
+    requestedEngine: 'prime' as const,
+  }
+
+  it('drops the lock when conversation, target, or Settings engine change', () => {
+    expect(startedEngineFromLock(lock, lock)).toBe('native')
+    expect(startedEngineFromLock(lock, { ...lock, conversation: 'sess-2' })).toBeNull()
+    expect(startedEngineFromLock(lock, { ...lock, target: 'codex' })).toBeNull()
+    expect(startedEngineFromLock(lock, { ...lock, requestedEngine: 'native' })).toBeNull()
+    expect(chatEngineLockTarget(true, 'prime')).toBe('prime')
+    expect(chatEngineLockTarget(false, 'codex')).toBe('codex')
   })
 })

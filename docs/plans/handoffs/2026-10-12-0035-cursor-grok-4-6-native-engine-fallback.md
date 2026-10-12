@@ -19,11 +19,15 @@ accounts collapsed to the first saved provider of that kind.
 
 - Native fallback only for Prime-targeted chats, and only after a real
   status says `not_installed`. Unknown status stays on Prime.
-- An open chat keeps the engine it started on. New Chat unlocks.
-- Configured catalog ids use `provider.id/model`. Old `kind/model`
-  selections still resolve when unique. Rust `catalog_provider` already
-  preferred id; a test now locks that over first-of-kind.
-- Chat engine switch copy rewritten to match.
+- Host `known` is true only when Prime is running or a problem was
+  corroborated. A failed status check publishes unknown, so the first
+  `not_installed` poll cannot lock Prime.
+- Engine lock is keyed to conversation + target + Settings engine.
+  New Chat and session picks clear it, so a native lock cannot leak
+  onto Codex.
+- Deleted configured-provider ids error instead of using another
+  OpenAI-compatible endpoint. Picker label: Provider removed.
+- Chat engine switch copy is the design-review On/Off wording.
 
 ## C-numbers
 
