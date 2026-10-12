@@ -3,7 +3,7 @@ title: Chat doesn't answer
 description: What to do when a message gets no reply, for Prime and for Rhizome's own engine.
 ---
 
-First check which engine runs Chat: Settings → AI Agents → **Chat engine**. Off means Prime Agent. On means Rhizome's own engine.
+First check **Chat engine** in Settings → AI Agents.
 
 ## Prime Agent
 

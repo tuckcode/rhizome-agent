@@ -41,7 +41,7 @@ Desktop apps can get a different `PATH` from your terminal. Rhizome checks commo
 Source: troubleshooting/chat-doesnt-answer.md
 URL: /troubleshooting/chat-doesnt-answer
 
-First check which engine runs Chat: Settings → AI Agents → **Chat engine**. Off means Prime Agent. On means Rhizome's own engine.
+First check **Chat engine** in Settings → AI Agents.
 
 ## Prime Agent
 

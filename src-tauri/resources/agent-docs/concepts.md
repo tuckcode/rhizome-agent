@@ -19,15 +19,14 @@ Rhizome lets you choose what runs Chat: Prime Agent or Rhizome's own engine. Whi
 | **Prime Agent** (default) | A separate harness Rhizome connects to. It runs sessions, tools, skills and provider login | Real agent work today: reading, searching and editing files, long runs, Prime packages |
 | **Rhizome's engine** | Rhizome's own loop, built into the app. It doesn't need Prime | Choosing your own providers, including free models. Early: it can create notes, but can't read, search or edit files yet |
 
-Switch with **Chat engine** in Settings → AI Agents. When it's on, new chats use Rhizome's engine and never call Prime, even if Prime isn't installed. When it's off, Prime runs them. The switch is only in Settings, not in the message box.
+Switch with **Chat engine** in Settings → AI Agents. When it's on, new chats use Rhizome's engine and never call Prime, even if Prime isn't installed. The switch is only in Settings, not in the message box.
 
 ### Rhizome's engine
 
-- **Models:** pick a catalog model, or **Free tier (auto)**, in the picker under the **Chat engine** switch. See [Free models and routing](free-models-and-routing.md). Anthropic models aren't offered here yet.
+- **Models:** pick a catalog model, or **Free tier (auto)**. See [Free models and routing](free-models-and-routing.md). Anthropic models aren't offered here yet.
 - **Tools:** `echo` and `create_note`. Power User adds `bash`. Rhizome asks you to approve each `bash` call, but `bash` doesn't run a shell yet. There are no tools to read, search or edit files, and the agent can't search the vault or old sessions.
 - **Saved chats:** each chat is saved as it goes and can be reopened after you quit. Chats get a title automatically from the first exchange.
 - **Errors:** a problem that doesn't stop the turn shows as a notice in the chat. A problem that does stop it, such as a missing key, ends the turn with a message that says what to fix.
-
 
 ### Prime Agent
 
@@ -144,7 +143,7 @@ URL: /concepts/free-models-and-routing
 
 **Free tier (auto)** runs Chat on free hosted models without you picking one. It tries free providers in a fixed order. When a provider fails, rate-limits you or runs out of free use, Rhizome moves to the next one. You can add your own endpoint as the last stop.
 
-This works with Rhizome's own engine. Turn on **Chat engine** in Settings → AI Agents, then choose **Free tier (auto)** in the model picker.
+This works with Rhizome's own engine. Choose **Free tier (auto)** in the model picker.
 
 ## What you get
 
@@ -171,12 +170,11 @@ The order is fixed. Settings shows it read-only under **Fallback order**.
 
 ## Set it up
 
-1. Settings → AI Agents → turn on **Chat engine**.
-2. In Settings → AI Agents, open the **API model** tab and find **Free tier (auto)**.
-3. For each provider you want, turn it on and paste its API key. The row shows **Key saved**, **No key**, or **Keychain error** if the keychain is locked or access was denied.
-4. Optional: choose an **Own endpoint** and **Own endpoint model**: any OpenAI-compatible server you've set up as a provider, local or hosted.
-5. Optional: turn on **Strict mode**. It uses only providers that document a hard stop at the free limit (Groq today), plus your own endpoint.
-6. In the model picker under **Chat engine**, choose **Free tier (auto)**. Until at least one provider has a key, Settings says "Add a key to at least one provider to use Free tier (auto)."
+1. In Settings → AI Agents, open the **API model** tab and find **Free tier (auto)**.
+2. For each provider you want, turn it on and paste its API key. The row shows **Key saved**, **No key**, or **Keychain error** if the keychain is locked or access was denied.
+3. Optional: choose an **Own endpoint** and **Own endpoint model**: any OpenAI-compatible server you've set up as a provider, local or hosted.
+4. Optional: turn on **Strict mode**. It uses only providers that document a hard stop at the free limit (Groq today), plus your own endpoint.
+5. In the model picker, choose **Free tier (auto)**. Until at least one provider has a key, Settings says "Add a key to at least one provider to use Free tier (auto)."
 
 ## How a provider gets skipped
 

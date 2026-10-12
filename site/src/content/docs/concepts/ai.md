@@ -19,16 +19,14 @@ Rhizome lets you choose what runs Chat: Prime Agent or Rhizome's own engine. Whi
 | **Prime Agent** (default) | A separate harness Rhizome connects to. It runs sessions, tools, skills and provider login | Real agent work today: reading, searching and editing files, long runs, Prime packages |
 | **Rhizome's engine** | Rhizome's own loop, built into the app. It doesn't need Prime | Choosing your own providers, including free models. Early: it can create notes, but can't read, search or edit files yet |
 
-Switch with **Chat engine** in Settings → AI Agents. When it's on, new chats use Rhizome's engine and never call Prime, even if Prime isn't installed. When it's off, Prime runs them. The switch is only in Settings, not in the message box.
+Switch with **Chat engine** in Settings → AI Agents. When it's on, new chats use Rhizome's engine and never call Prime, even if Prime isn't installed. The switch is only in Settings, not in the message box.
 
 ### Rhizome's engine
 
-- **Models:** pick a catalog model, or **Free tier (auto)**, in the picker under the **Chat engine** switch. See [Free models and routing](free-models-and-routing.md). Anthropic models aren't offered here yet.
+- **Models:** pick a catalog model, or **Free tier (auto)**. See [Free models and routing](free-models-and-routing.md). Anthropic models aren't offered here yet.
 - **Tools:** `echo` and `create_note`. Power User adds `bash`. Rhizome asks you to approve each `bash` call, but `bash` doesn't run a shell yet. There are no tools to read, search or edit files, and the agent can't search the vault or old sessions.
 - **Saved chats:** each chat is saved as it goes and can be reopened after you quit. Chats get a title automatically from the first exchange.
 - **Errors:** a problem that doesn't stop the turn shows as a notice in the chat. A problem that does stop it, such as a missing key, ends the turn with a message that says what to fix.
-
-<!-- PR #155 (open) changes how Settings and the composer list catalog models. Re-check the "Models" bullet when it merges. -->
 
 ### Prime Agent
 

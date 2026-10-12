@@ -39,7 +39,6 @@ Type a message and press Enter. You should get an answer, or a clear failure:
 
 | You see | Do this |
 |---|---|
-| Prime is missing | Turn on **Chat engine** in Settings → AI Agents to use Rhizome's own engine. Or install Prime (see [Install](install.md)) and reopen Chat |
 | Prime is installed, but Chat still says it's missing | Wait a few seconds. The check repeats |
 | No provider key (Rhizome's engine) | Add a key in Settings → AI Agents → API model, or turn on a free provider. See [Set up models and keys](../guides/configure-ai-models.md) |
 | The provider login expired (Prime) | Settings → AI Agents → Local agent → **Reconnect** on that provider, or run `prime-agent` and `/login` in a terminal |
