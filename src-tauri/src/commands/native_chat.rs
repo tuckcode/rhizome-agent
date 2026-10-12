@@ -1013,19 +1013,20 @@ mod tests {
     #[test]
     fn catalog_provider_prefers_matching_id_over_first_of_kind() {
         with_temp_home(|_| {
-            let model = crate::ai_models::AiModelDefinition {
-                id: "gpt-4o".into(),
-                display_name: Some("GPT-4o".into()),
-                context_window: None,
-                max_output_tokens: None,
-                capabilities: crate::ai_models::AiModelCapabilities {
-                    streaming: true,
-                    tools: false,
-                    vision: false,
-                    json_mode: false,
-                    reasoning: false,
-                },
-            };
+            let model: crate::ai_models::AiModelDefinition =
+                serde_json::from_value(serde_json::json!({
+                    "id": "gpt-4o",
+                    "display_name": "GPT-4o",
+                    "context_window": null,
+                    "capabilities": {
+                        "streaming": true,
+                        "tools": false,
+                        "vision": false,
+                        "json_mode": false,
+                        "reasoning": false,
+                    },
+                }))
+                .expect("model");
             let mut settings = crate::settings::get_settings().expect("settings");
             settings.ai_model_providers = Some(vec![
                 crate::ai_models::AiModelProvider {
