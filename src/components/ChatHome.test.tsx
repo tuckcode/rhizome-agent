@@ -5,6 +5,7 @@ import type { MutableRefObject } from 'react'
 
 const startNewChat = vi.fn()
 const primeHostMock = vi.hoisted(() => ({
+  enabled: true,
   status: {
     known: true,
     installed: true,
@@ -63,13 +64,17 @@ vi.mock('./AiPanel', () => ({
 
 vi.mock('../hooks/usePrimeHostStatus', () => ({
   primeModelLabel: () => 'xai / grok-4.5',
-  usePrimeHostStatus: () => primeHostMock.status,
+  usePrimeHostStatus: (enabled = true) => {
+    primeHostMock.enabled = enabled
+    return enabled ? primeHostMock.status : { ...primeHostMock.status, modelName: null, modelId: null }
+  },
 }))
 
 import ChatHome from './ChatHome'
 import { loadChatNoteContent } from '../utils/loadChatNoteContent'
 
 function livePrimeHost() {
+  primeHostMock.enabled = true
   primeHostMock.status = {
     known: true,
     installed: true,
@@ -410,8 +415,9 @@ describe('ChatHome composer wiring', () => {
     expect(chatHomeSource).toContain("target.kind === 'agent' && target.agent === 'prime'")
   })
 
-  it('does not poll Prime or show Prime banners when the Chat engine is native', () => {
-    expect(chatHomeSource).toContain(
+  it('polls Prime from the open chat engine, not the Settings switch', () => {
+    expect(chatHomeSource).toContain("effectiveEngineForStatus === 'prime'")
+    expect(chatHomeSource).not.toContain(
       "const isPrimeTarget = isPrimeChat && chatTarget?.kind !== 'api_model' && chatEngine !== 'native'",
     )
   })
@@ -588,6 +594,30 @@ describe('ChatHome composer wiring', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
+  })
+
+  it('keeps Prime status checks on an open Prime chat after Settings flips to native', () => {
+    const props = {
+      locale: 'en' as const,
+      defaultAiAgent: 'prime' as const,
+      defaultAiAgentReadiness: 'ready' as const,
+      defaultAiAgentReady: true,
+      vaultPath: '/Users/jdoe/Documents/Laputa',
+      vaultPaths: ['/Users/jdoe/Documents/Laputa'],
+      entries: [],
+      onExit: vi.fn(),
+    }
+    const { rerender } = render(<ChatHome {...props} chatEngine="prime" />)
+    expect(primeHostMock.enabled).toBe(true)
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+
+    rerender(<ChatHome {...props} chatEngine="native" />)
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+    expect(primeHostMock.enabled).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
+    expect(primeHostMock.enabled).toBe(false)
   })
 
   it('re-resolves after a session pick', () => {
