@@ -93,14 +93,12 @@ describe('startedEngineFromLock', () => {
     engine: 'native' as const,
     conversation: 'sess-1',
     target: 'prime',
-    requestedEngine: 'prime' as const,
   }
 
-  it('drops the lock when conversation, target, or Settings engine change', () => {
+  it('keeps the lock when Settings flips and drops it on a new conversation or target', () => {
     expect(startedEngineFromLock(lock, lock)).toBe('native')
     expect(startedEngineFromLock(lock, { ...lock, conversation: 'sess-2' })).toBeNull()
     expect(startedEngineFromLock(lock, { ...lock, target: 'codex' })).toBeNull()
-    expect(startedEngineFromLock(lock, { ...lock, requestedEngine: 'native' })).toBeNull()
     expect(chatEngineLockTarget(true, 'prime')).toBe('prime')
     expect(chatEngineLockTarget(false, 'codex')).toBe('codex')
   })

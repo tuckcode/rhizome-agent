@@ -9,7 +9,8 @@ const primeHostMock = vi.hoisted(() => ({
     known: true,
     installed: true,
     running: true,
-    sessionId: '019fe641-61fa-73e9-82ef-91fc90097aab',
+    sessionId: '019fe641-61fa-73e9-82ef-91fc90097aab' as string | null,
+    sessionPath: '/mock/vault/.rhizome/sessions/019fe641.jsonl' as string | null,
     modelName: 'Grok 4.5',
     modelProvider: 'xai',
     modelId: 'grok-4.5',
@@ -74,6 +75,7 @@ function livePrimeHost() {
     installed: true,
     running: true,
     sessionId: '019fe641-61fa-73e9-82ef-91fc90097aab',
+    sessionPath: '/mock/vault/.rhizome/sessions/019fe641.jsonl',
     modelName: 'Grok 4.5',
     modelProvider: 'xai',
     modelId: 'grok-4.5',
@@ -562,8 +564,30 @@ describe('ChatHome composer wiring', () => {
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
 
     rerender(<ChatHome {...props} chatEngine="prime" />)
-    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
+    fireEvent.click(screen.getByRole('button', { name: 'Pick session' }))
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+  })
+
+  it('applies a Settings engine flip to the next chat only', () => {
+    const props = {
+      locale: 'en' as const,
+      defaultAiAgent: 'prime' as const,
+      defaultAiAgentReadiness: 'ready' as const,
+      defaultAiAgentReady: true,
+      vaultPath: '/Users/jdoe/Documents/Laputa',
+      vaultPaths: ['/Users/jdoe/Documents/Laputa'],
+      entries: [],
+      onExit: vi.fn(),
+    }
+    const { rerender } = render(<ChatHome {...props} chatEngine="prime" />)
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+
+    rerender(<ChatHome {...props} chatEngine="native" />)
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+
+    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
   })
 
   it('re-resolves after a session pick', () => {
@@ -657,6 +681,33 @@ describe('ChatHome composer wiring', () => {
         onExit={vi.fn()}
       />,
     )
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+  })
+
+  it('keeps an already-open Prime chat on Prime when the host drops its session path', () => {
+    const props = {
+      locale: 'en' as const,
+      defaultAiAgent: 'prime' as const,
+      defaultAiAgentReadiness: 'ready' as const,
+      defaultAiAgentReady: true,
+      vaultPath: '/Users/jdoe/Documents/Laputa',
+      vaultPaths: ['/Users/jdoe/Documents/Laputa'],
+      entries: [],
+      onExit: vi.fn(),
+    }
+    const { rerender } = render(<ChatHome {...props} />)
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+
+    primeHostMock.status = {
+      ...primeHostMock.status,
+      known: true,
+      installed: false,
+      running: false,
+      sessionId: null,
+      sessionPath: null,
+      problem: { code: 'not_installed' },
+    }
+    rerender(<ChatHome {...props} />)
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
   })
 

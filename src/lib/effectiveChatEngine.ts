@@ -13,7 +13,11 @@ export interface ChatEngineLock {
   engine: ChatEngine
   conversation: string
   target: string
-  requestedEngine: ChatEngine
+}
+
+/** ChatHome's conversation token — not Prime's session path, which can go null. */
+export function newChatConversationId(): string {
+  return crypto.randomUUID()
 }
 
 export function chatEngineLockTarget(
@@ -25,12 +29,11 @@ export function chatEngineLockTarget(
 
 export function startedEngineFromLock(
   lock: ChatEngineLock | null,
-  scope: Pick<ChatEngineLock, 'conversation' | 'target' | 'requestedEngine'>,
+  scope: Pick<ChatEngineLock, 'conversation' | 'target'>,
 ): ChatEngine | null {
   if (!lock) return null
   if (lock.conversation !== scope.conversation) return null
   if (lock.target !== scope.target) return null
-  if (lock.requestedEngine !== scope.requestedEngine) return null
   return lock.engine
 }
 

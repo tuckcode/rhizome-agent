@@ -19,6 +19,7 @@ import { resolveChatOpenNote } from '../utils/resolveChatOpenNote'
 import { agentTargets, type AiModelProvider, type AiTarget } from '../lib/aiTargets'
 import {
   chatEngineLockTarget,
+  newChatConversationId,
   resolveEffectiveChatEngine,
   shouldLockEffectiveChatEngine,
   startedEngineFromLock,
@@ -123,13 +124,16 @@ export default function ChatHome({
   }, [defaultAiTarget, isPrimeChat])
   const isPrimeTarget = isPrimeChat && chatTarget?.kind !== 'api_model' && chatEngine !== 'native'
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
+  const [conversationId, setConversationId] = useState(newChatConversationId)
   const [engineLock, setEngineLock] = useState<ChatEngineLock | null>(null)
   const hostKnown = Boolean(primeHost.known)
   const hostNotInstalled = primeHost.problem?.code === 'not_installed'
   const lockScope = {
-    conversation: primeHost.sessionPath ?? primeHost.sessionId ?? '',
-    target: chatEngineLockTarget(isPrimeTarget, defaultAiAgent),
-    requestedEngine: chatEngine,
+    conversation: conversationId,
+    target: chatEngineLockTarget(
+      isPrimeChat && chatTarget?.kind !== 'api_model',
+      defaultAiAgent,
+    ),
   }
   const startedEngine = startedEngineFromLock(engineLock, lockScope)
   const engineInput = {
@@ -140,11 +144,15 @@ export default function ChatHome({
     startedEngine,
   }
   const effectiveEngine = resolveEffectiveChatEngine(engineInput)
+  const showPrimeChrome = isPrimeChat && chatTarget?.kind !== 'api_model' && effectiveEngine === 'prime'
   const rhizomeCatalog = effectiveEngine === 'native'
   if (startedEngine === null && shouldLockEffectiveChatEngine(engineInput)) {
     setEngineLock({ engine: effectiveEngine, ...lockScope })
   }
-  const clearEngineLock = () => setEngineLock(null)
+  const clearEngineLock = () => {
+    setConversationId(newChatConversationId())
+    setEngineLock(null)
+  }
   const sessionTitle = usePrimeActiveSessionTitle(primeHost?.sessionPath ?? null, primeHost?.isStreaming)
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
@@ -185,7 +193,7 @@ export default function ChatHome({
       data-testid="chat-home"
       data-chat-engine={effectiveEngine}
     >
-      {isPrimeTarget ? (
+      {showPrimeChrome ? (
         <PrimeSessionSubhead
           railLayoutWidth={railLayoutWidth}
           locale={locale}
@@ -207,10 +215,10 @@ export default function ChatHome({
           onOpenCommandPalette={onOpenCommandPalette}
         />
       ) : null}
-      <AgentActivityBand locale={locale} enabled={isPrimeTarget} />
+      <AgentActivityBand locale={locale} enabled={showPrimeChrome} />
       <RlmFamilyBand
         locale={locale}
-        enabled={isPrimeTarget}
+        enabled={showPrimeChrome}
         liveSessionId={primeHost?.sessionId ?? null}
       />
       <div className="flex min-h-0 flex-1">
@@ -274,7 +282,7 @@ export default function ChatHome({
             ) : null
           }
           composerControls={
-            isPrimeTarget ? (
+            showPrimeChrome ? (
               <>
               {/* Above the pills, not below: a reason the turn will fail is
                   worth more than the controls it sits over. */}
