@@ -41,7 +41,23 @@ export function readFrontmatter(markdown) {
 
 /** Maintainer notes (`<!-- … -->`) stay in the source and the website HTML, not in the agent bundle. */
 export function stripHtmlComments(markdown) {
-  return markdown.replace(/<!--[\s\S]*?-->\n?/g, '')
+  let text = markdown
+  for (;;) {
+    const open = text.indexOf('<!--')
+    if (open === -1) {
+      return text
+    }
+    const close = text.indexOf('-->', open + 4)
+    if (close === -1) {
+      text = text.slice(0, open) + text.slice(open + 4)
+      continue
+    }
+    let end = close + 3
+    if (text[end] === '\n') {
+      end += 1
+    }
+    text = text.slice(0, open) + text.slice(end)
+  }
 }
 
 function firstHeading(markdown, fallback) {
