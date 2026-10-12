@@ -34,6 +34,15 @@ merges" comments. Regenerated the in-app bundle.
 
 Did not edit `docs/HANDOFF.md`. Did not merge.
 
+## C95
+
+`tests/smoke/unified-shell-layout.spec.ts` expects `prime-session-list`
+after a rail hover. After #155, ChatHome passes `effectiveEngine`
+(`native` when Prime is not live) into `AiPanel`, so the rail portal
+does not mount the list. The assertion failed twice here. Not from this
+docs PR. CI does not run this smoke. Opened so the next session does
+not rediscover it.
+
 ## knispo
 
 Same review list as #156. Merge when ready.
