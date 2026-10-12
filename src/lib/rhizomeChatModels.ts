@@ -10,6 +10,29 @@ import { callHost } from './callHost'
 const FREE_TIER_AUTO_TARGET = 'free_tier_auto'
 const FREE_TIER_AUTO_LABEL = 'Free tier (auto)'
 
+export const REMOVED_PROVIDER_LABEL = 'Provider removed'
+export const REMOVED_PROVIDER_ERROR =
+  "This model's provider was removed. Pick another model, or add the provider back in Settings → AI Agents."
+
+const LEGACY_PROVIDER_KIND_IDS = new Set([
+  'anthropic',
+  'openai',
+  'open_ai',
+  'ollama',
+  'lmstudio',
+  'lm_studio',
+  'openrouter',
+  'open_router',
+  'gemini',
+  'open_ai_compatible',
+  'openai_compatible',
+  'compatible',
+])
+
+export function isLegacyProviderKindId(id: string): boolean {
+  return LEGACY_PROVIDER_KIND_IDS.has(id.trim().toLowerCase().replace(/-/g, '_'))
+}
+
 function isAnthropicTarget(id: string): boolean {
   const value = id.trim().toLowerCase()
   return value.startsWith('anthropic/') || value.includes('/claude')
@@ -71,6 +94,28 @@ export function resolveRhizomeChatModel(
   if (!parts) return undefined
   const matches = models.filter((model) => matchesStoredTarget(model, parts.provider, parts.modelId))
   return matches[0]
+}
+
+/** Keep a deleted configured-provider selection visible in the picker. */
+export function includeRemovedProviderModel(
+  models: RhizomeChatModel[],
+  selectedId: string | null | undefined,
+): RhizomeChatModel[] {
+  const value = selectedId?.trim()
+  if (!value || resolveRhizomeChatModel(models, value)) return models
+  const parts = splitTarget(value)
+  if (!parts || isLegacyProviderKindId(parts.provider)) return models
+  return [
+    {
+      id: value,
+      providerId: parts.provider,
+      providerKind: parts.provider,
+      providerName: REMOVED_PROVIDER_LABEL,
+      modelId: parts.modelId,
+      label: REMOVED_PROVIDER_LABEL,
+    },
+    ...models,
+  ]
 }
 
 /** Rewrite a unique kind-keyed selection to the provider-id target. */

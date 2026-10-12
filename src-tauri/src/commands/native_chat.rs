@@ -84,20 +84,26 @@ pub fn model_kind_for_target(target: &NativeChatTarget) -> &'static str {
     }
 }
 
-fn provider_kind_from_id(id: &str) -> AiModelProviderKind {
+fn provider_kind_from_legacy_id(id: &str) -> Option<AiModelProviderKind> {
     match id.to_ascii_lowercase().replace('-', "_").as_str() {
-        "anthropic" => AiModelProviderKind::Anthropic,
-        "openai" | "open_ai" => AiModelProviderKind::OpenAi,
-        "ollama" => AiModelProviderKind::Ollama,
-        "lmstudio" | "lm_studio" => AiModelProviderKind::LmStudio,
-        "openrouter" | "open_router" => AiModelProviderKind::OpenRouter,
-        "gemini" => AiModelProviderKind::Gemini,
+        "anthropic" => Some(AiModelProviderKind::Anthropic),
+        "openai" | "open_ai" => Some(AiModelProviderKind::OpenAi),
+        "ollama" => Some(AiModelProviderKind::Ollama),
+        "lmstudio" | "lm_studio" => Some(AiModelProviderKind::LmStudio),
+        "openrouter" | "open_router" => Some(AiModelProviderKind::OpenRouter),
+        "gemini" => Some(AiModelProviderKind::Gemini),
         "open_ai_compatible" | "openai_compatible" | "compatible" => {
-            AiModelProviderKind::OpenAiCompatible
+            Some(AiModelProviderKind::OpenAiCompatible)
         }
-        _ => AiModelProviderKind::OpenAiCompatible,
+        _ => None,
     }
 }
+
+fn provider_kind_from_id(id: &str) -> AiModelProviderKind {
+    provider_kind_from_legacy_id(id).unwrap_or(AiModelProviderKind::OpenAiCompatible)
+}
+
+const REMOVED_PROVIDER: &str = "This model's provider was removed. Pick another model, or add the provider back in Settings → AI Agents.";
 
 /// Live native chats. Each engine runs on its own thread.
 #[derive(Default)]
@@ -498,27 +504,30 @@ fn free_tier_routing_model_with(
     )
 }
 
-fn catalog_provider(kind: AiModelProviderKind, id: &str) -> AiModelProvider {
+fn catalog_provider(kind: AiModelProviderKind, id: &str) -> Result<AiModelProvider, String> {
     let saved = super::saved_model_providers().unwrap_or_default();
     if let Some(provider) = saved
         .iter()
         .find(|provider| provider.id.eq_ignore_ascii_case(id))
     {
-        return provider.clone();
+        return Ok(provider.clone());
     }
-    if let Some(provider) = saved.iter().find(|provider| provider.kind == kind) {
-        return provider.clone();
+    if provider_kind_from_legacy_id(id).is_some() {
+        if let Some(provider) = saved.iter().find(|provider| provider.kind == kind) {
+            return Ok(provider.clone());
+        }
+        return Ok(AiModelProvider {
+            id: id.to_string(),
+            name: id.to_string(),
+            kind,
+            base_url: None,
+            api_key_storage: Some(AiModelApiKeyStorage::LocalFile),
+            api_key_env_var: None,
+            headers: None,
+            models: Vec::new(),
+        });
     }
-    AiModelProvider {
-        id: id.to_string(),
-        name: id.to_string(),
-        kind,
-        base_url: None,
-        api_key_storage: Some(AiModelApiKeyStorage::LocalFile),
-        api_key_env_var: None,
-        headers: None,
-        models: Vec::new(),
-    }
+    Err(REMOVED_PROVIDER.into())
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -650,7 +659,7 @@ fn start_named_request(
             model_id,
         } => {
             let stream = AiModelStreamRequest {
-                provider: catalog_provider(provider_kind, &provider_id),
+                provider: catalog_provider(provider_kind, &provider_id)?,
                 model_id,
                 message: request.prompt.clone(),
                 system_prompt: system.clone(),
@@ -839,7 +848,7 @@ where
             model_id,
         } => {
             let stream = AiModelStreamRequest {
-                provider: catalog_provider(provider_kind, &provider_id),
+                provider: catalog_provider(provider_kind, &provider_id)?,
                 model_id,
                 message: String::new(),
                 system_prompt: system.clone(),
@@ -1052,14 +1061,21 @@ mod tests {
             ]);
             crate::settings::save_settings(settings).expect("save");
 
-            let work = catalog_provider(AiModelProviderKind::OpenAi, "work-openai");
+            let work = catalog_provider(AiModelProviderKind::OpenAi, "work-openai").expect("id");
             assert_eq!(work.id, "work-openai");
             assert_eq!(work.base_url.as_deref(), Some("https://work.example/v1"));
 
-            let legacy = catalog_provider(AiModelProviderKind::OpenAi, "open_ai");
+            let legacy = catalog_provider(AiModelProviderKind::OpenAi, "open_ai").expect("kind");
             assert_eq!(
                 legacy.id, "home-openai",
                 "old kind-keyed targets still pick the first saved provider of that kind"
+            );
+
+            let gone =
+                catalog_provider(AiModelProviderKind::OpenAi, "gone-openai").expect_err("gone");
+            assert_eq!(
+                gone,
+                "This model's provider was removed. Pick another model, or add the provider back in Settings → AI Agents."
             );
         });
     }

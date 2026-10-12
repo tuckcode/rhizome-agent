@@ -3,8 +3,11 @@ import type { AiModelProvider } from './aiTargets'
 import {
   filterRhizomeChatModels,
   groupRhizomeChatModels,
+  includeRemovedProviderModel,
   isWellFormedRhizomeTarget,
   loadRhizomeChatModels,
+  REMOVED_PROVIDER_ERROR,
+  REMOVED_PROVIDER_LABEL,
   resolveRhizomeChatModel,
   seedRhizomeChatModels,
 } from './rhizomeChatModels'
@@ -114,5 +117,23 @@ describe('resolveRhizomeChatModel', () => {
   it('still resolves an old kind-keyed selection to a matching configured model', () => {
     const listed = seedRhizomeChatModels(configured.slice(0, 1))
     expect(resolveRhizomeChatModel(listed, 'open_ai/gpt-4o')?.id).toBe('work-openai/gpt-4o')
+  })
+
+  it('keeps a deleted configured provider as a removed picker entry', () => {
+    const listed = includeRemovedProviderModel(
+      seedRhizomeChatModels(configured),
+      'gone-openai/gpt-4o',
+    )
+    const removed = resolveRhizomeChatModel(listed, 'gone-openai/gpt-4o')
+    expect(removed?.label).toBe(REMOVED_PROVIDER_LABEL)
+    expect(removed?.providerName).toBe(REMOVED_PROVIDER_LABEL)
+    expect(REMOVED_PROVIDER_ERROR).toBe(
+      "This model's provider was removed. Pick another model, or add the provider back in Settings → AI Agents.",
+    )
+    expect(
+      includeRemovedProviderModel(seedRhizomeChatModels(configured), 'open_ai/gpt-4o').some(
+        (model) => model.label === REMOVED_PROVIDER_LABEL,
+      ),
+    ).toBe(false)
   })
 })

@@ -13,7 +13,10 @@ import { CHAT_FOCUS_RING_CLASS } from '../lib/chatFocusRing'
 import {
   filterRhizomeChatModels,
   groupRhizomeChatModels,
+  includeRemovedProviderModel,
   loadRhizomeChatModels,
+  REMOVED_PROVIDER_ERROR,
+  REMOVED_PROVIDER_LABEL,
   resolveRhizomeChatModel,
   seedRhizomeChatModels,
   type RhizomeChatModel,
@@ -38,10 +41,12 @@ export function NativeChatModelPicker({
   const [query, setQuery] = useState('')
   const [models, setModels] = useState<RhizomeChatModel[]>(() => seedRhizomeChatModels(providers))
   const selectedId = resolveNativeChatTarget(value, providers)
-  const selected = resolveRhizomeChatModel(models, selectedId)
+  const listed = includeRemovedProviderModel(models, selectedId)
+  const selected = resolveRhizomeChatModel(listed, selectedId)
   const triggerLabel = selected?.label ?? selected?.modelId ?? selectedId
-  const visible = filterRhizomeChatModels(models, query)
+  const visible = filterRhizomeChatModels(listed, query)
   const groups = groupRhizomeChatModels(visible)
+  const removed = selected?.label === REMOVED_PROVIDER_LABEL
 
   useEffect(() => {
     setModels(seedRhizomeChatModels(providers))
@@ -61,7 +66,11 @@ export function NativeChatModelPicker({
   const chip = variant === 'chip'
   return (
     <div
-      className={chip ? 'inline-flex min-w-0 items-center' : 'flex items-center gap-2 px-3 py-2'}
+      className={
+        chip
+          ? cn('inline-flex min-w-0', removed ? 'flex-col items-start gap-1' : 'items-center')
+          : 'flex items-center gap-2 px-3 py-2'
+      }
       data-testid="native-chat-model-picker"
     >
       {chip ? null : <span className="text-xs text-muted-foreground">Model</span>}
@@ -139,6 +148,14 @@ export function NativeChatModelPicker({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+      {removed ? (
+        <p
+          className={cn('text-xs text-destructive', chip ? 'max-w-[16rem]' : 'max-w-[22rem]')}
+          data-testid="native-chat-removed-provider"
+        >
+          {REMOVED_PROVIDER_ERROR}
+        </p>
+      ) : null}
     </div>
   )
 }
