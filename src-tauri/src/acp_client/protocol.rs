@@ -3,7 +3,7 @@ use serde_json::Value;
 
 pub(crate) const PROTOCOL_VERSION: u32 = 1;
 pub(crate) const CLIENT_NAME: &str = "rhizome-agent";
-pub(crate) const CLIENT_TITLE: &str = "Rhizome Agent";
+pub(crate) const CLIENT_TITLE: &str = "Rhizome";
 pub(crate) const CLIENT_VERSION: &str = "0.1.0";
 
 #[derive(Debug, Serialize)]

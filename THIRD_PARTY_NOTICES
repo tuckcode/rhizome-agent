@@ -1,9 +1,15 @@
 # Third-party notices
 
-Rhizome Agent is AGPL-3.0. This file lists third-party material copied or
+Rhizome is AGPL-3.0. This file lists third-party material copied or
 ported into this tree, with each source's licence text. Library
 dependencies stay in `package.json` and `Cargo.toml`. The index of copied
 paths and pins is `docs/vendored-sources.md`.
+
+## Portent
+
+- Source: https://portent.md
+- Used as: the vault structure template (folders and default types)
+- No Portent specification text is copied into the app.
 
 ## OmniRoute
 

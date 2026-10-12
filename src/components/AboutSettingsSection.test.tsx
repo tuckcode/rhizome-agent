@@ -14,7 +14,7 @@ describe('AboutSettingsSection', () => {
     )
 
     const banner = screen.getByRole('img', {
-      name: 'Rhizome Agent. Your work. Your memory. Chat with Prime. Keep what matters.',
+      name: 'Rhizome. Your work. Your memory. Chat with Prime. Keep what matters.',
     })
     expect(banner).toHaveAttribute('width', '1774')
     expect(banner).toHaveAttribute('height', '887')

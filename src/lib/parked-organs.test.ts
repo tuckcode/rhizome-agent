@@ -96,9 +96,10 @@ describe('parked organs leftover', () => {
     )
   })
 
-  it('keeps Welcome Download words in en.json — C18', () => {
+  it('keeps Welcome Rhizome Vault / Portent words in en.json — C18', () => {
     const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
-    expect(en).toContain('"Download the Getting Started vault"')
+    expect(en).toContain('"Create the Rhizome Vault from the Portent template"')
+    expect(en).not.toContain('"Download the Getting Started vault"')
   })
 
   it('keeps packaged MCP generated and gitignored', () => {

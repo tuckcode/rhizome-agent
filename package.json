@@ -119,5 +119,5 @@
     "vitest": "^4.1.11",
     "ws": "^8.19.0"
   },
-  "description": "Rhizome Agent \u2014 desktop chat shell on the Prime Agent harness (not Rhizome Desktop)."
+  "description": "Rhizome \u2014 desktop chat shell (not Rhizome Desktop)."
 }

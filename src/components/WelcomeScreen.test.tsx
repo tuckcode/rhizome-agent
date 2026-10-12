@@ -59,15 +59,15 @@ describe('WelcomeScreen', () => {
       expect(screen.getByTestId('welcome-create-vault')).toHaveFocus()
     })
 
-    it('shows the simplified template option description', () => {
+    it('shows the Rhizome Vault / Portent template option description', () => {
       render(<WelcomeScreen {...defaultProps} />)
-      expect(screen.getByText('Download the Getting Started vault')).toBeInTheDocument()
+      expect(screen.getByText('Create the Rhizome Vault from the Portent template')).toBeInTheDocument()
       expect(screen.queryByText(/~\/Documents\/Laputa/)).not.toBeInTheDocument()
     })
 
-    it('keeps those Download words in en.json — C18, do not migrate this window', () => {
+    it('keeps the Rhizome Vault template words on the existing en.json key', () => {
       expect(en['onboarding.welcome.templateDescription']).toBe(
-        'Download the Getting Started vault',
+        'Create the Rhizome Vault from the Portent template',
       )
     })
 

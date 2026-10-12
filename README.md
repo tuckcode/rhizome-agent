@@ -34,7 +34,7 @@ The full list of tools, the first minute in the app, and what to do when it fail
 (prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
 ```
 
-Quit `/Applications/Rhizome Agent.app` before `pnpm tauri dev`. Both use the bundle id `ai.rhizome.agent`, and a second launch attaches to the one already open.
+Quit the installed Rhizome app before `pnpm tauri dev`. Both use the bundle id `ai.rhizome.agent`, and a second launch attaches to the one already open. A current install may still be named `Rhizome Agent.app`; a new build uses `Rhizome.app`. The executable inside stays `RhizomeAgent`.
 
 To look at the interface without a live engine: `pnpm dev`, then http://localhost:5202.
 

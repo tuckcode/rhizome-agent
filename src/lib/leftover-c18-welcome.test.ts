@@ -2,9 +2,12 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 describe('leftover C18 welcome Download words', () => {
-  it('locks Download the Getting Started vault on the existing key', () => {
+  it('locks the Rhizome Vault / Portent template words on the existing key', () => {
     const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
     expect(en).toContain(
+      '"onboarding.welcome.templateDescription": "Create the Rhizome Vault from the Portent template"',
+    )
+    expect(en).not.toContain(
       '"onboarding.welcome.templateDescription": "Download the Getting Started vault"',
     )
   })

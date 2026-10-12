@@ -1,18 +1,22 @@
-# Rhizome Agent — identity
+# Rhizome — identity
 
 **This repository is not Rhizome Desktop.**
+
+The user-facing product name is **Rhizome** (knispo, 2026-10). The GitHub
+repo, bundle id, config directory, and Cargo binary stay as they were so
+existing keys and settings keep working.
 
 GitHub: `tuckcode/rhizome-agent`. Bundle id: `ai.rhizome.agent`.
 Do not push this repo to the Desktop remote. Do not rename the product back to Desktop.
 
-| | Rhizome Desktop | Rhizome Agent (this repo) |
+| | Rhizome Desktop | Rhizome (this repo) |
 |---|---|---|
 | Purpose | Personal knowledge / vault / wiki app | Chat UI plus Rhizome's own harness; Prime and Hermes optional (ADR-0180) |
 | GitHub | `knispo/rhizome` (public AGPL desktop) | `tuckcode/rhizome-agent` |
 | Folder (local) | e.g. Grok worktree `code-lens` | `~/code/projects/rhizome-agent` |
 | Bundle id | `ai.rhizome.desktop` | `ai.rhizome.agent` |
-| Product name | Rhizome | Rhizome Agent |
-| Binary (Cargo) | `Rhizome` | `RhizomeAgent` |
+| Product name (menus, window) | Rhizome | Rhizome |
+| Binary (Cargo) | `Rhizome` | `RhizomeAgent` (kept; Desktop already uses `Rhizome` on PATH) |
 
 ## Origin
 
