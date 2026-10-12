@@ -27,4 +27,10 @@ accounts collapsed to the first saved provider of that kind.
 
 ## C-numbers
 
-None opened.
+- **C95:** After #155, Playwright smoke `unified-shell-layout.spec.ts`
+  failed because ChatHome passed `native` whenever Prime was not
+  running, so `prime-session-list` never mounted on rail hover.
+  mock-tauri reports `installed: true`, `running: false`, no
+  `not_installed` problem. The follow-up keeps that chat on Prime, so
+  the list mounts again. The smoke spec was not changed — that is the
+  intended behavior. Only a corroborated `not_installed` falls back.

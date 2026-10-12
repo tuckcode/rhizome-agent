@@ -1106,7 +1106,18 @@ describe('App', () => {
     })
   })
 
-  it('does not send right-panel messages through Prime when the host is not live', async () => {
+  it('still sends Prime-targeted messages through Prime when the host is installed but not running', async () => {
+    mockCommandResults.get_prime_session_host_status = {
+      installed: true,
+      version: 'mock',
+      running: false,
+      sessionId: null,
+      isStreaming: false,
+      binaryPath: '/mock/prime-agent',
+      modelProvider: 'xai',
+      modelId: 'grok-4.5',
+      modelName: 'Grok 4.5',
+    }
     mockCommandResults.get_settings = createSettings({
       auto_advance_inbox_after_organize: null,
       default_ai_agent: 'prime',
@@ -1126,14 +1137,18 @@ describe('App', () => {
     fireEvent.keyDown(window, { key: 'l', code: 'KeyL', metaKey: true, shiftKey: true })
 
     const input = await screen.findByTestId('agent-input')
+    await waitFor(() => {
+      expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime Agent')
+    })
     input.textContent = 'Summarize the active vault'
     fireEvent.input(input)
     fireEvent.click(screen.getByTestId('agent-send'))
 
-    await act(async () => {
-      await Promise.resolve()
+    await waitFor(() => {
+      expect(streamAiAgent).toHaveBeenCalledWith(expect.objectContaining({
+        agent: 'prime',
+      }))
     })
-    expect(streamAiAgent).not.toHaveBeenCalled()
   })
 
   it('waits for saved AI agent settings before sending right-panel messages', async () => {

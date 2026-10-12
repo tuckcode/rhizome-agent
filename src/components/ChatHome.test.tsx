@@ -464,6 +464,29 @@ describe('ChatHome composer wiring', () => {
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
   })
 
+  it('keeps Prime when the host is installed but not running (C95)', () => {
+    primeHostMock.status = {
+      ...primeHostMock.status,
+      known: true,
+      installed: true,
+      running: false,
+      problem: null,
+    }
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+  })
+
   it('falls back to native only after a real status says Prime is not installed', () => {
     primeHostMock.status = {
       ...primeHostMock.status,

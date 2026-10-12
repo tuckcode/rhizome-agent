@@ -742,6 +742,44 @@ describe('Chat home opens with its sessions column', () => {
     expect(screen.queryByRole('button', { name: 'Close sessions' })).not.toBeInTheDocument()
     slot.remove()
   })
+
+  it('keeps the rail session list on Prime when the host is down (C95)', () => {
+    const slot = document.createElement('div')
+    document.body.append(slot)
+
+    render(
+      <AiPanelView
+        controller={primeController()}
+        onClose={vi.fn()}
+        showHeader={false}
+        targetId="agent:prime"
+        sessionsRailSlot={slot}
+        chatEngine="prime"
+      />,
+    )
+
+    expect(within(slot).getByTestId('prime-session-list')).toBeInTheDocument()
+    slot.remove()
+  })
+
+  it('does not mount the rail session list on the native engine', () => {
+    const slot = document.createElement('div')
+    document.body.append(slot)
+
+    render(
+      <AiPanelView
+        controller={primeController()}
+        onClose={vi.fn()}
+        showHeader={false}
+        targetId="agent:prime"
+        sessionsRailSlot={slot}
+        chatEngine="native"
+      />,
+    )
+
+    expect(within(slot).queryByTestId('prime-session-list')).not.toBeInTheDocument()
+    slot.remove()
+  })
 })
 
 describe('a pick in the rail Sessions list', () => {
