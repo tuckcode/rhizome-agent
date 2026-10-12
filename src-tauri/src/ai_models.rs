@@ -42,6 +42,7 @@ pub struct AiModelDefinition {
     pub id: String,
     pub display_name: Option<String>,
     pub context_window: Option<u32>,
+    #[serde(default)]
     pub max_output_tokens: Option<u32>,
     pub capabilities: AiModelCapabilities,
 }

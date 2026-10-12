@@ -751,9 +751,13 @@ not running after a rebuild. It seeds from
 `aiModelProviderCatalog.json` plus `settings.ai_model_providers`, then
 asks `discover_ai_models` (`GET {base_url}/models`) for local and
 configured providers. A failed discover is dropped; the seed stays.
-Target ids use catalog kinds (`open_ai/…`, `open_router/…`) so native
-send hits the right provider. Prime’s `models.json` is only the Prime
-engine’s list.
+Catalog defaults keep kind-keyed ids (`open_ai/…`, `open_router/…`).
+Configured providers key on the provider id (`work-openai/gpt-4o`) so
+two accounts of the same kind stay distinct. An old kind-keyed
+selection still resolves when it uniquely matches. Prime’s
+`models.json` is only the Prime engine’s list. Native fallback is only
+for Prime-targeted chats, and only after a real host status says Prime
+is not installed; an open chat stays on the engine it started on.
 
 Native hide/reopen live-check is still **NOT RUN**. Do not mass-kill
 Prime-spawned `mcp-server/index.js` (ADR-0163). Do not recode hide to

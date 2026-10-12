@@ -17,6 +17,14 @@ import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus
 import { usePrimeActiveSessionTitle } from '../hooks/usePrimeActiveSessionTitle'
 import { resolveChatOpenNote } from '../utils/resolveChatOpenNote'
 import { agentTargets, type AiModelProvider, type AiTarget } from '../lib/aiTargets'
+import {
+  chatEngineLockTarget,
+  newChatConversationId,
+  resolveEffectiveChatEngine,
+  shouldLockEffectiveChatEngine,
+  startedEngineFromLock,
+  type ChatEngineLock,
+} from '../lib/effectiveChatEngine'
 import type { AiAgentId, AiAgentReadiness } from '../lib/aiAgents'
 import type { AppLocale } from '../lib/i18n'
 import type { VaultEntry } from '../types'
@@ -116,8 +124,35 @@ export default function ChatHome({
   }, [defaultAiTarget, isPrimeChat])
   const isPrimeTarget = isPrimeChat && chatTarget?.kind !== 'api_model' && chatEngine !== 'native'
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
-  const primeLive = isPrimeTarget && Boolean(primeHost?.running)
-  const effectiveEngine = primeLive ? 'prime' : 'native'
+  const [conversationId, setConversationId] = useState(newChatConversationId)
+  const [engineLock, setEngineLock] = useState<ChatEngineLock | null>(null)
+  const hostKnown = Boolean(primeHost.known)
+  const hostNotInstalled = primeHost.problem?.code === 'not_installed'
+  const lockScope = {
+    conversation: conversationId,
+    target: chatEngineLockTarget(
+      isPrimeChat && chatTarget?.kind !== 'api_model',
+      defaultAiAgent,
+    ),
+  }
+  const startedEngine = startedEngineFromLock(engineLock, lockScope)
+  const engineInput = {
+    requestedEngine: chatEngine,
+    isPrimeTarget,
+    hostKnown,
+    hostNotInstalled,
+    startedEngine,
+  }
+  const effectiveEngine = resolveEffectiveChatEngine(engineInput)
+  const showPrimeChrome = isPrimeChat && chatTarget?.kind !== 'api_model' && effectiveEngine === 'prime'
+  const rhizomeCatalog = effectiveEngine === 'native'
+  if (startedEngine === null && shouldLockEffectiveChatEngine(engineInput)) {
+    setEngineLock({ engine: effectiveEngine, ...lockScope })
+  }
+  const clearEngineLock = () => {
+    setConversationId(newChatConversationId())
+    setEngineLock(null)
+  }
   const sessionTitle = usePrimeActiveSessionTitle(primeHost?.sessionPath ?? null, primeHost?.isStreaming)
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
@@ -153,8 +188,12 @@ export default function ChatHome({
   const rhizomeJobs = useRhizomeJobs()
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="chat-home">
-      {isPrimeTarget ? (
+    <div
+      className="flex min-h-0 min-w-0 flex-1 flex-col"
+      data-testid="chat-home"
+      data-chat-engine={effectiveEngine}
+    >
+      {showPrimeChrome ? (
         <PrimeSessionSubhead
           railLayoutWidth={railLayoutWidth}
           locale={locale}
@@ -164,7 +203,10 @@ export default function ChatHome({
           startedAt={primeHost?.startedAt ?? null}
           problem={primeHost?.problem ?? null}
           sessionTitle={sessionTitle}
-          onNewChat={() => newChatRef.current?.()}
+          onNewChat={() => {
+            clearEngineLock()
+            newChatRef.current?.()
+          }}
           onOpenFootprint={
             onOpenSessionFootprint && primeHost?.sessionPath
               ? () => onOpenSessionFootprint(primeHost.sessionPath as string)
@@ -173,10 +215,10 @@ export default function ChatHome({
           onOpenCommandPalette={onOpenCommandPalette}
         />
       ) : null}
-      <AgentActivityBand locale={locale} enabled={isPrimeTarget} />
+      <AgentActivityBand locale={locale} enabled={showPrimeChrome} />
       <RlmFamilyBand
         locale={locale}
-        enabled={isPrimeTarget}
+        enabled={showPrimeChrome}
         liveSessionId={primeHost?.sessionId ?? null}
       />
       <div className="flex min-h-0 flex-1">
@@ -206,6 +248,7 @@ export default function ChatHome({
           sessionsAutoCollapsed={sessionsAutoCollapsed}
           sessionsRailSlot={sessionsRailSlot}
           onRailSessionPicked={onRailSessionPicked}
+          onConversationReset={clearEngineLock}
           forkTargetsPrimeEntry
           newChatRef={newChatRef}
           onOpenMycelium={onOpenSessionFootprint}
@@ -239,7 +282,7 @@ export default function ChatHome({
             ) : null
           }
           composerControls={
-            isPrimeTarget ? (
+            showPrimeChrome ? (
               <>
               {/* Above the pills, not below: a reason the turn will fail is
                   worth more than the controls it sits over. */}
@@ -260,7 +303,7 @@ export default function ChatHome({
               locale={locale}
               vaultPath={vaultPath}
               hostReady={Boolean(primeHost?.running)}
-              catalog={primeLive ? 'prime' : 'rhizome'}
+              catalog={rhizomeCatalog ? 'rhizome' : 'prime'}
               nativeTarget={nativeTarget}
               onNativeTargetChange={onNativeTargetChange}
               providers={aiModelProviders}

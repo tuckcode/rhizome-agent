@@ -316,7 +316,14 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/ChatEngineSettings.tsx`,
       'utf8',
     )
-    expect(toggle).toContain('Prime Agent runs Chat.')
+    const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
+    expect(toggle).toContain("translate(locale, 'settings.chatEngine.description')")
+    expect(en).toContain("On: new chats use Rhizome's engine")
+    expect(en).toContain(
+      "Off: new chats use Prime, and they switch to Rhizome's engine if Prime isn't installed",
+    )
+    expect(en).toContain('An open chat stays on the engine it started with')
+    expect(en).toContain('Changes apply to new chats.')
   })
 
   it('mounts Graph and Mycelium only on Changes, not Inbox', () => {
@@ -1004,7 +1011,8 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/PrimeModelPicker.tsx`,
       'utf8',
     )
-    expect(home).toContain('onNewChat={() => newChatRef.current?.()}')
+    expect(home).toContain('newChatRef.current?.()')
+    expect(home).toContain('clearEngineLock()')
     expect(home).toContain('thinkingLevel={primeHost?.thinkingLevel ?? null}')
     expect(home).not.toMatch(/if \(!vaultPath\) return/)
     expect(picker).toContain('if (!hostReady && vaultPath)')

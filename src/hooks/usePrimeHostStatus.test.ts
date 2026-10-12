@@ -5,6 +5,7 @@ const invoked = vi.hoisted(() => ({
   calls: [] as Array<{ cmd: string; args?: Record<string, unknown> }>,
   running: true,
   problem: null as { code: string } | null,
+  failStatus: false,
 }))
 
 vi.mock('../mock-tauri', () => ({
@@ -12,6 +13,7 @@ vi.mock('../mock-tauri', () => ({
   mockInvoke: (cmd: string, args?: Record<string, unknown>) => {
     invoked.calls.push({ cmd, args })
     if (cmd === 'get_prime_session_host_status') {
+      if (invoked.failStatus) return Promise.reject(new Error('status check failed'))
       return Promise.resolve({
         installed: true,
         version: '1',
@@ -36,6 +38,7 @@ describe('usePrimeHostStatus', () => {
     invoked.calls = []
     invoked.running = true
     invoked.problem = null
+    invoked.failStatus = false
     resetPrimeHostStatus()
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,
@@ -91,6 +94,12 @@ describe('usePrimeHostStatus', () => {
     expect(ensures).toHaveLength(1)
   })
 
+  it('does not treat the initial empty status as a real host answer', () => {
+    const { result } = renderHook(() => usePrimeHostStatus(true, '/vault'))
+    expect(result.current.known).toBe(false)
+    expect(result.current.running).toBe(false)
+  })
+
   it('gives a late subscriber the last published host status', async () => {
     const vault = '/Users/jdoe/Documents/Rhizome Vault'
     const first = renderHook(() => usePrimeHostStatus(true, vault))
@@ -140,9 +149,10 @@ describe('usePrimeHostStatus', () => {
       expect(invoked.calls.some((call) => call.cmd === 'get_prime_session_host_status')).toBe(true)
     })
     expect(result.current.problem).toBeNull()
+    expect(result.current.known).toBe(false)
   })
 
-  it('surfaces a problem once a second poll agrees with it', async () => {
+  it('stays unknown until a second poll corroborates not_installed', async () => {
     invoked.running = false
     invoked.problem = { code: 'not_installed' }
 
@@ -152,11 +162,30 @@ describe('usePrimeHostStatus', () => {
       expect(invoked.calls.some((call) => call.cmd === 'get_prime_session_host_status')).toBe(true)
     })
     expect(result.current.problem).toBeNull()
+    expect(result.current.known).toBe(false)
 
     document.dispatchEvent(new Event('visibilitychange'))
 
     await waitFor(() => {
+      expect(result.current.known).toBe(true)
       expect(result.current.problem).toEqual({ code: 'not_installed' })
+    })
+  })
+
+  it('publishes unknown when a status check fails', async () => {
+    invoked.running = true
+    const { result } = renderHook(() => usePrimeHostStatus(true, '/vault'))
+    await waitFor(() => {
+      expect(result.current.known).toBe(true)
+      expect(result.current.running).toBe(true)
+    })
+
+    invoked.failStatus = true
+    document.dispatchEvent(new Event('visibilitychange'))
+
+    await waitFor(() => {
+      expect(result.current.known).toBe(false)
+      expect(result.current.problem).toBeNull()
     })
   })
 })

@@ -1055,6 +1055,7 @@ function SettingsContentSections({
 
 function SettingsAgentWorkflowSections({
   t,
+  locale,
   autoAdvanceInboxAfterOrganize,
   setAutoAdvanceInboxAfterOrganize,
   celebrationsEnabled,
@@ -1090,6 +1091,7 @@ function SettingsAgentWorkflowSections({
       <SettingsSection id={SETTINGS_SECTION_IDS.ai}>
         <AiAgentSettingsSection
           t={t}
+          locale={locale}
           celebrationsEnabled={celebrationsEnabled}
           setCelebrationsEnabled={setCelebrationsEnabled}
           agentProfile={agentProfile}
@@ -1469,6 +1471,7 @@ function AutoSaveSettingRow({
 
 function AiAgentSettingsSection({
   t,
+  locale,
   celebrationsEnabled,
   setCelebrationsEnabled,
   agentProfile,
@@ -1486,6 +1489,7 @@ function AiAgentSettingsSection({
 }: Pick<
   SettingsBodyProps,
   | 't'
+  | 'locale'
   | 'celebrationsEnabled'
   | 'setCelebrationsEnabled'
   | 'agentProfile'
@@ -1529,7 +1533,7 @@ function AiAgentSettingsSection({
       </SettingsGroup>
 
       <SettingsGroup>
-        <ChatEngineSettings engine={chatEngine} onChange={setChatEngine} />
+        <ChatEngineSettings engine={chatEngine} onChange={setChatEngine} locale={locale} />
         <NativeChatModelPicker
           value={nativeChatTarget}
           onChange={setNativeChatTarget}

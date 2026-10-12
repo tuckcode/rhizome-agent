@@ -55,7 +55,7 @@ describe('NativeChatModelPicker', () => {
     await waitFor(() => {
       expect(screen.getByTestId('native-chat-model-menu')).toHaveTextContent('Work OpenAI')
     })
-    expect(screen.getByTestId('native-chat-model-open_ai/gpt-4o')).toHaveTextContent('GPT-4o')
+    expect(screen.getByTestId('native-chat-model-work-openai/gpt-4o')).toHaveTextContent('GPT-4o')
     expect(screen.getByTestId('native-chat-model-free_tier_auto')).toHaveTextContent('Free tier')
   })
 
@@ -77,5 +77,30 @@ describe('NativeChatModelPicker', () => {
     )
 
     expect(screen.getByTestId('native-chat-model-trigger')).toHaveTextContent('Work OpenAI · GPT-4o')
+  })
+
+  it('labels a deleted provider and tells the user how to recover', async () => {
+    render(
+      <NativeChatModelPicker
+        value="gone-openai/gpt-4o"
+        onChange={vi.fn()}
+        providers={configured}
+      />,
+    )
+
+    expect(screen.getByTestId('native-chat-model-trigger')).toHaveTextContent('Provider removed')
+    expect(screen.getByTestId('native-chat-removed-provider')).toHaveTextContent(
+      "This model's provider was removed. Pick another model, or add the provider back in Settings → AI Agents.",
+    )
+
+    fireEvent.pointerDown(
+      screen.getByTestId('native-chat-model-trigger'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+    await waitFor(() => {
+      expect(screen.getByTestId('native-chat-model-gone-openai/gpt-4o')).toHaveTextContent(
+        'Provider removed',
+      )
+    })
   })
 })

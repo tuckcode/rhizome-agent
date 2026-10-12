@@ -92,6 +92,8 @@ interface AiPanelProps {
   sessionsRailSlot?: HTMLElement | null
   /** A session or New chat was picked in the rail list; the shell closes a narrow-window drawer. */
   onRailSessionPicked?: () => void
+  /** Chat-home engine lock is per conversation; New Chat and session picks clear it. */
+  onConversationReset?: () => void
   onForkMessage?: (entryId: string) => void
   /** Fork branches the Prime session rather than copying the conversation. */
   forkTargetsPrimeEntry?: boolean
@@ -133,6 +135,7 @@ interface AiPanelViewProps {
   sessionsAutoCollapsed?: boolean
   sessionsRailSlot?: HTMLElement | null
   onRailSessionPicked?: () => void
+  onConversationReset?: () => void
   onForkMessage?: (messageId: string) => void
   forkTargetsPrimeEntry?: boolean
   onQueuedPromptTarget?: (targetId: string) => void
@@ -239,6 +242,7 @@ export function AiPanelView({
   sessionsAutoCollapsed = false,
   sessionsRailSlot,
   onRailSessionPicked,
+  onConversationReset,
   onForkMessage,
   forkTargetsPrimeEntry,
   onQueuedPromptTarget,
@@ -361,11 +365,21 @@ export function AiPanelView({
     primeHostSessionPath: primeHost.sessionPath,
     hostRunning: primeHost.running,
   })
+  const beginNewChat = () => {
+    onConversationReset?.()
+    handleNewChat()
+  }
+  const pickSession = (
+    ...args: Parameters<typeof handleSelectSession>
+  ) => {
+    onConversationReset?.()
+    return handleSelectSession(...args)
+  }
   usePrimeSessionRestore({
     enabled: isPrimeTarget,
     host: primeHost,
     onTranscript: agent.replaceMessages,
-    onOpen: handleSelectSession,
+    onOpen: pickSession,
   })
   const sessionsShown = sessionsVisible
   const usesRailSessions = sessionsRailSlot !== undefined
@@ -399,7 +413,7 @@ export function AiPanelView({
           hidePermissionMode={isPrimeTarget}
           skillsLabel={isPrimeTarget ? 'rhizome-vault' : null}
           onClose={onClose}
-          onNewChat={handleNewChat}
+          onNewChat={beginNewChat}
         />
       )}
       {isPrimeTarget && !usesRailSessions && (
@@ -449,8 +463,8 @@ export function AiPanelView({
             />
             <PrimeSessionList
               locale={locale}
-              onSelectSession={(session) => void handleSelectSession(session)}
-              onNewChat={handleNewChat}
+              onSelectSession={(session) => void pickSession(session)}
+              onNewChat={beginNewChat}
               onOpenMycelium={onOpenMycelium}
               activeSessionPath={activeSessionPath}
               working={isActive}
@@ -578,11 +592,11 @@ export function AiPanelView({
                 locale={locale}
                 onSelectSession={(session) => {
                   onRailSessionPicked?.()
-                  void handleSelectSession(session)
+                  void pickSession(session)
                 }}
                 onNewChat={() => {
                   onRailSessionPicked?.()
-                  handleNewChat()
+                  beginNewChat()
                 }}
                 onOpenMycelium={onOpenMycelium}
                 activeSessionPath={activeSessionPath}
@@ -632,6 +646,7 @@ export function AiPanel({
   sessionsAutoCollapsed,
   sessionsRailSlot,
   onRailSessionPicked,
+  onConversationReset,
   onOpenMycelium,
 }: AiPanelProps) {
   const defaultAiAgentReadiness = chatEngineAllowsSendWithoutPrime(chatEngine)
@@ -660,10 +675,14 @@ export function AiPanel({
     nativeTarget,
   })
 
+  const handleNewChat = controller.handleNewChat
   useEffect(() => {
     if (!newChatRef) return
-    newChatRef.current = controller.handleNewChat
-  }, [controller.handleNewChat, newChatRef])
+    newChatRef.current = () => {
+      onConversationReset?.()
+      handleNewChat()
+    }
+  }, [handleNewChat, newChatRef, onConversationReset])
 
   return (
     <AiPanelView
@@ -679,6 +698,7 @@ export function AiPanel({
       sessionsAutoCollapsed={sessionsAutoCollapsed}
       sessionsRailSlot={sessionsRailSlot}
       onRailSessionPicked={onRailSessionPicked}
+      onConversationReset={onConversationReset}
       onOpenMycelium={onOpenMycelium}
       onClose={onClose}
       onOpenNote={onOpenNote}

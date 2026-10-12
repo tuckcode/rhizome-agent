@@ -10,6 +10,29 @@ import { callHost } from './callHost'
 const FREE_TIER_AUTO_TARGET = 'free_tier_auto'
 const FREE_TIER_AUTO_LABEL = 'Free tier (auto)'
 
+export const REMOVED_PROVIDER_LABEL = 'Provider removed'
+export const REMOVED_PROVIDER_ERROR =
+  "This model's provider was removed. Pick another model, or add the provider back in Settings → AI Agents."
+
+const LEGACY_PROVIDER_KIND_IDS = new Set([
+  'anthropic',
+  'openai',
+  'open_ai',
+  'ollama',
+  'lmstudio',
+  'lm_studio',
+  'openrouter',
+  'open_router',
+  'gemini',
+  'open_ai_compatible',
+  'openai_compatible',
+  'compatible',
+])
+
+export function isLegacyProviderKindId(id: string): boolean {
+  return LEGACY_PROVIDER_KIND_IDS.has(id.trim().toLowerCase().replace(/-/g, '_'))
+}
+
 function isAnthropicTarget(id: string): boolean {
   const value = id.trim().toLowerCase()
   return value.startsWith('anthropic/') || value.includes('/claude')
@@ -17,6 +40,7 @@ function isAnthropicTarget(id: string): boolean {
 
 export interface RhizomeChatModel {
   id: string
+  providerId: string
   providerKind: string
   providerName: string
   modelId: string
@@ -35,9 +59,76 @@ interface CatalogEntry {
 
 const CATALOG = catalog as readonly CatalogEntry[]
 
+function providerKey(provider: Pick<AiModelProvider, 'id' | 'kind'>): string {
+  return provider.id.trim() || provider.kind
+}
+
+function splitTarget(id: string): { provider: string; modelId: string } | null {
+  const slash = id.indexOf('/')
+  if (slash <= 0 || slash === id.length - 1) return null
+  return { provider: id.slice(0, slash), modelId: id.slice(slash + 1) }
+}
+
 function addModel(into: Map<string, RhizomeChatModel>, model: RhizomeChatModel): void {
   if (isAnthropicTarget(model.id)) return
   into.set(model.id, model)
+}
+
+function matchesStoredTarget(model: RhizomeChatModel, provider: string, modelId: string): boolean {
+  return (
+    model.modelId === modelId
+    && (model.providerId === provider || model.providerKind === provider)
+  )
+}
+
+/** Exact id, or a unique old `kind/model` selection. */
+export function resolveRhizomeChatModel(
+  models: RhizomeChatModel[],
+  selectedId: string | null | undefined,
+): RhizomeChatModel | undefined {
+  const value = selectedId?.trim()
+  if (!value) return undefined
+  const exact = models.find((model) => model.id === value)
+  if (exact) return exact
+  const parts = splitTarget(value)
+  if (!parts) return undefined
+  const matches = models.filter((model) => matchesStoredTarget(model, parts.provider, parts.modelId))
+  return matches[0]
+}
+
+/** Keep a deleted configured-provider selection visible in the picker. */
+export function includeRemovedProviderModel(
+  models: RhizomeChatModel[],
+  selectedId: string | null | undefined,
+): RhizomeChatModel[] {
+  const value = selectedId?.trim()
+  if (!value || resolveRhizomeChatModel(models, value)) return models
+  const parts = splitTarget(value)
+  if (!parts || isLegacyProviderKindId(parts.provider)) return models
+  return [
+    {
+      id: value,
+      providerId: parts.provider,
+      providerKind: parts.provider,
+      providerName: REMOVED_PROVIDER_LABEL,
+      modelId: parts.modelId,
+      label: REMOVED_PROVIDER_LABEL,
+    },
+    ...models,
+  ]
+}
+
+/** Rewrite a unique kind-keyed selection to the provider-id target. */
+export function migrateRhizomeChatTarget(
+  models: RhizomeChatModel[],
+  selectedId: string,
+): string {
+  const exact = models.find((model) => model.id === selectedId)
+  if (exact) return exact.id
+  const parts = splitTarget(selectedId)
+  if (!parts) return selectedId
+  const matches = models.filter((model) => matchesStoredTarget(model, parts.provider, parts.modelId))
+  return matches.length === 1 ? matches[0].id : selectedId
 }
 
 /** Catalog defaults plus Settings-configured models. Never empty. */
@@ -48,6 +139,7 @@ export function seedRhizomeChatModels(
   for (const entry of CATALOG) {
     addModel(into, {
       id: `${entry.kind}/${entry.default_model_id}`,
+      providerId: entry.kind,
       providerKind: entry.kind,
       providerName: entry.name,
       modelId: entry.default_model_id,
@@ -55,9 +147,11 @@ export function seedRhizomeChatModels(
     })
   }
   for (const provider of normalizeAiModelProviders(providers)) {
+    const key = providerKey(provider)
     for (const model of provider.models) {
       addModel(into, {
-        id: `${provider.kind}/${model.id}`,
+        id: `${key}/${model.id}`,
+        providerId: key,
         providerKind: provider.kind,
         providerName: provider.name,
         modelId: model.id,
@@ -68,6 +162,7 @@ export function seedRhizomeChatModels(
   const listed = [...into.values()]
   listed.push({
     id: FREE_TIER_AUTO_TARGET,
+    providerId: 'free_tier',
     providerKind: 'free_tier',
     providerName: 'Free tier',
     modelId: FREE_TIER_AUTO_TARGET,
@@ -179,7 +274,8 @@ export async function discoverRhizomeChatModels(
           const id = modelId.trim()
           if (!id) continue
           extra.push({
-            id: `${provider.kind}/${id}`,
+            id: `${providerKey(provider)}/${id}`,
+            providerId: providerKey(provider),
             providerKind: provider.kind,
             providerName: provider.name,
             modelId: id,
@@ -204,6 +300,7 @@ export async function loadRhizomeChatModels(
   const listed = [...into.values()].filter((model) => model.id !== FREE_TIER_AUTO_TARGET)
   listed.push({
     id: FREE_TIER_AUTO_TARGET,
+    providerId: 'free_tier',
     providerKind: 'free_tier',
     providerName: 'Free tier',
     modelId: FREE_TIER_AUTO_TARGET,

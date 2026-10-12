@@ -8,7 +8,8 @@ const source = readFileSync(
 
 describe('leftover new chat no vault', () => {
   it('locks onNewChat to newChatRef', () => {
-    expect(source).toContain('onNewChat={() => newChatRef.current?.()}')
+    expect(source).toContain('newChatRef.current?.()')
+    expect(source).toContain('clearEngineLock()')
   })
 
   it('locks thinkingLevel from primeHost', () => {

@@ -3,8 +3,12 @@ import type { AiModelProvider } from './aiTargets'
 import {
   filterRhizomeChatModels,
   groupRhizomeChatModels,
+  includeRemovedProviderModel,
   isWellFormedRhizomeTarget,
   loadRhizomeChatModels,
+  REMOVED_PROVIDER_ERROR,
+  REMOVED_PROVIDER_LABEL,
+  resolveRhizomeChatModel,
   seedRhizomeChatModels,
 } from './rhizomeChatModels'
 
@@ -15,6 +19,14 @@ vi.mock('./callHost', () => ({
     throw new Error('provider offline')
   }),
 }))
+
+const capabilities = {
+  streaming: true,
+  tools: true,
+  vision: true,
+  json_mode: true,
+  reasoning: false,
+}
 
 const configured: AiModelProvider[] = [
   {
@@ -27,13 +39,21 @@ const configured: AiModelProvider[] = [
       {
         id: 'gpt-4o',
         display_name: 'GPT-4o',
-        capabilities: {
-          streaming: true,
-          tools: true,
-          vision: true,
-          json_mode: true,
-          reasoning: false,
-        },
+        capabilities,
+      },
+    ],
+  },
+  {
+    id: 'home-openai',
+    name: 'Home OpenAI',
+    kind: 'open_ai',
+    base_url: 'https://home.example/v1',
+    api_key_storage: 'local_file',
+    models: [
+      {
+        id: 'gpt-4o',
+        display_name: 'Home GPT-4o',
+        capabilities,
       },
     ],
   },
@@ -44,7 +64,8 @@ describe('seedRhizomeChatModels', () => {
     const listed = seedRhizomeChatModels(configured)
     expect(listed.some((model) => model.id === 'ollama/llama3.2')).toBe(true)
     expect(listed.some((model) => model.id === 'open_ai/gpt-4.1-mini')).toBe(true)
-    expect(listed.some((model) => model.id === 'open_ai/gpt-4o')).toBe(true)
+    expect(listed.some((model) => model.id === 'work-openai/gpt-4o')).toBe(true)
+    expect(listed.some((model) => model.id === 'home-openai/gpt-4o')).toBe(true)
     expect(listed.some((model) => model.id === 'free_tier_auto')).toBe(true)
     expect(listed.some((model) => model.id.startsWith('anthropic/'))).toBe(false)
     expect(listed.at(-1)?.id).toBe('free_tier_auto')
@@ -62,14 +83,15 @@ describe('group and filter', () => {
     const groups = groupRhizomeChatModels(listed)
     expect(groups.some((group) => group.provider === 'OpenAI')).toBe(true)
     expect(groups.some((group) => group.provider === 'Work OpenAI')).toBe(true)
-    expect(filterRhizomeChatModels(listed, 'gpt-4o').map((model) => model.id)).toContain(
-      'open_ai/gpt-4o',
+    expect(filterRhizomeChatModels(listed, 'gpt-4o').map((model) => model.id)).toEqual(
+      expect.arrayContaining(['work-openai/gpt-4o', 'home-openai/gpt-4o']),
     )
   })
 })
 
 describe('isWellFormedRhizomeTarget', () => {
   it('accepts catalog ids and Free tier, and refuses Anthropic', () => {
+    expect(isWellFormedRhizomeTarget('work-openai/gpt-4o')).toBe(true)
     expect(isWellFormedRhizomeTarget('open_ai/gpt-4o')).toBe(true)
     expect(isWellFormedRhizomeTarget('free_tier_auto')).toBe(true)
     expect(isWellFormedRhizomeTarget('anthropic/claude-opus-4')).toBe(false)
@@ -81,6 +103,37 @@ describe('loadRhizomeChatModels', () => {
   it('merges a live discover and keeps the seed when a provider fails', async () => {
     const listed = await loadRhizomeChatModels(configured)
     expect(listed.some((model) => model.id === 'ollama/qwen2.5')).toBe(true)
-    expect(listed.some((model) => model.id === 'open_ai/gpt-4o')).toBe(true)
+    expect(listed.some((model) => model.id === 'work-openai/gpt-4o')).toBe(true)
+  })
+})
+
+describe('resolveRhizomeChatModel', () => {
+  it('keys configured models on provider id so two OpenAI accounts stay distinct', () => {
+    const listed = seedRhizomeChatModels(configured)
+    expect(resolveRhizomeChatModel(listed, 'work-openai/gpt-4o')?.providerName).toBe('Work OpenAI')
+    expect(resolveRhizomeChatModel(listed, 'home-openai/gpt-4o')?.providerName).toBe('Home OpenAI')
+  })
+
+  it('still resolves an old kind-keyed selection to a matching configured model', () => {
+    const listed = seedRhizomeChatModels(configured.slice(0, 1))
+    expect(resolveRhizomeChatModel(listed, 'open_ai/gpt-4o')?.id).toBe('work-openai/gpt-4o')
+  })
+
+  it('keeps a deleted configured provider as a removed picker entry', () => {
+    const listed = includeRemovedProviderModel(
+      seedRhizomeChatModels(configured),
+      'gone-openai/gpt-4o',
+    )
+    const removed = resolveRhizomeChatModel(listed, 'gone-openai/gpt-4o')
+    expect(removed?.label).toBe(REMOVED_PROVIDER_LABEL)
+    expect(removed?.providerName).toBe(REMOVED_PROVIDER_LABEL)
+    expect(REMOVED_PROVIDER_ERROR).toBe(
+      "This model's provider was removed. Pick another model, or add the provider back in Settings → AI Agents.",
+    )
+    expect(
+      includeRemovedProviderModel(seedRhizomeChatModels(configured), 'open_ai/gpt-4o').some(
+        (model) => model.label === REMOVED_PROVIDER_LABEL,
+      ),
+    ).toBe(false)
   })
 })
