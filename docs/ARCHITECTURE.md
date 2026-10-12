@@ -216,17 +216,23 @@ flowchart TD
 
 **Origin:** Cursor Grok 4.6 · 2026-09-08 — corrected against `App.tsx`,
 `useViewMode.ts`, `VaultPanel.tsx`, and `ConnectionsPanel.tsx` (C72 +
-Graph-on-Changes). Do not restore Graph as a center-canvas destination.
+Graph-on-Changes).
 **Origin:** Cursor Grok 4.6 · 2026-09-19 — pane presets (ADR-0173). Fresh
 launch is Chat. Four legal layouts: Chat, Notes, Read, Workbench.
+**Origin:** Cursor Grok 4.7 · 2026-10-12 — rail Views checked against
+`src/lib/railViews.ts`, `src/lib/railViewShortcuts.ts`, `CommandRail.tsx`,
+and `App.tsx`. The 2026-09-08 note that Graph is not a center canvas is
+historical. Research, Graph, and Mycelium are center canvases now.
 
-The **network-shell** product map (ADR-0166, refined by ADR-0170 / ADR-0171 /
-ADR-0173) is:
+The **network-shell** product map (ADR-0166, refined by ADR-0170 / ADR-0173;
+the four rail views live in `railViews.ts`) is:
 
 ```
-rail (Inbox toggle) | sessions | CHAT | Notes (nav over list)
-                                      | 46px restore rail when Notes is shut
-Changes only:                         | Graph / Mycelium (resizable, below Notes)
+rail: Sessions | Research · Graph · Mycelium · History | Settings
+center: CHAT, hidden while Research, Graph, or Mycelium is selected
+right: Notes (nav over list) | 46px restore rail when Notes is shut
+       Changes sits next to All Notes (git file list, not Graph)
+       History (pulse) replaces the note list when Notes is open
 ```
 
 Chat is the center canvas. Sessions are a collapsible column on its left.
@@ -254,18 +260,49 @@ forces `editor-only`. Notes is not a left-rail destination.
 Inbox and other Notes filters keep a tall notes list — they do **not** mount
 Graph or Mycelium under the list.
 
-Graph and Mycelium mount only while Changes is selected
-(`ConnectionsPanel` inside `showVaultPanel && isChangesSelection`). A Graph
-or session-footprint request opens Notes if it was shut, then switches to
-Changes so the cell can appear. Expanding Graph or Mycelium is an overlay
-you can leave; it does not replace Chat. Docked Mycelium is a session card
-(name, tool count, files) — not the city and not a prompt dump. Expand to
-open the city. The Connections edge strip is gone
-(ADR-0170). Graph “Find a note” is a compact bottom-right box
-(`GraphControls`, collapsed until focus or an active filter) — not a large
-overlay. `useChatCenteredShellLayout` owns `notesOpen`, the restore strip,
-compact/Beside fold, and Notes restore strip so App
-does not recombine view mode with compact flags.
+Research, Graph, Mycelium, and History are the command-rail Views group
+(`RAIL_VIEWS` in `src/lib/railViews.ts`). Order is fixed and matches the Go
+menu and ⌘K. Changes is not in that group. ADR-0171's "mount Graph and
+Mycelium only while Changes is selected" does not match `App.tsx` in this
+tree. Do not put the 3D graph back under Inbox.
+
+| View | Selection | What mounts |
+|------|-----------|-------------|
+| Research | `filter: research` | `ResearchPanel` replaces Chat (`data-testid="research-destination"`). Choosing Research again returns to Chat: Inbox when explicit organization is on, otherwise All Notes. |
+| Graph | `filter: graph` | Lazy `GraphView` is the center canvas. Chat is `display: none`. Opening a note returns to Chat and opens that note. Close uses the view's exit control (`onExit` → `handleRailSelectChat`). Clicking Graph again does not toggle off. |
+| Mycelium | `filter: mycelium` | `MyceliumView` replaces Chat the same way. Close returns to Chat. |
+| History | `filter: pulse` (`go-pulse`) | Does not hide Chat and does not call `ensureNotesOpen`. `PulseView` replaces the note list only while the Notes panel is open. |
+
+Shortcuts are Ctrl+Cmd+1–4 on Mac and Ctrl+Shift+1–4 on Windows and Linux
+(`src/lib/railViewShortcuts.ts`, accelerators on `goResearch` / `goGraph` /
+`goMycelium` / `goHistory` in `src/shared/appCommandManifest.json`).
+Ctrl+Alt+digit is refused: on many layouts that chord is AltGr. These chords
+are separate from the pane presets (Cmd/Ctrl+1–4: Chat, Notes, Workbench, Read).
+
+`ConnectionsPanel` is a different surface. It mounts inside the Notes column
+whenever that column is open in the chat-centered shell, and it renders
+nothing until `presented` is set. The panel is not in the tree while
+Notes is shut, so a Show-in-Graph event has no listener until Notes is
+open. Note-list **Show in Graph** calls `openConnections('graph', path)`
+and opens a fixed overlay (`fixed inset-4`). That path does not switch
+the Notes filter to Changes.
+A Chat session footprint (`handleOpenSessionFootprint`) does open Notes,
+select Changes, and present Mycelium in that overlay. The overlay does not
+take a share of the Notes column. The Connections edge strip is gone
+(ADR-0170).
+
+Graph “Find a note” on the full-page `GraphView` is a compact bottom-right
+box (`GraphControls`, collapsed until focus or an active filter). Docked
+Mycelium in the overlay is a session card (name, tool count, files) — not
+the city and not a prompt dump.
+
+`chatCentered` is `commandRailEnabled && !noteWindow`. Classic shell
+(`ff_shell_command_rail=false`) has no rail. Its status bar still shows
+Graph, Mycelium, and Research. History is the Pulse badge, and that badge
+renders only when the vault is a git repo. The Graph button toggles the
+same full-page graph filter. `useChatCenteredShellLayout` owns `notesOpen`, the
+restore strip, compact/Beside fold, and `hideNotesForCanvas` (Research,
+Graph, Mycelium) so App does not recombine view mode with compact flags.
 
 #### Open-note split, Copy, and the latest-reply marker
 
@@ -796,7 +833,7 @@ Provider secrets are not written to `settings.json`. Hosted API targets keep the
 
 ### Authentication
 
-Each CLI agent authenticates itself outside Tolaria. Claude Code uses its existing CLI login or user-managed Anthropic/provider environment variables; Codex surfaces a friendly prompt to run `codex login` when needed; OpenCode surfaces a friendly prompt to run `opencode auth login` or configure a provider when needed; Pi surfaces a friendly prompt to run `pi /login` or configure a provider API key when needed. Tolaria does not store model-provider API keys in app settings; direct provider secrets stay in local app data or user-managed environment variables. App-managed Pi sessions copy that local Pi agent config into a per-run temporary directory before adding Tolaria MCP, so Tolaria does not overwrite global Pi files and does not drop a working standalone Pi setup.
+Each CLI agent authenticates itself outside Tolaria. Claude Code uses its existing CLI login or user-managed Anthropic/provider environment variables; Codex surfaces a friendly prompt to run `codex login` when needed; OpenCode surfaces a friendly prompt to run `opencode auth login` or configure a provider when needed; Pi surfaces a friendly prompt to run `pi /login` or configure a provider API key when needed. Tolaria does not store model-provider API keys in `settings.json`. Direct provider secrets live in the OS keychain (service `ai.rhizome.agent`, ADR-0185, paragraph above) or in a user-managed environment variable. Do not write them back to `ai-provider-secrets.json`. App-managed Pi sessions copy that local Pi agent config into a per-run temporary directory before adding Tolaria MCP, so Tolaria does not overwrite global Pi files and does not drop a working standalone Pi setup.
 
 ## MCP Server
 
@@ -1353,11 +1390,13 @@ graph — `src-tauri/src/vault/graph.rs`:
 - **Frontend** (`src/components/graph/`): `GraphView.tsx` is lazy-loaded
   via `React.lazy` so `3d-force-graph`/three.js never touch the main
   bundle chunk (`ForceGraph3DCanvas.tsx` is the sole file that imports
-  it, and even it defers the import inside a `useEffect`). In the
-  chat-centered shell it is **not** a top-level canvas destination.
-  `ConnectionsPanel` mounts it under Notes **only on Changes**
-  (ADR-0171). Classic shell (`ff_shell_command_rail=false`) can still
-  treat Graph as a filter view. Node colors resolve `typeColors.ts`'s
+  it, and even it defers the import inside a `useEffect`). The
+  command rail treats Graph as a center canvas (`filter: graph` in
+  `App.tsx` mounts this `GraphView`). `ConnectionsPanel` is the separate
+  **Show in Graph** overlay and is not limited to the Changes filter.
+  ADR-0171 described the older Changes-only cell; that mount is gone.
+  Classic shell (`ff_shell_command_rail=false`) reaches the same full-page
+  filter from the status-bar Graph button. Node colors resolve `typeColors.ts`'s
   CSS-var references to concrete values for three.js materials
   (`typeColorResolver.ts`), re-resolved on theme change. Clicking a node
   opens a docked `NodePreviewPanel` (type-color dot, icon, title,
@@ -1925,6 +1964,10 @@ Data flows unidirectionally: `App` passes data and callbacks as props to child c
 | Cmd+2 | Notes (`editor-list`) |
 | Cmd+3 | Workbench (`all`) |
 | Cmd+4 | Read (note beside Chat) |
+| Ctrl+Cmd+1 (Mac) / Ctrl+Shift+1 (Windows, Linux) | Research (center canvas) |
+| Ctrl+Cmd+2 / Ctrl+Shift+2 | Graph (center canvas) |
+| Ctrl+Cmd+3 / Ctrl+Shift+3 | Mycelium (center canvas) |
+| Ctrl+Cmd+4 / Ctrl+Shift+4 | History (`pulse` in the Notes list; does not open Notes) |
 | Tab (composer, idle) | Accept the ghost-text completion when `suggestReply` offers one |
 | `[[` in editor | Open wikilink suggestion menu |
 
