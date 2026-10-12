@@ -13,11 +13,7 @@ export function ChatEngineSettings({
   return (
     <SettingsSwitchRow
       label="Chat engine"
-      description={
-        native
-          ? 'New chats use Rhizome’s own engine. Prime stays available until you turn this on.'
-          : 'Prime Agent runs Chat. Turn this on to send new chats through Rhizome’s own engine.'
-      }
+      description="New chats use Prime unless you turn this on for Rhizome's engine. Prime chats fall back to Rhizome only after we know Prime is not installed, and an open chat stays on the engine it started on."
       checked={native}
       onChange={(checked) => onChange(checked ? 'native' : 'prime')}
       testId="settings-chat-engine"

@@ -14,6 +14,7 @@ import {
   filterRhizomeChatModels,
   groupRhizomeChatModels,
   loadRhizomeChatModels,
+  resolveRhizomeChatModel,
   seedRhizomeChatModels,
   type RhizomeChatModel,
 } from '../lib/rhizomeChatModels'
@@ -37,8 +38,8 @@ export function NativeChatModelPicker({
   const [query, setQuery] = useState('')
   const [models, setModels] = useState<RhizomeChatModel[]>(() => seedRhizomeChatModels(providers))
   const selectedId = resolveNativeChatTarget(value, providers)
-  const selected = models.find((model) => model.id === selectedId)
-  const triggerLabel = selected?.label ?? selectedId
+  const selected = resolveRhizomeChatModel(models, selectedId)
+  const triggerLabel = selected?.label ?? selected?.modelId ?? selectedId
   const visible = filterRhizomeChatModels(models, query)
   const groups = groupRhizomeChatModels(visible)
 

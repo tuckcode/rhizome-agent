@@ -4,6 +4,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MutableRefObject } from 'react'
 
 const startNewChat = vi.fn()
+const primeHostMock = vi.hoisted(() => ({
+  status: {
+    known: true,
+    installed: true,
+    running: true,
+    sessionId: '019fe641-61fa-73e9-82ef-91fc90097aab',
+    modelName: 'Grok 4.5',
+    modelProvider: 'xai',
+    modelId: 'grok-4.5',
+    problem: null as { code: string } | null,
+  },
+}))
 
 vi.mock('../utils/loadChatNoteContent', () => ({
   loadChatNoteContent: vi.fn(async () => '# Memory loop\n\nPromote is explicit.'),
@@ -45,19 +57,30 @@ vi.mock('./AiPanel', () => ({
 
 vi.mock('../hooks/usePrimeHostStatus', () => ({
   primeModelLabel: () => 'xai / grok-4.5',
-  usePrimeHostStatus: () => ({
-    running: true,
-    sessionId: '019fe641-61fa-73e9-82ef-91fc90097aab',
-    modelName: 'Grok 4.5',
-    modelProvider: 'xai',
-    modelId: 'grok-4.5',
-  }),
+  usePrimeHostStatus: () => primeHostMock.status,
 }))
 
 import ChatHome from './ChatHome'
 import { loadChatNoteContent } from '../utils/loadChatNoteContent'
 
+function livePrimeHost() {
+  primeHostMock.status = {
+    known: true,
+    installed: true,
+    running: true,
+    sessionId: '019fe641-61fa-73e9-82ef-91fc90097aab',
+    modelName: 'Grok 4.5',
+    modelProvider: 'xai',
+    modelId: 'grok-4.5',
+    problem: null,
+  }
+}
+
 describe('ChatHome', () => {
+  beforeEach(() => {
+    livePrimeHost()
+  })
+
   it('starts a new chat from the Frame A subhead', () => {
     startNewChat.mockClear()
     render(
@@ -345,6 +368,10 @@ describe('ChatHome — a note handed in from the vault', () => {
 describe('ChatHome composer wiring', () => {
   const chatHomeSource = readFileSync(`${process.cwd()}/src/components/ChatHome.tsx`, 'utf8')
 
+  beforeEach(() => {
+    livePrimeHost()
+  })
+
   it('puts the Agents idle/working pill on the composer next to thinking', () => {
     expect(chatHomeSource).toContain('activity={')
     expect(chatHomeSource).toContain('<AgentsPill')
@@ -382,11 +409,119 @@ describe('ChatHome composer wiring', () => {
     )
   })
 
-  it('sends through the Rhizome catalog when Prime is not live', () => {
-    expect(chatHomeSource).toContain('const primeLive = isPrimeTarget && Boolean(primeHost?.running)')
-    expect(chatHomeSource).toContain("const effectiveEngine = primeLive ? 'prime' : 'native'")
-    expect(chatHomeSource).toContain("catalog={primeLive ? 'prime' : 'rhizome'}")
-    expect(chatHomeSource).toContain('chatEngine={effectiveEngine}')
+  it('sends Prime-targeted chats through Prime when the host is live', () => {
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+  })
+
+  it('does not send Codex through the native engine', () => {
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="codex"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+  })
+
+  it('stays on Prime while host status is still unknown', () => {
+    primeHostMock.status = {
+      ...primeHostMock.status,
+      known: false,
+      installed: false,
+      running: false,
+      problem: null,
+    }
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+  })
+
+  it('falls back to native only after a real status says Prime is not installed', () => {
+    primeHostMock.status = {
+      ...primeHostMock.status,
+      known: true,
+      installed: false,
+      running: false,
+      problem: { code: 'not_installed' },
+    }
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
+  })
+
+  it('keeps an already-open Prime chat on Prime when the host later says it is missing', () => {
+    const { rerender } = render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+
+    primeHostMock.status = {
+      ...primeHostMock.status,
+      known: true,
+      installed: false,
+      running: false,
+      problem: { code: 'not_installed' },
+    }
+    rerender(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
   })
 
   it('polls Prime host status from whatever vaultPath Chat has, including empty', () => {

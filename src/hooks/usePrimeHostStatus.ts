@@ -42,6 +42,12 @@ export interface PrimeHostStatus {
   sessionPath?: string | null
   /** Why Prime is unreachable. Absent while connected. */
   problem?: PrimeConnectionProblem | null
+  /**
+   * True after this poll has published at least once. The initial EMPTY
+   * sentinel is not a real status — `installed: false` there does not mean
+   * Prime is missing.
+   */
+  known?: boolean
 }
 
 const EMPTY: PrimeHostStatus = {
@@ -60,6 +66,7 @@ const EMPTY: PrimeHostStatus = {
   startedAt: null,
   sessionPath: null,
   problem: null,
+  known: false,
 }
 
 type Listener = (status: PrimeHostStatus) => void
@@ -91,8 +98,9 @@ function withCorroboratedProblem(
 }
 
 function publish(loop: HostLoop, status: PrimeHostStatus): void {
-  loop.lastStatus = status
-  for (const listener of loop.listeners) listener(status)
+  const next = { ...status, known: true }
+  loop.lastStatus = next
+  for (const listener of loop.listeners) listener(next)
 }
 
 async function tick(vaultPath: string, loop: HostLoop): Promise<void> {

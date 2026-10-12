@@ -91,6 +91,12 @@ describe('usePrimeHostStatus', () => {
     expect(ensures).toHaveLength(1)
   })
 
+  it('does not treat the initial empty status as a real host answer', () => {
+    const { result } = renderHook(() => usePrimeHostStatus(true, '/vault'))
+    expect(result.current.known).toBe(false)
+    expect(result.current.running).toBe(false)
+  })
+
   it('gives a late subscriber the last published host status', async () => {
     const vault = '/Users/jdoe/Documents/Rhizome Vault'
     const first = renderHook(() => usePrimeHostStatus(true, vault))

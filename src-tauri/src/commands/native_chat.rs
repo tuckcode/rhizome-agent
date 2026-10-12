@@ -1011,6 +1011,59 @@ mod tests {
     }
 
     #[test]
+    fn catalog_provider_prefers_matching_id_over_first_of_kind() {
+        with_temp_home(|_| {
+            let model = crate::ai_models::AiModelDefinition {
+                id: "gpt-4o".into(),
+                display_name: Some("GPT-4o".into()),
+                context_window: None,
+                max_output_tokens: None,
+                capabilities: crate::ai_models::AiModelCapabilities {
+                    streaming: true,
+                    tools: false,
+                    vision: false,
+                    json_mode: false,
+                    reasoning: false,
+                },
+            };
+            let mut settings = crate::settings::get_settings().expect("settings");
+            settings.ai_model_providers = Some(vec![
+                crate::ai_models::AiModelProvider {
+                    id: "home-openai".into(),
+                    name: "Home OpenAI".into(),
+                    kind: AiModelProviderKind::OpenAi,
+                    base_url: Some("https://home.example/v1".into()),
+                    api_key_storage: Some(crate::ai_models::AiModelApiKeyStorage::LocalFile),
+                    api_key_env_var: None,
+                    headers: None,
+                    models: vec![model.clone()],
+                },
+                crate::ai_models::AiModelProvider {
+                    id: "work-openai".into(),
+                    name: "Work OpenAI".into(),
+                    kind: AiModelProviderKind::OpenAi,
+                    base_url: Some("https://work.example/v1".into()),
+                    api_key_storage: Some(crate::ai_models::AiModelApiKeyStorage::LocalFile),
+                    api_key_env_var: None,
+                    headers: None,
+                    models: vec![model],
+                },
+            ]);
+            crate::settings::save_settings(settings).expect("save");
+
+            let work = catalog_provider(AiModelProviderKind::OpenAi, "work-openai");
+            assert_eq!(work.id, "work-openai");
+            assert_eq!(work.base_url.as_deref(), Some("https://work.example/v1"));
+
+            let legacy = catalog_provider(AiModelProviderKind::OpenAi, "open_ai");
+            assert_eq!(
+                legacy.id, "home-openai",
+                "old kind-keyed targets still pick the first saved provider of that kind"
+            );
+        });
+    }
+
+    #[test]
     fn catalog_kind_ids_map_to_their_provider_kinds() {
         let openai = resolve_native_target("open_ai/gpt-4.1-mini").expect("openai");
         let openrouter = resolve_native_target("open_router/openai/gpt-4.1-mini").expect("router");

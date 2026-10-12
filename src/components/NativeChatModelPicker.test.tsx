@@ -55,7 +55,7 @@ describe('NativeChatModelPicker', () => {
     await waitFor(() => {
       expect(screen.getByTestId('native-chat-model-menu')).toHaveTextContent('Work OpenAI')
     })
-    expect(screen.getByTestId('native-chat-model-open_ai/gpt-4o')).toHaveTextContent('GPT-4o')
+    expect(screen.getByTestId('native-chat-model-work-openai/gpt-4o')).toHaveTextContent('GPT-4o')
     expect(screen.getByTestId('native-chat-model-free_tier_auto')).toHaveTextContent('Free tier')
   })
 

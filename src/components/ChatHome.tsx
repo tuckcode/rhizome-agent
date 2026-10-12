@@ -17,6 +17,11 @@ import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus
 import { usePrimeActiveSessionTitle } from '../hooks/usePrimeActiveSessionTitle'
 import { resolveChatOpenNote } from '../utils/resolveChatOpenNote'
 import { agentTargets, type AiModelProvider, type AiTarget } from '../lib/aiTargets'
+import type { ChatEngine } from '../lib/chatEngine'
+import {
+  resolveEffectiveChatEngine,
+  shouldLockEffectiveChatEngine,
+} from '../lib/effectiveChatEngine'
 import type { AiAgentId, AiAgentReadiness } from '../lib/aiAgents'
 import type { AppLocale } from '../lib/i18n'
 import type { VaultEntry } from '../types'
@@ -116,8 +121,21 @@ export default function ChatHome({
   }, [defaultAiTarget, isPrimeChat])
   const isPrimeTarget = isPrimeChat && chatTarget?.kind !== 'api_model' && chatEngine !== 'native'
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
-  const primeLive = isPrimeTarget && Boolean(primeHost?.running)
-  const effectiveEngine = primeLive ? 'prime' : 'native'
+  const [startedEngine, setStartedEngine] = useState<ChatEngine | null>(null)
+  const hostKnown = Boolean(primeHost.known)
+  const hostNotInstalled = primeHost.problem?.code === 'not_installed'
+  const engineInput = {
+    requestedEngine: chatEngine,
+    isPrimeTarget,
+    hostKnown,
+    hostNotInstalled,
+    startedEngine,
+  }
+  const effectiveEngine = resolveEffectiveChatEngine(engineInput)
+  const rhizomeCatalog = effectiveEngine === 'native'
+  if (startedEngine === null && shouldLockEffectiveChatEngine(engineInput)) {
+    setStartedEngine(effectiveEngine)
+  }
   const sessionTitle = usePrimeActiveSessionTitle(primeHost?.sessionPath ?? null, primeHost?.isStreaming)
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
@@ -153,7 +171,11 @@ export default function ChatHome({
   const rhizomeJobs = useRhizomeJobs()
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="chat-home">
+    <div
+      className="flex min-h-0 min-w-0 flex-1 flex-col"
+      data-testid="chat-home"
+      data-chat-engine={effectiveEngine}
+    >
       {isPrimeTarget ? (
         <PrimeSessionSubhead
           railLayoutWidth={railLayoutWidth}
@@ -164,7 +186,10 @@ export default function ChatHome({
           startedAt={primeHost?.startedAt ?? null}
           problem={primeHost?.problem ?? null}
           sessionTitle={sessionTitle}
-          onNewChat={() => newChatRef.current?.()}
+          onNewChat={() => {
+            setStartedEngine(null)
+            newChatRef.current?.()
+          }}
           onOpenFootprint={
             onOpenSessionFootprint && primeHost?.sessionPath
               ? () => onOpenSessionFootprint(primeHost.sessionPath as string)
@@ -260,7 +285,7 @@ export default function ChatHome({
               locale={locale}
               vaultPath={vaultPath}
               hostReady={Boolean(primeHost?.running)}
-              catalog={primeLive ? 'prime' : 'rhizome'}
+              catalog={rhizomeCatalog ? 'rhizome' : 'prime'}
               nativeTarget={nativeTarget}
               onNativeTargetChange={onNativeTargetChange}
               providers={aiModelProviders}

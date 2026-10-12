@@ -1,5 +1,9 @@
 import type { AiModelProvider } from './aiTargets'
-import { isWellFormedRhizomeTarget, seedRhizomeChatModels } from './rhizomeChatModels'
+import {
+  isWellFormedRhizomeTarget,
+  migrateRhizomeChatTarget,
+  seedRhizomeChatModels,
+} from './rhizomeChatModels'
 
 export const FREE_TIER_AUTO_TARGET = 'free_tier_auto'
 export const FREE_TIER_AUTO_LABEL = 'Free tier (auto)'
@@ -29,10 +33,14 @@ export function resolveNativeChatTarget(
   stored: string | null | undefined,
   providers?: AiModelProvider[] | null,
 ): string {
-  const options = nativeChatTargetOptions(providers)
+  const models = seedRhizomeChatModels(providers)
   const value = stored?.trim()
-  if (value && options.some((option) => option.id === value)) return value
-  if (value && isWellFormedRhizomeTarget(value)) return value
+  if (value) {
+    const migrated = migrateRhizomeChatTarget(models, value)
+    if (models.some((model) => model.id === migrated) || isWellFormedRhizomeTarget(value)) {
+      return migrated
+    }
+  }
   return defaultNativeChatTarget(providers)
 }
 
