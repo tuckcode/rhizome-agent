@@ -3,26 +3,26 @@
 Source: reference/contribute.md
 URL: /reference/contribute
 
-# Contribute
+Rhizome is free and open source under AGPL-3.0-or-later. All of these happen on GitHub.
 
-Rhizome is free and open source, and any kind of help is useful. Pick the path that matches what you want to do.
+## Report a bug
 
-## Sponsor Or Support
+Open an issue on [GitHub Issues](https://github.com/tuckcode/rhizome-agent/issues). Include what happened, what you expected, and the steps to reproduce it.
 
-The best way to support Rhizome is to subscribe to [Refactoring](https://refactoring.fm/), Luca's newsletter and community about running good teams and shipping software with AI.
+From inside Rhizome, open **Contribute** from the command palette or Settings → About. It can copy diagnostics with personal details removed, for you to paste into the issue.
 
-## Feature Requests
+## Suggest a feature
 
-Use the [product board](https://rhizome.canny.io/) for feature ideas. Search first, upvote existing ideas, and create a new post when the request is genuinely new.
+Search [GitHub Issues](https://github.com/tuckcode/rhizome-agent/issues) first. Comment on an existing request, or open a new one if yours is new.
 
-## Questions
+## Report a security issue
 
-Use [GitHub Issues](https://github.com/tuckcode/rhizome-agent/issues) for questions, conversations, show and tell, and broader community context.
+Don't open a public issue. Follow [SECURITY.md](https://github.com/tuckcode/rhizome-agent/blob/main/SECURITY.md).
 
-## Contribute Code
+## Contribute code
 
-Small, focused pull requests are welcome. Check the product board first so you build the right thing, then open a PR on [GitHub](https://github.com/tuckcode/rhizome-agent/pulls). The [contributing guide](https://github.com/tuckcode/rhizome-agent/blob/main/CONTRIBUTING.md) explains the local workflow.
+Small, focused pull requests are welcome. Read [CONTRIBUTING.md](https://github.com/tuckcode/rhizome-agent/blob/main/CONTRIBUTING.md) for the local workflow, then open a pull request on [GitHub](https://github.com/tuckcode/rhizome-agent/pulls).
 
-## Report A Bug
+## Origins
 
-Use [GitHub Issues](https://github.com/tuckcode/rhizome-agent/issues) for bugs. Include what happened, what you expected, and clear reproduction steps. If you are reporting from inside Rhizome, use the Contribute panel to copy sanitized diagnostics and attach them to the issue.
+Rhizome is a modified version of [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi. See [Credits and licences](credits.md).

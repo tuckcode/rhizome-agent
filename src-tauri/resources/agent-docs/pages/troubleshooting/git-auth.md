@@ -1,9 +1,7 @@
-# Git Authentication
+# Git authentication
 
 Source: troubleshooting/git-auth.md
 URL: /troubleshooting/git-auth
-
-# Git Authentication
 
 Rhizome uses system Git authentication. It does not manage provider passwords directly.
 
@@ -22,7 +20,7 @@ Rhizome uses system Git authentication. It does not manage provider passwords di
 
 If `git fetch` fails in the terminal, fix system Git auth first.
 
-## Common Fixes
+## Common fixes
 
 - Sign in with GitHub CLI.
 - Configure SSH keys.

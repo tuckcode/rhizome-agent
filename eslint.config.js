@@ -40,6 +40,13 @@ export default defineConfig([
     // anyway, and it broke a push on generated `src-tauri/gen/apple/assets/`
     // files that are not this tree's source at all.
     'rhizome-agent/',
+    // Starlight build product. `cd site && npm run build` writes generated
+    // `.d.ts` under site/.astro/; those files are gitignored, but eslint
+    // walks them anyway and fails the frontend lane after a local docs
+    // build. Same class as playwright-report/ and src-tauri/gen/.
+    'site/.astro/',
+    'site/dist/',
+    'site/node_modules/',
   ]),
   {
     files: ['**/*.{ts,tsx}'],

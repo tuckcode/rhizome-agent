@@ -1,13 +1,11 @@
-# Sync Conflicts
+# Sync conflicts
 
 Source: troubleshooting/sync-conflicts.md
 URL: /troubleshooting/sync-conflicts
 
-# Sync Conflicts
-
 Sync conflicts happen when local and remote changes touch the same content.
 
-## What To Do
+## What to do
 
 1. Stop editing the conflicted note.
 2. Open the conflict resolver if Rhizome presents it.
@@ -16,7 +14,7 @@ Sync conflicts happen when local and remote changes touch the same content.
 5. Commit the resolved file.
 6. Push again.
 
-## Prevent Conflicts
+## Prevent conflicts
 
 - Pull before starting work on another device.
 - Push after meaningful sessions.

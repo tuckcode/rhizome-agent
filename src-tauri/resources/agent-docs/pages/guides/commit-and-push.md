@@ -1,15 +1,13 @@
-# Manage Git Manually Or With AutoGit
+# Commit, push and AutoGit
 
 Source: guides/commit-and-push.md
 URL: /guides/commit-and-push
-
-# Manage Git Manually Or With AutoGit
 
 Rhizome can act as a lightweight Git client for a Git-enabled vault. You can manage commits and pushes yourself, or enable AutoGit to create conservative checkpoints after editing pauses or when the app is no longer active.
 
 ## Manual Git
 
-1. Open the Git or changes surface.
+1. Open **Changes**, next to All Notes in the sidebar.
 2. Review changed files.
 3. Write a short commit message.
 4. Commit locally.
@@ -21,8 +19,10 @@ If the remote has changed, pull first and resolve any conflicts. If the vault ha
 
 AutoGit is available in Settings for Git-enabled vaults. When enabled, Rhizome automatically commits and pushes saved local changes after an idle pause or after the app becomes inactive.
 
+> AutoGit commits and pushes everything that's saved, including the agent's edits. Review agent changes in Changes before you turn it on, or keep it off for vaults where the agent works.
+
 Use AutoGit when you want the safety of regular checkpoints without interrupting capture or editing. You can still inspect each note's current diff, review note history, and browse the whole-vault history before making larger manual commits.
 
-## Use Small Commits
+## Use small commits
 
 Small commits make it easier to understand what changed, roll back safely, and review AI-generated edits.

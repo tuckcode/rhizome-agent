@@ -3,11 +3,9 @@
 Source: concepts/relationships.md
 URL: /concepts/relationships
 
-# Relationships
-
 Relationships make a vault feel like a graph instead of a pile of documents.
 
-## Relationship Fields
+## Relationship fields
 
 Any frontmatter field containing wikilinks can become a relationship. Relationship fields can point to one note or to an array of notes.
 
@@ -28,10 +26,22 @@ Default relationships have automatically computed inverses. If a note says it `b
 
 These outgoing and inverse relationships appear in the Properties panel and in Neighborhood mode, where the note list becomes a graph view around the selected note.
 
-## Body Links Versus Relationship Fields
+## Wikilinks
+
+Wikilinks connect notes by name:
+
+```md
+This project belongs to [[content-systems]] and is related to [[git-workflows]].
+```
+
+Rhizome suggests targets while you type. Links can resolve by filename or title, so prefer clear titles and filenames.
+
+## Body links versus relationship fields
 
 Use body links when the relationship appears naturally in writing. Use frontmatter relationships when the connection is important enough to show in navigation, filters, Neighborhood mode, or the Properties panel.
 
 ## Backlinks
 
 Rhizome can show incoming links and inverse relationships, making it easier to navigate from a note to the rest of its context.
+
+To see all the links in the vault at once, use the [Wiki Graph](wiki-graph.md).

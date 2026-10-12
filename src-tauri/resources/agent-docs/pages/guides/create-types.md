@@ -1,9 +1,7 @@
-# Create Types
+# Create types
 
 Source: guides/create-types.md
 URL: /guides/create-types
-
-# Create Types
 
 Create a type when several notes share the same role in your system.
 
@@ -28,7 +26,7 @@ _order: 10
 # Project
 ```
 
-## Use Types Sparingly
+## Use types sparingly
 
 A type should represent a recurring category, not a one-off label. If you only need a temporary grouping, use a saved view or property instead.
 

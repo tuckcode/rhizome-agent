@@ -1,153 +1,191 @@
-# Index
+# Rhizome
 
 Source: index.md
 URL: /
 
-<LandingHome />
+Rhizome is a desktop app for working with an AI agent. What's worth keeping ends up as plain Markdown notes in a folder on your disk, called your **vault**. You can open, edit, diff and revert those notes like any other file.
+
+> **Developer preview.** Rhizome runs on macOS, built from source. There is no signed download yet. See [Install](start/install.md).
+
+## What you get
+
+- **Memory you can read.** Save an answer to the vault with one click. It becomes a Markdown file. In a Git repository, every change is a commit you can undo. [Your vault is the agent's memory](concepts/vault-as-memory.md)
+- **A replay of where the agent went.** Mycelium draws the folder a Prime run worked in as a map, and lights up each file the agent searched, read or edited. [Mycelium](concepts/mycelium.md)
+- **Free models that switch for you.** With **Free tier (auto)**, Rhizome routes a chat across free hosted models. When a provider fails or runs out, it moves to the next one. [Free models and routing](concepts/free-models-and-routing.md)
+- **Its own agent loop, or Prime.** Rhizome has its own agent loop: it sends your message to a model, runs the tools the model asks for, and repeats until the answer is done. Prime Agent is still the default engine for Chat. [Agents, engines and models](concepts/ai.md)
+
+It also has what you'd expect from a harness and a notes app: sessions you can resume, permission modes for tools, your choice of model, a rich Markdown editor, PDF and image previews, a wiki graph, and Git built in.
+
+## Where to go next
+
+| If you want to… | Read |
+|---|---|
+| Decide whether Rhizome is for you | [Why Rhizome](start/why-rhizome.md) |
+| Try it | [Install](start/install.md), then [First launch](start/first-launch.md) |
+| Move over from Claude Code, Hermes Agent, Cursor or Prime | [Coming from another harness](guides/coming-from-other-harnesses.md) |
+| Chat and keep what matters | [Chat with the agent](guides/use-ai-panel.md) |
+| Fix something | [Chat doesn't answer](troubleshooting/chat-doesnt-answer.md) |
+
+## Origins
+
+Rhizome is a modified version of [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi (AGPL-3.0). Rhizome is AGPL-3.0-or-later. Mycelium uses [Mindwalk](https://github.com/cosmtrek/mindwalk) (MIT) © 2026 Ricko Yu. Free tier (auto) builds on [OmniRoute](https://github.com/diegosouzapw/OmniRoute) and [freellmapi](https://github.com/tashfeenahmed/freellmapi) (both MIT). See [Credits and licences](reference/credits.md).
 
 ---
 
-# First Launch
+# First launch
 
 Source: start/first-launch.md
 URL: /start/first-launch
 
-# First Launch
+In a few minutes you'll have a vault open, an answer from the agent, and one note saved to disk that you can reopen after a restart.
 
-The first launch flow is designed to get you into a real vault quickly without hiding the local-first model.
+## 1. Choose about telemetry
 
-## What You Choose
+The first launch may ask **Help improve Rhizome**. You can decline.
 
-Rhizome asks whether you want to:
+- **Accept** turns on crash reports and usage analytics.
+- **Decline** turns both off.
 
-- Create or clone the Getting Started vault.
-- Open an existing local vault.
-- Create a new empty vault.
+Change either one later in Settings → Telemetry. Analytics events leave out vault content, note titles and file paths. A build made without a Sentry or PostHog key sends nothing, whatever you choose.
 
-The Getting Started vault is cloned locally and then disconnected from its remote. That keeps the sample safe to edit without accidentally pushing tutorial changes.
+## 2. Chat opens
 
-## What Rhizome Creates
+Rhizome opens on Chat. On a first launch, the sessions list opens next to it. The theme is Earth dark. Earth light, Loam and Match system are in Settings → Appearance.
 
-Rhizome stores app-level settings on the local machine. Your notes stay in the vault folder you choose.
+The left rail holds your sessions, the **Views** group (Research, Graph, Mycelium and History) and Settings. On a Mac, Ctrl+⌘1 to Ctrl+⌘4 open the four Views. On Windows, use Ctrl+Shift+1 to Ctrl+Shift+4.
 
-| Data | Stored in |
-| --- | --- |
-| Notes and attachments | Your vault folder |
-| Type definitions and saved views | Your vault folder |
-| Window size, zoom, recent vaults | Local app settings |
-| Cache data | Rebuildable local cache |
+## 3. Open or create a vault
 
-## First Commands To Try
+A **vault** is the folder where Rhizome keeps notes, and where the agent's saved memory goes. You have three choices:
 
-- `Cmd+K` / `Ctrl+K`: open the command palette.
-- `New Note`: create a note in the current vault.
-- `Open Getting Started Vault`: clone the public sample vault.
-- `Reload Vault`: rescan files after external edits.
+- **Get started with a template.** Rhizome creates a vault called `Getting Started` in your Documents folder. It's built on your computer; nothing is downloaded. It has starter folders, a welcome note, an `AGENTS.md` for agents, and the default work types from [Portent](../guides/structure-with-portent.md) (Project, Operation, Responsibility, Task, Event, Topic, Person). It's a Git repository with one first commit.
+- **Create empty vault.** Name a new folder and choose where it goes. Rhizome adds its default settings files.
+- **Open existing vault.** Pick a folder you already have. Any folder of Markdown files works, including an Obsidian vault or a Git repository.
 
-## AI Setup Prompt
 
-Rhizome can show an optional AI agents prompt after a vault is open. It checks common local install locations for supported coding agents and gives you setup paths, but you can dismiss it and use Rhizome without AI.
+If the folder is in Documents, Desktop or Downloads, macOS asks for permission. Allow it, or move the vault somewhere else.
 
----
+Git is optional, but recommended. In a Git repository, every change, including the agent's, can be reviewed and reverted. See [Open or create a vault](open-or-create-vault.md).
 
-# Getting Started Vault
+## 4. Send one message
 
-Source: start/getting-started-vault.md
-URL: /start/getting-started-vault
+Type a message and press Enter. You should get an answer, or a clear failure:
 
-# Getting Started Vault
+| You see | Do this |
+|---|---|
+| Prime is installed, but Chat still says it's missing | Wait a few seconds. The check repeats |
+| No provider key (Rhizome's engine) | Add a key in Settings → AI Agents → API model, or turn on a free provider. See [Set up models and keys](../guides/configure-ai-models.md) |
+| The provider login expired (Prime) | Settings → AI Agents → Local agent → **Reconnect** on that provider, or run `prime-agent` and `/login` in a terminal |
 
-The Getting Started vault is a small sample vault that Rhizome builds locally on first launch. Nothing is cloned from the network by default.
+More cases: [Chat doesn't answer](../troubleshooting/chat-doesnt-answer.md).
 
-It exists to show Rhizome's conventions without requiring you to restructure your own notes first.
+## 5. Save something to the vault
 
-## What It Demonstrates
+Under an answer you want to keep, click **Save to vault**. Rhizome writes it as a Markdown note in your vault.
 
-- Markdown notes with YAML frontmatter.
-- Types such as Project, Person, Topic, and Procedure.
-- Wikilinks in note bodies.
-- Relationship fields in frontmatter.
-- A local Git repository that can be connected to a remote later.
-- Vault guidance files for AI agents.
+Show Notes with ⌘2 (or the View menu), open the note, quit Rhizome with ⌘Q, and reopen it. The note is still there, because it's a file on your disk.
 
-## Local-Only By Default
+> The red window button quits Rhizome. If you turn on **Keep in taskbar** in Settings → Appearance, it hides the window instead, and you bring it back from the Dock.
 
-When Rhizome clones the sample, it removes the remote from the local copy. This makes the sample vault disposable. You can edit it freely, commit locally, and delete it later.
+## Where things are kept
 
-To connect a vault to your own remote, use the bottom status bar remote chip or run `Add Remote` from the command palette.
+| What | Where |
+|---|---|
+| Notes, attachments, types, saved views | Your vault folder |
+| Prime chat sessions | `~/.prime/agent/sessions/` |
+| Chats from Rhizome's own engine | `native-sessions/` in the app config folder (`com.rhizome.app`) |
+| API keys | The system keychain |
+| Settings, window size, recent vaults | Local app settings |
 
-Rhizome also repairs starter-vault guidance files when needed. `AGENTS.md` is the canonical guidance file, `CLAUDE.md` is kept as a compatibility shim, and `GEMINI.md` is only created when you explicitly restore Antigravity/Gemini guidance.
+## Next
 
-## Use It Alongside Your Own Vaults
-
-You can keep the Getting Started vault open while working in your own notes. Enable `Settings` -> `Vaults` -> `Use multiple vaults at the same time`, then use the bottom-left vault menu to include both the sample vault and your real vault in the unified graph.
-
-This lets search, quick open, note lists, backlinks, and wikilink navigation span both vaults. Git actions still stay scoped to each vault's own repository, and new notes go to the default vault you choose in `Manage vaults`.
-
-## When To Move On
-
-After you understand the sample, open your own vault. Rhizome does not require a special folder structure: a folder of Markdown files is enough to start. You can remove the sample from Rhizome's vault list later without deleting its files from disk.
+- [Why Rhizome](why-rhizome.md): what's different here.
+- [Your vault is the agent's memory](../concepts/vault-as-memory.md)
+- [Chat with the agent](../guides/use-ai-panel.md)
 
 ---
 
-# Install Rhizome
+# Install
 
 Source: start/install.md
 URL: /start/install
 
-# Install Rhizome
+You build Rhizome from source on a Mac and run it from there. This takes a few minutes, mostly for the first build.
 
-Rhizome publishes desktop builds for macOS, Windows, and Linux. macOS is the primary day-to-day development target, with Windows and Linux builds supported through the release pipeline and fixed as platform issues are found.
+> **Developer preview.** macOS only. There is no signed download, no Homebrew package and no in-app updater yet. See [Platforms and updates](../reference/platforms-and-updates.md).
 
-## Download
+## Before you start
 
-Use the latest stable release unless you are intentionally testing pre-release builds:
+You need:
 
-- <a href="https://github.com/tuckcode/rhizome-agent/releases" target="_self">Download the latest build</a>
-- [Browse all GitHub releases](https://github.com/tuckcode/rhizome-agent/releases)
-- <a href="https://github.com/tuckcode/rhizome-agent/releases" target="_self">Read the release notes</a>
+1. macOS with the Xcode Command Line Tools (`xcode-select --install`).
+2. Node.js `^20.19.0` or `>=22.12.0`.
+3. pnpm.
+4. Rust `1.77.2` or newer.
+5. git.
 
-## Homebrew
+Prime Agent is optional. You need it only if you keep Prime as the Chat engine, which is the default.
 
-On macOS you can install the cask:
+## Build and run
 
 ```bash
-brew install --cask rhizome
+git clone https://github.com/tuckcode/rhizome-agent.git
+cd rhizome-agent
+./install.sh
+pnpm tauri dev
 ```
 
-## Platform Status
+`./install.sh` installs the project's dependencies. If Prime Agent isn't on the machine, it also downloads Prime's command-line tool, because Prime is still the default Chat engine. Rhizome doesn't include a copy of Prime or Node.
 
-| Platform | Status | Notes |
-| --- | --- | --- |
-| macOS | Primary | Apple Silicon and Intel builds are published. Homebrew is available. |
-| Windows | Supported, early | NSIS installers and updater bundles are Tauri-signed. Authenticode publisher signing will be added after Windows certificate provisioning; company-managed SmartScreen, Defender, or WDAC policies can still require IT approval before install. |
-| Linux | Supported, early | AppImage, deb, and RPM artifacts are published. Desktop behavior depends on distribution WebKitGTK and input-method integration. |
+`pnpm tauri dev` builds the app and opens it.
 
-See [Supported Platforms](/reference/supported-platforms) for the current support policy.
+## Pick an engine
 
-## Managed Windows Devices
+Chat runs on one of two engines. You can switch at any time with **Chat engine** in Settings → AI Agents.
 
-Do not disable SmartScreen or Windows Security to install Rhizome. On a managed Windows device, install Rhizome through your normal software approval path if policy blocks unsigned or unknown-publisher installers. After Authenticode provisioning is complete, validate that the downloaded installer has a valid Rhizome publisher signature before installing.
+- **Prime Agent (default).** Prime runs Chat. Set it up below.
+- **Rhizome's own engine.** Turn **Chat engine** on. It doesn't need Prime. Add a provider key, or use **Free tier (auto)**. See [Set up models and keys](../guides/configure-ai-models.md).
 
-## After Installing
+## Set up Prime
 
-1. Open Rhizome.
-2. Choose the Getting Started vault if you want a guided sample.
-3. Or open an existing folder of Markdown files as a vault.
-4. Use the command palette with `Cmd+K` on macOS or `Ctrl+K` on Linux and Windows.
+Skip this section if you use Rhizome's own engine.
+
+The first time `prime-agent` runs in a terminal, it asks you to run `/login` and choose a model provider. You can also sign in from Settings → AI Agents → Local agent: each provider card has a **Sign in** button that runs Prime's login for you.
+
+Prime stops when the terminal that started it closes. To keep it running in the background:
+
+```bash
+(prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
+```
+
+## If you already have a built copy
+
+Quit `/Applications/Rhizome Agent.app` before you run `pnpm tauri dev`. Both use the bundle id `ai.rhizome.agent`, so a second launch attaches to the copy that's already open.
+
+## Look at the interface without an engine
+
+```bash
+pnpm dev
+```
+
+Then open `http://localhost:5202`. This runs the interface in a browser. Chat doesn't answer.
+
+## Next
+
+[First launch](first-launch.md): open a vault and send your first message.
 
 ---
 
-# Open Or Create A Vault
+# Open or create a vault
 
 Source: start/open-or-create-vault.md
 URL: /start/open-or-create-vault
 
-# Open Or Create A Vault
+A Rhizome vault is a folder on disk. It's where your notes live, and it's also the agent's memory: what you save from Chat lands here as Markdown. See [Your vault is the agent's memory](../concepts/vault-as-memory.md).
 
-A Rhizome vault is a folder on disk. The folder can contain Markdown notes, attachments, type definitions, saved views, and Git metadata.
+The folder can contain Markdown notes, attachments, type definitions, saved views, and Git metadata.
 
-## Open An Existing Folder
+## Open an existing folder
 
 Choose an existing folder if you already have Markdown notes. Rhizome scans `.md` files and uses frontmatter when it exists.
 
@@ -156,19 +194,23 @@ Good starting points:
 - A folder of plain Markdown files.
 - An Obsidian-style vault.
 - A Git repository containing notes.
-- A copy of the Getting Started vault.
 
-## Create A New Vault
+## Create a new vault
 
-Choose a new empty folder if you want Rhizome conventions from the start. New notes and optional type definitions are created as Markdown files.
+The welcome screen offers two ways to start fresh:
 
-## Use More Than One Vault
+- **Get started with a template** creates a `Getting Started` vault in your Documents folder, with starter folders, a welcome note, an `AGENTS.md`, and the default work types from [Portent](../guides/structure-with-portent.md). It's built locally and starts as a Git repository.
+- **Create empty vault** asks for a name and a location, then adds Rhizome's default settings files.
 
-You do not have to merge everything into one folder. Register each local folder as its own vault, then turn on `Use multiple vaults at the same time` in `Settings` -> `Vaults`.
+You can bring the template back later with **Restore Getting Started Vault** in the command palette.
+
+## Use more than one vault
+
+You do not have to merge everything into one folder. Register each local folder as its own vault, then turn on **Use multiple vaults at the same time** in Settings → Vaults.
 
 Once enabled, the bottom-left vault menu lets you include vaults in the unified graph. Search, quick open, wikilinks, and note lists can span the included vaults, while Git sync and commits remain tied to each vault's own repository.
 
-## Git Is Recommended, Not Required
+## Git is recommended, not required
 
 Rhizome works well with a plain folder of Markdown files. You can open, edit, organize, and search notes without making the vault a Git repository.
 
@@ -176,47 +218,127 @@ Git is recommended when you want local history, diff views, recovery, pull, push
 
 ---
 
-# AI
+# Why Rhizome
+
+Source: start/why-rhizome.md
+URL: /start/why-rhizome
+
+Rhizome gives an AI agent a memory you can see. The things worth keeping become notes in a folder you own, and you can check what the agent did to your files after the fact.
+
+## The problem it solves
+
+Most agent harnesses either forget everything when a session ends, or remember things in a store you can't easily read: a hidden memory file, a database, a cloud account. You can't tell what the agent "knows", fix it when it's wrong, or take it with you.
+
+## Memory is a folder of Markdown
+
+Rhizome keeps memory in a **vault**: an ordinary folder of Markdown files on your disk. You can start from a template with starter folders and note types, so you don't have to design a structure first. You can open the same files in any editor, search them with `grep`, and back them up however you like.
+
+When a chat produces something worth keeping, you click **Save to vault**. Rhizome writes a note. Nothing is saved without a click unless you turn automatic saving on. [How memory works](../concepts/vault-as-memory.md)
+
+## Git is the undo button
+
+If the vault is a Git repository, every change to it can be committed, including the agent's changes. You can see what a note looked like before, see what changed, and revert it. Git is optional, but it's what makes agent memory safe to trust. [Git](../concepts/git.md)
+
+## See where the agent went
+
+**Mycelium** replays a Prime session as a map. The folder the agent worked in becomes a city of files, and each file the agent searched, read or edited lights up. When something breaks, you can see which files a run touched and where it went in circles. Mycelium uses the open-source Mindwalk project, which you install separately. [Mycelium](../concepts/mycelium.md)
+
+## Free models, routed for you
+
+**Free tier (auto)** sends a chat to free hosted models (Groq, Mistral, LLM7, OpenRouter's free models, NVIDIA NIM) in a fixed order. When one fails or runs out of free use, Rhizome moves to the next. Models whose free tier trains on your prompts are left out. You can add your own endpoint as the last stop. It builds on two open-source projects, OmniRoute and freellmapi. [Free models and routing](../concepts/free-models-and-routing.md)
+
+## Rhizome runs its own loop
+
+An **agent loop** is the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done. Rhizome has its own. You can also use an **engine**: another harness that runs the loop instead. Prime Agent is the default engine today. The vault, the permissions and the memory stay with Rhizome whichever one runs.
+
+Rhizome's own engine is new. Today it can create notes, and not much else. It can't read, search or edit files yet, and it can't search the vault. [Agents, engines and models](../concepts/ai.md)
+
+## What will feel familiar
+
+If you've used Claude Code, Hermes Agent, Cursor or Prime, most of the basics carry over:
+
+| You know | In Rhizome |
+|---|---|
+| Sessions you can resume | Saved chats with automatic titles; Prime's session list when Prime is the engine |
+| Tool approval | Permission modes: **Limited tools** and **Power User** |
+| Bring your own model | Hosted providers, local models (Ollama, LM Studio), any OpenAI-compatible endpoint; keys in the system keychain |
+| `CLAUDE.md` / `AGENTS.md` | A vault `AGENTS.md`, with `CLAUDE.md` kept as a compatibility file |
+| MCP | Rhizome runs an MCP server, so other apps can read and write your vault |
+| Past chat history | Import Claude Code chats into the vault |
+| Extensions | Prime packages from Settings → Packages when Prime is the engine. Rhizome's own plugin system is planned |
+| An editor | A rich Markdown editor with a raw mode, plus PDF and image previews, sheets, diagrams and whiteboards |
+| A graph | The Wiki Graph: notes as nodes, links as edges |
+
+[Coming from another harness](../guides/coming-from-other-harnesses.md) maps each one in detail.
+
+## What it isn't yet
+
+Rhizome is a macOS developer preview. You build it from source; there is no signed download or in-app updater. The install script fetches Prime Agent because Prime is still the default engine, but Rhizome's own engine works without it.
+
+---
+
+# Agents, engines and models
 
 Source: concepts/ai.md
 URL: /concepts/ai
 
-# AI
+Rhizome lets you choose what runs Chat: Prime Agent or Rhizome's own engine. Whichever you use, the vault, the permissions and the saved memory stay the same.
 
-Rhizome has two AI paths: coding agents that can use tools to inspect and edit a vault, and direct model targets that answer in chat mode from note context.
+## Terms on this page
 
-## Coding Agents
+- **Agent loop:** the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done.
+- **Engine:** what runs that loop for Chat.
+- **Model:** the language model the engine talks to, hosted or running locally.
+- **Tool:** an action the agent can take, such as creating a note or running a command.
 
-The AI panel can stream supported local CLI agents through Rhizome's normalized event layer. Current targets include Claude Code, Codex, OpenCode, Pi, and Antigravity CLI when they are installed on the machine.
+## Engines for Chat
 
-Prime (Chat) always has local tools available. It has no sandbox; the old Vault Safe prompt is not sent.
+| Engine | What it is | Good for |
+|---|---|---|
+| **Prime Agent** (default) | A separate harness Rhizome connects to. It runs sessions, tools, skills and provider login | Real agent work today: reading, searching and editing files, long runs, Prime packages |
+| **Rhizome's engine** | Rhizome's own loop, built into the app. It doesn't need Prime | Choosing your own providers, including free models. Early: it can create notes, but can't read, search or edit files yet |
 
-Claude Code and Antigravity still enforce a per-vault mode:
+Switch with **Chat engine** in Settings → AI Agents. When it's on, new chats use Rhizome's engine and never call Prime, even if Prime isn't installed. The switch is only in Settings, not in the message box.
 
-- **Limited tools** blocks shell commands.
-- **Power User** allows local shell commands scoped to the active vault.
+### Rhizome's engine
 
-Other CLI agents are asked to follow the same labels; enforcement depends on the adapter.
+- **Models:** pick a catalog model, or **Free tier (auto)**. See [Free models and routing](free-models-and-routing.md). Anthropic models aren't offered here yet.
+- **Tools:** `echo` and `create_note`. Power User adds `bash`. Rhizome asks you to approve each `bash` call, but `bash` doesn't run a shell yet. There are no tools to read, search or edit files, and the agent can't search the vault or old sessions.
+- **Saved chats:** each chat is saved as it goes and can be reopened after you quit. Chats get a title automatically from the first exchange.
+- **Errors:** a problem that doesn't stop the turn shows as a notice in the chat. A problem that does stop it, such as a missing key, ends the turn with a message that says what to fix.
 
-## Direct Models
+### Prime Agent
 
-Direct model targets run in chat mode. They receive the active note, linked context, and conversation history, but they do not receive vault-write tools or shell access.
+Prime runs as a background service (a daemon) that Rhizome connects to. Prime owns its sessions (`~/.prime/agent/sessions/`) and its packages (Settings → Packages). Packages can use the whole machine; a vault isn't a sandbox for them.
 
-Supported provider shapes include:
+Prime handles its own provider login. Sign in from Settings → AI Agents → Local agent, where each provider card (Anthropic, OpenAI Codex, xAI, DeepSeek and others) has a **Sign in** or **Reconnect** button. Or run `prime-agent` in a terminal and use `/login`. Prime's model list includes Anthropic models.
 
-- Local models through Ollama or LM Studio.
-- Hosted providers such as OpenAI, Anthropic, Gemini, and OpenRouter.
-- Custom OpenAI-compatible endpoints.
+The same tab lists **Recognized local agents**, Prime's default model, and which models Prime may use.
 
-## External MCP Setup
+## Permission modes
 
-Rhizome exposes an MCP server for external tools. The setup flow can write Rhizome's MCP entry into Claude Code, Antigravity CLI, Cursor, and a generic MCP config path, and it can also copy the exact JSON snippet for manual setup.
+A **permission mode** decides what the agent may do without asking. It's set per vault.
 
-MCP setup is explicit. Closing the dialog leaves third-party config files untouched.
+| Mode | Rhizome's engine |
+|---|---|
+| **Limited tools** | `echo` and `create_note`. Asks before each note it creates |
+| **Power User** | Creates notes without asking. Adds `bash`, which asks every time and doesn't run a shell yet |
 
-## Why Git Matters For AI
+Prime has no sandbox, so Prime chats always run as Power User. While Prime is the default AI target, chats on Rhizome's engine also run as Power User.
 
-AI-generated changes should be inspectable. Git gives you diffs, history, rollback, and a clear boundary between suggestions and committed work.
+## Plugins
+
+Rhizome will have its own plugin system: add a tool, hook into a turn, or block a tool call. It's planned, not shipped. Today, Prime packages extend Prime, and MCP lets other apps use your vault.
+
+## Let other apps use your vault (MCP)
+
+**MCP** (Model Context Protocol) lets other AI apps call Rhizome's tools. With it, an MCP client such as Claude Code or Cursor can read and write your vault.
+
+Run **Set Up External AI Tools…** from the command palette (⌘K). Rhizome shows which config files it will change (for example `~/.claude.json` and `~/.cursor/mcp.json`) and writes nothing until you confirm. It needs Node.js 18 or newer, or Bun, on your `PATH`. To paste the entry yourself, use **Copy MCP config** in Settings → AI Agents → Local agent.
+
+## Review what the agent changed
+
+Agent edits are file edits. In a Git-backed vault, review them in the Changes view, look at the diff, and commit or revert. Save chat results you want to keep with **Save to vault**. See [Your vault is the agent's memory](vault-as-memory.md).
 
 ---
 
@@ -225,25 +347,25 @@ AI-generated changes should be inspectable. Git gives you diffs, history, rollba
 Source: concepts/editor.md
 URL: /concepts/editor
 
-# Editor
-
 Rhizome offers a rich editor for daily writing and a raw Markdown mode for exact file control. Both modes write back to the same Markdown file.
 
-## Rich Editing
+## Rich editing
 
 The rich editor supports blocks, slash commands, wikilinks, tables, code blocks, images, Mermaid diagrams, LaTeX-style math, and markdown-backed whiteboards.
 
 Use it when you want to write and reorganize quickly without thinking about Markdown syntax.
 
-## Raw Mode
+## Raw mode
 
 Raw mode shows the Markdown source directly. Use it when you need to edit YAML frontmatter, repair unusual Markdown, or make an exact text change.
 
 Toggle raw mode with `Cmd+\` on macOS or `Ctrl+\` on Windows and Linux.
 
-## Table Of Contents
+## Table of contents
 
-The table of contents panel builds an outline from headings in the current note. It is useful for long notes, procedures, research files, and generated documents. Toggle it with `Cmd+Shift+T` on macOS or `Ctrl+Shift+T` on Windows and Linux.
+The table of contents panel builds an outline from the headings in the current note, updates as you type, and jumps to a section when you click it. It's useful for long notes, procedures, research files, and generated documents. If a note has no useful headings, add clear H2 and H3 sections.
+
+Open it from the editor toolbar, the command palette, or with `Cmd+Shift+T` on macOS (`Ctrl+Shift+T` on Windows and Linux).
 
 ## Width
 
@@ -251,16 +373,26 @@ Notes can use normal or wide editor width. Set the default in Settings, or overr
 
 ---
 
-# Files And Media
+# Files, PDFs and media
 
 Source: concepts/files-and-media.md
 URL: /concepts/files-and-media
 
-# Files And Media
-
 Rhizome starts with Markdown notes, but a vault can also contain images, PDFs, media files, whiteboards, and other local files.
 
-## Mermaid Diagrams
+## Previews
+
+Select an image, PDF, media file, or other file from a folder or file list. Rhizome previews common image files, PDFs, and supported media files in the app. Other files open in the default system app.
+
+Settings control whether PDFs, images, and unsupported files appear in All Notes. Folder browsing still shows files in their folders.
+
+If a preview doesn't render, open the file in the default app to check that it's valid. Then check that the file is inside the active vault and isn't blocked by operating-system permissions.
+
+## Attachments
+
+When you paste or drop an image into a note, Rhizome copies it into the vault and links the copy from the Markdown. Attachments are normal files, so other tools can open them.
+
+## Diagrams
 
 Use Mermaid code blocks when a note needs a diagram that should stay plain text and versionable.
 
@@ -273,23 +405,84 @@ flowchart LR
 
 Rhizome renders Mermaid diagrams in the editor while keeping the source in Markdown.
 
-## Attachments
-
-Images pasted into the editor are saved into the vault as normal files. They remain portable and can be opened by other tools.
-
-## Previews
-
-Rhizome can preview common image files, PDFs, and supported media files in the app. Files without an in-app preview can still be opened in the default system app.
-
-Settings control whether PDFs, images, and unsupported files appear in All Notes. Folder browsing still shows files in their folders.
-
 ## Whiteboards
 
 Whiteboards use tldraw in the editor, but their durable representation stays in Markdown. That keeps them inside the vault and versioned by Git with the rest of your notes.
 
-## Git Boundary
+## Git boundary
 
 If generated or local-only files are ignored by Git, Rhizome can hide them from notes, search, quick open, and folders. Use this when build artifacts or private local files should not behave like vault content.
+
+---
+
+# Free models and routing
+
+Source: concepts/free-models-and-routing.md
+URL: /concepts/free-models-and-routing
+
+**Free tier (auto)** runs Chat on free hosted models without you picking one. It tries free providers in a fixed order. When a provider fails, rate-limits you or runs out of free use, Rhizome moves to the next one. You can add your own endpoint as the last stop.
+
+This works with Rhizome's own engine. Choose **Free tier (auto)** in the model picker.
+
+## What you get
+
+- **No model shopping.** One choice, and Rhizome picks a working free model for each step.
+- **Fewer dead ends.** A provider that's down or out of quota is skipped for a while instead of failing your chat.
+- **No surprise restarts.** Rhizome switches provider only before any reply text arrives. Once the model has started answering or called a tool, an error ends that step. The half-finished answer isn't silently started again somewhere else.
+- **Your keys stay on your computer.** Each provider needs its own free API key, kept in the OS keychain.
+- **Your prompts aren't used for training.** Models whose free tier trains on prompts are left out of the list Rhizome routes to, along with free tiers that don't renew or have poor terms.
+
+## The providers
+
+In order:
+
+1. Groq
+2. Mistral
+3. LLM7
+4. OpenRouter (free models only)
+5. NVIDIA NIM
+6. Your own endpoint, if you picked one
+
+Cloudflare Workers AI is off by default. It needs an account ID as well as a key, and turning it on shows a billing warning first. When on, it's tried after NVIDIA NIM.
+
+The order is fixed. Settings shows it read-only under **Fallback order**.
+
+## Set it up
+
+1. In Settings → AI Agents, open the **API model** tab and find **Free tier (auto)**.
+2. For each provider you want, turn it on and paste its API key. The row shows **Key saved**, **No key**, or **Keychain error** if the keychain is locked or access was denied.
+3. Optional: choose an **Own endpoint** and **Own endpoint model**: any OpenAI-compatible server you've set up as a provider, local or hosted.
+4. Optional: turn on **Strict mode**. It uses only providers that document a hard stop at the free limit (Groq today), plus your own endpoint.
+5. In the model picker, choose **Free tier (auto)**. Until at least one provider has a key, Settings says "Add a key to at least one provider to use Free tier (auto)."
+
+## How a provider gets skipped
+
+Rhizome keeps three kinds of cooldown:
+
+- **Provider:** after repeated timeouts or server errors, the provider is paused and tried again later.
+- **Key:** a key that's rate-limited cools down on its own.
+- **Model:** a model that's out of quota is locked out. A daily quota stays locked until it resets at midnight UTC.
+
+Each step has a 45-second budget for retries. Your own endpoint is still tried after the budget runs out.
+
+## Things to know
+
+- Free tiers change. A provider's limits, terms and models are set by that provider, not by Rhizome.
+- Some free tiers are for prototyping and evaluation only.
+- Settings doesn't show each provider's terms or training policy. Models that train on prompts are left out automatically, but check a provider's terms yourself before using it for real work.
+- Anthropic models aren't offered by Rhizome's own engine yet. To use Claude, use Prime and sign in on the Anthropic card in Settings → AI Agents → Local agent. See [Agents, engines and models](ai.md).
+
+## Credits
+
+- [OmniRoute](https://github.com/diegosouzapw/OmniRoute) (MIT) © 2026 diegosouzapw: the provider catalog data and cooldown rules are ported from it.
+- [freellmapi](https://github.com/tashfeenahmed/freellmapi) (MIT): used as an edge-case checklist for retries and failover. No code or hosted catalog is copied.
+
+See [Credits and licences](../reference/credits.md).
+
+## Related
+
+- [Set up models and keys](../guides/configure-ai-models.md)
+- [Agents, engines and models](ai.md)
 
 ---
 
@@ -298,13 +491,11 @@ If generated or local-only files are ignored by Git, Rhizome can hide them from 
 Source: concepts/git.md
 URL: /concepts/git
 
-# Git
-
 Git is Rhizome's recommended history and sync layer. Rhizome can work with plain Markdown folders, and Git unlocks local history, recovery, remote backup, and multi-device workflows when you want them.
 
 Rhizome acts as a lightweight Git client for your vault. You can review changes, commit, pull, push, and inspect history without leaving the app.
 
-## What Rhizome Uses Git For
+## What Rhizome uses Git for
 
 - Whole-vault commit history.
 - Current diff for the vault.
@@ -314,15 +505,25 @@ Rhizome acts as a lightweight Git client for your vault. You can review changes,
 - Conflict detection and resolution.
 - Remote connection for local-only vaults.
 
-## History And Diffs
+## History and diffs
 
 Each note can show its own history and current diff, so you can understand how that file changed over time or what is unsaved relative to Git.
 
 Rhizome also shows a history of the whole vault. Use it when you want to review broader changes across multiple notes before committing or syncing.
 
-## Local Commits
+## Local commits
 
 You can commit changes inside Rhizome without leaving the app. This gives you useful restore points even before a remote is configured.
+
+## Review what the agent changed
+
+The agent's edits and saved notes are file changes like yours. In a Git-backed vault:
+
+1. Open **Changes**, next to All Notes in the sidebar, to see every changed file.
+2. Open a file's diff to see exactly what changed.
+3. Commit what you want to keep, or revert what you don't.
+
+Keep agent work in small commits, so one bad change is easy to undo. See [Your vault is the agent's memory](vault-as-memory.md).
 
 ## Remotes
 
@@ -335,29 +536,74 @@ Connect a compatible Git remote when you want sync or backup. Rhizome relies on 
 Source: concepts/inbox.md
 URL: /concepts/inbox
 
-# Inbox
-
 The Inbox is for notes that have been captured but not yet organized.
 
-## Why It Exists
+## Why it exists
 
 Fast capture should not require perfect structure. The Inbox gives you a place to put incomplete notes, then process them later.
 
-The Inbox workflow is optional. Turn it off in Settings > Workflow if you prefer every note to appear organized by default.
+The Inbox workflow is optional. Turn it off in Settings → Workflow if you prefer every note to appear organized by default.
 
-## Organizing Inbox Notes
+## Organizing Inbox notes
 
-When reviewing the Inbox:
+The review checklist is in [Organize the Inbox](../guides/organize-inbox.md).
 
-1. Give the note a clear H1.
-2. Set its `type`.
-3. Add status, dates, or URL if useful.
-4. Add relationships with wikilinks or frontmatter fields.
-5. Move it into a folder only if the folder adds value.
-
-## Healthy Inbox Habit
+## Keep it small
 
 Keep the Inbox small enough that it can be reviewed in one focused pass. Rhizome works best when capture is fast and organization is deliberate.
+
+---
+
+# Mycelium
+
+Source: concepts/mycelium.md
+URL: /concepts/mycelium
+
+Mycelium shows where an agent run went. It draws the folder the run worked in as a map of files, and lights up each file the agent searched, read or edited. Use it to see a run's scope at a glance, find where it went in circles, or check which files a run touched before something broke.
+
+Mycelium uses [Mindwalk](https://github.com/cosmtrek/mindwalk) (MIT) © 2026 Ricko Yu. Mindwalk replays coding-agent sessions on a city map of a repository. You install it yourself; Rhizome doesn't include it or rebrand it.
+
+## What you see
+
+- **The map.** Each file in the folder is a building. The layout is fixed for a given folder, so the same file is always in the same place and two runs can be compared by eye.
+- **The footprint.** Files the run searched, read or edited are highlighted. A tight cluster means a focused run. Scattered light, or the same files lit again and again, means the agent was searching or going in circles.
+- **Sessions.** A column lists past sessions by title. Pick one to see its footprint, or look at the overview across all sessions.
+
+## Before you start
+
+1. Install Mindwalk so that the `mindwalk` program is on your path. See [Mindwalk](https://github.com/cosmtrek/mindwalk) for install steps.
+2. Chat with Prime as the engine. Mycelium reads Prime sessions from `~/.prime/agent/sessions/`. It doesn't show chats from Rhizome's own engine, and the agent can't search old Mycelium sessions.
+
+If Mindwalk is missing, Mycelium says **Install Mindwalk, then retry**.
+
+## Open it
+
+- In Chat, click the **Mycelium** button in the Prime session header to see the current session's footprint.
+- In the sessions list, right-click a Prime session and choose **Show in Mycelium**.
+- From the **Views** group on the left rail, choose Mycelium. The shortcut is Ctrl+⌘3 on a Mac and Ctrl+Shift+3 on Windows.
+
+## Find what touched a broken file
+
+Mycelium can't filter sessions by file yet, but the map makes it quick to check by eye:
+
+1. Open Mycelium and look at the overview across sessions.
+2. Find the file on the map. It's always in the same place.
+3. Open the sessions where it lights up, newest first.
+4. Open that session's chat to see what the agent did, and the vault or repository history to see the change.
+
+## What it needs
+
+- **A session that used tools.** A chat with no file activity draws an empty map.
+- **A real working folder.** The map is drawn from the folder the run worked in. A run that only touched the vault draws a small, sparse map.
+
+## What it isn't
+
+Mycelium shows where a run went. It doesn't save anything to memory and doesn't replace Git. For what's in the vault, use the Graph view (see [Relationships](relationships.md)). For what changed, use the Changes view and [Git](git.md).
+
+## Related
+
+- [Your vault is the agent's memory](vault-as-memory.md)
+- [Chat with the agent](../guides/use-ai-panel.md)
 
 ---
 
@@ -365,8 +611,6 @@ Keep the Inbox small enough that it can be reviewed in one focused pass. Rhizome
 
 Source: concepts/notes.md
 URL: /concepts/notes
-
-# Notes
 
 A note is a Markdown file with optional YAML frontmatter. Rhizome reads the first H1 as the primary title and keeps the file on disk as the durable representation.
 
@@ -391,9 +635,9 @@ The first H1 is the note title. Rhizome uses that title wherever the note is dis
 
 The title is separate from the filename. The filename stays visible in the breadcrumb so you can see the file on disk, and you can rename it independently when needed.
 
-Use the breadcrumb action to rename the file to match the title. New untitled notes can also auto-rename from the first H1 the first time they get a real title. Turn this behavior off in Settings > Vault Content > Titles & Filenames if you prefer filenames to stay unchanged until you rename them manually.
+Use the breadcrumb action to rename the file to match the title. New untitled notes can also auto-rename from the first H1 the first time they get a real title. Turn this off with **Auto-rename untitled notes from first H1** in Settings if you prefer filenames to stay unchanged until you rename them manually.
 
-## Body Links
+## Body links
 
 Use `[[wikilinks]]` to connect notes from the body. Rhizome shows autocomplete suggestions while you type, and links can resolve by filename or title.
 
@@ -401,7 +645,7 @@ Use `[[wikilinks]]` to connect notes from the body. Rhizome shows autocomplete s
 
 Use frontmatter for structured fields such as type, status, date, URL, and relationships. Keep free-form thinking in the body.
 
-Some notes can be displayed with specialized editors while keeping the same file-first model. A note with `_display: sheet` opens as a spreadsheet and stores its cells in a CSV-like body, while `type` remains available for organization. See [Spreadsheets](/concepts/spreadsheets).
+Some notes can be displayed with specialized editors while keeping the same file-first model. A note with `_display: sheet` opens as a spreadsheet and stores its cells in a CSV-like body, while `type` remains available for organization. See [Spreadsheets](spreadsheets.md).
 
 ---
 
@@ -410,11 +654,9 @@ Some notes can be displayed with specialized editors while keeping the same file
 Source: concepts/properties.md
 URL: /concepts/properties
 
-# Properties
-
 Properties are frontmatter fields that Rhizome can display, filter, and edit.
 
-## Suggested Properties
+## Suggested properties
 
 Suggested properties are the fields Rhizome knows how to create quickly from the Properties panel. When a suggested property is missing, the panel shows a shortcut to add it with the right editor.
 
@@ -425,13 +667,13 @@ Suggested properties are the fields Rhizome knows how to create quickly from the
 | `url` | Stores a canonical external link. |
 | `date` | Represents a single date. |
 
-## System Properties
+## System properties
 
 Fields that start with `_` are system properties. They remain in plain text but are hidden from normal property editing.
 
 Examples include `_icon`, `_color`, `_order`, `_sidebar_label`, `_width`, and `_pinned_properties` on type documents or notes.
 
-## Property Editing
+## Property editing
 
 The Properties panel is the safest place to edit structured properties. Toggle it with `Cmd+Shift+I` on macOS or `Ctrl+Shift+I` on Windows and Linux.
 
@@ -444,11 +686,9 @@ Date fields use Rhizome's picker, relationship fields can use wikilinks, and raw
 Source: concepts/relationships.md
 URL: /concepts/relationships
 
-# Relationships
-
 Relationships make a vault feel like a graph instead of a pile of documents.
 
-## Relationship Fields
+## Relationship fields
 
 Any frontmatter field containing wikilinks can become a relationship. Relationship fields can point to one note or to an array of notes.
 
@@ -469,13 +709,25 @@ Default relationships have automatically computed inverses. If a note says it `b
 
 These outgoing and inverse relationships appear in the Properties panel and in Neighborhood mode, where the note list becomes a graph view around the selected note.
 
-## Body Links Versus Relationship Fields
+## Wikilinks
+
+Wikilinks connect notes by name:
+
+```md
+This project belongs to [[content-systems]] and is related to [[git-workflows]].
+```
+
+Rhizome suggests targets while you type. Links can resolve by filename or title, so prefer clear titles and filenames.
+
+## Body links versus relationship fields
 
 Use body links when the relationship appears naturally in writing. Use frontmatter relationships when the connection is important enough to show in navigation, filters, Neighborhood mode, or the Properties panel.
 
 ## Backlinks
 
 Rhizome can show incoming links and inverse relationships, making it easier to navigate from a note to the rest of its context.
+
+To see all the links in the vault at once, use the [Wiki Graph](wiki-graph.md).
 
 ---
 
@@ -484,19 +736,17 @@ Rhizome can show incoming links and inverse relationships, making it easier to n
 Source: concepts/spreadsheets.md
 URL: /concepts/spreadsheets
 
-# Spreadsheets
-
 Rhizome sheets are spreadsheet notes. They keep the same file-first model as other notes, but a note with `_display: sheet` opens in a spreadsheet editor instead of the rich text editor. The note's `type` remains available for organization.
 
 The durable file is still Markdown with YAML frontmatter. The body is CSV-like text containing cell inputs and formulas, and spreadsheet presentation state is stored as plain YAML under `_sheet`.
 
-## Read Next
+## Read next
 
-- [Use Spreadsheets](/guides/use-spreadsheets) for the editing workflow.
-- [Spreadsheet File Format](/reference/spreadsheet-format) for the plain-text storage contract.
-- [Spreadsheet Formulas](/reference/spreadsheet-functions) for formula syntax, autocomplete, and IronCalc function families.
+- [Use Spreadsheets](../guides/use-spreadsheets.md) for the editing workflow.
+- [Spreadsheet File Format](../reference/spreadsheet-format.md) for the plain-text storage contract.
+- [Spreadsheet Formulas](../reference/spreadsheet-functions.md) for formula syntax, autocomplete, and IronCalc function families.
 
-## Why Sheet Notes
+## Why sheet notes
 
 Sheets are useful when information is better modeled as rows, columns, and formulas than as prose. Examples include budgets, revenue models, inventories, editorial calendars, lightweight trackers, and analytical scratchpads.
 
@@ -508,7 +758,7 @@ Rhizome does not store sheets as opaque workbook binaries. A sheet should remain
 - available offline
 - connected to the rest of the vault through types, properties, relationships, and wikilinks
 
-## One Note, One Sheet
+## One note, one sheet
 
 A sheet note is a single sheet. Rhizome does not expose multiple tabs inside one note.
 
@@ -543,7 +793,7 @@ Keyboard basics follow spreadsheet conventions:
 - `Delete` or `Backspace` clears the selected range
 - copy and paste should preserve formulas, including Rhizome cross-sheet references
 
-## Wikilinks In Cells
+## Wikilinks in cells
 
 Wikilinks in non-formula cells are stored as normal Rhizome wikilinks:
 
@@ -555,7 +805,7 @@ Project,Owner,Status
 
 The cell still behaves like a spreadsheet cell, but the value remains a vault link that Rhizome can understand.
 
-## Cross-Sheet Formulas
+## Cross-sheet formulas
 
 Rhizome adds a sheet-note reference syntax on top of IronCalc formulas:
 
@@ -608,11 +858,11 @@ Growth,,=(C5-B5)/B5,=(D5-C5)/C5,=(E5-B5)/B5
 
 Normal frontmatter stays normal Rhizome metadata. `_sheet` is system metadata for the spreadsheet editor and is hidden from normal property editing.
 
-For the full storage contract, see [Spreadsheet File Format](/reference/spreadsheet-format).
+For the full storage contract, see [Spreadsheet File Format](../reference/spreadsheet-format.md).
 
 ## Formulas
 
-Rhizome delegates formula calculation to IronCalc. IronCalc aims for Excel-compatible formulas, while its project documentation still describes it as work in progress. For Rhizome-specific formula behavior and the autocomplete function catalog, see [Spreadsheet Formulas](/reference/spreadsheet-functions).
+Rhizome delegates formula calculation to IronCalc. IronCalc aims for Excel-compatible formulas, while its project documentation still describes it as work in progress. For Rhizome-specific formula behavior and the autocomplete function catalog, see [Spreadsheet Formulas](../reference/spreadsheet-functions.md).
 
 ---
 
@@ -621,11 +871,9 @@ Rhizome delegates formula calculation to IronCalc. IronCalc aims for Excel-compa
 Source: concepts/types.md
 URL: /concepts/types
 
-# Types
-
 Types describe what kind of thing a note represents: Project, Person, Topic, Procedure, Event, or any category you create.
 
-## Type Field
+## Type field
 
 The `type:` field assigns a note to a type.
 
@@ -635,13 +883,13 @@ type: Project
 
 Rhizome does not infer type from folder location. Moving a file into another folder does not change its type.
 
-## Prefer Types Over Folders
+## Prefer types over folders
 
 Types are the preferred way to group notes in Rhizome. Folders are supported for existing vaults and fallback organization, but Rhizome is built around types and relationships because they carry stronger meaning than file paths.
 
 Use types for semantic groups such as Projects, People, Topics, Procedures, Events, and Essays. Use relationships to connect notes across those groups. This gives Rhizome better structure for navigation, filtering, properties, templates, and future automation than folder location alone.
 
-## Type Documents
+## Type documents
 
 Type documents are Markdown notes with `type: Type` in frontmatter. They describe how a type should appear and what new notes of that type should start with.
 Use Phosphor icon names in kebab-case for `_icon`, such as `folder` or `briefcase`.
@@ -660,7 +908,7 @@ _order: 10
 
 Type templates can live in the Type document's `template` frontmatter field. When a hand-edited Type body contains template-like structure after its own `# TypeName` heading, Rhizome also uses that body content as the new-note template. Plain descriptive body text stays documentation-only.
 
-## What Types Control
+## What types control
 
 - Sidebar grouping.
 - Type icon and color.
@@ -668,11 +916,82 @@ Type templates can live in the Type document's `template` frontmatter field. Whe
 - Pinned properties.
 - New-note templates.
 
-## New Note Defaults
+## New note defaults
 
 Type documents can define empty properties and relationships. When you create a new note of that type, Rhizome shows placeholders for those fields so you can fill them in from the Properties panel.
 
 If a type document gives a property a value, that value becomes the default for new notes of that type. For example, a Project type can define `status: Active` so every new project starts active until you change it.
+
+---
+
+# Your vault is the agent's memory
+
+Source: concepts/vault-as-memory.md
+URL: /concepts/vault-as-memory
+
+The agent's long-term memory is your vault: a folder of Markdown files you can read, edit, search and version yourself. Nothing the agent "knows" between chats is hidden from you.
+
+## What you get
+
+- **You decide what's remembered.** Knowledge reaches the vault when you save it, not as a side effect of every chat.
+- **Recall shows its source.** When a Prime answer uses a vault note, it's marked **From your vault**, so you can open the note and check.
+- **Memory is reversible.** In a Git-backed vault, every saved or edited note is a change you can diff and revert.
+- **Memory is portable.** It's plain Markdown. Open it in another editor, sync it with Git, or keep it if you stop using Rhizome.
+
+## The memory loop
+
+1. **Chat.** You and the agent work on something. Chat transcripts are working memory. They live with the session, not in the vault.
+2. **Save.** Under a reply worth keeping, click **Save to vault**. Rhizome writes a Markdown note.
+3. **Recall.** With Prime as the engine, the agent can search and open vault notes in later chats. An answer built on a note shows it came from your vault. Rhizome's own engine can't read or search the vault yet.
+4. **Review.** Open, edit or delete the note like any other. With Git, look at its history and revert a change.
+
+## Save to vault
+
+**Save to vault** appears under a reply. It writes the note straight away. There's no preview or diff step, so review the note afterwards, or use Git to undo it.
+
+It refuses to save when:
+
+- **The reply is empty.** There's nothing to save.
+- **No vault is attached** to the chat. It says "Attach a vault to save chat into notes".
+- **The text contains a credential**, such as an API key or password. Vault notes are committed and can be pushed, so remove the secret first.
+- **The same reply is already in the vault.** It names the existing note and doesn't overwrite it.
+
+### Automatic saves are off by default
+
+Settings → AI Agents → **Auto-save chat knowledge to the vault** saves durable decisions to the vault after each turn. It's off by default. Turn it on only if you want saves to happen without a click. Explicit saves are easier to trust.
+
+## Bring in past chats
+
+You can import your Claude Code chat history from Settings → AI Agents → **Import chat history**. Rhizome scans `~/.claude/projects` on your Mac. The chats become notes under `Imports/claude-code/` in the vault. A second import skips chats that are already there. Claude Code is the only source today.
+
+## Why Git matters here
+
+Git turns the vault into memory with a history:
+
+- **Diff:** see what a note said before the agent or you changed it.
+- **Revert:** undo one change without touching the rest.
+- **Sync:** push the vault to a remote you control. Rhizome uses your system Git login.
+
+Git is optional. A plain folder works, but it has no history to go back to. See [Git](git.md).
+
+## What the agent reads first
+
+A vault can hold an `AGENTS.md` file with your conventions: how notes are named, which types to use, what to avoid. The agent reads it before it works in the vault. `CLAUDE.md` is kept as a compatibility copy for tools that look for that name.
+
+## Where things live
+
+| What | Kept in | You can |
+|---|---|---|
+| Saved notes | The vault | Read, edit, diff, revert, sync |
+| Imported Claude Code chats | `Imports/claude-code/` in the vault | Read, edit, link |
+| Chat transcripts (Prime) | `~/.prime/agent/sessions/` | Resume from the sessions list |
+| Chat transcripts (Rhizome's engine) | `native-sessions/` in the app config folder | Resume from the sessions list |
+| Vault activity log | `.rhizome/events.jsonl` in the vault | Inspect |
+
+## Related
+
+- [Mycelium](mycelium.md): see which files a Prime run touched.
+- [Vaults](vaults.md) · [Git](git.md) · [Chat with the agent](../guides/use-ai-panel.md)
 
 ---
 
@@ -681,11 +1000,9 @@ If a type document gives a property a value, that value becomes the default for 
 Source: concepts/vaults.md
 URL: /concepts/vaults
 
-# Vaults
-
 A vault is the folder Rhizome reads and writes. The filesystem is the source of truth; the app state and cache are derived from files.
 
-## Core Rules
+## Core rules
 
 - Notes are Markdown files.
 - YAML frontmatter provides structure.
@@ -693,21 +1010,21 @@ A vault is the folder Rhizome reads and writes. The filesystem is the source of 
 - Type definitions and saved views are also files.
 - Git can track history and support remote sync.
 
-## Why Local Files Matter
+## Why local files matter
 
 Local files keep your notes inspectable. You can open them in another editor, search with command-line tools, back them up with your own system, and version them with Git.
 
 Rhizome should never become the only way to read your data.
 
-## Git Is A Capability
+## Git is a capability
 
 A plain folder of Markdown files can open as a vault. Git-backed vaults unlock history, changes, commits, pull, push, conflict handling, and remote setup.
 
 If a folder is not a Git repository, Rhizome can initialize Git when you explicitly ask it to. It avoids initializing broad personal folders such as Desktop, Documents, or Downloads unless they are clearly dedicated vault folders.
 
-## Multiple Vaults At The Same Time
+## Multiple vaults at the same time
 
-Rhizome can load multiple registered vaults into one unified graph. Enable this from `Settings` -> `Vaults` -> `Use multiple vaults at the same time`.
+Rhizome can load multiple registered vaults into one unified graph. Turn on **Use multiple vaults at the same time** in Settings → Vaults.
 
 After the option is enabled, open the bottom-left vault menu to include or exclude vaults from the graph. Included vaults appear together in note lists, search, quick open, backlinks, and wikilink navigation. Each note keeps a compact vault badge when Rhizome needs to disambiguate where it lives.
 
@@ -715,7 +1032,7 @@ The selected vault still matters. Git status, commits, sync, folder navigation, 
 
 Cross-vault wikilinks use the target vault's stable alias when needed, for example `[[team/projects/alpha]]`. Links inside the same vault stay normal vault-relative links.
 
-## App State Versus Vault State
+## App state versus vault state
 
 Vault-level information should travel with the vault. Machine-specific preferences stay with the app installation.
 
@@ -725,20 +1042,63 @@ Vault-level information should travel with the vault. Machine-specific preferenc
 | Saved views | Window size |
 | Pinned properties | Recent vault list |
 | Relationship conventions | Local cache |
-| Vault AI guidance files | AI target selection |
+| Vault AI guidance files (`AGENTS.md`, `CLAUDE.md`) | AI target and Chat engine |
+| Permission mode | Provider keys (in the system keychain) |
+| Auto-save chat knowledge setting | Chat logs from Rhizome's engine (`native-sessions/`) |
 
 ---
 
-# Build Custom Views
+# Wiki Graph
+
+Source: concepts/wiki-graph.md
+URL: /concepts/wiki-graph
+
+The Wiki Graph shows your vault as a map. Each note is a dot, and each link between notes is a line. Use it to see which notes hold your ideas together, and which ideas you've linked to but haven't written up yet.
+
+## Open it
+
+Choose **Graph** in the **Views** group on the left rail. The shortcut is Ctrl+⌘2 on a Mac and Ctrl+Shift+2 on Windows.
+
+If the vault has no links yet, the graph says "No linked notes yet — create wikilinks to grow the graph." See [Relationships](relationships.md) for how to link notes.
+
+## What you see
+
+- **Notes**, coloured by type. Notes with no type are marked **Untyped**.
+- **Links**, drawn differently for each kind: a **Wikilink** in the body, **Belongs to**, **Related to**, and other relationship fields.
+- **Notes that aren't created yet.** A note other notes link to, but that doesn't exist as a file, shows as "Not created yet". Select it and choose **Create note** to write it.
+
+The key in the corner counts notes, links and notes not yet created.
+
+## Find and focus
+
+- **Find a note…** searches the graph by title.
+- Turn types off to hide those notes. If every note is hidden, turn a type back on.
+- **Local graph** shows only the selected note and its neighbours. **Full graph** goes back to the whole vault.
+- Each note shows how many links and backlinks it has. **Open note** opens it in the editor.
+
+## Keyboard
+
+Arrow keys move between notes. Enter opens the selected note. Esc backs out of the local graph, then out of the graph.
+
+## Related
+
+- [Relationships](relationships.md)
+- [Mycelium](mycelium.md): where an agent run went, instead of how notes link.
+
+---
+
+# Build custom views
 
 Source: guides/build-custom-views.md
 URL: /guides/build-custom-views
 
-# Build Custom Views
-
 Custom views are saved filters for recurring questions.
 
-## Good View Candidates
+## Design the question first
+
+Before creating a view, write the question it answers. A good view is not "all fields with all filters"; it is a focused lens.
+
+## Good view candidates
 
 - Active projects.
 - People without a recent follow-up.
@@ -746,7 +1106,7 @@ Custom views are saved filters for recurring questions.
 - Notes changed this week.
 - Events in a date range.
 
-## View Definition
+## View definition
 
 Saved views live as files in the vault. They describe filters, sorting, and visible columns using structured data.
 
@@ -756,18 +1116,12 @@ Custom views can use nested conditions, similar to Notion or Airtable filter gro
 
 Date filters support dynamic natural-language values such as `today`, `yesterday`, or `one week ago`. Use these for views that should keep moving over time, such as recent work, stale follow-ups, or upcoming events.
 
-## Design The Question First
-
-Before creating a view, write the question it answers. A good view is not "all fields with all filters"; it is a focused lens.
-
 ---
 
-# Capture A Note
+# Capture a note
 
 Source: guides/capture-a-note.md
 URL: /guides/capture-a-note
-
-# Capture A Note
 
 Use capture when you need to get an idea into the vault before you know where it belongs.
 
@@ -778,28 +1132,92 @@ Use capture when you need to get an idea into the vault before you know where it
 3. Add the rough content.
 4. Leave structure for later if you are still thinking.
 
-## Capture Well
+## Capture well
 
 Prefer a useful title over a perfect taxonomy. You can add type, status, and relationships during inbox review.
 
-## When To Add Structure Immediately
+## When to add structure immediately
 
 Add structure while capturing when the note's type or relationships are already obvious. Otherwise, capture the idea first and organize it later.
 
 ---
 
-# Manage Git Manually Or With AutoGit
+# Coming from another harness
+
+Source: guides/coming-from-other-harnesses.md
+URL: /guides/coming-from-other-harnesses
+
+If you already use Claude Code, Hermes Agent, Cursor or Prime, a lot of what you know carries over. This page maps your habits onto Rhizome, and shows what's different: memory lives in a folder you can read, and you can see where a run went.
+
+## The one big difference
+
+In most harnesses, memory is a file or store that belongs to the tool: `MEMORY.md`, `USER.md`, a database, a cloud account. In Rhizome, memory is your **vault**, a folder of Markdown notes. You choose what's saved with **Save to vault**. With Prime, answers that use a note say it came from your vault. With Git, every change can be diffed and reverted. See [Your vault is the agent's memory](../concepts/vault-as-memory.md).
+
+## From Claude Code
+
+| In Claude Code | In Rhizome |
+|---|---|
+| Your past sessions | Settings → AI Agents → **Import chat history** brings them into the vault as notes under `Imports/claude-code/`. See [Import Claude Code history](import-a-session.md) |
+| `CLAUDE.md` | The vault's `AGENTS.md`. Rhizome keeps a `CLAUDE.md` alongside it for compatibility |
+| MCP servers | Rhizome is an MCP server too. **Set Up External AI Tools…** (⌘K) adds it to Claude Code's config, so Claude Code can read and write your vault from the terminal |
+| Claude models | Prime, signed in on the Anthropic card in Settings → AI Agents → Local agent. Rhizome's own engine doesn't offer Anthropic models yet |
+| Permission prompts | Permission modes, **Limited tools** and **Power User**, set per vault |
+| `/resume` | The sessions list. See [Sessions](sessions.md) |
+
+Rhizome doesn't run Claude Code inside Chat. Keep using Claude Code in the terminal, connected to your vault through MCP.
+
+## From Hermes Agent
+
+| In Hermes | In Rhizome |
+|---|---|
+| `MEMORY.md` / `USER.md` | Vault notes you save on purpose. Automatic saving exists but is off by default |
+| Memory writes you approve | **Save to vault** is an explicit click. It writes straight away, so review the note after, or undo with Git |
+| Observable, interruptible runs | Stop any run; with Prime, send a follow-up while it works; see a Prime run's file footprint in [Mycelium](../concepts/mycelium.md) |
+| Skills | Prime packages (Settings → Packages) when Prime is the engine. Rhizome's own plugin system is planned |
+| Your choice of provider | Your own providers, local models or **Free tier (auto)**. Keys live in the system keychain |
+
+## From Cursor
+
+| In Cursor | In Rhizome |
+|---|---|
+| Agent chat beside your files | Chat with notes beside it (⌘2 shows Notes) |
+| Cursor's MCP settings | **Set Up External AI Tools…** (⌘K) writes Rhizome's MCP entry into `~/.cursor/mcp.json`, so Cursor's agent can use your vault |
+| Rules files | The vault's `AGENTS.md` |
+| Model picker | Prime's models, your own providers, or **Free tier (auto)** |
+
+Rhizome isn't a code editor. Keep Cursor for code, and use Rhizome as the place where what you and your agents learn is kept, reviewed and found again.
+
+## From Prime Agent
+
+Prime is still Rhizome's default engine, so nothing changes about how Prime runs:
+
+- Your sessions stay in `~/.prime/agent/sessions/`. Rhizome lists them, lets you switch, fork and archive, and draws their footprint in Mycelium.
+- Your login stays with Prime (`/login` in a terminal, or **Sign in** on a provider card in Settings → AI Agents → Local agent).
+- Prime packages install from Settings → Packages. They have full system access.
+- Rhizome connects to Prime's background service.
+
+What Rhizome adds is the vault: Save to vault, recall with its source, Git history, the Graph view and Mycelium.
+
+## Bring your own model
+
+To skip Prime, turn on **Chat engine** in Settings → AI Agents and add a provider, or use **Free tier (auto)**. Rhizome's engine works without Prime installed. It's early: it can create notes, but can't read, search or edit files, or search the vault, yet. See [Set up models and keys](configure-ai-models.md).
+
+## Plugins
+
+Rhizome's own plugin system is planned, not shipped. Today you can extend Prime with packages, and other apps can reach your vault through MCP.
+
+---
+
+# Commit, push and AutoGit
 
 Source: guides/commit-and-push.md
 URL: /guides/commit-and-push
-
-# Manage Git Manually Or With AutoGit
 
 Rhizome can act as a lightweight Git client for a Git-enabled vault. You can manage commits and pushes yourself, or enable AutoGit to create conservative checkpoints after editing pauses or when the app is no longer active.
 
 ## Manual Git
 
-1. Open the Git or changes surface.
+1. Open **Changes**, next to All Notes in the sidebar.
 2. Review changed files.
 3. Write a short commit message.
 4. Commit locally.
@@ -811,57 +1229,78 @@ If the remote has changed, pull first and resolve any conflicts. If the vault ha
 
 AutoGit is available in Settings for Git-enabled vaults. When enabled, Rhizome automatically commits and pushes saved local changes after an idle pause or after the app becomes inactive.
 
+> AutoGit commits and pushes everything that's saved, including the agent's edits. Review agent changes in Changes before you turn it on, or keep it off for vaults where the agent works.
+
 Use AutoGit when you want the safety of regular checkpoints without interrupting capture or editing. You can still inspect each note's current diff, review note history, and browse the whole-vault history before making larger manual commits.
 
-## Use Small Commits
+## Use small commits
 
 Small commits make it easier to understand what changed, roll back safely, and review AI-generated edits.
 
 ---
 
-# Configure AI Models
+# Set up models and keys
 
 Source: guides/configure-ai-models.md
 URL: /guides/configure-ai-models
 
-# Configure AI Models
+Choose which models Chat can use, store their API keys safely, and check that they answer. Keys are kept in your operating system's keychain, never in the vault.
 
-Use model providers when you want chat over note context without giving an agent vault-write tools.
+## Choose an engine first
 
-## Local Models
+**Chat engine** in Settings → AI Agents decides who runs Chat:
 
-Local model targets are for tools such as Ollama and LM Studio. They usually need a base URL and model ID, and they usually do not need an API key.
+- **Off (default):** Prime handles its own provider login. Sign in from Settings → AI Agents → Local agent, or run `prime-agent` in a terminal and use `/login`.
+- **On:** Rhizome's own engine runs new chats with the models you set up below. It doesn't need Prime.
 
-## API Models
+## Add a provider
 
-API model targets are for hosted providers such as OpenAI, Anthropic, Gemini, OpenRouter, or another OpenAI-compatible endpoint.
+Settings → AI Agents has three tabs. **Local model** is for models on your computer. **API model** is for hosted models and holds **Free tier (auto)**.
 
-Rhizome does not store provider API keys in vault settings. Choose one of the supported key paths:
+| Kind | Examples | Needs |
+|---|---|---|
+| Hosted | OpenAI, Anthropic, Gemini, OpenRouter, Groq, Mistral | API key, model ID |
+| Local | Ollama, LM Studio | Base URL, model ID, usually no key |
+| Your own | Any OpenAI-compatible server | Base URL, model ID, optional key and headers |
 
-- Save the key locally on this device.
-- Read the key from an environment variable.
-- Use no key for local providers that do not require one.
+Anthropic models aren't offered by Rhizome's own Chat engine yet.
 
-## Test The Connection
+## Store the key
 
-After adding a provider, use the test action in Settings. A successful test means Rhizome reached the endpoint and the model replied.
+Under **API key storage**, pick one per provider:
 
-## Select The Target
+- **Save locally in Rhizome (recommended).** Paste the key. Rhizome stores it in the system keychain: macOS Keychain, Windows Credential Manager, or Secret Service on Linux. Keys that older versions saved in a settings file move to the keychain the first time they're read.
+- **Read from env var.** Give the variable's name. Rhizome reads the key from it.
+- **No key.** For local servers that don't need one.
 
-Once configured, choose the model from the AI target selector or set it as the default AI target in Settings.
+Don't edit a key file by hand.
+
+## Test the connection
+
+Click **Test model** on the provider. It sends one short request with no tools. If it passes, Settings says "Connection works. The model replied successfully."
+
+## Use free models
+
+**Free tier (auto)**, on the **API model** tab, lets Rhizome pick free hosted models for you and move on when one runs out. Each free provider needs its own key. See [Free models and routing](../concepts/free-models-and-routing.md).
+
+## Pick the model for Chat
+
+Choose a model, or **Free tier (auto)**, in the picker. The choice is saved with your settings.
+
+## If it doesn't connect
+
+See [Model provider connection](../troubleshooting/model-provider-connection.md).
 
 ---
 
-# Connect A Git Remote
+# Connect a Git remote
 
 Source: guides/connect-a-git-remote.md
 URL: /guides/connect-a-git-remote
 
-# Connect A Git Remote
-
 Connect a remote when you want backup or sync beyond the current machine.
 
-## Before You Start
+## Before you start
 
 Make sure the remote repository exists and your system Git can authenticate to it. Rhizome uses system Git rather than storing provider-specific credentials.
 
@@ -872,23 +1311,21 @@ Make sure the remote repository exists and your system Git can authenticate to i
 3. Confirm the remote name.
 4. Fetch or push according to the app prompt.
 
-## Recommended Auth
+## Recommended auth
 
 - SSH keys.
 - GitHub CLI authentication.
 - Existing Git credential helpers.
 - macOS Keychain credentials for HTTPS remotes on macOS.
 
-If authentication fails, see [Git Authentication](/troubleshooting/git-auth).
+If authentication fails, see [Git Authentication](../troubleshooting/git-auth.md).
 
 ---
 
-# Create Types
+# Create types
 
 Source: guides/create-types.md
 URL: /guides/create-types
-
-# Create Types
 
 Create a type when several notes share the same role in your system.
 
@@ -913,7 +1350,7 @@ _order: 10
 # Project
 ```
 
-## Use Types Sparingly
+## Use types sparingly
 
 A type should represent a recurring category, not a one-off label. If you only need a temporary grouping, use a saved view or property instead.
 
@@ -927,65 +1364,104 @@ Type documents can also define fields for new notes. Empty properties and relati
 
 ---
 
-# Manage Display Preferences
+# Import Claude Code history
+
+Source: guides/import-a-session.md
+URL: /guides/import-a-session
+
+Bring your past Claude Code chats into the vault, so what you worked out there becomes notes you can search, link and keep.
+
+## Import
+
+1. Open the vault you want the chats in.
+2. Open Settings → AI Agents → **Import chat history**.
+3. Under **Claude Code**, preview what Rhizome found, then run the import.
+
+Rhizome scans `~/.claude/projects` on your Mac. Each chat becomes a note under `Imports/claude-code/` in the vault.
+
+## Run it again
+
+A second import skips chats that are already in the vault, so you can run it whenever you've done more work in Claude Code.
+
+## Limits
+
+- Claude Code is the only source today. Cursor and other tools aren't wired yet.
+- Imported chats are notes, not sessions. You read and link them; you don't continue them in Chat.
+
+## Related
+
+- [Your vault is the agent's memory](../concepts/vault-as-memory.md)
+- [Coming from another harness](coming-from-other-harnesses.md)
+
+---
+
+# Display and themes
 
 Source: guides/manage-display-preferences.md
 URL: /guides/manage-display-preferences
 
-# Manage Display Preferences
-
-Display preferences live in local app settings unless a setting is intentionally stored in the note or vault.
+Display settings live with the app on this computer, unless a setting is stored in a note or the vault on purpose.
 
 ## Theme
 
-Choose Light, Dark, or System in Settings. System follows the operating system appearance at runtime.
+Rhizome starts in **Earth dark**. Change it in Settings → Appearance:
 
-You can also switch theme mode from the command palette.
+- **Color theme.** **Rhizome** is the Earth theme. It follows the **Theme** setting below it: Light (Earth light), Dark (Earth dark) or **Match system**, which follows your computer's light or dark setting. **Loam** is an optional warm dark skin. The other themes (Nord, Dracula, Solarized and more) are fixed skins with their own light or dark look.
+- **Accent color.** Sets the colour of actions, links and highlights on the Rhizome theme. Fixed themes use their own accent.
 
-## Note Width
+You can also switch with **Use Light Mode**, **Use Dark Mode** and **Match System** in the command palette.
+
+## Note width
 
 Set the default rich-editor width in Settings:
 
 - **Normal** for focused writing.
 - **Wide** for tables, diagrams, dense notes, and generated documents.
 
-An individual note can override the default width from the editor toolbar. That override is stored as `_width` in the note frontmatter.
+A single note can override the default from the editor toolbar. That override is stored as `_width` in the note's frontmatter.
 
-## Sidebar Labels
+## Sidebar labels
 
-Rhizome can pluralize type names in the sidebar. Turn this off in Settings if your type names should be shown exactly as written, or use `_sidebar_label` on a type document for an explicit label.
+**Pluralize type names in sidebar** shows "Projects" for the Project type. Turn it off to show type names as written, or set `_sidebar_label` on a type document.
 
-## Vault Content
+## What shows in All Notes
 
-Settings also control whether Gitignored files and non-Markdown file categories are visible in the app. Use these controls to keep generated or local-only files out of regular note workflows.
+**All Notes visibility** chooses whether PDFs, images, and other non-Markdown files appear in All Notes. Folder browsing still shows them in their folders. **Toggle Gitignored Files Visibility** in the command palette shows or hides files Git ignores.
+
+## Closing the window
+
+The red window button quits Rhizome. Turn on **Keep in taskbar** in Settings → Appearance to hide the window instead, so you can reopen it from the Dock or taskbar.
+
+## Language
+
+Settings → Appearance → **Display language**. **System** follows macOS when that language is supported. Missing translations fall back to English.
 
 ---
 
-# Organize The Inbox
+# Organize the Inbox
 
 Source: guides/organize-inbox.md
 URL: /guides/organize-inbox
 
-# Organize The Inbox
-
 Inbox review turns quick captures into usable knowledge.
 
-## Remove A Note From Inbox
+## Remove a note from Inbox
 
 When a note is organized enough, mark it as organized. Use `Cmd+E` on macOS or `Ctrl+E` on Windows and Linux, or click the organize action in the breadcrumb bar.
 
-That action is what removes the note from Inbox. If auto-advance is enabled in Settings > Workflow, Rhizome opens the next Inbox item immediately after you mark the current note organized.
+That action is what removes the note from Inbox. If **Auto-advance to next Inbox item** is on in Settings → Workflow, Rhizome opens the next Inbox item immediately after you mark the current note organized.
 
-## Review Checklist
+## Review checklist
 
 - Rename unclear notes.
 - Add or correct the first H1.
 - Set `type`.
 - Add `status` for actionable notes.
 - Add `belongs_to`, `related_to`, or other relationship fields when useful.
+- Move it into a folder only if the folder adds value.
 - Archive or delete notes that no longer matter.
 
-## Make Notes Navigable
+## Make notes navigable
 
 A note is organized when you can answer:
 
@@ -994,348 +1470,68 @@ A note is organized when you can answer:
 - What is this useful for?
 - What will I do with it?
 
-## Avoid Over-Structuring
+## Avoid over-structuring
 
 Do not add fields just because they exist. Add the structure that will help future navigation, review, or automation.
 
 ---
 
-# Use The AI
+# Sessions
 
-Source: guides/use-ai-panel.md
-URL: /guides/use-ai-panel
+Source: guides/sessions.md
+URL: /guides/sessions
 
-# Use The AI
+A **session** is one chat with the agent. Rhizome lists your sessions on the left rail, so you can go back to one and keep working.
 
-Rhizome gives you two ways to ask for AI help: open the AI panel for an ongoing conversation, or prompt directly from the editor with `Cmd+K` followed by a space.
+## Two kinds of session
 
-## Choose How To Prompt
+Which kind you get depends on the engine that ran the chat. See [Agents, engines and models](../concepts/ai.md).
 
-- **AI panel** is best for longer conversations, agent work, and requests that need visible back-and-forth.
-- **Inline prompt** is best when you are already writing. Press `Cmd+K`, type a space, then write the prompt you want the AI to handle from the current note context.
+| | Prime sessions | Chats on Rhizome's engine |
+|---|---|---|
+| Kept in | `~/.prime/agent/sessions/` | `native-sessions/` in the app config folder |
+| Owned by | Prime | Rhizome |
+| Titles | From Prime | Made automatically from the first exchange |
+| In Mycelium | Yes | No |
 
-## Choose A Target
+## Resume a chat
 
-Open Settings and choose the default AI target:
+Click a session in the list to reopen it, then send a message to continue.
 
-- **Coding agent** for tool-backed vault editing through Claude Code, Codex, OpenCode, Pi, or Antigravity CLI.
-- **Local model** for Ollama or LM Studio chat over note context.
-- **API model** for OpenAI, Anthropic, Gemini, OpenRouter, or an OpenAI-compatible endpoint.
+For chats on Rhizome's engine:
 
-If a coding agent is missing, install it and reopen Rhizome or switch to another target.
+- **A turn cut off by a quit** reopens as cancelled. Rhizome doesn't repeat its tools.
+- **Approvals don't carry over.** Rhizome says "Earlier permissions no longer apply. Approve new actions before continuing." Approve again when the agent asks.
+- **One turn at a time.** Two windows can show the same chat, but only one turn can run.
+- **A damaged log** opens up to the last good line, with a warning that some history is missing. The original file is kept, and you continue in a new chat that starts from the good part.
+- **A very long chat** (100 MiB of log) continues in a new chat. History isn't dropped.
 
-## Permission Mode
+## Fork and archive
 
-Prime (Chat) always runs with local tools available. It has no sandbox, so the old Vault Safe prompt is not sent — that text only asked the model not to use shell, and the model obeyed.
+- **Fork:** choose **Fork chat from here** on a past message to branch a new chat from that point.
+- **Archive:** choose **Archive chat** to move a chat out of the list. **Show archived chats** brings them back into view.
 
-Claude Code and Antigravity still enforce a per-vault mode:
 
-- **Limited tools** blocks shell commands.
-- **Power User** allows local shell commands for this vault.
+## What's not saved in a session
 
-Other CLI agents are asked to follow the same labels; enforcement depends on the adapter.
+API keys stay in the system keychain, never in session files. Rhizome removes known credentials from messages and tool results before it saves them. It can't recognise every private value, so don't paste secrets into a chat.
 
-Direct model targets always stay in chat mode. They can use note context, but they cannot edit vault files through tools.
+## Bring in chats from Claude Code
 
-## Good Requests
-
-- "Find notes related to this project."
-- "Summarize what changed in this note."
-- "Draft a weekly review from these linked notes."
-- "Update this checklist based on the current project status."
-
-## Review Changes
-
-AI edits are file edits. Review them with Rhizome's diff and Git history before committing.
+See [Import Claude Code history](import-a-session.md).
 
 ---
 
-# Use The Command Palette
+# Structure a vault with Portent
 
-Source: guides/use-command-palette.md
-URL: /guides/use-command-palette
-
-# Use The Command Palette
-
-The command palette is the fastest way to move around Rhizome.
-
-Open it with:
-
-- `Cmd+K` on macOS.
-- `Ctrl+K` on Linux and Windows.
-
-## Common Commands
-
-- New Note.
-- Search.
-- Open Settings.
-- Reload Vault.
-- Add Remote.
-- Open Getting Started Vault.
-- Toggle Raw Mode.
-- Toggle Table of Contents.
-- Toggle AI Panel.
-- Use Light, Dark, or System theme.
-- Open in New Window.
-
-## Keyboard-First Workflow
-
-Use the palette when you know what you want to do but do not want to hunt through panels. It is also the best place to discover commands as the app grows.
-
----
-
-# Use Media Previews
-
-Source: guides/use-media-previews.md
-URL: /guides/use-media-previews
-
-# Use Media Previews
-
-Media previews let you inspect vault files without leaving Rhizome.
-
-## Open A File
-
-Select an image, PDF, media file, or unsupported file from a folder or file list. Rhizome opens supported files in the app and offers an external-open action for files that should use the system default app.
-
-## All Notes Visibility
-
-Open Settings to choose whether non-Markdown files appear in All Notes:
-
-- PDFs.
-- Images.
-- Unsupported files.
-
-Folder browsing still shows files in their folders even when a category is hidden from All Notes.
-
-## Attachments
-
-When you paste or drop an image into a note, Rhizome copies it into the vault and references the copied file from Markdown.
-
-## Troubleshooting
-
-If a preview does not render, open the file in the default app to confirm the file is valid, then check whether the file is inside the active vault and not blocked by operating-system permissions.
-
----
-
-# Use Spreadsheets
-
-Source: guides/use-spreadsheets.md
-URL: /guides/use-spreadsheets
-
-# Use Spreadsheets
-
-Rhizome spreadsheets are sheet notes: Markdown files with frontmatter and a CSV-like body that open in a spreadsheet editor when their `Display as` value is `Sheet`.
-
-Use a sheet note when a model needs rows, columns, calculations, or repeated numeric editing. Use a normal note when the main artifact is prose.
-
-## Create A Sheet
-
-Use the command palette action `New Sheet`, or create/open a note and set its `Display as` to `Sheet` from the Properties panel. `Type` remains separate and can still be `Note`, `Project`, `Responsibility`, or any other Rhizome type.
-
-When a note is a sheet:
-
-- the YAML frontmatter remains available for type, status, relationships, wikilinks, and custom properties
-- `_display: sheet` tells Rhizome to display the note with the spreadsheet editor
-- the body is the sheet itself
-- there is no rich-text body around the table
-- the editor switches from the text editor to the spreadsheet editor
-
-## Enter Values
-
-Click a cell and type a value. Non-formula values can be text, numbers, dates, or wikilinks.
-
-Press `Enter` on a selected cell to edit the cell. Press `Escape` while editing to leave cell editing and keep focus in the sheet.
-
-Use `Delete` or `Backspace` to clear the selected cell or range.
-
-## Enter Formulas
-
-Formulas start with `=`.
-
-```txt
-=B2+B3-B4
-=SUM(B2:D2)
-=ROUND(E6, 2)
-=IF(E6>0, "Up", "Down")
-```
-
-Rhizome shows inline formula autocomplete while you type. The autocomplete list is built from the implemented function catalog in the bundled IronCalc engine; formula evaluation is still handled by IronCalc.
-
-See [Spreadsheet Formulas](/reference/spreadsheet-functions) for syntax, supported examples, and links to the full IronCalc formula reference.
-
-## Select And Edit Ranges
-
-The sheet editor follows spreadsheet conventions:
-
-- arrow keys move the active cell
-- `Shift` plus arrow keys extends the selection
-- drag to select a range
-- copy and paste preserves formulas where possible
-- cut and paste moves formulas and shifts relative references
-- right-click a selected cell or range to apply formatting
-
-Right-click actions apply to the current selection. Keep a multi-cell selection active before opening the context menu when you want to format several cells together.
-
-## Format Cells
-
-Use the context menu for common formatting:
-
-- number formats such as plain numbers, currency, and percentages
-- decimal precision
-- bold and italic text
-- alignment and clearing formatting when available
-
-Formatting is stored as plain YAML under `_sheet`, not in an opaque workbook blob. For example, percentage formatting for `E6` is stored as:
-
-```yaml
-_sheet:
-  cells:
-    E6:
-      num_fmt: "0.00%"
-```
-
-See [Spreadsheet File Format](/reference/spreadsheet-format) for the full storage model.
-
-## Add Wikilinks
-
-Type `[[` in a cell to open note autocomplete.
-
-```csv
-Project,Owner,Status
-[[website-redesign]],[[person/alice]],Active
-[[sponsorship-pipeline]],[[person/matteo]],Review
-```
-
-When the cell is not being edited, Rhizome renders the wikilink like other note links. When you edit the cell, the raw `[[wikilink]]` syntax is shown again.
-
-Command-click a wikilink in a sheet cell to open the linked note.
-
-## Reference Another Sheet Note
-
-Formulas can read a cell from another sheet note with Rhizome's wikilink cell syntax:
-
-```txt
-=[[newsletter-revenue]].B5
-=SUM(B2:D2)+[[sponsorship-pipeline]].E12
-=ROUND([[business-plan]].$E$12, 2)
-```
-
-The part inside `[[...]]` resolves like a normal Rhizome wikilink. The part after the dot is an A1-style cell reference.
-
-Use absolute markers when copying formulas:
-
-| Reference | Copy behavior |
-| --- | --- |
-| `[[revenue]].B5` | row and column can shift |
-| `[[revenue]].$B$5` | row and column stay fixed |
-| `[[revenue]].B$5` | row fixed, column can shift |
-| `[[revenue]].$B5` | column fixed, row can shift |
-
-Cross-sheet references currently resolve single cells. Keep range formulas inside one sheet note.
-
-## Work With The Raw File
-
-A sheet file remains readable text:
-
-```md
----
-type: Project
-_display: sheet
-status: Draft
-belongs_to:
-  - "[[business-plan]]"
-_sheet:
-  frozen_rows: 1
-  columns:
-    A:
-      width: 180
----
-Metric,January,February,March,Q1 Total
-Subscriptions,1200,1350,1500,=SUM(B2:D2)
-Services,800,900,750,=SUM(B3:D3)
-Expenses,650,700,760,=SUM(B4:D4)
-Net,=B2+B3-B4,=C2+C3-C4,=D2+D3-D4,=SUM(B5:D5)
-```
-
-When editing this file with scripts or AI agents, parse the body as CSV and preserve formulas as formulas. Do not replace formulas with displayed values.
-
----
-
-# Use The Table Of Contents
-
-Source: guides/use-table-of-contents.md
-URL: /guides/use-table-of-contents
-
-# Use The Table Of Contents
-
-The table of contents panel helps you navigate long notes by heading.
-
-## Open It
-
-Use the editor toolbar, the command palette, or the shortcut:
-
-- `Cmd+Shift+T` on macOS.
-- `Ctrl+Shift+T` on Windows and Linux.
-
-## How It Works
-
-Rhizome builds the outline from the current note's headings. The panel updates as the note changes and can jump to sections in the editor.
-
-## Good Uses
-
-- Long procedures.
-- Meeting notes with many sections.
-- Research notes.
-- Generated documents that need review.
-
-If a note has no useful headings, add clear H2 and H3 sections rather than relying on a long uninterrupted document.
-
----
-
-# Use Wikilinks
-
-Source: guides/use-wikilinks.md
-URL: /guides/use-wikilinks
-
-# Use Wikilinks
-
-Wikilinks connect notes by name.
-
-```md
-This project belongs to [[content-systems]] and is related to [[git-workflows]].
-```
-
-## Link From The Body
-
-Use body links when the connection is part of the sentence you are writing.
-
-## Link From Frontmatter
-
-Use frontmatter links when the relationship should become structured metadata.
-
-```yaml
-related_to:
-  - "[[git-workflows]]"
-```
-
-## Keep Links Stable
-
-Prefer clear note titles and filenames. Rhizome's wikilink autocomplete helps you pick the right target while you type.
-
----
-
-# Portent
-
-Source: templates/portent.md
-URL: /templates/portent
-
-# Portent
+Source: guides/structure-with-portent.md
+URL: /guides/structure-with-portent
 
 [Portent](https://portent.md) is an open specification and template for work and personal knowledge bases.
 
 It gives a Rhizome vault a small set of defaults for organizing information: clear types, generic graph-like relationships, and a simple lifecycle for captured knowledge. The goal is to make a knowledge base useful to humans and AI agents without forcing every person or team to design a private ontology first.
 
-## Core Questions
+## Core questions
 
 Portent favors convention over configuration. Instead of asking "where should this go?", it asks:
 
@@ -1384,23 +1580,272 @@ Portent separates capture from organization:
 
 Rhizome supports that lifecycle directly: the Inbox holds captured notes, organizing a note marks it ready for normal views, and archiving hides old or obsolete notes from active surfaces while keeping them available.
 
-## Why Use It
+## Why use it
 
 A blank vault is flexible, but it also asks you to make structural decisions before you have momentum. Portent gives you enough structure to start capturing, organizing, and retrieving notes immediately.
 
-Because Portent is file-friendly and portable, the same model can work across local Markdown vaults, note apps, docs tools, and agent-readable knowledge bases. Rhizome is the first intended implementation, but the spec is not tied to Rhizome internals.
+Because Portent is file-friendly and portable, the same model can work across local Markdown vaults, note apps, docs tools, and agent-readable knowledge bases. The spec isn't tied to Rhizome.
 
-## Start From The Template
+## In Rhizome
 
-The fastest starting point is the Portent template vault:
+New vaults already include Portent's work types: Project, Operation, Responsibility, Task, Event, Topic and Person. On an older vault, use **Add default work types** in Settings → Workflow to add any that are missing. Existing types are never overwritten.
+
+## Start from the template
+
+You can also start from the Portent template vault:
 
 - [refactoringhq/portent-vault-template](https://github.com/refactoringhq/portent-vault-template)
 
 Use it as-is, rename pieces to match your language, or treat it as a reference model for your own Rhizome setup.
 
-## Learn More
+## Learn more
 
 Visit [portent.md](https://portent.md) for the full spec, examples, and implementation notes.
+
+---
+
+# Chat with the agent
+
+Source: guides/use-ai-panel.md
+URL: /guides/use-ai-panel
+
+Chat is where you work with the agent: ask, let it use tools, keep what's worth keeping in the vault, and pick the conversation up again later.
+
+## Start a chat
+
+1. Open Chat with ⌘1. Rhizome opens on Chat by default.
+2. Attach a vault if you want the agent to read your notes or save to them.
+3. Type a message and press Enter.
+
+Which engine answers depends on **Chat engine** in Settings → AI Agents: Prime Agent (the default) or Rhizome's own engine. See [Agents, engines and models](../concepts/ai.md).
+
+## While a reply is running
+
+The message box stays open, so you can write your next message while the agent works.
+
+- **With Prime:** press Enter to send it to the running turn. Prime queues it and reads it before its next step.
+- **With Rhizome's engine:** Enter does nothing until the reply finishes. Your text stays in the box; send it when the turn ends.
+
+Press Stop to end the run with either engine. With VoiceOver, Rhizome announces when a run starts, when a tool starts or fails, and when the reply is complete or stopped.
+
+## Ask from the editor or about a note
+
+- **From the editor:** press ⌘K, then Space, and type a prompt. It uses the current note as context.
+- **About a note:** run **Ask the agent about this note**. Chat stays open and the note opens beside it.
+- **Show or hide Chat beside your notes:** ⌘⇧L.
+
+## Keep what matters
+
+Under a reply worth keeping, click **Save to vault**. Rhizome writes it as a Markdown note straight away, with no preview. It won't save an empty reply, a reply with no vault attached, text that contains a credential, or a reply that's already in the vault. See [Your vault is the agent's memory](../concepts/vault-as-memory.md).
+
+## Come back to a chat
+
+- **Rhizome's engine:** chats are saved as they go and listed with automatic titles. Reopen one to continue it. If Rhizome quit in the middle of a turn, that turn is marked cancelled when you reopen the chat. Tool approvals you gave earlier aren't restored, so the agent asks again. Only one window can send to a chat at a time.
+- **Prime:** use the sessions list to switch between, fork and archive Prime sessions.
+
+See [Sessions](sessions.md).
+
+## Approve tools
+
+The vault's permission mode decides what the agent may do without asking:
+
+- **Limited tools:** Rhizome's engine can echo and create notes, and asks before each note.
+- **Power User:** creates notes without asking, and also offers `bash`, with approval each time. `bash` doesn't run a shell yet.
+
+Prime always runs as Power User, with its local tools and no sandbox. See [Agents, engines and models](../concepts/ai.md#permission-modes).
+
+## See what the agent did
+
+- **Changes:** next to All Notes in the sidebar. The files that changed, with diffs. Commit or revert.
+- **Mycelium:** for Prime sessions, a map of which files the run searched, read or edited. See [Mycelium](../concepts/mycelium.md).
+
+## Requests that work well
+
+With Prime, which can read and search the vault:
+
+- "Find notes related to this project and summarize what's open."
+- "Draft a weekly review from the notes linked here."
+- "What did we decide about X? Check the vault."
+
+With Rhizome's engine, which can create notes but not read them yet:
+
+- "Write up these meeting notes as a note called *Weekly sync*."
+
+---
+
+# Use the command palette
+
+Source: guides/use-command-palette.md
+URL: /guides/use-command-palette
+
+The command palette is the fastest way to move around Rhizome.
+
+Open it with `Cmd+K` on macOS, or `Ctrl+K` on Windows and Linux.
+
+## Ask the agent from the palette
+
+Type a space first to switch the palette to a prompt. It sends the prompt to Chat with the current note as context.
+
+## Common commands
+
+- **New Note** and **Search Notes**.
+- **Go to Inbox**, **Go to All Notes**, **Go to Changes** and **Go to History**.
+- **Open Research**.
+- **Toggle AI Panel** and **New AI chat**.
+- **Ask the agent about this note**.
+- **Toggle Raw Editor**.
+- **Open in New Window**.
+- **Use Light Mode**, **Use Dark Mode** and **Match System**.
+- **Add Remote to Current Vault** and **View Pending Changes**.
+- **Reload Vault**, **Repair Vault** and **Restore Getting Started Vault**.
+- **Set Up External AI Tools…** to connect Claude Code, Cursor and other MCP clients to your vault.
+- **Open Settings**, **Open AI Agents** and **Keyboard Shortcuts**.
+
+## Keyboard-first
+
+Use the palette when you know what you want but don't want to hunt through panels. It's also the place to discover commands as the app grows. For shortcuts, see [Keyboard shortcuts](../reference/keyboard-shortcuts.md).
+
+---
+
+# Use spreadsheets
+
+Source: guides/use-spreadsheets.md
+URL: /guides/use-spreadsheets
+
+Rhizome spreadsheets are sheet notes: Markdown files with frontmatter and a CSV-like body that open in a spreadsheet editor when their `Display as` value is `Sheet`.
+
+Use a sheet note when a model needs rows, columns, calculations, or repeated numeric editing. Use a normal note when the main artifact is prose.
+
+## Create a sheet
+
+Use the command palette action `New Sheet`, or create/open a note and set its `Display as` to `Sheet` from the Properties panel. `Type` remains separate and can still be `Note`, `Project`, `Responsibility`, or any other Rhizome type.
+
+When a note is a sheet:
+
+- the YAML frontmatter remains available for type, status, relationships, wikilinks, and custom properties
+- `_display: sheet` tells Rhizome to display the note with the spreadsheet editor
+- the body is the sheet itself
+- there is no rich-text body around the table
+- the editor switches from the text editor to the spreadsheet editor
+
+## Enter values
+
+Click a cell and type a value. Non-formula values can be text, numbers, dates, or wikilinks.
+
+Press `Enter` on a selected cell to edit the cell. Press `Escape` while editing to leave cell editing and keep focus in the sheet.
+
+Use `Delete` or `Backspace` to clear the selected cell or range.
+
+## Enter formulas
+
+Formulas start with `=`.
+
+```txt
+=B2+B3-B4
+=SUM(B2:D2)
+=ROUND(E6, 2)
+=IF(E6>0, "Up", "Down")
+```
+
+Rhizome shows inline formula autocomplete while you type. The autocomplete list is built from the implemented function catalog in the bundled IronCalc engine; formula evaluation is still handled by IronCalc.
+
+See [Spreadsheet Formulas](../reference/spreadsheet-functions.md) for syntax, supported examples, and links to the full IronCalc formula reference.
+
+## Select and edit ranges
+
+The sheet editor follows spreadsheet conventions:
+
+- arrow keys move the active cell
+- `Shift` plus arrow keys extends the selection
+- drag to select a range
+- copy and paste preserves formulas where possible
+- cut and paste moves formulas and shifts relative references
+- right-click a selected cell or range to apply formatting
+
+Right-click actions apply to the current selection. Keep a multi-cell selection active before opening the context menu when you want to format several cells together.
+
+## Format cells
+
+Use the context menu for common formatting:
+
+- number formats such as plain numbers, currency, and percentages
+- decimal precision
+- bold and italic text
+- alignment and clearing formatting when available
+
+Formatting is stored as plain YAML under `_sheet`, not in an opaque workbook blob. For example, percentage formatting for `E6` is stored as:
+
+```yaml
+_sheet:
+  cells:
+    E6:
+      num_fmt: "0.00%"
+```
+
+See [Spreadsheet File Format](../reference/spreadsheet-format.md) for the full storage model.
+
+## Add wikilinks
+
+Type `[[` in a cell to open note autocomplete.
+
+```csv
+Project,Owner,Status
+[[website-redesign]],[[person/alice]],Active
+[[sponsorship-pipeline]],[[person/matteo]],Review
+```
+
+When the cell is not being edited, Rhizome renders the wikilink like other note links. When you edit the cell, the raw `[[wikilink]]` syntax is shown again.
+
+Command-click a wikilink in a sheet cell to open the linked note.
+
+## Reference another sheet note
+
+Formulas can read a cell from another sheet note with Rhizome's wikilink cell syntax:
+
+```txt
+=[[newsletter-revenue]].B5
+=SUM(B2:D2)+[[sponsorship-pipeline]].E12
+=ROUND([[business-plan]].$E$12, 2)
+```
+
+The part inside `[[...]]` resolves like a normal Rhizome wikilink. The part after the dot is an A1-style cell reference.
+
+Use absolute markers when copying formulas:
+
+| Reference | Copy behavior |
+| --- | --- |
+| `[[revenue]].B5` | row and column can shift |
+| `[[revenue]].$B$5` | row and column stay fixed |
+| `[[revenue]].B$5` | row fixed, column can shift |
+| `[[revenue]].$B5` | column fixed, row can shift |
+
+Cross-sheet references currently resolve single cells. Keep range formulas inside one sheet note.
+
+## Work with the raw file
+
+A sheet file remains readable text:
+
+```md
+---
+type: Project
+_display: sheet
+status: Draft
+belongs_to:
+  - "[[business-plan]]"
+_sheet:
+  frozen_rows: 1
+  columns:
+    A:
+      width: 180
+---
+Metric,January,February,March,Q1 Total
+Subscriptions,1200,1350,1500,=SUM(B2:D2)
+Services,800,900,750,=SUM(B3:D3)
+Expenses,650,700,760,=SUM(B4:D4)
+Net,=B2+B3-B4,=C2+C3-C4,=D2+D3-D4,=SUM(B5:D5)
+```
+
+When editing this file with scripts or AI agents, parse the body as CSV and preserve formulas as formulas. Do not replace formulas with displayed values.
 
 ---
 
@@ -1409,84 +1854,54 @@ Visit [portent.md](https://portent.md) for the full spec, examples, and implemen
 Source: reference/contribute.md
 URL: /reference/contribute
 
-# Contribute
+Rhizome is free and open source under AGPL-3.0-or-later. All of these happen on GitHub.
 
-Rhizome is free and open source, and any kind of help is useful. Pick the path that matches what you want to do.
+## Report a bug
 
-## Sponsor Or Support
+Open an issue on [GitHub Issues](https://github.com/tuckcode/rhizome-agent/issues). Include what happened, what you expected, and the steps to reproduce it.
 
-The best way to support Rhizome is to subscribe to [Refactoring](https://refactoring.fm/), Luca's newsletter and community about running good teams and shipping software with AI.
+From inside Rhizome, open **Contribute** from the command palette or Settings → About. It can copy diagnostics with personal details removed, for you to paste into the issue.
 
-## Feature Requests
+## Suggest a feature
 
-Use the [product board](https://rhizome.canny.io/) for feature ideas. Search first, upvote existing ideas, and create a new post when the request is genuinely new.
+Search [GitHub Issues](https://github.com/tuckcode/rhizome-agent/issues) first. Comment on an existing request, or open a new one if yours is new.
 
-## Questions
+## Report a security issue
 
-Use [GitHub Issues](https://github.com/tuckcode/rhizome-agent/issues) for questions, conversations, show and tell, and broader community context.
+Don't open a public issue. Follow [SECURITY.md](https://github.com/tuckcode/rhizome-agent/blob/main/SECURITY.md).
 
-## Contribute Code
+## Contribute code
 
-Small, focused pull requests are welcome. Check the product board first so you build the right thing, then open a PR on [GitHub](https://github.com/tuckcode/rhizome-agent/pulls). The [contributing guide](https://github.com/tuckcode/rhizome-agent/blob/main/CONTRIBUTING.md) explains the local workflow.
+Small, focused pull requests are welcome. Read [CONTRIBUTING.md](https://github.com/tuckcode/rhizome-agent/blob/main/CONTRIBUTING.md) for the local workflow, then open a pull request on [GitHub](https://github.com/tuckcode/rhizome-agent/pulls).
 
-## Report A Bug
+## Origins
 
-Use [GitHub Issues](https://github.com/tuckcode/rhizome-agent/issues) for bugs. Include what happened, what you expected, and clear reproduction steps. If you are reporting from inside Rhizome, use the Contribute panel to copy sanitized diagnostics and attach them to the issue.
-
----
-
-# Docs Maintenance
-
-Source: reference/docs-maintenance.md
-URL: /reference/docs-maintenance
-
-# Docs Maintenance
-
-The public docs live in the app repo so documentation changes can ship with behavior changes.
-
-## Update Docs When You Change
-
-- A Tauri command.
-- A new component or hook that changes user behavior.
-- A data model or frontmatter convention.
-- Git, AI, onboarding, or release behavior.
-- Public release pages, download metadata, or updater channels.
-- Platform support.
-- Keyboard shortcuts.
-
-## Suggested Workflow
-
-1. Make the code change.
-2. Update the matching concept, guide, or reference page.
-3. Add a troubleshooting page if the change creates a new failure mode.
-4. Run `pnpm docs:build`.
-5. Check the home page, search, release/download links, and changed docs pages in a browser.
-
-## Page Types
-
-| Type | Purpose |
-| --- | --- |
-| Start | Helps a new user get into the app. |
-| Concepts | Explains mental models. |
-| Guides | Teaches workflows. |
-| Reference | Gives stable facts and tables. |
-| Troubleshooting | Starts from a symptom and ends with recovery. |
-
-## Review Checklist
-
-- Does the page describe current behavior?
-- Does it mention macOS primary and Windows/Linux supported-early status when platform support matters?
-- Are links relative and VitePress-compatible?
-- Can a user discover the page with local search?
+Rhizome is a modified version of [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi. See [Credits and licences](credits.md).
 
 ---
 
-# File Layout
+# Credits and licences
+
+Source: reference/credits.md
+URL: /reference/credits
+
+Rhizome is free software under AGPL-3.0-or-later. It builds on the projects below. Copied or ported code is also listed in the repository's `THIRD_PARTY_NOTICES` and `docs/vendored-sources.md`.
+
+| Project | Licence | What Rhizome uses |
+|---|---|---|
+| [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi | AGPL-3.0 | Rhizome is a modified version of Tolaria: the vault, editor and note model |
+| [Mindwalk](https://github.com/cosmtrek/mindwalk) © 2026 Ricko Yu | MIT | The map engine behind [Mycelium](../concepts/mycelium.md). You install it separately; Rhizome calls it |
+| [OmniRoute](https://github.com/diegosouzapw/OmniRoute) © 2026 diegosouzapw | MIT | [Free tier (auto)](../concepts/free-models-and-routing.md): the provider catalog data and cooldown rules are ported from it |
+| [freellmapi](https://github.com/tashfeenahmed/freellmapi) | MIT | Free tier (auto): used as an edge-case checklist for retries and failover. No code or hosted catalog is copied |
+| [Portent](https://portent.md) | See the project | The default work types for new vaults. See [Structure a vault with Portent](../guides/structure-with-portent.md) |
+| [IronCalc](https://github.com/ironcalc/IronCalc) | MIT or Apache-2.0 | Spreadsheet engine for sheet notes |
+
+---
+
+# File layout
 
 Source: reference/file-layout.md
 URL: /reference/file-layout
-
-# File Layout
 
 Rhizome is not opinionated about folder structure. It finds notes recursively across the whole vault, stores new notes in the root by default, and uses types and relationships for real organization.
 
@@ -1505,18 +1920,29 @@ my-vault/
     active-projects.yml
 ```
 
-## Root Notes
+## Root notes
 
 Rhizome works well with a flat vault. Folders are optional and can be useful for compatibility with other tools, but they are not required for people, projects, topics, or any other note category.
 
 Type is not inferred from folder location. It comes from frontmatter, and relationships are expressed with wikilinks in fields. That is what Rhizome uses for the sidebar, Properties panel, search, custom views, and neighborhood navigation.
 
-## Special Folders
+## Special folders
 
 | Folder | Purpose |
 | --- | --- |
 | `views/` | Saved custom views. |
 | `attachments/` | Images and other attached files. |
+| `Imports/` | Chats brought in with **Import chat history**, for example `Imports/claude-code/`. |
+| `.rhizome/` | Rhizome's own vault files, such as the activity log `events.jsonl`. |
+
+## Agent files
+
+| File | Purpose |
+| --- | --- |
+| `AGENTS.md` | Your conventions for AI agents working in this vault. |
+| `CLAUDE.md` | A compatibility copy for tools that look for that name. |
+
+Chats from Rhizome's engine aren't kept in the vault. They're in `native-sessions/` in the app config folder. Prime keeps its sessions in `~/.prime/agent/sessions/`.
 
 PDFs, images, and other non-Markdown files stay as normal files. Folder browsing can show them in place, and Settings controls whether PDFs, images, and unsupported files appear in All Notes.
 
@@ -1526,18 +1952,16 @@ Spreadsheets are also Markdown files. A note with `_display: sheet` stores ordin
 
 Type definitions are Markdown notes with `type: Type` in frontmatter. New type documents are normal notes, and existing type documents in older folders still work.
 
-## Git Files
+## Git files
 
 If the vault is a Git repository, `.git/` belongs to Git. Rhizome reads Git state but does not treat `.git/` as notes.
 
 ---
 
-# Frontmatter Fields
+# Frontmatter fields
 
 Source: reference/frontmatter-fields.md
 URL: /reference/frontmatter-fields
-
-# Frontmatter Fields
 
 Rhizome uses conventions instead of a required schema.
 
@@ -1545,7 +1969,7 @@ Rhizome uses conventions instead of a required schema.
 | --- | --- |
 | `type` | The note's entity type. |
 | `status` | Lifecycle state. |
-| `icon` | Per-note icon. |
+| `icon` | Per-note icon you set as a normal property. |
 | `url` | External URL. |
 | `date` | Single date. |
 | `belongs_to` | Parent relationship. |
@@ -1558,11 +1982,13 @@ Rhizome uses conventions instead of a required schema.
 | `_pinned_properties` | Properties pinned for a type. |
 | `_sheet` | Sheet-note presentation metadata such as grid settings, column widths, row heights, and cell formatting. |
 
-## Custom Fields
+`icon` is an ordinary property you can see and edit. `_icon` is the system field Rhizome writes when you pick an icon from the app, and it's hidden from property editing.
+
+## Custom fields
 
 You can add your own fields. If a field contains wikilinks, Rhizome can treat it as a relationship.
 
-## System Fields
+## System fields
 
 Fields starting with `_` are reserved for system behavior and hidden from standard property editing. They remain plain YAML, so they can still be inspected or changed in raw mode when needed.
 
@@ -1570,92 +1996,127 @@ Nested keys under a system field are also system-owned. For example, `_sheet.cel
 
 ---
 
-# Keyboard Shortcuts
+# Keyboard shortcuts
 
 Source: reference/keyboard-shortcuts.md
 URL: /reference/keyboard-shortcuts
 
-# Keyboard Shortcuts
+Shortcuts are listed for macOS and for Windows and Linux. This list comes from the app's command manifest (`src/shared/appCommandManifest.json`). Press ⌘/ in the app to see the current list.
 
-| Shortcut | Action |
-| --- | --- |
-| `Cmd+K` / `Ctrl+K` | Open command palette. |
-| `Cmd+P` / `Ctrl+P` | Quick open notes and files. |
-| `Cmd+N` / `Ctrl+N` | Create a new note. |
-| `Cmd+S` / `Ctrl+S` | Save current note. |
-| `Cmd+F` / `Ctrl+F` | Find in the current note. |
-| `Cmd+Shift+F` / `Ctrl+Shift+F` | Search the vault. |
-| `Cmd+Shift+V` / `Ctrl+Shift+V` | Paste without formatting. |
-| `Cmd+\` / `Ctrl+\` | Toggle raw Markdown mode. |
-| `Cmd+Shift+T` / `Ctrl+Shift+T` | Toggle table of contents. |
-| `Cmd+Shift+I` / `Ctrl+Shift+I` | Toggle Properties panel. |
-| `Cmd+Shift+L` / `Ctrl+Shift+L` | Toggle AI panel. |
-| `Cmd+[` / `Alt+Left` | Navigate back when available. |
-| `Cmd+]` / `Alt+Right` | Navigate forward when available. |
-| `Cmd+Shift+O` / `Ctrl+Shift+O` | Open current note in a new window. |
-| `Cmd+D` / `Ctrl+D` | Toggle favorite for the current note. |
-| `Cmd+E` / `Ctrl+E` | Mark the current Inbox note organized. |
+## General
 
-Some shortcuts vary by platform because macOS, Linux, and Windows reserve different key combinations.
+| Action | macOS | Windows and Linux |
+| --- | --- | --- |
+| Open the command palette | `Cmd+K` | `Ctrl+K` |
+| Quick open notes and files | `Cmd+P` or `Cmd+O` | `Ctrl+P` or `Ctrl+O` |
+| Open Settings | `Cmd+,` | `Ctrl+,` |
+| Show keyboard shortcuts | `Cmd+/` | `Ctrl+/` |
+| Reload the vault | `Cmd+Shift+R` | `Ctrl+Shift+R` |
 
-Use the command palette to discover the current command set.
+## Layouts and Views
 
----
+| Action | macOS | Windows and Linux |
+| --- | --- | --- |
+| Chat layout | `Cmd+1` | `Ctrl+1` |
+| Notes layout | `Cmd+2` | `Ctrl+2` |
+| Workbench layout | `Cmd+3` | `Ctrl+3` |
+| Read layout | `Cmd+4` | `Ctrl+4` |
+| Open Research (Views) | `Ctrl+Cmd+1` | `Ctrl+Shift+1` |
+| Open Graph (Views) | `Ctrl+Cmd+2` | `Ctrl+Shift+2` |
+| Open Mycelium (Views) | `Ctrl+Cmd+3` | `Ctrl+Shift+3` |
+| Open History (Views) | `Ctrl+Cmd+4` | `Ctrl+Shift+4` |
+| Show or hide Chat beside your notes | `Cmd+Shift+L` | `Ctrl+Shift+L` |
 
-# Release Channels
+## Notes
 
-Source: reference/release-channels.md
-URL: /reference/release-channels
+| Action | macOS | Windows and Linux |
+| --- | --- | --- |
+| Create a new note | `Cmd+N` | `Ctrl+N` |
+| Save the current note | `Cmd+S` | `Ctrl+S` |
+| Mark the current Inbox note organized | `Cmd+E` | `Ctrl+E` |
+| Toggle favorite for the current note | `Cmd+D` | `Ctrl+D` |
+| Open the current note in a new window | `Cmd+Shift+O` | `Ctrl+Shift+O` |
+| Delete the current note | `Cmd+Backspace` | `Ctrl+Backspace` |
 
-# Release Channels
+## Editing
 
-Rhizome publishes Stable and Alpha release metadata to GitHub Pages.
+| Action | macOS | Windows and Linux |
+| --- | --- | --- |
+| Undo | `Cmd+Z` | `Ctrl+Z` |
+| Redo | `Cmd+Shift+Z` | `Ctrl+Shift+Z` |
+| Find in the current note | `Cmd+F` | `Ctrl+F` |
+| Search the vault | `Cmd+Shift+F` | `Ctrl+Shift+F` |
+| Paste without formatting | `Cmd+Shift+V` | `Ctrl+Shift+V` |
+| Toggle raw Markdown mode | `Cmd+\` | `Ctrl+\` |
+| Toggle the Properties panel | `Cmd+Shift+I` | `Ctrl+Shift+I` |
+| Toggle the table of contents | `Cmd+Shift+T` | `Ctrl+Shift+T` |
 
-## Stable
+## Navigation and zoom
 
-Stable follows manually promoted releases. This is the right channel for normal use.
+| Action | macOS | Windows and Linux |
+| --- | --- | --- |
+| Go back | `Cmd+←` | `Ctrl+←` |
+| Go forward | `Cmd+→` | `Ctrl+→` |
+| Zoom in | `Cmd+=` | `Ctrl+=` |
+| Zoom out | `Cmd+-` | `Ctrl+-` |
+| Actual size | `Cmd+0` | `Ctrl+0` |
 
-The stable updater metadata lives at:
+## Not on a shortcut
 
-```txt
-/stable/latest.json
-```
+**Go to Changes** has no shortcut. Run it from the command palette, or click Changes next to All Notes in the sidebar.
 
-The public download page points at the latest stable release.
-
-## Alpha
-
-Alpha follows pushes to `main`. It receives fixes and features earlier, but it can be rougher than Stable.
-
-The alpha updater metadata lives at:
-
-```txt
-/alpha/latest.json
-```
-
-Compatibility endpoints also point to the alpha metadata:
-
-```txt
-/latest.json
-/latest-canary.json
-```
-
-## Before Switching
-
-Commit or push important vault changes before changing release channel or installing an update. Your notes are local files, but a clean Git state makes recovery simpler.
+Some shortcuts differ by platform because macOS, Windows and Linux reserve different key combinations.
 
 ---
 
-# Spreadsheet File Format
+# Platforms and updates
+
+Source: reference/platforms-and-updates.md
+URL: /reference/platforms-and-updates
+
+Rhizome is a developer preview. It's built and tested on macOS, from source.
+
+| Platform | Status |
+|---|---|
+| macOS | The preview platform. Build from source; see [Install](../start/install.md) |
+| Windows | Builds from source, but isn't supported for daily use yet |
+| Linux | Builds from source, but hasn't been checked as an install for someone new |
+
+There is no signed download, no Homebrew package, and no release channel yet. The app reports version `0.1.0`. That's the bundle version, not a promise about every macOS release.
+
+## Update Rhizome
+
+There's no in-app updater. To update:
+
+1. Commit or push important vault changes first. Your notes are local files, but a clean Git state makes recovery simpler.
+2. Pull the latest code: `git pull` in your `rhizome-agent` folder.
+3. Run `./install.sh`, then `pnpm tauri dev`.
+
+If you built an `.app` before, replace it with a new build.
+
+## Update Prime
+
+If you use Prime as the Chat engine, Rhizome checks for Prime updates but never installs one on its own. When an update is ready, click **Update now**. If it fails, update Prime from a terminal.
+
+## Report a platform bug
+
+Open an issue on [GitHub](https://github.com/tuckcode/rhizome-agent/issues) and include:
+
+- Rhizome version.
+- Operating system, version and CPU architecture.
+- Whether the vault is local-only or connected to a remote.
+- Steps to reproduce.
+
+---
+
+# Spreadsheet file format
 
 Source: reference/spreadsheet-format.md
 URL: /reference/spreadsheet-format
 
-# Spreadsheet File Format
-
 Sheet notes are Markdown files with YAML frontmatter and a CSV-like body. The note uses `_display: sheet` when it should open in the spreadsheet editor. The `type` field remains ordinary semantic metadata.
 
-For editing workflows, see [Use Spreadsheets](/guides/use-spreadsheets). For formula syntax and function references, see [Spreadsheet Formulas](/reference/spreadsheet-functions).
+For editing workflows, see [Use Spreadsheets](../guides/use-spreadsheets.md). For formula syntax and function references, see [Spreadsheet Formulas](spreadsheet-functions.md).
 
 ## Structure
 
@@ -1716,7 +2177,7 @@ The body is CSV-like text:
 
 Any cell whose input starts with `=` is treated as a formula. Other cells are treated as literal values.
 
-## `_sheet` Metadata
+## `_sheet` metadata
 
 Rhizome stores spreadsheet presentation state in `_sheet` as plain YAML.
 
@@ -1751,7 +2212,7 @@ Border values are stored as a style name with an optional color, for example:
 border_bottom: "thin #d0d7de"
 ```
 
-## Number Formats
+## Number formats
 
 Number formats are stored in `num_fmt` using spreadsheet-style format codes. Common examples:
 
@@ -1765,7 +2226,7 @@ Number formats are stored in `num_fmt` using spreadsheet-style format codes. Com
 
 These formats affect presentation, not the underlying cell input in the CSV body.
 
-## Markdown Style Import
+## Markdown style import
 
 When Rhizome imports a non-formula CSV cell, simple Markdown wrappers can seed initial styles:
 
@@ -1797,7 +2258,7 @@ Formula cells can reference another sheet note with Rhizome's cross-sheet syntax
 
 Cross-sheet references resolve another sheet note by wikilink target, then read a single A1-style cell. Circular references and very deep chains are treated as unresolved.
 
-## Guidance For Agents And Scripts
+## Guidance for agents and scripts
 
 When editing a sheet note programmatically:
 
@@ -1815,18 +2276,16 @@ If a script cannot safely preserve `_sheet`, it should leave that block untouche
 
 ---
 
-# Spreadsheet Formulas
+# Spreadsheet formulas
 
 Source: reference/spreadsheet-functions.md
 URL: /reference/spreadsheet-functions
-
-# Spreadsheet Formulas
 
 Formula cells start with `=` and are evaluated by IronCalc through Rhizome's sheet editor.
 
 Rhizome adds vault-aware sheet references on top of the normal spreadsheet formula model. Everything else should be treated as IronCalc formula behavior. IronCalc aims for Excel-compatible formulas, but the upstream project is still evolving, so verify advanced formulas against the IronCalc docs when precision matters.
 
-## Basic Syntax
+## Basic syntax
 
 | Syntax | Meaning |
 | --- | --- |
@@ -1846,7 +2305,7 @@ Use parentheses when a model depends on precedence:
 =(B2+B3-B4)/B5
 ```
 
-## Rhizome Cross-Sheet References
+## Rhizome cross-sheet references
 
 Rhizome supports wikilink cell references for values that live in another sheet note:
 
@@ -1869,7 +2328,7 @@ Absolute markers follow spreadsheet copy behavior:
 
 Cross-sheet references currently resolve single cells. Keep range formulas inside one sheet note until cross-note ranges are explicitly supported.
 
-## Autocomplete Functions
+## Autocomplete functions
 
 Rhizome's formula autocomplete exposes the implemented function catalog from the bundled IronCalc engine. The current catalog has 195 functions.
 
@@ -1921,7 +2380,7 @@ The dropdown shows a small ranked set of matches while you type. Keep typing to 
 =SUM(B2:D2)-SUM(B4:D4)
 ```
 
-### Growth And Percentages
+### Growth and percentages
 
 ```txt
 =(C5-B5)/B5
@@ -1931,7 +2390,7 @@ The dropdown shows a small ranked set of matches while you type. Keep typing to 
 
 Format the result as a percentage with a cell `num_fmt` such as `0.00%`.
 
-### Conditional Logic
+### Conditional logic
 
 ```txt
 =IF(E5>10000, "On track", "Review")
@@ -1966,7 +2425,7 @@ Format the result as a percentage with a cell `num_fmt` such as `0.00%`.
 =XLOOKUP("Revenue", A2:A20, E2:E20)
 ```
 
-### Cross-Sheet Model
+### Cross-sheet model
 
 ```txt
 =[[newsletter-revenue]].E5
@@ -1974,7 +2433,7 @@ Format the result as a percentage with a cell `num_fmt` such as `0.00%`.
 =IF([[business-plan]].$E$12>0, [[business-plan]].$E$12, 0)
 ```
 
-## IronCalc Function Families
+## IronCalc function families
 
 IronCalc documents formulas by category. Use these upstream pages for detailed syntax and examples. The upstream documentation may include newer functions that are not yet present in Rhizome's bundled IronCalc version.
 
@@ -1997,47 +2456,14 @@ For current upstream gaps, see IronCalc's [unsupported features](https://docs.ir
 
 ---
 
-# Supported Platforms
-
-Source: reference/supported-platforms.md
-URL: /reference/supported-platforms
-
-# Supported Platforms
-
-Rhizome is a desktop app built with Tauri. Releases currently target macOS, Windows, and Linux.
-
-| Platform | Current support | Notes |
-| --- | --- | --- |
-| macOS | Primary | Main development and QA target. Apple Silicon and Intel artifacts are published. |
-| Windows | Supported, early | NSIS installers and signed updater bundles are published. Menu, shell-path, and credential-helper behavior receive platform-specific fixes as they appear. |
-| Linux | Supported, early | AppImage, deb, and RPM artifacts are published. Behavior can depend on distro WebKitGTK packages, Wayland/X11 details, and input-method setup. |
-
-## Support Policy
-
-Primary support means the platform is part of normal development and release validation. Supported, early means release artifacts exist and the app is expected to work, but platform-specific bugs can take longer to diagnose than macOS issues.
-
-## Reporting Platform Bugs
-
-Include:
-
-- Rhizome version.
-- Operating system and version.
-- CPU architecture.
-- Whether the vault is local-only or connected to a remote.
-- Steps to reproduce.
-
----
-
-# View Filters
+# View filters
 
 Source: reference/view-filters.md
 URL: /reference/view-filters
 
-# View Filters
-
 View filters define saved lists of notes.
 
-## Common Filter Ideas
+## Common filter ideas
 
 | Goal | Filter direction |
 | --- | --- |
@@ -2061,7 +2487,7 @@ Saved views can combine filters for text, dates, relationship fields, and frontm
 
 Regex filters are available for power-user cases. Keep them narrow and test them on a small view first.
 
-## Keep Views Focused
+## Keep views focused
 
 A view should answer one recurring question. If it becomes too broad, split it into two views.
 
@@ -2069,42 +2495,85 @@ You can also customize view appearance with the same kind of icon and color cont
 
 ---
 
-# AI Agent Not Found
+# AI agent not found
 
 Source: troubleshooting/ai-agent-not-found.md
 URL: /troubleshooting/ai-agent-not-found
 
-# AI Agent Not Found
+Rhizome runs Prime Agent as a separate program. It can only use Prime when Prime is installed and Rhizome can find it.
 
-Rhizome can only launch local CLI agents that are installed and discoverable.
+You don't need Prime if you use Rhizome's own engine. Turn on **Chat engine** in Settings → AI Agents.
 
 ## Symptoms
 
-- The AI panel says no supported agent is available.
-- Claude Code or another agent works in one shell but not in Rhizome.
+- Chat says Prime is missing.
+- Settings → AI Agents shows Prime Agent as **missing**.
+- `prime-agent` works in one terminal but not from Rhizome.
 
 ## Checks
 
-Open a terminal and run the agent command directly. For Claude Code:
+1. Open a terminal and run:
 
-```bash
-claude --version
-```
+   ```bash
+   prime-agent status
+   ```
 
-If the command fails, install or repair the agent first.
+2. If the command isn't found, run `./install.sh` in your `rhizome-agent` folder. It installs Prime when it's missing.
+3. If Prime is installed but not running, start the daemon:
 
-## Path Issues
+   ```bash
+   (prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
+   ```
 
-Desktop apps can inherit a different `PATH` from your interactive shell. Rhizome checks common install locations, but shell setup can still vary. Prefer installing CLI tools in standard locations or making them available from your login shell.
+4. Look at Settings → AI Agents → Local agent → **Recognized local agents**. Prime Agent should show as installed, with its version.
+
+## Path issues
+
+Desktop apps can get a different `PATH` from your terminal. Rhizome checks common install locations, but shell setup varies. Install command-line tools in standard locations, or make them available from your login shell.
 
 ---
 
-# Git Authentication
+# Chat doesn't answer
+
+Source: troubleshooting/chat-doesnt-answer.md
+URL: /troubleshooting/chat-doesnt-answer
+
+First check **Chat engine** in Settings → AI Agents.
+
+## Prime Agent
+
+| You see | Do this |
+|---|---|
+| Prime is missing | Install Prime with `./install.sh`, run `prime-agent` once, and start the daemon (see [Install](../start/install.md#set-up-prime)). Or turn on **Chat engine** to use Rhizome's engine, which doesn't need Prime |
+| Prime is installed, but Chat still says it's missing | Wait a few seconds. The check repeats. If it keeps failing, see [AI agent not found](ai-agent-not-found.md) |
+| Chat stopped answering after you closed a terminal | Prime stops with the terminal that started it. Start it as a daemon: `(prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status` |
+| The provider login expired | Settings → AI Agents → Local agent → **Reconnect** on that provider. Or run `prime-agent`, then `/login` |
+
+## Rhizome's engine
+
+| You see | Do this |
+|---|---|
+| No key for the model | Add the key in Settings → AI Agents → API model (or Local model). Settings points you there |
+| "No free-tier provider key is set." | Turn on at least one provider under **Free tier (auto)** and paste its key |
+| A provider row says **Keychain error** | Unlock the keychain, or allow Rhizome to use it, then reopen Settings |
+| A notice appears, but the reply goes on | Something went wrong that didn't stop the turn, such as part of the chat not being saved. Read the notice; the chat still works |
+| The model can't be reached | Click **Test model** on the provider. See [Model provider connection](model-provider-connection.md) |
+| Enter does nothing while a reply runs | Rhizome's engine takes one turn at a time. Wait for the reply, or press Stop |
+| Another window is already running this chat | Only one turn can run at a time. Wait, or continue in that window |
+
+## Either engine
+
+| You see | Do this |
+|---|---|
+| No network | Notes on disk still open. Chat can't answer until the network is back, unless you use a local model |
+| The window disappeared | The red button quits Rhizome unless **Keep in taskbar** is on. Reopen the app, or click the Dock icon |
+
+---
+
+# Git authentication
 
 Source: troubleshooting/git-auth.md
 URL: /troubleshooting/git-auth
-
-# Git Authentication
 
 Rhizome uses system Git authentication. It does not manage provider passwords directly.
 
@@ -2123,7 +2592,7 @@ Rhizome uses system Git authentication. It does not manage provider passwords di
 
 If `git fetch` fails in the terminal, fix system Git auth first.
 
-## Common Fixes
+## Common fixes
 
 - Sign in with GitHub CLI.
 - Configure SSH keys.
@@ -2132,49 +2601,53 @@ If `git fetch` fails in the terminal, fix system Git auth first.
 
 ---
 
-# Model Provider Connection
+# Model provider connection
 
 Source: troubleshooting/model-provider-connection.md
 URL: /troubleshooting/model-provider-connection
 
-# Model Provider Connection
+Use this checklist when a model provider doesn't answer. It applies to Rhizome's own engine. Prime handles its own providers; see [Chat doesn't answer](chat-doesnt-answer.md).
 
-Use this checklist when a local or API model provider does not connect.
-
-## Local Providers
+## Local providers
 
 For Ollama or LM Studio:
 
 1. Start the local model server.
-2. Confirm the base URL in Rhizome matches the server.
-3. Confirm the model ID is installed and loaded by the provider.
-4. Use the Settings test action again.
+2. Check that the base URL in Settings → AI Agents → Local model matches the server.
+3. Check that the model ID is installed and loaded.
+4. Click **Test model** again.
 
-## API Providers
+## Hosted providers
 
-For hosted providers:
+1. Check the provider kind and endpoint.
+2. Check that the model ID exists for your account.
+3. Check the key. With **Save locally in Rhizome**, the key is in the system keychain. With **Read from env var**, the variable must be set for the app, not only in your terminal.
+4. Click **Test model**. It sends one short request with no tools.
 
-1. Confirm the provider kind and endpoint.
-2. Confirm the model ID exists for your account.
-3. Confirm the API key is saved locally or available in the configured environment variable.
-4. Avoid storing secrets in the vault.
+Never store keys in the vault. Vault notes are committed and can be pushed.
 
-## Chat Mode Boundary
+## Keychain problems
 
-Direct model targets run in chat mode. If you need file-editing tools, use a coding agent target such as Claude Code, Codex, OpenCode, Pi, or Antigravity CLI.
+If a Free tier provider row says **Keychain error**, the system keychain is locked or Rhizome isn't allowed to use it. Unlock it or allow access, then reopen Settings. Keys from older versions move to the keychain the first time they're read; don't edit a key file by hand.
+
+## Free tier (auto) can't route
+
+If no free provider has a key, Settings says "Add a key to at least one provider to use Free tier (auto)." Turn on a provider and paste its key. With **Strict mode** on, only Groq and your own endpoint are used. See [Free models and routing](../concepts/free-models-and-routing.md).
+
+## No file tools
+
+Rhizome's engine can create notes, but it can't read, search or edit files yet. If you need an agent that edits files, use Prime as the engine. See [Agents, engines and models](../concepts/ai.md).
 
 ---
 
-# Sync Conflicts
+# Sync conflicts
 
 Source: troubleshooting/sync-conflicts.md
 URL: /troubleshooting/sync-conflicts
 
-# Sync Conflicts
-
 Sync conflicts happen when local and remote changes touch the same content.
 
-## What To Do
+## What to do
 
 1. Stop editing the conflicted note.
 2. Open the conflict resolver if Rhizome presents it.
@@ -2183,7 +2656,7 @@ Sync conflicts happen when local and remote changes touch the same content.
 5. Commit the resolved file.
 6. Push again.
 
-## Prevent Conflicts
+## Prevent conflicts
 
 - Pull before starting work on another device.
 - Push after meaningful sessions.
@@ -2192,21 +2665,23 @@ Sync conflicts happen when local and remote changes touch the same content.
 
 ---
 
-# Vault Not Loading
+# Vault not loading
 
 Source: troubleshooting/vault-not-loading.md
 URL: /troubleshooting/vault-not-loading
 
-# Vault Not Loading
-
 Use this checklist when Rhizome cannot open or refresh a vault.
 
-## Check The Folder
+## Check the folder
 
 - Confirm the folder exists.
 - Confirm the folder contains readable files.
 - Confirm Rhizome has permission to access the folder.
 - Try opening a smaller test vault to isolate the issue.
+
+## macOS folder permission
+
+If the vault is in Documents, Desktop or Downloads, macOS must allow Rhizome to read it. Allow access when macOS asks, or turn it on in System Settings → Privacy & Security → Files and Folders. Or move the vault to another folder.
 
 ## Check Git
 

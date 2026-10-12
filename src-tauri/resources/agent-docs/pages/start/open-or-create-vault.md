@@ -1,13 +1,13 @@
-# Open Or Create A Vault
+# Open or create a vault
 
 Source: start/open-or-create-vault.md
 URL: /start/open-or-create-vault
 
-# Open Or Create A Vault
+A Rhizome vault is a folder on disk. It's where your notes live, and it's also the agent's memory: what you save from Chat lands here as Markdown. See [Your vault is the agent's memory](../concepts/vault-as-memory.md).
 
-A Rhizome vault is a folder on disk. The folder can contain Markdown notes, attachments, type definitions, saved views, and Git metadata.
+The folder can contain Markdown notes, attachments, type definitions, saved views, and Git metadata.
 
-## Open An Existing Folder
+## Open an existing folder
 
 Choose an existing folder if you already have Markdown notes. Rhizome scans `.md` files and uses frontmatter when it exists.
 
@@ -16,19 +16,23 @@ Good starting points:
 - A folder of plain Markdown files.
 - An Obsidian-style vault.
 - A Git repository containing notes.
-- A copy of the Getting Started vault.
 
-## Create A New Vault
+## Create a new vault
 
-Choose a new empty folder if you want Rhizome conventions from the start. New notes and optional type definitions are created as Markdown files.
+The welcome screen offers two ways to start fresh:
 
-## Use More Than One Vault
+- **Get started with a template** creates a `Getting Started` vault in your Documents folder, with starter folders, a welcome note, an `AGENTS.md`, and the default work types from [Portent](../guides/structure-with-portent.md). It's built locally and starts as a Git repository.
+- **Create empty vault** asks for a name and a location, then adds Rhizome's default settings files.
 
-You do not have to merge everything into one folder. Register each local folder as its own vault, then turn on `Use multiple vaults at the same time` in `Settings` -> `Vaults`.
+You can bring the template back later with **Restore Getting Started Vault** in the command palette.
+
+## Use more than one vault
+
+You do not have to merge everything into one folder. Register each local folder as its own vault, then turn on **Use multiple vaults at the same time** in Settings → Vaults.
 
 Once enabled, the bottom-left vault menu lets you include vaults in the unified graph. Search, quick open, wikilinks, and note lists can span the included vaults, while Git sync and commits remain tied to each vault's own repository.
 
-## Git Is Recommended, Not Required
+## Git is recommended, not required
 
 Rhizome works well with a plain folder of Markdown files. You can open, edit, organize, and search notes without making the vault a Git repository.
 

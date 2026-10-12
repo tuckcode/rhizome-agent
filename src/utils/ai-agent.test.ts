@@ -27,7 +27,7 @@ describe('buildAgentSystemPrompt', () => {
     const prompt = buildAgentSystemPrompt({ agentDocsPath: '/app/agent-docs' })
 
     expect(prompt).toContain('/app/agent-docs/index.md')
-    expect(prompt).toContain('/app/agent-docs/pages/templates/portent.md')
+    expect(prompt).toContain('/app/agent-docs/pages/guides/structure-with-portent.md')
     expect(prompt).toContain("Portent as Rhizome's default best-practice model")
     expect(prompt).not.toContain('ripgrep')
     expect(prompt).toContain('Prefer bundled docs over guesses')

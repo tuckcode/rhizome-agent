@@ -1,30 +1,51 @@
-# Configure AI Models
+# Set up models and keys
 
 Source: guides/configure-ai-models.md
 URL: /guides/configure-ai-models
 
-# Configure AI Models
+Choose which models Chat can use, store their API keys safely, and check that they answer. Keys are kept in your operating system's keychain, never in the vault.
 
-Use model providers when you want chat over note context without giving an agent vault-write tools.
+## Choose an engine first
 
-## Local Models
+**Chat engine** in Settings → AI Agents decides who runs Chat:
 
-Local model targets are for tools such as Ollama and LM Studio. They usually need a base URL and model ID, and they usually do not need an API key.
+- **Off (default):** Prime handles its own provider login. Sign in from Settings → AI Agents → Local agent, or run `prime-agent` in a terminal and use `/login`.
+- **On:** Rhizome's own engine runs new chats with the models you set up below. It doesn't need Prime.
 
-## API Models
+## Add a provider
 
-API model targets are for hosted providers such as OpenAI, Anthropic, Gemini, OpenRouter, or another OpenAI-compatible endpoint.
+Settings → AI Agents has three tabs. **Local model** is for models on your computer. **API model** is for hosted models and holds **Free tier (auto)**.
 
-Rhizome does not store provider API keys in vault settings. Choose one of the supported key paths:
+| Kind | Examples | Needs |
+|---|---|---|
+| Hosted | OpenAI, Anthropic, Gemini, OpenRouter, Groq, Mistral | API key, model ID |
+| Local | Ollama, LM Studio | Base URL, model ID, usually no key |
+| Your own | Any OpenAI-compatible server | Base URL, model ID, optional key and headers |
 
-- Save the key locally on this device.
-- Read the key from an environment variable.
-- Use no key for local providers that do not require one.
+Anthropic models aren't offered by Rhizome's own Chat engine yet.
 
-## Test The Connection
+## Store the key
 
-After adding a provider, use the test action in Settings. A successful test means Rhizome reached the endpoint and the model replied.
+Under **API key storage**, pick one per provider:
 
-## Select The Target
+- **Save locally in Rhizome (recommended).** Paste the key. Rhizome stores it in the system keychain: macOS Keychain, Windows Credential Manager, or Secret Service on Linux. Keys that older versions saved in a settings file move to the keychain the first time they're read.
+- **Read from env var.** Give the variable's name. Rhizome reads the key from it.
+- **No key.** For local servers that don't need one.
 
-Once configured, choose the model from the AI target selector or set it as the default AI target in Settings.
+Don't edit a key file by hand.
+
+## Test the connection
+
+Click **Test model** on the provider. It sends one short request with no tools. If it passes, Settings says "Connection works. The model replied successfully."
+
+## Use free models
+
+**Free tier (auto)**, on the **API model** tab, lets Rhizome pick free hosted models for you and move on when one runs out. Each free provider needs its own key. See [Free models and routing](../concepts/free-models-and-routing.md).
+
+## Pick the model for Chat
+
+Choose a model, or **Free tier (auto)**, in the picker. The choice is saved with your settings.
+
+## If it doesn't connect
+
+See [Model provider connection](../troubleshooting/model-provider-connection.md).

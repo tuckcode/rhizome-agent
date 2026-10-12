@@ -1,15 +1,25 @@
-# AGENTS.md - Rhizome Docs Bundle
+# AGENTS.md: Rhizome docs bundle
 
-This folder contains local, generated Rhizome product docs for AI agents.
+These are Rhizome's product docs. Read them before you answer a question about how Rhizome works, or before you assume how it behaves. Rhizome changes fast, so when a page and the app disagree, trust the app and say so.
 
-Use these docs when a user asks how Rhizome works, when you need product behavior, or before making Rhizome-specific assumptions.
+## Lookup
 
-Portent is the default best-practice model for structuring Rhizome knowledge bases. When a user asks how to improve a knowledge base, make it better organized, choose better types, model relationships, or make the vault easier for humans and agents to use, read `pages/templates/portent.md` and combine it with Rhizome’s docs for types, relationships, properties, Inbox, archive, and custom views.
+1. Read the active vault's `AGENTS.md` for that vault's conventions. Vault conventions win for content; these docs win for product behavior.
+2. Open `index.md` here for the map.
+3. Search this folder with `rg` and open the page that matches the question.
 
-Recommended lookup flow:
+## Where answers live
 
-1. Read the active vault's AGENTS.md for vault-specific conventions.
-2. Read this folder's index.md for the docs map.
-3. Use `rg` over this folder for advanced concepts, workflows, shortcuts, Git, AutoGit, AI, Portent, types, properties, relationships, and troubleshooting.
+- **Engines, models, keys, tools, permission modes:** `pages/concepts/ai.md`, `pages/guides/configure-ai-models.md`
+- **Free tier (auto) and provider fallback:** `pages/concepts/free-models-and-routing.md`
+- **Saving to the vault, recall, Claude Code import:** `pages/concepts/vault-as-memory.md`, `pages/guides/import-a-session.md`
+- **Sessions, resuming and saved chats:** `pages/guides/sessions.md`
+- **Where a Prime run went, which files it touched:** `pages/concepts/mycelium.md`
+- **Install, first launch, opening a vault, preview limits:** `pages/start/`, `pages/reference/platforms-and-updates.md`
+- **Chat fails or a provider won't connect:** `pages/troubleshooting/chat-doesnt-answer.md` and the rest of `pages/troubleshooting/`
+- **Shortcuts:** `pages/reference/keyboard-shortcuts.md`
+- **Structuring a vault (types, relationships, Inbox, views):** `pages/concepts/` and `pages/guides/`; the default structure is Portent, in `pages/guides/structure-with-portent.md`
 
-Vault-specific AGENTS.md wins for local conventions. These bundled docs win for Rhizome product behavior.
+## When you write to the vault
+
+Save what the user asked to keep. Keep secrets out of notes: vault notes are committed and can be pushed.

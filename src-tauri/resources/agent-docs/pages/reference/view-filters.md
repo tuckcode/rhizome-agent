@@ -1,13 +1,11 @@
-# View Filters
+# View filters
 
 Source: reference/view-filters.md
 URL: /reference/view-filters
 
-# View Filters
-
 View filters define saved lists of notes.
 
-## Common Filter Ideas
+## Common filter ideas
 
 | Goal | Filter direction |
 | --- | --- |
@@ -31,7 +29,7 @@ Saved views can combine filters for text, dates, relationship fields, and frontm
 
 Regex filters are available for power-user cases. Keep them narrow and test them on a small view first.
 
-## Keep Views Focused
+## Keep views focused
 
 A view should answer one recurring question. If it becomes too broad, split it into two views.
 
