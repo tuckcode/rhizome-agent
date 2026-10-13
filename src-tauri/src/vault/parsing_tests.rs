@@ -295,6 +295,13 @@ fn test_extract_snippet_skips_agent_prompt_line() {
 }
 
 #[test]
+fn test_extract_snippet_keeps_ordinary_asking_text() {
+    let content = "# Title\n\nAsking the team about the vault layout.\n";
+    let snippet = extract_snippet(content);
+    assert_eq!(snippet, "Asking the team about the vault layout.");
+}
+
+#[test]
 fn test_extract_snippet_paragraph_takes_priority_over_headings() {
     let content = "# Title\n\n## Section One\n\nActual paragraph content.\n\n## Section Two\n";
     let snippet = extract_snippet(content);

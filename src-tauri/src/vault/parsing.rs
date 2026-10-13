@@ -96,7 +96,7 @@ fn strip_frontmatter(content: TextSlice<'_>) -> &str {
 }
 
 fn is_agent_prompt_line(t: &str) -> bool {
-    t.starts_with('→') || t.starts_with("Asking ")
+    t.starts_with("→ Asking ")
 }
 
 /// Check if a line is useful for snippet extraction (not blank, heading, code fence, or rule).
