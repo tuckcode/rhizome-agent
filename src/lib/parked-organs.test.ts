@@ -478,10 +478,10 @@ describe('parked organs leftover', () => {
     expect(layout).toContain('C72 policy lives here: Inbox opens Notes and does not close them.')
   })
 
-  it('toasts Getting Started as created, not cloned', () => {
+  it('toasts Rhizome Vault as created, not cloned', () => {
     const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
-    expect(app).toContain('Getting Started vault created and opened at')
-    expect(app).not.toContain('Getting Started vault cloned and opened')
+    expect(app).toContain('Rhizome Vault created and opened at')
+    expect(app).not.toContain('vault cloned and opened')
   })
 
   it('keeps Tab ghost-text and leaves #51 Case 2 unbuilt', () => {
@@ -539,10 +539,10 @@ describe('parked organs leftover', () => {
       'utf8',
     )
     expect(gs).toContain(
-      'return `Could not create Getting Started vault: ${firstCloneErrorLine(message)}`',
+      'return `Could not create Rhizome Vault: ${firstCloneErrorLine(message)}`',
     )
     expect(gs).toContain(
-      "'Could not download Getting Started vault. Check your connection and try again.'",
+      "'Could not download Rhizome Vault. Check your connection and try again.'",
     )
   })
 

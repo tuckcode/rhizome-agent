@@ -1038,7 +1038,7 @@
         {
           "kind": "command",
           "command": "vaultRestoreGettingStarted",
-          "label": "Restore Getting Started"
+          "label": "Restore Rhizome Vault"
         },
         {
           "kind": "separator"

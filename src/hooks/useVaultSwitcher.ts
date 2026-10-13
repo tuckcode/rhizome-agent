@@ -571,10 +571,10 @@ function formatGettingStartedRestoreError(err: unknown): string {
   ]
 
   if (networkErrors.some(fragment => message.includes(fragment))) {
-    return 'Getting Started requires internet. Clone it later.'
+    return 'Rhizome Vault requires internet. Clone it later.'
   }
 
-  return `Could not prepare Getting Started vault: ${message}`
+  return `Could not prepare Rhizome Vault: ${message}`
 }
 
 function formatCreateEmptyVaultError(err: unknown): string {
@@ -1185,7 +1185,7 @@ async function restoreGettingStartedVault({
   switchVault,
 }: RestoreGettingStartedOptions) {
   if (!defaultPath) {
-    onToastRef.current('Could not resolve the Getting Started vault path')
+    onToastRef.current('Could not resolve the Rhizome Vault path')
     return
   }
 
@@ -1194,7 +1194,7 @@ async function restoreGettingStartedVault({
     setDefaultAvailable(true)
     setHiddenDefaults(previousHidden => previousHidden.filter(path => path !== defaultPath))
     switchVault(defaultPath)
-    onToastRef.current('Getting Started vault ready')
+    onToastRef.current('Rhizome Vault ready')
   } catch (err) {
     onToastRef.current(formatGettingStartedRestoreError(err))
   }

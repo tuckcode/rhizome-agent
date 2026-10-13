@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { formatShortcutDisplay } from '../appCommandCatalog'
 import { TOGGLE_GITIGNORED_VISIBILITY_EVENT } from '../../lib/gitignoredVisibilityEvents'
+import { createTranslator } from '../../lib/i18n'
 import { buildSettingsCommands } from './settingsCommands'
 
 function findCommand(id: string, commands = buildSettingsCommands({ onOpenSettings: vi.fn() })) {
@@ -141,6 +142,28 @@ describe('buildSettingsCommands', () => {
     expect(commands.find((item) => item.id === 'use-system-theme-mode')).toMatchObject({
       label: '使用系统主题',
     })
+  })
+
+  it('reads the restore command label from the locale string', () => {
+    const t = createTranslator('en')
+    const onRestoreGettingStarted = vi.fn()
+    const commands = buildSettingsCommands({
+      onOpenSettings: vi.fn(),
+      isGettingStartedHidden: true,
+      onRestoreGettingStarted,
+    })
+    const command = commands.find((item) => item.id === 'restore-getting-started')
+
+    expect(t('command.settings.restoreGettingStarted')).toBe('Restore Rhizome Vault')
+    expect(command).toMatchObject({
+      label: t('command.settings.restoreGettingStarted'),
+      enabled: true,
+      group: 'Settings',
+    })
+    expect(command?.label).not.toBe('Restore Getting Started Vault')
+
+    command?.execute()
+    expect(onRestoreGettingStarted).toHaveBeenCalledTimes(1)
   })
 
   it('adds a create-empty-vault command when the handler is available', () => {

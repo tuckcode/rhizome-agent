@@ -11,7 +11,7 @@ describe('leftover Getting Started scaffold errors', () => {
     expect(source).toContain("'Failed to create scaffold folder'")
   })
 
-  it('locks Could not create Getting Started vault', () => {
-    expect(source).toContain('Could not create Getting Started vault')
+  it('locks Could not create Rhizome Vault', () => {
+    expect(source).toContain('Could not create Rhizome Vault')
   })
 })

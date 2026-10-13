@@ -12,7 +12,7 @@ interface PersistedState {
   vaults: Array<{ label: string; path: string }>
 }
 
-const GETTING_STARTED_PATH = '/Users/mock/Documents/Getting Started'
+const RHIZOME_VAULT_PATH = '/Users/mock/Documents/Rhizome Vault'
 const STATE_KEY = 'tolaria:test-vault-state'
 
 async function installOnboardingVaultMocks(page: Page, config: MockConfig) {
@@ -104,7 +104,7 @@ async function installOnboardingVaultMocks(page: Page, config: MockConfig) {
           })
           return null
         }
-        ref.get_default_vault_path = () => '/Users/mock/Documents/Getting Started'
+        ref.get_default_vault_path = () => '/Users/mock/Documents/Rhizome Vault'
         ref.check_vault_exists = (args: { path?: string | null }) => {
           const state = readState()
           return !!args.path && state.availablePaths.includes(args.path)
@@ -180,7 +180,7 @@ test('opening an existing vault from onboarding persists the selection and survi
   await expect(page.getByTestId('note-list-container')).toBeVisible()
 })
 
-test('cloning Getting Started from onboarding persists the default vault and survives reload @smoke', async ({ page }) => {
+test('creating Rhizome Vault from onboarding persists the default vault and survives reload @smoke', async ({ page }) => {
   await installOnboardingVaultMocks(page, {
     availablePaths: [],
     promptPath: 'file:///Users/mock/Documents',
@@ -192,14 +192,14 @@ test('cloning Getting Started from onboarding persists the default vault and sur
   await page.getByTestId('welcome-create-vault').click()
 
   await expect(page.getByTestId('note-list-container')).toBeVisible({ timeout: 5_000 })
-  await expect(page.getByTestId('status-vault-trigger')).toContainText('Getting Started')
+  await expect(page.getByTestId('status-vault-trigger')).toContainText('Rhizome Vault')
 
-  await expect.poll(async () => (await readPersistedState(page)).active_vault).toBe(GETTING_STARTED_PATH)
-  await expect.poll(async () => (await readPersistedState(page)).availablePaths).toEqual([GETTING_STARTED_PATH])
+  await expect.poll(async () => (await readPersistedState(page)).active_vault).toBe(RHIZOME_VAULT_PATH)
+  await expect.poll(async () => (await readPersistedState(page)).availablePaths).toEqual([RHIZOME_VAULT_PATH])
 
   await page.reload({ waitUntil: 'domcontentloaded' })
 
   await expect(page.getByTestId('welcome-screen')).not.toBeVisible()
-  await expect(page.getByTestId('status-vault-trigger')).toContainText('Getting Started')
+  await expect(page.getByTestId('status-vault-trigger')).toContainText('Rhizome Vault')
   await expect(page.getByTestId('note-list-container')).toBeVisible()
 })

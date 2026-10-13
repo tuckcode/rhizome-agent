@@ -43,9 +43,9 @@ describe('shell column edges', () => {
     expect(appSource).toContain("data-compact-sessions={compactSessions ? 'true' : 'false'}")
   })
 
-  it('toasts Getting Started as created, not cloned', () => {
-    expect(appSource).toContain('Getting Started vault created and opened at')
-    expect(appSource).not.toContain('Getting Started vault cloned and opened')
+  it('toasts Rhizome Vault as created, not cloned', () => {
+    expect(appSource).toContain('Rhizome Vault created and opened at')
+    expect(appSource).not.toContain('vault cloned and opened')
   })
 
   it('mounts Graph/Mycelium with Notes, not only on Changes', () => {
