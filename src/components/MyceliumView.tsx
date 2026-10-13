@@ -8,10 +8,14 @@ import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import { useDocumentThemeMode } from '../hooks/useDocumentThemeMode'
 import { usePanelWidth } from '../hooks/usePanelWidth'
 import { ResizeHandle } from './ResizeHandle'
+import { PeerToolExitButton } from './PeerToolExitButton'
+import { PEER_TOOL_EXIT_CHAT } from '../lib/peerToolExit'
 
 interface MyceliumViewProps {
   locale?: AppLocale
   onExit?: () => void
+  /** Names the surface this button restores. Defaults to chat. */
+  exitLabel?: string
   /** When set, show this session only. Rail overview leaves it empty. */
   focusSessionPath?: string | null
 }
@@ -35,6 +39,7 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
 export default function MyceliumView({
   locale = 'en',
   onExit,
+  exitLabel = PEER_TOOL_EXIT_CHAT,
   focusSessionPath = null,
 }: MyceliumViewProps) {
   const t = createTranslator(locale)
@@ -109,9 +114,7 @@ export default function MyceliumView({
           {t('mycelium.retry')}
         </Button>
         {onExit ? (
-          <Button type="button" variant="ghost" size="sm" onClick={onExit} data-testid="mycelium-close">
-            {t('mycelium.close')}
-          </Button>
+          <PeerToolExitButton label={exitLabel} onClick={onExit} testId="mycelium-close" />
         ) : null}
       </div>
 

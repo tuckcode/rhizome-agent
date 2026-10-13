@@ -29,7 +29,7 @@ it('shows one view at a time and can close it', async () => {
   fireEvent.click(screen.getByRole('tab', { name: 'Mycelium' }))
   expect(await screen.findByText('Recorded actions')).toBeVisible()
   expect(screen.queryByText('Graph canvas')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Close connections' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Back to notes' }))
   expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
 })
 it('tears down the inactive renderer when switching views', async () => {
@@ -88,22 +88,30 @@ it('honours a requested view passed as a prop on first mount', async () => {
  * handle up must make the panel taller. `usePanelWidth.resizeBy` already
  * treats a negative delta as growth, which matches a top-edge drag.
  */
-it('stays closed when both views were turned off, until one is opened', async () => {
+it('stays closed when both views were turned off, even if one is requested', async () => {
   localStorage.setItem('rhizome:connections-placement:v1', JSON.stringify({ graph: 'off', mycelium: 'off' }))
   const ref = createRef<ConnectionsPanelHandle>()
   render(<ConnectionsPanel ref={ref} vaultPath="/vault" />)
   expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
   act(() => { ref.current?.openView('graph') })
-  expect(await screen.findByRole('tab', { name: 'Graph' })).toBeInTheDocument()
+  expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
+  expect(screen.queryByText('Enable Graph')).not.toBeInTheDocument()
 })
 
-it('opens Mycelium from the notes-chrome shortcut and turns the view back on', async () => {
+it('does not reopen Mycelium from the notes-chrome shortcut when placement is off', async () => {
   localStorage.setItem('rhizome:connections-placement:v1', JSON.stringify({ graph: 'sidebar', mycelium: 'off' }))
   render(<ConnectionsPanel vaultPath="/vault" />)
   expect(screen.queryByRole('tab', { name: 'Mycelium' })).not.toBeInTheDocument()
   act(() => {
     window.dispatchEvent(new CustomEvent('rhizome:notes-chrome', { detail: 'mycelium' }))
   })
-  expect(await screen.findByRole('tab', { name: 'Mycelium' })).toBeInTheDocument()
-  expect(await screen.findByText('Recorded actions')).toBeVisible()
+  expect(screen.queryByRole('tab', { name: 'Mycelium' })).not.toBeInTheDocument()
+  expect(screen.queryByText('Enable Mycelium')).not.toBeInTheDocument()
+})
+
+it('names the notes origin on the shared exit control', async () => {
+  const ref = createRef<ConnectionsPanelHandle>()
+  render(<ConnectionsPanel ref={ref} vaultPath="/vault" />)
+  act(() => { ref.current?.openView('graph') })
+  expect(await screen.findByRole('button', { name: 'Back to notes' })).toBeInTheDocument()
 })

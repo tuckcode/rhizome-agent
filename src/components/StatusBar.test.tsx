@@ -121,10 +121,17 @@ describe('StatusBar', () => {
   })
 
   it('shows Research and Settings by default (legacy shell, no command rail)', () => {
-    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} onOpenResearch={vi.fn()} onOpenSettings={vi.fn()} />)
+    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} onOpenResearch={vi.fn()} onOpenSettings={vi.fn()} onClickGraph={vi.fn()} onClickMycelium={vi.fn()} />)
     expect(screen.getByTestId('status-graph')).toBeInTheDocument()
     expect(screen.getByTestId('status-mycelium')).toBeInTheDocument()
     expect(screen.getByTestId('status-research')).toBeInTheDocument()
+    expect(screen.getByTestId('status-settings')).toBeInTheDocument()
+  })
+
+  it('hides Graph and Mycelium when those destinations are turned off', () => {
+    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} onOpenResearch={vi.fn()} onOpenSettings={vi.fn()} />)
+    expect(screen.queryByTestId('status-graph')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('status-mycelium')).not.toBeInTheDocument()
     expect(screen.getByTestId('status-settings')).toBeInTheDocument()
   })
 
@@ -134,6 +141,7 @@ describe('StatusBar', () => {
     expect(screen.queryByTestId('status-mycelium')).not.toBeInTheDocument()
     expect(screen.queryByTestId('status-research')).not.toBeInTheDocument()
     expect(screen.queryByTestId('status-settings')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Open settings' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Switch vault' })).toBeInTheDocument()
   })
 

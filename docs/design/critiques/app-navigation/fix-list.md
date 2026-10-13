@@ -2,7 +2,7 @@
 
 Source critique: [2026-10-10-design.md](./2026-10-10-design.md). When a new version comes in, change the status to `fixed` or `won't fix` instead of deleting the row.
 
-**Open:** 1 worth fixing · 3 minor · first slice 2026-10-11 (Views group on the rail)
+**Open:** 0 worth fixing · 0 minor · first slice 2026-10-11 (Views group on the rail)
 
 | ID | Severity | Category | Finding | Fix (tokens) | Status | First seen |
 |---|---|---|---|---|---|---|
@@ -14,9 +14,9 @@ Source critique: [2026-10-10-design.md](./2026-10-10-design.md). When a new vers
 | A-W5 | worth fixing | interaction and states | Session "Node map" and note "Mycelium report" ignore their target | Pass the path, or remove | fixed | 2026-10-10 |
 | A-W6 | worth fixing | hierarchy and layout | Composer + menu mixes attach with Research/Mycelium | + menu = message inputs only | fixed | 2026-10-10 |
 | A-W7 | worth fixing | visual design | Research = Sparkle (anti-pattern); Graph = ShareNetwork | MagnifyingGlassPlus/Books; Phosphor `Graph`; GitDiff; ClockCounterClockwise | fixed | 2026-10-10 |
-| A-W8 | worth fixing | interaction and states | Peer tools open in 3 different containers; all exit "Back to chat" | Main area + rail current state; "← {origin}"; ⌘[ / Esc | open | 2026-10-10 |
+| A-W8 | worth fixing | interaction and states | Peer tools open in 3 different containers; all exit "Back to chat" | Main area + rail current state; "← {origin}"; ⌘[ / Esc | fixed | 2026-10-10 |
 | A-W9 | worth fixing | hierarchy and layout | Changes among note filters, no count, hard-coded English | Move to rail Views with a `--muted` count badge | fixed | 2026-10-10 |
-| A-M1 | minor | hierarchy and layout | Settings ×5, two gears visible at once | Rail footer + menu + ⌘, only | open | 2026-10-10 |
-| A-M2 | minor | hierarchy and layout | Contribute/Docs in the status bar | Help menu + ⌘K | open | 2026-10-10 |
-| A-M3 | minor | interaction and states | Placement "off" still shows entry points that lead to "Enable…" | Hide or disable the rail item with a tooltip | open | 2026-10-10 |
-| A-M4 | minor | interaction and states | View menu order ⌘1, ⌘2, ⌘4, ⌘3 | Re-key to 1–4 in menu order | open | 2026-10-10 |
+| A-M1 | minor | hierarchy and layout | Settings ×5, two gears visible at once | Rail footer + menu + ⌘, only | fixed | 2026-10-10 |
+| A-M2 | minor | hierarchy and layout | Contribute/Docs in the status bar | Help menu + ⌘K | fixed | 2026-10-10 |
+| A-M3 | minor | interaction and states | Placement "off" still shows entry points that lead to "Enable…" | Hide or disable the rail item with a tooltip | fixed | 2026-10-10 |
+| A-M4 | minor | interaction and states | View menu order ⌘1, ⌘2, ⌘4, ⌘3 | Re-key to 1–4 in menu order | fixed | 2026-10-10 |

@@ -31,6 +31,8 @@ import {
   BookOpenText, Sparkle, Question,
   ClockClockwise, WarningCircle
 } from '@phosphor-icons/react'
+import { PeerToolExitButton } from './PeerToolExitButton'
+import { PEER_TOOL_EXIT_CHAT } from '../lib/peerToolExit'
 
 interface LibraryItem {
   id: string
@@ -71,6 +73,8 @@ interface ResearchPanelProps {
    *  preflight (most tests, and any embedder that hasn't wired status yet)
    *  see the pre-existing always-ready behavior. */
   aiAgentsStatus?: AiAgentsStatus
+  /** Names the surface the exit button restores. Defaults to chat. */
+  exitLabel?: string
 }
 
 const EMPTY_SETTINGS: Settings = {
@@ -129,7 +133,7 @@ function parseAskResults(raw: string): AskResult[] {
   }
 }
 
-export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, vaults = [], onSetDefaultDestination, onOpenNote, locale = 'en', settings = EMPTY_SETTINGS, aiAgentsStatus = ALL_AGENTS_INSTALLED_STATUS }: ResearchPanelProps) {
+export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, vaults = [], onSetDefaultDestination, onOpenNote, locale = 'en', settings = EMPTY_SETTINGS, aiAgentsStatus = ALL_AGENTS_INSTALLED_STATUS, exitLabel = PEER_TOOL_EXIT_CHAT }: ResearchPanelProps) {
   const t = useMemo(() => createTranslator(locale), [locale])
   // Generate/Import/Distill all currently run through the same resolved
   // target — preflight it once so a missing/unauthenticated CLI blocks
@@ -537,9 +541,7 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
               <Sparkle weight="bold" className="w-5 h-5 text-muted-foreground" />
               {t('research.title')}
             </h2>
-            <Button type="button" variant="ghost" size="sm" onClick={onClose} data-testid="research-exit">
-              {t('research.exit')}
-            </Button>
+            <PeerToolExitButton label={exitLabel} onClick={onClose} testId="research-exit" />
             </div>
             {destinationVaultPath ? (
               <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">

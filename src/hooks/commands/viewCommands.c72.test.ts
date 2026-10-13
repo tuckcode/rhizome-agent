@@ -80,4 +80,24 @@ describe('C72 view labels', () => {
     )
     expect(readItem && 'label' in readItem ? readItem.label : null).toBe('Read')
   })
+
+  it('lists Chat, Notes, Workbench, Read so the View menu reads 1, 2, 3, 4', () => {
+    const viewMenu = appCommandManifest.menus.find((menu) => menu.label === 'View')
+    const layoutIds = ['viewEditorOnly', 'viewEditorList', 'viewAll', 'viewRead'] as const
+    const layoutItems = (viewMenu?.items ?? []).filter((item) => {
+      if (item.kind !== 'command' || !('command' in item)) return false
+      const command = item.command
+      return typeof command === 'string' && layoutIds.includes(command as typeof layoutIds[number])
+    })
+    expect(layoutItems.map((item) => 'command' in item ? item.command : null)).toEqual([
+      'viewEditorOnly',
+      'viewEditorList',
+      'viewAll',
+      'viewRead',
+    ])
+    expect(appCommandManifest.commands.viewEditorOnly.shortcut?.key).toBe('1')
+    expect(appCommandManifest.commands.viewEditorList.shortcut?.key).toBe('2')
+    expect(appCommandManifest.commands.viewAll.shortcut?.key).toBe('3')
+    expect(appCommandManifest.commands.viewRead.shortcut?.key).toBe('4')
+  })
 })

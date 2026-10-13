@@ -74,6 +74,14 @@ describe('CommandRail', () => {
     )
   })
 
+  it('hides a view whose placement is off', () => {
+    renderRail({ hiddenViewIds: ['graph', 'mycelium'] })
+    expect(screen.getByTestId('command-rail-research')).toBeInTheDocument()
+    expect(screen.queryByTestId('command-rail-graph')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('command-rail-mycelium')).not.toBeInTheDocument()
+    expect(screen.getByTestId('command-rail-history')).toBeInTheDocument()
+  })
+
   it('opens settings from the gear', () => {
     const props = renderRail()
 

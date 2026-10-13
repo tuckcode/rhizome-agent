@@ -33,6 +33,7 @@ interface CommandRailProps {
   onWidthChange?: (delta: number) => void
   onOpenSettings: () => void
   onSelectView: (view: RailViewId) => void
+  hiddenViewIds?: readonly RailViewId[]
   activeView?: RailViewId | null
   /** Expanded rail's open middle, where Chat mounts its session list. */
   onSessionsSlotReady?: (slot: HTMLDivElement | null) => void
@@ -162,6 +163,7 @@ export function CommandRail({
   pinned, autoCollapsed = false, onPinnedChange, width, onWidthChange,
   onOpenSettings,
   onSelectView,
+  hiddenViewIds = [],
   activeView = null,
   onSessionsSlotReady,
   onLayoutWidthChange,
@@ -488,7 +490,7 @@ export function CommandRail({
             Views
           </div>
         ) : null}
-        {RAIL_VIEWS.map((view) => (
+        {RAIL_VIEWS.filter((view) => !hiddenViewIds.includes(view.id)).map((view) => (
           <RailButton
             key={view.id}
             active={activeView === view.id}

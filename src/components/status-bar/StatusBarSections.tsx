@@ -654,11 +654,11 @@ export function StatusBarSecondarySection({
           </Button>
         </ActionTooltip>
       )}
-      {!commandRailActive ? (
-        <>
-          <ClassicViewButton compact={compact} icon={Graph} label="Graph" onClick={onClickGraph} testId="status-graph" />
-          <ClassicViewButton compact={compact} icon={CirclesThree} label="Mycelium" onClick={onClickMycelium} testId="status-mycelium" />
-        </>
+      {!commandRailActive && onClickGraph ? (
+        <ClassicViewButton compact={compact} icon={Graph} label="Graph" onClick={onClickGraph} testId="status-graph" />
+      ) : null}
+      {!commandRailActive && onClickMycelium ? (
+        <ClassicViewButton compact={compact} icon={CirclesThree} label="Mycelium" onClick={onClickMycelium} testId="status-mycelium" />
       ) : null}
       {!commandRailActive && onOpenResearch ? <ResearchButton compact={compact} locale={locale} onOpenResearch={onOpenResearch} /> : null}
       <BuildNumberButton buildNumber={buildNumber} onCheckForUpdates={onCheckForUpdates} compact={compact} locale={locale} />

@@ -9,6 +9,8 @@ import { COMMAND_RAIL_WIDTH_PX, overlayTitleBarBandStyle, railConsumesExpandedWi
 import { Sidebar } from './components/Sidebar'
 import { CommandRail } from './components/CommandRail'
 import type { RailViewId } from './lib/railViews'
+import { peerToolExitLabel, peerToolOriginFromNote, type PeerToolOrigin } from './lib/peerToolExit'
+import { useConnectionsPlacements } from './lib/connectionsPlacement'
 import { NoteList } from './components/NoteList'
 import {
   VaultPanel,
@@ -543,6 +545,16 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     !chatCentered &&
     effectiveSelection.kind === 'filter' &&
     effectiveSelection.filter === 'chat'
+  const [peerToolOrigin, setPeerToolOrigin] = useState<PeerToolOrigin>('chat')
+  const openNotePathRef = useRef<string | null>(null)
+  const rememberPeerToolOrigin = useCallback(() => {
+    setPeerToolOrigin(peerToolOriginFromNote(Boolean(openNotePathRef.current)))
+  }, [])
+  const peerToolExit = peerToolExitLabel(peerToolOrigin)
+  const connectionsPlacements = useConnectionsPlacements()
+  const hiddenRailViewIds = (['graph', 'mycelium'] as const).filter(
+    (view) => connectionsPlacements[view] === 'off',
+  )
   const handleRailSelectChat = useCallback(() => {
     if (isGraphDestination || isMyceliumDestination || isResearchDestination) {
       handleSetSelection({
@@ -577,8 +589,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       handleRailSelectChat()
       return
     }
+    rememberPeerToolOrigin()
     handleSetSelection({ kind: 'filter', filter: 'research' })
-  }, [handleRailSelectChat, handleSetSelection, isResearchDestination])
+  }, [handleRailSelectChat, handleSetSelection, isResearchDestination, rememberPeerToolOrigin])
   // Graph, Mycelium, and Research are rail View destinations (full-page
   // canvas). Contextual "Show in Graph / Mycelium" still uses Connections.
   const connectionsPanelRef = useRef<ConnectionsPanelHandle>(null)
@@ -600,14 +613,16 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     handleSetSelection({ kind: 'filter', filter: 'pulse' })
   }, [handleSetSelection])
   const handleRailSelectMycelium = useCallback(() => {
+    rememberPeerToolOrigin()
     handleSetSelection({ kind: 'filter', filter: 'mycelium' })
-  }, [handleSetSelection])
+  }, [handleSetSelection, rememberPeerToolOrigin])
   const handleSelectRailView = useCallback((view: RailViewId) => {
     if (view === 'research') {
       handleRailSelectResearch()
       return
     }
     if (view === 'graph') {
+      rememberPeerToolOrigin()
       handleSetSelection({ kind: 'filter', filter: 'graph' })
       return
     }
@@ -621,6 +636,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     handleRailSelectMycelium,
     handleRailSelectResearch,
     handleSetSelection,
+    rememberPeerToolOrigin,
   ])
   const activeRailView: RailViewId | null =
     isResearchDestination
@@ -1622,6 +1638,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   })
   const activeTabEntry = activeTab?.entry ?? null
   const activeTabPath = activeTabEntry?.path
+  useEffect(() => {
+    openNotePathRef.current = activeTabPath ?? null
+  }, [activeTabPath])
   const handleAskChatAboutExcerpt = useCallback((excerpt: string) => {
     const title = activeTabEntry?.title || activeTabEntry?.filename || 'this note'
     prefillAiComposer(formatAskChatExcerpt(title, excerpt))
@@ -1698,6 +1717,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     collapseNotes()
   }, [collapseNotes])
   const handleRailSelectGraph = useCallback(() => {
+    if (connectionsPlacements.graph === 'off') return
+    rememberPeerToolOrigin()
     if (chatCentered) {
       ensureNotesOpen()
       handleRailSelectChanges()
@@ -1706,8 +1727,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       return
     }
     handleSetSelection(toggleGraphSelection(effectiveSelection, vaultConfig.inbox?.explicitOrganization))
-  }, [chatCentered, ensureNotesOpen, handleRailSelectChanges, handleSetSelection, effectiveSelection, setConnectionsRequest, vaultConfig.inbox?.explicitOrganization])
+  }, [chatCentered, connectionsPlacements.graph, ensureNotesOpen, handleRailSelectChanges, handleSetSelection, effectiveSelection, rememberPeerToolOrigin, setConnectionsRequest, vaultConfig.inbox?.explicitOrganization])
   const handleOpenSessionFootprint = useCallback((path: string) => {
+    if (connectionsPlacements.mycelium === 'off') return
+    rememberPeerToolOrigin()
     if (chatCentered) {
       ensureNotesOpen()
       handleRailSelectChanges()
@@ -1717,7 +1740,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     }
     setMyceliumFocusPath(path)
     handleSetSelection({ kind: 'filter', filter: 'mycelium' })
-  }, [chatCentered, ensureNotesOpen, handleRailSelectChanges, handleSetSelection, setConnectionsRequest])
+  }, [chatCentered, connectionsPlacements.mycelium, ensureNotesOpen, handleRailSelectChanges, handleSetSelection, rememberPeerToolOrigin, setConnectionsRequest])
   const handleSelectNoteForPdfExport = notes.handleSelectNote
   const handleExportNotePdfFromList = useCallback((entry: VaultEntry) => {
     if (!isMarkdownEntry(entry)) return
@@ -2116,6 +2139,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           locale={appLocale}
           requestedView={connectionsRequest}
           canOpenNote={vaultBridge.canOpenNoteByPath}
+          exitLabel={peerToolExit}
           onOpenNote={path => {
             handleRailSelectChat()
             vaultBridge.openNoteByPath(path)
@@ -2191,6 +2215,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               onWidthChange={chatCentered ? delta => resizeColumn('rail', delta) : undefined}
               onOpenSettings={handleOpenSettings}
               onSelectView={handleSelectRailView}
+              hiddenViewIds={hiddenRailViewIds}
               activeView={activeRailView}
               onSessionsSlotReady={setSessionRailSlot}
             />
@@ -2345,14 +2370,14 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                   <GraphView vaultPath={resolvedPath} onOpenNote={(path) => {
                     vaultBridge.openNoteByPath(path)
                     handleRailSelectChat()
-                  }} locale={appLocale} onExit={handleRailSelectChat} />
+                  }} locale={appLocale} onExit={handleRailSelectChat} exitLabel={peerToolExit} />
                 </Suspense>
                 {effectiveShowAIChat && aiWorkspaceSurface}
               </div>
             ) : isMyceliumDestination ? (
               <div className="relative flex flex-1 min-h-0">
                 <Suspense fallback={<div className="flex h-full flex-1 items-center justify-center text-sm text-muted-foreground" data-testid="mycelium-suspense">{translate(appLocale, 'mycelium.title')}</div>}>
-                  <MyceliumView locale={appLocale} onExit={handleRailSelectChat} focusSessionPath={myceliumFocusPath} />
+                  <MyceliumView locale={appLocale} onExit={handleRailSelectChat} exitLabel={peerToolExit} focusSessionPath={myceliumFocusPath} />
                 </Suspense>
                 {effectiveShowAIChat && aiWorkspaceSurface}
               </div>
@@ -2361,6 +2386,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                 <ResearchPanel
                   open
                   onClose={handleRailSelectChat}
+                  exitLabel={peerToolExit}
                   vaultPath={resolvedPath}
                   agentMemoryVaultPath={settings.agent_memory_vault_path}
                   vaults={vaultSwitcher.allVaults}
@@ -2466,7 +2492,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         </div>
         <UpdateBanner status={updateStatus} actions={updateActions} locale={appLocale} />
         <RenameDetectedBanner renames={detectedRenames} onUpdate={handleUpdateWikilinks} onDismiss={handleDismissRenames} />
-        <StatusBar noteCount={visibleEntries.length} modifiedCount={gitModifiedCount} vaultPath={resolvedPath} defaultWorkspacePath={defaultWorkspacePath} vaults={vaultSwitcher.allVaults} multiWorkspaceEnabled={multiWorkspaceEnabled} onSwitchVault={vaultSwitcher.switchVault} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onOpenSettings={handleOpenSettings} onOpenVaultSettings={handleOpenVaultSettings} onOpenResearch={handleRailSelectResearch} onOpenLocalFolder={vaultSwitcher.handleOpenLocalFolder} onCreateEmptyVault={vaultSwitcher.handleCreateEmptyVault} onCloneVault={dialogs.openCloneVault} onCloneGettingStarted={cloneGettingStartedVault} onClickPending={() => handleSetSelection({ kind: 'filter', filter: 'changes' })} onClickPulse={() => handleSetSelection({ kind: 'filter', filter: 'pulse' })} onClickGraph={handleRailSelectGraph} onClickMycelium={handleRailSelectMycelium} onCommitPush={handleCommitPush} commitActionPending={commitFlow.isOpeningCommitDialog} gitFeaturesEnabled={gitFeaturesEnabled} onInitializeGit={openGitSetupDialog} isOffline={networkStatus.isOffline} isGitVault={isGitVault} isVaultReloading={vault.isReloading || isVaultContentLoading} syncStatus={autoSync.syncStatus} lastSyncTime={autoSync.lastSyncTime} conflictCount={autoSync.conflictFiles.length} remoteStatus={autoSync.remoteStatus} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.syncRepositoryPath} onRepositoryChange={gitSurfaces.setSyncRepositoryPath} onTriggerSync={handlePullSelectedRepository} onPullAndPush={handlePullAndPushSelectedRepository} onOpenConflictResolver={conflictFlow.handleOpenConflictResolver} zoomLevel={zoom.zoomLevel} themeMode={documentThemeMode} onZoomReset={zoom.zoomReset} onToggleThemeMode={settingsLoaded ? handleToggleThemeMode : undefined} buildNumber={buildNumber} onCheckForUpdates={handleCheckForUpdates} versionUpdateIndicator={versionUpdateIndicator} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} mcpStatus={mcpSetupDialog.status} onInstallMcp={mcpSetupDialog.openDialog} commandRailActive={commandRailEnabled} locale={appLocale} />
+        <StatusBar noteCount={visibleEntries.length} modifiedCount={gitModifiedCount} vaultPath={resolvedPath} defaultWorkspacePath={defaultWorkspacePath} vaults={vaultSwitcher.allVaults} multiWorkspaceEnabled={multiWorkspaceEnabled} onSwitchVault={vaultSwitcher.switchVault} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onOpenSettings={handleOpenSettings} onOpenVaultSettings={handleOpenVaultSettings} onOpenResearch={handleRailSelectResearch} onOpenLocalFolder={vaultSwitcher.handleOpenLocalFolder} onCreateEmptyVault={vaultSwitcher.handleCreateEmptyVault} onCloneVault={dialogs.openCloneVault} onCloneGettingStarted={cloneGettingStartedVault} onClickPending={() => handleSetSelection({ kind: 'filter', filter: 'changes' })} onClickPulse={() => handleSetSelection({ kind: 'filter', filter: 'pulse' })} onClickGraph={connectionsPlacements.graph === 'off' ? undefined : handleRailSelectGraph} onClickMycelium={connectionsPlacements.mycelium === 'off' ? undefined : handleRailSelectMycelium} onCommitPush={handleCommitPush} commitActionPending={commitFlow.isOpeningCommitDialog} gitFeaturesEnabled={gitFeaturesEnabled} onInitializeGit={openGitSetupDialog} isOffline={networkStatus.isOffline} isGitVault={isGitVault} isVaultReloading={vault.isReloading || isVaultContentLoading} syncStatus={autoSync.syncStatus} lastSyncTime={autoSync.lastSyncTime} conflictCount={autoSync.conflictFiles.length} remoteStatus={autoSync.remoteStatus} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.syncRepositoryPath} onRepositoryChange={gitSurfaces.setSyncRepositoryPath} onTriggerSync={handlePullSelectedRepository} onPullAndPush={handlePullAndPushSelectedRepository} onOpenConflictResolver={conflictFlow.handleOpenConflictResolver} zoomLevel={zoom.zoomLevel} themeMode={documentThemeMode} onZoomReset={zoom.zoomReset} onToggleThemeMode={settingsLoaded ? handleToggleThemeMode : undefined} buildNumber={buildNumber} onCheckForUpdates={handleCheckForUpdates} versionUpdateIndicator={versionUpdateIndicator} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} mcpStatus={mcpSetupDialog.status} onInstallMcp={mcpSetupDialog.openDialog} commandRailActive={commandRailEnabled} locale={appLocale} />
         <GitSetupDialog open={gitFeaturesEnabled && shouldShowGitSetupDialog} onInitGit={handleInitGitRepo} onDismiss={dismissGitSetupDialog} onNeverForVault={neverForVaultGitSetupDialog} />
         <DeleteProgressNotice count={deleteActions.pendingDeleteCount} />
         <Toast

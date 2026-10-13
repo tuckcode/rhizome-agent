@@ -238,6 +238,20 @@
         "accelerator": "CmdOrCtrl+3"
       }
     },
+    "viewRead": {
+      "id": "view-read",
+      "route": {
+        "kind": "handler",
+        "handler": "onReadLayout"
+      },
+      "menuOwned": true,
+      "shortcut": {
+        "combo": "command-or-ctrl",
+        "key": "4",
+        "display": "\u23184",
+        "accelerator": "CmdOrCtrl+4"
+      }
+    },
     "viewToggleProperties": {
       "id": "view-toggle-properties",
       "route": {
@@ -707,20 +721,6 @@
       },
       "menuOwned": true
     },
-    "viewRead": {
-      "id": "view-read",
-      "route": {
-        "kind": "handler",
-        "handler": "onReadLayout"
-      },
-      "menuOwned": true,
-      "shortcut": {
-        "combo": "command-or-ctrl",
-        "key": "4",
-        "display": "\u23184",
-        "accelerator": "CmdOrCtrl+4"
-      }
-    },
     "viewResetLayout": {
       "id": "view-reset-layout",
       "route": {
@@ -844,13 +844,13 @@
         },
         {
           "kind": "command",
-          "command": "viewRead",
-          "label": "Read"
+          "command": "viewAll",
+          "label": "Workbench"
         },
         {
           "kind": "command",
-          "command": "viewAll",
-          "label": "Workbench"
+          "command": "viewRead",
+          "label": "Read"
         },
         {
           "kind": "command",
