@@ -252,6 +252,12 @@ describe('GraphView', () => {
     expect(source).toContain('canvasRef.current?.flyToNode(id)')
   })
 
+  it('reads the live orbit target instead of a stale look-at origin', () => {
+    const source = readFileSync(`${process.cwd()}/src/components/graph/ForceGraph3DCanvas.tsx`, 'utf8')
+    expect(source).toContain('lookAtFromControls(graph.controls())')
+    expect(source).not.toContain('lastLookAtRef')
+  })
+
   it('makes the graph host a labelled, focusable application surface', async () => {
     await renderGraph()
     const host = screen.getByTestId('graph-canvas-host')

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MIN_CAMERA_DISTANCE, clampedCameraPosition, panCameraToNode } from './cameraFraming'
+import { MIN_CAMERA_DISTANCE, clampedCameraPosition, lookAtFromControls, panCameraToNode } from './cameraFraming'
 
 describe('clampedCameraPosition', () => {
   // C63: zoomToFit frames the graph's bounding box, and a single node is a
@@ -61,6 +61,22 @@ describe('panCameraToNode', () => {
     )
     expect(next.lookAt).toEqual({ x: 5, y: -3, z: 2 })
     expect(next.camera).toEqual({ x: 15, y: 17, z: 82 })
+  })
+})
+
+describe('lookAtFromControls', () => {
+  it('reads the orbit target so a hop after fit or drag keeps heading', () => {
+    expect(lookAtFromControls({ target: { x: 4, y: -2, z: 9 } })).toEqual({
+      x: 4,
+      y: -2,
+      z: 9,
+    })
+  })
+
+  it('returns null when the controls have no usable target', () => {
+    expect(lookAtFromControls(null)).toBeNull()
+    expect(lookAtFromControls({})).toBeNull()
+    expect(lookAtFromControls({ target: { x: Number.NaN, y: 0, z: 0 } })).toBeNull()
   })
 })
 

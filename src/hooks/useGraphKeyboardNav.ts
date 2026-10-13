@@ -48,6 +48,11 @@ function isActionTarget(target: EventTarget | null): boolean {
   return host != null
 }
 
+function eventInDialog(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return target.closest('[role="dialog"], [role="alertdialog"], [aria-modal="true"]') != null
+}
+
 function eventInGraph(container: HTMLElement | null, event: KeyboardEvent): boolean {
   if (!container) return false
   if (isEditableTarget(event.target)) return false
@@ -82,13 +87,13 @@ export function useGraphKeyboardNav(options: UseGraphKeyboardNavOptions): void {
         onEscape,
       } = latest.current
       if (!enabled) return
-      if (!eventInGraph(getContainer(), event)) return
-
       if (event.key === 'Escape') {
+        if (isEditableTarget(event.target) || eventInDialog(event.target)) return
         event.preventDefault()
         onEscape()
         return
       }
+      if (!eventInGraph(getContainer(), event)) return
 
       if (!focusedId) {
         const direction = ARROW_DIRECTIONS[event.key]

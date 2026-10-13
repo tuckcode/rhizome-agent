@@ -17,7 +17,7 @@ import type {
   WikiGraphNode,
 } from './graphTypes'
 import { toGraphData } from './graphData'
-import { clampedCameraPosition, panCameraToNode } from './cameraFraming'
+import { clampedCameraPosition, lookAtFromControls, panCameraToNode } from './cameraFraming'
 import { graphNodeScale } from './graphData'
 
 export interface ForceGraphHandle {
@@ -88,7 +88,6 @@ export const ForceGraph3DCanvas = forwardRef<ForceGraphHandle, ForceGraph3DCanva
         if (clamped) graph.cameraPosition(clamped, undefined, 0)
       }, transitionMs)
     }
-    const lastLookAtRef = useRef({ x: 0, y: 0, z: 0 })
     const latest = useRef({ data, colorForNode, colorForEdge, onNodeClick, onBackgroundClick, selectedId, onError })
     latest.current = { data, colorForNode, colorForEdge, onNodeClick, onBackgroundClick, selectedId, onError }
 
@@ -198,11 +197,10 @@ export const ForceGraph3DCanvas = forwardRef<ForceGraphHandle, ForceGraph3DCanva
         }
         const next = panCameraToNode(
           graph.cameraPosition(),
-          lastLookAtRef.current,
+          lookAtFromControls(graph.controls()) ?? { x: 0, y: 0, z: 0 },
           { x: node.x, y: node.y, z: node.z },
         )
         graph.cameraPosition(next.camera, next.lookAt, 600)
-        lastLookAtRef.current = next.lookAt
       },
       getScreenPositions() {
         const positions = new Map<string, NodeScreenPosition>()

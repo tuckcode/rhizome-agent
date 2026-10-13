@@ -90,6 +90,40 @@ describe('useGraphKeyboardNav', () => {
     expect(options.onFocus).not.toHaveBeenCalled()
   })
 
+  it('clears selection on Escape even when focus is outside the graph', () => {
+    const options = makeOptions()
+    renderHook(() => useGraphKeyboardNav(options))
+
+    const other = document.createElement('div')
+    other.tabIndex = 0
+    document.body.appendChild(other)
+    other.focus()
+    fireEvent.keyDown(other, { key: 'Escape' })
+    fireEvent.keyDown(other, { key: 'ArrowRight' })
+    expect(options.onEscape).toHaveBeenCalledOnce()
+    expect(options.onFocus).not.toHaveBeenCalled()
+  })
+
+  it('does not steal Escape from an input or an open dialog', () => {
+    const options = makeOptions()
+    renderHook(() => useGraphKeyboardNav(options))
+
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    input.focus()
+    fireEvent.keyDown(input, { key: 'Escape' })
+
+    const dialog = document.createElement('div')
+    dialog.setAttribute('role', 'dialog')
+    const dialogButton = document.createElement('button')
+    dialog.appendChild(dialogButton)
+    document.body.appendChild(dialog)
+    dialogButton.focus()
+    fireEvent.keyDown(dialogButton, { key: 'Escape' })
+
+    expect(options.onEscape).not.toHaveBeenCalled()
+  })
+
   it('does not steal Enter from a focused button in another pane', () => {
     const options = makeOptions()
     renderHook(() => useGraphKeyboardNav(options))

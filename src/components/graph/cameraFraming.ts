@@ -17,6 +17,26 @@ export const MIN_CAMERA_DISTANCE = 180
  * Translate the camera so `node` is the new look-at, keeping the same
  * offset (and therefore the same heading). Arrow Left stays left.
  */
+/** Live orbit look-at from `graph.controls().target` (Three OrbitControls). */
+export function lookAtFromControls(
+  controls: { target?: { x?: number; y?: number; z?: number } } | null | undefined,
+): CameraPosition | null {
+  const target = controls?.target
+  if (!target) return null
+  const { x, y, z } = target
+  if (
+    typeof x !== 'number'
+    || typeof y !== 'number'
+    || typeof z !== 'number'
+    || !Number.isFinite(x)
+    || !Number.isFinite(y)
+    || !Number.isFinite(z)
+  ) {
+    return null
+  }
+  return { x, y, z }
+}
+
 export function panCameraToNode(
   camera: CameraPosition,
   lookAt: CameraPosition,
