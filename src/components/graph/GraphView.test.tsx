@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ForceGraph3DCanvasProps } from './ForceGraph3DCanvas'
@@ -220,6 +221,49 @@ describe('GraphView', () => {
     // No positions from the mocked canvas → deterministic sorted fallback.
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     await waitFor(() => expect(screen.getByText('Unwritten Idea')).toBeInTheDocument())
+  })
+
+  it('focuses a start node on the first arrow without a click', async () => {
+    await renderGraph()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    await waitFor(() =>
+      expect(screen.getByTestId('graph-node-preview')).toBeInTheDocument(),
+    )
+    expect(screen.getByTestId('graph-canvas-host')).toHaveAttribute(
+      'data-selected-id',
+      'note/daily-log.md',
+    )
+  })
+
+  it('selects a clicked node so keyboard focus and the preview stay in sync', async () => {
+    await renderGraph()
+    act(() => lastCanvasProps?.onNodeClick('note/daily-log.md'))
+    await waitFor(() =>
+      expect(screen.getByTestId('graph-canvas-host')).toHaveAttribute(
+        'data-selected-id',
+        'note/daily-log.md',
+      ),
+    )
+  })
+
+  it('flies on click through the same selectNode path as keyboard hops', () => {
+    const source = readFileSync(`${process.cwd()}/src/components/graph/GraphView.tsx`, 'utf8')
+    expect(source).toContain('const selectNode = useCallback((id: string) => {')
+    expect(source).toContain('canvasRef.current?.flyToNode(id)')
+  })
+
+  it('reads the live orbit target instead of a stale look-at origin', () => {
+    const source = readFileSync(`${process.cwd()}/src/components/graph/ForceGraph3DCanvas.tsx`, 'utf8')
+    expect(source).toContain('lookAtFromControls(graph.controls())')
+    expect(source).not.toContain('lastLookAtRef')
+  })
+
+  it('makes the graph host a labelled, focusable application surface', async () => {
+    await renderGraph()
+    const host = screen.getByTestId('graph-canvas-host')
+    expect(host).toHaveAttribute('tabIndex', '0')
+    expect(host).toHaveAttribute('role', 'application')
+    expect(host).toHaveAccessibleName('Graph')
   })
 })
 

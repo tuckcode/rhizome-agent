@@ -14,6 +14,45 @@ export interface CameraPosition {
 export const MIN_CAMERA_DISTANCE = 180
 
 /**
+ * Translate the camera so `node` is the new look-at, keeping the same
+ * offset (and therefore the same heading). Arrow Left stays left.
+ */
+/** Live orbit look-at from `graph.controls().target` (Three OrbitControls). */
+export function lookAtFromControls(
+  controls: { target?: { x?: number; y?: number; z?: number } } | null | undefined,
+): CameraPosition | null {
+  const target = controls?.target
+  if (!target) return null
+  const { x, y, z } = target
+  if (
+    typeof x !== 'number'
+    || typeof y !== 'number'
+    || typeof z !== 'number'
+    || !Number.isFinite(x)
+    || !Number.isFinite(y)
+    || !Number.isFinite(z)
+  ) {
+    return null
+  }
+  return { x, y, z }
+}
+
+export function panCameraToNode(
+  camera: CameraPosition,
+  lookAt: CameraPosition,
+  node: CameraPosition,
+): { camera: CameraPosition; lookAt: CameraPosition } {
+  return {
+    camera: {
+      x: node.x + (camera.x - lookAt.x),
+      y: node.y + (camera.y - lookAt.y),
+      z: node.z + (camera.z - lookAt.z),
+    },
+    lookAt: { x: node.x, y: node.y, z: node.z },
+  }
+}
+
+/**
  * Pull an over-tight camera back to `MIN_CAMERA_DISTANCE`, keeping its heading.
  *
  * `zoomToFit` frames the graph's bounding box, but a single node is a zero-size

@@ -1,8 +1,17 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, renderHook } from '@testing-library/react'
 import { useGraphKeyboardNav } from './useGraphKeyboardNav'
 
+function mountHost() {
+  const host = document.createElement('div')
+  host.tabIndex = 0
+  document.body.appendChild(host)
+  host.focus()
+  return host
+}
+
 function makeOptions(overrides: Partial<Parameters<typeof useGraphKeyboardNav>[0]> = {}) {
+  const host = overrides.getContainer ? null : mountHost()
   return {
     enabled: true,
     adjacency: new Map([
@@ -10,14 +19,24 @@ function makeOptions(overrides: Partial<Parameters<typeof useGraphKeyboardNav>[0
       ['b', new Set(['a'])],
       ['c', new Set(['a'])],
     ]),
+    nodes: [
+      { id: 'a', linkCount: 2, backlinkCount: 0 },
+      { id: 'b', linkCount: 1, backlinkCount: 0 },
+      { id: 'c', linkCount: 1, backlinkCount: 0 },
+    ],
     focusedId: 'a' as string | null,
     getPositions: () => new Map(),
+    getContainer: () => host,
     onFocus: vi.fn(),
     onOpen: vi.fn(),
     onEscape: vi.fn(),
     ...overrides,
   }
 }
+
+afterEach(() => {
+  document.body.innerHTML = ''
+})
 
 describe('useGraphKeyboardNav', () => {
   it('moves focus along adjacency on arrow keys (sorted fallback)', () => {
@@ -31,6 +50,15 @@ describe('useGraphKeyboardNav', () => {
     expect(options.onFocus).toHaveBeenCalledWith('c')
   })
 
+  it('focuses a start node when nothing is selected yet', () => {
+    const options = makeOptions({ focusedId: null })
+    renderHook(() => useGraphKeyboardNav(options))
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(options.onFocus).toHaveBeenCalledWith('a')
+    expect(options.onOpen).not.toHaveBeenCalled()
+  })
+
   it('opens the focused node on Enter and escapes on Escape', () => {
     const options = makeOptions()
     renderHook(() => useGraphKeyboardNav(options))
@@ -42,7 +70,7 @@ describe('useGraphKeyboardNav', () => {
     expect(options.onEscape).toHaveBeenCalledOnce()
   })
 
-  it('does nothing when disabled or without a focused node (except Escape needs enabled)', () => {
+  it('does nothing when disabled', () => {
     const options = makeOptions({ enabled: false })
     renderHook(() => useGraphKeyboardNav(options))
 
@@ -60,7 +88,69 @@ describe('useGraphKeyboardNav', () => {
     document.body.appendChild(input)
     fireEvent.keyDown(input, { key: 'ArrowRight' })
     expect(options.onFocus).not.toHaveBeenCalled()
-    input.remove()
+  })
+
+  it('clears selection on Escape even when focus is outside the graph', () => {
+    const options = makeOptions()
+    renderHook(() => useGraphKeyboardNav(options))
+
+    const other = document.createElement('div')
+    other.tabIndex = 0
+    document.body.appendChild(other)
+    other.focus()
+    fireEvent.keyDown(other, { key: 'Escape' })
+    fireEvent.keyDown(other, { key: 'ArrowRight' })
+    expect(options.onEscape).toHaveBeenCalledOnce()
+    expect(options.onFocus).not.toHaveBeenCalled()
+  })
+
+  it('does not steal Escape from an input or an open dialog', () => {
+    const options = makeOptions()
+    renderHook(() => useGraphKeyboardNav(options))
+
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    input.focus()
+    fireEvent.keyDown(input, { key: 'Escape' })
+
+    const dialog = document.createElement('div')
+    dialog.setAttribute('role', 'dialog')
+    const dialogButton = document.createElement('button')
+    dialog.appendChild(dialogButton)
+    document.body.appendChild(dialog)
+    dialogButton.focus()
+    fireEvent.keyDown(dialogButton, { key: 'Escape' })
+
+    expect(options.onEscape).not.toHaveBeenCalled()
+  })
+
+  it('does not steal Enter from a focused button in another pane', () => {
+    const options = makeOptions()
+    renderHook(() => useGraphKeyboardNav(options))
+
+    const button = document.createElement('button')
+    button.textContent = 'Open note'
+    document.body.appendChild(button)
+    button.focus()
+    fireEvent.keyDown(button, { key: 'Enter' })
+    fireEvent.keyDown(button, { key: 'ArrowRight' })
+    expect(options.onOpen).not.toHaveBeenCalled()
+    expect(options.onFocus).not.toHaveBeenCalled()
+  })
+
+  it('still handles Escape when a control inside the graph is focused', () => {
+    const host = mountHost()
+    const button = document.createElement('button')
+    button.textContent = 'Close graph'
+    host.appendChild(button)
+    button.focus()
+    const options = makeOptions({ getContainer: () => host })
+    renderHook(() => useGraphKeyboardNav(options))
+
+    fireEvent.keyDown(button, { key: 'Escape' })
+    expect(options.onEscape).toHaveBeenCalledOnce()
+    fireEvent.keyDown(button, { key: 'Enter' })
+    expect(options.onOpen).not.toHaveBeenCalled()
   })
 
   it('detaches the listener on unmount', () => {

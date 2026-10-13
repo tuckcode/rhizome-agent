@@ -17,7 +17,8 @@ import type {
   WikiGraphNode,
 } from './graphTypes'
 import { toGraphData } from './graphData'
-import { clampedCameraPosition } from './cameraFraming'
+import { clampedCameraPosition, lookAtFromControls, panCameraToNode } from './cameraFraming'
+import { graphNodeScale } from './graphData'
 
 export interface ForceGraphHandle {
   /** Animate the camera to look at a node. */
@@ -113,7 +114,7 @@ export const ForceGraph3DCanvas = forwardRef<ForceGraphHandle, ForceGraph3DCanva
             .nodeLabel((node) => (node as GraphNodeObject).title)
             .nodeVal((node) => {
               const n = node as GraphNodeObject
-              return 1 + n.linkCount + n.backlinkCount
+              return (1 + n.linkCount + n.backlinkCount) * graphNodeScale(n.id, latest.current.selectedId)
             })
             .nodeColor((node) => latest.current.colorForNode(node as GraphNodeObject))
             .nodeOpacity(0.9)
@@ -168,11 +169,15 @@ export const ForceGraph3DCanvas = forwardRef<ForceGraphHandle, ForceGraph3DCanva
       framePreservingMinimumDistance(graph, 0)
     }, [data])
 
-    // Re-evaluate node colors on selection or theme change.
+    // Re-evaluate node colors and selected scale on selection or theme change.
     useEffect(() => {
       graphRef.current?.nodeColor((node) =>
         latest.current.colorForNode(node as GraphNodeObject),
       )
+      graphRef.current?.nodeVal((node) => {
+        const n = node as GraphNodeObject
+        return (1 + n.linkCount + n.backlinkCount) * graphNodeScale(n.id, latest.current.selectedId)
+      })
     }, [selectedId, colorVersion])
 
     // Re-evaluate link colors on theme change (edge colors resolve CSS vars).
@@ -190,13 +195,12 @@ export const ForceGraph3DCanvas = forwardRef<ForceGraphHandle, ForceGraph3DCanva
         if (!node || node.x === undefined || node.y === undefined || node.z === undefined) {
           return
         }
-        const distance = 120
-        const ratio = 1 + distance / Math.hypot(node.x, node.y, node.z || 1)
-        graph.cameraPosition(
-          { x: node.x * ratio, y: node.y * ratio, z: node.z * ratio },
+        const next = panCameraToNode(
+          graph.cameraPosition(),
+          lookAtFromControls(graph.controls()) ?? { x: 0, y: 0, z: 0 },
           { x: node.x, y: node.y, z: node.z },
-          600,
         )
+        graph.cameraPosition(next.camera, next.lookAt, 600)
       },
       getScreenPositions() {
         const positions = new Map<string, NodeScreenPosition>()
