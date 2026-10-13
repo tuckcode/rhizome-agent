@@ -203,6 +203,22 @@ export function isSameDisplayDay(a: Date, b: Date, timeZone?: string | null): bo
  * `None` follows this machine. A chosen IANA zone formats through `Intl` and
  * does not read `getHours` or `getDate`.
  */
+export function formatSavedLabel(
+  savedSeconds: number | null | undefined,
+  createdSeconds: number | null | undefined,
+  format: DateDisplayFormat = DEFAULT_DATE_DISPLAY_FORMAT,
+  timeZone?: string | null,
+): string {
+  if (!savedSeconds) return ''
+  const saved = new Date(savedSeconds * 1000)
+  if (!createdSeconds) return formatDateForDisplay(saved, format, timeZone)
+
+  const created = new Date(createdSeconds * 1000)
+  return isSameDisplayDay(saved, created, timeZone)
+    ? formatTimeForDisplay(saved, timeZone)
+    : formatDateForDisplay(saved, format, timeZone)
+}
+
 /**
  * One inbox-row date. Recent notes use a short relative label; older notes
  * keep the chosen calendar format. The tooltip always carries the full date.
@@ -223,22 +239,6 @@ export function formatInboxDateLabel(
   if (ageDays === 0) return { label: 'Today', title }
   if (ageDays > 0 && ageDays < 7) return { label: `${ageDays}d`, title }
   return { label: title, title }
-}
-
-export function formatSavedLabel(
-  savedSeconds: number | null | undefined,
-  createdSeconds: number | null | undefined,
-  format: DateDisplayFormat = DEFAULT_DATE_DISPLAY_FORMAT,
-  timeZone?: string | null,
-): string {
-  if (!savedSeconds) return ''
-  const saved = new Date(savedSeconds * 1000)
-  if (!createdSeconds) return formatDateForDisplay(saved, format, timeZone)
-
-  const created = new Date(createdSeconds * 1000)
-  return isSameDisplayDay(saved, created, timeZone)
-    ? formatTimeForDisplay(saved, timeZone)
-    : formatDateForDisplay(saved, format, timeZone)
 }
 
 export function parseDateDisplayParts(value: string): DateParts | null {
