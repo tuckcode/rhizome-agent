@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MIN_CAMERA_DISTANCE, clampedCameraPosition } from './cameraFraming'
+import { MIN_CAMERA_DISTANCE, clampedCameraPosition, panCameraToNode } from './cameraFraming'
 
 describe('clampedCameraPosition', () => {
   // C63: zoomToFit frames the graph's bounding box, and a single node is a
@@ -49,6 +49,18 @@ describe('clampedCameraPosition', () => {
       y: 0,
       z: MIN_CAMERA_DISTANCE,
     })
+  })
+})
+
+describe('panCameraToNode', () => {
+  it('keeps the camera offset so heading does not spin', () => {
+    const next = panCameraToNode(
+      { x: 10, y: 20, z: 80 },
+      { x: 0, y: 0, z: 0 },
+      { x: 5, y: -3, z: 2 },
+    )
+    expect(next.lookAt).toEqual({ x: 5, y: -3, z: 2 })
+    expect(next.camera).toEqual({ x: 15, y: 17, z: 82 })
   })
 })
 

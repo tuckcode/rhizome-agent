@@ -157,6 +157,35 @@ export function countGhosts(data: WikiGraphData): number {
   return data.nodes.filter((n) => n.ghost).length
 }
 
+export const SELECTED_NODE_SCALE = 1.6
+
+/** Selected node is larger. Neighbours keep their size. Not a color-only cue. */
+export function graphNodeScale(nodeId: string, selectedId: string | null): number {
+  return selectedId && nodeId === selectedId ? SELECTED_NODE_SCALE : 1
+}
+
+/**
+ * First arrow with nothing focused: keep the current selection if it is
+ * still in the graph, else the most connected node, else the first.
+ */
+export function pickGraphStartNode(
+  nodes: readonly Pick<WikiGraphNode, 'id' | 'linkCount' | 'backlinkCount'>[],
+  selectedId: string | null,
+): string | null {
+  if (selectedId && nodes.some((node) => node.id === selectedId)) return selectedId
+  if (nodes.length === 0) return null
+  let best = nodes[0]
+  let bestDegree = best.linkCount + best.backlinkCount
+  for (const node of nodes) {
+    const degree = node.linkCount + node.backlinkCount
+    if (degree > bestDegree) {
+      best = node
+      bestDegree = degree
+    }
+  }
+  return best.id
+}
+
 export function findNode(data: WikiGraphData, id: string | null): WikiGraphNode | null {
   if (!id) return null
   return data.nodes.find((n) => n.id === id) ?? null

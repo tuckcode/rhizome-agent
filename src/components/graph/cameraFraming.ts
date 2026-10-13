@@ -14,6 +14,25 @@ export interface CameraPosition {
 export const MIN_CAMERA_DISTANCE = 180
 
 /**
+ * Translate the camera so `node` is the new look-at, keeping the same
+ * offset (and therefore the same heading). Arrow Left stays left.
+ */
+export function panCameraToNode(
+  camera: CameraPosition,
+  lookAt: CameraPosition,
+  node: CameraPosition,
+): { camera: CameraPosition; lookAt: CameraPosition } {
+  return {
+    camera: {
+      x: node.x + (camera.x - lookAt.x),
+      y: node.y + (camera.y - lookAt.y),
+      z: node.z + (camera.z - lookAt.z),
+    },
+    lookAt: { x: node.x, y: node.y, z: node.z },
+  }
+}
+
+/**
  * Pull an over-tight camera back to `MIN_CAMERA_DISTANCE`, keeping its heading.
  *
  * `zoomToFit` frames the graph's bounding box, but a single node is a zero-size

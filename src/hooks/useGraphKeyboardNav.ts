@@ -3,10 +3,11 @@
 // window listener stays stable across renders.
 
 import { useEffect, useRef } from 'react'
-import { nextNodeInDirection } from '../components/graph/graphData'
+import { nextNodeInDirection, pickGraphStartNode } from '../components/graph/graphData'
 import type {
   GraphDirection,
   NodeScreenPosition,
+  WikiGraphNode,
 } from '../components/graph/graphTypes'
 
 const ARROW_DIRECTIONS: Record<string, GraphDirection> = {
@@ -19,9 +20,12 @@ const ARROW_DIRECTIONS: Record<string, GraphDirection> = {
 interface UseGraphKeyboardNavOptions {
   enabled: boolean
   adjacency: Map<string, Set<string>>
+  nodes: readonly Pick<WikiGraphNode, 'id' | 'linkCount' | 'backlinkCount'>[]
   focusedId: string | null
   /** Screen-projected positions from the canvas (may be empty pre-render). */
   getPositions: () => Map<string, NodeScreenPosition>
+  /** Graph host. Arrows and Enter only run when this is the focused surface. */
+  getContainer: () => HTMLElement | null
   onFocus: (id: string) => void
   onOpen: (id: string) => void
   /** Escape: exit ego view first, then close the preview (caller decides). */
@@ -33,8 +37,29 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return (
     target.tagName === 'INPUT' ||
     target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT' ||
     target.isContentEditable
   )
+}
+
+function isActionTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  const host = target.closest('button, a, [role="button"], [role="link"], [role="menuitem"], [role="radio"]')
+  return host != null
+}
+
+function eventInGraph(container: HTMLElement | null, event: KeyboardEvent): boolean {
+  if (!container) return false
+  if (isEditableTarget(event.target)) return false
+  const inside = (
+    (event.target instanceof Node && container.contains(event.target))
+    || document.activeElement === container
+  )
+  if (!inside) return false
+  // Enter on a graph button or link must fire that control. Escape still
+  // clears selection / leaves the view.
+  if (event.key !== 'Escape' && isActionTarget(event.target)) return false
+  return true
 }
 
 export function useGraphKeyboardNav(options: UseGraphKeyboardNavOptions): void {
@@ -48,20 +73,33 @@ export function useGraphKeyboardNav(options: UseGraphKeyboardNavOptions): void {
       const {
         enabled,
         adjacency,
+        nodes,
         focusedId,
         getPositions,
+        getContainer,
         onFocus,
         onOpen,
         onEscape,
       } = latest.current
-      if (!enabled || isEditableTarget(event.target)) return
+      if (!enabled) return
+      if (!eventInGraph(getContainer(), event)) return
 
       if (event.key === 'Escape') {
         event.preventDefault()
         onEscape()
         return
       }
-      if (!focusedId) return
+
+      if (!focusedId) {
+        const direction = ARROW_DIRECTIONS[event.key]
+        if (!direction) return
+        const start = pickGraphStartNode(nodes, focusedId)
+        if (start) {
+          event.preventDefault()
+          onFocus(start)
+        }
+        return
+      }
 
       if (event.key === 'Enter') {
         event.preventDefault()

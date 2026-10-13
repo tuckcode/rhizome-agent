@@ -5,8 +5,11 @@ import {
   egoSubgraph,
   filterGraph,
   findNode,
+  graphNodeScale,
   nextNodeInDirection,
   nodeTypesIn,
+  pickGraphStartNode,
+  SELECTED_NODE_SCALE,
   parseGraphResponse,
   toGraphData,
 } from './graphData'
@@ -234,5 +237,34 @@ describe('filterGraph', () => {
     // 'Alpha', 'Beta' and 'Gamma' all contain 'a'; hiding Project removes
     // only 'a', leaving the Person and the ghost.
     expect(result.nodes.map((n) => n.id)).toEqual(['b', 'g'])
+  })
+})
+
+describe('pickGraphStartNode', () => {
+  it('keeps the selected node when it is still in the graph', () => {
+    const nodes = [
+      node('hub.md', { linkCount: 8, backlinkCount: 2 }),
+      node('picked.md', { linkCount: 0, backlinkCount: 0 }),
+    ]
+    expect(pickGraphStartNode(nodes, 'picked.md')).toBe('picked.md')
+  })
+
+  it('picks the most connected node, then the first', () => {
+    const nodes = [
+      node('first.md', { linkCount: 1, backlinkCount: 0 }),
+      node('hub.md', { linkCount: 4, backlinkCount: 3 }),
+      node('other.md', { linkCount: 2, backlinkCount: 0 }),
+    ]
+    expect(pickGraphStartNode(nodes, null)).toBe('hub.md')
+    expect(pickGraphStartNode([node('only.md')], null)).toBe('only.md')
+    expect(pickGraphStartNode([], null)).toBeNull()
+  })
+})
+
+describe('graphNodeScale', () => {
+  it('scales only the selected node', () => {
+    expect(graphNodeScale('a', 'a')).toBe(SELECTED_NODE_SCALE)
+    expect(graphNodeScale('b', 'a')).toBe(1)
+    expect(graphNodeScale('a', null)).toBe(1)
   })
 })

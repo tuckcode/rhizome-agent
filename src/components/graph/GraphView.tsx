@@ -84,6 +84,8 @@ export function GraphView({
   const [hideGhosts, setHideGhosts] = useState(() => retainedState?.hideGhosts ?? false)
   const [colorVersion, setColorVersion] = useState(0)
   const canvasRef = useRef<ForceGraphHandle | null>(null)
+  const hostRef = useRef<HTMLDivElement | null>(null)
+  const didFocusHost = useRef(false)
   const { startJob } = useRhizomeJobs()
   const { graphPreviewWidth, handleGraphPreviewResize } = useLayoutPanels()
 
@@ -202,6 +204,7 @@ export function GraphView({
 
   const selectNode = useCallback((id: string) => {
     setSelectedId(id)
+    canvasRef.current?.flyToNode(id)
   }, [])
 
   const toggleEgo = useCallback(() => {
@@ -243,10 +246,12 @@ export function GraphView({
   )
 
   useGraphKeyboardNav({
-    enabled: true,
+    enabled: Boolean(displayData),
     adjacency,
+    nodes: displayData?.nodes ?? [],
     focusedId: selectedId,
     getPositions: () => canvasRef.current?.getScreenPositions() ?? new Map(),
+    getContainer: () => hostRef.current,
     onFocus: (id) => {
       setSelectedId(id)
       canvasRef.current?.flyToNode(id)
@@ -257,6 +262,12 @@ export function GraphView({
     },
     onEscape: handleEscape,
   })
+
+  useEffect(() => {
+    if (!displayData || didFocusHost.current || !hostRef.current) return
+    didFocusHost.current = true
+    hostRef.current.focus({ preventScroll: true })
+  }, [displayData])
 
   const colorForNode = useCallback(
     (node: WikiGraphNode) => resolver.colorFor(node.isA, node.ghost),
@@ -294,8 +305,13 @@ export function GraphView({
   return (
     <div className={`flex h-full w-full min-h-0 overflow-hidden bg-background ${compact ? 'flex-col' : ''}`} data-testid="graph-view">
       <div
-        className="relative min-h-0 min-w-0 flex-1 overflow-hidden isolate"
+        ref={hostRef}
+        tabIndex={0}
+        role="application"
+        aria-label="Graph"
+        className="relative min-h-0 min-w-0 flex-1 overflow-hidden isolate outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         data-testid="graph-canvas-host"
+        data-selected-id={selectedId ?? ''}
         style={{ clipPath: 'inset(0)' }}
       >
         <ForceGraph3DCanvas
