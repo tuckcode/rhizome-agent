@@ -72,6 +72,38 @@ describe('createMcpToolService', () => {
     ])
   })
 
+  it('rewrites a raw agent run into the answer plus one collapsed log', async () => {
+    const service = makeService()
+    const relativePath = 'note/run-log.md'
+    const note = await service.createNote({
+      path: relativePath,
+      vaultPath: firstVault,
+      content: [
+        '→ Asking local/rhizome: Vault analysis',
+        '',
+        '[tool] Grep',
+        '[tool] Grep is running.',
+        '[tool] Read README.md',
+        '',
+        'agent: Grok CLI',
+        'mode: deep',
+        '',
+        'The vault has three layers.',
+        '',
+        'duration: 1m 3s',
+      ].join('\n'),
+    })
+
+    const written = await readFile(note.absolutePath, 'utf-8')
+    assert.match(written, /# Vault analysis/)
+    assert.match(written, /The vault has three layers/)
+    assert.match(written, /<summary>Run log · 2 tools · 1m 3s<\/summary>/)
+    assert.match(written, /agent: "Grok CLI"/)
+    assert.match(written, /mode: "deep"/)
+    assert.doesNotMatch(written, /is running\./)
+    assert.ok(written.indexOf('The vault has three layers') < written.indexOf('<details>'))
+  })
+
   it('searches active vaults with consistent vault metadata', async () => {
     const service = makeService()
 

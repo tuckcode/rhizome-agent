@@ -1,4 +1,5 @@
 mod acp_client;
+mod agent_run_note;
 mod ai_agent_processes;
 pub mod ai_agents;
 pub(crate) mod ai_model_tools;

@@ -6,6 +6,7 @@ import {
 } from './vault.js'
 import { requireVaultPaths } from './vault-path.js'
 import { readAgentInstructions, vaultContextWithInstructions } from './agent-instructions.js'
+import { rewriteAgentRunNoteContent } from './format-agent-run-note.js'
 
 export function createMcpToolService({
   resolveVaultPaths = () => requireVaultPaths(),
@@ -240,7 +241,9 @@ function fallbackCreateNoteContent(args = {}) {
 }
 
 function createNoteContent(args = {}) {
-  return typeof args.content === 'string' && args.content.trim()
+  const fallbackTitle = typeof args.title === 'string' ? args.title : undefined
+  const raw = typeof args.content === 'string' && args.content.trim()
     ? args.content
     : fallbackCreateNoteContent(args)
+  return rewriteAgentRunNoteContent(raw, fallbackTitle)
 }
