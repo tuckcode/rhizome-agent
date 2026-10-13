@@ -83,11 +83,17 @@ interface AiPanelMessageHistoryProps {
   onOpenNote?: (path: string) => void
   onNavigateWikilink?: (target: string) => void
   onRegenerateMessage?: (messageId: string) => void
-  onPromoteToVault?: (text: string) => void
+  onPromoteToVault?: (text: string) => void | boolean | Promise<void | boolean>
   onScrollStateChange?: (scrolled: boolean) => void
   hasContext: boolean
   /** Transcript item index from a session search hit. Scrolls that turn into view. */
   focusedTranscriptIndex?: number | null
+  /**
+   * Why the transcript is empty. Default `new` is a genuine new chat.
+   * A picked session uses `loading` / `ready` / `error` so the new-chat
+   * empty state never covers a conversation that is still arriving.
+   */
+  transcriptState?: 'new' | 'loading' | 'ready' | 'error'
 }
 
 interface AiPanelComposerProps {
@@ -465,6 +471,45 @@ function headerStatusText({
   return model ? t('ai.panel.status.readyWithModel', { agent: agentLabel, mode: modeLabel, model }) : ready
 }
 
+type TranscriptPane =
+  | 'hidden'
+  | 'new'
+  | 'loading'
+  | 'empty-session'
+  | 'error'
+
+function transcriptPane(
+  transcriptState: 'new' | 'loading' | 'ready' | 'error',
+  isActive: boolean,
+): TranscriptPane {
+  if (isActive) return 'hidden'
+  if (transcriptState === 'loading') return 'loading'
+  if (transcriptState === 'error') return 'error'
+  if (transcriptState === 'ready') return 'empty-session'
+  return 'new'
+}
+
+function AiPanelTranscriptNotice({
+  testId,
+  title,
+  description,
+}: {
+  testId: string
+  title: string
+  description: string
+}) {
+  return (
+    <div
+      className="flex min-h-full flex-col items-center justify-center text-center text-muted-foreground"
+      data-testid={testId}
+    >
+      <Sparkle size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
+      <p style={{ fontSize: 13, margin: '0 0 4px' }}>{title}</p>
+      <p style={{ fontSize: 11, margin: 0 }}>{description}</p>
+    </div>
+  )
+}
+
 function AiPanelEmptyState({
   agentLabel,
   agentReadiness,
@@ -692,6 +737,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
   onScrollStateChange,
   hasContext,
   focusedTranscriptIndex = null,
+  transcriptState = 'new',
 }: AiPanelMessageHistoryProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
@@ -752,7 +798,28 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
         aria-relevant="additions"
       >
         <div className="chat-column">
-          {messages.length === 0 && !isActive && (
+          {messages.length === 0 && transcriptPane(transcriptState, isActive) === 'loading' && (
+            <AiPanelTranscriptNotice
+              testId="ai-panel-transcript-loading"
+              title="Loading conversation"
+              description="The selected session is opening."
+            />
+          )}
+          {messages.length === 0 && transcriptPane(transcriptState, isActive) === 'error' && (
+            <AiPanelTranscriptNotice
+              testId="ai-panel-transcript-error"
+              title="Could not load this conversation"
+              description="Pick the session again, or start a new chat."
+            />
+          )}
+          {messages.length === 0 && transcriptPane(transcriptState, isActive) === 'empty-session' && (
+            <AiPanelTranscriptNotice
+              testId="ai-panel-transcript-empty-session"
+              title="This session has no messages"
+              description="Send a message to continue it, or start a new chat."
+            />
+          )}
+          {messages.length === 0 && transcriptPane(transcriptState, isActive) === 'new' && (
             <AiPanelEmptyState
               agentLabel={agentLabel}
               agentReadiness={agentReadiness}

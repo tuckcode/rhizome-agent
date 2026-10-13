@@ -9,7 +9,7 @@ import { isTauri } from '../mock-tauri'
 import { translate } from '../lib/i18n'
 import { trackVaultCredentialsHandled } from '../lib/productAnalytics'
 import { redactCredentialTokens } from '../lib/sensitiveTextRedaction'
-import { writePromoteNoteFromChat } from '../utils/promoteChatToVault'
+import { promoteSavedToastMessage, writePromoteNoteFromChat } from '../utils/promoteChatToVault'
 import {
   aiWorkspaceWindowSharedContextSnapshot,
   subscribeAiWorkspaceWindowSharedContext,
@@ -240,6 +240,7 @@ export function AiWorkspaceWindowApp() {
   useAiWorkspaceFrameCursor()
   useAiWorkspaceWindowChrome()
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [toastAction, setToastAction] = useState<{ label: string; onClick: () => void } | null>(null)
   const context = useAiWorkspaceWindowContext()
   const sharedContext = useSyncExternalStore(
     subscribeAiWorkspaceWindowSharedContext,
@@ -279,16 +280,18 @@ export function AiWorkspaceWindowApp() {
   const handleVaultChanged = useMainWindowEvent<null>(AI_WORKSPACE_VAULT_CHANGED_EVENT)
   const handlePromoteToVault = useCallback(async (text: string, session?: string) => {
     const body = text.trim()
-    if (!body) return
+    if (!body) return false
     if (!vaultPath) {
+      setToastAction(null)
       setToastMessage(translate(preferences.appLocale, 'ai.message.saveToVaultNoVault'))
-      return
+      return false
     }
     const credentials = redactCredentialTokens(body)
     if (credentials.count > 0) {
       trackVaultCredentialsHandled('promote', 'refuse', credentials.count)
+      setToastAction(null)
       setToastMessage(translate(preferences.appLocale, 'ai.message.saveToVaultCredentials'))
-      return
+      return false
     }
     try {
       const result = await writePromoteNoteFromChat(body, new Date(), {
@@ -297,21 +300,33 @@ export function AiWorkspaceWindowApp() {
         persist: (note) => persistNewNote({ path: note.path, content: note.content, vaultPath }),
       })
       if (result.status === 'refused') {
+        setToastAction(null)
         setToastMessage(translate(preferences.appLocale, 'ai.message.saveToVaultNoContent'))
-        return
+        return false
       }
       if (result.status === 'duplicate') {
-        setToastMessage(translate(preferences.appLocale, 'ai.message.saveToVaultDuplicate', { title: result.note.title }))
-        return
+        setToastMessage(promoteSavedToastMessage(result.note.title, result.note.path))
+        setToastAction({
+          label: 'Open',
+          onClick: () => handleOpenNote(result.note.path),
+        })
+        return true
       }
       handleFileCreated(result.note.path)
-      setToastMessage(translate(preferences.appLocale, 'ai.message.saveToVaultDone', { title: result.note.title }))
+      setToastMessage(promoteSavedToastMessage(result.note.title, result.note.path))
+      setToastAction({
+        label: 'Open',
+        onClick: () => handleOpenNote(result.note.path),
+      })
+      return true
     } catch (error) {
+      setToastAction(null)
       setToastMessage(translate(preferences.appLocale, 'ai.message.saveToVaultFailed', {
         error: error instanceof Error ? error.message : String(error),
       }))
+      return false
     }
-  }, [handleFileCreated, preferences.appLocale, vaultPath])
+  }, [handleFileCreated, handleOpenNote, preferences.appLocale, vaultPath])
 
   return (
     <AppPreferencesProvider dateDisplayFormat={preferences.dateDisplayFormat} displayTimeZone={preferences.displayTimeZone}>
@@ -356,7 +371,15 @@ export function AiWorkspaceWindowApp() {
             aria-hidden
           />
         )}
-        <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+        <Toast
+          message={toastMessage}
+          actionLabel={toastAction?.label}
+          onAction={toastAction?.onClick}
+          onDismiss={() => {
+            setToastMessage(null)
+            setToastAction(null)
+          }}
+        />
       </div>
     </AppPreferencesProvider>
   )

@@ -88,6 +88,18 @@ export function titleFromChatContent(text: string): string {
   return firstHeadingTitle(text) ?? firstSentenceTitle(text) ?? FALLBACK_TITLE
 }
 
+/** Folder a promoted note lives in, for the save toast. */
+export function promoteNoteFolder(path: string): string {
+  const normalized = path.replace(/\\/g, '/')
+  const slash = normalized.lastIndexOf('/')
+  return slash <= 0 ? '' : normalized.slice(0, slash)
+}
+
+export function promoteSavedToastMessage(title: string, path: string): string {
+  const folder = promoteNoteFolder(path)
+  return folder ? `Saved “${title}” to ${folder}` : `Saved “${title}” to the vault`
+}
+
 export function promoteNoteRelativePath(title: string, at: Date = new Date()): string {
   const stamp = [
     at.getFullYear(),

@@ -37,7 +37,7 @@ const GraphView = lazy(() => import('./components/graph/GraphView'))
 const MyceliumView = lazy(() => import('./components/MyceliumView'))
 const ChatHome = lazy(() => import('./components/ChatHome'))
 import { AppAiWorkspaceSurface } from './components/AppAiWorkspaceSurface'
-import { writePromoteNoteFromChat } from './utils/promoteChatToVault'
+import { promoteSavedToastMessage, writePromoteNoteFromChat } from './utils/promoteChatToVault'
 import { AiWorkspaceWindowApp } from './components/AiWorkspaceWindowApp'
 import { SettingsPanel } from './components/SettingsPanel'
 import { CloneVaultModal } from './components/CloneVaultModal'
@@ -223,6 +223,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const visibleNotesRef = useRef<VaultEntry[]>([])
   const multiSelectionCommandRef = useRef<NoteListMultiSelectionCommands | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [toastAction, setToastAction] = useState<{ label: string; onClick: () => void } | null>(null)
   // "Ask the agent about this note" — the vault pointing at the conversation.
   // `requestId` rather than a bare path so asking twice about the same note
   // reopens it after the user has closed the pane.
@@ -1915,17 +1916,19 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   }, [saveSettings, settings])
   const handlePromoteChatToVault = useCallback(async (text: string, session?: string) => {
     const body = text.trim()
-    if (!body) return
+    if (!body) return false
     const vaultPath = activeEditorVaultPath
     if (!vaultPath) {
+      setToastAction(null)
       setToastMessage(translate(appLocale, 'ai.message.saveToVaultNoVault'))
-      return
+      return false
     }
     const credentials = redactCredentialTokens(body)
     if (credentials.count > 0) {
       trackVaultCredentialsHandled('promote', 'refuse', credentials.count)
+      setToastAction(null)
       setToastMessage(translate(appLocale, 'ai.message.saveToVaultCredentials'))
-      return
+      return false
     }
     try {
       const result = await writePromoteNoteFromChat(body, new Date(), {
@@ -1934,19 +1937,31 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         persist: (note) => persistNewNote({ path: note.path, content: note.content, vaultPath }),
       })
       if (result.status === 'refused') {
+        setToastAction(null)
         setToastMessage(translate(appLocale, 'ai.message.saveToVaultNoContent'))
-        return
+        return false
       }
       if (result.status === 'duplicate') {
-        setToastMessage(translate(appLocale, 'ai.message.saveToVaultDuplicate', { title: result.note.title }))
-        return
+        setToastMessage(promoteSavedToastMessage(result.note.title, result.note.path))
+        setToastAction({
+          label: 'Open',
+          onClick: () => vaultBridge.openNoteByPath(result.note.path),
+        })
+        return true
       }
       vaultBridge.handleAgentFileCreated(result.note.path)
-      setToastMessage(translate(appLocale, 'ai.message.saveToVaultDone', { title: result.note.title }))
+      setToastMessage(promoteSavedToastMessage(result.note.title, result.note.path))
+      setToastAction({
+        label: 'Open',
+        onClick: () => vaultBridge.openNoteByPath(result.note.path),
+      })
+      return true
     } catch (error) {
+      setToastAction(null)
       setToastMessage(translate(appLocale, 'ai.message.saveToVaultFailed', {
         error: error instanceof Error ? error.message : String(error),
       }))
+      return false
     }
   }, [activeEditorVaultPath, appLocale, vaultBridge])
 
@@ -2454,7 +2469,15 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         <StatusBar noteCount={visibleEntries.length} modifiedCount={gitModifiedCount} vaultPath={resolvedPath} defaultWorkspacePath={defaultWorkspacePath} vaults={vaultSwitcher.allVaults} multiWorkspaceEnabled={multiWorkspaceEnabled} onSwitchVault={vaultSwitcher.switchVault} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onOpenSettings={handleOpenSettings} onOpenVaultSettings={handleOpenVaultSettings} onOpenResearch={handleRailSelectResearch} onOpenLocalFolder={vaultSwitcher.handleOpenLocalFolder} onCreateEmptyVault={vaultSwitcher.handleCreateEmptyVault} onCloneVault={dialogs.openCloneVault} onCloneGettingStarted={cloneGettingStartedVault} onClickPending={() => handleSetSelection({ kind: 'filter', filter: 'changes' })} onClickPulse={() => handleSetSelection({ kind: 'filter', filter: 'pulse' })} onClickGraph={handleRailSelectGraph} onClickMycelium={handleRailSelectMycelium} onCommitPush={handleCommitPush} commitActionPending={commitFlow.isOpeningCommitDialog} gitFeaturesEnabled={gitFeaturesEnabled} onInitializeGit={openGitSetupDialog} isOffline={networkStatus.isOffline} isGitVault={isGitVault} isVaultReloading={vault.isReloading || isVaultContentLoading} syncStatus={autoSync.syncStatus} lastSyncTime={autoSync.lastSyncTime} conflictCount={autoSync.conflictFiles.length} remoteStatus={autoSync.remoteStatus} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.syncRepositoryPath} onRepositoryChange={gitSurfaces.setSyncRepositoryPath} onTriggerSync={handlePullSelectedRepository} onPullAndPush={handlePullAndPushSelectedRepository} onOpenConflictResolver={conflictFlow.handleOpenConflictResolver} zoomLevel={zoom.zoomLevel} themeMode={documentThemeMode} onZoomReset={zoom.zoomReset} onToggleThemeMode={settingsLoaded ? handleToggleThemeMode : undefined} buildNumber={buildNumber} onCheckForUpdates={handleCheckForUpdates} versionUpdateIndicator={versionUpdateIndicator} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} mcpStatus={mcpSetupDialog.status} onInstallMcp={mcpSetupDialog.openDialog} commandRailActive={commandRailEnabled} locale={appLocale} />
         <GitSetupDialog open={gitFeaturesEnabled && shouldShowGitSetupDialog} onInitGit={handleInitGitRepo} onDismiss={dismissGitSetupDialog} onNeverForVault={neverForVaultGitSetupDialog} />
         <DeleteProgressNotice count={deleteActions.pendingDeleteCount} />
-        <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+        <Toast
+          message={toastMessage}
+          actionLabel={toastAction?.label}
+          onAction={toastAction?.onClick}
+          onDismiss={() => {
+            setToastMessage(null)
+            setToastAction(null)
+          }}
+        />
         <QuickOpenPalette open={dialogs.showQuickOpen} entries={visibleEntries} isLoading={vault.isLoading} onSelect={notes.handleSelectNote} onCreateNote={(title) => notes.handleCreateNote(title, 'Note', 'quick_open')} onClose={dialogs.closeQuickOpen} locale={appLocale} />
         <CommandPalette
           open={dialogs.showCommandPalette}

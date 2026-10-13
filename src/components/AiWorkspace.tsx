@@ -97,7 +97,7 @@ interface AiWorkspaceProps {
   onFileModified?: (relativePath: string) => void
   onOpenAiSettings?: () => void
   onOpenNote?: (path: string) => void
-  onPromoteToVault?: (text: string) => void
+  onPromoteToVault?: (text: string) => void | boolean | Promise<void | boolean>
   onRestoreVaultAiGuidance?: () => void
   onUnsupportedAiPaste?: (message: string) => void
   onVaultChanged?: () => void
@@ -335,7 +335,7 @@ type ConversationSessionProps = {
   onMessageHistoryScrollStateChange?: (scrolled: boolean) => void
   onOpenAiSettings?: () => void
   onOpenNote?: (path: string) => void
-  onPromoteToVault?: (text: string) => void
+  onPromoteToVault?: (text: string) => void | boolean | Promise<void | boolean>
   onRestoreVaultAiGuidance?: () => void
   onSelectTarget: (targetId: string) => void
   onStatusChange: (id: string, status: AgentStatus) => void

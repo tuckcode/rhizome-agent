@@ -572,6 +572,24 @@ describe('AiMessage', () => {
     expect(screen.getByTestId('ai-message-save-to-vault')).toBeDisabled()
   })
 
+  it('switches Save to vault to a disabled Saved state after a successful promote', async () => {
+    const onPromoteToVault = vi.fn(async () => true)
+    render(
+      <AiMessage
+        userMessage="Ask"
+        actions={[]}
+        messageId="message-1"
+        response="Done"
+        onPromoteToVault={onPromoteToVault}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save to vault' }))
+    expect(onPromoteToVault).toHaveBeenCalledWith('Done')
+    expect(await screen.findByRole('button', { name: 'Saved' })).toBeDisabled()
+    expect(screen.getByTestId('ai-message-save-to-vault')).toHaveTextContent('Saved')
+  })
+
   it('shows Save to vault as an icon control with full accessible name', () => {
     render(
       <AiMessage

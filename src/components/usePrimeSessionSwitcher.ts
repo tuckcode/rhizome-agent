@@ -87,6 +87,10 @@ interface UsePrimeSessionSwitcherResult {
   branchError: string | null
   /** Stay in this conversation and continue from an earlier fork (#17) — the log file is the same, only the leaf moves. */
   handleNavigateBranch: (targetId: string) => Promise<void>
+  /** Empty-transcript reason: new chat, loading a pick, ready, or failed. */
+  transcriptState: 'new' | 'loading' | 'ready' | 'error'
+  /** New chat: drop the selected session so the empty state is genuine. */
+  resetSessionSelection: () => void
 }
 
 /**
@@ -134,6 +138,7 @@ export function usePrimeSessionSwitcher({
 
   const [activeSessionPath, setActiveSessionPath] = useState<string | null>(null)
   const [focusedTranscriptIndex, setFocusedTranscriptIndex] = useState<number | null>(null)
+  const [transcriptState, setTranscriptState] = useState<'new' | 'loading' | 'ready' | 'error'>('new')
   const [switchError, setSwitchError] = useState<string | null>(null)
   const reportSwitchError = useCallback((error: unknown) => {
     setSwitchError(error instanceof Error ? error.message : String(error))
@@ -158,10 +163,12 @@ export function usePrimeSessionSwitcher({
     setFocusedTranscriptIndex(null)
     const previousPath = activeSessionPath
     const previousMessages = [...agent.messages]
+    const previousState = transcriptState
     // Highlight the row immediately. Clear the stale transcript in the same
     // click so the old conversation does not linger while the host round-trip
     // runs (session-switch beachball).
     setActiveSessionPath(session.path)
+    setTranscriptState('loading')
     agent.replaceMessages([])
     try {
       if (vaultPath && !hostRunning) {
@@ -173,6 +180,7 @@ export function usePrimeSessionSwitcher({
       })
       startTransition(() => {
         agent.replaceMessages(primeTranscriptToConversation(transcript))
+        setTranscriptState('ready')
         if (typeof options?.messageIndex === 'number') {
           setFocusedTranscriptIndex(options.messageIndex)
         }
@@ -186,10 +194,11 @@ export function usePrimeSessionSwitcher({
     } catch (e) {
       setActiveSessionPath(previousPath)
       setFocusedTranscriptIndex(null)
+      setTranscriptState(previousPath ? previousState : 'error')
       agent.replaceMessages(previousMessages)
       reportSwitchError(e)
     }
-  }, [activeSessionPath, agent, hostRunning, primeHostSessionPath, refreshSessionTree, reportSwitchError, vaultPath])
+  }, [activeSessionPath, agent, hostRunning, primeHostSessionPath, refreshSessionTree, reportSwitchError, transcriptState, vaultPath])
 
   const handleOpenTranscriptHit = useCallback((hit: SessionTranscriptHit) => {
     trackSessionTranscriptHitOpened(hit.role)
@@ -209,6 +218,13 @@ export function usePrimeSessionSwitcher({
   }, [handleSelectSession])
   useMenuBarSessionOpen(handleOpenSessionFromMenuBar)
 
+  const resetSessionSelection = useCallback(() => {
+    setActiveSessionPath(null)
+    setFocusedTranscriptIndex(null)
+    setTranscriptState('new')
+    setSwitchError(null)
+  }, [])
+
   /**
    * Only replayed turns carry a Prime entry id — the live stream has none — so
    * the button is disabled elsewhere and this always receives a real one. The
@@ -227,6 +243,7 @@ export function usePrimeSessionSwitcher({
         // transcript will be there on the next open, so this does not report
         // a failure that did not happen.
         setActiveSessionPath(null)
+        setTranscriptState('new')
         return
       }
       const transcript = await callHost<PrimeTranscriptItem[]>('read_prime_session_transcript', {
@@ -239,6 +256,7 @@ export function usePrimeSessionSwitcher({
           : translate(locale, 'ai.command.forked'),
       )
       setActiveSessionPath(branch.path)
+      setTranscriptState('ready')
       refreshSessionTree()
       // Same as selecting: the column stays. A fork adds a session to the very
       // list being hidden, so closing it hides the thing that just happened.
@@ -287,5 +305,7 @@ export function usePrimeSessionSwitcher({
     branchBusyId,
     branchError,
     handleNavigateBranch,
+    transcriptState,
+    resetSessionSelection,
   }
 }

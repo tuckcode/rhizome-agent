@@ -43,7 +43,7 @@ interface ChatHomeProps {
   vaultPaths: string[]
   entries: VaultEntry[]
   onOpenNote?: (path: string) => void
-  onPromoteToVault?: (text: string) => void
+  onPromoteToVault?: (text: string) => void | boolean | Promise<void | boolean>
   onFileCreated?: (path: string) => void
   onFileModified?: (path: string) => void
   onVaultChanged?: () => void
