@@ -4,48 +4,46 @@
  */
 
 const TOOL_LINE = /^\[tool\]\s+(\S+)(?:\s+is running\.)?(?:\s+(.*?))?\s*$/i
+const TOOL_RUNNING_LINE = /^\[tool\]\s+\S+.*\bis running\.\s*$/i
 const LIFECYCLE_LINE =
   /^\[(preparing|spawned|grok-auth|auth|lifecycle|init|shutdown)\]\s*(.*)$/i
-const ANY_EVENT_LINE = /^\[([^\]]+)\]\s*(.*)$/
 const AGENT_LINE = /^agent:\s+(.+)$/i
 const MODE_LINE = /^mode:\s+(.+)$/i
 const DURATION_LINE = /^(?:duration|elapsed):\s*(.+)$/i
 const ASKING_LINE = /^(?:→|=>)\s+Asking\b[:\s]*(.*)$/i
 const CLOCK = /\b(\d+m(?:\s*\d+s)?|\d+s)\b/i
 const FAIL = /\b(fail(?:ed|ure)?|error|denied|timeout|refused|abort(?:ed)?)\b/i
+const TASK_LINE = /^\s*(?:[-*+]|\d+\.)\s+\[[ xX]\]/
+const LINK_START = /^\s*(?:\[[^\]]+\]\(|\[\[[^\]]+\]\]|<(?:https?:|mailto:))/
+const FENCE_LINE = /^(`{3,}|~{3,})/
 
 export function looksLikeAgentRunLog(text) {
-  let events = 0
-  let tools = 0
+  const body = splitFrontmatter(text).body
+  let running = 0
+  let lifecycle = 0
   let hasAgent = false
   let hasMode = false
-  for (const raw of text.split(/\r?\n/)) {
-    const line = stripBullet(raw)
-    if (TOOL_LINE.test(line) || /^\[tool\]/i.test(line)) {
-      events += 1
-      tools += 1
+  let inFence = false
+  for (const raw of body.split(/\r?\n/)) {
+    const line = raw.trim()
+    if (FENCE_LINE.test(line)) {
+      inFence = !inFence
       continue
     }
-    if (LIFECYCLE_LINE.test(line)) {
-      events += 1
-      continue
-    }
+    if (inFence || isQuotedLine(line)) continue
+    if (TOOL_RUNNING_LINE.test(line)) running += 1
+    if (LIFECYCLE_LINE.test(line)) lifecycle += 1
     if (AGENT_LINE.test(line)) hasAgent = true
     if (MODE_LINE.test(line)) hasMode = true
   }
-  return events >= 2 || (tools >= 1 && hasAgent && hasMode)
+  return running >= 1 && (lifecycle >= 1 || (hasAgent && hasMode))
 }
 
 export function rewriteAgentRunNoteContent(content, fallbackTitle = 'Agent run') {
   const formatted = formatAgentRunNote(content, fallbackTitle)
   if (!formatted.rewritten) return content
-  const { fields, rawFrontmatter } = splitFrontmatter(content)
-  const merged = { ...fields }
-  if (formatted.agent) merged.agent = formatted.agent
-  if (formatted.mode) merged.mode = formatted.mode
-  if (formatted.title && !merged.title) merged.title = formatted.title
-  if (!merged.type) merged.type = 'Note'
-  return `${renderFrontmatter(merged, rawFrontmatter)}\n\n${renderRunNoteBody(formatted)}\n`
+  const { rawFrontmatter } = splitFrontmatter(content)
+  return `${keepFrontmatter(rawFrontmatter, formatted.agent, formatted.mode, formatted.title)}\n\n${renderRunNoteBody(formatted)}\n`
 }
 
 function formatAgentRunNote(text, fallbackTitle) {
@@ -63,51 +61,67 @@ function formatAgentRunNote(text, fallbackTitle) {
   let mode = fields.mode ?? null
   let duration = null
   let heading = firstHeading(source) ?? fields.title ?? null
+  let inFence = false
+  let consumedTitleHeading = false
 
   for (const raw of source.split(/\r?\n/)) {
-    const line = stripBullet(raw)
-    if (!line) {
+    const trimmed = raw.trim()
+    if (FENCE_LINE.test(trimmed)) {
+      inFence = !inFence
+      answerLines.push(raw.trimEnd())
+      continue
+    }
+    if (inFence) {
+      answerLines.push(raw.trimEnd())
+      continue
+    }
+    if (!trimmed) {
       if (answerLines.length > 0 && answerLines[answerLines.length - 1] !== '') {
         answerLines.push('')
       }
       continue
     }
-
-    const asking = line.match(ASKING_LINE)
-    if (asking) {
-      asked = asking[1]?.trim() || line.replace(/^(?:→|=>)\s+/, '').trim()
-      if (!heading && asked) heading = usableTitle(titleFromAsked(asked))
+    if (TASK_LINE.test(raw) || LINK_START.test(raw)) {
+      answerLines.push(raw.trimEnd())
       continue
     }
 
-    const agentMatch = line.match(AGENT_LINE)
+    const asking = trimmed.match(ASKING_LINE)
+    if (asking) {
+      asked = asking[1]?.trim() || trimmed.replace(/^(?:→|=>)\s+/, '').trim()
+      if (!heading && asked) heading = usableTitle(titleFromAsked(asked))
+      continue
+    }
+    const agentMatch = trimmed.match(AGENT_LINE)
     if (agentMatch) {
       agent = unquote(agentMatch[1].trim())
       continue
     }
-    const modeMatch = line.match(MODE_LINE)
+    const modeMatch = trimmed.match(MODE_LINE)
     if (modeMatch) {
       mode = unquote(modeMatch[1].trim())
       continue
     }
-    const durationMatch = line.match(DURATION_LINE)
+    const durationMatch = trimmed.match(DURATION_LINE)
     if (durationMatch) {
       duration = durationMatch[1].trim()
       continue
     }
-    const headingMatch = line.match(/^#\s+(.+)$/)
-    if (headingMatch && !heading) {
-      heading = usableTitle(headingMatch[1]) ?? headingMatch[1].trim()
+    const headingMatch = trimmed.match(/^#\s+(.+)$/)
+    if (headingMatch && !consumedTitleHeading) {
+      heading = heading ?? usableTitle(headingMatch[1]) ?? headingMatch[1].trim()
+      consumedTitleHeading = true
       continue
     }
 
-    const toolMatch = line.match(TOOL_LINE) ?? toolishLine(line)
+    const toolMatch = !isQuotedLine(trimmed)
+      ? (trimmed.match(TOOL_LINE) ?? toolishLine(trimmed))
+      : null
     if (toolMatch) {
       const name = toolMatch[1]
       const rest = (toolMatch[2] ?? '').trim()
-      const key = `${name}\0${targetFromRest(rest)}`
-      const existing = tools.get(key)
-      tools.set(key, {
+      const existing = tools.get(`${name}\0${targetFromRest(rest)}`)
+      tools.set(`${name}\0${targetFromRest(rest)}`, {
         name,
         target: targetFromRest(rest) || existing?.target || '',
         duration: clockIn(rest) || existing?.duration || '',
@@ -116,12 +130,8 @@ function formatAgentRunNote(text, fallbackTitle) {
       continue
     }
 
-    if (LIFECYCLE_LINE.test(line)) {
-      if (FAIL.test(line)) failedLifecycle.push(line)
-      continue
-    }
-    if (ANY_EVENT_LINE.test(line) && !/^\[\[/.test(line)) {
-      if (FAIL.test(line)) failedLifecycle.push(line)
+    if (!isQuotedLine(trimmed) && LIFECYCLE_LINE.test(trimmed)) {
+      if (FAIL.test(trimmed)) failedLifecycle.push(trimmed)
       continue
     }
     answerLines.push(raw.trimEnd())
@@ -132,7 +142,6 @@ function formatAgentRunNote(text, fallbackTitle) {
     const fromTools = [...tools.values()].map((row) => row.duration).filter(Boolean)
     if (fromTools.length === 1) duration = fromTools[0]
   }
-
   return {
     title: heading ?? firstSentenceTitle(answer) ?? fallbackTitle,
     answer,
@@ -171,8 +180,14 @@ function renderRunLog(formatted) {
   return `<details>\n<summary>${summary}</summary>\n\n${inner}\n\n</details>`
 }
 
-function stripBullet(raw) {
-  return raw.replace(/^\s*(?:[-*+]|\d+\.)\s+/, '').trim()
+function isQuotedLine(line) {
+  const trimmed = line.trim()
+  if (FENCE_LINE.test(trimmed)) return false
+  return (
+    (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2)
+    || (trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.length >= 2)
+    || (trimmed.startsWith('`') && trimmed.endsWith('`') && trimmed.length >= 2)
+  )
 }
 
 function toolishLine(line) {
@@ -199,8 +214,15 @@ function titleFromAsked(asked) {
 }
 
 function firstHeading(text) {
+  let inFence = false
   for (const raw of text.split(/\r?\n/)) {
-    const match = raw.trim().match(/^#\s+(.+)$/)
+    const trimmed = raw.trim()
+    if (FENCE_LINE.test(trimmed)) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+    const match = trimmed.match(/^#\s+(.+)$/)
     if (match) return usableTitle(match[1]) ?? match[1].trim()
   }
   return null
@@ -245,26 +267,27 @@ function splitFrontmatter(text) {
   return { fields, body: text.slice(match[0].length), rawFrontmatter: match[1] }
 }
 
-function renderFrontmatter(fields, rawFrontmatter) {
-  const keys = rawFrontmatter
-    ? uniqueKeys(rawFrontmatter, fields)
-    : ['title', 'type', 'agent', 'mode'].filter((key) => fields[key])
-  const lines = keys
-    .filter((key) => fields[key])
-    .map((key) => `${key}: ${yamlDoubleQuoted(fields[key])}`)
-  return `---\n${lines.join('\n')}\n---`
+function keepFrontmatter(rawFrontmatter, agent, mode, title) {
+  if (!rawFrontmatter) {
+    return [
+      '---',
+      `title: ${yamlDoubleQuoted(title)}`,
+      'type: Note',
+      ...(agent ? [`agent: ${yamlDoubleQuoted(agent)}`] : []),
+      ...(mode ? [`mode: ${yamlDoubleQuoted(mode)}`] : []),
+      '---',
+    ].join('\n')
+  }
+  const extras = []
+  if (agent && !hasYamlKey(rawFrontmatter, 'agent')) extras.push(`agent: ${yamlDoubleQuoted(agent)}`)
+  if (mode && !hasYamlKey(rawFrontmatter, 'mode')) extras.push(`mode: ${yamlDoubleQuoted(mode)}`)
+  const kept = rawFrontmatter.replace(/\s+$/, '')
+  const block = extras.length > 0 ? `${kept}\n${extras.join('\n')}` : kept
+  return `---\n${block}\n---`
 }
 
-function uniqueKeys(rawFrontmatter, fields) {
-  const keys = []
-  for (const line of rawFrontmatter.split(/\r?\n/)) {
-    const field = line.match(/^([A-Za-z][\w-]*):/)
-    if (field && !keys.includes(field[1])) keys.push(field[1])
-  }
-  for (const extra of ['agent', 'mode', 'title', 'type']) {
-    if (fields[extra] && !keys.includes(extra)) keys.push(extra)
-  }
-  return keys
+function hasYamlKey(rawFrontmatter, key) {
+  return new RegExp(`^${key}\\s*:`, 'm').test(rawFrontmatter)
 }
 
 function yamlDoubleQuoted(value) {

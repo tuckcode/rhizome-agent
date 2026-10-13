@@ -12,22 +12,15 @@ pub fn rewrite_agent_run_note_content(content: &str, fallback_title: Option<&str
     let Some(formatted) = format_agent_run_note(content, fallback) else {
         return content.to_string();
     };
-    let (mut fields, _body, raw_frontmatter) = split_frontmatter(content);
-    if let Some(agent) = &formatted.agent {
-        fields.insert("agent".into(), agent.clone());
-    }
-    if let Some(mode) = &formatted.mode {
-        fields.insert("mode".into(), mode.clone());
-    }
-    if !fields.contains_key("title") {
-        fields.insert("title".into(), formatted.title.clone());
-    }
-    if !fields.contains_key("type") {
-        fields.insert("type".into(), "Note".into());
-    }
+    let (_fields, _body, raw_frontmatter) = split_frontmatter(content);
     format!(
         "{}\n\n{}\n",
-        render_frontmatter(&fields, raw_frontmatter.as_deref()),
+        keep_frontmatter(
+            raw_frontmatter.as_deref(),
+            formatted.agent.as_deref(),
+            formatted.mode.as_deref(),
+            &formatted.title,
+        ),
         render_run_note_body(&formatted)
     )
 }
@@ -69,20 +62,36 @@ fn format_agent_run_note(text: &str, fallback_title: &str) -> Option<FormattedNo
     let mut mode = fields.get("mode").cloned();
     let mut duration = None;
     let mut heading = first_heading(source).or_else(|| fields.get("title").cloned());
+    let mut in_fence = false;
+    let mut consumed_title_heading = false;
 
     for raw in source.lines() {
-        let line = strip_bullet(raw);
-        if line.is_empty() {
+        let trimmed = raw.trim();
+        if fence_line().is_match(trimmed) {
+            in_fence = !in_fence;
+            answer_lines.push(raw.trim_end().to_string());
+            continue;
+        }
+        if in_fence {
+            answer_lines.push(raw.trim_end().to_string());
+            continue;
+        }
+        if trimmed.is_empty() {
             if !answer_lines.is_empty() && answer_lines.last().is_some_and(|last| !last.is_empty())
             {
                 answer_lines.push(String::new());
             }
             continue;
         }
+        if task_line().is_match(raw) || link_start().is_match(raw) {
+            answer_lines.push(raw.trim_end().to_string());
+            continue;
+        }
 
-        if let Some(rest) = capture(asking_line(), &line) {
+        if let Some(rest) = capture(asking_line(), trimmed) {
             let value = if rest.is_empty() {
-                line.trim_start_matches(['→', '='])
+                trimmed
+                    .trim_start_matches(['→', '='])
                     .trim_start_matches('>')
                     .trim()
                     .to_string()
@@ -95,59 +104,62 @@ fn format_agent_run_note(text: &str, fallback_title: &str) -> Option<FormattedNo
             asked = Some(value);
             continue;
         }
-        if let Some(value) = capture(agent_line(), &line) {
+        if let Some(value) = capture(agent_line(), trimmed) {
             agent = Some(unquote(&value));
             continue;
         }
-        if let Some(value) = capture(mode_line(), &line) {
+        if let Some(value) = capture(mode_line(), trimmed) {
             mode = Some(unquote(&value));
             continue;
         }
-        if let Some(value) = capture(duration_line(), &line) {
+        if let Some(value) = capture(duration_line(), trimmed) {
             duration = Some(value);
             continue;
         }
-        if let Some(value) = line.strip_prefix("# ") {
-            if heading.is_none() {
-                heading = usable_title(value).or_else(|| Some(value.trim().to_string()));
+        if let Some(value) = trimmed.strip_prefix("# ") {
+            if !consumed_title_heading {
+                if heading.is_none() {
+                    heading = usable_title(value).or_else(|| Some(value.trim().to_string()));
+                }
+                consumed_title_heading = true;
+                continue;
             }
-            continue;
         }
-        if let Some((name, rest)) = parse_tool_line(&line) {
-            let target = target_from_rest(&rest);
-            let key = format!("{name}\0{target}");
-            let existing = tools.get(&key);
-            let status = if fail_re().is_match(&rest) {
-                "failed"
-            } else {
-                existing.map(|row| row.status).unwrap_or("ok")
-            };
-            let tool_duration = clock_in(&rest)
-                .or_else(|| existing.map(|row| row.duration.clone()))
-                .unwrap_or_default();
-            let target = if target.is_empty() {
-                existing.map(|row| row.target.clone()).unwrap_or_default()
-            } else {
-                target
-            };
-            tools.insert(
-                key,
-                ToolRow {
-                    name,
-                    target,
-                    duration: tool_duration,
-                    status,
-                },
-            );
-            continue;
-        }
-        if lifecycle_line().is_match(&line)
-            || (any_event_line().is_match(&line) && !line.starts_with("[["))
-        {
-            if fail_re().is_match(&line) {
-                failed_lifecycle.push(line);
+        if !is_quoted_line(trimmed) {
+            if let Some((name, rest)) = parse_tool_line(trimmed) {
+                let target = target_from_rest(&rest);
+                let key = format!("{name}\0{target}");
+                let existing = tools.get(&key);
+                let status = if fail_re().is_match(&rest) {
+                    "failed"
+                } else {
+                    existing.map(|row| row.status).unwrap_or("ok")
+                };
+                let tool_duration = clock_in(&rest)
+                    .or_else(|| existing.map(|row| row.duration.clone()))
+                    .unwrap_or_default();
+                let target = if target.is_empty() {
+                    existing.map(|row| row.target.clone()).unwrap_or_default()
+                } else {
+                    target
+                };
+                tools.insert(
+                    key,
+                    ToolRow {
+                        name,
+                        target,
+                        duration: tool_duration,
+                        status,
+                    },
+                );
+                continue;
             }
-            continue;
+            if lifecycle_line().is_match(trimmed) {
+                if fail_re().is_match(trimmed) {
+                    failed_lifecycle.push(trimmed.to_string());
+                }
+                continue;
+            }
         }
         answer_lines.push(raw.trim_end().to_string());
     }
@@ -180,29 +192,35 @@ fn format_agent_run_note(text: &str, fallback_title: &str) -> Option<FormattedNo
 }
 
 fn looks_like_agent_run_log(text: &str) -> bool {
-    let mut events = 0;
-    let mut tools = 0;
+    let (_, body, _) = split_frontmatter(text);
+    let mut running = 0;
+    let mut lifecycle = 0;
     let mut has_agent = false;
     let mut has_mode = false;
-    for raw in text.lines() {
-        let line = strip_bullet(raw);
-        if tool_line().is_match(&line) || line.to_ascii_lowercase().starts_with("[tool]") {
-            events += 1;
-            tools += 1;
+    let mut in_fence = false;
+    for raw in body.lines() {
+        let line = raw.trim();
+        if fence_line().is_match(line) {
+            in_fence = !in_fence;
             continue;
         }
-        if lifecycle_line().is_match(&line) {
-            events += 1;
+        if in_fence || is_quoted_line(line) {
             continue;
         }
-        if agent_line().is_match(&line) {
+        if tool_running_line().is_match(line) {
+            running += 1;
+        }
+        if lifecycle_line().is_match(line) {
+            lifecycle += 1;
+        }
+        if agent_line().is_match(line) {
             has_agent = true;
         }
-        if mode_line().is_match(&line) {
+        if mode_line().is_match(line) {
             has_mode = true;
         }
     }
-    events >= 2 || (tools >= 1 && has_agent && has_mode)
+    running >= 1 && (lifecycle >= 1 || (has_agent && has_mode))
 }
 
 fn render_run_note_body(formatted: &FormattedNote) -> String {
@@ -295,8 +313,17 @@ fn title_from_asked(asked: &str) -> String {
 }
 
 fn first_heading(text: &str) -> Option<String> {
+    let mut in_fence = false;
     for raw in text.lines() {
-        if let Some(rest) = raw.trim().strip_prefix("# ") {
+        let trimmed = raw.trim();
+        if fence_line().is_match(trimmed) {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix("# ") {
             return usable_title(rest).or_else(|| Some(rest.trim().to_string()));
         }
     }
@@ -342,8 +369,16 @@ fn collapse_blank(lines: &[String]) -> String {
         .to_string()
 }
 
-fn strip_bullet(raw: &str) -> String {
-    bullet_re().replace(raw.trim(), "").to_string()
+fn is_quoted_line(line: &str) -> bool {
+    let trimmed = line.trim();
+    if fence_line().is_match(trimmed) {
+        return false;
+    }
+    let bytes = trimmed.as_bytes();
+    bytes.len() >= 2
+        && ((bytes[0] == b'"' && bytes[bytes.len() - 1] == b'"')
+            || (bytes[0] == b'\'' && bytes[bytes.len() - 1] == b'\'')
+            || (bytes[0] == b'`' && bytes[bytes.len() - 1] == b'`'))
 }
 
 fn unquote(value: &str) -> String {
@@ -382,42 +417,56 @@ fn split_frontmatter(text: &str) -> (BTreeMap<String, String>, String, Option<St
     (fields, body, Some(raw))
 }
 
-fn render_frontmatter(fields: &BTreeMap<String, String>, raw_frontmatter: Option<&str>) -> String {
-    let keys = match raw_frontmatter {
-        Some(raw) => unique_keys(raw, fields),
-        None => ["title", "type", "agent", "mode"]
-            .into_iter()
-            .filter(|key| fields.contains_key(*key))
-            .map(str::to_string)
-            .collect(),
-    };
-    let lines: Vec<String> = keys
-        .into_iter()
-        .filter_map(|key| {
-            fields
-                .get(&key)
-                .map(|value| format!("{key}: {}", yaml_double_quoted(value)))
-        })
-        .collect();
-    format!("---\n{}\n---", lines.join("\n"))
+fn keep_frontmatter(
+    raw_frontmatter: Option<&str>,
+    agent: Option<&str>,
+    mode: Option<&str>,
+    title: &str,
+) -> String {
+    match raw_frontmatter {
+        None => {
+            let mut lines = vec![
+                "---".into(),
+                format!("title: {}", yaml_double_quoted(title)),
+                "type: Note".into(),
+            ];
+            if let Some(agent) = agent {
+                lines.push(format!("agent: {}", yaml_double_quoted(agent)));
+            }
+            if let Some(mode) = mode {
+                lines.push(format!("mode: {}", yaml_double_quoted(mode)));
+            }
+            lines.push("---".into());
+            lines.join("\n")
+        }
+        Some(raw) => {
+            let mut extras = Vec::new();
+            if let Some(agent) = agent {
+                if !has_yaml_key(raw, "agent") {
+                    extras.push(format!("agent: {}", yaml_double_quoted(agent)));
+                }
+            }
+            if let Some(mode) = mode {
+                if !has_yaml_key(raw, "mode") {
+                    extras.push(format!("mode: {}", yaml_double_quoted(mode)));
+                }
+            }
+            let kept = raw.trim_end();
+            let block = if extras.is_empty() {
+                kept.to_string()
+            } else {
+                format!("{kept}\n{}", extras.join("\n"))
+            };
+            format!("---\n{block}\n---")
+        }
+    }
 }
 
-fn unique_keys(raw_frontmatter: &str, fields: &BTreeMap<String, String>) -> Vec<String> {
-    let mut keys = Vec::new();
-    for line in raw_frontmatter.lines() {
-        if let Some(caps) = field_key_re().captures(line) {
-            let key = caps.get(1).unwrap().as_str().to_string();
-            if !keys.contains(&key) {
-                keys.push(key);
-            }
-        }
-    }
-    for extra in ["agent", "mode", "title", "type"] {
-        if fields.contains_key(extra) && !keys.iter().any(|key| key == extra) {
-            keys.push(extra.to_string());
-        }
-    }
-    keys
+fn has_yaml_key(raw: &str, key: &str) -> bool {
+    raw.lines().any(|line| {
+        line.split_once(':')
+            .is_some_and(|(name, _)| name.trim() == key)
+    })
 }
 
 fn yaml_double_quoted(value: &str) -> String {
@@ -445,9 +494,26 @@ fn lifecycle_line() -> &'static Regex {
     })
 }
 
-fn any_event_line() -> &'static Regex {
+fn tool_running_line() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^\[([^\]]+)\]\s*(.*)$").unwrap())
+    RE.get_or_init(|| Regex::new(r"(?i)^\[tool\]\s+\S+.*\bis running\.\s*$").unwrap())
+}
+
+fn task_line() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"^\s*(?:[-*+]|\d+\.)\s+\[[ xX]\]").unwrap())
+}
+
+fn link_start() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(r"^\s*(?:\[[^\]]+\]\(|\[\[[^\]]+\]\]|<(?:https?:|mailto:))").unwrap()
+    })
+}
+
+fn fence_line() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"^(`{3,}|~{3,})").unwrap())
 }
 
 fn agent_line() -> &'static Regex {
@@ -502,11 +568,6 @@ fn extra_blank() -> &'static Regex {
     RE.get_or_init(|| Regex::new(r"\n{3,}").unwrap())
 }
 
-fn bullet_re() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^(?:[-*+]|\d+\.)\s+").unwrap())
-}
-
 fn frontmatter_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| Regex::new(r"(?s)^---\r?\n(.*?)\r?\n---\r?\n?").unwrap())
@@ -515,11 +576,6 @@ fn frontmatter_re() -> &'static Regex {
 fn field_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| Regex::new(r"^([A-Za-z][\w-]*):\s*(.*)$").unwrap())
-}
-
-fn field_key_re() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^([A-Za-z][\w-]*):").unwrap())
 }
 
 #[cfg(test)]
@@ -573,5 +629,36 @@ duration: 1m 3s
         );
         assert!(note.contains("[grok-auth] failed: token expired"));
         assert!(!note.contains("[spawned] child"));
+    }
+
+    #[test]
+    fn does_not_rewrite_quoted_tool_lines() {
+        let quoted = "# Research\n\nThe dump said \"[tool] Grep is running.\"\nand \"[tool] Read is running.\"\n";
+        assert_eq!(rewrite_agent_run_note_content(quoted, None), quoted);
+    }
+
+    #[test]
+    fn keeps_tasks_links_extra_headings_and_fences() {
+        let note = rewrite_agent_run_note_content(
+            "---\ntype: Note\n---\n\n# Vault analysis\n\n[preparing] start\n[tool] Grep\n[tool] Grep is running.\n\n## Methods\n\n- [ ] Check the inbox\n\n[Docs](https://example.com/docs)\n\n```\n[tool] Fake is running.\n```\n\n# Extra heading\n\nThe answer.\n\nagent: Grok CLI\nmode: deep\n",
+            None,
+        );
+        assert!(note.contains("- [ ] Check the inbox"));
+        assert!(note.contains("[Docs](https://example.com/docs)"));
+        assert!(note.contains("# Extra heading"));
+        assert!(note.contains("[tool] Fake is running."));
+        assert!(note.contains("<summary>Run log · 1 tools"));
+        assert!(note.contains("type: Note\n"));
+    }
+
+    #[test]
+    fn keeps_yaml_tag_lists() {
+        let note = rewrite_agent_run_note_content(
+            "---\ntype: Note\ntags:\n  - research\n  - vault\nrelated: [a, b]\n---\n\n# Vault analysis\n\n[preparing] start\n[tool] Grep\n[tool] Grep is running.\n\nThe answer.\n\nagent: Grok CLI\nmode: deep\n",
+            None,
+        );
+        assert!(note.contains("tags:\n  - research\n  - vault"));
+        assert!(note.contains("related: [a, b]"));
+        assert!(!note.contains("related: \"[a, b]\""));
     }
 }
