@@ -72,7 +72,7 @@ export interface AiMessageProps {
   onOpenNote?: (path: string) => void
   onNavigateWikilink?: (target: string) => void
   onRegenerate?: (messageId: string) => void
-  onPromoteToVault?: (text: string) => void
+  onPromoteToVault?: (text: string) => void | boolean | Promise<void | boolean>
 }
 
 function LocalMarker({ text, tone }: { text: string; tone?: 'warning' }) {
@@ -381,12 +381,14 @@ function ResponseActions({
   onReadAloud,
   promoteDisabled = false,
   showReadAloud = false,
+  saved = false,
 }: {
   locale: AppLocale
   messageId?: string
   onCopy: () => void
   onFork?: (messageId: string) => void
-  onPromoteToVault?: () => void
+  onPromoteToVault?: () => void | boolean | Promise<void | boolean>
+  saved?: boolean
   onRegenerate?: (messageId: string) => void
   onReadAloud?: () => void
   promoteDisabled?: boolean
@@ -400,10 +402,10 @@ function ResponseActions({
 }) {
   const regenerateDisabled = !messageId || !onRegenerate
   const forkDisabled = !forkTargetId || !onFork
-  const saveDisabled = promoteDisabled || !onPromoteToVault
+  const saveDisabled = saved || promoteDisabled || !onPromoteToVault
   const regenerateLabel = translate(locale, 'ai.message.regenerate')
   const copyLabel = translate(locale, 'ai.message.copy')
-  const saveLabel = translate(locale, 'ai.message.saveToVault')
+  const saveLabel = saved ? 'Saved' : translate(locale, 'ai.message.saveToVault')
   const forkLabel = translate(locale, 'ai.message.fork')
   const readAloud = useReadAloud()
   const readingThis = showReadAloud && messageId != null && readAloud.messageId === messageId
@@ -469,14 +471,16 @@ function ResponseActions({
           <Button
             type="button"
             variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-primary hover:text-primary"
+            size={saved ? 'sm' : 'icon'}
+            className={saved
+              ? 'h-7 px-2 text-muted-foreground'
+              : 'h-7 w-7 text-primary hover:text-primary'}
             disabled={saveDisabled}
             aria-label={saveLabel}
-            onClick={() => onPromoteToVault?.()}
+            onClick={() => { void onPromoteToVault?.() }}
             data-testid="ai-message-save-to-vault"
           >
-            <FloppyDisk size={14} aria-hidden="true" />
+            {saved ? 'Saved' : <FloppyDisk size={14} aria-hidden="true" />}
           </Button>
         </ActionTooltip>
         <ActionTooltip copy={{ label: forkLabel }}>
@@ -583,7 +587,7 @@ function ResponseBlock({
   onFork?: (messageId: string) => void
   onOpenNote?: (path: string) => void
   onNavigateWikilink?: (target: string) => void
-  onPromoteToVault?: (text: string) => void
+  onPromoteToVault?: (text: string) => void | boolean | Promise<void | boolean>
   onRegenerate?: (messageId: string) => void
   text: string
   isLatestReply?: boolean
@@ -594,8 +598,10 @@ function ResponseBlock({
       console.warn('[ai] Failed to copy assistant message:', error)
     })
   }, [text])
-  const handlePromote = useCallback(() => {
-    onPromoteToVault?.(text)
+  const [saved, setSaved] = useState(false)
+  const handlePromote = useCallback(async () => {
+    const result = await onPromoteToVault?.(text)
+    if (result === true) setSaved(true)
   }, [onPromoteToVault, text])
 
   return (
@@ -625,6 +631,7 @@ function ResponseBlock({
           onRegenerate={onRegenerate}
           onReadAloud={() => messageId && void toggleReadAloud(messageId, text)}
           promoteDisabled={!text.trim()}
+          saved={saved}
           showReadAloud={!isStreaming && Boolean(text.trim()) && Boolean(messageId)}
         />
       </div>

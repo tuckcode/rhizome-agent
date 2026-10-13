@@ -1,28 +1,51 @@
 import { useEffect } from 'react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 interface ToastProps {
   message: string | null
   onDismiss: () => void
+  actionLabel?: string
+  onAction?: () => void
 }
 
-export function Toast({ message, onDismiss }: ToastProps) {
+export function Toast({ message, onDismiss, actionLabel, onAction }: ToastProps) {
+  const hasAction = Boolean(actionLabel && onAction)
+
   useEffect(() => {
     if (!message) return
-    const timer = setTimeout(onDismiss, 2000)
+    const timer = setTimeout(onDismiss, hasAction ? 6000 : 2000)
     return () => clearTimeout(timer)
-  }, [message, onDismiss])
+  }, [hasAction, message, onDismiss])
 
   if (!message) return null
 
   return (
-    <div className={cn(
-      "fixed bottom-8 left-1/2 -translate-x-1/2 z-[1100]",
-      "bg-secondary text-foreground px-5 py-2 rounded-lg text-[13px]",
-      "shadow-[0_4px_16px_var(--shadow-dialog)]",
-      "animate-in slide-in-from-bottom-2 fade-in duration-200"
-    )}>
-      {message}
+    <div
+      role="status"
+      className={cn(
+        "fixed bottom-8 left-1/2 -translate-x-1/2 z-[1100]",
+        "flex items-center gap-3",
+        "bg-secondary text-foreground px-5 py-2 rounded-lg text-[13px]",
+        "shadow-[0_4px_16px_var(--shadow-dialog)]",
+        "animate-in slide-in-from-bottom-2 fade-in duration-200",
+      )}
+    >
+      <span>{message}</span>
+      {hasAction ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2"
+          onClick={() => {
+            onAction?.()
+            onDismiss()
+          }}
+        >
+          {actionLabel}
+        </Button>
+      ) : null}
     </div>
   )
 }

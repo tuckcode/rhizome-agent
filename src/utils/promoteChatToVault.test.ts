@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   buildPromoteNoteFromChat,
   isRawTimestampTitle,
+  promoteNoteFolder,
   promoteNoteRelativePath,
+  promoteSavedToastMessage,
   promoteSessionFromHost,
   titleFromChatContent,
   writePromoteNoteFromChat,
@@ -37,6 +39,13 @@ describe('promoteChatToVault', () => {
 
   it('builds a raw/inbox path with date slug', () => {
     expect(promoteNoteRelativePath('Hello world', at)).toBe('raw/inbox/20260809-hello-world.md')
+  })
+
+  it('names the folder a saved note landed in', () => {
+    expect(promoteNoteFolder('raw/inbox/20260809-hello-world.md')).toBe('raw/inbox')
+    expect(promoteNoteFolder('note.md')).toBe('')
+    expect(promoteSavedToastMessage('Kernel notes', 'raw/inbox/20260809-kernel-notes.md'))
+      .toBe('Saved “Kernel notes” to raw/inbox')
   })
 
   it('builds vault-shaped frontmatter and keeps the selected body', () => {

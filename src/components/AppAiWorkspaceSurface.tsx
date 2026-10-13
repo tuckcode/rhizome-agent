@@ -32,7 +32,7 @@ interface AppAiWorkspaceSurfaceProps {
   onFileModified?: (relativePath: string) => void
   onOpenAiSettings?: () => void
   onOpenNote?: (path: string) => void
-  onPromoteToVault?: (text: string) => void
+  onPromoteToVault?: (text: string) => void | boolean | Promise<void | boolean>
   onRestoreVaultAiGuidance?: () => void
   onUnsupportedAiPaste?: (message: string) => void
   onVaultChanged?: () => void

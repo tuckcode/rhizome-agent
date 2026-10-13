@@ -80,6 +80,7 @@ describe('usePrimeSessionSwitcher', () => {
       await Promise.resolve()
     })
     expect(result.current.activeSessionPath).toBe('/past.jsonl')
+    expect(result.current.transcriptState).toBe('loading')
     expect(agent.replaceMessages).toHaveBeenCalledWith([])
     expect(invoked.calls.map((call) => call.cmd)).not.toContain('read_prime_session_transcript')
 
@@ -191,9 +192,33 @@ describe('usePrimeSessionSwitcher', () => {
     })
 
     expect(result.current.activeSessionPath).toBeNull()
+    expect(result.current.transcriptState).toBe('error')
     expect(result.current.switchError).toContain('still streaming')
     expect(agent.replaceMessages).toHaveBeenNthCalledWith(1, [])
     expect(agent.replaceMessages).toHaveBeenLastCalledWith(stale)
+  })
+
+  it('marks a finished switch as ready and New chat as a genuine new session', async () => {
+    const { result } = renderHook(() => usePrimeSessionSwitcher({
+      agent: agent as never,
+      locale: 'en',
+      vaultPath: '/vault',
+      sessionsAutoCollapsed: false,
+      refreshSessionTree,
+      primeHostSessionPath: '/live.jsonl',
+      hostRunning: true,
+    }))
+
+    await act(async () => {
+      await result.current.handleSelectSession({ id: 'past', path: '/past.jsonl' })
+    })
+    expect(result.current.transcriptState).toBe('ready')
+
+    act(() => {
+      result.current.resetSessionSelection()
+    })
+    expect(result.current.activeSessionPath).toBeNull()
+    expect(result.current.transcriptState).toBe('new')
   })
 
   it('switches a past session without starting Prime when Chat has no vault', async () => {

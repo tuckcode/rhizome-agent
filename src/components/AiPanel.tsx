@@ -51,7 +51,7 @@ import { useAiPanelScheduleDialog } from './useAiPanelScheduleDialog'
 interface AiPanelProps {
   onClose: () => void
   onOpenNote?: (path: string) => void
-  onPromoteToVault?: (text: string, session?: string) => void
+  onPromoteToVault?: (text: string, session?: string) => void | boolean | Promise<void | boolean>
   onUnsupportedAiPaste?: (message: string) => void
   defaultAiAgent?: AiAgentId
   defaultAiTarget?: AiTarget
@@ -105,7 +105,7 @@ interface AiPanelViewProps {
   controller: AiPanelController
   onClose: () => void
   onOpenNote?: (path: string) => void
-  onPromoteToVault?: (text: string, session?: string) => void
+  onPromoteToVault?: (text: string, session?: string) => void | boolean | Promise<void | boolean>
   onUnsupportedAiPaste?: (message: string) => void
   defaultAiAgent?: AiAgentId
   defaultAiTarget?: AiTarget
@@ -144,6 +144,7 @@ interface AiPanelViewProps {
   targetId?: string
   /** Sessions-list → Mycelium for that session (C67). */
   onOpenMycelium?: (sessionPath: string) => void
+  newChatRef?: MutableRefObject<(() => void) | null>
 }
 
 function readinessFromReadyFlag(ready: boolean | undefined): AiAgentReadiness {
@@ -251,6 +252,7 @@ export function AiPanelView({
   targetId,
   vaultPath = null,
   onOpenMycelium,
+  newChatRef,
 }: AiPanelViewProps) {
   const view = resolveAiPanelViewModel({
     defaultAiAgent: providedDefaultAiAgent,
@@ -356,6 +358,8 @@ export function AiPanelView({
     branchBusyId,
     branchError,
     handleNavigateBranch,
+    transcriptState,
+    resetSessionSelection,
   } = usePrimeSessionSwitcher({
     agent,
     locale,
@@ -366,9 +370,14 @@ export function AiPanelView({
     hostRunning: primeHost.running,
   })
   const beginNewChat = () => {
+    resetSessionSelection()
     onConversationReset?.()
     handleNewChat()
   }
+  useEffect(() => {
+    if (!newChatRef) return
+    newChatRef.current = beginNewChat
+  })
   const pickSession = (
     ...args: Parameters<typeof handleSelectSession>
   ) => {
@@ -507,6 +516,7 @@ export function AiPanelView({
         onScrollStateChange={onMessageHistoryScrollStateChange}
         hasContext={hasContext}
         focusedTranscriptIndex={focusedTranscriptIndex}
+        transcriptState={transcriptState}
       />
       </div>
       </div>
@@ -675,18 +685,10 @@ export function AiPanel({
     nativeTarget,
   })
 
-  const handleNewChat = controller.handleNewChat
-  useEffect(() => {
-    if (!newChatRef) return
-    newChatRef.current = () => {
-      onConversationReset?.()
-      handleNewChat()
-    }
-  }, [handleNewChat, newChatRef, onConversationReset])
-
   return (
     <AiPanelView
       controller={controller}
+      newChatRef={newChatRef}
       showHeader={showHeader}
       composerControls={composerControls}
       composerDeck={composerDeck}
