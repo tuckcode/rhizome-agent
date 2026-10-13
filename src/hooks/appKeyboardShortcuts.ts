@@ -53,6 +53,10 @@ const TEXT_EDITING_BLOCKED_COMMANDS = new Set<AppCommandId>([
   APP_COMMAND_IDS.editRedo,
   APP_COMMAND_IDS.viewGoBack,
   APP_COMMAND_IDS.viewGoForward,
+  APP_COMMAND_IDS.viewEditorOnly,
+  APP_COMMAND_IDS.viewEditorList,
+  APP_COMMAND_IDS.viewAll,
+  APP_COMMAND_IDS.viewRead,
 ])
 
 function isTextInputFocused(): boolean {

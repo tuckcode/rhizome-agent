@@ -12,15 +12,10 @@ import {
   type ConnectionsChromeView,
   type NotesChromeDestination,
 } from '../lib/notesChrome'
-import {
-  availableConnectionsViews,
-  isConnectionsViewOff,
-  readConnectionsPlacements,
-  type ConnectionsView,
-} from '../lib/connectionsPlacement'
 import { PeerToolExitButton } from './PeerToolExitButton'
 import { PEER_TOOL_EXIT_NOTES } from '../lib/peerToolExit'
 const GraphView = lazy(() => import('./graph/GraphView'))
+export type ConnectionsView = 'graph' | 'mycelium'
 export interface ConnectionsPanelHandle {
   /** Opens the given view, focusing a specific Mycelium session when asked. */
   openView: (view: ConnectionsView, options?: { focusPath?: string }) => void
@@ -51,11 +46,8 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
   requestedView,
   exitLabel = PEER_TOOL_EXIT_NOTES,
 }, ref) {
-  const placements = readConnectionsPlacements()
   const [view, setView] = useState<ConnectionsView>(() => requestedView?.view ?? 'graph')
-  const [presented, setPresented] = useState(() => (
-    requestedView != null && !isConnectionsViewOff(requestedView.view, placements)
-  ))
+  const [presented, setPresented] = useState(() => requestedView != null)
   const [graphFocusToken, setGraphFocusToken] = useState(0)
   const [graphState, setGraphState] = useState<GraphViewRetainedState>({ selectedId: null, egoRootId: null, query: '', hiddenTypes: [], hideGhosts: false })
   const [myceliumState, setMyceliumState] = useState<SessionActivityRetainedState>(() => ({
@@ -70,14 +62,13 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
   const [seenRequestId, setSeenRequestId] = useState<number | null>(
     () => requestedView?.requestId ?? null,
   )
-  const available = availableConnectionsViews(placements)
+  const available: ConnectionsView[] = ['graph', 'mycelium']
   const selected = available.includes(view) ? view : available[0]
   function select(target: ConnectionsView) {
     setView(target)
     trackEvent('connections_view_selected', { view: target })
   }
   function applyRequest(target: ConnectionsView, options?: { focusPath?: string }) {
-    if (placements[target] === 'off') return
     select(target)
     setPresented(true)
     if (target === 'mycelium' && options?.focusPath) {
@@ -132,13 +123,11 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
   }))
   if (requestedView && requestedView.requestId !== seenRequestId) {
     setSeenRequestId(requestedView.requestId)
-    if (!isConnectionsViewOff(requestedView.view, placements)) {
-      setView(requestedView.view)
-      setPresented(true)
-      if (requestedView.view === 'mycelium' && requestedView.focusPath) {
-        setMyceliumState({ path: requestedView.focusPath, selected: null, scrollTop: 0 })
-        setMyceliumFocusToken(token => token + 1)
-      }
+    setView(requestedView.view)
+    setPresented(true)
+    if (requestedView.view === 'mycelium' && requestedView.focusPath) {
+      setMyceliumState({ path: requestedView.focusPath, selected: null, scrollTop: 0 })
+      setMyceliumFocusToken(token => token + 1)
     }
   }
   if (!presented || !selected) return null

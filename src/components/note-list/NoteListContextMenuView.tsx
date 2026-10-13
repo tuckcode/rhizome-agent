@@ -21,7 +21,6 @@ import { Input } from '@/components/ui/input'
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../../hooks/appCommandCatalog'
 import { translate, type AppLocale } from '../../lib/i18n'
 import { openConnections } from '../../lib/notesChrome'
-import { isConnectionsViewOff } from '../../lib/connectionsPlacement'
 import { trackEvent } from '../../lib/telemetry'
 import type { VaultEntry } from '../../types'
 import { isMarkdownEntry } from '../../utils/typeDefinitions'
@@ -161,7 +160,7 @@ function renameItem(
 }
 
 function connectionItems(entry: VaultEntry, selectAction: SelectContextAction): NoteListContextMenuItem[] {
-  if (entry.fileKind === 'binary' || isConnectionsViewOff('graph')) return []
+  if (entry.fileKind === 'binary') return []
   return [
     {
       icon: Graph,

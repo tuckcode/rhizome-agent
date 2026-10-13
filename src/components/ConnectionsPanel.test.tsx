@@ -88,27 +88,6 @@ it('honours a requested view passed as a prop on first mount', async () => {
  * handle up must make the panel taller. `usePanelWidth.resizeBy` already
  * treats a negative delta as growth, which matches a top-edge drag.
  */
-it('stays closed when both views were turned off, even if one is requested', async () => {
-  localStorage.setItem('rhizome:connections-placement:v1', JSON.stringify({ graph: 'off', mycelium: 'off' }))
-  const ref = createRef<ConnectionsPanelHandle>()
-  render(<ConnectionsPanel ref={ref} vaultPath="/vault" />)
-  expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
-  act(() => { ref.current?.openView('graph') })
-  expect(screen.queryByTestId('connections-panel')).not.toBeInTheDocument()
-  expect(screen.queryByText('Enable Graph')).not.toBeInTheDocument()
-})
-
-it('does not reopen Mycelium from the notes-chrome shortcut when placement is off', async () => {
-  localStorage.setItem('rhizome:connections-placement:v1', JSON.stringify({ graph: 'sidebar', mycelium: 'off' }))
-  render(<ConnectionsPanel vaultPath="/vault" />)
-  expect(screen.queryByRole('tab', { name: 'Mycelium' })).not.toBeInTheDocument()
-  act(() => {
-    window.dispatchEvent(new CustomEvent('rhizome:notes-chrome', { detail: 'mycelium' }))
-  })
-  expect(screen.queryByRole('tab', { name: 'Mycelium' })).not.toBeInTheDocument()
-  expect(screen.queryByText('Enable Mycelium')).not.toBeInTheDocument()
-})
-
 it('names the notes origin on the shared exit control', async () => {
   const ref = createRef<ConnectionsPanelHandle>()
   render(<ConnectionsPanel ref={ref} vaultPath="/vault" />)

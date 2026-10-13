@@ -129,7 +129,7 @@ describe('formatSavedLabel', () => {
 describe('formatInboxDateLabel', () => {
   const now = new Date('2026-08-22T14:08:00').getTime() / 1000
 
-  it('uses Today and a short relative label for the last week', () => {
+  it('uses translated Today and a short relative label for the last week', () => {
     expect(formatInboxDateLabel(now, 'friendly', now)).toEqual({
       label: 'Today',
       title: 'August 22, 2026',

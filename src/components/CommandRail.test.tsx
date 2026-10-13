@@ -74,7 +74,7 @@ describe('CommandRail', () => {
     )
   })
 
-  it('hides a view whose placement is off', () => {
+  it('hides views listed in hiddenViewIds', () => {
     renderRail({ hiddenViewIds: ['graph', 'mycelium'] })
     expect(screen.getByTestId('command-rail-research')).toBeInTheDocument()
     expect(screen.queryByTestId('command-rail-graph')).not.toBeInTheDocument()

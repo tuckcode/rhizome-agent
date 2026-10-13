@@ -48,6 +48,7 @@ function makeActions(): KeyboardActions {
     onArchiveNote: vi.fn(),
     onToggleOrganized: vi.fn(),
     onSetViewMode: vi.fn(),
+    onReadLayout: vi.fn(),
     onZoomIn: vi.fn(),
     onZoomOut: vi.fn(),
     onZoomReset: vi.fn(),
@@ -118,6 +119,32 @@ describe('useAppKeyboard', () => {
       const event = fireKeyOnTarget(editable, '1', { metaKey: true, altKey: true, code: 'Digit1' })
       expect(event.defaultPrevented).toBe(false)
       expect(actions.onSetViewMode).not.toHaveBeenCalled()
+    })
+  })
+
+  it('does not fire View 1-4 while typing in the editor', () => {
+    const actions = makeActions()
+    renderHook(() => useAppKeyboard(actions))
+    withFocusedEditorSurface((editable) => {
+      fireKeyOnTarget(editable, '1', { metaKey: true })
+      fireKeyOnTarget(editable, '2', { metaKey: true })
+      fireKeyOnTarget(editable, '3', { metaKey: true })
+      fireKeyOnTarget(editable, '4', { metaKey: true })
+      expect(actions.onSetViewMode).not.toHaveBeenCalled()
+      expect(actions.onReadLayout).not.toHaveBeenCalled()
+    })
+  })
+
+  it('does not fire View 1-4 while typing in the chat box', () => {
+    const actions = makeActions()
+    renderHook(() => useAppKeyboard(actions))
+    withFocusedContentEditable((editable) => {
+      fireKeyOnTarget(editable, '1', { metaKey: true })
+      fireKeyOnTarget(editable, '2', { metaKey: true })
+      fireKeyOnTarget(editable, '3', { metaKey: true })
+      fireKeyOnTarget(editable, '4', { metaKey: true })
+      expect(actions.onSetViewMode).not.toHaveBeenCalled()
+      expect(actions.onReadLayout).not.toHaveBeenCalled()
     })
   })
 
