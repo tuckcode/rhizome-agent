@@ -20,6 +20,7 @@ function renderPillStatusBar(overrides: Record<string, unknown> = {}) {
       onCommitPush={vi.fn()}
       onClickPulse={vi.fn()}
       onClickGraph={vi.fn()}
+      onClickMycelium={vi.fn()}
       onTriggerSync={vi.fn()}
       commandRailActive
       {...overrides}
