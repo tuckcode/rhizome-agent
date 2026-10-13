@@ -652,6 +652,17 @@ duration: 1m 3s
     }
 
     #[test]
+    fn does_not_duplicate_existing_agent_or_mode() {
+        let note = rewrite_agent_run_note_content(
+            "---\ntype: Note\nagent: Grok CLI\nmode: deep\n---\n\n# Vault analysis\n\n[preparing] start\n[tool] Grep\n[tool] Grep is running.\n\nThe answer.\n",
+            None,
+        );
+        assert_eq!(note.matches("agent:").count(), 1);
+        assert!(note.contains("agent: Grok CLI"));
+        assert!(!note.contains("agent: \"Grok CLI\""));
+    }
+
+    #[test]
     fn keeps_yaml_tag_lists() {
         let note = rewrite_agent_run_note_content(
             "---\ntype: Note\ntags:\n  - research\n  - vault\nrelated: [a, b]\n---\n\n# Vault analysis\n\n[preparing] start\n[tool] Grep\n[tool] Grep is running.\n\nThe answer.\n\nagent: Grok CLI\nmode: deep\n",

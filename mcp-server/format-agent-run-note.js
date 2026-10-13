@@ -287,7 +287,10 @@ function keepFrontmatter(rawFrontmatter, agent, mode, title) {
 }
 
 function hasYamlKey(rawFrontmatter, key) {
-  return new RegExp(`^${key}\\s*:`, 'm').test(rawFrontmatter)
+  return rawFrontmatter.split(/\r?\n/).some((line) => {
+    const colon = line.indexOf(':')
+    return colon > 0 && line.slice(0, colon).trim() === key
+  })
 }
 
 function yamlDoubleQuoted(value) {

@@ -51,6 +51,27 @@ mode: deep
     assert.match(note, /<summary>Run log · 1 tools/)
   })
 
+  it('does not duplicate an existing agent or mode field', () => {
+    const note = rewriteAgentRunNoteContent(`---
+type: Note
+agent: Grok CLI
+mode: deep
+---
+
+# Vault analysis
+
+[preparing] start
+[tool] Grep
+[tool] Grep is running.
+
+The answer.
+`)
+    assert.equal(note.match(/^agent:/gm)?.length, 1)
+    assert.equal(note.match(/^mode:/gm)?.length, 1)
+    assert.match(note, /^agent: Grok CLI$/m)
+    assert.doesNotMatch(note, /agent: "Grok CLI"/)
+  })
+
   it('keeps one-per-line tag lists and inline YAML lists', () => {
     const note = rewriteAgentRunNoteContent(`---
 type: Note

@@ -170,6 +170,28 @@ mode: deep
     expect(note).not.toMatch(/^\[tool\] Grep$/m)
   })
 
+  it('does not duplicate an existing agent or mode field', () => {
+    const note = rewriteAgentRunNoteContent(`---
+type: Note
+agent: Grok CLI
+mode: deep
+---
+
+# Vault analysis
+
+[preparing] start
+[tool] Grep
+[tool] Grep is running.
+
+The answer.
+`)
+    expect(note.match(/^agent:/gm)).toHaveLength(1)
+    expect(note.match(/^mode:/gm)).toHaveLength(1)
+    expect(note).toContain('agent: Grok CLI')
+    expect(note).toContain('mode: deep')
+    expect(note).not.toContain('agent: "Grok CLI"')
+  })
+
   it('keeps one-per-line tag lists and inline YAML lists', () => {
     const note = rewriteAgentRunNoteContent(`---
 type: Note
