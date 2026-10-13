@@ -398,13 +398,13 @@ describe('parked organs leftover', () => {
     expect(chrome).not.toContain('mutate_queued_message')
   })
 
-  it('keeps C57 Limited tools / Power User, not Vault Safe', () => {
+  it('keeps C57 Limited tools / Full access, not Vault Safe', () => {
     const modes = readFileSync(
       `${process.cwd()}/src/lib/aiAgentPermissionMode.ts`,
       'utf8',
     )
     expect(modes).toContain("control: 'Limited tools'")
-    expect(modes).toContain("short: 'Power User'")
+    expect(modes).toContain("short: 'Full access'")
     expect(modes).not.toMatch(/Vault Safe/)
     expect(modes).toContain('Prime has no sandbox')
     expect(modes).toContain('export function permissionModeIsInstructionOnly')

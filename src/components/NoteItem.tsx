@@ -10,7 +10,7 @@ import {
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
 import { resolveIcon } from '../utils/iconRegistry'
 import { getDisplayDate } from '../utils/noteListHelpers'
-import { formatSavedLabel, formatTimestampForDateDisplay } from '../utils/dateDisplay'
+import { formatInboxDateLabel } from '../utils/dateDisplay'
 import { filePreviewKind, type FilePreviewKind } from '../utils/filePreview'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { PropertyChips } from './note-item/PropertyChips'
@@ -99,7 +99,7 @@ type NoteItemSurfaceProps = {
 }
 
 const NOTE_ITEM_BASE_CLASS_NAME = 'relative w-full border-0 border-b border-[var(--border)] bg-transparent p-0 text-left transition-colors'
-const BINARY_NOTE_STYLE: CSSProperties = { padding: '14px 16px' }
+const BINARY_NOTE_STYLE: CSSProperties = { padding: '14px 24px 14px 16px' }
 const NOTE_ITEM_ROW_CLASS_NAMES: Record<NoteItemRowState, string> = {
   binary: 'cursor-default opacity-50',
   multiSelected: 'cursor-pointer',
@@ -133,7 +133,7 @@ function NoteTypeIndicator({
     <TypeIcon
       width={14}
       height={14}
-      className="absolute right-3 top-2.5"
+      className="absolute right-6 top-2.5"
       style={{ color: typeColor }}
       data-testid="type-icon"
       data-file-preview-kind={filePreviewKind}
@@ -296,7 +296,7 @@ function NoteTitleRow({
 }) {
   return (
     <div
-      className={cn('truncate pr-5 text-[13px]', isBinary ? 'text-muted-foreground' : 'text-foreground', isSelected && !isBinary ? 'font-semibold' : 'font-medium')}
+      className={cn('truncate pr-8 text-[13px]', isBinary ? 'text-muted-foreground' : 'text-foreground', isSelected && !isBinary ? 'font-semibold' : 'font-medium')}
       data-testid="note-title-row"
       title={entry.title}
     >
@@ -338,23 +338,20 @@ function NoteDateRow({
   allEntries: VaultEntry[]
 }) {
   const dateDisplayFormat = useDateDisplayFormat()
-  // The clock time when saved and created land on the same day — the right
-  // half of this row already prints that date, so printing it twice spent the
-  // row saying nothing. See `formatSavedLabel`.
-  const modifiedLabel = formatSavedLabel(getDisplayDate(entry), entry.createdAt, dateDisplayFormat)
-  const createdLabel = entry.createdAt ? `Created ${formatTimestampForDateDisplay(entry.createdAt, dateDisplayFormat)}` : null
+  const inboxDate = formatInboxDateLabel(getDisplayDate(entry), dateDisplayFormat)
   const linkCount = entry.outgoingLinks.length
 
-  if (!modifiedLabel && !createdLabel && linkCount <= 0) return null
+  if (!inboxDate && linkCount <= 0) return null
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-[10px] text-muted-foreground" data-testid="note-date-row">
       <span className="flex min-w-0 items-center gap-1.5">
-        <span className="truncate">{modifiedLabel}</span>
+        {inboxDate && (
+          <span className="truncate" title={inboxDate.title}>{inboxDate.label}</span>
+        )}
         <LinkCountChip count={linkCount} />
       </span>
       <span className="flex min-w-0 items-center justify-end gap-1.5 text-right">
-        {createdLabel && <span className="note-item__created-label">{createdLabel}</span>}
         <WorkspaceBadge entry={entry} allEntries={allEntries} />
       </span>
     </div>
@@ -362,7 +359,7 @@ function NoteDateRow({
 }
 
 function noteItemStyle(isSelected: boolean, isMultiSelected: boolean, typeColor: string, typeLightColor: string): CSSProperties {
-  const base: CSSProperties = { padding: isSelected && !isMultiSelected ? '14px 16px 14px 13px' : '14px 16px' }
+  const base: CSSProperties = { padding: isSelected && !isMultiSelected ? '14px 24px 14px 13px' : '14px 24px 14px 16px' }
   if (isMultiSelected) base.backgroundColor = 'color-mix(in srgb, var(--accent-blue) 10%, transparent)'
   else if (isSelected) { base.borderLeftColor = typeColor; base.backgroundColor = typeLightColor }
   return base

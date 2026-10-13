@@ -216,7 +216,7 @@ describe('AiWorkspace', () => {
     expect(workspace).toHaveAttribute('data-ai-workspace-expanded', 'false')
     expect(workspace).not.toHaveClass('fixed')
     expect(workspace).toHaveClass('bg-sidebar')
-    expect(workspace).toHaveStyle({ width: '420px', minWidth: '320px' })
+    expect(workspace).toHaveStyle({ width: '320px', minWidth: '320px' })
     const header = screen.getByTestId('ai-workspace-side-header')
     const tabStrip = screen.getByTestId('ai-workspace-side-tabs')
     expect(header).not.toHaveClass('border-b')
@@ -372,12 +372,12 @@ describe('AiWorkspace', () => {
     fireEvent.mouseDown(screen.getByTestId('ai-workspace-left-resize'), { clientX: 100, clientY: 20 })
     fireEvent.mouseMove(window, { clientX: 40, clientY: 20 })
     fireEvent.mouseUp(window)
-    expect(workspace).toHaveStyle({ width: '480px' })
+    expect(workspace).toHaveStyle({ width: '380px' })
 
     unmount()
     render(<AiWorkspace open mode="side" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
 
-    expect(screen.getByTestId('ai-workspace')).toHaveStyle({ width: '480px' })
+    expect(screen.getByTestId('ai-workspace')).toHaveStyle({ width: '380px' })
   })
 
   it('separates the guidance warning from the header and uses a short restore action', () => {

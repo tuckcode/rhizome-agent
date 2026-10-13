@@ -3,6 +3,7 @@ import {
   bindDisplayTimeZone,
   formatDatePartsForDisplay,
   formatDateValueForDisplay,
+  formatInboxDateLabel,
   formatSavedLabel,
   formatTimeForDisplay,
   formatTimestampForDateDisplay,
@@ -122,5 +123,31 @@ describe('formatSavedLabel', () => {
 
   it('pads the clock so rows line up', () => {
     expect(formatSavedLabel(secs('2026-08-22T09:05:00'), secs('2026-08-22T08:00:00'))).toBe('09:05')
+  })
+})
+
+describe('formatInboxDateLabel', () => {
+  const now = new Date('2026-08-22T14:08:00').getTime() / 1000
+
+  it('uses Today and a short relative label for the last week', () => {
+    expect(formatInboxDateLabel(now, 'friendly', now)).toEqual({
+      label: 'Today',
+      title: 'August 22, 2026',
+    })
+    expect(formatInboxDateLabel(now - 86400 * 3, 'friendly', now)).toEqual({
+      label: '3d',
+      title: 'August 19, 2026',
+    })
+  })
+
+  it('keeps the calendar date after a week', () => {
+    expect(formatInboxDateLabel(now - 86400 * 10, 'friendly', now)).toEqual({
+      label: 'August 12, 2026',
+      title: 'August 12, 2026',
+    })
+  })
+
+  it('says nothing when the note has no timestamp', () => {
+    expect(formatInboxDateLabel(null, 'friendly', now)).toBeNull()
   })
 })

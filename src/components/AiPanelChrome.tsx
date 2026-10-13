@@ -523,7 +523,6 @@ function AiPanelEmptyState({
       <div
         className="flex min-h-full flex-col items-center justify-center text-center text-muted-foreground"
       >
-        <Sparkle size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
         <p style={{ fontSize: 13, margin: '0 0 4px' }}>
           {t('ai.panel.empty.checkingTitle')}
         </p>
@@ -539,7 +538,6 @@ function AiPanelEmptyState({
       <div
         className="flex min-h-full flex-col items-center justify-center text-center text-muted-foreground"
       >
-        <Sparkle size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
         <p style={{ fontSize: 13, margin: '0 0 4px' }}>
           {t('ai.panel.empty.missingTitle', { agent: agentLabel })}
         </p>
@@ -554,7 +552,6 @@ function AiPanelEmptyState({
     <div
       className="flex min-h-full flex-col items-center justify-center text-center text-muted-foreground"
     >
-      <Sparkle size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
       <p style={{ fontSize: 13, margin: '0 0 4px' }}>
         {hasContext
           ? t('ai.panel.empty.withContextTitle', { agent: agentLabel })

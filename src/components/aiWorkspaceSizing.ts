@@ -12,7 +12,8 @@ export interface AiWorkspaceSizing {
 
 const DEFAULT_DOCKED_WORKSPACE_SIZE = { height: 540, width: 560 }
 const MIN_DOCKED_WORKSPACE_SIZE = { height: 360, width: 460 }
-const DEFAULT_SIDE_WORKSPACE_WIDTH = 420
+/** Empty / first-open docked chat. 420px was ~29% of a 1440 shell (V-W1). */
+export const DEFAULT_SIDE_WORKSPACE_WIDTH = 320
 const MIN_SIDE_WORKSPACE_WIDTH = 320
 /**
  * Chat-primary share of the shell. DESIGN.md §5: "Conversation owns >=55%

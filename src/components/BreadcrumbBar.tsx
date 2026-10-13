@@ -40,6 +40,7 @@ import {
 } from '@phosphor-icons/react'
 import { slugify } from '../hooks/useNoteCreation'
 import { useDragRegion } from '../hooks/useDragRegion'
+import { noteFolderLabel } from '../lib/noteFolderLabel'
 
 interface BreadcrumbBarProps {
   entry: VaultEntry
@@ -237,13 +238,6 @@ const TOGGLE_ACTION_CONFIGS = {
     shortcut: '⌘D',
     renderIcon: (active: boolean) => <Star size={16} weight={active ? 'fill' : 'regular'} className={BREADCRUMB_ICON_CLASS} />,
   },
-  organized: {
-    activeClassName: 'text-[var(--accent-green)]',
-    activeLabelKey: 'editor.toolbar.markUnorganized',
-    inactiveLabelKey: 'editor.toolbar.markOrganized',
-    shortcut: '⌘E',
-    renderIcon: (active: boolean) => <CheckCircle size={16} weight={active ? 'fill' : 'regular'} className={BREADCRUMB_ICON_CLASS} />,
-  },
 } satisfies Record<string, {
   activeClassName: string
   activeLabelKey: Parameters<typeof translate>[1]
@@ -348,19 +342,6 @@ function NoteWidthAction({
 
 function FavoriteAction({ favorite, locale = 'en', onToggleFavorite }: { favorite: boolean; locale?: AppLocale; onToggleFavorite?: () => void }) {
   return <ConfiguredToggleAction active={favorite} config={TOGGLE_ACTION_CONFIGS.favorite} locale={locale} onClick={onToggleFavorite} />
-}
-
-function OrganizedAction({
-  organized,
-  locale = 'en',
-  onToggleOrganized,
-}: {
-  organized: boolean
-  locale?: AppLocale
-  onToggleOrganized?: () => void
-}) {
-  if (!onToggleOrganized) return null
-  return <ConfiguredToggleAction active={organized} config={TOGGLE_ACTION_CONFIGS.organized} locale={locale} onClick={onToggleOrganized} />
 }
 
 function NeighborhoodAction({
@@ -691,12 +672,11 @@ function deriveEntryDisplayTitleState(entry: VaultEntry): BreadcrumbDisplayTitle
   }
 }
 
-function deriveBreadcrumbDisplayTitle(entry: VaultEntry, filenameStem: string, content?: string | null): string | null {
+function deriveVisibleBreadcrumbTitle(entry: VaultEntry, content?: string | null): string {
   const displayState = deriveContentDisplayTitleState(content) ?? deriveEntryDisplayTitleState(entry)
   const displayTitle = displayState.title.trim()
-  if (!displayTitle || displayState.hasH1) return null
-  if (slugify(displayTitle) === slugify(filenameStem)) return null
-  return displayTitle
+  if (displayTitle) return displayTitle
+  return entry.filename.replace(/\.md$/i, '')
 }
 
 function FilenameInput({
@@ -730,10 +710,12 @@ function FilenameInput({
 
 function FilenameTrigger({
   filenameStem,
+  displayTitle,
   locale = 'en',
   onStartEditing,
 }: {
   filenameStem: string
+  displayTitle: string
   locale?: AppLocale
   onStartEditing: () => void
 }) {
@@ -753,8 +735,9 @@ function FilenameTrigger({
       onKeyDown={handleKeyDown}
       data-testid="breadcrumb-filename-trigger"
       aria-label={translate(locale, 'editor.filename.trigger', { filename: filenameStem })}
+      title={filenameStem}
     >
-      <span className="breadcrumb-bar__filename-text truncate">{filenameStem}</span>
+      <span className="breadcrumb-bar__filename-text truncate" data-testid="breadcrumb-note-title">{displayTitle}</span>
     </Button>
   )
 }
@@ -805,23 +788,16 @@ function FilenameDisplay({
   onRenameFilename?: (path: string, newFilenameStem: string) => void
   onStartEditing: () => void
 }) {
-  const displayTitle = deriveBreadcrumbDisplayTitle(entry, filenameStem, content)
+  const displayTitle = deriveVisibleBreadcrumbTitle(entry, content)
 
   return (
     <div className="flex min-w-0 items-center gap-1">
-      {displayTitle && (
-        <>
-          <span
-            className="min-w-0 max-w-[min(24rem,45vw)] truncate text-foreground"
-            data-testid="breadcrumb-display-title"
-            title={displayTitle}
-          >
-            {displayTitle}
-          </span>
-          <span aria-hidden="true" className="shrink-0 text-border">·</span>
-        </>
-      )}
-      <FilenameTrigger filenameStem={filenameStem} locale={locale} onStartEditing={onStartEditing} />
+      <FilenameTrigger
+        filenameStem={filenameStem}
+        displayTitle={displayTitle}
+        locale={locale}
+        onStartEditing={onStartEditing}
+      />
       <SyncFilenameButton entryPath={entry.path} syncStem={syncStem} locale={locale} onRenameFilename={onRenameFilename} />
     </div>
   )
@@ -940,9 +916,7 @@ function BreadcrumbActions({
       <OverflowToolbarAction>
         <FavoriteAction favorite={entry.favorite} locale={locale} onToggleFavorite={onToggleFavorite} />
       </OverflowToolbarAction>
-      <OverflowToolbarAction>
-        <OrganizedAction organized={entry.organized} locale={locale} onToggleOrganized={onToggleOrganized} />
-      </OverflowToolbarAction>
+      {/* Organized (✓) lives in the overflow menu — ☆ and ⋯ stay primary. */}
       {onReloadVault && (
         <OverflowToolbarAction>
           <IconActionButton
@@ -1129,6 +1103,12 @@ function BreadcrumbOverflowMenu({
             {leadingControl}
           </div>
         )}
+        {onToggleOrganized && (
+          <DropdownMenuItem onSelect={onToggleOrganized}>
+            <CheckCircle size={16} weight={organized ? 'fill' : 'regular'} />
+            {organizedLabel}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem disabled={!runDiffAction} onSelect={runDiffAction}>
           <GitBranch size={16} />
           {diffLabel}
@@ -1142,10 +1122,6 @@ function BreadcrumbOverflowMenu({
             <DropdownMenuItem disabled={!onToggleFavorite} onSelect={onToggleFavorite}>
               <Star size={16} weight={favorite ? 'fill' : 'regular'} />
               {favoriteLabel}
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={!onToggleOrganized} onSelect={onToggleOrganized}>
-              <CheckCircle size={16} weight={organized ? 'fill' : 'regular'} />
-              {organizedLabel}
             </DropdownMenuItem>
             <DropdownMenuItem disabled={!onReloadVault} onSelect={onReloadVault}>
               <ArrowsClockwise size={16} />
@@ -1245,6 +1221,17 @@ function WorkspaceCrumb({ entry }: Pick<BreadcrumbBarProps, 'entry'>) {
   )
 }
 
+function FolderCrumb({ entry }: Pick<BreadcrumbBarProps, 'entry'>) {
+  const folder = noteFolderLabel(entry.path, entry.filename)
+  if (!folder) return null
+  return (
+    <>
+      <span className="shrink-0" data-testid="breadcrumb-folder">{folder}</span>
+      <BreadcrumbSeparator />
+    </>
+  )
+}
+
 function BreadcrumbTitle({
   content,
   entry,
@@ -1252,12 +1239,10 @@ function BreadcrumbTitle({
   loadingTitle,
   onRenameFilename,
 }: Pick<BreadcrumbBarProps, 'content' | 'entry' | 'locale' | 'loadingTitle' | 'onRenameFilename'>) {
-  const typeLabel = entry.isA ?? 'Note'
   return (
     <div className="breadcrumb-bar__title-content flex items-center gap-1.5 min-w-0 text-sm text-muted-foreground">
       <WorkspaceCrumb entry={entry} />
-      <span className="shrink-0">{typeLabel}</span>
-      <BreadcrumbSeparator />
+      <FolderCrumb entry={entry} />
       <div className="flex min-w-0 items-center gap-1 truncate">
         {loadingTitle
           ? <BreadcrumbTitleSkeleton />

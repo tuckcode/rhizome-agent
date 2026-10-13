@@ -203,6 +203,28 @@ export function isSameDisplayDay(a: Date, b: Date, timeZone?: string | null): bo
  * `None` follows this machine. A chosen IANA zone formats through `Intl` and
  * does not read `getHours` or `getDate`.
  */
+/**
+ * One inbox-row date. Recent notes use a short relative label; older notes
+ * keep the chosen calendar format. The tooltip always carries the full date.
+ */
+export function formatInboxDateLabel(
+  timestampSeconds: number | null | undefined,
+  format: DateDisplayFormat = DEFAULT_DATE_DISPLAY_FORMAT,
+  nowSeconds: number = Date.now() / 1000,
+  timeZone?: string | null,
+): { label: string; title: string } | null {
+  if (!timestampSeconds) return null
+  const title = formatTimestampForDateDisplay(timestampSeconds, format, timeZone)
+  const savedParts = datePartsFromDate(new Date(timestampSeconds * 1000), timeZone)
+  const nowParts = datePartsFromDate(new Date(nowSeconds * 1000), timeZone)
+  const savedUtc = Date.UTC(savedParts.year, savedParts.month - 1, savedParts.day)
+  const nowUtc = Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day)
+  const ageDays = Math.round((nowUtc - savedUtc) / 86_400_000)
+  if (ageDays === 0) return { label: 'Today', title }
+  if (ageDays > 0 && ageDays < 7) return { label: `${ageDays}d`, title }
+  return { label: title, title }
+}
+
 export function formatSavedLabel(
   savedSeconds: number | null | undefined,
   createdSeconds: number | null | undefined,
