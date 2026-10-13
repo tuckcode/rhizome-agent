@@ -600,7 +600,7 @@ describe('Editor', () => {
       inspectorContent: mockContent,
     })
 
-    expect(screen.getByTestId('breadcrumb-filename-trigger')).toHaveTextContent('test')
+    expect(screen.getByTestId('breadcrumb-filename-trigger')).toHaveTextContent('Test Project')
     expect(screen.getAllByText('Properties').length).toBeGreaterThan(0)
     expect(screen.queryByText('Select a note to start editing')).not.toBeInTheDocument()
     expect(screen.queryByTestId('blocknote-view')).not.toBeInTheDocument()
