@@ -24,11 +24,11 @@ The left rail holds your sessions, the **Views** group (Research, Graph, Myceliu
 
 A **vault** is the folder where Rhizome keeps notes, and where the agent's saved memory goes. You have three choices:
 
-- **Get started with a template.** Rhizome creates a vault called `Getting Started` in your Documents folder. It's built on your computer; nothing is downloaded. It has starter folders, a welcome note, an `AGENTS.md` for agents, and the default work types from [Portent](../guides/structure-with-portent.md) (Project, Operation, Responsibility, Task, Event, Topic, Person). It's a Git repository with one first commit.
+- **Get started with a template.** Rhizome creates a vault at `~/Documents/Rhizome Vault`. It's built on your computer; nothing is downloaded. It has starter folders, a welcome note, an `AGENTS.md` for agents, and the default work types from [Portent](../guides/structure-with-portent.md) (Project, Operation, Responsibility, Task, Event, Topic, Person). It's a Git repository with one first commit. If you already have a `Getting Started` vault from an earlier version, it still opens as before.
 - **Create empty vault.** Name a new folder and choose where it goes. Rhizome adds its default settings files.
 - **Open existing vault.** Pick a folder you already have. Any folder of Markdown files works, including an Obsidian vault or a Git repository.
 
-<!-- The welcome card still says "Download the Getting Started vault", but the app builds it locally unless RHIZOME_GETTING_STARTED_REPO_URL is set. Update this page if the card copy or the default folder name ("Rhizome Vault" was proposed) changes. -->
+<!-- The app builds the template vault locally unless RHIZOME_GETTING_STARTED_REPO_URL is set. Update this page if the welcome card copy or the default folder name changes. -->
 
 If the folder is in Documents, Desktop or Downloads, macOS asks for permission. Allow it, or move the vault somewhere else.
 

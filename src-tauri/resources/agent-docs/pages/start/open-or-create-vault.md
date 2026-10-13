@@ -21,10 +21,10 @@ Good starting points:
 
 The welcome screen offers two ways to start fresh:
 
-- **Get started with a template** creates a `Getting Started` vault in your Documents folder, with starter folders, a welcome note, an `AGENTS.md`, and the default work types from [Portent](../guides/structure-with-portent.md). It's built locally and starts as a Git repository.
+- **Get started with a template** creates a vault at `~/Documents/Rhizome Vault`, with starter folders, a welcome note, an `AGENTS.md`, and the default work types from [Portent](../guides/structure-with-portent.md). It's built locally and starts as a Git repository. A `Getting Started` vault from an earlier version still opens as before.
 - **Create empty vault** asks for a name and a location, then adds Rhizome's default settings files.
 
-You can bring the template back later with **Restore Getting Started Vault** in the command palette.
+You can bring the template back later with **Restore Rhizome Vault** in the command palette.
 
 ## Use more than one vault
 

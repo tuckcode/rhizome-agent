@@ -58,7 +58,7 @@ The left rail holds your sessions, the **Views** group (Research, Graph, Myceliu
 
 A **vault** is the folder where Rhizome keeps notes, and where the agent's saved memory goes. You have three choices:
 
-- **Get started with a template.** Rhizome creates a vault called `Getting Started` in your Documents folder. It's built on your computer; nothing is downloaded. It has starter folders, a welcome note, an `AGENTS.md` for agents, and the default work types from [Portent](../guides/structure-with-portent.md) (Project, Operation, Responsibility, Task, Event, Topic, Person). It's a Git repository with one first commit.
+- **Get started with a template.** Rhizome creates a vault at `~/Documents/Rhizome Vault`. It's built on your computer; nothing is downloaded. It has starter folders, a welcome note, an `AGENTS.md` for agents, and the default work types from [Portent](../guides/structure-with-portent.md) (Project, Operation, Responsibility, Task, Event, Topic, Person). It's a Git repository with one first commit. If you already have a `Getting Started` vault from an earlier version, it still opens as before.
 - **Create empty vault.** Name a new folder and choose where it goes. Rhizome adds its default settings files.
 - **Open existing vault.** Pick a folder you already have. Any folder of Markdown files works, including an Obsidian vault or a Git repository.
 
@@ -199,10 +199,10 @@ Good starting points:
 
 The welcome screen offers two ways to start fresh:
 
-- **Get started with a template** creates a `Getting Started` vault in your Documents folder, with starter folders, a welcome note, an `AGENTS.md`, and the default work types from [Portent](../guides/structure-with-portent.md). It's built locally and starts as a Git repository.
+- **Get started with a template** creates a vault at `~/Documents/Rhizome Vault`, with starter folders, a welcome note, an `AGENTS.md`, and the default work types from [Portent](../guides/structure-with-portent.md). It's built locally and starts as a Git repository. A `Getting Started` vault from an earlier version still opens as before.
 - **Create empty vault** asks for a name and a location, then adds Rhizome's default settings files.
 
-You can bring the template back later with **Restore Getting Started Vault** in the command palette.
+You can bring the template back later with **Restore Rhizome Vault** in the command palette.
 
 ## Use more than one vault
 
@@ -1697,7 +1697,7 @@ Type a space first to switch the palette to a prompt. It sends the prompt to Cha
 - **Open in New Window**.
 - **Use Light Mode**, **Use Dark Mode** and **Match System**.
 - **Add Remote to Current Vault** and **View Pending Changes**.
-- **Reload Vault**, **Repair Vault** and **Restore Getting Started Vault**.
+- **Reload Vault**, **Repair Vault** and **Restore Rhizome Vault**.
 - **Set Up External AI Tools…** to connect Claude Code, Cursor and other MCP clients to your vault.
 - **Open Settings**, **Open AI Agents** and **Keyboard Shortcuts**.
 
@@ -1893,7 +1893,7 @@ Rhizome is free software under AGPL-3.0-or-later. It builds on the projects belo
 | [Mindwalk](https://github.com/cosmtrek/mindwalk) © 2026 Ricko Yu | MIT | The map engine behind [Mycelium](../concepts/mycelium.md). You install it separately; Rhizome calls it |
 | [OmniRoute](https://github.com/diegosouzapw/OmniRoute) © 2026 diegosouzapw | MIT | [Free tier (auto)](../concepts/free-models-and-routing.md): the provider catalog data and cooldown rules are ported from it |
 | [freellmapi](https://github.com/tashfeenahmed/freellmapi) | MIT | Free tier (auto): used as an edge-case checklist for retries and failover. No code or hosted catalog is copied |
-| [Portent](https://portent.md) | See the project | The default work types for new vaults. See [Structure a vault with Portent](../guides/structure-with-portent.md) |
+| [Portent](https://portent.md) ([portent-vault-template](https://github.com/refactoringhq/portent-vault-template) at commit `87c4adc`) © 2026 Refactoring | MIT | The default work types for new vaults, copied into `src-tauri/src/vault/config_seed.rs`. See [Structure a vault with Portent](../guides/structure-with-portent.md) |
 | [IronCalc](https://github.com/ironcalc/IronCalc) | MIT or Apache-2.0 | Spreadsheet engine for sheet notes |
 
 ---
