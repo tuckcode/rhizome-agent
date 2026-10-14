@@ -1,3 +1,4 @@
+import { formatAgentRunNote, renderRunLog } from './formatAgentRunNote'
 import { slugifyNoteStem } from './noteSlug'
 import { isTransientAgentFailureText } from './sessionAutoDistill'
 
@@ -117,7 +118,14 @@ export function buildPromotedNoteMarkdown(
   at: Date = new Date(),
   session?: string | null,
 ): string {
-  const body = text.trim()
+  const formatted = formatAgentRunNote(text, title)
+  const body = formatted.rewritten
+    ? [formatted.answer, formatted.tools.length > 0 || formatted.failedLifecycle.length > 0
+      ? renderRunLog(formatted)
+      : '']
+      .filter((part) => part.trim().length > 0)
+      .join('\n\n')
+    : text.trim()
   const yyyy = at.getFullYear()
   const mm = String(at.getMonth() + 1).padStart(2, '0')
   const dd = String(at.getDate()).padStart(2, '0')
@@ -130,6 +138,8 @@ export function buildPromotedNoteMarkdown(
     `created: ${date}`,
     'source: prime-chat-promote',
     ...(sessionValue ? [`session: ${yamlDoubleQuoted(sessionValue)}`] : []),
+    ...(formatted.agent ? [`agent: ${yamlDoubleQuoted(formatted.agent)}`] : []),
+    ...(formatted.mode ? [`mode: ${yamlDoubleQuoted(formatted.mode)}`] : []),
     '---',
   ]
   return [
@@ -147,7 +157,8 @@ export function buildPromoteNoteFromChat(
   at: Date = new Date(),
   options?: { session?: string | null },
 ): PromoteNoteFromChat {
-  const title = titleFromChatContent(text)
+  const formatted = formatAgentRunNote(text)
+  const title = formatted.rewritten ? formatted.title : titleFromChatContent(text)
   const path = promoteNoteRelativePath(title, at)
   const content = buildPromotedNoteMarkdown(text, title, at, options?.session)
   return { title, path, content }

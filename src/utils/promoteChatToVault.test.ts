@@ -85,6 +85,36 @@ describe('promoteChatToVault', () => {
     expect(invented).toHaveLength(original.length)
   })
 
+  it('collapses a raw agent run into the answer plus one run log', () => {
+    const note = buildPromoteNoteFromChat(
+      [
+        '→ Asking local/rhizome: Vault analysis',
+        '',
+        '[tool] Grep',
+        '[tool] Grep is running.',
+        '[tool] Read README.md',
+        '',
+        'agent: Grok CLI',
+        'mode: deep',
+        '',
+        'The vault has three layers.',
+        '',
+        'duration: 1m 3s',
+      ].join('\n'),
+      at,
+    )
+    expect(note.title).toBe('Vault analysis')
+    expect(note.content).toContain('agent: "Grok CLI"')
+    expect(note.content).toContain('mode: "deep"')
+    expect(note.content).toContain('# Vault analysis')
+    expect(note.content).toContain('The vault has three layers.')
+    expect(note.content).toContain('<summary>Run log · 2 tools · 1m 3s</summary>')
+    expect(note.content).not.toContain('is running.')
+    expect(note.content.indexOf('The vault has three layers.')).toBeLessThan(
+      note.content.indexOf('<details>'),
+    )
+  })
+
   // C51: a turn that produced nothing still renders a placeholder in Chat, and
   // Promote used to write that placeholder to the vault as if it were the
   // reply. Found natively 2026-08-26 when the model returned an empty turn.

@@ -296,17 +296,20 @@ fn tool_vault_path<'a>(
 }
 
 fn create_note_tool_content(args: &serde_json::Value, note_path: &str) -> String {
-    if let Some(content) = content_arg(args, "content") {
-        return content.to_string();
-    }
-    let title = string_arg(args, "title")
+    let fallback_title = string_arg(args, "title")
         .map(str::to_string)
         .unwrap_or_else(|| fallback_note_title(note_path));
+    if let Some(content) = content_arg(args, "content") {
+        return crate::agent_run_note::rewrite_agent_run_note_content(
+            content,
+            Some(&fallback_title),
+        );
+    }
     let note_type = string_arg(args, "type")
         .or_else(|| string_arg(args, "is_a"))
         .unwrap_or("Note");
     let note_type_yaml = serde_json::to_string(note_type).unwrap_or_else(|_| "\"Note\"".into());
-    format!("---\ntype: {note_type_yaml}\n---\n\n# {title}\n")
+    format!("---\ntype: {note_type_yaml}\n---\n\n# {fallback_title}\n")
 }
 
 fn fallback_note_title(note_path: &str) -> String {
