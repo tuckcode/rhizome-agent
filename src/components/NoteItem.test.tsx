@@ -277,7 +277,7 @@ describe('NoteItem', () => {
     expect(screen.getByTestId('note-content-stack').className).toContain('space-y-2')
   })
 
-  it('shows created date on the right side of the date row when available', () => {
+  it('shows one relative date and never prints Created beside it', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(NOW_SECONDS * 1000))
     const entry = makeEntry({
@@ -290,30 +290,15 @@ describe('NoteItem', () => {
 
     const dateRow = screen.getByTestId('note-date-row')
     expect(dateRow.className).toContain('grid')
-    expect(dateRow).toHaveTextContent('April 8, 2025')
-    expect(dateRow).toHaveTextContent('Created April 5, 2025')
+    expect(dateRow).toHaveTextContent('2d')
+    expect(dateRow.querySelector('[title="April 8, 2025"]')).toBeTruthy()
+    expect(screen.queryByText(/Created /)).not.toBeInTheDocument()
   })
 
-  /**
-   * The "Created …" half of this row is the first metadata to go when the
-   * note list is narrow (required-order step 3): `.note-item__created-label`
-   * is hidden by a container query on `.note-list-container` below ~260px
-   * (App.css), which jsdom does not evaluate — so this only checks the class
-   * is present for that CSS rule to target, not the rendered width.
-   */
-  it('marks the Created label so a narrow note list can hide it first', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date(NOW_SECONDS * 1000))
-    const entry = makeEntry({
-      title: 'Dated note',
-      createdAt: NOW_SECONDS - 86400 * 5,
-      modifiedAt: NOW_SECONDS - 86400 * 2,
-    })
+  it('keeps the type icon clear of the scrollbar', () => {
+    render(<NoteItem entry={makeEntry({ title: 'Icon room' })} isSelected={false} typeEntryMap={{}} onClickNote={vi.fn()} />)
 
-    render(<NoteItem entry={entry} isSelected={false} typeEntryMap={{}} onClickNote={vi.fn()} />)
-
-    const createdLabel = screen.getByText('Created April 5, 2025')
-    expect(createdLabel).toHaveClass('note-item__created-label')
+    expect(screen.getByTestId('type-icon')).toHaveClass('right-6')
   })
 
   it('shows the workspace badge after the creation date as an outlined badge', () => {
@@ -369,7 +354,8 @@ describe('NoteItem', () => {
     const dateRow = screen.getByTestId('note-date-row')
     const badge = within(dateRow).getByTestId('workspace-badge')
     expect(screen.getByTestId('note-title-row')).not.toContainElement(badge)
-    expect(dateRow).toHaveTextContent('Created April 10, 2025')
+    expect(dateRow).toHaveTextContent('Today')
+    expect(screen.queryByText(/Created /)).not.toBeInTheDocument()
     expect(badge).toHaveTextContent('LA')
     expect(badge).toHaveClass('-mr-1.5', 'border', 'bg-transparent', 'opacity-75')
     expect(badge.getAttribute('style')).toContain('border-color: var(--accent-red)')
@@ -387,7 +373,7 @@ describe('NoteItem', () => {
 
     render(<NoteItem entry={entry} isSelected={false} typeEntryMap={{}} onClickNote={vi.fn()} />)
 
-    expect(screen.getByTestId('note-date-row')).toHaveTextContent('April 10, 2025')
+    expect(screen.getByTestId('note-date-row')).toHaveTextContent('Today')
     expect(screen.queryByText(/Created /)).not.toBeInTheDocument()
   })
 

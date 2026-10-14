@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { workspaceClassName, workspaceStyle } from './aiWorkspaceSizing'
+import { DEFAULT_SIDE_WORKSPACE_WIDTH, workspaceClassName, workspaceStyle } from './aiWorkspaceSizing'
 
 /**
  * Chat-primary expands the side workspace to own the majority of the shell.
@@ -13,7 +13,7 @@ import { workspaceClassName, workspaceStyle } from './aiWorkspaceSizing'
  * `ff_chat_primary_shell=0`, where both pass.
  */
 describe('aiWorkspaceSizing — chat-primary must not cover the editor', () => {
-  const size = { height: 540, width: 420 }
+  const size = { height: 540, width: DEFAULT_SIDE_WORKSPACE_WIDTH }
 
   it('keeps the expanded side workspace in normal flow, not painted over the shell', () => {
     const className = workspaceClassName('side')
@@ -44,6 +44,11 @@ describe('aiWorkspaceSizing — chat-primary must not cover the editor', () => {
   it('still honours the user-resized width when not expanded', () => {
     const style = workspaceStyle('side', size, false)
 
-    expect(style?.width).toBe(420)
+    expect(style?.width).toBe(DEFAULT_SIDE_WORKSPACE_WIDTH)
+  })
+
+  it('defaults a first-open side workspace to the narrow empty width', () => {
+    expect(DEFAULT_SIDE_WORKSPACE_WIDTH).toBe(320)
+    expect(workspaceStyle('side', { height: 540, width: DEFAULT_SIDE_WORKSPACE_WIDTH })?.width).toBe(320)
   })
 })

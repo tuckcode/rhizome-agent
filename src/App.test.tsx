@@ -325,6 +325,21 @@ async function clickNoteListItem(noteListContainer: HTMLElement, title: string, 
   })
 }
 
+async function clickOrganizeFromOverflow() {
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: 'More note actions' })).toBeInTheDocument()
+  })
+  fireEvent.pointerDown(screen.getByRole('button', { name: 'More note actions' }), {
+    button: 0,
+    ctrlKey: false,
+  })
+  const menu = await screen.findByRole('menu')
+  await act(async () => {
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Set note as organized' }))
+    await Promise.resolve()
+  })
+}
+
 async function enterNeighborhood(noteListContainer: HTMLElement, title: string) {
   await clickNoteListItem(noteListContainer, title, { metaKey: true })
 }
@@ -1563,14 +1578,7 @@ describe('App', () => {
 
     await clickNoteListItem(noteListContainer, 'Alpha')
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Set note as organized' })).toBeInTheDocument()
-    })
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Set note as organized' }))
-      await Promise.resolve()
-    })
+    await clickOrganizeFromOverflow()
 
     await waitFor(() => {
       expect(window.__rhizomeTest?.activeTabPath).toBe('/vault/beta.md')
@@ -1597,14 +1605,7 @@ describe('App', () => {
 
     await clickNoteListItem(noteListContainer, 'Alpha')
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Set note as organized' })).toBeInTheDocument()
-    })
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Set note as organized' }))
-      await Promise.resolve()
-    })
+    await clickOrganizeFromOverflow()
 
     await act(async () => {
       fireEvent.click(within(noteListContainer).getByText('Gamma'))

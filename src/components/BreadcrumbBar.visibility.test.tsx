@@ -47,15 +47,16 @@ const defaultProps = {
 }
 
 describe('BreadcrumbBar filename visibility', () => {
-  it('keeps the filename visible in the breadcrumb by default', () => {
+  it('keeps the note title visible in the breadcrumb by default', () => {
     render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
-    expect(screen.getByText('test')).toBeVisible()
+    expect(screen.getByTestId('breadcrumb-note-title')).toHaveTextContent('Test Note')
+    expect(screen.getByTestId('breadcrumb-note-title')).toBeVisible()
   })
 
-  it('keeps the filename visible even when the bar is marked as title-hidden', () => {
+  it('keeps the note title visible even when the bar is marked as title-hidden', () => {
     const { container } = render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
     container.querySelector('.breadcrumb-bar')?.setAttribute('data-title-hidden', '')
-    expect(screen.getByText('test')).toBeVisible()
+    expect(screen.getByTestId('breadcrumb-note-title')).toBeVisible()
   })
 
   it('gives breadcrumb action buttons a full 32px hit target', () => {

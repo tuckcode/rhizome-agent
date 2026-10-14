@@ -105,7 +105,7 @@ describe('useCliAiAgent', () => {
     const { result } = renderAgent()
 
     act(() => {
-      result.current.addLocalMarker('AI permission mode changed to Power User. It will apply to the next message.')
+      result.current.addLocalMarker('AI permission mode changed to Full access. It will apply to the next message.')
     })
 
     await act(async () => {
@@ -113,7 +113,7 @@ describe('useCliAiAgent', () => {
     })
 
     expect(result.current.messages[0]).toEqual(expect.objectContaining({
-      localMarker: 'AI permission mode changed to Power User. It will apply to the next message.',
+      localMarker: 'AI permission mode changed to Full access. It will apply to the next message.',
     }))
     expect(mockStreamAiAgent).toHaveBeenCalledWith(expect.objectContaining({
       message: 'Continue',

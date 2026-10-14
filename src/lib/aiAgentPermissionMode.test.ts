@@ -25,7 +25,7 @@ describe('aiAgentPermissionMode', () => {
     expect(normalizeAiAgentPermissionMode('power_user')).toBe('power_user')
     expect(AI_AGENT_PERMISSION_MODE_LABELS.safe.short).toBe('Limited')
     expect(AI_AGENT_PERMISSION_MODE_LABELS.safe.control).toBe('Limited tools')
-    expect(AI_AGENT_PERMISSION_MODE_LABELS.power_user.short).toBe('Power User')
+    expect(AI_AGENT_PERMISSION_MODE_LABELS.power_user.short).toBe('Full access')
   })
 
   it('defaults Prime to power user and CLI agents to safe', () => {
@@ -71,7 +71,7 @@ describe('aiAgentPermissionMode', () => {
 
   it('formats a local transcript marker for mode changes', () => {
     expect(aiAgentPermissionModeMarker('power_user')).toBe(
-      'AI permission mode changed to Power User. It will apply to the next message.',
+      'AI permission mode changed to Full access. It will apply to the next message.',
     )
     expect(aiAgentPermissionModeMarker('power_user', 'en', 'prime')).toBe(
       'AI permission mode changed to Full tools. It will apply to the next message.',

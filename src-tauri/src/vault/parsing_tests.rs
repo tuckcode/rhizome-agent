@@ -283,6 +283,25 @@ fn test_extract_snippet_subheadings_with_emoji() {
 }
 
 #[test]
+fn test_extract_snippet_skips_agent_prompt_line() {
+    let content = "# Title\n\n→ Asking local/rhizome: \"How does Rhizome's vault work?\"\n\nThe vault stores notes as markdown files.\n";
+    let snippet = extract_snippet(content);
+    assert!(
+        snippet.starts_with("The vault stores notes as markdown"),
+        "snippet should skip the agent prompt, got: {}",
+        snippet
+    );
+    assert!(!snippet.contains("Asking"));
+}
+
+#[test]
+fn test_extract_snippet_keeps_ordinary_asking_text() {
+    let content = "# Title\n\nAsking the team about the vault layout.\n";
+    let snippet = extract_snippet(content);
+    assert_eq!(snippet, "Asking the team about the vault layout.");
+}
+
+#[test]
 fn test_extract_snippet_paragraph_takes_priority_over_headings() {
     let content = "# Title\n\n## Section One\n\nActual paragraph content.\n\n## Section Two\n";
     let snippet = extract_snippet(content);

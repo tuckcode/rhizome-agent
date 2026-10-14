@@ -21,8 +21,8 @@ export const AI_AGENT_PERMISSION_MODE_LABELS: Record<
     control: 'Limited tools',
   },
   power_user: {
-    short: 'Power User',
-    control: 'Power User',
+    short: 'Full access',
+    control: 'Full access',
   },
 }
 

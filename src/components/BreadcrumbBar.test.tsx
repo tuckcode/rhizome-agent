@@ -88,19 +88,13 @@ function startFilenameRename() {
   return screen.getByTestId('breadcrumb-filename-input')
 }
 
-function expectDisplayTitleState(
+function expectVisibleTitle(
   entryOverrides: Partial<VaultEntry>,
-  expected: { displayTitle: string | null; filenameStem: string },
+  expectedTitle: string,
   props: Partial<BreadcrumbBarRenderProps> = {},
 ) {
   renderEditableFilenameBreadcrumb(entryOverrides, props)
-
-  if (expected.displayTitle) {
-    expect(screen.getByTestId('breadcrumb-display-title')).toHaveTextContent(expected.displayTitle)
-  } else {
-    expect(screen.queryByTestId('breadcrumb-display-title')).not.toBeInTheDocument()
-  }
-  expect(screen.getByTestId('breadcrumb-filename-trigger')).toHaveTextContent(expected.filenameStem)
+  expect(screen.getByTestId('breadcrumb-note-title')).toHaveTextContent(expectedTitle)
 }
 
 async function expectTooltip(trigger: HTMLElement, ...parts: string[]) {
@@ -321,18 +315,18 @@ describe('BreadcrumbBar — file actions', () => {
 })
 
 describe('BreadcrumbBar — organized shortcut hint', () => {
-  it('shows Cmd+E on the organized toggle tooltip', async () => {
+  it('keeps organized in the overflow menu, not the icon row', async () => {
     render(<BreadcrumbBar entry={baseEntry} {...defaultProps} onToggleOrganized={vi.fn()} />)
-    await expectTooltip(
-      screen.getByRole('button', { name: 'Set note as organized' }),
-      'Set note as organized',
-      formatShortcutDisplay({ display: '⌘E' }),
-    )
+    expect(screen.queryByRole('button', { name: 'Set note as organized' })).not.toBeInTheDocument()
+    const menu = await openOverflowMenu()
+    expect(within(menu).getByRole('menuitem', { name: 'Set note as organized' })).toBeInTheDocument()
   })
 
-  it('hides the organized toggle when the workflow is disabled', () => {
+  it('hides the organized action when the workflow is disabled', async () => {
     render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
     expect(screen.queryByRole('button', { name: 'Set note as organized' })).not.toBeInTheDocument()
+    const menu = await openOverflowMenu()
+    expect(within(menu).queryByRole('menuitem', { name: 'Set note as organized' })).not.toBeInTheDocument()
   })
 })
 
@@ -356,12 +350,12 @@ describe('BreadcrumbBar — neighborhood action', () => {
 describe('BreadcrumbBar — title in breadcrumb (always rendered, CSS-toggled)', () => {
   it('always renders title elements in the DOM', () => {
     render(<BreadcrumbBar entry={baseEntry} {...defaultProps} />)
-    expect(screen.getByText('Note')).toBeInTheDocument()
+    expect(screen.getByTestId('breadcrumb-folder')).toHaveTextContent('note')
     expect(screen.getByText('›')).toBeInTheDocument()
-    expect(screen.getByText('test')).toBeInTheDocument()
+    expect(screen.getByTestId('breadcrumb-note-title')).toHaveTextContent('Test Note')
   })
 
-  it('shows the workspace initials label before the note type when workspace metadata is present', () => {
+  it('shows the workspace initials label before the folder when workspace metadata is present', () => {
     renderBreadcrumb({
       isA: 'Responsibility',
       workspace: {
@@ -379,30 +373,32 @@ describe('BreadcrumbBar — title in breadcrumb (always rendered, CSS-toggled)',
     })
 
     const workspaceLabel = screen.getByTestId('breadcrumb-workspace-label')
-    const typeLabel = screen.getByText('Responsibility')
+    const folderLabel = screen.getByTestId('breadcrumb-folder')
     expect(workspaceLabel).toHaveTextContent('BR')
     expect(workspaceLabel).toHaveAttribute('title', 'Brian (brian)')
-    expect(workspaceLabel.compareDocumentPosition(typeLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(folderLabel).toHaveTextContent('note')
+    expect(workspaceLabel.compareDocumentPosition(folderLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('does not render emoji note icons in the breadcrumb filename', () => {
     const entryWithEmoji = { ...baseEntry, icon: '🚀' }
     render(<BreadcrumbBar entry={entryWithEmoji} {...defaultProps} />)
-    expect(screen.getByTestId('breadcrumb-filename-trigger')).toHaveTextContent('test')
+    expect(screen.getByTestId('breadcrumb-filename-trigger')).toHaveTextContent('Test Note')
     expect(screen.queryByText('🚀')).not.toBeInTheDocument()
   })
 
   it('does not render Phosphor note icons in the breadcrumb filename', () => {
     const entryWithPhosphor = { ...baseEntry, icon: 'cooking-pot' }
     render(<BreadcrumbBar entry={entryWithPhosphor} {...defaultProps} />)
-    expect(screen.getByTestId('breadcrumb-filename-trigger')).toHaveTextContent('test')
+    expect(screen.getByTestId('breadcrumb-filename-trigger')).toHaveTextContent('Test Note')
     expect(screen.queryByTestId('breadcrumb-note-icon')).not.toBeInTheDocument()
   })
 
-  it('falls back to "Note" when isA is null', () => {
+  it('still shows the folder and title when isA is null', () => {
     const entryNoType = { ...baseEntry, isA: null }
     render(<BreadcrumbBar entry={entryNoType} {...defaultProps} />)
-    expect(screen.getByText('Note')).toBeInTheDocument()
+    expect(screen.getByTestId('breadcrumb-folder')).toHaveTextContent('note')
+    expect(screen.getByTestId('breadcrumb-note-title')).toHaveTextContent('Test Note')
   })
 
   it('separator visibility is controlled by data-title-hidden while using the shared border chrome', () => {
@@ -422,75 +418,75 @@ describe('BreadcrumbBar — title in breadcrumb (always rendered, CSS-toggled)',
 })
 
 describe('BreadcrumbBar — filename controls', () => {
-  it('shows a legacy display title while keeping the filename visible', () => {
-    expectDisplayTitleState(
+  it('shows the note title instead of the filename slug', () => {
+    expectVisibleTitle(
       {
         title: 'Reference Planning Notes',
         filename: 'ref-570.md',
         hasH1: false,
       },
-      { displayTitle: 'Reference Planning Notes', filenameStem: 'ref-570' },
+      'Reference Planning Notes',
     )
   })
 
   it('uses opened content when stale metadata marks a legacy note as H1-titled', () => {
-    expectDisplayTitleState(
+    expectVisibleTitle(
       {
         title: 'Reference Planning Notes',
         filename: 'ref-570.md',
         hasH1: true,
       },
-      { displayTitle: 'Reference Planning Notes', filenameStem: 'ref-570' },
+      'Reference Planning Notes',
       {
         content: '---\ntitle: Reference Planning Notes\ntype: Note\n---\n\nBody without an H1.',
       },
     )
   })
 
-  it('keeps content-derived H1 notes focused on the filename breadcrumb', () => {
-    expectDisplayTitleState(
+  it('uses the live H1 as the visible title', () => {
+    expectVisibleTitle(
       {
         title: 'Reference Planning Notes',
         filename: 'manual-filename.md',
         hasH1: false,
       },
-      { displayTitle: null, filenameStem: 'manual-filename' },
+      'Canonical H1',
       {
         content: '---\ntitle: Reference Planning Notes\n---\n\n# Canonical H1\n\nBody.',
       },
     )
   })
 
-  it('does not duplicate the display title when the filename already matches it', () => {
-    expectDisplayTitleState(
+  it('shows the title once when the filename already matches it', () => {
+    expectVisibleTitle(
       {
         title: 'Reference Planning Notes',
         filename: 'reference-planning-notes.md',
         hasH1: false,
       },
-      { displayTitle: null, filenameStem: 'reference-planning-notes' },
+      'Reference Planning Notes',
     )
   })
 
-  it('does not duplicate the display title when the filename matches with spaces', () => {
-    expectDisplayTitleState(
+  it('shows the title once when the filename matches with spaces', () => {
+    expectVisibleTitle(
       {
         title: 'Reference Planning Notes',
         filename: 'Reference Planning Notes.md',
         hasH1: false,
       },
-      { displayTitle: null, filenameStem: 'Reference Planning Notes' },
+      'Reference Planning Notes',
     )
   })
 
-  it('keeps H1-titled notes focused on the filename breadcrumb', () => {
-    expectDisplayTitleState(
+  it('keeps the entry title visible for H1-titled notes without opened content', () => {
+    expectVisibleTitle(
       {
         title: 'Reference Planning Notes',
         filename: 'manual-filename.md',
         hasH1: true,
       },
-      { displayTitle: null, filenameStem: 'manual-filename' },
+      'Reference Planning Notes',
     )
   })
 
@@ -880,7 +876,7 @@ describe('BreadcrumbBar — narrow layout keeps title, overflow trigger, and clo
 
     const menu = await openOverflowMenu()
     expect(within(menu).queryByRole('menuitem', { name: 'Add to favorites' })).not.toBeInTheDocument()
-    expect(within(menu).queryByRole('menuitem', { name: 'Set note as organized' })).not.toBeInTheDocument()
+    expect(within(menu).getByRole('menuitem', { name: 'Set note as organized' })).toBeInTheDocument()
     expect(within(menu).queryByRole('menuitem', { name: 'Reload vault' })).not.toBeInTheDocument()
     expect(within(menu).queryByRole('menuitem', { name: 'Lock note' })).not.toBeInTheDocument()
   })

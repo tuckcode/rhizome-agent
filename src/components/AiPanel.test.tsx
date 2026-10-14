@@ -241,7 +241,7 @@ describe('AiPanel', () => {
   it('does not expose a permission mode toggle for Prime', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
     expect(screen.queryByTestId('ai-permission-mode-toggle')).toBeNull()
-    expect(screen.queryByRole('radio', { name: 'Power User' })).toBeNull()
+    expect(screen.queryByRole('radio', { name: 'Full access' })).toBeNull()
     expect(screen.getByTestId('ai-harness-skills').textContent).toMatch(/rhizome-vault/)
   })
 
@@ -330,7 +330,7 @@ describe('AiPanel', () => {
 
   it('renders empty state without context', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
-    expect(screen.getByText('Message Prime Agent')).toBeTruthy()
+    expect(screen.getAllByText('Ask Prime Agent').length).toBeGreaterThan(0)
   })
 
   it('renders contextual empty state when active entry is provided', () => {
@@ -338,7 +338,7 @@ describe('AiPanel', () => {
     render(
       <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" activeEntry={entry} entries={[entry]} />
     )
-    expect(screen.getByText('Message Prime Agent')).toBeTruthy()
+    expect(screen.getByText('Ask Prime Agent about this note')).toBeTruthy()
   })
 
   it('does not render a context bar for the active entry', () => {

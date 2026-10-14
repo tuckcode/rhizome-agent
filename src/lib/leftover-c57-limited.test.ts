@@ -8,17 +8,17 @@ import {
 } from './aiAgentPermissionMode'
 
 describe('leftover C57 limited tools', () => {
-  it('locks Limited tools / Power User labels', () => {
+  it('locks Limited tools / Full access labels', () => {
     expect(AI_AGENT_PERMISSION_MODE_LABELS.safe.short).toBe('Limited')
     expect(AI_AGENT_PERMISSION_MODE_LABELS.safe.control).toBe('Limited tools')
-    expect(AI_AGENT_PERMISSION_MODE_LABELS.power_user.short).toBe('Power User')
-    expect(AI_AGENT_PERMISSION_MODE_LABELS.power_user.control).toBe('Power User')
+    expect(AI_AGENT_PERMISSION_MODE_LABELS.power_user.short).toBe('Full access')
+    expect(AI_AGENT_PERMISSION_MODE_LABELS.power_user.control).toBe('Full access')
 
     expect(aiAgentPermissionModeLabels('safe', 'en', 'claude_code').control).toBe(
       'Limited tools',
     )
     expect(aiAgentPermissionModeLabels('power_user', 'en', 'claude_code').control).toBe(
-      'Power User',
+      'Full access',
     )
   })
 
