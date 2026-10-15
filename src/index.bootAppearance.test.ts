@@ -124,6 +124,17 @@ describe('HTML boot appearance', () => {
     expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
   })
 
+  it('maps stored Graphite through Dark/Light/System instead of pinning Light', () => {
+    paint({ 'rhizome-theme': 'light', 'rhizome-color-theme': 'graphite' }, true)
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveClass('dark')
+
+    paint({ 'rhizome-theme': 'system', 'rhizome-color-theme': 'graphite' }, false)
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+  })
+
   it('keeps unsaved dark on Graphite on first paint', () => {
     paint({ 'rhizome-theme': 'dark' })
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')

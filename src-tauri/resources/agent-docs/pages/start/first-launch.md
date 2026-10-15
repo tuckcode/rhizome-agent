@@ -16,7 +16,7 @@ Change either one later in Settings → Telemetry. Analytics events leave out va
 
 ## 2. Chat opens
 
-Rhizome opens on Chat. On a first launch, the sessions list opens next to it. The theme is Graphite. Earth dark, Earth light, Loam, Mycelium and Match system (on Earth) are in Settings → Appearance.
+Rhizome opens on Chat. On a first launch, the sessions list opens next to it. The theme is Graphite. Dark is Graphite, Light is Earth light, and System follows the OS between those two. Earth dark, Loam, and Mycelium are color skins in Settings → Appearance.
 
 The left rail holds your sessions, the **Views** group (Research, Graph, Mycelium and History) and Settings. On a Mac, Ctrl+⌘1 to Ctrl+⌘4 open the four Views. On Windows, use Ctrl+Shift+1 to Ctrl+Shift+4.
 

@@ -5,6 +5,8 @@ export const LEGACY_THEME_MODE_STORAGE_KEY = LEGACY_APP_STORAGE_KEYS.theme
 export const DEFAULT_THEME_MODE = 'dark'
 export const SYSTEM_THEME_MODE = 'system'
 export const SYSTEM_THEME_MEDIA_QUERY = '(prefers-color-scheme: dark)'
+/** Settings mode picker order: System / Dark / Light. */
+export const THEME_MODE_PICKER_ORDER = ['system', 'dark', 'light'] as const
 
 const RESOLVED_THEME_MODES = new Set(['light', 'dark'])
 const THEME_MODES = new Set([...RESOLVED_THEME_MODES, SYSTEM_THEME_MODE])
@@ -12,7 +14,7 @@ const THEME_MODES = new Set([...RESOLVED_THEME_MODES, SYSTEM_THEME_MODE])
 export type ResolvedThemeMode = 'light' | 'dark'
 export type ThemeMode = ResolvedThemeMode | typeof SYSTEM_THEME_MODE
 
-type ThemeStorage = Pick<Storage, 'getItem' | 'setItem'>
+type ThemeStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 type ThemeDocument = Pick<Document, 'documentElement'>
 type ThemeMatchMedia = Window['matchMedia']
 
@@ -105,23 +107,45 @@ export function applyStoredThemeMode(
 }
 
 /**
- * Color skin when the user never stored one.
- * No saved color → Graphite in dark (fresh install and existing dark-mode
- * users who never picked a skin). Saved light → Earth. Saved system follows
- * the OS (dark may resolve to Graphite; light stays Earth light). An explicit
- * stored slug always wins. Does not write the inferred slug.
+ * Mode picker mapping. Dark is Graphite, Light is Earth light, System
+ * picks between those two from the OS. Default (nothing saved) is Dark.
+ * Does not write the inferred slug.
+ */
+export function colorThemeForThemeMode(
+  mode: ThemeMode | null,
+  matchMedia?: ThemeMatchMedia,
+): string {
+  if (mode === 'light') return DUAL_MODE_COLOR_THEME
+  if (mode === 'system') {
+    return resolveSystemThemeMode(matchMedia) === 'light' ? DUAL_MODE_COLOR_THEME : DEFAULT_COLOR_THEME
+  }
+  return DEFAULT_COLOR_THEME
+}
+
+/**
+ * True when Light / Dark / System still drive Graphite vs Earth light.
+ * Graphite is the Dark default, not a pin. Earth dark (`rhizome` in dark),
+ * Loam, Mycelium, and community skins pin the toggle.
+ */
+export function colorThemeFollowsMode(theme: string, mode?: ThemeMode | null): boolean {
+  if (!theme || theme === DEFAULT_COLOR_THEME) return true
+  if (theme === DUAL_MODE_COLOR_THEME && mode !== 'dark') return true
+  return false
+}
+
+/**
+ * Color skin when the user never stored a pinning slug.
+ * Stored Graphite is the Dark default, not a pin — Light and System still
+ * map through `colorThemeForThemeMode`. Earth dark / Loam / Mycelium /
+ * community slugs win. Does not write the inferred slug.
  */
 export function resolveStoredColorTheme(
   storedColor: string | null,
   storedMode: ThemeMode | null,
   matchMedia?: ThemeMatchMedia,
 ): string {
-  if (storedColor) return storedColor
-  if (storedMode === 'light') return DUAL_MODE_COLOR_THEME
-  if (storedMode === 'system') {
-    return resolveSystemThemeMode(matchMedia) === 'light' ? DUAL_MODE_COLOR_THEME : DEFAULT_COLOR_THEME
-  }
-  return DEFAULT_COLOR_THEME
+  if (storedColor && storedColor !== DEFAULT_COLOR_THEME) return storedColor
+  return colorThemeForThemeMode(storedMode, matchMedia)
 }
 
 export function readStoredAppearance(
@@ -142,12 +166,13 @@ export function readStoredAppearance(
 // Earth lives on slug `rhizome`: light is the default light contract, dark
 // is `:root.dark[data-color-theme="rhizome"]`. No saved color starts in
 // Graphite (fresh install and unsaved dark). Saved Light stays Earth light.
-// Saved System follows the OS. A stored `rhizome` / Loam / Mycelium /
-// community slug is kept. Loam and Mycelium are optional dark skins. Other
-// fixed themes (from the brand handoff) are single-polarity skins in
-// themes.css; picking one pins the resolved mode to its polarity. The
-// accent swap only applies on the default theme — fixed themes own their
-// accent. Earth still follows the Light/Dark/Match system toggle.
+// Saved System follows the OS between Graphite and Earth light. A stored
+// `rhizome` (Earth dark) / Loam / Mycelium / community slug is kept. Loam
+// and Mycelium are optional dark skins. Other fixed themes (from the brand
+// handoff) are single-polarity skins in themes.css; picking one pins the
+// resolved mode to its polarity. The accent swap only applies on the
+// default theme — fixed themes own their accent. Dark / Light / System map
+// to Graphite / Earth light; Earth dark is a color skin.
 
 export const COLOR_THEME_STORAGE_KEY = 'rhizome-color-theme'
 export const DARK_PARTNER_STORAGE_KEY = 'rhizome-dark-partner'
@@ -156,7 +181,7 @@ export const ACCENT_COLOR_STORAGE_KEY = 'rhizome-accent'
 export const LEGACY_COLOR_THEME_STORAGE_KEY = 'tolaria-color-theme'
 export const LEGACY_ACCENT_COLOR_STORAGE_KEY = 'tolaria-accent'
 export const DEFAULT_COLOR_THEME = 'graphite'
-/** Earth light/dark — the only slug that follows the mode toggle. */
+/** Earth — light side of Dark/Light/System; dark is the Earth dark skin. */
 export const DUAL_MODE_COLOR_THEME = 'rhizome'
 export const DEFAULT_ACCENT_COLOR = 'blue'
 
@@ -242,6 +267,14 @@ export function writeStoredColorTheme(storage: ThemeStorage, theme: string): voi
   safeSetItem(storage, COLOR_THEME_STORAGE_KEY, theme)
 }
 
+export function clearStoredColorTheme(storage: ThemeStorage): void {
+  try {
+    storage.removeItem(COLOR_THEME_STORAGE_KEY)
+  } catch {
+    // Storage can be unavailable in restricted browser contexts.
+  }
+}
+
 export function readStoredAccentColor(storage: ThemeStorage): AccentColor | null {
   const stored = normalizeAccentColor(safeGetItem(storage, ACCENT_COLOR_STORAGE_KEY))
   if (stored) return stored
@@ -306,31 +339,33 @@ export function applyStoredAppearance(
 
 /**
  * Next appearance patch for the status-bar light/dark toggle.
- * Fixed color themes pin polarity, so a bare theme_mode flip is a no-op —
- * leave the pinned skin for Earth so the mode change takes effect.
- * Graphite (and other dark-pinned skins) remember themselves as the dark
- * partner so the next press returns there instead of Earth dark.
+ * The default pair is Graphite ↔ Earth light. A pinned dark skin other
+ * than Graphite (Loam, Mycelium, community) remembers itself as partner.
+ * `color_theme: null` clears a stored slug so Light/Dark inference applies.
  */
 export function buildStatusBarThemeTogglePatch(
   documentThemeMode: ResolvedThemeMode,
   colorTheme: string | null | undefined,
   darkPartner?: string | null,
-): { theme_mode: ResolvedThemeMode; color_theme?: string; dark_partner?: string | null } {
-  const selectedColorTheme = normalizeColorTheme(colorTheme) ?? DEFAULT_COLOR_THEME
+): { theme_mode: ResolvedThemeMode; color_theme: string | null; dark_partner?: string | null } {
+  const selectedColorTheme = normalizeColorTheme(colorTheme)
   if (documentThemeMode === 'dark') {
-    if (colorThemePolarity(selectedColorTheme) === 'dark') {
-      return { theme_mode: 'light', color_theme: DUAL_MODE_COLOR_THEME, dark_partner: selectedColorTheme }
-    }
-    return { theme_mode: 'light', dark_partner: null }
+    const partner = selectedColorTheme
+      && colorThemePolarity(selectedColorTheme) === 'dark'
+      && selectedColorTheme !== DEFAULT_COLOR_THEME
+      ? selectedColorTheme
+      : null
+    return { theme_mode: 'light', color_theme: null, dark_partner: partner }
   }
   const partner = normalizeColorTheme(darkPartner)
-  if (partner && colorThemePolarity(partner) === 'dark') {
+  if (
+    partner
+    && colorThemePolarity(partner) === 'dark'
+    && partner !== DEFAULT_COLOR_THEME
+  ) {
     return { theme_mode: 'dark', color_theme: partner, dark_partner: null }
   }
-  if (colorThemePolarity(selectedColorTheme)) {
-    return { theme_mode: 'dark', color_theme: DUAL_MODE_COLOR_THEME, dark_partner: null }
-  }
-  return { theme_mode: 'dark' }
+  return { theme_mode: 'dark', color_theme: null, dark_partner: null }
 }
 
 export interface AppearancePickerOption {
@@ -348,7 +383,7 @@ const EARTH_LIGHT_SWATCH: [string, string, string] = ['#ECE6DA', '#F1ECE2', '#2C
 export function appearancePickerOptions(): AppearancePickerOption[] {
   const bySlug = new Map(COLOR_THEMES.map((theme) => [theme.slug, theme]))
   const product: AppearancePickerOption[] = [
-    { id: 'graphite', name: 'Graphite', colorTheme: 'graphite', swatch: bySlug.get('graphite')!.swatch },
+    { id: 'graphite', name: 'Graphite', colorTheme: 'graphite', mode: 'dark', swatch: bySlug.get('graphite')!.swatch },
     { id: 'earth-dark', name: 'Earth dark', colorTheme: DUAL_MODE_COLOR_THEME, mode: 'dark', swatch: EARTH_DARK_SWATCH },
     { id: 'earth-light', name: 'Earth light', colorTheme: DUAL_MODE_COLOR_THEME, mode: 'light', swatch: EARTH_LIGHT_SWATCH },
     { id: 'loam', name: 'Loam', colorTheme: 'loam', swatch: bySlug.get('loam')!.swatch },

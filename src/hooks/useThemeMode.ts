@@ -1,8 +1,10 @@
 import { useEffect } from 'react'
 import {
   applyAppearanceToDocument,
+  clearStoredColorTheme,
   colorThemePolarity,
   DEFAULT_ACCENT_COLOR,
+  DEFAULT_COLOR_THEME,
   DEFAULT_THEME_MODE,
   normalizeAccentColor,
   normalizeColorTheme,
@@ -36,14 +38,17 @@ function resolveRuntimeColorTheme(
   storedMode: ThemeMode | null,
 ): { colorTheme: string; persistColor: boolean } {
   const fromSettings = normalizeColorTheme(colorTheme)
-  if (fromSettings) return { colorTheme: fromSettings, persistColor: true }
+  if (fromSettings && fromSettings !== DEFAULT_COLOR_THEME) {
+    return { colorTheme: fromSettings, persistColor: true }
+  }
   if (typeof window === 'undefined') {
     return { colorTheme: resolveStoredColorTheme(null, storedMode), persistColor: false }
   }
   const stored = readStoredColorTheme(window.localStorage)
+  const persistColor = Boolean(stored && stored !== DEFAULT_COLOR_THEME)
   return {
     colorTheme: resolveStoredColorTheme(stored, storedMode, currentMatchMedia()),
-    persistColor: stored !== null,
+    persistColor,
   }
 }
 
@@ -69,6 +74,7 @@ function writeAppearanceMirror(
   if (typeof window === 'undefined') return
   writeStoredThemeMode(window.localStorage, themeMode)
   if (persistColor) writeStoredColorTheme(window.localStorage, colorTheme)
+  else clearStoredColorTheme(window.localStorage)
   writeStoredAccentColor(window.localStorage, accentColor)
 }
 
@@ -123,10 +129,9 @@ function subscribeSystemThemeChanges(
 /**
  * Applies the full appearance selection (light/dark/system mode, color
  * theme, accent) to the document. `colorTheme`/`accentColor` are optional —
- * omitting them infers from the saved mode (Graphite when there is no
- * saved color, including unsaved dark; Light stays Earth; System follows
- * the OS). Earth (`rhizome`) is the only slug that follows Light/Dark/Match
- * system.
+ * omitting them infers from the saved mode (Dark is Graphite, Light is
+ * Earth light, System follows the OS between those two). Earth dark,
+ * Loam, and Mycelium stay as color skins.
  */
 export function useThemeMode(
   themeMode: ThemeMode | null | undefined,

@@ -50,7 +50,7 @@ Change either one later in Settings → Telemetry. Analytics events leave out va
 
 ## 2. Chat opens
 
-Rhizome opens on Chat. On a first launch, the sessions list opens next to it. The theme is Graphite. Earth dark, Earth light, Loam, Mycelium and Match system (on Earth) are in Settings → Appearance.
+Rhizome opens on Chat. On a first launch, the sessions list opens next to it. The theme is Graphite. Dark is Graphite, Light is Earth light, and System follows the OS between those two. Earth dark, Loam, and Mycelium are color skins in Settings → Appearance.
 
 The left rail holds your sessions, the **Views** group (Research, Graph, Mycelium and History) and Settings. On a Mac, Ctrl+⌘1 to Ctrl+⌘4 open the four Views. On Windows, use Ctrl+Shift+1 to Ctrl+Shift+4.
 
@@ -1406,7 +1406,8 @@ Display settings live with the app on this computer, unless a setting is stored 
 
 Rhizome starts in **Graphite**. Change it in Settings → Appearance:
 
-- **Color theme.** **Graphite** is the default warm-neutral dark skin. **Earth dark** and **Earth light** are the Earth theme; they follow the **Theme** setting below the chips: Light, Dark, or **Match system**, which follows your computer's light or dark setting. **Loam** is a warm dark skin. **Mycelium** is a green-black skin. The other themes (Nord, Dracula, Solarized and more) are fixed skins with their own light or dark look.
+- **Theme.** **System**, **Dark**, and **Light**. Dark is Graphite. Light is Earth light. System follows your computer between those two. Default is Dark (Graphite). The status-bar toggle swaps Graphite and Earth light.
+- **Color theme.** **Earth dark**, **Loam**, and **Mycelium** stay selectable as color skins. The other themes (Nord, Dracula, Solarized and more) are fixed skins with their own light or dark look.
 - **Accent color.** Sets the colour of actions, links and highlights on Graphite. Fixed themes use their own accent.
 
 You can also switch with **Use Light Mode**, **Use Dark Mode** and **Match System** in the command palette.

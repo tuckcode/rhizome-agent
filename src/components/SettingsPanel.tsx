@@ -36,10 +36,12 @@ import {
 import {
   applyAppearanceToDocument,
   appearancePickerOptions,
-  colorThemePolarity,
+  clearStoredColorTheme,
+  colorThemeFollowsMode,
   DEFAULT_ACCENT_COLOR,
   DEFAULT_COLOR_THEME,
   DEFAULT_THEME_MODE,
+  DUAL_MODE_COLOR_THEME,
   isAppearancePickerOptionSelected,
   normalizeColorTheme,
   readStoredAccentColor,
@@ -47,6 +49,7 @@ import {
   readStoredThemeMode,
   resolveStoredColorTheme,
   resolveThemeMode,
+  THEME_MODE_PICKER_ORDER,
   writeStoredAccentColor,
   writeStoredColorTheme,
   writeStoredThemeMode,
@@ -324,7 +327,7 @@ function resolveSettingsDraftColorTheme(
   colorTheme: Settings['color_theme'],
 ): string {
   const storedColor = colorTheme || (typeof window === 'undefined' ? null : readStoredColorTheme(window.localStorage))
-  if (storedColor) return storedColor
+  if (storedColor && storedColor !== DEFAULT_COLOR_THEME) return storedColor
   return ''
 }
 
@@ -390,9 +393,16 @@ function sanitizePositiveInteger(value: number | null | undefined, fallback: num
   return Math.round(value)
 }
 
+function persistableColorTheme(colorTheme: string, mode: ThemeMode): string | null {
+  const persistedColor = normalizeColorTheme(colorTheme)
+  if (!persistedColor || persistedColor === DEFAULT_COLOR_THEME) return null
+  if (persistedColor === DUAL_MODE_COLOR_THEME && mode !== 'dark') return null
+  return persistedColor
+}
+
 function applyAppearanceSelection(mode: ThemeMode, colorTheme: string, accentColor: AccentColor): void {
   const matchMedia = typeof window !== 'undefined' ? window.matchMedia?.bind(window) : undefined
-  const persistedColor = normalizeColorTheme(colorTheme)
+  const persistedColor = persistableColorTheme(colorTheme, mode)
   const selectedColor = persistedColor ?? resolveStoredColorTheme(null, mode, matchMedia)
   if (typeof document !== 'undefined') {
     applyAppearanceToDocument(document, { mode, colorTheme: selectedColor, accentColor }, matchMedia)
@@ -400,6 +410,7 @@ function applyAppearanceSelection(mode: ThemeMode, colorTheme: string, accentCol
   if (typeof window !== 'undefined') {
     writeStoredThemeMode(window.localStorage, mode)
     if (persistedColor) writeStoredColorTheme(window.localStorage, persistedColor)
+    else clearStoredColorTheme(window.localStorage)
     writeStoredAccentColor(window.localStorage, accentColor)
   }
 }
@@ -566,18 +577,20 @@ function SettingsPanelInner({
 
   const handleThemeModeChange = useCallback((value: ThemeMode) => {
     updateDraft('themeMode', value)
-    applyAppearanceSelection(value, draft.colorTheme, draft.accentColor)
-    onSave({ ...settings, theme_mode: value })
-  }, [draft.accentColor, draft.colorTheme, onSave, settings, updateDraft])
+    updateDraft('colorTheme', '')
+    applyAppearanceSelection(value, '', draft.accentColor)
+    onSave({ ...settings, theme_mode: value, color_theme: null })
+  }, [draft.accentColor, onSave, settings, updateDraft])
 
   const handleColorThemeChange = useCallback((value: string, mode?: ThemeMode) => {
     const nextMode = mode ?? draft.themeMode
+    const persistColor = persistableColorTheme(value, nextMode)
     if (mode) updateDraft('themeMode', mode)
-    updateDraft('colorTheme', value)
-    applyAppearanceSelection(nextMode, value, draft.accentColor)
+    updateDraft('colorTheme', persistColor ?? '')
+    applyAppearanceSelection(nextMode, persistColor ?? '', draft.accentColor)
     onSave({
       ...settings,
-      color_theme: value,
+      color_theme: persistColor,
       ...(mode ? { theme_mode: mode } : {}),
     })
   }, [draft.accentColor, draft.themeMode, onSave, settings, updateDraft])
@@ -1242,13 +1255,13 @@ function AppearanceSettingsSection({
   SettingsBodyProps,
   't' | 'themeMode' | 'setThemeMode' | 'colorTheme' | 'setColorTheme' | 'accentColor' | 'setAccentColor'
 >) {
-  const followsMode = colorThemePolarity(colorTheme) === null
+  const followsMode = colorThemeFollowsMode(colorTheme, themeMode)
   const showAccent = colorTheme === DEFAULT_COLOR_THEME || (!colorTheme && resolveThemeMode(themeMode) === 'dark')
   return (
     <>
       <SettingsRow
         label={t('settings.colorTheme.label')}
-        description={t('settings.colorTheme.description')}
+        description="Graphite is Dark. Earth light is Light. System follows the OS between those two. Earth dark, Loam, and Mycelium are color skins."
         controlWidth="wide"
       >
         <ColorThemeControl value={colorTheme} themeMode={themeMode} onChange={setColorTheme} t={t} />
@@ -1257,8 +1270,8 @@ function AppearanceSettingsSection({
         label={t('settings.theme.label')}
         description={
           followsMode
-            ? t('settings.appearance.description')
-            : t('settings.theme.controlledByColorTheme')
+            ? 'Dark is Graphite. Light is Earth light. System follows the OS.'
+            : 'Controlled by the selected color theme.'
         }
       >
         <ThemeModeControl value={themeMode} onChange={setThemeMode} t={t} disabled={!followsMode} />
@@ -1348,15 +1361,18 @@ function ThemeModeControl({
       aria-disabled={disabled}
       data-testid="settings-theme-mode"
     >
-      <ThemeModeButton label={t('settings.theme.light')} selected={value === 'light'} value="light" onSelect={onChange} disabled={disabled}>
-        <Sun size={14} />
-      </ThemeModeButton>
-      <ThemeModeButton label={t('settings.theme.dark')} selected={value === 'dark'} value="dark" onSelect={onChange} disabled={disabled}>
-        <Moon size={14} />
-      </ThemeModeButton>
-      <ThemeModeButton label={t('settings.theme.system')} selected={value === 'system'} value="system" onSelect={onChange} disabled={disabled}>
-        <Monitor size={14} />
-      </ThemeModeButton>
+      {THEME_MODE_PICKER_ORDER.map((mode) => (
+        <ThemeModeButton
+          key={mode}
+          label={mode === 'system' ? 'System' : mode === 'dark' ? 'Dark' : 'Light'}
+          selected={value === mode}
+          value={mode}
+          onSelect={onChange}
+          disabled={disabled}
+        >
+          {mode === 'system' ? <Monitor size={14} /> : mode === 'dark' ? <Moon size={14} /> : <Sun size={14} />}
+        </ThemeModeButton>
+      ))}
     </div>
   )
 }

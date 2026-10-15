@@ -3,6 +3,8 @@ import type { Settings } from '../types'
 import {
   applyAppearanceToDocument,
   buildStatusBarThemeTogglePatch,
+  clearStoredColorTheme,
+  colorThemeFollowsMode,
   DARK_PARTNER_STORAGE_KEY,
   DEFAULT_ACCENT_COLOR,
   normalizeAccentColor,
@@ -137,6 +139,7 @@ export function useAppPreferences({
     if (typeof window !== 'undefined') {
       writeStoredThemeMode(window.localStorage, mode)
       if (storedColor) writeStoredColorTheme(window.localStorage, storedColor)
+      else clearStoredColorTheme(window.localStorage)
       writeStoredAccentColor(window.localStorage, selectedAccent)
     }
     void syncAppIconThemeMode(resolved)
@@ -153,15 +156,21 @@ export function useAppPreferences({
     const nextSettings = { ...settings, ...settingsPatch }
     applyAppearanceNow(
       patch.theme_mode,
-      patch.color_theme ?? settings.color_theme,
+      patch.color_theme,
       settings.accent_color,
     )
     void saveSettings(nextSettings)
   }, [applyAppearanceNow, documentThemeMode, saveSettings, settings])
   const handleSetThemeMode = useCallback((theme_mode: ThemeMode) => {
     if (!settingsLoaded) return
-    applyAppearanceNow(theme_mode, settings.color_theme, settings.accent_color)
-    void saveSettings({ ...settings, theme_mode })
+    const followsMode = colorThemeFollowsMode(settings.color_theme ?? '', settings.theme_mode)
+    const nextColor = followsMode ? null : settings.color_theme
+    applyAppearanceNow(theme_mode, nextColor, settings.accent_color)
+    void saveSettings({
+      ...settings,
+      theme_mode,
+      ...(followsMode ? { color_theme: null } : {}),
+    })
   }, [applyAppearanceNow, saveSettings, settings, settingsLoaded])
   const handleSetUiLanguage = useCallback((uiLanguage: UiLanguagePreference) => {
     void saveSettings({ ...settings, ui_language: serializeUiLanguagePreference(uiLanguage) })

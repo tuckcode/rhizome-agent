@@ -149,7 +149,7 @@ describe('useThemeMode', () => {
   })
 
   it('applies a non-default accent only alongside Graphite, and mirrors it to storage', () => {
-    renderHook(() => useThemeMode('light', true, 'graphite', 'green'))
+    renderHook(() => useThemeMode('dark', true, 'graphite', 'green'))
 
     expect(document.documentElement).toHaveAttribute('data-accent', 'green')
     expect(document.documentElement).not.toHaveAttribute('data-color-theme')

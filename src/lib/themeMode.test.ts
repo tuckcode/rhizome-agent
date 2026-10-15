@@ -14,7 +14,10 @@ import {
   COLOR_THEME_STORAGE_KEY,
   COLOR_THEMES,
   appearancePickerOptions,
+  colorThemeFollowsMode,
+  colorThemeForThemeMode,
   isAppearancePickerOptionSelected,
+  THEME_MODE_PICKER_ORDER,
   LEGACY_ACCENT_COLOR_STORAGE_KEY,
   LEGACY_COLOR_THEME_STORAGE_KEY,
   LEGACY_THEME_MODE_STORAGE_KEY,
@@ -103,12 +106,24 @@ describe('themeMode', () => {
     expect(document.documentElement).toHaveClass('dark')
   })
 
-  it('infers Graphite for unsaved dark and only Earth for saved light', () => {
+  it('maps Dark to Graphite, Light to Earth light, and System to that pair', () => {
+    expect(THEME_MODE_PICKER_ORDER).toEqual(['system', 'dark', 'light'])
+    expect(colorThemeForThemeMode(null)).toBe('graphite')
+    expect(colorThemeForThemeMode('dark')).toBe('graphite')
+    expect(colorThemeForThemeMode('light')).toBe('rhizome')
+    expect(colorThemeForThemeMode('system', makeMatchMedia(true))).toBe('graphite')
+    expect(colorThemeForThemeMode('system', makeMatchMedia(false))).toBe('rhizome')
     expect(resolveStoredColorTheme(null, null)).toBe('graphite')
     expect(resolveStoredColorTheme(null, 'dark')).toBe('graphite')
-    expect(resolveStoredColorTheme(null, 'system', makeMatchMedia(true))).toBe('graphite')
-    expect(resolveStoredColorTheme(null, 'light')).toBe('rhizome')
-    expect(resolveStoredColorTheme('rhizome', 'light')).toBe('rhizome')
+    expect(resolveStoredColorTheme('graphite', 'light')).toBe('rhizome')
+    expect(resolveStoredColorTheme('graphite', 'system', makeMatchMedia(false))).toBe('rhizome')
+    expect(resolveStoredColorTheme('rhizome', 'dark')).toBe('rhizome')
+    expect(colorThemeFollowsMode('')).toBe(true)
+    expect(colorThemeFollowsMode('graphite')).toBe(true)
+    expect(colorThemeFollowsMode('rhizome', 'light')).toBe(true)
+    expect(colorThemeFollowsMode('rhizome', 'dark')).toBe(false)
+    expect(colorThemeFollowsMode('loam')).toBe(false)
+    expect(colorThemeFollowsMode('mycelium')).toBe(false)
   })
 
   it('keeps an explicit Earth light pick instead of switching to Graphite', () => {
@@ -429,24 +444,43 @@ describe('color themes and accent', () => {
     expect(readStoredAccentColor(storage)).toBe('green')
   })
 
-  it('status-bar toggle flips mode on Earth and leaves Graphite for Earth light', () => {
-    expect(buildStatusBarThemeTogglePatch('light', 'rhizome')).toEqual({ theme_mode: 'dark' })
-    expect(buildStatusBarThemeTogglePatch('dark', 'graphite')).toEqual({
+  it('status-bar toggle swaps Graphite and Earth light', () => {
+    expect(buildStatusBarThemeTogglePatch('dark', null)).toEqual({
       theme_mode: 'light',
-      color_theme: 'rhizome',
-      dark_partner: 'graphite',
+      color_theme: null,
+      dark_partner: null,
     })
-  })
-
-  it('status-bar toggle remembers Graphite as the dark partner', () => {
     expect(buildStatusBarThemeTogglePatch('dark', 'graphite')).toEqual({
       theme_mode: 'light',
-      color_theme: 'rhizome',
-      dark_partner: 'graphite',
+      color_theme: null,
+      dark_partner: null,
+    })
+    expect(buildStatusBarThemeTogglePatch('light', 'rhizome')).toEqual({
+      theme_mode: 'dark',
+      color_theme: null,
+      dark_partner: null,
     })
     expect(buildStatusBarThemeTogglePatch('light', 'rhizome', 'graphite')).toEqual({
       theme_mode: 'dark',
-      color_theme: 'graphite',
+      color_theme: null,
+      dark_partner: null,
+    })
+    expect(buildStatusBarThemeTogglePatch('dark', 'rhizome')).toEqual({
+      theme_mode: 'light',
+      color_theme: null,
+      dark_partner: null,
+    })
+  })
+
+  it('status-bar toggle remembers a pinned dark skin other than Graphite', () => {
+    expect(buildStatusBarThemeTogglePatch('dark', 'loam')).toEqual({
+      theme_mode: 'light',
+      color_theme: null,
+      dark_partner: 'loam',
+    })
+    expect(buildStatusBarThemeTogglePatch('light', null, 'loam')).toEqual({
+      theme_mode: 'dark',
+      color_theme: 'loam',
       dark_partner: null,
     })
   })
@@ -454,12 +488,12 @@ describe('color themes and accent', () => {
   it('status-bar toggle leaves a pinned color theme so mode can change', () => {
     expect(buildStatusBarThemeTogglePatch('dark', 'dracula')).toEqual({
       theme_mode: 'light',
-      color_theme: 'rhizome',
+      color_theme: null,
       dark_partner: 'dracula',
     })
     expect(buildStatusBarThemeTogglePatch('light', 'github-light')).toEqual({
       theme_mode: 'dark',
-      color_theme: 'rhizome',
+      color_theme: null,
       dark_partner: null,
     })
   })
