@@ -50,11 +50,11 @@
     <style>
       :root {
         color-scheme: dark;
-        background: #0F110C;
-        color: #E9E8DC;
-        --primary: #7DF0AE;
-        --text-primary: #E9E8DC;
-        --text-muted: #999784;
+        background: #131210;
+        color: #EEEDEB;
+        --primary: #76EAA7;
+        --text-primary: #EEEDEB;
+        --text-muted: #A6A5A3;
       }
       :root[data-theme="light"] {
         color-scheme: light;
@@ -66,11 +66,27 @@
       }
       :root[data-theme="dark"] {
         color-scheme: dark;
+        background: #131210;
+        color: #EEEDEB;
+        --primary: #76EAA7;
+        --text-primary: #EEEDEB;
+        --text-muted: #A6A5A3;
+      }
+      :root[data-color-theme="rhizome"] {
+        color-scheme: dark;
         background: #0F110C;
         color: #E9E8DC;
         --primary: #7DF0AE;
         --text-primary: #E9E8DC;
         --text-muted: #999784;
+      }
+      :root[data-theme="light"][data-color-theme="rhizome"] {
+        color-scheme: light;
+        background: #ECE6DA;
+        color: #2A251E;
+        --primary: #2C6A4D;
+        --text-primary: #2A251E;
+        --text-muted: #625A4D;
       }
       :root[data-color-theme="loam"] {
         color-scheme: dark;
@@ -79,6 +95,14 @@
         --primary: #6FE3A0;
         --text-primary: #EDE6D8;
         --text-muted: #A3987F;
+      }
+      :root[data-color-theme="mycelium"] {
+        color-scheme: dark;
+        background: #0E120C;
+        color: #E6EBE0;
+        --primary: #6FE3A0;
+        --text-primary: #E6EBE0;
+        --text-muted: #9AA48E;
       }
       :root[data-accent="red"] { --primary: #C03D30; }
       :root[data-accent="orange"] { --primary: #B4552D; }
@@ -112,8 +136,8 @@
         padding: 20px;
       }
       :root.ai-workspace-native-window #root {
-        background: #0F110C;
-        border: 1px solid #2A281D;
+        background: #131210;
+        border: 1px solid #302F2D;
         border-radius: 12px;
         box-sizing: border-box;
         box-shadow: 0 12px 26px rgba(0, 0, 0, 0.30), 0 1px 4px rgba(0, 0, 0, 0.22);
@@ -127,13 +151,25 @@
         box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.10);
       }
       :root.ai-workspace-native-window[data-theme="dark"] #root {
+        background: #131210;
+        border-color: #302F2D;
+        box-shadow: 0 12px 26px rgba(0, 0, 0, 0.30), 0 1px 4px rgba(0, 0, 0, 0.22);
+      }
+      :root.ai-workspace-native-window[data-color-theme="rhizome"] #root {
         background: #0F110C;
         border-color: #2A281D;
-        box-shadow: 0 12px 26px rgba(0, 0, 0, 0.30), 0 1px 4px rgba(0, 0, 0, 0.22);
+      }
+      :root.ai-workspace-native-window[data-theme="light"][data-color-theme="rhizome"] #root {
+        background: #F1ECE2;
+        border-color: #DDD4C3;
       }
       :root.ai-workspace-native-window[data-color-theme="loam"] #root {
         background: #15110C;
         border-color: #352C20;
+      }
+      :root.ai-workspace-native-window[data-color-theme="mycelium"] #root {
+        background: #0E120C;
+        border-color: #232A1F;
       }
     </style>
     <title>Rhizome Agent</title>
@@ -153,12 +189,14 @@
         // themes pin the resolved mode to their polarity so there is no
         // flash even when the mode toggle disagrees (e.g. system=light but
         // the chosen fixed theme is dark).
+        var DEFAULT_COLOR_THEME = 'graphite';
         var THEME_POLARITY = {
+          graphite: 'dark',
           dracula: 'dark', nord: 'dark', 'gruvbox-dark': 'dark', 'gruvbox-light': 'light',
           'solarized-light': 'light', 'solarized-dark': 'dark', 'catppuccin-mocha': 'dark',
           'catppuccin-latte': 'light', 'tokyo-night': 'dark', 'one-dark': 'dark',
           'rose-pine': 'dark', 'github-light': 'light', everforest: 'dark', 'monokai-pro': 'dark',
-          loam: 'dark',
+          loam: 'dark', mycelium: 'dark',
         };
         var ACCENT_KEYS = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'gray'];
         function normalizeTheme(value) {
@@ -183,7 +221,7 @@
           return mode === 'system' ? (prefersDarkTheme() ? 'dark' : 'light') : mode;
         }
         function applyTheme(modeValue, colorThemeValue, accentValue) {
-          var colorTheme = normalizeColorTheme(colorThemeValue) || 'rhizome';
+          var colorTheme = normalizeColorTheme(colorThemeValue) || DEFAULT_COLOR_THEME;
           var accent = normalizeAccent(accentValue) || 'blue';
           var polarity = THEME_POLARITY[colorTheme];
           var mode = polarity || resolveTheme(modeValue);
@@ -191,12 +229,12 @@
           document.documentElement.setAttribute('data-theme', mode);
           document.documentElement.classList.toggle('dark', mode === 'dark');
 
-          if (colorTheme === 'rhizome') {
+          if (colorTheme === DEFAULT_COLOR_THEME) {
             document.documentElement.removeAttribute('data-color-theme');
           } else {
             document.documentElement.setAttribute('data-color-theme', colorTheme);
           }
-          if (colorTheme === 'rhizome' && accent !== 'blue') {
+          if (colorTheme === DEFAULT_COLOR_THEME && accent !== 'blue') {
             document.documentElement.setAttribute('data-accent', accent);
           } else {
             document.documentElement.removeAttribute('data-accent');

@@ -19,6 +19,17 @@ describe('NoteItem', () => {
     openExternalUrl.mockClear()
   })
 
+  it('marks a selected row with the shared list-row fill and left bar', () => {
+    const entry = makeEntry({ filename: 'selected.md', title: 'Selected note' })
+
+    render(<NoteItem entry={entry} isSelected typeEntryMap={{}} onClickNote={vi.fn()} />)
+
+    const row = screen.getByRole('option')
+    expect(row.className).toContain('list-row-selected')
+    expect(row.style.borderLeft).toBe('')
+    expect(row.style.backgroundColor).toBe('')
+  })
+
   it('renders unsupported binary files as non-clickable muted rows', () => {
     const binaryEntry = makeEntry({
       path: '/vault/archive.zip',

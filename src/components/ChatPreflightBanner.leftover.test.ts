@@ -9,7 +9,7 @@ const source = readFileSync(
 describe('ChatPreflightBanner leftover chrome', () => {
   it('keeps title and body at 12px', () => {
     expect(source).toContain('text-[12px] font-medium text-foreground')
-    expect(source).toContain('min-w-0 text-[12px] text-foreground')
+    expect(source).toContain('min-w-0 text-[12px] text-[var(--text-secondary)]')
     expect(source).not.toMatch(/text-\[11px\]/)
   })
 

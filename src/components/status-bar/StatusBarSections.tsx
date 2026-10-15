@@ -127,8 +127,8 @@ function BuildNumberButton({
   locale: AppLocale
 }) {
   const className = compact
-    ? 'h-6 min-w-0 gap-1 rounded-sm px-1 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground'
-    : 'h-auto gap-1 rounded-sm px-1 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground'
+    ? 'h-6 min-w-0 gap-1 rounded-sm px-1 py-0.5 font-mono text-[12px] font-medium tracking-[0.02em] text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground'
+    : 'h-auto gap-1 rounded-sm px-1 py-0.5 font-mono text-[12px] font-medium tracking-[0.02em] text-muted-foreground hover:bg-[var(--hover)] hover:text-foreground'
 
   return (
     <ActionTooltip copy={{ label: translate(locale, 'status.update.check') }} side="top">

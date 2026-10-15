@@ -46,7 +46,7 @@ export function FolderItemRow({
       className={cn(
         'group relative flex items-center gap-1 rounded transition-colors',
         isSelected
-          ? 'bg-[var(--accent-blue-light)] text-primary'
+          ? 'list-row-selected text-primary'
           : 'text-foreground hover:bg-accent',
       )}
       style={{ paddingLeft: depthIndent, borderRadius: 4 }}

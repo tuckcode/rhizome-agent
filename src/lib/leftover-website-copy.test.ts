@@ -20,6 +20,7 @@ describe('leftover website and preview copy', () => {
     expect(landing).toContain('<title>Rhizome</title>')
     expect(landing).toContain('Rhizome runs its own agent loop')
     expect(landing).toContain('Free tier (auto)')
+    expect(landing).toContain('Graphite')
     expect(landing).toContain('Earth dark')
     expect(landing).toContain('The agent cannot search the vault yet')
     expect(readme).toContain('The agent cannot search the vault or old Mycelium sessions yet')

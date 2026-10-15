@@ -116,6 +116,7 @@ describe('StatusBar', () => {
       />,
     )
     const build = screen.getByTestId('status-build-number')
+    expect(build.className).toContain('font-mono')
     const theme = screen.getByTestId('status-theme-mode')
     expect(build.compareDocumentPosition(theme) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })

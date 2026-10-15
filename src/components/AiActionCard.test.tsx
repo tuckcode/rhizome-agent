@@ -16,19 +16,25 @@ describe('AiActionCard', () => {
     expect(screen.getByText('Created test.md')).toBeTruthy()
   })
 
-  it('shows pending spinner', () => {
+  it('shows pending as RUN with a spinner', () => {
     render(<AiActionCard {...defaults} tool="search_notes" label="Searching..." status="pending" />)
-    expect(screen.getByTestId('status-pending')).toBeTruthy()
+    const pending = screen.getByTestId('status-pending')
+    expect(pending).toHaveTextContent('RUN')
+    expect(pending.className).toContain('font-mono')
   })
 
-  it('shows done check', () => {
+  it('shows done as OK with a status dot', () => {
     render(<AiActionCard {...defaults} status="done" />)
-    expect(screen.getByTestId('status-done')).toBeTruthy()
+    const done = screen.getByTestId('status-done')
+    expect(done).toHaveTextContent('OK')
+    expect(done.className).toContain('font-mono')
   })
 
-  it('shows error icon', () => {
+  it('shows error as ERR with a status dot', () => {
     render(<AiActionCard {...defaults} tool="delete_note" label="Failed" status="error" />)
-    expect(screen.getByTestId('status-error')).toBeTruthy()
+    const error = screen.getByTestId('status-error')
+    expect(error).toHaveTextContent('ERR')
+    expect(error.className).toContain('font-mono')
   })
 
   it('navigates to note when no details and path+onOpenNote provided', () => {

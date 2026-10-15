@@ -36,11 +36,11 @@ export function CelebrationToast({
     >
       <div className="pointer-events-auto flex max-w-md items-start gap-3 rounded-[var(--radius)] border border-[var(--border-subtle)] bg-[var(--surface-panel,var(--card))] px-4 py-3 shadow-lg">
         <div className="min-w-0">
-          <p className="text-sm leading-snug text-[var(--text-primary,var(--foreground))]">
+          <p className="text-sm leading-snug text-[var(--text-secondary,var(--foreground))]">
             {message}
           </p>
           {from ? (
-            <p className="mt-0.5 text-xs text-[var(--text-muted,var(--muted-foreground))]">
+            <p className="mt-0.5 text-xs text-[var(--text-secondary,var(--muted-foreground))]">
               {t('ai.celebration.from', { name: from })}
             </p>
           ) : null}

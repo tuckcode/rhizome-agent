@@ -12,7 +12,7 @@ User-facing name is **Rhizome**. The bundle is still `ai.rhizome.agent` / `Rhizo
 
 - Rhizome owns the agent loop (ADR-0180). Native chat works without Prime. Settings still starts Chat on Prime until you switch **Chat engine**. Hermes is not a usable engine in the app today.
 - Free-tier routing appears as **Free tier (auto)**. The name Taproot is not on main.
-- Earth dark is the default theme. Earth light, Loam, and Match system are in Settings.
+- Graphite is the default theme. Earth dark, Earth light, Loam, Mycelium, and Match system (on Earth) are in Settings.
 - Left rail Views are Research, Graph, Mycelium, and History (Ctrl+Cmd+1–4 on Mac, Ctrl+Shift+1–4 on Windows). Changes sits next to Notes.
 - You read and diff notes in the vault. Mycelium replays builds. The agent cannot search the vault or old Mycelium sessions yet.
 - Provider keys live in the system keychain. A leftover `ai-provider-secrets.json` migrates on first read. Do not tell a user to edit that file.

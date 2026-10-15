@@ -40,11 +40,13 @@ describe('useThemeMode', () => {
     expect(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)).toBe('dark')
   })
 
-  it('starts a fresh install in Earth dark when nothing is saved', () => {
+  it('starts a fresh install in Graphite when nothing is saved', () => {
     renderHook(() => useThemeMode(null, true))
 
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     expect(document.documentElement).toHaveClass('dark')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(window.localStorage.getItem(COLOR_THEME_STORAGE_KEY)).toBe('graphite')
   })
 
   it('uses the storage mirror when persisted settings are empty', () => {
@@ -58,7 +60,7 @@ describe('useThemeMode', () => {
   it('keeps system stored while applying the resolved OS appearance', () => {
     installMatchMedia(true)
 
-    renderHook(() => useThemeMode('system', true))
+    renderHook(() => useThemeMode('system', true, 'rhizome'))
 
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     expect(document.documentElement).toHaveClass('dark')
@@ -68,7 +70,7 @@ describe('useThemeMode', () => {
   it('updates the document theme when the OS appearance changes in system mode', () => {
     const media = installMatchMedia(true)
 
-    const { unmount } = renderHook(() => useThemeMode('system', true))
+    const { unmount } = renderHook(() => useThemeMode('system', true, 'rhizome'))
 
     act(() => media.setMatches(false))
     expect(document.documentElement).toHaveAttribute('data-theme', 'light')
@@ -82,7 +84,7 @@ describe('useThemeMode', () => {
   it('removes the Match system prefers-color-scheme listener on cleanup and when leaving system mode', () => {
     const media = installMatchMedia(true)
     const { rerender, unmount } = renderHook(
-      ({ mode }: { mode: ThemeMode }) => useThemeMode(mode, true),
+      ({ mode }: { mode: ThemeMode }) => useThemeMode(mode, true, 'rhizome'),
       { initialProps: { mode: 'system' as ThemeMode } },
     )
 
@@ -111,11 +113,19 @@ describe('useThemeMode', () => {
     expect(window.localStorage.getItem(COLOR_THEME_STORAGE_KEY)).toBe('dracula')
   })
 
-  it('applies a non-default accent only alongside the rhizome theme, and mirrors it to storage', () => {
-    renderHook(() => useThemeMode('light', true, 'rhizome', 'green'))
+  it('applies a non-default accent only alongside Graphite, and mirrors it to storage', () => {
+    renderHook(() => useThemeMode('light', true, 'graphite', 'green'))
 
     expect(document.documentElement).toHaveAttribute('data-accent', 'green')
     expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(window.localStorage.getItem(ACCENT_COLOR_STORAGE_KEY)).toBe('green')
+  })
+
+  it('does not apply a non-default accent on Earth', () => {
+    renderHook(() => useThemeMode('light', true, 'rhizome', 'green'))
+
+    expect(document.documentElement).not.toHaveAttribute('data-accent')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
     expect(window.localStorage.getItem(ACCENT_COLOR_STORAGE_KEY)).toBe('green')
   })
 

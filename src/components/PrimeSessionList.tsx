@@ -123,9 +123,9 @@ function SessionRowFrame({
   return (
     <div
       className={cn(
-        'group relative flex items-stretch rounded-sm border border-transparent',
-        'transition-colors hover:border-border hover:bg-background',
-        active && 'border-border-strong bg-background',
+        'group relative flex items-stretch rounded-sm',
+        'transition-colors hover:bg-[var(--state-hover)]',
+        active && 'list-row-selected',
       )}
       onContextMenu={onContextMenu}
       onFocus={onFocus}
@@ -344,7 +344,7 @@ function SessionRowButton({
           {title}
         </span>
         {meta ? (
-          <span className="mt-px block truncate font-mono text-[10px] tracking-[0.02em] text-muted-foreground">
+          <span className="mt-px block truncate font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
             {meta}
           </span>
         ) : null}

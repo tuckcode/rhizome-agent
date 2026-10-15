@@ -113,20 +113,24 @@ export function readStoredAppearance(storage: ThemeStorage): AppearanceSelection
 }
 
 // ── Color themes and accent ──────────────────────────────────────────────────
-// The default `rhizome` theme is the hand-tuned Earth light/dark contract in
-// index.css and follows the Light/Dark/Match system mode toggle. Fresh
-// installs start in Earth dark. Loam is an optional warm-dark Earth skin.
-// Other fixed themes (from the brand handoff) are single-polarity skins in
-// themes.css; picking one pins the resolved mode to its polarity so every
-// existing dark-conditional keeps working. The accent swap only applies on
-// the rhizome theme — fixed themes own their accent.
+// The default `graphite` theme is the warm-neutral dark contract in index.css
+// (`:root.dark` with no data-color-theme). Earth lives on slug `rhizome`:
+// light is the default light contract, dark is `:root.dark[data-color-theme="rhizome"]`.
+// Fresh installs and empty storage start in Graphite. A stored `rhizome` /
+// Loam / Mycelium / community slug is kept. Loam and Mycelium are optional
+// dark skins. Other fixed themes (from the brand handoff) are single-polarity
+// skins in themes.css; picking one pins the resolved mode to its polarity.
+// The accent swap only applies on the default theme — fixed themes own their
+// accent. Earth still follows the Light/Dark/Match system toggle.
 
 export const COLOR_THEME_STORAGE_KEY = 'rhizome-color-theme'
 export const ACCENT_COLOR_STORAGE_KEY = 'rhizome-accent'
 /** Prior generation ("tolaria", the pre-rename product name). See ADR-0162. */
 export const LEGACY_COLOR_THEME_STORAGE_KEY = 'tolaria-color-theme'
 export const LEGACY_ACCENT_COLOR_STORAGE_KEY = 'tolaria-accent'
-export const DEFAULT_COLOR_THEME = 'rhizome'
+export const DEFAULT_COLOR_THEME = 'graphite'
+/** Earth light/dark — the only slug that follows the mode toggle. */
+export const DUAL_MODE_COLOR_THEME = 'rhizome'
 export const DEFAULT_ACCENT_COLOR = 'blue'
 
 export interface ColorThemeDefinition {
@@ -140,8 +144,10 @@ export interface ColorThemeDefinition {
 }
 
 export const COLOR_THEMES: readonly ColorThemeDefinition[] = [
-  { slug: 'rhizome', name: 'Rhizome', polarity: null, swatch: ['#ECE6DA', '#F1ECE2', '#2C6A4D'] },
+  { slug: 'graphite', name: 'Graphite', polarity: 'dark', swatch: ['#171614', '#131210', '#76EAA7'] },
+  { slug: 'rhizome', name: 'Earth', polarity: null, swatch: ['#ECE6DA', '#F1ECE2', '#2C6A4D'] },
   { slug: 'loam', name: 'Loam', polarity: 'dark', swatch: ['#15110C', '#1D1811', '#6FE3A0'] },
+  { slug: 'mycelium', name: 'Mycelium', polarity: 'dark', swatch: ['#10150E', '#0E120C', '#6FE3A0'] },
   { slug: 'dracula', name: 'Dracula', polarity: 'dark', swatch: ['#21222C', '#282A36', '#BD93F9'] },
   { slug: 'nord', name: 'Nord', polarity: 'dark', swatch: ['#3B4252', '#2E3440', '#88C0D0'] },
   { slug: 'gruvbox-dark', name: 'Gruvbox Dark', polarity: 'dark', swatch: ['#32302F', '#282828', '#FE8019'] },
@@ -232,8 +238,8 @@ export interface AppearanceSelection {
 
 /**
  * Apply the full appearance selection: color theme attribute, accent
- * attribute (rhizome only), and the resolved light/dark mode — pinned to
- * the theme's polarity for fixed themes, mode-toggle-driven for rhizome.
+ * attribute (default theme only), and the resolved light/dark mode — pinned
+ * to the theme's polarity for fixed themes, mode-toggle-driven for Earth.
  * Returns the resolved mode.
  */
 export function applyAppearanceToDocument(
@@ -274,7 +280,7 @@ export function applyStoredAppearance(
 /**
  * Next appearance patch for the status-bar light/dark toggle.
  * Fixed color themes pin polarity, so a bare theme_mode flip is a no-op —
- * leave the pinned skin (back to Rhizome) so the mode change takes effect.
+ * leave the pinned skin for Earth so the mode change takes effect.
  */
 export function buildStatusBarThemeTogglePatch(
   documentThemeMode: ResolvedThemeMode,
@@ -283,7 +289,48 @@ export function buildStatusBarThemeTogglePatch(
   const theme_mode: ResolvedThemeMode = documentThemeMode === 'dark' ? 'light' : 'dark'
   const selectedColorTheme = normalizeColorTheme(colorTheme) ?? DEFAULT_COLOR_THEME
   if (colorThemePolarity(selectedColorTheme)) {
-    return { theme_mode, color_theme: DEFAULT_COLOR_THEME }
+    return { theme_mode, color_theme: DUAL_MODE_COLOR_THEME }
   }
   return { theme_mode }
+}
+
+export interface AppearancePickerOption {
+  id: string
+  name: string
+  colorTheme: string
+  mode?: ResolvedThemeMode
+  swatch: [string, string, string]
+}
+
+const EARTH_DARK_SWATCH: [string, string, string] = ['#121410', '#0F110C', '#7DF0AE']
+const EARTH_LIGHT_SWATCH: [string, string, string] = ['#ECE6DA', '#F1ECE2', '#2C6A4D']
+
+/** Product chips first (Graphite, Earth dark, Earth light, Loam, Mycelium), then community skins. */
+export function appearancePickerOptions(): AppearancePickerOption[] {
+  const bySlug = new Map(COLOR_THEMES.map((theme) => [theme.slug, theme]))
+  const product: AppearancePickerOption[] = [
+    { id: 'graphite', name: 'Graphite', colorTheme: 'graphite', swatch: bySlug.get('graphite')!.swatch },
+    { id: 'earth-dark', name: 'Earth dark', colorTheme: DUAL_MODE_COLOR_THEME, mode: 'dark', swatch: EARTH_DARK_SWATCH },
+    { id: 'earth-light', name: 'Earth light', colorTheme: DUAL_MODE_COLOR_THEME, mode: 'light', swatch: EARTH_LIGHT_SWATCH },
+    { id: 'loam', name: 'Loam', colorTheme: 'loam', swatch: bySlug.get('loam')!.swatch },
+    { id: 'mycelium', name: 'Mycelium', colorTheme: 'mycelium', swatch: bySlug.get('mycelium')!.swatch },
+  ]
+  const productThemes = new Set(product.map((option) => option.colorTheme))
+  const rest = COLOR_THEMES.filter((theme) => !productThemes.has(theme.slug)).map((theme) => ({
+    id: theme.slug,
+    name: theme.name,
+    colorTheme: theme.slug,
+    swatch: theme.swatch,
+  }))
+  return [...product, ...rest]
+}
+
+export function isAppearancePickerOptionSelected(
+  option: AppearancePickerOption,
+  colorTheme: string,
+  resolvedMode: ResolvedThemeMode,
+): boolean {
+  if (option.colorTheme !== colorTheme) return false
+  if (!option.mode) return true
+  return resolvedMode === option.mode
 }

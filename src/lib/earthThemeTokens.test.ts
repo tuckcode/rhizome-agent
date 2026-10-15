@@ -49,6 +49,52 @@ function contrastRatio(foreground: string, background: string): number {
   return (lighter + 0.05) / (darker + 0.05)
 }
 
+const GRAPHITE = {
+  '--surface-app': '#131210',
+  '--surface-editor': '#131210',
+  '--surface-sidebar': '#171614',
+  '--surface-panel': '#1C1B19',
+  '--surface-card': '#1C1B19',
+  '--surface-popover': '#22211F',
+  '--surface-input': '#131210',
+  '--surface-button': '#292826',
+  '--surface-dialog': '#1F1E1C',
+  '--text-primary': '#EEEDEB',
+  '--text-secondary': '#C6C5C3',
+  '--text-tertiary': '#AFAEAC',
+  '--text-muted': '#A6A5A3',
+  '--text-faint': '#9F9E9C',
+  '--text-heading': '#F7F6F4',
+  '--text-inverse': '#131210',
+  '--border-default': '#302F2D',
+  '--border-subtle': '#282725',
+  '--border-strong': '#3F3E3C',
+  '--border-input': '#7F7E7C',
+  '--border-dialog': '#302F2D',
+  '--border-focus': 'var(--accent-blue)',
+  '--state-hover': '#242321',
+  '--state-hover-subtle': '#1A1917',
+  '--state-selected': '#202B23',
+  '--state-selected-strong': '#26382C',
+  '--state-active': '#26382C',
+  '--state-focus-ring': 'var(--accent-blue)',
+  '--state-drag-target': 'rgba(118, 234, 167, 0.18)',
+  '--state-disabled': '#1A1917',
+  '--accent-blue': '#76EAA7',
+  '--accent-blue-hover': '#94F0BB',
+  '--accent-blue-bg': 'rgba(118, 234, 167, 0.18)',
+  '--accent-blue-light': 'rgba(118, 234, 167, 0.14)',
+  '--accent-green': '#9BCF7E',
+  '--accent-green-light': 'rgba(155, 207, 126, 0.16)',
+  '--accent-orange': '#E9B04F',
+  '--accent-orange-light': 'rgba(233, 176, 79, 0.14)',
+  '--accent-red': '#EE8B7E',
+  '--accent-red-light': 'rgba(238, 139, 126, 0.16)',
+  '--ok-text': '#9BCF7E',
+  '--danger-text': '#EE8B7E',
+  '--warn-text': '#E9B04F',
+} as const
+
 const EARTH_DARK = {
   '--surface-app': '#0F110C',
   '--surface-editor': '#0F110C',
@@ -253,15 +299,21 @@ function expectReadableText(block: string): void {
 
 describe('Earth theme tokens', () => {
   const light = themeBlock(indexCss, ':root,\n[data-theme="light"]')
-  const dark = themeBlock(indexCss, ':root.dark,\n[data-theme="dark"]')
+  const graphite = themeBlock(indexCss, ':root.dark,\n[data-theme="dark"]')
+  const dark = themeBlock(indexCss, ':root.dark[data-color-theme="rhizome"] {')
   const loam = themeBlock(
     themesCss,
     ':root[data-color-theme="loam"],\n:root.dark[data-color-theme="loam"]',
   )
+  const mycelium = themeBlock(
+    themesCss,
+    ':root[data-color-theme="mycelium"],\n:root.dark[data-color-theme="mycelium"]',
+  )
 
-  it('keeps rhizome as the default color theme and adds Loam', () => {
+  it('keeps Graphite as the default color theme and keeps Earth, Loam, and Mycelium', () => {
     expect(DEFAULT_THEME_MODE).toBe('dark')
-    expect(DEFAULT_COLOR_THEME).toBe('rhizome')
+    expect(DEFAULT_COLOR_THEME).toBe('graphite')
+    expect(COLOR_THEMES.find((theme) => theme.slug === 'rhizome')?.name).toBe('Earth')
     const loamTheme = COLOR_THEMES.find((theme) => theme.slug === 'loam')
     expect(loamTheme).toEqual({
       slug: 'loam',
@@ -269,6 +321,7 @@ describe('Earth theme tokens', () => {
       polarity: 'dark',
       swatch: ['#15110C', '#1D1811', '#6FE3A0'],
     })
+    expect(COLOR_THEMES.find((theme) => theme.slug === 'mycelium')?.swatch[1]).toBe('#0E120C')
   })
 
   it('writes Earth light values into the default light contract', () => {
@@ -278,7 +331,15 @@ describe('Earth theme tokens', () => {
     expect(token(light, '--feedback-warning-text')).toBe('var(--warn-text)')
   })
 
-  it('writes Earth dark values into the default dark contract', () => {
+  it('writes Graphite values into the default dark contract', () => {
+    expectTokens(graphite, GRAPHITE)
+    expect(token(graphite, '--feedback-success-text')).toBe('var(--accent-green)')
+    expect(token(graphite, '--feedback-error-text')).toBe('var(--accent-red)')
+    expect(token(graphite, '--editor-code-block-background')).toBe('#0D0D0B')
+    expect(token(graphite, '--surface-overlay')).toBe('rgba(5, 5, 4, 0.6)')
+  })
+
+  it('writes Earth dark values onto the rhizome color-theme attribute', () => {
     expectTokens(dark, EARTH_DARK)
     expect(token(dark, '--feedback-success-text')).toBe('var(--ok-text)')
     expect(token(dark, '--feedback-error-text')).toBe('var(--danger-text)')
@@ -293,14 +354,31 @@ describe('Earth theme tokens', () => {
     expect(token(loam, '--feedback-warning-text')).toBe('var(--warn-text)')
   })
 
-  it('keeps every Earth and Loam text pair at 4.5:1 or better', () => {
+  it('restores Mycelium as a green-black skin', () => {
+    expect(generator).toContain("slug: 'mycelium'")
+    expect(token(mycelium, '--surface-app')).toBe('#0E120C')
+    expect(token(mycelium, '--surface-panel')).toBe('#151A12')
+    expect(token(mycelium, '--accent-blue')).toBe('#6FE3A0')
+  })
+
+  it('keeps Graphite, Earth, Loam, and Mycelium text pairs at 4.5:1 or better', () => {
     expectReadableText(light)
     expectReadableText(dark)
     expectReadableText(loam)
+    expectReadableText(graphite)
+    expectReadableText(mycelium)
+  })
+
+  it('uses one selected-row style: fill plus a 2px accent bar', () => {
+    expect(indexCss).toContain('.list-row-selected')
+    expect(indexCss).toMatch(/\.list-row-selected\s*\{\s*background-color:\s*var\(--state-selected\);\s*box-shadow:\s*inset 2px 0 0 var\(--accent-blue\);/)
+    expect(readFileSync(join(process.cwd(), 'src/components/NoteItem.tsx'), 'utf8')).toContain('list-row-selected')
+    expect(readFileSync(join(process.cwd(), 'src/components/folder-tree/FolderItemRow.tsx'), 'utf8')).toContain('list-row-selected')
+    expect(readFileSync(join(process.cwd(), 'src/components/PrimeSessionList.tsx'), 'utf8')).toContain('list-row-selected')
   })
 
   it('keeps muted text at 4.5:1 on --state-selected-strong in all three themes', () => {
-    for (const block of [light, dark, loam]) {
+    for (const block of [light, dark, loam, graphite, mycelium]) {
       expect(
         contrastRatio(token(block, '--text-muted'), token(block, '--state-selected-strong')),
       ).toBeGreaterThanOrEqual(4.5)
@@ -351,7 +429,7 @@ describe('Earth theme tokens', () => {
     expect(CHAT_FOCUS_RING_CLASS).toContain('outline-2')
     expect(CHAT_FOCUS_RING_CLASS).toContain('var(--state-focus-ring)')
     expect(CHAT_FOCUS_RING_CLASS).not.toMatch(/#[0-9A-Fa-f]{3,8}/)
-    for (const block of [light, dark, loam]) {
+    for (const block of [light, dark, loam, graphite]) {
       expect(token(block, '--state-focus-ring')).toBe('var(--accent-blue)')
       expect(token(block, '--border-focus')).toBe('var(--accent-blue)')
       const ring = token(block, '--accent-blue')
@@ -392,15 +470,17 @@ describe('Earth theme tokens', () => {
     expect(output).toContain('kind=app')
     expect(output).toContain('src/index.css')
     expect(output).toContain('src/themes.css')
+    expect(output).toContain('== Graphite')
     expect(output).toContain('== Earth dark')
     expect(output).toContain('== Earth light')
     expect(output).toContain('== Loam')
+    expect(output).toContain('== Mycelium')
     expect(output).toMatch(/--text-muted on --state-selected-strong: [0-9.]+/)
     expect(output).toMatch(/--border-input on --surface-app: [0-9.]+/)
     expect(output).toMatch(/--focus-ring on --bg: [0-9.]+/)
     const failLines = output.split('\n').filter((line) => line.startsWith('FAIL '))
     for (const line of failLines) {
-      expect(line).toMatch(/^FAIL (Earth dark|Earth light|Loam)\s{2}--[\w-]+ on \S+\s{2}[0-9.]+\s{2}\((text|non-text) /)
+      expect(line).toMatch(/^FAIL (Graphite|Earth dark|Earth light|Loam|Mycelium)\s{2}--[\w-]+ on \S+\s{2}[0-9.]+\s{2}\((text|non-text) /)
     }
   })
 
@@ -429,7 +509,7 @@ describe('Earth theme tokens', () => {
     }
     expect(status).toBe(1)
     expect(output).toMatch(
-      /FAIL Earth dark {2}--text-muted {2}unparseable {2}oklch\(0\.55 0\.04 120\)/,
+      /FAIL Graphite {2}--text-muted {2}unparseable {2}oklch\(0\.55 0\.04 120\)/,
     )
   })
 
@@ -473,10 +553,11 @@ describe('Earth theme tokens', () => {
     const companion = readFileSync(join(process.cwd(), 'src/components/MenuBarCompanionApp.tsx'), 'utf8')
     const darkBoot = bootHtml.slice(
       bootHtml.indexOf(':root[data-theme="dark"]'),
-      bootHtml.indexOf(':root[data-color-theme="loam"]'),
+      bootHtml.indexOf(':root[data-color-theme="rhizome"]'),
     )
-    expect(darkBoot).toContain('--primary: #7DF0AE')
-    expect(darkBoot).not.toContain('#6FE3A0')
+    expect(darkBoot).toContain('--primary: #76EAA7')
+    expect(bootHtml).toContain(':root[data-color-theme="rhizome"]')
+    expect(bootHtml).toMatch(/\[data-color-theme="rhizome"\][^{]*\{[^}]*--primary:\s*#7DF0AE/)
     expect(mycelium).toContain('--moss: #7DF0AE')
     expect(mycelium).toContain('--moon: #9AF5C2')
     expect(mycelium).toContain('--act-verify: #7DF0AE')

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import {
   applyAppearanceToDocument,
+  colorThemePolarity,
   DEFAULT_ACCENT_COLOR,
   DEFAULT_COLOR_THEME,
   DEFAULT_THEME_MODE,
@@ -91,8 +92,8 @@ function subscribeSystemThemeChanges(
 /**
  * Applies the full appearance selection (light/dark/system mode, color
  * theme, accent) to the document. `colorTheme`/`accentColor` are optional —
- * omitting them (existing 2-arg call sites) behaves exactly as before this
- * was extended: the default `rhizome` theme, mode-toggle-driven.
+ * omitting them (existing 2-arg call sites) uses Graphite, which pins dark.
+ * Earth (`rhizome`) is the only slug that follows Light/Dark/Match system.
  */
 export function useThemeMode(
   themeMode: ThemeMode | null | undefined,
@@ -108,7 +109,7 @@ export function useThemeMode(
     const selectedAccentColor = resolveRuntimeAccentColor(accentColor)
     applySelectedAppearance(selectedMode, selectedColorTheme, selectedAccentColor)
 
-    if (selectedMode !== 'system' || selectedColorTheme !== DEFAULT_COLOR_THEME) return
+    if (selectedMode !== 'system' || colorThemePolarity(selectedColorTheme) !== null) return
     const mediaQueryList = getSystemThemeMediaQueryList()
     return mediaQueryList
       ? subscribeSystemThemeChanges(mediaQueryList, selectedColorTheme, selectedAccentColor)

@@ -58,7 +58,7 @@ Open http://localhost:5202. The dev server does not use port 5173.
 
 ## First minute
 
-1. The first launch may ask **Help improve Rhizome**. Telemetry is explained below. Earth dark is the default theme.
+1. The first launch may ask **Help improve Rhizome**. Telemetry is explained below. Graphite is the default theme.
 2. Chat opens. Notes stay closed until you show them. Views sit on the left rail.
 3. You can create a local vault or open a folder you already have. Nothing is cloned from the network unless you set `RHIZOME_GETTING_STARTED_REPO_URL`.
 4. Send one message. On Rhizome's engine you should get an answer, a notice if a non-fatal error occurred, or a clear failure. Prime-targeted chats fail clearly when Prime is missing, the provider login expired, or the connection dropped.

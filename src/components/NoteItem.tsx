@@ -7,7 +7,7 @@ import {
   Users, CalendarBlank, Tag, FileText, StackSimple,
   File, FileDashed, FilePdf, ImageSquare, SpeakerHigh, Video, LinkSimple,
 } from '@phosphor-icons/react'
-import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
+import { getTypeColor } from '../utils/typeColors'
 import { resolveIcon } from '../utils/iconRegistry'
 import { getDisplayDate } from '../utils/noteListHelpers'
 import { formatInboxDateLabel } from '../utils/dateDisplay'
@@ -103,7 +103,7 @@ const BINARY_NOTE_STYLE: CSSProperties = { padding: '14px 24px 14px 16px' }
 const NOTE_ITEM_ROW_CLASS_NAMES: Record<NoteItemRowState, string> = {
   binary: 'cursor-default opacity-50',
   multiSelected: 'cursor-pointer',
-  selected: 'cursor-pointer border-l-[3px]',
+  selected: 'cursor-pointer list-row-selected',
   highlighted: 'cursor-pointer bg-muted hover:bg-muted',
   default: 'cursor-pointer hover:bg-muted',
 }
@@ -358,10 +358,9 @@ function NoteDateRow({
   )
 }
 
-function noteItemStyle(isSelected: boolean, isMultiSelected: boolean, typeColor: string, typeLightColor: string): CSSProperties {
-  const base: CSSProperties = { padding: isSelected && !isMultiSelected ? '14px 24px 14px 13px' : '14px 24px 14px 16px' }
+function noteItemStyle(isMultiSelected: boolean): CSSProperties {
+  const base: CSSProperties = { padding: '14px 24px 14px 16px' }
   if (isMultiSelected) base.backgroundColor = 'color-mix(in srgb, var(--accent-blue) 10%, transparent)'
-  else if (isSelected) { base.borderLeftColor = typeColor; base.backgroundColor = typeLightColor }
   return base
 }
 
@@ -414,16 +413,10 @@ function createNoteItemClickHandler(
 
 function resolveNoteItemSurfaceStyle({
   isUnavailableBinary,
-  isSelected,
   isMultiSelected,
-  typeColor,
-  typeLightColor,
-}: Pick<NoteItemVisualState, 'isUnavailableBinary' | 'isSelected' | 'isMultiSelected'> & {
-  typeColor: string
-  typeLightColor: string
-}) {
+}: Pick<NoteItemVisualState, 'isUnavailableBinary' | 'isMultiSelected'>) {
   if (isUnavailableBinary) return BINARY_NOTE_STYLE
-  return noteItemStyle(isSelected, isMultiSelected, typeColor, typeLightColor)
+  return noteItemStyle(isMultiSelected)
 }
 
 function resolveNoteItemTestId({
@@ -461,20 +454,16 @@ function resolveNoteItemSurfaceProps({
   onClickNote,
   onPrefetch,
   onContextMenu,
-  typeColor,
-  typeLightColor,
 }: NoteItemVisualState & {
   entry: VaultEntry
   previewKind: FilePreviewKind | null
   onClickNote: NoteItemProps['onClickNote']
   onPrefetch?: NoteItemProps['onPrefetch']
   onContextMenu?: NoteItemProps['onContextMenu']
-  typeColor: string
-  typeLightColor: string
 }): NoteItemSurfaceProps {
   return {
     className: noteItemClassName({ isUnavailableBinary, isSelected, isMultiSelected, isHighlighted }),
-    style: resolveNoteItemSurfaceStyle({ isUnavailableBinary, isSelected, isMultiSelected, typeColor, typeLightColor }),
+    style: resolveNoteItemSurfaceStyle({ isUnavailableBinary, isMultiSelected }),
     onClick: createNoteItemClickHandler(entry, isUnavailableBinary, onClickNote),
     onContextMenu: onContextMenu ? (event) => onContextMenu(entry, event) : undefined,
     onMouseEnter: entry.fileKind !== 'binary' && onPrefetch ? () => onPrefetch(entry) : undefined,
@@ -584,7 +573,6 @@ export function NoteItem({ entry, isSelected, isMultiSelected = false, isHighlig
   const te = typeEntryMap[entry.isA ?? '']
   const displayProps = resolveDisplayProps(entry, typeEntryMap, displayPropsOverride)
   const typeColor = isPreviewableFile ? 'var(--accent-blue)' : isBinary ? 'var(--muted-foreground)' : getTypeColor(entry.isA ?? 'Note', te?.color)
-  const typeLightColor = getTypeLightColor(entry.isA ?? 'Note', te?.color)
   const surfaceProps = resolveNoteItemSurfaceProps({
     entry,
     isUnavailableBinary,
@@ -595,8 +583,6 @@ export function NoteItem({ entry, isSelected, isMultiSelected = false, isHighlig
     onClickNote,
     onPrefetch,
     onContextMenu,
-    typeColor,
-    typeLightColor,
   })
 
   return (

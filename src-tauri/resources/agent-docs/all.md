@@ -50,7 +50,7 @@ Change either one later in Settings → Telemetry. Analytics events leave out va
 
 ## 2. Chat opens
 
-Rhizome opens on Chat. On a first launch, the sessions list opens next to it. The theme is Earth dark. Earth light, Loam and Match system are in Settings → Appearance.
+Rhizome opens on Chat. On a first launch, the sessions list opens next to it. The theme is Graphite. Earth dark, Earth light, Loam, Mycelium and Match system (on Earth) are in Settings → Appearance.
 
 The left rail holds your sessions, the **Views** group (Research, Graph, Mycelium and History) and Settings. On a Mac, Ctrl+⌘1 to Ctrl+⌘4 open the four Views. On Windows, use Ctrl+Shift+1 to Ctrl+Shift+4.
 
@@ -1404,10 +1404,10 @@ Display settings live with the app on this computer, unless a setting is stored 
 
 ## Theme
 
-Rhizome starts in **Earth dark**. Change it in Settings → Appearance:
+Rhizome starts in **Graphite**. Change it in Settings → Appearance:
 
-- **Color theme.** **Rhizome** is the Earth theme. It follows the **Theme** setting below it: Light (Earth light), Dark (Earth dark) or **Match system**, which follows your computer's light or dark setting. **Loam** is an optional warm dark skin. The other themes (Nord, Dracula, Solarized and more) are fixed skins with their own light or dark look.
-- **Accent color.** Sets the colour of actions, links and highlights on the Rhizome theme. Fixed themes use their own accent.
+- **Color theme.** **Graphite** is the default warm-neutral dark skin. **Earth dark** and **Earth light** are the Earth theme; they follow the **Theme** setting below the chips: Light, Dark, or **Match system**, which follows your computer's light or dark setting. **Loam** is a warm dark skin. **Mycelium** is a green-black skin. The other themes (Nord, Dracula, Solarized and more) are fixed skins with their own light or dark look.
+- **Accent color.** Sets the colour of actions, links and highlights on Graphite. Fixed themes use their own accent.
 
 You can also switch with **Use Light Mode**, **Use Dark Mode** and **Match System** in the command palette.
 

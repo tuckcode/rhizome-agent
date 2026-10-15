@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Contrast check for Rhizome theme tokens.
 
-Default (no args): shipped app CSS — src/index.css (Earth light/dark) and
-src/themes.css (Loam). Appearance loads those files via main.tsx
-(index.css + themes.css) and themeMode/applyAppearanceToDocument.
+Default (no args): shipped app CSS — src/index.css (Graphite dark, Earth
+light/dark) and src/themes.css (Loam, Mycelium, community skins).
+Appearance loads those files via main.tsx (index.css + themes.css) and
+themeMode/applyAppearanceToDocument.
 
 Pass a design token file to keep the old design-file mode:
 
@@ -181,8 +182,10 @@ def theme_schemes(text: str, kind: str) -> list[tuple[str, str, str | None]]:
             ('[data-theme="light"]', 'Earth light', ':root'),
         ]
     return [
-        ('[data-theme="dark"]', 'Earth dark', None),
+        ('[data-theme="dark"]', 'Graphite', None),
+        (':root.dark[data-color-theme="rhizome"]', 'Earth dark', '[data-theme="dark"]'),
         ('[data-color-theme="loam"]', 'Loam', '[data-theme="dark"]'),
+        ('[data-color-theme="mycelium"]', 'Mycelium', '[data-theme="dark"]'),
         ('[data-theme="light"]', 'Earth light', None),
     ]
 

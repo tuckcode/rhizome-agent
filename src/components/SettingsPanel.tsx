@@ -35,13 +35,16 @@ import {
 } from '../lib/i18n'
 import {
   applyAppearanceToDocument,
-  COLOR_THEMES,
+  appearancePickerOptions,
+  colorThemePolarity,
   DEFAULT_ACCENT_COLOR,
   DEFAULT_COLOR_THEME,
   DEFAULT_THEME_MODE,
+  isAppearancePickerOptionSelected,
   readStoredAccentColor,
   readStoredColorTheme,
   readStoredThemeMode,
+  resolveThemeMode,
   writeStoredAccentColor,
   writeStoredColorTheme,
   writeStoredThemeMode,
@@ -204,7 +207,7 @@ interface SettingsBodyProps {
   themeMode: ThemeMode
   setThemeMode: (value: ThemeMode) => void
   colorTheme: string
-  setColorTheme: (value: string) => void
+  setColorTheme: (value: string, mode?: ThemeMode) => void
   accentColor: AccentColor
   setAccentColor: (value: AccentColor) => void
   uiLanguage: UiLanguagePreference
@@ -561,10 +564,16 @@ function SettingsPanelInner({
     onSave({ ...settings, theme_mode: value })
   }, [draft.accentColor, draft.colorTheme, onSave, settings, updateDraft])
 
-  const handleColorThemeChange = useCallback((value: string) => {
+  const handleColorThemeChange = useCallback((value: string, mode?: ThemeMode) => {
+    const nextMode = mode ?? draft.themeMode
+    if (mode) updateDraft('themeMode', mode)
     updateDraft('colorTheme', value)
-    applyAppearanceSelection(draft.themeMode, value, draft.accentColor)
-    onSave({ ...settings, color_theme: value })
+    applyAppearanceSelection(nextMode, value, draft.accentColor)
+    onSave({
+      ...settings,
+      color_theme: value,
+      ...(mode ? { theme_mode: mode } : {}),
+    })
   }, [draft.accentColor, draft.themeMode, onSave, settings, updateDraft])
 
   const handleAccentColorChange = useCallback((value: AccentColor) => {
@@ -721,7 +730,7 @@ interface SettingsBodyFromDraftProps {
   defaultWorkspacePath?: string | null
   onRemoveVault?: (path: string) => void; onReorderVaults?: (orderedPaths: string[]) => void; onSetDefaultWorkspace?: (path: string) => void; onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
   setThemeMode: (value: ThemeMode) => void
-  setColorTheme: (value: string) => void
+  setColorTheme: (value: string, mode?: ThemeMode) => void
   setAccentColor: (value: AccentColor) => void
   setHideGitignoredFiles: (value: boolean) => void
   setAllNotesFileVisibility: (value: AllNotesFileVisibility) => void
@@ -1227,7 +1236,8 @@ function AppearanceSettingsSection({
   SettingsBodyProps,
   't' | 'themeMode' | 'setThemeMode' | 'colorTheme' | 'setColorTheme' | 'accentColor' | 'setAccentColor'
 >) {
-  const isRhizomeTheme = colorTheme === DEFAULT_COLOR_THEME
+  const followsMode = colorThemePolarity(colorTheme) === null
+  const showAccent = colorTheme === DEFAULT_COLOR_THEME
   return (
     <>
       <SettingsRow
@@ -1235,19 +1245,19 @@ function AppearanceSettingsSection({
         description={t('settings.colorTheme.description')}
         controlWidth="wide"
       >
-        <ColorThemeControl value={colorTheme} onChange={setColorTheme} t={t} />
+        <ColorThemeControl value={colorTheme} themeMode={themeMode} onChange={setColorTheme} t={t} />
       </SettingsRow>
       <SettingsRow
         label={t('settings.theme.label')}
         description={
-          isRhizomeTheme
+          followsMode
             ? t('settings.appearance.description')
             : t('settings.theme.controlledByColorTheme')
         }
       >
-        <ThemeModeControl value={themeMode} onChange={setThemeMode} t={t} disabled={!isRhizomeTheme} />
+        <ThemeModeControl value={themeMode} onChange={setThemeMode} t={t} disabled={!followsMode} />
       </SettingsRow>
-      {isRhizomeTheme && (
+      {showAccent && (
         <SettingsRow label={t('settings.accentColor.label')} description={t('settings.accentColor.description')}>
           <AccentColorPicker
             selectedColor={accentColor}
@@ -1263,13 +1273,16 @@ function AppearanceSettingsSection({
 
 function ColorThemeControl({
   value,
+  themeMode,
   onChange,
   t,
 }: {
   value: string
-  onChange: (value: string) => void
+  themeMode: ThemeMode
+  onChange: (value: string, mode?: ThemeMode) => void
   t: Translate
 }) {
+  const resolvedMode = resolveThemeMode(themeMode)
   return (
     <div
       role="radiogroup"
@@ -1277,18 +1290,18 @@ function ColorThemeControl({
       data-testid="settings-color-theme"
       className="grid w-full grid-cols-2 gap-2 max-[520px]:grid-cols-1"
     >
-      {COLOR_THEMES.map((theme) => {
-        const selected = value === theme.slug
+      {appearancePickerOptions().map((option) => {
+        const selected = isAppearancePickerOptionSelected(option, value, resolvedMode)
         return (
           <Button
-            key={theme.slug}
+            key={option.id}
             type="button"
             variant="outline"
             role="radio"
             aria-checked={selected}
-            aria-label={theme.name}
-            data-testid={`settings-color-theme-${theme.slug}`}
-            onClick={() => onChange(theme.slug)}
+            aria-label={option.name}
+            data-testid={`settings-color-theme-${option.id}`}
+            onClick={() => onChange(option.colorTheme, option.mode)}
             className={cn(
               'h-auto min-h-8 w-full items-start justify-start gap-2 whitespace-normal px-2 py-1.5 text-left text-xs font-medium',
               selected ? 'border-foreground bg-muted hover:bg-muted' : 'hover:bg-muted/50',
@@ -1298,11 +1311,11 @@ function ColorThemeControl({
               className="mt-0.5 flex h-5 w-5 shrink-0 overflow-hidden rounded-full border border-border/60"
               aria-hidden="true"
             >
-              <span className="h-full w-1/2" style={{ backgroundColor: theme.swatch[0] }} />
-              <span className="h-full w-1/4" style={{ backgroundColor: theme.swatch[1] }} />
-              <span className="h-full w-1/4" style={{ backgroundColor: theme.swatch[2] }} />
+              <span className="h-full w-1/2" style={{ backgroundColor: option.swatch[0] }} />
+              <span className="h-full w-1/4" style={{ backgroundColor: option.swatch[1] }} />
+              <span className="h-full w-1/4" style={{ backgroundColor: option.swatch[2] }} />
             </span>
-            <span className="min-w-0 whitespace-normal text-xs font-medium leading-4">{theme.name}</span>
+            <span className="min-w-0 whitespace-normal text-xs font-medium leading-4">{option.name}</span>
           </Button>
         )
       })}
