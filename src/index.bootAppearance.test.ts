@@ -72,8 +72,8 @@ describe('HTML boot appearance', () => {
       'tolaria-accent': 'purple',
     }, true)
     expect(document.documentElement).toHaveAttribute('data-theme', 'light')
-    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
-    expect(document.documentElement).toHaveAttribute('data-accent', 'green')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveAttribute('data-accent')
     expect(document.documentElement).not.toHaveClass('dark')
   })
 
@@ -93,21 +93,73 @@ describe('HTML boot appearance', () => {
     expect(document.documentElement).toHaveClass('dark')
   })
 
-  it('starts a fresh install in Earth dark when nothing is saved', () => {
+  it('starts a fresh install in Graphite when nothing is saved', () => {
     paint({})
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     expect(document.documentElement).toHaveClass('dark')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
     const html = readFileSync(join(process.cwd(), 'index.html'), 'utf8')
-    expect(html).toMatch(/:root\s*\{[^}]*background:\s*#0F110C/)
-    expect(html).toMatch(/:root\s*\{[^}]*--primary:\s*#7DF0AE/)
-    expect(html).toMatch(/:root\[data-theme="dark"\]\s*\{[^}]*--primary:\s*#7DF0AE/)
+    expect(html).toMatch(/:root\s*\{[^}]*background:\s*#131210/)
+    expect(html).toMatch(/:root\s*\{[^}]*--primary:\s*#76EAA7/)
+    expect(html).toMatch(/:root\[data-theme="dark"\]:not\(\[data-color-theme\]\)\s*\{[^}]*--primary:\s*#76EAA7/)
     expect(html).toMatch(/normalizeTheme\(value\) \|\| 'dark'/)
   })
 
-  it('gives Loam its own first-paint background so relaunch does not flash Earth dark', () => {
+  it('keeps saved Light as Earth light on first paint', () => {
+    paint({ 'rhizome-theme': 'light' }, true)
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveClass('dark')
+    expect(localStorage.getItem('rhizome-color-theme')).toBeNull()
+  })
+
+  it('lets saved System follow the OS on first paint', () => {
+    paint({ 'rhizome-theme': 'system' }, true)
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(localStorage.getItem('rhizome-color-theme')).toBeNull()
+
+    paint({ 'rhizome-theme': 'system' }, false)
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+  })
+
+  it('maps stored Graphite through Dark/Light/System instead of pinning Light', () => {
+    paint({ 'rhizome-theme': 'light', 'rhizome-color-theme': 'graphite' }, true)
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveClass('dark')
+
+    paint({ 'rhizome-theme': 'system', 'rhizome-color-theme': 'graphite' }, false)
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+  })
+
+  it('keeps unsaved dark on Graphite on first paint', () => {
+    paint({ 'rhizome-theme': 'dark' })
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(localStorage.getItem('rhizome-color-theme')).toBeNull()
+  })
+
+  it('keeps saved Earth dark on first paint', () => {
+    paint({ 'rhizome-theme': 'dark', 'rhizome-color-theme': 'rhizome' })
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+  })
+
+  it('keeps a stored Earth pick on first paint', () => {
+    paint({ 'rhizome-theme': 'dark', 'rhizome-color-theme': 'rhizome' })
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+  })
+
+  it('gives Loam and Mycelium their own first-paint backgrounds so relaunch does not flash Graphite', () => {
     const html = readFileSync(join(process.cwd(), 'index.html'), 'utf8')
     expect(html).toMatch(/\[data-color-theme="loam"\][^{]*\{[^}]*background:\s*#15110C/)
     expect(html).toMatch(/:root\[data-color-theme="loam"\]\s*\{[^}]*--primary:\s*#6FE3A0/)
+    expect(html).toMatch(/\[data-color-theme="mycelium"\][^{]*\{[^}]*background:\s*#0E120C/)
+    expect(html).toMatch(/:root\[data-color-theme="mycelium"\]\s*\{[^}]*--primary:\s*#6FE3A0/)
     expect(html).not.toMatch(/:root\[data-theme="dark"\][^{]*\{[^}]*background:\s*#15110C/)
     expect(html).not.toContain('#38A169')
     expect(html).not.toContain('#3b9e83')

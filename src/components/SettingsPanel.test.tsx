@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { SettingsPanel } from './SettingsPanel'
 import type { Settings } from '../types'
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../hooks/appCommandCatalog'
-import { COLOR_THEMES, THEME_MODE_STORAGE_KEY } from '../lib/themeMode'
+import { appearancePickerOptions, THEME_MODE_STORAGE_KEY } from '../lib/themeMode'
 import {
   createAiAgentAvailability,
   createMissingAiAgentsStatus,
@@ -537,29 +537,47 @@ describe('SettingsPanel', () => {
     )
   })
 
-  it('defaults the color mode control to Earth dark', () => {
+  it('defaults the color mode control to Dark (Graphite)', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
-    expect(screen.getByTestId('settings-theme-mode')).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: 'Light' })).toHaveAttribute('aria-checked', 'false')
+    const modeRadios = within(screen.getByTestId('settings-theme-mode')).getAllByRole('radio')
+    expect(modeRadios.map((radio) => radio.getAttribute('aria-label'))).toEqual(['System', 'Dark', 'Light'])
+    expect(screen.getByRole('radio', { name: 'System' })).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByRole('radio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('radio', { name: 'Match system' })).toHaveAttribute('aria-checked', 'false')
-    expect(
-      screen.getAllByText("Earth dark is the default. Match system follows your computer's light or dark setting.").length,
-    ).toBeGreaterThan(0)
+    expect(screen.getByRole('radio', { name: 'Light' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByTestId('settings-theme-mode')).toHaveAttribute('aria-disabled', 'false')
   })
 
-  it('defaults the color theme to rhizome and shows an accent picker', () => {
+  it('defaults the color theme to Graphite and shows an accent picker', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
-    expect(screen.getByRole('radio', { name: 'Rhizome' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('radio', { name: 'Graphite' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('radio', { name: 'Earth dark' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Earth light' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Loam' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Mycelium' })).toBeInTheDocument()
     expect(screen.getByTestId('settings-accent-blue')).toBeInTheDocument()
-    // Mode toggle stays live and enabled on the default theme.
-    expect(screen.getByTestId('settings-theme-mode')).not.toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByTestId('settings-theme-mode')).toHaveAttribute('aria-disabled', 'false')
+  })
+
+  it('keeps System selectable while Graphite is only the inferred Dark default', () => {
+    installMatchMedia(true)
+    renderOpenSettings()
+
+    expect(screen.getByRole('radio', { name: 'Graphite' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('settings-theme-mode')).toHaveAttribute('aria-disabled', 'false')
+
+    selectThemeMode('System')
+
+    expect(screen.getByRole('radio', { name: 'System' })).toHaveAttribute('aria-checked', 'true')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(document.documentElement).toHaveClass('dark')
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ theme_mode: 'system', color_theme: null }))
+    expect(onSave).not.toHaveBeenCalledWith(expect.objectContaining({ color_theme: 'graphite' }))
   })
 
   it('selecting a fixed color theme pins the mode toggle disabled and hides the accent picker', () => {
@@ -590,7 +608,7 @@ describe('SettingsPanel', () => {
     expectSettingsSaved({ accent_color: 'green' })
   })
 
-  it('switching back to the rhizome theme clears data-color-theme and re-enables the mode toggle', () => {
+  it('switching back to Graphite clears data-color-theme and keeps System selectable', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
@@ -601,11 +619,29 @@ describe('SettingsPanel', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Nord' }))
     expect(document.documentElement).toHaveAttribute('data-color-theme', 'nord')
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Rhizome' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Graphite' }))
 
     expect(document.documentElement).not.toHaveAttribute('data-color-theme')
-    expect(screen.getByTestId('settings-theme-mode')).not.toHaveAttribute('aria-disabled', 'true')
-    expectSettingsSaved({ color_theme: 'rhizome' })
+    expect(screen.getByTestId('settings-theme-mode')).toHaveAttribute('aria-disabled', 'false')
+    expectSettingsSaved({ color_theme: null, theme_mode: 'dark' })
+  })
+
+  it('keeps an explicit Earth dark pick instead of Graphite', () => {
+    render(
+      <SettingsPanel
+        open={true}
+        settings={{ ...emptySettings, color_theme: 'rhizome', theme_mode: 'dark' }}
+        onSave={onSave}
+        onClose={onClose}
+      />,
+    )
+
+    expect(screen.getByRole('radio', { name: 'Earth dark' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('radio', { name: 'Graphite' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByTestId('settings-theme-mode')).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(screen.getByRole('radio', { name: 'Earth light' }))
+    expectSettingsSaved({ color_theme: null, theme_mode: 'light' })
+    expect(screen.getByTestId('settings-theme-mode')).toHaveAttribute('aria-disabled', 'false')
   })
 
   it('defaults the language selector to system language', () => {
@@ -717,60 +753,87 @@ describe('SettingsPanel', () => {
     expect(screen.getByRole('radio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'true')
   })
 
-  it('saves the selected dark color mode', () => {
+  it('maps Dark to Graphite and Light to Earth light', () => {
     renderOpenSettings()
+    fireEvent.click(screen.getByRole('radio', { name: 'Earth light' }))
+
+    expect(screen.getByRole('radio', { name: 'Earth light' })).toHaveAttribute('aria-checked', 'true')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveClass('dark')
+    expectSettingsSaved({ color_theme: null, theme_mode: 'light' })
 
     selectThemeMode('Dark')
     saveSettingsPanel()
 
+    expect(screen.getByRole('radio', { name: 'Graphite' })).toHaveAttribute('aria-checked', 'true')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(document.documentElement).toHaveClass('dark')
     expectSettingsSaved({
+      color_theme: null,
       theme_mode: 'dark',
     })
   })
 
-  it('applies the selected dark color mode immediately while settings stays open', () => {
+  it('applies Dark as Graphite immediately while settings stays open', () => {
     renderOpenSettings()
+    fireEvent.click(screen.getByRole('radio', { name: 'Earth light' }))
 
     selectThemeMode('Dark')
 
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
     expect(document.documentElement).toHaveClass('dark')
     expect(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)).toBe('dark')
-    expectSettingsSaved({
-      theme_mode: 'dark',
-    })
+    expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({ theme_mode: 'dark', color_theme: null }))
   })
 
-  it('saves system color mode while applying the current OS appearance immediately', () => {
+  it('saves System while applying Graphite when the OS is dark', () => {
     installMatchMedia(true)
     renderOpenSettings()
 
-    selectThemeMode('Match system')
+    selectThemeMode('System')
     saveSettingsPanel()
 
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
     expect(document.documentElement).toHaveClass('dark')
     expect(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)).toBe('system')
     expectSettingsSaved({
+      color_theme: null,
       theme_mode: 'system',
     })
   })
 
-  it('Match system follows prefers-color-scheme for Earth light and Earth dark', () => {
+  it('System follows the OS between Graphite and Earth light', () => {
     installMatchMedia(false)
     renderOpenSettings()
 
-    selectThemeMode('Match system')
+    selectThemeMode('System')
 
+    expect(screen.getByRole('radio', { name: 'Earth light' })).toHaveAttribute('aria-checked', 'true')
     expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
     expect(document.documentElement).not.toHaveClass('dark')
     expect(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)).toBe('system')
-    expectSettingsSaved({
-      theme_mode: 'system',
-    })
+    expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({ theme_mode: 'system', color_theme: null }))
   })
 
-  it('Loam locks the mode toggle so Match system cannot flip Earth light', () => {
+  it('Earth dark, Loam, and Mycelium stay selectable as color skins', () => {
+    renderOpenSettings()
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Earth dark' }))
+    expect(screen.getByRole('radio', { name: 'Earth dark' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('settings-theme-mode')).toHaveAttribute('aria-disabled', 'true')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expectSettingsSaved({ color_theme: 'rhizome', theme_mode: 'dark' })
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Loam' }))
+    expectSettingsSaved({ color_theme: 'loam' })
+    fireEvent.click(screen.getByRole('radio', { name: 'Mycelium' }))
+    expectSettingsSaved({ color_theme: 'mycelium' })
+  })
+
+  it('Loam locks the mode toggle so System cannot flip Earth light', () => {
     installMatchMedia(false)
     renderOpenSettings()
 
@@ -1297,8 +1360,8 @@ describe('SettingsPanel', () => {
     const group = screen.getByTestId('settings-color-theme')
     expect(group).toHaveClass('grid-cols-2')
     expect(group).toHaveClass('max-[520px]:grid-cols-1')
-    for (const theme of COLOR_THEMES) {
-      const control = screen.getByTestId(`settings-color-theme-${theme.slug}`)
+    for (const theme of appearancePickerOptions()) {
+      const control = screen.getByTestId(`settings-color-theme-${theme.id}`)
       expect(control).toHaveTextContent(theme.name)
       expect(control).not.toHaveClass('truncate')
       expect(control.querySelector('.truncate')).toBeNull()

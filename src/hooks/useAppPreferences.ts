@@ -3,10 +3,13 @@ import type { Settings } from '../types'
 import {
   applyAppearanceToDocument,
   buildStatusBarThemeTogglePatch,
+  clearStoredColorTheme,
+  colorThemeFollowsMode,
+  DARK_PARTNER_STORAGE_KEY,
   DEFAULT_ACCENT_COLOR,
-  DEFAULT_COLOR_THEME,
   normalizeAccentColor,
   normalizeColorTheme,
+  resolveStoredColorTheme,
   writeStoredAccentColor,
   writeStoredColorTheme,
   writeStoredThemeMode,
@@ -122,11 +125,12 @@ export function useAppPreferences({
   // status-bar toggle looking dead when persist lagged or failed.
   const applyAppearanceNow = useCallback((mode: ThemeMode, colorTheme: string | null | undefined, accentColor: Settings['accent_color']) => {
     if (typeof document === 'undefined') return
-    const selectedColorTheme = normalizeColorTheme(colorTheme) ?? DEFAULT_COLOR_THEME
-    const selectedAccent = normalizeAccentColor(accentColor) ?? DEFAULT_ACCENT_COLOR
     const matchMedia = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
       ? window.matchMedia.bind(window)
       : undefined
+    const storedColor = normalizeColorTheme(colorTheme)
+    const selectedColorTheme = storedColor ?? resolveStoredColorTheme(null, mode, matchMedia)
+    const selectedAccent = normalizeAccentColor(accentColor) ?? DEFAULT_ACCENT_COLOR
     const resolved = applyAppearanceToDocument(
       document,
       { mode, colorTheme: selectedColorTheme, accentColor: selectedAccent },
@@ -134,26 +138,39 @@ export function useAppPreferences({
     )
     if (typeof window !== 'undefined') {
       writeStoredThemeMode(window.localStorage, mode)
-      writeStoredColorTheme(window.localStorage, selectedColorTheme)
+      if (storedColor) writeStoredColorTheme(window.localStorage, storedColor)
+      else clearStoredColorTheme(window.localStorage)
       writeStoredAccentColor(window.localStorage, selectedAccent)
     }
     void syncAppIconThemeMode(resolved)
   }, [])
 
   const handleToggleThemeMode = useCallback(() => {
-    const patch = buildStatusBarThemeTogglePatch(documentThemeMode, settings.color_theme)
-    const nextSettings = { ...settings, ...patch }
+    const partner = typeof window !== 'undefined' ? window.localStorage.getItem(DARK_PARTNER_STORAGE_KEY) : null
+    const patch = buildStatusBarThemeTogglePatch(documentThemeMode, settings.color_theme, partner)
+    const { dark_partner: nextPartner, ...settingsPatch } = patch
+    if (typeof window !== 'undefined' && nextPartner !== undefined) {
+      if (nextPartner) window.localStorage.setItem(DARK_PARTNER_STORAGE_KEY, nextPartner)
+      else window.localStorage.removeItem(DARK_PARTNER_STORAGE_KEY)
+    }
+    const nextSettings = { ...settings, ...settingsPatch }
     applyAppearanceNow(
       patch.theme_mode,
-      patch.color_theme ?? settings.color_theme,
+      patch.color_theme,
       settings.accent_color,
     )
     void saveSettings(nextSettings)
   }, [applyAppearanceNow, documentThemeMode, saveSettings, settings])
   const handleSetThemeMode = useCallback((theme_mode: ThemeMode) => {
     if (!settingsLoaded) return
-    applyAppearanceNow(theme_mode, settings.color_theme, settings.accent_color)
-    void saveSettings({ ...settings, theme_mode })
+    const followsMode = colorThemeFollowsMode(settings.color_theme ?? '', settings.theme_mode)
+    const nextColor = followsMode ? null : settings.color_theme
+    applyAppearanceNow(theme_mode, nextColor, settings.accent_color)
+    void saveSettings({
+      ...settings,
+      theme_mode,
+      ...(followsMode ? { color_theme: null } : {}),
+    })
   }, [applyAppearanceNow, saveSettings, settings, settingsLoaded])
   const handleSetUiLanguage = useCallback((uiLanguage: UiLanguagePreference) => {
     void saveSettings({ ...settings, ui_language: serializeUiLanguagePreference(uiLanguage) })

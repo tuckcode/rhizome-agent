@@ -482,9 +482,10 @@ describe('PrimeSessionList', () => {
 
     const active = await screen.findByRole('button', { name: 'Open session active one' })
     expect(active).toHaveAttribute('aria-current', 'true')
-    expect(screen.getByRole('button', { name: 'Open session other one' })).not.toHaveAttribute(
-      'aria-current',
-    )
+    expect(active.closest('.list-row-selected')).not.toBeNull()
+    const other = screen.getByRole('button', { name: 'Open session other one' })
+    expect(other).not.toHaveAttribute('aria-current')
+    expect(other.closest('.list-row-selected')).toBeNull()
   })
 
   /** What a session is doing now matters more than when it last changed. */

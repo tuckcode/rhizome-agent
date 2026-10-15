@@ -26,9 +26,9 @@ describe('index.css default theme tokens', () => {
     expect(extractAccentBlue(lightBlock).toUpperCase()).toBe('#2C6A4D')
   })
 
-  it('keeps the Rhizome phosphor-mint accent in the default dark theme', () => {
-    const darkBlock = /:root\.dark,\s*\n\[data-theme="dark"\]\s*\{/
-    expect(extractAccentBlue(darkBlock).toUpperCase()).toBe('#7DF0AE')
+  it('keeps the Graphite mint accent in the default dark theme', () => {
+    const darkBlock = /:root\.dark:not\(\[data-color-theme\]\),\s*\n\[data-theme="dark"\]:not\(\[data-color-theme\]\)\s*\{/
+    expect(extractAccentBlue(darkBlock).toUpperCase()).toBe('#76EAA7')
   })
 })
 
@@ -38,7 +38,7 @@ describe('theme picker swatch stays in sync with the default theme tokens', () =
   // during the ledger/mycelium redesign (chip previewed Tolaria white/blue
   // while clicking applied sage/forest). Keep the tuple pinned to the
   // light-theme tokens: [--surface-sidebar, --surface-app, --accent-blue].
-  it('Rhizome swatch tuple matches the light-theme surface and accent tokens', () => {
+  it('Earth swatch tuple matches the light-theme surface and accent tokens', () => {
     const themeModeTs = readFileSync(join(__dirname, 'lib', 'themeMode.ts'), 'utf-8')
     const swatchMatch =
       /slug:\s*'rhizome'[^}]*swatch:\s*\[\s*'(#[0-9A-Fa-f]{6})',\s*'(#[0-9A-Fa-f]{6})',\s*'(#[0-9A-Fa-f]{6})'\s*\]/.exec(
@@ -49,5 +49,18 @@ describe('theme picker swatch stays in sync with the default theme tokens', () =
     expect(sidebar.toUpperCase()).toBe('#ECE6DA')
     expect(app.toUpperCase()).toBe('#F1ECE2')
     expect(accent.toUpperCase()).toBe('#2C6A4D')
+  })
+
+  it('Graphite swatch tuple matches the default dark surface and accent tokens', () => {
+    const themeModeTs = readFileSync(join(__dirname, 'lib', 'themeMode.ts'), 'utf-8')
+    const swatchMatch =
+      /slug:\s*'graphite'[^}]*swatch:\s*\[\s*'(#[0-9A-Fa-f]{6})',\s*'(#[0-9A-Fa-f]{6})',\s*'(#[0-9A-Fa-f]{6})'\s*\]/.exec(
+        themeModeTs,
+      )
+    expect(swatchMatch).not.toBeNull()
+    const [, sidebar, app, accent] = swatchMatch!
+    expect(sidebar.toUpperCase()).toBe('#171614')
+    expect(app.toUpperCase()).toBe('#131210')
+    expect(accent.toUpperCase()).toBe('#76EAA7')
   })
 })

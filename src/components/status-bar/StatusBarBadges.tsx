@@ -700,6 +700,7 @@ export function ChangesBadge({
         <span style={ICON_STYLE}>
           <GitDiff size={13} style={{ color: 'var(--accent-orange)' }} />
           <span
+            className="font-mono text-[11px] tracking-[0.02em]"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -708,7 +709,6 @@ export function ChangesBadge({
               color: 'var(--text-inverse)',
               borderRadius: 9,
               padding: '0 5px',
-              fontSize: 11,
               fontWeight: 600,
               minWidth: 16,
               lineHeight: '16px',
@@ -716,7 +716,11 @@ export function ChangesBadge({
           >
             {count}
           </span>
-          {compact ? null : translate(locale, 'status.changes.label')}
+          {compact ? null : (
+            <span className="font-mono text-[11px] tracking-[0.02em]">
+              {translate(locale, 'status.changes.label')}
+            </span>
+          )}
         </span>
       </StatusBarAction>
     </>

@@ -164,13 +164,13 @@ function VaultPillContent({ label, summary }: { label: string; summary: VaultPil
       {summary.branch ? (
         <>
           <VaultPillSeparator />
-          <span className="max-w-24 truncate">{summary.branch}</span>
+          <span className="max-w-24 truncate font-mono text-[11px] tracking-[0.02em]">{summary.branch}</span>
         </>
       ) : null}
       {summary.changeCount > 0 ? (
         <>
           <VaultPillSeparator />
-          <span>{`${summary.changeCount}△`}</span>
+          <span className="font-mono text-[11px] tracking-[0.02em]">{`${summary.changeCount}△`}</span>
         </>
       ) : null}
     </span>

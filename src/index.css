@@ -18,9 +18,12 @@
 }
 
 /* ============================================================
-   Theme Variables — app-owned Earth light/dark contract
-   Earth dark is :root.dark; Earth light is :root / [data-theme="light"].
-   Loam lives in themes.css as data-color-theme="loam".
+   Theme Variables — app-owned light/dark contract
+   Shared dark (`:root.dark, [data-theme="dark"]`) is Earth dark, so named
+   skins inherit syntax/diff/shadcn aliases. Graphite overrides live only
+   on :not([data-color-theme]). Earth light is :root / [data-theme="light"].
+   Earth dark is also `:root.dark[data-color-theme="rhizome"]`.
+   Loam and Mycelium live in themes.css.
    ============================================================ */
 
 :root {
@@ -195,7 +198,7 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* --- Semantic surfaces (Earth dark) --- */
+  /* --- Semantic surfaces (Earth dark, shared) --- */
   --surface-app: #0F110C;
   --surface-sidebar: #121410;
   --surface-panel: #16170F;
@@ -207,16 +210,16 @@
   --surface-editor: #0F110C;
   --surface-overlay: rgba(4, 6, 3, 0.6);
 
-  /* --- Semantic text (Earth dark) --- */
+  /* --- Semantic text (Earth dark, shared) --- */
   --text-primary: #E9E8DC;
   --text-secondary: #BDBAA8;
   --text-tertiary: #A8A592;
-  --text-muted: #999784;
-  --text-faint: #8F8D7B;
+  --text-muted: #9B9986;
+  --text-faint: #9B9989;
   --text-heading: #F4F2E8;
   --text-inverse: #0F110C;
 
-  /* --- Semantic borders (Earth dark) --- */
+  /* --- Semantic borders (Earth dark, shared) --- */
   --border-default: #2A281D;
   --border-subtle: #1F1E16;
   --border-strong: #3B3828;
@@ -224,7 +227,7 @@
   --border-dialog: #3B3828;
   --border-focus: var(--accent-blue);
 
-  /* --- Interaction states (Earth dark) --- */
+  /* --- Interaction states (Earth dark, shared) --- */
   --state-hover: #1C1D14;
   --state-hover-subtle: #16170F;
   --state-selected: #1A2619;
@@ -234,7 +237,7 @@
   --state-drag-target: rgba(125, 240, 174, 0.18);
   --state-disabled: #15160F;
 
-  /* --- Accent roles (Earth dark) --- */
+  /* --- Accent roles (Earth dark, shared) --- */
   --accent-blue: #7DF0AE;
   --accent-blue-bg: rgba(125, 240, 174, 0.18);
   --accent-blue-hover: #9AF5C2;
@@ -256,7 +259,7 @@
   --accent-gray: #9AA491;
   --accent-gray-light: rgba(154, 164, 145, 0.14);
 
-  /* --- Feedback roles (Earth dark) --- */
+  /* --- Feedback roles (Earth dark, shared) --- */
   --ok-text: #9BCF7E;
   --danger-text: #EE8B7E;
   --warn-text: #E9B04F;
@@ -270,12 +273,12 @@
   --feedback-error-text: var(--danger-text);
   --feedback-error-bg: var(--accent-red-light);
 
-  /* --- Syntax and diff roles (Earth dark) --- */
+  /* --- Syntax and diff roles (Earth dark, shared) --- */
   --syntax-heading: #6FE3A0;
   --syntax-link: #6FE3A0;
   --syntax-monospace: #E9B04F;
   --syntax-monospace-bg: rgba(121, 131, 111, 0.16);
-  --syntax-muted: #999784;
+  --syntax-muted: #9B9986;
   --syntax-frontmatter-key: #E9B04F;
   --syntax-frontmatter-value: #8CDFA6;
   --syntax-highlight-comment: #88917B;
@@ -345,7 +348,230 @@
   --link-hover: var(--accent-blue-hover);
 }
 
-/* --- Accent color overrides (rhizome theme only) ---
+/* Graphite — only the tokens that differ from the shared Earth dark base. */
+:root.dark:not([data-color-theme]),
+[data-theme="dark"]:not([data-color-theme]) {
+  --surface-app: #131210;
+  --surface-sidebar: #171614;
+  --surface-panel: #1C1B19;
+  --surface-card: #1C1B19;
+  --surface-popover: #22211F;
+  --surface-input: #131210;
+  --surface-button: #292826;
+  --surface-dialog: #1F1E1C;
+  --surface-editor: #131210;
+  --surface-overlay: rgba(5, 5, 4, 0.6);
+
+  --text-primary: #EEEDEB;
+  --text-secondary: #C6C5C3;
+  --text-tertiary: #AFAEAC;
+  --text-muted: #A6A5A3;
+  --text-faint: #9F9E9C;
+  --text-heading: #F7F6F4;
+  --text-inverse: #131210;
+
+  --border-default: #302F2D;
+  --border-subtle: #282725;
+  --border-strong: #3F3E3C;
+  --border-input: #7F7E7C;
+  --border-dialog: #302F2D;
+  --border-focus: var(--accent-blue);
+
+  --state-hover: #242321;
+  --state-hover-subtle: #1A1917;
+  --state-selected: #202B23;
+  --state-selected-strong: #26382C;
+  --state-active: #26382C;
+  --state-focus-ring: var(--accent-blue);
+  --state-drag-target: rgba(118, 234, 167, 0.18);
+  --state-disabled: #1A1917;
+
+  --accent-blue: #76EAA7;
+  --accent-blue-bg: rgba(118, 234, 167, 0.18);
+  --accent-blue-hover: #94F0BB;
+  --accent-blue-light: rgba(118, 234, 167, 0.14);
+  --accent-green: #9BCF7E;
+  --accent-green-light: rgba(155, 207, 126, 0.16);
+  --accent-orange: #E9B04F;
+  --accent-orange-light: rgba(233, 176, 79, 0.14);
+  --accent-red: #EE8B7E;
+  --accent-red-light: rgba(238, 139, 126, 0.16);
+
+  --ok-text: #9BCF7E;
+  --danger-text: #EE8B7E;
+  --warn-text: #E9B04F;
+  --feedback-success-text: var(--accent-green);
+  --feedback-error-text: var(--accent-red);
+  --feedback-warning-bg: rgba(233, 176, 79, 0.14);
+  --feedback-warning-border: #B8862F;
+
+  --syntax-monospace-bg: rgba(166, 165, 163, 0.16);
+  --syntax-muted: #999784;
+  --editor-code-block-background: #0D0D0B;
+  --editor-code-block-text: #EEEDEB;
+  --editor-code-block-language: rgba(238, 237, 235, 0.65);
+}
+
+/* Earth dark — full original contract so it does not inherit Graphite mint. */
+:root.dark[data-color-theme="rhizome"] {
+  color-scheme: dark;
+
+  /* --- Semantic surfaces (Earth dark) --- */
+  --surface-app: #0F110C;
+  --surface-sidebar: #121410;
+  --surface-panel: #16170F;
+  --surface-card: #16170F;
+  --surface-popover: #1C1D14;
+  --surface-input: #0F110C;
+  --surface-button: #23231A;
+  --surface-dialog: #19190F;
+  --surface-editor: #0F110C;
+  --surface-overlay: rgba(4, 6, 3, 0.6);
+
+  /* --- Semantic text (Earth dark) --- */
+  --text-primary: #E9E8DC;
+  --text-secondary: #BDBAA8;
+  --text-tertiary: #A8A592;
+  --text-muted: #9B9986;
+  --text-faint: #9B9989;
+  --text-heading: #F4F2E8;
+  --text-inverse: #0F110C;
+
+  /* --- Semantic borders (Earth dark) --- */
+  --border-default: #2A281D;
+  --border-subtle: #1F1E16;
+  --border-strong: #3B3828;
+  --border-input: #75705C;
+  --border-dialog: #3B3828;
+  --border-focus: var(--accent-blue);
+
+  /* --- Interaction states (Earth dark) --- */
+  --state-hover: #1C1D14;
+  --state-hover-subtle: #16170F;
+  --state-selected: #1A2619;
+  --state-selected-strong: #1C291B;
+  --state-active: #1C291B;
+  --state-focus-ring: var(--accent-blue);
+  --state-drag-target: rgba(125, 240, 174, 0.18);
+  --state-disabled: #15160F;
+
+  /* --- Accent roles (Earth dark) --- */
+  --accent-blue: #7DF0AE;
+  --accent-blue-bg: rgba(125, 240, 174, 0.18);
+  --accent-blue-hover: #9AF5C2;
+  --accent-blue-light: rgba(125, 240, 174, 0.14);
+  --accent-green: #9BCF7E;
+  --accent-green-light: rgba(155, 207, 126, 0.14);
+  --accent-orange: #E9B04F;
+  --accent-orange-light: rgba(233, 176, 79, 0.13);
+  --accent-red: #EE8B7E;
+  --accent-red-light: rgba(238, 139, 126, 0.12);
+  --accent-purple: #B4A0E8;
+  --accent-purple-light: rgba(180, 160, 232, 0.16);
+  --accent-yellow: #E4C97A;
+  --accent-yellow-light: rgba(228, 201, 122, 0.16);
+  --accent-teal: #64D1C8;
+  --accent-teal-light: rgba(100, 209, 200, 0.16);
+  --accent-pink: #E594BB;
+  --accent-pink-light: rgba(229, 148, 187, 0.16);
+  --accent-gray: #9AA491;
+  --accent-gray-light: rgba(154, 164, 145, 0.14);
+
+  /* --- Feedback roles (Earth dark) --- */
+  --ok-text: #9BCF7E;
+  --danger-text: #EE8B7E;
+  --warn-text: #E9B04F;
+  --feedback-info-text: var(--accent-blue);
+  --feedback-info-bg: var(--accent-blue-light);
+  --feedback-success-text: var(--ok-text);
+  --feedback-success-bg: var(--accent-green-light);
+  --feedback-warning-text: var(--warn-text);
+  --feedback-warning-bg: rgba(233, 176, 79, 0.13);
+  --feedback-warning-border: #E9B04F;
+  --feedback-error-text: var(--danger-text);
+  --feedback-error-bg: var(--accent-red-light);
+
+  /* --- Syntax and diff roles (Earth dark) --- */
+  --syntax-heading: #6FE3A0;
+  --syntax-link: #6FE3A0;
+  --syntax-monospace: #E9B04F;
+  --syntax-monospace-bg: rgba(121, 131, 111, 0.16);
+  --syntax-muted: #9B9986;
+  --syntax-frontmatter-key: #E9B04F;
+  --syntax-frontmatter-value: #8CDFA6;
+  --syntax-highlight-comment: #88917B;
+  --syntax-highlight-keyword: #E8938A;
+  --syntax-highlight-string: #A5D8C8;
+  --syntax-highlight-number: #8FBEDB;
+  --syntax-highlight-title: #C3B2F0;
+  --syntax-highlight-type: #E5B171;
+  --syntax-highlight-deletion: #E8938A;
+  --syntax-highlight-deletion-bg: rgba(238, 139, 126, 0.15);
+  --diff-added-text: #6FE3A0;
+  --diff-added-bg: rgba(111, 227, 160, 0.13);
+  --diff-removed-text: #EE8B7E;
+  --diff-removed-bg: rgba(238, 139, 126, 0.14);
+  --diff-hunk-bg: rgba(233, 176, 79, 0.12);
+  --editor-code-block-background: #090A07;
+  --editor-code-block-border: transparent;
+  --editor-code-block-text: #E9E8DC;
+  --editor-code-block-language: rgba(233, 232, 220, 0.65);
+
+  /* --- Overlays and shadows (dark mode) --- */
+  --shadow-overlay: var(--surface-overlay);
+  --shadow-dialog: rgba(0, 0, 0, 0.45);
+
+  /* --- shadcn theme aliases (dark mode) --- */
+  --background: var(--surface-app);
+  --foreground: var(--text-primary);
+  --card: var(--surface-card);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-popover);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--accent-blue);
+  --primary-foreground: var(--text-inverse);
+  --secondary: var(--state-hover);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--state-hover-subtle);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--state-hover);
+  --accent-foreground: var(--text-primary);
+  --destructive: var(--accent-red);
+  --destructive-foreground: var(--text-inverse);
+  --border: var(--border-default);
+  --input: var(--border-input);
+  --ring: var(--state-focus-ring);
+  --sidebar: var(--surface-sidebar);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--accent-blue);
+  --sidebar-primary-foreground: var(--text-inverse);
+  --sidebar-accent: var(--state-hover);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border-default);
+  --sidebar-ring: var(--state-focus-ring);
+
+  /* --- Compatibility aliases for existing product code --- */
+  --bg-primary: var(--surface-app);
+  --bg-sidebar: var(--surface-sidebar);
+  --bg-card: var(--surface-card);
+  --bg-hover: var(--state-hover);
+  --bg-hover-subtle: var(--state-hover-subtle);
+  --bg-selected: var(--state-selected);
+  --bg-input: var(--surface-input);
+  --bg-button: var(--surface-button);
+  --bg-dialog: var(--surface-dialog);
+  --border-primary: var(--border-default);
+  --hover: var(--state-hover);
+  --link-color: var(--accent-blue);
+  --link-hover: var(--accent-blue-hover);
+}
+
+.list-row-selected {
+  background-color: var(--state-selected);
+  box-shadow: inset 2px 0 0 var(--accent-blue);
+}
+
+/* --- Accent color overrides (default Graphite theme only) ---
    Maps the data-accent attribute set by applyAppearanceToDocument()
    to the correct --accent-* CSS variables. No blue-hover / blue-bg
    variants for non-blue accents exist yet, so link-hover falls back

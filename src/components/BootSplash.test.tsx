@@ -34,14 +34,16 @@ describe('BootSplash', () => {
     expect(splashCss).toContain('calc(720ms - var(--boot-elapsed, 0ms))')
   })
 
-  it('paints the splash card from the Earth palette', () => {
-    expect(splashCss).toMatch(/\.boot-splash-card\s*\{[^}]*background:\s*#16170F/)
-    expect(splashCss).toMatch(/\.boot-splash-card\s*\{[^}]*border:\s*1px solid #2A281D/)
+  it('paints the splash card from the Graphite palette by default', () => {
+    expect(splashCss).toMatch(/\.boot-splash-card\s*\{[^}]*background:\s*#1C1B19/)
+    expect(splashCss).toMatch(/\.boot-splash-card\s*\{[^}]*border:\s*1px solid #302F2D/)
     expect(splashCss).toMatch(/\[data-theme="light"\] \.boot-splash-card\s*\{[^}]*background:\s*#F8F5EE/)
-    expect(splashCss).toMatch(/\[data-theme="dark"\] \.boot-splash-card\s*\{[^}]*background:\s*#16170F/)
-    expect(splashCss).toMatch(/\[data-theme="dark"\] \.boot-splash-card\s*\{[^}]*border-color:\s*#2A281D/)
+    expect(splashCss).toMatch(/\[data-theme="dark"\]:not\(\[data-color-theme\]\) \.boot-splash-card\s*\{[^}]*background:\s*#1C1B19/)
+    expect(splashCss).toMatch(/\[data-theme="dark"\]:not\(\[data-color-theme\]\) \.boot-splash-card\s*\{[^}]*border-color:\s*#302F2D/)
+    expect(splashCss).toMatch(/\[data-color-theme="rhizome"\] \.boot-splash-card\s*\{[^}]*background:\s*#16170F/)
+    expect(splashCss).toMatch(/\[data-color-theme="loam"\] \.boot-splash-card\s*\{[^}]*background:\s*#1D1811/)
+    expect(splashCss).toMatch(/\[data-color-theme="mycelium"\] \.boot-splash-card\s*\{[^}]*background:\s*#151A12/)
     expect(splashCss).not.toContain('#F7F8F5')
-    expect(splashCss).not.toContain('#151A12')
     expect(splashCss).not.toContain('#3b9e83')
     expect(splashCss).toContain('var(--primary, #2C6A4D)')
   })

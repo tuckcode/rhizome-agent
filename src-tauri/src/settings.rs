@@ -22,7 +22,10 @@ const SUPPORTED_NOTE_WIDTH_MODES: &[&str] = &["normal", "wide"];
 /// light/dark pair in `index.css`; the rest are fixed-polarity skins whose
 /// token blocks live in `src/themes.css`.
 const SUPPORTED_COLOR_THEMES: &[&str] = &[
+    "graphite",
     "rhizome",
+    "loam",
+    "mycelium",
     "dracula",
     "nord",
     "gruvbox-dark",
@@ -38,7 +41,7 @@ const SUPPORTED_COLOR_THEMES: &[&str] = &[
     "everforest",
     "monokai-pro",
 ];
-/// Accent hues selectable on the default `rhizome` theme — matches the 8
+/// Accent hues selectable on the default `graphite` theme — matches the 8
 /// keys `AccentColorPicker`/`ACCENT_COLOR_PICKER_KEYS` already expose
 /// (reused verbatim per AGENTS.md's "reuse the color swatch picker" rule).
 const SUPPORTED_ACCENT_COLORS: &[&str] = &[

@@ -26,7 +26,7 @@ export function Toast({ message, onDismiss, actionLabel, onAction }: ToastProps)
       className={cn(
         "fixed bottom-8 left-1/2 -translate-x-1/2 z-[1100]",
         "flex items-center gap-3",
-        "bg-secondary text-foreground px-5 py-2 rounded-lg text-[13px]",
+        "bg-secondary px-5 py-2 rounded-lg text-[13px] text-[var(--text-secondary)]",
         "shadow-[0_4px_16px_var(--shadow-dialog)]",
         "animate-in slide-in-from-bottom-2 fade-in duration-200",
       )}

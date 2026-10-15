@@ -35,13 +35,21 @@ import {
 } from '../lib/i18n'
 import {
   applyAppearanceToDocument,
-  COLOR_THEMES,
+  appearancePickerOptions,
+  clearStoredColorTheme,
+  colorThemeFollowsMode,
   DEFAULT_ACCENT_COLOR,
   DEFAULT_COLOR_THEME,
   DEFAULT_THEME_MODE,
+  DUAL_MODE_COLOR_THEME,
+  isAppearancePickerOptionSelected,
+  normalizeColorTheme,
   readStoredAccentColor,
   readStoredColorTheme,
   readStoredThemeMode,
+  resolveStoredColorTheme,
+  resolveThemeMode,
+  THEME_MODE_PICKER_ORDER,
   writeStoredAccentColor,
   writeStoredColorTheme,
   writeStoredThemeMode,
@@ -204,7 +212,7 @@ interface SettingsBodyProps {
   themeMode: ThemeMode
   setThemeMode: (value: ThemeMode) => void
   colorTheme: string
-  setColorTheme: (value: string) => void
+  setColorTheme: (value: string, mode?: ThemeMode) => void
   accentColor: AccentColor
   setAccentColor: (value: AccentColor) => void
   uiLanguage: UiLanguagePreference
@@ -315,10 +323,12 @@ function resolveSettingsDraftThemeMode(themeMode: Settings['theme_mode']): Theme
   return readStoredThemeMode(window.localStorage) ?? DEFAULT_THEME_MODE
 }
 
-function resolveSettingsDraftColorTheme(colorTheme: Settings['color_theme']): string {
-  if (colorTheme) return colorTheme
-  if (typeof window === 'undefined') return DEFAULT_COLOR_THEME
-  return readStoredColorTheme(window.localStorage) ?? DEFAULT_COLOR_THEME
+function resolveSettingsDraftColorTheme(
+  colorTheme: Settings['color_theme'],
+): string {
+  const storedColor = colorTheme || (typeof window === 'undefined' ? null : readStoredColorTheme(window.localStorage))
+  if (storedColor && storedColor !== DEFAULT_COLOR_THEME) return storedColor
+  return ''
 }
 
 function resolveSettingsDraftAccentColor(accentColor: Settings['accent_color']): AccentColor {
@@ -356,7 +366,7 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     release_channel: serializeReleaseChannel(draft.releaseChannel),
     automatic_update_checks_enabled: draft.automaticUpdateChecksEnabled ? null : false,
     theme_mode: draft.themeMode,
-    color_theme: draft.colorTheme,
+    color_theme: draft.colorTheme || null,
     accent_color: draft.accentColor,
     ui_language: serializeUiLanguagePreference(draft.uiLanguage),
     date_display_format: draft.dateDisplayFormat,
@@ -383,14 +393,24 @@ function sanitizePositiveInteger(value: number | null | undefined, fallback: num
   return Math.round(value)
 }
 
+function persistableColorTheme(colorTheme: string, mode: ThemeMode): string | null {
+  const persistedColor = normalizeColorTheme(colorTheme)
+  if (!persistedColor || persistedColor === DEFAULT_COLOR_THEME) return null
+  if (persistedColor === DUAL_MODE_COLOR_THEME && mode !== 'dark') return null
+  return persistedColor
+}
+
 function applyAppearanceSelection(mode: ThemeMode, colorTheme: string, accentColor: AccentColor): void {
   const matchMedia = typeof window !== 'undefined' ? window.matchMedia?.bind(window) : undefined
+  const persistedColor = persistableColorTheme(colorTheme, mode)
+  const selectedColor = persistedColor ?? resolveStoredColorTheme(null, mode, matchMedia)
   if (typeof document !== 'undefined') {
-    applyAppearanceToDocument(document, { mode, colorTheme, accentColor }, matchMedia)
+    applyAppearanceToDocument(document, { mode, colorTheme: selectedColor, accentColor }, matchMedia)
   }
   if (typeof window !== 'undefined') {
     writeStoredThemeMode(window.localStorage, mode)
-    writeStoredColorTheme(window.localStorage, colorTheme)
+    if (persistedColor) writeStoredColorTheme(window.localStorage, persistedColor)
+    else clearStoredColorTheme(window.localStorage)
     writeStoredAccentColor(window.localStorage, accentColor)
   }
 }
@@ -557,14 +577,22 @@ function SettingsPanelInner({
 
   const handleThemeModeChange = useCallback((value: ThemeMode) => {
     updateDraft('themeMode', value)
-    applyAppearanceSelection(value, draft.colorTheme, draft.accentColor)
-    onSave({ ...settings, theme_mode: value })
-  }, [draft.accentColor, draft.colorTheme, onSave, settings, updateDraft])
+    updateDraft('colorTheme', '')
+    applyAppearanceSelection(value, '', draft.accentColor)
+    onSave({ ...settings, theme_mode: value, color_theme: null })
+  }, [draft.accentColor, onSave, settings, updateDraft])
 
-  const handleColorThemeChange = useCallback((value: string) => {
-    updateDraft('colorTheme', value)
-    applyAppearanceSelection(draft.themeMode, value, draft.accentColor)
-    onSave({ ...settings, color_theme: value })
+  const handleColorThemeChange = useCallback((value: string, mode?: ThemeMode) => {
+    const nextMode = mode ?? draft.themeMode
+    const persistColor = persistableColorTheme(value, nextMode)
+    if (mode) updateDraft('themeMode', mode)
+    updateDraft('colorTheme', persistColor ?? '')
+    applyAppearanceSelection(nextMode, persistColor ?? '', draft.accentColor)
+    onSave({
+      ...settings,
+      color_theme: persistColor,
+      ...(mode ? { theme_mode: mode } : {}),
+    })
   }, [draft.accentColor, draft.themeMode, onSave, settings, updateDraft])
 
   const handleAccentColorChange = useCallback((value: AccentColor) => {
@@ -721,7 +749,7 @@ interface SettingsBodyFromDraftProps {
   defaultWorkspacePath?: string | null
   onRemoveVault?: (path: string) => void; onReorderVaults?: (orderedPaths: string[]) => void; onSetDefaultWorkspace?: (path: string) => void; onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
   setThemeMode: (value: ThemeMode) => void
-  setColorTheme: (value: string) => void
+  setColorTheme: (value: string, mode?: ThemeMode) => void
   setAccentColor: (value: AccentColor) => void
   setHideGitignoredFiles: (value: boolean) => void
   setAllNotesFileVisibility: (value: AllNotesFileVisibility) => void
@@ -1227,27 +1255,28 @@ function AppearanceSettingsSection({
   SettingsBodyProps,
   't' | 'themeMode' | 'setThemeMode' | 'colorTheme' | 'setColorTheme' | 'accentColor' | 'setAccentColor'
 >) {
-  const isRhizomeTheme = colorTheme === DEFAULT_COLOR_THEME
+  const followsMode = colorThemeFollowsMode(colorTheme, themeMode)
+  const showAccent = colorTheme === DEFAULT_COLOR_THEME || (!colorTheme && resolveThemeMode(themeMode) === 'dark')
   return (
     <>
       <SettingsRow
         label={t('settings.colorTheme.label')}
-        description={t('settings.colorTheme.description')}
+        description="Graphite is Dark. Earth light is Light. System follows the OS between those two. Earth dark, Loam, and Mycelium are color skins."
         controlWidth="wide"
       >
-        <ColorThemeControl value={colorTheme} onChange={setColorTheme} t={t} />
+        <ColorThemeControl value={colorTheme} themeMode={themeMode} onChange={setColorTheme} t={t} />
       </SettingsRow>
       <SettingsRow
         label={t('settings.theme.label')}
         description={
-          isRhizomeTheme
-            ? t('settings.appearance.description')
-            : t('settings.theme.controlledByColorTheme')
+          followsMode
+            ? 'Dark is Graphite. Light is Earth light. System follows the OS.'
+            : 'Controlled by the selected color theme.'
         }
       >
-        <ThemeModeControl value={themeMode} onChange={setThemeMode} t={t} disabled={!isRhizomeTheme} />
+        <ThemeModeControl value={themeMode} onChange={setThemeMode} t={t} disabled={!followsMode} />
       </SettingsRow>
-      {isRhizomeTheme && (
+      {showAccent && (
         <SettingsRow label={t('settings.accentColor.label')} description={t('settings.accentColor.description')}>
           <AccentColorPicker
             selectedColor={accentColor}
@@ -1263,13 +1292,16 @@ function AppearanceSettingsSection({
 
 function ColorThemeControl({
   value,
+  themeMode,
   onChange,
   t,
 }: {
   value: string
-  onChange: (value: string) => void
+  themeMode: ThemeMode
+  onChange: (value: string, mode?: ThemeMode) => void
   t: Translate
 }) {
+  const resolvedMode = resolveThemeMode(themeMode)
   return (
     <div
       role="radiogroup"
@@ -1277,18 +1309,18 @@ function ColorThemeControl({
       data-testid="settings-color-theme"
       className="grid w-full grid-cols-2 gap-2 max-[520px]:grid-cols-1"
     >
-      {COLOR_THEMES.map((theme) => {
-        const selected = value === theme.slug
+      {appearancePickerOptions().map((option) => {
+        const selected = isAppearancePickerOptionSelected(option, value, resolvedMode)
         return (
           <Button
-            key={theme.slug}
+            key={option.id}
             type="button"
             variant="outline"
             role="radio"
             aria-checked={selected}
-            aria-label={theme.name}
-            data-testid={`settings-color-theme-${theme.slug}`}
-            onClick={() => onChange(theme.slug)}
+            aria-label={option.name}
+            data-testid={`settings-color-theme-${option.id}`}
+            onClick={() => onChange(option.colorTheme, option.mode)}
             className={cn(
               'h-auto min-h-8 w-full items-start justify-start gap-2 whitespace-normal px-2 py-1.5 text-left text-xs font-medium',
               selected ? 'border-foreground bg-muted hover:bg-muted' : 'hover:bg-muted/50',
@@ -1298,11 +1330,11 @@ function ColorThemeControl({
               className="mt-0.5 flex h-5 w-5 shrink-0 overflow-hidden rounded-full border border-border/60"
               aria-hidden="true"
             >
-              <span className="h-full w-1/2" style={{ backgroundColor: theme.swatch[0] }} />
-              <span className="h-full w-1/4" style={{ backgroundColor: theme.swatch[1] }} />
-              <span className="h-full w-1/4" style={{ backgroundColor: theme.swatch[2] }} />
+              <span className="h-full w-1/2" style={{ backgroundColor: option.swatch[0] }} />
+              <span className="h-full w-1/4" style={{ backgroundColor: option.swatch[1] }} />
+              <span className="h-full w-1/4" style={{ backgroundColor: option.swatch[2] }} />
             </span>
-            <span className="min-w-0 whitespace-normal text-xs font-medium leading-4">{theme.name}</span>
+            <span className="min-w-0 whitespace-normal text-xs font-medium leading-4">{option.name}</span>
           </Button>
         )
       })}
@@ -1329,15 +1361,18 @@ function ThemeModeControl({
       aria-disabled={disabled}
       data-testid="settings-theme-mode"
     >
-      <ThemeModeButton label={t('settings.theme.light')} selected={value === 'light'} value="light" onSelect={onChange} disabled={disabled}>
-        <Sun size={14} />
-      </ThemeModeButton>
-      <ThemeModeButton label={t('settings.theme.dark')} selected={value === 'dark'} value="dark" onSelect={onChange} disabled={disabled}>
-        <Moon size={14} />
-      </ThemeModeButton>
-      <ThemeModeButton label={t('settings.theme.system')} selected={value === 'system'} value="system" onSelect={onChange} disabled={disabled}>
-        <Monitor size={14} />
-      </ThemeModeButton>
+      {THEME_MODE_PICKER_ORDER.map((mode) => (
+        <ThemeModeButton
+          key={mode}
+          label={mode === 'system' ? 'System' : mode === 'dark' ? 'Dark' : 'Light'}
+          selected={value === mode}
+          value={mode}
+          onSelect={onChange}
+          disabled={disabled}
+        >
+          {mode === 'system' ? <Monitor size={14} /> : mode === 'dark' ? <Moon size={14} /> : <Sun size={14} />}
+        </ThemeModeButton>
+      ))}
     </div>
   )
 }

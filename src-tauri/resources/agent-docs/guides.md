@@ -315,10 +315,11 @@ Display settings live with the app on this computer, unless a setting is stored 
 
 ## Theme
 
-Rhizome starts in **Earth dark**. Change it in Settings → Appearance:
+Rhizome starts in **Graphite**. Change it in Settings → Appearance:
 
-- **Color theme.** **Rhizome** is the Earth theme. It follows the **Theme** setting below it: Light (Earth light), Dark (Earth dark) or **Match system**, which follows your computer's light or dark setting. **Loam** is an optional warm dark skin. The other themes (Nord, Dracula, Solarized and more) are fixed skins with their own light or dark look.
-- **Accent color.** Sets the colour of actions, links and highlights on the Rhizome theme. Fixed themes use their own accent.
+- **Theme.** **System**, **Dark**, and **Light**. Dark is Graphite. Light is Earth light. System follows your computer between those two. Default is Dark (Graphite). The status-bar toggle swaps Graphite and Earth light.
+- **Color theme.** **Earth dark**, **Loam**, and **Mycelium** stay selectable as color skins. The other themes (Nord, Dracula, Solarized and more) are fixed skins with their own light or dark look.
+- **Accent color.** Sets the colour of actions, links and highlights on Graphite. Fixed themes use their own accent.
 
 You can also switch with **Use Light Mode**, **Use Dark Mode** and **Match System** in the command palette.
 

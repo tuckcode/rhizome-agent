@@ -1,7 +1,7 @@
 import { type KeyboardEvent, type ReactNode, useCallback } from 'react'
 import {
   PencilSimple, MagnifyingGlass, Trash, ChartBar, Eye,
-  CircleNotch, CheckCircle, XCircle, CaretRight, CaretDown,
+  CircleNotch, CaretRight, CaretDown,
   Terminal, File, FolderOpen, NotePencil,
 } from '@phosphor-icons/react'
 
@@ -51,14 +51,36 @@ const TOOL_ICON_BY_NAME = new Map(Object.entries(TOOL_ICON_MAP))
 
 const DEFAULT_ICON: IconRenderer = (s) => <PencilSimple size={s} />
 
+function StatusWord({
+  word,
+  color,
+  testId,
+}: {
+  word: string
+  color: string
+  testId: string
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.02em]" style={{ color }} data-testid={testId}>
+      <span aria-hidden="true" className="size-1.5 rounded-full" style={{ background: color }} />
+      {word}
+    </span>
+  )
+}
+
 function StatusIndicator({ status }: { status: AiActionStatus }) {
   if (status === 'pending') {
-    return <CircleNotch size={14} className="ai-spin text-muted-foreground" data-testid="status-pending" />
+    return (
+      <span className="inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground" data-testid="status-pending">
+        <CircleNotch size={12} className="ai-spin" />
+        RUN
+      </span>
+    )
   }
   if (status === 'done') {
-    return <CheckCircle size={14} weight="fill" style={{ color: 'var(--accent-green)' }} data-testid="status-done" />
+    return <StatusWord word="OK" color="var(--ok-text, var(--accent-green))" testId="status-done" />
   }
-  return <XCircle size={14} weight="fill" style={{ color: 'var(--destructive)' }} data-testid="status-error" />
+  return <StatusWord word="ERR" color="var(--danger-text, var(--destructive))" testId="status-error" />
 }
 
 function truncateText(text: string): { text: string; truncated: boolean } {

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
   ACCENT_COLOR_STORAGE_KEY,
@@ -5,11 +7,17 @@ import {
   applyStoredAppearance,
   applyStoredThemeMode,
   readStoredAppearance,
+  resolveStoredColorTheme,
   applyThemeModeToDocument,
   buildStatusBarThemeTogglePatch,
   DEFAULT_THEME_MODE,
   COLOR_THEME_STORAGE_KEY,
   COLOR_THEMES,
+  appearancePickerOptions,
+  colorThemeFollowsMode,
+  colorThemeForThemeMode,
+  isAppearancePickerOptionSelected,
+  THEME_MODE_PICKER_ORDER,
   LEGACY_ACCENT_COLOR_STORAGE_KEY,
   LEGACY_COLOR_THEME_STORAGE_KEY,
   LEGACY_THEME_MODE_STORAGE_KEY,
@@ -48,21 +56,84 @@ describe('themeMode', () => {
     expect(resolveThemeMode('sepia')).toBe('dark')
   })
 
-  it('starts a fresh install in Earth dark when nothing is saved', () => {
+  it('starts a fresh install in Graphite when nothing is saved', () => {
     expect(DEFAULT_THEME_MODE).toBe('dark')
     const storage = makeStorage()
     expect(readStoredThemeMode(storage)).toBeNull()
     expect(readStoredAppearance(storage).mode).toBe('dark')
+    expect(readStoredAppearance(storage).colorTheme).toBe('graphite')
     expect(applyStoredAppearance(document, storage, makeMatchMedia(false))).toBe('dark')
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     expect(document.documentElement).toHaveClass('dark')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
   })
 
-  it('keeps a saved light choice instead of forcing Earth dark', () => {
+  it('keeps saved Light as Earth light instead of switching to Graphite', () => {
     const storage = makeStorage({ [THEME_MODE_STORAGE_KEY]: 'light' })
     expect(readStoredThemeMode(storage)).toBe('light')
+    expect(readStoredColorTheme(storage)).toBeNull()
+    expect(readStoredAppearance(storage).colorTheme).toBe('rhizome')
     expect(applyStoredAppearance(document, storage, makeMatchMedia(true))).toBe('light')
     expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveClass('dark')
+    expect(storage.getItem(COLOR_THEME_STORAGE_KEY)).toBeNull()
+  })
+
+  it('lets saved System follow the OS: dark may resolve to Graphite, light stays Earth', () => {
+    const storage = makeStorage({ [THEME_MODE_STORAGE_KEY]: 'system' })
+    expect(readStoredAppearance(storage, makeMatchMedia(true)).colorTheme).toBe('graphite')
+    expect(applyStoredAppearance(document, storage, makeMatchMedia(true))).toBe('dark')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(document.documentElement).toHaveClass('dark')
+
+    expect(readStoredAppearance(storage, makeMatchMedia(false)).colorTheme).toBe('rhizome')
+    expect(applyStoredAppearance(document, storage, makeMatchMedia(false))).toBe('light')
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveClass('dark')
+    expect(storage.getItem(COLOR_THEME_STORAGE_KEY)).toBeNull()
+  })
+
+  it('keeps saved Earth dark instead of switching to Graphite', () => {
+    const storage = makeStorage({
+      [THEME_MODE_STORAGE_KEY]: 'dark',
+      [COLOR_THEME_STORAGE_KEY]: 'rhizome',
+    })
+    expect(readStoredAppearance(storage).colorTheme).toBe('rhizome')
+    expect(applyStoredAppearance(document, storage, makeMatchMedia(false))).toBe('dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).toHaveClass('dark')
+  })
+
+  it('maps Dark to Graphite, Light to Earth light, and System to that pair', () => {
+    expect(THEME_MODE_PICKER_ORDER).toEqual(['system', 'dark', 'light'])
+    expect(colorThemeForThemeMode(null)).toBe('graphite')
+    expect(colorThemeForThemeMode('dark')).toBe('graphite')
+    expect(colorThemeForThemeMode('light')).toBe('rhizome')
+    expect(colorThemeForThemeMode('system', makeMatchMedia(true))).toBe('graphite')
+    expect(colorThemeForThemeMode('system', makeMatchMedia(false))).toBe('rhizome')
+    expect(resolveStoredColorTheme(null, null)).toBe('graphite')
+    expect(resolveStoredColorTheme(null, 'dark')).toBe('graphite')
+    expect(resolveStoredColorTheme('graphite', 'light')).toBe('rhizome')
+    expect(resolveStoredColorTheme('graphite', 'system', makeMatchMedia(false))).toBe('rhizome')
+    expect(resolveStoredColorTheme('rhizome', 'dark')).toBe('rhizome')
+    expect(colorThemeFollowsMode('')).toBe(true)
+    expect(colorThemeFollowsMode('graphite')).toBe(true)
+    expect(colorThemeFollowsMode('rhizome', 'light')).toBe(true)
+    expect(colorThemeFollowsMode('rhizome', 'dark')).toBe(false)
+    expect(colorThemeFollowsMode('loam')).toBe(false)
+    expect(colorThemeFollowsMode('mycelium')).toBe(false)
+  })
+
+  it('keeps an explicit Earth light pick instead of switching to Graphite', () => {
+    const storage = makeStorage({
+      [THEME_MODE_STORAGE_KEY]: 'light',
+      [COLOR_THEME_STORAGE_KEY]: 'rhizome',
+    })
+    expect(applyStoredAppearance(document, storage, makeMatchMedia(true))).toBe('light')
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
     expect(document.documentElement).not.toHaveClass('dark')
   })
 
@@ -119,11 +190,11 @@ describe('color themes and accent', () => {
     expect(normalizeAccentColor('magenta')).toBeNull()
   })
 
-  it('the rhizome theme follows the mode toggle and clears theme/accent-default attributes', () => {
+  it('the default Graphite theme pins dark and clears the color-theme attribute', () => {
     const resolved = applyAppearanceToDocument(
       document,
-      { mode: 'system', colorTheme: 'rhizome', accentColor: 'blue' },
-      makeMatchMedia(true),
+      { mode: 'light', colorTheme: 'graphite', accentColor: 'blue' },
+      makeMatchMedia(false),
     )
 
     expect(resolved).toBe('dark')
@@ -132,9 +203,33 @@ describe('color themes and accent', () => {
     expect(document.documentElement).toHaveClass('dark')
   })
 
-  it('a non-default accent applies only on the rhizome theme', () => {
-    applyAppearanceToDocument(document, { mode: 'light', colorTheme: 'rhizome', accentColor: 'green' })
+  it('keeps an explicit Earth pick instead of switching to Graphite', () => {
+    const storage = makeStorage({ [COLOR_THEME_STORAGE_KEY]: 'rhizome', [THEME_MODE_STORAGE_KEY]: 'dark' })
+    expect(readStoredAppearance(storage).colorTheme).toBe('rhizome')
+    expect(applyStoredAppearance(document, storage, makeMatchMedia(false))).toBe('dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).toHaveClass('dark')
+  })
+
+  it('Earth follows the mode toggle and sets data-color-theme=rhizome', () => {
+    const resolved = applyAppearanceToDocument(
+      document,
+      { mode: 'system', colorTheme: 'rhizome', accentColor: 'blue' },
+      makeMatchMedia(true),
+    )
+
+    expect(resolved).toBe('dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveAttribute('data-accent')
+    expect(document.documentElement).toHaveClass('dark')
+  })
+
+  it('a non-default accent applies only on the default Graphite theme', () => {
+    applyAppearanceToDocument(document, { mode: 'dark', colorTheme: 'graphite', accentColor: 'green' })
     expect(document.documentElement).toHaveAttribute('data-accent', 'green')
+
+    applyAppearanceToDocument(document, { mode: 'light', colorTheme: 'rhizome', accentColor: 'green' })
+    expect(document.documentElement).not.toHaveAttribute('data-accent')
 
     applyAppearanceToDocument(document, { mode: 'light', colorTheme: 'dracula', accentColor: 'green' })
     expect(document.documentElement).not.toHaveAttribute('data-accent')
@@ -168,6 +263,57 @@ describe('color themes and accent', () => {
         expect(theme.polarity === 'light' || theme.polarity === 'dark').toBe(true)
       }
     }
+  })
+
+  it('keeps every picker slug in the Rust settings allow-list', () => {
+    const settingsRs = readFileSync(join(process.cwd(), 'src-tauri/src/settings.rs'), 'utf8')
+    const block = settingsRs.match(/const SUPPORTED_COLOR_THEMES: &\[&str\] = &\[([\s\S]*?)\];/)
+    expect(block).not.toBeNull()
+    const allowed = new Set([...(block?.[1].matchAll(/"([^"]+)"/g) ?? [])].map((match) => match[1]))
+    for (const theme of COLOR_THEMES) {
+      expect(allowed.has(theme.slug), theme.slug).toBe(true)
+    }
+  })
+
+  it('registers Mycelium as a selectable dark skin', () => {
+    expect(normalizeColorTheme('mycelium')).toBe('mycelium')
+    expect(COLOR_THEMES.find((theme) => theme.slug === 'mycelium')).toEqual({
+      slug: 'mycelium',
+      name: 'Mycelium',
+      polarity: 'dark',
+      swatch: ['#10150E', '#0E120C', '#6FE3A0'],
+    })
+    expect(
+      applyAppearanceToDocument(document, { mode: 'light', colorTheme: 'mycelium', accentColor: 'blue' }),
+    ).toBe('dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'mycelium')
+  })
+
+  it('lists Graphite, Earth dark, Earth light, Loam, and Mycelium first in the picker', () => {
+    expect(appearancePickerOptions().slice(0, 5).map((option) => option.name)).toEqual([
+      'Graphite',
+      'Earth dark',
+      'Earth light',
+      'Loam',
+      'Mycelium',
+    ])
+    expect(isAppearancePickerOptionSelected(
+      appearancePickerOptions()[0]!,
+      'graphite',
+      'dark',
+    )).toBe(true)
+    expect(isAppearancePickerOptionSelected(
+      appearancePickerOptions()[1]!,
+      'rhizome',
+      'dark',
+    )).toBe(true)
+    expect(isAppearancePickerOptionSelected(
+      appearancePickerOptions()[1]!,
+      'graphite',
+      'dark',
+    )).toBe(false)
+    expect(isAppearancePickerOptionSelected(appearancePickerOptions()[0]!, '', 'dark')).toBe(true)
+    expect(isAppearancePickerOptionSelected(appearancePickerOptions()[2]!, '', 'light')).toBe(true)
   })
 
   it('registers Loam as an optional warm dark theme', () => {
@@ -218,16 +364,17 @@ describe('color themes and accent', () => {
     expect(document.documentElement).not.toHaveAttribute('data-accent')
     expect(document.documentElement).toHaveClass('dark')
 
-    const rhizome = makeStorage({
-      [THEME_MODE_STORAGE_KEY]: 'light',
+    const graphite = makeStorage({
+      [THEME_MODE_STORAGE_KEY]: 'dark',
       [ACCENT_COLOR_STORAGE_KEY]: 'green',
     })
-    expect(applyStoredAppearance(document, rhizome, makeMatchMedia(false))).toBe('light')
+    expect(applyStoredAppearance(document, graphite, makeMatchMedia(false))).toBe('dark')
     expect(document.documentElement).toHaveAttribute('data-accent', 'green')
-    expect(document.documentElement).not.toHaveClass('dark')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(document.documentElement).toHaveClass('dark')
   })
 
-  it('uses Earth dark defaults when storage is unavailable', () => {
+  it('uses Graphite defaults when storage is unavailable', () => {
     const storage = {
       getItem: () => {
         throw new Error('blocked')
@@ -264,7 +411,7 @@ describe('color themes and accent', () => {
     })
     expect(readStoredAppearance(invalid)).toEqual({
       mode: 'system',
-      colorTheme: 'rhizome',
+      colorTheme: 'graphite',
       accentColor: 'blue',
     })
     expect(applyStoredAppearance(document, invalid, makeMatchMedia(true))).toBe('dark')
@@ -297,20 +444,95 @@ describe('color themes and accent', () => {
     expect(readStoredAccentColor(storage)).toBe('green')
   })
 
-  it('status-bar toggle flips mode on the default Rhizome theme', () => {
-    expect(buildStatusBarThemeTogglePatch('light', 'rhizome')).toEqual({ theme_mode: 'dark' })
-    expect(buildStatusBarThemeTogglePatch('dark', null)).toEqual({ theme_mode: 'light' })
+  it('status-bar toggle swaps Graphite and Earth light', () => {
+    expect(buildStatusBarThemeTogglePatch('dark', null)).toEqual({
+      theme_mode: 'light',
+      color_theme: null,
+      dark_partner: null,
+    })
+    expect(buildStatusBarThemeTogglePatch('dark', 'graphite')).toEqual({
+      theme_mode: 'light',
+      color_theme: null,
+      dark_partner: null,
+    })
+    expect(buildStatusBarThemeTogglePatch('light', 'rhizome')).toEqual({
+      theme_mode: 'dark',
+      color_theme: null,
+      dark_partner: null,
+    })
+    expect(buildStatusBarThemeTogglePatch('light', 'rhizome', 'graphite')).toEqual({
+      theme_mode: 'dark',
+      color_theme: null,
+      dark_partner: null,
+    })
+    expect(buildStatusBarThemeTogglePatch('dark', 'rhizome')).toEqual({
+      theme_mode: 'light',
+      color_theme: null,
+      dark_partner: null,
+    })
+  })
+
+  it('status-bar toggle round-trips Graphite to Earth light and back to Graphite', () => {
+    const toEarthLight = buildStatusBarThemeTogglePatch('dark', null)
+    expect(toEarthLight.theme_mode).toBe('light')
+    expect(colorThemeForThemeMode(toEarthLight.theme_mode)).toBe('rhizome')
+    applyAppearanceToDocument(document, {
+      mode: toEarthLight.theme_mode,
+      colorTheme: colorThemeForThemeMode(toEarthLight.theme_mode),
+      accentColor: 'blue',
+    })
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveClass('dark')
+
+    const backToGraphite = buildStatusBarThemeTogglePatch(
+      toEarthLight.theme_mode,
+      toEarthLight.color_theme,
+      toEarthLight.dark_partner,
+    )
+    expect(backToGraphite.theme_mode).toBe('dark')
+    expect(colorThemeForThemeMode(backToGraphite.theme_mode)).toBe('graphite')
+    applyAppearanceToDocument(document, {
+      mode: backToGraphite.theme_mode,
+      colorTheme: colorThemeForThemeMode(backToGraphite.theme_mode),
+      accentColor: 'blue',
+    })
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(document.documentElement).toHaveClass('dark')
+  })
+
+  it('status-bar toggle remembers a pinned dark skin other than Graphite', () => {
+    expect(buildStatusBarThemeTogglePatch('dark', 'loam')).toEqual({
+      theme_mode: 'light',
+      color_theme: null,
+      dark_partner: 'loam',
+    })
+    expect(buildStatusBarThemeTogglePatch('light', null, 'loam')).toEqual({
+      theme_mode: 'dark',
+      color_theme: 'loam',
+      dark_partner: null,
+    })
   })
 
   it('status-bar toggle leaves a pinned color theme so mode can change', () => {
     expect(buildStatusBarThemeTogglePatch('dark', 'dracula')).toEqual({
       theme_mode: 'light',
-      color_theme: 'rhizome',
+      color_theme: null,
+      dark_partner: 'dracula',
     })
     expect(buildStatusBarThemeTogglePatch('light', 'github-light')).toEqual({
       theme_mode: 'dark',
-      color_theme: 'rhizome',
+      color_theme: null,
+      dark_partner: null,
     })
+  })
+
+  it('shows community theme names in sentence case', () => {
+    expect(COLOR_THEMES.find((theme) => theme.slug === 'gruvbox-dark')?.name).toBe('Gruvbox dark')
+    expect(COLOR_THEMES.find((theme) => theme.slug === 'github-light')?.name).toBe('GitHub light')
+    expect(COLOR_THEMES.find((theme) => theme.slug === 'tokyo-night')?.name).toBe('Tokyo night')
+    expect(appearancePickerOptions().map((option) => option.name).join(' ')).not.toMatch(/\sDark\b|\sLight\b|\sNight\b/)
   })
 })
 

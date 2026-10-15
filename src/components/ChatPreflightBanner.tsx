@@ -105,7 +105,7 @@ export function ChatPreflightBanner({
         </div>
         <ul className="mt-1 flex flex-col gap-1">
           {blockers.map((blocker) => (
-            <li key={blocker.reason} className="min-w-0 text-[12px] text-foreground">
+            <li key={blocker.reason} className="min-w-0 text-[12px] text-[var(--text-secondary)]">
               <span data-testid="chat-preflight-reason">
                 {blocker.reason}
               </span>
