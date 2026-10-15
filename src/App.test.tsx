@@ -531,6 +531,16 @@ function setPanePreset(id: 'chat' | 'notes' | 'read' | 'workbench', scope = '/va
   }))
 }
 
+function blurTypingSurface() {
+  const active = document.activeElement
+  if (active instanceof HTMLElement) active.blur()
+}
+
+function pressViewShortcut(key: '1' | '2' | '3' | '4') {
+  blurTypingSurface()
+  fireEvent.keyDown(window, { key, metaKey: true })
+}
+
 function render(ui: ReactElement, options?: Parameters<typeof testingLibraryRender>[1]) {
   return testingLibraryRender(ui, {
     wrapper: ({ children }) => <TooltipProvider>{children}</TooltipProvider>,
@@ -851,7 +861,7 @@ describe('App', () => {
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
     expect(screen.getByTestId('chat-center')).not.toHaveStyle({ display: 'none' })
 
-    fireEvent.keyDown(window, { key: '1', metaKey: true })
+    pressViewShortcut('1')
     await waitFor(() => {
       expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     })
@@ -1749,7 +1759,7 @@ describe('App', () => {
 
     expect(document.querySelector('.app__vault-panel')).toBeInTheDocument()
 
-    fireEvent.keyDown(window, { key: '1', metaKey: true })
+    pressViewShortcut('1')
     await waitFor(() => {
       expect(document.querySelector('.app__vault-panel')).not.toBeInTheDocument()
     })
@@ -1772,7 +1782,7 @@ describe('App', () => {
       expect(screen.getByText('All Notes')).toBeInTheDocument()
     })
 
-    fireEvent.keyDown(window, { key: '2', metaKey: true })
+    pressViewShortcut('2')
     await waitFor(() => {
       expect(document.querySelector('.app__vault-panel')).toBeInTheDocument()
       expect(screen.queryByTestId('vault-panel-navigation')).not.toBeInTheDocument()
@@ -1805,12 +1815,12 @@ describe('App', () => {
       expect(screen.getByText('All Notes')).toBeInTheDocument()
     })
 
-    fireEvent.keyDown(window, { key: '1', metaKey: true })
+    pressViewShortcut('1')
     await waitFor(() => {
       expect(document.querySelector('.app__vault-panel')).not.toBeInTheDocument()
     })
 
-    fireEvent.keyDown(window, { key: '3', metaKey: true })
+    pressViewShortcut('3')
     await waitFor(() => {
       expect(document.querySelector('.app__vault-panel')).toBeInTheDocument()
       expect(screen.getByTestId('vault-panel-navigation')).toContainElement(screen.getByTestId('sidebar-top-nav'))
@@ -1828,7 +1838,7 @@ describe('App', () => {
 
     invoke.mockClear()
 
-    fireEvent.keyDown(window, { key: '1', metaKey: true })
+    pressViewShortcut('1')
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith('update_current_window_min_size', {
         minWidth: 512,
@@ -1839,7 +1849,7 @@ describe('App', () => {
 
     invoke.mockClear()
 
-    fireEvent.keyDown(window, { key: '3', metaKey: true })
+    pressViewShortcut('3')
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith('update_current_window_min_size', {
         minWidth: 512,
