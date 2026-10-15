@@ -9,6 +9,7 @@ import { COMMAND_RAIL_WIDTH_PX, overlayTitleBarBandStyle, railConsumesExpandedWi
 import { Sidebar } from './components/Sidebar'
 import { CommandRail } from './components/CommandRail'
 import type { RailViewId } from './lib/railViews'
+import { peerToolExitLabel, peerToolOriginFromScreen, type PeerToolOrigin } from './lib/peerToolExit'
 import { NoteList } from './components/NoteList'
 import {
   VaultPanel,
@@ -543,6 +544,12 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     !chatCentered &&
     effectiveSelection.kind === 'filter' &&
     effectiveSelection.filter === 'chat'
+  const [peerToolOrigin, setPeerToolOrigin] = useState<PeerToolOrigin>('chat')
+  const noteOnScreenRef = useRef(false)
+  const rememberPeerToolOrigin = useCallback(() => {
+    setPeerToolOrigin(peerToolOriginFromScreen(noteOnScreenRef.current))
+  }, [])
+  const peerToolExit = peerToolExitLabel(peerToolOrigin, appLocale)
   const handleRailSelectChat = useCallback(() => {
     if (isGraphDestination || isMyceliumDestination || isResearchDestination) {
       handleSetSelection({
@@ -577,8 +584,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       handleRailSelectChat()
       return
     }
+    rememberPeerToolOrigin()
     handleSetSelection({ kind: 'filter', filter: 'research' })
-  }, [handleRailSelectChat, handleSetSelection, isResearchDestination])
+  }, [handleRailSelectChat, handleSetSelection, isResearchDestination, rememberPeerToolOrigin])
   // Graph, Mycelium, and Research are rail View destinations (full-page
   // canvas). Contextual "Show in Graph / Mycelium" still uses Connections.
   const connectionsPanelRef = useRef<ConnectionsPanelHandle>(null)
@@ -600,14 +608,16 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     handleSetSelection({ kind: 'filter', filter: 'pulse' })
   }, [handleSetSelection])
   const handleRailSelectMycelium = useCallback(() => {
+    rememberPeerToolOrigin()
     handleSetSelection({ kind: 'filter', filter: 'mycelium' })
-  }, [handleSetSelection])
+  }, [handleSetSelection, rememberPeerToolOrigin])
   const handleSelectRailView = useCallback((view: RailViewId) => {
     if (view === 'research') {
       handleRailSelectResearch()
       return
     }
     if (view === 'graph') {
+      rememberPeerToolOrigin()
       handleSetSelection({ kind: 'filter', filter: 'graph' })
       return
     }
@@ -621,6 +631,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     handleRailSelectMycelium,
     handleRailSelectResearch,
     handleSetSelection,
+    rememberPeerToolOrigin,
   ])
   const activeRailView: RailViewId | null =
     isResearchDestination
@@ -1680,6 +1691,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     setFocusedPane(activeNotePath ? 'note' : 'chat')
   }
   const showFocusedNote = !focusedWindow || focusedPane === 'note'
+  const noteOnScreen = Boolean(notesOpen || (activeTab && showFocusedNote))
+  useEffect(() => {
+    noteOnScreenRef.current = noteOnScreen
+  }, [noteOnScreen])
   const sessionsRailLayoutWidth = railOccupiesExpandedWidth && !fittedRailPinned
     ? COMMAND_RAIL_WIDTH_PX
     : reportedCommandRailLayoutWidth(commandRailEnabled, reportedRailWidth)
@@ -1698,6 +1713,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     collapseNotes()
   }, [collapseNotes])
   const handleRailSelectGraph = useCallback(() => {
+    rememberPeerToolOrigin()
     if (chatCentered) {
       ensureNotesOpen()
       handleRailSelectChanges()
@@ -1706,8 +1722,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       return
     }
     handleSetSelection(toggleGraphSelection(effectiveSelection, vaultConfig.inbox?.explicitOrganization))
-  }, [chatCentered, ensureNotesOpen, handleRailSelectChanges, handleSetSelection, effectiveSelection, setConnectionsRequest, vaultConfig.inbox?.explicitOrganization])
+  }, [chatCentered, ensureNotesOpen, handleRailSelectChanges, handleSetSelection, effectiveSelection, rememberPeerToolOrigin, setConnectionsRequest, vaultConfig.inbox?.explicitOrganization])
   const handleOpenSessionFootprint = useCallback((path: string) => {
+    rememberPeerToolOrigin()
     if (chatCentered) {
       ensureNotesOpen()
       handleRailSelectChanges()
@@ -1717,7 +1734,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     }
     setMyceliumFocusPath(path)
     handleSetSelection({ kind: 'filter', filter: 'mycelium' })
-  }, [chatCentered, ensureNotesOpen, handleRailSelectChanges, handleSetSelection, setConnectionsRequest])
+  }, [chatCentered, ensureNotesOpen, handleRailSelectChanges, handleSetSelection, rememberPeerToolOrigin, setConnectionsRequest])
   const handleSelectNoteForPdfExport = notes.handleSelectNote
   const handleExportNotePdfFromList = useCallback((entry: VaultEntry) => {
     if (!isMarkdownEntry(entry)) return
@@ -2116,6 +2133,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           locale={appLocale}
           requestedView={connectionsRequest}
           canOpenNote={vaultBridge.canOpenNoteByPath}
+          exitLabel={peerToolExit}
           onOpenNote={path => {
             handleRailSelectChat()
             vaultBridge.openNoteByPath(path)
@@ -2345,14 +2363,14 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                   <GraphView vaultPath={resolvedPath} onOpenNote={(path) => {
                     vaultBridge.openNoteByPath(path)
                     handleRailSelectChat()
-                  }} locale={appLocale} onExit={handleRailSelectChat} />
+                  }} locale={appLocale} onExit={handleRailSelectChat} exitLabel={peerToolExit} />
                 </Suspense>
                 {effectiveShowAIChat && aiWorkspaceSurface}
               </div>
             ) : isMyceliumDestination ? (
               <div className="relative flex flex-1 min-h-0">
                 <Suspense fallback={<div className="flex h-full flex-1 items-center justify-center text-sm text-muted-foreground" data-testid="mycelium-suspense">{translate(appLocale, 'mycelium.title')}</div>}>
-                  <MyceliumView locale={appLocale} onExit={handleRailSelectChat} focusSessionPath={myceliumFocusPath} />
+                  <MyceliumView locale={appLocale} onExit={handleRailSelectChat} exitLabel={peerToolExit} focusSessionPath={myceliumFocusPath} />
                 </Suspense>
                 {effectiveShowAIChat && aiWorkspaceSurface}
               </div>
@@ -2361,6 +2379,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                 <ResearchPanel
                   open
                   onClose={handleRailSelectChat}
+                  exitLabel={peerToolExit}
                   vaultPath={resolvedPath}
                   agentMemoryVaultPath={settings.agent_memory_vault_path}
                   vaults={vaultSwitcher.allVaults}

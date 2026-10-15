@@ -5,8 +5,9 @@ import {
   useRef,
   useState,
 } from 'react'
-import { X } from '@phosphor-icons/react'
 import { invoke } from '@tauri-apps/api/core'
+import { PeerToolExitButton } from '../PeerToolExitButton'
+import { PEER_TOOL_EXIT_CHAT } from '../../lib/peerToolExit'
 import { isTauri, mockInvoke } from '../../mock-tauri'
 import { translate, type AppLocale, DEFAULT_APP_LOCALE } from '../../lib/i18n'
 import { trackEvent } from '../../lib/telemetry'
@@ -45,6 +46,8 @@ export interface GraphViewProps {
    *  is a one-way trip: Escape only cleared selection and there was no close
    *  control, so the only way out was re-clicking the rail/status-bar toggle. */
   onExit?: () => void
+  /** Names the surface this button restores. Defaults to chat. */
+  exitLabel?: string
   /** Small UI state retained by an owning panel while this WebGL view is idle. */
   retainedState?: GraphViewRetainedState
   onRetainedStateChange?: (state: GraphViewRetainedState) => void
@@ -70,6 +73,7 @@ export function GraphView({
   refreshKey = 0,
   locale = DEFAULT_APP_LOCALE,
   onExit,
+  exitLabel = PEER_TOOL_EXIT_CHAT,
   retainedState,
   onRetainedStateChange,
 }: GraphViewProps) {
@@ -361,22 +365,9 @@ export function GraphView({
           locale={locale}
         />
         {onExit && (
-          <button
-            type="button"
-            data-testid="graph-exit"
-            aria-label={t('graph.exit')}
-            title={t('graph.exit')}
-            onClick={onExit}
-            className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-[var(--radius)] border px-2 py-1 text-[12px]"
-            style={{
-              borderColor: 'var(--border)',
-              background: 'var(--surface-panel, var(--sidebar))',
-              color: 'var(--muted-foreground)',
-            }}
-          >
-            <X size={13} weight="regular" />
-            {t('graph.exit')}
-          </button>
+          <div className="absolute right-3 top-3 z-10">
+            <PeerToolExitButton label={exitLabel} onClick={onExit} testId="graph-exit" />
+          </div>
         )}
       </div>
       {selectedNode && (

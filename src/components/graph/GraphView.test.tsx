@@ -278,9 +278,23 @@ describe('GraphView exit affordance', () => {
   it('renders a visible close control so the graph is not a one-way trap', async () => {
     const onExit = await renderWithExit()
 
+    expect(screen.getByTestId('graph-exit')).toHaveTextContent('Back to chat')
     fireEvent.click(screen.getByTestId('graph-exit'))
 
     expect(onExit).toHaveBeenCalledOnce()
+  })
+
+  it('names the notes origin when the graph opened from a note', async () => {
+    render(
+      <GraphView
+        vaultPath="/Users/mock/demo-vault-v2"
+        onOpenNote={vi.fn()}
+        onExit={vi.fn()}
+        exitLabel="Back to notes"
+      />,
+    )
+    await waitFor(() => expect(screen.getByTestId('graph-view')).toBeInTheDocument())
+    expect(screen.getByTestId('graph-exit')).toHaveTextContent('Back to notes')
   })
 
   it('exits the graph on Escape when nothing is selected', async () => {

@@ -1,3 +1,4 @@
+import { translate, type AppLocale, DEFAULT_APP_LOCALE } from '../lib/i18n'
 import { parseDashDateParts, parseSlashDateParts, type DateParts } from './dateStringParts'
 
 export type DateDisplayFormat = 'us' | 'european' | 'friendly' | 'iso'
@@ -228,6 +229,7 @@ export function formatInboxDateLabel(
   format: DateDisplayFormat = DEFAULT_DATE_DISPLAY_FORMAT,
   nowSeconds: number = Date.now() / 1000,
   timeZone?: string | null,
+  locale: AppLocale = DEFAULT_APP_LOCALE,
 ): { label: string; title: string } | null {
   if (!timestampSeconds) return null
   const title = formatTimestampForDateDisplay(timestampSeconds, format, timeZone)
@@ -236,8 +238,10 @@ export function formatInboxDateLabel(
   const savedUtc = Date.UTC(savedParts.year, savedParts.month - 1, savedParts.day)
   const nowUtc = Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day)
   const ageDays = Math.round((nowUtc - savedUtc) / 86_400_000)
-  if (ageDays === 0) return { label: 'Today', title }
-  if (ageDays > 0 && ageDays < 7) return { label: `${ageDays}d`, title }
+  if (ageDays === 0) return { label: translate(locale, 'inbox.date.today'), title }
+  if (ageDays > 0 && ageDays < 7) {
+    return { label: translate(locale, 'inbox.date.days', { count: ageDays }), title }
+  }
   return { label: title, title }
 }
 
