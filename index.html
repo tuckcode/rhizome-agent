@@ -225,7 +225,8 @@
           var colorTheme = normalizeColorTheme(colorThemeValue);
           if (colorTheme) return colorTheme;
           var mode = normalizeTheme(modeValue);
-          if (mode === 'light' || mode === 'dark' || mode === 'system') return DUAL_MODE_COLOR_THEME;
+          if (mode === 'light') return DUAL_MODE_COLOR_THEME;
+          if (mode === 'system') return prefersDarkTheme() ? DEFAULT_COLOR_THEME : DUAL_MODE_COLOR_THEME;
           return DEFAULT_COLOR_THEME;
         }
         function applyTheme(modeValue, colorThemeValue, accentValue) {

@@ -106,12 +106,10 @@ export function applyStoredThemeMode(
 
 /**
  * Color skin when the user never stored one.
- * Empty storage (fresh install) → Graphite. A saved Light / Dark / System
- * mode with no color_theme stays Earth (`rhizome`), matching main. An
- * explicit stored slug always wins. Does not write the inferred slug.
- *
- * Empty storage cannot be told apart from a user who never wrote theme_mode.
- * Those both look like a fresh install and get Graphite.
+ * No saved color → Graphite in dark (fresh install and existing dark-mode
+ * users who never picked a skin). Saved light → Earth. Saved system follows
+ * the OS (dark may resolve to Graphite; light stays Earth light). An explicit
+ * stored slug always wins. Does not write the inferred slug.
  */
 export function resolveStoredColorTheme(
   storedColor: string | null,
@@ -119,10 +117,10 @@ export function resolveStoredColorTheme(
   matchMedia?: ThemeMatchMedia,
 ): string {
   if (storedColor) return storedColor
-  if (storedMode === 'light' || storedMode === 'dark' || storedMode === 'system') {
-    return DUAL_MODE_COLOR_THEME
+  if (storedMode === 'light') return DUAL_MODE_COLOR_THEME
+  if (storedMode === 'system') {
+    return resolveSystemThemeMode(matchMedia) === 'light' ? DUAL_MODE_COLOR_THEME : DEFAULT_COLOR_THEME
   }
-  void matchMedia
   return DEFAULT_COLOR_THEME
 }
 
@@ -142,14 +140,14 @@ export function readStoredAppearance(
 // The default `graphite` theme is the warm-neutral overlay in index.css
 // (`:root.dark:not([data-color-theme])`) on the shared Earth dark base.
 // Earth lives on slug `rhizome`: light is the default light contract, dark
-// is `:root.dark[data-color-theme="rhizome"]`. Only empty storage (no saved
-// mode and no saved color) starts in Graphite. A saved Light, Dark, or
-// System mode with no color stays Earth. A stored `rhizome` / Loam /
-// Mycelium / community slug is kept. Loam and Mycelium are optional dark
-// skins. Other fixed themes (from the brand handoff) are single-polarity
-// skins in themes.css; picking one pins the resolved mode to its polarity.
-// The accent swap only applies on the default theme — fixed themes own
-// their accent. Earth still follows the Light/Dark/Match system toggle.
+// is `:root.dark[data-color-theme="rhizome"]`. No saved color starts in
+// Graphite (fresh install and unsaved dark). Saved Light stays Earth light.
+// Saved System follows the OS. A stored `rhizome` / Loam / Mycelium /
+// community slug is kept. Loam and Mycelium are optional dark skins. Other
+// fixed themes (from the brand handoff) are single-polarity skins in
+// themes.css; picking one pins the resolved mode to its polarity. The
+// accent swap only applies on the default theme — fixed themes own their
+// accent. Earth still follows the Light/Dark/Match system toggle.
 
 export const COLOR_THEME_STORAGE_KEY = 'rhizome-color-theme'
 export const DARK_PARTNER_STORAGE_KEY = 'rhizome-dark-partner'
@@ -371,6 +369,11 @@ export function isAppearancePickerOptionSelected(
   colorTheme: string,
   resolvedMode: ResolvedThemeMode,
 ): boolean {
+  if (!colorTheme) {
+    if (resolvedMode === 'dark') return option.id === 'graphite'
+    if (resolvedMode === 'light') return option.id === 'earth-light'
+    return false
+  }
   if (option.colorTheme !== colorTheme) return false
   if (!option.mode) return true
   return resolvedMode === option.mode

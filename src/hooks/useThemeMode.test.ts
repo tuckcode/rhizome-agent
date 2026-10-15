@@ -67,7 +67,7 @@ describe('useThemeMode', () => {
     renderHook(() => useThemeMode('system', true, null))
 
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
-    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
     expect(window.localStorage.getItem(COLOR_THEME_STORAGE_KEY)).toBeNull()
 
     act(() => media.setMatches(false))

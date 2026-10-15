@@ -41,6 +41,7 @@ import {
   DEFAULT_COLOR_THEME,
   DEFAULT_THEME_MODE,
   isAppearancePickerOptionSelected,
+  normalizeColorTheme,
   readStoredAccentColor,
   readStoredColorTheme,
   readStoredThemeMode,
@@ -295,7 +296,7 @@ function createSettingsDraft(
     releaseChannel: normalizeReleaseChannel(settings.release_channel),
     automaticUpdateChecksEnabled: areAutomaticUpdateChecksEnabled(settings),
     themeMode: resolveSettingsDraftThemeMode(settings.theme_mode),
-    colorTheme: resolveSettingsDraftColorTheme(settings.color_theme, settings.theme_mode),
+    colorTheme: resolveSettingsDraftColorTheme(settings.color_theme),
     accentColor: resolveSettingsDraftAccentColor(settings.accent_color),
     uiLanguage: settings.ui_language ?? SYSTEM_UI_LANGUAGE,
     dateDisplayFormat: normalizeDateDisplayFormat(settings.date_display_format) ?? DEFAULT_DATE_DISPLAY_FORMAT,
@@ -321,16 +322,10 @@ function resolveSettingsDraftThemeMode(themeMode: Settings['theme_mode']): Theme
 
 function resolveSettingsDraftColorTheme(
   colorTheme: Settings['color_theme'],
-  themeMode: Settings['theme_mode'],
 ): string {
   const storedColor = colorTheme || (typeof window === 'undefined' ? null : readStoredColorTheme(window.localStorage))
   if (storedColor) return storedColor
-  const storedMode = themeMode || (typeof window === 'undefined' ? null : readStoredThemeMode(window.localStorage))
-  if (storedMode === 'system') return ''
-  const matchMedia = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-    ? window.matchMedia.bind(window)
-    : undefined
-  return resolveStoredColorTheme(null, storedMode ?? null, matchMedia)
+  return ''
 }
 
 function resolveSettingsDraftAccentColor(accentColor: Settings['accent_color']): AccentColor {
@@ -397,12 +392,14 @@ function sanitizePositiveInteger(value: number | null | undefined, fallback: num
 
 function applyAppearanceSelection(mode: ThemeMode, colorTheme: string, accentColor: AccentColor): void {
   const matchMedia = typeof window !== 'undefined' ? window.matchMedia?.bind(window) : undefined
+  const persistedColor = normalizeColorTheme(colorTheme)
+  const selectedColor = persistedColor ?? resolveStoredColorTheme(null, mode, matchMedia)
   if (typeof document !== 'undefined') {
-    applyAppearanceToDocument(document, { mode, colorTheme, accentColor }, matchMedia)
+    applyAppearanceToDocument(document, { mode, colorTheme: selectedColor, accentColor }, matchMedia)
   }
   if (typeof window !== 'undefined') {
     writeStoredThemeMode(window.localStorage, mode)
-    writeStoredColorTheme(window.localStorage, colorTheme)
+    if (persistedColor) writeStoredColorTheme(window.localStorage, persistedColor)
     writeStoredAccentColor(window.localStorage, accentColor)
   }
 }
@@ -1246,7 +1243,7 @@ function AppearanceSettingsSection({
   't' | 'themeMode' | 'setThemeMode' | 'colorTheme' | 'setColorTheme' | 'accentColor' | 'setAccentColor'
 >) {
   const followsMode = colorThemePolarity(colorTheme) === null
-  const showAccent = colorTheme === DEFAULT_COLOR_THEME
+  const showAccent = colorTheme === DEFAULT_COLOR_THEME || (!colorTheme && resolveThemeMode(themeMode) === 'dark')
   return (
     <>
       <SettingsRow

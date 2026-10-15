@@ -77,11 +77,11 @@ describe('themeMode', () => {
     expect(storage.getItem(COLOR_THEME_STORAGE_KEY)).toBeNull()
   })
 
-  it('lets saved System stay on Earth while the OS still sets light vs dark', () => {
+  it('lets saved System follow the OS: dark may resolve to Graphite, light stays Earth', () => {
     const storage = makeStorage({ [THEME_MODE_STORAGE_KEY]: 'system' })
-    expect(readStoredAppearance(storage, makeMatchMedia(true)).colorTheme).toBe('rhizome')
+    expect(readStoredAppearance(storage, makeMatchMedia(true)).colorTheme).toBe('graphite')
     expect(applyStoredAppearance(document, storage, makeMatchMedia(true))).toBe('dark')
-    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
     expect(document.documentElement).toHaveClass('dark')
 
     expect(readStoredAppearance(storage, makeMatchMedia(false)).colorTheme).toBe('rhizome')
@@ -103,10 +103,10 @@ describe('themeMode', () => {
     expect(document.documentElement).toHaveClass('dark')
   })
 
-  it('keeps unsaved dark on Earth dark and infers Graphite only when nothing is saved', () => {
+  it('infers Graphite for unsaved dark and only Earth for saved light', () => {
     expect(resolveStoredColorTheme(null, null)).toBe('graphite')
-    expect(resolveStoredColorTheme(null, 'dark')).toBe('rhizome')
-    expect(resolveStoredColorTheme(null, 'system', makeMatchMedia(true))).toBe('rhizome')
+    expect(resolveStoredColorTheme(null, 'dark')).toBe('graphite')
+    expect(resolveStoredColorTheme(null, 'system', makeMatchMedia(true))).toBe('graphite')
     expect(resolveStoredColorTheme(null, 'light')).toBe('rhizome')
     expect(resolveStoredColorTheme('rhizome', 'light')).toBe('rhizome')
   })
@@ -297,6 +297,8 @@ describe('color themes and accent', () => {
       'graphite',
       'dark',
     )).toBe(false)
+    expect(isAppearancePickerOptionSelected(appearancePickerOptions()[0]!, '', 'dark')).toBe(true)
+    expect(isAppearancePickerOptionSelected(appearancePickerOptions()[2]!, '', 'light')).toBe(true)
   })
 
   it('registers Loam as an optional warm dark theme', () => {
@@ -349,7 +351,6 @@ describe('color themes and accent', () => {
 
     const graphite = makeStorage({
       [THEME_MODE_STORAGE_KEY]: 'dark',
-      [COLOR_THEME_STORAGE_KEY]: 'graphite',
       [ACCENT_COLOR_STORAGE_KEY]: 'green',
     })
     expect(applyStoredAppearance(document, graphite, makeMatchMedia(false))).toBe('dark')
@@ -395,11 +396,11 @@ describe('color themes and accent', () => {
     })
     expect(readStoredAppearance(invalid)).toEqual({
       mode: 'system',
-      colorTheme: 'rhizome',
+      colorTheme: 'graphite',
       accentColor: 'blue',
     })
     expect(applyStoredAppearance(document, invalid, makeMatchMedia(true))).toBe('dark')
-    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
     expect(document.documentElement).not.toHaveAttribute('data-accent')
   })
 

@@ -113,10 +113,10 @@ describe('HTML boot appearance', () => {
     expect(localStorage.getItem('rhizome-color-theme')).toBeNull()
   })
 
-  it('lets saved System follow the OS on first paint and stay on Earth', () => {
+  it('lets saved System follow the OS on first paint', () => {
     paint({ 'rhizome-theme': 'system' }, true)
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
-    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
     expect(localStorage.getItem('rhizome-color-theme')).toBeNull()
 
     paint({ 'rhizome-theme': 'system' }, false)
@@ -124,10 +124,10 @@ describe('HTML boot appearance', () => {
     expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
   })
 
-  it('keeps unsaved dark on Earth dark on first paint', () => {
+  it('keeps unsaved dark on Graphite on first paint', () => {
     paint({ 'rhizome-theme': 'dark' })
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
-    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
     expect(localStorage.getItem('rhizome-color-theme')).toBeNull()
   })
 

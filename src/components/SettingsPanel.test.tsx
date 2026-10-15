@@ -546,8 +546,7 @@ describe('SettingsPanel', () => {
     expect(screen.getByRole('radio', { name: 'Light' })).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByRole('radio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByRole('radio', { name: 'Match system' })).toHaveAttribute('aria-checked', 'false')
-    expect(screen.getByTestId('settings-theme-mode')).toHaveAttribute('aria-disabled', 'true')
-    expect(screen.getByText('Controlled by the selected color theme.')).toBeInTheDocument()
+    expect(screen.getByTestId('settings-theme-mode')).toHaveAttribute('aria-disabled', 'false')
   })
 
   it('defaults the color theme to Graphite and shows an accent picker', () => {
@@ -561,7 +560,23 @@ describe('SettingsPanel', () => {
     expect(screen.getByRole('radio', { name: 'Loam' })).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: 'Mycelium' })).toBeInTheDocument()
     expect(screen.getByTestId('settings-accent-blue')).toBeInTheDocument()
-    expect(screen.getByTestId('settings-theme-mode')).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByTestId('settings-theme-mode')).toHaveAttribute('aria-disabled', 'false')
+  })
+
+  it('keeps Match system selectable while Graphite is only the inferred default', () => {
+    installMatchMedia(true)
+    renderOpenSettings()
+
+    expect(screen.getByRole('radio', { name: 'Graphite' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('settings-theme-mode')).toHaveAttribute('aria-disabled', 'false')
+
+    selectThemeMode('Match system')
+
+    expect(screen.getByRole('radio', { name: 'Match system' })).toHaveAttribute('aria-checked', 'true')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(document.documentElement).toHaveClass('dark')
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ theme_mode: 'system' }))
+    expect(onSave).not.toHaveBeenCalledWith(expect.objectContaining({ color_theme: 'graphite' }))
   })
 
   it('selecting a fixed color theme pins the mode toggle disabled and hides the accent picker', () => {

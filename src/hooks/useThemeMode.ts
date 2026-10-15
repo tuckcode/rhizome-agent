@@ -123,9 +123,10 @@ function subscribeSystemThemeChanges(
 /**
  * Applies the full appearance selection (light/dark/system mode, color
  * theme, accent) to the document. `colorTheme`/`accentColor` are optional —
- * omitting them infers from the saved mode (Graphite only when nothing is
- * saved; a saved Light/Dark/System mode stays Earth). Earth (`rhizome`) is
- * the only slug that follows Light/Dark/Match system.
+ * omitting them infers from the saved mode (Graphite when there is no
+ * saved color, including unsaved dark; Light stays Earth; System follows
+ * the OS). Earth (`rhizome`) is the only slug that follows Light/Dark/Match
+ * system.
  */
 export function useThemeMode(
   themeMode: ThemeMode | null | undefined,
