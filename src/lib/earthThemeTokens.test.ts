@@ -336,12 +336,58 @@ describe('Earth theme tokens', () => {
     expect(token(light, '--feedback-warning-text')).toBe('var(--warn-text)')
   })
 
-  it('writes Graphite values into the default dark contract', () => {
+  it('writes Graphite overlay tokens without replacing the shared dark base', () => {
+    expect(indexCss).toMatch(/:root\.dark,\s*\n\[data-theme="dark"\] \{/)
     expectTokens(graphite, GRAPHITE)
     expect(token(graphite, '--feedback-success-text')).toBe('var(--accent-green)')
     expect(token(graphite, '--feedback-error-text')).toBe('var(--accent-red)')
     expect(token(graphite, '--editor-code-block-background')).toBe('#0D0D0B')
     expect(token(graphite, '--surface-overlay')).toBe('rgba(5, 5, 4, 0.6)')
+    expect(graphite).not.toContain('--syntax-highlight-string')
+    expect(graphite).not.toContain('--diff-added-text')
+    const sharedDark = themeBlock(indexCss, ':root.dark,\n[data-theme="dark"]')
+    expect(token(sharedDark, '--syntax-highlight-string')).toBe('#A5D8C8')
+    expect(token(sharedDark, '--diff-added-text')).toBe('#6FE3A0')
+    expect(token(sharedDark, '--shadow-dialog')).toBe('rgba(0, 0, 0, 0.45)')
+  })
+
+  it('resolves applied tokens per skin so no dark skin inherits light values', () => {
+    const dump = JSON.parse(
+      execFileSync('python3', ['scripts/contrast_check.py', '--dump-resolved'], { encoding: 'utf8' }),
+    ) as Record<string, Record<string, string>>
+    const light = dump['Earth light']
+    expect(light['--syntax-highlight-string']).toBe('#23503C')
+    expect(light['--surface-app']).toBe('#F1ECE2')
+    const darkSkins = [
+      'Graphite',
+      'Earth dark',
+      'Loam',
+      'Mycelium',
+      'Dracula',
+      'Nord',
+      'Gruvbox dark',
+      'Solarized dark',
+      'Catppuccin mocha',
+      'Tokyo night',
+      'One dark',
+      'Rosé pine',
+      'Everforest',
+      'Monokai pro',
+    ]
+    for (const name of darkSkins) {
+      const tokens = dump[name]
+      expect(tokens, name).toBeTruthy()
+      expect(tokens['--syntax-highlight-string'], `${name} string`).not.toBe(light['--syntax-highlight-string'])
+      expect(tokens['--diff-added-text'], `${name} diff-added`).not.toBe(light['--diff-added-text'])
+      expect(tokens['--diff-removed-text'], `${name} diff-removed`).not.toBe(light['--diff-removed-text'])
+      expect(tokens['--surface-app'], `${name} bg`).not.toBe(light['--surface-app'])
+      expect(tokens['--shadow-dialog'], `${name} shadow`).not.toBe(light['--shadow-dialog'])
+      expect(tokens['--text-primary'], `${name} text`).not.toBe(light['--text-primary'])
+    }
+    expect(dump.Graphite['--accent-blue']).toBe('#76EAA7')
+    expect(dump['Earth dark']['--accent-blue']).toBe('#7DF0AE')
+    expect(dump.Loam['--syntax-highlight-string']).toBe('#A5D8C8')
+    expect(dump.Dracula['--syntax-highlight-string']).toBe('#A5D8C8')
   })
 
   it('keeps Graphite mint in the Graphite block and Earth accents on Earth', () => {
@@ -440,6 +486,16 @@ describe('Earth theme tokens', () => {
     expect(lines).toHaveLength(3)
     for (const ratio of lines) {
       expect(ratio).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  it('uses a solid 2px --state-focus-ring on shared UI controls', () => {
+    for (const file of ['button.tsx', 'input.tsx', 'select.tsx', 'checkbox.tsx', 'badge.tsx']) {
+      const source = readFileSync(join(process.cwd(), 'src/components/ui', file), 'utf8')
+      expect(source).toContain('focus-visible:ring-2')
+      expect(source).toContain('var(--state-focus-ring)')
+      expect(source).not.toContain('focus-visible:ring-[3px]')
+      expect(source).not.toContain('ring-ring/50')
     }
   })
 

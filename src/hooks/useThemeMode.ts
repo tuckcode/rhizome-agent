@@ -25,18 +25,24 @@ function resolveRuntimeThemeMode(themeMode: ThemeMode | null | undefined): Theme
   return readStoredThemeMode(window.localStorage) ?? DEFAULT_THEME_MODE
 }
 
+function storedModeForColorInference(themeMode: ThemeMode | null | undefined): ThemeMode | null {
+  if (themeMode) return themeMode
+  if (typeof window === 'undefined') return null
+  return readStoredThemeMode(window.localStorage)
+}
+
 function resolveRuntimeColorTheme(
   colorTheme: string | null | undefined,
-  themeMode: ThemeMode,
+  storedMode: ThemeMode | null,
 ): { colorTheme: string; persistColor: boolean } {
   const fromSettings = normalizeColorTheme(colorTheme)
   if (fromSettings) return { colorTheme: fromSettings, persistColor: true }
   if (typeof window === 'undefined') {
-    return { colorTheme: resolveStoredColorTheme(null, themeMode), persistColor: false }
+    return { colorTheme: resolveStoredColorTheme(null, storedMode), persistColor: false }
   }
   const stored = readStoredColorTheme(window.localStorage)
   return {
-    colorTheme: resolveStoredColorTheme(stored, themeMode, currentMatchMedia()),
+    colorTheme: resolveStoredColorTheme(stored, storedMode, currentMatchMedia()),
     persistColor: stored !== null,
   }
 }
@@ -118,7 +124,7 @@ function subscribeSystemThemeChanges(
  * Applies the full appearance selection (light/dark/system mode, color
  * theme, accent) to the document. `colorTheme`/`accentColor` are optional —
  * omitting them infers from the saved mode (Graphite only when nothing is
- * saved; Light stays Earth; System follows the OS). Earth (`rhizome`) is
+ * saved; a saved Light/Dark/System mode stays Earth). Earth (`rhizome`) is
  * the only slug that follows Light/Dark/Match system.
  */
 export function useThemeMode(
@@ -131,7 +137,7 @@ export function useThemeMode(
     if (!loaded || typeof document === 'undefined') return
 
     const selectedMode = resolveRuntimeThemeMode(themeMode)
-    const resolvedColor = resolveRuntimeColorTheme(colorTheme, selectedMode)
+    const resolvedColor = resolveRuntimeColorTheme(colorTheme, storedModeForColorInference(themeMode))
     const selectedAccentColor = resolveRuntimeAccentColor(accentColor)
     applySelectedAppearance(
       selectedMode,

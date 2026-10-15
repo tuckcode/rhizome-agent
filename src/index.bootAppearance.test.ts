@@ -113,15 +113,22 @@ describe('HTML boot appearance', () => {
     expect(localStorage.getItem('rhizome-color-theme')).toBeNull()
   })
 
-  it('lets saved System follow the OS on first paint', () => {
+  it('lets saved System follow the OS on first paint and stay on Earth', () => {
     paint({ 'rhizome-theme': 'system' }, true)
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
-    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
     expect(localStorage.getItem('rhizome-color-theme')).toBeNull()
 
     paint({ 'rhizome-theme': 'system' }, false)
     expect(document.documentElement).toHaveAttribute('data-theme', 'light')
     expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+  })
+
+  it('keeps unsaved dark on Earth dark on first paint', () => {
+    paint({ 'rhizome-theme': 'dark' })
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(localStorage.getItem('rhizome-color-theme')).toBeNull()
   })
 
   it('keeps saved Earth dark on first paint', () => {

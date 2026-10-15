@@ -106,9 +106,12 @@ export function applyStoredThemeMode(
 
 /**
  * Color skin when the user never stored one.
- * Fresh / saved dark → Graphite. Saved light → Earth. Saved system follows
- * the OS (dark may resolve to Graphite; light stays Earth light). An explicit
- * stored slug always wins. Does not write the inferred slug.
+ * Empty storage (fresh install) → Graphite. A saved Light / Dark / System
+ * mode with no color_theme stays Earth (`rhizome`), matching main. An
+ * explicit stored slug always wins. Does not write the inferred slug.
+ *
+ * Empty storage cannot be told apart from a user who never wrote theme_mode.
+ * Those both look like a fresh install and get Graphite.
  */
 export function resolveStoredColorTheme(
   storedColor: string | null,
@@ -116,10 +119,10 @@ export function resolveStoredColorTheme(
   matchMedia?: ThemeMatchMedia,
 ): string {
   if (storedColor) return storedColor
-  if (storedMode === 'light') return DUAL_MODE_COLOR_THEME
-  if (storedMode === 'system') {
-    return resolveSystemThemeMode(matchMedia) === 'light' ? DUAL_MODE_COLOR_THEME : DEFAULT_COLOR_THEME
+  if (storedMode === 'light' || storedMode === 'dark' || storedMode === 'system') {
+    return DUAL_MODE_COLOR_THEME
   }
+  void matchMedia
   return DEFAULT_COLOR_THEME
 }
 
@@ -136,19 +139,20 @@ export function readStoredAppearance(
 }
 
 // ── Color themes and accent ──────────────────────────────────────────────────
-// The default `graphite` theme is the warm-neutral dark contract in index.css
-// (`:root.dark:not([data-color-theme])`). Earth lives on slug `rhizome`:
-// light is the default light contract, dark is `:root.dark[data-color-theme="rhizome"]`.
-// Only empty storage (no saved mode and no saved color) starts in Graphite.
-// Saved Light stays Earth light. Saved System follows the OS. A stored
-// `rhizome` / Loam / Mycelium / community slug is kept. Loam and Mycelium
-// are optional dark skins. Other fixed themes (from the brand handoff) are
-// single-polarity skins in themes.css; picking one pins the resolved mode
-// to its polarity. The accent swap only applies on the default theme —
-// fixed themes own their accent. Earth still follows the Light/Dark/Match
-// system toggle.
+// The default `graphite` theme is the warm-neutral overlay in index.css
+// (`:root.dark:not([data-color-theme])`) on the shared Earth dark base.
+// Earth lives on slug `rhizome`: light is the default light contract, dark
+// is `:root.dark[data-color-theme="rhizome"]`. Only empty storage (no saved
+// mode and no saved color) starts in Graphite. A saved Light, Dark, or
+// System mode with no color stays Earth. A stored `rhizome` / Loam /
+// Mycelium / community slug is kept. Loam and Mycelium are optional dark
+// skins. Other fixed themes (from the brand handoff) are single-polarity
+// skins in themes.css; picking one pins the resolved mode to its polarity.
+// The accent swap only applies on the default theme — fixed themes own
+// their accent. Earth still follows the Light/Dark/Match system toggle.
 
 export const COLOR_THEME_STORAGE_KEY = 'rhizome-color-theme'
+export const DARK_PARTNER_STORAGE_KEY = 'rhizome-dark-partner'
 export const ACCENT_COLOR_STORAGE_KEY = 'rhizome-accent'
 /** Prior generation ("tolaria", the pre-rename product name). See ADR-0162. */
 export const LEGACY_COLOR_THEME_STORAGE_KEY = 'tolaria-color-theme'
@@ -175,18 +179,18 @@ export const COLOR_THEMES: readonly ColorThemeDefinition[] = [
   { slug: 'mycelium', name: 'Mycelium', polarity: 'dark', swatch: ['#10150E', '#0E120C', '#6FE3A0'] },
   { slug: 'dracula', name: 'Dracula', polarity: 'dark', swatch: ['#21222C', '#282A36', '#BD93F9'] },
   { slug: 'nord', name: 'Nord', polarity: 'dark', swatch: ['#3B4252', '#2E3440', '#88C0D0'] },
-  { slug: 'gruvbox-dark', name: 'Gruvbox Dark', polarity: 'dark', swatch: ['#32302F', '#282828', '#FE8019'] },
-  { slug: 'gruvbox-light', name: 'Gruvbox Light', polarity: 'light', swatch: ['#F2E5BC', '#FBF1C7', '#D65D0E'] },
-  { slug: 'solarized-light', name: 'Solarized Light', polarity: 'light', swatch: ['#EEE8D5', '#FDF6E3', '#268BD2'] },
-  { slug: 'solarized-dark', name: 'Solarized Dark', polarity: 'dark', swatch: ['#073642', '#002B36', '#268BD2'] },
-  { slug: 'catppuccin-mocha', name: 'Catppuccin Mocha', polarity: 'dark', swatch: ['#181825', '#1E1E2E', '#CBA6F7'] },
-  { slug: 'catppuccin-latte', name: 'Catppuccin Latte', polarity: 'light', swatch: ['#E6E9EF', '#EFF1F5', '#8839EF'] },
-  { slug: 'tokyo-night', name: 'Tokyo Night', polarity: 'dark', swatch: ['#16161E', '#1A1B26', '#7AA2F7'] },
-  { slug: 'one-dark', name: 'One Dark', polarity: 'dark', swatch: ['#21252B', '#282C34', '#61AFEF'] },
-  { slug: 'rose-pine', name: 'Rosé Pine', polarity: 'dark', swatch: ['#1F1D2E', '#191724', '#C4A7E7'] },
-  { slug: 'github-light', name: 'GitHub Light', polarity: 'light', swatch: ['#F6F8FA', '#FFFFFF', '#0969DA'] },
+  { slug: 'gruvbox-dark', name: 'Gruvbox dark', polarity: 'dark', swatch: ['#32302F', '#282828', '#FE8019'] },
+  { slug: 'gruvbox-light', name: 'Gruvbox light', polarity: 'light', swatch: ['#F2E5BC', '#FBF1C7', '#D65D0E'] },
+  { slug: 'solarized-light', name: 'Solarized light', polarity: 'light', swatch: ['#EEE8D5', '#FDF6E3', '#268BD2'] },
+  { slug: 'solarized-dark', name: 'Solarized dark', polarity: 'dark', swatch: ['#073642', '#002B36', '#268BD2'] },
+  { slug: 'catppuccin-mocha', name: 'Catppuccin mocha', polarity: 'dark', swatch: ['#181825', '#1E1E2E', '#CBA6F7'] },
+  { slug: 'catppuccin-latte', name: 'Catppuccin latte', polarity: 'light', swatch: ['#E6E9EF', '#EFF1F5', '#8839EF'] },
+  { slug: 'tokyo-night', name: 'Tokyo night', polarity: 'dark', swatch: ['#16161E', '#1A1B26', '#7AA2F7'] },
+  { slug: 'one-dark', name: 'One dark', polarity: 'dark', swatch: ['#21252B', '#282C34', '#61AFEF'] },
+  { slug: 'rose-pine', name: 'Rosé pine', polarity: 'dark', swatch: ['#1F1D2E', '#191724', '#C4A7E7'] },
+  { slug: 'github-light', name: 'GitHub light', polarity: 'light', swatch: ['#F6F8FA', '#FFFFFF', '#0969DA'] },
   { slug: 'everforest', name: 'Everforest', polarity: 'dark', swatch: ['#232A2E', '#2D353B', '#A7C080'] },
-  { slug: 'monokai-pro', name: 'Monokai Pro', polarity: 'dark', swatch: ['#221F22', '#2D2A2E', '#FFD866'] },
+  { slug: 'monokai-pro', name: 'Monokai pro', polarity: 'dark', swatch: ['#221F22', '#2D2A2E', '#FFD866'] },
 ] as const
 
 // Matches AccentColorPicker / ACCENT_COLOR_PICKER_KEYS in utils/typeColors.ts
@@ -306,17 +310,29 @@ export function applyStoredAppearance(
  * Next appearance patch for the status-bar light/dark toggle.
  * Fixed color themes pin polarity, so a bare theme_mode flip is a no-op —
  * leave the pinned skin for Earth so the mode change takes effect.
+ * Graphite (and other dark-pinned skins) remember themselves as the dark
+ * partner so the next press returns there instead of Earth dark.
  */
 export function buildStatusBarThemeTogglePatch(
   documentThemeMode: ResolvedThemeMode,
   colorTheme: string | null | undefined,
-): { theme_mode: ResolvedThemeMode; color_theme?: string } {
-  const theme_mode: ResolvedThemeMode = documentThemeMode === 'dark' ? 'light' : 'dark'
+  darkPartner?: string | null,
+): { theme_mode: ResolvedThemeMode; color_theme?: string; dark_partner?: string | null } {
   const selectedColorTheme = normalizeColorTheme(colorTheme) ?? DEFAULT_COLOR_THEME
-  if (colorThemePolarity(selectedColorTheme)) {
-    return { theme_mode, color_theme: DUAL_MODE_COLOR_THEME }
+  if (documentThemeMode === 'dark') {
+    if (colorThemePolarity(selectedColorTheme) === 'dark') {
+      return { theme_mode: 'light', color_theme: DUAL_MODE_COLOR_THEME, dark_partner: selectedColorTheme }
+    }
+    return { theme_mode: 'light', dark_partner: null }
   }
-  return { theme_mode }
+  const partner = normalizeColorTheme(darkPartner)
+  if (partner && colorThemePolarity(partner) === 'dark') {
+    return { theme_mode: 'dark', color_theme: partner, dark_partner: null }
+  }
+  if (colorThemePolarity(selectedColorTheme)) {
+    return { theme_mode: 'dark', color_theme: DUAL_MODE_COLOR_THEME, dark_partner: null }
+  }
+  return { theme_mode: 'dark' }
 }
 
 export interface AppearancePickerOption {

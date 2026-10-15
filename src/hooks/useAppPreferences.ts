@@ -3,6 +3,7 @@ import type { Settings } from '../types'
 import {
   applyAppearanceToDocument,
   buildStatusBarThemeTogglePatch,
+  DARK_PARTNER_STORAGE_KEY,
   DEFAULT_ACCENT_COLOR,
   normalizeAccentColor,
   normalizeColorTheme,
@@ -142,8 +143,14 @@ export function useAppPreferences({
   }, [])
 
   const handleToggleThemeMode = useCallback(() => {
-    const patch = buildStatusBarThemeTogglePatch(documentThemeMode, settings.color_theme)
-    const nextSettings = { ...settings, ...patch }
+    const partner = typeof window !== 'undefined' ? window.localStorage.getItem(DARK_PARTNER_STORAGE_KEY) : null
+    const patch = buildStatusBarThemeTogglePatch(documentThemeMode, settings.color_theme, partner)
+    const { dark_partner: nextPartner, ...settingsPatch } = patch
+    if (typeof window !== 'undefined' && nextPartner !== undefined) {
+      if (nextPartner) window.localStorage.setItem(DARK_PARTNER_STORAGE_KEY, nextPartner)
+      else window.localStorage.removeItem(DARK_PARTNER_STORAGE_KEY)
+    }
+    const nextSettings = { ...settings, ...settingsPatch }
     applyAppearanceNow(
       patch.theme_mode,
       patch.color_theme ?? settings.color_theme,

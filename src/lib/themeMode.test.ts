@@ -77,11 +77,11 @@ describe('themeMode', () => {
     expect(storage.getItem(COLOR_THEME_STORAGE_KEY)).toBeNull()
   })
 
-  it('lets saved System follow the OS: dark may resolve to Graphite, light stays Earth', () => {
+  it('lets saved System stay on Earth while the OS still sets light vs dark', () => {
     const storage = makeStorage({ [THEME_MODE_STORAGE_KEY]: 'system' })
-    expect(readStoredAppearance(storage, makeMatchMedia(true)).colorTheme).toBe('graphite')
+    expect(readStoredAppearance(storage, makeMatchMedia(true)).colorTheme).toBe('rhizome')
     expect(applyStoredAppearance(document, storage, makeMatchMedia(true))).toBe('dark')
-    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
     expect(document.documentElement).toHaveClass('dark')
 
     expect(readStoredAppearance(storage, makeMatchMedia(false)).colorTheme).toBe('rhizome')
@@ -103,9 +103,10 @@ describe('themeMode', () => {
     expect(document.documentElement).toHaveClass('dark')
   })
 
-  it('infers Graphite only when nothing is saved', () => {
+  it('keeps unsaved dark on Earth dark and infers Graphite only when nothing is saved', () => {
     expect(resolveStoredColorTheme(null, null)).toBe('graphite')
-    expect(resolveStoredColorTheme(null, 'dark')).toBe('graphite')
+    expect(resolveStoredColorTheme(null, 'dark')).toBe('rhizome')
+    expect(resolveStoredColorTheme(null, 'system', makeMatchMedia(true))).toBe('rhizome')
     expect(resolveStoredColorTheme(null, 'light')).toBe('rhizome')
     expect(resolveStoredColorTheme('rhizome', 'light')).toBe('rhizome')
   })
@@ -348,6 +349,7 @@ describe('color themes and accent', () => {
 
     const graphite = makeStorage({
       [THEME_MODE_STORAGE_KEY]: 'dark',
+      [COLOR_THEME_STORAGE_KEY]: 'graphite',
       [ACCENT_COLOR_STORAGE_KEY]: 'green',
     })
     expect(applyStoredAppearance(document, graphite, makeMatchMedia(false))).toBe('dark')
@@ -393,11 +395,11 @@ describe('color themes and accent', () => {
     })
     expect(readStoredAppearance(invalid)).toEqual({
       mode: 'system',
-      colorTheme: 'graphite',
+      colorTheme: 'rhizome',
       accentColor: 'blue',
     })
     expect(applyStoredAppearance(document, invalid, makeMatchMedia(true))).toBe('dark')
-    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
     expect(document.documentElement).not.toHaveAttribute('data-accent')
   })
 
@@ -431,6 +433,20 @@ describe('color themes and accent', () => {
     expect(buildStatusBarThemeTogglePatch('dark', 'graphite')).toEqual({
       theme_mode: 'light',
       color_theme: 'rhizome',
+      dark_partner: 'graphite',
+    })
+  })
+
+  it('status-bar toggle remembers Graphite as the dark partner', () => {
+    expect(buildStatusBarThemeTogglePatch('dark', 'graphite')).toEqual({
+      theme_mode: 'light',
+      color_theme: 'rhizome',
+      dark_partner: 'graphite',
+    })
+    expect(buildStatusBarThemeTogglePatch('light', 'rhizome', 'graphite')).toEqual({
+      theme_mode: 'dark',
+      color_theme: 'graphite',
+      dark_partner: null,
     })
   })
 
@@ -438,11 +454,20 @@ describe('color themes and accent', () => {
     expect(buildStatusBarThemeTogglePatch('dark', 'dracula')).toEqual({
       theme_mode: 'light',
       color_theme: 'rhizome',
+      dark_partner: 'dracula',
     })
     expect(buildStatusBarThemeTogglePatch('light', 'github-light')).toEqual({
       theme_mode: 'dark',
       color_theme: 'rhizome',
+      dark_partner: null,
     })
+  })
+
+  it('shows community theme names in sentence case', () => {
+    expect(COLOR_THEMES.find((theme) => theme.slug === 'gruvbox-dark')?.name).toBe('Gruvbox dark')
+    expect(COLOR_THEMES.find((theme) => theme.slug === 'github-light')?.name).toBe('GitHub light')
+    expect(COLOR_THEMES.find((theme) => theme.slug === 'tokyo-night')?.name).toBe('Tokyo night')
+    expect(appearancePickerOptions().map((option) => option.name).join(' ')).not.toMatch(/\sDark\b|\sLight\b|\sNight\b/)
   })
 })
 

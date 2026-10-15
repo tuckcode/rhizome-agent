@@ -86,6 +86,40 @@ BANNER_TINT_ROLES = (
 )
 BANNER_TEXT_ROLES = ('--text-faint', '--text-muted')
 
+# Syntax / diff ink checked on each skin's app background after cascade.
+SYNTAX_DIFF_ROLES = (
+    '--syntax-highlight-string',
+    '--syntax-highlight-keyword',
+    '--syntax-highlight-comment',
+    '--diff-added-text',
+    '--diff-removed-text',
+)
+
+APP_THEME_ELEMENTS = (
+    ('Graphite', {'class': 'dark', 'data-theme': 'dark'}),
+    ('Earth dark', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'rhizome'}),
+    ('Earth light', {'data-theme': 'light'}),
+    ('Loam', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'loam'}),
+    ('Mycelium', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'mycelium'}),
+)
+
+DARK_SKIN_DUMP = (
+    ('Graphite', {'class': 'dark', 'data-theme': 'dark'}),
+    ('Earth dark', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'rhizome'}),
+    ('Loam', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'loam'}),
+    ('Mycelium', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'mycelium'}),
+    ('Dracula', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'dracula'}),
+    ('Nord', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'nord'}),
+    ('Gruvbox dark', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'gruvbox-dark'}),
+    ('Solarized dark', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'solarized-dark'}),
+    ('Catppuccin mocha', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'catppuccin-mocha'}),
+    ('Tokyo night', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'tokyo-night'}),
+    ('One dark', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'one-dark'}),
+    ('Rosé pine', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'rose-pine'}),
+    ('Everforest', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'everforest'}),
+    ('Monokai pro', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'monokai-pro'}),
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INDEX = REPO_ROOT / 'src' / 'index.css'
 DEFAULT_THEMES = REPO_ROOT / 'src' / 'themes.css'
@@ -145,6 +179,145 @@ def load_sel(text: str, sel: str) -> dict[str, str]:
         for key, value in re.findall(r'(--[\w-]+):\s*([^;]+);', blk):
             out[key] = value
     return out
+
+
+def strip_css_comments(text: str) -> str:
+    return re.sub(r'/\*.*?\*/', '', text, flags=re.S)
+
+
+def skip_at_rule(text: str, start: int) -> int:
+    i = start
+    n = len(text)
+    while i < n and text[i] not in '{;':
+        i += 1
+    if i < n and text[i] == ';':
+        return i + 1
+    depth = 0
+    while i < n:
+        if text[i] == '{':
+            depth += 1
+        elif text[i] == '}':
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    return n
+
+
+def iter_style_rules(text: str) -> list[tuple[int, str, dict[str, str]]]:
+    text = strip_css_comments(text)
+    rules: list[tuple[int, str, dict[str, str]]] = []
+    i = 0
+    n = len(text)
+    order = 0
+    while i < n:
+        while i < n and text[i].isspace():
+            i += 1
+        if i >= n:
+            break
+        if text.startswith('@', i):
+            i = skip_at_rule(text, i)
+            continue
+        brace = text.find('{', i)
+        if brace < 0:
+            break
+        selector = text[i:brace].strip()
+        depth = 1
+        j = brace + 1
+        while j < n and depth:
+            if text[j] == '{':
+                depth += 1
+            elif text[j] == '}':
+                depth -= 1
+            j += 1
+        body = text[brace + 1:j - 1]
+        if '{' not in body and selector:
+            decls = {key: value.strip() for key, value in re.findall(r'(--[\w-]+):\s*([^;]+);', body)}
+            if decls:
+                rules.append((order, selector, decls))
+                order += 1
+        i = j
+    return rules
+
+
+def selector_has_combinator(sel: str) -> bool:
+    stripped = re.sub(r':not\([^)]*\)|\[[^\]]*\]', '', sel)
+    return bool(re.search(r'[>+~]', stripped) or re.search(r'\s', stripped.strip()))
+
+
+def specificity(sel: str) -> tuple[int, int, int]:
+    a = b = c = 0
+    for not_inner, attr, ident, klass, pseudo, type_sel in re.findall(
+        r':not\(([^)]*)\)|(\[[^\]]+\])|(#[\w-]+)|(\.[\w-]+)|(:[\w-]+)|([\w-]+)',
+        sel,
+    ):
+        if not_inner:
+            nested = specificity(not_inner)
+            a += nested[0]
+            b += nested[1]
+            c += nested[2]
+        elif ident:
+            a += 1
+        elif attr or klass or pseudo:
+            b += 1
+        elif type_sel:
+            c += 1
+    return (a, b, c)
+
+
+def match_compound(sel: str, element: dict[str, str]) -> bool:
+    tokens = re.findall(r':not\([^)]*\)|\[[^\]]+\]|:[\w-]+|\.[\w-]+|#[\w-]+|[\w-]+', sel)
+    if not tokens:
+        return False
+    classes = {item for item in element.get('class', '').split() if item}
+    for tok in tokens:
+        if tok in (':root', 'html'):
+            continue
+        if tok.startswith('.'):
+            if tok[1:] not in classes:
+                return False
+            continue
+        if tok.startswith('#'):
+            if element.get('id') != tok[1:]:
+                return False
+            continue
+        if tok.startswith(':not('):
+            inner = tok[5:-1]
+            if match_compound(inner, element):
+                return False
+            continue
+        if tok.startswith('['):
+            match = re.match(r'\[([^=\]]+)(?:="([^"]*)")?\]', tok)
+            if not match:
+                return False
+            attr, value = match.group(1), match.group(2)
+            if value is None:
+                if attr not in element:
+                    return False
+            elif element.get(attr) != value:
+                return False
+            continue
+        if tok.startswith(':'):
+            continue
+        if tok not in ('html', 'root'):
+            return False
+    return True
+
+
+def resolve_cascade(text: str, element: dict[str, str], rules: list[tuple[int, str, dict[str, str]]] | None = None) -> dict[str, str]:
+    applicable: list[tuple[tuple[int, int, int], int, dict[str, str]]] = []
+    for order, grouped, decls in rules or iter_style_rules(text):
+        for selector in grouped.split(','):
+            sel = selector.strip()
+            if not sel or selector_has_combinator(sel):
+                continue
+            if match_compound(sel, element):
+                applicable.append((specificity(sel), order, decls))
+    applicable.sort(key=lambda item: (item[0], item[1]))
+    tokens: dict[str, str] = {}
+    for _, _, decls in applicable:
+        tokens.update(decls)
+    return tokens
 
 
 def resolve(tokens: dict[str, str], name: str, seen: set[str] | None = None) -> str:
@@ -395,23 +568,53 @@ def report(tokens: dict[str, str], theme: str, kind: str) -> tuple[list[str], li
                 if ratio < NONTEXT_MIN:
                     fails.append(fail_line(theme, icon_name, surf_name, ratio, NONTEXT_MIN, 'non-text'))
 
+    for syntax_name in SYNTAX_DIFF_ROLES:
+        if syntax_name not in tokens:
+            continue
+        fg_rgb = require_color(syntax_name)
+        if fg_rgb is None:
+            continue
+        ratio = cr(fg_rgb, bg_rgb)
+        rows.append(f'  {syntax_name} on {bg_name}: {ratio:.2f}')
+        if ratio < TEXT_MIN:
+            fails.append(fail_line(theme, syntax_name, bg_name, ratio, TEXT_MIN, 'text'))
+
     return rows, fails
+
+
+def dump_resolved(text: str) -> dict[str, dict[str, str]]:
+    rules = iter_style_rules(text)
+    out: dict[str, dict[str, str]] = {}
+    for name, element in (*APP_THEME_ELEMENTS, *DARK_SKIN_DUMP):
+        if name in out:
+            continue
+        out[name] = resolve_cascade(text, element, rules)
+    return out
 
 
 def run(paths: list[Path]) -> int:
     text = read_files(paths)
     kind = 'design' if all(is_design_css(path.read_text()) for path in paths) else 'app'
     print(f'contrast_check  kind={kind}  files={", ".join(os.path.relpath(path, REPO_ROOT) for path in paths)}')
-    cache: dict[str, dict[str, str]] = {}
     all_fails: list[str] = []
-    for sel, name, base_sel in theme_schemes(text, kind):
-        tokens = load_sel(text, sel)
+    if kind == 'app':
+        rules = iter_style_rules(text)
+        schemes = [(name, resolve_cascade(text, element, rules)) for name, element in APP_THEME_ELEMENTS]
+    else:
+        cache: dict[str, dict[str, str]] = {}
+        schemes = []
+        for sel, name, base_sel in theme_schemes(text, kind):
+            tokens = load_sel(text, sel)
+            if not tokens:
+                continue
+            if base_sel:
+                base = cache.get(base_sel) or load_sel(text, base_sel)
+                tokens = {**base, **tokens}
+            cache[sel] = tokens
+            schemes.append((name, tokens))
+    for name, tokens in schemes:
         if not tokens:
             continue
-        if base_sel:
-            base = cache.get(base_sel) or load_sel(text, base_sel)
-            tokens = {**base, **tokens}
-        cache[sel] = tokens
         rows, fails = report(tokens, name, kind)
         print('==', name)
         for row in rows:
@@ -432,14 +635,23 @@ def run(paths: list[Path]) -> int:
 
 
 def main(argv: list[str]) -> int:
-    if argv:
-        paths = [Path(arg) if os.path.isabs(arg) else Path.cwd() / arg for arg in argv]
+    dump = False
+    args = list(argv)
+    if args and args[0] == '--dump-resolved':
+        dump = True
+        args = args[1:]
+    if args:
+        paths = [Path(arg) if os.path.isabs(arg) else Path.cwd() / arg for arg in args]
     else:
         paths = [DEFAULT_INDEX, DEFAULT_THEMES]
     missing = [str(path) for path in paths if not path.is_file()]
     if missing:
         print('missing CSS:', ', '.join(missing), file=sys.stderr)
         return 2
+    if dump:
+        import json
+        print(json.dumps(dump_resolved(read_files(paths)), sort_keys=True))
+        return 0
     return run(paths)
 
 
