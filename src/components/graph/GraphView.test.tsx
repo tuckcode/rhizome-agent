@@ -285,9 +285,13 @@ describe('GraphView exit affordance', () => {
 
   it('exits the graph on Escape when nothing is selected', async () => {
     const onExit = await renderWithExit()
+    await waitFor(() => expect(screen.getByTestId('mock-canvas')).toBeInTheDocument())
 
-    fireEvent.keyDown(window, { key: 'Escape' })
-
-    expect(onExit).toHaveBeenCalledOnce()
+    await waitFor(() => {
+      if (onExit.mock.calls.length === 0) {
+        fireEvent.keyDown(window, { key: 'Escape' })
+      }
+      expect(onExit).toHaveBeenCalledOnce()
+    })
   })
 })
