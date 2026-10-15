@@ -22,29 +22,29 @@ const bannerStyle = {
   alignItems: 'center',
   gap: 10,
   padding: '6px 12px',
-  background: 'var(--accent-blue)',
-  borderBottom: 'none',
+  background: 'var(--feedback-info-bg)',
+  borderBottom: '1px solid var(--border-default)',
   fontSize: 13,
-  color: 'var(--text-inverse)',
+  color: 'var(--text-secondary)',
   flexShrink: 0,
 } satisfies CSSProperties
 
 const iconStyle = {
-  color: 'var(--text-inverse)',
+  color: 'var(--text-secondary)',
   flexShrink: 0,
 } satisfies CSSProperties
 
 const primaryActionStyle = {
   marginLeft: 'auto',
   padding: '3px 10px',
-  background: 'var(--text-inverse)',
-  color: 'var(--accent-blue)',
+  background: 'var(--accent-blue)',
+  color: 'var(--text-inverse)',
   fontSize: 12,
   fontWeight: 500,
 } satisfies CSSProperties
 
 const dismissButtonStyle = {
-  color: 'var(--text-inverse)',
+  color: 'var(--text-secondary)',
   display: 'flex',
   padding: 2,
 } satisfies CSSProperties
@@ -53,14 +53,14 @@ const progressTrackStyle = {
   flex: 1,
   maxWidth: 200,
   height: 4,
-  background: 'color-mix(in srgb, var(--text-inverse) 30%, transparent)',
+  background: 'color-mix(in srgb, var(--text-secondary) 30%, transparent)',
   borderRadius: 2,
   overflow: 'hidden',
 } satisfies CSSProperties
 
 const progressTextStyle = {
   fontSize: 11,
-  color: 'color-mix(in srgb, var(--text-inverse) 85%, transparent)',
+  color: 'var(--text-secondary)',
 } satisfies CSSProperties
 
 const readyIconStyle = {
@@ -81,7 +81,7 @@ function renderAvailableContent(status: Extract<VisibleUpdateStatus, { state: 'a
         size="xs"
         data-testid="update-release-notes"
         onClick={actions.openReleaseNotes}
-        style={{ color: 'var(--text-inverse)', padding: 0, height: 'auto' }}
+        style={{ color: 'var(--text-secondary)', padding: 0, height: 'auto' }}
       >
         {translate(locale, 'update.releaseNotes')} <ExternalLink size={11} />
       </Button>
@@ -129,7 +129,7 @@ function renderDownloadingContent(status: Extract<VisibleUpdateStatus, { state: 
           style={{
             width: `${Math.round(status.progress * 100)}%`,
             height: '100%',
-            background: 'var(--text-inverse)',
+            background: 'var(--accent-blue)',
             borderRadius: 2,
             transition: 'width 0.2s ease',
           }}

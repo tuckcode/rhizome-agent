@@ -108,8 +108,13 @@ const EARTH_DARK = {
   '--text-primary': '#E9E8DC',
   '--text-secondary': '#BDBAA8',
   '--text-tertiary': '#A8A592',
-  '--text-muted': '#999784',
-  '--text-faint': '#8F8D7B',
+  '--text-muted': '#9B9986',
+  '--text-faint': '#9B9989',
+  '--accent-purple': '#B4A0E8',
+  '--accent-teal': '#64D1C8',
+  '--accent-yellow': '#E4C97A',
+  '--accent-pink': '#E594BB',
+  '--accent-gray': '#9AA491',
   '--text-heading': '#F4F2E8',
   '--text-inverse': '#0F110C',
   '--border-default': '#2A281D',
@@ -215,7 +220,7 @@ const LOAM = {
   '--text-secondary': '#C6BBA6',
   '--text-tertiary': '#B2A791',
   '--text-muted': '#A3987F',
-  '--text-faint': '#998D74',
+  '--text-faint': '#A29881',
   '--text-heading': '#F7F1E5',
   '--text-inverse': '#15110C',
   '--border-default': '#352C20',
@@ -299,7 +304,7 @@ function expectReadableText(block: string): void {
 
 describe('Earth theme tokens', () => {
   const light = themeBlock(indexCss, ':root,\n[data-theme="light"]')
-  const graphite = themeBlock(indexCss, ':root.dark,\n[data-theme="dark"]')
+  const graphite = themeBlock(indexCss, ':root.dark:not([data-color-theme]),\n[data-theme="dark"]:not([data-color-theme])')
   const dark = themeBlock(indexCss, ':root.dark[data-color-theme="rhizome"] {')
   const loam = themeBlock(
     themesCss,
@@ -337,6 +342,19 @@ describe('Earth theme tokens', () => {
     expect(token(graphite, '--feedback-error-text')).toBe('var(--accent-red)')
     expect(token(graphite, '--editor-code-block-background')).toBe('#0D0D0B')
     expect(token(graphite, '--surface-overlay')).toBe('rgba(5, 5, 4, 0.6)')
+  })
+
+  it('keeps Graphite mint in the Graphite block and Earth accents on Earth', () => {
+    expect(graphite).toContain(':not([data-color-theme])')
+    expect(token(graphite, '--accent-blue')).toBe('#76EAA7')
+    expect(token(dark, '--accent-blue')).toBe('#7DF0AE')
+    expect(token(light, '--accent-blue')).toBe('#2C6A4D')
+    expect(token(dark, '--accent-purple')).toBe('#B4A0E8')
+    expect(token(dark, '--accent-teal')).toBe('#64D1C8')
+    expect(token(light, '--accent-purple')).toBe('#714EB2')
+    expect(token(light, '--accent-teal')).toBe('#286C68')
+    expect(dark).not.toContain('#76EAA7')
+    expect(light).not.toContain('#76EAA7')
   })
 
   it('writes Earth dark values onto the rhizome color-theme attribute', () => {
@@ -478,6 +496,8 @@ describe('Earth theme tokens', () => {
     expect(output).toMatch(/--text-muted on --state-selected-strong: [0-9.]+/)
     expect(output).toMatch(/--border-input on --surface-app: [0-9.]+/)
     expect(output).toMatch(/--focus-ring on --bg: [0-9.]+/)
+    expect(output).toMatch(/--text-faint on info\//)
+    expect(output).toMatch(/--text-muted on error\//)
     const failLines = output.split('\n').filter((line) => line.startsWith('FAIL '))
     for (const line of failLines) {
       expect(line).toMatch(/^FAIL (Graphite|Earth dark|Earth light|Loam|Mycelium)\s{2}--[\w-]+ on \S+\s{2}[0-9.]+\s{2}\((text|non-text) /)

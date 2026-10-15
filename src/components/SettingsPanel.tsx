@@ -44,6 +44,7 @@ import {
   readStoredAccentColor,
   readStoredColorTheme,
   readStoredThemeMode,
+  resolveStoredColorTheme,
   resolveThemeMode,
   writeStoredAccentColor,
   writeStoredColorTheme,
@@ -294,7 +295,7 @@ function createSettingsDraft(
     releaseChannel: normalizeReleaseChannel(settings.release_channel),
     automaticUpdateChecksEnabled: areAutomaticUpdateChecksEnabled(settings),
     themeMode: resolveSettingsDraftThemeMode(settings.theme_mode),
-    colorTheme: resolveSettingsDraftColorTheme(settings.color_theme),
+    colorTheme: resolveSettingsDraftColorTheme(settings.color_theme, settings.theme_mode),
     accentColor: resolveSettingsDraftAccentColor(settings.accent_color),
     uiLanguage: settings.ui_language ?? SYSTEM_UI_LANGUAGE,
     dateDisplayFormat: normalizeDateDisplayFormat(settings.date_display_format) ?? DEFAULT_DATE_DISPLAY_FORMAT,
@@ -318,10 +319,18 @@ function resolveSettingsDraftThemeMode(themeMode: Settings['theme_mode']): Theme
   return readStoredThemeMode(window.localStorage) ?? DEFAULT_THEME_MODE
 }
 
-function resolveSettingsDraftColorTheme(colorTheme: Settings['color_theme']): string {
-  if (colorTheme) return colorTheme
-  if (typeof window === 'undefined') return DEFAULT_COLOR_THEME
-  return readStoredColorTheme(window.localStorage) ?? DEFAULT_COLOR_THEME
+function resolveSettingsDraftColorTheme(
+  colorTheme: Settings['color_theme'],
+  themeMode: Settings['theme_mode'],
+): string {
+  const storedColor = colorTheme || (typeof window === 'undefined' ? null : readStoredColorTheme(window.localStorage))
+  if (storedColor) return storedColor
+  const storedMode = themeMode || (typeof window === 'undefined' ? null : readStoredThemeMode(window.localStorage))
+  if (storedMode === 'system') return ''
+  const matchMedia = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia.bind(window)
+    : undefined
+  return resolveStoredColorTheme(null, storedMode ?? null, matchMedia)
 }
 
 function resolveSettingsDraftAccentColor(accentColor: Settings['accent_color']): AccentColor {
@@ -359,7 +368,7 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     release_channel: serializeReleaseChannel(draft.releaseChannel),
     automatic_update_checks_enabled: draft.automaticUpdateChecksEnabled ? null : false,
     theme_mode: draft.themeMode,
-    color_theme: draft.colorTheme,
+    color_theme: draft.colorTheme || null,
     accent_color: draft.accentColor,
     ui_language: serializeUiLanguagePreference(draft.uiLanguage),
     date_display_format: draft.dateDisplayFormat,

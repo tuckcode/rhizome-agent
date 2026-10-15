@@ -78,6 +78,14 @@ STATUS_ROLES = (
     (('--accent-blue', '--accent'), ('--accent-dim', '--accent-blue-bg', '--accent-blue-light')),
 )
 
+BANNER_TINT_ROLES = (
+    ('info', ('--feedback-info-bg', '--accent-blue-light')),
+    ('success', ('--feedback-success-bg', '--accent-green-light')),
+    ('warning', ('--feedback-warning-bg', '--accent-orange-light')),
+    ('error', ('--feedback-error-bg', '--accent-red-light')),
+)
+BANNER_TEXT_ROLES = ('--text-faint', '--text-muted')
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INDEX = REPO_ROOT / 'src' / 'index.css'
 DEFAULT_THEMES = REPO_ROOT / 'src' / 'themes.css'
@@ -266,6 +274,42 @@ def report(tokens: dict[str, str], theme: str, kind: str) -> tuple[list[str], li
             rows.append(f'  {text_name} on {tint_name}/{surf_name}: {ratio:.2f}')
             if ratio < TEXT_MIN:
                 fails.append(fail_line(theme, text_name, f'{tint_name}/{surf_name}', ratio, TEXT_MIN, 'text'))
+
+    panel_name = pick_name(tokens, ('--surface-panel', '--surface'))
+    app_name = pick_name(tokens, ('--surface-app', '--bg'))
+    banner_bases = [name for name in (panel_name, app_name) if name][:1]
+    for tint_label, tint_aliases in BANNER_TINT_ROLES:
+        tint_name = pick_name(tokens, tint_aliases)
+        if not tint_name:
+            continue
+        for text_name in BANNER_TEXT_ROLES:
+            if text_name not in tokens:
+                continue
+            fg_rgb = require_color(text_name)
+            if fg_rgb is None:
+                continue
+            for surf_name in banner_bases:
+                base = require_color(surf_name, bg_rgb)
+                if base is None:
+                    continue
+                tint = require_color(tint_name, base)
+                if tint is None:
+                    continue
+                ratio = cr(fg_rgb, tint)
+                rows.append(
+                    f'  {text_name} on {tint_label}/{tint_name}/{surf_name}: {ratio:.2f}'
+                )
+                if ratio < TEXT_MIN:
+                    fails.append(
+                        fail_line(
+                            theme,
+                            text_name,
+                            f'{tint_label}/{tint_name}/{surf_name}',
+                            ratio,
+                            TEXT_MIN,
+                            'text',
+                        )
+                    )
 
     ink_name = pick_name(tokens, ('--text-inverse', '--accent-ink'))
     accent_name = pick_name(tokens, ('--accent-blue', '--accent'))

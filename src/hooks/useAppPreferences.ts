@@ -4,9 +4,9 @@ import {
   applyAppearanceToDocument,
   buildStatusBarThemeTogglePatch,
   DEFAULT_ACCENT_COLOR,
-  DEFAULT_COLOR_THEME,
   normalizeAccentColor,
   normalizeColorTheme,
+  resolveStoredColorTheme,
   writeStoredAccentColor,
   writeStoredColorTheme,
   writeStoredThemeMode,
@@ -122,11 +122,12 @@ export function useAppPreferences({
   // status-bar toggle looking dead when persist lagged or failed.
   const applyAppearanceNow = useCallback((mode: ThemeMode, colorTheme: string | null | undefined, accentColor: Settings['accent_color']) => {
     if (typeof document === 'undefined') return
-    const selectedColorTheme = normalizeColorTheme(colorTheme) ?? DEFAULT_COLOR_THEME
-    const selectedAccent = normalizeAccentColor(accentColor) ?? DEFAULT_ACCENT_COLOR
     const matchMedia = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
       ? window.matchMedia.bind(window)
       : undefined
+    const storedColor = normalizeColorTheme(colorTheme)
+    const selectedColorTheme = storedColor ?? resolveStoredColorTheme(null, mode, matchMedia)
+    const selectedAccent = normalizeAccentColor(accentColor) ?? DEFAULT_ACCENT_COLOR
     const resolved = applyAppearanceToDocument(
       document,
       { mode, colorTheme: selectedColorTheme, accentColor: selectedAccent },
@@ -134,7 +135,7 @@ export function useAppPreferences({
     )
     if (typeof window !== 'undefined') {
       writeStoredThemeMode(window.localStorage, mode)
-      writeStoredColorTheme(window.localStorage, selectedColorTheme)
+      if (storedColor) writeStoredColorTheme(window.localStorage, storedColor)
       writeStoredAccentColor(window.localStorage, selectedAccent)
     }
     void syncAppIconThemeMode(resolved)

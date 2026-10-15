@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { UpdateBanner } from './UpdateBanner'
@@ -56,6 +58,14 @@ function renderBanner(status: UpdateStatus, actions = makeActions(), locale: 'en
 }
 
 describe('UpdateBanner', () => {
+  it('uses --text-secondary for body copy on a tinted banner', () => {
+    const source = readFileSync(join(process.cwd(), 'src/components/UpdateBanner.tsx'), 'utf8')
+    const banner = source.slice(source.indexOf('const bannerStyle'), source.indexOf('const iconStyle'))
+    expect(banner).toContain("background: 'var(--feedback-info-bg)'")
+    expect(banner).toContain("color: 'var(--text-secondary)'")
+    expect(banner).not.toContain('--text-inverse')
+  })
+
   it('renders nothing when idle', () => {
     const status: UpdateStatus = { state: 'idle' }
     const { container } = renderBanner(status)

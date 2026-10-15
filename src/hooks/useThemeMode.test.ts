@@ -46,7 +46,42 @@ describe('useThemeMode', () => {
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     expect(document.documentElement).toHaveClass('dark')
     expect(document.documentElement).not.toHaveAttribute('data-color-theme')
-    expect(window.localStorage.getItem(COLOR_THEME_STORAGE_KEY)).toBe('graphite')
+    expect(window.localStorage.getItem(COLOR_THEME_STORAGE_KEY)).toBeNull()
+  })
+
+  it('keeps saved Light as Earth light and does not write Graphite', () => {
+    window.localStorage.setItem(THEME_MODE_STORAGE_KEY, 'light')
+
+    renderHook(() => useThemeMode('light', true, null))
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveClass('dark')
+    expect(window.localStorage.getItem(COLOR_THEME_STORAGE_KEY)).toBeNull()
+  })
+
+  it('lets saved System follow the OS without writing a color theme', () => {
+    const media = installMatchMedia(true)
+    window.localStorage.setItem(THEME_MODE_STORAGE_KEY, 'system')
+
+    renderHook(() => useThemeMode('system', true, null))
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(window.localStorage.getItem(COLOR_THEME_STORAGE_KEY)).toBeNull()
+
+    act(() => media.setMatches(false))
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(window.localStorage.getItem(COLOR_THEME_STORAGE_KEY)).toBeNull()
+  })
+
+  it('keeps saved Earth dark instead of switching to Graphite', () => {
+    renderHook(() => useThemeMode('dark', true, 'rhizome'))
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(window.localStorage.getItem(COLOR_THEME_STORAGE_KEY)).toBe('rhizome')
   })
 
   it('uses the storage mirror when persisted settings are empty', () => {

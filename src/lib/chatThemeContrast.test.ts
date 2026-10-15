@@ -37,7 +37,7 @@ function contrastRatio(foreground: string, background: string): number {
 describe('chat theme contrast tokens (B2–B4)', () => {
   const css = readFileSync(`${process.cwd()}/src/index.css`, 'utf8')
   const light = themeBlock(css, ':root,\n[data-theme="light"]')
-  const graphite = themeBlock(css, ':root.dark,\n[data-theme="dark"]')
+  const graphite = themeBlock(css, ':root.dark:not([data-color-theme]),\n[data-theme="dark"]:not([data-color-theme])')
   const dark = themeBlock(css, ':root.dark[data-color-theme="rhizome"] {')
 
   it('keeps Earth light muted and faint text on the paper-safe ladder', () => {
@@ -53,8 +53,8 @@ describe('chat theme contrast tokens (B2–B4)', () => {
   })
 
   it('keeps Earth dark muted and faint text on the forest-safe ladder', () => {
-    expect(token(dark, '--text-muted')).toBe('#999784')
-    expect(token(dark, '--text-faint')).toBe('#8F8D7B')
+    expect(token(dark, '--text-muted')).toBe('#9B9986')
+    expect(token(dark, '--text-faint')).toBe('#9B9989')
     expect(token(dark, '--text-tertiary')).toBe('#A8A592')
   })
 

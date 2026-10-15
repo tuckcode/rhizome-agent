@@ -7,6 +7,7 @@ import {
   applyStoredAppearance,
   applyStoredThemeMode,
   readStoredAppearance,
+  resolveStoredColorTheme,
   applyThemeModeToDocument,
   buildStatusBarThemeTogglePatch,
   DEFAULT_THEME_MODE,
@@ -64,13 +65,49 @@ describe('themeMode', () => {
     expect(document.documentElement).not.toHaveAttribute('data-color-theme')
   })
 
-  it('pins Graphite dark when no color theme is stored, even if mode is light', () => {
+  it('keeps saved Light as Earth light instead of switching to Graphite', () => {
     const storage = makeStorage({ [THEME_MODE_STORAGE_KEY]: 'light' })
     expect(readStoredThemeMode(storage)).toBe('light')
+    expect(readStoredColorTheme(storage)).toBeNull()
+    expect(readStoredAppearance(storage).colorTheme).toBe('rhizome')
+    expect(applyStoredAppearance(document, storage, makeMatchMedia(true))).toBe('light')
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveClass('dark')
+    expect(storage.getItem(COLOR_THEME_STORAGE_KEY)).toBeNull()
+  })
+
+  it('lets saved System follow the OS: dark may resolve to Graphite, light stays Earth', () => {
+    const storage = makeStorage({ [THEME_MODE_STORAGE_KEY]: 'system' })
+    expect(readStoredAppearance(storage, makeMatchMedia(true)).colorTheme).toBe('graphite')
     expect(applyStoredAppearance(document, storage, makeMatchMedia(true))).toBe('dark')
-    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
-    expect(document.documentElement).toHaveClass('dark')
     expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(document.documentElement).toHaveClass('dark')
+
+    expect(readStoredAppearance(storage, makeMatchMedia(false)).colorTheme).toBe('rhizome')
+    expect(applyStoredAppearance(document, storage, makeMatchMedia(false))).toBe('light')
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveClass('dark')
+    expect(storage.getItem(COLOR_THEME_STORAGE_KEY)).toBeNull()
+  })
+
+  it('keeps saved Earth dark instead of switching to Graphite', () => {
+    const storage = makeStorage({
+      [THEME_MODE_STORAGE_KEY]: 'dark',
+      [COLOR_THEME_STORAGE_KEY]: 'rhizome',
+    })
+    expect(readStoredAppearance(storage).colorTheme).toBe('rhizome')
+    expect(applyStoredAppearance(document, storage, makeMatchMedia(false))).toBe('dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).toHaveClass('dark')
+  })
+
+  it('infers Graphite only when nothing is saved', () => {
+    expect(resolveStoredColorTheme(null, null)).toBe('graphite')
+    expect(resolveStoredColorTheme(null, 'dark')).toBe('graphite')
+    expect(resolveStoredColorTheme(null, 'light')).toBe('rhizome')
+    expect(resolveStoredColorTheme('rhizome', 'light')).toBe('rhizome')
   })
 
   it('keeps an explicit Earth light pick instead of switching to Graphite', () => {
@@ -310,7 +347,7 @@ describe('color themes and accent', () => {
     expect(document.documentElement).toHaveClass('dark')
 
     const graphite = makeStorage({
-      [THEME_MODE_STORAGE_KEY]: 'light',
+      [THEME_MODE_STORAGE_KEY]: 'dark',
       [ACCENT_COLOR_STORAGE_KEY]: 'green',
     })
     expect(applyStoredAppearance(document, graphite, makeMatchMedia(false))).toBe('dark')

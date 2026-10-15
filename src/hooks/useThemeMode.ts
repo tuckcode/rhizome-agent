@@ -3,13 +3,13 @@ import {
   applyAppearanceToDocument,
   colorThemePolarity,
   DEFAULT_ACCENT_COLOR,
-  DEFAULT_COLOR_THEME,
   DEFAULT_THEME_MODE,
   normalizeAccentColor,
   normalizeColorTheme,
   readStoredAccentColor,
   readStoredColorTheme,
   readStoredThemeMode,
+  resolveStoredColorTheme,
   SYSTEM_THEME_MEDIA_QUERY,
   writeStoredAccentColor,
   writeStoredColorTheme,
@@ -25,11 +25,20 @@ function resolveRuntimeThemeMode(themeMode: ThemeMode | null | undefined): Theme
   return readStoredThemeMode(window.localStorage) ?? DEFAULT_THEME_MODE
 }
 
-function resolveRuntimeColorTheme(colorTheme: string | null | undefined): string {
-  const normalized = normalizeColorTheme(colorTheme)
-  if (normalized) return normalized
-  if (typeof window === 'undefined') return DEFAULT_COLOR_THEME
-  return readStoredColorTheme(window.localStorage) ?? DEFAULT_COLOR_THEME
+function resolveRuntimeColorTheme(
+  colorTheme: string | null | undefined,
+  themeMode: ThemeMode,
+): { colorTheme: string; persistColor: boolean } {
+  const fromSettings = normalizeColorTheme(colorTheme)
+  if (fromSettings) return { colorTheme: fromSettings, persistColor: true }
+  if (typeof window === 'undefined') {
+    return { colorTheme: resolveStoredColorTheme(null, themeMode), persistColor: false }
+  }
+  const stored = readStoredColorTheme(window.localStorage)
+  return {
+    colorTheme: resolveStoredColorTheme(stored, themeMode, currentMatchMedia()),
+    persistColor: stored !== null,
+  }
 }
 
 function resolveRuntimeAccentColor(accentColor: AccentColor | null | undefined): AccentColor {
@@ -45,20 +54,30 @@ function currentMatchMedia(): Window['matchMedia'] | undefined {
     : undefined
 }
 
-function writeAppearanceMirror(themeMode: ThemeMode, colorTheme: string, accentColor: AccentColor): void {
+function writeAppearanceMirror(
+  themeMode: ThemeMode,
+  colorTheme: string,
+  accentColor: AccentColor,
+  persistColor: boolean,
+): void {
   if (typeof window === 'undefined') return
   writeStoredThemeMode(window.localStorage, themeMode)
-  writeStoredColorTheme(window.localStorage, colorTheme)
+  if (persistColor) writeStoredColorTheme(window.localStorage, colorTheme)
   writeStoredAccentColor(window.localStorage, accentColor)
 }
 
-function applySelectedAppearance(themeMode: ThemeMode, colorTheme: string, accentColor: AccentColor): void {
+function applySelectedAppearance(
+  themeMode: ThemeMode,
+  colorTheme: string,
+  accentColor: AccentColor,
+  persistColor: boolean,
+): void {
   const resolvedMode = applyAppearanceToDocument(
     document,
     { mode: themeMode, colorTheme, accentColor },
     currentMatchMedia(),
   )
-  writeAppearanceMirror(themeMode, colorTheme, accentColor)
+  writeAppearanceMirror(themeMode, colorTheme, accentColor, persistColor)
   void syncAppIconThemeMode(resolvedMode)
 }
 
@@ -77,8 +96,14 @@ function subscribeSystemThemeChanges(
   mediaQueryList: MediaQueryList,
   colorTheme: string,
   accentColor: AccentColor,
+  persistColor: boolean,
 ): () => void {
-  const handleSystemThemeChange = () => applySelectedAppearance('system', colorTheme, accentColor)
+  const handleSystemThemeChange = () => {
+    const nextColor = persistColor
+      ? colorTheme
+      : resolveStoredColorTheme(null, 'system', currentMatchMedia())
+    applySelectedAppearance('system', nextColor, accentColor, persistColor)
+  }
 
   if (typeof mediaQueryList.addEventListener === 'function') {
     mediaQueryList.addEventListener('change', handleSystemThemeChange)
@@ -92,8 +117,9 @@ function subscribeSystemThemeChanges(
 /**
  * Applies the full appearance selection (light/dark/system mode, color
  * theme, accent) to the document. `colorTheme`/`accentColor` are optional —
- * omitting them (existing 2-arg call sites) uses Graphite, which pins dark.
- * Earth (`rhizome`) is the only slug that follows Light/Dark/Match system.
+ * omitting them infers from the saved mode (Graphite only when nothing is
+ * saved; Light stays Earth; System follows the OS). Earth (`rhizome`) is
+ * the only slug that follows Light/Dark/Match system.
  */
 export function useThemeMode(
   themeMode: ThemeMode | null | undefined,
@@ -105,14 +131,25 @@ export function useThemeMode(
     if (!loaded || typeof document === 'undefined') return
 
     const selectedMode = resolveRuntimeThemeMode(themeMode)
-    const selectedColorTheme = resolveRuntimeColorTheme(colorTheme)
+    const resolvedColor = resolveRuntimeColorTheme(colorTheme, selectedMode)
     const selectedAccentColor = resolveRuntimeAccentColor(accentColor)
-    applySelectedAppearance(selectedMode, selectedColorTheme, selectedAccentColor)
+    applySelectedAppearance(
+      selectedMode,
+      resolvedColor.colorTheme,
+      selectedAccentColor,
+      resolvedColor.persistColor,
+    )
 
-    if (selectedMode !== 'system' || colorThemePolarity(selectedColorTheme) !== null) return
+    if (selectedMode !== 'system') return
+    if (resolvedColor.persistColor && colorThemePolarity(resolvedColor.colorTheme) !== null) return
     const mediaQueryList = getSystemThemeMediaQueryList()
     return mediaQueryList
-      ? subscribeSystemThemeChanges(mediaQueryList, selectedColorTheme, selectedAccentColor)
+      ? subscribeSystemThemeChanges(
+        mediaQueryList,
+        resolvedColor.colorTheme,
+        selectedAccentColor,
+        resolvedColor.persistColor,
+      )
       : undefined
   }, [loaded, themeMode, colorTheme, accentColor])
 }

@@ -64,7 +64,7 @@
         --text-primary: #2A251E;
         --text-muted: #625A4D;
       }
-      :root[data-theme="dark"] {
+      :root[data-theme="dark"]:not([data-color-theme]) {
         color-scheme: dark;
         background: #131210;
         color: #EEEDEB;
@@ -78,7 +78,7 @@
         color: #E9E8DC;
         --primary: #7DF0AE;
         --text-primary: #E9E8DC;
-        --text-muted: #999784;
+        --text-muted: #9B9986;
       }
       :root[data-theme="light"][data-color-theme="rhizome"] {
         color-scheme: light;
@@ -150,7 +150,7 @@
         border-color: #DDD4C3;
         box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.10);
       }
-      :root.ai-workspace-native-window[data-theme="dark"] #root {
+      :root.ai-workspace-native-window[data-theme="dark"]:not([data-color-theme]) #root {
         background: #131210;
         border-color: #302F2D;
         box-shadow: 0 12px 26px rgba(0, 0, 0, 0.30), 0 1px 4px rgba(0, 0, 0, 0.22);
@@ -190,6 +190,7 @@
         // flash even when the mode toggle disagrees (e.g. system=light but
         // the chosen fixed theme is dark).
         var DEFAULT_COLOR_THEME = 'graphite';
+        var DUAL_MODE_COLOR_THEME = 'rhizome';
         var THEME_POLARITY = {
           graphite: 'dark',
           dracula: 'dark', nord: 'dark', 'gruvbox-dark': 'dark', 'gruvbox-light': 'light',
@@ -220,8 +221,16 @@
           var mode = normalizeTheme(value) || 'dark';
           return mode === 'system' ? (prefersDarkTheme() ? 'dark' : 'light') : mode;
         }
+        function inferColorTheme(colorThemeValue, modeValue) {
+          var colorTheme = normalizeColorTheme(colorThemeValue);
+          if (colorTheme) return colorTheme;
+          var mode = normalizeTheme(modeValue);
+          if (mode === 'light') return DUAL_MODE_COLOR_THEME;
+          if (mode === 'system') return prefersDarkTheme() ? DEFAULT_COLOR_THEME : DUAL_MODE_COLOR_THEME;
+          return DEFAULT_COLOR_THEME;
+        }
         function applyTheme(modeValue, colorThemeValue, accentValue) {
-          var colorTheme = normalizeColorTheme(colorThemeValue) || DEFAULT_COLOR_THEME;
+          var colorTheme = inferColorTheme(colorThemeValue, modeValue);
           var accent = normalizeAccent(accentValue) || 'blue';
           var polarity = THEME_POLARITY[colorTheme];
           var mode = polarity || resolveTheme(modeValue);

@@ -19,10 +19,11 @@
 
 /* ============================================================
    Theme Variables — app-owned light/dark contract
-   Graphite (default dark) is :root.dark / [data-theme="dark"].
+   Graphite (default dark) is :root.dark:not([data-color-theme]) /
+   [data-theme="dark"]:not([data-color-theme]). Mint stays in that block.
    Earth light is :root / [data-theme="light"].
-   Earth dark is :root.dark[data-color-theme="rhizome"].
-   Loam and Mycelium live in themes.css as data-color-theme skins.
+   Earth dark is :root.dark[data-color-theme="rhizome"] with its original
+   accent contract. Loam and Mycelium live in themes.css.
    ============================================================ */
 
 :root {
@@ -193,8 +194,8 @@
   --link-hover: var(--accent-blue-hover);
 }
 
-:root.dark,
-[data-theme="dark"] {
+:root.dark:not([data-color-theme]),
+[data-theme="dark"]:not([data-color-theme]) {
   color-scheme: dark;
 
   /* --- Semantic surfaces (Graphite) --- */
@@ -347,10 +348,11 @@
   --link-hover: var(--accent-blue-hover);
 }
 
-/* Earth dark — selectable skin. Outranks Graphite when color-theme is rhizome. */
+/* Earth dark — full original contract so it does not inherit Graphite mint. */
 :root.dark[data-color-theme="rhizome"] {
   color-scheme: dark;
 
+  /* --- Semantic surfaces (Earth dark) --- */
   --surface-app: #0F110C;
   --surface-sidebar: #121410;
   --surface-panel: #16170F;
@@ -362,14 +364,16 @@
   --surface-editor: #0F110C;
   --surface-overlay: rgba(4, 6, 3, 0.6);
 
+  /* --- Semantic text (Earth dark) --- */
   --text-primary: #E9E8DC;
   --text-secondary: #BDBAA8;
   --text-tertiary: #A8A592;
-  --text-muted: #999784;
-  --text-faint: #8F8D7B;
+  --text-muted: #9B9986;
+  --text-faint: #9B9989;
   --text-heading: #F4F2E8;
   --text-inverse: #0F110C;
 
+  /* --- Semantic borders (Earth dark) --- */
   --border-default: #2A281D;
   --border-subtle: #1F1E16;
   --border-strong: #3B3828;
@@ -377,6 +381,7 @@
   --border-dialog: #3B3828;
   --border-focus: var(--accent-blue);
 
+  /* --- Interaction states (Earth dark) --- */
   --state-hover: #1C1D14;
   --state-hover-subtle: #16170F;
   --state-selected: #1A2619;
@@ -386,6 +391,7 @@
   --state-drag-target: rgba(125, 240, 174, 0.18);
   --state-disabled: #15160F;
 
+  /* --- Accent roles (Earth dark) --- */
   --accent-blue: #7DF0AE;
   --accent-blue-bg: rgba(125, 240, 174, 0.18);
   --accent-blue-hover: #9AF5C2;
@@ -396,7 +402,18 @@
   --accent-orange-light: rgba(233, 176, 79, 0.13);
   --accent-red: #EE8B7E;
   --accent-red-light: rgba(238, 139, 126, 0.12);
+  --accent-purple: #B4A0E8;
+  --accent-purple-light: rgba(180, 160, 232, 0.16);
+  --accent-yellow: #E4C97A;
+  --accent-yellow-light: rgba(228, 201, 122, 0.16);
+  --accent-teal: #64D1C8;
+  --accent-teal-light: rgba(100, 209, 200, 0.16);
+  --accent-pink: #E594BB;
+  --accent-pink-light: rgba(229, 148, 187, 0.16);
+  --accent-gray: #9AA491;
+  --accent-gray-light: rgba(154, 164, 145, 0.14);
 
+  /* --- Feedback roles (Earth dark) --- */
   --ok-text: #9BCF7E;
   --danger-text: #EE8B7E;
   --warn-text: #E9B04F;
@@ -410,20 +427,77 @@
   --feedback-error-text: var(--danger-text);
   --feedback-error-bg: var(--accent-red-light);
 
+  /* --- Syntax and diff roles (Earth dark) --- */
   --syntax-heading: #6FE3A0;
   --syntax-link: #6FE3A0;
   --syntax-monospace: #E9B04F;
   --syntax-monospace-bg: rgba(121, 131, 111, 0.16);
-  --syntax-muted: #999784;
+  --syntax-muted: #9B9986;
   --syntax-frontmatter-key: #E9B04F;
   --syntax-frontmatter-value: #8CDFA6;
   --syntax-highlight-comment: #88917B;
+  --syntax-highlight-keyword: #E8938A;
+  --syntax-highlight-string: #A5D8C8;
+  --syntax-highlight-number: #8FBEDB;
+  --syntax-highlight-title: #C3B2F0;
+  --syntax-highlight-type: #E5B171;
+  --syntax-highlight-deletion: #E8938A;
+  --syntax-highlight-deletion-bg: rgba(238, 139, 126, 0.15);
+  --diff-added-text: #6FE3A0;
+  --diff-added-bg: rgba(111, 227, 160, 0.13);
+  --diff-removed-text: #EE8B7E;
+  --diff-removed-bg: rgba(238, 139, 126, 0.14);
+  --diff-hunk-bg: rgba(233, 176, 79, 0.12);
   --editor-code-block-background: #090A07;
+  --editor-code-block-border: transparent;
   --editor-code-block-text: #E9E8DC;
   --editor-code-block-language: rgba(233, 232, 220, 0.65);
 
+  /* --- Overlays and shadows (dark mode) --- */
+  --shadow-overlay: var(--surface-overlay);
+  --shadow-dialog: rgba(0, 0, 0, 0.45);
+
+  /* --- shadcn theme aliases (dark mode) --- */
+  --background: var(--surface-app);
+  --foreground: var(--text-primary);
+  --card: var(--surface-card);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-popover);
+  --popover-foreground: var(--text-primary);
   --primary: var(--accent-blue);
+  --primary-foreground: var(--text-inverse);
+  --secondary: var(--state-hover);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--state-hover-subtle);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--state-hover);
+  --accent-foreground: var(--text-primary);
+  --destructive: var(--accent-red);
+  --destructive-foreground: var(--text-inverse);
+  --border: var(--border-default);
+  --input: var(--border-input);
+  --ring: var(--state-focus-ring);
+  --sidebar: var(--surface-sidebar);
+  --sidebar-foreground: var(--text-primary);
   --sidebar-primary: var(--accent-blue);
+  --sidebar-primary-foreground: var(--text-inverse);
+  --sidebar-accent: var(--state-hover);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border-default);
+  --sidebar-ring: var(--state-focus-ring);
+
+  /* --- Compatibility aliases for existing product code --- */
+  --bg-primary: var(--surface-app);
+  --bg-sidebar: var(--surface-sidebar);
+  --bg-card: var(--surface-card);
+  --bg-hover: var(--state-hover);
+  --bg-hover-subtle: var(--state-hover-subtle);
+  --bg-selected: var(--state-selected);
+  --bg-input: var(--surface-input);
+  --bg-button: var(--surface-button);
+  --bg-dialog: var(--surface-dialog);
+  --border-primary: var(--border-default);
+  --hover: var(--state-hover);
   --link-color: var(--accent-blue);
   --link-hover: var(--accent-blue-hover);
 }

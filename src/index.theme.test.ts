@@ -27,7 +27,7 @@ describe('index.css default theme tokens', () => {
   })
 
   it('keeps the Graphite mint accent in the default dark theme', () => {
-    const darkBlock = /:root\.dark,\s*\n\[data-theme="dark"\]\s*\{/
+    const darkBlock = /:root\.dark:not\(\[data-color-theme\]\),\s*\n\[data-theme="dark"\]:not\(\[data-color-theme\]\)\s*\{/
     expect(extractAccentBlue(darkBlock).toUpperCase()).toBe('#76EAA7')
   })
 })

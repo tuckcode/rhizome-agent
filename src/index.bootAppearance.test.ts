@@ -101,8 +101,33 @@ describe('HTML boot appearance', () => {
     const html = readFileSync(join(process.cwd(), 'index.html'), 'utf8')
     expect(html).toMatch(/:root\s*\{[^}]*background:\s*#131210/)
     expect(html).toMatch(/:root\s*\{[^}]*--primary:\s*#76EAA7/)
-    expect(html).toMatch(/:root\[data-theme="dark"\]\s*\{[^}]*--primary:\s*#76EAA7/)
+    expect(html).toMatch(/:root\[data-theme="dark"\]:not\(\[data-color-theme\]\)\s*\{[^}]*--primary:\s*#76EAA7/)
     expect(html).toMatch(/normalizeTheme\(value\) \|\| 'dark'/)
+  })
+
+  it('keeps saved Light as Earth light on first paint', () => {
+    paint({ 'rhizome-theme': 'light' }, true)
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveClass('dark')
+    expect(localStorage.getItem('rhizome-color-theme')).toBeNull()
+  })
+
+  it('lets saved System follow the OS on first paint', () => {
+    paint({ 'rhizome-theme': 'system' }, true)
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(localStorage.getItem('rhizome-color-theme')).toBeNull()
+
+    paint({ 'rhizome-theme': 'system' }, false)
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+  })
+
+  it('keeps saved Earth dark on first paint', () => {
+    paint({ 'rhizome-theme': 'dark', 'rhizome-color-theme': 'rhizome' })
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
   })
 
   it('keeps a stored Earth pick on first paint', () => {

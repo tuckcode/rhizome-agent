@@ -104,24 +104,49 @@ export function applyStoredThemeMode(
   return applyThemeSelectionToDocument(documentObject, mode, matchMedia)
 }
 
-export function readStoredAppearance(storage: ThemeStorage): AppearanceSelection {
+/**
+ * Color skin when the user never stored one.
+ * Fresh / saved dark → Graphite. Saved light → Earth. Saved system follows
+ * the OS (dark may resolve to Graphite; light stays Earth light). An explicit
+ * stored slug always wins. Does not write the inferred slug.
+ */
+export function resolveStoredColorTheme(
+  storedColor: string | null,
+  storedMode: ThemeMode | null,
+  matchMedia?: ThemeMatchMedia,
+): string {
+  if (storedColor) return storedColor
+  if (storedMode === 'light') return DUAL_MODE_COLOR_THEME
+  if (storedMode === 'system') {
+    return resolveSystemThemeMode(matchMedia) === 'light' ? DUAL_MODE_COLOR_THEME : DEFAULT_COLOR_THEME
+  }
+  return DEFAULT_COLOR_THEME
+}
+
+export function readStoredAppearance(
+  storage: ThemeStorage,
+  matchMedia?: ThemeMatchMedia,
+): AppearanceSelection {
+  const storedMode = readStoredThemeMode(storage)
   return {
-    mode: readStoredThemeMode(storage) ?? DEFAULT_THEME_MODE,
-    colorTheme: readStoredColorTheme(storage) ?? DEFAULT_COLOR_THEME,
+    mode: storedMode ?? DEFAULT_THEME_MODE,
+    colorTheme: resolveStoredColorTheme(readStoredColorTheme(storage), storedMode, matchMedia),
     accentColor: readStoredAccentColor(storage) ?? DEFAULT_ACCENT_COLOR,
   }
 }
 
 // ── Color themes and accent ──────────────────────────────────────────────────
 // The default `graphite` theme is the warm-neutral dark contract in index.css
-// (`:root.dark` with no data-color-theme). Earth lives on slug `rhizome`:
+// (`:root.dark:not([data-color-theme])`). Earth lives on slug `rhizome`:
 // light is the default light contract, dark is `:root.dark[data-color-theme="rhizome"]`.
-// Fresh installs and empty storage start in Graphite. A stored `rhizome` /
-// Loam / Mycelium / community slug is kept. Loam and Mycelium are optional
-// dark skins. Other fixed themes (from the brand handoff) are single-polarity
-// skins in themes.css; picking one pins the resolved mode to its polarity.
-// The accent swap only applies on the default theme — fixed themes own their
-// accent. Earth still follows the Light/Dark/Match system toggle.
+// Only empty storage (no saved mode and no saved color) starts in Graphite.
+// Saved Light stays Earth light. Saved System follows the OS. A stored
+// `rhizome` / Loam / Mycelium / community slug is kept. Loam and Mycelium
+// are optional dark skins. Other fixed themes (from the brand handoff) are
+// single-polarity skins in themes.css; picking one pins the resolved mode
+// to its polarity. The accent swap only applies on the default theme —
+// fixed themes own their accent. Earth still follows the Light/Dark/Match
+// system toggle.
 
 export const COLOR_THEME_STORAGE_KEY = 'rhizome-color-theme'
 export const ACCENT_COLOR_STORAGE_KEY = 'rhizome-accent'
@@ -274,7 +299,7 @@ export function applyStoredAppearance(
   storage: ThemeStorage,
   matchMedia?: ThemeMatchMedia,
 ): ResolvedThemeMode {
-  return applyAppearanceToDocument(documentObject, readStoredAppearance(storage), matchMedia)
+  return applyAppearanceToDocument(documentObject, readStoredAppearance(storage, matchMedia), matchMedia)
 }
 
 /**
