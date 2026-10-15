@@ -472,6 +472,36 @@ describe('color themes and accent', () => {
     })
   })
 
+  it('status-bar toggle round-trips Graphite to Earth light and back to Graphite', () => {
+    const toEarthLight = buildStatusBarThemeTogglePatch('dark', null)
+    expect(toEarthLight.theme_mode).toBe('light')
+    expect(colorThemeForThemeMode(toEarthLight.theme_mode)).toBe('rhizome')
+    applyAppearanceToDocument(document, {
+      mode: toEarthLight.theme_mode,
+      colorTheme: colorThemeForThemeMode(toEarthLight.theme_mode),
+      accentColor: 'blue',
+    })
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(document.documentElement).toHaveAttribute('data-color-theme', 'rhizome')
+    expect(document.documentElement).not.toHaveClass('dark')
+
+    const backToGraphite = buildStatusBarThemeTogglePatch(
+      toEarthLight.theme_mode,
+      toEarthLight.color_theme,
+      toEarthLight.dark_partner,
+    )
+    expect(backToGraphite.theme_mode).toBe('dark')
+    expect(colorThemeForThemeMode(backToGraphite.theme_mode)).toBe('graphite')
+    applyAppearanceToDocument(document, {
+      mode: backToGraphite.theme_mode,
+      colorTheme: colorThemeForThemeMode(backToGraphite.theme_mode),
+      accentColor: 'blue',
+    })
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement).not.toHaveAttribute('data-color-theme')
+    expect(document.documentElement).toHaveClass('dark')
+  })
+
   it('status-bar toggle remembers a pinned dark skin other than Graphite', () => {
     expect(buildStatusBarThemeTogglePatch('dark', 'loam')).toEqual({
       theme_mode: 'light',

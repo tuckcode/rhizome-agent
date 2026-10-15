@@ -388,6 +388,16 @@ describe('Earth theme tokens', () => {
     expect(dump['Earth dark']['--accent-blue']).toBe('#7DF0AE')
     expect(dump.Loam['--syntax-highlight-string']).toBe('#A5D8C8')
     expect(dump.Dracula['--syntax-highlight-string']).toBe('#A5D8C8')
+    for (const name of darkSkins) {
+      const tokens = dump[name]
+      const background = tokens['--surface-app']
+      for (const role of ['--syntax-highlight-string', '--diff-added-text', '--diff-removed-text'] as const) {
+        expect(
+          contrastRatio(tokens[role], background),
+          `${name} ${role} on ${background}`,
+        ).toBeGreaterThanOrEqual(4.5)
+      }
+    }
   })
 
   it('keeps Graphite mint in the Graphite block and Earth accents on Earth', () => {
