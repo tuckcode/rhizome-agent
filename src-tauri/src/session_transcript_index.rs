@@ -6,7 +6,18 @@
 
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+#[cfg(test)]
+use std::cell::RefCell;
+
+#[cfg(test)]
+thread_local! {
+    /// Per-test cache root. `RHIZOME_CACHE_DIR` is process-global and is also
+    /// mutated by `vault::cache` tests under a different lock, so the worker
+    /// that writes this index must not trust the env at TurnEnd time.
+    static TEST_CACHE_DIR: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
+}
 
 const INDEX_VERSION: u32 = 1;
 const INDEX_FILE_NAME: &str = "v1.json";
@@ -57,7 +68,18 @@ pub fn append_native_turns(
     title: &str,
     new_turns: Vec<IndexedTranscriptTurn>,
 ) -> Result<(), String> {
-    let mut document = load()?;
+    append_native_turns_to(&index_path()?, path, id, title, new_turns)
+}
+
+/// Same write as `append_native_turns`, using a path resolved on the starting thread.
+pub(crate) fn append_native_turns_to(
+    index_file: &Path,
+    path: &str,
+    id: &str,
+    title: &str,
+    new_turns: Vec<IndexedTranscriptTurn>,
+) -> Result<(), String> {
+    let mut document = load_from(index_file.to_path_buf())?;
     if let Some(session) = document
         .sessions
         .iter_mut()
@@ -90,7 +112,7 @@ pub fn append_native_turns(
             turns,
         });
     }
-    save(&document)
+    save_to(index_file.to_path_buf(), &document)
 }
 
 /// Remove a native session from the index. Missing is success.
@@ -152,11 +174,15 @@ fn save_to(path: PathBuf, document: &SessionTranscriptIndexDocument) -> Result<(
     Ok(())
 }
 
-fn index_path() -> Result<PathBuf, String> {
+pub(crate) fn index_path() -> Result<PathBuf, String> {
     Ok(index_dir()?.join(INDEX_FILE_NAME))
 }
 
 fn index_dir() -> Result<PathBuf, String> {
+    #[cfg(test)]
+    if let Some(dir) = TEST_CACHE_DIR.with(|slot| slot.borrow().clone()) {
+        return Ok(dir.join("session-transcript-index"));
+    }
     if let Ok(dir) = std::env::var("RHIZOME_CACHE_DIR") {
         if !dir.trim().is_empty() {
             return Ok(PathBuf::from(dir).join("session-transcript-index"));
@@ -190,9 +216,11 @@ mod tests {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let dir = TempDir::new().expect("temp cache dir");
+        TEST_CACHE_DIR.with(|slot| *slot.borrow_mut() = Some(dir.path().to_path_buf()));
         std::env::set_var("RHIZOME_CACHE_DIR", dir.path());
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| body(&dir)));
         std::env::remove_var("RHIZOME_CACHE_DIR");
+        TEST_CACHE_DIR.with(|slot| *slot.borrow_mut() = None);
         match result {
             Ok(value) => value,
             Err(panic) => std::panic::resume_unwind(panic),
@@ -214,6 +242,18 @@ mod tests {
                 }],
             }],
         }
+    }
+
+    #[test]
+    fn load_uses_the_thread_cache_even_when_env_points_elsewhere() {
+        with_cache_dir(|_| {
+            let document = sample_document();
+            save(&document).expect("save index");
+            let decoy = TempDir::new().expect("decoy cache");
+            std::env::set_var("RHIZOME_CACHE_DIR", decoy.path());
+            let loaded = load().expect("load index");
+            assert_eq!(loaded, document);
+        });
     }
 
     #[test]
