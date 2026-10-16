@@ -1,18 +1,20 @@
 name: Landing page
 
-# Publishes website/ to GitHub Pages. Release workflows run the same
-# website/build.sh, so a release deploy keeps the landing page.
+# Publishes website/ at the Pages root and site/ (Starlight) at /docs.
+# Release workflows run the same website/build.sh, so a release deploy
+# keeps both the landing page and the docs.
 #
 # This job only queues when one of the paths below changes. That is why
 # it last ran on 2026-09-27 (8ed9817) while main kept moving: no later
-# commit touched website/, the hero assets, or this file. GitHub did not
-# disable Pages and the last run succeeded. A merge that touches these
-# paths deploys; Actions → Landing page → Run workflow also deploys.
+# commit touched website/, site/, the hero assets, or this file. GitHub
+# did not disable Pages and the last run succeeded. A merge that touches
+# these paths deploys; Actions → Landing page → Run workflow also deploys.
 on:
   push:
     branches: [main]
     paths:
       - 'website/**'
+      - 'site/**'
       - 'docs/assets/**'
       - 'src/assets/brand/rhizome-organic-hero.png'
       - '.github/workflows/pages.yml'
@@ -37,8 +39,13 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: site/package-lock.json
       - uses: actions/configure-pages@v5
-      - name: Build landing page
+      - name: Build landing page and Starlight docs
         run: bash website/build.sh _site
       - uses: actions/upload-pages-artifact@v3
         with:

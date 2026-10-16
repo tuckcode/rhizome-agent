@@ -465,8 +465,9 @@ jobs:
           cp _site/alpha/latest.json _site/latest-canary.json
 
       # A Pages deploy replaces the whole site. Keep the landing page
-      # (website/, also deployed by pages.yml) at the root.
-      - name: Add landing page
+      # (website/, also deployed by pages.yml) at the root and Starlight
+      # docs at /docs.
+      - name: Add landing page and Starlight docs
         run: bash website/build.sh _site
 
       - name: Upload Pages artifact
