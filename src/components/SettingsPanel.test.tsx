@@ -946,7 +946,9 @@ describe('SettingsPanel', () => {
    * jsdom has no layout, so visibility cannot prove a menu escaped a clip.
    * Walk parents (not the menu itself — it uses overflow-y-auto) and require
    * no overflow-hidden / overflow-clip ancestor, including inline overflow
-   * styles. The menu must sit on document.body.
+   * styles. Theme classes and CSS variables live on html (`data-theme`,
+   * `.dark`, `:root`), so a document.body portal still sits inside the
+   * themed element and keeps popover background, padding, and hover.
    */
   function clipsDescendants(node: HTMLElement): boolean {
     if (node.classList.contains('overflow-hidden') || node.classList.contains('overflow-clip')) {
@@ -973,12 +975,19 @@ describe('SettingsPanel', () => {
     return null
   }
 
-  function expectMenuInPortal(menu: HTMLElement) {
+  function expectMenuInThemedPortal(menu: HTMLElement, mode: 'dark' | 'light' = 'dark') {
+    const themed = document.documentElement
+    expect(themed).toHaveAttribute('data-theme', mode)
+    if (mode === 'dark') expect(themed).toHaveClass('dark')
+    else expect(themed).not.toHaveClass('dark')
+    expect(themed.contains(menu)).toBe(true)
     expect(document.body.contains(menu)).toBe(true)
     expect(clippingAncestor(menu)).toBeNull()
   }
 
   it('opens the model menu in a portal outside the settings overflow box and selects a model', async () => {
+    document.documentElement.setAttribute('data-theme', 'dark')
+    document.documentElement.classList.add('dark')
     render(
       <SettingsPanel
         open={true}
@@ -997,7 +1006,7 @@ describe('SettingsPanel', () => {
     )
 
     const menu = await screen.findByTestId('native-chat-model-menu')
-    expectMenuInPortal(menu)
+    expectMenuInThemedPortal(menu)
     expect(menu).toHaveAttribute('data-settings-panel-portal', 'true')
     expect(menu.className).toMatch(/z-\[12000\]/)
 

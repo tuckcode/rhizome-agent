@@ -109,7 +109,9 @@ describe('NativeChatModelPicker', () => {
    * jsdom has no layout, so visibility cannot prove a menu escaped a clip.
    * Walk parents (not the menu itself — it uses overflow-y-auto) and require
    * no overflow-hidden / overflow-clip ancestor, including inline overflow
-   * styles. The menu must sit on document.body.
+   * styles. Theme classes and CSS variables live on html (`data-theme`,
+   * `.dark`, `:root`), so a document.body portal still sits inside the
+   * themed element and keeps popover background, padding, and hover.
    */
   function clipsDescendants(node: HTMLElement): boolean {
     if (node.classList.contains('overflow-hidden') || node.classList.contains('overflow-clip')) {
@@ -136,7 +138,12 @@ describe('NativeChatModelPicker', () => {
     return null
   }
 
-  function expectMenuInPortal(menu: HTMLElement) {
+  function expectMenuInThemedPortal(menu: HTMLElement, mode: 'dark' | 'light' = 'dark') {
+    const themed = document.documentElement
+    expect(themed).toHaveAttribute('data-theme', mode)
+    if (mode === 'dark') expect(themed).toHaveClass('dark')
+    else expect(themed).not.toHaveClass('dark')
+    expect(themed.contains(menu)).toBe(true)
     expect(document.body.contains(menu)).toBe(true)
     expect(clippingAncestor(menu)).toBeNull()
   }
@@ -148,7 +155,13 @@ describe('NativeChatModelPicker', () => {
     )
   }
 
+  function themeDocument() {
+    document.documentElement.setAttribute('data-theme', 'dark')
+    document.documentElement.classList.add('dark')
+  }
+
   it('opens the Settings model menu in a portal and selects a model', async () => {
+    themeDocument()
     const onChange = vi.fn()
     render(
       <div className="h-8 overflow-clip" data-testid="settings-clip-trap">
@@ -163,7 +176,7 @@ describe('NativeChatModelPicker', () => {
     openMenu()
     const menu = await screen.findByTestId('native-chat-model-menu')
     const trap = screen.getByTestId('settings-clip-trap')
-    expectMenuInPortal(menu)
+    expectMenuInThemedPortal(menu)
     expect(trap.contains(menu)).toBe(false)
 
     const option = await screen.findByTestId('native-chat-model-free_tier_auto')
@@ -176,6 +189,7 @@ describe('NativeChatModelPicker', () => {
   })
 
   it('portals the Settings model menu outside a dialog content box and selects a model', async () => {
+    themeDocument()
     const onChange = vi.fn()
     render(
       <Dialog open>
@@ -196,7 +210,7 @@ describe('NativeChatModelPicker', () => {
     const menu = await screen.findByTestId('native-chat-model-menu')
     const dialog = document.querySelector('[data-slot="dialog-content"]')
     expect(dialog).toBeInstanceOf(HTMLElement)
-    expectMenuInPortal(menu)
+    expectMenuInThemedPortal(menu)
     expect((dialog as HTMLElement).contains(menu)).toBe(false)
     expect(screen.getByTestId('dialog-clip-trap').contains(menu)).toBe(false)
 
@@ -208,5 +222,24 @@ describe('NativeChatModelPicker', () => {
       fireEvent.click(option)
     })
     expect(onChange).toHaveBeenCalledWith('free_tier_auto')
+  })
+
+  it('keeps the portaled Settings model menu inside Earth-light html', async () => {
+    document.documentElement.setAttribute('data-theme', 'light')
+    document.documentElement.classList.remove('dark')
+    render(
+      <div className="overflow-hidden" data-testid="settings-clip-trap">
+        <NativeChatModelPicker
+          value="open_ai/gpt-4o"
+          onChange={vi.fn()}
+          providers={configured}
+        />
+      </div>,
+    )
+
+    openMenu()
+    const menu = await screen.findByTestId('native-chat-model-menu')
+    expectMenuInThemedPortal(menu, 'light')
+    expect(screen.getByTestId('settings-clip-trap').contains(menu)).toBe(false)
   })
 })
