@@ -69,6 +69,7 @@ describe('notes panel mode values', () => {
     })).toBe(false)
     expect(isNotesPanelModeShortcut({
       key: '.',
+      code: '',
       metaKey: mac,
       ctrlKey: !mac,
       altKey: false,

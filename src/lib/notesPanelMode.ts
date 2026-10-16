@@ -93,7 +93,9 @@ export function notesPanelModeShortcutAria(): string {
   return isMac() ? 'Meta+Shift+Period' : 'Control+Shift+Period'
 }
 
-export function isNotesPanelModeShortcut(event: Pick<KeyboardEvent, 'code' | 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>): boolean {
+export function isNotesPanelModeShortcut(
+  event: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'> & { code?: string },
+): boolean {
   // Shift+Period types '>' on a US keyboard. Match the physical key.
   if (event.code !== 'Period') return false
   if (event.altKey || !event.shiftKey) return false
