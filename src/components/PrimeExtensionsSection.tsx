@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { PuzzlePiece } from '@phosphor-icons/react'
+import { CaretDown, CaretRight, Warning } from '@phosphor-icons/react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import {
@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog'
-import { SectionHeading, SettingsGroup, SettingsGroupItem } from './SettingsControls'
+import { SettingsGroup, SettingsGroupItem } from './SettingsControls'
 import { callHost } from '../lib/callHost'
 import {
   isPrimeCliMissing,
@@ -32,6 +32,7 @@ import {
 import { queueAiPrompt, requestOpenAiChat } from '../utils/aiPromptBridge'
 import { writeClipboardText } from '../utils/clipboardText'
 import { openExternalUrl } from '../utils/url'
+import { cn } from '@/lib/utils'
 
 const KIND_TABS: ReadonlyArray<{ id: PrimePackageKind; label: string }> = [
   { id: 'all', label: 'All' },
@@ -47,7 +48,7 @@ interface InstallPrimePackageResult {
 }
 
 /**
- * Pi package hub — catalog plus what is already on this machine.
+ * Prime package hub — catalog plus what is already on this machine.
  *
  * Install runs `prime-agent package install` in the background, then reloads
  * Prime. Chat is only the fallback when that CLI is missing.
@@ -71,6 +72,7 @@ export function PrimeExtensionsSection({
   const [status, setStatus] = useState<string | null>(null)
   const [installError, setInstallError] = useState<string | null>(null)
   const [cliMissingSource, setCliMissingSource] = useState<string | null>(null)
+  const [catalogOpen, setCatalogOpen] = useState(false)
 
   const refreshInstalled = useCallback(async () => {
     try {
@@ -85,7 +87,6 @@ export function PrimeExtensionsSection({
 
   useEffect(() => {
     if (!active) return
-    trackPrimePackageCatalogOpened()
     let cancelled = false
     void (async () => {
       try {
@@ -105,7 +106,12 @@ export function PrimeExtensionsSection({
   }, [active])
 
   useEffect(() => {
-    if (!active) return
+    if (!active || !catalogOpen) return
+    trackPrimePackageCatalogOpened()
+  }, [active, catalogOpen])
+
+  useEffect(() => {
+    if (!active || !catalogOpen) return
     let cancelled = false
     const idle = window.setTimeout(() => {
       setSearching(true)
@@ -130,7 +136,7 @@ export function PrimeExtensionsSection({
       cancelled = true
       window.clearTimeout(idle)
     }
-  }, [active, kind, query])
+  }, [active, catalogOpen, kind, query])
 
   const confirmInstall = useCallback(async () => {
     if (!pendingSource) return
@@ -183,11 +189,19 @@ export function PrimeExtensionsSection({
 
   return (
     <div className="space-y-3" data-testid="prime-extensions-section">
-      <SectionHeading
-        icon={<PuzzlePiece size={16} aria-hidden="true" />}
-        title="Packages"
-        description="The Pi catalog: extensions, skills, prompts, and themes. They run with full system access. Review the source before you install."
-      />
+      <div>
+        <h3 className="text-sm font-medium text-foreground">Packages</h3>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          Add-ons for the Prime engine: extensions, skills, prompts and themes.
+        </p>
+        <p
+          className="mt-1 flex items-start gap-1.5 text-[12px] leading-5 text-[var(--feedback-warning-text)]"
+          data-testid="prime-packages-access-warning"
+        >
+          <Warning size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+          <span>They run with full system access. Review the source before you install.</span>
+        </p>
+      </div>
       {active ? (
         <>
       {listed.length > 0 ? (
@@ -208,22 +222,48 @@ export function PrimeExtensionsSection({
         </div>
       ) : null}
 
-      <div className="space-y-2">
-        <div className="text-sm font-medium text-foreground">Catalog</div>
+      <Button
+        type="button"
+        variant="ghost"
+        aria-expanded={catalogOpen}
+        aria-controls="prime-packages-catalog"
+        data-testid="prime-packages-browse"
+        onClick={() => setCatalogOpen((open) => !open)}
+        className="h-auto w-full justify-start gap-2 px-0 py-1.5 text-left text-sm font-medium text-foreground hover:bg-transparent"
+      >
+        {catalogOpen ? (
+          <CaretDown size={12} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+        ) : (
+          <CaretRight size={12} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+        )}
+        Browse packages
+      </Button>
+
+      {catalogOpen ? (
+        <div id="prime-packages-catalog" className="space-y-2">
         <div className="flex flex-wrap gap-1" data-testid="prime-packages-kind-tabs" role="tablist" aria-label="Package kind">
-          {KIND_TABS.map((tab) => (
+          {KIND_TABS.map((tab) => {
+            const selected = kind === tab.id
+            return (
             <Button
               key={tab.id}
               type="button"
               size="sm"
-              variant={kind === tab.id ? 'secondary' : 'ghost'}
+              variant="ghost"
               role="tab"
-              aria-selected={kind === tab.id}
+              aria-selected={selected}
+              data-active={selected ? 'true' : 'false'}
+              className={cn(
+                selected
+                  ? 'bg-foreground text-background hover:bg-foreground hover:text-background'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
               onClick={() => setKind(tab.id)}
             >
               {tab.label}
             </Button>
-          ))}
+            )
+          })}
         </div>
         <Input
           value={query}
@@ -232,7 +272,6 @@ export function PrimeExtensionsSection({
           aria-label="Search Prime packages"
           data-testid="prime-extensions-search"
         />
-      </div>
 
       {searching ? (
         <p className="text-xs text-muted-foreground">Searching the catalog…</p>
@@ -242,16 +281,17 @@ export function PrimeExtensionsSection({
       ) : null}
 
       {hits.length > 0 ? (
+        <div className="max-h-[31rem] overflow-y-auto" data-testid="prime-packages-catalog-list">
         <SettingsGroup>
           {hits.map((hit) => {
             const already = isPrimePackageInstalled(hit.name, listed)
             return (
               <SettingsGroupItem key={hit.name}>
-                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex min-w-0 items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-foreground">{hit.name}</div>
                     {hit.description ? (
-                      <p className="mt-0.5 text-xs text-muted-foreground">{hit.description}</p>
+                      <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-muted-foreground">{hit.description}</p>
                     ) : null}
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {[hit.publisher, hit.kinds.length > 0 ? hit.kinds.join(', ') : null]
@@ -260,13 +300,13 @@ export function PrimeExtensionsSection({
                     </p>
                   </div>
                   {already ? (
-                    <p className="shrink-0 text-xs text-muted-foreground">Installed</p>
+                    <p className="shrink-0 self-start text-xs text-muted-foreground">Installed</p>
                   ) : (
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="shrink-0"
+                      className="shrink-0 self-start"
                       disabled={installing}
                       onClick={() => {
                         setCliMissingSource(null)
@@ -282,6 +322,7 @@ export function PrimeExtensionsSection({
             )
           })}
         </SettingsGroup>
+        </div>
       ) : null}
 
       {total !== null && !searching ? (
@@ -328,6 +369,8 @@ export function PrimeExtensionsSection({
       >
         Browse the full catalog
       </Button>
+        </div>
+      ) : null}
         </>
       ) : null}
 

@@ -196,6 +196,15 @@ describe('SettingsPanel', () => {
       expect(fetchSpy).not.toHaveBeenCalled()
 
       fireEvent.click(screen.getByTestId('settings-advanced-prime-engine-toggle'))
+      expect(await screen.findByText('Packages')).toBeInTheDocument()
+      expect(screen.getByText('Prime is not installed')).toBeInTheDocument()
+      expect(screen.queryByTestId('prime-extensions-search')).not.toBeInTheDocument()
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 30))
+      })
+      expect(fetchSpy).not.toHaveBeenCalled()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Browse packages' }))
       expect(await screen.findByTestId('prime-extensions-search')).toBeInTheDocument()
       await waitFor(() => {
         expect(fetchSpy).toHaveBeenCalled()
@@ -221,17 +230,51 @@ describe('SettingsPanel', () => {
           onClose={onClose}
         />,
       )
-      expect(await screen.findByTestId('prime-extensions-search')).toBeInTheDocument()
+      expect(await screen.findByText('Packages')).toBeInTheDocument()
       expect(screen.getByTestId('settings-advanced-prime-engine-toggle')).toHaveAttribute(
         'aria-expanded',
         'true',
       )
+      expect(screen.queryByTestId('prime-extensions-search')).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Browse packages' }))
+      expect(await screen.findByTestId('prime-extensions-search')).toBeInTheDocument()
       await waitFor(() => {
         expect(fetchSpy).toHaveBeenCalled()
       })
     } finally {
       fetchSpy.mockRestore()
     }
+  })
+
+  it('puts Prime install status and Copy MCP above Packages', () => {
+    const aiAgentsStatus: AiAgentsStatus = {
+      ...createMissingAiAgentsStatus(),
+      prime: createAiAgentAvailability('installed', '2.1.18'),
+    }
+    render(
+      <SettingsPanel
+        open={true}
+        settings={emptySettings}
+        aiAgentsStatus={aiAgentsStatus}
+        onSave={onSave}
+        onCopyMcpConfig={vi.fn()}
+        onClose={onClose}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: 'Copy MCP config' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('settings-advanced-prime-engine-toggle'))
+    const advanced = screen.getByTestId('settings-advanced-prime-engine')
+    expect(within(advanced).getByTestId('settings-advanced-prime-install-status')).toHaveTextContent(
+      'Prime is installed',
+    )
+    expect(within(advanced).getByTestId('settings-advanced-prime-install-status')).toHaveTextContent(
+      '2.1.18',
+    )
+    const copy = within(advanced).getByRole('button', { name: 'Copy MCP config' })
+    const packagesHeading = within(advanced).getByText('Packages')
+    expect(
+      copy.compareDocumentPosition(packagesHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   it('loads the Prime catalog when Settings opens on Agents', async () => {
@@ -1559,6 +1602,7 @@ describe('SettingsPanel', () => {
       />
     )
 
+    fireEvent.click(screen.getByTestId('settings-advanced-prime-engine-toggle'))
     fireEvent.click(screen.getByRole('button', { name: 'Copy MCP config' }))
 
     expect(onCopyMcpConfig).toHaveBeenCalledOnce()
