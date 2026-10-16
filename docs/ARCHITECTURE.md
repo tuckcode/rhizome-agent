@@ -787,7 +787,8 @@ composer dropdown when Chat is on the native engine, or when Prime is
 not running after a rebuild. It seeds from
 `aiModelProviderCatalog.json` plus `settings.ai_model_providers`, then
 asks `discover_ai_models` (`GET {base_url}/models`) for local and
-configured providers. A failed discover is dropped; the seed stays.
+configured providers. That command runs the blocking HTTP off the UI
+thread. A failed discover is dropped; the seed stays.
 Catalog defaults keep kind-keyed ids (`open_ai/…`, `open_router/…`).
 Configured providers key on the provider id (`work-openai/gpt-4o`) so
 two accounts of the same kind stay distinct. An old kind-keyed
