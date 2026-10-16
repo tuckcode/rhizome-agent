@@ -251,6 +251,48 @@ describe('PrimeSessionList', () => {
      * settings and never moved or deleted on disk. The row leaves the main
      * list and the archive disclosure appears.
      */
+    it('reloads native rows when a forked session becomes active', async () => {
+      invoked.result = [
+        {
+          sessionId: 'n1',
+          createdAt: '2026-10-13T12:00:00.000Z',
+          target: 'free_tier_auto',
+          title: 'Native hello',
+        },
+      ]
+      const { rerender } = render(
+        <PrimeSessionList engine="native" activeSessionPath={null} onSelect={vi.fn()} locale="en" now={NOW} />,
+      )
+      expect(await screen.findByText('Native hello')).toBeInTheDocument()
+
+      invoked.result = [
+        {
+          sessionId: 'n1',
+          createdAt: '2026-10-13T12:00:00.000Z',
+          target: 'free_tier_auto',
+          title: 'Native hello',
+        },
+        {
+          sessionId: 'n2',
+          createdAt: '2026-10-16T12:00:00.000Z',
+          target: 'free_tier_auto',
+          title: 'Forked native chat',
+        },
+      ]
+      rerender(
+        <PrimeSessionList
+          engine="native"
+          activeSessionPath="rhizome-native:n2"
+          onSelect={vi.fn()}
+          locale="en"
+          now={NOW}
+        />,
+      )
+
+      expect(await screen.findByText('Forked native chat')).toBeInTheDocument()
+      expect(invoked.calls.filter((cmd) => cmd === 'native_chat_list').length).toBeGreaterThanOrEqual(2)
+    })
+
     it('files a native session through the native archive command', async () => {
       invoked.result = [
         {

@@ -523,4 +523,48 @@ describe('aiAgentSession', () => {
     }))
     expect(streamAiAgentMock).not.toHaveBeenCalled()
   })
+
+  it('continues a forked native session instead of stuffing history into a new start', async () => {
+    nextMessageIdMock.mockReturnValue('msg-native-fork')
+    const session = createRuntime([completedHistory])
+    await sendAgentMessage({
+      runtime: session.runtime,
+      context: {
+        agent: 'prime',
+        ready: true,
+        vaultPath: '/vault',
+        permissionMode: 'safe',
+        chatEngine: 'native',
+        nativeTarget: 'open_ai/gpt-4.1-mini',
+        nativeSessionId: 'forked-id',
+      },
+      prompt: { text: 'What next' },
+    })
+    expect(streamNativeChatMock).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: 'forked-id',
+      message: 'What next',
+    }))
+    expect(streamNativeChatMock.mock.calls[0]?.[0]?.message).not.toContain('Previous')
+  })
+
+  it('does not send on a read-only native session', async () => {
+    nextMessageIdMock.mockReturnValue('msg-native-readonly')
+    const session = createRuntime()
+    await sendAgentMessage({
+      runtime: session.runtime,
+      context: {
+        agent: 'prime',
+        ready: true,
+        vaultPath: '/vault',
+        permissionMode: 'safe',
+        chatEngine: 'native',
+        nativeTarget: 'open_ai/gpt-4.1-mini',
+        nativeSessionId: 'n1',
+        nativeReadOnly: true,
+      },
+      prompt: { text: 'Hello' },
+    })
+    expect(streamNativeChatMock).not.toHaveBeenCalled()
+    expect(session.getMessages()[0]?.localMarker).toContain('read-only')
+  })
 })

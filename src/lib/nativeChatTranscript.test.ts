@@ -1,11 +1,25 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const { callHostMock } = vi.hoisted(() => ({
+  callHostMock: vi.fn(),
+}))
+
+vi.mock('./callHost', () => ({
+  callHost: (...args: unknown[]) => callHostMock(...args),
+}))
+
 import {
+  conversationToNativeEvents,
+  currentNativeSession,
   forksPrimeEntry,
   nativeChatListItemToSummary,
   nativeChatListToSummaries,
   nativeEventsToConversation,
   isNativeSessionPath,
+  nativeSessionIdFromPath,
   nativeSessionPath,
+  persistNativeFork,
+  rememberNativeSession,
   transcriptUntilMessage,
 } from './nativeChatTranscript'
 import type { AiAgentMessage } from './aiAgentConversation'
@@ -42,8 +56,10 @@ describe('transcriptUntilMessage', () => {
     expect(transcriptUntilMessage(live, 'm1')[0]?.isStreaming).toBe(false)
   })
 
-  it('copies the whole transcript when the id is missing', () => {
-    expect(transcriptUntilMessage(messages, 'missing')).toHaveLength(3)
+  it('fails when the message id is missing', () => {
+    expect(() => transcriptUntilMessage(messages, 'missing')).toThrow(
+      'Unknown native chat message id: missing',
+    )
   })
 })
 
@@ -52,6 +68,8 @@ describe('isNativeSessionPath', () => {
     expect(isNativeSessionPath(nativeSessionPath('n1'))).toBe(true)
     expect(isNativeSessionPath('/sessions/prime.jsonl')).toBe(false)
     expect(isNativeSessionPath(null)).toBe(false)
+    expect(nativeSessionIdFromPath(nativeSessionPath('n1'))).toBe('n1')
+    expect(nativeSessionIdFromPath('/sessions/prime.jsonl')).toBeNull()
   })
 })
 
@@ -90,5 +108,109 @@ describe('nativeEventsToConversation', () => {
     expect(messages).toEqual([
       expect.objectContaining({ userMessage: 'Hello', response: 'Hi there' }),
     ])
+  })
+
+  it('does not mark a tool call completed until a result arrives', () => {
+    const messages = nativeEventsToConversation([
+      { User: { text: 'Search' } },
+      { ToolCall: { id: 't1', name: 'search', args: '{}' } },
+      'TurnEnd',
+    ])
+    expect(messages[0]?.actions).toEqual([
+      expect.objectContaining({ toolId: 't1', status: 'pending' }),
+    ])
+  })
+
+  it('marks a tool done only once the result is present', () => {
+    const messages = nativeEventsToConversation([
+      { User: { text: 'Search' } },
+      { ToolCall: { id: 't1', name: 'search', args: '{}' } },
+      { ToolResult: { id: 't1', name: 'search', output: 'found' } },
+      'TurnEnd',
+    ])
+    expect(messages[0]?.actions).toEqual([
+      expect.objectContaining({ toolId: 't1', status: 'done', output: 'found' }),
+    ])
+  })
+})
+
+describe('conversationToNativeEvents', () => {
+  it('round-trips kept turns so a reload can restore them', () => {
+    const kept = transcriptUntilMessage([
+      turn('m1', 'First', 'One'),
+      turn('m2', 'Second', 'Two'),
+      turn('m3', 'Third', 'Three'),
+    ], 'm2')
+    expect(nativeEventsToConversation(conversationToNativeEvents(kept))).toEqual([
+      expect.objectContaining({ userMessage: 'First', response: 'One' }),
+      expect.objectContaining({ userMessage: 'Second', response: 'Two' }),
+    ])
+  })
+})
+
+describe('persistNativeFork', () => {
+  beforeEach(() => {
+    callHostMock.mockReset()
+    callHostMock.mockResolvedValue('fork-id')
+    rememberNativeSession(null)
+  })
+
+  it('writes the kept turns as a new native session', async () => {
+    const sessionId = await persistNativeFork({
+      messages: [
+        turn('m1', 'First', 'One'),
+        turn('m2', 'Second', 'Two'),
+        turn('m3', 'Third', 'Three'),
+      ],
+      messageId: 'm2',
+      target: 'openai/gpt-4o-mini',
+      vaultPath: '/vault',
+    })
+    expect(sessionId).toBe('fork-id')
+    expect(callHostMock).toHaveBeenCalledWith('native_chat_fork', {
+      request: {
+        events: conversationToNativeEvents([
+          turn('m1', 'First', 'One'),
+          turn('m2', 'Second', 'Two'),
+        ]),
+        target: 'openai/gpt-4o-mini',
+        systemPrompt: null,
+        vaultPath: '/vault',
+        vaultPaths: [],
+        permissionMode: 'safe',
+      },
+    })
+  })
+
+  it('still persists a fork when the source chat is archived', async () => {
+    await persistNativeFork({
+      messages: [turn('m1', 'Filed', 'Ok')],
+      messageId: 'm1',
+      target: 'free_tier_auto',
+    })
+    expect(callHostMock).toHaveBeenCalledWith(
+      'native_chat_fork',
+      expect.objectContaining({
+        request: expect.not.objectContaining({ archived: true }),
+      }),
+    )
+  })
+
+  it('does not call the host when the message id is unknown', async () => {
+    await expect(persistNativeFork({
+      messages: [turn('m1', 'First', 'One')],
+      messageId: 'missing',
+      target: 'free_tier_auto',
+    })).rejects.toThrow('Unknown native chat message id: missing')
+    expect(callHostMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('rememberNativeSession', () => {
+  it('holds the live native session until New chat clears it', () => {
+    rememberNativeSession('n1', true)
+    expect(currentNativeSession()).toEqual({ sessionId: 'n1', readOnly: true })
+    rememberNativeSession(null)
+    expect(currentNativeSession()).toEqual({ sessionId: null, readOnly: false })
   })
 })

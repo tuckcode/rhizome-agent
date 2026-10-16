@@ -7,7 +7,7 @@ describe('leftover native fork and archive', () => {
     const panel = readFileSync(`${process.cwd()}/src/components/AiPanel.tsx`, 'utf8')
     expect(home).toContain("forkTargetsPrimeEntry={effectiveEngine === 'prime'}")
     expect(panel).toContain('const forkPrime = forksPrimeEntry(isPrimeTarget, forkTargetsPrimeEntry)')
-    expect(panel).toContain('transcriptUntilMessage(agent.messages, messageId)')
+    expect(panel).toContain('persistNativeFork({')
   })
 
   it('lists and archives native chats on the native engine', () => {

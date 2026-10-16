@@ -510,12 +510,19 @@ fn create_successor(header: &SessionHeader, events: &[DurableEvent]) -> Result<S
         vault_paths: header.vault_paths.clone(),
         system_prompt: header.system_prompt.clone(),
     };
-    let mut writer = create_session_log(&successor_header)?;
+    write_session_events(&successor_header, events)?;
+    Ok(id)
+}
+
+/// Write a new native session log with these events. Used by fork and by
+/// the damage-recovery successor path.
+pub fn write_session_events(header: &SessionHeader, events: &[DurableEvent]) -> Result<(), String> {
+    let mut writer = create_session_log(header)?;
     for event in events {
         writer.append(event)?;
     }
     drop(writer);
-    Ok(id)
+    Ok(())
 }
 
 pub fn create_session_log(header: &SessionHeader) -> Result<NativeSessionWriter, String> {

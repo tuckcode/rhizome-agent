@@ -35,6 +35,8 @@ export interface StreamNativeChatRequest {
   vaultPath: string
   vaultPaths?: string[]
   permissionMode?: AiAgentPermissionMode
+  /** Continue this live native session instead of starting a new log. */
+  sessionId?: string | null
   callbacks: AgentStreamCallbacks
   signal?: AbortSignal
 }
@@ -78,7 +80,7 @@ export function applyNativeEvent(event: NativeEngineEvent, callbacks: AgentStrea
   }
 }
 
-export async function streamNativeChat(request: StreamNativeChatRequest): Promise<void> {
+export async function streamNativeChat(request: StreamNativeChatRequest): Promise<string | undefined> {
   if (request.signal?.aborted) {
     request.callbacks.onDone()
     return
@@ -98,16 +100,21 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
   const { invoke } = await import('@tauri-apps/api/core')
   const { listen } = await import('@tauri-apps/api/event')
   try {
-    const sessionId = await invoke<string>('native_chat_start', {
-      request: {
-        target: request.target,
-        prompt: request.message,
-        systemPrompt: request.systemPrompt || null,
-        vaultPath: request.vaultPath || null,
-        vaultPaths: request.vaultPaths ?? [],
-        permissionMode: normalizeAiAgentPermissionMode(request.permissionMode),
-      },
-    })
+    const sessionId = request.sessionId
+      ? request.sessionId
+      : await invoke<string>('native_chat_start', {
+        request: {
+          target: request.target,
+          prompt: request.message,
+          systemPrompt: request.systemPrompt || null,
+          vaultPath: request.vaultPath || null,
+          vaultPaths: request.vaultPaths ?? [],
+          permissionMode: normalizeAiAgentPermissionMode(request.permissionMode),
+        },
+      })
+    if (request.sessionId) {
+      await invoke('native_chat_send', { sessionId, text: request.message })
+    }
     await new Promise<void>((resolve) => {
       let settled = false
       let unlisten: (() => void) | undefined
@@ -135,6 +142,7 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
         if (settled) cleanupTauriEventListener(stop)
       })
     })
+    return sessionId
   } catch (error) {
     request.callbacks.onError(
       nativeChatUserError(error instanceof Error ? error.message : String(error)),

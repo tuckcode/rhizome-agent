@@ -20,7 +20,9 @@ import { streamAiModel } from '../utils/streamAiModel'
 import { streamNativeChat } from '../utils/streamNativeChat'
 import { chatEngineAllowsSendWithoutPrime } from './chatEngine'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
+import { rememberNativeSession } from './nativeChatTranscript'
 import { hydrateNoteReferences } from '../utils/ai-reference-content'
+import { formatPromptWithReferences } from '../utils/ai-context'
 import { createTranslator } from './i18n'
 
 export interface AiAgentAbortState {
@@ -103,16 +105,18 @@ async function streamWithSelectedTarget({
   signal,
 }: SelectedTargetStreamRequest): Promise<void> {
   if (context.chatEngine === 'native') {
-    await streamNativeChat({
+    const sessionId = await streamNativeChat({
       target: resolveNativeChatTarget(context.nativeTarget),
       message: formattedMessage,
       systemPrompt,
       vaultPath: context.vaultPath,
       vaultPaths: context.vaultPaths,
       permissionMode: context.permissionMode,
+      sessionId: context.nativeSessionId,
       callbacks,
       signal,
     })
+    if (sessionId) rememberNativeSession(sessionId, false)
     return
   }
 
@@ -158,6 +162,11 @@ export async function sendAgentMessage({
 
   if (shouldIgnorePrompt(currentStatus, normalizedPrompt)) return
 
+  if (context.chatEngine === 'native' && context.nativeReadOnly) {
+    appendLocalMarker(runtime.setMessages, 'This chat is read-only.')
+    return
+  }
+
   // Prime (Rhizome Agent product) can chat without a vault; vault unlocks memory tools later.
   if (!context.vaultPath && context.agent !== 'prime') {
     blockMissingVault(runtime, context, normalizedPrompt)
@@ -198,6 +207,10 @@ export async function sendAgentMessage({
     runtime.messagesRef.current,
     promptForAgent,
   )
+  const liveNativeSession = context.chatEngine === 'native' && Boolean(context.nativeSessionId)
+  const nativeTurnMessage = liveNativeSession
+    ? formatPromptWithReferences(promptForAgent.text, promptForAgent.references)
+    : formattedMessage
 
   const callbacks = createStreamCallbacks({
     agent: context.agent,
@@ -216,7 +229,7 @@ export async function sendAgentMessage({
 
   await streamWithSelectedTarget({
     context,
-    formattedMessage,
+    formattedMessage: nativeTurnMessage,
     systemPrompt,
     images: promptForAgent.images,
     callbacks,
@@ -267,6 +280,7 @@ export function clearAgentConversation(runtime: Pick<AiAgentSessionRuntime, 'abo
   runtime.toolInputMapRef.current = new Map()
   runtime.setMessages([])
   runtime.setStatus('idle')
+  rememberNativeSession(null)
 }
 
 export function stopAgentMessage(

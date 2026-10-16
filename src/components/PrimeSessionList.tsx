@@ -595,7 +595,7 @@ export default function PrimeSessionList({
     return () => {
       cancelled = true
     }
-  }, [engine])
+  }, [engine, activeSessionPath])
 
   const ordered = useMemo(
     () => sortPrimeSessions(sessions ?? [], sortKey),

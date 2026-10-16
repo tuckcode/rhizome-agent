@@ -784,7 +784,7 @@ describe('Chat home opens with its sessions column', () => {
 })
 
 describe('forking a native chat', () => {
-  it('copies the transcript through the chosen turn even when ChatHome asked for a Prime fork', () => {
+  it('persists a new native session through the chosen turn even when ChatHome asked for a Prime fork', async () => {
     const replaceMessages = vi.fn()
     const handleNewChat = vi.fn()
     const messages = [
@@ -807,6 +807,8 @@ describe('forking a native chat', () => {
         defaultAiAgent="prime"
         defaultAiAgentReady
         chatEngine="native"
+        nativeTarget="openai/gpt-4o-mini"
+        vaultPath="/vault"
         forkTargetsPrimeEntry
       />,
     )
@@ -815,10 +817,12 @@ describe('forking a native chat', () => {
     expect(forks[0]).toBeEnabled()
     fireEvent.click(forks[0])
 
-    expect(handleNewChat).toHaveBeenCalled()
-    expect(replaceMessages).toHaveBeenCalledWith([
-      expect.objectContaining({ id: 'm1', userMessage: 'First', isStreaming: false }),
-    ])
+    await waitFor(() => {
+      expect(replaceMessages).toHaveBeenCalledWith([
+        expect.objectContaining({ userMessage: 'First', response: 'One' }),
+      ])
+    })
+    expect(handleNewChat).not.toHaveBeenCalled()
   })
 })
 

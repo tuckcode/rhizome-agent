@@ -543,6 +543,19 @@ pub struct NativeChatStartRequest {
     pub permission_mode: AiAgentPermissionMode,
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeChatForkRequest {
+    pub events: Vec<crate::rhizome_loop::DurableEvent>,
+    pub target: String,
+    pub system_prompt: Option<String>,
+    pub vault_path: Option<String>,
+    #[serde(default)]
+    pub vault_paths: Vec<String>,
+    #[serde(default)]
+    pub permission_mode: AiAgentPermissionMode,
+}
+
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeChatListItem {
@@ -776,6 +789,30 @@ pub fn native_chat_end(chats: tauri::State<NativeChats>, session_id: String) -> 
 #[tauri::command]
 pub fn native_chat_list() -> Result<Vec<NativeChatListItem>, String> {
     list_native_sessions()
+}
+
+/// Persist kept turns as a new native session. A fork of an archived chat
+/// gets a new id, so it is not archived.
+pub fn fork_native_session(request: NativeChatForkRequest) -> Result<String, String> {
+    let id = uuid::Uuid::new_v4().to_string();
+    let header = crate::engines::native_log::SessionHeader {
+        version: crate::engines::native_log::NATIVE_LOG_VERSION,
+        session_id: id.clone(),
+        created_at: chrono::Utc::now().to_rfc3339(),
+        target: request.target,
+        permission_mode: crate::engines::native_log::permission_mode_label(request.permission_mode),
+        vault_path: request.vault_path,
+        vault_paths: request.vault_paths,
+        system_prompt: request.system_prompt,
+    };
+    crate::engines::native_log::write_session_events(&header, &request.events)?;
+    Ok(id)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn native_chat_fork(request: NativeChatForkRequest) -> Result<String, String> {
+    fork_native_session(request)
 }
 
 #[cfg(desktop)]
@@ -1324,6 +1361,115 @@ mod tests {
         let marked = mark_native_archived(items, &["file".into()]);
         assert!(!marked[0].archived);
         assert!(marked[1].archived);
+    }
+
+    fn kept_turns() -> Vec<DurableEvent> {
+        vec![
+            DurableEvent::User {
+                text: "First".into(),
+            },
+            DurableEvent::Assistant { text: "One".into() },
+            DurableEvent::TurnEnd,
+            DurableEvent::User {
+                text: "Second".into(),
+            },
+            DurableEvent::Assistant { text: "Two".into() },
+            DurableEvent::TurnEnd,
+        ]
+    }
+
+    fn fork_request(events: Vec<DurableEvent>) -> NativeChatForkRequest {
+        NativeChatForkRequest {
+            events,
+            target: "openai/gpt-4o-mini".into(),
+            system_prompt: None,
+            vault_path: Some("/vault".into()),
+            vault_paths: Vec::new(),
+            permission_mode: AiAgentPermissionMode::Safe,
+        }
+    }
+
+    #[test]
+    fn fork_persists_kept_turns_lists_them_and_survives_reload() {
+        with_temp_home(|_| {
+            write_native_log(
+                "archived-source",
+                1,
+                "openai/gpt-4o-mini",
+                &two_turn_events(),
+            );
+            let source_id = log_id("archived-source");
+            let events = kept_turns();
+            let fork_id = fork_native_session(fork_request(events.clone())).expect("fork");
+            assert_ne!(fork_id, source_id);
+
+            let listed = list_native_sessions().expect("list");
+            assert!(
+                listed.iter().any(|item| item.session_id == fork_id),
+                "fork must appear in the session list: {listed:?}"
+            );
+            let marked = mark_native_archived(listed, std::slice::from_ref(&source_id));
+            let source = marked
+                .iter()
+                .find(|item| item.session_id == source_id)
+                .expect("source");
+            let forked = marked
+                .iter()
+                .find(|item| item.session_id == fork_id)
+                .expect("fork");
+            assert!(source.archived);
+            assert!(
+                !forked.archived,
+                "a fork of an archived chat must land unarchived"
+            );
+
+            let reopened = crate::engines::native_log::open_session_log(&fork_id).expect("reload");
+            assert_eq!(reopened.events, events);
+        });
+    }
+
+    #[test]
+    fn forked_session_sends_kept_history_on_the_next_turn() {
+        with_temp_home(|_| {
+            let fork_id = fork_native_session(fork_request(kept_turns())).expect("fork");
+            let opened = crate::engines::native_log::open_session_log(&fork_id).expect("open log");
+            let agent = AgentLoop::from_log(opened.events);
+            let seen = std::sync::Arc::new(Mutex::new(Vec::<ModelView>::new()));
+            let model = FakeModel::saying("third").share_seen(std::sync::Arc::clone(&seen));
+            let chats = NativeChats::new();
+            let (tx, rx) = mpsc::channel();
+            chats
+                .open_with_engine(
+                    fork_id.clone(),
+                    NativeEngine::from_parts(agent, model),
+                    move |event| {
+                        let _ = tx.send(event);
+                    },
+                )
+                .expect("open");
+            chats.send(&fork_id, "three").expect("send");
+            let events = wait_for_turn_end(&rx);
+            assert!(
+                events.iter().any(
+                    |event| matches!(event, EngineEvent::TextDelta { text } if text == "third")
+                ),
+                "next turn missing: {events:?}"
+            );
+            let views = seen.lock().expect("seen").clone();
+            let last = views.last().expect("model saw the resumed turn");
+            let users: Vec<&str> = last
+                .history
+                .iter()
+                .filter_map(|item| match item {
+                    crate::rhizome_loop::HistoryItem::User { text } => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect();
+            assert!(
+                users.contains(&"First") && users.contains(&"Second"),
+                "forked model must see kept turns: {users:?}"
+            );
+        });
     }
 
     #[test]

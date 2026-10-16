@@ -180,4 +180,54 @@ describe('native stream listen', () => {
     expect(next.onDone).toHaveBeenCalledTimes(1)
     expect(next.onText).not.toHaveBeenCalled()
   })
+
+  it('starts a new native session when none is live', async () => {
+    const next = callbacks()
+    listenMock.mockImplementation(async (_name: string, handler: (event: { payload: unknown }) => void) => {
+      queueMicrotask(() => {
+        handler({ payload: { kind: 'turn_end' } })
+      })
+      return vi.fn()
+    })
+    invokeMock.mockResolvedValue('new-id')
+
+    const sessionId = await streamNativeChat({
+      target: 'openai/gpt-4o-mini',
+      message: 'hi',
+      vaultPath: '/vault',
+      callbacks: next,
+    })
+
+    expect(sessionId).toBe('new-id')
+    expect(invokeMock).toHaveBeenCalledWith('native_chat_start', expect.objectContaining({
+      request: expect.objectContaining({ prompt: 'hi' }),
+    }))
+    expect(invokeMock).not.toHaveBeenCalledWith('native_chat_send', expect.anything())
+  })
+
+  it('sends the next turn on the live session so the model sees forked history', async () => {
+    const next = callbacks()
+    listenMock.mockImplementation(async (_name: string, handler: (event: { payload: unknown }) => void) => {
+      queueMicrotask(() => {
+        handler({ payload: { kind: 'turn_end' } })
+      })
+      return vi.fn()
+    })
+    invokeMock.mockResolvedValue(undefined)
+
+    const sessionId = await streamNativeChat({
+      target: 'openai/gpt-4o-mini',
+      message: 'what next',
+      vaultPath: '/vault',
+      sessionId: 'already-open',
+      callbacks: next,
+    })
+
+    expect(sessionId).toBe('already-open')
+    expect(invokeMock).toHaveBeenCalledWith('native_chat_send', {
+      sessionId: 'already-open',
+      text: 'what next',
+    })
+    expect(invokeMock).not.toHaveBeenCalledWith('native_chat_start', expect.anything())
+  })
 })

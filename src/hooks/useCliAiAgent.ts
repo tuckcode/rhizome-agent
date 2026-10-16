@@ -20,6 +20,7 @@ import {
   stopAgentMessage,
   type AiAgentSessionRuntime,
 } from '../lib/aiAgentSession'
+import { currentNativeSession } from '../lib/nativeChatTranscript'
 import type { ToolInvocation } from '../lib/aiAgentMessageState'
 import {
   aiWorkspaceSessionDispatchers,
@@ -137,6 +138,7 @@ export function useCliAiAgent(
   async function buildAgentContext() {
     const agentDocsPath = await getAgentDocsPath()
 
+    const liveNative = currentNativeSession()
     return {
       agent,
       agentDocsPath,
@@ -150,6 +152,8 @@ export function useCliAiAgent(
       sessionAutoDistillEnabled,
       chatEngine,
       nativeTarget,
+      nativeSessionId: liveNative.sessionId,
+      nativeReadOnly: liveNative.readOnly,
     }
   }
 

@@ -29,13 +29,18 @@ import {
   type AiAgentReadiness,
 } from '../lib/aiAgents'
 import { chatEngineAllowsSendWithoutPrime } from '../lib/chatEngine'
+import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
 import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
 import { type NoteListItem } from '../utils/ai-context'
 import type { VaultEntry } from '../types'
 import { useAiPanelController, type AiPanelController } from './useAiPanelController'
 import type { AiAgentMessage } from '../lib/aiAgentConversation'
-import { forksPrimeEntry, transcriptUntilMessage } from '../lib/nativeChatTranscript'
+import {
+  forksPrimeEntry,
+  nativeSessionPath,
+  persistNativeFork,
+} from '../lib/nativeChatTranscript'
 import { useAiPanelPromptQueue } from './useAiPanelPromptQueue'
 import { useAiPanelFocus } from './useAiPanelFocus'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
@@ -113,6 +118,7 @@ interface AiPanelViewProps {
   defaultAiAgentReadiness?: AiAgentReadiness
   defaultAiAgentReady?: boolean
   chatEngine?: 'prime' | 'native'
+  nativeTarget?: string
   locale?: AppLocale
   activeEntry?: VaultEntry | null
   entries?: VaultEntry[]
@@ -230,6 +236,7 @@ export function AiPanelView({
   defaultAiAgentReadiness: providedDefaultAiAgentReadiness,
   defaultAiAgentReady: providedDefaultAiAgentReady,
   chatEngine,
+  nativeTarget,
   locale = 'en',
   entries,
   interactive = true,
@@ -378,11 +385,6 @@ export function AiPanelView({
     onConversationReset?.()
     handleNewChat()
   }
-  const handleNativeFork = (messageId: string) => {
-    const kept = transcriptUntilMessage(agent.messages, messageId)
-    beginNewChat()
-    agent.replaceMessages(kept)
-  }
   useEffect(() => {
     if (!newChatRef) return
     newChatRef.current = beginNewChat
@@ -392,6 +394,23 @@ export function AiPanelView({
   ) => {
     onConversationReset?.()
     return handleSelectSession(...args)
+  }
+  const handleNativeFork = async (messageId: string) => {
+    try {
+      const sessionId = await persistNativeFork({
+        messages: agent.messages,
+        messageId,
+        target: resolveNativeChatTarget(nativeTarget),
+        vaultPath,
+        permissionMode,
+      })
+      await pickSession({
+        id: sessionId,
+        path: nativeSessionPath(sessionId),
+      })
+    } catch (error) {
+      reportSwitchError(error)
+    }
   }
   usePrimeSessionRestore({
     enabled: isPrimeTarget,
@@ -722,6 +741,7 @@ export function AiPanel({
       defaultAiAgentReadiness={defaultAiAgentReadiness}
       defaultAiAgentReady={providedDefaultAiAgentReady}
       chatEngine={chatEngine}
+      nativeTarget={nativeTarget}
       locale={locale}
       vaultPath={vaultPath}
       activeEntry={activeEntry}
