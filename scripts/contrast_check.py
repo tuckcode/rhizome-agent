@@ -14,8 +14,9 @@ Pass a design token file to keep the old design-file mode:
 Prints each text token's ratio on each surface (including hover and
 selected), status text on its tinted fill, input borders, and focus rings.
 App CSS also checks the dark-skin ink ladder (primary > secondary >
-muted > faint) on --surface-app, the banner tints, and the selected-row
-fills (resolved cascade). Each step stays at or above 4.5:1.
+tertiary > muted > faint) on --surface-app, banner tints, hover,
+sidebar, panel, and selected-row fills (resolved cascade). Each step
+stays at or above 4.5:1.
 A color the script cannot parse (hsl(), oklch(), color-mix(), an
 unresolved var(), …) is a FAIL that names the theme, token, and raw
 value — it is not skipped. Exits non-zero if any pair is below WCAG AA
@@ -26,6 +27,7 @@ or any checked token is unparseable:
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import sys
@@ -87,10 +89,22 @@ BANNER_TINT_ROLES = (
     ('warning', ('--feedback-warning-bg', '--accent-orange-light')),
     ('error', ('--feedback-error-bg', '--accent-red-light')),
 )
-BANNER_TEXT_ROLES = ('--text-primary', '--text-secondary', '--text-muted', '--text-faint')
+BANNER_TEXT_ROLES = (
+    '--text-primary',
+    '--text-secondary',
+    '--text-tertiary',
+    '--text-muted',
+    '--text-faint',
+)
 INK_LADDER_ROLES = BANNER_TEXT_ROLES
-INK_GAP = 0.015
-SELECTED_SURFACES = ('--state-selected', '--state-selected-strong')
+INK_GAP = json.loads((Path(__file__).resolve().with_name('ink-gap.json')).read_text())['INK_GAP']
+INK_SURFACES = (
+    '--state-selected',
+    '--state-selected-strong',
+    '--state-hover',
+    '--surface-sidebar',
+    '--surface-panel',
+)
 
 # Syntax / diff ink checked on each skin's app background after cascade.
 SYNTAX_DIFF_ROLES = (
@@ -589,7 +603,7 @@ def report(tokens: dict[str, str], theme: str, kind: str) -> tuple[list[str], li
 
 
 def report_dark_ink(tokens: dict[str, str], theme: str) -> tuple[list[str], list[str]]:
-    """Primary > secondary > muted > faint on app, banners, and selected rows."""
+    """Primary > secondary > tertiary > muted > faint on app, banners, and fills."""
     rows: list[str] = []
     fails: list[str] = []
     bg_name = pick_name(tokens, ('--surface-app', '--bg'))
@@ -648,7 +662,7 @@ def report_dark_ink(tokens: dict[str, str], theme: str) -> tuple[list[str], list
                         )
                     )
 
-        for surf_name in SELECTED_SURFACES:
+        for surf_name in INK_SURFACES:
             if surf_name not in tokens:
                 continue
             surf_rgb = parse(resolve(tokens, surf_name), bg_rgb)
@@ -663,7 +677,7 @@ def report_dark_ink(tokens: dict[str, str], theme: str) -> tuple[list[str], list
     if len(measured) == len(INK_LADDER_ROLES):
         ys = [lum(item) for item in measured]
         rows.append(
-            f'  ladder Y {ys[0]:.3f} > {ys[1]:.3f} > {ys[2]:.3f} > {ys[3]:.3f}'
+            '  ladder Y ' + ' > '.join(f'{value:.3f}' for value in ys)
         )
         for upper, lower, upper_name, lower_name in zip(
             ys, ys[1:], INK_LADDER_ROLES, INK_LADDER_ROLES[1:]
@@ -718,7 +732,6 @@ def run(paths: list[Path]) -> int:
 
     if kind == 'app':
         print('== dark faint/muted')
-        product = {name for name, _ in APP_THEME_ELEMENTS}
         for name, element in DARK_SKIN_DUMP:
             tokens = resolve_cascade(text, element, rules)
             rows, fails = report_dark_ink(tokens, name)
@@ -727,8 +740,9 @@ def run(paths: list[Path]) -> int:
                 print(row)
             theme_fails = [item for item in fails if item.startswith(f'FAIL {name}  ')]
             print('FAILS', [item.split('  ', 2)[2] if '  ' in item else item for item in theme_fails] or [])
-            if name not in product:
-                all_fails.extend(fails)
+            for item in fails:
+                if item not in all_fails:
+                    all_fails.append(item)
 
     print()
     if all_fails:

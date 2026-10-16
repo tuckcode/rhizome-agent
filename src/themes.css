@@ -138,10 +138,10 @@
   --surface-overlay: rgba(8, 8, 7, 0.58);
 
   --text-primary: #F8F8F2;
-  --text-secondary: #C2C8D7;
-  --text-tertiary: #CFD4E1;
-  --text-muted: #BDC4D9;
-  --text-faint: #BAC0D4;
+  --text-secondary: #C3C9D8;
+  --text-tertiary: #BFC6D8;
+  --text-muted: #BCC3D8;
+  --text-faint: #B8C0D6;
   --text-heading: #F8F8F2;
   --text-inverse: #282A36;
 
@@ -199,10 +199,10 @@
   --surface-overlay: rgba(8, 8, 7, 0.58);
 
   --text-primary: #D8DEE9;
-  --text-secondary: #C3CBD7;
-  --text-tertiary: #C8CEDA;
-  --text-muted: #C1C7D3;
-  --text-faint: #BEC4CE;
+  --text-secondary: #C5CCD8;
+  --text-tertiary: #C3C9D6;
+  --text-muted: #C0C7D2;
+  --text-faint: #BDC4D0;
   --text-heading: #ECEFF4;
   --text-inverse: #2E3440;
 
@@ -260,10 +260,10 @@
   --surface-overlay: rgba(8, 8, 7, 0.58);
 
   --text-primary: #EBDBB2;
-  --text-secondary: #C8BA9B;
-  --text-tertiary: #CCC1AF;
-  --text-muted: #BEB6AD;
-  --text-faint: #B9B2AA;
+  --text-secondary: #C9BB9D;
+  --text-tertiary: #C3B8A7;
+  --text-muted: #BEB5AB;
+  --text-faint: #BBB2A8;
   --text-heading: #FBF1C7;
   --text-inverse: #282828;
 
@@ -443,10 +443,10 @@
   --surface-overlay: rgba(8, 8, 7, 0.58);
 
   --text-primary: #A5B2B3;
-  --text-secondary: #A0AEB0;
-  --text-tertiary: #9BADB2;
-  --text-muted: #97ABB1;
-  --text-faint: #86A9B2;
+  --text-secondary: #A2AFB2;
+  --text-tertiary: #99ADB3;
+  --text-muted: #96AAB0;
+  --text-faint: #92A7AD;
   --text-heading: #EEE8D5;
   --text-inverse: #FDF6E3;
 
@@ -504,10 +504,10 @@
   --surface-overlay: rgba(8, 8, 7, 0.58);
 
   --text-primary: #CDD6F4;
-  --text-secondary: #B1B7D2;
-  --text-tertiary: #B9BED1;
-  --text-muted: #B0B4C2;
-  --text-faint: #AEB0BE;
+  --text-secondary: #B2B8D3;
+  --text-tertiary: #B0B6C8;
+  --text-muted: #AFB3C2;
+  --text-faint: #ADB0C0;
   --text-heading: #CDD6F4;
   --text-inverse: #1E1E2E;
 
@@ -626,10 +626,10 @@
   --surface-overlay: rgba(8, 8, 7, 0.58);
 
   --text-primary: #A9B1D6;
-  --text-secondary: #A4ABC8;
-  --text-tertiary: #A3AAC9;
-  --text-muted: #A0A7C4;
-  --text-faint: #9CA3C0;
+  --text-secondary: #A5ACC9;
+  --text-tertiary: #A4A9C3;
+  --text-muted: #A0A6C3;
+  --text-faint: #9CA3C1;
   --text-heading: #C0CAF5;
   --text-inverse: #1A1B26;
 
@@ -686,11 +686,11 @@
   --surface-editor: #282C34;
   --surface-overlay: rgba(8, 8, 7, 0.58);
 
-  --text-primary: #BEC3CE;
-  --text-secondary: #BBC0C7;
-  --text-tertiary: #B9BEC7;
-  --text-muted: #B7BCC4;
-  --text-faint: #B2B8C1;
+  --text-primary: #BEC4CE;
+  --text-secondary: #BCC1C8;
+  --text-tertiary: #BABEC4;
+  --text-muted: #B6BBC3;
+  --text-faint: #B3B8C0;
   --text-heading: #DCDFE4;
   --text-inverse: #282C34;
 
@@ -749,9 +749,9 @@
 
   --text-primary: #E0DEF4;
   --text-secondary: #C0BDD6;
-  --text-tertiary: #BAB6CE;
-  --text-muted: #A9A5BD;
-  --text-faint: #A4A2B3;
+  --text-tertiary: #A9A7C1;
+  --text-muted: #A7A4BC;
+  --text-faint: #A4A1B9;
   --text-heading: #E0DEF4;
   --text-inverse: #191724;
 
@@ -869,11 +869,11 @@
   --surface-editor: #2D353B;
   --surface-overlay: rgba(8, 8, 7, 0.58);
 
-  --text-primary: #D6CAAF;
-  --text-secondary: #CAC8B9;
-  --text-tertiary: #C6C7BC;
-  --text-muted: #BFC6C1;
-  --text-faint: #BBC2BF;
+  --text-primary: #D7CBB1;
+  --text-secondary: #CCCABC;
+  --text-tertiary: #C4C8BF;
+  --text-muted: #BFC5C1;
+  --text-faint: #BBC3BE;
   --text-heading: #D3C6AA;
   --text-inverse: #2D353B;
 
@@ -931,9 +931,9 @@
   --surface-overlay: rgba(8, 8, 7, 0.58);
 
   --text-primary: #FCFCFA;
-  --text-secondary: #D2D2D2;
-  --text-tertiary: #D4D4D4;
-  --text-muted: #C3C3C3;
+  --text-secondary: #D2D2D1;
+  --text-tertiary: #C5C5C5;
+  --text-muted: #C2C2C2;
   --text-faint: #BFBFBF;
   --text-heading: #FCFCFA;
   --text-inverse: #2D2A2E;

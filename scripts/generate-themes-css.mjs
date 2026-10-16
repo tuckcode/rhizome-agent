@@ -13,9 +13,13 @@
 //
 // Run: node scripts/generate-themes-css.mjs   (rewrites src/themes.css)
 
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+const { INK_GAP } = JSON.parse(
+  readFileSync(new URL('./ink-gap.json', import.meta.url), 'utf8'),
+)
 
 const THEMES = [
   {
@@ -228,20 +232,15 @@ const hslToHex = (h, s, l) => {
   )
 }
 
-// Dark community skins keep each role's hue and only change HSL lightness.
-// Faint sits at the 4.5:1 floor. Muted, secondary, and primary step up from
-// it so body > secondary > muted > faint on the app surface, banner tints,
-// and the selected-row fills.
+// Dark community skins keep each role's hue and saturation and only change
+// HSL lightness. Faint and muted stay on the palette muted hue. Tertiary
+// sits between secondary and muted. Solarized dark body text is pinned.
 const TEXT_MIN = 4.5
-const INK_GAP = 0.02
+const SOLARIZED_DARK_PRIMARY = '#A5B2B3'
 const relativeY = (hex) => lum(hex2rgb(hex))
 const passesInk = (value, backgrounds) => backgrounds.every((bg) => contrast(value, bg) >= TEXT_MIN)
-const stableHueSat = (hex) => {
-  const [h, s] = hexToHsl(hex)
-  return s < 0.03 ? [0, 0] : [h, s]
-}
 const setY = (hex, targetY) => {
-  const [h, s] = stableHueSat(hex)
+  const [h, s] = hexToHsl(hex)
   let lo = 0
   let hi = 1
   let best = hex
@@ -266,8 +265,7 @@ const liftLightness = (hex, backgrounds) => {
   if (passesInk(hex, backgrounds)) {
     return hex
   }
-  const [h, s] = stableHueSat(hex)
-  const [, , l0] = hexToHsl(hex)
+  const [h, s, l0] = hexToHsl(hex)
   let lo = l0
   let hi = 1
   let best = '#FFFFFF'
@@ -290,12 +288,51 @@ const liftLightness = (hex, backgrounds) => {
   return out
 }
 const liftToY = (hex, targetY, backgrounds) => liftLightness(setY(hex, Math.max(relativeY(hex), targetY)), backgrounds)
+const setYUnder = (hex, maxY) => {
+  const [h, s] = hexToHsl(hex)
+  let lo = 0
+  let hi = 1
+  let best = hslToHex(h, s, 0)
+  for (let i = 0; i < 28; i += 1) {
+    const mid = (lo + hi) / 2
+    const candidate = hslToHex(h, s, mid)
+    if (relativeY(candidate) > maxY) {
+      hi = mid
+    } else {
+      best = candidate
+      lo = mid
+    }
+  }
+  let [, , l] = hexToHsl(best)
+  while (relativeY(best) > maxY && l > 0) {
+    l = Math.max(0, l - 1 / 255)
+    best = hslToHex(h, s, l)
+  }
+  return best
+}
+const fitUnderY = (hex, maxY, backgrounds) => liftLightness(setYUnder(hex, maxY), backgrounds)
 const fitInkLadder = (t, backgrounds) => {
-  let faint = liftLightness(mix(t.muted, t.bg, 0.3), backgrounds)
-  let muted = liftToY(t.muted, relativeY(faint) + INK_GAP, backgrounds)
-  let secondary = liftToY(mix(t.fg, t.muted, 0.4), relativeY(muted) + INK_GAP, backgrounds)
-  let primary = liftToY(t.fg, relativeY(secondary) + INK_GAP, backgrounds)
-  return { primary, secondary, muted, faint }
+  const faint = liftLightness(t.muted, backgrounds)
+  const muted = liftToY(t.muted, relativeY(faint) + INK_GAP, backgrounds)
+  if (t.slug === 'solarized-dark') {
+    const primary = SOLARIZED_DARK_PRIMARY
+    const secondary = fitUnderY(mix(t.fg, t.muted, 0.4), relativeY(primary) - INK_GAP, backgrounds)
+    const tertiary = liftToY(t.muted, relativeY(muted) + INK_GAP, backgrounds)
+    return {
+      primary,
+      secondary,
+      tertiary:
+        relativeY(tertiary) <= relativeY(secondary) - INK_GAP
+          ? tertiary
+          : fitUnderY(t.muted, relativeY(secondary) - INK_GAP, backgrounds),
+      muted,
+      faint,
+    }
+  }
+  const tertiary = liftToY(mix(t.fg, t.muted, 0.7), relativeY(muted) + INK_GAP, backgrounds)
+  const secondary = liftToY(mix(t.fg, t.muted, 0.4), relativeY(tertiary) + INK_GAP, backgrounds)
+  const primary = liftToY(t.fg, relativeY(secondary) + INK_GAP, backgrounds)
+  return { primary, secondary, tertiary, muted, faint }
 }
 
 function themeBlock(t) {
@@ -338,6 +375,7 @@ function themeBlock(t) {
   const accentHover = mix(t.accent, t.dark ? white : black, 0.15)
   let primary = t.fg
   let secondaryText = mix(t.fg, t.muted, 0.4)
+  let tertiary = mix(t.fg, t.muted, 0.7)
   let muted = t.muted
   let faint = mix(t.muted, t.bg, 0.3)
   if (t.dark) {
@@ -345,6 +383,9 @@ function themeBlock(t) {
     const panel = hex2rgb(card)
     const inkBackgrounds = [
       app,
+      hex2rgb(t.panel),
+      panel,
+      hex2rgb(hover),
       hex2rgb(selected),
       hex2rgb(selectedStrong),
       composite(t.accent, 0.12, panel),
@@ -355,6 +396,7 @@ function themeBlock(t) {
     const ladder = fitInkLadder(t, inkBackgrounds)
     primary = ladder.primary
     secondaryText = ladder.secondary
+    tertiary = ladder.tertiary
     muted = ladder.muted
     faint = ladder.faint
   }
@@ -377,7 +419,7 @@ function themeBlock(t) {
     '',
     `  --text-primary: ${primary};`,
     `  --text-secondary: ${secondaryText};`,
-    `  --text-tertiary: ${mix(primary, muted, 0.7)};`,
+    `  --text-tertiary: ${tertiary};`,
     `  --text-muted: ${muted};`,
     `  --text-faint: ${faint};`,
     `  --text-heading: ${t.heading};`,

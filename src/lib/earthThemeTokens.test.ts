@@ -9,6 +9,7 @@ import { COLOR_THEMES, DEFAULT_COLOR_THEME, DEFAULT_THEME_MODE } from './themeMo
 const indexCss = readFileSync(join(process.cwd(), 'src/index.css'), 'utf8')
 const themesCss = readFileSync(join(process.cwd(), 'src/themes.css'), 'utf8')
 const generator = readFileSync(join(process.cwd(), 'scripts/generate-themes-css.mjs'), 'utf8')
+const INK_GAP = JSON.parse(readFileSync(join(process.cwd(), 'scripts/ink-gap.json'), 'utf8')).INK_GAP as number
 const sheetSelectionChrome = readFileSync(join(process.cwd(), 'src/utils/sheetSelectionChrome.ts'), 'utf8')
 const blockReorder = readFileSync(join(process.cwd(), 'src/components/rhizomeBlockReorder.ts'), 'utf8')
 
@@ -492,7 +493,7 @@ describe('Earth theme tokens', () => {
       }
       const selected = tokens['--state-selected']
       const selectedStrong = tokens['--state-selected-strong']
-      for (const role of ['--text-primary', '--text-secondary', '--text-faint', '--text-muted'] as const) {
+      for (const role of ['--text-primary', '--text-secondary', '--text-tertiary', '--text-faint', '--text-muted'] as const) {
         expect(
           contrastRatio(tokens[role], background),
           `${name} ${role} on ${background}`,
@@ -525,24 +526,42 @@ describe('Earth theme tokens', () => {
     expect(dump.Mycelium['--text-faint']).toBe('#959F89')
     expect(generator).toContain('fitInkLadder')
     expect(generator).toContain('liftLightness')
+    expect(generator).toContain('ink-gap.json')
+    expect(readFileSync(join(process.cwd(), 'scripts/contrast_check.py'), 'utf8')).toContain('ink-gap.json')
+    expect(INK_GAP).toBe(0.015)
     for (const [name, source] of Object.entries(COMMUNITY_MUTED_SOURCE)) {
-      const next = hslHueSat(dump[name]['--text-muted'])
       const sourceHs = hslHueSat(source)
-      if (sourceHs.sat < 0.05) {
-        expect(next.sat, `${name} muted stays gray`).toBeLessThan(0.05)
-        continue
+      for (const role of ['--text-muted', '--text-faint'] as const) {
+        const next = hslHueSat(dump[name][role])
+        expect(Math.abs(next.sat - sourceHs.sat), `${name} ${role} sat`).toBeLessThan(0.04)
+        if (sourceHs.sat < 0.02) {
+          expect(next.sat, `${name} ${role} stays near-gray`).toBeLessThan(0.02)
+          continue
+        }
+        const hueDelta = Math.min(Math.abs(next.hue - sourceHs.hue), 360 - Math.abs(next.hue - sourceHs.hue))
+        expect(hueDelta, `${name} ${role} hue`).toBeLessThan(5)
       }
-      const delta = Math.min(Math.abs(next.hue - sourceHs.hue), 360 - Math.abs(next.hue - sourceHs.hue))
-      expect(delta, `${name} muted hue`).toBeLessThan(5)
     }
+    expect(dump['Solarized dark']['--text-primary']).toBe('#A5B2B3')
   })
 
-  it('steps body text down through secondary, muted, and faint on every dark skin', () => {
+  it('steps body text down through secondary, tertiary, muted, and faint on every dark skin', () => {
     const dump = JSON.parse(
       execFileSync('python3', ['scripts/contrast_check.py', '--dump-resolved'], { encoding: 'utf8' }),
     ) as Record<string, Record<string, string>>
-    const ladder = ['--text-primary', '--text-secondary', '--text-muted', '--text-faint'] as const
-    const minGap = 0.015
+    const ladder = [
+      '--text-primary',
+      '--text-secondary',
+      '--text-tertiary',
+      '--text-muted',
+      '--text-faint',
+    ] as const
+    const extraSurfaces = [
+      '--state-hover',
+      '--surface-sidebar',
+      '--surface-panel',
+      '--state-selected-strong',
+    ] as const
     for (const name of DARK_SKIN_NAMES) {
       const tokens = dump[name]
       const background = tokens['--surface-app']
@@ -553,7 +572,7 @@ describe('Earth theme tokens', () => {
         expect(
           ys[index] - ys[index + 1],
           `${name} ${ladder[index]} above ${ladder[index + 1]}`,
-        ).toBeGreaterThanOrEqual(minGap)
+        ).toBeGreaterThanOrEqual(INK_GAP)
       }
       for (const role of ladder) {
         expect(
@@ -564,6 +583,12 @@ describe('Earth theme tokens', () => {
           contrastRatio(tokens[role], selected),
           `${name} ${role} on .list-row-selected`,
         ).toBeGreaterThanOrEqual(4.5)
+        for (const surfaceName of extraSurfaces) {
+          expect(
+            contrastRatio(tokens[role], tokens[surfaceName]),
+            `${name} ${role} on ${surfaceName}`,
+          ).toBeGreaterThanOrEqual(4.5)
+        }
         for (const [label, aliases] of BANNER_TINT_ROLES) {
           const tintName = pickToken(tokens, aliases)
           expect(
@@ -573,6 +598,7 @@ describe('Earth theme tokens', () => {
         }
       }
     }
+    expect(dump['Solarized dark']['--text-primary']).toBe('#A5B2B3')
     expect(
       contrastRatio(dump['Monokai pro']['--text-primary'], dump['Monokai pro']['--state-selected']),
     ).toBeGreaterThanOrEqual(4.5)
@@ -741,6 +767,10 @@ describe('Earth theme tokens', () => {
     expect(output).toContain('== Loam')
     expect(output).toContain('== Mycelium')
     expect(output).toContain('== dark faint/muted')
+    expect(output).toContain('-- Graphite')
+    expect(output).toContain('-- Earth dark')
+    expect(output).toContain('-- Loam')
+    expect(output).toContain('-- Mycelium')
     expect(output).toContain('-- Dracula')
     expect(output).toContain('-- Tokyo night')
     expect(output).toMatch(/--text-muted on --state-selected-strong: [0-9.]+/)
