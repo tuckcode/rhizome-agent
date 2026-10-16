@@ -15,6 +15,10 @@ import {
   VaultPanel,
   VaultPanelRestoreButton,
 } from './components/VaultPanel'
+import { NotesRail } from './components/NotesRail'
+import { useHoverExpandPanel } from './hooks/useHoverExpandPanel'
+import { useNotesPanelMode } from './hooks/useNotesPanelMode'
+import { fittedNotesPanelMode, type NotesPanelMode } from './lib/notesPanelMode'
 import { Editor } from './components/Editor'
 import { AskChatExcerptMenu } from './components/AskChatExcerptMenu'
 import { ChatNoteSplitToggle } from './components/ChatNoteSplitToggle'
@@ -1384,10 +1388,15 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     storageScope: resolvedPath ?? '',
     windowMode: Boolean(noteWindowParams),
   })
+  const { mode: storedNotesMode, setMode: setNotesMode } = useNotesPanelMode()
+  const handleSetViewModeWithNotes = useCallback((mode: typeof viewMode) => {
+    if (mode !== 'editor-only') setNotesMode('open')
+    handleSetViewMode(mode)
+  }, [handleSetViewMode, setNotesMode])
   const handleChatViewMode = useCallback((mode: typeof viewMode) => {
     if (mode === 'editor-only') handleRailSelectChat()
-    handleSetViewMode(mode)
-  }, [handleRailSelectChat, handleSetViewMode])
+    handleSetViewModeWithNotes(mode)
+  }, [handleRailSelectChat, handleSetViewModeWithNotes])
   const { status: updateStatus, actions: updateActions } = useUpdater(
     settings.release_channel,
     areAutomaticUpdateChecksEnabled(settings),
@@ -1661,7 +1670,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     kind: chatCentered ? 'chat-centered' : 'classic',
     panePreset, setPanePreset, updatePanePreset, railPinned: railPinned || railConsumesExpandedWidth(reportedRailWidth),
     viewMode,
-    setViewMode: handleSetViewMode,
+    setViewMode: handleSetViewModeWithNotes,
     noteOpen: Boolean(activeTab),
     inspectorOpen: !layout.inspectorCollapsed,
     hideNotesForCanvas,
@@ -1704,10 +1713,28 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       return next
     })
   }, [])
-  const handleCollapseNotes = useCallback(() => {
+  const [leftOverlaying, setLeftOverlaying] = useState(false)
+  const [notesMenuOpen, setNotesMenuOpen] = useState(false)
+  const effectiveNotesMode = fittedNotesPanelMode(storedNotesMode, notesOpen && !hideNotesForCanvas)
+  const notesHover = useHoverExpandPanel({
+    enabled: chatCentered && effectiveNotesMode === 'auto' && !hideNotesForCanvas,
+    peerOverlaying: leftOverlaying,
+    menuOpen: notesMenuOpen,
+  })
+  const handleNotesModeChange = useCallback((mode: NotesPanelMode) => {
+    setNotesMode(mode)
+    if (mode === 'open') {
+      ensureNotesOpen()
+      return
+    }
     setNotesFocus(false)
     collapseNotes()
-  }, [collapseNotes])
+  }, [collapseNotes, ensureNotesOpen, setNotesMode])
+  const handleCollapseNotes = useCallback(() => {
+    setNotesFocus(false)
+    setNotesMode('auto')
+    collapseNotes()
+  }, [collapseNotes, setNotesMode])
   const handleRailSelectGraph = useCallback(() => {
     rememberPeerToolOrigin()
     if (chatCentered) {
@@ -2052,7 +2079,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   */
   const showSidebarTree = classicSidebarVisible
   const showNoteListPanel = classicNoteListVisible
-  const showVaultPanel = chatCentered && notesOpen
+  const showVaultPanel = chatCentered && notesOpen && effectiveNotesMode === 'open'
+  const showNotesRail = chatCentered && !hideNotesForCanvas && effectiveNotesMode !== 'open'
   const showVaultPanelRestore = showRestoreStrip
 
   const handleVaultTreeSelect = (nextSelection: SidebarSelection) => {
@@ -2067,7 +2095,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   )
 
   const noteListSurface = effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse' ? (
-    <PulseView vaultPath={gitSurfaces.historyRepositoryPath} onOpenNote={handlePulseOpenNote} refreshKey={gitHistoryRefreshKey} sidebarCollapsed={!showSidebarTree && !chatCentered} onExpandSidebar={() => handleSetViewMode('all')} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.historyRepositoryPath} onRepositoryChange={gitSurfaces.setHistoryRepositoryPath} locale={appLocale} />
+    <PulseView vaultPath={gitSurfaces.historyRepositoryPath} onOpenNote={handlePulseOpenNote} refreshKey={gitHistoryRefreshKey} sidebarCollapsed={!showSidebarTree && !chatCentered} onExpandSidebar={() => handleSetViewModeWithNotes('all')} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.historyRepositoryPath} onRepositoryChange={gitSurfaces.setHistoryRepositoryPath} locale={appLocale} />
   ) : (
     <NoteList entries={visibleEntries} selection={effectiveSelection} selectedNote={activeTab?.entry ?? null} loading={isVaultContentLoading} noteListFilter={noteListFilter} onNoteListFilterChange={setNoteListFilter} inboxPeriod={inboxPeriod} modifiedFiles={noteListModifiedFiles} modifiedFilesError={noteListModifiedFilesError} gitRepositories={gitRepositories} selectedGitRepositoryPath={gitSurfaces.changesRepositoryPath} onGitRepositoryChange={gitSurfaces.setChangesRepositoryPath} getNoteStatus={vault.getNoteStatus} sidebarCollapsed={!showSidebarTree && !chatCentered} onSelectNote={(entry) => { notes.handleSelectNote(entry) }} onReplaceActiveTab={(entry) => { handleReplaceActiveTabWithQueuedDiff(entry) }} onEnterNeighborhood={handleEnterNeighborhood} onCreateNote={notes.handleCreateNoteImmediate} onBulkOrganize={explicitOrganizationEnabled ? bulkActions.handleBulkOrganize : undefined} onBulkArchive={bulkActions.handleBulkArchive} onBulkDeletePermanently={deleteActions.handleBulkDeletePermanently} onUpdateTypeSort={notes.handleUpdateFrontmatter} onUpdateViewDefinition={handleUpdateViewDefinition} updateEntry={vault.updateEntry} onOpenInNewWindow={handleOpenEntryInNewWindow} onRenameFilename={appSave.handleFilenameRename} onExportPdf={handleExportNotePdfFromList} onToggleFavorite={entryActions.handleToggleFavorite} onToggleOrganized={explicitOrganizationEnabled ? entryActions.handleToggleOrganized : undefined} onAskAgent={handleAskAgentAboutNote} onRevealFile={fileActions.revealFile} onCopyFilePath={fileActions.copyFilePath} canCopyGitUrl={noteGitUrls.canCopyEntryGitUrl} onCopyGitUrl={noteGitUrls.copyEntryGitUrl} onDiscardFile={handleDiscardFile} onOpenDeletedNote={handleOpenDeletedNote} allNotesNoteListProperties={vaultConfig.allNotes?.noteListProperties ?? null} onUpdateAllNotesNoteListProperties={handleUpdateAllNotesNoteListProperties} inboxNoteListProperties={vaultConfig.inbox?.noteListProperties ?? null} onUpdateInboxNoteListProperties={handleUpdateInboxNoteListProperties} views={vault.views} visibleNotesRef={visibleNotesRef} allNotesFileVisibility={allNotesFileVisibility} multiSelectionCommandRef={multiSelectionCommandRef} locale={appLocale} />
   )
@@ -2121,6 +2149,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         onCollapse={handleCollapseNotes}
         focused={notesFocus}
         onFocusToggle={handleNotesFocusToggle}
+        mode={effectiveNotesMode}
+        onModeChange={handleNotesModeChange}
+        onModeMenuOpenChange={setNotesMenuOpen}
+        modeButtonRef={notesHover.modeButtonRef}
       />
       {chatCentered ? (
         <ConnectionsPanel
@@ -2151,7 +2183,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         nativeTarget={settings.native_chat_target}
         onNativeTargetChange={(target) => saveSettings({ ...settings, native_chat_target: target })}
         aiModelProviders={settings.ai_model_providers}
-        onExit={() => handleSetViewMode(chatCentered ? 'all' : 'editor-list')}
+        onExit={() => handleSetViewModeWithNotes(chatCentered ? 'all' : 'editor-list')}
         vaultPath={activeEditorVaultPath}
         vaultPaths={writableVaultPaths}
         entries={visibleEntries}
@@ -2200,6 +2232,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               autoCollapsed={chatCentered && (railPinned || railOccupiesExpandedWidth) && !fittedRailPinned}
               drawer={chatCentered && !railFits}
               drawerCloseSignal={railDrawerCloseSignal}
+              hoverDisabled={notesHover.overlaying}
+              onOverlayingChange={setLeftOverlaying}
               onPinnedChange={handleRailPinned}
               onLayoutWidthChange={setReportedRailWidth}
               width={chatCentered ? paneWidths.rail : undefined}
@@ -2471,7 +2505,46 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
             />
             )}
           </div>
-          {showVaultPanelRestore && (
+          {showNotesRail && (
+            <NotesRail
+              mode={effectiveNotesMode}
+              onModeChange={handleNotesModeChange}
+              expanded={notesHover.expanded}
+              overlaying={notesHover.overlaying}
+              width={paneWidths.notes + (vaultBrowseOpen ? paneWidths.browse : 0)}
+              panelRef={notesHover.panelRef}
+              modeButtonRef={notesHover.modeButtonRef}
+              onMouseEnter={notesHover.onMouseEnter}
+              onMouseLeave={notesHover.onMouseLeave}
+              onFocusCapture={notesHover.onFocusCapture}
+              onMenuOpenChange={setNotesMenuOpen}
+              showInbox={explicitOrganizationEnabled}
+              selection={effectiveSelection}
+              onSelectSection={handleSetSelection}
+              entries={visibleEntries}
+              getNoteStatus={vault.getNoteStatus}
+              onSelectNote={notes.handleSelectNote}
+            >
+              <VaultPanel
+                browseOpen={vaultBrowseOpen}
+                notesWidth={paneWidths.notes}
+                browseWidth={paneWidths.browse}
+                onBrowseResize={delta => resizeColumn('browse', delta)}
+                locale={appLocale}
+                navigation={sidebarSurface(true)}
+                noteList={noteListSurface}
+                onBrowseToggle={toggleBrowse}
+                onCollapse={handleCollapseNotes}
+                focused={notesFocus}
+                onFocusToggle={handleNotesFocusToggle}
+                mode={effectiveNotesMode}
+                onModeChange={handleNotesModeChange}
+                onModeMenuOpenChange={setNotesMenuOpen}
+                modeButtonRef={notesHover.modeButtonRef}
+              />
+            </NotesRail>
+          )}
+          {showVaultPanelRestore && !showNotesRail && (
             <VaultPanelRestoreButton
               locale={appLocale}
               onClick={ensureNotesOpen}

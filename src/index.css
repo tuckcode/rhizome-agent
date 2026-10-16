@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Screenshot harnesses and extra HTML entry points outside this file's
+   default scan. Point at the checkout src tree so app utilities load. */
+@source ".";
+@source "../scripts";
+
 /* Follow the application theme (`html.dark`), including portaled descendants.
    The default Tailwind variant follows the operating-system preference. */
 @custom-variant dark (&:where(.dark, .dark *));
