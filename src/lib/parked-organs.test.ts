@@ -295,7 +295,7 @@ describe('parked organs leftover', () => {
     expect(history).toContain('ArrowUp → older, ArrowDown → newer')
   })
 
-  it('waits to load Settings catalogs until Agents or Packages is opened', () => {
+  it('waits to load Settings catalogs until Agents or Advanced Prime is opened', () => {
     const settings = readFileSync(
       `${process.cwd()}/src/components/SettingsPanel.tsx`,
       'utf8',
@@ -304,14 +304,12 @@ describe('parked organs leftover', () => {
       'props.initialSectionId === SETTINGS_SECTION_IDS.ai',
     )
     expect(settings).toContain(
-      'props.initialSectionId === SETTINGS_SECTION_IDS.extensions',
+      'shouldOpenAdvancedPrimeEngine(props.initialSectionId)',
     )
     expect(settings).toContain(
       "if (id === SETTINGS_SECTION_IDS.ai) setLoadModelCatalog(true)",
     )
-    expect(settings).toContain(
-      "if (id === SETTINGS_SECTION_IDS.extensions) setLoadExtensionCatalog(true)",
-    )
+    expect(settings).toContain('setLoadExtensionCatalog(true)')
     const toggle = readFileSync(
       `${process.cwd()}/src/components/ChatEngineSettings.tsx`,
       'utf8',

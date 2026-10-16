@@ -1090,7 +1090,8 @@ CodeMirror read-only (`EditorContentLayout.test.tsx`). Not vault
 Installed packages are Prime settings (`list_prime_packages`). The
 catalog is the public npm `pi-package` index. Install is a CLI spawn
 (`install_prime_package`), then `reload` on the attached session. The
-daemon has no package-install verb.
+daemon has no package-install verb. The hub lives under Settings →
+AI Agents → Advanced Prime engine, not as a top-level Settings page.
 
 ### Hide vs quit
 

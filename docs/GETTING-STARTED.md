@@ -417,7 +417,7 @@ rhizome-agent/
 | `src/components/chatNoteSplit.ts` | On top / Beside for an open note over Chat. Beside forces compact Sessions/Notes. |
 | `src/App.tsx` `handleAskAgentAboutNote` | Right-click a list row → Ask the agent about this note. Keeps Chat and opens that note (`App.test.tsx`). |
 | `src/hooks/useNoteLockMode.ts` | Ephemeral per-note lock. Locked notes make BlockNote/raw read-only (`EditorContentLayout.test.tsx`). Not vault `editor_mode`. |
-| `src/components/PrimeExtensionsSection.tsx` | Settings → Packages hub. Catalog is npm `pi-package`; install is the Prime CLI, not a daemon command. |
+| `src/components/PrimeExtensionsSection.tsx` | Settings → AI Agents → Advanced Prime engine. Catalog is npm `pi-package`; install is the Prime CLI, not a daemon command. |
 | `src/lib/primePackages.ts` | Catalog search URL, install spec (`npm:` prefix), and Ask-Chat fallback prompt. |
 | `src/hooks/useViewMode.ts` | Runtime pane preset (`chat` / `notes` / `read` / `workbench`). Legacy `editor-only` / `editor-list` / `all` remain compatibility mirrors. Fresh default is Chat. |
 | `src/components/ConnectionsPanel.tsx` | Overlay for note-list **Show in Graph** and for a Chat session footprint. Renders nothing until presented. The rail Graph view is `GraphView`, not this panel. |

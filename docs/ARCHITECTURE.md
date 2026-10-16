@@ -717,12 +717,12 @@ keeps whatever is running listed, since the picker only ever receives a label.
 
 #### Prime packages (Pi catalog)
 
-Settings → **Packages** is the Pi catalog hub. Prime is a
-distribution of Pi, so the catalog is npm's `pi-package` keyword — the same
-index as [pi.dev/packages](https://pi.dev/packages). Installed entries come
-from `~/.prime/agent/settings.json` via `list_prime_packages`. Install runs
-`prime-agent package install` in the background (`install_prime_package`), then
-reloads the attached Prime session (`reload`). Prime's own docs warn that
+Settings → AI Agents → **Advanced Prime engine** holds the Pi catalog hub.
+Prime is a distribution of Pi, so the catalog is npm's `pi-package` keyword —
+the same index as [pi.dev/packages](https://pi.dev/packages). Installed entries
+come from `~/.prime/agent/settings.json` via `list_prime_packages`. Install
+runs `prime-agent package install` in the background (`install_prime_package`),
+then reloads the attached Prime session (`reload`). Prime's own docs warn that
 packages run with full system access; Settings confirms that once per install.
 If the CLI is missing, Settings copies the command or asks Chat to run it
 (`primePackageAskAgentPrompt`). Kind tabs (extension / skill / prompt / theme)
@@ -730,8 +730,9 @@ add a second keyword. Search hits the public npm registry from the renderer
 (`catalogSearchUrl`). Prime's **daemon has no install command**. Install is a
 180s background process (`prime_packages.rs`). Bare names become `npm:{name}`.
 Sources that start with `-` or contain whitespace are refused. Opening Settings
-does **not** search the catalog until Packages is visited or that section
-scrolls into view.
+does **not** search the catalog until Advanced Prime engine is expanded. An
+old Packages section id (`packages`, `settings-section-extensions`) opens that
+disclosure.
 
 The allow-list is Rhizome's view of Prime's catalog, in the same sense as
 archiving below: Prime's CLI and every other client still see all 501.

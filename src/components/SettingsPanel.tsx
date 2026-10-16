@@ -1,4 +1,4 @@
-import { Copy, Cube, Monitor, Moon, Stack, Sun, X } from '@phosphor-icons/react'
+import { CaretDown, CaretRight, Copy, Cube, Monitor, Moon, Stack, Sun, X } from '@phosphor-icons/react'
 import {
   PRODUCT_AI_AGENT_DEFINITIONS,
   DEFAULT_AI_AGENT,
@@ -111,7 +111,11 @@ import { Button } from './ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import type { NoteWidthMode } from '../types'
 import type { VaultOption } from './status-bar/types'
-import { SETTINGS_SECTION_IDS } from './settingsSectionIds'
+import {
+  SETTINGS_SECTION_IDS,
+  resolveSettingsSectionId,
+  shouldOpenAdvancedPrimeEngine,
+} from './settingsSectionIds'
 import {
   trackSettingsPreferenceChanges,
   trackTelemetryConsentChange,
@@ -252,6 +256,8 @@ interface SettingsBodyProps {
   initialSectionId?: string | null
   loadModelCatalog?: boolean
   loadExtensionCatalog?: boolean
+  openAdvancedPrime?: boolean
+  onOpenAdvancedPrime?: () => void
   onClose?: () => void
 }
 
@@ -550,8 +556,9 @@ function SettingsPanelInner({
 
   useEffect(() => {
     if (!initialSectionId) return
+    const targetId = resolveSettingsSectionId(initialSectionId)
     const timer = window.setTimeout(() => {
-      document.getElementById(initialSectionId)?.scrollIntoView({ block: 'start' })
+      if (targetId) document.getElementById(targetId)?.scrollIntoView({ block: 'start' })
     }, 50)
     return () => window.clearTimeout(timer)
   }, [initialSectionId])
@@ -865,12 +872,12 @@ function SettingsBodyFromDraft({
 }
 
 function SettingsBody(props: SettingsBodyProps) {
+  const openAdvancedPrime = shouldOpenAdvancedPrimeEngine(props.initialSectionId)
   const [loadModelCatalog, setLoadModelCatalog] = useState(
-    props.initialSectionId === SETTINGS_SECTION_IDS.ai,
+    props.initialSectionId === SETTINGS_SECTION_IDS.ai || openAdvancedPrime,
   )
-  const [loadExtensionCatalog, setLoadExtensionCatalog] = useState(
-    props.initialSectionId === SETTINGS_SECTION_IDS.extensions,
-  )
+  const [loadExtensionCatalog, setLoadExtensionCatalog] = useState(openAdvancedPrime)
+  const handleOpenAdvancedPrime = useCallback(() => setLoadExtensionCatalog(true), [])
 
   useEffect(() => {
     if (loadModelCatalog) return
@@ -887,28 +894,12 @@ function SettingsBody(props: SettingsBodyProps) {
     return () => io.disconnect()
   }, [loadModelCatalog])
 
-  useEffect(() => {
-    if (loadExtensionCatalog) return
-    const el = document.getElementById(SETTINGS_SECTION_IDS.extensions)
-    if (!el || typeof IntersectionObserver === 'undefined') return
-    const root = el.closest('.overflow-auto')
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) setLoadExtensionCatalog(true)
-      },
-      { root: root instanceof Element ? root : null, threshold: 0.15 },
-    )
-    io.observe(el)
-    return () => io.disconnect()
-  }, [loadExtensionCatalog])
-
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden">
       <SettingsBodyNav
         t={props.t}
         onVisit={(id) => {
           if (id === SETTINGS_SECTION_IDS.ai) setLoadModelCatalog(true)
-          if (id === SETTINGS_SECTION_IDS.extensions) setLoadExtensionCatalog(true)
         }}
       />
       <div className="min-w-0 flex-1 overflow-auto px-6 py-4">
@@ -918,6 +909,8 @@ function SettingsBody(props: SettingsBodyProps) {
           {...props}
           loadModelCatalog={loadModelCatalog}
           loadExtensionCatalog={loadExtensionCatalog}
+          openAdvancedPrime={openAdvancedPrime}
+          onOpenAdvancedPrime={handleOpenAdvancedPrime}
         />
         {/* Lets the last sections scroll their heading to the top when picked
             in the nav (native audit 2026-09-26). Sized to the scroll box. */}
@@ -1112,6 +1105,8 @@ function SettingsAgentWorkflowSections({
   activeVaultPath,
   loadModelCatalog = false,
   loadExtensionCatalog = false,
+  openAdvancedPrime = false,
+  onOpenAdvancedPrime,
   onClose,
 }: SettingsBodyProps) {
   return (
@@ -1133,15 +1128,15 @@ function SettingsAgentWorkflowSections({
           setAiModelProviders={setAiModelProviders}
           onCopyMcpConfig={onCopyMcpConfig}
           loadModelCatalog={loadModelCatalog}
+          loadExtensionCatalog={loadExtensionCatalog}
+          openAdvancedPrime={openAdvancedPrime}
+          onOpenAdvancedPrime={onOpenAdvancedPrime}
+          onClose={onClose}
           activeVaultPath={activeVaultPath}
         />
         <div className="mt-4">
           <SessionImportSettingsSection vaultPath={activeVaultPath ?? null} />
         </div>
-      </SettingsSection>
-
-      <SettingsSection id={SETTINGS_SECTION_IDS.extensions}>
-        <PrimeExtensionsSection active={loadExtensionCatalog} onClose={onClose} />
       </SettingsSection>
 
       <SettingsSection id={SETTINGS_SECTION_IDS.workflow}>
@@ -1520,6 +1515,10 @@ function AiAgentSettingsSection({
   setAiModelProviders,
   onCopyMcpConfig,
   loadModelCatalog,
+  loadExtensionCatalog,
+  openAdvancedPrime,
+  onOpenAdvancedPrime,
+  onClose,
   activeVaultPath,
 }: Pick<
   SettingsBodyProps,
@@ -1538,6 +1537,10 @@ function AiAgentSettingsSection({
   | 'setAiModelProviders'
   | 'onCopyMcpConfig'
   | 'loadModelCatalog'
+  | 'loadExtensionCatalog'
+  | 'openAdvancedPrime'
+  | 'onOpenAdvancedPrime'
+  | 'onClose'
   | 'activeVaultPath'
 >) {
   const primeStatus = getAiAgentAvailability(aiAgentsStatus, DEFAULT_AI_AGENT)
@@ -1608,6 +1611,10 @@ function AiAgentSettingsSection({
         setAiModelProviders={setAiModelProviders}
         onCopyMcpConfig={onCopyMcpConfig}
         loadModelCatalog={loadModelCatalog}
+        loadExtensionCatalog={loadExtensionCatalog}
+        openAdvancedPrime={openAdvancedPrime}
+        onOpenAdvancedPrime={onOpenAdvancedPrime}
+        onClose={onClose}
         vaultPath={activeVaultPath}
       />
     </>
@@ -1621,6 +1628,10 @@ function AiTargetManagementTabs({
   setAiModelProviders,
   onCopyMcpConfig,
   loadModelCatalog,
+  loadExtensionCatalog,
+  openAdvancedPrime,
+  onOpenAdvancedPrime,
+  onClose,
   vaultPath,
 }: {
   t: Translate
@@ -1629,6 +1640,10 @@ function AiTargetManagementTabs({
   setAiModelProviders: (value: AiModelProvider[]) => void
   onCopyMcpConfig?: () => void
   loadModelCatalog?: boolean
+  loadExtensionCatalog?: boolean
+  openAdvancedPrime?: boolean
+  onOpenAdvancedPrime?: () => void
+  onClose?: () => void
   vaultPath?: string | null
 }) {
   return (
@@ -1645,6 +1660,14 @@ function AiTargetManagementTabs({
         {loadModelCatalog ? <PrimeDefaultModelSection vaultPath={vaultPath} /> : null}
         {loadModelCatalog ? <PrimeModelAllowListSection t={t} /> : null}
         {onCopyMcpConfig ? <CopyMcpConfigButton t={t} onCopyMcpConfig={onCopyMcpConfig} /> : null}
+        <AdvancedPrimeEngineSection
+          t={t}
+          aiAgentsStatus={aiAgentsStatus}
+          loadExtensionCatalog={loadExtensionCatalog}
+          openAdvancedPrime={openAdvancedPrime}
+          onOpenAdvancedPrime={onOpenAdvancedPrime}
+          onClose={onClose}
+        />
         <BridgeTokenRow t={t} />
       </TabsContent>
       <TabsContent value="local">
@@ -1654,6 +1677,70 @@ function AiTargetManagementTabs({
         <AiProviderSettings t={t} mode="api" providers={aiModelProviders} onChange={setAiModelProviders} />
       </TabsContent>
     </Tabs>
+  )
+}
+
+function AdvancedPrimeEngineSection({
+  t,
+  aiAgentsStatus,
+  loadExtensionCatalog = false,
+  openAdvancedPrime = false,
+  onOpenAdvancedPrime,
+  onClose,
+}: {
+  t: Translate
+  aiAgentsStatus: AiAgentsStatus
+  loadExtensionCatalog?: boolean
+  openAdvancedPrime?: boolean
+  onOpenAdvancedPrime?: () => void
+  onClose?: () => void
+}) {
+  const [userExpanded, setUserExpanded] = useState<boolean | null>(null)
+  const expanded = userExpanded ?? openAdvancedPrime
+  const primeStatus = getAiAgentAvailability(aiAgentsStatus, DEFAULT_AI_AGENT)
+  const bodyId = 'settings-advanced-prime-engine-body'
+
+  return (
+    <div
+      id={SETTINGS_SECTION_IDS.primeEngine}
+      className="scroll-mt-4 overflow-hidden rounded-md border border-border bg-card"
+      data-testid="settings-advanced-prime-engine"
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        aria-expanded={expanded}
+        aria-controls={bodyId}
+        data-testid="settings-advanced-prime-engine-toggle"
+        onClick={() => {
+          const next = !expanded
+          if (next) onOpenAdvancedPrime?.()
+          setUserExpanded(next)
+        }}
+        className="h-auto w-full justify-start gap-2 rounded-none px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-muted/50"
+      >
+        {expanded ? (
+          <CaretDown size={12} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+        ) : (
+          <CaretRight size={12} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+        )}
+        Advanced Prime engine
+      </Button>
+      {expanded ? (
+        <div id={bodyId} className="space-y-3 border-t border-border px-3 py-3">
+          <div
+            className="text-xs leading-5 text-muted-foreground"
+            data-testid="settings-advanced-prime-install-status"
+          >
+            Prime Agent
+            {primeStatus.status === 'installed'
+              ? ` (${t('settings.aiAgents.installed')}${primeStatus.version ? ` ${primeStatus.version}` : ''})`
+              : ` (${t('settings.aiAgents.missing')})`}
+          </div>
+          <PrimeExtensionsSection active={loadExtensionCatalog} onClose={onClose} />
+        </div>
+      ) : null}
+    </div>
   )
 }
 

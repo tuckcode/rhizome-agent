@@ -87,7 +87,7 @@ The macOS app asks for:
 
 It does not ask for the microphone, the camera, or accessibility.
 
-Prime tools and packages you install can use the machine. A vault is not a sandbox for those tools. Settings → Packages says that those packages have full system access.
+Prime tools and packages you install can use the machine. A vault is not a sandbox for those tools. Settings → AI Agents → Advanced Prime engine says that those packages have full system access.
 
 ## Telemetry
 
