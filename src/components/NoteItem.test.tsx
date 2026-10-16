@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NoteItem } from './NoteItem'
@@ -386,6 +387,14 @@ describe('NoteItem', () => {
 
     expect(screen.getByTestId('note-date-row')).toHaveTextContent('Today')
     expect(screen.queryByText(/Created /)).not.toBeInTheDocument()
+  })
+
+  it('passes the app locale to the inbox date label', () => {
+    const source = readFileSync(`${process.cwd()}/src/components/NoteItem.tsx`, 'utf8')
+    expect(source).toContain('useAppLocale()')
+    expect(source).toContain(
+      'formatInboxDateLabel(getDisplayDate(entry), dateDisplayFormat, undefined, undefined, locale)',
+    )
   })
 
   it('colors relationship chips by target type and opens the related note on Cmd+click only', () => {

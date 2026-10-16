@@ -17,7 +17,7 @@ import { PropertyChips } from './note-item/PropertyChips'
 import { ChangeNoteContent } from './note-item/ChangeNoteContent'
 import { workspaceForEntry } from '../utils/workspaces'
 import { WorkspaceInitialsBadge } from './WorkspaceInitialsBadge'
-import { useDateDisplayFormat } from '../hooks/useAppPreferences'
+import { useAppLocale, useDateDisplayFormat } from '../hooks/useAppPreferences'
 
 const TYPE_ICON_MAP: Record<string, ComponentType<SVGAttributes<SVGSVGElement>>> = {
   Project: Wrench,
@@ -338,7 +338,8 @@ function NoteDateRow({
   allEntries: VaultEntry[]
 }) {
   const dateDisplayFormat = useDateDisplayFormat()
-  const inboxDate = formatInboxDateLabel(getDisplayDate(entry), dateDisplayFormat)
+  const locale = useAppLocale()
+  const inboxDate = formatInboxDateLabel(getDisplayDate(entry), dateDisplayFormat, undefined, undefined, locale)
   const linkCount = entry.outgoingLinks.length
 
   if (!inboxDate && linkCount <= 0) return null

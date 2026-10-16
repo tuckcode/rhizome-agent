@@ -329,7 +329,7 @@ export function AiWorkspaceWindowApp() {
   }, [handleFileCreated, handleOpenNote, preferences.appLocale, vaultPath])
 
   return (
-    <AppPreferencesProvider dateDisplayFormat={preferences.dateDisplayFormat} displayTimeZone={preferences.displayTimeZone}>
+    <AppPreferencesProvider dateDisplayFormat={preferences.dateDisplayFormat} displayTimeZone={preferences.displayTimeZone} locale={preferences.appLocale}>
       <div className="relative h-full w-full">
         {settingsLoaded ? (
           <AppAiWorkspaceSurface
