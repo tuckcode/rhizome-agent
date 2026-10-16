@@ -182,6 +182,10 @@ export function createStreamCallbacks(context: StreamMutationContext) {
   // own bubble instead of merging into the first turn's reply.
   let activeMessageId = messageId
   let sealedByTurnBoundary = false
+  // Index into responseAccRef: beforeText for a tool is the slice since the
+  // previous tool start. The accumulator itself is never cleared here — the
+  // panel renders message.response, not action.beforeText.
+  let responseMark = 0
 
   function sealActiveTurn(): void {
     const sealedText = finalResponseText(responseAccRef.current, agent)
@@ -241,6 +245,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
     }
 
     responseAccRef.current = ''
+    responseMark = 0
     toolInputMapRef.current = new Map()
     failureTracked = false
     if (retarget.id) {
@@ -276,7 +281,13 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       const previous = toolInputMapRef.current.get(toolId)
       toolInputMapRef.current.set(toolId, { tool: toolName, input: input ?? previous?.input })
 
-      updateMessage(setMessages, activeMessageId, (message) => updateToolAction(message, toolName, toolId, input))
+      const acc = responseAccRef.current
+      const beforeText = acc.slice(responseMark)
+      responseMark = acc.length
+
+      updateMessage(setMessages, activeMessageId, (message) => (
+        updateToolAction(message, toolName, toolId, input, beforeText || undefined)
+      ))
     },
 
     onToolDone: (toolId: ToolInvocationId, output?: ToolOutputText) => {

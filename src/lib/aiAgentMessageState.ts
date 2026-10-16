@@ -100,6 +100,7 @@ export function updateToolAction(
   toolName: string,
   toolId: string,
   input?: string,
+  beforeText?: string,
 ): AiAgentMessage {
   const path = notePathFromToolInput(toolName, input)
   const existing = message.actions.find((action) => action.toolId === toolId)
@@ -113,6 +114,9 @@ export function updateToolAction(
               input: input ?? action.input,
               path: path ?? action.path,
               label: action.label || formatToolLabel(toolName, input ?? action.input),
+              ...(action.beforeText || beforeText
+                ? { beforeText: action.beforeText || beforeText }
+                : {}),
             }
           : action
       )),
@@ -132,6 +136,7 @@ export function updateToolAction(
         path,
         status: 'pending' as const,
         input,
+        ...(beforeText ? { beforeText } : {}),
       },
     ],
   }

@@ -27,6 +27,7 @@ vi.mock('../utils/sessionAutoDistill', async (importOriginal) => {
 })
 
 import { createStreamCallbacks } from './aiAgentStreamCallbacks'
+import { conversationToNativeEvents } from './nativeChatTranscript'
 import { translate } from './i18n'
 
 function createMessageStore(initialMessages: AiAgentMessage[]) {
@@ -123,12 +124,146 @@ describe('aiAgentStreamCallbacks', () => {
           status: 'done',
           input: '{"path":"/vault/note.md"}',
           output: 'saved',
+          beforeText: 'Hello',
         }],
         isStreaming: false,
         reasoning: 'step 1',
         reasoningDone: true,
         response: 'Hello',
       },
+    ])
+  })
+
+  it.each([
+    ['claude_code', 'claude_code'],
+    ['native', 'prime'],
+  ] as const)('keeps a pre-tool-only displayed response on %s', (_engine, agent) => {
+      const messages = createMessageStore([
+        {
+          id: 'msg-1',
+          userMessage: 'Question',
+          actions: [],
+          isStreaming: true,
+        },
+      ])
+      const responseAccRef = { current: '' }
+      const callbacks = createStreamCallbacks({
+        agent,
+        messageId: 'msg-1',
+        vaultPath: '/vault',
+        setMessages: messages.setMessages,
+        setStatus: createStatusStore().setStatus,
+        abortRef: { current: { aborted: false } },
+        responseAccRef,
+        toolInputMapRef: { current: new Map() },
+        fileCallbacksRef: { current: undefined },
+      })
+
+      callbacks.onText('Hello')
+      callbacks.onToolStart('search', 't1', '{}')
+      callbacks.onToolDone('t1', 'hits')
+      callbacks.onDone()
+
+      expect(responseAccRef.current).toBe('Hello')
+      expect(messages.getMessages()[0].response).toBe('Hello')
+      expect(messages.getMessages()[0].actions[0].beforeText).toBe('Hello')
+      expect(conversationToNativeEvents(messages.getMessages())).toEqual([
+        { User: { text: 'Question' } },
+        { Assistant: { text: 'Hello' } },
+        { ToolCall: { id: 't1', name: 'search', args: '{}' } },
+        { ToolResult: { id: 't1', name: 'search', output: 'hits' } },
+        'TurnEnd',
+      ])
+    },
+  )
+
+  it.each([
+    ['claude_code', 'claude_code'],
+    ['native', 'prime'],
+  ] as const)('forks a live %s chat with assistant text still in front of its tool round', (_engine, agent) => {
+      const messages = createMessageStore([
+        {
+          id: 'msg-1',
+          userMessage: 'Do both',
+          actions: [],
+          isStreaming: true,
+        },
+      ])
+      const callbacks = createStreamCallbacks({
+        agent,
+        messageId: 'msg-1',
+        vaultPath: '/vault',
+        setMessages: messages.setMessages,
+        setStatus: createStatusStore().setStatus,
+        abortRef: { current: { aborted: false } },
+        responseAccRef: { current: '' },
+        toolInputMapRef: { current: new Map() },
+        fileCallbacksRef: { current: undefined },
+      })
+
+      callbacks.onText('I will search first')
+      callbacks.onToolStart('search', 't1', '{}')
+      callbacks.onToolDone('t1', 'hits')
+      callbacks.onText('Here is the answer')
+      callbacks.onDone()
+
+      expect(messages.getMessages()[0].response).toBe('I will search firstHere is the answer')
+      expect(messages.getMessages()[0].actions[0].beforeText).toBe('I will search first')
+      expect(conversationToNativeEvents(messages.getMessages())).toEqual([
+        { User: { text: 'Do both' } },
+        { Assistant: { text: 'I will search first' } },
+        { ToolCall: { id: 't1', name: 'search', args: '{}' } },
+        { ToolResult: { id: 't1', name: 'search', output: 'hits' } },
+        { Assistant: { text: 'Here is the answer' } },
+        'TurnEnd',
+      ])
+    },
+  )
+
+  it('records only the slice since the previous tool start as beforeText', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'Do both',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+
+    callbacks.onText('I will search first')
+    callbacks.onToolStart('search', 't1', '{}')
+    callbacks.onToolDone('t1', 'hits')
+    callbacks.onText('Now I will write')
+    callbacks.onToolStart('write', 't2', '{}')
+    callbacks.onToolDone('t2', 'ok')
+    callbacks.onText('Here is the answer')
+    callbacks.onDone()
+
+    const message = messages.getMessages()[0]
+    expect(message.response).toBe('I will search firstNow I will writeHere is the answer')
+    expect(message.actions[0].beforeText).toBe('I will search first')
+    expect(message.actions[1].beforeText).toBe('Now I will write')
+    expect(conversationToNativeEvents(messages.getMessages())).toEqual([
+      { User: { text: 'Do both' } },
+      { Assistant: { text: 'I will search first' } },
+      { ToolCall: { id: 't1', name: 'search', args: '{}' } },
+      { ToolResult: { id: 't1', name: 'search', output: 'hits' } },
+      { Assistant: { text: 'Now I will write' } },
+      { ToolCall: { id: 't2', name: 'write', args: '{}' } },
+      { ToolResult: { id: 't2', name: 'write', output: 'ok' } },
+      { Assistant: { text: 'Here is the answer' } },
+      'TurnEnd',
     ])
   })
 

@@ -43,6 +43,8 @@ export interface AiAction {
   status: AiActionStatus
   input?: string
   output?: string
+  /** Assistant text that was logged immediately before this tool round. */
+  beforeText?: string
 }
 
 export interface AiMessageProps {
