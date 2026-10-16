@@ -22,6 +22,7 @@
       --ink-85: rgb(241 236 226 / 0.85);
       --ink-60: rgb(241 236 226 / 0.6);
       --ink-45: rgb(241 236 226 / 0.45);
+      --ink-kicker: #a8a592;
       --line: rgb(241 236 226 / 0.1);
       --line-2: rgb(241 236 226 / 0.16);
       --fill: rgb(241 236 226 / 0.04);
@@ -35,7 +36,7 @@
     body { margin: 0; color: var(--ink); background: var(--bg); font: 18px/1.55 var(--sans); -webkit-font-smoothing: antialiased; }
     a { color: inherit; }
     .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
-    .eyebrow { font: 500 11.5px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-45); }
+    .eyebrow { font: 500 12px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-kicker); }
     .btn {
       display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px;
       font: 500 11.5px/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none;
@@ -51,16 +52,14 @@
     .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 500 14px/1 var(--mono); letter-spacing: 0.02em; }
     .logo img { width: 22px; height: 22px; border-radius: 5px; }
     .bar nav { display: flex; align-items: center; gap: 22px; }
-    .bar nav a.link { font: 500 11.5px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-60); text-decoration: none; }
+    .bar nav a.link { font: 500 14px/1 var(--sans); letter-spacing: 0; text-transform: none; color: var(--ink-60); text-decoration: none; }
     .bar nav a.link:hover { color: var(--ink); }
+    .bar nav .btn { text-transform: none; letter-spacing: 0.02em; font-family: var(--sans); }
 
-    /* Hero */
-    .hero { position: relative; border-bottom: 1px solid var(--line); }
-    .hero .art { display: block; width: 100%; height: auto; aspect-ratio: 2 / 1; max-height: 78vh; object-fit: cover; object-position: 70% 50%; }
-    .hero .fade { position: absolute; inset: auto 0 0 0; height: 45%; background: linear-gradient(to bottom, transparent, var(--bg)); pointer-events: none; }
-    .intro { display: grid; grid-template-columns: 1.3fr 1fr; gap: 40px; align-items: end; padding: 8px 0 56px; }
-    .intro h1 { margin: 14px 0 16px; font: 500 clamp(38px, 5.6vw, 72px)/1.02 var(--sans); letter-spacing: -0.035em; }
-    .intro p { margin: 0; color: var(--ink-60); font-size: 18px; max-width: 560px; }
+    /* Hero is HTML text. The glossy 3D molecule art is not used. */
+    .intro { display: grid; grid-template-columns: 1.3fr 1fr; gap: 40px; align-items: end; padding: 56px 0 56px; }
+    .intro h1 { margin: 14px 0 16px; font: 500 clamp(38px, 5.6vw, 72px)/1.02 var(--sans); letter-spacing: -0.035em; color: var(--ink); }
+    .intro p { margin: 0; color: var(--ink-85); font-size: 18px; max-width: 560px; }
     .intro .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 26px; }
     .term { margin-top: 18px; font: 14px/1 var(--mono); color: var(--ink-60); }
     .term b { color: var(--accent); font-weight: 400; }
@@ -132,35 +131,30 @@
       .cell .body { grid-template-columns: 1fr; }
       .run > div:first-child { border-right: 0; border-bottom: 1px solid var(--line); }
       .foot > div { border-right: 0; border-bottom: 1px solid var(--line); }
-      .bar nav a.link { display: none; }
-      .hero .art { aspect-ratio: 2 / 1; max-height: none; object-position: 50% 50%; }
+      .bar nav a.jump { display: none; }
     }
     @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
       .term .caret { animation: none; }
-      .hero .art[data-animated] { content: url("assets/hero.png"); }
+      .hero .fade, .intro .fade { display: none; }
     }
   </style>
 </head>
 <body>
   <header class="bar">
     <div class="wrap">
-      <a class="logo" href="./"><img src="assets/icon.png" alt="" />rhizome</a>
+      <a class="logo" href="./"><img src="assets/icon.png" alt="" />Rhizome</a>
       <nav>
-        <a class="link" href="#features">Features</a>
-        <a class="link" href="#demo">Demo</a>
-        <a class="link" href="#run">Run it</a>
-        <a class="btn" href="docs/">Docs</a>
-        <a class="btn solid" href="https://github.com/tuckcode/rhizome-agent">GitHub <span class="arrow">↗</span></a>
+        <a class="link jump" href="#features">Features</a>
+        <a class="link jump" href="#demo">Demo</a>
+        <a class="link jump" href="#run">Run it</a>
+        <a class="btn solid" href="docs/">Docs</a>
+        <a class="link" href="https://github.com/tuckcode/rhizome-agent">GitHub</a>
       </nav>
     </div>
   </header>
 
-  <section class="hero">
-    <img class="art" src="assets/hero.png" width="1774" height="887"
-         alt="Rhizome mark. Branching nodes over dark earth." />
-    <div class="fade"></div>
-  </section>
-
+  <!-- Hero is HTML text. The glossy 3D molecule (hero.png, rejected 11 Oct 2026) is not used. -->
   <div class="wrap">
     <div class="intro">
       <div>
