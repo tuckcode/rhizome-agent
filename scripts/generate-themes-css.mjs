@@ -94,7 +94,7 @@ const THEMES = [
       '--text-primary': '#EDE6D8',
       '--text-secondary': '#C6BBA6',
       '--text-tertiary': '#B2A791',
-      '--text-muted': '#A3987F',
+      '--text-muted': '#A79D85',
       '--text-faint': '#A29881',
       '--text-heading': '#F7F1E5',
       '--text-inverse': '#15110C',
@@ -228,22 +228,53 @@ const hslToHex = (h, s, l) => {
   )
 }
 
-// Dark community skins keep the palette hue and only raise HSL lightness
-// until faint/muted clear 4.5:1 on --surface-app and the banner tints.
+// Dark community skins keep each role's hue and only change HSL lightness.
+// Faint sits at the 4.5:1 floor. Muted, secondary, and primary step up from
+// it so body > secondary > muted > faint on the app surface, banner tints,
+// and the selected-row fills.
 const TEXT_MIN = 4.5
+const INK_GAP = 0.02
+const relativeY = (hex) => lum(hex2rgb(hex))
+const passesInk = (value, backgrounds) => backgrounds.every((bg) => contrast(value, bg) >= TEXT_MIN)
+const stableHueSat = (hex) => {
+  const [h, s] = hexToHsl(hex)
+  return s < 0.03 ? [0, 0] : [h, s]
+}
+const setY = (hex, targetY) => {
+  const [h, s] = stableHueSat(hex)
+  let lo = 0
+  let hi = 1
+  let best = hex
+  for (let i = 0; i < 28; i += 1) {
+    const mid = (lo + hi) / 2
+    const candidate = hslToHex(h, s, mid)
+    if (relativeY(candidate) < targetY) {
+      lo = mid
+    } else {
+      best = candidate
+      hi = mid
+    }
+  }
+  let [, , l] = hexToHsl(best)
+  while (relativeY(best) < targetY && l < 1) {
+    l = Math.min(1, l + 1 / 255)
+    best = hslToHex(h, s, l)
+  }
+  return best
+}
 const liftLightness = (hex, backgrounds) => {
-  const passes = (value) => backgrounds.every((bg) => contrast(value, bg) >= TEXT_MIN)
-  if (passes(hex)) {
+  if (passesInk(hex, backgrounds)) {
     return hex
   }
-  const [h, s, l0] = hexToHsl(hex)
+  const [h, s] = stableHueSat(hex)
+  const [, , l0] = hexToHsl(hex)
   let lo = l0
   let hi = 1
   let best = '#FFFFFF'
   for (let i = 0; i < 24; i += 1) {
     const mid = (lo + hi) / 2
     const candidate = hslToHex(h, s, mid)
-    if (passes(candidate)) {
+    if (passesInk(candidate, backgrounds)) {
       best = candidate
       hi = mid
     } else {
@@ -252,11 +283,19 @@ const liftLightness = (hex, backgrounds) => {
   }
   let [, , l] = hexToHsl(best)
   let out = best
-  while (!passes(out) && l < 1) {
+  while (!passesInk(out, backgrounds) && l < 1) {
     l = Math.min(1, l + 1 / 255)
     out = hslToHex(h, s, l)
   }
   return out
+}
+const liftToY = (hex, targetY, backgrounds) => liftLightness(setY(hex, Math.max(relativeY(hex), targetY)), backgrounds)
+const fitInkLadder = (t, backgrounds) => {
+  let faint = liftLightness(mix(t.muted, t.bg, 0.3), backgrounds)
+  let muted = liftToY(t.muted, relativeY(faint) + INK_GAP, backgrounds)
+  let secondary = liftToY(mix(t.fg, t.muted, 0.4), relativeY(muted) + INK_GAP, backgrounds)
+  let primary = liftToY(t.fg, relativeY(secondary) + INK_GAP, backgrounds)
+  return { primary, secondary, muted, faint }
 }
 
 function themeBlock(t) {
@@ -297,7 +336,8 @@ function themeBlock(t) {
   const selected = mix(t.bg, t.accent, 0.14)
   const selectedStrong = mix(t.bg, t.accent, 0.2)
   const accentHover = mix(t.accent, t.dark ? white : black, 0.15)
-  const secondaryText = mix(t.fg, t.muted, 0.4)
+  let primary = t.fg
+  let secondaryText = mix(t.fg, t.muted, 0.4)
   let muted = t.muted
   let faint = mix(t.muted, t.bg, 0.3)
   if (t.dark) {
@@ -305,13 +345,18 @@ function themeBlock(t) {
     const panel = hex2rgb(card)
     const inkBackgrounds = [
       app,
+      hex2rgb(selected),
+      hex2rgb(selectedStrong),
       composite(t.accent, 0.12, panel),
       composite(t.green, 0.15, panel),
       composite(t.yellow, 0.16, panel),
       composite(t.red, 0.15, panel),
     ]
-    muted = liftLightness(muted, inkBackgrounds)
-    faint = liftLightness(faint, inkBackgrounds)
+    const ladder = fitInkLadder(t, inkBackgrounds)
+    primary = ladder.primary
+    secondaryText = ladder.secondary
+    muted = ladder.muted
+    faint = ladder.faint
   }
   const borderStrong = mix(t.border, t.fg, 0.15)
   const warningText = t.dark ? t.yellow : mix(t.yellow, black, 0.25)
@@ -330,9 +375,9 @@ function themeBlock(t) {
     `  --surface-editor: ${t.bg};`,
     `  --surface-overlay: ${t.dark ? 'rgba(8, 8, 7, 0.58)' : 'rgba(0, 0, 0, 0.3)'};`,
     '',
-    `  --text-primary: ${t.fg};`,
+    `  --text-primary: ${primary};`,
     `  --text-secondary: ${secondaryText};`,
-    `  --text-tertiary: ${mix(t.fg, t.muted, 0.7)};`,
+    `  --text-tertiary: ${mix(primary, muted, 0.7)};`,
     `  --text-muted: ${muted};`,
     `  --text-faint: ${faint};`,
     `  --text-heading: ${t.heading};`,

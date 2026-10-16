@@ -121,14 +121,16 @@ function resolveToken(tokens: Record<string, string>, name: string, seen = new S
   return value
 }
 
-function hslHue(hex: string): number {
+function hslHueSat(hex: string): { hue: number; sat: number } {
   const [r, g, b] = hexToRgb(hex).map((channel) => channel / 255)
   const max = Math.max(r, g, b)
   const min = Math.min(r, g, b)
+  const lightness = (max + min) / 2
   if (max === min) {
-    return 0
+    return { hue: 0, sat: 0 }
   }
   const delta = max - min
+  const sat = lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min)
   let hue = 0
   if (max === r) {
     hue = (g - b) / delta + (g < b ? 6 : 0)
@@ -137,7 +139,7 @@ function hslHue(hex: string): number {
   } else {
     hue = (r - g) / delta + 4
   }
-  return (hue / 6) * 360
+  return { hue: (hue / 6) * 360, sat }
 }
 
 const COMMUNITY_MUTED_SOURCE = {
@@ -212,7 +214,7 @@ const EARTH_DARK = {
   '--text-primary': '#E9E8DC',
   '--text-secondary': '#BDBAA8',
   '--text-tertiary': '#A8A592',
-  '--text-muted': '#9B9986',
+  '--text-muted': '#9F9E8B',
   '--text-faint': '#9B9989',
   '--accent-purple': '#B4A0E8',
   '--accent-teal': '#64D1C8',
@@ -323,7 +325,7 @@ const LOAM = {
   '--text-primary': '#EDE6D8',
   '--text-secondary': '#C6BBA6',
   '--text-tertiary': '#B2A791',
-  '--text-muted': '#A3987F',
+  '--text-muted': '#A79D85',
   '--text-faint': '#A29881',
   '--text-heading': '#F7F1E5',
   '--text-inverse': '#15110C',
@@ -488,10 +490,20 @@ describe('Earth theme tokens', () => {
           `${name} ${role} on ${background}`,
         ).toBeGreaterThanOrEqual(4.5)
       }
-      for (const role of ['--text-faint', '--text-muted'] as const) {
+      const selected = tokens['--state-selected']
+      const selectedStrong = tokens['--state-selected-strong']
+      for (const role of ['--text-primary', '--text-secondary', '--text-faint', '--text-muted'] as const) {
         expect(
           contrastRatio(tokens[role], background),
           `${name} ${role} on ${background}`,
+        ).toBeGreaterThanOrEqual(4.5)
+        expect(
+          contrastRatio(tokens[role], selected),
+          `${name} ${role} on selected-row`,
+        ).toBeGreaterThanOrEqual(4.5)
+        expect(
+          contrastRatio(tokens[role], selectedStrong),
+          `${name} ${role} on selected-strong`,
         ).toBeGreaterThanOrEqual(4.5)
         for (const [label, aliases] of BANNER_TINT_ROLES) {
           const tintName = pickToken(tokens, aliases)
@@ -505,19 +517,68 @@ describe('Earth theme tokens', () => {
     }
     expect(dump.Graphite['--text-muted']).toBe('#A6A5A3')
     expect(dump.Graphite['--text-faint']).toBe('#9F9E9C')
-    expect(dump['Earth dark']['--text-muted']).toBe('#9B9986')
+    expect(dump['Earth dark']['--text-muted']).toBe('#9F9E8B')
     expect(dump['Earth dark']['--text-faint']).toBe('#9B9989')
-    expect(dump.Loam['--text-muted']).toBe('#A3987F')
+    expect(dump.Loam['--text-muted']).toBe('#A79D85')
     expect(dump.Loam['--text-faint']).toBe('#A29881')
     expect(dump.Mycelium['--text-muted']).toBe('#9AA48E')
     expect(dump.Mycelium['--text-faint']).toBe('#959F89')
+    expect(generator).toContain('fitInkLadder')
     expect(generator).toContain('liftLightness')
     for (const [name, source] of Object.entries(COMMUNITY_MUTED_SOURCE)) {
-      const hue = hslHue(dump[name]['--text-muted'])
-      const sourceHue = hslHue(source)
-      const delta = Math.min(Math.abs(hue - sourceHue), 360 - Math.abs(hue - sourceHue))
+      const next = hslHueSat(dump[name]['--text-muted'])
+      const sourceHs = hslHueSat(source)
+      if (sourceHs.sat < 0.05) {
+        expect(next.sat, `${name} muted stays gray`).toBeLessThan(0.05)
+        continue
+      }
+      const delta = Math.min(Math.abs(next.hue - sourceHs.hue), 360 - Math.abs(next.hue - sourceHs.hue))
       expect(delta, `${name} muted hue`).toBeLessThan(5)
     }
+  })
+
+  it('steps body text down through secondary, muted, and faint on every dark skin', () => {
+    const dump = JSON.parse(
+      execFileSync('python3', ['scripts/contrast_check.py', '--dump-resolved'], { encoding: 'utf8' }),
+    ) as Record<string, Record<string, string>>
+    const ladder = ['--text-primary', '--text-secondary', '--text-muted', '--text-faint'] as const
+    const minGap = 0.015
+    for (const name of DARK_SKIN_NAMES) {
+      const tokens = dump[name]
+      const background = tokens['--surface-app']
+      const panelRgb = parseCssColor(tokens['--surface-panel'], parseCssColor(background))
+      const selected = tokens['--state-selected']
+      const ys = ladder.map((role) => relativeLuminance(tokens[role]))
+      for (let index = 0; index < ys.length - 1; index += 1) {
+        expect(
+          ys[index] - ys[index + 1],
+          `${name} ${ladder[index]} above ${ladder[index + 1]}`,
+        ).toBeGreaterThanOrEqual(minGap)
+      }
+      for (const role of ladder) {
+        expect(
+          contrastRatio(tokens[role], background),
+          `${name} ${role} on app`,
+        ).toBeGreaterThanOrEqual(4.5)
+        expect(
+          contrastRatio(tokens[role], selected),
+          `${name} ${role} on .list-row-selected`,
+        ).toBeGreaterThanOrEqual(4.5)
+        for (const [label, aliases] of BANNER_TINT_ROLES) {
+          const tintName = pickToken(tokens, aliases)
+          expect(
+            contrastCss(tokens[role], resolveToken(tokens, tintName!), panelRgb),
+            `${name} ${role} on ${label}`,
+          ).toBeGreaterThanOrEqual(4.5)
+        }
+      }
+    }
+    expect(
+      contrastRatio(dump['Monokai pro']['--text-primary'], dump['Monokai pro']['--state-selected']),
+    ).toBeGreaterThanOrEqual(4.5)
+    expect(
+      contrastRatio(dump['Monokai pro']['--text-muted'], dump['Monokai pro']['--state-selected']),
+    ).toBeGreaterThanOrEqual(4.5)
   })
 
   it('keeps Graphite mint in the Graphite block and Earth accents on Earth', () => {
@@ -688,6 +749,7 @@ describe('Earth theme tokens', () => {
     expect(output).toMatch(/--text-faint on info\//)
     expect(output).toMatch(/--text-muted on error\//)
     expect(output).toMatch(/-- Dracula[\s\S]*--text-faint /)
+    expect(output).toMatch(/ladder Y /)
     expect(output).toContain('== FAILING PAIRS')
     expect(output).toContain('(none)')
     const failLines = output.split('\n').filter((line) => line.startsWith('FAIL '))

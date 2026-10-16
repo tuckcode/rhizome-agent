@@ -53,7 +53,7 @@ describe('chat theme contrast tokens (B2–B4)', () => {
   })
 
   it('keeps Earth dark muted and faint text on the forest-safe ladder', () => {
-    expect(token(dark, '--text-muted')).toBe('#9B9986')
+    expect(token(dark, '--text-muted')).toBe('#9F9E8B')
     expect(token(dark, '--text-faint')).toBe('#9B9989')
     expect(token(dark, '--text-tertiary')).toBe('#A8A592')
   })
