@@ -509,10 +509,16 @@ describe('Earth theme tokens', () => {
         for (const [label, aliases] of BANNER_TINT_ROLES) {
           const tintName = pickToken(tokens, aliases)
           expect(tintName, `${name} ${label} tint`).toBeTruthy()
-          expect(
-            contrastCss(tokens[role], resolveToken(tokens, tintName!), panelRgb),
-            `${name} ${role} on ${label}/${tintName}`,
-          ).toBeGreaterThanOrEqual(4.5)
+          for (const [baseLabel, baseRgb] of [
+            ['panel', panelRgb],
+            ['app', parseCssColor(background)],
+            ['sidebar', parseCssColor(tokens['--surface-sidebar'], parseCssColor(background))],
+          ] as const) {
+            expect(
+              contrastCss(tokens[role], resolveToken(tokens, tintName!), baseRgb),
+              `${name} ${role} on ${label}/${tintName}/${baseLabel}`,
+            ).toBeGreaterThanOrEqual(4.5)
+          }
         }
       }
     }
@@ -533,7 +539,12 @@ describe('Earth theme tokens', () => {
       const sourceHs = hslHueSat(source)
       for (const role of ['--text-muted', '--text-faint'] as const) {
         const next = hslHueSat(dump[name][role])
-        expect(Math.abs(next.sat - sourceHs.sat), `${name} ${role} sat`).toBeLessThan(0.04)
+        if (name === 'Everforest') {
+          expect(next.sat, `${name} ${role} sat`).toBeGreaterThan(sourceHs.sat + 0.04)
+          expect(next.sat, `${name} ${role} sat cap`).toBeLessThan(sourceHs.sat + 0.16)
+        } else {
+          expect(Math.abs(next.sat - sourceHs.sat), `${name} ${role} sat`).toBeLessThan(0.04)
+        }
         if (sourceHs.sat < 0.02) {
           expect(next.sat, `${name} ${role} stays near-gray`).toBeLessThan(0.02)
           continue
@@ -542,7 +553,12 @@ describe('Earth theme tokens', () => {
         expect(hueDelta, `${name} ${role} hue`).toBeLessThan(5)
       }
     }
-    expect(dump['Solarized dark']['--text-primary']).toBe('#A5B2B3')
+    expect(dump.Dracula['--text-faint']).not.toBe('#B8C0D6')
+    expect(dump.Everforest['--text-muted']).not.toBe('#BFC5C1')
+    expect(dump.Everforest['--text-faint']).not.toBe('#BBC3BE')
+    expect(relativeLuminance(dump['Solarized dark']['--text-primary'])).toBeGreaterThanOrEqual(
+      relativeLuminance('#A5B2B3'),
+    )
   })
 
   it('steps body text down through secondary, tertiary, muted, and faint on every dark skin', () => {
@@ -591,14 +607,22 @@ describe('Earth theme tokens', () => {
         }
         for (const [label, aliases] of BANNER_TINT_ROLES) {
           const tintName = pickToken(tokens, aliases)
-          expect(
-            contrastCss(tokens[role], resolveToken(tokens, tintName!), panelRgb),
-            `${name} ${role} on ${label}`,
-          ).toBeGreaterThanOrEqual(4.5)
+          for (const [baseLabel, baseRgb] of [
+            ['panel', panelRgb],
+            ['app', parseCssColor(background)],
+            ['sidebar', parseCssColor(tokens['--surface-sidebar'], parseCssColor(background))],
+          ] as const) {
+            expect(
+              contrastCss(tokens[role], resolveToken(tokens, tintName!), baseRgb),
+              `${name} ${role} on ${label}/${baseLabel}`,
+            ).toBeGreaterThanOrEqual(4.5)
+          }
         }
       }
     }
-    expect(dump['Solarized dark']['--text-primary']).toBe('#A5B2B3')
+    expect(relativeLuminance(dump['Solarized dark']['--text-primary'])).toBeGreaterThanOrEqual(
+      relativeLuminance('#A5B2B3'),
+    )
     expect(
       contrastRatio(dump['Monokai pro']['--text-primary'], dump['Monokai pro']['--state-selected']),
     ).toBeGreaterThanOrEqual(4.5)
@@ -778,7 +802,10 @@ describe('Earth theme tokens', () => {
     expect(output).toMatch(/--focus-ring on --bg: [0-9.]+/)
     expect(output).toMatch(/--text-faint on info\//)
     expect(output).toMatch(/--text-muted on error\//)
+    expect(output).toMatch(/--text-faint on warning\/[^/\n]+\/--surface-app:/)
+    expect(output).toMatch(/--text-faint on warning\/[^/\n]+\/--surface-sidebar:/)
     expect(output).toMatch(/-- Dracula[\s\S]*--text-faint /)
+    expect(checker).toContain('panel_name, bg_name, sidebar_name')
     expect(output).toMatch(/ladder Y /)
     expect(output).toContain('== FAILING PAIRS')
     expect(output).toContain('(none)')
