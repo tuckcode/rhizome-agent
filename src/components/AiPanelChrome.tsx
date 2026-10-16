@@ -1061,18 +1061,16 @@ export function AiPanelComposer({
   const hasPayload = hasInput || attachments.length > 0
   const canSend = !composerDisabled && hasPayload
   const placeholder = getComposerPlaceholder(agentLabel, agentReadiness, t)
-  const [multiline, setMultiline] = useState(false)
+  const boxRef = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
+    const box = boxRef.current
     const editor = inputRef.current
-    if (!editor) {
-      setMultiline(false)
-      return
-    }
+    if (!box) return
     const measure = () => {
-      setMultiline(composerIsMultiline(editor))
+      box.dataset.multiline = editor && composerIsMultiline(editor) ? 'true' : 'false'
     }
     measure()
-    if (typeof ResizeObserver === 'undefined') return
+    if (typeof ResizeObserver === 'undefined' || !editor) return
     const observer = new ResizeObserver(measure)
     observer.observe(editor)
     return () => observer.disconnect()
@@ -1205,9 +1203,10 @@ export function AiPanelComposer({
         </ul>
       ) : null}
       <div
+        ref={boxRef}
         className="flex items-center gap-1 rounded-xl border border-border bg-background p-1 shadow-xs"
         data-testid="chat-composer-box"
-        data-multiline={multiline ? 'true' : 'false'}
+        data-multiline="false"
       >
         <ComposerPlusMenu
           locale={locale}
