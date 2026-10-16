@@ -104,6 +104,17 @@ describe('useGraphKeyboardNav', () => {
     expect(options.onFocus).not.toHaveBeenCalled()
   })
 
+  it('respects Escape when something else already handled the event', () => {
+    const options = makeOptions()
+    renderHook(() => useGraphKeyboardNav(options))
+
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    event.preventDefault()
+    window.dispatchEvent(event)
+
+    expect(options.onEscape).not.toHaveBeenCalled()
+  })
+
   it('does not steal Escape from an input or an open dialog', () => {
     const options = makeOptions()
     renderHook(() => useGraphKeyboardNav(options))
