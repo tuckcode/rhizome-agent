@@ -8,6 +8,7 @@ import { TooltipProvider } from '../src/components/ui/tooltip'
 import '../src/index.css'
 import '../src/themes.css'
 import '../src/App.css'
+import './notes-panel-modes-shots.css'
 
 type ShotState = 'rail' | 'hover' | 'open' | 'narrow'
 type ShotTheme = 'graphite' | 'earth'

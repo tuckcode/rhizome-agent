@@ -47,7 +47,7 @@ describe('NotesRail', () => {
     expect(rail).toHaveAttribute('data-overlay', 'true')
     expect(rail).toHaveClass('bg-background')
     expect(rail).toHaveClass('shadow-md')
-    expect(rail).toHaveStyle({ marginLeft: '-194px', width: '240px' })
+    expect(rail).toHaveStyle({ marginLeft: '-194px', width: '240px', zIndex: '40' })
     expect(screen.getByTestId('notes-panel-rail-expanded')).toBeInTheDocument()
     expect(screen.queryByTestId('notes-rail-all')).not.toBeInTheDocument()
   })

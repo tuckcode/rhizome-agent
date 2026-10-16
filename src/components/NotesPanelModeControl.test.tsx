@@ -19,13 +19,21 @@ describe('NotesPanelModeControl', () => {
 
     fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false })
     const menu = await screen.findByTestId('notes-panel-mode-menu')
+    expect(menu).toHaveStyle({ zIndex: '60' })
+    expect(within(menu).getByRole('group')).toBeInTheDocument()
     expect(within(menu).getByTestId('notes-panel-mode-auto')).toHaveTextContent('Auto')
     expect(within(menu).getByTestId('notes-panel-mode-rail')).toHaveTextContent('Rail')
     expect(within(menu).getByTestId('notes-panel-mode-open')).toHaveTextContent('Open')
     expect(within(menu).getByTestId('notes-panel-mode-auto')).toHaveAttribute('data-checked', 'true')
+    expect(within(menu).getByRole('menuitemradio', { name: 'Auto' })).toHaveAttribute('aria-checked', 'true')
     expect(within(menu).getByTestId('notes-panel-mode-rail')).toHaveAttribute('data-checked', 'false')
 
     fireEvent.click(within(menu).getByTestId('notes-panel-mode-rail'))
     expect(onModeChange).toHaveBeenCalledWith('rail')
+  })
+
+  it('keeps the picked mode in the tooltip when the window folded Open to Auto', () => {
+    render(<NotesPanelModeControl mode="open" onModeChange={vi.fn()} windowTooNarrow />)
+    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Open (window too narrow)')
   })
 })

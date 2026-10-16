@@ -1,10 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Screenshot harnesses and extra HTML entry points outside this file's
-   default scan. Point at the checkout src tree so app utilities load. */
+/* Screenshot harnesses point Tailwind at this src tree so app utilities load.
+   The notes-panel harness keeps its own @source in scripts/. */
 @source ".";
-@source "../scripts";
 
 /* Follow the application theme (`html.dark`), including portaled descendants.
    The default Tailwind variant follows the operating-system preference. */

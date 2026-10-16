@@ -1389,10 +1389,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     windowMode: Boolean(noteWindowParams),
   })
   const { mode: storedNotesMode, setMode: setNotesMode } = useNotesPanelMode()
+  const [notesSessionOpen, setNotesSessionOpen] = useState(false)
   const handleSetViewModeWithNotes = useCallback((mode: typeof viewMode) => {
-    if (mode !== 'editor-only') setNotesMode('open')
+    setNotesSessionOpen(mode !== 'editor-only')
     handleSetViewMode(mode)
-  }, [handleSetViewMode, setNotesMode])
+  }, [handleSetViewMode])
   const handleChatViewMode = useCallback((mode: typeof viewMode) => {
     if (mode === 'editor-only') handleRailSelectChat()
     handleSetViewModeWithNotes(mode)
@@ -1715,13 +1716,16 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   }, [])
   const [leftOverlaying, setLeftOverlaying] = useState(false)
   const [notesMenuOpen, setNotesMenuOpen] = useState(false)
-  const effectiveNotesMode = fittedNotesPanelMode(storedNotesMode, notesOpen && !hideNotesForCanvas)
+  const fittedNotesMode = fittedNotesPanelMode(storedNotesMode, notesOpen && !hideNotesForCanvas)
+  const layoutNotesMode = notesSessionOpen && notesOpen && !hideNotesForCanvas ? 'open' : fittedNotesMode
+  const notesWindowTooNarrow = compactVaultPanel && storedNotesMode === 'open'
   const notesHover = useHoverExpandPanel({
-    enabled: chatCentered && effectiveNotesMode === 'auto' && !hideNotesForCanvas,
+    enabled: chatCentered && layoutNotesMode === 'auto' && !hideNotesForCanvas,
     peerOverlaying: leftOverlaying,
     menuOpen: notesMenuOpen,
   })
   const handleNotesModeChange = useCallback((mode: NotesPanelMode) => {
+    setNotesSessionOpen(false)
     setNotesMode(mode)
     if (mode === 'open') {
       ensureNotesOpen()
@@ -2079,8 +2083,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   */
   const showSidebarTree = classicSidebarVisible
   const showNoteListPanel = classicNoteListVisible
-  const showVaultPanel = chatCentered && notesOpen && effectiveNotesMode === 'open'
-  const showNotesRail = chatCentered && !hideNotesForCanvas && effectiveNotesMode !== 'open'
+  const showVaultPanel = chatCentered && notesOpen && layoutNotesMode === 'open'
+  const showNotesRail = chatCentered && !hideNotesForCanvas && layoutNotesMode !== 'open'
   const showVaultPanelRestore = showRestoreStrip
 
   const handleVaultTreeSelect = (nextSelection: SidebarSelection) => {
@@ -2149,10 +2153,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         onCollapse={handleCollapseNotes}
         focused={notesFocus}
         onFocusToggle={handleNotesFocusToggle}
-        mode={effectiveNotesMode}
+        mode={storedNotesMode}
         onModeChange={handleNotesModeChange}
         onModeMenuOpenChange={setNotesMenuOpen}
         modeButtonRef={notesHover.modeButtonRef}
+        windowTooNarrow={notesWindowTooNarrow}
       />
       {chatCentered ? (
         <ConnectionsPanel
@@ -2507,7 +2512,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           </div>
           {showNotesRail && (
             <NotesRail
-              mode={effectiveNotesMode}
+              mode={layoutNotesMode}
+              controlMode={storedNotesMode}
+              windowTooNarrow={notesWindowTooNarrow}
               onModeChange={handleNotesModeChange}
               expanded={notesHover.expanded}
               overlaying={notesHover.overlaying}
@@ -2537,10 +2544,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                 onCollapse={handleCollapseNotes}
                 focused={notesFocus}
                 onFocusToggle={handleNotesFocusToggle}
-                mode={effectiveNotesMode}
+                mode={storedNotesMode}
                 onModeChange={handleNotesModeChange}
                 onModeMenuOpenChange={setNotesMenuOpen}
                 modeButtonRef={notesHover.modeButtonRef}
+                windowTooNarrow={notesWindowTooNarrow}
               />
             </NotesRail>
           )}

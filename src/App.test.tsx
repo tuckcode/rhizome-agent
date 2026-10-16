@@ -531,6 +531,7 @@ import { isTauri, mockInvoke } from './mock-tauri'
 import { resetPrimeHostStatus } from './hooks/usePrimeHostStatus'
 import { streamAiAgent } from './utils/streamAiAgent'
 import { panePresetStorageKey } from './lib/panePresetStorage'
+import { notesPanelModeStorageKey } from './lib/notesPanelMode'
 
 const AI_AGENTS_ONBOARDING_DISMISSED_STORAGE_NAME = 'rhizome:ai-agents-onboarding-dismissed'
 const CLAUDE_CODE_ONBOARDING_DISMISSED_STORAGE_NAME = 'tolaria:claude-code-onboarding-dismissed'
@@ -866,7 +867,19 @@ describe('App', () => {
     expect(screen.getByTestId('command-rail-history')).toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     expect(screen.getByTestId('notes-panel-rail')).toBeVisible()
-    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Auto')
+    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Open')
+  })
+
+  it('keeps a saved Auto or Rail mode when a view switch opens the panel', async () => {
+    localStorage.setItem(notesPanelModeStorageKey('main'), 'rail')
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(localStorage.getItem(notesPanelModeStorageKey('main'))).toBe('rail')
+
+    pressViewShortcut('2')
+    expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
+    expect(localStorage.getItem(notesPanelModeStorageKey('main'))).toBe('rail')
+    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Rail')
   })
 
   it('keeps Chat as the canvas while Notes is open, and Inbox only opens the list', async () => {
@@ -880,7 +893,7 @@ describe('App', () => {
       expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     })
     expect(screen.getByTestId('chat-center')).not.toHaveStyle({ display: 'none' })
-    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Auto')
+    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Open')
 
     await openNotesPanelFromRail()
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()

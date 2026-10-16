@@ -74,21 +74,26 @@ export function notesPanelModeLabel(mode: NotesPanelMode): string {
   return 'Open'
 }
 
-export function notesPanelModeTooltip(mode: NotesPanelMode): string {
-  return `Panel: ${notesPanelModeLabel(mode)}`
+export function notesPanelModeTooltip(
+  mode: NotesPanelMode,
+  options: { windowTooNarrow?: boolean } = {},
+): string {
+  const base = `Panel: ${notesPanelModeLabel(mode)}`
+  return options.windowTooNarrow ? `${base} (window too narrow)` : base
 }
 
 export function notesPanelModeShortcutDisplay(): string {
-  return isMac() ? '⌘.' : 'Ctrl+.'
+  // macOS Command-Period is Cancel. Shift keeps this off that chord.
+  return isMac() ? '⌘⇧.' : 'Ctrl+Shift+.'
 }
 
 export function notesPanelModeShortcutAria(): string {
-  return isMac() ? 'Meta+Period' : 'Control+Period'
+  return isMac() ? 'Meta+Shift+Period' : 'Control+Shift+Period'
 }
 
 export function isNotesPanelModeShortcut(event: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>): boolean {
   if (event.key !== '.' && event.key !== 'Period') return false
-  if (event.altKey || event.shiftKey) return false
+  if (event.altKey || !event.shiftKey) return false
   return isMac() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
 }
 

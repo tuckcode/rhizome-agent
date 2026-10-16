@@ -1,3 +1,4 @@
+import { StrictMode } from 'react'
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
@@ -50,12 +51,23 @@ describe('useNotesPanelMode', () => {
         key: '.',
         metaKey: mac,
         ctrlKey: !mac,
+        shiftKey: true,
         bubbles: true,
       }))
     })
 
     expect(result.current.mode).toBe('auto')
     expect(localStorage.getItem(notesPanelModeStorageKey('main'))).toBe('auto')
+  })
+
+  it('fires analytics once per cycle under StrictMode', () => {
+    const { result } = renderHook(() => useNotesPanelMode('main'), { wrapper: StrictMode })
+    act(() => {
+      result.current.cycleMode()
+    })
+    expect(result.current.mode).toBe('auto')
+    expect(trackNotesPanelModeChanged).toHaveBeenCalledTimes(1)
+    expect(trackNotesPanelModeChanged).toHaveBeenCalledWith('auto')
   })
 
   it('does not use the shared command-rail expanded key', () => {

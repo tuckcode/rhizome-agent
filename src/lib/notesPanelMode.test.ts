@@ -42,10 +42,12 @@ describe('notes panel mode values', () => {
     expect(notesPanelModeTooltip('auto')).toBe('Panel: Auto')
     expect(notesPanelModeTooltip('rail')).toBe('Panel: Rail')
     expect(notesPanelModeTooltip('open')).toBe('Panel: Open')
-    expect(notesPanelModeShortcutAria()).toMatch(/Period/)
+    expect(notesPanelModeTooltip('open', { windowTooNarrow: true })).toBe('Panel: Open (window too narrow)')
+    expect(notesPanelModeTooltip('auto', { windowTooNarrow: true })).toBe('Panel: Auto (window too narrow)')
+    expect(notesPanelModeShortcutAria()).toMatch(/Shift\+Period/)
   })
 
-  it('matches the panel-mode shortcut without extra modifiers', () => {
+  it('uses Shift so Cmd+. / Ctrl+. stay with the OS cancel chord', () => {
     const mac = notesPanelModeShortcutAria().startsWith('Meta')
     expect(isNotesPanelModeShortcut({
       key: '.',
@@ -53,20 +55,27 @@ describe('notes panel mode values', () => {
       ctrlKey: !mac,
       altKey: false,
       shiftKey: false,
+    })).toBe(false)
+    expect(isNotesPanelModeShortcut({
+      key: '.',
+      metaKey: mac,
+      ctrlKey: !mac,
+      altKey: false,
+      shiftKey: true,
     })).toBe(true)
     expect(isNotesPanelModeShortcut({
       key: '.',
       metaKey: mac,
       ctrlKey: !mac,
       altKey: true,
-      shiftKey: false,
+      shiftKey: true,
     })).toBe(false)
     expect(isNotesPanelModeShortcut({
       key: '2',
       metaKey: mac,
       ctrlKey: !mac,
       altKey: false,
-      shiftKey: false,
+      shiftKey: true,
     })).toBe(false)
   })
 })

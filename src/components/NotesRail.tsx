@@ -6,6 +6,7 @@ import type { NotesPanelMode } from '../lib/notesPanelMode'
 import { notesRailRecentItems, notesRailSectionItems, type NotesRailItem } from '../lib/notesRailItems'
 import type { NoteStatus, SidebarSelection, VaultEntry } from '../types'
 import {
+  NOTES_PANEL_OVERLAY_Z,
   NOTES_RAIL_GAP_PX,
   NOTES_RAIL_HIT_PX,
   NOTES_RAIL_ICON_PX,
@@ -36,6 +37,8 @@ interface NotesRailProps {
   getNoteStatus?: (path: string) => NoteStatus
   onSelectNote?: (entry: VaultEntry) => void
   children?: ReactNode
+  controlMode?: NotesPanelMode
+  windowTooNarrow?: boolean
 }
 
 export function NotesRail({
@@ -58,7 +61,10 @@ export function NotesRail({
   getNoteStatus,
   onSelectNote,
   children,
+  controlMode,
+  windowTooNarrow = false,
 }: NotesRailProps) {
+  const triggerMode = controlMode ?? mode
   const railItems = items ?? [
     ...(selection && onSelectSection
       ? notesRailSectionItems({ showInbox, selection, onSelect: onSelectSection })
@@ -86,7 +92,7 @@ export function NotesRail({
       style={{
         width: visualWidth,
         marginLeft: overlaying ? -(visualWidth - RAIL_COLLAPSED_WIDTH_PX) : undefined,
-        zIndex: overlaying ? 50 : undefined,
+        zIndex: overlaying ? NOTES_PANEL_OVERLAY_Z : undefined,
         borderLeft: '1px solid var(--border-subtle)',
         transition: `width ${RAIL_WIDTH_TRANSITION_MS}ms ease-out`,
         flexBasis: layoutWidth,
@@ -101,10 +107,11 @@ export function NotesRail({
       >
         {expanded ? null : (
           <NotesPanelModeControl
-            mode={mode}
+            mode={triggerMode}
             onModeChange={onModeChange}
             onMenuOpenChange={onMenuOpenChange}
             triggerRef={modeButtonRef}
+            windowTooNarrow={windowTooNarrow}
           />
         )}
         {!expanded

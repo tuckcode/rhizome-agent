@@ -26,13 +26,9 @@ export function useNotesPanelMode(windowId = resolveNotesPanelWindowId()) {
   }, [windowId])
 
   const cycleMode = useCallback(() => {
-    setModeState((current) => {
-      const next = cycleNotesPanelMode(current)
-      writeNotesPanelMode(windowId, next)
-      trackNotesPanelModeChanged(next)
-      return next
-    })
-  }, [windowId])
+    const next = cycleNotesPanelMode(mode)
+    setMode(next)
+  }, [mode, setMode])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

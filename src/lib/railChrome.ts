@@ -18,3 +18,6 @@ export const NOTES_RAIL_HIT_PX = 32
 export const NOTES_RAIL_GAP_PX = 4
 export const NOTES_MODE_BUTTON_PX = 24
 export const NOTES_MODE_BUTTON_RADIUS_PX = 8
+/** Overlay sits under the mode menu. Both used to be z-50. */
+export const NOTES_PANEL_OVERLAY_Z = 40
+export const NOTES_PANEL_MENU_Z = 60
