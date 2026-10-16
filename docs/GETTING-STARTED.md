@@ -420,7 +420,9 @@ rhizome-agent/
 | `src/components/PrimeExtensionsSection.tsx` | Settings → Packages hub. Catalog is npm `pi-package`; install is the Prime CLI, not a daemon command. |
 | `src/lib/primePackages.ts` | Catalog search URL, install spec (`npm:` prefix), and Ask-Chat fallback prompt. |
 | `src/hooks/useViewMode.ts` | Runtime pane preset (`chat` / `notes` / `read` / `workbench`). Legacy `editor-only` / `editor-list` / `all` remain compatibility mirrors. Fresh default is Chat. |
-| `src/components/ConnectionsPanel.tsx` | Graph/Mycelium cell. Chat-centered shell mounts this only on Changes. |
+| `src/components/ConnectionsPanel.tsx` | Overlay for note-list **Show in Graph** and for a Chat session footprint. Renders nothing until presented. The rail Graph view is `GraphView`, not this panel. |
+| `src/lib/railViews.ts` | Research, Graph, Mycelium, and History: labels, command ids, and order. Changes is not in this list. |
+| `src/lib/railViewShortcuts.ts` | View chords: Ctrl+Cmd+1–4 on Mac, Ctrl+Shift+1–4 on Windows and Linux. Ctrl+Alt+digit is refused. |
 | `src/utils/openAiWorkspaceWindow.ts` | Native Tauri AI workspace window creation, focus, and dock-back traffic-light handling. |
 | `src/hooks/useCliAiAgent.ts` | Thin React owner for the selected CLI agent session state. |
 | `src/lib/aiAgentSession.ts` | Single message/session lifecycle for prompt normalization, history, streaming, and reset behavior. |
@@ -512,9 +514,16 @@ Verified against source 2026-09-14. Longer landmine list:
   32px hit target). Inbox toggles; it does not mount Graph. Beside an open
   note folds Sessions/Notes — do not restore hover-collapse on that pane
   (`App.layout-edges.test.ts`). ADR-0173.
-- **Graph/Mycelium only on Changes.** `ConnectionsPanel` is gated on
-  `isChangesSelection` (`App.layout-edges.test.ts`). Inbox rail is a
-  Notes filter. Do not remount Graph under Inbox.
+- **Rail Views are Research, Graph, Mycelium, and History.** Order and
+  labels live in `src/lib/railViews.ts`. Shortcuts are Ctrl+Cmd+1–4 on Mac
+  and Ctrl+Shift+1–4 elsewhere (`src/lib/railViewShortcuts.ts`). Do not
+  bind Ctrl+Alt+digit (AltGr). Changes sits next to All Notes and lists
+  git files; it is not a rail view and it does not mount Graph. Research,
+  Graph, and Mycelium replace the Chat canvas. History sets `filter: pulse`
+  and shows `PulseView` in the Notes list; it does not open Notes by
+  itself. `ConnectionsPanel` is the **Show in Graph** overlay, not the
+  rail Graph. ADR-0171's "mount only on Changes" does not match `App.tsx`.
+  Inbox stays a Notes filter. Do not remount Graph under Inbox.
 - **Thinking levels come from the host.** Call `get_prime_thinking_levels`
   for the scale and `get_prime_supported_thinking_levels` for the attached
   model's subset of it. Do not hardcode Off → Max in the frontend, and do not
