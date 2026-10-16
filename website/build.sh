@@ -2,6 +2,7 @@
 # Assemble the GitHub Pages site into $1 (default: _site).
 # Root = landing page from website/. /docs = Starlight from site/.
 # Assets are copied from where they already live, so the repo holds one copy.
+# scripts/check-pages-artifact.mjs then checks the composed tree.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 out="${1:-_site}"
@@ -26,4 +27,4 @@ rm -rf "$out/docs"
 mkdir -p "$out/docs"
 cp -a "$root/site/dist/." "$out/docs/"
 
-node "$root/website/check-pages-artifact.mjs" "$out"
+node "$root/scripts/check-pages-artifact.mjs" "$out"
