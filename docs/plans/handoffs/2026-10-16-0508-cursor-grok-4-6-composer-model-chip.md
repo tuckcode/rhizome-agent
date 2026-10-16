@@ -77,3 +77,16 @@ ancestors and requires no overflow-hidden parent, plus a body
 portal. Inside a dialog the menu is also outside
 `[data-slot=dialog-content]`. Clicking a row still selects that
 model.
+
+The 959f136 unstyled-menu shots were cause (b), not (a). Theme
+already lives on `<html>`. The portal stays on `document.body`.
+The screenshot harness now `@source`s `/workspace/src`.
+
+`data-multiline` stays and drives `data-[multiline=true]:items-end`
+on the composer box. Wrap starts after 32px of `scrollHeight` so a
+zoomed single line is not a wrap.
+
+The chip menu follows Critiquito's spec: popover panel, rows as
+model ids under sentence-case groups, filter at the top, "Applies
+to new chats" as a footer, check on the selected row, empty
+"No models match" / "Add a key in Settings to use this provider".

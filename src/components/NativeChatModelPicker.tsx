@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CaretDown } from '@phosphor-icons/react'
+import { CaretDown, Check, MagnifyingGlass } from '@phosphor-icons/react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,12 +26,30 @@ import {
   REMOVED_PROVIDER_ERROR,
   REMOVED_PROVIDER_LABEL,
   resolveRhizomeChatModel,
+  rhizomeProviderNeedsApiKey,
   seedRhizomeChatModels,
   type RhizomeChatModel,
 } from '../lib/rhizomeChatModels'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
 import { trackRhizomeModelChanged } from '../lib/productAnalytics'
-import { Input } from './ui/input'
+
+const FILTER_PLACEHOLDER = 'Filter models'
+const EMPTY_MATCH = 'No models match'
+const EMPTY_ADD_KEY = 'Add a key in Settings to use this provider'
+
+const MENU_PANEL_CLASS = cn(
+  'bg-popover text-popover-foreground border border-border rounded-lg shadow-md p-1',
+  'w-[18rem] max-h-[min(24rem,var(--radix-popover-content-available-height))] overflow-y-auto',
+)
+
+const ROW_CLASS = cn(
+  'h-8 px-2 rounded-md text-[13px]',
+  'focus:bg-accent/60 data-[highlighted]:bg-accent/60',
+)
+
+function rowLabel(model: RhizomeChatModel): string {
+  return model.label === REMOVED_PROVIDER_LABEL ? model.label : model.modelId
+}
 
 /** One picker: Rhizome catalog from Settings through the composer. Not an engine control. */
 export function NativeChatModelPicker({
@@ -49,6 +67,7 @@ export function NativeChatModelPicker({
 }) {
   const t = createTranslator(locale)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const filterRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [models, setModels] = useState<RhizomeChatModel[]>(() => seedRhizomeChatModels(providers))
@@ -76,6 +95,10 @@ export function NativeChatModelPicker({
       cancelled = true
     }
   }, [open, providers])
+
+  useEffect(() => {
+    if (open) filterRef.current?.focus()
+  }, [open])
 
   const updateMenuSide = () => {
     if (!chip) {
@@ -108,7 +131,10 @@ export function NativeChatModelPicker({
       <DropdownMenu
         open={open}
         onOpenChange={(next) => {
-          if (next) updateMenuSide()
+          if (next) {
+            updateMenuSide()
+            setQuery('')
+          }
           setOpen(next)
         }}
       >
@@ -121,9 +147,10 @@ export function NativeChatModelPicker({
               CHAT_FOCUS_RING_CLASS,
               chip
                 ? cn(
-                    'h-6 shrink-0 self-center rounded-md border border-border px-2',
+                    'h-6 shrink-0 self-center rounded-md border border-border bg-transparent px-2',
                     'font-mono text-[11px] text-muted-foreground',
-                    'hover:border-border-strong hover:bg-accent hover:text-foreground',
+                    'hover:bg-accent/50 hover:text-foreground',
+                    'data-[state=open]:bg-accent',
                     NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS,
                   )
                 : 'h-8 min-w-[12rem] max-w-[20rem] rounded-md border border-border bg-background px-2 text-left text-sm',
@@ -135,32 +162,32 @@ export function NativeChatModelPicker({
             <span className="min-w-0 truncate" data-testid="native-chat-model-trigger-label">
               {triggerLabel}
             </span>
-            <CaretDown size={9} weight="bold" aria-hidden="true" className="shrink-0 text-muted-foreground" />
+            <CaretDown
+              size={chip ? 12 : 9}
+              weight="bold"
+              aria-hidden="true"
+              className="shrink-0 text-muted-foreground"
+            />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
-          side={menuSide}
+          side={chip ? menuSide : 'bottom'}
           align="start"
+          sideOffset={4}
           collisionPadding={COMPOSER_MENU_COLLISION_PADDING_PX}
           avoidCollisions
           onCloseAutoFocus={(event) => {
             event.preventDefault()
             triggerRef.current?.focus()
           }}
-          className="max-h-[320px] w-72 overflow-y-auto"
+          className={MENU_PANEL_CLASS}
           data-testid="native-chat-model-menu"
           data-settings-panel-portal={chip ? undefined : 'true'}
         >
-          {chip ? (
-            <p
-              className="px-2 pb-1 pt-0.5 text-[12px] text-muted-foreground"
-              data-testid="native-chat-model-new-chats"
-            >
-              {t('ai.composer.modelAppliesToNewChats')}
-            </p>
-          ) : null}
-          <div className="px-1.5 pb-1 pt-0.5">
-            <Input
+          <div className="flex items-center border-b border-border px-2">
+            <MagnifyingGlass size={14} aria-hidden="true" className="shrink-0 text-muted-foreground" />
+            <input
+              ref={filterRef}
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value)
@@ -168,42 +195,86 @@ export function NativeChatModelPicker({
               onKeyDown={(event) => {
                 event.stopPropagation()
               }}
-              placeholder={t('ai.composer.modelsFilter')}
-              className="h-8 font-mono text-[11px]"
-              aria-label={t('ai.composer.modelsFilter')}
+              placeholder={FILTER_PLACEHOLDER}
+              autoFocus
+              className="h-8 min-w-0 flex-1 border-0 bg-transparent px-2 text-[13px] shadow-none outline-none placeholder:text-muted-foreground"
+              aria-label={FILTER_PLACEHOLDER}
               data-testid="native-chat-model-filter"
             />
           </div>
           {groups.length === 0 ? (
-            <div className="px-2 py-1.5 text-xs text-muted-foreground" data-testid="native-chat-models-empty">
-              {t('ai.composer.modelsEmpty')}
+            <div className="px-2 py-1.5 text-[13px] text-muted-foreground" data-testid="native-chat-models-empty">
+              {query.trim() ? EMPTY_MATCH : t('ai.composer.modelsEmpty')}
             </div>
           ) : (
-            groups.map((group) => (
-              <div key={group.provider}>
-                <DropdownMenuLabel
-                  className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground"
-                  data-testid="native-chat-model-provider"
-                >
-                  {group.provider}
-                </DropdownMenuLabel>
-                {group.models.map((model) => (
-                  <DropdownMenuItem
-                    key={model.id}
-                    className="text-[12px]"
-                    title={model.label}
-                    data-testid={`native-chat-model-${model.id}`}
-                    onSelect={() => {
-                      onChange(model.id)
-                      trackRhizomeModelChanged(model.providerKind)
-                    }}
-                  >
-                    <span className="truncate">{model.label}</span>
-                  </DropdownMenuItem>
-                ))}
-              </div>
-            ))
+            <div className="flex flex-col gap-1">
+              {groups.map((group, index) => {
+                const needsKey = group.models.every((model) => (
+                  rhizomeProviderNeedsApiKey(model.providerKind, providers)
+                ))
+                return (
+                  <div key={group.provider}>
+                    {index > 0 ? (
+                      <div
+                        className="h-px bg-border"
+                        data-testid="native-chat-model-group-sep"
+                      />
+                    ) : null}
+                    <DropdownMenuLabel
+                      className="px-2 pb-1 pt-2 text-[11px] font-medium text-muted-foreground normal-case tracking-normal"
+                      data-testid="native-chat-model-provider"
+                    >
+                      {group.provider}
+                    </DropdownMenuLabel>
+                    {needsKey ? (
+                      <div
+                        className="px-2 py-1.5 text-[13px] text-muted-foreground"
+                        data-testid="native-chat-models-add-key"
+                      >
+                        {EMPTY_ADD_KEY}
+                      </div>
+                    ) : (
+                      group.models.map((model) => {
+                        const label = rowLabel(model)
+                        const isSelected = model.id === selectedId
+                        return (
+                          <DropdownMenuItem
+                            key={model.id}
+                            className={ROW_CLASS}
+                            title={label}
+                            data-testid={`native-chat-model-${model.id}`}
+                            data-selected={isSelected ? 'true' : undefined}
+                            onSelect={() => {
+                              onChange(model.id)
+                              trackRhizomeModelChanged(model.providerKind)
+                            }}
+                          >
+                            <span className="min-w-0 flex-1 truncate">{label}</span>
+                            {isSelected ? (
+                              <Check
+                                size={16}
+                                aria-hidden="true"
+                                className="ml-auto size-4 shrink-0 text-foreground"
+                                data-testid="native-chat-model-selected-check"
+                              />
+                            ) : null}
+                          </DropdownMenuItem>
+                        )
+                      })
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           )}
+          {chip ? (
+            <p
+              className="border-t border-border px-2 py-1.5 text-[12px] text-muted-foreground"
+              data-testid="native-chat-model-new-chats"
+            >
+              {t('ai.composer.modelAppliesToNewChats')}
+            </p>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
       {removed ? (

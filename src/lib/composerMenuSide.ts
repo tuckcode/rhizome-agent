@@ -2,7 +2,7 @@
 export type ComposerMenuSide = 'top' | 'bottom'
 
 export const COMPOSER_MENU_COLLISION_PADDING_PX = 8
-export const NATIVE_CHAT_MODEL_MENU_HEIGHT_PX = 320
+export const NATIVE_CHAT_MODEL_MENU_HEIGHT_PX = 384
 export const NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS = 'max-w-[8.5rem]'
 
 /**

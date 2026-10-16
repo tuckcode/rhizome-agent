@@ -41,7 +41,7 @@ describe('AiPanelComposer collapsed box', () => {
     expect(box).toHaveAttribute('data-multiline', 'false')
     expect(box).toContainElement(send)
     expect(box.className.split(/\s+/)).toEqual(
-      expect.arrayContaining(['items-center', 'p-1']),
+      expect.arrayContaining(['items-center', 'p-1', 'data-[multiline=true]:items-end']),
     )
     expect(box.className).not.toMatch(/px-1\.5/)
     expect(box.className).not.toMatch(/py-0\.5/)
@@ -67,6 +67,7 @@ describe('AiPanelComposer collapsed box', () => {
       const editor = screen.getByTestId('agent-input')
 
       expect(box).toHaveAttribute('data-multiline', 'true')
+      expect(box).toHaveClass('data-[multiline=true]:items-end')
       expect(box).toContainElement(screen.getByTestId('agent-send'))
       expect(editor).toHaveTextContent('first line')
       expect(editor).toHaveTextContent('third line')
@@ -120,7 +121,24 @@ describe('AiPanelComposer collapsed box', () => {
 
     try {
       renderComposer('a long line that wraps across the composer instead of breaking')
-      expect(screen.getByTestId('chat-composer-box')).toHaveAttribute('data-multiline', 'true')
+      const box = screen.getByTestId('chat-composer-box')
+      expect(box).toHaveAttribute('data-multiline', 'true')
+      expect(box).toHaveClass('data-[multiline=true]:items-end')
+    } finally {
+      getScrollHeight.mockRestore()
+    }
+  })
+
+  it('does not flag a 32px single line as multiline', () => {
+    const getScrollHeight = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+    getScrollHeight.mockImplementation(function (this: HTMLElement) {
+      if (this.getAttribute('data-testid') === 'agent-input') return 32
+      return 0
+    })
+
+    try {
+      renderComposer('one zoomed line')
+      expect(screen.getByTestId('chat-composer-box')).toHaveAttribute('data-multiline', 'false')
     } finally {
       getScrollHeight.mockRestore()
     }

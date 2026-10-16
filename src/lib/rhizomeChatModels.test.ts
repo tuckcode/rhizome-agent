@@ -9,6 +9,7 @@ import {
   REMOVED_PROVIDER_ERROR,
   REMOVED_PROVIDER_LABEL,
   resolveRhizomeChatModel,
+  rhizomeProviderNeedsApiKey,
   seedRhizomeChatModels,
 } from './rhizomeChatModels'
 
@@ -192,5 +193,12 @@ describe('resolveRhizomeChatModel', () => {
         (model) => model.label === REMOVED_PROVIDER_LABEL,
       ),
     ).toBe(false)
+  })
+
+  it('asks for a Settings key only on remote catalog kinds with no configured provider', () => {
+    expect(rhizomeProviderNeedsApiKey('open_ai', configured)).toBe(false)
+    expect(rhizomeProviderNeedsApiKey('gemini', configured)).toBe(true)
+    expect(rhizomeProviderNeedsApiKey('ollama', [])).toBe(false)
+    expect(rhizomeProviderNeedsApiKey('open_ai', [])).toBe(true)
   })
 })

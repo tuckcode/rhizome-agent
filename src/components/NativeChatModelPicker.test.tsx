@@ -79,8 +79,9 @@ describe('NativeChatModelPicker', () => {
     await waitFor(() => {
       expect(screen.getByTestId('native-chat-model-menu')).toHaveTextContent('Work OpenAI')
     })
-    expect(screen.getByTestId('native-chat-model-work-openai/gpt-4o')).toHaveTextContent('GPT-4o')
-    expect(screen.getByTestId('native-chat-model-free_tier_auto')).toHaveTextContent('Free tier')
+    expect(screen.getByTestId('native-chat-model-work-openai/gpt-4o')).toHaveTextContent('gpt-4o')
+    expect(screen.getByTestId('native-chat-model-work-openai/gpt-4o')).not.toHaveTextContent('Work OpenAI ·')
+    expect(screen.getByTestId('native-chat-model-free_tier_auto')).toHaveTextContent('free_tier_auto')
   })
 
   it('merges a live discover when the menu opens', async () => {
@@ -138,6 +139,10 @@ describe('NativeChatModelPicker', () => {
     expect(chip).toHaveClass('rounded-md')
     expect(chip).toHaveClass('h-6')
     expect(chip).toHaveClass('self-center')
+    expect(chip).toHaveClass('bg-transparent')
+    expect(chip).toHaveClass('hover:bg-accent/50')
+    expect(chip).toHaveClass('data-[state=open]:bg-accent')
+    expect(chip).toHaveClass('gap-1')
     expect(chip.className).toMatch(/outline-2/)
     expect(chip.className).not.toMatch(/text-primary|accent-green|bg-primary/)
   })
@@ -156,6 +161,9 @@ describe('NativeChatModelPicker', () => {
     await waitFor(() => {
       const note = screen.getByTestId('native-chat-model-new-chats')
       expect(note).toHaveTextContent('Applies to new chats')
+      expect(note).toHaveClass('border-t')
+      expect(note).toHaveClass('px-2')
+      expect(note).toHaveClass('py-1.5')
       expect(note).toHaveClass('text-[12px]')
       expect(note).toHaveClass('text-muted-foreground')
       expect(note.className).not.toMatch(/text-\[11px\]/)
@@ -202,12 +210,65 @@ describe('NativeChatModelPicker', () => {
     await waitFor(() => {
       expect(screen.getByTestId('native-chat-model-work-openai/anthropic-claude-opus-4-very-long-id')).toHaveAttribute(
         'title',
-        LONG_NAME,
+        'anthropic-claude-opus-4-very-long-id',
       )
     })
-    expect(
-      screen.getByTestId('native-chat-model-work-openai/anthropic-claude-opus-4-very-long-id'),
-    ).toHaveTextContent(LONG_NAME)
+    const row = screen.getByTestId('native-chat-model-work-openai/anthropic-claude-opus-4-very-long-id')
+    expect(row).toHaveTextContent('anthropic-claude-opus-4-very-long-id')
+    expect(row.querySelector('.truncate')).not.toBeNull()
+  })
+
+  it('styles the chip menu panel and lists model ids under sentence-case groups', async () => {
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value="work-openai/gpt-4o"
+        onChange={vi.fn()}
+        providers={configured}
+      />,
+    )
+    mockTriggerBox(420, 444)
+    openMenu()
+    const menu = await screen.findByTestId('native-chat-model-menu')
+    expect(menu).toHaveClass('bg-popover')
+    expect(menu).toHaveClass('text-popover-foreground')
+    expect(menu).toHaveClass('border-border')
+    expect(menu).toHaveClass('rounded-lg')
+    expect(menu).toHaveClass('shadow-md')
+    expect(menu).toHaveClass('p-1')
+    expect(menu).toHaveClass('w-[18rem]')
+    expect(menu).toHaveAttribute('data-side', 'top')
+    expect(screen.getByTestId('native-chat-model-filter')).toHaveAttribute('placeholder', 'Filter models')
+    expect(screen.getByTestId('native-chat-model-filter')).toHaveClass('h-8')
+    expect(screen.getByTestId('native-chat-model-filter')).toHaveClass('text-[13px]')
+    const group = screen.getAllByTestId('native-chat-model-provider')[0]
+    expect(group.className).toMatch(/text-\[11px\]/)
+    expect(group.className).not.toMatch(/uppercase/)
+    const row = screen.getByTestId('native-chat-model-work-openai/gpt-4o')
+    expect(row).toHaveClass('h-8')
+    expect(row).toHaveClass('rounded-md')
+    expect(row).toHaveClass('text-[13px]')
+    expect(row).toHaveClass('focus:bg-accent/60')
+    expect(screen.getByTestId('native-chat-model-selected-check')).toHaveClass('text-foreground')
+    expect(screen.getByTestId('native-chat-model-selected-check')).not.toHaveClass('text-primary')
+    expect(screen.getAllByTestId('native-chat-model-group-sep').length).toBeGreaterThan(0)
+  })
+
+  it('shows no-match and add-key empty states', async () => {
+    render(
+      <NativeChatModelPicker variant="chip" value={null} onChange={vi.fn()} providers={[]} />,
+    )
+    openMenu()
+    await waitFor(() => {
+      expect(screen.getAllByTestId('native-chat-models-add-key')[0]).toHaveTextContent(
+        'Add a key in Settings to use this provider',
+      )
+    })
+
+    fireEvent.change(screen.getByTestId('native-chat-model-filter'), {
+      target: { value: 'zzzz-no-such-model' },
+    })
+    expect(screen.getByTestId('native-chat-models-empty')).toHaveTextContent('No models match')
   })
 
   it('opens the chip menu upward when there is room above', async () => {
@@ -289,12 +350,42 @@ describe('NativeChatModelPicker', () => {
   /**
    * jsdom has no layout, so visibility cannot prove a menu escaped a clip.
    * Walk parents (not the menu itself — it uses overflow-y-auto) and require
-   * no overflow-hidden ancestor. The menu must sit on document.body.
+   * no clipping ancestor: overflow-hidden/clip as a class, inline style, or
+   * computed style. The menu must sit on document.body.
    */
+  const CLIP_OVERFLOW = new Set(['hidden', 'clip'])
+
+  function overflowTokenClips(value: string | null | undefined): boolean {
+    if (!value) return false
+    return value.split(/\s+/).some((token) => CLIP_OVERFLOW.has(token))
+  }
+
+  function elementClipsOverflow(el: HTMLElement): boolean {
+    if (
+      el.classList.contains('overflow-hidden')
+      || el.classList.contains('overflow-clip')
+    ) {
+      return true
+    }
+    if (
+      overflowTokenClips(el.style.overflow)
+      || overflowTokenClips(el.style.overflowX)
+      || overflowTokenClips(el.style.overflowY)
+    ) {
+      return true
+    }
+    const computed = getComputedStyle(el)
+    return (
+      overflowTokenClips(computed.overflow)
+      || overflowTokenClips(computed.overflowX)
+      || overflowTokenClips(computed.overflowY)
+    )
+  }
+
   function overflowHiddenAncestor(node: HTMLElement): HTMLElement | null {
     let current = node.parentElement
     while (current && current !== document.body && current !== document.documentElement) {
-      if (current.classList.contains('overflow-hidden')) return current
+      if (elementClipsOverflow(current)) return current
       current = current.parentElement
     }
     return null
@@ -305,10 +396,49 @@ describe('NativeChatModelPicker', () => {
     expect(overflowHiddenAncestor(menu)).toBeNull()
   }
 
-  it('opens the composer chip menu in a portal and selects a model', async () => {
+  it('treats overflow-clip, inline overflow, and computed overflow as clip ancestors', () => {
+    const style = document.createElement('style')
+    style.textContent = '.computed-clip { overflow: hidden }'
+    document.head.appendChild(style)
+
+    const cases: Array<{ name: string; apply: (el: HTMLElement) => void }> = [
+      { name: 'overflow-clip class', apply: (el) => { el.className = 'overflow-clip' } },
+      { name: 'inline overflow hidden', apply: (el) => { el.style.overflow = 'hidden' } },
+      { name: 'inline overflow clip', apply: (el) => { el.style.overflow = 'clip' } },
+      { name: 'computed overflow hidden', apply: (el) => { el.className = 'computed-clip' } },
+    ]
+
+    try {
+      for (const next of cases) {
+        const trap = document.createElement('div')
+        next.apply(trap)
+        const leaf = document.createElement('div')
+        trap.appendChild(leaf)
+        document.body.appendChild(trap)
+        expect(overflowHiddenAncestor(leaf), next.name).toBe(trap)
+        trap.remove()
+      }
+
+      const visible = document.createElement('div')
+      const leaf = document.createElement('div')
+      visible.appendChild(leaf)
+      document.body.appendChild(visible)
+      expect(overflowHiddenAncestor(leaf)).toBeNull()
+      visible.remove()
+    } finally {
+      style.remove()
+    }
+  })
+
+  it.each([
+    { name: 'overflow-hidden class', className: 'h-8 overflow-hidden', style: undefined },
+    { name: 'overflow-clip class', className: 'h-8 overflow-clip', style: undefined },
+    { name: 'inline overflow hidden', className: 'h-8', style: { overflow: 'hidden' } },
+    { name: 'inline overflow clip', className: 'h-8', style: { overflow: 'clip' } },
+  ])('opens the composer chip menu in a portal past $name and selects a model', async ({ className, style }) => {
     const onChange = vi.fn()
     render(
-      <div className="h-8 overflow-hidden" data-testid="composer-clip-trap">
+      <div className={className} style={style} data-testid="composer-clip-trap">
         <NativeChatModelPicker
           variant="chip"
           value="open_ai/gpt-4o"

@@ -235,6 +235,16 @@ function catalogEntry(kind: string): CatalogEntry | undefined {
   return CATALOG.find((entry) => entry.kind === kind)
 }
 
+/** Remote catalog kinds with no configured provider still need a Settings key. */
+export function rhizomeProviderNeedsApiKey(
+  providerKind: string,
+  providers?: AiModelProvider[] | null,
+): boolean {
+  const entry = catalogEntry(providerKind)
+  if (!entry || entry.local || entry.api_key_storage === 'none') return false
+  return !normalizeAiModelProviders(providers).some((provider) => provider.kind === providerKind)
+}
+
 export function providerForDiscover(
   kind: string,
   configured?: AiModelProvider,

@@ -1204,7 +1204,7 @@ export function AiPanelComposer({
       ) : null}
       <div
         ref={boxRef}
-        className="flex items-center gap-1 rounded-xl border border-border bg-background p-1 shadow-xs"
+        className="flex items-center gap-1 rounded-xl border border-border bg-background p-1 shadow-xs data-[multiline=true]:items-end"
         data-testid="chat-composer-box"
         data-multiline="false"
       >
