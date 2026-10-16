@@ -153,7 +153,7 @@ export function NativeChatModelPicker({
         >
           {chip ? (
             <p
-              className="px-2 pb-1 pt-0.5 text-[11px] text-muted-foreground"
+              className="px-2 pb-1 pt-0.5 text-[12px] text-muted-foreground"
               data-testid="native-chat-model-new-chats"
             >
               {t('ai.composer.modelAppliesToNewChats')}

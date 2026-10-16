@@ -54,18 +54,29 @@ describe('AiPanelComposer collapsed box', () => {
   })
 
   it('still grows with multi-line text instead of staying a single row', () => {
-    renderComposer('first line\nsecond line\nthird line')
+    const getScrollHeight = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+    getScrollHeight.mockImplementation(function (this: HTMLElement) {
+      if (this.getAttribute('data-testid') === 'agent-input') return 72
+      return 0
+    })
 
-    const box = screen.getByTestId('chat-composer-box')
-    const editor = screen.getByTestId('agent-input')
+    try {
+      renderComposer('first line\nsecond line\nthird line')
 
-    expect(box).toHaveAttribute('data-multiline', 'true')
-    expect(box).toContainElement(screen.getByTestId('agent-send'))
-    expect(editor).toHaveTextContent('first line')
-    expect(editor).toHaveTextContent('third line')
-    expect(editor.className).toMatch(/max-h-\[120px\]/)
-    expect(editor.className).toMatch(/min-h-\[30px\]/)
+      const box = screen.getByTestId('chat-composer-box')
+      const editor = screen.getByTestId('agent-input')
+
+      expect(box).toHaveAttribute('data-multiline', 'true')
+      expect(box).toContainElement(screen.getByTestId('agent-send'))
+      expect(editor).toHaveTextContent('first line')
+      expect(editor).toHaveTextContent('third line')
+      expect(editor.className).toMatch(/max-h-\[120px\]/)
+      expect(editor.className).toMatch(/min-h-\[30px\]/)
+    } finally {
+      getScrollHeight.mockRestore()
+    }
   })
+
 
   it('does not keep the compact hug behind Prime banners', () => {
     render(
@@ -88,4 +99,31 @@ describe('AiPanelComposer collapsed box', () => {
     expect(box).toHaveClass('p-1')
     expect(screen.getByTestId('agent-input').className).toMatch(/min-h-\[30px\]/)
   })
+
+  it('pads the empty placeholder on the 4px composer grid', () => {
+    renderComposer('')
+
+    const placeholder = screen.getByText('Ask Claude')
+    expect(placeholder.className.split(/\s+/)).toEqual(
+      expect.arrayContaining(['p-1', 'text-[13px]', 'leading-5']),
+    )
+    expect(placeholder.className).not.toMatch(/px-\[10px\]/)
+    expect(placeholder.className).not.toMatch(/py-\[8px\]/)
+  })
+
+  it('marks the box multiline when a long line wraps without a newline', () => {
+    const getScrollHeight = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+    getScrollHeight.mockImplementation(function (this: HTMLElement) {
+      if (this.getAttribute('data-testid') === 'agent-input') return 56
+      return 0
+    })
+
+    try {
+      renderComposer('a long line that wraps across the composer instead of breaking')
+      expect(screen.getByTestId('chat-composer-box')).toHaveAttribute('data-multiline', 'true')
+    } finally {
+      getScrollHeight.mockRestore()
+    }
+  })
 })
+

@@ -153,7 +153,11 @@ describe('NativeChatModelPicker', () => {
 
     openMenu()
     await waitFor(() => {
-      expect(screen.getByTestId('native-chat-model-new-chats')).toHaveTextContent('Applies to new chats')
+      const note = screen.getByTestId('native-chat-model-new-chats')
+      expect(note).toHaveTextContent('Applies to new chats')
+      expect(note).toHaveClass('text-[12px]')
+      expect(note).toHaveClass('text-muted-foreground')
+      expect(note.className).not.toMatch(/text-\[11px\]/)
     })
   })
 

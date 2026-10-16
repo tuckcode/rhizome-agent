@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ImageSquare, PaperPlaneRight, Plugs, Plus, Sparkle, Stop, X } from '@phosphor-icons/react'
 import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
@@ -32,6 +32,7 @@ import type { CommandMenuAction, CommandMenuEntry } from '../lib/primeCommandMen
 import { primeQueueIsEmpty, primeQueueItems, type PrimeQueue } from '../lib/primeQueue'
 import { PrimeQueueItemActions } from './PrimeQueueItemActions'
 import { cn } from '@/lib/utils'
+import { composerIsMultiline } from '../lib/composerMultiline'
 import { requestMcpSetupToggle } from '../hooks/useMcpSetupDialogController'
 import { expandReplyQuotes } from '../lib/replyQuote'
 import { suggestReply } from '../lib/replySuggestions'
@@ -238,7 +239,7 @@ function ComposerInput({
       disabled={disabled}
       placeholder={shownPlaceholder}
       placeholderClassName={cn(
-        'flex items-center px-1 text-[13px] leading-5',
+        'flex items-center p-1 text-[13px] leading-5',
         completion && 'italic',
       )}
       placeholderTestId={completion ? 'composer-reply-completion' : undefined}
@@ -1060,6 +1061,22 @@ export function AiPanelComposer({
   const hasPayload = hasInput || attachments.length > 0
   const canSend = !composerDisabled && hasPayload
   const placeholder = getComposerPlaceholder(agentLabel, agentReadiness, t)
+  const [multiline, setMultiline] = useState(false)
+  useLayoutEffect(() => {
+    const editor = inputRef.current
+    if (!editor) {
+      setMultiline(false)
+      return
+    }
+    const measure = () => {
+      setMultiline(composerIsMultiline(editor))
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(editor)
+    return () => observer.disconnect()
+  }, [input, inputRef])
   const hasControls = controls !== undefined && controls !== null
   // While a turn runs: typed text steers it, empty input stops it. The button
   // says which, so the affordance is never ambiguous.
@@ -1190,7 +1207,7 @@ export function AiPanelComposer({
       <div
         className="flex items-center gap-1 rounded-xl border border-border bg-background p-1 shadow-xs"
         data-testid="chat-composer-box"
-        data-multiline={input.includes('\n') ? 'true' : 'false'}
+        data-multiline={multiline ? 'true' : 'false'}
       >
         <ComposerPlusMenu
           locale={locale}

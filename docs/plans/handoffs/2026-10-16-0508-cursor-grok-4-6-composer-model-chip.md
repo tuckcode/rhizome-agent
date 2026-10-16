@@ -64,3 +64,10 @@ The box is now always `p-1 items-center` with
 `data-testid="chat-composer-box"`. The editor always uses
 `min-h-[30px] py-1 leading-5 border-0` and still grows to
 `max-h-[120px]`. Test: `AiPanelChrome.composerBox.test.tsx`.
+
+Review follow-up: the chip menu "Applies to new chats" line is
+`text-[12px] text-muted-foreground`. The empty placeholder uses
+`p-1` on the same 4px grid. `data-multiline` comes from
+`composerIsMultiline` (`scrollHeight` vs the 30px single-line
+floor), so a wrapped line without `\n` counts. The always-on
+composer border stays.
