@@ -1,6 +1,6 @@
 ---
 title: Mycelium
-description: Replay where a Prime run went, meaning which files it searched, read and edited. Uses Mindwalk.
+description: Replay where an optional Prime run went, meaning which files it searched, read and edited. Uses Mindwalk.
 ---
 
 Mycelium shows where an agent run went. It draws the folder the run worked in as a map of files, and lights up each file the agent searched, read or edited. Use it to see a run's scope at a glance, find where it went in circles, or check which files a run touched before something broke.
@@ -16,7 +16,7 @@ Mycelium uses [Mindwalk](https://github.com/cosmtrek/mindwalk) (MIT) © 2026 Ric
 ## Before you start
 
 1. Install Mindwalk so that the `mindwalk` program is on your path. See [Mindwalk](https://github.com/cosmtrek/mindwalk) for install steps.
-2. Chat with Prime as the engine. Mycelium reads Prime sessions from `~/.prime/agent/sessions/`. It doesn't show chats from Rhizome's own engine, and the agent can't search old Mycelium sessions.
+2. Mycelium currently reads sessions from `~/.prime/agent/sessions/`, so it only maps runs from Prime as an optional engine. It doesn't show chats from Rhizome's own engine, and the agent can't search old Mycelium sessions. You don't need Prime to use Rhizome.
 
 If Mindwalk is missing, Mycelium says **Install Mindwalk, then retry**.
 

@@ -19,7 +19,7 @@ You need:
 4. Rust `1.77.2` or newer
 5. git
 
-Prime Agent is optional. You need it only if you keep Prime as the Chat engine, which is the default.
+Prime Agent is optional. Rhizome's Chat engine does not need it. Install Prime only if you want that extra engine.
 
 ## Build and run
 
@@ -30,22 +30,21 @@ cd rhizome-agent
 pnpm tauri dev
 ```
 
-`./install.sh` installs the project's dependencies. If Prime Agent isn't on the machine, it also downloads Prime's command-line tool, because Prime is still the default Chat engine. Rhizome doesn't include a copy of Prime or Node.
+`./install.sh` installs the project's dependencies. Rhizome doesn't include a copy of Prime or Node. If you want Prime as an optional engine and it isn't on the machine, the script can also download Prime's command-line tool.
 
 `pnpm tauri dev` builds the app and opens it.
 
 ## Pick an engine
 
-Chat runs on one of two engines. You can switch at any time with **Chat engine** in Settings → AI Agents.
+Chat runs on Rhizome's own engine. Turn **Chat engine** on in Settings → AI Agents, then add a provider key or use **Free tier (auto)**. See [Set up models and keys](../guides/configure-ai-models.md). You do not sign in to Prime to use Rhizome.
 
-- **Prime Agent (default).** Prime runs Chat. Set it up below.
-- **Rhizome's own engine.** Turn **Chat engine** on. It doesn't need Prime. Add a provider key, or use **Free tier (auto)**. See [Set up models and keys](../guides/configure-ai-models.md).
+Prime Agent is an optional engine. Switch to it in the same Settings tab only if you want it.
 
 ## Set up Prime
 
-Skip this section if you use Rhizome's own engine.
+This section is optional. Skip it unless you choose Prime.
 
-The first time `prime-agent` runs in a terminal, it asks you to run `/login` and choose a model provider. You can also sign in from Settings → AI Agents → Local agent: each provider card has a **Sign in** button that runs Prime's login for you.
+Prime handles its own provider login. If you use Prime, the first time `prime-agent` runs in a terminal it asks you to run `/login`. You can also sign in from Settings → AI Agents → Local agent: each provider card has a **Sign in** button that runs Prime's login for you. That login is for Prime, not for Rhizome.
 
 Prime stops when the terminal that started it closes. To keep it running in the background:
 

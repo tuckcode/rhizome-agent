@@ -7,7 +7,7 @@ If you already use Claude Code, Hermes Agent, Cursor or Prime, a lot of what you
 
 ## The one big difference
 
-In most harnesses, memory is a file or store that belongs to the tool: `MEMORY.md`, `USER.md`, a database, a cloud account. In Rhizome, memory is your **vault**, a folder of Markdown notes. You choose what's saved with **Save to vault**. With Prime, answers that use a note say it came from your vault. With Git, every change can be diffed and reverted. See [Your vault is the agent's memory](../concepts/vault-as-memory.md).
+In most harnesses, memory is a file or store that belongs to the tool: `MEMORY.md`, `USER.md`, a database, a cloud account. In Rhizome, memory is your **vault**, a folder of Markdown notes. You choose what's saved with **Save to vault**. If you use Prime as an optional engine, answers that use a note say it came from your vault. With Git, every change can be diffed and reverted. See [Your vault is the agent's memory](../concepts/vault-as-memory.md).
 
 ## From Claude Code
 
@@ -16,7 +16,7 @@ In most harnesses, memory is a file or store that belongs to the tool: `MEMORY.m
 | Your past sessions | Settings → AI Agents → **Import chat history** brings them into the vault as notes under `Imports/claude-code/`. See [Import Claude Code history](import-a-session.md) |
 | `CLAUDE.md` | The vault's `AGENTS.md`. Rhizome keeps a `CLAUDE.md` alongside it for compatibility |
 | MCP servers | Rhizome is an MCP server too. **Set Up External AI Tools…** (⌘K) adds it to Claude Code's config, so Claude Code can read and write your vault from the terminal |
-| Claude models | Prime, signed in on the Anthropic card in Settings → AI Agents → Local agent. Rhizome's own engine doesn't offer Anthropic models yet |
+| Claude models | Rhizome's own engine doesn't offer Anthropic models yet. If you want Claude, you can use Prime as an optional engine and sign in on the Anthropic card in Settings → AI Agents → Local agent |
 | Permission prompts | Permission modes, **Limited tools** and **Power User**, set per vault |
 | `/resume` | The sessions list. See [Sessions](sessions.md) |
 
@@ -39,16 +39,18 @@ Rhizome doesn't run Claude Code inside Chat. Keep using Claude Code in the termi
 | Agent chat beside your files | Chat with notes beside it (⌘2 shows Notes) |
 | Cursor's MCP settings | **Set Up External AI Tools…** (⌘K) writes Rhizome's MCP entry into `~/.cursor/mcp.json`, so Cursor's agent can use your vault |
 | Rules files | The vault's `AGENTS.md` |
-| Model picker | Prime's models, your own providers, or **Free tier (auto)** |
+| Model picker | Your own providers, local models, or **Free tier (auto)**. Prime's models only if you choose Prime |
 
 Rhizome isn't a code editor. Keep Cursor for code, and use Rhizome as the place where what you and your agents learn is kept, reviewed and found again.
 
 ## From Prime Agent
 
-Prime is still Rhizome's default engine, so nothing changes about how Prime runs:
+Prime is an optional engine in Rhizome, not the harness. Rhizome works without it.
+
+If you do switch Chat to Prime:
 
 - Your sessions stay in `~/.prime/agent/sessions/`. Rhizome lists them, lets you switch, fork and archive, and draws their footprint in Mycelium.
-- Your login stays with Prime (`/login` in a terminal, or **Sign in** on a provider card in Settings → AI Agents → Local agent).
+- Prime keeps its own login (`/login` in a terminal, or **Sign in** on a provider card in Settings → AI Agents → Local agent). That sign-in is not required to use Rhizome.
 - Prime packages install from Settings → Packages. They have full system access.
 - Rhizome connects to Prime's background service.
 
@@ -56,7 +58,7 @@ What Rhizome adds is the vault: Save to vault, recall with its source, Git histo
 
 ## Bring your own model
 
-To skip Prime, turn on **Chat engine** in Settings → AI Agents and add a provider, or use **Free tier (auto)**. Rhizome's engine works without Prime installed. It's early: it can create notes, but can't read, search or edit files, or search the vault, yet. See [Set up models and keys](configure-ai-models.md).
+Turn **Chat engine** on in Settings → AI Agents and add a provider, or use **Free tier (auto)**. Rhizome's engine works without Prime installed. It's early: it can create notes, but can't read, search or edit files, or search the vault, yet. See [Set up models and keys](configure-ai-models.md).
 
 ## Plugins
 

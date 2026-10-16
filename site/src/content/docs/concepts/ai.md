@@ -1,9 +1,9 @@
 ---
 title: Agents, engines and models
-description: The agent loop, Chat engines (Prime and Rhizome's own), models, tools and permission modes.
+description: The agent loop, Rhizome's own Chat engine, optional engines, models, tools and permission modes.
 ---
 
-Rhizome lets you choose what runs Chat: Prime Agent or Rhizome's own engine. Whichever you use, the vault, the permissions and the saved memory stay the same.
+Rhizome is its own harness. Chat runs on Rhizome's engine. Prime Agent and Hermes are optional engines you can switch to. The vault, the permissions and the saved memory stay with Rhizome.
 
 ## Terms on this page
 
@@ -16,10 +16,11 @@ Rhizome lets you choose what runs Chat: Prime Agent or Rhizome's own engine. Whi
 
 | Engine | What it is | Good for |
 |---|---|---|
-| **Prime Agent** (default) | A separate harness Rhizome connects to. It runs sessions, tools, skills and provider login | Real agent work today: reading, searching and editing files, long runs, Prime packages |
-| **Rhizome's engine** | Rhizome's own loop, built into the app. It doesn't need Prime | Choosing your own providers, including free models. Early: it can create notes, but can't read, search or edit files yet |
+| **Rhizome's engine** | Rhizome's own loop, built into the app. It doesn't need Prime | Using Rhizome on its own: your providers, including free models. Early: it can create notes, but can't read, search or edit files yet |
+| **Prime Agent** (optional) | A separate harness Rhizome can connect to. It runs its own sessions, tools, skills and provider login | File work Prime can do today: reading, searching and editing files, long runs, Prime packages |
+| **Hermes** (planned) | A planned adapter, not a usable engine today | — |
 
-Switch with **Chat engine** in Settings → AI Agents. When it's on, new chats use Rhizome's engine and never call Prime, even if Prime isn't installed. The switch is only in Settings, not in the message box.
+Turn **Chat engine** on in Settings → AI Agents. New chats then use Rhizome's engine and never call Prime, even if Prime isn't installed. You do not sign in to Prime to use Rhizome. The switch is only in Settings, not in the message box.
 
 ### Rhizome's engine
 
@@ -28,11 +29,13 @@ Switch with **Chat engine** in Settings → AI Agents. When it's on, new chats u
 - **Saved chats:** each chat is saved as it goes and can be reopened after you quit. Chats get a title automatically from the first exchange.
 - **Errors:** a problem that doesn't stop the turn shows as a notice in the chat. A problem that does stop it, such as a missing key, ends the turn with a message that says what to fix.
 
-### Prime Agent
+### Prime Agent (optional)
 
-Prime runs as a background service (a daemon) that Rhizome connects to. Prime owns its sessions (`~/.prime/agent/sessions/`) and its packages (Settings → Packages). Packages can use the whole machine; a vault isn't a sandbox for them.
+Skip this unless you choose Prime.
 
-Prime handles its own provider login. Sign in from Settings → AI Agents → Local agent, where each provider card (Anthropic, OpenAI Codex, xAI, DeepSeek and others) has a **Sign in** or **Reconnect** button. Or run `prime-agent` in a terminal and use `/login`. Prime's model list includes Anthropic models.
+Prime runs as a background service (a daemon) that Rhizome can connect to. Prime owns its sessions (`~/.prime/agent/sessions/`) and its packages (Settings → Packages). Packages can use the whole machine; a vault isn't a sandbox for them.
+
+Prime handles its own provider login. That login is not required to use Rhizome. If you use Prime, sign in from Settings → AI Agents → Local agent, where each provider card (Anthropic, OpenAI Codex, xAI, DeepSeek and others) has a **Sign in** or **Reconnect** button. Or run `prime-agent` in a terminal and use `/login`. Prime's model list includes Anthropic models.
 
 The same tab lists **Recognized local agents**, Prime's default model, and which models Prime may use.
 
@@ -45,7 +48,7 @@ A **permission mode** decides what the agent may do without asking. It's set per
 | **Limited tools** | `echo` and `create_note`. Asks before each note it creates |
 | **Power User** | Creates notes without asking. Adds `bash`, which asks every time and doesn't run a shell yet |
 
-Prime has no sandbox, so Prime chats always run as Power User. While Prime is the default AI target, chats on Rhizome's engine also run as Power User.
+Prime has no sandbox, so Prime chats always run as Power User. If Prime is still the selected AI target in Settings, chats on Rhizome's engine also run as Power User.
 
 ## Plugins
 

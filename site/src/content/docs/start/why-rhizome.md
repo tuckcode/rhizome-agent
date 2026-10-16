@@ -21,7 +21,7 @@ If the vault is a Git repository, every change to it can be committed, including
 
 ## See where the agent went
 
-**Mycelium** replays a Prime session as a map. The folder the agent worked in becomes a city of files, and each file the agent searched, read or edited lights up. When something breaks, you can see which files a run touched and where it went in circles. Mycelium uses the open-source Mindwalk project, which you install separately. [Mycelium](../concepts/mycelium.md)
+**Mycelium** can replay an optional Prime session as a map. The folder that run worked in becomes a city of files, and each file it searched, read or edited lights up. When something breaks, you can see which files a run touched and where it went in circles. Mycelium uses the open-source Mindwalk project, which you install separately. It does not map chats from Rhizome's own engine. [Mycelium](../concepts/mycelium.md)
 
 ## Free models, routed for you
 
@@ -29,7 +29,7 @@ If the vault is a Git repository, every change to it can be committed, including
 
 ## Rhizome runs its own loop
 
-An **agent loop** is the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done. Rhizome has its own. You can also use an **engine**: another harness that runs the loop instead. Prime Agent is the default engine today. The vault, the permissions and the memory stay with Rhizome whichever one runs.
+An **agent loop** is the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done. Rhizome has its own, and Chat uses it. You can also switch to an optional **engine**: another harness that runs the loop instead. Prime Agent is one of those. Hermes is a planned adapter, not usable today. The vault, the permissions and the memory stay with Rhizome.
 
 Rhizome's own engine is new. Today it can create notes, and not much else. It can't read, search or edit files yet, and it can't search the vault. [Agents, engines and models](../concepts/ai.md)
 
@@ -53,4 +53,4 @@ If you've used Claude Code, Hermes Agent, Cursor or Prime, most of the basics ca
 
 ## What it isn't yet
 
-Rhizome is a macOS developer preview. You build it from source; there is no signed download or in-app updater. The install script fetches Prime Agent because Prime is still the default engine, but Rhizome's own engine works without it.
+Rhizome is a macOS developer preview. You build it from source; there is no signed download or in-app updater. Rhizome's own engine works without Prime. The install script can also fetch Prime Agent if you want that optional engine.
