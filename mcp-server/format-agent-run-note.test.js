@@ -48,7 +48,7 @@ mode: deep
     assert.match(note, /\[Docs\]\(https:\/\/example.com\/docs\)/)
     assert.match(note, /# Extra heading/)
     assert.match(note, /\[tool\] Fake is running\./)
-    assert.match(note, /<summary>Run log · 1 tools/)
+    assert.match(note, /<summary>Run log · 1 tool/)
   })
 
   it('does not duplicate an existing agent or mode field', () => {
@@ -70,6 +70,28 @@ The answer.
     assert.equal(note.match(/^mode:/gm)?.length, 1)
     assert.match(note, /^agent: Grok CLI$/m)
     assert.doesNotMatch(note, /agent: "Grok CLI"/)
+  })
+
+  it('does not treat an indented agent field as a top-level key', () => {
+    const note = rewriteAgentRunNoteContent(`---
+type: Note
+meta:
+  agent: nested
+---
+
+# Vault analysis
+
+[preparing] start
+[tool] Grep
+[tool] Grep is running.
+
+The answer.
+
+agent: Grok CLI
+mode: deep
+`)
+    assert.match(note, /^ {2}agent: nested$/m)
+    assert.match(note, /^agent: "Grok CLI"$/m)
   })
 
   it('keeps one-per-line tag lists and inline YAML lists', () => {

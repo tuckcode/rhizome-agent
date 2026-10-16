@@ -165,7 +165,7 @@ mode: deep
     expect(note).toContain('[tool] Fake is running.')
     expect(note).toContain('console.log("inside")')
     expect(note).toContain('The answer.')
-    expect(note).toContain('<summary>Run log · 1 tools')
+    expect(note).toContain('<summary>Run log · 1 tool')
     expect(note).toContain('Grep · — · — · ok')
     expect(note).not.toMatch(/^\[tool\] Grep$/m)
   })
@@ -190,6 +190,28 @@ The answer.
     expect(note).toContain('agent: Grok CLI')
     expect(note).toContain('mode: deep')
     expect(note).not.toContain('agent: "Grok CLI"')
+  })
+
+  it('does not treat an indented agent field as a top-level key', () => {
+    const note = rewriteAgentRunNoteContent(`---
+type: Note
+meta:
+  agent: nested
+---
+
+# Vault analysis
+
+[preparing] start
+[tool] Grep
+[tool] Grep is running.
+
+The answer.
+
+agent: Grok CLI
+mode: deep
+`)
+    expect(note).toContain('  agent: nested')
+    expect(note).toMatch(/^agent: "Grok CLI"$/m)
   })
 
   it('keeps one-per-line tag lists and inline YAML lists', () => {

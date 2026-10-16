@@ -225,11 +225,15 @@ export function renderRunNoteBody(formatted: FormattedAgentRunNote): string {
   return parts.join('\n').trimEnd()
 }
 
+function toolCountLabel(n: number): string {
+  return n === 1 ? 'tool' : 'tools'
+}
+
 export function renderRunLog(formatted: FormattedAgentRunNote): string {
   const n = formatted.tools.length
   const summary = formatted.duration
-    ? `Run log · ${n} tools · ${formatted.duration}`
-    : `Run log · ${n} tools`
+    ? `Run log · ${n} ${toolCountLabel(n)} · ${formatted.duration}`
+    : `Run log · ${n} ${toolCountLabel(n)}`
   const rows = formatted.tools.map((row) => {
     const target = row.target || '—'
     const duration = row.duration || '—'
@@ -372,7 +376,7 @@ function keepFrontmatter(
 function hasYamlKey(rawFrontmatter: string, key: string): boolean {
   return rawFrontmatter.split(/\r?\n/).some((line) => {
     const colon = line.indexOf(':')
-    return colon > 0 && line.slice(0, colon).trim() === key
+    return colon > 0 && line.slice(0, colon) === key
   })
 }
 
