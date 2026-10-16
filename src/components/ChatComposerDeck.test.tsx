@@ -51,7 +51,7 @@ describe('ChatComposerDeck', () => {
     expect(screen.getByTestId('chat-composer-deck')).not.toHaveTextContent('Laputa')
   })
 
-  it('puts the Rhizome catalog chip on the composer when Prime is not live', () => {
+  it('puts the Rhizome catalog chip on the composer row when Prime is not live', () => {
     render(
       <ChatComposerDeck
         catalog="rhizome"
@@ -60,7 +60,10 @@ describe('ChatComposerDeck', () => {
       />,
     )
 
-    expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
+    const deck = screen.getByTestId('chat-composer-deck')
+    const picker = screen.getByTestId('native-chat-model-picker')
+    expect(deck.contains(picker)).toBe(true)
+    expect(screen.getByTestId('native-chat-model-trigger')).toHaveClass('h-6')
     expect(screen.queryByTestId('prime-model-chip')).not.toBeInTheDocument()
     expect(screen.queryByTestId('prime-thinking-toggle')).not.toBeInTheDocument()
   })

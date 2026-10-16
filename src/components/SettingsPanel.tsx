@@ -1570,6 +1570,7 @@ function AiAgentSettingsSection({
       <SettingsGroup>
         <ChatEngineSettings engine={chatEngine} onChange={setChatEngine} locale={locale} />
         <NativeChatModelPicker
+          locale={locale}
           value={nativeChatTarget}
           onChange={setNativeChatTarget}
           providers={aiModelProviders}
