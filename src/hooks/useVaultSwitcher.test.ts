@@ -209,6 +209,9 @@ describe('useVaultSwitcher', () => {
       default_workspace_path: '/selected/vault',
       hidden_defaults: [],
     })
+    expect(mockInvokeFn.mock.calls.map(([command]) => command)).not.toContain(
+      'ensure_prime_session_host',
+    )
   })
 
   it('registers the canonical Getting Started vault without persisting a duplicate entry', async () => {

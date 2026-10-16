@@ -41,6 +41,7 @@ function createCallbacks() {
     onToolStart: vi.fn(),
     onToolDone: vi.fn(),
     onError: vi.fn(),
+    onNotice: vi.fn(),
     onCompaction: vi.fn(),
     onDone: vi.fn(),
   }
@@ -130,6 +131,37 @@ describe('streamAiAgent', () => {
     expect(callbacks.onToolDone).toHaveBeenCalledWith('tool-1', 'saved')
     expect(callbacks.onDone).toHaveBeenCalledTimes(1)
     expect(unlistenMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('forwards a Prime skill Notice without treating it as a stream error', async () => {
+    isTauriState.value = true
+    listenMock.mockImplementation(async (_eventName: string, handler: (event: { payload: unknown }) => void) => {
+      handler({
+        payload: {
+          kind: 'Notice',
+          message: 'Could not write the Prime vault skill under .prime/. Prime chat can continue, but vault tools may be missing.',
+        },
+      })
+      handler({ payload: { kind: 'TextDelta', text: 'hello' } })
+      handler({ payload: { kind: 'Done' } })
+      return vi.fn()
+    })
+    invokeMock.mockResolvedValue('session-1')
+
+    const callbacks = createCallbacks()
+    await streamAiAgent({
+      agent: 'prime',
+      message: 'Hello',
+      vaultPath: '/vault',
+      callbacks,
+    })
+
+    expect(callbacks.onNotice).toHaveBeenCalledWith(
+      expect.stringContaining('Could not write the Prime vault skill'),
+    )
+    expect(callbacks.onError).not.toHaveBeenCalled()
+    expect(callbacks.onText).toHaveBeenCalledWith('hello')
+    expect(callbacks.onDone).toHaveBeenCalledTimes(1)
   })
 
   it('routes prime agent through stream_prime_session and abort_prime_session_turn', async () => {

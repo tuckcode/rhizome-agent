@@ -585,7 +585,8 @@ Each answers "nothing", which is true of a host with no session.
   locating the binary, checking GitHub for a newer Chat-engine release
   (`check_prime_update`), applying it only after a click
   (`apply_prime_update({ expectedVersion, chatBusy })`), and seeding the
-  Rhizome vault skill.   Apply refuses a busy chat (host `is_streaming()` is the guard; the
+  Rhizome vault skill when a Prime chat starts — never on vault open.
+  Apply refuses a busy chat (host `is_streaming()` is the guard; the
   client `chatBusy` flag is only a hint), a stale offer, or a
   missing binary. It runs `prime-agent update` (one `--force` retry when
   the CLI says it is already latest), then reloads the attached session.
