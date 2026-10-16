@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Screenshot harnesses point Tailwind at this src tree so app utilities load.
+   The notes-panel harness keeps its own @source in scripts/. */
+@source ".";
+
 /* Follow the application theme (`html.dark`), including portaled descendants.
    The default Tailwind variant follows the operating-system preference. */
 @custom-variant dark (&:where(.dark, .dark *));

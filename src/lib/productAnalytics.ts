@@ -369,6 +369,10 @@ export function trackCommandRailPinChanged(mode: 'hover' | 'expanded' | 'compact
   trackEvent('command_rail_pin_changed', { mode })
 }
 
+export function trackNotesPanelModeChanged(mode: 'auto' | 'rail' | 'open'): void {
+  trackEvent('notes_panel_mode_changed', { mode })
+}
+
 /** Narrow window: the Sessions rail opened as a temporary drawer over Chat. */
 export function trackSessionsDrawerOpened(): void {
   trackEvent('sessions_drawer_opened')

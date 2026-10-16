@@ -297,9 +297,22 @@ function getHeaderForNoteList(noteListContainer: HTMLElement) {
   return within(noteListContainer.parentElement as HTMLElement).getByRole('heading', { level: 3 })
 }
 
+async function openNotesPanelFromRail() {
+  if (screen.queryByTestId('vault-panel')) return
+  pressViewShortcut('2')
+  await screen.findByTestId('vault-panel')
+}
+
+async function collapseNotesPanelToRail() {
+  pressViewShortcut('1')
+  await waitFor(() => {
+    expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
+  })
+}
+
 async function selectFilterInVaultPanel(label: 'Inbox') {
   if (!screen.queryByTestId('vault-panel')) {
-    fireEvent.click(await screen.findByTestId('vault-panel-restore'))
+    await openNotesPanelFromRail()
   }
   if (!screen.queryByTestId('vault-panel-navigation')) {
     fireEvent.click(await screen.findByTestId('vault-panel-browse-toggle'))
@@ -518,6 +531,7 @@ import { isTauri, mockInvoke } from './mock-tauri'
 import { resetPrimeHostStatus } from './hooks/usePrimeHostStatus'
 import { streamAiAgent } from './utils/streamAiAgent'
 import { panePresetStorageKey } from './lib/panePresetStorage'
+import { notesPanelModeStorageKey } from './lib/notesPanelMode'
 
 const AI_AGENTS_ONBOARDING_DISMISSED_STORAGE_NAME = 'rhizome:ai-agents-onboarding-dismissed'
 const CLAUDE_CODE_ONBOARDING_DISMISSED_STORAGE_NAME = 'tolaria:claude-code-onboarding-dismissed'
@@ -852,7 +866,20 @@ describe('App', () => {
     expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
     expect(screen.getByTestId('command-rail-history')).toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
-    expect(screen.getByTestId('vault-panel-restore')).toBeVisible()
+    expect(screen.getByTestId('notes-panel-rail')).toBeVisible()
+    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Open')
+  })
+
+  it('keeps a saved Auto or Rail mode when a view switch opens the panel', async () => {
+    localStorage.setItem(notesPanelModeStorageKey('main'), 'rail')
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(localStorage.getItem(notesPanelModeStorageKey('main'))).toBe('rail')
+
+    pressViewShortcut('2')
+    expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
+    expect(localStorage.getItem(notesPanelModeStorageKey('main'))).toBe('rail')
+    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Rail (open for now)')
   })
 
   it('keeps Chat as the canvas while Notes is open, and Inbox only opens the list', async () => {
@@ -866,16 +893,16 @@ describe('App', () => {
       expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     })
     expect(screen.getByTestId('chat-center')).not.toHaveStyle({ display: 'none' })
-    expect(screen.getByTestId('vault-panel-restore')).toHaveAccessibleName('Show Notes')
+    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Open')
 
-    fireEvent.click(screen.getByTestId('vault-panel-restore'))
+    await openNotesPanelFromRail()
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel-navigation')).not.toBeInTheDocument()
     expect(screen.getByTestId('chat-center')).not.toHaveStyle({ display: 'none' })
 
-    fireEvent.click(await screen.findByTestId('vault-panel-collapse'))
+    await collapseNotesPanelToRail()
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByTestId('vault-panel-restore'))
+    await openNotesPanelFromRail()
     expect(screen.getByTestId('vault-panel')).toBeInTheDocument()
   })
 
@@ -1731,7 +1758,7 @@ describe('App', () => {
     const noteList = await screen.findByTestId('note-list-container')
     await clickNoteListItem(noteList, 'Test Project')
     fireEvent.click(screen.getByRole('radio', { name: 'Note beside Chat' }))
-    fireEvent.click(await screen.findByTestId('vault-panel-restore'))
+    await openNotesPanelFromRail()
     const vaultPanel = document.querySelector('.app__vault-panel') as HTMLElement
     expect(vaultPanel).toBeInTheDocument()
     expect(vaultPanel).not.toHaveClass('app__vault-panel--overlay')
@@ -1763,14 +1790,10 @@ describe('App', () => {
     await waitFor(() => {
       expect(document.querySelector('.app__vault-panel')).not.toBeInTheDocument()
     })
-    const restore = await screen.findByTestId('vault-panel-restore')
-    expect(restore).toBeVisible()
-    expect(restore.closest('.app__notes-rail')).toHaveStyle({
-      width: '46px',
-      minWidth: '46px',
-      maxWidth: '46px',
-    })
-    fireEvent.click(restore)
+    const rail = await screen.findByTestId('notes-panel-rail')
+    expect(rail).toBeVisible()
+    expect(rail).toHaveStyle({ width: '46px' })
+    await openNotesPanelFromRail()
     await waitFor(() => {
       expect(document.querySelector('.app__vault-panel')).toBeInTheDocument()
     })

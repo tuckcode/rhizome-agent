@@ -472,6 +472,15 @@ describe('the Sessions drawer in a narrow window', () => {
     vi.useRealTimers()
   })
 
+  it('does not hover-open when the notes panel already overlays', () => {
+    vi.useFakeTimers()
+    renderRail({ hoverDisabled: true })
+    fireEvent.mouseEnter(screen.getByTestId('command-rail'))
+    vi.advanceTimersByTime(2000)
+    expect(screen.getByTestId('command-rail')).toHaveAttribute('data-expanded', 'false')
+    vi.useRealTimers()
+  })
+
   it('stays an in-flow column when the shell has room', () => {
     renderRail({ drawer: false })
     fireEvent.click(screen.getByTestId('command-rail-expand'))

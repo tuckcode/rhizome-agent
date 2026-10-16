@@ -46,6 +46,9 @@ interface CommandRailProps {
   drawer?: boolean
   /** Bump to close an open drawer — the shell does this after a session is picked. */
   drawerCloseSignal?: number
+  /** Notes Auto overlay is already up. Hover must not open a second overlay. */
+  hoverDisabled?: boolean
+  onOverlayingChange?: (overlaying: boolean) => void
 }
 
 const VIEW_ICONS: Record<RailViewId, Icon> = {
@@ -169,6 +172,8 @@ export function CommandRail({
   onLayoutWidthChange,
   drawer = false,
   drawerCloseSignal,
+  hoverDisabled = false,
+  onOverlayingChange,
 }: CommandRailProps) {
   const t = createTranslator(locale)
   const [storedPinned, setPinnedExpanded] = useState(() =>
@@ -223,12 +228,24 @@ export function CommandRail({
   const overlaying = false
   // ...unless the shell has no room: then it is a drawer with a scrim.
   const drawerOpen = drawer && expanded && !pinnedExpanded
+  useEffect(() => {
+    onOverlayingChange?.(drawerOpen)
+  }, [drawerOpen, onOverlayingChange])
+  const [prevHoverDisabled, setPrevHoverDisabled] = useState(hoverDisabled)
+  if (hoverDisabled !== prevHoverDisabled) {
+    setPrevHoverDisabled(hoverDisabled)
+    if (hoverDisabled) {
+      setHoverExpanded(false)
+      setKeyboardExpanded(false)
+    }
+  }
   const openFromHover = () => {
     if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current)
     hoverCloseTimer.current = null
     if (
       autoCollapsed
       || drawer
+      || hoverDisabled
       || suppressHoverRef.current
       || compactLocked
       || pinnedExpanded
