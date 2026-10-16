@@ -9,6 +9,7 @@ import { COLOR_THEMES, DEFAULT_COLOR_THEME, DEFAULT_THEME_MODE } from './themeMo
 const indexCss = readFileSync(join(process.cwd(), 'src/index.css'), 'utf8')
 const themesCss = readFileSync(join(process.cwd(), 'src/themes.css'), 'utf8')
 const generator = readFileSync(join(process.cwd(), 'scripts/generate-themes-css.mjs'), 'utf8')
+const INK_GAP = JSON.parse(readFileSync(join(process.cwd(), 'scripts/ink-gap.json'), 'utf8')).INK_GAP as number
 const sheetSelectionChrome = readFileSync(join(process.cwd(), 'src/utils/sheetSelectionChrome.ts'), 'utf8')
 const blockReorder = readFileSync(join(process.cwd(), 'src/components/rhizomeBlockReorder.ts'), 'utf8')
 
@@ -48,6 +49,112 @@ function contrastRatio(foreground: string, background: string): number {
   const darker = Math.min(relativeLuminance(foreground), relativeLuminance(background))
   return (lighter + 0.05) / (darker + 0.05)
 }
+
+function rgbToHex(rgb: [number, number, number]): string {
+  return `#${rgb.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`
+}
+
+function parseCssColor(value: string, base?: [number, number, number]): [number, number, number] {
+  const raw = value.trim()
+  if (raw.startsWith('#')) {
+    return hexToRgb(raw)
+  }
+  const match = raw.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/)
+  expect(match, raw).toBeTruthy()
+  const rgb: [number, number, number] = [
+    Number(match?.[1]),
+    Number(match?.[2]),
+    Number(match?.[3]),
+  ]
+  const alpha = match?.[4] === undefined ? 1 : Number(match[4])
+  if (alpha >= 1 || !base) {
+    return rgb
+  }
+  return [
+    Math.round(rgb[0] * alpha + base[0] * (1 - alpha)),
+    Math.round(rgb[1] * alpha + base[1] * (1 - alpha)),
+    Math.round(rgb[2] * alpha + base[2] * (1 - alpha)),
+  ]
+}
+
+function contrastCss(foreground: string, background: string, base?: [number, number, number]): number {
+  return contrastRatio(rgbToHex(parseCssColor(foreground)), rgbToHex(parseCssColor(background, base)))
+}
+
+const BANNER_TINT_ROLES = [
+  ['info', ['--feedback-info-bg', '--accent-blue-light']],
+  ['success', ['--feedback-success-bg', '--accent-green-light']],
+  ['warning', ['--feedback-warning-bg', '--accent-orange-light']],
+  ['error', ['--feedback-error-bg', '--accent-red-light']],
+] as const
+
+const DARK_SKIN_NAMES = [
+  'Graphite',
+  'Earth dark',
+  'Loam',
+  'Mycelium',
+  'Dracula',
+  'Nord',
+  'Gruvbox dark',
+  'Solarized dark',
+  'Catppuccin mocha',
+  'Tokyo night',
+  'One dark',
+  'Rosé pine',
+  'Everforest',
+  'Monokai pro',
+] as const
+
+function pickToken(tokens: Record<string, string>, names: readonly string[]): string | undefined {
+  return names.find((name) => tokens[name]?.trim())
+}
+
+function resolveToken(tokens: Record<string, string>, name: string, seen = new Set<string>()): string {
+  if (seen.has(name)) {
+    return ''
+  }
+  seen.add(name)
+  const value = (tokens[name] ?? '').trim()
+  const match = value.match(/^var\((--[\w-]+)(?:,[^)]*)?\)$/)
+  if (match) {
+    return resolveToken(tokens, match[1], seen)
+  }
+  return value
+}
+
+function hslHueSat(hex: string): { hue: number; sat: number } {
+  const [r, g, b] = hexToRgb(hex).map((channel) => channel / 255)
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const lightness = (max + min) / 2
+  if (max === min) {
+    return { hue: 0, sat: 0 }
+  }
+  const delta = max - min
+  const sat = lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min)
+  let hue = 0
+  if (max === r) {
+    hue = (g - b) / delta + (g < b ? 6 : 0)
+  } else if (max === g) {
+    hue = (b - r) / delta + 2
+  } else {
+    hue = (r - g) / delta + 4
+  }
+  return { hue: (hue / 6) * 360, sat }
+}
+
+const COMMUNITY_MUTED_SOURCE = {
+  Dracula: '#6272A4',
+  Nord: '#7B88A1',
+  'Gruvbox dark': '#928374',
+  'Solarized dark': '#586E75',
+  'Catppuccin mocha': '#7F849C',
+  'Tokyo night': '#565F89',
+  'One dark': '#5C6370',
+  'Rosé pine': '#908CAA',
+  Everforest: '#859289',
+  'Monokai pro': '#939293',
+} as const
 
 const GRAPHITE = {
   '--surface-app': '#131210',
@@ -108,7 +215,7 @@ const EARTH_DARK = {
   '--text-primary': '#E9E8DC',
   '--text-secondary': '#BDBAA8',
   '--text-tertiary': '#A8A592',
-  '--text-muted': '#9B9986',
+  '--text-muted': '#9F9E8B',
   '--text-faint': '#9B9989',
   '--accent-purple': '#B4A0E8',
   '--accent-teal': '#64D1C8',
@@ -219,7 +326,7 @@ const LOAM = {
   '--text-primary': '#EDE6D8',
   '--text-secondary': '#C6BBA6',
   '--text-tertiary': '#B2A791',
-  '--text-muted': '#A3987F',
+  '--text-muted': '#A79D85',
   '--text-faint': '#A29881',
   '--text-heading': '#F7F1E5',
   '--text-inverse': '#15110C',
@@ -358,22 +465,7 @@ describe('Earth theme tokens', () => {
     const light = dump['Earth light']
     expect(light['--syntax-highlight-string']).toBe('#23503C')
     expect(light['--surface-app']).toBe('#F1ECE2')
-    const darkSkins = [
-      'Graphite',
-      'Earth dark',
-      'Loam',
-      'Mycelium',
-      'Dracula',
-      'Nord',
-      'Gruvbox dark',
-      'Solarized dark',
-      'Catppuccin mocha',
-      'Tokyo night',
-      'One dark',
-      'Rosé pine',
-      'Everforest',
-      'Monokai pro',
-    ]
+    const darkSkins = DARK_SKIN_NAMES
     for (const name of darkSkins) {
       const tokens = dump[name]
       expect(tokens, name).toBeTruthy()
@@ -391,13 +483,128 @@ describe('Earth theme tokens', () => {
     for (const name of darkSkins) {
       const tokens = dump[name]
       const background = tokens['--surface-app']
+      const panel = tokens['--surface-panel']
+      const panelRgb = parseCssColor(panel, parseCssColor(background))
       for (const role of ['--syntax-highlight-string', '--diff-added-text', '--diff-removed-text'] as const) {
         expect(
           contrastRatio(tokens[role], background),
           `${name} ${role} on ${background}`,
         ).toBeGreaterThanOrEqual(4.5)
       }
+      const selected = tokens['--state-selected']
+      const selectedStrong = tokens['--state-selected-strong']
+      for (const role of ['--text-primary', '--text-secondary', '--text-tertiary', '--text-faint', '--text-muted'] as const) {
+        expect(
+          contrastRatio(tokens[role], background),
+          `${name} ${role} on ${background}`,
+        ).toBeGreaterThanOrEqual(4.5)
+        expect(
+          contrastRatio(tokens[role], selected),
+          `${name} ${role} on selected-row`,
+        ).toBeGreaterThanOrEqual(4.5)
+        expect(
+          contrastRatio(tokens[role], selectedStrong),
+          `${name} ${role} on selected-strong`,
+        ).toBeGreaterThanOrEqual(4.5)
+        for (const [label, aliases] of BANNER_TINT_ROLES) {
+          const tintName = pickToken(tokens, aliases)
+          expect(tintName, `${name} ${label} tint`).toBeTruthy()
+          expect(
+            contrastCss(tokens[role], resolveToken(tokens, tintName!), panelRgb),
+            `${name} ${role} on ${label}/${tintName}`,
+          ).toBeGreaterThanOrEqual(4.5)
+        }
+      }
     }
+    expect(dump.Graphite['--text-muted']).toBe('#A6A5A3')
+    expect(dump.Graphite['--text-faint']).toBe('#9F9E9C')
+    expect(dump['Earth dark']['--text-muted']).toBe('#9F9E8B')
+    expect(dump['Earth dark']['--text-faint']).toBe('#9B9989')
+    expect(dump.Loam['--text-muted']).toBe('#A79D85')
+    expect(dump.Loam['--text-faint']).toBe('#A29881')
+    expect(dump.Mycelium['--text-muted']).toBe('#9AA48E')
+    expect(dump.Mycelium['--text-faint']).toBe('#959F89')
+    expect(generator).toContain('fitInkLadder')
+    expect(generator).toContain('liftLightness')
+    expect(generator).toContain('ink-gap.json')
+    expect(readFileSync(join(process.cwd(), 'scripts/contrast_check.py'), 'utf8')).toContain('ink-gap.json')
+    expect(INK_GAP).toBe(0.015)
+    for (const [name, source] of Object.entries(COMMUNITY_MUTED_SOURCE)) {
+      const sourceHs = hslHueSat(source)
+      for (const role of ['--text-muted', '--text-faint'] as const) {
+        const next = hslHueSat(dump[name][role])
+        expect(Math.abs(next.sat - sourceHs.sat), `${name} ${role} sat`).toBeLessThan(0.04)
+        if (sourceHs.sat < 0.02) {
+          expect(next.sat, `${name} ${role} stays near-gray`).toBeLessThan(0.02)
+          continue
+        }
+        const hueDelta = Math.min(Math.abs(next.hue - sourceHs.hue), 360 - Math.abs(next.hue - sourceHs.hue))
+        expect(hueDelta, `${name} ${role} hue`).toBeLessThan(5)
+      }
+    }
+    expect(dump['Solarized dark']['--text-primary']).toBe('#A5B2B3')
+  })
+
+  it('steps body text down through secondary, tertiary, muted, and faint on every dark skin', () => {
+    const dump = JSON.parse(
+      execFileSync('python3', ['scripts/contrast_check.py', '--dump-resolved'], { encoding: 'utf8' }),
+    ) as Record<string, Record<string, string>>
+    const ladder = [
+      '--text-primary',
+      '--text-secondary',
+      '--text-tertiary',
+      '--text-muted',
+      '--text-faint',
+    ] as const
+    const extraSurfaces = [
+      '--state-hover',
+      '--surface-sidebar',
+      '--surface-panel',
+      '--state-selected-strong',
+    ] as const
+    for (const name of DARK_SKIN_NAMES) {
+      const tokens = dump[name]
+      const background = tokens['--surface-app']
+      const panelRgb = parseCssColor(tokens['--surface-panel'], parseCssColor(background))
+      const selected = tokens['--state-selected']
+      const ys = ladder.map((role) => relativeLuminance(tokens[role]))
+      for (let index = 0; index < ys.length - 1; index += 1) {
+        expect(
+          ys[index] - ys[index + 1],
+          `${name} ${ladder[index]} above ${ladder[index + 1]}`,
+        ).toBeGreaterThanOrEqual(INK_GAP)
+      }
+      for (const role of ladder) {
+        expect(
+          contrastRatio(tokens[role], background),
+          `${name} ${role} on app`,
+        ).toBeGreaterThanOrEqual(4.5)
+        expect(
+          contrastRatio(tokens[role], selected),
+          `${name} ${role} on .list-row-selected`,
+        ).toBeGreaterThanOrEqual(4.5)
+        for (const surfaceName of extraSurfaces) {
+          expect(
+            contrastRatio(tokens[role], tokens[surfaceName]),
+            `${name} ${role} on ${surfaceName}`,
+          ).toBeGreaterThanOrEqual(4.5)
+        }
+        for (const [label, aliases] of BANNER_TINT_ROLES) {
+          const tintName = pickToken(tokens, aliases)
+          expect(
+            contrastCss(tokens[role], resolveToken(tokens, tintName!), panelRgb),
+            `${name} ${role} on ${label}`,
+          ).toBeGreaterThanOrEqual(4.5)
+        }
+      }
+    }
+    expect(dump['Solarized dark']['--text-primary']).toBe('#A5B2B3')
+    expect(
+      contrastRatio(dump['Monokai pro']['--text-primary'], dump['Monokai pro']['--state-selected']),
+    ).toBeGreaterThanOrEqual(4.5)
+    expect(
+      contrastRatio(dump['Monokai pro']['--text-muted'], dump['Monokai pro']['--state-selected']),
+    ).toBeGreaterThanOrEqual(4.5)
   })
 
   it('keeps Graphite mint in the Graphite block and Earth accents on Earth', () => {
@@ -559,15 +766,24 @@ describe('Earth theme tokens', () => {
     expect(output).toContain('== Earth light')
     expect(output).toContain('== Loam')
     expect(output).toContain('== Mycelium')
+    expect(output).toContain('== dark faint/muted')
+    expect(output).toContain('-- Graphite')
+    expect(output).toContain('-- Earth dark')
+    expect(output).toContain('-- Loam')
+    expect(output).toContain('-- Mycelium')
+    expect(output).toContain('-- Dracula')
+    expect(output).toContain('-- Tokyo night')
     expect(output).toMatch(/--text-muted on --state-selected-strong: [0-9.]+/)
     expect(output).toMatch(/--border-input on --surface-app: [0-9.]+/)
     expect(output).toMatch(/--focus-ring on --bg: [0-9.]+/)
     expect(output).toMatch(/--text-faint on info\//)
     expect(output).toMatch(/--text-muted on error\//)
+    expect(output).toMatch(/-- Dracula[\s\S]*--text-faint /)
+    expect(output).toMatch(/ladder Y /)
+    expect(output).toContain('== FAILING PAIRS')
+    expect(output).toContain('(none)')
     const failLines = output.split('\n').filter((line) => line.startsWith('FAIL '))
-    for (const line of failLines) {
-      expect(line).toMatch(/^FAIL (Graphite|Earth dark|Earth light|Loam|Mycelium)\s{2}--[\w-]+ on \S+\s{2}[0-9.]+\s{2}\((text|non-text) /)
-    }
+    expect(failLines).toEqual([])
   })
 
   it('fails contrast_check.py when a theme token is unparseable', () => {
