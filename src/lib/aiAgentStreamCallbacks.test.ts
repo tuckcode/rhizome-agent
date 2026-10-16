@@ -27,6 +27,7 @@ vi.mock('../utils/sessionAutoDistill', async (importOriginal) => {
 })
 
 import { createStreamCallbacks } from './aiAgentStreamCallbacks'
+import { conversationToNativeEvents } from './nativeChatTranscript'
 import { translate } from './i18n'
 
 function createMessageStore(initialMessages: AiAgentMessage[]) {
@@ -93,7 +94,7 @@ describe('aiAgentStreamCallbacks', () => {
     callbacks.onDone()
 
     expect(status.getStatus()).toBe('done')
-    expect(responseAccRef.current).toBe('Hello')
+    expect(responseAccRef.current).toBe('')
     expect(toolInputMapRef.current.get('tool-1')).toEqual({
       tool: 'Write',
       input: '{"path":"/vault/note.md"}',
@@ -123,12 +124,49 @@ describe('aiAgentStreamCallbacks', () => {
           status: 'done',
           input: '{"path":"/vault/note.md"}',
           output: 'saved',
+          beforeText: 'Hello',
         }],
         isStreaming: false,
         reasoning: 'step 1',
         reasoningDone: true,
-        response: 'Hello',
       },
+    ])
+  })
+
+  it('forks a live chat with assistant text still in front of its tool round', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'Do both',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'claude_code',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+
+    callbacks.onText('I will search first')
+    callbacks.onToolStart('search', 't1', '{}')
+    callbacks.onToolDone('t1', 'hits')
+    callbacks.onText('Here is the answer')
+    callbacks.onDone()
+
+    expect(conversationToNativeEvents(messages.getMessages())).toEqual([
+      { User: { text: 'Do both' } },
+      { Assistant: { text: 'I will search first' } },
+      { ToolCall: { id: 't1', name: 'search', args: '{}' } },
+      { ToolResult: { id: 't1', name: 'search', output: 'hits' } },
+      { Assistant: { text: 'Here is the answer' } },
+      'TurnEnd',
     ])
   })
 

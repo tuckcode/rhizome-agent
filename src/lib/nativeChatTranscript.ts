@@ -317,7 +317,10 @@ export function nativeEventsToConversation(events: unknown[] | undefined): AiAge
       continue
     }
     if (record.ModelFailed) {
-      pendingAssistant = String(record.ModelFailed.message ?? '')
+      const failure = String(record.ModelFailed.message ?? '')
+      pendingAssistant = pendingAssistant
+        ? `${pendingAssistant}\n\nError: ${failure}`
+        : failure
     }
   }
   flush()

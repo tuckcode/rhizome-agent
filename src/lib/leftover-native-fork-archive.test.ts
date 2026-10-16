@@ -20,6 +20,7 @@ describe('leftover native fork and archive', () => {
     expect(agent).toContain('releaseNativeLiveSlot')
     expect(agent).toContain('setNativeSession')
     expect(transcript).toContain('beforeText')
+    expect(readFileSync(`${process.cwd()}/src/lib/aiAgentStreamCallbacks.ts`, 'utf8')).toContain('beforeText || undefined')
     expect(switcher).toContain('agent.setNativeSession')
     expect(switcher).toContain('agent.getNativeSession()')
   })

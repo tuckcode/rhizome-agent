@@ -124,6 +124,21 @@ describe('nativeEventsToConversation', () => {
     ])
   })
 
+  it('keeps assistant text when a ModelFailed follows it', () => {
+    const messages = nativeEventsToConversation([
+      { User: { text: 'Hello' } },
+      { Assistant: { text: 'I found it' } },
+      { ModelFailed: { message: 'provider down' } },
+      'TurnEnd',
+    ])
+    expect(messages).toEqual([
+      expect.objectContaining({
+        userMessage: 'Hello',
+        response: 'I found it\n\nError: provider down',
+      }),
+    ])
+  })
+
   it('marks a matching ToolDenied as an error on the existing call', () => {
     const messages = nativeEventsToConversation([
       { User: { text: 'Search' } },
