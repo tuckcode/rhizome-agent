@@ -35,6 +35,7 @@ import { type NoteListItem } from '../utils/ai-context'
 import type { VaultEntry } from '../types'
 import { useAiPanelController, type AiPanelController } from './useAiPanelController'
 import type { AiAgentMessage } from '../lib/aiAgentConversation'
+import { forksPrimeEntry, transcriptUntilMessage } from '../lib/nativeChatTranscript'
 import { useAiPanelPromptQueue } from './useAiPanelPromptQueue'
 import { useAiPanelFocus } from './useAiPanelFocus'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
@@ -276,6 +277,9 @@ export function AiPanelView({
     handleNewChat,
   } = controller
   const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime' && chatEngine !== 'native'
+  const showSessionList = isPrimeTarget || chatEngine === 'native'
+  const sessionListEngine = chatEngine === 'native' ? 'native' : 'prime'
+  const forkPrime = forksPrimeEntry(isPrimeTarget, forkTargetsPrimeEntry)
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath ?? undefined)
   const modelLabel = isPrimeTarget ? primeModelLabel(primeHost) : null
   // Refresh when a turn finishes rather than only on the interval, so context
@@ -374,6 +378,11 @@ export function AiPanelView({
     onConversationReset?.()
     handleNewChat()
   }
+  const handleNativeFork = (messageId: string) => {
+    const kept = transcriptUntilMessage(agent.messages, messageId)
+    beginNewChat()
+    agent.replaceMessages(kept)
+  }
   useEffect(() => {
     if (!newChatRef) return
     newChatRef.current = beginNewChat
@@ -425,7 +434,7 @@ export function AiPanelView({
           onNewChat={beginNewChat}
         />
       )}
-      {isPrimeTarget && !usesRailSessions && (
+      {showSessionList && !usesRailSessions && (
         <div className="flex shrink-0 justify-end px-3 pt-1.5">
           <Button
             type="button"
@@ -472,6 +481,7 @@ export function AiPanelView({
             />
             <PrimeSessionList
               locale={locale}
+              engine={sessionListEngine}
               onSelectSession={(session) => void pickSession(session)}
               onNewChat={beginNewChat}
               onOpenMycelium={onOpenMycelium}
@@ -503,8 +513,8 @@ export function AiPanelView({
         locale={locale}
         messages={agent.messages}
         isActive={isActive}
-        onForkMessage={forkTargetsPrimeEntry ? (entryId) => void handleForkFromEntry(entryId) : onForkMessage}
-        forkTargetsPrimeEntry={forkTargetsPrimeEntry}
+        onForkMessage={forkPrime ? (entryId) => void handleForkFromEntry(entryId) : (onForkMessage ?? handleNativeFork)}
+        forkTargetsPrimeEntry={forkPrime}
         onOpenNote={onOpenNote}
         onNavigateWikilink={handleNavigateWikilink}
         onRegenerateMessage={agent.regenerateMessage}
@@ -591,7 +601,7 @@ export function AiPanelView({
         onCommandAction={isPrimeTarget ? (action, nextValue) => void handleCommandAction(action, nextValue) : undefined}
       />
       </AiPanelFrame>
-      {usesRailSessions && sessionsRailSlot && isPrimeTarget
+      {usesRailSessions && sessionsRailSlot && showSessionList
         ? createPortal(
             <div
               data-testid="command-rail-session-hits"
@@ -600,6 +610,7 @@ export function AiPanelView({
             >
               <PrimeSessionList
                 locale={locale}
+                engine={sessionListEngine}
                 onSelectSession={(session) => {
                   onRailSessionPicked?.()
                   void pickSession(session)

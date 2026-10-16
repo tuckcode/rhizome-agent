@@ -204,6 +204,7 @@ let mockSettings: Settings = {
 
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
 const mockArchivedSessions = new Set<string>()
+const mockArchivedNativeSessions = new Set<string>()
 let mockPrimeModelAllowList: string[] = ['mock/mock-model']
 const mockPrimePackages: string[] = []
 
@@ -676,7 +677,22 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   native_chat_cancel: () => null,
   native_chat_approval_reply: () => null,
   native_chat_end: () => null,
-  native_chat_list: () => [],
+  native_chat_list: () => [
+    {
+      sessionId: 'mock-native-1',
+      createdAt: new Date(Date.now() - 60_000).toISOString(),
+      target: 'free_tier_auto',
+      title: 'Native hello',
+      archived: mockArchivedNativeSessions.has('mock-native-1'),
+    },
+  ],
+  set_native_session_archived: (args: { sessionId?: string; archived?: boolean }) => {
+    const id = args?.sessionId
+    if (!id) return null
+    if (args?.archived) mockArchivedNativeSessions.add(id)
+    else mockArchivedNativeSessions.delete(id)
+    return null
+  },
   native_chat_open: () => ({
     sessionId: 'mock-native-session',
     events: [],

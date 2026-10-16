@@ -251,6 +251,34 @@ describe('PrimeSessionList', () => {
      * settings and never moved or deleted on disk. The row leaves the main
      * list and the archive disclosure appears.
      */
+    it('files a native session through the native archive command', async () => {
+      invoked.result = [
+        {
+          sessionId: 'n1',
+          createdAt: '2026-10-13T12:00:00.000Z',
+          target: 'free_tier_auto',
+          title: 'Native hello',
+        },
+        {
+          sessionId: 'n2',
+          createdAt: '2026-10-13T11:00:00.000Z',
+          target: 'free_tier_auto',
+          title: 'File me',
+        },
+      ]
+
+      render(<PrimeSessionList engine="native" onSelect={vi.fn()} locale="en" now={NOW} />)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Archive File me' }))
+
+      await waitFor(() => expect(screen.queryByText('File me')).not.toBeInTheDocument())
+      expect(screen.getByText('Native hello')).toBeInTheDocument()
+      expect(invoked.calls).toContain('native_chat_list')
+      expect(invoked.calls).toContain('set_native_session_archived')
+      expect(invoked.calls).not.toContain('list_prime_session_summaries')
+      expect(invoked.calls).not.toContain('set_prime_session_archived')
+    })
+
     it('files a session out of the list and tells the host', async () => {
       invoked.result = [
         summary({ id: 'a', path: '/sessions/a.jsonl', title: 'Keep me' }),

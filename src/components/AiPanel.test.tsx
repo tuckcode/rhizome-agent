@@ -156,6 +156,7 @@ function primeController(overrides: Partial<AiPanelController> = {}): AiPanelCon
       regenerateMessage: () => Promise.resolve(),
       clearConversation: vi.fn(),
       addLocalMarker: vi.fn(),
+      replaceMessages: vi.fn(),
     },
     input: '',
     setInput: vi.fn(),
@@ -762,7 +763,7 @@ describe('Chat home opens with its sessions column', () => {
     slot.remove()
   })
 
-  it('does not mount the rail session list on the native engine', () => {
+  it('mounts the native session list on the native engine', () => {
     const slot = document.createElement('div')
     document.body.append(slot)
 
@@ -777,8 +778,47 @@ describe('Chat home opens with its sessions column', () => {
       />,
     )
 
-    expect(within(slot).queryByTestId('prime-session-list')).not.toBeInTheDocument()
+    expect(within(slot).getByTestId('prime-session-list')).toBeInTheDocument()
     slot.remove()
+  })
+})
+
+describe('forking a native chat', () => {
+  it('copies the transcript through the chosen turn even when ChatHome asked for a Prime fork', () => {
+    const replaceMessages = vi.fn()
+    const handleNewChat = vi.fn()
+    const messages = [
+      { id: 'm1', userMessage: 'First', response: 'One', actions: [] },
+      { id: 'm2', userMessage: 'Second', response: 'Two', actions: [] },
+    ]
+
+    render(
+      <AiPanelView
+        controller={primeController({
+          agent: {
+            ...primeController().agent,
+            messages,
+            replaceMessages,
+          },
+          handleNewChat,
+        })}
+        onClose={vi.fn()}
+        showHeader={false}
+        defaultAiAgent="prime"
+        defaultAiAgentReady
+        chatEngine="native"
+        forkTargetsPrimeEntry
+      />,
+    )
+
+    const forks = screen.getAllByTestId('ai-message-fork')
+    expect(forks[0]).toBeEnabled()
+    fireEvent.click(forks[0])
+
+    expect(handleNewChat).toHaveBeenCalled()
+    expect(replaceMessages).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'm1', userMessage: 'First', isStreaming: false }),
+    ])
   })
 })
 
@@ -1004,7 +1044,7 @@ describe('AiPanel sessions title-bar gutter', () => {
   })
 
   it('does not put a second gutter on the Prime rail portal list', () => {
-    const portalBlock = aiPanelSource.slice(aiPanelSource.indexOf('usesRailSessions && sessionsRailSlot && isPrimeTarget'))
+    const portalBlock = aiPanelSource.slice(aiPanelSource.indexOf('usesRailSessions && sessionsRailSlot && showSessionList'))
     expect(portalBlock).toContain('<PrimeSessionList')
     expect(portalBlock).not.toContain('titleBarGutter')
   })

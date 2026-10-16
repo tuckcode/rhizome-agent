@@ -11,6 +11,11 @@ import {
   transcriptAlongBranch,
   type PrimeTranscriptItem,
 } from '../lib/primeTranscriptToConversation'
+import {
+  isNativeSessionPath,
+  nativeEventsToConversation,
+  type NativeChatOpenResult,
+} from '../lib/nativeChatTranscript'
 import type { PrimeSessionTree } from '../lib/primeSessionTree'
 import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
 import { useMenuBarSessionOpen } from '../hooks/useMenuBarSessionOpen'
@@ -171,6 +176,19 @@ export function usePrimeSessionSwitcher({
     setTranscriptState('loading')
     agent.replaceMessages([])
     try {
+      if (isNativeSessionPath(session.path)) {
+        const opened = await callHost<NativeChatOpenResult>('native_chat_open', {
+          sessionId: session.id,
+        })
+        startTransition(() => {
+          agent.replaceMessages(nativeEventsToConversation(opened.events))
+          setTranscriptState('ready')
+          if (typeof options?.messageIndex === 'number') {
+            setFocusedTranscriptIndex(options.messageIndex)
+          }
+        })
+        return
+      }
       if (vaultPath && !hostRunning) {
         await callHost('ensure_prime_session_host', { vaultPath })
       }

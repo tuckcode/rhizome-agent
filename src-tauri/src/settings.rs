@@ -187,6 +187,11 @@ pub struct Settings {
     /// and any other client: archiving is Rhizome's view of the list, and must
     /// not alter what anyone else sees. See `docs/adr/0165-archiving-prime-sessions.md`.
     pub archived_prime_sessions: Option<Vec<String>>,
+    /// Native chats the user has filed out of the main history list.
+    ///
+    /// Session ids. Rhizome's own view: native logs stay on disk, the same
+    /// way [`Self::archived_prime_sessions`] never touches `~/.prime`.
+    pub archived_native_sessions: Option<Vec<String>>,
     /// The models the chat picker shows, as `"provider/id"` keys.
     ///
     /// `None` — the default — means no curation: show the whole catalog. A
@@ -441,6 +446,7 @@ fn normalize_settings(settings: Settings) -> Settings {
         // Passed through untouched: an id is Prime's own uuid, and there is no
         // normalising to do to a set of them.
         archived_prime_sessions: settings.archived_prime_sessions,
+        archived_native_sessions: settings.archived_native_sessions,
         prime_model_allow_list: normalize_prime_model_allow_list(settings.prime_model_allow_list),
         keep_sessions_running_on_quit: settings.keep_sessions_running_on_quit,
         keep_in_taskbar_on_close: settings.keep_in_taskbar_on_close,
@@ -962,6 +968,18 @@ mod tests {
     }
 
     #[test]
+    fn archived_native_sessions_survive_save_and_reload() {
+        let loaded = save_and_reload(Settings {
+            archived_native_sessions: Some(vec!["n1".into()]),
+            ..Settings::default()
+        });
+        assert_eq!(
+            loaded.archived_native_sessions,
+            Some(vec!["n1".to_string()])
+        );
+    }
+
+    #[test]
     fn keep_in_taskbar_on_close_defaults_off() {
         assert_eq!(Settings::default().keep_in_taskbar_on_close, None);
         let loaded = save_and_reload(Settings {
@@ -975,6 +993,7 @@ mod tests {
     fn test_settings_json_roundtrip() {
         let settings = Settings {
             archived_prime_sessions: Some(vec!["01a0252e-filed".to_string()]),
+            archived_native_sessions: Some(vec!["native-filed".to_string()]),
             prime_model_allow_list: Some(vec!["opencode/hy3-free".to_string()]),
             keep_sessions_running_on_quit: Some(true),
             keep_in_taskbar_on_close: Some(true),

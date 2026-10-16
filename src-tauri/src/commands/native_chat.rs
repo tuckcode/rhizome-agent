@@ -550,6 +550,8 @@ pub struct NativeChatListItem {
     pub created_at: String,
     pub target: String,
     pub title: String,
+    #[serde(default)]
+    pub archived: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -565,15 +567,65 @@ pub struct NativeChatOpenResult {
 
 pub fn list_native_sessions() -> Result<Vec<NativeChatListItem>, String> {
     let headers = crate::engines::native_log::list_session_headers()?;
-    Ok(headers
+    let archived = settings::get_settings()
+        .ok()
+        .and_then(|settings| settings.archived_native_sessions)
+        .unwrap_or_default();
+    Ok(mark_native_archived(
+        headers
+            .into_iter()
+            .map(|header| NativeChatListItem {
+                session_id: header.session_id,
+                created_at: header.created_at,
+                target: header.target,
+                title: String::new(),
+                archived: false,
+            })
+            .collect(),
+        &archived,
+    ))
+}
+
+/// Flag filed native chats without dropping them from the list.
+pub fn mark_native_archived(
+    items: Vec<NativeChatListItem>,
+    archived_ids: &[String],
+) -> Vec<NativeChatListItem> {
+    if archived_ids.is_empty() {
+        return items;
+    }
+    let archived: std::collections::HashSet<&str> =
+        archived_ids.iter().map(String::as_str).collect();
+    items
         .into_iter()
-        .map(|header| NativeChatListItem {
-            session_id: header.session_id,
-            created_at: header.created_at,
-            target: header.target,
-            title: String::new(),
+        .map(|mut item| {
+            item.archived = archived.contains(item.session_id.as_str());
+            item
         })
-        .collect())
+        .collect()
+}
+
+/// File a native chat out of the main list, or put it back.
+///
+/// Rhizome's own state. Native logs stay on disk.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn set_native_session_archived(session_id: String, archived: bool) -> Result<(), String> {
+    let session_id = session_id.trim().to_string();
+    if session_id.is_empty() {
+        return Err("A session needs an id to archive".into());
+    }
+    let mut stored = settings::get_settings()?;
+    let mut ids = stored.archived_native_sessions.take().unwrap_or_default();
+    if archived {
+        if !ids.iter().any(|id| id == &session_id) {
+            ids.push(session_id);
+        }
+    } else {
+        ids.retain(|id| id != &session_id);
+    }
+    stored.archived_native_sessions = Some(ids);
+    settings::save_settings(stored)
 }
 
 pub fn open_native_session_record(session_id: &str) -> Result<NativeChatOpenResult, String> {
@@ -1249,6 +1301,29 @@ mod tests {
                 text: String::new(),
             };
         });
+    }
+
+    #[test]
+    fn native_list_items_carry_the_archive_flag() {
+        let items = vec![
+            NativeChatListItem {
+                session_id: "keep".into(),
+                created_at: String::new(),
+                target: String::new(),
+                title: String::new(),
+                archived: false,
+            },
+            NativeChatListItem {
+                session_id: "file".into(),
+                created_at: String::new(),
+                target: String::new(),
+                title: String::new(),
+                archived: false,
+            },
+        ];
+        let marked = mark_native_archived(items, &["file".into()]);
+        assert!(!marked[0].archived);
+        assert!(marked[1].archived);
     }
 
     #[test]
