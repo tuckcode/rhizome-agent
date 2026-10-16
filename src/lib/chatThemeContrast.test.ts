@@ -58,6 +58,14 @@ describe('chat theme contrast tokens (B2–B4)', () => {
     expect(token(dark, '--text-tertiary')).toBe('#A8A592')
   })
 
+  it('gives Earth light group-label muted text at least 4.5:1 on popover', () => {
+    const popover = token(light, '--surface-popover')
+    expect(contrastRatio(token(light, '--text-muted'), popover)).toBeGreaterThanOrEqual(4.5)
+    expect(contrastRatio(token(light, '--text-secondary'), popover)).toBeGreaterThanOrEqual(4.5)
+    expect(token(light, '--muted-foreground')).toBe('var(--text-secondary)')
+    expect(token(light, '--popover')).toBe('var(--surface-popover)')
+  })
+
   it('gives muted, faint, and tertiary at least 4.5:1 on selected-strong', () => {
     for (const block of [light, dark, graphite]) {
       const selected = token(block, '--state-selected-strong')

@@ -9,7 +9,11 @@ import {
   REMOVED_PROVIDER_ERROR,
   REMOVED_PROVIDER_LABEL,
   resolveRhizomeChatModel,
+  rhizomeModelVisibleName,
+  rhizomeProviderNeedsApiKey,
   seedRhizomeChatModels,
+  excludeKeylessRhizomeModels,
+  countKeylessRhizomeProviders,
 } from './rhizomeChatModels'
 
 vi.mock('./callHost', () => ({
@@ -69,6 +73,8 @@ describe('seedRhizomeChatModels', () => {
     expect(listed.some((model) => model.id === 'free_tier_auto')).toBe(true)
     expect(listed.some((model) => model.id.startsWith('anthropic/'))).toBe(false)
     expect(listed.at(-1)?.id).toBe('free_tier_auto')
+    expect(listed.find((model) => model.id === 'work-openai/gpt-4o')?.displayName).toBe('GPT-4o')
+    expect(rhizomeModelVisibleName(listed.at(-1)!)).toBe('Free tier (auto)')
   })
 
   it('lists OpenRouter Claude models and still hides Anthropic and Claude Code', () => {
@@ -192,5 +198,20 @@ describe('resolveRhizomeChatModel', () => {
         (model) => model.label === REMOVED_PROVIDER_LABEL,
       ),
     ).toBe(false)
+  })
+
+  it('asks for a Settings key only on remote catalog kinds with no configured provider', () => {
+    expect(rhizomeProviderNeedsApiKey('open_ai', configured)).toBe(false)
+    expect(rhizomeProviderNeedsApiKey('gemini', configured)).toBe(true)
+    expect(rhizomeProviderNeedsApiKey('ollama', [])).toBe(false)
+    expect(rhizomeProviderNeedsApiKey('open_ai', [])).toBe(true)
+  })
+
+  it('omits keyless remote catalog groups and counts them for the footer', () => {
+    const listed = seedRhizomeChatModels(configured)
+    const keyed = excludeKeylessRhizomeModels(listed, configured)
+    expect(keyed.some((model) => model.providerKind === 'gemini')).toBe(false)
+    expect(keyed.some((model) => model.id === 'work-openai/gpt-4o')).toBe(true)
+    expect(countKeylessRhizomeProviders(listed, configured)).toBeGreaterThan(0)
   })
 })

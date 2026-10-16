@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ImageSquare, PaperPlaneRight, Plugs, Plus, Sparkle, Stop, X } from '@phosphor-icons/react'
 import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
@@ -32,6 +32,7 @@ import type { CommandMenuAction, CommandMenuEntry } from '../lib/primeCommandMen
 import { primeQueueIsEmpty, primeQueueItems, type PrimeQueue } from '../lib/primeQueue'
 import { PrimeQueueItemActions } from './PrimeQueueItemActions'
 import { cn } from '@/lib/utils'
+import { composerIsMultiline } from '../lib/composerMultiline'
 import { requestMcpSetupToggle } from '../hooks/useMcpSetupDialogController'
 import { expandReplyQuotes } from '../lib/replyQuote'
 import { suggestReply } from '../lib/replySuggestions'
@@ -179,7 +180,6 @@ function composerStopButtonStyle(): CSSProperties {
 function ComposerInput({
   disabled,
   entries,
-  hasControls,
   input,
   inputRef,
   onChange,
@@ -200,7 +200,6 @@ function ComposerInput({
 }: {
   disabled: boolean
   entries: VaultEntry[]
-  hasControls: boolean
   input: string
   inputRef: React.RefObject<HTMLDivElement | null>
   onChange: (value: string) => void
@@ -239,16 +238,10 @@ function ComposerInput({
       unsupportedPasteMessage={unsupportedPasteMessage}
       disabled={disabled}
       placeholder={shownPlaceholder}
-      placeholderClassName={
-        completion
-          ? cn(
-              hasControls ? 'flex items-center px-1 text-[13px] leading-5' : 'flex items-center px-[10px] py-[8px] text-[13px]',
-              'italic',
-            )
-          : hasControls
-            ? 'flex items-center px-1 text-[13px] leading-5'
-            : undefined
-      }
+      placeholderClassName={cn(
+        'flex items-center p-1 text-[13px] leading-5',
+        completion && 'italic',
+      )}
       placeholderTestId={completion ? 'composer-reply-completion' : undefined}
       onAcceptCompletion={onAcceptCompletion}
       onDismissCompletion={onDismissCompletion}
@@ -259,10 +252,7 @@ function ComposerInput({
       commandInstantLabel={commandInstantLabel}
       onCommandAction={onCommandAction}
       onBrowsePromptHistory={onBrowsePromptHistory}
-      editorClassName={cn(
-        'max-h-[120px] overflow-y-auto overscroll-contain',
-        hasControls && 'min-h-0 border-0 px-1 py-1 leading-5',
-      )}
+      editorClassName="max-h-[120px] min-h-[30px] overflow-y-auto overscroll-contain border-0 px-1 py-1 leading-5"
       editorStyle={{ maxHeight: 120, overflowY: 'auto', overscrollBehavior: 'contain' }}
     />
   )
@@ -1071,6 +1061,20 @@ export function AiPanelComposer({
   const hasPayload = hasInput || attachments.length > 0
   const canSend = !composerDisabled && hasPayload
   const placeholder = getComposerPlaceholder(agentLabel, agentReadiness, t)
+  const boxRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const box = boxRef.current
+    const editor = inputRef.current
+    if (!box) return
+    const measure = () => {
+      box.dataset.multiline = editor && composerIsMultiline(editor) ? 'true' : 'false'
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined' || !editor) return
+    const observer = new ResizeObserver(measure)
+    observer.observe(editor)
+    return () => observer.disconnect()
+  }, [input, inputRef])
   const hasControls = controls !== undefined && controls !== null
   // While a turn runs: typed text steers it, empty input stops it. The button
   // says which, so the affordance is never ambiguous.
@@ -1198,10 +1202,12 @@ export function AiPanelComposer({
           ))}
         </ul>
       ) : null}
-      <div className={cn(
-        'flex items-center gap-1',
-        hasControls && 'rounded-xl border border-border bg-background px-1.5 py-0.5 shadow-xs',
-      )}>
+      <div
+        ref={boxRef}
+        className="flex items-center gap-1 rounded-xl border border-border bg-background p-1 shadow-xs data-[multiline=true]:items-end"
+        data-testid="chat-composer-box"
+        data-multiline="false"
+      >
         <ComposerPlusMenu
           locale={locale}
           onAttachImages={onAttachImages}
@@ -1215,7 +1221,6 @@ export function AiPanelComposer({
           <ComposerInput
             disabled={composerDisabled}
             entries={entries}
-            hasControls={hasControls}
             input={input}
             inputRef={inputRef}
             onChange={onChange}

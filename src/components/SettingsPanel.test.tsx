@@ -1040,10 +1040,20 @@ describe('SettingsPanel', () => {
     return values.some((value) => value === 'hidden' || value === 'clip')
   }
 
+  function isModelMenuChrome(el: HTMLElement): boolean {
+    const id = el.getAttribute('data-testid')
+    return (
+      id === 'native-chat-model-menu'
+      || id === 'native-chat-model-list'
+      || id === 'native-chat-model-filter-row'
+      || id === 'native-chat-model-footer'
+    )
+  }
+
   function clippingAncestor(node: HTMLElement): HTMLElement | null {
     let current = node.parentElement
     while (current && current !== document.body && current !== document.documentElement) {
-      if (clipsDescendants(current)) return current
+      if (!isModelMenuChrome(current) && clipsDescendants(current)) return current
       current = current.parentElement
     }
     return null
@@ -1096,7 +1106,7 @@ describe('SettingsPanel', () => {
     expect(clipGroup?.contains(menu)).toBe(false)
     expect(settings.contains(menu)).toBe(false)
 
-    const option = await screen.findByTestId('native-chat-model-open_ai/gpt-4.1-mini')
+    const option = await screen.findByTestId('native-chat-model-free_tier_auto')
     expect(clippingAncestor(option)).toBeNull()
     expect((dialog as HTMLElement).contains(option)).toBe(false)
     expect(overflow?.contains(option)).toBe(false)
@@ -1104,7 +1114,7 @@ describe('SettingsPanel', () => {
     await act(async () => {
       fireEvent.click(option)
     })
-    expect(trigger).toHaveTextContent('OpenAI · gpt-4.1-mini')
+    expect(trigger).toHaveTextContent('Free tier (auto)')
   })
 
   it('persists the native Chat engine across a settings save and reload', () => {

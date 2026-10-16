@@ -34,6 +34,7 @@ interface ChatComposerDeckProps {
   nativeTarget?: string | null
   onNativeTargetChange?: (target: string) => void
   providers?: AiModelProvider[] | null
+  onOpenProviders?: () => void
 }
 
 function pillClass(accent = false) {
@@ -94,6 +95,7 @@ export function ChatComposerDeck({
   nativeTarget,
   onNativeTargetChange,
   providers,
+  onOpenProviders,
 }: ChatComposerDeckProps) {
   const t = createTranslator(locale)
   const rhizome = catalog === 'rhizome'
@@ -105,10 +107,12 @@ export function ChatComposerDeck({
       >
         {rhizome ? (
           <NativeChatModelPicker
+            locale={locale}
             value={nativeTarget}
             onChange={(target) => onNativeTargetChange?.(target)}
             providers={providers}
             variant="chip"
+            onOpenProviders={onOpenProviders}
           />
         ) : (
           <PrimeModelPicker

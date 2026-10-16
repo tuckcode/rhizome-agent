@@ -2172,6 +2172,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         chatEngineUpdate={primeUpdateStatus}
         onApplyChatEngineUpdate={() => { void primeUpdateActions.applyEngineUpdate() }}
         railLayoutWidth={sessionsRailLayoutWidth}
+        onOpenAiSettings={handleOpenAiSettings}
       />
     </Suspense>
   )
