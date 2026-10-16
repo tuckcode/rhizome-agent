@@ -942,6 +942,97 @@ describe('SettingsPanel', () => {
     expect(screen.queryByTestId('settings-default-ai-agent')).not.toBeInTheDocument()
   })
 
+  /**
+   * jsdom has no layout, so visibility cannot prove a menu escaped a clip.
+   * Walk parents (not the menu itself — it uses overflow-y-auto) and require
+   * no overflow-hidden / overflow-clip ancestor, including inline overflow
+   * styles. Theme classes and CSS variables live on html (`data-theme`,
+   * `.dark`, `:root`), so a document.body portal still sits inside the
+   * themed element and keeps popover background, padding, and hover.
+   */
+  function clipsDescendants(node: HTMLElement): boolean {
+    if (node.classList.contains('overflow-hidden') || node.classList.contains('overflow-clip')) {
+      return true
+    }
+    const computed = window.getComputedStyle(node)
+    const values = [
+      node.style.overflow,
+      node.style.overflowX,
+      node.style.overflowY,
+      computed.overflow,
+      computed.overflowX,
+      computed.overflowY,
+    ]
+    return values.some((value) => value === 'hidden' || value === 'clip')
+  }
+
+  function clippingAncestor(node: HTMLElement): HTMLElement | null {
+    let current = node.parentElement
+    while (current && current !== document.body && current !== document.documentElement) {
+      if (clipsDescendants(current)) return current
+      current = current.parentElement
+    }
+    return null
+  }
+
+  function expectMenuInThemedPortal(menu: HTMLElement, mode: 'dark' | 'light' = 'dark') {
+    const themed = document.documentElement
+    expect(themed).toHaveAttribute('data-theme', mode)
+    if (mode === 'dark') expect(themed).toHaveClass('dark')
+    else expect(themed).not.toHaveClass('dark')
+    expect(themed.contains(menu)).toBe(true)
+    expect(document.body.contains(menu)).toBe(true)
+    expect(clippingAncestor(menu)).toBeNull()
+  }
+
+  it('opens the model menu in a portal outside the settings overflow box and selects a model', async () => {
+    document.documentElement.setAttribute('data-theme', 'dark')
+    document.documentElement.classList.add('dark')
+    render(
+      <SettingsPanel
+        open={true}
+        settings={{ ...emptySettings, native_chat_target: 'gemini/gemini-2.5-flash' }}
+        onSave={onSave}
+        onClose={onClose}
+      />,
+    )
+
+    const trigger = screen.getByTestId('native-chat-model-trigger')
+    expect(trigger).toHaveTextContent('Gemini · gemini-2.5-flash')
+
+    fireEvent.pointerDown(
+      trigger,
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+
+    const menu = await screen.findByTestId('native-chat-model-menu')
+    expectMenuInThemedPortal(menu)
+    expect(menu).toHaveAttribute('data-settings-panel-portal', 'true')
+    expect(menu.className).toMatch(/z-\[12000\]/)
+
+    const settings = screen.getByTestId('settings-panel')
+    const dialog = settings.querySelector('[role="dialog"]')
+    const overflow = settings.querySelector('.overflow-auto')
+    const clipGroup = trigger.closest('.overflow-hidden')
+    expect(dialog).toBeInstanceOf(HTMLElement)
+    expect(overflow).not.toBeNull()
+    expect(clipGroup).not.toBeNull()
+    expect((dialog as HTMLElement).contains(menu)).toBe(false)
+    expect(overflow?.contains(menu)).toBe(false)
+    expect(clipGroup?.contains(menu)).toBe(false)
+    expect(settings.contains(menu)).toBe(false)
+
+    const option = await screen.findByTestId('native-chat-model-open_ai/gpt-4.1-mini')
+    expect(clippingAncestor(option)).toBeNull()
+    expect((dialog as HTMLElement).contains(option)).toBe(false)
+    expect(overflow?.contains(option)).toBe(false)
+    expect(clipGroup?.contains(option)).toBe(false)
+    await act(async () => {
+      fireEvent.click(option)
+    })
+    expect(trigger).toHaveTextContent('OpenAI · gpt-4.1-mini')
+  })
+
   it('persists the native Chat engine across a settings save and reload', () => {
     const { rerender } = render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
