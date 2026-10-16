@@ -8,7 +8,7 @@ import { startResizeDrag } from './utils/startResizeDrag'
 import { COMMAND_RAIL_WIDTH_PX, overlayTitleBarBandStyle, railConsumesExpandedWidth, reportedCommandRailLayoutWidth, subheadTrafficLightInset } from './utils/trafficLights'
 import { Sidebar } from './components/Sidebar'
 import { CommandRail } from './components/CommandRail'
-import type { RailViewId } from './lib/railViews'
+import { computeActiveRailView, type RailViewId } from './lib/railViews'
 import { peerToolExitLabel, peerToolOriginFromScreen, type PeerToolOrigin } from './lib/peerToolExit'
 import { NoteList } from './components/NoteList'
 import {
@@ -633,16 +633,12 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     handleSetSelection,
     rememberPeerToolOrigin,
   ])
-  const activeRailView: RailViewId | null =
-    isResearchDestination
-      ? 'research'
-      : isGraphDestination
-        ? 'graph'
-        : isMyceliumDestination
-          ? 'mycelium'
-          : effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse'
-            ? 'history'
-            : null
+  const activeRailView: RailViewId | null = computeActiveRailView(
+    effectiveSelection,
+    isGraphDestination,
+    isMyceliumDestination,
+    isResearchDestination,
+  )
 
   const handleOpenVaultSettings = useCallback(() => {
     setSettingsInitialSectionId(SETTINGS_SECTION_IDS.workspaces)
@@ -2176,6 +2172,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         chatEngineUpdate={primeUpdateStatus}
         onApplyChatEngineUpdate={() => { void primeUpdateActions.applyEngineUpdate() }}
         railLayoutWidth={sessionsRailLayoutWidth}
+        onOpenAiSettings={handleOpenAiSettings}
       />
     </Suspense>
   )

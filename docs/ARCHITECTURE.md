@@ -585,7 +585,8 @@ Each answers "nothing", which is true of a host with no session.
   locating the binary, checking GitHub for a newer Chat-engine release
   (`check_prime_update`), applying it only after a click
   (`apply_prime_update({ expectedVersion, chatBusy })`), and seeding the
-  Rhizome vault skill.   Apply refuses a busy chat (host `is_streaming()` is the guard; the
+  Rhizome vault skill when a Prime chat starts — never on vault open.
+  Apply refuses a busy chat (host `is_streaming()` is the guard; the
   client `chatBusy` flag is only a hint), a stale offer, or a
   missing binary. It runs `prime-agent update` (one `--force` retry when
   the CLI says it is already latest), then reloads the attached session.
@@ -714,23 +715,24 @@ itself: an empty allow-list means *never curated* (normalized to `None` in
 Rust), and a list matching no live model shows everything. `activeModelKey`
 keeps whatever is running listed, since the picker only ever receives a label.
 
-#### Prime packages (Pi catalog)
+#### Prime packages
 
-Settings → **Packages** is the Pi catalog hub. Prime is a
-distribution of Pi, so the catalog is npm's `pi-package` keyword — the same
-index as [pi.dev/packages](https://pi.dev/packages). Installed entries come
-from `~/.prime/agent/settings.json` via `list_prime_packages`. Install runs
-`prime-agent package install` in the background (`install_prime_package`), then
-reloads the attached Prime session (`reload`). Prime's own docs warn that
-packages run with full system access; Settings confirms that once per install.
+Settings → AI Agents → **Advanced Prime engine** holds Prime install status,
+Copy MCP config, and the package catalog. The catalog is npm's `pi-package`
+keyword — the same index as [pi.dev/packages](https://pi.dev/packages).
+Installed entries come from `~/.prime/agent/settings.json` via
+`list_prime_packages`. Install runs `prime-agent package install` in the
+background (`install_prime_package`), then reloads the attached Prime session
+(`reload`). Settings shows the full-system-access warning on its own line.
 If the CLI is missing, Settings copies the command or asks Chat to run it
 (`primePackageAskAgentPrompt`). Kind tabs (extension / skill / prompt / theme)
 add a second keyword. Search hits the public npm registry from the renderer
 (`catalogSearchUrl`). Prime's **daemon has no install command**. Install is a
 180s background process (`prime_packages.rs`). Bare names become `npm:{name}`.
-Sources that start with `-` or contain whitespace are refused. Opening Settings
-does **not** search the catalog until Packages is visited or that section
-scrolls into view.
+Sources that start with `-` or contain whitespace are refused. Expanding
+Advanced Prime engine does **not** search the catalog until **Browse packages**
+is opened. An old Packages section id (`packages`, `settings-section-extensions`)
+opens that disclosure.
 
 The allow-list is Rhizome's view of Prime's catalog, in the same sense as
 archiving below: Prime's CLI and every other client still see all 501.
@@ -787,7 +789,8 @@ composer dropdown when Chat is on the native engine, or when Prime is
 not running after a rebuild. It seeds from
 `aiModelProviderCatalog.json` plus `settings.ai_model_providers`, then
 asks `discover_ai_models` (`GET {base_url}/models`) for local and
-configured providers. A failed discover is dropped; the seed stays.
+configured providers. That command runs the blocking HTTP off the UI
+thread. A failed discover is dropped; the seed stays.
 Catalog defaults keep kind-keyed ids (`open_ai/…`, `open_router/…`).
 Configured providers key on the provider id (`work-openai/gpt-4o`) so
 two accounts of the same kind stay distinct. An old kind-keyed

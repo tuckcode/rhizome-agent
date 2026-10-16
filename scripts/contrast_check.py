@@ -14,9 +14,9 @@ Pass a design token file to keep the old design-file mode:
 Prints each text token's ratio on each surface (including hover and
 selected), status text on its tinted fill, input borders, and focus rings.
 App CSS also checks the dark-skin ink ladder (primary > secondary >
-tertiary > muted > faint) on --surface-app, banner tints, hover,
-sidebar, panel, and selected-row fills (resolved cascade). Each step
-stays at or above 4.5:1.
+tertiary > muted > faint) on --surface-app, banner tints blended over
+app / sidebar / panel, hover, sidebar, panel, and selected-row fills
+(resolved cascade). Each step stays at or above 4.5:1.
 A color the script cannot parse (hsl(), oklch(), color-mix(), an
 unresolved var(), …) is a FAIL that names the theme, token, and raw
 value — it is not skipped. Exits non-zero if any pair is below WCAG AA
@@ -617,7 +617,8 @@ def report_dark_ink(tokens: dict[str, str], theme: str) -> tuple[list[str], list
         return rows, fails
 
     panel_name = pick_name(tokens, ('--surface-panel', '--surface'))
-    banner_bases = [name for name in (panel_name, bg_name) if name][:1] or [bg_name]
+    sidebar_name = pick_name(tokens, ('--surface-sidebar',))
+    banner_bases = [name for name in (panel_name, bg_name, sidebar_name) if name] or [bg_name]
     ink_rgb: dict[str, list[int]] = {}
 
     for text_name in INK_LADDER_ROLES:

@@ -74,6 +74,7 @@ interface ChatHomeProps {
   /** Chat engine offer. The banner is the visible control. */
   chatEngineUpdate?: PrimeUpdateStatus
   onApplyChatEngineUpdate?: () => void
+  onOpenAiSettings?: () => void
 }
 
 /**
@@ -111,6 +112,7 @@ export default function ChatHome({
   chatEngineUpdate,
   onApplyChatEngineUpdate,
   railLayoutWidth,
+  onOpenAiSettings,
 }: ChatHomeProps) {
   // Chat is Prime's home canvas (ADR-0166). A direct API model chosen as the
   // global default must not strip Prime chrome or route chat away from Prime.
@@ -306,32 +308,35 @@ export default function ChatHome({
             ) : undefined
           }
           composerDeck={
-            <ChatComposerDeck
-              locale={locale}
-              vaultPath={vaultPath}
-              hostReady={Boolean(primeHost?.running)}
-              catalog={rhizomeCatalog ? 'rhizome' : 'prime'}
-              nativeTarget={nativeTarget}
-              onNativeTargetChange={onNativeTargetChange}
-              providers={aiModelProviders}
-              contextLabel={openNote ? openNote.label.split('/').filter(Boolean).at(-1) ?? openNote.label : null}
-              onCloseContext={() => {
-                setOpenNote(null)
-              }}
-              model={primeModelLabel(primeHost)}
-              thinkingLevel={primeHost?.thinkingLevel ?? null}
-              activity={
-                // Idle agents are the normal state; only working ones earn
-                // a place on the row (native audit 2026-09-26).
-                rhizomeJobs.activeJobs.length > 0 ? (
-                  <AgentsPill
-                    jobs={rhizomeJobs.activeJobs}
-                    onCancelJob={rhizomeJobs.cancelJob}
-                    locale={locale}
-                  />
-                ) : null
-              }
-            />
+            isPrimeChat && (showPrimeChrome || rhizomeCatalog) ? (
+              <ChatComposerDeck
+                locale={locale}
+                vaultPath={vaultPath}
+                hostReady={Boolean(primeHost?.running)}
+                catalog={rhizomeCatalog ? 'rhizome' : 'prime'}
+                nativeTarget={nativeTarget}
+                onNativeTargetChange={onNativeTargetChange}
+                providers={aiModelProviders}
+                onOpenProviders={onOpenAiSettings}
+                contextLabel={openNote ? openNote.label.split('/').filter(Boolean).at(-1) ?? openNote.label : null}
+                onCloseContext={() => {
+                  setOpenNote(null)
+                }}
+                model={primeModelLabel(primeHost)}
+                thinkingLevel={primeHost?.thinkingLevel ?? null}
+                activity={
+                  // Idle agents are the normal state; only working ones earn
+                  // a place on the row (native audit 2026-09-26).
+                  rhizomeJobs.activeJobs.length > 0 ? (
+                    <AgentsPill
+                      jobs={rhizomeJobs.activeJobs}
+                      onCancelJob={rhizomeJobs.cancelJob}
+                      locale={locale}
+                    />
+                  ) : null
+                }
+              />
+            ) : undefined
           }
           composerSkillsLabel="rhizome-vault"
           onClose={onExit}

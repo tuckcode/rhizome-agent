@@ -177,22 +177,34 @@ describe('SettingsPanel', () => {
     }
   })
 
-  it('does not search the Prime package catalog until Packages is opened', async () => {
+  it('keeps Packages out of the Settings nav and collapsed under Advanced Prime engine', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({ objects: [], total: 0 }),
     } as Response)
     try {
       renderOpenSettings()
-      expect(screen.getByTestId('settings-nav-settings-section-extensions')).toHaveTextContent(
-        'Packages',
+      expect(screen.queryByTestId('settings-nav-settings-section-extensions')).not.toBeInTheDocument()
+      expect(screen.getByTestId('settings-advanced-prime-engine-toggle')).toHaveAttribute(
+        'aria-expanded',
+        'false',
       )
+      expect(screen.queryByTestId('prime-extensions-search')).not.toBeInTheDocument()
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 30))
       })
       expect(fetchSpy).not.toHaveBeenCalled()
 
-      fireEvent.click(screen.getByTestId(`settings-nav-${SETTINGS_SECTION_IDS.extensions}`))
+      fireEvent.click(screen.getByTestId('settings-advanced-prime-engine-toggle'))
+      expect(await screen.findByText('Packages')).toBeInTheDocument()
+      expect(screen.getByText('Prime is not installed')).toBeInTheDocument()
+      expect(screen.queryByTestId('prime-extensions-search')).not.toBeInTheDocument()
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 30))
+      })
+      expect(fetchSpy).not.toHaveBeenCalled()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Browse packages' }))
       expect(await screen.findByTestId('prime-extensions-search')).toBeInTheDocument()
       await waitFor(() => {
         expect(fetchSpy).toHaveBeenCalled()
@@ -201,6 +213,68 @@ describe('SettingsPanel', () => {
     } finally {
       fetchSpy.mockRestore()
     }
+  })
+
+  it('opens Advanced Prime engine for an old Packages section id', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ objects: [], total: 0 }),
+    } as Response)
+    try {
+      render(
+        <SettingsPanel
+          open={true}
+          settings={emptySettings}
+          initialSectionId="packages"
+          onSave={onSave}
+          onClose={onClose}
+        />,
+      )
+      expect(await screen.findByText('Packages')).toBeInTheDocument()
+      expect(screen.getByTestId('settings-advanced-prime-engine-toggle')).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      )
+      expect(screen.queryByTestId('prime-extensions-search')).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Browse packages' }))
+      expect(await screen.findByTestId('prime-extensions-search')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalled()
+      })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('puts Prime install status and Copy MCP above Packages', () => {
+    const aiAgentsStatus: AiAgentsStatus = {
+      ...createMissingAiAgentsStatus(),
+      prime: createAiAgentAvailability('installed', '2.1.18'),
+    }
+    render(
+      <SettingsPanel
+        open={true}
+        settings={emptySettings}
+        aiAgentsStatus={aiAgentsStatus}
+        onSave={onSave}
+        onCopyMcpConfig={vi.fn()}
+        onClose={onClose}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: 'Copy MCP config' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('settings-advanced-prime-engine-toggle'))
+    const advanced = screen.getByTestId('settings-advanced-prime-engine')
+    expect(within(advanced).getByTestId('settings-advanced-prime-install-status')).toHaveTextContent(
+      'Prime is installed',
+    )
+    expect(within(advanced).getByTestId('settings-advanced-prime-install-status')).toHaveTextContent(
+      '2.1.18',
+    )
+    const copy = within(advanced).getByRole('button', { name: 'Copy MCP config' })
+    const packagesHeading = within(advanced).getByText('Packages')
+    expect(
+      copy.compareDocumentPosition(packagesHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   it('loads the Prime catalog when Settings opens on Agents', async () => {
@@ -942,6 +1016,107 @@ describe('SettingsPanel', () => {
     expect(screen.queryByTestId('settings-default-ai-agent')).not.toBeInTheDocument()
   })
 
+  /**
+   * jsdom has no layout, so visibility cannot prove a menu escaped a clip.
+   * Walk parents (not the menu itself — it uses overflow-y-auto) and require
+   * no overflow-hidden / overflow-clip ancestor, including inline overflow
+   * styles. Theme classes and CSS variables live on html (`data-theme`,
+   * `.dark`, `:root`), so a document.body portal still sits inside the
+   * themed element and keeps popover background, padding, and hover.
+   */
+  function clipsDescendants(node: HTMLElement): boolean {
+    if (node.classList.contains('overflow-hidden') || node.classList.contains('overflow-clip')) {
+      return true
+    }
+    const computed = window.getComputedStyle(node)
+    const values = [
+      node.style.overflow,
+      node.style.overflowX,
+      node.style.overflowY,
+      computed.overflow,
+      computed.overflowX,
+      computed.overflowY,
+    ]
+    return values.some((value) => value === 'hidden' || value === 'clip')
+  }
+
+  function isModelMenuChrome(el: HTMLElement): boolean {
+    const id = el.getAttribute('data-testid')
+    return (
+      id === 'native-chat-model-menu'
+      || id === 'native-chat-model-list'
+      || id === 'native-chat-model-filter-row'
+      || id === 'native-chat-model-footer'
+    )
+  }
+
+  function clippingAncestor(node: HTMLElement): HTMLElement | null {
+    let current = node.parentElement
+    while (current && current !== document.body && current !== document.documentElement) {
+      if (!isModelMenuChrome(current) && clipsDescendants(current)) return current
+      current = current.parentElement
+    }
+    return null
+  }
+
+  function expectMenuInThemedPortal(menu: HTMLElement, mode: 'dark' | 'light' = 'dark') {
+    const themed = document.documentElement
+    expect(themed).toHaveAttribute('data-theme', mode)
+    if (mode === 'dark') expect(themed).toHaveClass('dark')
+    else expect(themed).not.toHaveClass('dark')
+    expect(themed.contains(menu)).toBe(true)
+    expect(document.body.contains(menu)).toBe(true)
+    expect(clippingAncestor(menu)).toBeNull()
+  }
+
+  it('opens the model menu in a portal outside the settings overflow box and selects a model', async () => {
+    document.documentElement.setAttribute('data-theme', 'dark')
+    document.documentElement.classList.add('dark')
+    render(
+      <SettingsPanel
+        open={true}
+        settings={{ ...emptySettings, native_chat_target: 'gemini/gemini-2.5-flash' }}
+        onSave={onSave}
+        onClose={onClose}
+      />,
+    )
+
+    const trigger = screen.getByTestId('native-chat-model-trigger')
+    expect(trigger).toHaveTextContent('Gemini · gemini-2.5-flash')
+
+    fireEvent.pointerDown(
+      trigger,
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+
+    const menu = await screen.findByTestId('native-chat-model-menu')
+    expectMenuInThemedPortal(menu)
+    expect(menu).toHaveAttribute('data-settings-panel-portal', 'true')
+    expect(menu.className).toMatch(/z-\[12000\]/)
+
+    const settings = screen.getByTestId('settings-panel')
+    const dialog = settings.querySelector('[role="dialog"]')
+    const overflow = settings.querySelector('.overflow-auto')
+    const clipGroup = trigger.closest('.overflow-hidden')
+    expect(dialog).toBeInstanceOf(HTMLElement)
+    expect(overflow).not.toBeNull()
+    expect(clipGroup).not.toBeNull()
+    expect((dialog as HTMLElement).contains(menu)).toBe(false)
+    expect(overflow?.contains(menu)).toBe(false)
+    expect(clipGroup?.contains(menu)).toBe(false)
+    expect(settings.contains(menu)).toBe(false)
+
+    const option = await screen.findByTestId('native-chat-model-free_tier_auto')
+    expect(clippingAncestor(option)).toBeNull()
+    expect((dialog as HTMLElement).contains(option)).toBe(false)
+    expect(overflow?.contains(option)).toBe(false)
+    expect(clipGroup?.contains(option)).toBe(false)
+    await act(async () => {
+      fireEvent.click(option)
+    })
+    expect(trigger).toHaveTextContent('Free tier (auto)')
+  })
+
   it('persists the native Chat engine across a settings save and reload', () => {
     const { rerender } = render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
@@ -1427,6 +1602,7 @@ describe('SettingsPanel', () => {
       />
     )
 
+    fireEvent.click(screen.getByTestId('settings-advanced-prime-engine-toggle'))
     fireEvent.click(screen.getByRole('button', { name: 'Copy MCP config' }))
 
     expect(onCopyMcpConfig).toHaveBeenCalledOnce()

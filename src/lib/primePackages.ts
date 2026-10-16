@@ -171,7 +171,7 @@ function parseSearchObject(object: unknown): PrimePackageHit | null {
   const name = nameRaw.trim()
   const descriptionRaw = Reflect.get(pkg, 'description')
   const description = typeof descriptionRaw === 'string' ? descriptionRaw.trim() : ''
-  const publisher = publisherName(Reflect.get(pkg, 'publisher'))
+  const publisher = catalogPublisher(pkg, name)
   const keywordsRaw = Reflect.get(pkg, 'keywords')
   const keywords = Array.isArray(keywordsRaw)
     ? keywordsRaw.filter((keyword): keyword is string => typeof keyword === 'string')
@@ -196,11 +196,54 @@ function parseSearchObject(object: unknown): PrimePackageHit | null {
   }
 }
 
-function publisherName(publisher: unknown): string | null {
+function catalogPublisher(pkg: object, name: string): string | null {
+  const username = publisherUsername(Reflect.get(pkg, 'publisher'))
+  if (username && !isGitHubActionsPublisher(username)) return username
+  const links = Reflect.get(pkg, 'links')
+  const repoFromLinks = links && typeof links === 'object' && !Array.isArray(links)
+    ? Reflect.get(links, 'repository')
+    : null
+  const repoField = Reflect.get(pkg, 'repository')
+  return githubOwnerFromUnknown(repoFromLinks)
+    ?? githubOwnerFromUnknown(repoField)
+    ?? npmScopeOwner(name)
+}
+
+function publisherUsername(publisher: unknown): string | null {
   if (!publisher || typeof publisher !== 'object' || Array.isArray(publisher)) return null
   const username = Reflect.get(publisher, 'username')
   if (typeof username !== 'string' || username.trim().length === 0) return null
   return username.trim()
+}
+
+function isGitHubActionsPublisher(username: string): boolean {
+  const key = username.trim().toLowerCase()
+  return key === 'github actions'
+    || key === 'github-actions'
+    || key === 'github-actions[bot]'
+    || key === 'github_actions'
+}
+
+function npmScopeOwner(name: string): string | null {
+  if (!name.startsWith('@')) return null
+  const slash = name.indexOf('/')
+  if (slash <= 1) return null
+  const scope = name.slice(1, slash).trim()
+  return scope.length > 0 ? scope : null
+}
+
+function githubOwnerFromUnknown(value: unknown): string | null {
+  if (typeof value === 'string') return githubOwnerFromUrl(value)
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const url = Reflect.get(value, 'url')
+  return typeof url === 'string' ? githubOwnerFromUrl(url) : null
+}
+
+function githubOwnerFromUrl(value: string): string | null {
+  const match = value.trim().match(/(?:github\.com[/:]|github:)([^/:\s]+)\/[^/:\s]+/i)
+  const owner = match?.[1]?.trim()
+  if (!owner || isGitHubActionsPublisher(owner)) return null
+  return owner
 }
 
 function packageKinds(keywords: string[]): string[] {

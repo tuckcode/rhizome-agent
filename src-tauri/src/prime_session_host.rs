@@ -2597,7 +2597,8 @@ where
     F: FnMut(AiAgentStreamEvent),
 {
     let cwd = normalize_cwd(&request.vault_path)?;
-    ensure_host_for_cwd(cwd)?;
+    ensure_host_for_cwd(cwd.clone())?;
+    emit_prime_vault_skill_seed(&cwd, &mut emit);
 
     if request.new_session {
         match new_session() {
@@ -2814,6 +2815,29 @@ fn with_host_mut<T>(f: impl FnOnce(&mut PrimeHost) -> Result<T, String>) -> Resu
     f(host)
 }
 
+/// Seed the Prime vault skill when a chat turn starts. Write failures are a
+/// notice, not a failed turn and not a vault-open error.
+fn emit_prime_vault_skill_seed(cwd: &Path, emit: &mut impl FnMut(AiAgentStreamEvent)) {
+    match crate::prime_vault_skill::seed_vault_skill(cwd) {
+        Ok(seed) => {
+            log::info!(
+                "Prime vault skill ready at {} (vault={}, cli={})",
+                seed.skill_dir.display(),
+                seed.vault_path,
+                seed.cli_call_path.display()
+            );
+        }
+        Err(error) => {
+            log::warn!("Prime vault skill not seeded: {error}");
+            if crate::prime_vault_skill::is_prime_skill_write_failure(&error) {
+                emit(AiAgentStreamEvent::Notice {
+                    message: crate::prime_vault_skill::prime_skill_write_failure_message(&error),
+                });
+            }
+        }
+    }
+}
+
 fn ensure_host_for_cwd(cwd: PathBuf) -> Result<String, String> {
     if host_is_suspended() {
         return Err("Prime is paused while the window is hidden".into());
@@ -2823,7 +2847,6 @@ fn ensure_host_for_cwd(cwd: PathBuf) -> Result<String, String> {
         let mut guard = slot.host.lock().map_err(poison)?;
         if let Some(host) = guard.as_mut() {
             if host.is_alive() && host.cwd == cwd {
-                let _ = crate::prime_vault_skill::seed_vault_skill(&cwd);
                 return Ok(host.session_id.clone().unwrap_or_default());
             }
             // Disconnected or wrong cwd → detach and reconnect there.
@@ -3374,28 +3397,9 @@ impl PrimeHost {
             )
         })?;
 
-        // Seed Rhizome vault skill + optional mcpServers entry when cwd is a vault.
-        // Failures are non-fatal so chat still works without vault tools.
-        // Chat-without-vault uses $HOME as cwd and never seeds; still scrub a
-        // leftover global rhizome-vault skill from before #46's guard.
-        crate::prime_vault_skill::scrub_poisoned_global_home_vault_skill();
-        match crate::prime_vault_skill::seed_vault_skill(&cwd) {
-            Ok(seed) => {
-                log::info!(
-                    "Prime vault skill ready at {} (vault={}, cli={})",
-                    seed.skill_dir.display(),
-                    seed.vault_path,
-                    seed.cli_call_path.display()
-                );
-            }
-            Err(error) => {
-                // Packaged builds historically omitted cli-call.mjs from
-                // resources/mcp-server, which made every seed fail here and
-                // left agents on a stale skill with no graph path. Warn so
-                // the miss shows up in logs instead of vanishing as debug.
-                log::warn!("Prime vault skill not seeded: {error}");
-            }
-        }
+        // Do not seed `<vault>/.prime/...` here. Vault attach and host
+        // connect must not write Prime skill files. Seeding runs when a
+        // Prime chat turn starts (`run_prompt_stream`).
 
         let socket_path = daemon_socket_path().map_err(|detail| {
             let problem = unreachable_problem(&detail);
@@ -4819,6 +4823,123 @@ mod tests {
         assert_eq!(status.model_provider, defaults.default_provider);
         assert_eq!(status.thinking_level, defaults.default_thinking_level);
 
+        let _ = shutdown_host();
+    }
+
+    fn note_vault() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("AGENTS.md"), "# vault\n").unwrap();
+        dir
+    }
+
+    fn vault_skill_md(vault: &Path) -> PathBuf {
+        vault.join(".prime/agent/skills/rhizome-vault/SKILL.md")
+    }
+
+    fn prompt_stream_daemon() -> FakeDaemon {
+        FakeDaemon::start(|command, id| {
+            (command["type"].as_str() == Some("prompt")).then(|| {
+                vec![
+                    ok(id, "prompt", serde_json::Value::Null),
+                    session_event(serde_json::json!({ "type": "agent_start" })),
+                    session_event(text_delta("hello")),
+                    session_event(serde_json::json!({ "type": "agent_end", "messages": [] })),
+                ]
+            })
+        })
+    }
+
+    /// Opening / attaching a vault must not write Prime skill files.
+    ///
+    /// Chat's status poll used to call `ensure_prime_session_host` as soon as
+    /// a vault path was set. That seeded `<vault>/.prime/.../SKILL.md`. A
+    /// permission error there was swallowed, and the folder picker then
+    /// reported "Selected folder is not available."
+    #[test]
+    fn attaching_a_vault_does_not_write_the_prime_skill() {
+        let _guard = host_guard();
+        let vault = note_vault();
+        let daemon = FakeDaemon::start(|_, _| None);
+        daemon.install();
+
+        connect_host_lazy(vault.path()).expect("vault attach must not depend on writing .prime");
+        assert!(
+            !vault_skill_md(vault.path()).exists(),
+            "Prime skill write belongs on chat start, not vault attach"
+        );
+        assert!(
+            !vault.path().join(".prime").exists(),
+            "vault attach must not create .prime/"
+        );
+        let _ = shutdown_host();
+    }
+
+    #[test]
+    fn the_first_prime_prompt_writes_the_vault_skill() {
+        let _guard = host_guard();
+        let vault = note_vault();
+        let daemon = prompt_stream_daemon();
+        daemon.install();
+        connect_host_lazy(vault.path()).unwrap();
+        assert!(!vault_skill_md(vault.path()).exists());
+
+        let mut events = Vec::new();
+        run_prompt_stream(prompt_request(vault.path(), false), |event| {
+            events.push(event)
+        })
+        .unwrap();
+
+        assert!(
+            vault_skill_md(vault.path()).is_file(),
+            "Prime chat start must seed the vault skill"
+        );
+        assert!(
+            events.iter().any(
+                |event| matches!(event, AiAgentStreamEvent::TextDelta { text } if text == "hello")
+            ),
+            "events={events:?}"
+        );
+        let _ = shutdown_host();
+    }
+
+    #[test]
+    fn a_blocked_prime_skill_write_is_a_notice_and_does_not_fail_the_prompt() {
+        let _guard = host_guard();
+        let vault = note_vault();
+        std::fs::write(vault.path().join(".prime"), "blocked").unwrap();
+        let daemon = prompt_stream_daemon();
+        daemon.install();
+
+        connect_host_lazy(vault.path()).expect("unwritable .prime must not block vault attach");
+
+        let mut events = Vec::new();
+        run_prompt_stream(prompt_request(vault.path(), false), |event| {
+            events.push(event)
+        })
+        .expect("Prime chat continues when the skill write fails");
+
+        assert!(
+            events.iter().any(|event| matches!(
+                event,
+                AiAgentStreamEvent::Notice { message }
+                    if message.contains("Could not write the Prime vault skill")
+                        && message.contains(".prime/")
+            )),
+            "events={events:?}"
+        );
+        assert!(
+            events.iter().any(
+                |event| matches!(event, AiAgentStreamEvent::TextDelta { text } if text == "hello")
+            ),
+            "events={events:?}"
+        );
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AiAgentStreamEvent::Error { .. })),
+            "skill write failure must not be a fatal stream error: {events:?}"
+        );
+        assert!(matches!(events.last(), Some(AiAgentStreamEvent::Done)));
         let _ = shutdown_host();
     }
 
