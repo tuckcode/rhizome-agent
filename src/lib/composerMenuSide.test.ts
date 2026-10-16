@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  COMPOSER_CHIP_MENU_GAP_PX,
   COMPOSER_MENU_COLLISION_PADDING_PX,
   NATIVE_CHAT_MODEL_MENU_HEIGHT_PX,
+  composerChipMenuSideOffset,
   resolveComposerMenuSide,
 } from './composerMenuSide'
 
@@ -42,5 +44,21 @@ describe('resolveComposerMenuSide', () => {
         menuHeight: NATIVE_CHAT_MODEL_MENU_HEIGHT_PX,
       }),
     ).toBe('bottom')
+  })
+})
+
+describe('composerChipMenuSideOffset', () => {
+  it('clears the composer box and leaves an 8px gap', () => {
+    expect(
+      composerChipMenuSideOffset({
+        triggerTop: 420,
+        composerBoxTop: 360,
+        gap: COMPOSER_CHIP_MENU_GAP_PX,
+      }),
+    ).toBe(68)
+  })
+
+  it('falls back to 4 when there is no composer box', () => {
+    expect(composerChipMenuSideOffset({ triggerTop: 420, composerBoxTop: null })).toBe(4)
   })
 })

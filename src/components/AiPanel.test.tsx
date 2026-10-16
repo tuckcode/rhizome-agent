@@ -897,6 +897,23 @@ describe('the native composer deck', () => {
     expect(screen.queryByTestId('prime-thinking-toggle')).not.toBeInTheDocument()
     expect(screen.queryByTestId('chat-composer-bar')).not.toBeInTheDocument()
   })
+
+  it('renders no model chip on a Codex chat even if a deck is passed', () => {
+    render(
+      <AiPanelView
+        controller={primeController()}
+        onClose={vi.fn()}
+        showHeader={false}
+        defaultAiAgent="codex"
+        defaultAiAgentReady
+        composerDeck={<div data-testid="native-chat-model-picker">chip</div>}
+      />,
+    )
+
+    expect(screen.queryByTestId('native-chat-model-picker')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('prime-model-chip')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('chat-composer-bar')).not.toBeInTheDocument()
+  })
 })
 
 describe('the Goal button has one home', () => {

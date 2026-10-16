@@ -79,9 +79,10 @@ describe('NativeChatModelPicker', () => {
     await waitFor(() => {
       expect(screen.getByTestId('native-chat-model-menu')).toHaveTextContent('Work OpenAI')
     })
-    expect(screen.getByTestId('native-chat-model-work-openai/gpt-4o')).toHaveTextContent('gpt-4o')
+    expect(screen.getByTestId('native-chat-model-work-openai/gpt-4o')).toHaveTextContent('GPT-4o')
     expect(screen.getByTestId('native-chat-model-work-openai/gpt-4o')).not.toHaveTextContent('Work OpenAI ·')
-    expect(screen.getByTestId('native-chat-model-free_tier_auto')).toHaveTextContent('free_tier_auto')
+    expect(screen.getByTestId('native-chat-model-free_tier_auto')).toHaveTextContent('Free tier (auto)')
+    expect(screen.getByTestId('native-chat-model-free_tier_auto')).not.toHaveTextContent('free_tier_auto')
   })
 
   it('merges a live discover when the menu opens', async () => {
@@ -135,7 +136,9 @@ describe('NativeChatModelPicker', () => {
 
     const chip = screen.getByTestId('native-chat-model-trigger')
     expect(chip.tagName).toBe('BUTTON')
-    expect(chip).toHaveAccessibleName('Model: Work OpenAI · GPT-4o')
+    expect(chip).toHaveAccessibleName('Model: Work OpenAI · gpt-4o')
+    expect(chip).toHaveAttribute('title', 'Model: Work OpenAI · gpt-4o')
+    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('GPT-4o')
     expect(chip).toHaveClass('rounded-md')
     expect(chip).toHaveClass('h-6')
     expect(chip).toHaveClass('self-center')
@@ -161,12 +164,16 @@ describe('NativeChatModelPicker', () => {
     await waitFor(() => {
       const note = screen.getByTestId('native-chat-model-new-chats')
       expect(note).toHaveTextContent('Applies to new chats')
-      expect(note).toHaveClass('border-t')
       expect(note).toHaveClass('px-2')
       expect(note).toHaveClass('py-1.5')
       expect(note).toHaveClass('text-[12px]')
       expect(note).toHaveClass('text-muted-foreground')
       expect(note.className).not.toMatch(/text-\[11px\]/)
+      expect(note.className).not.toMatch(/border-t/)
+      expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('my-1')
+      expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('h-px')
+      expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('w-full')
+      expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('bg-border')
     })
   })
 
@@ -203,7 +210,8 @@ describe('NativeChatModelPicker', () => {
 
     const chip = screen.getByTestId('native-chat-model-trigger')
     expect(chip).toHaveClass(NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS)
-    expect(chip).toHaveAttribute('title', LONG_NAME)
+    expect(chip).toHaveAttribute('title', `Model: ${LONG_NAME}`)
+    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('anthropic…-long-id')
     expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveClass('truncate')
 
     openMenu()
@@ -248,23 +256,54 @@ describe('NativeChatModelPicker', () => {
     expect(row).toHaveClass('h-8')
     expect(row).toHaveClass('rounded-md')
     expect(row).toHaveClass('text-[13px]')
-    expect(row).toHaveClass('focus:bg-accent/60')
+    expect(row).toHaveClass('focus:bg-accent')
+    expect(row).toHaveClass('data-[highlighted]:bg-accent')
+    expect(row).toHaveClass('focus:text-accent-foreground')
+    expect(row).toHaveClass('data-[highlighted]:text-accent-foreground')
+    expect(row.className).not.toMatch(/bg-accent\/60/)
     expect(screen.getByTestId('native-chat-model-selected-check')).toHaveClass('text-foreground')
     expect(screen.getByTestId('native-chat-model-selected-check')).not.toHaveClass('text-primary')
-    expect(screen.getAllByTestId('native-chat-model-group-sep').length).toBeGreaterThan(0)
+    const sep = screen.getAllByTestId('native-chat-model-group-sep')[0]
+    expect(sep).toHaveClass('my-1')
+    expect(sep).toHaveClass('h-px')
+    expect(sep).toHaveClass('w-full')
+    expect(sep).toHaveClass('bg-border')
+    expect(menu).toHaveClass('overflow-hidden')
+    expect(menu).toHaveClass('overflow-y-hidden')
+    expect(screen.getByTestId('native-chat-model-filter-row')).toHaveClass('border-b')
+    expect(screen.getByTestId('native-chat-model-list').contains(screen.getByTestId('native-chat-model-filter'))).toBe(false)
+    expect(screen.getByTestId('native-chat-model-list')).toHaveClass('overflow-y-auto')
+    expect(screen.getByTestId('native-chat-model-filter')).toHaveFocus()
   })
 
-  it('shows no-match and add-key empty states', async () => {
+  it('omits keyless providers and opens Settings from the footer', async () => {
+    const onOpenProviders = vi.fn()
     render(
-      <NativeChatModelPicker variant="chip" value={null} onChange={vi.fn()} providers={[]} />,
+      <NativeChatModelPicker
+        variant="chip"
+        value={null}
+        onChange={vi.fn()}
+        providers={[]}
+        onOpenProviders={onOpenProviders}
+      />,
     )
     openMenu()
     await waitFor(() => {
-      expect(screen.getAllByTestId('native-chat-models-add-key')[0]).toHaveTextContent(
-        'Add a key in Settings to use this provider',
+      expect(screen.queryByTestId('native-chat-models-add-key')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('native-chat-model-gemini/gemini-2.5-flash')).not.toBeInTheDocument()
+      expect(screen.getByTestId('native-chat-model-open-providers')).toHaveTextContent(
+        'providers need a key · Open settings',
       )
     })
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('native-chat-model-open-providers'))
+    })
+    expect(onOpenProviders).toHaveBeenCalledOnce()
 
+    openMenu()
+    await waitFor(() => {
+      expect(screen.getByTestId('native-chat-model-filter')).toBeInTheDocument()
+    })
     fireEvent.change(screen.getByTestId('native-chat-model-filter'), {
       target: { value: 'zzzz-no-such-model' },
     })
@@ -382,10 +421,20 @@ describe('NativeChatModelPicker', () => {
     )
   }
 
+  function isMenuChrome(el: HTMLElement): boolean {
+    const id = el.getAttribute('data-testid')
+    return (
+      id === 'native-chat-model-menu'
+      || id === 'native-chat-model-list'
+      || id === 'native-chat-model-filter-row'
+      || id === 'native-chat-model-footer'
+    )
+  }
+
   function overflowHiddenAncestor(node: HTMLElement): HTMLElement | null {
     let current = node.parentElement
     while (current && current !== document.body && current !== document.documentElement) {
-      if (elementClipsOverflow(current)) return current
+      if (!isMenuChrome(current) && elementClipsOverflow(current)) return current
       current = current.parentElement
     }
     return null

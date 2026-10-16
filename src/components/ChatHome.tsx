@@ -74,6 +74,7 @@ interface ChatHomeProps {
   /** Chat engine offer. The banner is the visible control. */
   chatEngineUpdate?: PrimeUpdateStatus
   onApplyChatEngineUpdate?: () => void
+  onOpenAiSettings?: () => void
 }
 
 /**
@@ -111,6 +112,7 @@ export default function ChatHome({
   chatEngineUpdate,
   onApplyChatEngineUpdate,
   railLayoutWidth,
+  onOpenAiSettings,
 }: ChatHomeProps) {
   // Chat is Prime's home canvas (ADR-0166). A direct API model chosen as the
   // global default must not strip Prime chrome or route chat away from Prime.
@@ -306,7 +308,7 @@ export default function ChatHome({
             ) : undefined
           }
           composerDeck={
-            showPrimeChrome || rhizomeCatalog ? (
+            isPrimeChat && (showPrimeChrome || rhizomeCatalog) ? (
               <ChatComposerDeck
                 locale={locale}
                 vaultPath={vaultPath}
@@ -315,6 +317,7 @@ export default function ChatHome({
                 nativeTarget={nativeTarget}
                 onNativeTargetChange={onNativeTargetChange}
                 providers={aiModelProviders}
+                onOpenProviders={onOpenAiSettings}
                 contextLabel={openNote ? openNote.label.split('/').filter(Boolean).at(-1) ?? openNote.label : null}
                 onCloseContext={() => {
                   setOpenNote(null)

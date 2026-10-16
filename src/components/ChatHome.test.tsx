@@ -33,6 +33,7 @@ vi.mock('./AiPanel', () => ({
     activeNoteContent,
     defaultAiTarget,
     composerControls,
+    composerDeck,
   }: {
     newChatRef?: MutableRefObject<(() => void) | null>
     onOpenNote?: (path: string) => void
@@ -42,6 +43,7 @@ vi.mock('./AiPanel', () => ({
     activeNoteContent?: string | null
     defaultAiTarget?: { kind: string; label?: string; agent?: string }
     composerControls?: React.ReactNode
+    composerDeck?: React.ReactNode
   }) => {
     if (newChatRef) newChatRef.current = startNewChat
     return (
@@ -50,6 +52,7 @@ vi.mock('./AiPanel', () => ({
         <span data-testid="agent-note-body">{activeNoteContent ?? 'none'}</span>
         <span data-testid="agent-target-kind">{defaultAiTarget?.kind ?? 'none'}</span>
         <span data-testid="composer-controls">{composerControls ? 'yes' : 'no'}</span>
+        <span data-testid="composer-deck-mounted">{composerDeck ? 'yes' : 'no'}</span>
         <button type="button" onClick={() => onOpenNote?.('/Users/jdoe/Documents/Laputa/wiki/decisions/memory-loop.md')}>
           Open
         </button>
@@ -387,7 +390,8 @@ describe('ChatHome composer wiring', () => {
   it('does not mount the native model picker as its own row above chat', () => {
     expect(chatHomeSource).not.toContain('<NativeChatModelPicker')
     expect(chatHomeSource).toContain('<ChatComposerDeck')
-    expect(chatHomeSource).toContain('showPrimeChrome || rhizomeCatalog')
+    expect(chatHomeSource).toContain('isPrimeChat && (showPrimeChrome || rhizomeCatalog)')
+    expect(chatHomeSource).not.toMatch(/composerDeck=\{\s*showPrimeChrome \|\| rhizomeCatalog/)
   })
 
   it('puts the Agents idle/working pill on the composer next to thinking', () => {
@@ -442,6 +446,25 @@ describe('ChatHome composer wiring', () => {
       />,
     )
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+  })
+
+  it('does not mount the composer model chip on Claude Code or Codex, even on the native engine', () => {
+    const props = {
+      locale: 'en' as const,
+      defaultAiAgentReadiness: 'ready' as const,
+      defaultAiAgentReady: true,
+      chatEngine: 'native' as const,
+      vaultPath: '/Users/jdoe/Documents/Laputa',
+      vaultPaths: ['/Users/jdoe/Documents/Laputa'],
+      entries: [],
+      onExit: vi.fn(),
+    }
+    const { rerender } = render(<ChatHome {...props} defaultAiAgent="claude_code" />)
+    expect(screen.getByTestId('composer-deck-mounted')).toHaveTextContent('no')
+    rerender(<ChatHome {...props} defaultAiAgent="codex" />)
+    expect(screen.getByTestId('composer-deck-mounted')).toHaveTextContent('no')
+    rerender(<ChatHome {...props} defaultAiAgent="prime" />)
+    expect(screen.getByTestId('composer-deck-mounted')).toHaveTextContent('yes')
   })
 
   it('does not send Codex through the native engine', () => {
