@@ -191,6 +191,14 @@ pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<Str
     complete_text(&request)
 }
 
+/// Model ids the provider reports for the key Rhizome holds for it.
+///
+/// Feeds the model list in the composer and settings. A failed call returns
+/// the provider's message, so the picker can say why a list is empty.
+pub fn list_provider_models(provider: AiModelProvider) -> Result<Vec<String>, String> {
+    discover_ai_model_ids(&provider, None).map_err(|error| error.message)
+}
+
 /// One plain reply to `request.message`, with no tools and no loop.
 ///
 /// OpenAI-compatible providers stream through `stream_chat_events_with`,
@@ -1471,6 +1479,20 @@ mod tests {
         assert_eq!(kind(503, None, ""), ModelErrorKind::Unavailable);
         assert_eq!(kind(400, None, ""), ModelErrorKind::Rejected);
         assert_eq!(classify_http_failure(400, None, "bad").status, Some(400));
+    }
+
+    #[test]
+    fn list_provider_models_returns_the_ids_the_provider_reports() {
+        let server = serve(vec![http_response(
+            "200 OK",
+            &["Content-Type: application/json"],
+            r#"{"object":"list","data":[{"id":"grok-4"},{"id":"grok-3-mini"}]}"#,
+        )]);
+        let provider = compatible_request(&server.base_url).provider;
+
+        let ids = list_provider_models(provider).unwrap();
+
+        assert_eq!(ids, vec!["grok-4", "grok-3-mini"]);
     }
 
     #[test]

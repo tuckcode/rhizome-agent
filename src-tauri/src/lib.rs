@@ -826,6 +826,7 @@ macro_rules! app_invoke_handler {
             commands::get_free_tier_overview,
             commands::save_free_tier_settings,
             commands::save_ai_model_provider_api_key,
+            commands::list_ai_model_provider_models,
             commands::delete_ai_model_provider_api_key,
             commands::test_ai_model_provider,
             commands::complete_ai_model_text,

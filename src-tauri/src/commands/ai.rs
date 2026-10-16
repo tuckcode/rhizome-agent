@@ -1,7 +1,7 @@
 #[cfg(desktop)]
 use crate::ai_agents::{AiAgentStreamRequest, AiAgentsStatus};
 #[cfg(desktop)]
-use crate::ai_models::{AiModelProviderTestRequest, AiModelStreamRequest};
+use crate::ai_models::{AiModelProvider, AiModelProviderTestRequest, AiModelStreamRequest};
 use crate::claude_cli::{ChatStreamRequest, ClaudeCliStatus};
 use crate::vault::VaultAiGuidanceStatus;
 
@@ -255,6 +255,15 @@ pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<Str
     crate::ai_models::test_ai_model_provider(request)
 }
 
+/// Model ids the provider lists for its saved key. Blocking HTTP, so it runs off the UI thread.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn list_ai_model_provider_models(
+    provider: AiModelProvider,
+) -> Result<Vec<String>, String> {
+    run_blocking(move || crate::ai_models::list_provider_models(provider)).await?
+}
+
 /// One plain reply with no tools, for batch callers such as chat titles.
 #[cfg(desktop)]
 #[tauri::command]
@@ -354,6 +363,14 @@ pub fn save_ai_model_provider_api_key(
     _api_key: String,
 ) -> Result<(), String> {
     Err("Local AI provider secret storage is only available in the desktop app.".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn list_ai_model_provider_models(
+    _provider: AiModelProvider,
+) -> Result<Vec<String>, String> {
+    Err("Provider model lists are only available in the desktop app.".into())
 }
 
 #[cfg(mobile)]

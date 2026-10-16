@@ -176,9 +176,6 @@ export default function ChatHome({
         enabled={isPrimeTarget}
         liveSessionId={primeHost?.sessionId ?? null}
       />
-      {chatEngine === 'native' ? (
-        <NativeChatModelPicker value={nativeTarget} onChange={(target) => onNativeTargetChange?.(target)} />
-      ) : null}
       <div className="flex min-h-0 flex-1">
         <AiPanel
           locale={locale}
@@ -278,6 +275,8 @@ export default function ChatHome({
                 ) : null
               }
             />
+          ) : chatEngine === 'native' ? (
+            <NativeChatModelPicker value={nativeTarget} onChange={(target) => onNativeTargetChange?.(target)} />
           ) : undefined}
           composerSkillsLabel="rhizome-vault"
           onClose={onExit}
