@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { AiModelProvider } from '../lib/aiTargets'
 import { NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS } from '../lib/composerMenuSide'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { NativeChatModelPicker } from './NativeChatModelPicker'
 
 vi.mock('../lib/callHost', () => ({
@@ -284,4 +285,74 @@ describe('NativeChatModelPicker', () => {
     })
     expect(chip).toHaveFocus()
   })
+
+  /**
+   * jsdom has no layout, so toBeVisible cannot prove a menu escaped a clip.
+   * The regression is structural: Radix must portal the menu to document.body,
+   * outside the overflow-hidden composer (and outside a dialog content box).
+   */
+  function expectMenuOutsideTrap(menu: HTMLElement, trap: HTMLElement) {
+    expect(document.body.contains(menu)).toBe(true)
+    expect(menu).toBeVisible()
+    expect(trap.contains(menu)).toBe(false)
+  }
+
+  it('opens the composer chip menu in a portal and selects a model', async () => {
+    const onChange = vi.fn()
+    render(
+      <div className="h-8 overflow-hidden" data-testid="composer-clip-trap">
+        <NativeChatModelPicker
+          variant="chip"
+          value="open_ai/gpt-4o"
+          onChange={onChange}
+          providers={configured}
+        />
+      </div>,
+    )
+
+    openMenu()
+    const menu = await screen.findByTestId('native-chat-model-menu')
+    expectMenuOutsideTrap(menu, screen.getByTestId('composer-clip-trap'))
+
+    const option = await screen.findByTestId('native-chat-model-free_tier_auto')
+    expect(screen.getByTestId('composer-clip-trap').contains(option)).toBe(false)
+    await act(async () => {
+      fireEvent.click(option)
+    })
+    expect(onChange).toHaveBeenCalledWith('free_tier_auto')
+  })
+
+  it('portals the chip menu outside a dialog content box and selects a model', async () => {
+    const onChange = vi.fn()
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>Model</DialogTitle>
+          <div className="h-8 overflow-hidden" data-testid="dialog-clip-trap">
+            <NativeChatModelPicker
+              variant="chip"
+              value="open_ai/gpt-4o"
+              onChange={onChange}
+              providers={configured}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>,
+    )
+
+    openMenu()
+    const menu = await screen.findByTestId('native-chat-model-menu')
+    const dialog = document.querySelector('[data-slot="dialog-content"]')
+    expect(dialog).toBeInstanceOf(HTMLElement)
+    expectMenuOutsideTrap(menu, dialog as HTMLElement)
+    expectMenuOutsideTrap(menu, screen.getByTestId('dialog-clip-trap'))
+
+    const option = await screen.findByTestId('native-chat-model-free_tier_auto')
+    expect((dialog as HTMLElement).contains(option)).toBe(false)
+    await act(async () => {
+      fireEvent.click(option)
+    })
+    expect(onChange).toHaveBeenCalledWith('free_tier_auto')
+  })
 })
+
