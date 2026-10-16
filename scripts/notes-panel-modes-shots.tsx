@@ -58,7 +58,7 @@ const narrow = state === 'narrow'
 const expanded = state === 'hover'
 const overlaying = state === 'hover' || state === 'narrow'
 
-function Shot() {
+export function Shot() {
   return (
     <TooltipProvider>
       <div
