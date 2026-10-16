@@ -3,7 +3,10 @@ import type { AiModelProvider } from './aiTargets'
 import { callHost } from './callHost'
 import {
   listAiModelProviderModels,
+  liveModelDisplayName,
   loadLiveRhizomeChatModels,
+  offlineLiveProviderNames,
+  providerModelsCacheKey,
   resetListProviderModelsCache,
 } from './listProviderModels'
 
@@ -95,8 +98,31 @@ describe('listAiModelProviderModels', () => {
       .mockResolvedValueOnce(['grok-4'])
 
     await expect(listAiModelProviderModels(provider)).resolves.toEqual(['gpt-4o'])
+    expect(offlineLiveProviderNames([provider])).toEqual(['Work OpenAI'])
     await expect(listAiModelProviderModels(provider)).resolves.toEqual(['grok-4'])
+    expect(offlineLiveProviderNames([provider])).toEqual([])
     expect(callHost).toHaveBeenCalledTimes(2)
+  })
+
+  it('refetches when the provider base URL changes', async () => {
+    const provider = keyedOpenAi()
+    vi.mocked(callHost).mockResolvedValue(['grok-4'])
+    await listAiModelProviderModels(provider)
+    const moved = { ...provider, base_url: 'https://other.example/v1' }
+    expect(providerModelsCacheKey(moved)).not.toBe(providerModelsCacheKey(provider))
+    vi.mocked(callHost).mockResolvedValue(['grok-5'])
+    await expect(listAiModelProviderModels(moved)).resolves.toEqual(['grok-5'])
+    expect(callHost).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('liveModelDisplayName', () => {
+  it('uses the API display name when the host sends one', () => {
+    expect(liveModelDisplayName('qwen2.5', 'Qwen 2.5')).toBe('Qwen 2.5')
+  })
+
+  it('cleans a raw id when the API sends only that', () => {
+    expect(liveModelDisplayName('accounts/fireworks/models/qwen2.5:latest')).toBe('qwen2.5')
   })
 })
 
@@ -113,5 +139,16 @@ describe('loadLiveRhizomeChatModels', () => {
     expect(listed.some((model) => model.id === 'work-openai/gpt-5')).toBe(true)
     expect(listed.some((model) => model.id === 'ollama/qwen2.5')).toBe(true)
     expect(listed.find((model) => model.id === 'work-openai/gpt-4o')?.displayName).toBe('GPT-4o')
+  })
+
+  it('uses an API display name on live-only rows', async () => {
+    vi.mocked(callHost).mockImplementation(async (_cmd, args) => {
+      const provider = args?.provider as { kind?: string } | undefined
+      if (provider?.kind === 'ollama') return [{ id: 'qwen2.5', display_name: 'Qwen 2.5' }]
+      return []
+    })
+
+    const listed = await loadLiveRhizomeChatModels([])
+    expect(listed.find((model) => model.id === 'ollama/qwen2.5')?.displayName).toBe('Qwen 2.5')
   })
 })

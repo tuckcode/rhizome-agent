@@ -790,8 +790,9 @@ not running after a rebuild. It seeds from
 `aiModelProviderCatalog.json` plus `settings.ai_model_providers`, then
 asks `list_ai_model_provider_models` (`GET {base_url}/models` via
 `list_provider_models`) for local providers and remote providers that
-hold a key. The renderer caches that list per provider for the session.
-A failed or keyless call keeps the seed. `discover_ai_models` still
+hold a key. The renderer caches that list per provider for the session
+and drops the cache when a key, base URL, or provider changes. A failed
+call keeps the seed and marks the group offline. `discover_ai_models` still
 accepts an API-key override for Settings tests.
 Catalog defaults keep kind-keyed ids (`open_ai/…`, `open_router/…`).
 Configured providers key on the provider id (`work-openai/gpt-4o`) so

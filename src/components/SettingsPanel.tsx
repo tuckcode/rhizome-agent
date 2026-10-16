@@ -13,6 +13,7 @@ import {
 } from '../lib/aiTargets'
 import { ChatEngineSettings } from './ChatEngineSettings'
 import { NativeChatModelPicker } from './NativeChatModelPicker'
+import { resetListProviderModelsCache } from '../lib/listProviderModels'
 import {
   useCallback,
   useEffect,
@@ -609,6 +610,7 @@ function SettingsPanelInner({
   }, [draft.colorTheme, draft.themeMode, onSave, settings, updateDraft])
 
   const handleAiModelProvidersChange = useCallback((value: AiModelProvider[]) => {
+    resetListProviderModelsCache()
     updateDraft('aiModelProviders', value)
     onSave({
       ...settings,

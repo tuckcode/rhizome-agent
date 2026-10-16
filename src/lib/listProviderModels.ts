@@ -1,7 +1,6 @@
 import {
   isLocalAiProvider,
   LOCAL_AI_PROVIDER_KINDS,
-  normalizeAiModelProviders,
   type AiModelProvider,
 } from './aiTargets'
 import { callHost } from './callHost'
@@ -13,16 +12,25 @@ import {
 
 const FREE_TIER_AUTO_TARGET = 'free_tier_auto'
 
-const cached = new Map<string, string[]>()
-const inflight = new Map<string, Promise<string[]>>()
+export interface ListedProviderModel {
+  id: string
+  displayName: string
+}
+
+const cached = new Map<string, ListedProviderModel[]>()
+const inflight = new Map<string, Promise<ListedProviderModel[]>>()
+const failed = new Set<string>()
 
 export function resetListProviderModelsCache(): void {
   cached.clear()
   inflight.clear()
+  failed.clear()
 }
 
-export function providerModelsCacheKey(provider: Pick<AiModelProvider, 'id' | 'kind'>): string {
-  return provider.id.trim() || provider.kind
+export function providerModelsCacheKey(provider: Pick<AiModelProvider, 'id' | 'kind' | 'base_url'>): string {
+  const id = provider.id.trim() || provider.kind
+  const base = provider.base_url?.trim() ?? ''
+  return base ? `${id}::${base}` : id
 }
 
 export function providerHasListKey(provider: AiModelProvider): boolean {
@@ -38,7 +46,7 @@ export function staticProviderModelIds(provider: AiModelProvider): string[] {
   return provider.models.map((model) => model.id.trim()).filter(Boolean)
 }
 
-export function isProviderModelsCached(provider: Pick<AiModelProvider, 'id' | 'kind'>): boolean {
+export function isProviderModelsCached(provider: Pick<AiModelProvider, 'id' | 'kind' | 'base_url'>): boolean {
   return cached.has(providerModelsCacheKey(provider))
 }
 
@@ -49,9 +57,13 @@ export function providersToListLive(providers?: AiModelProvider[] | null): AiMod
     if (!canListProviderModelsLive(provider)) continue
     jobs.set(providerModelsCacheKey(provider), provider)
   }
-  for (const provider of normalizeAiModelProviders(providers)) {
+  for (const provider of providers ?? []) {
     if (provider.kind === 'anthropic' || !canListProviderModelsLive(provider)) continue
-    jobs.set(providerModelsCacheKey(provider), provider)
+    const id = provider.id.trim() || provider.kind
+    const name = provider.name.trim()
+    if (!id || !name) continue
+    const listed = { ...provider, id, name }
+    jobs.set(providerModelsCacheKey(listed), listed)
   }
   return [...jobs.values()]
 }
@@ -62,9 +74,56 @@ export function pendingLiveProviderNames(providers?: AiModelProvider[] | null): 
     .map((provider) => provider.name)
 }
 
-/** Live `/models` for a keyed or local provider. Failures and keyless hosts use the static list. */
-export async function listAiModelProviderModels(provider: AiModelProvider): Promise<string[]> {
-  const fallback = staticProviderModelIds(provider)
+export function offlineLiveProviderNames(providers?: AiModelProvider[] | null): string[] {
+  return providersToListLive(providers)
+    .filter((provider) => failed.has(providerModelsCacheKey(provider)))
+    .map((provider) => provider.name)
+}
+
+export function liveProviderHeadingNames(providers?: AiModelProvider[] | null): string[] {
+  return providersToListLive(providers).map((provider) => provider.name)
+}
+
+export function liveModelDisplayName(id: string, apiName?: string | null): string {
+  const given = apiName?.trim()
+  if (given) return given
+  const last = id.split('/').filter(Boolean).pop() ?? id
+  return last.replace(/:latest$/i, '')
+}
+
+export function normalizeListedProviderModels(raw: unknown): ListedProviderModel[] {
+  if (!Array.isArray(raw)) return []
+  const listed: ListedProviderModel[] = []
+  for (const entry of raw) {
+    if (typeof entry === 'string') {
+      const id = entry.trim()
+      if (!id) continue
+      listed.push({ id, displayName: liveModelDisplayName(id) })
+      continue
+    }
+    if (!entry || typeof entry !== 'object') continue
+    const record = entry as { id?: unknown; display_name?: unknown; displayName?: unknown; name?: unknown }
+    const id = typeof record.id === 'string' ? record.id.trim() : ''
+    if (!id) continue
+    const apiName = [record.display_name, record.displayName, record.name]
+      .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    listed.push({ id, displayName: liveModelDisplayName(id, apiName) })
+  }
+  return listed
+}
+
+function staticProviderModels(provider: AiModelProvider): ListedProviderModel[] {
+  return staticProviderModelIds(provider).map((id) => {
+    const seeded = provider.models.find((model) => model.id.trim() === id)
+    return {
+      id,
+      displayName: liveModelDisplayName(id, seeded?.display_name),
+    }
+  })
+}
+
+async function listProviderModelEntries(provider: AiModelProvider): Promise<ListedProviderModel[]> {
+  const fallback = staticProviderModels(provider)
   if (!canListProviderModelsLive(provider)) return fallback
 
   const key = providerModelsCacheKey(provider)
@@ -75,11 +134,14 @@ export async function listAiModelProviderModels(provider: AiModelProvider): Prom
 
   const request = (async () => {
     try {
-      const ids = await callHost<string[]>('list_ai_model_provider_models', { provider })
-      const live = Array.isArray(ids) ? ids.map((id) => id.trim()).filter(Boolean) : fallback
-      cached.set(key, live)
-      return live
+      const raw = await callHost<unknown>('list_ai_model_provider_models', { provider })
+      const live = normalizeListedProviderModels(raw)
+      const listed = live.length > 0 ? live : fallback
+      cached.set(key, listed)
+      failed.delete(key)
+      return listed
     } catch {
+      failed.add(key)
       return fallback
     } finally {
       inflight.delete(key)
@@ -89,16 +151,21 @@ export async function listAiModelProviderModels(provider: AiModelProvider): Prom
   return request
 }
 
-function liveChatModel(provider: AiModelProvider, modelId: string): RhizomeChatModel {
-  const providerId = providerModelsCacheKey(provider)
+/** Live `/models` for a keyed or local provider. Failures and keyless hosts use the static list. */
+export async function listAiModelProviderModels(provider: AiModelProvider): Promise<string[]> {
+  return (await listProviderModelEntries(provider)).map((model) => model.id)
+}
+
+function liveChatModel(provider: AiModelProvider, model: ListedProviderModel): RhizomeChatModel {
+  const providerId = provider.id.trim() || provider.kind
   return {
-    id: `${providerId}/${modelId}`,
+    id: `${providerId}/${model.id}`,
     providerId,
     providerKind: provider.kind,
     providerName: provider.name,
-    modelId,
-    displayName: modelId,
-    label: `${provider.name} · ${modelId}`,
+    modelId: model.id,
+    displayName: model.displayName,
+    label: `${provider.name} · ${model.displayName}`,
   }
 }
 
@@ -110,9 +177,9 @@ export async function loadLiveRhizomeChatModels(
   const into = new Map(seed.map((model) => [model.id, model]))
   await Promise.all(
     providersToListLive(providers).map(async (provider) => {
-      const ids = await listAiModelProviderModels(provider)
-      for (const modelId of ids) {
-        const model = liveChatModel(provider, modelId)
+      const entries = await listProviderModelEntries(provider)
+      for (const entry of entries) {
+        const model = liveChatModel(provider, entry)
         if (model.providerKind === 'anthropic' || into.has(model.id)) continue
         into.set(model.id, model)
       }

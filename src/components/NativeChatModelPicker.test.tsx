@@ -9,11 +9,13 @@ import { NativeChatModelPicker } from './NativeChatModelPicker'
 const host = vi.hoisted(() => ({
   hold: null as Promise<void> | null,
   release: null as (() => void) | null,
+  fail: false,
 }))
 
 vi.mock('../lib/callHost', () => ({
   callHost: vi.fn(async (cmd: string, args?: { provider?: { kind?: string; id?: string } }) => {
     if (host.hold) await host.hold
+    if (host.fail) throw new Error('provider offline')
     if (cmd !== 'list_ai_model_provider_models' && cmd !== 'discover_ai_models') return []
     if (args?.provider?.kind === 'ollama') return ['llama3.2', 'qwen2.5']
     if (args?.provider?.id === 'work-openai') return ['gpt-4o', 'gpt-5']
@@ -59,6 +61,7 @@ function openMenu(testId = 'native-chat-model-trigger') {
 beforeEach(() => {
   host.hold = null
   host.release = null
+  host.fail = false
   resetListProviderModelsCache()
 })
 
@@ -212,7 +215,7 @@ describe('NativeChatModelPicker', () => {
       expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('my-1')
       expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('h-px')
       expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('w-full')
-      expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('bg-border')
+      expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('bg-[var(--border-input)]')
     })
   })
 
@@ -306,7 +309,7 @@ describe('NativeChatModelPicker', () => {
     expect(sep).toHaveClass('my-1')
     expect(sep).toHaveClass('h-px')
     expect(sep).toHaveClass('w-full')
-    expect(sep).toHaveClass('bg-border')
+    expect(sep).toHaveClass('bg-[var(--border-input)]')
     expect(menu).toHaveClass('overflow-hidden')
     expect(menu).toHaveClass('overflow-y-hidden')
     expect(screen.getByTestId('native-chat-model-filter-row')).toHaveClass('border-b')
@@ -347,6 +350,150 @@ describe('NativeChatModelPicker', () => {
       target: { value: 'zzzz-no-such-model' },
     })
     expect(screen.getByTestId('native-chat-models-empty')).toHaveTextContent('No models match')
+    fireEvent.click(screen.getByTestId('native-chat-models-clear-filter'))
+    expect(screen.getByTestId('native-chat-model-filter')).toHaveValue('')
+    expect(screen.queryByTestId('native-chat-models-empty')).not.toBeInTheDocument()
+  })
+
+  it('caps the model list and pins the filter and footer', async () => {
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value="work-openai/gpt-4o"
+        onChange={vi.fn()}
+        providers={configured}
+      />,
+    )
+    openMenu()
+    const list = await screen.findByTestId('native-chat-model-list')
+    expect(list).toHaveClass('max-h-[min(60vh,420px)]')
+    expect(list).toHaveClass('overflow-y-auto')
+    expect(list.contains(screen.getByTestId('native-chat-model-filter'))).toBe(false)
+    expect(list.contains(screen.getByTestId('native-chat-model-footer'))).toBe(false)
+    expect(screen.getByTestId('native-chat-model-filter-row')).toHaveClass('shrink-0')
+    expect(screen.getByTestId('native-chat-model-footer')).toHaveClass('shrink-0')
+  })
+
+  it('scrolls the selected row into view when the menu opens', async () => {
+    const scrollIntoView = vi.fn()
+    HTMLElement.prototype.scrollIntoView = scrollIntoView
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value="work-openai/gpt-4o"
+        onChange={vi.fn()}
+        providers={configured}
+      />,
+    )
+    openMenu()
+    await waitFor(() => {
+      expect(scrollIntoView).toHaveBeenCalled()
+    })
+    const selected = screen.getByTestId('native-chat-model-work-openai/gpt-4o')
+    expect(selected).toHaveAttribute('data-selected', 'true')
+  })
+
+  it('marks a failed live list as offline and keeps the saved rows', async () => {
+    host.fail = true
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value="work-openai/gpt-4o"
+        onChange={vi.fn()}
+        providers={configured}
+      />,
+    )
+    openMenu()
+    const offline = await screen.findAllByTestId('native-chat-model-offline')
+    expect(offline[0]).toHaveTextContent('offline, showing saved list')
+    expect(offline[0]).toHaveClass('text-muted-foreground')
+    expect(screen.getByTestId('native-chat-model-work-openai/gpt-4o')).toHaveTextContent('GPT-4o')
+  })
+
+  it('keeps cached rows usable while Loading… is muted', async () => {
+    const onChange = vi.fn()
+    host.hold = new Promise<void>((resolve) => {
+      host.release = resolve
+    })
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value="work-openai/gpt-4o"
+        onChange={onChange}
+        providers={configured}
+      />,
+    )
+    openMenu()
+    const loading = await screen.findAllByTestId('native-chat-model-loading')
+    expect(loading[0]).toHaveClass('text-muted-foreground')
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('native-chat-model-work-openai/gpt-4o'))
+    })
+    expect(onChange).toHaveBeenCalledWith('work-openai/gpt-4o')
+    await act(async () => {
+      host.release?.()
+    })
+  })
+
+  it('styles Open settings as an accent link', async () => {
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value={null}
+        onChange={vi.fn()}
+        providers={[]}
+        onOpenProviders={vi.fn()}
+      />,
+    )
+    openMenu()
+    const opener = await screen.findByTestId('native-chat-model-open-providers')
+    expect(opener).toHaveClass('text-primary')
+    expect(opener.className).toMatch(/underline/)
+  })
+
+  it('keeps a heading for a live provider with no seed models', async () => {
+    host.hold = new Promise<void>((resolve) => {
+      host.release = resolve
+    })
+    const emptyKeyed: AiModelProvider[] = [
+      {
+        ...configured[0],
+        models: [],
+      },
+    ]
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value={null}
+        onChange={vi.fn()}
+        providers={emptyKeyed}
+      />,
+    )
+    openMenu()
+    const headings = await screen.findAllByTestId('native-chat-model-provider')
+    expect(headings.some((node) => node.textContent?.includes('Work OpenAI'))).toBe(true)
+    expect(screen.getAllByTestId('native-chat-model-loading').length).toBeGreaterThan(0)
+    await act(async () => {
+      host.release?.()
+    })
+  })
+
+  it('paints group dividers with the input-border token', async () => {
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value="work-openai/gpt-4o"
+        onChange={vi.fn()}
+        providers={configured}
+      />,
+    )
+    openMenu()
+    await waitFor(() => {
+      expect(screen.getAllByTestId('native-chat-model-group-sep')[0]).toHaveClass(
+        'bg-[var(--border-input)]',
+      )
+    })
+    expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('bg-[var(--border-input)]')
   })
 
   it('opens the chip menu upward when there is room above', async () => {
