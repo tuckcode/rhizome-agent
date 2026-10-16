@@ -44,6 +44,8 @@ vi.mock('../hooks/useCliAiAgent', () => ({
       stopMessage: mockStopMessage,
       clearConversation: mockClearConversation,
       addLocalMarker: mockAddLocalMarker,
+      setNativeSession: vi.fn(),
+      getNativeSession: () => ({ sessionId: null, readOnly: false }),
     }
   },
 }))
@@ -116,6 +118,8 @@ function QueuedPromptTargetHarness({ onTargetChange }: { onTargetChange: (target
       addLocalMarker: (text: string) => {
         mockAddLocalMarker(text)
       },
+      setNativeSession: vi.fn(),
+      getNativeSession: vi.fn(() => ({ sessionId: null, readOnly: false })),
     },
     input,
     setInput,
@@ -157,6 +161,8 @@ function primeController(overrides: Partial<AiPanelController> = {}): AiPanelCon
       clearConversation: vi.fn(),
       addLocalMarker: vi.fn(),
       replaceMessages: vi.fn(),
+      setNativeSession: vi.fn(),
+      getNativeSession: vi.fn(() => ({ sessionId: null, readOnly: false })),
     },
     input: '',
     setInput: vi.fn(),

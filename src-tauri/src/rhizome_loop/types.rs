@@ -1,3 +1,8 @@
+/// Answer written for a tool call that never produced a result.
+/// OpenAI-style providers reject a `tool_calls` id with no `role: "tool"`
+/// message, so a resume pairs the call with this output.
+pub const UNANSWERED_TOOL_OUTPUT: &str = "Not run: the turn stopped first.";
+
 /// Durable facts for one agent. Live coordination stays out of this list.
 /// Variant names are the on-disk JSON keys for native session logs (2c).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

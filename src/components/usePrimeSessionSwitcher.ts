@@ -12,10 +12,8 @@ import {
   type PrimeTranscriptItem,
 } from '../lib/primeTranscriptToConversation'
 import {
-  currentNativeSession,
   isNativeSessionPath,
   nativeEventsToConversation,
-  rememberNativeSession,
   type NativeChatOpenResult,
 } from '../lib/nativeChatTranscript'
 import type { PrimeSessionTree } from '../lib/primeSessionTree'
@@ -169,7 +167,7 @@ export function usePrimeSessionSwitcher({
     setSwitchError(null)
     setFocusedTranscriptIndex(null)
     const previousPath = activeSessionPath
-    const previousLive = currentNativeSession()
+    const previousLive = agent.getNativeSession()
     const previousMessages = [...agent.messages]
     const previousState = transcriptState
     // Highlight the row immediately. Clear the stale transcript in the same
@@ -187,7 +185,7 @@ export function usePrimeSessionSwitcher({
         if (opened.error) {
           reportSwitchError(opened.error)
         }
-        rememberNativeSession(opened.successorId || opened.sessionId || session.id, readOnly)
+        agent.setNativeSession(opened.successorId || opened.sessionId || session.id, readOnly)
         startTransition(() => {
           agent.replaceMessages(nativeEventsToConversation(opened.events))
           setTranscriptState('ready')
@@ -218,7 +216,7 @@ export function usePrimeSessionSwitcher({
       // it on select throws away the standing context you opened it for, then
       // makes you reopen it to pick a second session.
     } catch (e) {
-      rememberNativeSession(previousLive.sessionId, previousLive.readOnly)
+      agent.setNativeSession(previousLive.sessionId, previousLive.readOnly)
       setActiveSessionPath(previousPath)
       setFocusedTranscriptIndex(null)
       setTranscriptState(previousPath ? previousState : 'error')
@@ -246,12 +244,12 @@ export function usePrimeSessionSwitcher({
   useMenuBarSessionOpen(handleOpenSessionFromMenuBar)
 
   const resetSessionSelection = useCallback(() => {
-    rememberNativeSession(null)
+    agent.setNativeSession(null)
     setActiveSessionPath(null)
     setFocusedTranscriptIndex(null)
     setTranscriptState('new')
     setSwitchError(null)
-  }, [])
+  }, [agent])
 
   /**
    * Only replayed turns carry a Prime entry id — the live stream has none — so

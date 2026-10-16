@@ -83,6 +83,8 @@ export interface AgentExecutionContext {
   nativeSessionId?: string | null
   /** Opened native logs that cannot accept another turn. */
   nativeReadOnly?: boolean
+  /** Panel or workspace slot that owns `nativeSessionId`. */
+  nativeLiveSlot?: string
 }
 
 export interface PendingUserPrompt {

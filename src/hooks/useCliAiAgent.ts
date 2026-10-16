@@ -20,7 +20,12 @@ import {
   stopAgentMessage,
   type AiAgentSessionRuntime,
 } from '../lib/aiAgentSession'
-import { currentNativeSession } from '../lib/nativeChatTranscript'
+import {
+  createNativeLiveSlot,
+  currentNativeSession,
+  rememberNativeSession,
+  type LiveNativeChat,
+} from '../lib/nativeChatTranscript'
 import type { ToolInvocation } from '../lib/aiAgentMessageState'
 import {
   aiWorkspaceSessionDispatchers,
@@ -134,11 +139,24 @@ export function useCliAiAgent(
   const sharedRuntime = useSharedCliAiAgentRuntime(sessionId, fileCallbacks)
   const runtime = sessionId ? sharedRuntime : localRuntime
   const { messages, status } = runtime
+  const panelSlotRef = useRef<string | null>(null)
+  if (panelSlotRef.current === null) {
+    panelSlotRef.current = createNativeLiveSlot()
+  }
+  const nativeLiveSlot = sessionId ? createNativeLiveSlot(sessionId) : panelSlotRef.current
+
+  function setNativeSession(nextSessionId: string | null, readOnly = false): void {
+    rememberNativeSession(nativeLiveSlot, nextSessionId, readOnly)
+  }
+
+  function getNativeSession(): LiveNativeChat {
+    return currentNativeSession(nativeLiveSlot)
+  }
 
   async function buildAgentContext() {
     const agentDocsPath = await getAgentDocsPath()
 
-    const liveNative = currentNativeSession()
+    const liveNative = currentNativeSession(nativeLiveSlot)
     return {
       agent,
       agentDocsPath,
@@ -154,6 +172,7 @@ export function useCliAiAgent(
       nativeTarget,
       nativeSessionId: liveNative.sessionId,
       nativeReadOnly: liveNative.readOnly,
+      nativeLiveSlot,
     }
   }
 
@@ -191,6 +210,7 @@ export function useCliAiAgent(
 
   function clearConversation(): void {
     clearAgentConversation(runtime)
+    rememberNativeSession(nativeLiveSlot, null)
   }
 
   function addLocalMarker(text: string): void {
@@ -242,5 +262,7 @@ export function useCliAiAgent(
     addLocalMarker,
     appendQueuedFollowUp,
     replaceMessages,
+    setNativeSession,
+    getNativeSession,
   }
 }

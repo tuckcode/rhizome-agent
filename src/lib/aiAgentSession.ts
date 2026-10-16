@@ -116,7 +116,9 @@ async function streamWithSelectedTarget({
       callbacks,
       signal,
     })
-    if (sessionId) rememberNativeSession(sessionId, false)
+    if (sessionId && context.nativeLiveSlot) {
+      rememberNativeSession(context.nativeLiveSlot, sessionId, false)
+    }
     return
   }
 
@@ -280,7 +282,6 @@ export function clearAgentConversation(runtime: Pick<AiAgentSessionRuntime, 'abo
   runtime.toolInputMapRef.current = new Map()
   runtime.setMessages([])
   runtime.setStatus('idle')
-  rememberNativeSession(null)
 }
 
 export function stopAgentMessage(

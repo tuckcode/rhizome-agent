@@ -9,7 +9,9 @@ vi.mock('./callHost', () => ({
 }))
 
 import {
+  CANCELLED_NATIVE_TOOL_REASON,
   conversationToNativeEvents,
+  createNativeLiveSlot,
   currentNativeSession,
   forksPrimeEntry,
   nativeChatListItemToSummary,
@@ -20,6 +22,7 @@ import {
   nativeSessionPath,
   persistNativeFork,
   rememberNativeSession,
+  resetNativeLiveSessions,
   transcriptUntilMessage,
 } from './nativeChatTranscript'
 import type { AiAgentMessage } from './aiAgentConversation'
@@ -121,6 +124,18 @@ describe('nativeEventsToConversation', () => {
     ])
   })
 
+  it('marks a matching ToolDenied as an error on the existing call', () => {
+    const messages = nativeEventsToConversation([
+      { User: { text: 'Search' } },
+      { ToolCall: { id: 't1', name: 'search', args: '{}' } },
+      { ToolDenied: { id: 't1', name: 'search', reason: 'cancelled' } },
+      'TurnEnd',
+    ])
+    expect(messages[0]?.actions).toEqual([
+      expect.objectContaining({ toolId: 't1', status: 'error', output: 'cancelled' }),
+    ])
+  })
+
   it('marks a tool done only once the result is present', () => {
     const messages = nativeEventsToConversation([
       { User: { text: 'Search' } },
@@ -146,13 +161,44 @@ describe('conversationToNativeEvents', () => {
       expect.objectContaining({ userMessage: 'Second', response: 'Two' }),
     ])
   })
+
+  it('writes each tool call next to a result, then the final assistant text', () => {
+    const events = conversationToNativeEvents([{
+      id: 'm1',
+      userMessage: 'Do both',
+      response: 'Tried both',
+      actions: [
+        { tool: 'search', toolId: 'pending-1', label: 'search', status: 'pending', input: '{}' },
+        { tool: 'write', toolId: 'err-1', label: 'write', status: 'error', input: '{}', output: 'disk full' },
+        { tool: 'echo', toolId: 'ok-1', label: 'echo', status: 'done', input: 'ping', output: 'pong' },
+      ],
+    }])
+    expect(events).toEqual([
+      { User: { text: 'Do both' } },
+      { ToolCall: { id: 'pending-1', name: 'search', args: '{}' } },
+      { ToolDenied: { id: 'pending-1', name: 'search', reason: CANCELLED_NATIVE_TOOL_REASON } },
+      { ToolCall: { id: 'err-1', name: 'write', args: '{}' } },
+      { ToolDenied: { id: 'err-1', name: 'write', reason: 'disk full' } },
+      { ToolCall: { id: 'ok-1', name: 'echo', args: 'ping' } },
+      { ToolResult: { id: 'ok-1', name: 'echo', output: 'pong' } },
+      { Assistant: { text: 'Tried both' } },
+      'TurnEnd',
+    ])
+    const reloaded = nativeEventsToConversation(events)
+    expect(reloaded[0]?.actions).toEqual([
+      expect.objectContaining({ toolId: 'pending-1', status: 'error', output: CANCELLED_NATIVE_TOOL_REASON }),
+      expect.objectContaining({ toolId: 'err-1', status: 'error', output: 'disk full' }),
+      expect.objectContaining({ toolId: 'ok-1', status: 'done', output: 'pong' }),
+    ])
+    expect(reloaded[0]?.response).toBe('Tried both')
+  })
 })
 
 describe('persistNativeFork', () => {
   beforeEach(() => {
     callHostMock.mockReset()
     callHostMock.mockResolvedValue('fork-id')
-    rememberNativeSession(null)
+    resetNativeLiveSessions()
   })
 
   it('writes the kept turns as a new native session', async () => {
@@ -182,6 +228,42 @@ describe('persistNativeFork', () => {
     })
   })
 
+  it('persists pending and errored tools as paired call/result events', async () => {
+    const forked: AiAgentMessage = {
+      id: 'm1',
+      userMessage: 'Do both',
+      response: 'Tried both',
+      actions: [
+        { tool: 'search', toolId: 'pending-1', label: 'search', status: 'pending', input: '{}' },
+        { tool: 'write', toolId: 'err-1', label: 'write', status: 'error', input: '{}', output: 'disk full' },
+      ],
+    }
+    await persistNativeFork({
+      messages: [forked],
+      messageId: 'm1',
+      target: 'openai/gpt-4o-mini',
+    })
+    expect(callHostMock).toHaveBeenCalledWith(
+      'native_chat_fork',
+      expect.objectContaining({
+        request: expect.objectContaining({
+          events: conversationToNativeEvents([forked]),
+        }),
+      }),
+    )
+    const events = conversationToNativeEvents([forked])
+    const callIds = events.flatMap((event) => (
+      typeof event === 'object' && 'ToolCall' in event ? [event.ToolCall.id] : []
+    ))
+    const resultIds = events.flatMap((event) => {
+      if (typeof event !== 'object') return []
+      if ('ToolResult' in event) return [event.ToolResult.id]
+      if ('ToolDenied' in event) return [event.ToolDenied.id]
+      return []
+    })
+    expect(callIds.sort()).toEqual(resultIds.sort())
+  })
+
   it('still persists a fork when the source chat is archived', async () => {
     await persistNativeFork({
       messages: [turn('m1', 'Filed', 'Ok')],
@@ -207,10 +289,28 @@ describe('persistNativeFork', () => {
 })
 
 describe('rememberNativeSession', () => {
-  it('holds the live native session until New chat clears it', () => {
-    rememberNativeSession('n1', true)
-    expect(currentNativeSession()).toEqual({ sessionId: 'n1', readOnly: true })
-    rememberNativeSession(null)
-    expect(currentNativeSession()).toEqual({ sessionId: null, readOnly: false })
+  beforeEach(() => {
+    resetNativeLiveSessions()
+  })
+
+  it('holds the live native session on one slot until that slot is cleared', () => {
+    rememberNativeSession('panel:1', 'n1', true)
+    expect(currentNativeSession('panel:1')).toEqual({ sessionId: 'n1', readOnly: true })
+    rememberNativeSession('panel:1', null)
+    expect(currentNativeSession('panel:1')).toEqual({ sessionId: null, readOnly: false })
+  })
+
+  it('does not share a live session across two panel slots', () => {
+    const first = createNativeLiveSlot()
+    const second = createNativeLiveSlot()
+    rememberNativeSession(first, 'n1')
+    rememberNativeSession(second, 'n2', true)
+    expect(first).not.toBe(second)
+    expect(currentNativeSession(first)).toEqual({ sessionId: 'n1', readOnly: false })
+    expect(currentNativeSession(second)).toEqual({ sessionId: 'n2', readOnly: true })
+  })
+
+  it('shares a slot when two surfaces use the same workspace session id', () => {
+    expect(createNativeLiveSlot('chat-1')).toBe(createNativeLiveSlot('chat-1'))
   })
 })

@@ -41,6 +41,12 @@ export interface LiveNativeChat {
   readOnly: boolean
 }
 
+/** Forked pending tools land as a denial so the new session is paired. */
+export const CANCELLED_NATIVE_TOOL_REASON = 'cancelled'
+
+const liveNativeBySlot = new Map<string, LiveNativeChat>()
+let nextNativeLivePanel = 0
+
 export interface PersistNativeForkRequest {
   messages: readonly AiAgentMessage[]
   messageId: string
@@ -50,8 +56,6 @@ export interface PersistNativeForkRequest {
   permissionMode?: AiAgentPermissionMode
   systemPrompt?: string | null
 }
-
-let liveNativeChat: LiveNativeChat = { sessionId: null, readOnly: false }
 
 /**
  * ChatHome currently always asks the panel to fork a Prime entry. Native
@@ -82,6 +86,11 @@ export function transcriptUntilMessage(
 /**
  * Fold panel turns into the durable log shape so a fork can be written and
  * later reopened with the same history.
+ *
+ * Order matches a live native turn: each ToolCall is followed by its
+ * ToolResult or ToolDenied, then the assistant text after those rounds.
+ * Pending and errored tools still get a paired result so OpenAI-style
+ * providers do not see an unpaired tool_call id.
  */
 export function conversationToNativeEvents(
   messages: readonly AiAgentMessage[],
@@ -90,22 +99,26 @@ export function conversationToNativeEvents(
   for (const message of messages) {
     if (message.localMarker) continue
     events.push({ User: { text: message.userMessage } })
-    if (message.response) {
-      events.push({ Assistant: { text: message.response } })
-    }
     for (const action of message.actions) {
       const id = action.toolId || nextMessageId()
       const name = action.tool || 'tool'
-      if (action.status === 'error') {
-        events.push({
-          ToolDenied: { id, name, reason: action.output || action.label || name },
-        })
-        continue
-      }
       events.push({ ToolCall: { id, name, args: action.input ?? '' } })
       if (action.status === 'done') {
         events.push({ ToolResult: { id, name, output: action.output ?? '' } })
+        continue
       }
+      events.push({
+        ToolDenied: {
+          id,
+          name,
+          reason: action.status === 'error'
+            ? (action.output || action.label || name)
+            : CANCELLED_NATIVE_TOOL_REASON,
+        },
+      })
+    }
+    if (message.response) {
+      events.push({ Assistant: { text: message.response } })
     }
     events.push('TurnEnd')
   }
@@ -133,12 +146,31 @@ export async function persistNativeFork(request: PersistNativeForkRequest): Prom
   return sessionId
 }
 
-export function rememberNativeSession(sessionId: string | null, readOnly = false): void {
-  liveNativeChat = { sessionId, readOnly }
+/** One slot per Chat panel, or per workspace conversation id. */
+export function createNativeLiveSlot(sessionKey?: string | null): string {
+  if (sessionKey) return `session:${sessionKey}`
+  nextNativeLivePanel += 1
+  return `panel:${nextNativeLivePanel}`
 }
 
-export function currentNativeSession(): LiveNativeChat {
-  return liveNativeChat
+export function rememberNativeSession(
+  slot: string,
+  sessionId: string | null,
+  readOnly = false,
+): void {
+  if (!sessionId) {
+    liveNativeBySlot.delete(slot)
+    return
+  }
+  liveNativeBySlot.set(slot, { sessionId, readOnly })
+}
+
+export function currentNativeSession(slot: string): LiveNativeChat {
+  return liveNativeBySlot.get(slot) ?? { sessionId: null, readOnly: false }
+}
+
+export function resetNativeLiveSessions(): void {
+  liveNativeBySlot.clear()
 }
 
 export function nativeSessionPath(sessionId: string): string {
@@ -238,9 +270,18 @@ export function nativeEventsToConversation(events: unknown[] | undefined): AiAge
       continue
     }
     if (record.ToolDenied) {
+      const toolId = String(record.ToolDenied.id ?? '')
+      const reason = String(record.ToolDenied.reason ?? '')
+      const existing = current.actions.some((action) => action.toolId === toolId)
       current = {
         ...current,
-        actions: [...current.actions, toolAction(record.ToolDenied, 'error')],
+        actions: existing
+          ? current.actions.map((action) => (
+            action.toolId === toolId
+              ? { ...action, output: reason, status: 'error' as const }
+              : action
+          ))
+          : [...current.actions, toolAction(record.ToolDenied, 'error')],
       }
       continue
     }

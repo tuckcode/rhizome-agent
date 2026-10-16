@@ -26,7 +26,7 @@ pub use driver::{AgentLoop, ApprovalReply, DEFAULT_STEP_CAP};
 pub use fake_model::{FakeModel, ScriptPart};
 pub use model::Model;
 pub use policy::{approval_options, ApprovalOption};
-pub use types::{DurableEvent, HistoryItem, ModelView, ToolCall};
+pub use types::{DurableEvent, HistoryItem, ModelView, ToolCall, UNANSWERED_TOOL_OUTPUT};
 
 #[cfg(test)]
 mod tests {
@@ -38,7 +38,7 @@ mod tests {
 
     use super::{
         AgentLoop, ApprovalReply, DurableEvent, FakeModel, HistoryItem, Model, ModelView,
-        ScriptPart, ToolCall, DEFAULT_STEP_CAP,
+        ScriptPart, ToolCall, DEFAULT_STEP_CAP, UNANSWERED_TOOL_OUTPUT,
     };
     use crate::ai_agents::AiAgentPermissionMode;
     use crate::model_events::{FinishReason, ModelError, ModelErrorKind, ModelEvent};
@@ -1620,6 +1620,114 @@ mod tests {
             }),
             "a stale AllowOnce must not run after dismiss: {events:?}"
         );
+    }
+
+    #[test]
+    fn from_log_closes_unpaired_tool_calls_and_drops_orphan_results() {
+        let agent = AgentLoop::from_log(vec![
+            DurableEvent::User { text: "hi".into() },
+            DurableEvent::ToolCall {
+                id: "open".into(),
+                name: "echo".into(),
+                args: "x".into(),
+            },
+            DurableEvent::ToolDenied {
+                id: "orphan-deny".into(),
+                name: "echo".into(),
+                reason: "nope".into(),
+            },
+            DurableEvent::ToolResult {
+                id: "orphan-result".into(),
+                name: "echo".into(),
+                output: "no".into(),
+            },
+            DurableEvent::Assistant {
+                text: "done".into(),
+            },
+            DurableEvent::TurnEnd,
+        ]);
+        let events = agent.events();
+        assert!(
+            events.iter().any(|event| matches!(
+                event,
+                DurableEvent::ToolResult { id, output, .. }
+                    if id == "open" && output == UNANSWERED_TOOL_OUTPUT
+            )),
+            "unpaired ToolCall must get a synthetic result: {events:?}"
+        );
+        assert!(
+            !events.iter().any(|event| matches!(
+                event,
+                DurableEvent::ToolDenied { id, .. } if id == "orphan-deny"
+            )),
+            "orphan ToolDenied must be dropped: {events:?}"
+        );
+        assert!(
+            !events.iter().any(|event| matches!(
+                event,
+                DurableEvent::ToolResult { id, .. } if id == "orphan-result"
+            )),
+            "orphan ToolResult must be dropped: {events:?}"
+        );
+    }
+
+    #[test]
+    fn from_log_keeps_pending_and_errored_tools_paired_for_the_model() {
+        let agent = AgentLoop::from_log(vec![
+            DurableEvent::User {
+                text: "Do both".into(),
+            },
+            DurableEvent::ToolCall {
+                id: "pending-1".into(),
+                name: "search".into(),
+                args: "{}".into(),
+            },
+            DurableEvent::ToolDenied {
+                id: "pending-1".into(),
+                name: "search".into(),
+                reason: "cancelled".into(),
+            },
+            DurableEvent::ToolCall {
+                id: "err-1".into(),
+                name: "write".into(),
+                args: "{}".into(),
+            },
+            DurableEvent::ToolDenied {
+                id: "err-1".into(),
+                name: "write".into(),
+                reason: "disk full".into(),
+            },
+            DurableEvent::Assistant {
+                text: "Tried both".into(),
+            },
+            DurableEvent::TurnEnd,
+        ]);
+        let history = agent.model_view_for_resume().history;
+        let HistoryItem::Assistant { tool_calls, .. } = &history[1] else {
+            panic!("first assistant should hold the tool calls: {history:?}");
+        };
+        assert_eq!(
+            tool_calls
+                .iter()
+                .map(|call| call.id.as_str())
+                .collect::<Vec<_>>(),
+            ["pending-1", "err-1"]
+        );
+        assert!(matches!(
+            &history[2],
+            HistoryItem::ToolDenied { id, reason, .. }
+                if id == "pending-1" && reason == "cancelled"
+        ));
+        assert!(matches!(
+            &history[3],
+            HistoryItem::ToolDenied { id, reason, .. }
+                if id == "err-1" && reason == "disk full"
+        ));
+        assert!(matches!(
+            &history[4],
+            HistoryItem::Assistant { text, tool_calls }
+                if text == "Tried both" && tool_calls.is_empty()
+        ));
     }
 
     /// Blocks in the waiter until `on_entered` runs, then expects the loop

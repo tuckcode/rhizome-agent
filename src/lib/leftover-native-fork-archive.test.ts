@@ -10,6 +10,18 @@ describe('leftover native fork and archive', () => {
     expect(panel).toContain('persistNativeFork({')
   })
 
+  it('pairs native tool events and scopes the live session per panel', () => {
+    const transcript = readFileSync(`${process.cwd()}/src/lib/nativeChatTranscript.ts`, 'utf8')
+    const agent = readFileSync(`${process.cwd()}/src/hooks/useCliAiAgent.ts`, 'utf8')
+    const switcher = readFileSync(`${process.cwd()}/src/components/usePrimeSessionSwitcher.ts`, 'utf8')
+    expect(transcript).toContain('CANCELLED_NATIVE_TOOL_REASON')
+    expect(transcript).toContain('liveNativeBySlot')
+    expect(agent).toContain('createNativeLiveSlot')
+    expect(agent).toContain('setNativeSession')
+    expect(switcher).toContain('agent.setNativeSession')
+    expect(switcher).toContain('agent.getNativeSession()')
+  })
+
   it('lists and archives native chats on the native engine', () => {
     const panel = readFileSync(`${process.cwd()}/src/components/AiPanel.tsx`, 'utf8')
     const list = readFileSync(`${process.cwd()}/src/components/PrimeSessionList.tsx`, 'utf8')

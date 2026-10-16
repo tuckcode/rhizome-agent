@@ -160,7 +160,7 @@ fn close_unanswered(unanswered: &mut Vec<String>, messages: &mut Vec<Value>) {
         messages.push(json!({
             "role": "tool",
             "tool_call_id": id,
-            "content": "Not run: the turn stopped first.",
+            "content": crate::rhizome_loop::UNANSWERED_TOOL_OUTPUT,
         }));
     }
 }

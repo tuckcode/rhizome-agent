@@ -1472,6 +1472,146 @@ mod tests {
         });
     }
 
+    fn pending_and_errored_fork_events() -> Vec<DurableEvent> {
+        vec![
+            DurableEvent::User {
+                text: "Do both".into(),
+            },
+            DurableEvent::ToolCall {
+                id: "pending-1".into(),
+                name: "search".into(),
+                args: "{}".into(),
+            },
+            DurableEvent::ToolDenied {
+                id: "pending-1".into(),
+                name: "search".into(),
+                reason: "cancelled".into(),
+            },
+            DurableEvent::ToolCall {
+                id: "err-1".into(),
+                name: "write".into(),
+                args: "{}".into(),
+            },
+            DurableEvent::ToolDenied {
+                id: "err-1".into(),
+                name: "write".into(),
+                reason: "disk full".into(),
+            },
+            DurableEvent::Assistant {
+                text: "Tried both".into(),
+            },
+            DurableEvent::TurnEnd,
+        ]
+    }
+
+    fn openai_tool_calls_are_paired(messages: &[serde_json::Value]) {
+        let mut open: Vec<String> = Vec::new();
+        for message in messages {
+            let role = message
+                .get("role")
+                .and_then(|value| value.as_str())
+                .unwrap_or("");
+            match role {
+                "user" | "system" => {
+                    assert!(
+                        open.is_empty(),
+                        "unpaired tool_calls before {role}: {open:?} in {messages:?}"
+                    );
+                }
+                "assistant" => {
+                    if let Some(calls) =
+                        message.get("tool_calls").and_then(|value| value.as_array())
+                    {
+                        for call in calls {
+                            open.push(
+                                call.get("id")
+                                    .and_then(|value| value.as_str())
+                                    .expect("tool_call id")
+                                    .to_string(),
+                            );
+                        }
+                    }
+                }
+                "tool" => {
+                    let id = message
+                        .get("tool_call_id")
+                        .and_then(|value| value.as_str())
+                        .expect("tool_call_id");
+                    let index = open
+                        .iter()
+                        .position(|open_id| open_id == id)
+                        .unwrap_or_else(|| {
+                            panic!("tool result {id} has no matching call: {messages:?}")
+                        });
+                    open.remove(index);
+                }
+                _ => {}
+            }
+        }
+        assert!(
+            open.is_empty(),
+            "unpaired tool_calls at end: {open:?} in {messages:?}"
+        );
+    }
+
+    fn openai_roles(messages: &[serde_json::Value]) -> Vec<&str> {
+        messages
+            .iter()
+            .filter_map(|message| message.get("role").and_then(|value| value.as_str()))
+            .collect()
+    }
+
+    #[test]
+    fn forked_pending_and_errored_tools_reload_into_a_valid_provider_list() {
+        with_temp_home(|_| {
+            let events = pending_and_errored_fork_events();
+            let fork_id = fork_native_session(fork_request(events.clone())).expect("fork");
+            let opened = crate::engines::native_log::open_session_log(&fork_id).expect("reload");
+            assert_eq!(opened.events, events);
+
+            let agent = AgentLoop::from_log(opened.events);
+            let seen = std::sync::Arc::new(Mutex::new(Vec::<ModelView>::new()));
+            let model = FakeModel::saying("next").share_seen(std::sync::Arc::clone(&seen));
+            let chats = NativeChats::new();
+            let (tx, rx) = mpsc::channel();
+            chats
+                .open_with_engine(
+                    fork_id.clone(),
+                    NativeEngine::from_parts(agent, model),
+                    move |event| {
+                        let _ = tx.send(event);
+                    },
+                )
+                .expect("open");
+            chats.send(&fork_id, "what next").expect("send");
+            let turn = wait_for_turn_end(&rx);
+            assert!(
+                turn.iter().any(
+                    |event| matches!(event, EngineEvent::TextDelta { text } if text == "next")
+                ),
+                "next turn missing: {turn:?}"
+            );
+
+            let views = seen.lock().expect("seen").clone();
+            let last = views.last().expect("model saw the resumed turn");
+            let messages = crate::rhizome_provider_model::openai_messages(last, last.turn_start);
+            openai_tool_calls_are_paired(&messages);
+            assert_eq!(
+                openai_roles(&messages),
+                ["user", "assistant", "tool", "tool", "assistant", "user",]
+            );
+            assert_eq!(messages[0]["content"], "Do both");
+            assert_eq!(messages[1]["tool_calls"][0]["id"], "pending-1");
+            assert_eq!(messages[1]["tool_calls"][1]["id"], "err-1");
+            assert_eq!(messages[2]["tool_call_id"], "pending-1");
+            assert_eq!(messages[2]["content"], "Denied: cancelled");
+            assert_eq!(messages[3]["tool_call_id"], "err-1");
+            assert_eq!(messages[3]["content"], "Denied: disk full");
+            assert_eq!(messages[4]["content"], "Tried both");
+            assert_eq!(messages[5]["content"], "what next");
+        });
+    }
+
     #[test]
     fn native_chat_writes_nothing_under_prime_home() {
         with_temp_home(|home| {
