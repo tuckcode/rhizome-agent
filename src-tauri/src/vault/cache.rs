@@ -708,15 +708,10 @@ pub fn scan_vault_cached(vault_path: &Path) -> Result<Vec<VaultEntry>, String> {
 mod tests {
     use super::*;
     use std::io::Write;
-    use std::sync::Mutex;
     use tempfile::TempDir;
 
-    /// Serialize all cache tests that mutate the RHIZOME_CACHE_DIR env var.
-    /// `std::env::set_var` is process-global, so parallel tests would race.
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
-
     /// Set up a temporary cache directory for test isolation.
-    /// Caller MUST hold `ENV_LOCK` for the duration of the test.
+    /// Caller MUST hold `crate::app_config::TEST_CACHE_DIR_ENV` for the test.
     fn set_test_cache_dir(dir: &Path) {
         std::env::set_var("RHIZOME_CACHE_DIR", dir.to_string_lossy().as_ref());
     }
@@ -751,7 +746,7 @@ mod tests {
     /// Common setup: acquire env lock, create temp cache dir + git-initialised vault.
     /// Returns (lock_guard, cache_tmpdir, vault_tmpdir) — keep all alive for the test.
     fn setup_git_vault() -> (std::sync::MutexGuard<'static, ()>, TempDir, TempDir) {
-        let lock = ENV_LOCK.lock().unwrap();
+        let lock = crate::app_config::lock_test_cache_dir();
         let cache_tmp = TempDir::new().unwrap();
         set_test_cache_dir(cache_tmp.path());
         let vault_tmp = TempDir::new().unwrap();
@@ -812,7 +807,7 @@ mod tests {
 
     #[test]
     fn test_cache_path_is_outside_vault() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = crate::app_config::lock_test_cache_dir();
         let cache_dir = TempDir::new().unwrap();
         set_test_cache_dir(cache_dir.path());
 
@@ -862,7 +857,7 @@ mod tests {
 
     #[test]
     fn test_cache_write_no_tmp_file_left() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = crate::app_config::lock_test_cache_dir();
         let cache_dir = TempDir::new().unwrap();
         set_test_cache_dir(cache_dir.path());
 
@@ -898,7 +893,7 @@ mod tests {
 
     #[test]
     fn test_scan_vault_cached_no_git() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = crate::app_config::lock_test_cache_dir();
         let cache_dir = TempDir::new().unwrap();
         set_test_cache_dir(cache_dir.path());
 

@@ -236,8 +236,8 @@ mod tests {
         assert_save_view_cmd_rejects_invalid_filename("con.yml");
     }
 
-    #[tokio::test]
-    async fn test_reload_vault_invalidates_cache_and_rescans() {
+    #[test]
+    fn test_reload_vault_invalidates_cache_and_rescans() {
         let dir = tempfile::TempDir::new().unwrap();
         let vault_path = dir.path();
         std::process::Command::new("git")
@@ -256,11 +256,24 @@ mod tests {
             .output()
             .unwrap();
 
+        let _lock = crate::app_config::lock_test_cache_dir();
+        let previous = std::env::var("RHIZOME_CACHE_DIR").ok();
         let cache_dir = tempfile::TempDir::new().unwrap();
         std::env::set_var(
             "RHIZOME_CACHE_DIR",
             cache_dir.path().to_string_lossy().as_ref(),
         );
+        struct RestoreCacheDir(Option<String>);
+        impl Drop for RestoreCacheDir {
+            fn drop(&mut self) {
+                if let Some(value) = self.0.take() {
+                    std::env::set_var("RHIZOME_CACHE_DIR", value);
+                } else {
+                    std::env::remove_var("RHIZOME_CACHE_DIR");
+                }
+            }
+        }
+        let _restore = RestoreCacheDir(previous);
 
         std::fs::write(
             vault_path.join("note.md"),
@@ -278,7 +291,10 @@ mod tests {
             .output()
             .unwrap();
 
-        let entries = list_vault(vault_path.into()).await.unwrap();
+        let entries = tokio::runtime::Runtime::new()
+            .expect("test runtime")
+            .block_on(list_vault(vault_path.into()))
+            .unwrap();
         assert!(!entries[0].archived);
 
         std::fs::write(

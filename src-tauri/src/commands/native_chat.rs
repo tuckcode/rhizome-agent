@@ -156,6 +156,7 @@ impl NativeChats {
         let emit = Arc::new(Mutex::new(emit));
         let index_path = path.clone();
         let index_id = id.clone();
+        let index_file = session_transcript_index::index_path().ok();
         let turn_busy = Arc::new(AtomicBool::new(false));
         let worker_busy = Arc::clone(&turn_busy);
         let worker = thread::spawn(move || {
@@ -171,6 +172,7 @@ impl NativeChats {
                         let emit = Arc::clone(&emit);
                         let index_path = index_path.clone();
                         let index_id = index_id.clone();
+                        let index_file = index_file.clone();
                         let user_text = prompt.clone();
                         let assistant = Arc::new(Mutex::new(String::new()));
                         let busy = Arc::clone(&worker_busy);
@@ -192,22 +194,12 @@ impl NativeChats {
                                     EngineEvent::TurnEnd => {
                                         let assistant =
                                             assistant.lock().expect("assistant").clone();
-                                        let _ = session_transcript_index::append_native_turns(
+                                        index_native_turn(
+                                            index_file.as_deref(),
                                             &index_path,
                                             &index_id,
                                             &user_text,
-                                            vec![
-                                                IndexedTranscriptTurn {
-                                                    message_index: 0,
-                                                    role: "user".into(),
-                                                    text: user_text.clone(),
-                                                },
-                                                IndexedTranscriptTurn {
-                                                    message_index: 1,
-                                                    role: "assistant".into(),
-                                                    text: assistant,
-                                                },
-                                            ],
+                                            assistant,
                                         );
                                     }
                                     _ => {}
@@ -292,6 +284,7 @@ impl NativeChats {
         let emit = Arc::new(Mutex::new(emit));
         let index_path = path.clone();
         let index_id = id.clone();
+        let index_file = session_transcript_index::index_path().ok();
         let turn_busy = Arc::new(AtomicBool::new(false));
         let worker_busy = Arc::clone(&turn_busy);
         let worker = thread::spawn(move || {
@@ -307,6 +300,7 @@ impl NativeChats {
                         let emit = Arc::clone(&emit);
                         let index_path = index_path.clone();
                         let index_id = index_id.clone();
+                        let index_file = index_file.clone();
                         let user_text = prompt.clone();
                         let assistant = Arc::new(Mutex::new(String::new()));
                         let busy = Arc::clone(&worker_busy);
@@ -328,22 +322,12 @@ impl NativeChats {
                                     EngineEvent::TurnEnd => {
                                         let assistant =
                                             assistant.lock().expect("assistant").clone();
-                                        let _ = session_transcript_index::append_native_turns(
+                                        index_native_turn(
+                                            index_file.as_deref(),
                                             &index_path,
                                             &index_id,
                                             &user_text,
-                                            vec![
-                                                IndexedTranscriptTurn {
-                                                    message_index: 0,
-                                                    role: "user".into(),
-                                                    text: user_text.clone(),
-                                                },
-                                                IndexedTranscriptTurn {
-                                                    message_index: 1,
-                                                    role: "assistant".into(),
-                                                    text: assistant,
-                                                },
-                                            ],
+                                            assistant,
                                         );
                                     }
                                     _ => {}
@@ -458,6 +442,42 @@ impl NativeChats {
             .contains_key(session_id)
             .then(|| format!("{NATIVE_SESSION_PREFIX}{session_id}"))
     }
+}
+
+fn index_native_turn(
+    index_file: Option<&std::path::Path>,
+    session_path: &str,
+    session_id: &str,
+    user_text: &str,
+    assistant: String,
+) {
+    let turns = vec![
+        IndexedTranscriptTurn {
+            message_index: 0,
+            role: "user".into(),
+            text: user_text.to_string(),
+        },
+        IndexedTranscriptTurn {
+            message_index: 1,
+            role: "assistant".into(),
+            text: assistant,
+        },
+    ];
+    let _ = match index_file {
+        Some(file) => session_transcript_index::append_native_turns_to(
+            file,
+            session_path,
+            session_id,
+            user_text,
+            turns,
+        ),
+        None => session_transcript_index::append_native_turns(
+            session_path,
+            session_id,
+            user_text,
+            turns,
+        ),
+    };
 }
 
 fn join_with_bound(worker: thread::JoinHandle<()>, bound: Duration) -> bool {
@@ -894,7 +914,7 @@ mod tests {
     use crate::engines::{EngineEvent, NativeEngine, PrimeEngine};
     use crate::model_events::{ModelError, ModelErrorKind};
     use crate::rhizome_loop::{AgentLoop, DurableEvent, FakeModel, ModelView, ScriptPart};
-    use crate::session_transcript_index::{self, IndexedTranscriptTurn};
+    use crate::session_transcript_index;
     use std::panic::{catch_unwind, AssertUnwindSafe};
     use std::sync::mpsc;
     use std::time::Instant;
@@ -1194,19 +1214,28 @@ mod tests {
     ) -> crate::session_transcript_index::PersistedSessionRecord {
         let deadline = Instant::now() + Duration::from_secs(2);
         loop {
-            if let Ok(document) = session_transcript_index::load() {
-                if let Some(record) = document
-                    .sessions
-                    .iter()
-                    .find(|session| session.path == path)
-                {
-                    return record.clone();
+            match session_transcript_index::load() {
+                Ok(document) => {
+                    if let Some(record) = document
+                        .sessions
+                        .iter()
+                        .find(|session| session.path == path)
+                    {
+                        return record.clone();
+                    }
+                    assert!(
+                        Instant::now() < deadline,
+                        "index never got the native session; index had {} session(s)",
+                        document.sessions.len()
+                    );
+                }
+                Err(_) => {
+                    assert!(
+                        Instant::now() < deadline,
+                        "index never got the native session"
+                    );
                 }
             }
-            assert!(
-                Instant::now() < deadline,
-                "index never got the native session"
-            );
             thread::sleep(Duration::from_millis(20));
         }
     }
@@ -1226,14 +1255,18 @@ mod tests {
     fn transcript_index_contains_native_turn() {
         with_temp_home_and_cache(|_| {
             let chats = NativeChats::new();
+            let (tx, rx) = mpsc::channel();
             let id = chats
-                .start_with_engine("hello vault", NativeEngine::saying("ok"), |_| {})
+                .start_with_engine("hello vault", NativeEngine::saying("ok"), move |event| {
+                    let _ = tx.send(event);
+                })
                 .expect("start");
             let path = chats.path_for(&id).expect("native path");
             assert!(
                 path.starts_with(NATIVE_SESSION_PREFIX),
                 "path must be Rhizome-owned"
             );
+            wait_for_turn_end(&rx);
             let record = wait_for_indexed_session(&path);
             assert!(record
                 .turns
@@ -1243,11 +1276,6 @@ mod tests {
                 .turns
                 .iter()
                 .any(|turn| { turn.role == "assistant" && turn.text == "ok" }));
-            let _ = IndexedTranscriptTurn {
-                message_index: 0,
-                role: "user".into(),
-                text: String::new(),
-            };
         });
     }
 
@@ -1365,10 +1393,10 @@ mod tests {
                 .iter()
                 .any(|event| matches!(event, EngineEvent::TurnEnd))
             {
-                break;
+                return seen;
             }
         }
-        seen
+        panic!("turn never ended: {seen:?}");
     }
 
     #[test]
@@ -1732,10 +1760,14 @@ mod tests {
     fn delete_removes_the_log_and_the_index_entry() {
         with_temp_home_and_cache(|_| {
             let chats = NativeChats::new();
+            let (tx, rx) = mpsc::channel();
             let id = chats
-                .start_with_engine("delete me", NativeEngine::saying("ok"), |_| {})
+                .start_with_engine("delete me", NativeEngine::saying("ok"), move |event| {
+                    let _ = tx.send(event);
+                })
                 .expect("start");
             let path = chats.path_for(&id).expect("native path");
+            wait_for_turn_end(&rx);
             let _indexed = wait_for_indexed_session(&path);
             let log_path = crate::engines::native_log::session_log_path(&id).expect("log");
             assert!(log_path.exists(), "log should exist before delete");
