@@ -89,6 +89,10 @@ pub enum AiAgentStreamEvent {
     Error {
         message: String,
     },
+    /// Non-fatal warning. Chat continues; the transcript can show the notice.
+    Notice {
+        message: String,
+    },
     /// Steering / follow-up queue depth changed. Lets the composer show
     /// "2 queued" without tracking its own sends.
     QueueUpdate {

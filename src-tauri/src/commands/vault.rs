@@ -318,6 +318,34 @@ mod tests {
     }
 
     #[test]
+    fn check_vault_exists_succeeds_when_prime_dir_is_not_writable() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(dir.path().join("note.md"), "# Note\n").unwrap();
+        std::fs::write(dir.path().join(".prime"), "blocked").unwrap();
+        assert!(check_vault_exists(dir.path().to_string_lossy().to_string()));
+        assert!(!dir
+            .path()
+            .join(".prime/agent/skills/rhizome-vault/SKILL.md")
+            .exists());
+    }
+
+    #[tokio::test]
+    async fn list_vault_succeeds_when_prime_dir_is_not_writable() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(dir.path().join("note.md"), "# Note\n").unwrap();
+        std::fs::write(dir.path().join(".prime"), "blocked").unwrap();
+        let entries = list_vault(dir.path().to_path_buf())
+            .await
+            .expect("listing a vault must not write .prime/");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].title, "Note");
+        assert!(!dir
+            .path()
+            .join(".prime/agent/skills/rhizome-vault/SKILL.md")
+            .exists());
+    }
+
+    #[test]
     fn test_is_wiki_vault_true_for_marker_file() {
         let dir = tempfile::TempDir::new().unwrap();
         std::fs::write(dir.path().join("RHIZOME_VAULT.md"), "# Rhizome Vault\n").unwrap();

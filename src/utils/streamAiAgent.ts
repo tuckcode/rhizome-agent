@@ -15,6 +15,7 @@ type AiAgentStreamEvent =
   | { kind: 'ToolStart'; tool_name: string; tool_id: string; input?: string }
   | { kind: 'ToolDone'; tool_id: string; output?: string }
   | { kind: 'Error'; message: string }
+  | { kind: 'Notice'; message: string }
   | { kind: 'QueueUpdate'; queued: number }
   | { kind: 'Compaction'; phase: string; reason?: string; tokens_before?: number }
   | { kind: 'TurnBoundary' }
@@ -96,6 +97,9 @@ function handleStreamEvent(data: AiAgentStreamEvent, callbacks: AgentStreamCallb
       return
     case 'Error':
       callbacks.onError(data.message)
+      return
+    case 'Notice':
+      callbacks.onNotice?.(data.message)
       return
     case 'Compaction':
       callbacks.onCompaction?.(data.phase, data.reason, data.tokens_before)
