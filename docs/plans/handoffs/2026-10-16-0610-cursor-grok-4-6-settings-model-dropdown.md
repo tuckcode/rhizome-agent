@@ -31,3 +31,10 @@ Out of scope. Seed catalog still lists every non-Anthropic default plus
 Free tier. Live `discover_ai_models` only fills local / configured
 providers. Gemini as the trigger label is the saved selection, not a
 one-item menu.
+
+## Review follow-up
+
+Portal tests walk ancestors for `overflow-hidden` / `overflow-clip` and
+computed/inline `overflow` `hidden`/`clip`, require `document.body`, and
+keep the selected row outside `[data-slot=dialog-content]`. Review PNGs:
+`docs/screenshots/pr-178/`.

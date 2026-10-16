@@ -942,6 +942,42 @@ describe('SettingsPanel', () => {
     expect(screen.queryByTestId('settings-default-ai-agent')).not.toBeInTheDocument()
   })
 
+  /**
+   * jsdom has no layout, so visibility cannot prove a menu escaped a clip.
+   * Walk parents (not the menu itself — it uses overflow-y-auto) and require
+   * no overflow-hidden / overflow-clip ancestor, including inline overflow
+   * styles. The menu must sit on document.body.
+   */
+  function clipsDescendants(node: HTMLElement): boolean {
+    if (node.classList.contains('overflow-hidden') || node.classList.contains('overflow-clip')) {
+      return true
+    }
+    const computed = window.getComputedStyle(node)
+    const values = [
+      node.style.overflow,
+      node.style.overflowX,
+      node.style.overflowY,
+      computed.overflow,
+      computed.overflowX,
+      computed.overflowY,
+    ]
+    return values.some((value) => value === 'hidden' || value === 'clip')
+  }
+
+  function clippingAncestor(node: HTMLElement): HTMLElement | null {
+    let current = node.parentElement
+    while (current && current !== document.body && current !== document.documentElement) {
+      if (clipsDescendants(current)) return current
+      current = current.parentElement
+    }
+    return null
+  }
+
+  function expectMenuInPortal(menu: HTMLElement) {
+    expect(document.body.contains(menu)).toBe(true)
+    expect(clippingAncestor(menu)).toBeNull()
+  }
+
   it('opens the model menu in a portal outside the settings overflow box and selects a model', async () => {
     render(
       <SettingsPanel
@@ -961,21 +997,30 @@ describe('SettingsPanel', () => {
     )
 
     const menu = await screen.findByTestId('native-chat-model-menu')
-    expect(menu).toBeVisible()
+    expectMenuInPortal(menu)
     expect(menu).toHaveAttribute('data-settings-panel-portal', 'true')
     expect(menu.className).toMatch(/z-\[12000\]/)
 
     const settings = screen.getByTestId('settings-panel')
+    const dialog = settings.querySelector('[role="dialog"]')
     const overflow = settings.querySelector('.overflow-auto')
     const clipGroup = trigger.closest('.overflow-hidden')
+    expect(dialog).toBeInstanceOf(HTMLElement)
     expect(overflow).not.toBeNull()
     expect(clipGroup).not.toBeNull()
+    expect((dialog as HTMLElement).contains(menu)).toBe(false)
     expect(overflow?.contains(menu)).toBe(false)
     expect(clipGroup?.contains(menu)).toBe(false)
     expect(settings.contains(menu)).toBe(false)
-    expect(document.body.contains(menu)).toBe(true)
 
-    fireEvent.click(screen.getByTestId('native-chat-model-open_ai/gpt-4.1-mini'))
+    const option = await screen.findByTestId('native-chat-model-open_ai/gpt-4.1-mini')
+    expect(clippingAncestor(option)).toBeNull()
+    expect((dialog as HTMLElement).contains(option)).toBe(false)
+    expect(overflow?.contains(option)).toBe(false)
+    expect(clipGroup?.contains(option)).toBe(false)
+    await act(async () => {
+      fireEvent.click(option)
+    })
     expect(trigger).toHaveTextContent('OpenAI · gpt-4.1-mini')
   })
 
