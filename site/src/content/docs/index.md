@@ -15,9 +15,9 @@ Rhizome is a desktop app for working with an AI agent. What's worth keeping ends
 ## What you get
 
 - **Memory you can read.** Save an answer to the vault with one click. It becomes a Markdown file. In a Git repository, every change is a commit you can undo. [Your vault is the agent's memory](concepts/vault-as-memory.md)
-- **A replay of where the agent went.** Mycelium can draw the folder an optional Prime run worked in as a map, and light up each file that run searched, read or edited. [Mycelium](concepts/mycelium.md)
+- **A replay of where the agent went.** Mycelium draws the folder a Prime run worked in as a map, and lights up each file the agent searched, read or edited. [Mycelium](concepts/mycelium.md)
 - **Free models that switch for you.** With **Free tier (auto)**, Rhizome routes a chat across free hosted models. When a provider fails or runs out, it moves to the next one. [Free models and routing](concepts/free-models-and-routing.md)
-- **Its own agent loop.** Rhizome sends your message to a model, runs the tools the model asks for, and repeats until the answer is done. Prime Agent and Hermes are optional engines, not required. [Agents, engines and models](concepts/ai.md)
+- **Its own agent loop, or Prime.** Rhizome has its own agent loop: it sends your message to a model, runs the tools the model asks for, and repeats until the answer is done. Prime Agent is still the default engine for Chat. [Agents, engines and models](concepts/ai.md)
 
 It also has what you'd expect from a harness and a notes app: sessions you can resume, permission modes for tools, your choice of model, a rich Markdown editor, PDF and image previews, a wiki graph, and Git built in.
 

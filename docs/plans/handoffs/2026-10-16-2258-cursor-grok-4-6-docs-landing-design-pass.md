@@ -33,12 +33,14 @@ code or `docs/HANDOFF.md`. Did not run `pnpm agent-docs`.
 PR push diffs against `origin/main`, and the skip path runs `website/build.sh`
 instead of `pnpm docs:build` (that script writes `src-tauri/resources/agent-docs`).
 
-## Copy (same PR)
+## Copy (same PR, then corrected)
 
-Landing and Starlight no longer present Rhizome as a Prime client. Chat
-runs on Rhizome's engine. Prime Agent and Hermes are optional. Prime
-`/login` / **Sign in** is documented only under optional Prime setup.
-Dropped "Chat with Prime" in Mycelium. Did not touch app code or
-`src-tauri/resources/agent-docs`.
+A follow-up rewrote Starlight as if Prime were not the default. Restored
+the factual lines: Prime is still the default Chat engine, and
+`install.sh` still fetches it (`Why Rhizome` § What it isn't yet, the
+Install page, landing Run it). Marketing/brand only: no baked
+"Chat with Prime" subline, no AGENT wordmark, no unapproved slogan, no
+3D molecule. A later PR will change the default engine; docs update
+after that. Did not touch app code.
 
 Review shots: `docs/review-shots/docs-pass/`.

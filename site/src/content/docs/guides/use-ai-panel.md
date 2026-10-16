@@ -11,7 +11,7 @@ Chat is where you work with the agent: ask, let it use tools, keep what's worth 
 2. Attach a vault if you want the agent to read your notes or save to them.
 3. Type a message and press Enter.
 
-Turn **Chat engine** on in Settings → AI Agents so Rhizome's own engine answers. Prime Agent is optional. See [Agents, engines and models](../concepts/ai.md).
+Which engine answers depends on **Chat engine** in Settings → AI Agents: Prime Agent (the default) or Rhizome's own engine. See [Agents, engines and models](../concepts/ai.md).
 
 ## While a reply is running
 
@@ -55,12 +55,12 @@ Prime always runs as Power User, with its local tools and no sandbox. See [Agent
 
 ## Requests that work well
 
-With Rhizome's engine, which can create notes but not read them yet:
-
-- "Write up these meeting notes as a note called *Weekly sync*."
-
-With Prime as an optional engine, which can read and search the vault:
+With Prime, which can read and search the vault:
 
 - "Find notes related to this project and summarize what's open."
 - "Draft a weekly review from the notes linked here."
 - "What did we decide about X? Check the vault."
+
+With Rhizome's engine, which can create notes but not read them yet:
+
+- "Write up these meeting notes as a note called *Weekly sync*."

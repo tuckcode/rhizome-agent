@@ -55,7 +55,7 @@ Each step has a 45-second budget for retries. Your own endpoint is still tried a
 - Free tiers change. A provider's limits, terms and models are set by that provider, not by Rhizome.
 - Some free tiers are for prototyping and evaluation only.
 - Settings doesn't show each provider's terms or training policy. Models that train on prompts are left out automatically, but check a provider's terms yourself before using it for real work.
-- Anthropic models aren't offered by Rhizome's own engine yet. Claude is not required to use Rhizome. If you want it, you can use Prime as an optional engine and sign in on the Anthropic card in Settings → AI Agents → Local agent. See [Agents, engines and models](ai.md).
+- Anthropic models aren't offered by Rhizome's own engine yet. To use Claude, use Prime and sign in on the Anthropic card in Settings → AI Agents → Local agent. See [Agents, engines and models](ai.md).
 
 ## Credits
 

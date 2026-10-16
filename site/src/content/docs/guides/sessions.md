@@ -9,12 +9,12 @@ A **session** is one chat with the agent. Rhizome lists your sessions on the lef
 
 Which kind you get depends on the engine that ran the chat. See [Agents, engines and models](../concepts/ai.md).
 
-| | Chats on Rhizome's engine | Prime sessions (optional) |
+| | Prime sessions | Chats on Rhizome's engine |
 |---|---|---|
-| Kept in | `native-sessions/` in the app config folder | `~/.prime/agent/sessions/` |
-| Owned by | Rhizome | Prime |
-| Titles | Made automatically from the first exchange | From Prime |
-| In Mycelium | No | Yes |
+| Kept in | `~/.prime/agent/sessions/` | `native-sessions/` in the app config folder |
+| Owned by | Prime | Rhizome |
+| Titles | From Prime | Made automatically from the first exchange |
+| In Mycelium | Yes | No |
 
 ## Resume a chat
 

@@ -36,13 +36,13 @@ Git is optional, but recommended. In a Git repository, every change, including t
 
 ## 4. Send one message
 
-Turn **Chat engine** on in Settings → AI Agents so Rhizome's own engine answers. Type a message and press Enter. You should get an answer, or a clear failure:
+Type a message and press Enter. You should get an answer, or a clear failure:
 
 | You see | Do this |
 |---|---|
-| No provider key | Add a key in Settings → AI Agents → API model, or turn on a free provider. See [Set up models and keys](../guides/configure-ai-models.md) |
-| Prime is missing (only if you chose Prime) | You don't need Prime. Stay on Rhizome's engine, or see [AI agent not found](../troubleshooting/ai-agent-not-found.md) if you want Prime |
-| The Prime provider login expired (only if you chose Prime) | Settings → AI Agents → Local agent → **Reconnect** on that provider, or run `prime-agent` and `/login` in a terminal |
+| Prime is installed, but Chat still says it's missing | Wait a few seconds. The check repeats |
+| No provider key (Rhizome's engine) | Add a key in Settings → AI Agents → API model, or turn on a free provider. See [Set up models and keys](../guides/configure-ai-models.md) |
+| The provider login expired (Prime) | Settings → AI Agents → Local agent → **Reconnect** on that provider, or run `prime-agent` and `/login` in a terminal |
 
 More cases: [Chat doesn't answer](../troubleshooting/chat-doesnt-answer.md).
 
